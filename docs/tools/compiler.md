@@ -46,6 +46,24 @@ Limit the number of compilation errors reported. Useful for large projects with 
 onionc -maxErrorReport 10 MyProgram.on
 ```
 
+### `-super <super class>`
+
+Specify the class a top-level script's synthesized class extends. Only meaningful when
+the source has no explicit class declaration.
+
+```bash
+onionc -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+Show timing for each compilation phase (parsing, rewriting, type checking, code
+generation) as it runs.
+
+```bash
+onionc --verbose MyProgram.on
+```
+
 ### `--dump-ast`
 
 Print the parsed AST to stderr. Useful when debugging syntax and parsing.
@@ -125,6 +143,15 @@ count widens the search for others.
 ```bash
 onionc --law-samples 500 MyProgram.on
 onionc --law-seed 7 MyProgram.on
+```
+
+### `--effects`
+
+Print each compiled method's inferred effect set (`read write net exec env clock rand
+console unknown`; empty means pure) to stderr.
+
+```bash
+onionc --effects MyProgram.on
 ```
 
 ## Examples

@@ -1,0 +1,261 @@
+// WeatherReport — 28 days of weather data: aggregation, trend analysis, and
+// per-week summaries. Exercises records with methods, data-carrying enum,
+// interface, classes, extension methods on Double and String, collection
+// pipelines (filter/map/fold/sortedBy/distinct/partition/reduce/take/drop/
+// zip/flatten), string interpolation, select pattern matching, and recursion.
+
+// ── Alert level (data-carrying enum) ─────────────────────────────────────────
+
+enum AlertLevel(label: String, order: Int) {
+  NONE("Normal", 0), ADVISORY("Advisory", 1), WARNING("Warning", 2), EMERGENCY("Emergency", 3)
+}
+
+// ── Daily reading record ──────────────────────────────────────────────────────
+
+record DailyReading(
+  day: Int,
+  tempHigh: Double,
+  tempLow: Double,
+  precipitation: Double,
+  windKph: Double
+) {
+public:
+  def tempMid(): Double = (tempHigh() + tempLow()) / 2.0
+  def tempRange(): Double = tempHigh() - tempLow()
+  def isRainy(): Boolean = precipitation() > 0.1
+
+  def alert(): AlertLevel {
+    if windKph() >= 90.0 { return AlertLevel::EMERGENCY }
+    if windKph() >= 60.0 || tempHigh() >= 38.0 { return AlertLevel::WARNING }
+    if windKph() >= 40.0 || precipitation() >= 20.0 { return AlertLevel::ADVISORY }
+    return AlertLevel::NONE
+  }
+}
+
+// ── Week summary record ───────────────────────────────────────────────────────
+
+record WeekSummary(week: Int, avgTemp: Double, totalRain: Double, alertDays: Int) {
+public:
+  def label(): String =
+    "Week #{week()}: avg #{avgTemp()}°C  rain #{totalRain()}mm  alerts #{alertDays()}"
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def summary(): String
+  def meanTemp(): Double
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+
+extension Double {
+  def r1(): Double = (Math::round(self * 10.0) as Double) / 10.0
+  def r2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def degStr(): String = "" + self.r1() + "°C"
+}
+
+// ── Extension methods on String ───────────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    var s = ""
+    foreach i: Int in 1..n { s = s + self }
+    return s
+  }
+}
+
+// ── MonthData class ───────────────────────────────────────────────────────────
+
+class MonthData conforms Reportable {
+  val monthName_: String
+  val readings_: List[DailyReading]
+public:
+  def this(name: String, rs: List[DailyReading]) {
+    this.monthName_ = name
+    this.readings_ = rs
+  }
+
+  def name(): String = monthName_
+  def readings(): List[DailyReading] = readings_
+
+  def meanTemp(): Double {
+    if readings_.size == 0 { return 0.0 }
+    val total = readings_.fold(0.0) { acc, r =>
+      (acc as Double) + (r as DailyReading).tempMid()
+    }
+    return (total as Double) / readings_.size
+  }
+
+  def summary(): String =
+    "#{monthName_}: mean #{meanTemp().degStr()}, #{readings_.size} days of data"
+}
+
+// ── Helper: build a WeekSummary from a slice of readings ─────────────────────
+
+def buildWeek(week: Int, rs: List[DailyReading]): WeekSummary {
+  if rs.size == 0 { return new WeekSummary(week, 0.0, 0.0, 0) }
+  val sumT = rs.fold(0.0) { acc, r => (acc as Double) + (r as DailyReading).tempMid() }
+  val sumP = rs.fold(0.0) { acc, r => (acc as Double) + (r as DailyReading).precipitation() }
+  val alerts = rs.filter { r => (r as DailyReading).alert().order() > 0 }.size
+  return new WeekSummary(week, ((sumT as Double) / rs.size).r1(), (sumP as Double).r1(), alerts)
+}
+
+// ── 3-day moving average (recursive) ─────────────────────────────────────────
+
+def movAvg3(rs: List[DailyReading], idx: Int): Double {
+  val n = rs.size
+  if n == 0 { return 0.0 }
+  val clamped = if idx < 0 { 0 } else if idx >= n { n - 1 } else { idx }
+  val a = if clamped > 0 { (rs.get(clamped - 1) as DailyReading).tempMid() } else { 0.0 }
+  val b = (rs.get(clamped) as DailyReading).tempMid()
+  val c = if clamped < n - 1 { (rs.get(clamped + 1) as DailyReading).tempMid() } else { 0.0 }
+  val cnt = if clamped == 0 || clamped == n - 1 { 2.0 } else { 3.0 }
+  return ((a + b + c) / cnt).r1()
+}
+
+// ── 28-day data for April ─────────────────────────────────────────────────────
+
+val readings: List[DailyReading] = [
+  new DailyReading( 1, 22.1, 14.5,  0.0, 15.0),
+  new DailyReading( 2, 19.3, 12.1,  8.5, 25.0),
+  new DailyReading( 3, 17.2, 11.0, 12.3, 38.0),
+  new DailyReading( 4, 20.5, 13.2,  0.0, 20.0),
+  new DailyReading( 5, 24.0, 15.6,  0.0, 10.0),
+  new DailyReading( 6, 26.3, 17.1,  0.0,  8.0),
+  new DailyReading( 7, 21.8, 14.3,  5.2, 30.0),
+  new DailyReading( 8, 18.4, 10.9, 18.7, 55.0),
+  new DailyReading( 9, 16.1,  9.5, 22.4, 65.0),
+  new DailyReading(10, 19.7, 12.3,  2.1, 28.0),
+  new DailyReading(11, 23.5, 15.8,  0.0, 12.0),
+  new DailyReading(12, 27.2, 18.4,  0.0,  9.0),
+  new DailyReading(13, 28.9, 19.2,  0.0,  7.0),
+  new DailyReading(14, 25.1, 16.7,  0.0, 18.0),
+  new DailyReading(15, 21.4, 13.9,  4.8, 35.0),
+  new DailyReading(16, 17.8, 10.5, 15.3, 62.0),
+  new DailyReading(17, 16.3,  9.1, 19.6, 72.0),
+  new DailyReading(18, 20.1, 12.7,  0.0, 22.0),
+  new DailyReading(19, 24.7, 16.3,  0.0, 11.0),
+  new DailyReading(20, 29.4, 20.1,  0.0,  5.0),
+  new DailyReading(21, 31.2, 21.3,  0.0,  8.0),
+  new DailyReading(22, 33.5, 22.8,  0.0, 15.0),
+  new DailyReading(23, 28.3, 18.7,  3.2, 40.0),
+  new DailyReading(24, 24.6, 15.9,  9.8, 48.0),
+  new DailyReading(25, 22.1, 14.2,  6.5, 38.0),
+  new DailyReading(26, 20.5, 12.8, 11.2, 55.0),
+  new DailyReading(27, 19.3, 11.4, 14.7, 70.0),
+  new DailyReading(28, 22.8, 14.9,  2.3, 30.0)
+]
+
+val month = new MonthData("April", readings)
+IO::println("=".rep(42))
+IO::println(month.summary())
+IO::println("=".rep(42))
+IO::println("")
+
+// ── 1. Total precipitation (fold) ────────────────────────────────────────────
+val totalRain = readings.fold(0.0) { acc, r =>
+  (acc as Double) + (r as DailyReading).precipitation()
+}
+IO::println("total precipitation: #{(totalRain as Double).r1()}mm")
+
+// ── 2. Hottest and coldest days (reduce) ─────────────────────────────────────
+val hottest = readings.reduce { a, b =>
+  if (a as DailyReading).tempHigh() >= (b as DailyReading).tempHigh() { a } else { b }
+}
+val coldest = readings.reduce { a, b =>
+  if (a as DailyReading).tempLow() <= (b as DailyReading).tempLow() { a } else { b }
+}
+val hd = hottest as DailyReading
+val cd = coldest as DailyReading
+IO::println("hottest: day #{hd.day()} high #{hd.tempHigh().degStr()}")
+IO::println("coldest: day #{cd.day()} low  #{cd.tempLow().degStr()}")
+IO::println("")
+
+// ── 3. Partition: rainy vs dry ────────────────────────────────────────────────
+val parts = readings.partition { r => (r as DailyReading).isRainy() }
+val rainy = parts.get(0) as List
+val dry   = parts.get(1) as List
+IO::println("rainy days: #{rainy.size}  dry days: #{dry.size}")
+
+// ── 4. Alert-day summary ──────────────────────────────────────────────────────
+val alertDays = readings.filter { r => (r as DailyReading).alert().order() > 0 }
+IO::println("alert days: #{alertDays.size}")
+foreach r: Object in alertDays {
+  val dr = r as DailyReading
+  IO::println("  day #{dr.day()}: #{dr.alert().label()} (wind #{dr.windKph()}kph, rain #{dr.precipitation()}mm)")
+}
+IO::println("")
+
+// ── 5. Top-5 warmest (sortedBy + take) ───────────────────────────────────────
+IO::println("top 5 warmest days:")
+val top5warm = readings.sortedBy { r => 0.0 - (r as DailyReading).tempHigh() }.take(5)
+foreach r: Object in top5warm {
+  val dr = r as DailyReading
+  IO::println("  day #{dr.day()}: #{dr.tempHigh().degStr()} (range #{dr.tempRange().r1()}°)")
+}
+IO::println("")
+
+// ── 6. Last 7 days (drop) ────────────────────────────────────────────────────
+val last7 = readings.drop(21)
+val last7total = last7.fold(0.0) { acc, r =>
+  (acc as Double) + (r as DailyReading).tempMid()
+}
+IO::println("last-7-day mean: #{((last7total as Double) / last7.size).r1()}°C")
+
+// ── 7. Zip: day-index with temp (first week) ─────────────────────────────────
+val dayNums: List[Int] = []
+foreach i: Int in 1..7 { dayNums << i }
+val week1Temps = readings.take(7).map { r => (r as DailyReading).tempMid().r1() }
+val zipped = dayNums.zip(week1Temps)
+IO::println("week-1 midpoint temps:")
+foreach pair: Object in zipped {
+  val p = pair as List
+  IO::println("  Apr #{p.get(0)}: #{p.get(1)}°C")
+}
+IO::println("")
+
+// ── 8. Per-week summaries (take + drop) ──────────────────────────────────────
+val w1 = buildWeek(1, readings.take(7))
+val w2 = buildWeek(2, readings.drop(7).take(7))
+val w3 = buildWeek(3, readings.drop(14).take(7))
+val w4 = buildWeek(4, readings.drop(21))
+IO::println("week summaries:")
+IO::println("  " + w1.label())
+IO::println("  " + w2.label())
+IO::println("  " + w3.label())
+IO::println("  " + w4.label())
+IO::println("")
+
+// ── 9. Flatten: week avg temps as one list ────────────────────────────────────
+val weekAvgs = [[w1.avgTemp()], [w2.avgTemp()], [w3.avgTemp()], [w4.avgTemp()]]
+val allAvgs = weekAvgs.flatten()
+IO::println("weekly avg temps: " + allAvgs.toString())
+
+// ── 10. Distinct alert labels seen ────────────────────────────────────────────
+val alertsSeen = readings.map { r => (r as DailyReading).alert().label() }.distinct()
+IO::println("alert levels: " + alertsSeen.toString())
+
+// ── 11. 3-day moving average (recursive function) ────────────────────────────
+IO::println("3-day moving avg mid-month (days 13-17):")
+foreach i: Int in 12..16 {
+  IO::println("  day #{i + 1}: #{movAvg3(readings, i)}°C")
+}
+IO::println("")
+
+// ── 12. Select on alert level ────────────────────────────────────────────────
+def alertDesc(al: AlertLevel): String {
+  select al {
+    case AlertLevel::NONE:      return "no action required"
+    case AlertLevel::ADVISORY:  return "be aware of conditions"
+    case AlertLevel::WARNING:   return "take precautions"
+    case AlertLevel::EMERGENCY: return "seek shelter immediately"
+  }
+  return "unknown"
+}
+IO::println("ADVISORY means: " + alertDesc(AlertLevel::ADVISORY))
+IO::println("WARNING means:  " + alertDesc(AlertLevel::WARNING))
+
+// ── 13. String extension demo ─────────────────────────────────────────────────
+IO::println("-".rep(42))
+IO::println("report complete")

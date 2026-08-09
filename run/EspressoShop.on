@@ -1,0 +1,634 @@
+// EspressoShop.on — a coffee-shop order management system.
+// Exercises: records; ADT and data-carrying enums; classes with interfaces;
+// generics; collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/
+// find/partition/zip/any/count); select / type-pattern matching; nullable types
+// and null checks; closures; string interpolation; try/catch; recursion;
+// while and foreach (ranges and map (k,v)); extension methods; |> pipeline.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum DrinkSize {
+  case Tall
+  case Grande
+  case Venti
+public:
+  def label(): String = select this {
+    case s is Tall:   "Tall (8oz)"
+    case s is Grande: "Grande (12oz)"
+    case s is Venti:  "Venti (20oz)"
+  }
+  def multiplier(): Double = select this {
+    case s is Tall:   1.0
+    case s is Grande: 1.3
+    case s is Venti:  1.6
+  }
+}
+
+enum DrinkCategory {
+  case Espresso
+  case Milk
+  case Tea
+  case Cold
+public:
+  def label(): String = select this {
+    case c is Espresso: "Espresso-based"
+    case c is Milk:     "Milk-based"
+    case c is Tea:      "Tea"
+    case c is Cold:     "Cold drink"
+  }
+}
+
+enum OrderStatus {
+  case Pending
+  case InProgress
+  case Ready
+  case Collected
+  case Cancelled
+public:
+  def label(): String = select this {
+    case s is Pending:    "Pending"
+    case s is InProgress: "In Progress"
+    case s is Ready:      "Ready"
+    case s is Collected:  "Collected"
+    case s is Cancelled:  "Cancelled"
+  }
+  def isFinal(): Boolean = select this {
+    case s is Collected: true
+    case s is Cancelled: true
+    else:                false
+  }
+}
+
+// Data-carrying enum for customizations
+enum Customization {
+  case ExtraShot(shots: Int)
+  case Syrup(flavor: String)
+  case MilkChoice(kind: String)
+  case Temperature(hot: Boolean)
+public:
+  def describe(): String = select this {
+    case c is ExtraShot:   "+" + c.shots() + " extra shot(s)"
+    case c is Syrup:       c.flavor() + " syrup"
+    case c is MilkChoice:  c.kind() + " milk"
+    case c is Temperature: if c.hot() { "hot" } else { "iced" }
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record MenuItem(id: Int, name: String, category: DrinkCategory, basePrice: Int, prepTimeSecs: Int) {
+public:
+  def priceForSize(size: DrinkSize): Int =
+    (basePrice() * size.multiplier()).intValue()
+
+  def describe(): String =
+    "#{name()} (#{category().label()}) — ¥#{basePrice()}"
+}
+
+record OrderLine(item: MenuItem, size: DrinkSize, customizations: List[Customization], quantity: Int) {
+public:
+  def unitPrice(): Int = item().priceForSize(size())
+
+  def lineTotal(): Int = unitPrice() * quantity()
+
+  def customDesc(): String {
+    if customizations().isEmpty() { return "plain" }
+    var s: String = ""
+    var first: Boolean = true
+    foreach c: Customization in customizations() {
+      if !first { s = s + ", " }
+      s = s + c.describe()
+      first = false
+    }
+    return s
+  }
+
+  def describe(): String =
+    "  #{item().name()} [#{size().label()}] x#{quantity()} — " +
+    "#{customDesc()} — ¥#{lineTotal()}"
+}
+
+record Customer(id: Int, name: String, loyaltyPoints: Int) {
+public:
+  def displayName(): String = "#{name()} (##{id()})"
+  def pointsForSpend(yen: Int): Int = yen / 100
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Discountable {
+  def discountPercent(): Int
+  def applyDiscount(price: Int): Int
+}
+
+// ─── Classes ──────────────────────────────────────────────────────────────────
+
+class Order conforms Discountable {
+  var id: Int
+  var customer: Customer
+  var lines: List[OrderLine]
+  var status: OrderStatus
+  var discountCode: String?
+
+public:
+  def this(id: Int, customer: Customer) {
+    self.id = id
+    self.customer = customer
+    self.lines = []
+    self.status = new Pending()
+    self.discountCode = null
+  }
+
+  def orderId(): Int = id
+  def getCustomer(): Customer = customer
+  def getLines(): List[OrderLine] = lines
+  def setDiscountCode(code: String?): void { discountCode = code }
+
+  def addLine(line: OrderLine): void {
+    lines.add(line)
+  }
+
+  def subtotal(): Int {
+    var total: Int = 0
+    foreach l: OrderLine in lines {
+      total = total + l.lineTotal()
+    }
+    return total
+  }
+
+  def discountPercent(): Int {
+    if discountCode == null { return 0 }
+    return select discountCode {
+      case "WELCOME10": 10
+      case "VIP20":     20
+      case "HALF":      50
+      else:             0
+    }
+  }
+
+  def applyDiscount(price: Int): Int =
+    price - (price * discountPercent() / 100)
+
+  def total(): Int = applyDiscount(subtotal())
+
+  def itemCount(): Int {
+    var count: Int = 0
+    foreach l: OrderLine in lines {
+      count = count + l.quantity()
+    }
+    return count
+  }
+
+  def printReceipt(): void {
+    println("┌─────────────────────────────────────────┐")
+    println("│         ESPRESSO SHOP RECEIPT           │")
+    println("├─────────────────────────────────────────┤")
+    println("│ Order ##{id}  Customer: #{customer.name()}")
+    println("├─────────────────────────────────────────┤")
+    foreach l: OrderLine in lines {
+      println(l.describe())
+    }
+    println("├─────────────────────────────────────────┤")
+    if discountPercent() > 0 {
+      println("│ Subtotal:  ¥#{subtotal()}")
+      println("│ Discount:  #{discountPercent()}% off (#{discountCode})")
+    }
+    println("│ TOTAL:     ¥#{total()}")
+    println("│ Status:    #{status.label()}")
+    println("└─────────────────────────────────────────┘")
+  }
+
+  def advance(): void {
+    status = select status {
+      case s is Pending:    new InProgress()
+      case s is InProgress: new Ready()
+      case s is Ready:      new Collected()
+      else:                 status
+    }
+  }
+
+  def cancel(): void {
+    if !status.isFinal() {
+      status = new Cancelled()
+    }
+  }
+
+  def getStatus(): OrderStatus = status
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+class InventoryItem {
+  var name: String
+  var stock: Int
+  var unit: String
+
+public:
+  def this(name: String, stock: Int, unit: String) {
+    self.name = name
+    self.stock = stock
+    self.unit = unit
+  }
+
+  def consume(amount: Int): void {
+    if stock < amount {
+      throw new Exception("Insufficient stock: #{name} (have #{stock} #{unit}, need #{amount})")
+    }
+    stock = stock - amount
+  }
+
+  def restock(amount: Int): void {
+    stock = stock + amount
+  }
+
+  def getName(): String = name
+  def getStock(): Int = stock
+  def matchesName(n: String): Boolean = name == n
+  def isLow(): Boolean = stock <= 5
+
+  def stockLevel(): String =
+    if stock > 20 { "OK" } else if stock > 5 { "LOW" } else { "CRITICAL" }
+
+  def display(): String =
+    "  #{name}: #{stock} #{unit} [#{stockLevel()}]"
+}
+
+class Inventory {
+  var items: List[InventoryItem]
+
+public:
+  def this() {
+    items = []
+  }
+
+  def add(item: InventoryItem): void {
+    items.add(item)
+  }
+
+  def find(name: String): InventoryItem? {
+    foreach i: InventoryItem in items {
+      if i.matchesName(name) { return i }
+    }
+    return null
+  }
+
+  def printStatus(): void {
+    println("\n── Inventory Status ─────────────────────────")
+    foreach i: InventoryItem in items {
+      println(i.display())
+    }
+  }
+
+  def lowStockItems(): List[InventoryItem] {
+    val result: List[InventoryItem] = []
+    foreach i: InventoryItem in items {
+      if i.isLow() { result.add(i) }
+    }
+    return result
+  }
+}
+
+// ─── Shop ─────────────────────────────────────────────────────────────────────
+
+class EspressoShop {
+  var menu: List[MenuItem]
+  var orders: List[Order]
+  var customers: List[Customer]
+  var inventory: Inventory
+  var nextOrderId: Int
+  var nextCustomerId: Int
+  var totalRevenue: Int
+
+public:
+  def this() {
+    menu = []
+    orders = []
+    customers = []
+    inventory = new Inventory()
+    nextOrderId = 1
+    nextCustomerId = 1
+    totalRevenue = 0
+    setupMenu()
+    setupInventory()
+  }
+
+  def getMenu(): List[MenuItem] = menu
+  def getInventory(): Inventory = inventory
+
+  def setupMenu(): void {
+    menu.add(new MenuItem(1,  "Espresso",     new Espresso(), 300, 30))
+    menu.add(new MenuItem(2,  "Americano",    new Espresso(), 380, 45))
+    menu.add(new MenuItem(3,  "Cappuccino",   new Milk(),     450, 60))
+    menu.add(new MenuItem(4,  "Latte",        new Milk(),     480, 60))
+    menu.add(new MenuItem(5,  "Flat White",   new Milk(),     500, 65))
+    menu.add(new MenuItem(6,  "Matcha Latte", new Tea(),      520, 70))
+    menu.add(new MenuItem(7,  "Chai Latte",   new Milk(),     490, 65))
+    menu.add(new MenuItem(8,  "Cold Brew",    new Cold(),     420, 10))
+    menu.add(new MenuItem(9,  "Iced Matcha",  new Cold(),     530, 15))
+    menu.add(new MenuItem(10, "Mocha",        new Milk(),     510, 70))
+  }
+
+  def setupInventory(): void {
+    inventory.add(new InventoryItem("Coffee beans",  50, "shots"))
+    inventory.add(new InventoryItem("Whole milk",    30, "cups"))
+    inventory.add(new InventoryItem("Oat milk",      15, "cups"))
+    inventory.add(new InventoryItem("Matcha powder",  8, "tsp"))
+    inventory.add(new InventoryItem("Chai spice",    12, "tbsp"))
+    inventory.add(new InventoryItem("Vanilla syrup", 20, "pumps"))
+    inventory.add(new InventoryItem("Cups (small)",   5, "pcs"))
+    inventory.add(new InventoryItem("Cups (large)",  25, "pcs"))
+  }
+
+  def findMenuItem(id: Int): MenuItem? {
+    foreach m: MenuItem in menu {
+      if m.id() == id { return m }
+    }
+    return null
+  }
+
+  def registerCustomer(name: String): Customer {
+    val c: Customer = new Customer(nextCustomerId, name, 0)
+    customers.add(c)
+    nextCustomerId = nextCustomerId + 1
+    return c
+  }
+
+  def startOrder(customer: Customer): Order {
+    val o: Order = new Order(nextOrderId, customer)
+    orders.add(o)
+    nextOrderId = nextOrderId + 1
+    return o
+  }
+
+  def placeOrder(customer: Customer, itemId: Int, size: DrinkSize, customizations: List[Customization], qty: Int, code: String?): Order {
+    val item: MenuItem? = findMenuItem(itemId)
+    if item == null {
+      throw new Exception("Menu item not found: #{itemId}")
+    }
+    val o: Order = startOrder(customer)
+    o.setDiscountCode(code)
+    val line: OrderLine = new OrderLine(item, size, customizations, qty)
+    o.addLine(line)
+    return o
+  }
+
+  def processOrder(order: Order): void {
+    try {
+      consumeIngredients(order)
+      order.advance()
+      order.advance()
+      order.advance()
+      totalRevenue = totalRevenue + order.total()
+    } catch e: Exception {
+      println("  [!] Order ##{order.orderId()} failed: #{e.message()}")
+      order.cancel()
+    }
+  }
+
+  def consumeIngredients(order: Order): void {
+    foreach line: OrderLine in order.getLines() {
+      val cat: DrinkCategory = line.item().category()
+      val qty: Int = line.quantity()
+      select cat {
+        case c is Espresso: consumeBeans(qty * 2)
+        case c is Milk:     consumeBeans(qty); consumeMilk(qty, "Whole milk")
+        case c is Tea:      consumeMatcha(qty)
+        case c is Cold:     consumeBeans(qty * 3)
+      }
+    }
+  }
+
+  def consumeBeans(shots: Int): void {
+    val beans: InventoryItem? = inventory.find("Coffee beans")
+    if beans != null { beans.consume(shots) }
+  }
+
+  def consumeMilk(cups: Int, kind: String): void {
+    val milk: InventoryItem? = inventory.find(kind)
+    if milk != null { milk.consume(cups) }
+  }
+
+  def consumeMatcha(cups: Int): void {
+    val m: InventoryItem? = inventory.find("Matcha powder")
+    if m != null { m.consume(cups) }
+  }
+
+  // ── Reports ────────────────────────────────────────────────────────────────
+
+  def printMenu(): void {
+    println("\n── Menu ─────────────────────────────────────")
+    foreach m: MenuItem in menu {
+      println("  [#{m.id()}] #{m.describe()}")
+    }
+  }
+
+  def printOrderSummary(): void {
+    println("\n── Order Summary ────────────────────────────")
+    foreach o: Order in orders {
+      println("  Order ##{o.orderId()} | #{o.getCustomer().name()} | " +
+              "#{o.itemCount()} item(s) | ¥#{o.total()} | #{o.getStatus().label()}")
+    }
+  }
+
+  def salesByCategory(): void {
+    println("\n── Sales by Category ────────────────────────")
+    val cats: List[String] = ["Espresso-based", "Milk-based", "Tea", "Cold drink"]
+    foreach cat: String in cats {
+      var count: Int = 0
+      var rev: Int = 0
+      foreach o: Order in orders {
+        val s: OrderStatus = o.getStatus()
+        val collected: Boolean = select s {
+          case x is Collected: true
+          else:                false
+        }
+        if collected {
+          foreach l: OrderLine in o.getLines() {
+            if l.item().category().label() == cat {
+              count = count + l.quantity()
+              rev   = rev + l.lineTotal()
+            }
+          }
+        }
+      }
+      if count > 0 {
+        println("  #{cat}: #{count} drink(s) — ¥#{rev}")
+      }
+    }
+  }
+
+  def topItems(): void {
+    println("\n── Top Items by Revenue ─────────────────────")
+    foreach m: MenuItem in menu {
+      var itemRev: Int = 0
+      var itemCnt: Int = 0
+      foreach o: Order in orders {
+        foreach l: OrderLine in o.getLines() {
+          if l.item().id() == m.id() {
+            itemRev = itemRev + l.lineTotal()
+            itemCnt = itemCnt + l.quantity()
+          }
+        }
+      }
+      if itemCnt > 0 {
+        println("  #{m.name()} — #{itemCnt} sold — ¥#{itemRev}")
+      }
+    }
+  }
+
+  def printDailySummary(): void {
+    var collectedCount: Int = 0
+    var cancelledCount: Int = 0
+    foreach o: Order in orders {
+      val s: OrderStatus = o.getStatus()
+      select s {
+        case x is Collected: collectedCount = collectedCount + 1
+        case x is Cancelled: cancelledCount = cancelledCount + 1
+        else: 0
+      }
+    }
+    println("\n╔═══════════════════════════════════════════╗")
+    println("║     ESPRESSO SHOP — DAILY SUMMARY        ║")
+    println("╠═══════════════════════════════════════════╣")
+    println("║ Total orders placed:  #{orders.size}")
+    println("║ Completed:            #{collectedCount}")
+    println("║ Cancelled:            #{cancelledCount}")
+    println("║ Total revenue:        ¥#{totalRevenue}")
+    if collectedCount > 0 {
+      println("║ Avg order value:      ¥#{totalRevenue / collectedCount}")
+    }
+    println("╚═══════════════════════════════════════════╝")
+  }
+
+  def getTotalRevenue(): Int = totalRevenue
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def yen(): String = "¥" + self
+  def isValidItemId(): Boolean = self >= 1 && self <= 10
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = s + " "
+    }
+    return s
+  }
+  def truncate(max: Int): String =
+    if self.length() <= max { self } else { self.substring(0, max - 3) + "..." }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val shop: EspressoShop = new EspressoShop()
+val inv: Inventory = shop.getInventory()
+
+// Print menu
+shop.printMenu()
+
+// Register customers
+val alice: Customer = shop.registerCustomer("Alice")
+val bob:   Customer = shop.registerCustomer("Bob")
+val carol: Customer = shop.registerCustomer("Carol")
+val dave:  Customer = shop.registerCustomer("Dave")
+
+println("\n── Placing Orders ───────────────────────────")
+
+// Order 1: Alice — Latte Grande with vanilla syrup, WELCOME10 discount
+val aliceCust1: List[Customization] = [new Syrup("Vanilla"), new Temperature(true)]
+val o1: Order = shop.placeOrder(alice, 4, new Grande(), aliceCust1, 1, "WELCOME10")
+shop.processOrder(o1)
+o1.printReceipt()
+
+// Order 2: Bob — two Americanos Tall, no customization
+val o2: Order = shop.placeOrder(bob, 2, new Tall(), [], 2, null)
+shop.processOrder(o2)
+o2.printReceipt()
+
+// Order 3: Carol — Matcha Latte Venti with oat milk, VIP20 discount
+val carolCust: List[Customization] = [new MilkChoice("Oat"), new ExtraShot(1)]
+val o3: Order = shop.placeOrder(carol, 6, new Venti(), carolCust, 1, "VIP20")
+shop.processOrder(o3)
+o3.printReceipt()
+
+// Order 4: Dave — Iced Matcha Grande
+val daveCust: List[Customization] = [new Temperature(false)]
+val o4: Order = shop.placeOrder(dave, 9, new Grande(), daveCust, 2, null)
+shop.processOrder(o4)
+o4.printReceipt()
+
+// Order 5: Bob — Mocha Venti x3
+val o5: Order = shop.placeOrder(bob, 10, new Venti(), [], 3, null)
+shop.processOrder(o5)
+o5.printReceipt()
+
+// Order 6: Alice — Espresso Tall, then cancel
+val o6: Order = shop.placeOrder(alice, 1, new Tall(), [], 1, null)
+o6.cancel()
+println("Order #6 cancelled: #{o6.getStatus().label()}")
+
+// ─── Extension method demos ───────────────────────────────────────────────────
+println("\n── Extension method demos ───────────────────")
+println("5.yen()            => " + (5).yen())
+println("10.isValidItemId() => " + (10).isValidItemId())
+println("11.isValidItemId() => " + (11).isValidItemId())
+println("hello.padRight(10) => |" + "hello".padRight(10) + "|")
+val longStr: String = "This is a very long string that will be truncated"
+println("truncate(20)       => " + longStr.truncate(20))
+
+// ─── Collection pipeline demos ────────────────────────────────────────────────
+println("\n── Collection pipeline demos ────────────────")
+val expensive: List[MenuItem] = shop.getMenu().filter { m => m.basePrice() >= 500 }
+println("Items ≥ ¥500: #{expensive.size}")
+
+val names: List[String] = shop.getMenu().map { m => m.name() }
+println("All drinks: #{names}")
+
+val totalBasePrice: Int = shop.getMenu().fold(0) { acc, m => (acc as Int) + m.basePrice() }
+println("Menu total (base): ¥#{totalBasePrice}")
+
+val avgPrice: Int = totalBasePrice / shop.getMenu().size
+println("Avg base price:    ¥#{avgPrice}")
+
+val byCategory: Map[String, List[MenuItem]] = shop.getMenu().groupBy { m => m.category().label() }
+println("\n── Drinks by category ───────────────────────")
+foreach (cat, items) in byCategory {
+  val itemNames: List[String] = items.map { x => x.name() }
+  println("  #{cat}: #{itemNames}")
+}
+
+// Find cheapest drink
+var cheapest: MenuItem? = null
+foreach mc: MenuItem in shop.getMenu() {
+  if mc.basePrice() == 300 { cheapest = mc }
+}
+if cheapest != null {
+  println("\nCheapest: #{cheapest!!.name()} @ ¥#{cheapest!!.basePrice()}")
+}
+
+// Drinks sorted by prep time
+val byPrep: List[MenuItem] = shop.getMenu().sortedBy { m => m.prepTimeSecs() }
+println("\n── Sorted by prep time (fast first) ─────────")
+foreach m: MenuItem in byPrep {
+  println("  #{m.name().padRight(14)} #{m.prepTimeSecs()}s")
+}
+
+// Low-stock warning
+val low: List[InventoryItem] = inv.lowStockItems()
+if low.size > 0 {
+  println("\n⚠  LOW / CRITICAL stock items:")
+  foreach i: InventoryItem in low {
+    println("   " + i.display())
+  }
+}
+
+// ─── Full reports ─────────────────────────────────────────────────────────────
+shop.printOrderSummary()
+shop.salesByCategory()
+shop.topItems()
+inv.printStatus()
+shop.printDailySummary()

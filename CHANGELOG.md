@@ -7,6 +7,304 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.27] - 2026-08-09
+
+### Added
+
+- **`run/Sudoku.on`, a 261-line Sudoku solver with backtracking search.** Exercises
+  a flat `List[Int]` as a 2D 9×9 grid (row-major `row*9+col` indexing), records
+  with methods (`Puzzle.label`, `SolveResult.summary`), a class with a mutable
+  field and a public getter (`Solver.numSteps`/`steps()`), extension methods on
+  `Int` (`cellChar`, `boxStart`), nested `foreach` over ranges (`0..<9`, `1..9`),
+  collection pipelines (`count`/`filter`/`sortedBy`), recursion (backtracking
+  solver), and explicit `return` statements in block-body methods. Solves an easy
+  puzzle (30 givens, 4208 steps), a medium (36 givens, 54 steps), and a hard (23
+  givens, 879417 steps) with full row/column/box validation confirming each
+  solution. `SampleProgramsSpec` passes (120/120) including `Sudoku.on`.
+- **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
+  Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
+  fields, a class with public-section fields, `foreach (k, v) in map` map-entry
+  destructuring, string interpolation, and collection grouping.
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum (`Category`) with `select`-based methods, records
+  with body methods and `example` clauses, a class backed by `Map[String, Employee]`
+  and `Map[String, Double]` registries, nullable `Double?` lookups, collection
+  pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
+  methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
+- **`run/LibrarySystem.on` expanded from a 374-line stub to a 529-line library
+  management system.** Exercises extension methods on `String`/`Int`/`Double`,
+  homogeneous enums with `public:` methods (`Genre`, `MemberStatus`,
+  `LoanStatus`), records with inline `public:` methods, interface conformance
+  (`Reportable`), classes with mutable typed-list fields, in-place mutation via
+  `indexOf`/`List.set`, collection pipelines (`filter`/`map`/`fold`/`groupBy`/
+  `sortedBy`/`partition`/`zip`/`any`/`count`), `foreach (k, v) in map`, nullable
+  types with null guards, closures stored in `val`s, and a tail-recursive helper.
+
+## [0.10.26] - 2026-08-08
+
+### Added
+
+- **`run/SortingShowcase.on`, a 402-line sorting-algorithms showcase.** Implements
+  bubble, insertion, selection, merge (recursive), quick, and counting sort behind
+  a `SortKind` enum dispatched via `select`, with `TestCase`/`SortResult` records,
+  extension methods on `Int`, in-place `List[Int]` mutation, collection pipelines,
+  recursive algorithms, and `try`/`catch`.
+- **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
+  homogeneous enum (`Genre`) with public methods, an ADT case-enum
+  (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records
+  (`Book`, `MemberBook`, `Meeting`), classes backed by `List` state (`Member`,
+  `BookClub`), extension methods on `Int`, collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`reduce`),
+  `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
+  inclusive range and over `Map` entries, nullable return types, recursion,
+  and `try`/`catch`.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
+  a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
+  a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
+  `Generation.summary`/`isStable`/`isEmpty`/`delta`), extension methods on `Int`
+  (`wrapIn`, `sign`) and `String` (`padLeft`, `padRight`), a sparse
+  `Map[String,Boolean]` grid with toroidal wrapping, `foreach (k, v) in map`,
+  collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/`distinct`), and
+  closures stored in `val`s. Verified oscillators: Glider (period-4), Blinker
+  (period-2), Pulsar (period-3), and a 50-generation R-Pentomino run.
+
+- **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
+  data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
+  `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`
+  destructuring), plain enums (`Cuisine`, `MealType`, `Difficulty`), records
+  with methods and `static def of(...)` factories (`Ingredient`,
+  `NutritionInfo`, `Recipe`), extension methods on `Double`/`Int`/`String`,
+  collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`distinct`/`find`),
+  nullable types with safe calls and null coalescing, and a mutable
+  `RecipeBook` class with query and report-generation methods.
+
+- **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
+  Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
+  `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum
+  (`ReviewStatus` with `::` constant access), records with compile-time `example`
+  clauses (`ReviewMetrics`), extension methods on records, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`zip`/`distinct`),
+  nullable map lookups, `foreach (k, v) in map` destructuring, and `foreach :
+  Type in list` typed iteration.
+
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.**
+  Exercises a homogeneous enum (`CellState`), an enum with a `select`-based
+  method (`PatternKind.label()`), records with methods (`Cell.distanceTo()`,
+  `Generation.summary/isStable/isEmpty`), extension methods on `Int`
+  (`wrapIn`/`sign`) and `String` (`padLeft`/`padRight`), a `Map`-backed
+  sparse grid with toroidal wrapping, `foreach (k, v) in map`, nullable map
+  lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
+  `distinct`/`forEach`), and closures stored in `val`s. Verified against
+  canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
+
+### Fixed
+
+- **`sbt test` could hit a real JVM `OutOfMemoryError`** (in `SampleProgramsSpec`
+  and `MutationFuzzSpec`) as the `run/` corpus grew past 121 samples, wedging
+  CI on `develop` instead of failing cleanly — the same failure mode fixed at
+  0.10.17 (78 samples, `-Xmx6G`) recurring as the corpus kept growing. Raised
+  the heap headroom again, both locally (`.jvmopts`: 4g → 10g) and in CI
+  (`SBT_OPTS`: `-Xmx6G` → `-Xmx10G`); a clean run now completes in ~4 minutes
+  with room to spare. `docs/quality-bar.md` / `docs/ja/quality-bar.md` rows 2–3
+  (sample count 119→121, large-program count 62→64, adding `EspressoShop` and
+  `MusicFestival`) updated to match, fixing the two `QualityBarSpec` failures
+  those additions had left behind.
+
+## [0.10.25] - 2026-08-07
+
+### Added
+
+- **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
+  domain not previously covered by the corpus. Exercises a data-carrying enum
+  (`AlertLevel`: `NONE`/`ADVISORY`/`WARNING`/`EMERGENCY`), records with inline
+  methods (`DailyReading`, `WeekSummary`), an interface implemented by a class
+  (`Reportable`/`MonthData`), extension methods on `Double` and `String`,
+  `select` dispatch over enum cases, a recursive moving-average function, and
+  collection-pipeline operations underused elsewhere in the corpus
+  (`reduce`/`partition`/`take`/`drop`/`zip`/`flatten`/`distinct`/`sortedBy`).
+- **`run/CourseRegistration.on`, a 365-line university course registration sample.**
+  Exercises plain enums (`Department`, `Grade`) with `select` dispatch, records with
+  inline methods (`Course`, `Student`, `Enrollment`, `RankedStudent`), a class with
+  private `Map[String, T]` fields, `foreach (k, v) in map` iteration, nullable
+  (`Grade?`) fields with null-checks, an extension method on a record
+  (`Student::shortLabel`), and an in-place insertion sort over `List[RankedStudent]`.
+- **`run/RankedChoice.on`, a 312-line instant-runoff voting simulation.** Runs a
+  5-candidate/30-ballot election (4 elimination rounds) and a 3-candidate
+  "plurality != RCV" demo. Exercises records with inline methods (`Candidate`,
+  `ElectionSummary`), `foreach (k, v) in map` and `foreach v in map.values()`,
+  `break` and non-local `return` inside `foreach`, collection pipelines
+  (`filter`/`sortedBy`/`find`), `String::format` for column-aligned output, and
+  an `extension String` method.
+- **`run/StudentGradeBook.on`, a 248-line student grade management sample.**
+  Exercises records (`Course`, `Student`, `Enrollment`), a data-carrying enum
+  (`Semester(label)`), collection pipelines (`filter`/`map`/`sortedBy`/
+  `sortedByDescending`/`groupBy`/`fold`/`find`), `select` dispatch on `String`,
+  closures capturing outer `val`s, recursion (`halveDepth`), `foreach` over
+  list/map-entry/range, `while`, `try`/`catch`, and the two-step
+  `(val as Int) as Double` numeric cast pattern.
+- **`run/CensusAnalyzer.on`, a 468-line population data parsing and reporting
+  sample.** Combines features under-represented elsewhere in the corpus:
+  `from re"..."` pattern-attached record parsing (`Person`), `do[List]`
+  list-comprehension cross-tabulation, the `|>` pipeline operator, an ADT
+  `case`-enum (`AgeGroup`) alongside a homogeneous enum with methods
+  (`IncomeBracket`), a wrapper record with computed properties (`PersonExt`),
+  extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
+  `record example {}` build-time parse round-trip assertions.
+  111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
+
+### Documentation
+
+- **`docs/ja/reference/stdlib.md`'s Json Module section never mentioned `Json::value`,
+  the navigable JSON wrapper (`Value`, indexable with `[]` and read with
+  `asString`/`asInt`/`asLong`/`asDouble`/`asBoolean`/`isNull`/`size`) that
+  `docs/reference/stdlib.md` documents.** Added the missing subsection and example to
+  the Japanese page, and added `StdlibDocJsonModuleParitySpec` (same approach as
+  `StdlibDocYamlModuleParitySpec`) so this can't silently drift again.
+
+- **`docs/tools/compiler.md` and `docs/tools/script-runner.md` (and their `docs/ja`
+  translations) had no section for the real `-super <super class>` and `--verbose`
+  flags, and the `compiler.md` pair was additionally missing `--effects`** — all three
+  work today but were absent from every option reference. Added the missing sections
+  to all four pages and added `CliOptionDocCoverageSpec`, which ties each page to the
+  actual `--help` option list in `CompilerFrontend`/`ScriptRunner` so a future flag
+  added to one and not the other fails the build instead of drifting silently.
+
+## [0.10.24] - 2026-08-06
+
+### Documentation
+
+- **`docs/ja/reference/stdlib.md`'s Yaml Module section collapsed the English section's
+  four subsections (`Yaml::parse`, `Yaml::stringify`, the round-trip guarantee, and
+  `derive!(Yaml)` usage) into a single short paragraph, dropping the round-trip
+  guarantee statement and the `derive!(Yaml)` code examples (`ServerConfig`,
+  `derive!(Json, Yaml)`) entirely.** Restored the missing subsections and examples, and
+  added `StdlibDocYamlModuleParitySpec` (same subheading-count approach as
+  `StdlibDocFutureModuleParitySpec`, plus a direct check for the `derive!(Yaml)` example)
+  so this can't silently drift again.
+
+- **`docs/ja/reference/stdlib.md`'s Maps Module and Sets Module sections were missing
+  several members that `docs/reference/stdlib.md` documents** — Maps: `newMap`,
+  `getOrDefault`, `filterKeys`, `filterValues`, `toList`, `forEach`, `merge`; Sets:
+  `newSet`, `containsAll`, `forEach`. Restored the missing entries and added
+  `StdlibDocMapsSetsModuleParitySpec` (same approach as `StdlibDocStringsModuleParitySpec`)
+  so this can't silently drift again.
+
+- **`docs/ja/reference/stdlib.md`'s Strings Module section was missing 13 of the 29
+  documented `Strings::*` members** (`split`, `join`, `upper`, `lower`, `trim`, `replace`,
+  `replaceRegex`, `startsWith`, `endsWith`, `contains`, `padLeft`, `padRight`, `repeat`) —
+  the first code block was dropped during translation, leaving only the case/inspection
+  and null-safe-parsing examples. Restored it in the same grouping as the English
+  reference, and added `StdlibDocStringsModuleParitySpec` to guard against this drifting
+  again (the existing subheading-based parity specs don't cover this section, since it
+  has no `###` subheadings to count).
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0058`
+  (label not found), `E0059` (invalid regex literal), `E0060` (regex capture group /
+  binding count mismatch), `E0061` (record component type unsupported by `from
+  re"..."`), `E0062` (record component type unsupported by `derive!(Json)`), `E0063`
+  (unknown `derive!` marker), `E0064` (law violation), `E0065` (example failed),
+  `E0068` (override target not found), `E0069` (local val requires an initializer),
+  `E0070` (nullable member access), `E0071` (static call on instance), and `E0072`
+  (abstract method with a body) only in the end-of-file summary table.** Added the
+  missing `### E0058`–`### E0072` sections (13 codes total) to both language
+  references, filed under their most fitting existing category (control-flow,
+  pattern-matching, resolution, null-safety, and declaration errors), using the
+  existing dedicated regression specs (`LabelNotFoundSpec`, `RegexLiteralValidationSpec`,
+  `RegexPatternSpec`, `RecordFromRegexSpec`, `RecordJsonSpec`, `LawExampleSpec`,
+  `OverrideTargetNotFoundSpec`, `UninitializedValSpec`, `NullableMemberAccessSpec`,
+  `StaticCallOnInstanceSpec`, `AbstractMethodBodySpec`) as the basis for the examples.
+  This closes the remaining gap in the error-code reference — every code in the
+  summary table now has a full prose section, except `E0032` (intentionally
+  skipped — no in-process trigger under the current grammar, see the note in
+  `SemanticErrorCodeCoverageSpec`).
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0043`
+  (unknown named argument), `E0044` (duplicate argument), `E0045` (positional argument
+  after named argument), `E0046` (wrong destructuring binding count), `E0047` (not a
+  record type), `E0048` (break outside loop), `E0049` (continue outside loop), `E0050`
+  (current instance not available in static context), `E0051` (return type is
+  required), `E0052` (lambda parameter needs a type), `E0053` (cyclic type alias),
+  `E0054` (duplicate type alias), and `E0055` (function requires a body) only in the
+  end-of-file summary table.** Added the missing `### E0043`–`### E0055` sections to
+  both language references (a new "Control-flow errors" category covers `E0048`–`E0050`),
+  and added regression coverage asserting the error *code* (not just compile failure)
+  for `E0046`, `E0047`, and `E0052`, which previously had no such assertion.
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0036`
+  (cannot assign to val), `E0037` (unimplemented abstract method), `E0038` (cannot
+  instantiate abstract class), `E0039` (cannot override a final method), `E0040` (cannot
+  call method on primitive type), and `E0041` (invalid method call target) only in the
+  end-of-file summary table.** Added the missing `### E0036`–`### E0041` sections to both
+  language references. `E0041` (`INVALID_METHOD_CALL_TARGET`) had no regression test at
+  all; added `InvalidMethodCallTargetSpec` covering the "indexing a nullable class-typed
+  value" trigger site.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0030`
+  (type is not generic), `E0031` (type argument arity mismatch), `E0033` (method is not
+  generic), `E0034` (method type argument arity mismatch), and `E0035` (erased JVM
+  signature collision) only in the end-of-file summary table.** Added the missing
+  `### E0030`–`### E0035` sections (skipping `E0032`, which has a live report site but
+  no in-process trigger under the current grammar — see the note in
+  `SemanticErrorCodeCoverageSpec`) to both language references, using the existing
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples, and added a new
+  `E0030` coverage case (previously untested).
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0025`
+  (duplicate constructor), `E0026` (duplicate generated method), `E0027` (type not
+  boxable), `E0028` (lvalue required), and `E0029` (duplicate type parameter) only in
+  the end-of-file summary table.** Added the missing `### E0025`–`### E0029` sections
+  to both language references, using the existing `SemanticErrorCodeCoverageSpec` and
+  `RecordDuplicateLawExampleSpec` cases as the basis for the examples.
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0004`
+  (field not found) only in the end-of-file summary table, unlike its neighbors `E0003`
+  and `E0005`, which both have a full prose section.** Added the missing `### E0004`
+  section to both language references, using the existing `SemanticErrorCodeCoverageSpec`
+  case as the basis for the example.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0011`
+  (duplicate global variable), `E0012` (duplicate function), `E0013` (method not
+  accessible), `E0014` (field not accessible), and `E0015` (class not accessible) only
+  in the end-of-file summary table.** Added the missing `### E0011`–`### E0015` sections
+  to both language references, using the existing `DuplicateGlobalVariableSpec`,
+  `DuplicateFunctionSpec`, `StaticMethodAccessSpec`, `FieldWriteAccessSpec`, and
+  `ClassAccessibilitySpec` cases as the basis for the examples.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0016`
+  (cyclic inheritance), `E0018` (illegal inheritance), `E0019` (illegal method call),
+  `E0020` (cannot return value), `E0022` (ambiguous constructor), and `E0023` (interface
+  required) only in the end-of-file summary table.** Added the missing `### E0016`,
+  `### E0018`–`### E0020`, and `### E0022`–`### E0023` sections to both language
+  references, using the existing `CyclicInheritanceSpec` and
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples.
+
 ## [0.10.23] - 2026-08-05
 
 ### Fixed

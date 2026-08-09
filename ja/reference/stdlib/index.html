@@ -2891,6 +2891,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#jsonvalue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Json::value（ナビゲート可能なラッパー）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2909,10 +2920,43 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#yamlparse-yamlstringify" class="md-nav__link">
+  <a href="#yamlparse" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Yaml::parse / Yaml::stringify
+        Yaml::parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#yamlstringify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round-trip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        round-trip の保証
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriveyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        derive!(Yaml) の利用
       
     </span>
   </a>
@@ -6924,6 +6968,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#jsonvalue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Json::value（ナビゲート可能なラッパー）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6942,10 +6997,43 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#yamlparse-yamlstringify" class="md-nav__link">
+  <a href="#yamlparse" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Yaml::parse / Yaml::stringify
+        Yaml::parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#yamlstringify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round-trip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        round-trip の保証
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriveyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        derive!(Yaml) の利用
       
     </span>
   </a>
@@ -8114,159 +8202,231 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 </span><span id="__span-68-2"><a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>Json::getIntOr(obj, &quot;missing&quot;, 42)      // 42（NPE にならない）
 </span><span id="__span-68-3"><a id="__codelineno-68-3" name="__codelineno-68-3" href="#__codelineno-68-3"></a>Json::getStringOr(obj, &quot;name&quot;, &quot;anon&quot;)  // &quot;anon&quot;
 </span></code></pre></div>
-<h2 id="yaml">Yaml モジュール<a class="headerlink" href="#yaml" title="Permanent link">&para;</a></h2>
-<p>YAML（flat block mapping のサブセット）のパースとシリアライズ。中間表現は Json と共通です。</p>
-<h3 id="yamlparse-yamlstringify">Yaml::parse / Yaml::stringify<a class="headerlink" href="#yamlparse-yamlstringify" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>val obj = Yaml::parse(&quot;name: ko\nage: 3&quot;)    // Object（実体は Map）
-</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>val text = Yaml::stringify(obj)               // &quot;name: ko\nage: 3\n&quot;
+<h3 id="jsonvalue">Json::value（ナビゲート可能なラッパー）<a class="headerlink" href="#jsonvalue" title="Permanent link">&para;</a></h3>
+<p><code>Json::value(text)</code> は <code>[]</code> でインデックスアクセスできるラッパー値を返します。オブジェクトのキーには文字列、
+配列の要素には整数でアクセスでき、値の取り出しには <code>asString()</code> / <code>asInt()</code> / <code>asLong()</code> / <code>asDouble()</code> /
+<code>asBoolean()</code> を使います:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>val v = Json::value(jsonText)
+</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>v[&quot;users&quot;][0][&quot;name&quot;].asString()
 </span></code></pre></div>
-<p>scalar の型推論は Json と一致します（<code>3</code>→Long、<code>3.5</code>→Double、<code>true</code>→Boolean、<code>null</code>→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、<code>record ... derive!(Yaml)</code> の土台になっています。<code>:</code> や前後の空白を含むキーは <code>key: value</code> の区切りと衝突しないよう自動的にダブルクォートされます(値側の quoting ルールと同じ)。</p>
+<p>キーが存在しない・添字が範囲外のときは null を保持する <code>Value</code> を返すので、途中の欠損があっても例外にはなりません
+（末尾で <code>asString()</code> 等を呼ぶと <code>null</code> になります）。<code>isNull()</code> で null かどうか、<code>size()</code> で配列・オブジェクトの
+要素数を調べられます。</p>
+<h2 id="yaml">Yaml モジュール<a class="headerlink" href="#yaml" title="Permanent link">&para;</a></h2>
+<p>flat block mapping ドキュメント限定の YAML パースとシリアライズ（<code>onion.Yaml</code>）。
+Json と同じ中間表現を共有しており（scalar は同じ Java 型にマップされる）、
+<code>derive!(Yaml)</code> は <code>derive!(Json)</code> とまったく同じ <code>toMap</code> / <code>fromMap</code> の土台の上に
+構築されています。</p>
+<p>対象範囲: flat block mapping のみ（ネストした map、シーケンス、アンカーは非対応）。</p>
+<h3 id="yamlparse">Yaml::parse<a class="headerlink" href="#yamlparse" title="Permanent link">&para;</a></h3>
+<p>YAML の flat block-mapping 文字列を <code>LinkedHashMap</code> にパースします:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>val data = Yaml::parse(&quot;name: Alice\nage: 30\n&quot;)
+</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>// data は LinkedHashMap；scalar の型推論は Json::parse と同じ
+</span></code></pre></div>
+<p>scalar の型推論規則（Json と同一）:
+- <code>""</code> または <code>null</code> → <code>null</code>
+- <code>true</code> / <code>false</code> → <code>Boolean</code>
+- 整数リテラル（<code>-?\d+</code> にマッチ）→ <code>Long</code>
+- 浮動小数点パターンや <code>.</code>/<code>e</code>/<code>E</code> を含む数値 → <code>Double</code>
+- クォートされた <code>"..."</code> → <code>String</code>（エスケープ解除のみ、それ以上の変換なし）
+- それ以外 → <code>String</code></p>
+<p>不正な入力に対しては <code>Yaml.YamlParseException</code> を投げます。<code>derive!(Yaml)</code> の
+<code>fromYaml</code> はこれを捕捉して代わりに <code>null</code> を返します。</p>
+<h3 id="yamlstringify">Yaml::stringify<a class="headerlink" href="#yamlstringify" title="Permanent link">&para;</a></h3>
+<p><code>Map</code>（または scalar）を YAML の flat block-mapping 文字列にシリアライズします:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>val m = [&quot;name&quot;: &quot;Alice&quot;, &quot;age&quot;: 30L]
+</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>val yaml = Yaml::stringify(m)
+</span><span id="__span-71-3"><a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>// &quot;name: Alice\nage: 30\n&quot;
+</span></code></pre></div>
+<p>パースし直したときに誤読される可能性のある文字列値（<code>:</code>、<code>#</code>、改行を含む、または
+数値・真偽値に見えるもの）は自動的にダブルクォートされます。数値と真偽値はそのまま
+出力されます。Map の<strong>キー</strong>も同じ規則でクォートされます — <code>:</code> や前後の空白を含む
+キーは <code>key: value</code> の区切りと衝突しないようダブルクォートされます。</p>
+<h3 id="round-trip">round-trip の保証<a class="headerlink" href="#round-trip" title="Permanent link">&para;</a></h3>
+<p><code>Yaml::parse</code> が生成した任意の <code>Map</code> について、<code>Yaml::parse(Yaml::stringify(m))</code> は
+等しい map を返します。同様に、<code>derive!(Yaml)</code> を付けたレコードでは、scalar 成分の
+みを持つすべての値について <code>fromYaml(toYaml(v)) == v</code> が成り立ちます。</p>
+<h3 id="deriveyaml"><code>derive!(Yaml)</code> の利用<a class="headerlink" href="#deriveyaml" title="Permanent link">&para;</a></h3>
+<p><code>derive!(Yaml)</code> は scalar 成分のみを持つ任意のレコードに対して <code>fromYaml</code> と
+<code>toYaml</code> を合成します。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
+</span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>
+</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>val cfg = new ServerConfig(&quot;localhost&quot;, 8080, false)
+</span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a>val yaml = ServerConfig::toYaml(cfg)
+</span><span id="__span-72-5"><a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a>// &quot;host: localhost\nport: 8080\ndebug: false\n&quot;
+</span><span id="__span-72-6"><a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a>
+</span><span id="__span-72-7"><a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a>val cfg2 = ServerConfig::fromYaml(yaml)   // ServerConfig? — パース/変換失敗時は null
+</span></code></pre></div>
+<p><code>derive!(Json, Yaml)</code> も有効です。両フォーマットは内部の <code>toMap</code> / <code>fromMap</code> を
+共有するため、重複はありません:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
+</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>
+</span><span id="__span-73-3"><a id="__codelineno-73-3" name="__codelineno-73-3" href="#__codelineno-73-3"></a>val u = new User(&quot;ko&quot;, 3)
+</span><span id="__span-73-4"><a id="__codelineno-73-4" name="__codelineno-73-4" href="#__codelineno-73-4"></a>val viaJson = User::fromJson(User::toJson(u))   // == u
+</span><span id="__span-73-5"><a id="__codelineno-73-5" name="__codelineno-73-5" href="#__codelineno-73-5"></a>val viaYaml = User::fromYaml(User::toYaml(u))  // == u
+</span></code></pre></div>
 <h2 id="config">Config モジュール<a class="headerlink" href="#config" title="Permanent link">&para;</a></h2>
 <p>パース済み JSON に対するドット記法アクセスと設定読み込み（<code>onion.Config</code>）。内部では <code>Json::parse</code> をそのまま使うので、object / array / scalar の形は Json と同じです。YAML や <code>.env</code> 形式には対応せず、あくまで JSON とドット区切りパス、環境変数によるオーバーライドを提供します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>val config = Config::loadJson(&quot;config.json&quot;)          // ファイルを読んでパース
-</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>val config2 = Config::parseJson(&quot;{\&quot;port\&quot;: 8080}&quot;)   // JSON 文字列を直接パース
-</span><span id="__span-70-3"><a id="__codelineno-70-3" name="__codelineno-70-3" href="#__codelineno-70-3"></a>
-</span><span id="__span-70-4"><a id="__codelineno-70-4" name="__codelineno-70-4" href="#__codelineno-70-4"></a>Config::get(config, &quot;database.host&quot;)                   // 生の値、見つからなければ null
-</span><span id="__span-70-5"><a id="__codelineno-70-5" name="__codelineno-70-5" href="#__codelineno-70-5"></a>Config::getString(config, &quot;database.host&quot;, &quot;localhost&quot;)
-</span><span id="__span-70-6"><a id="__codelineno-70-6" name="__codelineno-70-6" href="#__codelineno-70-6"></a>Config::getInt(config, &quot;database.port&quot;, 5432)
-</span><span id="__span-70-7"><a id="__codelineno-70-7" name="__codelineno-70-7" href="#__codelineno-70-7"></a>Config::getLong(config, &quot;database.maxConnections&quot;, 10L)
-</span><span id="__span-70-8"><a id="__codelineno-70-8" name="__codelineno-70-8" href="#__codelineno-70-8"></a>Config::getDouble(config, &quot;database.timeout&quot;, 30.0)
-</span><span id="__span-70-9"><a id="__codelineno-70-9" name="__codelineno-70-9" href="#__codelineno-70-9"></a>Config::getBoolean(config, &quot;database.ssl&quot;, false)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>val config = Config::loadJson(&quot;config.json&quot;)          // ファイルを読んでパース
+</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>val config2 = Config::parseJson(&quot;{\&quot;port\&quot;: 8080}&quot;)   // JSON 文字列を直接パース
+</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>
+</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>Config::get(config, &quot;database.host&quot;)                   // 生の値、見つからなければ null
+</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>Config::getString(config, &quot;database.host&quot;, &quot;localhost&quot;)
+</span><span id="__span-74-6"><a id="__codelineno-74-6" name="__codelineno-74-6" href="#__codelineno-74-6"></a>Config::getInt(config, &quot;database.port&quot;, 5432)
+</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a>Config::getLong(config, &quot;database.maxConnections&quot;, 10L)
+</span><span id="__span-74-8"><a id="__codelineno-74-8" name="__codelineno-74-8" href="#__codelineno-74-8"></a>Config::getDouble(config, &quot;database.timeout&quot;, 30.0)
+</span><span id="__span-74-9"><a id="__codelineno-74-9" name="__codelineno-74-9" href="#__codelineno-74-9"></a>Config::getBoolean(config, &quot;database.ssl&quot;, false)
 </span></code></pre></div>
 <p>パスはドット区切りで、object と array の両方をたどれます。数字のセグメントは array のインデックスとして扱われます:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>val config = Config::parseJson(&quot;{\&quot;users\&quot;: [{\&quot;name\&quot;: \&quot;Alice\&quot;}, {\&quot;name\&quot;: \&quot;Bob\&quot;}]}&quot;)
-</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>Config::getString(config, &quot;users.0.name&quot;, &quot;unknown&quot;)   // &quot;Alice&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>val config = Config::parseJson(&quot;{\&quot;users\&quot;: [{\&quot;name\&quot;: \&quot;Alice\&quot;}, {\&quot;name\&quot;: \&quot;Bob\&quot;}]}&quot;)
+</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>Config::getString(config, &quot;users.0.name&quot;, &quot;unknown&quot;)   // &quot;Alice&quot;
 </span></code></pre></div>
 <p>キーが見つからない場合・array の添字が範囲外の場合・値を要求された型へ変換できない場合は、例外を投げず指定したデフォルト値にフォールバックします。数値系のゲッターは JSON の数値だけでなく数値文字列も受け付けます。<code>hasPath</code> はデフォルト値なしで存在確認だけ行います:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>Config::hasPath(config, &quot;database.host&quot;)   // true / false
+<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>Config::hasPath(config, &quot;database.host&quot;)   // true / false
 </span></code></pre></div>
 <p>環境変数へのアクセスも用意されています。<code>getEnv</code> はそのまま環境変数を読み、<code>getWithEnvOverride</code> は設定パスを読みつつ、対応する環境変数がセットされていればそちらを優先します（デプロイ時に設定ファイルの値を上書きするのに便利です）:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>Config::getEnv(&quot;PORT&quot;, &quot;3000&quot;)
-</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>Config::getWithEnvOverride(config, &quot;database.host&quot;, &quot;DB_HOST&quot;, &quot;localhost&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>Config::getEnv(&quot;PORT&quot;, &quot;3000&quot;)
+</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>Config::getWithEnvOverride(config, &quot;database.host&quot;, &quot;DB_HOST&quot;, &quot;localhost&quot;)
 </span></code></pre></div>
 <h2 id="strings">Strings モジュール<a class="headerlink" href="#strings" title="Permanent link">&para;</a></h2>
-<p>文字列ユーティリティ（<code>onion.Strings</code>、自動 import）。分割・結合・大文字小文字変換・パディングに加え：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>Strings::capitalize(&quot;hello&quot;)             // &quot;Hello&quot;
-</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>Strings::capitalizeWords(&quot;a b c&quot;)        // &quot;A B C&quot;
-</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
-</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>Strings::count(&quot;banana&quot;, &quot;a&quot;)            // 3
-</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>Strings::removePrefix(&quot;unhappy&quot;, &quot;un&quot;)   // &quot;happy&quot;
-</span><span id="__span-74-6"><a id="__codelineno-74-6" name="__codelineno-74-6" href="#__codelineno-74-6"></a>Strings::removeSuffix(&quot;running&quot;, &quot;ing&quot;)  // &quot;runn&quot;
-</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a>Strings::truncate(&quot;hello world&quot;, 8, &quot;...&quot;)   // &quot;hello...&quot;
-</span><span id="__span-74-8"><a id="__codelineno-74-8" name="__codelineno-74-8" href="#__codelineno-74-8"></a>Strings::center(&quot;hi&quot;, 6, &#39;*&#39;)            // &quot;**hi**&quot;
-</span><span id="__span-74-9"><a id="__codelineno-74-9" name="__codelineno-74-9" href="#__codelineno-74-9"></a>Strings::ifBlank(&quot;   &quot;, &quot;default&quot;)       // &quot;default&quot;
-</span><span id="__span-74-10"><a id="__codelineno-74-10" name="__codelineno-74-10" href="#__codelineno-74-10"></a>Strings::words(&quot;  a  b  c &quot;)             // List[String] [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
-</span><span id="__span-74-11"><a id="__codelineno-74-11" name="__codelineno-74-11" href="#__codelineno-74-11"></a>Strings::chars(&quot;abc&quot;)                    // List [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
-</span><span id="__span-74-12"><a id="__codelineno-74-12" name="__codelineno-74-12" href="#__codelineno-74-12"></a>// null 安全なパース（例外を投げずに null/フォールバックを返す）
-</span><span id="__span-74-13"><a id="__codelineno-74-13" name="__codelineno-74-13" href="#__codelineno-74-13"></a>Strings::toIntOrNull(&quot;42&quot;) / Strings::toLongOrNull(&quot;100&quot;) / Strings::toDoubleOrNull(&quot;3.14&quot;)
-</span><span id="__span-74-14"><a id="__codelineno-74-14" name="__codelineno-74-14" href="#__codelineno-74-14"></a>Strings::toIntOr(&quot;nope&quot;, 0)              // 0
+<p>文字列ユーティリティ（<code>onion.Strings</code>、自動 import）：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>Strings::split(&quot;a,b,c&quot;, &quot;,&quot;)          // List[String] [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
+</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>Strings::join(parts, &quot;-&quot;)             // 配列・List どちらも可
+</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
+</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>Strings::replace(s, &quot;a&quot;, &quot;b&quot;) / Strings::replaceRegex(s, &quot;[0-9]+&quot;, &quot;#&quot;)
+</span><span id="__span-78-5"><a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>Strings::startsWith(s, p) / Strings::endsWith(s, p) / Strings::contains(s, sub)
+</span><span id="__span-78-6"><a id="__codelineno-78-6" name="__codelineno-78-6" href="#__codelineno-78-6"></a>Strings::padLeft(s, 8, &#39;0&#39;) / Strings::padRight(s, 8, &#39; &#39;) / Strings::repeat(s, 3)
+</span></code></pre></div>
+<p>大文字小文字と検査のヘルパー：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>Strings::capitalize(&quot;hello&quot;)             // &quot;Hello&quot;
+</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>Strings::capitalizeWords(&quot;a b c&quot;)        // &quot;A B C&quot;
+</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
+</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>Strings::count(&quot;banana&quot;, &quot;a&quot;)            // 3
+</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>Strings::removePrefix(&quot;unhappy&quot;, &quot;un&quot;)   // &quot;happy&quot;
+</span><span id="__span-79-6"><a id="__codelineno-79-6" name="__codelineno-79-6" href="#__codelineno-79-6"></a>Strings::removeSuffix(&quot;running&quot;, &quot;ing&quot;)  // &quot;runn&quot;
+</span><span id="__span-79-7"><a id="__codelineno-79-7" name="__codelineno-79-7" href="#__codelineno-79-7"></a>Strings::truncate(&quot;hello world&quot;, 8, &quot;...&quot;)   // &quot;hello...&quot;
+</span><span id="__span-79-8"><a id="__codelineno-79-8" name="__codelineno-79-8" href="#__codelineno-79-8"></a>Strings::center(&quot;hi&quot;, 6, &#39;*&#39;)            // &quot;**hi**&quot;
+</span><span id="__span-79-9"><a id="__codelineno-79-9" name="__codelineno-79-9" href="#__codelineno-79-9"></a>Strings::ifBlank(&quot;   &quot;, &quot;default&quot;)       // &quot;default&quot;
+</span><span id="__span-79-10"><a id="__codelineno-79-10" name="__codelineno-79-10" href="#__codelineno-79-10"></a>Strings::words(&quot;  a  b  c &quot;)             // List[String] [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
+</span><span id="__span-79-11"><a id="__codelineno-79-11" name="__codelineno-79-11" href="#__codelineno-79-11"></a>Strings::chars(&quot;abc&quot;)                    // List [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
+</span><span id="__span-79-12"><a id="__codelineno-79-12" name="__codelineno-79-12" href="#__codelineno-79-12"></a>// null 安全なパース（例外を投げずに null/フォールバックを返す）
+</span><span id="__span-79-13"><a id="__codelineno-79-13" name="__codelineno-79-13" href="#__codelineno-79-13"></a>Strings::toIntOrNull(&quot;42&quot;) / Strings::toLongOrNull(&quot;100&quot;) / Strings::toDoubleOrNull(&quot;3.14&quot;)
+</span><span id="__span-79-14"><a id="__codelineno-79-14" name="__codelineno-79-14" href="#__codelineno-79-14"></a>Strings::toIntOr(&quot;nope&quot;, 0)              // 0
 </span></code></pre></div>
 <h2 id="maps">Maps モジュール<a class="headerlink" href="#maps" title="Permanent link">&para;</a></h2>
 <p>Map ユーティリティ（<code>onion.Maps</code>）。結果 Map は挿入順を保持（<code>LinkedHashMap</code>）。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>Maps::getOrElse(m, &quot;x&quot;, () -&gt; compute())      // 遅延デフォルト
-</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
-</span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a>Maps::mapValues(m, (v: Int) -&gt; v * 2) / Maps::mapKeys(m, (k: String) -&gt; k.toUpperCase())
-</span><span id="__span-75-4"><a id="__codelineno-75-4" name="__codelineno-75-4" href="#__codelineno-75-4"></a>Maps::filter(m, (k: String, v: Int) -&gt; v &gt; 0) // キー+値の述語
-</span><span id="__span-75-5"><a id="__codelineno-75-5" name="__codelineno-75-5" href="#__codelineno-75-5"></a>Maps::invert(m)                               // キーと値を入れ替え
-</span><span id="__span-75-6"><a id="__codelineno-75-6" name="__codelineno-75-6" href="#__codelineno-75-6"></a>Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
-</span><span id="__span-75-7"><a id="__codelineno-75-7" name="__codelineno-75-7" href="#__codelineno-75-7"></a>Maps::groupBy(items, keyOf)                   // Map[K, List]
-</span><span id="__span-75-8"><a id="__codelineno-75-8" name="__codelineno-75-8" href="#__codelineno-75-8"></a>Maps::countBy(items, keyOf)                   // 頻度 Map[K, Integer]
-</span><span id="__span-75-9"><a id="__codelineno-75-9" name="__codelineno-75-9" href="#__codelineno-75-9"></a>Maps::mergeWith(a, b, (x: Int, y: Int) -&gt; x + y)  // 衝突を結合
-</span><span id="__span-75-10"><a id="__codelineno-75-10" name="__codelineno-75-10" href="#__codelineno-75-10"></a>Maps::update(m, &quot;a&quot;, (v: Int) -&gt; v + 1)       // 関数的更新
+<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>val m: Map[String, Int] = Maps::newMap()
+</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>Maps::getOrDefault(m, &quot;a&quot;, 0)                 // あればその値、無ければデフォルト
+</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>Maps::getOrElse(m, &quot;x&quot;, () -&gt; compute())      // 遅延デフォルト
+</span><span id="__span-80-4"><a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
+</span><span id="__span-80-5"><a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>Maps::mapValues(m, (v: Int) -&gt; v * 2) / Maps::mapKeys(m, (k: String) -&gt; k.toUpperCase())
+</span><span id="__span-80-6"><a id="__codelineno-80-6" name="__codelineno-80-6" href="#__codelineno-80-6"></a>Maps::filterValues(m, (v: Int) -&gt; v &gt; 0) / Maps::filterKeys(m, (k: String) -&gt; k.startsWith(&quot;a&quot;))
+</span><span id="__span-80-7"><a id="__codelineno-80-7" name="__codelineno-80-7" href="#__codelineno-80-7"></a>Maps::filter(m, (k: String, v: Int) -&gt; v &gt; 0) // キー+値の述語
+</span><span id="__span-80-8"><a id="__codelineno-80-8" name="__codelineno-80-8" href="#__codelineno-80-8"></a>Maps::invert(m)                               // キーと値を入れ替え
+</span><span id="__span-80-9"><a id="__codelineno-80-9" name="__codelineno-80-9" href="#__codelineno-80-9"></a>Maps::toList(m, (k: String, v: Int) -&gt; k + &quot;=&quot; + v)  // エントリ -&gt; List
+</span><span id="__span-80-10"><a id="__codelineno-80-10" name="__codelineno-80-10" href="#__codelineno-80-10"></a>Maps::forEach(m, (k: String, v: Int) -&gt; println(k))
+</span><span id="__span-80-11"><a id="__codelineno-80-11" name="__codelineno-80-11" href="#__codelineno-80-11"></a>Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
+</span><span id="__span-80-12"><a id="__codelineno-80-12" name="__codelineno-80-12" href="#__codelineno-80-12"></a>Maps::groupBy(items, keyOf)                   // Map[K, List]
+</span><span id="__span-80-13"><a id="__codelineno-80-13" name="__codelineno-80-13" href="#__codelineno-80-13"></a>Maps::countBy(items, keyOf)                   // 頻度 Map[K, Integer]
+</span><span id="__span-80-14"><a id="__codelineno-80-14" name="__codelineno-80-14" href="#__codelineno-80-14"></a>val merged = Maps::merge(a, b)                // 衝突時は b が優先
+</span><span id="__span-80-15"><a id="__codelineno-80-15" name="__codelineno-80-15" href="#__codelineno-80-15"></a>Maps::mergeWith(a, b, (x: Int, y: Int) -&gt; x + y)  // 衝突を結合
+</span><span id="__span-80-16"><a id="__codelineno-80-16" name="__codelineno-80-16" href="#__codelineno-80-16"></a>Maps::update(m, &quot;a&quot;, (v: Int) -&gt; v + 1)       // 関数的更新
 </span></code></pre></div>
 <h2 id="sets">Sets モジュール<a class="headerlink" href="#sets" title="Permanent link">&para;</a></h2>
 <p>Set ユーティリティ（<code>onion.Sets</code>）。結果 Set は挿入順を保持し、集合演算は null 安全。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>Sets::of(1, 2, 3) / Sets::fromList([1, 1, 2]) / Sets::toList(a)
-</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
-</span><span id="__span-76-3"><a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
-</span><span id="__span-76-4"><a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a>Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
-</span><span id="__span-76-5"><a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
-</span><span id="__span-76-6"><a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a>Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>Sets::of(1, 2, 3) / Sets::newSet[Int]() / Sets::fromList([1, 1, 2]) / Sets::toList(a)
+</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
+</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
+</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>Sets::containsAll(a, b)                       // a が b の要素をすべて含む
+</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
+</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
+</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>Sets::forEach(a, (x: Int) -&gt; println(x))
+</span><span id="__span-81-8"><a id="__codelineno-81-8" name="__codelineno-81-8" href="#__codelineno-81-8"></a>Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
 </span></code></pre></div>
 <h2 id="hash">Hash モジュール<a class="headerlink" href="#hash" title="Permanent link">&para;</a></h2>
 <p>暗号学的ハッシュ・チェックサム（<code>onion.Hash</code>）。文字列の UTF-8 バイトをハッシュ化し、小文字 hex のダイジェストを返します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>Hash::sha256(&quot;password&quot;)   // 64文字 hex
-</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>Hash::sha512(text)         // 128文字 hex
-</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突耐性なし）
+<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>Hash::sha256(&quot;password&quot;)   // 64文字 hex
+</span><span id="__span-82-2"><a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>Hash::sha512(text)         // 128文字 hex
+</span><span id="__span-82-3"><a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突耐性なし）
 </span></code></pre></div>
 <h2 id="codec">Codec モジュール<a class="headerlink" href="#codec" title="Permanent link">&para;</a></h2>
 <p>テキストのエンコード・デコード（<code>onion.Codec</code>）: Base64・hex・URL/パーセント形式。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>val enc = Codec::base64Encode(&quot;Hello&quot;)    // &quot;SGVsbG8=&quot;
-</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>Codec::base64Decode(enc)                  // &quot;Hello&quot;
-</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>Codec::hexEncode(&quot;Hi&quot;) / Codec::hexDecode(&quot;4869&quot;)
-</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>Codec::urlEncode(&quot;a b&amp;c&quot;) / Codec::urlDecode(s)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>val enc = Codec::base64Encode(&quot;Hello&quot;)    // &quot;SGVsbG8=&quot;
+</span><span id="__span-83-2"><a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>Codec::base64Decode(enc)                  // &quot;Hello&quot;
+</span><span id="__span-83-3"><a id="__codelineno-83-3" name="__codelineno-83-3" href="#__codelineno-83-3"></a>Codec::hexEncode(&quot;Hi&quot;) / Codec::hexDecode(&quot;4869&quot;)
+</span><span id="__span-83-4"><a id="__codelineno-83-4" name="__codelineno-83-4" href="#__codelineno-83-4"></a>Codec::urlEncode(&quot;a b&amp;c&quot;) / Codec::urlDecode(s)
 </span></code></pre></div>
 <h2 id="stats">Stats モジュール<a class="headerlink" href="#stats" title="Permanent link">&para;</a></h2>
 <p>数値リストの集計（<code>onion.Stats</code>）。汎用集計は <code>List[Int]</code>/<code>List[Long]</code>/<code>List[Double]</code> を受け付け倍精度で計算。<code>sumInt</code>/<code>sumLong</code> は整数精度を保持。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>val xs: List[Int] = [10, 20, 30, 40]
-</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
-</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
-</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
-</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>Stats::variance(xs) / Stats::stddev(xs)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>val xs: List[Int] = [10, 20, 30, 40]
+</span><span id="__span-84-2"><a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
+</span><span id="__span-84-3"><a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
+</span><span id="__span-84-4"><a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a>Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
+</span><span id="__span-84-5"><a id="__codelineno-84-5" name="__codelineno-84-5" href="#__codelineno-84-5"></a>Stats::variance(xs) / Stats::stddev(xs)
 </span></code></pre></div>
 <p>メソッド呼び出しの形でも使えます（実際のコードではこちらが自然です）。ただし
 <strong>メソッド形式も同じく倍精度</strong>なので、<code>Int</code> のリストでも合計は <code>Double</code> になります。
 <code>Int</code> で受け取りたい場合は <code>Stats::sumInt</code> を使ってください。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>val xs: List[Int] = [10, 20, 30, 40]
-</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>xs.sum()             // 100.0  （Double: 汎用集計）
-</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>Stats::sumInt(xs)    // 100    （Int）
+<div class="language-text highlight"><pre><span></span><code><span id="__span-85-1"><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a>val xs: List[Int] = [10, 20, 30, 40]
+</span><span id="__span-85-2"><a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a>xs.sum()             // 100.0  （Double: 汎用集計）
+</span><span id="__span-85-3"><a id="__codelineno-85-3" name="__codelineno-85-3" href="#__codelineno-85-3"></a>Stats::sumInt(xs)    // 100    （Int）
 </span></code></pre></div>
 <p><code>Int</code> を返す <code>sum()</code> のオーバーロードが無いのは型消去のためです。実行時には要素型が
 消えるので、<code>sum(List[Int])</code> と <code>sum(List[Double])</code> は同じ JVM シグネチャになります。</p>
 <h2 id="format">Format モジュール<a class="headerlink" href="#format" title="Permanent link">&para;</a></h2>
 <p>locale 非依存の人間可読フォーマット（<code>onion.Format</code>）——桁区切り・小数・サイズ・時間。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>Format::integer(1234567)          // &quot;1,234,567&quot;
-</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>Format::number(1234.5678, 2)      // &quot;1,234.57&quot;
-</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>Format::fixed(3.14159, 2)         // &quot;3.14&quot;
-</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>Format::percent(0.756, 1)         // &quot;75.6%&quot;
-</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>Format::bytes(1536)               // &quot;1.5 KB&quot;（1024基準）
-</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>Format::duration(3661)            // &quot;1h 1m 1s&quot;
-</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>Format::ordinal(21)               // &quot;21st&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-86-1"><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a>Format::integer(1234567)          // &quot;1,234,567&quot;
+</span><span id="__span-86-2"><a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a>Format::number(1234.5678, 2)      // &quot;1,234.57&quot;
+</span><span id="__span-86-3"><a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a>Format::fixed(3.14159, 2)         // &quot;3.14&quot;
+</span><span id="__span-86-4"><a id="__codelineno-86-4" name="__codelineno-86-4" href="#__codelineno-86-4"></a>Format::percent(0.756, 1)         // &quot;75.6%&quot;
+</span><span id="__span-86-5"><a id="__codelineno-86-5" name="__codelineno-86-5" href="#__codelineno-86-5"></a>Format::bytes(1536)               // &quot;1.5 KB&quot;（1024基準）
+</span><span id="__span-86-6"><a id="__codelineno-86-6" name="__codelineno-86-6" href="#__codelineno-86-6"></a>Format::duration(3661)            // &quot;1h 1m 1s&quot;
+</span><span id="__span-86-7"><a id="__codelineno-86-7" name="__codelineno-86-7" href="#__codelineno-86-7"></a>Format::ordinal(21)               // &quot;21st&quot;
 </span></code></pre></div>
 <h2 id="text">Text モジュール<a class="headerlink" href="#text" title="Permanent link">&para;</a></h2>
 <p>コンソールのテキストレイアウト（<code>onion.Text</code>）——折返し・インデント・整列テーブル。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>Text::wrap(&quot;長い文章 ...&quot;, 40)          // 折り返した行のリスト
-</span><span id="__span-82-2"><a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>Text::indent(&quot;a\nb&quot;, &quot;&gt; &quot;)              // &quot;&gt; a\n&gt; b&quot;
-</span><span id="__span-82-3"><a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>Text::dedent(&quot;    a\n    b&quot;)            // &quot;a\nb&quot;
-</span><span id="__span-82-4"><a id="__codelineno-82-4" name="__codelineno-82-4" href="#__codelineno-82-4"></a>
-</span><span id="__span-82-5"><a id="__codelineno-82-5" name="__codelineno-82-5" href="#__codelineno-82-5"></a>Text::table([[&quot;Name&quot;, &quot;Dept&quot;], [&quot;Alice&quot;, &quot;Eng&quot;], [&quot;Bob&quot;, &quot;Sales&quot;]])
-</span><span id="__span-82-6"><a id="__codelineno-82-6" name="__codelineno-82-6" href="#__codelineno-82-6"></a>// Name   Dept
-</span><span id="__span-82-7"><a id="__codelineno-82-7" name="__codelineno-82-7" href="#__codelineno-82-7"></a>// Alice  Eng
-</span><span id="__span-82-8"><a id="__codelineno-82-8" name="__codelineno-82-8" href="#__codelineno-82-8"></a>// Bob    Sales
+<div class="language-text highlight"><pre><span></span><code><span id="__span-87-1"><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a>Text::wrap(&quot;長い文章 ...&quot;, 40)          // 折り返した行のリスト
+</span><span id="__span-87-2"><a id="__codelineno-87-2" name="__codelineno-87-2" href="#__codelineno-87-2"></a>Text::indent(&quot;a\nb&quot;, &quot;&gt; &quot;)              // &quot;&gt; a\n&gt; b&quot;
+</span><span id="__span-87-3"><a id="__codelineno-87-3" name="__codelineno-87-3" href="#__codelineno-87-3"></a>Text::dedent(&quot;    a\n    b&quot;)            // &quot;a\nb&quot;
+</span><span id="__span-87-4"><a id="__codelineno-87-4" name="__codelineno-87-4" href="#__codelineno-87-4"></a>
+</span><span id="__span-87-5"><a id="__codelineno-87-5" name="__codelineno-87-5" href="#__codelineno-87-5"></a>Text::table([[&quot;Name&quot;, &quot;Dept&quot;], [&quot;Alice&quot;, &quot;Eng&quot;], [&quot;Bob&quot;, &quot;Sales&quot;]])
+</span><span id="__span-87-6"><a id="__codelineno-87-6" name="__codelineno-87-6" href="#__codelineno-87-6"></a>// Name   Dept
+</span><span id="__span-87-7"><a id="__codelineno-87-7" name="__codelineno-87-7" href="#__codelineno-87-7"></a>// Alice  Eng
+</span><span id="__span-87-8"><a id="__codelineno-87-8" name="__codelineno-87-8" href="#__codelineno-87-8"></a>// Bob    Sales
 </span></code></pre></div>
 <h2 id="system">System モジュール<a class="headerlink" href="#system" title="Permanent link">&para;</a></h2>
 <p>Java の <code>System</code> クラスを介したシステムレベル操作へのアクセス。</p>
 <h3 id="systemout">System::out<a class="headerlink" href="#systemout" title="Permanent link">&para;</a></h3>
 <p>標準出力ストリーム:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>System::out.println(&quot;直接システム出力&quot;)
-</span><span id="__span-83-2"><a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>System::out.print(&quot;改行なし&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-88-1"><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a>System::out.println(&quot;直接システム出力&quot;)
+</span><span id="__span-88-2"><a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a>System::out.print(&quot;改行なし&quot;)
 </span></code></pre></div>
 <h3 id="systemin">System::in<a class="headerlink" href="#systemin" title="Permanent link">&para;</a></h3>
 <p>標準入力ストリーム:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>import {
-</span><span id="__span-84-2"><a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>  java.io.BufferedReader;
-</span><span id="__span-84-3"><a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>  java.io.InputStreamReader;
-</span><span id="__span-84-4"><a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a>}
-</span><span id="__span-84-5"><a id="__codelineno-84-5" name="__codelineno-84-5" href="#__codelineno-84-5"></a>
-</span><span id="__span-84-6"><a id="__codelineno-84-6" name="__codelineno-84-6" href="#__codelineno-84-6"></a>val reader: BufferedReader = new BufferedReader(
-</span><span id="__span-84-7"><a id="__codelineno-84-7" name="__codelineno-84-7" href="#__codelineno-84-7"></a>  new InputStreamReader(System::in)
-</span><span id="__span-84-8"><a id="__codelineno-84-8" name="__codelineno-84-8" href="#__codelineno-84-8"></a>)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-89-1"><a id="__codelineno-89-1" name="__codelineno-89-1" href="#__codelineno-89-1"></a>import {
+</span><span id="__span-89-2"><a id="__codelineno-89-2" name="__codelineno-89-2" href="#__codelineno-89-2"></a>  java.io.BufferedReader;
+</span><span id="__span-89-3"><a id="__codelineno-89-3" name="__codelineno-89-3" href="#__codelineno-89-3"></a>  java.io.InputStreamReader;
+</span><span id="__span-89-4"><a id="__codelineno-89-4" name="__codelineno-89-4" href="#__codelineno-89-4"></a>}
+</span><span id="__span-89-5"><a id="__codelineno-89-5" name="__codelineno-89-5" href="#__codelineno-89-5"></a>
+</span><span id="__span-89-6"><a id="__codelineno-89-6" name="__codelineno-89-6" href="#__codelineno-89-6"></a>val reader: BufferedReader = new BufferedReader(
+</span><span id="__span-89-7"><a id="__codelineno-89-7" name="__codelineno-89-7" href="#__codelineno-89-7"></a>  new InputStreamReader(System::in)
+</span><span id="__span-89-8"><a id="__codelineno-89-8" name="__codelineno-89-8" href="#__codelineno-89-8"></a>)
 </span></code></pre></div>
 <h3 id="systemcurrenttimemillis">System::currentTimeMillis<a class="headerlink" href="#systemcurrenttimemillis" title="Permanent link">&para;</a></h3>
 <p>現在時刻をミリ秒で取得:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-85-1"><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a>val time: Long = System::currentTimeMillis()
-</span><span id="__span-85-2"><a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a>IO::println(&quot;現在時刻: &quot; + time)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-90-1"><a id="__codelineno-90-1" name="__codelineno-90-1" href="#__codelineno-90-1"></a>val time: Long = System::currentTimeMillis()
+</span><span id="__span-90-2"><a id="__codelineno-90-2" name="__codelineno-90-2" href="#__codelineno-90-2"></a>IO::println(&quot;現在時刻: &quot; + time)
 </span></code></pre></div>
 <h3 id="systemgetproperty">System::getProperty<a class="headerlink" href="#systemgetproperty" title="Permanent link">&para;</a></h3>
 <p>システムプロパティを取得:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-86-1"><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a>val os: String = System::getProperty(&quot;os.name&quot;)
-</span><span id="__span-86-2"><a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a>val user: String = System::getProperty(&quot;user.name&quot;)
-</span><span id="__span-86-3"><a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a>val home: String = System::getProperty(&quot;user.home&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-91-1"><a id="__codelineno-91-1" name="__codelineno-91-1" href="#__codelineno-91-1"></a>val os: String = System::getProperty(&quot;os.name&quot;)
+</span><span id="__span-91-2"><a id="__codelineno-91-2" name="__codelineno-91-2" href="#__codelineno-91-2"></a>val user: String = System::getProperty(&quot;user.name&quot;)
+</span><span id="__span-91-3"><a id="__codelineno-91-3" name="__codelineno-91-3" href="#__codelineno-91-3"></a>val home: String = System::getProperty(&quot;user.home&quot;)
 </span></code></pre></div>
 <h3 id="systemexit">System::exit<a class="headerlink" href="#systemexit" title="Permanent link">&para;</a></h3>
 <p>プログラムを終了:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-87-1"><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a>System::exit(0)  // 成功
-</span><span id="__span-87-2"><a id="__codelineno-87-2" name="__codelineno-87-2" href="#__codelineno-87-2"></a>System::exit(1)  // エラー
+<div class="language-text highlight"><pre><span></span><code><span id="__span-92-1"><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a>System::exit(0)  // 成功
+</span><span id="__span-92-2"><a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a>System::exit(1)  // エラー
 </span></code></pre></div>
 <h2 id="iterables">Iterables モジュール<a class="headerlink" href="#iterables" title="Permanent link">&para;</a></h2>
 <p><code>onion.Iterables</code>（Java インターフェース）で提供。</p>
@@ -8282,184 +8442,184 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 </ul>
 <h2 id="files">Files モジュール<a class="headerlink" href="#files" title="Permanent link">&para;</a></h2>
 <p>ファイル I/O（<code>onion.Files</code>）:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-88-1"><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a>Files::readText(&quot;path.txt&quot;)            // ファイル全体を String として
-</span><span id="__span-88-2"><a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a>Files::readLines(&quot;path.txt&quot;)           // List[String]
-</span><span id="__span-88-3"><a id="__codelineno-88-3" name="__codelineno-88-3" href="#__codelineno-88-3"></a>Files::writeText(&quot;out.txt&quot;, content)
-</span><span id="__span-88-4"><a id="__codelineno-88-4" name="__codelineno-88-4" href="#__codelineno-88-4"></a>Files::readBytes(path) / Files::writeBytes(path, bytes)
-</span><span id="__span-88-5"><a id="__codelineno-88-5" name="__codelineno-88-5" href="#__codelineno-88-5"></a>Files::list(&quot;dir&quot;)                     // エントリ名の List
-</span><span id="__span-88-6"><a id="__codelineno-88-6" name="__codelineno-88-6" href="#__codelineno-88-6"></a>Files::glob(&quot;dir&quot;, &quot;*.on&quot;)             // glob にマッチしたエントリ名
-</span><span id="__span-88-7"><a id="__codelineno-88-7" name="__codelineno-88-7" href="#__codelineno-88-7"></a>Files::delete(path) / Files::exists(path)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-93-1"><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a>Files::readText(&quot;path.txt&quot;)            // ファイル全体を String として
+</span><span id="__span-93-2"><a id="__codelineno-93-2" name="__codelineno-93-2" href="#__codelineno-93-2"></a>Files::readLines(&quot;path.txt&quot;)           // List[String]
+</span><span id="__span-93-3"><a id="__codelineno-93-3" name="__codelineno-93-3" href="#__codelineno-93-3"></a>Files::writeText(&quot;out.txt&quot;, content)
+</span><span id="__span-93-4"><a id="__codelineno-93-4" name="__codelineno-93-4" href="#__codelineno-93-4"></a>Files::readBytes(path) / Files::writeBytes(path, bytes)
+</span><span id="__span-93-5"><a id="__codelineno-93-5" name="__codelineno-93-5" href="#__codelineno-93-5"></a>Files::list(&quot;dir&quot;)                     // エントリ名の List
+</span><span id="__span-93-6"><a id="__codelineno-93-6" name="__codelineno-93-6" href="#__codelineno-93-6"></a>Files::glob(&quot;dir&quot;, &quot;*.on&quot;)             // glob にマッチしたエントリ名
+</span><span id="__span-93-7"><a id="__codelineno-93-7" name="__codelineno-93-7" href="#__codelineno-93-7"></a>Files::delete(path) / Files::exists(path)
 </span></code></pre></div>
 <p>パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-89-1"><a id="__codelineno-89-1" name="__codelineno-89-1" href="#__codelineno-89-1"></a>Files::getFileName(&quot;a/b/c.txt&quot;)        // &quot;c.txt&quot;
-</span><span id="__span-89-2"><a id="__codelineno-89-2" name="__codelineno-89-2" href="#__codelineno-89-2"></a>Files::getParent(&quot;a/b/c.txt&quot;)          // &quot;a/b&quot;
-</span><span id="__span-89-3"><a id="__codelineno-89-3" name="__codelineno-89-3" href="#__codelineno-89-3"></a>Files::joinPath(&quot;a/b&quot;, &quot;c.txt&quot;)        // &quot;a/b/c.txt&quot;
-</span><span id="__span-89-4"><a id="__codelineno-89-4" name="__codelineno-89-4" href="#__codelineno-89-4"></a>Files::ext(&quot;report.txt&quot;)               // &quot;txt&quot;（拡張子。予約語を避けた名前）
-</span><span id="__span-89-5"><a id="__codelineno-89-5" name="__codelineno-89-5" href="#__codelineno-89-5"></a>Files::stem(&quot;report.txt&quot;)              // &quot;report&quot;
-</span><span id="__span-89-6"><a id="__codelineno-89-6" name="__codelineno-89-6" href="#__codelineno-89-6"></a>Files::withExtension(&quot;report.txt&quot;, &quot;md&quot;)   // &quot;report.md&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-94-1"><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a>Files::getFileName(&quot;a/b/c.txt&quot;)        // &quot;c.txt&quot;
+</span><span id="__span-94-2"><a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a>Files::getParent(&quot;a/b/c.txt&quot;)          // &quot;a/b&quot;
+</span><span id="__span-94-3"><a id="__codelineno-94-3" name="__codelineno-94-3" href="#__codelineno-94-3"></a>Files::joinPath(&quot;a/b&quot;, &quot;c.txt&quot;)        // &quot;a/b/c.txt&quot;
+</span><span id="__span-94-4"><a id="__codelineno-94-4" name="__codelineno-94-4" href="#__codelineno-94-4"></a>Files::ext(&quot;report.txt&quot;)               // &quot;txt&quot;（拡張子。予約語を避けた名前）
+</span><span id="__span-94-5"><a id="__codelineno-94-5" name="__codelineno-94-5" href="#__codelineno-94-5"></a>Files::stem(&quot;report.txt&quot;)              // &quot;report&quot;
+</span><span id="__span-94-6"><a id="__codelineno-94-6" name="__codelineno-94-6" href="#__codelineno-94-6"></a>Files::withExtension(&quot;report.txt&quot;, &quot;md&quot;)   // &quot;report.md&quot;
 </span></code></pre></div>
 <h2 id="csv">Csv モジュール<a class="headerlink" href="#csv" title="Permanent link">&para;</a></h2>
 <p>RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（<code>onion.Csv</code>、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-90-1"><a id="__codelineno-90-1" name="__codelineno-90-1" href="#__codelineno-90-1"></a>val rows = Csv::parse(text)                  // List of List of String
-</span><span id="__span-90-2"><a id="__codelineno-90-2" name="__codelineno-90-2" href="#__codelineno-90-2"></a>val recs = Csv::parseWithHeader(text)        // List of Map（ヘッダー -&gt; 値）
-</span><span id="__span-90-3"><a id="__codelineno-90-3" name="__codelineno-90-3" href="#__codelineno-90-3"></a>
-</span><span id="__span-90-4"><a id="__codelineno-90-4" name="__codelineno-90-4" href="#__codelineno-90-4"></a>Csv::column(rows, 0)                          // 位置指定で1列取得
-</span><span id="__span-90-5"><a id="__codelineno-90-5" name="__codelineno-90-5" href="#__codelineno-90-5"></a>Csv::columnByName(recs, &quot;age&quot;)                // ヘッダー名で1列取得
-</span><span id="__span-90-6"><a id="__codelineno-90-6" name="__codelineno-90-6" href="#__codelineno-90-6"></a>
-</span><span id="__span-90-7"><a id="__codelineno-90-7" name="__codelineno-90-7" href="#__codelineno-90-7"></a>val out  = Csv::stringify(rows)               // rows -&gt; CSV テキスト
-</span><span id="__span-90-8"><a id="__codelineno-90-8" name="__codelineno-90-8" href="#__codelineno-90-8"></a>val out2 = Csv::stringifyWithHeader(recs)     // records -&gt; CSV（parseWithHeader の逆）
+<div class="language-text highlight"><pre><span></span><code><span id="__span-95-1"><a id="__codelineno-95-1" name="__codelineno-95-1" href="#__codelineno-95-1"></a>val rows = Csv::parse(text)                  // List of List of String
+</span><span id="__span-95-2"><a id="__codelineno-95-2" name="__codelineno-95-2" href="#__codelineno-95-2"></a>val recs = Csv::parseWithHeader(text)        // List of Map（ヘッダー -&gt; 値）
+</span><span id="__span-95-3"><a id="__codelineno-95-3" name="__codelineno-95-3" href="#__codelineno-95-3"></a>
+</span><span id="__span-95-4"><a id="__codelineno-95-4" name="__codelineno-95-4" href="#__codelineno-95-4"></a>Csv::column(rows, 0)                          // 位置指定で1列取得
+</span><span id="__span-95-5"><a id="__codelineno-95-5" name="__codelineno-95-5" href="#__codelineno-95-5"></a>Csv::columnByName(recs, &quot;age&quot;)                // ヘッダー名で1列取得
+</span><span id="__span-95-6"><a id="__codelineno-95-6" name="__codelineno-95-6" href="#__codelineno-95-6"></a>
+</span><span id="__span-95-7"><a id="__codelineno-95-7" name="__codelineno-95-7" href="#__codelineno-95-7"></a>val out  = Csv::stringify(rows)               // rows -&gt; CSV テキスト
+</span><span id="__span-95-8"><a id="__codelineno-95-8" name="__codelineno-95-8" href="#__codelineno-95-8"></a>val out2 = Csv::stringifyWithHeader(recs)     // records -&gt; CSV（parseWithHeader の逆）
 </span></code></pre></div>
 <h2 id="proc">Proc モジュール<a class="headerlink" href="#proc" title="Permanent link">&para;</a></h2>
 <p>スクリプト向けのプロセス実行（<code>onion.Proc</code>）:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-91-1"><a id="__codelineno-91-1" name="__codelineno-91-1" href="#__codelineno-91-1"></a>val r = Proc::capture(&quot;git&quot;, &quot;status&quot;)  // r.status() / r.stdout() / r.stderr() / r.succeeded()
-</span><span id="__span-91-2"><a id="__codelineno-91-2" name="__codelineno-91-2" href="#__codelineno-91-2"></a>Proc::run(&quot;ls&quot;, &quot;-la&quot;)                  // stdout を String で取得（失敗時は例外）
-</span><span id="__span-91-3"><a id="__codelineno-91-3" name="__codelineno-91-3" href="#__codelineno-91-3"></a>Proc::exec(&quot;make&quot;, &quot;build&quot;)             // 終了コード、出力はそのまま素通し
-</span><span id="__span-91-4"><a id="__codelineno-91-4" name="__codelineno-91-4" href="#__codelineno-91-4"></a>Proc::captureIn(&quot;/tmp&quot;, &quot;ls&quot;)           // ...In 系は作業ディレクトリを指定
+<div class="language-text highlight"><pre><span></span><code><span id="__span-96-1"><a id="__codelineno-96-1" name="__codelineno-96-1" href="#__codelineno-96-1"></a>val r = Proc::capture(&quot;git&quot;, &quot;status&quot;)  // r.status() / r.stdout() / r.stderr() / r.succeeded()
+</span><span id="__span-96-2"><a id="__codelineno-96-2" name="__codelineno-96-2" href="#__codelineno-96-2"></a>Proc::run(&quot;ls&quot;, &quot;-la&quot;)                  // stdout を String で取得（失敗時は例外）
+</span><span id="__span-96-3"><a id="__codelineno-96-3" name="__codelineno-96-3" href="#__codelineno-96-3"></a>Proc::exec(&quot;make&quot;, &quot;build&quot;)             // 終了コード、出力はそのまま素通し
+</span><span id="__span-96-4"><a id="__codelineno-96-4" name="__codelineno-96-4" href="#__codelineno-96-4"></a>Proc::captureIn(&quot;/tmp&quot;, &quot;ls&quot;)           // ...In 系は作業ディレクトリを指定
 </span></code></pre></div>
 <h2 id="args">Args モジュール<a class="headerlink" href="#args" title="Permanent link">&para;</a></h2>
 <p>コマンドライン引数のパース（<code>onion.Args</code>）:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-92-1"><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a>val parsed = Args::parse(args)
-</span><span id="__span-92-2"><a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a>parsed.flag(&quot;verbose&quot;)                  // --verbose
-</span><span id="__span-92-3"><a id="__codelineno-92-3" name="__codelineno-92-3" href="#__codelineno-92-3"></a>parsed.option(&quot;out&quot;, &quot;a.out&quot;)           // --out path（デフォルト値付き）
-</span><span id="__span-92-4"><a id="__codelineno-92-4" name="__codelineno-92-4" href="#__codelineno-92-4"></a>parsed.intOption(&quot;level&quot;, 3)
-</span><span id="__span-92-5"><a id="__codelineno-92-5" name="__codelineno-92-5" href="#__codelineno-92-5"></a>parsed.positional()                     // オプション以外の引数の List
+<div class="language-text highlight"><pre><span></span><code><span id="__span-97-1"><a id="__codelineno-97-1" name="__codelineno-97-1" href="#__codelineno-97-1"></a>val parsed = Args::parse(args)
+</span><span id="__span-97-2"><a id="__codelineno-97-2" name="__codelineno-97-2" href="#__codelineno-97-2"></a>parsed.flag(&quot;verbose&quot;)                  // --verbose
+</span><span id="__span-97-3"><a id="__codelineno-97-3" name="__codelineno-97-3" href="#__codelineno-97-3"></a>parsed.option(&quot;out&quot;, &quot;a.out&quot;)           // --out path（デフォルト値付き）
+</span><span id="__span-97-4"><a id="__codelineno-97-4" name="__codelineno-97-4" href="#__codelineno-97-4"></a>parsed.intOption(&quot;level&quot;, 3)
+</span><span id="__span-97-5"><a id="__codelineno-97-5" name="__codelineno-97-5" href="#__codelineno-97-5"></a>parsed.positional()                     // オプション以外の引数の List
 </span></code></pre></div>
 <h2 id="colls">Colls モジュール<a class="headerlink" href="#colls" title="Permanent link">&para;</a></h2>
 <p>コレクションのファクトリとパイプライン（<code>onion.Colls</code>）:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-93-1"><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a>Colls::listOf(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)            // 不変の List
-</span><span id="__span-93-2"><a id="__codelineno-93-2" name="__codelineno-93-2" href="#__codelineno-93-2"></a>Colls::mutableListOf(1, 2, 3)           // ArrayList
-</span><span id="__span-93-3"><a id="__codelineno-93-3" name="__codelineno-93-3" href="#__codelineno-93-3"></a>Colls::range(0, 5)                      // List [0,1,2,3,4]
-</span><span id="__span-93-4"><a id="__codelineno-93-4" name="__codelineno-93-4" href="#__codelineno-93-4"></a>Colls::sortedBy(people) { p =&gt; p.age() }
-</span><span id="__span-93-5"><a id="__codelineno-93-5" name="__codelineno-93-5" href="#__codelineno-93-5"></a>// map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
-</span><span id="__span-93-6"><a id="__codelineno-93-6" name="__codelineno-93-6" href="#__codelineno-93-6"></a>// xs.map { x =&gt; x * 2 }.filter { x =&gt; x &gt; 0 }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-98-1"><a id="__codelineno-98-1" name="__codelineno-98-1" href="#__codelineno-98-1"></a>Colls::listOf(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)            // 不変の List
+</span><span id="__span-98-2"><a id="__codelineno-98-2" name="__codelineno-98-2" href="#__codelineno-98-2"></a>Colls::mutableListOf(1, 2, 3)           // ArrayList
+</span><span id="__span-98-3"><a id="__codelineno-98-3" name="__codelineno-98-3" href="#__codelineno-98-3"></a>Colls::range(0, 5)                      // List [0,1,2,3,4]
+</span><span id="__span-98-4"><a id="__codelineno-98-4" name="__codelineno-98-4" href="#__codelineno-98-4"></a>Colls::sortedBy(people) { p =&gt; p.age() }
+</span><span id="__span-98-5"><a id="__codelineno-98-5" name="__codelineno-98-5" href="#__codelineno-98-5"></a>// map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
+</span><span id="__span-98-6"><a id="__codelineno-98-6" name="__codelineno-98-6" href="#__codelineno-98-6"></a>// xs.map { x =&gt; x * 2 }.filter { x =&gt; x &gt; 0 }
 </span></code></pre></div>
 <h2 id="http">Http<a class="headerlink" href="#http" title="Permanent link">&para;</a></h2>
 <p>HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用）。</p>
 <h3 id="get">GET リクエスト<a class="headerlink" href="#get" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-94-1"><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a>Http::get(url): String
-</span><span id="__span-94-2"><a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a>Http::get(url, headers): String    // headers: [&quot;Name1&quot;, &quot;Value1&quot;, ...]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-99-1"><a id="__codelineno-99-1" name="__codelineno-99-1" href="#__codelineno-99-1"></a>Http::get(url): String
+</span><span id="__span-99-2"><a id="__codelineno-99-2" name="__codelineno-99-2" href="#__codelineno-99-2"></a>Http::get(url, headers): String    // headers: [&quot;Name1&quot;, &quot;Value1&quot;, ...]
 </span></code></pre></div>
 <h3 id="post">POST リクエスト<a class="headerlink" href="#post" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-95-1"><a id="__codelineno-95-1" name="__codelineno-95-1" href="#__codelineno-95-1"></a>Http::post(url, body): String
-</span><span id="__span-95-2"><a id="__codelineno-95-2" name="__codelineno-95-2" href="#__codelineno-95-2"></a>Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
-</span><span id="__span-95-3"><a id="__codelineno-95-3" name="__codelineno-95-3" href="#__codelineno-95-3"></a>Http::post(url, body, headers): String   // headers は get と同じ
+<div class="language-text highlight"><pre><span></span><code><span id="__span-100-1"><a id="__codelineno-100-1" name="__codelineno-100-1" href="#__codelineno-100-1"></a>Http::post(url, body): String
+</span><span id="__span-100-2"><a id="__codelineno-100-2" name="__codelineno-100-2" href="#__codelineno-100-2"></a>Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
+</span><span id="__span-100-3"><a id="__codelineno-100-3" name="__codelineno-100-3" href="#__codelineno-100-3"></a>Http::post(url, body, headers): String   // headers は get と同じ
 </span></code></pre></div>
 <h3 id="_21">その他のメソッド<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-96-1"><a id="__codelineno-96-1" name="__codelineno-96-1" href="#__codelineno-96-1"></a>Http::put(url, body): String
-</span><span id="__span-96-2"><a id="__codelineno-96-2" name="__codelineno-96-2" href="#__codelineno-96-2"></a>Http::delete(url): String
+<div class="language-text highlight"><pre><span></span><code><span id="__span-101-1"><a id="__codelineno-101-1" name="__codelineno-101-1" href="#__codelineno-101-1"></a>Http::put(url, body): String
+</span><span id="__span-101-2"><a id="__codelineno-101-2" name="__codelineno-101-2" href="#__codelineno-101-2"></a>Http::delete(url): String
 </span></code></pre></div>
 <h3 id="url">URL ユーティリティ<a class="headerlink" href="#url" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-97-1"><a id="__codelineno-97-1" name="__codelineno-97-1" href="#__codelineno-97-1"></a>Http::encodeUrl(str): String
-</span><span id="__span-97-2"><a id="__codelineno-97-2" name="__codelineno-97-2" href="#__codelineno-97-2"></a>Http::decodeUrl(str): String
-</span><span id="__span-97-3"><a id="__codelineno-97-3" name="__codelineno-97-3" href="#__codelineno-97-3"></a>Http::buildQuery(params): String        // params: キーと値を交互に並べる
-</span><span id="__span-97-4"><a id="__codelineno-97-4" name="__codelineno-97-4" href="#__codelineno-97-4"></a>Http::buildUrl(baseUrl, params): String // &quot;?&quot;/&quot;&amp;&quot; + buildQuery(params) を付加
+<div class="language-text highlight"><pre><span></span><code><span id="__span-102-1"><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a>Http::encodeUrl(str): String
+</span><span id="__span-102-2"><a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a>Http::decodeUrl(str): String
+</span><span id="__span-102-3"><a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a>Http::buildQuery(params): String        // params: キーと値を交互に並べる
+</span><span id="__span-102-4"><a id="__codelineno-102-4" name="__codelineno-102-4" href="#__codelineno-102-4"></a>Http::buildUrl(baseUrl, params): String // &quot;?&quot;/&quot;&amp;&quot; + buildQuery(params) を付加
 </span></code></pre></div>
 <h3 id="_22">例<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-98-1"><a id="__codelineno-98-1" name="__codelineno-98-1" href="#__codelineno-98-1"></a>val response: String = Http::get(&quot;https://api.example.com/data&quot;);
-</span><span id="__span-98-2"><a id="__codelineno-98-2" name="__codelineno-98-2" href="#__codelineno-98-2"></a>val data: Object = Json::parse(response);
-</span><span id="__span-98-3"><a id="__codelineno-98-3" name="__codelineno-98-3" href="#__codelineno-98-3"></a>
-</span><span id="__span-98-4"><a id="__codelineno-98-4" name="__codelineno-98-4" href="#__codelineno-98-4"></a>val postResponse: String = Http::postJson(
-</span><span id="__span-98-5"><a id="__codelineno-98-5" name="__codelineno-98-5" href="#__codelineno-98-5"></a>  &quot;https://api.example.com/users&quot;,
-</span><span id="__span-98-6"><a id="__codelineno-98-6" name="__codelineno-98-6" href="#__codelineno-98-6"></a>  &quot;{\&quot;name\&quot;: \&quot;Bob\&quot;}&quot;
-</span><span id="__span-98-7"><a id="__codelineno-98-7" name="__codelineno-98-7" href="#__codelineno-98-7"></a>);
+<div class="language-text highlight"><pre><span></span><code><span id="__span-103-1"><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a>val response: String = Http::get(&quot;https://api.example.com/data&quot;);
+</span><span id="__span-103-2"><a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a>val data: Object = Json::parse(response);
+</span><span id="__span-103-3"><a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a>
+</span><span id="__span-103-4"><a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a>val postResponse: String = Http::postJson(
+</span><span id="__span-103-5"><a id="__codelineno-103-5" name="__codelineno-103-5" href="#__codelineno-103-5"></a>  &quot;https://api.example.com/users&quot;,
+</span><span id="__span-103-6"><a id="__codelineno-103-6" name="__codelineno-103-6" href="#__codelineno-103-6"></a>  &quot;{\&quot;name\&quot;: \&quot;Bob\&quot;}&quot;
+</span><span id="__span-103-7"><a id="__codelineno-103-7" name="__codelineno-103-7" href="#__codelineno-103-7"></a>);
 </span></code></pre></div>
 <hr />
 <h2 id="datetime">DateTime<a class="headerlink" href="#datetime" title="Permanent link">&para;</a></h2>
 <p>エポックミリ秒を使った日時ユーティリティ。</p>
 <h3 id="_23">現在時刻<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-99-1"><a id="__codelineno-99-1" name="__codelineno-99-1" href="#__codelineno-99-1"></a>DateTime::now(): Long              // 現在のエポックミリ秒
-</span><span id="__span-99-2"><a id="__codelineno-99-2" name="__codelineno-99-2" href="#__codelineno-99-2"></a>DateTime::nowString(): String      // ISO 形式（ローカルタイムゾーン）
-</span><span id="__span-99-3"><a id="__codelineno-99-3" name="__codelineno-99-3" href="#__codelineno-99-3"></a>DateTime::nowString(pattern): String
+<div class="language-text highlight"><pre><span></span><code><span id="__span-104-1"><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a>DateTime::now(): Long              // 現在のエポックミリ秒
+</span><span id="__span-104-2"><a id="__codelineno-104-2" name="__codelineno-104-2" href="#__codelineno-104-2"></a>DateTime::nowString(): String      // ISO 形式（ローカルタイムゾーン）
+</span><span id="__span-104-3"><a id="__codelineno-104-3" name="__codelineno-104-3" href="#__codelineno-104-3"></a>DateTime::nowString(pattern): String
 </span></code></pre></div>
 <h3 id="_24">パース<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-100-1"><a id="__codelineno-100-1" name="__codelineno-100-1" href="#__codelineno-100-1"></a>DateTime::parse(isoString): Long
-</span><span id="__span-100-2"><a id="__codelineno-100-2" name="__codelineno-100-2" href="#__codelineno-100-2"></a>DateTime::parse(dateTime, pattern): Long
+<div class="language-text highlight"><pre><span></span><code><span id="__span-105-1"><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a>DateTime::parse(isoString): Long
+</span><span id="__span-105-2"><a id="__codelineno-105-2" name="__codelineno-105-2" href="#__codelineno-105-2"></a>DateTime::parse(dateTime, pattern): Long
 </span></code></pre></div>
 <h3 id="_25">フォーマット<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-101-1"><a id="__codelineno-101-1" name="__codelineno-101-1" href="#__codelineno-101-1"></a>DateTime::format(epochMillis): String
-</span><span id="__span-101-2"><a id="__codelineno-101-2" name="__codelineno-101-2" href="#__codelineno-101-2"></a>DateTime::format(epochMillis, pattern): String
+<div class="language-text highlight"><pre><span></span><code><span id="__span-106-1"><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a>DateTime::format(epochMillis): String
+</span><span id="__span-106-2"><a id="__codelineno-106-2" name="__codelineno-106-2" href="#__codelineno-106-2"></a>DateTime::format(epochMillis, pattern): String
 </span></code></pre></div>
 <h3 id="_26">構成要素<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-102-1"><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a>DateTime::year(epochMillis): Int
-</span><span id="__span-102-2"><a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a>DateTime::month(epochMillis): Int       // 1-12
-</span><span id="__span-102-3"><a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a>DateTime::day(epochMillis): Int         // 1-31
-</span><span id="__span-102-4"><a id="__codelineno-102-4" name="__codelineno-102-4" href="#__codelineno-102-4"></a>DateTime::hour(epochMillis): Int        // 0-23
-</span><span id="__span-102-5"><a id="__codelineno-102-5" name="__codelineno-102-5" href="#__codelineno-102-5"></a>DateTime::minute(epochMillis): Int      // 0-59
-</span><span id="__span-102-6"><a id="__codelineno-102-6" name="__codelineno-102-6" href="#__codelineno-102-6"></a>DateTime::second(epochMillis): Int      // 0-59
-</span><span id="__span-102-7"><a id="__codelineno-102-7" name="__codelineno-102-7" href="#__codelineno-102-7"></a>DateTime::dayOfWeek(epochMillis): Int   // 1=月曜, 7=日曜
-</span><span id="__span-102-8"><a id="__codelineno-102-8" name="__codelineno-102-8" href="#__codelineno-102-8"></a>DateTime::dayOfYear(epochMillis): Int   // 1-366
+<div class="language-text highlight"><pre><span></span><code><span id="__span-107-1"><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a>DateTime::year(epochMillis): Int
+</span><span id="__span-107-2"><a id="__codelineno-107-2" name="__codelineno-107-2" href="#__codelineno-107-2"></a>DateTime::month(epochMillis): Int       // 1-12
+</span><span id="__span-107-3"><a id="__codelineno-107-3" name="__codelineno-107-3" href="#__codelineno-107-3"></a>DateTime::day(epochMillis): Int         // 1-31
+</span><span id="__span-107-4"><a id="__codelineno-107-4" name="__codelineno-107-4" href="#__codelineno-107-4"></a>DateTime::hour(epochMillis): Int        // 0-23
+</span><span id="__span-107-5"><a id="__codelineno-107-5" name="__codelineno-107-5" href="#__codelineno-107-5"></a>DateTime::minute(epochMillis): Int      // 0-59
+</span><span id="__span-107-6"><a id="__codelineno-107-6" name="__codelineno-107-6" href="#__codelineno-107-6"></a>DateTime::second(epochMillis): Int      // 0-59
+</span><span id="__span-107-7"><a id="__codelineno-107-7" name="__codelineno-107-7" href="#__codelineno-107-7"></a>DateTime::dayOfWeek(epochMillis): Int   // 1=月曜, 7=日曜
+</span><span id="__span-107-8"><a id="__codelineno-107-8" name="__codelineno-107-8" href="#__codelineno-107-8"></a>DateTime::dayOfYear(epochMillis): Int   // 1-366
 </span></code></pre></div>
 <h3 id="_27">演算<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-103-1"><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a>DateTime::addDays(epochMillis, days): Long
-</span><span id="__span-103-2"><a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a>DateTime::addHours(epochMillis, hours): Long
-</span><span id="__span-103-3"><a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a>DateTime::addMinutes(epochMillis, minutes): Long
-</span><span id="__span-103-4"><a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a>DateTime::addSeconds(epochMillis, seconds): Long
-</span><span id="__span-103-5"><a id="__codelineno-103-5" name="__codelineno-103-5" href="#__codelineno-103-5"></a>DateTime::addMonths(epochMillis, months): Long
-</span><span id="__span-103-6"><a id="__codelineno-103-6" name="__codelineno-103-6" href="#__codelineno-103-6"></a>DateTime::addYears(epochMillis, years): Long
+<div class="language-text highlight"><pre><span></span><code><span id="__span-108-1"><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a>DateTime::addDays(epochMillis, days): Long
+</span><span id="__span-108-2"><a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a>DateTime::addHours(epochMillis, hours): Long
+</span><span id="__span-108-3"><a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a>DateTime::addMinutes(epochMillis, minutes): Long
+</span><span id="__span-108-4"><a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a>DateTime::addSeconds(epochMillis, seconds): Long
+</span><span id="__span-108-5"><a id="__codelineno-108-5" name="__codelineno-108-5" href="#__codelineno-108-5"></a>DateTime::addMonths(epochMillis, months): Long
+</span><span id="__span-108-6"><a id="__codelineno-108-6" name="__codelineno-108-6" href="#__codelineno-108-6"></a>DateTime::addYears(epochMillis, years): Long
 </span></code></pre></div>
 <h3 id="_28">比較<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-104-1"><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a>DateTime::diff(time1, time2): Long        // ミリ秒単位の差分
-</span><span id="__span-104-2"><a id="__codelineno-104-2" name="__codelineno-104-2" href="#__codelineno-104-2"></a>DateTime::diffDays(time1, time2): Int
-</span><span id="__span-104-3"><a id="__codelineno-104-3" name="__codelineno-104-3" href="#__codelineno-104-3"></a>DateTime::diffHours(time1, time2): Long   // hours / minutes / seconds は整数値
-</span><span id="__span-104-4"><a id="__codelineno-104-4" name="__codelineno-104-4" href="#__codelineno-104-4"></a>DateTime::diffMinutes(time1, time2): Long
-</span><span id="__span-104-5"><a id="__codelineno-104-5" name="__codelineno-104-5" href="#__codelineno-104-5"></a>DateTime::diffSeconds(time1, time2): Long
-</span><span id="__span-104-6"><a id="__codelineno-104-6" name="__codelineno-104-6" href="#__codelineno-104-6"></a>DateTime::isBefore(time1, time2): Boolean
-</span><span id="__span-104-7"><a id="__codelineno-104-7" name="__codelineno-104-7" href="#__codelineno-104-7"></a>DateTime::isAfter(time1, time2): Boolean
-</span><span id="__span-104-8"><a id="__codelineno-104-8" name="__codelineno-104-8" href="#__codelineno-104-8"></a>DateTime::dayName(epochMillis): String    // &quot;Friday&quot;（英語、ロケール非依存）
-</span><span id="__span-104-9"><a id="__codelineno-104-9" name="__codelineno-104-9" href="#__codelineno-104-9"></a>DateTime::monthName(epochMillis): String  // &quot;March&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-109-1"><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a>DateTime::diff(time1, time2): Long        // ミリ秒単位の差分
+</span><span id="__span-109-2"><a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a>DateTime::diffDays(time1, time2): Int
+</span><span id="__span-109-3"><a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a>DateTime::diffHours(time1, time2): Long   // hours / minutes / seconds は整数値
+</span><span id="__span-109-4"><a id="__codelineno-109-4" name="__codelineno-109-4" href="#__codelineno-109-4"></a>DateTime::diffMinutes(time1, time2): Long
+</span><span id="__span-109-5"><a id="__codelineno-109-5" name="__codelineno-109-5" href="#__codelineno-109-5"></a>DateTime::diffSeconds(time1, time2): Long
+</span><span id="__span-109-6"><a id="__codelineno-109-6" name="__codelineno-109-6" href="#__codelineno-109-6"></a>DateTime::isBefore(time1, time2): Boolean
+</span><span id="__span-109-7"><a id="__codelineno-109-7" name="__codelineno-109-7" href="#__codelineno-109-7"></a>DateTime::isAfter(time1, time2): Boolean
+</span><span id="__span-109-8"><a id="__codelineno-109-8" name="__codelineno-109-8" href="#__codelineno-109-8"></a>DateTime::dayName(epochMillis): String    // &quot;Friday&quot;（英語、ロケール非依存）
+</span><span id="__span-109-9"><a id="__codelineno-109-9" name="__codelineno-109-9" href="#__codelineno-109-9"></a>DateTime::monthName(epochMillis): String  // &quot;March&quot;
 </span></code></pre></div>
 <h3 id="_29">ファクトリ<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-105-1"><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a>DateTime::of(year, month, day): Long
-</span><span id="__span-105-2"><a id="__codelineno-105-2" name="__codelineno-105-2" href="#__codelineno-105-2"></a>DateTime::of(year, month, day, hour, minute, second): Long
-</span><span id="__span-105-3"><a id="__codelineno-105-3" name="__codelineno-105-3" href="#__codelineno-105-3"></a>DateTime::startOfDay(epochMillis): Long
-</span><span id="__span-105-4"><a id="__codelineno-105-4" name="__codelineno-105-4" href="#__codelineno-105-4"></a>DateTime::endOfDay(epochMillis): Long
+<div class="language-text highlight"><pre><span></span><code><span id="__span-110-1"><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a>DateTime::of(year, month, day): Long
+</span><span id="__span-110-2"><a id="__codelineno-110-2" name="__codelineno-110-2" href="#__codelineno-110-2"></a>DateTime::of(year, month, day, hour, minute, second): Long
+</span><span id="__span-110-3"><a id="__codelineno-110-3" name="__codelineno-110-3" href="#__codelineno-110-3"></a>DateTime::startOfDay(epochMillis): Long
+</span><span id="__span-110-4"><a id="__codelineno-110-4" name="__codelineno-110-4" href="#__codelineno-110-4"></a>DateTime::endOfDay(epochMillis): Long
 </span></code></pre></div>
 <h3 id="_30">例<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-106-1"><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a>val now: Long = DateTime::now();
-</span><span id="__span-106-2"><a id="__codelineno-106-2" name="__codelineno-106-2" href="#__codelineno-106-2"></a>IO::println(&quot;今日: &quot; + DateTime::format(now, &quot;yyyy-MM-dd&quot;));
-</span><span id="__span-106-3"><a id="__codelineno-106-3" name="__codelineno-106-3" href="#__codelineno-106-3"></a>
-</span><span id="__span-106-4"><a id="__codelineno-106-4" name="__codelineno-106-4" href="#__codelineno-106-4"></a>val tomorrow: Long = DateTime::addDays(now, 1);
-</span><span id="__span-106-5"><a id="__codelineno-106-5" name="__codelineno-106-5" href="#__codelineno-106-5"></a>IO::println(&quot;明日: &quot; + DateTime::format(tomorrow));
-</span><span id="__span-106-6"><a id="__codelineno-106-6" name="__codelineno-106-6" href="#__codelineno-106-6"></a>
-</span><span id="__span-106-7"><a id="__codelineno-106-7" name="__codelineno-106-7" href="#__codelineno-106-7"></a>val birthday: Long = DateTime::of(1990, 5, 15);
-</span><span id="__span-106-8"><a id="__codelineno-106-8" name="__codelineno-106-8" href="#__codelineno-106-8"></a>val age: Int = DateTime::diffDays(now, birthday) / 365;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-111-1"><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a>val now: Long = DateTime::now();
+</span><span id="__span-111-2"><a id="__codelineno-111-2" name="__codelineno-111-2" href="#__codelineno-111-2"></a>IO::println(&quot;今日: &quot; + DateTime::format(now, &quot;yyyy-MM-dd&quot;));
+</span><span id="__span-111-3"><a id="__codelineno-111-3" name="__codelineno-111-3" href="#__codelineno-111-3"></a>
+</span><span id="__span-111-4"><a id="__codelineno-111-4" name="__codelineno-111-4" href="#__codelineno-111-4"></a>val tomorrow: Long = DateTime::addDays(now, 1);
+</span><span id="__span-111-5"><a id="__codelineno-111-5" name="__codelineno-111-5" href="#__codelineno-111-5"></a>IO::println(&quot;明日: &quot; + DateTime::format(tomorrow));
+</span><span id="__span-111-6"><a id="__codelineno-111-6" name="__codelineno-111-6" href="#__codelineno-111-6"></a>
+</span><span id="__span-111-7"><a id="__codelineno-111-7" name="__codelineno-111-7" href="#__codelineno-111-7"></a>val birthday: Long = DateTime::of(1990, 5, 15);
+</span><span id="__span-111-8"><a id="__codelineno-111-8" name="__codelineno-111-8" href="#__codelineno-111-8"></a>val age: Int = DateTime::diffDays(now, birthday) / 365;
 </span></code></pre></div>
 <hr />
 <h2 id="regex">Regex<a class="headerlink" href="#regex" title="Permanent link">&para;</a></h2>
 <p>正規表現ユーティリティ。</p>
 <h3 id="_31">マッチング<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-107-1"><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a>Regex::matches(input, pattern): Boolean   // 文字列全体がマッチ
-</span><span id="__span-107-2"><a id="__codelineno-107-2" name="__codelineno-107-2" href="#__codelineno-107-2"></a>Regex::find(input, pattern): Boolean      // どこかにパターンが見つかる
+<div class="language-text highlight"><pre><span></span><code><span id="__span-112-1"><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a>Regex::matches(input, pattern): Boolean   // 文字列全体がマッチ
+</span><span id="__span-112-2"><a id="__codelineno-112-2" name="__codelineno-112-2" href="#__codelineno-112-2"></a>Regex::find(input, pattern): Boolean      // どこかにパターンが見つかる
 </span></code></pre></div>
 <h3 id="_32">抽出<a class="headerlink" href="#_32" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-108-1"><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a>Regex::findAll(input, pattern): List[String]
-</span><span id="__span-108-2"><a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a>Regex::findFirst(input, pattern): String
-</span><span id="__span-108-3"><a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a>Regex::groups(input, pattern): List[String]   // 最初のマッチのグループ
-</span><span id="__span-108-4"><a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a>Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグループ
+<div class="language-text highlight"><pre><span></span><code><span id="__span-113-1"><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a>Regex::findAll(input, pattern): List[String]
+</span><span id="__span-113-2"><a id="__codelineno-113-2" name="__codelineno-113-2" href="#__codelineno-113-2"></a>Regex::findFirst(input, pattern): String
+</span><span id="__span-113-3"><a id="__codelineno-113-3" name="__codelineno-113-3" href="#__codelineno-113-3"></a>Regex::groups(input, pattern): List[String]   // 最初のマッチのグループ
+</span><span id="__span-113-4"><a id="__codelineno-113-4" name="__codelineno-113-4" href="#__codelineno-113-4"></a>Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグループ
 </span></code></pre></div>
 <h3 id="_33">置換<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-109-1"><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a>Regex::replace(input, pattern, replacement): String
-</span><span id="__span-109-2"><a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a>Regex::replaceFirst(input, pattern, replacement): String
+<div class="language-text highlight"><pre><span></span><code><span id="__span-114-1"><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a>Regex::replace(input, pattern, replacement): String
+</span><span id="__span-114-2"><a id="__codelineno-114-2" name="__codelineno-114-2" href="#__codelineno-114-2"></a>Regex::replaceFirst(input, pattern, replacement): String
 </span></code></pre></div>
 <h3 id="_34">分割<a class="headerlink" href="#_34" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-110-1"><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a>Regex::split(input, pattern): List[String]
-</span><span id="__span-110-2"><a id="__codelineno-110-2" name="__codelineno-110-2" href="#__codelineno-110-2"></a>Regex::split(input, pattern, limit): List[String]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-115-1"><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a>Regex::split(input, pattern): List[String]
+</span><span id="__span-115-2"><a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a>Regex::split(input, pattern, limit): List[String]
 </span></code></pre></div>
 <h3 id="_35">ユーティリティ<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-111-1"><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a>Regex::quote(literal): String    // 特殊文字をエスケープ
-</span><span id="__span-111-2"><a id="__codelineno-111-2" name="__codelineno-111-2" href="#__codelineno-111-2"></a>Regex::isValid(pattern): Boolean
+<div class="language-text highlight"><pre><span></span><code><span id="__span-116-1"><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a>Regex::quote(literal): String    // 特殊文字をエスケープ
+</span><span id="__span-116-2"><a id="__codelineno-116-2" name="__codelineno-116-2" href="#__codelineno-116-2"></a>Regex::isValid(pattern): Boolean
 </span></code></pre></div>
 <h3 id="_36">例<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-112-1"><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a>val text: String = &quot;Email: alice@example.com, bob@test.org&quot;;
-</span><span id="__span-112-2"><a id="__codelineno-112-2" name="__codelineno-112-2" href="#__codelineno-112-2"></a>val emails: List[String] = Regex::findAll(text, &quot;[\\w.]+@[\\w.]+&quot;);
-</span><span id="__span-112-3"><a id="__codelineno-112-3" name="__codelineno-112-3" href="#__codelineno-112-3"></a>// [&quot;alice@example.com&quot;, &quot;bob@test.org&quot;]
-</span><span id="__span-112-4"><a id="__codelineno-112-4" name="__codelineno-112-4" href="#__codelineno-112-4"></a>
-</span><span id="__span-112-5"><a id="__codelineno-112-5" name="__codelineno-112-5" href="#__codelineno-112-5"></a>val masked: String = Regex::replace(text, &quot;@[\\w.]+&quot;, &quot;@***&quot;);
-</span><span id="__span-112-6"><a id="__codelineno-112-6" name="__codelineno-112-6" href="#__codelineno-112-6"></a>// &quot;Email: alice@***, bob@***&quot;
-</span><span id="__span-112-7"><a id="__codelineno-112-7" name="__codelineno-112-7" href="#__codelineno-112-7"></a>
-</span><span id="__span-112-8"><a id="__codelineno-112-8" name="__codelineno-112-8" href="#__codelineno-112-8"></a>if (Regex::matches(&quot;hello123&quot;, &quot;[a-z]+\\d+&quot;)) {
-</span><span id="__span-112-9"><a id="__codelineno-112-9" name="__codelineno-112-9" href="#__codelineno-112-9"></a>  IO::println(&quot;パターンマッチ!&quot;);
-</span><span id="__span-112-10"><a id="__codelineno-112-10" name="__codelineno-112-10" href="#__codelineno-112-10"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-117-1"><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a>val text: String = &quot;Email: alice@example.com, bob@test.org&quot;;
+</span><span id="__span-117-2"><a id="__codelineno-117-2" name="__codelineno-117-2" href="#__codelineno-117-2"></a>val emails: List[String] = Regex::findAll(text, &quot;[\\w.]+@[\\w.]+&quot;);
+</span><span id="__span-117-3"><a id="__codelineno-117-3" name="__codelineno-117-3" href="#__codelineno-117-3"></a>// [&quot;alice@example.com&quot;, &quot;bob@test.org&quot;]
+</span><span id="__span-117-4"><a id="__codelineno-117-4" name="__codelineno-117-4" href="#__codelineno-117-4"></a>
+</span><span id="__span-117-5"><a id="__codelineno-117-5" name="__codelineno-117-5" href="#__codelineno-117-5"></a>val masked: String = Regex::replace(text, &quot;@[\\w.]+&quot;, &quot;@***&quot;);
+</span><span id="__span-117-6"><a id="__codelineno-117-6" name="__codelineno-117-6" href="#__codelineno-117-6"></a>// &quot;Email: alice@***, bob@***&quot;
+</span><span id="__span-117-7"><a id="__codelineno-117-7" name="__codelineno-117-7" href="#__codelineno-117-7"></a>
+</span><span id="__span-117-8"><a id="__codelineno-117-8" name="__codelineno-117-8" href="#__codelineno-117-8"></a>if (Regex::matches(&quot;hello123&quot;, &quot;[a-z]+\\d+&quot;)) {
+</span><span id="__span-117-9"><a id="__codelineno-117-9" name="__codelineno-117-9" href="#__codelineno-117-9"></a>  IO::println(&quot;パターンマッチ!&quot;);
+</span><span id="__span-117-10"><a id="__codelineno-117-10" name="__codelineno-117-10" href="#__codelineno-117-10"></a>}
 </span></code></pre></div>
 <hr />
 <h2 id="_37">次のステップ<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h2>

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/MazeSolver.on`, a 295-line maze generator + BFS solver sample.**
+  Generates a perfect maze via recursive-backtracking DFS with a Fisher-Yates
+  shuffle, then finds the shortest path with an iterative BFS using
+  array-based visited/parent trackers. Exercises an ADT enum (`Cell`) matched
+  with `select`/`is`, a `Point` record, classes with `public:`/`private:`
+  sections (`Maze`, `BfsSolver`, `MazeStats`), extension methods on `String`,
+  a flat row-major `List[Cell]` grid, `Boolean[]`/`Int[]` primitive arrays,
+  recursion, `while`/`foreach` loops, and string interpolation.
 - **`run/TextAnalytics.on`, a 272-line multi-document text-analysis sample.**
   Exercises records (`Document`, `WordFreq`, `SentenceInfo`, `AnalysisResult`),
   a data-carrying enum (`ReadabilityLevel`) matched via `select this`, a class

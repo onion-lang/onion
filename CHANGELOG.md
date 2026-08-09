@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Format::fixed` percentage/float formatting. Reports word-frequency
   profiles, sentence-length breakdown, readability classification, pairwise
   Jaccard similarity, and a complexity ranking across three sample documents.
+- **`run/SpaceMission.on`, a 324-line space mission planner sample.** Exercises
+  records with body methods (`Planet`, `Spacecraft.wetMass`/`massRatio`,
+  `MissionLog`), a plain enum (`MissionStatus`), a data-carrying enum
+  (`MissionOutcome`), an ADT case-enum (`MissionEvent` with 4 cases), a class
+  with mutable state (`MissionController`), collection pipelines (`filter`,
+  `map`, `fold`, `groupBy`, `sortedBy`, `find`), exhaustive `select` over the
+  ADT cases, nullable lookups (`findPlanet(): Planet?`), closures, string
+  interpolation, recursion (Newton's method for orbital period), `foreach`
+  over a range, `while`, `try`/`catch`, and `foreach (k, v) in map`.
 - **`run/KingdomSim.on`, a 550-line medieval kingdom simulation sample.**
   Exercises operator overloading (`plus`/`times`/`minus` on a `Resource`
   record), `do[List]` comprehension for trade-pair generation, multiple

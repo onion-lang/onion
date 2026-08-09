@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `Map[String, Double]` registries, nullable `Double?` lookups, collection
   pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
   methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
+- **`run/LibrarySystem.on` expanded from a 374-line stub to a 529-line library
+  management system.** Exercises extension methods on `String`/`Int`/`Double`,
+  homogeneous enums with `public:` methods (`Genre`, `MemberStatus`,
+  `LoanStatus`), records with inline `public:` methods, interface conformance
+  (`Reportable`), classes with mutable typed-list fields, in-place mutation via
+  `indexOf`/`List.set`, collection pipelines (`filter`/`map`/`fold`/`groupBy`/
+  `sortedBy`/`partition`/`zip`/`any`/`count`), `foreach (k, v) in map`, nullable
+  types with null guards, closures stored in `val`s, and a tail-recursive helper.
 
 ## [0.10.26] - 2026-08-08
 

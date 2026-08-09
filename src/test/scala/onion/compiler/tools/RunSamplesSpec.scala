@@ -369,5 +369,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs MusicFestival.on") {
       assert(Shell.Success(null) == runSample("run/MusicFestival.on"))
     }
+
+    it("runs LibrarySystem.on") {
+      assert(Shell.Success(null) == runSample("run/LibrarySystem.on"))
+    }
   }
 }

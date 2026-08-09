@@ -1,0 +1,383 @@
+// BookClub.on — A book-club management system.
+// Exercises: homogeneous enum, ADT case-enum, records with methods,
+// classes with ArrayList, extension methods on Int, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/reduce),
+// select / type patterns, string interpolation, foreach ranges and map-entry
+// destructuring, nullable, try/catch, recursion, and while loops.
+
+import { java.util.ArrayList }
+
+// ──────────────────────── primitive helpers ──────────────────────────────────
+
+extension Int {
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "★"; i = i + 1 }
+    var j: Int = self
+    while j < 5 { s = s + "☆"; j = j + 1 }
+    return s
+  }
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+// ──────────────────────── genre enum ────────────────────────────────────────
+
+enum Genre {
+  Fiction, NonFiction, Mystery, SciFi, Fantasy, Biography, History
+public:
+  def label(): String = select this {
+    case Genre::Fiction:    "Fiction"
+    case Genre::NonFiction: "Non-Fiction"
+    case Genre::Mystery:    "Mystery"
+    case Genre::SciFi:      "Sci-Fi"
+    case Genre::Fantasy:    "Fantasy"
+    case Genre::Biography:  "Biography"
+    case Genre::History:    "History"
+    else: "Other"
+  }
+  def recommendedLength(): Int = select this {
+    case Genre::NonFiction: 300
+    case Genre::Biography:  350
+    case Genre::History:    400
+    else: 250
+  }
+}
+
+// ──────────────────────── ADT: reading status ────────────────────────────────
+
+enum ReadStatus {
+  case Unread
+  case InProgress(page: Int)
+  case Finished(rating: Int)
+  case Abandoned(reason: String)
+public:
+  def label(): String = select this {
+    case s is Unread:     "Not started"
+    case s is InProgress: "Reading (p.#{s.page()})"
+    case s is Finished:   "Done – #{s.rating().stars()}"
+    case s is Abandoned:  "Abandoned: #{s.reason()}"
+  }
+  def isDone(): Boolean = select this {
+    case s is Finished: true
+    else: false
+  }
+  def rating(): Int = select this {
+    case s is Finished: s.rating()
+    else: 0
+  }
+}
+
+// ──────────────────────── records ───────────────────────────────────────────
+
+record Book(title: String, author: String, year: Int, pages: Int, genre: Genre) {
+public:
+  def shortDesc(): String = "\"#{title()}\" by #{author()} (#{year()}, #{genre().label()}, #{pages()}p)"
+  def isLong(): Boolean = pages() > genre().recommendedLength()
+}
+
+record MemberBook(book: Book, status: ReadStatus) {
+public:
+  def line(): String = "  #{book().title()} — #{status().label()}"
+}
+
+record Meeting(meetingTitle: String, book: Book, attendeeCount: Int, avgRating: Int) {
+public:
+  def report(): String =
+    "Meeting: \"#{meetingTitle()}\" | Book: #{book().title()} | Attendees: #{attendeeCount()} | Avg: #{avgRating().stars()}"
+}
+
+// ──────────────────────── member class ──────────────────────────────────────
+
+class Member {
+public:
+  val name: String
+  val joinYear: Int
+  val shelf: ArrayList[MemberBook]
+
+  def this(n: String, year: Int) {
+    this.name = n
+    this.joinYear = year
+    this.shelf = new ArrayList[MemberBook]()
+  }
+
+  def addBook(b: Book, s: ReadStatus): void {
+    shelf.add(new MemberBook(b, s))
+  }
+
+  def finishedBooks(): List[MemberBook] {
+    return shelf.filter { mb => (mb as MemberBook).status().isDone() }
+  }
+
+  def avgRating(): Int {
+    val done = finishedBooks()
+    if done.size == 0 { return 0 }
+    val total = done.fold(0) { acc, mb => (acc as Int) + (mb as MemberBook).status().rating() }
+    return (total as Int) / done.size
+  }
+
+  def favoriteGenre(): String {
+    val done = finishedBooks()
+    if done.size == 0 { return "none" }
+    val counts = done.groupBy { mb => (mb as MemberBook).book().genre().label() }
+    var topGenre: String = "none"
+    var topCount: Int = 0
+    foreach (g, entries) in counts {
+      val c = (entries as List).size
+      if c > topCount {
+        topCount = c
+        topGenre = g
+      }
+    }
+    return topGenre
+  }
+
+  def statusLine(): String {
+    val done = finishedBooks().size
+    val total = shelf.size
+    val avg = avgRating()
+    val ratingStr = if avg == 0 { "no ratings" } else { avg.stars() }
+    return "#{name} (joined #{joinYear}): #{done}/#{total} books done, avg #{ratingStr}, fave genre: #{favoriteGenre()}"
+  }
+}
+
+// ──────────────────────── book-club class ───────────────────────────────────
+
+class BookClub {
+public:
+  val clubName: String
+  val members: ArrayList[Member]
+  val meetings: ArrayList[Meeting]
+  val catalog: ArrayList[Book]
+
+  def this(n: String) {
+    this.clubName = n
+    this.members = new ArrayList[Member]()
+    this.meetings = new ArrayList[Meeting]()
+    this.catalog = new ArrayList[Book]()
+  }
+
+  def addMember(m: Member): void  { members.add(m) }
+  def addMeeting(m: Meeting): void { meetings.add(m) }
+  def addBook(b: Book): void       { catalog.add(b) }
+
+  def totalFinished(): Int {
+    return members.fold(0) { acc, m => (acc as Int) + (m as Member).finishedBooks().size }
+  }
+
+  def topReader(): Member? {
+    if members.size == 0 { return null }
+    return members.reduce { a, b =>
+      if (a as Member).finishedBooks().size >= (b as Member).finishedBooks().size { a } else { b }
+    } as Member
+  }
+
+  def mostDiscussedBook(): Book? {
+    if meetings.size == 0 { return null }
+    val best = meetings.reduce { a, b =>
+      if (a as Meeting).attendeeCount() >= (b as Meeting).attendeeCount() { a } else { b }
+    }
+    return (best as Meeting).book()
+  }
+}
+
+// ──────────────────────── utility functions ──────────────────────────────────
+
+def pagesRead(m: Member): Int {
+  return m.shelf.fold(0) { acc, mb =>
+    val s = (mb as MemberBook).status()
+    val extra = select s {
+      case st is Finished:   (mb as MemberBook).book().pages()
+      case st is InProgress: st.page()
+      else: 0
+    }
+    (acc as Int) + extra
+  }
+}
+
+// Recursive: years between joinYear and currentYear
+def yearsActive(joinYear: Int, currentYear: Int): Int =
+  if joinYear >= currentYear { 0 } else { 1 + yearsActive(joinYear + 1, currentYear) }
+
+def safeDivide(a: Int, b: Int): Int {
+  try {
+    return a / b
+  } catch e: Exception {
+    return 0
+  }
+}
+
+// ──────────────────────── build the club ────────────────────────────────────
+
+val b1 = new Book("The Onion of Time",   "A. Verne",    2019, 320, Genre::SciFi)
+val b2 = new Book("Midnight Layers",      "C. Bronte",   2021, 280, Genre::Mystery)
+val b3 = new Book("Kotlin in Action",     "D. Jemerov",  2017, 360, Genre::NonFiction)
+val b4 = new Book("Dragons of Tomorrow", "T. Brooks",   2020, 420, Genre::Fantasy)
+val b5 = new Book("The Mind's Eye",       "O. Sacks",    2010, 310, Genre::Biography)
+val b6 = new Book("Foundation",           "I. Asimov",   1951, 244, Genre::SciFi)
+val b7 = new Book("Sapiens",              "Y. Harari",   2011, 443, Genre::History)
+
+val club = new BookClub("Pages & Co.")
+club.addBook(b1); club.addBook(b2); club.addBook(b3)
+club.addBook(b4); club.addBook(b5); club.addBook(b6); club.addBook(b7)
+
+val alice = new Member("Alice", 2020)
+alice.addBook(b1, new Finished(5))
+alice.addBook(b2, new Finished(4))
+alice.addBook(b4, new Finished(4))
+alice.addBook(b6, new Finished(5))
+alice.addBook(b7, new InProgress(180))
+
+val bob = new Member("Bob", 2021)
+bob.addBook(b1, new Finished(3))
+bob.addBook(b3, new Finished(4))
+bob.addBook(b5, new Abandoned("Too dense"))
+bob.addBook(b6, new Finished(5))
+
+val caro = new Member("Caro", 2019)
+caro.addBook(b2, new Finished(5))
+caro.addBook(b4, new Finished(5))
+caro.addBook(b7, new Finished(4))
+caro.addBook(b3, new InProgress(120))
+caro.addBook(b1, new Unread())
+
+val dan = new Member("Dan", 2022)
+dan.addBook(b6, new Finished(4))
+dan.addBook(b2, new Finished(3))
+dan.addBook(b5, new Finished(4))
+
+club.addMember(alice); club.addMember(bob)
+club.addMember(caro);  club.addMember(dan)
+
+club.addMeeting(new Meeting("Sci-Fi Night",    b6, 4, 5))
+club.addMeeting(new Meeting("Mystery Corner",  b2, 3, 4))
+club.addMeeting(new Meeting("Fantasy Evening", b4, 2, 4))
+club.addMeeting(new Meeting("Tech Talks",      b3, 3, 3))
+
+// ──────────────────────── print reports ─────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════╗")
+IO::println("║        BOOK CLUB: " + club.clubName + "                  ║")
+IO::println("╚══════════════════════════════════════════════════╝")
+
+IO::println("\n── MEMBER STATUS ──────────────────────────────────")
+foreach m: Member in club.members {
+  IO::println(m.statusLine())
+  foreach mb: MemberBook in m.shelf {
+    IO::println(mb.line())
+  }
+}
+
+IO::println("\n── CATALOG (" + club.catalog.size + " books) ─────────────────────────")
+foreach b: Book in club.catalog {
+  val flag = if b.isLong() { " [LONG]" } else { "" }
+  IO::println("  " + b.shortDesc() + flag)
+}
+
+IO::println("\n── GENRE BREAKDOWN ────────────────────────────────")
+val breakdown = club.catalog.groupBy { b => (b as Book).genre().label() }
+foreach (genre, books) in breakdown {
+  IO::println("  #{genre}: #{(books as List).size} book(s)")
+}
+
+IO::println("\n── MEETING HISTORY ────────────────────────────────")
+foreach mt: Meeting in club.meetings {
+  IO::println("  " + mt.report())
+}
+
+IO::println("\n── STATISTICS ─────────────────────────────────────")
+IO::println("  Total books finished: " + club.totalFinished())
+
+val top = club.topReader()
+if top != null {
+  val tr = top as Member
+  IO::println("  Top reader: #{tr.name} (#{tr.finishedBooks().size} books)")
+} else {
+  IO::println("  Top reader: none")
+}
+
+val discussed = club.mostDiscussedBook()
+if discussed != null {
+  IO::println("  Most discussed: " + (discussed as Book).title())
+}
+
+IO::println("\n── PAGES READ PER MEMBER ──────────────────────────")
+foreach m: Member in club.members {
+  val pages = pagesRead(m)
+  val yrs = yearsActive(m.joinYear, 2026)
+  val perYear = safeDivide(pages, yrs)
+  IO::println("  #{m.name}: #{pages} pages total (#{yrs} yrs active, ~#{perYear}/yr)")
+}
+
+IO::println("\n── ACTIVE vs INACTIVE READERS ─────────────────────")
+val parts = club.members.partition { m => (m as Member).finishedBooks().size >= 3 }
+val active = parts[0] as List
+val inactive = parts[1] as List
+IO::println("  Active (>=3 books done): #{active.size}")
+IO::println("  Inactive (<3 books done): #{inactive.size}")
+foreach m: Member in active {
+  IO::println("    * " + (m as Member).name)
+}
+
+IO::println("\n── BOOKS SORTED BY YEAR ───────────────────────────")
+val byYear = club.catalog.sortedBy { b => (b as Book).year() }
+foreach b: Book in byYear {
+  IO::println("  #{(b as Book).year()} - #{(b as Book).title()}")
+}
+
+IO::println("\n── HIGHEST-RATED BOOKS (avg across members) ───────")
+val ratedBooks = club.catalog.map { b =>
+  val bk = b as Book
+  val ratings = club.members.map { m =>
+    val found = (m as Member).shelf.find { mb => (mb as MemberBook).book().title() == bk.title() }
+    if found != null { (found as MemberBook).status().rating() } else { 0 }
+  }.filter { r => (r as Int) > 0 }
+  val total2 = ratings.fold(0) { acc, r => (acc as Int) + (r as Int) }
+  val cnt = ratings.size
+  val avg2 = if cnt == 0 { 0 } else { (total2 as Int) / cnt }
+  "#{avg2.stars()} #{bk.title()} (#{cnt} rating(s))"
+}
+foreach entry: String in ratedBooks {
+  IO::println("  " + entry)
+}
+
+IO::println("\n── RATING RANGE SUMMARY ───────────────────────────")
+foreach star: Int in 1..5 {
+  val cnt = club.members.fold(0) { acc, m =>
+    val mBooks = (m as Member).shelf
+    val n = mBooks.filter { mb => (mb as MemberBook).status().rating() == star }.size
+    (acc as Int) + n
+  }
+  IO::println("  #{star}: #{cnt} book(s) rated #{star}/5")
+}
+
+IO::println("\n── TOP MEMBER PER GENRE ───────────────────────────")
+val allGenres = [Genre::SciFi, Genre::Mystery, Genre::Fantasy, Genre::NonFiction, Genre::Biography, Genre::History]
+foreach genre: Genre in allGenres {
+  val gl = genre.label()
+  val best: Member? = club.members.reduce { a, b =>
+    val ac = (a as Member).finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
+    val bc = (b as Member).finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
+    if ac >= bc { a } else { b }
+  } as Member?
+  if best != null {
+    val bm = best as Member
+    val cnt2 = bm.finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
+    if cnt2 > 0 {
+      IO::println("  #{gl}: #{bm.name} (#{cnt2} book(s))")
+    }
+  }
+}
+
+IO::println("\n── COST PROJECTION (compound interest model) ──────")
+def compound(base: Int, pct: Int, n: Int): Int =
+  if n <= 0 { base } else { compound(base + base * pct / 100, pct, n - 1) }
+
+val baseCost = 5000
+foreach yr: Int in 1..5 {
+  val projected = compound(baseCost, 3, yr)
+  IO::println("  Year #{yr}: budget estimate $#{projected}")
+}
+
+IO::println("\nDone.")

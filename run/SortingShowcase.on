@@ -1,0 +1,402 @@
+// SortingShowcase.on — five classic sorting algorithms plus statistics,
+// exercising: recursion, while/foreach, records, enums, extension Int,
+// closures, collection pipelines (map/filter/fold/sortedBy/groupBy/partition),
+// select pattern matching, string interpolation, try/catch, nullable.
+
+// ── Helper records and enum ───────────────────────────────────────────────────
+
+record TestCase(label: String, data: List[Int])
+record SortResult(algorithm: String, inputLabel: String, sorted: Boolean, size: Int)
+
+enum SortKind {
+  BUBBLE, INSERTION, SELECTION, MERGE, QUICK, COUNTING
+}
+
+// ── Extension on Int ──────────────────────────────────────────────────────────
+
+extension Int {
+  def absVal(): Int = if self < 0 { 0 - self } else { self }
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+  def times(n: Int): Int = self * n
+  def isEven(): Boolean = self % 2 == 0
+  def isOdd(): Boolean = self % 2 != 0
+  def squared(): Int = self * self
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+def copyList(data: List[Int]): List[Int] {
+  val result: List[Int] = []
+  var i = 0
+  while i < data.size { result.add(data[i]); i = i + 1 }
+  return result
+}
+
+def isSorted(data: List[Int]): Boolean {
+  if data.size <= 1 { return true }
+  var i = 0
+  while i < data.size - 1 {
+    if (data[i] as Int) > (data[i + 1] as Int) { return false }
+    i = i + 1
+  }
+  return true
+}
+
+def listStr(data: List[Int]): String {
+  val limit = 8
+  var s = "["
+  var i = 0
+  while i < data.size && i < limit {
+    s = s + (data[i] as Int)
+    if i < data.size - 1 && i < limit - 1 { s = s + ", " }
+    i = i + 1
+  }
+  if data.size > limit { s = s + ", ..." }
+  s = s + "]"
+  return s
+}
+
+// ── Bubble Sort ───────────────────────────────────────────────────────────────
+
+def bubbleSort(input: List[Int]): List[Int] {
+  val arr = copyList(input)
+  val n = arr.size
+  var i = 0
+  while i < n - 1 {
+    var j = 0
+    while j < n - i - 1 {
+      if (arr[j] as Int) > (arr[j + 1] as Int) {
+        val tmp = arr[j]
+        arr[j] = arr[j + 1]
+        arr[j + 1] = tmp
+      }
+      j = j + 1
+    }
+    i = i + 1
+  }
+  return arr
+}
+
+// ── Insertion Sort ────────────────────────────────────────────────────────────
+
+def insertionSort(input: List[Int]): List[Int] {
+  val arr = copyList(input)
+  val n = arr.size
+  var i = 1
+  while i < n {
+    val key = arr[i]
+    var j = i - 1
+    while j >= 0 && (arr[j] as Int) > (key as Int) {
+      arr[j + 1] = arr[j]
+      j = j - 1
+    }
+    arr[j + 1] = key
+    i = i + 1
+  }
+  return arr
+}
+
+// ── Selection Sort ────────────────────────────────────────────────────────────
+
+def selectionSort(input: List[Int]): List[Int] {
+  val arr = copyList(input)
+  val n = arr.size
+  var i = 0
+  while i < n - 1 {
+    var minIdx = i
+    var j = i + 1
+    while j < n {
+      if (arr[j] as Int) < (arr[minIdx] as Int) { minIdx = j }
+      j = j + 1
+    }
+    if minIdx != i {
+      val tmp = arr[i]
+      arr[i] = arr[minIdx]
+      arr[minIdx] = tmp
+    }
+    i = i + 1
+  }
+  return arr
+}
+
+// ── Merge Sort (recursive, functional) ───────────────────────────────────────
+
+def mergeTwo(left: List[Int], right: List[Int]): List[Int] {
+  val result: List[Int] = []
+  var li = 0
+  var ri = 0
+  while li < left.size && ri < right.size {
+    if (left[li] as Int) <= (right[ri] as Int) {
+      result.add(left[li])
+      li = li + 1
+    } else {
+      result.add(right[ri])
+      ri = ri + 1
+    }
+  }
+  while li < left.size { result.add(left[li]); li = li + 1 }
+  while ri < right.size { result.add(right[ri]); ri = ri + 1 }
+  return result
+}
+
+def mergeSort(data: List[Int]): List[Int] {
+  if data.size <= 1 { return copyList(data) }
+  val mid = data.size / 2
+  val left: List[Int] = []
+  val right: List[Int] = []
+  var i = 0
+  while i < mid { left.add(data[i]); i = i + 1 }
+  while i < data.size { right.add(data[i]); i = i + 1 }
+  return mergeTwo(mergeSort(left), mergeSort(right))
+}
+
+// ── Quick Sort (in-place on a mutable copy) ───────────────────────────────────
+
+def qpartition(arr: List[Int], lo: Int, hi: Int): Int {
+  val pivot = arr[hi] as Int
+  var i = lo - 1
+  var j = lo
+  while j < hi {
+    if (arr[j] as Int) <= pivot {
+      i = i + 1
+      val tmp = arr[i]
+      arr[i] = arr[j]
+      arr[j] = tmp
+    }
+    j = j + 1
+  }
+  val tmp2 = arr[i + 1]
+  arr[i + 1] = arr[hi]
+  arr[hi] = tmp2
+  return i + 1
+}
+
+def qsortRange(arr: List[Int], lo: Int, hi: Int): void {
+  if lo < hi {
+    val p = qpartition(arr, lo, hi)
+    qsortRange(arr, lo, p - 1)
+    qsortRange(arr, p + 1, hi)
+  }
+}
+
+def quickSort(input: List[Int]): List[Int] {
+  val arr = copyList(input)
+  qsortRange(arr, 0, arr.size - 1)
+  return arr
+}
+
+// ── Counting Sort (non-negative integers bounded by maxVal) ───────────────────
+
+def countingSort(input: List[Int], maxVal: Int): List[Int] {
+  val counts: Int[] = new Int[maxVal + 1]
+  foreach v: Int in input {
+    if v >= 0 && v <= maxVal { counts[v] = counts[v] + 1 }
+  }
+  val result: List[Int] = []
+  var i = 0
+  while i <= maxVal {
+    var c = counts[i]
+    while c > 0 { result.add(i); c = c - 1 }
+    i = i + 1
+  }
+  return result
+}
+
+// ── Dispatch by SortKind ──────────────────────────────────────────────────────
+
+def runSort(kind: SortKind, data: List[Int]): List[Int] = select kind {
+  case SortKind::BUBBLE:    bubbleSort(data)
+  case SortKind::INSERTION: insertionSort(data)
+  case SortKind::SELECTION: selectionSort(data)
+  case SortKind::MERGE:     mergeSort(data)
+  case SortKind::QUICK:     quickSort(data)
+  case SortKind::COUNTING:  countingSort(data, 100)
+}
+
+def kindName(kind: SortKind): String = select kind {
+  case SortKind::BUBBLE:    "BubbleSort"
+  case SortKind::INSERTION: "InsertionSort"
+  case SortKind::SELECTION: "SelectionSort"
+  case SortKind::MERGE:     "MergeSort"
+  case SortKind::QUICK:     "QuickSort"
+  case SortKind::COUNTING:  "CountingSort"
+}
+
+// ── Test datasets ─────────────────────────────────────────────────────────────
+
+val testCases: List[TestCase] = [
+  new TestCase("random",  [64, 34, 25, 12, 22, 11, 90]),
+  new TestCase("reverse", [9, 8, 7, 6, 5, 4, 3, 2, 1]),
+  new TestCase("sorted",  [1, 2, 3, 4, 5, 6, 7, 8]),
+  new TestCase("single",  [42]),
+  new TestCase("dups",    [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]),
+  new TestCase("small",   [4, 2, 5, 1, 3])
+]
+
+val allKinds: List[SortKind] = [
+  SortKind::BUBBLE, SortKind::INSERTION, SortKind::SELECTION,
+  SortKind::MERGE, SortKind::QUICK, SortKind::COUNTING
+]
+
+// ── Run each algorithm on each dataset ───────────────────────────────────────
+
+val results: List[SortResult] = []
+foreach kind: SortKind in allKinds {
+  foreach tc: TestCase in testCases {
+    val sorted = runSort(kind, tc.data())
+    results.add(new SortResult(kindName(kind), tc.label(), isSorted(sorted), sorted.size))
+  }
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+
+val allPassed: Boolean = results.fold(true) { acc, r =>
+  (acc as Boolean) && (r as SortResult).sorted()
+}
+IO::println("All sorts correct: #{allPassed}")
+IO::println("Total test cases:  #{results.size}")
+
+// ── MergeSort detail ──────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== MergeSort detail ===")
+foreach tc: TestCase in testCases {
+  val sorted = mergeSort(tc.data())
+  IO::println("  #{tc.label()}: #{listStr(tc.data())} -> #{listStr(sorted)}")
+}
+
+// ── Pipeline analysis: groupBy algorithm ─────────────────────────────────────
+
+IO::println("")
+IO::println("=== Pipeline analysis ===")
+val byAlg = results.groupBy { r => (r as SortResult).algorithm() }
+foreach (name, rlist) in byAlg {
+  val l = rlist as List[Object]
+  val passing = l.filter { r => (r as SortResult).sorted() }.size
+  IO::println("  #{name}: #{passing}/#{l.size} passed")
+}
+
+// ── Partition: small vs larger datasets ──────────────────────────────────────
+
+IO::println("")
+IO::println("=== Partition by dataset size ===")
+val parts = results.partition { r => (r as SortResult).size <= 5 }
+val smallPart  = parts[0] as List[Object]
+val largerPart = parts[1] as List[Object]
+IO::println("  Small (<=5 elements): #{smallPart.size} results")
+IO::println("  Larger (>5 elements): #{largerPart.size} results")
+
+// ── Extension Int in action ───────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Extension Int ===")
+IO::println("  (-7).absVal()  = #{(0 - 7).absVal()}")
+IO::println("  15.clamp(0,10) = #{15.clamp(0, 10)}")
+IO::println("  3.times(4)     = #{3.times(4)}")
+IO::println("  8.isEven()     = #{8.isEven()}")
+IO::println("  7.isOdd()      = #{7.isOdd()}")
+IO::println("  5.squared()    = #{5.squared()}")
+
+// ── Collection-pipeline on a range ───────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Collection pipeline on [1..20] ===")
+val nums: List[Int] = []
+foreach i: Int in 1..20 { nums.add(i) }
+val evens = nums.filter { n => (n as Int).isEven() }
+val odds  = nums.filter { n => (n as Int).isOdd() }
+val doubled = nums.filter { n => (n as Int).isEven() }.map { n => (n as Int) * 2 }
+val sumEvens = evens.fold(0) { acc, n => (acc as Int) + (n as Int) }
+val sumOdds  = odds.fold(0) { acc, n => (acc as Int) + (n as Int) }
+IO::println("  evens count=#{evens.size}, sum=#{sumEvens}")
+IO::println("  odds  count=#{odds.size}, sum=#{sumOdds}")
+IO::println("  doubled evens: #{listStr(doubled)}")
+
+// ── SortedBy closures ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Sorted by closures ===")
+val raw: List[Int] = [5, 3, 8, 1, 9, 2, 7, 4, 6]
+val ascSorted  = raw.sortedBy { x => x as Int }
+val descSorted = raw.sortedBy { x => 0 - (x as Int) }
+IO::println("  asc:  #{listStr(ascSorted)}")
+IO::println("  desc: #{listStr(descSorted)}")
+
+// ── Distinct ─────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Distinct ===")
+val withDups: List[Int] = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+val unique = withDups.distinct()
+IO::println("  size before: #{withDups.size}, after: #{unique.size}")
+
+// ── Try/catch ────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Safe division ===")
+def safeDiv(a: Int, b: Int): Int {
+  try {
+    return a / b
+  } catch e: ArithmeticException {
+    return 0 - 1
+  }
+}
+IO::println("  10 / 2 = #{safeDiv(10, 2)}")
+IO::println("  10 / 0 = #{safeDiv(10, 0)}")
+
+// ── Nullable find ────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Nullable find ===")
+val mixed: List[Int] = [5, 1, 9, 3, 7, 2, 8, 4, 6]
+val found9  = mixed.find { n => (n as Int) == 9 }
+val found99 = mixed.find { n => (n as Int) == 99 }
+val found9Str  = if found9  != null { "" + (found9  as Int) } else { "none" }
+val found99Str = if found99 != null { "" + (found99 as Int) } else { "none" }
+IO::println("  found 9:  #{found9Str}")
+IO::println("  found 99: #{found99Str}")
+
+// ── Zip: algorithms with complexity ──────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Algorithms with complexity ===")
+val algNames: List[String] = ["Bubble","Insertion","Selection","Merge","Quick","Counting"]
+val complexity: List[String] = ["O(n^2)","O(n^2)","O(n^2)","O(n log n)","O(n log n)","O(n+k)"]
+val zipped = algNames.zip(complexity)
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  IO::println("  #{p[0]}: #{p[1]}")
+}
+
+// ── Recursion: Fibonacci ──────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Fibonacci (recursive) ===")
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+val fibs: List[Int] = []
+foreach i: Int in 0..10 { fibs.add(fib(i)) }
+IO::println("  fib(0..10): #{listStr(fibs)}")
+
+// ── Grouping by value parity ──────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== GroupBy parity ===")
+val tenNums: List[Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+val byParity = tenNums.groupBy { n => if (n as Int).isEven() { "even" } else { "odd" } }
+foreach (parity, grp) in byParity {
+  val g = grp as List[Object]
+  val sum = g.fold(0) { acc, v => (acc as Int) + (v as Int) }
+  IO::println("  #{parity}: count=#{g.size}, sum=#{sum}")
+}
+
+// ── Final correctness check ───────────────────────────────────────────────────
+
+IO::println("")
+val data: List[Int] = [5, 3, 8, 1, 9, 2, 7]
+val bSort = bubbleSort(data)
+val mSort = mergeSort(data)
+val qSort = quickSort(data)
+val agree = listStr(bSort) == listStr(mSort) && listStr(mSort) == listStr(qSort)
+IO::println("Bubble==Merge==Quick: #{agree}")
+IO::println("Final: #{listStr(qSort)}")

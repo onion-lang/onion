@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A record with a duplicate component name (`record R(a: Int, a: Int)`) no
+  longer crashes the compiler.** Two components sharing a name generate two
+  same-named accessor methods and fields, which previously went completely
+  unchecked and only surfaced later as an internal compiler error (I0000,
+  a JVM `ClassFormatError`) once the class was loaded. It is now reported as
+  a normal `E0086` semantic error at the offending component's location.
+  Found by the mutation fuzzer (issue #666).
+
 ## [0.10.28] - 2026-08-09
 
 ### Added

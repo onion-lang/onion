@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.28] - 2026-08-09
+
+### Added
+
+- **`run/MazeSolver.on`, a 295-line maze generator + BFS solver sample.**
+  Generates a perfect maze via recursive-backtracking DFS with a Fisher-Yates
+  shuffle, then finds the shortest path with an iterative BFS using
+  array-based visited/parent trackers. Exercises an ADT enum (`Cell`) matched
+  with `select`/`is`, a `Point` record, classes with `public:`/`private:`
+  sections (`Maze`, `BfsSolver`, `MazeStats`), extension methods on `String`,
+  a flat row-major `List[Cell]` grid, `Boolean[]`/`Int[]` primitive arrays,
+  recursion, `while`/`foreach` loops, and string interpolation.
+- **`run/TextAnalytics.on`, a 272-line multi-document text-analysis sample.**
+  Exercises records (`Document`, `WordFreq`, `SentenceInfo`, `AnalysisResult`),
+  a data-carrying enum (`ReadabilityLevel`) matched via `select this`, a class
+  with a constructor argument (`TextAnalyzer(topN)`), `Map[String, Int]`
+  frequency tables built with `Maps::countBy`/`Maps::toList`, nullable `Int?`
+  lookups, closures, `foreach` over lists, string interpolation, and
+  `Format::fixed` percentage/float formatting. Reports word-frequency
+  profiles, sentence-length breakdown, readability classification, pairwise
+  Jaccard similarity, and a complexity ranking across three sample documents.
+- **`run/SpaceMission.on`, a 324-line space mission planner sample.** Exercises
+  records with body methods (`Planet`, `Spacecraft.wetMass`/`massRatio`,
+  `MissionLog`), a plain enum (`MissionStatus`), a data-carrying enum
+  (`MissionOutcome`), an ADT case-enum (`MissionEvent` with 4 cases), a class
+  with mutable state (`MissionController`), collection pipelines (`filter`,
+  `map`, `fold`, `groupBy`, `sortedBy`, `find`), exhaustive `select` over the
+  ADT cases, nullable lookups (`findPlanet(): Planet?`), closures, string
+  interpolation, recursion (Newton's method for orbital period), `foreach`
+  over a range, `while`, `try`/`catch`, and `foreach (k, v) in map`.
+- **`run/KingdomSim.on`, a 550-line medieval kingdom simulation sample.**
+  Exercises operator overloading (`plus`/`times`/`minus` on a `Resource`
+  record), `do[List]` comprehension for trade-pair generation, multiple
+  interface conformance, `foreach (k, v)` map iteration, extension methods
+  on `Int`/`Double`/`String`, the `|>` pipeline operator, an ADT case-enum
+  (`KingdomEvent`) with 5 data-carrying cases, `example`/`law` clauses on a
+  record, `try`/`catch`, nullable returns, exhaustive `select`, and a broad
+  set of collection pipelines (`groupBy`, `sortedBy`, `fold`, `partition`,
+  `zip`, `distinct`, `find`, `any`, `take`).
+
 ## [0.10.27] - 2026-08-09
 
 ### Added

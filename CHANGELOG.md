@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.29] - 2026-08-10
+
 ### Added
 
 - **`run/HuffmanCoding.on`, a 318-line Huffman lossless compression demo.**

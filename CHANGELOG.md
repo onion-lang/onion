@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `partition`/`zip`/`flatten`/`distinct`/`any`/`count`), `foreach (k, v)` on
   `Map`, nullable types with null guards, a tail-recursive prefix search, a
   `while` loop, `try`/`catch`, and `string interpolation` throughout.
+- **`run/PharmacySystem.on`, a 320-line pharmacy/prescription management
+  sample.** Covers ADT enums (`DrugCategory`, `PrescriptionStatus`) with
+  exhaustive `select this { case x is Y: ... }` dispatch, records (`Drug`,
+  `Patient`, `Prescription`, `FilledRx`), typed generics (`List[T]`,
+  `Map[String, List[Drug]]`), collection pipelines (`filter`/`map`/`fold`/
+  `groupBy`/`sortedBy`), `foreach (k, v)` map destructuring, nullable-aware
+  lookup helpers, and `string interpolation` across a ten-section report.
 
 ## [0.10.29] - 2026-08-10
 

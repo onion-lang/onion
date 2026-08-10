@@ -1,0 +1,261 @@
+// Sudoku.on — Sudoku solver with backtracking search and solution validation.
+// Exercises: flat List[Int] as 2D grid (row*9+col indexing), records with
+// methods, class with mutable field (Solver), extension Int, collection
+// pipelines (count/filter/sortedBy), nested foreach (ranges),
+// string interpolation, recursion, explicit return statements.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Puzzle(name: String, clues: Int) {
+public:
+  def label(): String = "#{name()} (#{clues()} givens)"
+}
+
+record SolveResult(puzzle: Puzzle, solved: Boolean, steps: Int, valid: Boolean) {
+public:
+  def summary(): String {
+    val status = if solved() { if valid() { "OK" } else { "INVALID" } } else { "UNSOLVABLE" }
+    return "#{puzzle().name()}: #{status}  steps=#{steps()}"
+  }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def cellChar(): String = if self == 0 { "." } else { "" + self }
+  def boxStart(): Int = (self / 3) * 3
+}
+
+// ── Grid helpers ──────────────────────────────────────────────────────────────
+
+def makeGrid(vs: List[Int]): List[Int] {
+  val g: List[Int] = []
+  g.addAll(vs)
+  return g
+}
+
+def getCell(grid: List[Int], row: Int, col: Int): Int =
+  grid[row * 9 + col] as Int
+
+def setCell(grid: List[Int], row: Int, col: Int, v: Int): void {
+  grid[row * 9 + col] = v
+}
+
+def countGivens(grid: List[Int]): Int {
+  var n = 0
+  foreach i: Int in 0..<81 {
+    if (grid[i] as Int) != 0 { n = n + 1 }
+  }
+  return n
+}
+
+// ── Constraint checking ───────────────────────────────────────────────────────
+
+def rowAllows(grid: List[Int], row: Int, col: Int, d: Int): Boolean {
+  foreach c: Int in 0..<9 {
+    if c != col && getCell(grid, row, c) == d { return false }
+  }
+  return true
+}
+
+def colAllows(grid: List[Int], row: Int, col: Int, d: Int): Boolean {
+  foreach r: Int in 0..<9 {
+    if r != row && getCell(grid, r, col) == d { return false }
+  }
+  return true
+}
+
+def boxAllows(grid: List[Int], row: Int, col: Int, d: Int): Boolean {
+  val br = row.boxStart()
+  val bc = col.boxStart()
+  foreach dr: Int in 0..<3 {
+    foreach dc: Int in 0..<3 {
+      if (br + dr != row || bc + dc != col) && getCell(grid, br + dr, bc + dc) == d {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+def canPlace(grid: List[Int], row: Int, col: Int, d: Int): Boolean =
+  rowAllows(grid, row, col, d) && colAllows(grid, row, col, d) && boxAllows(grid, row, col, d)
+
+// ── Solver class ──────────────────────────────────────────────────────────────
+
+class Solver {
+  var numSteps: Int
+public:
+  def this { this.numSteps = 0 }
+  def steps(): Int = numSteps
+
+  def nextEmpty(grid: List[Int]): Int {
+    foreach i: Int in 0..<81 {
+      if (grid[i] as Int) == 0 { return i }
+    }
+    return -1
+  }
+
+  def solve(grid: List[Int]): Boolean {
+    val idx = nextEmpty(grid)
+    if idx == -1 { return true }
+    numSteps = numSteps + 1
+    val row = idx / 9
+    val col = idx % 9
+    foreach d: Int in 1..9 {
+      if canPlace(grid, row, col, d) {
+        setCell(grid, row, col, d)
+        if solve(grid) { return true }
+        setCell(grid, row, col, 0)
+      }
+    }
+    return false
+  }
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+def validateGrid(grid: List[Int]): Boolean {
+  foreach row: Int in 0..<9 {
+    foreach d: Int in 1..9 {
+      var hit = false
+      foreach c: Int in 0..<9 {
+        if getCell(grid, row, c) == d { hit = true }
+      }
+      if !hit { return false }
+    }
+  }
+  foreach col: Int in 0..<9 {
+    foreach d: Int in 1..9 {
+      var hit = false
+      foreach r: Int in 0..<9 {
+        if getCell(grid, r, col) == d { hit = true }
+      }
+      if !hit { return false }
+    }
+  }
+  foreach br: Int in 0..<3 {
+    foreach bc: Int in 0..<3 {
+      foreach d: Int in 1..9 {
+        var hit = false
+        foreach dr: Int in 0..<3 {
+          foreach dc: Int in 0..<3 {
+            if getCell(grid, br * 3 + dr, bc * 3 + dc) == d { hit = true }
+          }
+        }
+        if !hit { return false }
+      }
+    }
+  }
+  return true
+}
+
+// ── Display ───────────────────────────────────────────────────────────────────
+
+def printGrid(grid: List[Int]): void {
+  foreach row: Int in 0..<9 {
+    if row == 3 || row == 6 {
+      IO::println("------+-------+------")
+    }
+    var line = ""
+    foreach col: Int in 0..<9 {
+      if col == 3 || col == 6 { line = line + " |" }
+      line = line + " " + getCell(grid, row, col).cellChar()
+    }
+    IO::println(line)
+  }
+}
+
+// ── Test puzzles ──────────────────────────────────────────────────────────────
+
+def easyPuzzle(): List[Int] = makeGrid([
+  5, 3, 0,  0, 7, 0,  0, 0, 0,
+  6, 0, 0,  1, 9, 5,  0, 0, 0,
+  0, 9, 8,  0, 0, 0,  0, 6, 0,
+
+  8, 0, 0,  0, 6, 0,  0, 0, 3,
+  4, 0, 0,  8, 0, 3,  0, 0, 1,
+  7, 0, 0,  0, 2, 0,  0, 0, 6,
+
+  0, 6, 0,  0, 0, 0,  2, 8, 0,
+  0, 0, 0,  4, 1, 9,  0, 0, 5,
+  0, 0, 0,  0, 8, 0,  0, 7, 9
+])
+
+def mediumPuzzle(): List[Int] = makeGrid([
+  0, 0, 0,  2, 6, 0,  7, 0, 1,
+  6, 8, 0,  0, 7, 0,  0, 9, 0,
+  1, 9, 0,  0, 0, 4,  5, 0, 0,
+
+  8, 2, 0,  1, 0, 0,  0, 4, 0,
+  0, 0, 4,  6, 0, 2,  9, 0, 0,
+  0, 5, 0,  0, 0, 3,  0, 2, 8,
+
+  0, 0, 9,  3, 0, 0,  0, 7, 4,
+  0, 4, 0,  0, 5, 0,  0, 3, 6,
+  7, 0, 3,  0, 1, 8,  0, 0, 0
+])
+
+def hardPuzzle(): List[Int] = makeGrid([
+  0, 0, 0,  6, 0, 0,  4, 0, 0,
+  7, 0, 0,  0, 0, 3,  6, 0, 0,
+  0, 0, 0,  0, 9, 1,  0, 8, 0,
+
+  0, 0, 0,  0, 0, 0,  0, 0, 0,
+  0, 5, 0,  1, 8, 0,  0, 0, 3,
+  0, 0, 0,  3, 0, 6,  0, 4, 5,
+
+  0, 4, 0,  2, 0, 0,  0, 6, 0,
+  9, 0, 3,  0, 0, 0,  0, 0, 0,
+  0, 2, 0,  0, 0, 0,  1, 0, 0
+])
+
+// ── Runner ────────────────────────────────────────────────────────────────────
+
+def runPuzzle(name: String, grid: List[Int]): SolveResult {
+  val clues = countGivens(grid)
+  val puzzle = new Puzzle(name, clues)
+  IO::println("--- #{puzzle.label()} ---")
+  IO::println("Before solving:")
+  printGrid(grid)
+  IO::println("")
+
+  val solver = new Solver()
+  val ok = solver.solve(grid)
+
+  IO::println("After #{solver.steps()} steps:")
+  printGrid(grid)
+  val valid = ok && validateGrid(grid)
+  IO::println("=> #{if ok { "SOLVED" } else { "NO SOLUTION" }} | Validation: #{if valid { "PASS" } else { "FAIL" }}")
+  IO::println("")
+
+  return new SolveResult(puzzle, ok, solver.steps(), valid)
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== SUDOKU SOLVER ===")
+  IO::println("")
+
+  val r1 = runPuzzle("Easy",   easyPuzzle())
+  val r2 = runPuzzle("Medium", mediumPuzzle())
+  val r3 = runPuzzle("Hard",   hardPuzzle())
+
+  val results: List[SolveResult] = [r1, r2, r3]
+
+  IO::println("=== SUMMARY ===")
+  foreach r: SolveResult in results {
+    IO::println("  " + r.summary())
+  }
+
+  val solvedCount = results.count { r => (r as SolveResult).solved() }
+  IO::println("")
+  IO::println("Solved #{solvedCount}/#{results.size} puzzles.")
+
+  val sorted: List[SolveResult] = results.sortedBy { r => (r as SolveResult).steps() }
+  IO::println("Easiest to hardest (by search steps):")
+  foreach r: SolveResult in sorted {
+    IO::println("  #{r.puzzle().name()}: #{r.steps()} steps")
+  }
+}

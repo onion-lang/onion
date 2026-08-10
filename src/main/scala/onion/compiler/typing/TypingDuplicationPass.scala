@@ -190,10 +190,27 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processRecordDeclaration(node: AST.RecordDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
+      checkDuplicateRecordComponents(node, clazz)
       for (section <- node.sections) processAccessSection(section)
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
+
+  // A component name repeated in the record's parameter list (`record R(a: Int, a: Int)`)
+  // makes TypingOutlinePass generate two same-named private fields and two same-named
+  // public accessor methods for the same record, which went completely unchecked: the
+  // record compiled clean and only failed later as a JVM ClassFormatError ("Duplicate
+  // method name ... in class file ...") once something loaded the class, surfaced as an
+  // internal compiler error (I0000) instead of a normal diagnostic (issue #666). Checked
+  // against the raw `node.args` names directly, mirroring the law/example and extension
+  // duplicate-name checks above.
+  private def checkDuplicateRecordComponents(node: AST.RecordDeclaration, clazz: ClassDefinition): Unit = {
+    var seen = Set.empty[String]
+    for (arg <- node.args) {
+      if (seen.contains(arg.name)) typing.report(SemanticError.DUPLICATE_RECORD_COMPONENT, arg, clazz, arg.name)
+      else seen += arg.name
+    }
+  }
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>

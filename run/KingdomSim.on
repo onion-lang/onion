@@ -1,0 +1,546 @@
+// KingdomSim.on — a medieval kingdom simulation demonstrating:
+//   operator overloading (Resource +/*/-), do[List] comprehension,
+//   multiple interface conformance (Reportable + Auditable), foreach (k,v)
+//   on Map, extension methods on Int/Double/String, |> pipeline, ADT
+//   case-enum (KingdomEvent), records with example + law clauses, try/catch,
+//   nullable, closures, select exhaustiveness, and collection pipelines:
+//   groupBy/sortedBy/filter/map/fold/partition/zip/distinct/find/any/take.
+
+import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap; }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def coins(): String = "#{self}g"
+  def pct(): String   = "#{self}%"
+  def abs(): Int { if self < 0 { return 0 - self } return self }
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    val s: Long = (self * 100.0 + 0.5) as Long
+    return (s as Double) / 100.0
+  }
+  def pct(): String = "#{(self * 100.0).round2()}%"
+}
+
+extension String {
+  def pad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def center(w: Int): String {
+    val gap: Int = w - self.length()
+    if gap <= 0 { return self }
+    val left: Int = gap / 2
+    val right: Int = gap - left
+    var s: String = ""
+    var i: Int = 0
+    while i < left  { s = s + " "; i = i + 1 }
+    s = s + self
+    i = 0
+    while i < right { s = s + " "; i = i + 1 }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ─── ResourceType (plain enum) ────────────────────────────────────────────────
+
+enum ResourceType {
+  Gold, Grain, Wood, Stone, Iron
+public:
+  def label(): String = select this {
+    case ResourceType::Gold:  "Gold"
+    case ResourceType::Grain: "Grain"
+    case ResourceType::Wood:  "Wood"
+    case ResourceType::Stone: "Stone"
+    case ResourceType::Iron:  "Iron"
+    else: "?"
+  }
+  def symbol(): String = select this {
+    case ResourceType::Gold:  "⚜"
+    case ResourceType::Grain: "🌾"
+    case ResourceType::Wood:  "🪵"
+    case ResourceType::Stone: "🪨"
+    case ResourceType::Iron:  "⚙"
+    else: "•"
+  }
+}
+
+// ─── Season ───────────────────────────────────────────────────────────────────
+
+enum Season {
+  Spring, Summer, Autumn, Winter
+public:
+  def label(): String = select this {
+    case Season::Spring: "Spring"
+    case Season::Summer: "Summer"
+    case Season::Autumn: "Autumn"
+    case Season::Winter: "Winter"
+    else: "?"
+  }
+  def harvestMod(): Double = select this {
+    case Season::Spring: 1.1
+    case Season::Summer: 1.2
+    case Season::Autumn: 1.3
+    case Season::Winter: 0.6
+    else: 1.0
+  }
+  def next(): Season = select this {
+    case Season::Spring: Season::Summer
+    case Season::Summer: Season::Autumn
+    case Season::Autumn: Season::Winter
+    case Season::Winter: Season::Spring
+    else: Season::Spring
+  }
+}
+
+// ─── Event ADT ───────────────────────────────────────────────────────────────
+
+enum KingdomEvent {
+  case Harvest(provinceId: Int, amount: Int)
+  case Trade(fromId: Int, toId: Int, resource: ResourceType, amount: Int)
+  case Disaster(provinceId: Int, kind: String, loss: Int)
+  case Construction(provinceId: Int, building: String, cost: Int)
+  case Population(provinceId: Int, change: Int)
+public:
+  def label(): String = select this {
+    case e is Harvest:      "Harvest: province ##{e.provinceId()} +#{e.amount()} grain"
+    case e is Trade:        "Trade: ##{e.fromId()} -> ##{e.toId()} #{e.amount()} #{e.resource().label()}"
+    case e is Disaster:     "Disaster: ##{e.provinceId()} #{e.kind()} -#{e.loss()}"
+    case e is Construction: "Build: ##{e.provinceId()} #{e.building()} (#{e.cost().coins()})"
+    case e is Population:   "Pop: ##{e.provinceId()} " + (if e.change() >= 0 { "+" + e.change() } else { "" + e.change() })
+  }
+  def provinceId(): Int = select this {
+    case e is Harvest:      e.provinceId()
+    case e is Trade:        e.fromId()
+    case e is Disaster:     e.provinceId()
+    case e is Construction: e.provinceId()
+    case e is Population:   e.provinceId()
+  }
+}
+
+// ─── Resource record with operator overloading ────────────────────────────────
+
+record Resource(kind: ResourceType, amount: Int)
+  example { new Resource(ResourceType::Gold, 100).plus(new Resource(ResourceType::Gold, 50)).amount() == 150 }
+  law times_zero_gives_zero(n: Int) { new Resource(ResourceType::Gold, n).times(0).amount() == 0 }
+{
+public:
+  def plus(o: Resource): Resource {
+    if kind == o.kind() { return new Resource(kind, amount + o.amount()) }
+    return self
+  }
+  def times(factor: Int): Resource = new Resource(kind, (amount * factor).clamp(0, 99999))
+  def minus(n: Int): Resource = new Resource(kind, (amount - n).clamp(0, 99999))
+  def label(): String = "#{amount} #{kind.label()}"
+  def isLow(): Boolean = amount < 50
+}
+
+// ─── Province record ──────────────────────────────────────────────────────────
+
+record Province(
+  id: Int,
+  name: String,
+  region: String,
+  population: Int,
+  gold: Int,
+  grain: Int,
+  wood: Int,
+  stone: Int,
+  iron: Int,
+  taxRate: Int,
+  buildings: List[Object]
+) {
+public:
+  def totalWealth(): Int = gold + grain * 2 + wood + stone * 3 + iron * 4
+  def taxRevenue(): Int  = (gold * taxRate) / 100
+  def isRich(): Boolean  = totalWealth() > 500
+  def isPoor(): Boolean  = totalWealth() < 100
+  def resourceMap(): Map[String, Int] {
+    return [
+      "Gold":  gold,
+      "Grain": grain,
+      "Wood":  wood,
+      "Stone": stone,
+      "Iron":  iron
+    ]
+  }
+  def displayHeader(): String = "Province ##{id}: #{name} [#{region}]  Pop:#{population}  Wealth:#{totalWealth()}"
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def generateReport(): String
+}
+
+interface Auditable {
+  def audit(): List[Object]
+}
+
+// ─── KingdomLedger class ─────────────────────────────────────────────────────
+
+class KingdomLedger conforms Auditable {
+  var log: ArrayList[Object]
+  var totalGoldFlow: Int
+
+public:
+  def this {
+    log = new ArrayList[Object]()
+    totalGoldFlow = 0
+  }
+
+  def logEvent(event: KingdomEvent): void {
+    log.add(event)
+    val ev: KingdomEvent = event
+    select ev {
+      case e is Trade:
+        if e.resource() == ResourceType::Gold { totalGoldFlow = totalGoldFlow + e.amount() }
+      else: {}
+    }
+  }
+
+  def eventCount(): Int = log.size()
+
+  def eventsFor(pid: Int): List[Object] {
+    val events: List[Object] = []
+    foreach e: Object in log {
+      val ev: KingdomEvent = e as KingdomEvent
+      if ev.provinceId() == pid { events << ev }
+    }
+    return events
+  }
+
+  def audit(): List[Object] {
+    val lines: List[Object] = []
+    var i: Int = 0
+    foreach e: Object in log {
+      i = i + 1
+      val ev: KingdomEvent = e as KingdomEvent
+      lines << "  [#{i}] #{ev.label()}"
+    }
+    return lines
+  }
+}
+
+// ─── Province Manager class ───────────────────────────────────────────────────
+
+class ProvinceManager {
+  var provinces: ArrayList[Object]
+  var ledger: KingdomLedger
+
+public:
+  def this(l: KingdomLedger) {
+    provinces = new ArrayList[Object]()
+    ledger = l
+  }
+
+  def addProvince(p: Province): void { provinces.add(p) }
+
+  def find(id: Int): Province? {
+    foreach p: Object in provinces {
+      val pr: Province = p as Province
+      if pr.id() == id { return pr }
+    }
+    return null
+  }
+
+  def all(): List[Object] {
+    val out: List[Object] = []
+    foreach p: Object in provinces { out << p }
+    return out
+  }
+
+  def applyHarvest(pid: Int, season: Season): void {
+    val p = find(pid)
+    if p == null { return }
+    val pr: Province = p as Province
+    val base: Int = 30 + pr.population() / 10
+    val mod: Double = season.harvestMod()
+    val gain: Int = (base as Double * mod) as Int
+    ledger.logEvent(new Harvest(pid, gain))
+  }
+
+  def applyTrade(fromId: Int, toId: Int, res: ResourceType, amount: Int): void {
+    val from = find(fromId)
+    val to   = find(toId)
+    if from == null || to == null { return }
+    ledger.logEvent(new Trade(fromId, toId, res, amount))
+  }
+
+  def applyDisaster(pid: Int, kind: String, loss: Int): void {
+    ledger.logEvent(new Disaster(pid, kind, loss))
+  }
+
+  def applyConstruction(pid: Int, building: String, cost: Int): void {
+    ledger.logEvent(new Construction(pid, building, cost))
+  }
+
+  def applyPopChange(pid: Int, delta: Int): void {
+    ledger.logEvent(new Population(pid, delta))
+  }
+
+  def richProvinces(): List[Object] {
+    return all().filter { p => (p as Province).isRich() }
+  }
+
+  def poorProvinces(): List[Object] {
+    return all().filter { p => (p as Province).isPoor() }
+  }
+
+  def byWealth(): List[Object] {
+    return all().sortedBy { p => (p as Province).totalWealth() }
+  }
+
+  def byRegion(): Map[String, List[Object]] {
+    return all().groupBy { p => (p as Province).region() }
+  }
+
+  def totalGold(): Int {
+    return all().map { p => (p as Province).gold() }
+                .fold(0) { acc, v => acc + (v as Int) }
+  }
+
+  def totalPopulation(): Int {
+    return all().map { p => (p as Province).population() }
+                .fold(0) { acc, v => acc + (v as Int) }
+  }
+
+  def avgWealth(): Double {
+    val cnt: Int = provinces.size()
+    if cnt == 0 { return 0.0 }
+    val total: Int = all().map { p => (p as Province).totalWealth() }
+                         .fold(0) { acc, v => acc + (v as Int) }
+    return (total as Double) / (cnt as Double)
+  }
+}
+
+// ─── Reporter class (conforms Reportable) ─────────────────────────────────────
+
+class KingdomReporter conforms Reportable {
+  var manager: ProvinceManager
+  var ledger: KingdomLedger
+  var kingdomName: String
+
+public:
+  def this(n: String, m: ProvinceManager, l: KingdomLedger) {
+    kingdomName = n
+    manager = m
+    ledger  = l
+  }
+
+  def banner(title: String): String {
+    val line: String = "═".rep(60)
+    return "#{line}\n#{title.center(60)}\n#{line}"
+  }
+
+  def generateReport(): String {
+    var sb: String = ""
+    sb = sb + banner("Kingdom of #{kingdomName} — Summary Report") + "\n\n"
+
+    // Total stats
+    sb = sb + "  Total provinces  : #{manager.all().size}\n"
+    sb = sb + "  Total population : #{manager.totalPopulation()}\n"
+    sb = sb + "  Total gold       : #{manager.totalGold().coins()}\n"
+    sb = sb + "  Average wealth   : #{manager.avgWealth().round2()}\n"
+    sb = sb + "  Events logged    : #{ledger.eventCount()}\n\n"
+
+    // Province listing by wealth
+    sb = sb + "  ── Provinces by wealth (ascending) ──\n"
+    foreach p: Object in manager.byWealth() {
+      val pr: Province = p as Province
+      val badge: String = if pr.isRich() { "[RICH]" } else if pr.isPoor() { "[POOR]" } else { "      " }
+      sb = sb + "  #{badge} #{pr.displayHeader()}\n"
+    }
+    sb = sb + "\n"
+
+    // By region grouping
+    sb = sb + "  ── Provinces by region ──\n"
+    val byReg: Map[String, List[Object]] = manager.byRegion()
+    foreach (region, list) in byReg {
+      val ps: List[Object] = list as List[Object]
+      val names: List[Object] = ps.map { p => (p as Province).name() }
+      val joined: String = names.fold("") { acc, n => if acc == "" { n as String } else { acc + ", " + (n as String) } } as String
+      sb = sb + "  #{region}: #{joined}\n"
+    }
+    sb = sb + "\n"
+
+    // Resource overview per province
+    sb = sb + "  ── Resource Overview ──\n"
+    foreach p: Object in manager.all() {
+      val pr: Province = p as Province
+      sb = sb + "  #{pr.name().pad(16)}"
+      val rm: Map[String, Int] = pr.resourceMap()
+      foreach (rname, amount) in rm {
+        sb = sb + " #{(rname as String).pad(5)}:#{(amount as Int).toString().pad(5)}"
+      }
+      sb = sb + "\n"
+    }
+    sb = sb + "\n"
+
+    // Rich vs poor partition
+    val parts = manager.all().partition { p => (p as Province).isRich() }
+    val rich: List[Object] = (parts as List)[0] as List[Object]
+    val poor: List[Object] = (parts as List)[1] as List[Object]
+    val richNames: String = rich.map { p => (p as Province).name() }.fold("") { a, n => if a == "" { n as String } else { a + ", " + (n as String) } } as String
+    val poorNames: String = poor.map { p => (p as Province).name() }.fold("") { a, n => if a == "" { n as String } else { a + ", " + (n as String) } } as String
+    sb = sb + "  Rich provinces (#{rich.size}): #{richNames}\n"
+    sb = sb + "  Poor provinces (#{poor.size}): #{poorNames}\n\n"
+
+    // Event log (ledger audit)
+    sb = sb + "  ── Event Log ──\n"
+    foreach line: Object in ledger.audit() {
+      sb = sb + line as String + "\n"
+    }
+
+    sb = sb + "\n" + "═".rep(60) + "\n"
+    return sb
+  }
+}
+
+// ─── Trade pair generator using do[List] ──────────────────────────────────────
+
+def tradePairs(provinces: List[Object]): List[Object] {
+  val all: List[Object] = do[List] {
+    a <- provinces
+    b <- provinces
+    ret new Trade((a as Province).id(), (b as Province).id(), ResourceType::Gold, 10)
+  }
+  return all.filter { ev =>
+    val e: KingdomEvent = ev as KingdomEvent
+    select e {
+      case t is Trade: t.fromId() != t.toId()
+      else: true
+    }
+  }
+}
+
+// ─── Simulation runner ────────────────────────────────────────────────────────
+
+def runSimulation(manager: ProvinceManager, season: Season): void {
+  IO::println("--- Simulating #{season.label()} ---")
+
+  // Each province harvests
+  foreach p: Object in manager.all() {
+    val pr: Province = p as Province
+    manager.applyHarvest(pr.id(), season)
+  }
+
+  // Trade between province 1 and 2
+  manager.applyTrade(1, 2, ResourceType::Grain, 20)
+  manager.applyTrade(2, 3, ResourceType::Wood,  15)
+  manager.applyTrade(3, 1, ResourceType::Iron,   8)
+
+  // Random event per season
+  select season {
+    case Season::Winter:
+      manager.applyDisaster(2, "Blizzard", 30)
+      manager.applyPopChange(2, -5)
+    case Season::Summer:
+      manager.applyConstruction(1, "Granary",  200)
+      manager.applyConstruction(3, "Barracks", 350)
+    case Season::Spring:
+      manager.applyPopChange(1, 8)
+      manager.applyPopChange(3, 5)
+    case Season::Autumn:
+      manager.applyTrade(1, 4, ResourceType::Stone, 25)
+    else: {}
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val ledger: KingdomLedger = new KingdomLedger()
+  val manager: ProvinceManager = new ProvinceManager(ledger)
+
+  // Seed provinces
+  manager.addProvince(new Province(1, "Ironhaven",  "North", 420, 180, 240, 110,  90, 200, 15, []))
+  manager.addProvince(new Province(2, "Maplewood",  "North", 310,  60, 310, 280,  40,  30, 12, []))
+  manager.addProvince(new Province(3, "Stonemark",  "South", 510, 220,  80,  60, 400,  90, 18, []))
+  manager.addProvince(new Province(4, "Goldvale",   "South", 680, 540, 150,  70, 120,  60, 22, []))
+  manager.addProvince(new Province(5, "Ashfield",   "East",  190,  30,  55,  40,  20,  10,  8, []))
+  manager.addProvince(new Province(6, "Duskwater",  "East",  260,  90, 120, 200,  50,  15, 10, []))
+
+  // Run four seasons
+  var season: Season = Season::Spring
+  foreach _: Int in 0..3 {
+    runSimulation(manager, season)
+    season = season.next()
+  }
+
+  // Pipeline showcase: top 3 wealthiest provinces
+  IO::println("\n  Top 3 wealthiest provinces:")
+  val top3: List[Object] = manager.byWealth()
+                                  .filter { p => (p as Province).totalWealth() > 100 }
+                                  .sortedBy { p => 0 - (p as Province).totalWealth() }
+                                  .take(3)
+  foreach p: Object in top3 {
+    val pr: Province = p as Province
+    IO::println("    #{pr.name().pad(14)} wealth=#{pr.totalWealth()}")
+  }
+
+  // do[List] trade-pair preview (first 4)
+  IO::println("\n  Sample trade pairs (first 4):")
+  val pairs: List[Object] = tradePairs(manager.all()).take(4)
+  foreach ev: Object in pairs {
+    IO::println("    #{(ev as KingdomEvent).label()}")
+  }
+
+  // find + any: poverty and grain shortage checks
+  val hasPovert: Boolean = manager.all().any { p => (p as Province).isPoor() }
+  val poorest: Object? = manager.all()
+    .sortedBy { p => (p as Province).totalWealth() }
+    .find { p => (p as Province).isPoor() }
+  IO::println("\n  Any province in poverty? #{hasPovert}")
+  if poorest != null {
+    val lgMsg: String = "  Poorest province: #{(poorest as Province).name()} wealth=#{(poorest as Province).totalWealth()}"
+    lgMsg |> IO::println
+  }
+
+  // distinct: show unique regions represented
+  val regions = manager.all().map { p => (p as Province).region() }.distinct()
+  val regionList: String = regions.fold("") { a, r => if a == "" { r as String } else { a + ", " + (r as String) } } as String
+  IO::println("  Distinct regions: #{regionList}")
+
+  // zip: pair province names with their wealth values
+  val names: List[Object] = manager.all().map { p => (p as Province).name() }
+  val wealths: List[Object] = manager.all().map { p => (p as Province).totalWealth() }
+  val zipped = names.zip(wealths)
+  IO::println("\n  Province name → wealth pairs:")
+  foreach pair: Object in zipped {
+    val pairList: List[Object] = pair as List[Object]
+    IO::println("    #{(pairList.get(0) as String).pad(12)} → #{pairList.get(1)}")
+  }
+
+  // |> pipeline: find any province with low grain (use |> for the println call)
+  val lowGrainList: List[Object] = manager.all()
+    .filter { p => (p as Province).grain() < 100 }
+    .sortedBy { p => (p as Province).grain() }
+  val lowGrain: Object? = if lowGrainList.size > 0 { lowGrainList.get(0) } else { null }
+  if lowGrain != null {
+    val lgMsg: String = "\n  Low-grain alert: #{((lowGrain as Province)).name()} (#{((lowGrain as Province)).grain()} grain)"
+    lgMsg |> IO::println
+  }
+
+  // Report
+  val reporter: KingdomReporter = new KingdomReporter("Onyria", manager, ledger)
+  try {
+    IO::println("\n" + reporter.generateReport())
+  } catch e: Exception {
+    IO::println("Report error: #{e.getMessage()}")
+  }
+}

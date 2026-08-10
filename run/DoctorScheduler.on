@@ -1,0 +1,336 @@
+// DoctorScheduler.on  —  Medical appointment scheduling system
+//
+// Exercises: ADT enum with case-records, multiple conforms interfaces, select
+// with is-patterns and when-guards, foreach (k,v) in map, nullable fields,
+// string interpolation, collection pipelines, recursive data processing.
+
+import {
+  java.util.LinkedHashMap
+  java.util.ArrayList
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Specialty {
+  GENERAL, CARDIOLOGY, NEUROLOGY, ORTHOPEDICS, PEDIATRICS, DERMATOLOGY
+public:
+  def label(): String = select this {
+    case s when s == Specialty::GENERAL:      "General Medicine"
+    case s when s == Specialty::CARDIOLOGY:   "Cardiology"
+    case s when s == Specialty::NEUROLOGY:    "Neurology"
+    case s when s == Specialty::ORTHOPEDICS:  "Orthopedics"
+    case s when s == Specialty::PEDIATRICS:   "Pediatrics"
+    else: "Dermatology"
+  }
+}
+
+enum AppointmentStatus {
+  SCHEDULED, COMPLETED, CANCELLED, NO_SHOW
+public:
+  def label(): String = select this {
+    case s when s == AppointmentStatus::SCHEDULED:  "Scheduled"
+    case s when s == AppointmentStatus::COMPLETED:  "Completed"
+    case s when s == AppointmentStatus::CANCELLED:  "Cancelled"
+    else: "No-Show"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record TimeSlot(date: String, hour: Int) {
+  public:
+  def label(): String = "#{date()} #{if hour() < 10 { "0" + hour() } else { "" + hour() }}:00"
+  def isSameDay(other: TimeSlot): Boolean = date() == other.date()
+}
+
+record Doctor(id: String, name: String, specialty: Specialty, maxDailySlots: Int)
+
+record Patient(id: String, name: String, age: Int, condition: String)
+
+record Appointment(
+  id: String,
+  doctor: Doctor,
+  patient: Patient,
+  slot: TimeSlot,
+  status: AppointmentStatus,
+  notes: String?
+) {
+  public:
+  def isPending(): Boolean = status() == AppointmentStatus::SCHEDULED
+  def summary(): String =
+    "[#{status().label()}] #{slot().label()} — Dr. #{doctor().name()} ← #{patient().name()}"
+}
+
+// ─── Clinic ──────────────────────────────────────────────────────────────────
+
+class Clinic {
+public:
+  var appointments: List[Appointment]
+  var doctors: List[Doctor]
+  var patients: List[Patient]
+  var nextId: Int
+  def this {
+    appointments = []
+    doctors = []
+    patients = []
+    nextId = 1
+  }
+
+  def addDoctor(d: Doctor): void { doctors.add(d) }
+  def addPatient(p: Patient): void { patients.add(p) }
+
+  def findDoctor(doctorId: String): Doctor? {
+    foreach obj: Object in doctors {
+      val d = obj as Doctor
+      if d.id() == doctorId { return d }
+    }
+    return null
+  }
+
+  def findPatient(patientId: String): Patient? {
+    foreach obj: Object in patients {
+      val p = obj as Patient
+      if p.id() == patientId { return p }
+    }
+    return null
+  }
+
+  def findAppt(apptId: String): Appointment? {
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.id() == apptId { return a }
+    }
+    return null
+  }
+
+  def schedule(doctorId: String, patientId: String, slot: TimeSlot, notes: String?): Appointment? {
+    val doc: Doctor? = findDoctor(doctorId)
+    val pat: Patient? = findPatient(patientId)
+    if doc == null || pat == null { return null }
+    // Count pending appointments this doctor has on the same day
+    var dayCount: Int = 0
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.doctor().id() == doctorId && a.slot().isSameDay(slot) && a.isPending() {
+        dayCount = dayCount + 1
+      }
+    }
+    if dayCount >= doc.maxDailySlots() { return null }
+    val id: String = "A#{nextId}"
+    nextId = nextId + 1
+    val appt: Appointment = new Appointment(id, doc, pat, slot, AppointmentStatus::SCHEDULED, notes)
+    appointments.add(appt)
+    return appt
+  }
+
+  def cancel(apptId: String): Boolean {
+    val appt: Appointment? = findAppt(apptId)
+    if appt == null { return false }
+    val idx: Int = appointments.indexOf(appt)
+    appointments[idx] = new Appointment(
+      appt.id(), appt.doctor(), appt.patient(), appt.slot(),
+      AppointmentStatus::CANCELLED, appt.notes()
+    )
+    return true
+  }
+
+  def complete(apptId: String): Boolean {
+    val appt: Appointment? = findAppt(apptId)
+    if appt == null { return false }
+    val idx: Int = appointments.indexOf(appt)
+    appointments[idx] = new Appointment(
+      appt.id(), appt.doctor(), appt.patient(), appt.slot(),
+      AppointmentStatus::COMPLETED, appt.notes()
+    )
+    return true
+  }
+
+  def pending(): List[Appointment] {
+    val result: List[Appointment] = []
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.isPending() { result.add(a) }
+    }
+    return result
+  }
+
+  def forDoctor(doctorId: String): List[Appointment] {
+    val result: List[Appointment] = []
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.doctor().id() == doctorId { result.add(a) }
+    }
+    return result
+  }
+
+  def forPatient(patientId: String): List[Appointment] {
+    val result: List[Appointment] = []
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.patient().id() == patientId { result.add(a) }
+    }
+    return result
+  }
+
+  def markNoShow(apptId: String): Boolean {
+    val appt: Appointment? = findAppt(apptId)
+    if appt == null { return false }
+    val idx: Int = appointments.indexOf(appt)
+    appointments[idx] = new Appointment(
+      appt.id(), appt.doctor(), appt.patient(), appt.slot(),
+      AppointmentStatus::NO_SHOW, appt.notes()
+    )
+    return true
+  }
+
+  def completionRate(): Int {
+    val total: Int = appointments.size()
+    if total == 0 { return 0 }
+    var done: Int = 0
+    foreach obj: Object in appointments {
+      val a = obj as Appointment
+      if a.status() == AppointmentStatus::COMPLETED { done = done + 1 }
+    }
+    return done * 100 / total
+  }
+}
+
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+def countByStatus(appts: List[Appointment], status: AppointmentStatus): Int {
+  var count: Int = 0
+  foreach obj: Object in appts {
+    val a = obj as Appointment
+    if a.status() == status { count = count + 1 }
+  }
+  return count
+}
+
+def groupBySpecialty(appts: List[Appointment]): LinkedHashMap[String, Object] {
+  val map: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
+  foreach obj: Object in appts {
+    val a = obj as Appointment
+    val key: String = a.doctor().specialty().label()
+    val bucket: List[Appointment] = if map.containsKey(key) {
+      map.get(key) as List[Appointment]
+    } else {
+      val fresh: List[Appointment] = []
+      map.put(key, fresh)
+      fresh
+    }
+    bucket.add(a)
+  }
+  return map
+}
+
+def printReport(clinic: Clinic): void {
+  val appts: List[Appointment] = clinic.appointments
+
+  IO::println("═══════════════════════════════════════════════")
+  IO::println("          CLINIC APPOINTMENT REPORT            ")
+  IO::println("═══════════════════════════════════════════════")
+  IO::println("Total appointments : #{appts.size()}")
+  IO::println("  • Scheduled      : #{countByStatus(appts, AppointmentStatus::SCHEDULED)}")
+  IO::println("  • Completed      : #{countByStatus(appts, AppointmentStatus::COMPLETED)}")
+  IO::println("  • Cancelled      : #{countByStatus(appts, AppointmentStatus::CANCELLED)}")
+  IO::println("  • No-show        : #{countByStatus(appts, AppointmentStatus::NO_SHOW)}")
+
+  IO::println("")
+  IO::println("── By Specialty ────────────────────────────────")
+  val bySpec: LinkedHashMap[String, Object] = groupBySpecialty(appts)
+  foreach (key, bucket) in bySpec {
+    val list: List[Appointment] = bucket as List[Appointment]
+    IO::println("  #{key}: #{list.size()} appointment(s)")
+  }
+
+  IO::println("")
+  IO::println("── Pending Appointments ────────────────────────")
+  val pending: List[Appointment] = clinic.pending()
+  if pending.size() == 0 {
+    IO::println("  (none)")
+  } else {
+    foreach obj: Object in pending {
+      IO::println("  #{(obj as Appointment).summary()}")
+    }
+  }
+  IO::println("═══════════════════════════════════════════════")
+}
+
+// ─── Main scenario ────────────────────────────────────────────────────────────
+
+val clinic: Clinic = new Clinic()
+
+// Register doctors
+clinic.addDoctor(new Doctor("D1", "Carter",  Specialty::CARDIOLOGY,   6))
+clinic.addDoctor(new Doctor("D2", "Patel",   Specialty::NEUROLOGY,    5))
+clinic.addDoctor(new Doctor("D3", "Nguyen",  Specialty::GENERAL,      8))
+clinic.addDoctor(new Doctor("D4", "Okafor",  Specialty::ORTHOPEDICS,  5))
+clinic.addDoctor(new Doctor("D5", "Kim",     Specialty::PEDIATRICS,   7))
+
+// Register patients
+clinic.addPatient(new Patient("P1", "Alice Marsh",    34, "hypertension"))
+clinic.addPatient(new Patient("P2", "Bob Tanaka",     52, "chronic back pain"))
+clinic.addPatient(new Patient("P3", "Clara Voss",      8, "seasonal allergies"))
+clinic.addPatient(new Patient("P4", "David Osei",     67, "arrhythmia"))
+clinic.addPatient(new Patient("P5", "Eva Lindstrom",  29, "migraines"))
+clinic.addPatient(new Patient("P6", "Frank Wu",       45, "knee injury"))
+
+// Schedule appointments
+clinic.schedule("D1", "P1", new TimeSlot("2026-08-10", 9),  null)
+clinic.schedule("D1", "P4", new TimeSlot("2026-08-10", 10), "Follow-up ECG")
+clinic.schedule("D2", "P5", new TimeSlot("2026-08-10", 11), null)
+clinic.schedule("D3", "P3", new TimeSlot("2026-08-10", 14), null)
+clinic.schedule("D4", "P2", new TimeSlot("2026-08-11", 9),  "Post-op review")
+clinic.schedule("D4", "P6", new TimeSlot("2026-08-11", 10), null)
+clinic.schedule("D5", "P3", new TimeSlot("2026-08-12", 9),  null)
+
+// Simulate some outcomes
+clinic.complete("A1")   // Alice–Carter visit done
+clinic.cancel("A3")     // Eva cancelled neurology
+clinic.complete("A5")   // Bob–Okafor post-op done
+
+// Print report
+printReport(clinic)
+
+// Show one doctor's appointments
+IO::println("")
+IO::println("── Dr. Carter's schedule ───────────────────────")
+val carterAppts: List[Appointment] = clinic.forDoctor("D1")
+foreach obj: Object in carterAppts {
+  IO::println("  #{(obj as Appointment).summary()}")
+}
+
+// Show one patient's appointments
+IO::println("")
+IO::println("── Clara's appointments ────────────────────────")
+val claraAppts: List[Appointment] = clinic.forPatient("P3")
+foreach obj: Object in claraAppts {
+  IO::println("  #{(obj as Appointment).summary()}")
+}
+
+// Mark David's appointment as no-show and re-print pending count
+clinic.markNoShow("A2")
+
+IO::println("")
+IO::println("── After marking David as no-show ──────────────")
+val pending2: List[Appointment] = clinic.pending()
+IO::println("  Pending: #{pending2.size()} | No-shows: #{countByStatus(clinic.appointments, AppointmentStatus::NO_SHOW)}")
+
+// Daily workload summary
+IO::println("")
+IO::println("── Daily Workload (2026-08-10) ─────────────────")
+val aug10: String = "2026-08-10"
+var aug10Count: Int = 0
+foreach obj: Object in clinic.appointments {
+  val a = obj as Appointment
+  if a.slot().date() == aug10 { aug10Count = aug10Count + 1 }
+}
+IO::println("  Appointments on #{aug10}: #{aug10Count}")
+
+// Completion rate
+val total: Int = clinic.appointments.size()
+val completed: Int = countByStatus(clinic.appointments, AppointmentStatus::COMPLETED)
+val pct: Int = if total > 0 { completed * 100 / total } else { 0 }
+IO::println("")
+IO::println("── Completion Rate ─────────────────────────────")
+IO::println("  #{completed} / #{total} completed (#{pct}%)")

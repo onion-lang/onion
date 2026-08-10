@@ -638,6 +638,20 @@ record U(a: String) derive!(Bogus)   // E0063: unknown derive! marker Bogus
 
 Fix: use `derive!(Json)`, or remove the clause.
 
+### `E0086` — Duplicate record component
+
+Two components of the same record declare the same name. Each component name
+generates a private field and a public accessor method, so a repeated name
+would collide with itself — left unchecked, this only failed once something
+loaded the generated class (a `ClassFormatError`, surfaced as an internal
+I0000 error) rather than at compile time.
+
+```onion
+record R(a: Int, a: Int)   // E0086: duplicated record component a in R
+```
+
+Fix: rename one of the components.
+
 ### `E0064` — Law violation
 
 A `law name(p: T) { boolExpr }` clause is checked at build time against
@@ -1419,6 +1433,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
+| `E0086` | duplicated record component … in … |
 
 ## See also
 

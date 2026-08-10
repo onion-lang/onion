@@ -2476,6 +2476,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0086" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0086 — レコード成分名の重複
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0064-law" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5947,6 +5958,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0086" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0086 — レコード成分名の重複
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0064-law" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7029,12 +7051,21 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <div class="language-text highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bogus
 </span></code></pre></div>
 <p>対処: <code>derive!(Json)</code> を使うか、この句を削除してください。</p>
+<h3 id="e0086"><code>E0086</code> — レコード成分名の重複<a class="headerlink" href="#e0086" title="Permanent link">&para;</a></h3>
+<p>同じレコード内の2つの成分が同じ名前を宣言しています。成分名はそれぞれ private
+フィールドと public アクセサメソッドを1つずつ生成するため、名前が重複すると
+それ自身と衝突します。以前はこれを検査しておらず、生成されたクラスが実際に
+ロードされたときに初めて（<code>ClassFormatError</code> が内部エラー I0000 として現れる
+形で）失敗していました。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>record R(a: Int, a: Int)   // E0086: レコード R の成分 a が重複しています
+</span></code></pre></div>
+<p>対処: どちらかの成分名を変更してください。</p>
 <h3 id="e0064-law"><code>E0064</code> — law の反証<a class="headerlink" href="#e0064-law" title="Permanent link">&para;</a></h3>
 <p><code>law name(p: T) { boolExpr }</code> 句は、ビルド時に <code>p</code> の生成されたサンプル値に対して
 チェックされます。式を false にするサンプルは反例であり、再現できるように
 （シードやサンプル数などの）生成設定とともに報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>  law wrong(p: Pt) { p.x() == p.y() }   // E0064: 反証された（例: Pt(0, 1)）
+<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  law wrong(p: Pt) { p.x() == p.y() }   // E0064: 反証された（例: Pt(0, 1)）
 </span></code></pre></div>
 <p>対処: あらゆる生成サンプルに対して成り立つように law（またはチェック対象のコード）を
 修正するか、一般には成り立たない law であれば削除してください。</p>
@@ -7042,33 +7073,33 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <p>トップレベルまたはレコードに付随する <code>example { boolExpr }</code> 句が、ビルド時に
 <code>false</code> と評価された（または例外をスローした）ケースです。<code>law</code> と異なり、
 <code>example</code> は生成されたサンプル群ではなく、1つの固定ケースをチェックします。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>record R(x: Int)
-</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  example { new R(1).x() == 2 }   // E0065: false と評価された
+<div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>record R(x: Int)
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>  example { new R(1).x() == 2 }   // E0065: false と評価された
 </span></code></pre></div>
 <p>対処: example が期待する値を修正するか、その example が検証しているコード側を
 修正してください。</p>
 <h3 id="e0073-map"><code>E0073</code> — Map は直接反復できない<a class="headerlink" href="#e0073-map" title="Permanent link">&para;</a></h3>
 <p><code>foreach</code> は配列か <code>iterator()</code> を持つ値を走査しますが、<code>Map</code> はそのどちらでもありません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>val m = [&quot;a&quot;: 1]
-</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>foreach k: String in m { println(k) }   // E0073
+<div class="language-text highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>val m = [&quot;a&quot;: 1]
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>foreach k: String in m { println(k) }   // E0073
 </span></code></pre></div>
 <p>エントリを回す分割代入形式を使うか、ビューを選んでください。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
-</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>foreach k: String in m.keySet() { println(k) }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
+</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>foreach k: String in m.keySet() { println(k) }
 </span></code></pre></div>
 <h3 id="e0074-law"><code>E0074</code> — law の引数型からサンプルを生成できない<a class="headerlink" href="#e0074-law" title="Permanent link">&para;</a></h3>
 <p><code>law</code> はビルド時に生成したサンプル値で検査されるため、すべての引数型に生成器が必要です。
 生成できる型は <code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code> と、
 全成分が生成可能なレコードです。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>record Dummy(v: Int)
-</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
+<div class="language-text highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>record Dummy(v: Int)
+</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
 </span></code></pre></div>
 <p>それ以外——配列、<code>Map</code>、enum、インターフェース、コンストラクタが複数あるクラス——には
 生成器がありません。以前はこうした law が黙って読み飛ばされ、<strong>成立した law と区別が
 つきませんでした</strong>。実行できない検査が「通った検査」に見えてはいけません。
 引数の型を変えるか、law を削除してください。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>  law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
+<div class="language-text highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>  law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
 </span></code></pre></div>
 <h3 id="e0075-law"><code>E0075</code> — law を持つクラスをロードできなかった<a class="headerlink" href="#e0075-law" title="Permanent link">&para;</a></h3>
 <p>law はコンパイル済みクラスに対して実行されます。<code>law</code> / <code>example</code> 句を持つクラスを
@@ -7078,8 +7109,8 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <p><code>shape name = &lt;format&gt;</code> 句が、コンパイラの知らない文書フォーマットを指しています。
 推測すると「何も読まない shape」が黙って出来上がるため、サポート対象を列挙した
 エラーにしています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>  shape doc = toml     // E0076: サポートしているのは json, yaml
+<div class="language-text highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>  shape doc = toml     // E0076: サポートしているのは json, yaml
 </span></code></pre></div>
 <p>インラインのパターンを書く場合は <code>shape name = re"..."</code> としてください。</p>
 <h3 id="e0080-shape-law"><code>E0080</code> — 自作の <code>Shape</code> に law がない<a class="headerlink" href="#e0080-shape-law" title="Permanent link">&para;</a></h3>
@@ -7087,23 +7118,23 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 そのファイル内で機械検査される <code>law</code> か <code>example</code> を最低1つ主張しなければなりません。
 導出された shape は round-trip が構造的に保証されますが、手書きのものは<strong>主張するだけ</strong>
 なので、その主張を検査する必要があります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>class FixedWidth conforms Shape[Person] {
-</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>public:
-</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>  def this {}
-</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a>  def canPrint(): Boolean = true
-</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a>  def print(v: Person): String { ... }
-</span><span id="__span-47-7"><a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
-</span><span id="__span-47-8"><a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a>}
-</span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a>// E0080: FixedWidth の law を主張している箇所がこのファイルにない
+<div class="language-text highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>public:
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>  def this {}
+</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-48-8"><a id="__codelineno-48-8" name="__codelineno-48-8" href="#__codelineno-48-8"></a>}
+</span><span id="__span-48-9"><a id="__codelineno-48-9" name="__codelineno-48-9" href="#__codelineno-48-9"></a>// E0080: FixedWidth の law を主張している箇所がこのファイルにない
 </span></code></pre></div>
 <p>対処: トップレベルの <code>example</code>（またはクラス自身の <code>law</code>）を追加してください——代表的な
 主張は round-trip <code>s.parse(s.print(v)).get() == v</code> です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>example fixedWidthL1 {
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>  val s = new FixedWidth()
-</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
-</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>  s.parse(s.print(v)).get() == v
-</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>example fixedWidthL1 {
+</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>  val s = new FixedWidth()
+</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a>}
 </span></code></pre></div>
 <p>パース専用の shape（<code>canPrint(): false</code>）は、読み取り方向にある law を代わりに主張します。
 主張が偽であれば、他の <code>example</code> と同様に <code>E0065</code> になります。</p>
@@ -7113,44 +7144,44 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <h3 id="e0077-tool"><code>E0077</code> — tool が未宣言の効果を実行している<a class="headerlink" href="#e0077-tool" title="Permanent link">&para;</a></h3>
 <p>本体が <code>requires</code> 節でカバーされていない効果を実行しています。診断は不足している
 効果、呼び出し先、呼び出し箇所を示します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>tool sneaky(src: String, dst: String): void
-</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>  requires { read(src) }
-</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>{
-</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: `write` を実行 (writeText)
-</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>tool sneaky(src: String, dst: String): void
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>  requires { read(src) }
+</span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>{
+</span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: `write` を実行 (writeText)
+</span><span id="__span-50-5"><a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>}
 </span></code></pre></div>
 <p>修正方法: 不足している capability を追加する — <code>requires { read(src), write(dst) }</code>。</p>
 <h3 id="e0078-capability"><code>E0078</code> — 本体が実行できない capability が宣言されている<a class="headerlink" href="#e0078-capability" title="Permanent link">&para;</a></h3>
 <p><code>requires</code> 内の capability が未使用です: 本体のどこもそれを実行していません。誠実な
 境界は、実際に起きることだけを列挙します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>tool overclaim(src: String): String
-</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>  requires { read(src), net }   // E0078: `net` が未使用
-</span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>{
-</span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>  return Files::readText(src)
-</span><span id="__span-50-5"><a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>tool overclaim(src: String): String
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>  requires { read(src), net }   // E0078: `net` が未使用
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>{
+</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>  return Files::readText(src)
+</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>}
 </span></code></pre></div>
 <p>修正方法: 未使用の capability を削除する。</p>
 <h3 id="e0079-capability"><code>E0079</code> — 不正な capability エントリ<a class="headerlink" href="#e0079-capability" title="Permanent link">&para;</a></h3>
 <p><code>requires</code> のエントリが有効な capability ではありません: 未知の効果名、常に ambient な
 効果へのパラメータ引数、またはこの tool のパラメータ名を指していない引数です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>tool t(): Int requires { teleport } { return 0 }
-</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>  // E0079: `teleport` は効果ではない
-</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>
-</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
-</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>  // E0079: `console` はパラメータ引数を取らない
-</span><span id="__span-51-6"><a id="__codelineno-51-6" name="__codelineno-51-6" href="#__codelineno-51-6"></a>
-</span><span id="__span-51-7"><a id="__codelineno-51-7" name="__codelineno-51-7" href="#__codelineno-51-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
-</span><span id="__span-51-8"><a id="__codelineno-51-8" name="__codelineno-51-8" href="#__codelineno-51-8"></a>  // E0079: `nope` はパラメータ名ではない
+<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>tool t(): Int requires { teleport } { return 0 }
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>  // E0079: `teleport` は効果ではない
+</span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>
+</span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+</span><span id="__span-52-5"><a id="__codelineno-52-5" name="__codelineno-52-5" href="#__codelineno-52-5"></a>  // E0079: `console` はパラメータ引数を取らない
+</span><span id="__span-52-6"><a id="__codelineno-52-6" name="__codelineno-52-6" href="#__codelineno-52-6"></a>
+</span><span id="__span-52-7"><a id="__codelineno-52-7" name="__codelineno-52-7" href="#__codelineno-52-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+</span><span id="__span-52-8"><a id="__codelineno-52-8" name="__codelineno-52-8" href="#__codelineno-52-8"></a>  // E0079: `nope` はパラメータ名ではない
 </span></code></pre></div>
 <p>効果の語彙は <code>read write net exec env clock rand console unknown</code> で、パラメータ引数
 を取るのは <code>read</code>, <code>write</code>, <code>net</code>, <code>exec</code> のみです。</p>
 <h2 id="null">Null 安全エラー<a class="headerlink" href="#null" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-null"><code>E0057</code> — 型引数が null の可能性がある<a class="headerlink" href="#e0057-null" title="Permanent link">&para;</a></h3>
 <p>裸の型引数 <code>[T]</code> は nullable な型で実体化される可能性があるため、null チェックまたは非 null 制限なしには直接デリファレンスできません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>class Box[T] {
-</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>public:
-</span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>class Box[T] {
+</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>public:
+</span><span id="__span-53-3"><a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-53-4"><a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>}
 </span></code></pre></div>
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
@@ -7158,13 +7189,13 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <h3 id="e0070-nullable"><code>E0070</code> — nullable なメンバへのアクセス<a class="headerlink" href="#e0070-nullable" title="Permanent link">&para;</a></h3>
 <p>nullable な型（<code>T?</code>）の値に対して、フィールド（メソッドではない）が直接アクセス
 されました。この時点で値は null である可能性があります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>class Test {
-</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>public:
-</span><span id="__span-53-3"><a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-53-4"><a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>    val x: String? = &quot;abc&quot;
-</span><span id="__span-53-5"><a id="__codelineno-53-5" name="__codelineno-53-5" href="#__codelineno-53-5"></a>    return x.length   // E0070: x は null の可能性がある
-</span><span id="__span-53-6"><a id="__codelineno-53-6" name="__codelineno-53-6" href="#__codelineno-53-6"></a>  }
-</span><span id="__span-53-7"><a id="__codelineno-53-7" name="__codelineno-53-7" href="#__codelineno-53-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>class Test {
+</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>public:
+</span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>    val x: String? = &quot;abc&quot;
+</span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>    return x.length   // E0070: x は null の可能性がある
+</span><span id="__span-54-6"><a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a>  }
+</span><span id="__span-54-7"><a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a>}
 </span></code></pre></div>
 <p>対処: 安全にアクセスするには <code>?.</code>、デフォルト値を与えるには <code>?:</code>、非 null を
 断言するには <code>!!</code>、または先に null チェック（<code>if x != null { ... }</code>）を行って
@@ -7172,11 +7203,11 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <h3 id="e0081-tool"><code>E0081</code> — tool のパラメータがコマンドラインから読めない<a class="headerlink" href="#e0081-tool" title="Permanent link">&para;</a></h3>
 <p>CLI は <code>tool</code> のパラメータから導出されるので、パラメータはすべてコマンドライン引数から
 読める型でなければなりません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>record P(x: Int)
-</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>
-</span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
-</span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>// E0081: パラメータ `p` の型 P は引数から読み取れません。
-</span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>record P(x: Int)
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>
+</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-55-4"><a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a>// E0081: パラメータ `p` の型 P は引数から読み取れません。
+</span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a>//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
 </span></code></pre></div>
 <p>以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、<code>main</code> のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。</p>
@@ -7184,22 +7215,22 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 <p>2つの <code>tool</code> が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド
 ラインは<strong>名前だけ</strong>で tool を選ぶため、2つ目は決して呼び出せず、<code>--contract</code> にも同名
 で2件並んでどちらも指定できません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
-</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
-</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>// E0082: tool 名 `same` が重複しています。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
+</span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
+</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>// E0082: tool 名 `same` が重複しています。
 </span></code></pre></div>
 <h2 id="trycatch">try/catch エラー<a class="headerlink" href="#trycatch" title="Permanent link">&para;</a></h2>
 <h3 id="e0083-catch"><code>E0083</code> — 到達不能な catch 節<a class="headerlink" href="#e0083-catch" title="Permanent link">&para;</a></h3>
 <p>後ろにある <code>catch</code> 節の例外型が、手前の節の型のサブタイプ（または同じ型）である場合、
 その節には決して到達できません。手前の節が先に処理してしまうためです。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>try {
-</span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>  risky()
-</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>} catch e: RuntimeException {
-</span><span id="__span-56-4"><a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>  handle(e)
-</span><span id="__span-56-5"><a id="__codelineno-56-5" name="__codelineno-56-5" href="#__codelineno-56-5"></a>} catch e: IllegalArgumentException {
-</span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a>  // E0083: IllegalArgumentException は RuntimeException のサブタイプで、
-</span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a>  //        すでに手前の節が処理してしまう
-</span><span id="__span-56-8"><a id="__codelineno-56-8" name="__codelineno-56-8" href="#__codelineno-56-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>try {
+</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>  risky()
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>} catch e: RuntimeException {
+</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>  handle(e)
+</span><span id="__span-57-5"><a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a>} catch e: IllegalArgumentException {
+</span><span id="__span-57-6"><a id="__codelineno-57-6" name="__codelineno-57-6" href="#__codelineno-57-6"></a>  // E0083: IllegalArgumentException は RuntimeException のサブタイプで、
+</span><span id="__span-57-7"><a id="__codelineno-57-7" name="__codelineno-57-7" href="#__codelineno-57-7"></a>  //        すでに手前の節が処理してしまう
+</span><span id="__span-57-8"><a id="__codelineno-57-8" name="__codelineno-57-8" href="#__codelineno-57-8"></a>}
 </span></code></pre></div>
 <p>より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
 multi-catch 節（<code>catch e: A | B</code>）の候補同士は互いにチェックされません。</p>
@@ -7209,63 +7240,63 @@ multi-catch 節（<code>catch e: A | B</code>）の候補同士は互いにチ�
 ています。チェックせずに放置すると、生成されるコンテナクラスが同一の JVM シグネチャを
 持つメソッドを2つ持つことになり、コンパイル時ではなくクラスをロードした瞬間に初めて
 （<code>ClassFormatError</code> が内部エラー I0000 として現れる形で）失敗します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>extension Double {
-</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>  def pct(): String = &quot;&quot; + self
-</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>  def pct(): String = &quot;&quot; + self   // E0084: duplicated extension method pct() on Double
-</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>extension Double {
+</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>  def pct(): String = &quot;&quot; + self
+</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>  def pct(): String = &quot;&quot; + self   // E0084: duplicated extension method pct() on Double
+</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>}
 </span></code></pre></div>
 <p>対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
 extension メソッド同士は影響を受けません — 通常のオーバーロードです。</p>
 <h2 id="_4">宣言エラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0007"><code>E0007</code> — ローカル変数の重複<a class="headerlink" href="#e0007" title="Permanent link">&para;</a></h3>
 <p>同じスコープ内で、同じ名前のローカル変数が2回宣言されています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>class Test {
-</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>public:
-</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>    val x = 1
-</span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>    val x = 2   // E0007: x はこのスコープで既に宣言済み
-</span><span id="__span-58-6"><a id="__codelineno-58-6" name="__codelineno-58-6" href="#__codelineno-58-6"></a>    return 0
-</span><span id="__span-58-7"><a id="__codelineno-58-7" name="__codelineno-58-7" href="#__codelineno-58-7"></a>  }
-</span><span id="__span-58-8"><a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>class Test {
+</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>public:
+</span><span id="__span-59-3"><a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a>    val x = 1
+</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a>    val x = 2   // E0007: x はこのスコープで既に宣言済み
+</span><span id="__span-59-6"><a id="__codelineno-59-6" name="__codelineno-59-6" href="#__codelineno-59-6"></a>    return 0
+</span><span id="__span-59-7"><a id="__codelineno-59-7" name="__codelineno-59-7" href="#__codelineno-59-7"></a>  }
+</span><span id="__span-59-8"><a id="__codelineno-59-8" name="__codelineno-59-8" href="#__codelineno-59-8"></a>}
 </span></code></pre></div>
 <p>対処: どちらか一方の変数をリネームするか、冗長な宣言を削除してください。</p>
 <h3 id="e0008"><code>E0008</code> — クラスの重複<a class="headerlink" href="#e0008" title="Permanent link">&para;</a></h3>
 <p>トップレベルのクラス（インターフェース・レコード・enum を含む）が同じ名前で
 2つ宣言されています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>class A { public: def this {} }
-</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>class A { public: def this {} }   // E0008: A は既に宣言済み
+<div class="language-text highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>class A { public: def this {} }
+</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>class A { public: def this {} }   // E0008: A は既に宣言済み
 </span></code></pre></div>
 <p>対処: どちらか一方の宣言をリネームまたは削除してください。</p>
 <h3 id="e0009"><code>E0009</code> — フィールドの重複<a class="headerlink" href="#e0009" title="Permanent link">&para;</a></h3>
 <p>同じフィールド名がクラス上で2回宣言されています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>class A {
-</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>  var x: Int
-</span><span id="__span-60-3"><a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>  var x: Int   // E0009: x は A 上に既に宣言済み
-</span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a>public:
-</span><span id="__span-60-5"><a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a>  def this {}
-</span><span id="__span-60-6"><a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>class A {
+</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>  var x: Int
+</span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>  var x: Int   // E0009: x は A 上に既に宣言済み
+</span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>public:
+</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>  def this {}
+</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>}
 </span></code></pre></div>
 <p>対処: 重複したフィールドを削除するか、別の名前を付けてください。</p>
 <h3 id="e0010"><code>E0010</code> — メソッドの重複<a class="headerlink" href="#e0010" title="Permanent link">&para;</a></h3>
 <p>同じクラス上で、同じ名前・同じパラメータリストを持つメソッドが2つ宣言されて
 おり、どちらも他方の正当なオーバーロードになっていません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>class Test {
-</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>public:
-</span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>  def m(): Int = 1
-</span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>  def m(): Int = 2   // E0010: m() は Test 上に既に宣言済み
-</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>  static def main(args: String[]): Int { return 0 }
-</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>class Test {
+</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>public:
+</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>  def m(): Int = 1
+</span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>  def m(): Int = 2   // E0010: m() は Test 上に既に宣言済み
+</span><span id="__span-62-5"><a id="__codelineno-62-5" name="__codelineno-62-5" href="#__codelineno-62-5"></a>  static def main(args: String[]): Int { return 0 }
+</span><span id="__span-62-6"><a id="__codelineno-62-6" name="__codelineno-62-6" href="#__codelineno-62-6"></a>}
 </span></code></pre></div>
 <p>対処: どちらか一方のメソッドをリネームするか、パラメータ型を変えて正当な
 オーバーロードにしてください。</p>
 <h3 id="e0025"><code>E0025</code> — コンストラクタの重複<a class="headerlink" href="#e0025" title="Permanent link">&para;</a></h3>
 <p>同じクラスの2つのコンストラクタがまったく同じパラメータ型を持っており、
 どちらも他方の正当なオーバーロードになっていません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>class A {
-</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>public:
-</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>  def this(x: Int) {}
-</span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>  def this(y: Int) {}   // E0025: this(Int) は A に既に定義されている
-</span><span id="__span-62-5"><a id="__codelineno-62-5" name="__codelineno-62-5" href="#__codelineno-62-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>class A {
+</span><span id="__span-63-2"><a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>public:
+</span><span id="__span-63-3"><a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>  def this(x: Int) {}
+</span><span id="__span-63-4"><a id="__codelineno-63-4" name="__codelineno-63-4" href="#__codelineno-63-4"></a>  def this(y: Int) {}   // E0025: this(Int) は A に既に定義されている
+</span><span id="__span-63-5"><a id="__codelineno-63-5" name="__codelineno-63-5" href="#__codelineno-63-5"></a>}
 </span></code></pre></div>
 <p>対処: 一方のコンストラクタのパラメータ型を変えるか、重複を削除してください。</p>
 <h3 id="e0026"><code>E0026</code> — 生成されたメソッドの重複<a class="headerlink" href="#e0026" title="Permanent link">&para;</a></h3>
@@ -7274,30 +7305,30 @@ extension メソッド同士は影響を受けません — 通常のオーバ�
 同じメソッドへとマングルされ、コード生成時に衝突します。このチェックがなければ、
 この衝突は通常の診断ではなく、生の JVM <code>ClassFormatError</code> として後になって表面化
 していました。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-63-2"><a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
-</span><span id="__span-63-3"><a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+<div class="language-text highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-64-2"><a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+</span><span id="__span-64-3"><a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
 </span></code></pre></div>
 <p>対処: 一方の節の名前を変更するか、重複を削除してください。</p>
 <h3 id="e0029"><code>E0029</code> — 型パラメータの重複<a class="headerlink" href="#e0029" title="Permanent link">&para;</a></h3>
 <p>同じ型パラメータ名が、1つのクラス・インタフェース・メソッドの型パラメータリスト内で
 2回出現しています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>class Box[T, T] { public: def this {} }   // E0029: T は既に宣言されている
+<div class="language-text highlight"><pre><span></span><code><span id="__span-65-1"><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>class Box[T, T] { public: def this {} }   // E0029: T は既に宣言されている
 </span></code></pre></div>
 <p>対処: 型パラメータに異なる名前を付けてください。</p>
 <h3 id="e0051"><code>E0051</code> — 戻り値の型が必要<a class="headerlink" href="#e0051" title="Permanent link">&para;</a></h3>
 <p>トップレベル関数または extension メソッドに戻り値の型が宣言されておらず、
 コンパイラがそれを推論できません。典型的には、その関数が自己再帰的で、
 型付け済みの本体から型を推論する手がかりがない場合に発生します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-65-1"><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>def f(n: Int) = f(n)   // E0051: f には明示的な戻り値の型が必要
-</span><span id="__span-65-2"><a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-66-1"><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>def f(n: Int) = f(n)   // E0051: f には明示的な戻り値の型が必要
+</span><span id="__span-66-2"><a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>対処: 関数に明示的な戻り値の型を与えてください（例: <code>def f(n: Int): Int = f(n)</code>）。</p>
 <h3 id="e0052"><code>E0052</code> — ラムダのパラメータに型指定が必要<a class="headerlink" href="#e0052" title="Permanent link">&para;</a></h3>
 <p>ラムダのパラメータに型注釈がなく、そのラムダが現れている文脈からは
 コンパイラがパラメータの型を推論するための関数型インタフェースが得られません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-66-1"><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>val f = (x) -&gt; x + 1   // E0052: x の型をここでは推論できない
-</span><span id="__span-66-2"><a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-67-1"><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>val f = (x) -&gt; x + 1   // E0052: x の型をここでは推論できない
+</span><span id="__span-67-2"><a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>対処: パラメータに明示的に型を注釈する（<code>(x: Int) -&gt; x + 1</code>）か、目的の型が
 わかる文脈でラムダを使ってください — 例えば、関数型のパラメータが宣言された
@@ -7305,23 +7336,23 @@ extension メソッド同士は影響を受けません — 通常のオーバ�
 <h3 id="e0053"><code>E0053</code> — 循環した型エイリアス<a class="headerlink" href="#e0053" title="Permanent link">&para;</a></h3>
 <p>2つ以上の <code>type</code> エイリアスが互いを参照しており、どれを解決しようとしても
 無限に再帰してしまいます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-67-1"><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>type A = B
-</span><span id="__span-67-2"><a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>type B = A   // E0053: A -&gt; B -&gt; A
+<div class="language-text highlight"><pre><span></span><code><span id="__span-68-1"><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>type A = B
+</span><span id="__span-68-2"><a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>type B = A   // E0053: A -&gt; B -&gt; A
 </span></code></pre></div>
 <p>対処: 少なくとも一方のエイリアスを具体的な型に向けることで循環を断ち切って
 ください。</p>
 <h3 id="e0054"><code>E0054</code> — 型エイリアスの重複<a class="headerlink" href="#e0054" title="Permanent link">&para;</a></h3>
 <p>同じ <code>type</code> エイリアス名が同じスコープで2回宣言されています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-68-1"><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>type A = java.lang.String
-</span><span id="__span-68-2"><a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>type A = java.lang.Integer   // E0054: A は既に宣言されている
+<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>type A = java.lang.String
+</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>type A = java.lang.Integer   // E0054: A は既に宣言されている
 </span></code></pre></div>
 <p>対処: 一方の宣言をリネームするか削除してください。</p>
 <h3 id="e0055"><code>E0055</code> — 関数には本体が必要<a class="headerlink" href="#e0055" title="Permanent link">&para;</a></h3>
 <p>トップレベル関数が本体なし（<code>{ ... }</code> も <code>= expr</code> もなし）で宣言されています。
 クラスのメソッドと異なり、トップレベル関数は決して abstract にはなれないため、
 常に実装を持つ必要があります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>def f(): Int;   // E0055: f には本体が必要
-</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>def f(): Int;   // E0055: f には本体が必要
+</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>対処: 関数に本体を与えてください。</p>
 <h3 id="e0085-static"><code>E0085</code> — 本体のない static メソッド<a class="headerlink" href="#e0085-static" title="Permanent link">&para;</a></h3>
@@ -7330,11 +7361,11 @@ extension メソッド同士は影響を受けません — 通常のオーバ�
 abstract は矛盾します — static メソッドはオーバーライドできないため、abstract にも
 なり得ません。もしクラスファイルを生成すれば <code>ACC_STATIC</code> と <code>ACC_ABSTRACT</code> の両方が
 必要になり、これは JVM が拒否します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>class LineFilter {
-</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>public:
-</span><span id="__span-70-3"><a id="__codelineno-70-3" name="__codelineno-70-3" href="#__codelineno-70-3"></a>  static def main(args: String[]): void
-</span><span id="__span-70-4"><a id="__codelineno-70-4" name="__codelineno-70-4" href="#__codelineno-70-4"></a>  // E0085: static method main must have a body
-</span><span id="__span-70-5"><a id="__codelineno-70-5" name="__codelineno-70-5" href="#__codelineno-70-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>class LineFilter {
+</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>public:
+</span><span id="__span-71-3"><a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>  static def main(args: String[]): void
+</span><span id="__span-71-4"><a id="__codelineno-71-4" name="__codelineno-71-4" href="#__codelineno-71-4"></a>  // E0085: static method main must have a body
+</span><span id="__span-71-5"><a id="__codelineno-71-5" name="__codelineno-71-5" href="#__codelineno-71-5"></a>}
 </span></code></pre></div>
 <p>対処: 本体を追加するか、<code>static</code> を外して通常の abstract インスタンスメソッドとして
 宣言してください。</p>
@@ -7342,14 +7373,14 @@ abstract は矛盾します — static メソッドはオーバーライドで�
 <p>ローカル <code>val</code> が初期化子（<code>= expr</code>）なしで宣言されました。<code>var</code> と異なり <code>val</code> は
 後から代入できないため、初期化子のない <code>val</code> は JVM のゼロ値デフォルトしか読み取れず
 — それはバグであって、値ではありません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>class Test {
-</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>public:
-</span><span id="__span-71-3"><a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-71-4"><a id="__codelineno-71-4" name="__codelineno-71-4" href="#__codelineno-71-4"></a>    val x: String   // E0069: x は初期化されていない
-</span><span id="__span-71-5"><a id="__codelineno-71-5" name="__codelineno-71-5" href="#__codelineno-71-5"></a>    IO::println(x)
-</span><span id="__span-71-6"><a id="__codelineno-71-6" name="__codelineno-71-6" href="#__codelineno-71-6"></a>    return 0
-</span><span id="__span-71-7"><a id="__codelineno-71-7" name="__codelineno-71-7" href="#__codelineno-71-7"></a>  }
-</span><span id="__span-71-8"><a id="__codelineno-71-8" name="__codelineno-71-8" href="#__codelineno-71-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>class Test {
+</span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>public:
+</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a>    val x: String   // E0069: x は初期化されていない
+</span><span id="__span-72-5"><a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a>    IO::println(x)
+</span><span id="__span-72-6"><a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a>    return 0
+</span><span id="__span-72-7"><a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a>  }
+</span><span id="__span-72-8"><a id="__codelineno-72-8" name="__codelineno-72-8" href="#__codelineno-72-8"></a>}
 </span></code></pre></div>
 <p>対処: 宣言時に初期化子を与える（<code>val x: String = ...</code>）か、後から代入する必要が
 本当にあるなら <code>var</code> を使ってください。コンストラクタ内で初期化されるフィールドの
@@ -7357,138 +7388,138 @@ abstract は矛盾します — static メソッドはオーバーライドで�
 <h2 id="_5">制御フローエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <h3 id="e0048-break"><code>E0048</code> — ループの外での break<a class="headerlink" href="#e0048-break" title="Permanent link">&para;</a></h3>
 <p><code>break</code>（ラベル付き・なし問わず）が、囲むループのない場所に出現しています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>class Test {
-</span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>public:
-</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a>    break   // E0048: 囲むループがない
-</span><span id="__span-72-5"><a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a>    return 0
-</span><span id="__span-72-6"><a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a>  }
-</span><span id="__span-72-7"><a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>class Test {
+</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>public:
+</span><span id="__span-73-3"><a id="__codelineno-73-3" name="__codelineno-73-3" href="#__codelineno-73-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-73-4"><a id="__codelineno-73-4" name="__codelineno-73-4" href="#__codelineno-73-4"></a>    break   // E0048: 囲むループがない
+</span><span id="__span-73-5"><a id="__codelineno-73-5" name="__codelineno-73-5" href="#__codelineno-73-5"></a>    return 0
+</span><span id="__span-73-6"><a id="__codelineno-73-6" name="__codelineno-73-6" href="#__codelineno-73-6"></a>  }
+</span><span id="__span-73-7"><a id="__codelineno-73-7" name="__codelineno-73-7" href="#__codelineno-73-7"></a>}
 </span></code></pre></div>
 <p>対処: <code>break</code> は <code>while</code>・<code>for</code>・<code>foreach</code> ループの内側でのみ使用してください。</p>
 <h3 id="e0049-continue"><code>E0049</code> — ループの外での continue<a class="headerlink" href="#e0049-continue" title="Permanent link">&para;</a></h3>
 <p><code>continue</code>（ラベル付き・なし問わず）が、囲むループのない場所に出現しています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>class Test {
-</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>public:
-</span><span id="__span-73-3"><a id="__codelineno-73-3" name="__codelineno-73-3" href="#__codelineno-73-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-73-4"><a id="__codelineno-73-4" name="__codelineno-73-4" href="#__codelineno-73-4"></a>    continue   // E0049: 囲むループがない
-</span><span id="__span-73-5"><a id="__codelineno-73-5" name="__codelineno-73-5" href="#__codelineno-73-5"></a>    return 0
-</span><span id="__span-73-6"><a id="__codelineno-73-6" name="__codelineno-73-6" href="#__codelineno-73-6"></a>  }
-</span><span id="__span-73-7"><a id="__codelineno-73-7" name="__codelineno-73-7" href="#__codelineno-73-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>class Test {
+</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>public:
+</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>    continue   // E0049: 囲むループがない
+</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>    return 0
+</span><span id="__span-74-6"><a id="__codelineno-74-6" name="__codelineno-74-6" href="#__codelineno-74-6"></a>  }
+</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a>}
 </span></code></pre></div>
 <p>対処: <code>continue</code> は <code>while</code>・<code>for</code>・<code>foreach</code> ループの内側でのみ使用してください。</p>
 <h3 id="e0050-static"><code>E0050</code> — static コンテキストで現在のインスタンスが利用できない<a class="headerlink" href="#e0050-static" title="Permanent link">&para;</a></h3>
 <p><code>static</code> メソッドの内部で <code>this</code>/<code>self</code> が使われています。static メソッドには
 レシーバインスタンスが存在しません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>class Test {
-</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>public:
-</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>  static def s(): Int { return this.hashCode() }   // E0050: s は static
-</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>  static def main(args: String[]): Int { return 0 }
-</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>class Test {
+</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>public:
+</span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a>  static def s(): Int { return this.hashCode() }   // E0050: s は static
+</span><span id="__span-75-4"><a id="__codelineno-75-4" name="__codelineno-75-4" href="#__codelineno-75-4"></a>  static def main(args: String[]): Int { return 0 }
+</span><span id="__span-75-5"><a id="__codelineno-75-5" name="__codelineno-75-5" href="#__codelineno-75-5"></a>}
 </span></code></pre></div>
 <p>対処: <code>static</code> を外すか、インスタンスを明示的にパラメータとして渡してください。</p>
 <h3 id="e0058"><code>E0058</code> — ラベルが見つからない<a class="headerlink" href="#e0058" title="Permanent link">&para;</a></h3>
 <p>ラベル付きの <code>break</code>/<code>continue</code> が、囲んでいるどのループにも束縛されていない
 ラベルを指定しています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>class Test {
-</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>public:
-</span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a>  static def main(args: String[]): void {
-</span><span id="__span-75-4"><a id="__codelineno-75-4" name="__codelineno-75-4" href="#__codelineno-75-4"></a>    foreach i: Int in 0..3 {
-</span><span id="__span-75-5"><a id="__codelineno-75-5" name="__codelineno-75-5" href="#__codelineno-75-5"></a>      break nosuch   // E0058: nosuch というラベルの付いた囲みループがない
-</span><span id="__span-75-6"><a id="__codelineno-75-6" name="__codelineno-75-6" href="#__codelineno-75-6"></a>    }
-</span><span id="__span-75-7"><a id="__codelineno-75-7" name="__codelineno-75-7" href="#__codelineno-75-7"></a>  }
-</span><span id="__span-75-8"><a id="__codelineno-75-8" name="__codelineno-75-8" href="#__codelineno-75-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>class Test {
+</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>public:
+</span><span id="__span-76-3"><a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>  static def main(args: String[]): void {
+</span><span id="__span-76-4"><a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a>    foreach i: Int in 0..3 {
+</span><span id="__span-76-5"><a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>      break nosuch   // E0058: nosuch というラベルの付いた囲みループがない
+</span><span id="__span-76-6"><a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a>    }
+</span><span id="__span-76-7"><a id="__codelineno-76-7" name="__codelineno-76-7" href="#__codelineno-76-7"></a>  }
+</span><span id="__span-76-8"><a id="__codelineno-76-8" name="__codelineno-76-8" href="#__codelineno-76-8"></a>}
 </span></code></pre></div>
 <p>対処: 対象のループにラベルを付ける（<code>outer: foreach ... { break outer }</code>）か、
 ラベルの綴りを修正してください。</p>
 <h2 id="_6">パターンマッチングエラー<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>sealed interface Shape {}
-</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-76-3"><a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-76-4"><a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a>
-</span><span id="__span-76-5"><a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>select shape {
-</span><span id="__span-76-6"><a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-76-7"><a id="__codelineno-76-7" name="__codelineno-76-7" href="#__codelineno-76-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-76-8"><a id="__codelineno-76-8" name="__codelineno-76-8" href="#__codelineno-76-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>sealed interface Shape {}
+</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-77-4"><a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a>
+</span><span id="__span-77-5"><a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>select shape {
+</span><span id="__span-77-6"><a id="__codelineno-77-6" name="__codelineno-77-6" href="#__codelineno-77-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-77-7"><a id="__codelineno-77-7" name="__codelineno-77-7" href="#__codelineno-77-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-77-8"><a id="__codelineno-77-8" name="__codelineno-77-8" href="#__codelineno-77-8"></a>}
 </span></code></pre></div>
 <h3 id="e0043"><code>E0043</code> — 未知の名前付き引数<a class="headerlink" href="#e0043" title="Permanent link">&para;</a></h3>
 <p>呼び出しが <code>name = value</code> 構文を使ったが、その名前が解決されたメソッド・
 コンストラクタ・関数のどのパラメータとも一致しません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>class T {
-</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>public:
-</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-77-4"><a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a>  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f に nope という名前のパラメータはない
-</span><span id="__span-77-5"><a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>class T {
+</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>public:
+</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f に nope という名前のパラメータはない
+</span><span id="__span-78-5"><a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>}
 </span></code></pre></div>
 <p>対処: 引数名のスペルを対象の宣言と照らし合わせてください。</p>
 <h3 id="e0044"><code>E0044</code> — 引数の重複<a class="headerlink" href="#e0044" title="Permanent link">&para;</a></h3>
 <p>同じパラメータが1回の呼び出しの中で2回束縛されています — 例えば、同じ呼び出し内で
 既に使われた名前を繰り返す名前付き引数などです。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>class Test {
-</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>public:
-</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x は既に束縛されている
-</span><span id="__span-78-5"><a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>class Test {
+</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>public:
+</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x は既に束縛されている
+</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>}
 </span></code></pre></div>
 <p>対処: 重複した束縛を削除してください。</p>
 <h3 id="e0045"><code>E0045</code> — 名前付き引数の後の位置引数<a class="headerlink" href="#e0045" title="Permanent link">&para;</a></h3>
 <p>呼び出しで、名前付き引数の後に位置引数が置かれています。呼び出しが一度名前付き
 引数を使い始めたら、それ以降の引数もすべて名前で指定する必要があります —
 そうでなければ、位置引数がどのパラメータを埋めるのか曖昧になるためです。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>class Test {
-</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>public:
-</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 が名前付き引数の後に来ている
-</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>class Test {
+</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>public:
+</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-80-4"><a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 が名前付き引数の後に来ている
+</span><span id="__span-80-5"><a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>}
 </span></code></pre></div>
 <p>対処: 残りの引数もすべて名前付きにするか、位置引数を先頭にまとめてください。</p>
 <h3 id="e0046"><code>E0046</code> — 分割宣言パターンの束縛数が一致しない<a class="headerlink" href="#e0046" title="Permanent link">&para;</a></h3>
 <p>分割宣言の <code>val</code>/<code>var (a, b, ...)</code>（またはネストした分割パターン）で指定した
 変数の数が、record のコンポーネント数と一致していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>record Point(x: Int, y: Int)
-</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>class Test {
-</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>public:
-</span><span id="__span-80-4"><a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>  static def main(args: String[]): Int {
-</span><span id="__span-80-5"><a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>    val (a, b, c) = new Point(1, 2)   // E0046: Point は2フィールドだが3つの束縛が指定された
-</span><span id="__span-80-6"><a id="__codelineno-80-6" name="__codelineno-80-6" href="#__codelineno-80-6"></a>    return 0
-</span><span id="__span-80-7"><a id="__codelineno-80-7" name="__codelineno-80-7" href="#__codelineno-80-7"></a>  }
-</span><span id="__span-80-8"><a id="__codelineno-80-8" name="__codelineno-80-8" href="#__codelineno-80-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>record Point(x: Int, y: Int)
+</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>class Test {
+</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>public:
+</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>  static def main(args: String[]): Int {
+</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>    val (a, b, c) = new Point(1, 2)   // E0046: Point は2フィールドだが3つの束縛が指定された
+</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>    return 0
+</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>  }
+</span><span id="__span-81-8"><a id="__codelineno-81-8" name="__codelineno-81-8" href="#__codelineno-81-8"></a>}
 </span></code></pre></div>
 <p>対処: 束縛の数を record のコンポーネント数に合わせてください。</p>
 <h3 id="e0047-record"><code>E0047</code> — record 型ではない<a class="headerlink" href="#e0047-record" title="Permanent link">&para;</a></h3>
 <p>分割宣言の <code>val</code>/<code>var (a, b, ...) = expr</code> が、record ではない型の値に対して
 使われたため、位置で束縛できるコンポーネントがありません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>class Test {
-</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>public:
-</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>    val (a, b) = &quot;not a record&quot;   // E0047: String は record 型ではない
-</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>    return 0
-</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>  }
-</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>class Test {
+</span><span id="__span-82-2"><a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>public:
+</span><span id="__span-82-3"><a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-82-4"><a id="__codelineno-82-4" name="__codelineno-82-4" href="#__codelineno-82-4"></a>    val (a, b) = &quot;not a record&quot;   // E0047: String は record 型ではない
+</span><span id="__span-82-5"><a id="__codelineno-82-5" name="__codelineno-82-5" href="#__codelineno-82-5"></a>    return 0
+</span><span id="__span-82-6"><a id="__codelineno-82-6" name="__codelineno-82-6" href="#__codelineno-82-6"></a>  }
+</span><span id="__span-82-7"><a id="__codelineno-82-7" name="__codelineno-82-7" href="#__codelineno-82-7"></a>}
 </span></code></pre></div>
 <p>対処: record の値を分割するか、通常の <code>val</code>/<code>var</code> で値全体を束縛してください。</p>
 <h3 id="e0059"><code>E0059</code> — 不正な正規表現リテラル<a class="headerlink" href="#e0059" title="Permanent link">&para;</a></h3>
 <p><code>re"..."</code> リテラル（裸の式、<code>select case</code>、<code>from re"..."</code> 句のいずれでも）が
 正しい正規表現になっていません。コンパイル時に検証されるため、不正なパターンは
 実行時に <code>PatternSyntaxException</code> をスローする代わりにここで捕捉されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>val p = re&quot;(unclosed&quot;   // E0059: 不正な正規表現リテラル
+<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>val p = re&quot;(unclosed&quot;   // E0059: 不正な正規表現リテラル
 </span></code></pre></div>
 <p>対処: パターンを修正してください。</p>
 <h3 id="e0060"><code>E0060</code> — 正規表現のキャプチャグループ数とバインディング数の不一致<a class="headerlink" href="#e0060" title="Permanent link">&para;</a></h3>
 <p><code>case re"..." (b1, b2, ...)</code> パターン（または <code>record ... from re"..."</code> 句）が、
 パターンのキャプチャグループ数とは異なる数のバインディング／成分を指定しています。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>select &quot;x&quot; {
-</span><span id="__span-83-2"><a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>  case re&quot;(\d+)-(\d+)&quot; (a): a   // E0060: パターンは2グループだが、バインディングは1個
-</span><span id="__span-83-3"><a id="__codelineno-83-3" name="__codelineno-83-3" href="#__codelineno-83-3"></a>  else: &quot;no&quot;
-</span><span id="__span-83-4"><a id="__codelineno-83-4" name="__codelineno-83-4" href="#__codelineno-83-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>select &quot;x&quot; {
+</span><span id="__span-84-2"><a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>  case re&quot;(\d+)-(\d+)&quot; (a): a   // E0060: パターンは2グループだが、バインディングは1個
+</span><span id="__span-84-3"><a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>  else: &quot;no&quot;
+</span><span id="__span-84-4"><a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a>}
 </span></code></pre></div>
 <p>対処: バインディング（またはレコード成分）の数をパターンのキャプチャグループ数に
 合わせてください。</p>
 <h2 id="_7">パーサーエラー<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-85-1"><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_8">診断コード一覧<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p>上の各節は遭遇しやすいコードを例つきで説明しています。この表は全コードの一覧なので、
@@ -7836,6 +7867,10 @@ abstract は矛盾します — static メソッドはオーバーライドで�
 <tr>
 <td><code>E0085</code></td>
 <td>static method … must have a body</td>
+</tr>
+<tr>
+<td><code>E0086</code></td>
+<td>duplicated record component … in …</td>
 </tr>
 </tbody>
 </table>

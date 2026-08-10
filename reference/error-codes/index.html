@@ -4248,6 +4248,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0086-duplicate-record-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0086 — Duplicate record component
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0064-law-violation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5929,6 +5940,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0086-duplicate-record-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0086 — Duplicate record component
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0064-law-violation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7013,13 +7035,22 @@ supported marker today is <code>Json</code>.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>record U(a: String) derive!(Bogus)   // E0063: unknown derive! marker Bogus
 </span></code></pre></div>
 <p>Fix: use <code>derive!(Json)</code>, or remove the clause.</p>
+<h3 id="e0086-duplicate-record-component"><code>E0086</code> — Duplicate record component<a class="headerlink" href="#e0086-duplicate-record-component" title="Permanent link">&para;</a></h3>
+<p>Two components of the same record declare the same name. Each component name
+generates a private field and a public accessor method, so a repeated name
+would collide with itself — left unchecked, this only failed once something
+loaded the generated class (a <code>ClassFormatError</code>, surfaced as an internal
+I0000 error) rather than at compile time.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>record R(a: Int, a: Int)   // E0086: duplicated record component a in R
+</span></code></pre></div>
+<p>Fix: rename one of the components.</p>
 <h3 id="e0064-law-violation"><code>E0064</code> — Law violation<a class="headerlink" href="#e0064-law-violation" title="Permanent link">&para;</a></h3>
 <p>A <code>law name(p: T) { boolExpr }</code> clause is checked at build time against
 generated sample values of <code>p</code>; a sample that makes the expression false is a
 counterexample, reported with the settings (seed, sample count) that produced
 it so the failure can be reproduced.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>  law wrong(p: Pt) { p.x() == p.y() }   // E0064: falsified, e.g. by Pt(0, 1)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  law wrong(p: Pt) { p.x() == p.y() }   // E0064: falsified, e.g. by Pt(0, 1)
 </span></code></pre></div>
 <p>Fix: correct the law (or the code it's checking) so it holds for every
 generated sample, or remove the law if it doesn't actually hold in general.</p>
@@ -7027,33 +7058,33 @@ generated sample, or remove the law if it doesn't actually hold in general.</p>
 <p>A top-level or record-attached <code>example { boolExpr }</code> clause evaluated to
 <code>false</code> (or threw) at build time. Unlike <code>law</code>, an <code>example</code> checks one fixed
 case, not a generated family of them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>record R(x: Int)
-</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  example { new R(1).x() == 2 }   // E0065: evaluated to false
+<div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>record R(x: Int)
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>  example { new R(1).x() == 2 }   // E0065: evaluated to false
 </span></code></pre></div>
 <p>Fix: correct the example's expected value, or fix the code it's asserting
 against.</p>
 <h3 id="e0073-map-cannot-be-iterated-directly"><code>E0073</code> — Map cannot be iterated directly<a class="headerlink" href="#e0073-map-cannot-be-iterated-directly" title="Permanent link">&para;</a></h3>
 <p><code>foreach</code> walks an array or something with an <code>iterator()</code>; a <code>Map</code> has neither.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>val m = [&quot;a&quot;: 1]
-</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>foreach k: String in m { println(k) }   // E0073
+<div class="language-text highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>val m = [&quot;a&quot;: 1]
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>foreach k: String in m { println(k) }   // E0073
 </span></code></pre></div>
 <p>Iterate the entries with the destructuring form, or pick a view:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
-</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>foreach k: String in m.keySet() { println(k) }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
+</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>foreach k: String in m.keySet() { println(k) }
 </span></code></pre></div>
 <h3 id="e0074-a-laws-parameter-type-cannot-be-generated"><code>E0074</code> — A law's parameter type cannot be generated<a class="headerlink" href="#e0074-a-laws-parameter-type-cannot-be-generated" title="Permanent link">&para;</a></h3>
 <p><code>law</code> is checked at build time over generated sample values, so every parameter type
 needs a generator. Generatable types are <code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>,
 <code>Boolean</code>, <code>Short</code>, <code>Byte</code>, and records whose components are all generatable.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>record Dummy(v: Int)
-</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>record Dummy(v: Int)
+</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
 </span></code></pre></div>
 <p>Anything else — arrays, <code>Map</code>, enums, interfaces, or a class with more than one
 constructor — has no generator. Such a law used to be skipped silently, which made it
 indistinguishable from a law that held; a check that cannot run must not look like one
 that passed. Change the parameter type, or remove the law.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>  law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
+<div class="language-text highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>  law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
 </span></code></pre></div>
 <h3 id="e0075-a-class-declaring-laws-could-not-be-loaded"><code>E0075</code> — A class declaring laws could not be loaded<a class="headerlink" href="#e0075-a-class-declaring-laws-could-not-be-loaded" title="Permanent link">&para;</a></h3>
 <p>Laws run against the compiled classes. If a class that declares <code>law</code> / <code>example</code>
@@ -7063,8 +7094,8 @@ for the same reason as <code>E0074</code>.</p>
 <p>A <code>shape name = &lt;format&gt;</code> clause names a document format the compiler does not know.
 Guessing would produce a shape that silently reads nothing, so it is an error listing
 what is supported.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>  shape doc = toml     // E0076: supported formats are json, yaml
+<div class="language-text highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>  shape doc = toml     // E0076: supported formats are json, yaml
 </span></code></pre></div>
 <p>For an inline pattern, write <code>shape name = re"..."</code>.</p>
 <h3 id="e0080-a-user-written-shape-asserts-no-law"><code>E0080</code> — A user-written <code>Shape</code> asserts no law<a class="headerlink" href="#e0080-a-user-written-shape-asserts-no-law" title="Permanent link">&para;</a></h3>
@@ -7072,23 +7103,23 @@ what is supported.</p>
 <code>shape</code>/<code>from re"..."</code>) must assert at least one machine-checked <code>law</code> or <code>example</code> in
 its file. A derived shape's round-trip is guaranteed by construction; a hand-written
 one only <em>claims</em> it, so the claim must be checked.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>class FixedWidth conforms Shape[Person] {
-</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>public:
-</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>  def this {}
-</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-</span><span id="__span-47-5"><a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a>  def canPrint(): Boolean = true
-</span><span id="__span-47-6"><a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a>  def print(v: Person): String { ... }
-</span><span id="__span-47-7"><a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
-</span><span id="__span-47-8"><a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a>}
-</span><span id="__span-47-9"><a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a>// E0080: nothing in this file asserts a law for FixedWidth
+<div class="language-text highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>public:
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>  def this {}
+</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-48-8"><a id="__codelineno-48-8" name="__codelineno-48-8" href="#__codelineno-48-8"></a>}
+</span><span id="__span-48-9"><a id="__codelineno-48-9" name="__codelineno-48-9" href="#__codelineno-48-9"></a>// E0080: nothing in this file asserts a law for FixedWidth
 </span></code></pre></div>
 <p>Fix: add a top-level <code>example</code> (or the class's own <code>law</code>) — the canonical claim is the
 round-trip <code>s.parse(s.print(v)).get() == v</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>example fixedWidthL1 {
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>  val s = new FixedWidth()
-</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
-</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>  s.parse(s.print(v)).get() == v
-</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>example fixedWidthL1 {
+</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>  val s = new FixedWidth()
+</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a>}
 </span></code></pre></div>
 <p>A parse-only shape (<code>canPrint(): false</code>) instead asserts whatever laws its reading
 direction has. A false claim is <code>E0065</code>, the same as any other falsified <code>example</code>.</p>
@@ -7099,45 +7130,45 @@ the declaration against them.</p>
 <h3 id="e0077-tool-performs-an-undeclared-effect"><code>E0077</code> — Tool performs an undeclared effect<a class="headerlink" href="#e0077-tool-performs-an-undeclared-effect" title="Permanent link">&para;</a></h3>
 <p>The body performs an effect the <code>requires</code> clause does not cover. The diagnostic names
 the missing effect, the callee, and the call site.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>tool sneaky(src: String, dst: String): void
-</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>  requires { read(src) }
-</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>{
-</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: performs `write` (writeText)
-</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>tool sneaky(src: String, dst: String): void
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>  requires { read(src) }
+</span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>{
+</span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: performs `write` (writeText)
+</span><span id="__span-50-5"><a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>}
 </span></code></pre></div>
 <p>Fix: add the missing capability — <code>requires { read(src), write(dst) }</code>.</p>
 <h3 id="e0078-declared-capability-the-body-cannot-perform"><code>E0078</code> — Declared capability the body cannot perform<a class="headerlink" href="#e0078-declared-capability-the-body-cannot-perform" title="Permanent link">&para;</a></h3>
 <p>A capability in <code>requires</code> is unused: nothing in the body performs it. An honest
 boundary lists only what actually happens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>tool overclaim(src: String): String
-</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>  requires { read(src), net }   // E0078: `net` is unused
-</span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>{
-</span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>  return Files::readText(src)
-</span><span id="__span-50-5"><a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>tool overclaim(src: String): String
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>  requires { read(src), net }   // E0078: `net` is unused
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>{
+</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>  return Files::readText(src)
+</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>}
 </span></code></pre></div>
 <p>Fix: remove the unused capability.</p>
 <h3 id="e0079-invalid-capability-entry"><code>E0079</code> — Invalid capability entry<a class="headerlink" href="#e0079-invalid-capability-entry" title="Permanent link">&para;</a></h3>
 <p>A <code>requires</code> entry is not a valid capability: an unknown effect name, a parameter
 argument on an effect that is always ambient, or an argument that does not name one of
 the tool's parameters.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>tool t(): Int requires { teleport } { return 0 }
-</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>  // E0079: `teleport` is not an effect
-</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>
-</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
-</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>  // E0079: `console` does not take a parameter argument
-</span><span id="__span-51-6"><a id="__codelineno-51-6" name="__codelineno-51-6" href="#__codelineno-51-6"></a>
-</span><span id="__span-51-7"><a id="__codelineno-51-7" name="__codelineno-51-7" href="#__codelineno-51-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
-</span><span id="__span-51-8"><a id="__codelineno-51-8" name="__codelineno-51-8" href="#__codelineno-51-8"></a>  // E0079: `nope` does not name a parameter
+<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>tool t(): Int requires { teleport } { return 0 }
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>  // E0079: `teleport` is not an effect
+</span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>
+</span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+</span><span id="__span-52-5"><a id="__codelineno-52-5" name="__codelineno-52-5" href="#__codelineno-52-5"></a>  // E0079: `console` does not take a parameter argument
+</span><span id="__span-52-6"><a id="__codelineno-52-6" name="__codelineno-52-6" href="#__codelineno-52-6"></a>
+</span><span id="__span-52-7"><a id="__codelineno-52-7" name="__codelineno-52-7" href="#__codelineno-52-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+</span><span id="__span-52-8"><a id="__codelineno-52-8" name="__codelineno-52-8" href="#__codelineno-52-8"></a>  // E0079: `nope` does not name a parameter
 </span></code></pre></div>
 <p>The effect vocabulary is <code>read write net exec env clock rand console unknown</code>; only
 <code>read</code>, <code>write</code>, <code>net</code>, and <code>exec</code> take a parameter argument.</p>
 <h2 id="null-safety-errors">Null-safety errors<a class="headerlink" href="#null-safety-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-type-parameter-may-be-null"><code>E0057</code> — Type parameter may be null<a class="headerlink" href="#e0057-type-parameter-may-be-null" title="Permanent link">&para;</a></h3>
 <p>A bare type parameter <code>[T]</code> can be instantiated with a nullable type, so direct dereference is not allowed without a null-check or a non-null bound.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>class Box[T] {
-</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>public:
-</span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>class Box[T] {
+</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>public:
+</span><span id="__span-53-3"><a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-53-4"><a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>}
 </span></code></pre></div>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
@@ -7145,24 +7176,24 @@ the tool's parameters.</p>
 <h3 id="e0070-nullable-member-access"><code>E0070</code> — Nullable member access<a class="headerlink" href="#e0070-nullable-member-access" title="Permanent link">&para;</a></h3>
 <p>A field (not method) was accessed directly on a value of nullable type
 (<code>T?</code>), which may be null at that point.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>class Test {
-</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>public:
-</span><span id="__span-53-3"><a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-53-4"><a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>    val x: String? = &quot;abc&quot;
-</span><span id="__span-53-5"><a id="__codelineno-53-5" name="__codelineno-53-5" href="#__codelineno-53-5"></a>    return x.length   // E0070: x may be null
-</span><span id="__span-53-6"><a id="__codelineno-53-6" name="__codelineno-53-6" href="#__codelineno-53-6"></a>  }
-</span><span id="__span-53-7"><a id="__codelineno-53-7" name="__codelineno-53-7" href="#__codelineno-53-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>class Test {
+</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>public:
+</span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>    val x: String? = &quot;abc&quot;
+</span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>    return x.length   // E0070: x may be null
+</span><span id="__span-54-6"><a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a>  }
+</span><span id="__span-54-7"><a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a>}
 </span></code></pre></div>
 <p>Fix: use <code>?.</code> to access it safely, <code>?:</code> to supply a default, <code>!!</code> to assert
 non-null, or check for null first (<code>if x != null { ... }</code>).</p>
 <h3 id="e0081-tool-parameter-cannot-be-read-from-the-command-line"><code>E0081</code> — Tool parameter cannot be read from the command line<a class="headerlink" href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" title="Permanent link">&para;</a></h3>
 <p>A <code>tool</code>'s parameters must all be readable from a command-line argument, since the CLI
 is derived from them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>record P(x: Int)
-</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>
-</span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
-</span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>// E0081: parameter `p` has type P, which cannot be read from an argument.
-</span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>record P(x: Int)
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>
+</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-55-4"><a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a>// E0081: parameter `p` has type P, which cannot be read from an argument.
+</span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a>//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
 </span></code></pre></div>
 <p>This used to be silent: CLI synthesis skipped such a script, which then compiled to a
 program with no <code>main</code> and nothing to run (issue #424).</p>
@@ -7170,21 +7201,21 @@ program with no <code>main</code> and nothing to run (issue #424).</p>
 <p>Two <code>tool</code>s share a name. Function overloading is fine, but the command line selects a
 tool <strong>by name alone</strong>, so the second one can never be invoked and <code>--contract</code> lists
 both under the same name with no way to address either.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
-</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
-</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>// E0082: duplicate tool name `same`.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
+</span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
+</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>// E0082: duplicate tool name `same`.
 </span></code></pre></div>
 <h2 id="trycatch-errors">Try/catch errors<a class="headerlink" href="#trycatch-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0083-unreachable-catch-clause"><code>E0083</code> — Unreachable catch clause<a class="headerlink" href="#e0083-unreachable-catch-clause" title="Permanent link">&para;</a></h3>
 <p>A later <code>catch</code> clause whose exception type is already a subtype of (or the same as)
 an earlier clause's type can never run — the earlier clause handles it first.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>try {
-</span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>  risky()
-</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>} catch e: RuntimeException {
-</span><span id="__span-56-4"><a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>  handle(e)
-</span><span id="__span-56-5"><a id="__codelineno-56-5" name="__codelineno-56-5" href="#__codelineno-56-5"></a>} catch e: IllegalArgumentException {
-</span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a>  // E0083: IllegalArgumentException is a RuntimeException, already caught above
-</span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>try {
+</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>  risky()
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>} catch e: RuntimeException {
+</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>  handle(e)
+</span><span id="__span-57-5"><a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a>} catch e: IllegalArgumentException {
+</span><span id="__span-57-6"><a id="__codelineno-57-6" name="__codelineno-57-6" href="#__codelineno-57-6"></a>  // E0083: IllegalArgumentException is a RuntimeException, already caught above
+</span><span id="__span-57-7"><a id="__codelineno-57-7" name="__codelineno-57-7" href="#__codelineno-57-7"></a>}
 </span></code></pre></div>
 <p>Reorder so the more specific type comes first, or remove the unreachable clause. The
 alternatives of a single multi-catch clause (<code>catch e: A | B</code>) are not checked against
@@ -7196,62 +7227,62 @@ each other.</p>
 methods with an identical JVM signature, which only fails once something loads the
 class (a <code>ClassFormatError</code>, surfaced as an internal I0000 error) rather than at
 compile time.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>extension Double {
-</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>  def pct(): String = &quot;&quot; + self
-</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>  def pct(): String = &quot;&quot; + self   // E0084: duplicated extension method pct() on Double
-</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>extension Double {
+</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>  def pct(): String = &quot;&quot; + self
+</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>  def pct(): String = &quot;&quot; + self   // E0084: duplicated extension method pct() on Double
+</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>}
 </span></code></pre></div>
 <p>Fix: remove or rename the duplicate. Two extension methods with the same name but
 different parameter types are unaffected — that's ordinary overloading.</p>
 <h2 id="declaration-errors">Declaration errors<a class="headerlink" href="#declaration-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0007-duplicate-local-variable"><code>E0007</code> — Duplicate local variable<a class="headerlink" href="#e0007-duplicate-local-variable" title="Permanent link">&para;</a></h3>
 <p>The same name is declared twice as a local variable in the same scope.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>class Test {
-</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>public:
-</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>    val x = 1
-</span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>    val x = 2   // E0007: x is already declared in this scope
-</span><span id="__span-58-6"><a id="__codelineno-58-6" name="__codelineno-58-6" href="#__codelineno-58-6"></a>    return 0
-</span><span id="__span-58-7"><a id="__codelineno-58-7" name="__codelineno-58-7" href="#__codelineno-58-7"></a>  }
-</span><span id="__span-58-8"><a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>class Test {
+</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>public:
+</span><span id="__span-59-3"><a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a>    val x = 1
+</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a>    val x = 2   // E0007: x is already declared in this scope
+</span><span id="__span-59-6"><a id="__codelineno-59-6" name="__codelineno-59-6" href="#__codelineno-59-6"></a>    return 0
+</span><span id="__span-59-7"><a id="__codelineno-59-7" name="__codelineno-59-7" href="#__codelineno-59-7"></a>  }
+</span><span id="__span-59-8"><a id="__codelineno-59-8" name="__codelineno-59-8" href="#__codelineno-59-8"></a>}
 </span></code></pre></div>
 <p>Fix: rename one of the variables, or drop the redundant declaration.</p>
 <h3 id="e0008-duplicate-class"><code>E0008</code> — Duplicate class<a class="headerlink" href="#e0008-duplicate-class" title="Permanent link">&para;</a></h3>
 <p>Two top-level classes (or interfaces/records/enums) share the same name.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>class A { public: def this {} }
-</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>class A { public: def this {} }   // E0008: A is already declared
+<div class="language-text highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>class A { public: def this {} }
+</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>class A { public: def this {} }   // E0008: A is already declared
 </span></code></pre></div>
 <p>Fix: rename or remove one of the declarations.</p>
 <h3 id="e0009-duplicate-field"><code>E0009</code> — Duplicate field<a class="headerlink" href="#e0009-duplicate-field" title="Permanent link">&para;</a></h3>
 <p>The same field name is declared twice on a class.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>class A {
-</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>  var x: Int
-</span><span id="__span-60-3"><a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>  var x: Int   // E0009: x is already declared on A
-</span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a>public:
-</span><span id="__span-60-5"><a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a>  def this {}
-</span><span id="__span-60-6"><a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>class A {
+</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>  var x: Int
+</span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>  var x: Int   // E0009: x is already declared on A
+</span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>public:
+</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>  def this {}
+</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>}
 </span></code></pre></div>
 <p>Fix: remove the duplicate field, or give it a different name.</p>
 <h3 id="e0010-duplicate-method"><code>E0010</code> — Duplicate method<a class="headerlink" href="#e0010-duplicate-method" title="Permanent link">&para;</a></h3>
 <p>Two methods on the same class share an identical name and parameter list, so
 neither is a valid overload of the other.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>class Test {
-</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>public:
-</span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>  def m(): Int = 1
-</span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>  def m(): Int = 2   // E0010: m() is already declared on Test
-</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>  static def main(args: String[]): Int { return 0 }
-</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>class Test {
+</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>public:
+</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>  def m(): Int = 1
+</span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>  def m(): Int = 2   // E0010: m() is already declared on Test
+</span><span id="__span-62-5"><a id="__codelineno-62-5" name="__codelineno-62-5" href="#__codelineno-62-5"></a>  static def main(args: String[]): Int { return 0 }
+</span><span id="__span-62-6"><a id="__codelineno-62-6" name="__codelineno-62-6" href="#__codelineno-62-6"></a>}
 </span></code></pre></div>
 <p>Fix: rename one method, or give it different parameter types to make it a genuine
 overload.</p>
 <h3 id="e0025-duplicate-constructor"><code>E0025</code> — Duplicate constructor<a class="headerlink" href="#e0025-duplicate-constructor" title="Permanent link">&para;</a></h3>
 <p>Two constructors on the same class have identical parameter types, so
 neither is a valid overload of the other.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>class A {
-</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>public:
-</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>  def this(x: Int) {}
-</span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>  def this(y: Int) {}   // E0025: this(Int) is already declared on A
-</span><span id="__span-62-5"><a id="__codelineno-62-5" name="__codelineno-62-5" href="#__codelineno-62-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>class A {
+</span><span id="__span-63-2"><a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>public:
+</span><span id="__span-63-3"><a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>  def this(x: Int) {}
+</span><span id="__span-63-4"><a id="__codelineno-63-4" name="__codelineno-63-4" href="#__codelineno-63-4"></a>  def this(y: Int) {}   // E0025: this(Int) is already declared on A
+</span><span id="__span-63-5"><a id="__codelineno-63-5" name="__codelineno-63-5" href="#__codelineno-63-5"></a>}
 </span></code></pre></div>
 <p>Fix: give one constructor different parameter types, or remove the duplicate.</p>
 <h3 id="e0026-duplicate-generated-method"><code>E0026</code> — Duplicate generated method<a class="headerlink" href="#e0026-duplicate-generated-method" title="Permanent link">&para;</a></h3>
@@ -7260,31 +7291,31 @@ named after the clause. Two <code>law</code> (or two <code>example</code>) claus
 name and the same parameter types mangle to the same method, colliding at
 codegen. Without this check the collision surfaced later as a raw JVM
 <code>ClassFormatError</code> instead of a normal diagnostic.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-63-2"><a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
-</span><span id="__span-63-3"><a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+<div class="language-text highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-64-2"><a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+</span><span id="__span-64-3"><a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a>  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
 </span></code></pre></div>
 <p>Fix: rename one of the clauses, or remove the duplicate.</p>
 <h3 id="e0029-duplicate-type-parameter"><code>E0029</code> — Duplicate type parameter<a class="headerlink" href="#e0029-duplicate-type-parameter" title="Permanent link">&para;</a></h3>
 <p>The same type parameter name appears twice in one class, interface, or
 method's type parameter list.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>class Box[T, T] { public: def this {} }   // E0029: T is already declared
+<div class="language-text highlight"><pre><span></span><code><span id="__span-65-1"><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>class Box[T, T] { public: def this {} }   // E0029: T is already declared
 </span></code></pre></div>
 <p>Fix: give the type parameters distinct names.</p>
 <h3 id="e0051-return-type-is-required"><code>E0051</code> — Return type is required<a class="headerlink" href="#e0051-return-type-is-required" title="Permanent link">&para;</a></h3>
 <p>A top-level function or extension method has no declared return type, and the
 compiler cannot infer one — typically because the function is self-recursive,
 so there is no already-typed body to infer the type from.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-65-1"><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>def f(n: Int) = f(n)   // E0051: f needs an explicit return type
-</span><span id="__span-65-2"><a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-66-1"><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>def f(n: Int) = f(n)   // E0051: f needs an explicit return type
+</span><span id="__span-66-2"><a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>Fix: give the function an explicit return type, e.g. <code>def f(n: Int): Int = f(n)</code>.</p>
 <h3 id="e0052-lambda-parameter-must-specify-a-type"><code>E0052</code> — Lambda parameter must specify a type<a class="headerlink" href="#e0052-lambda-parameter-must-specify-a-type" title="Permanent link">&para;</a></h3>
 <p>A lambda parameter has no type annotation, and the context the lambda appears
 in gives the compiler no functional-interface type to infer the parameter's
 type from.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-66-1"><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>val f = (x) -&gt; x + 1   // E0052: x&#39;s type can&#39;t be inferred here
-</span><span id="__span-66-2"><a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-67-1"><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>val f = (x) -&gt; x + 1   // E0052: x&#39;s type can&#39;t be inferred here
+</span><span id="__span-67-2"><a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>Fix: annotate the parameter explicitly (<code>(x: Int) -&gt; x + 1</code>), or use the
 lambda where its target type is known — e.g. passed directly as an argument
@@ -7292,22 +7323,22 @@ to a method with a declared function-typed parameter.</p>
 <h3 id="e0053-cyclic-type-alias"><code>E0053</code> — Cyclic type alias<a class="headerlink" href="#e0053-cyclic-type-alias" title="Permanent link">&para;</a></h3>
 <p>Two or more <code>type</code> aliases refer to each other, so resolving any of them
 would recurse forever.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-67-1"><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>type A = B
-</span><span id="__span-67-2"><a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>type B = A   // E0053: A -&gt; B -&gt; A
+<div class="language-text highlight"><pre><span></span><code><span id="__span-68-1"><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>type A = B
+</span><span id="__span-68-2"><a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>type B = A   // E0053: A -&gt; B -&gt; A
 </span></code></pre></div>
 <p>Fix: break the cycle by pointing at least one alias at a concrete type.</p>
 <h3 id="e0054-duplicate-type-alias"><code>E0054</code> — Duplicate type alias<a class="headerlink" href="#e0054-duplicate-type-alias" title="Permanent link">&para;</a></h3>
 <p>The same <code>type</code> alias name is declared twice at the same scope.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-68-1"><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>type A = java.lang.String
-</span><span id="__span-68-2"><a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>type A = java.lang.Integer   // E0054: A is already declared
+<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>type A = java.lang.String
+</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>type A = java.lang.Integer   // E0054: A is already declared
 </span></code></pre></div>
 <p>Fix: rename or remove one of the declarations.</p>
 <h3 id="e0055-function-requires-a-body"><code>E0055</code> — Function requires a body<a class="headerlink" href="#e0055-function-requires-a-body" title="Permanent link">&para;</a></h3>
 <p>A top-level function was declared without a body (no <code>{ ... }</code> and no
 <code>= expr</code>). Unlike a class method, a top-level function can never be
 abstract, so it must always carry an implementation.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>def f(): Int;   // E0055: f requires a body
-</span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>def main(): void { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>def f(): Int;   // E0055: f requires a body
+</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>def main(): void { }
 </span></code></pre></div>
 <p>Fix: give the function a body.</p>
 <h3 id="e0085-static-method-with-no-body"><code>E0085</code> — Static method with no body<a class="headerlink" href="#e0085-static-method-with-no-body" title="Permanent link">&para;</a></h3>
@@ -7316,25 +7347,25 @@ also accepts a bodyless method as an abstract/interface-style declaration, but <
 and abstract are contradictory — a static method cannot be overridden, so it cannot be
 abstract either. Generating a class file for one would need both <code>ACC_STATIC</code> and
 <code>ACC_ABSTRACT</code>, which the JVM rejects.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-70-1"><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>class LineFilter {
-</span><span id="__span-70-2"><a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>public:
-</span><span id="__span-70-3"><a id="__codelineno-70-3" name="__codelineno-70-3" href="#__codelineno-70-3"></a>  static def main(args: String[]): void
-</span><span id="__span-70-4"><a id="__codelineno-70-4" name="__codelineno-70-4" href="#__codelineno-70-4"></a>  // E0085: static method main must have a body
-</span><span id="__span-70-5"><a id="__codelineno-70-5" name="__codelineno-70-5" href="#__codelineno-70-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>class LineFilter {
+</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>public:
+</span><span id="__span-71-3"><a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>  static def main(args: String[]): void
+</span><span id="__span-71-4"><a id="__codelineno-71-4" name="__codelineno-71-4" href="#__codelineno-71-4"></a>  // E0085: static method main must have a body
+</span><span id="__span-71-5"><a id="__codelineno-71-5" name="__codelineno-71-5" href="#__codelineno-71-5"></a>}
 </span></code></pre></div>
 <p>Fix: add a body, or drop <code>static</code> to declare an ordinary abstract instance method.</p>
 <h3 id="e0069-local-val-requires-an-initializer"><code>E0069</code> — Local val requires an initializer<a class="headerlink" href="#e0069-local-val-requires-an-initializer" title="Permanent link">&para;</a></h3>
 <p>A local <code>val</code> was declared without an initializer (no <code>= expr</code>). Unlike a
 <code>var</code>, a <code>val</code> can never be assigned later, so a <code>val</code> with no initializer
 could only ever read the JVM's zero-value default — a bug, not a value.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-71-1"><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>class Test {
-</span><span id="__span-71-2"><a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>public:
-</span><span id="__span-71-3"><a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-71-4"><a id="__codelineno-71-4" name="__codelineno-71-4" href="#__codelineno-71-4"></a>    val x: String   // E0069: x is never initialized
-</span><span id="__span-71-5"><a id="__codelineno-71-5" name="__codelineno-71-5" href="#__codelineno-71-5"></a>    IO::println(x)
-</span><span id="__span-71-6"><a id="__codelineno-71-6" name="__codelineno-71-6" href="#__codelineno-71-6"></a>    return 0
-</span><span id="__span-71-7"><a id="__codelineno-71-7" name="__codelineno-71-7" href="#__codelineno-71-7"></a>  }
-</span><span id="__span-71-8"><a id="__codelineno-71-8" name="__codelineno-71-8" href="#__codelineno-71-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>class Test {
+</span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>public:
+</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a>    val x: String   // E0069: x is never initialized
+</span><span id="__span-72-5"><a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a>    IO::println(x)
+</span><span id="__span-72-6"><a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a>    return 0
+</span><span id="__span-72-7"><a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a>  }
+</span><span id="__span-72-8"><a id="__codelineno-72-8" name="__codelineno-72-8" href="#__codelineno-72-8"></a>}
 </span></code></pre></div>
 <p>Fix: give it an initializer at the declaration (<code>val x: String = ...</code>), or
 use <code>var</code> if the value genuinely needs to be assigned later. A field <code>val</code>
@@ -7342,117 +7373,117 @@ initialized in the constructor is unaffected.</p>
 <h2 id="control-flow-errors">Control-flow errors<a class="headerlink" href="#control-flow-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0048-break-outside-loop"><code>E0048</code> — Break outside loop<a class="headerlink" href="#e0048-break-outside-loop" title="Permanent link">&para;</a></h3>
 <p>A <code>break</code> (labeled or not) appears outside any enclosing loop.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>class Test {
-</span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>public:
-</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a>    break   // E0048: no enclosing loop
-</span><span id="__span-72-5"><a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a>    return 0
-</span><span id="__span-72-6"><a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a>  }
-</span><span id="__span-72-7"><a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>class Test {
+</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>public:
+</span><span id="__span-73-3"><a id="__codelineno-73-3" name="__codelineno-73-3" href="#__codelineno-73-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-73-4"><a id="__codelineno-73-4" name="__codelineno-73-4" href="#__codelineno-73-4"></a>    break   // E0048: no enclosing loop
+</span><span id="__span-73-5"><a id="__codelineno-73-5" name="__codelineno-73-5" href="#__codelineno-73-5"></a>    return 0
+</span><span id="__span-73-6"><a id="__codelineno-73-6" name="__codelineno-73-6" href="#__codelineno-73-6"></a>  }
+</span><span id="__span-73-7"><a id="__codelineno-73-7" name="__codelineno-73-7" href="#__codelineno-73-7"></a>}
 </span></code></pre></div>
 <p>Fix: only use <code>break</code> inside a <code>while</code>, <code>for</code>, or <code>foreach</code> loop.</p>
 <h3 id="e0049-continue-outside-loop"><code>E0049</code> — Continue outside loop<a class="headerlink" href="#e0049-continue-outside-loop" title="Permanent link">&para;</a></h3>
 <p>A <code>continue</code> (labeled or not) appears outside any enclosing loop.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>class Test {
-</span><span id="__span-73-2"><a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>public:
-</span><span id="__span-73-3"><a id="__codelineno-73-3" name="__codelineno-73-3" href="#__codelineno-73-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-73-4"><a id="__codelineno-73-4" name="__codelineno-73-4" href="#__codelineno-73-4"></a>    continue   // E0049: no enclosing loop
-</span><span id="__span-73-5"><a id="__codelineno-73-5" name="__codelineno-73-5" href="#__codelineno-73-5"></a>    return 0
-</span><span id="__span-73-6"><a id="__codelineno-73-6" name="__codelineno-73-6" href="#__codelineno-73-6"></a>  }
-</span><span id="__span-73-7"><a id="__codelineno-73-7" name="__codelineno-73-7" href="#__codelineno-73-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>class Test {
+</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>public:
+</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>    continue   // E0049: no enclosing loop
+</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>    return 0
+</span><span id="__span-74-6"><a id="__codelineno-74-6" name="__codelineno-74-6" href="#__codelineno-74-6"></a>  }
+</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a>}
 </span></code></pre></div>
 <p>Fix: only use <code>continue</code> inside a <code>while</code>, <code>for</code>, or <code>foreach</code> loop.</p>
 <h3 id="e0050-current-instance-not-available-in-static-context"><code>E0050</code> — Current instance not available in static context<a class="headerlink" href="#e0050-current-instance-not-available-in-static-context" title="Permanent link">&para;</a></h3>
 <p><code>this</code>/<code>self</code> was used inside a <code>static</code> method, where there is no receiver
 instance.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-74-1"><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>class Test {
-</span><span id="__span-74-2"><a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>public:
-</span><span id="__span-74-3"><a id="__codelineno-74-3" name="__codelineno-74-3" href="#__codelineno-74-3"></a>  static def s(): Int { return this.hashCode() }   // E0050: s is static
-</span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a>  static def main(args: String[]): Int { return 0 }
-</span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>class Test {
+</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>public:
+</span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a>  static def s(): Int { return this.hashCode() }   // E0050: s is static
+</span><span id="__span-75-4"><a id="__codelineno-75-4" name="__codelineno-75-4" href="#__codelineno-75-4"></a>  static def main(args: String[]): Int { return 0 }
+</span><span id="__span-75-5"><a id="__codelineno-75-5" name="__codelineno-75-5" href="#__codelineno-75-5"></a>}
 </span></code></pre></div>
 <p>Fix: drop <code>static</code>, or pass the instance in explicitly as a parameter.</p>
 <h3 id="e0058-label-not-found"><code>E0058</code> — Label not found<a class="headerlink" href="#e0058-label-not-found" title="Permanent link">&para;</a></h3>
 <p>A labeled <code>break</code>/<code>continue</code> names a label that is not bound to any
 enclosing loop.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-75-1"><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>class Test {
-</span><span id="__span-75-2"><a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>public:
-</span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a>  static def main(args: String[]): void {
-</span><span id="__span-75-4"><a id="__codelineno-75-4" name="__codelineno-75-4" href="#__codelineno-75-4"></a>    foreach i: Int in 0..3 {
-</span><span id="__span-75-5"><a id="__codelineno-75-5" name="__codelineno-75-5" href="#__codelineno-75-5"></a>      break nosuch   // E0058: no enclosing loop labeled nosuch
-</span><span id="__span-75-6"><a id="__codelineno-75-6" name="__codelineno-75-6" href="#__codelineno-75-6"></a>    }
-</span><span id="__span-75-7"><a id="__codelineno-75-7" name="__codelineno-75-7" href="#__codelineno-75-7"></a>  }
-</span><span id="__span-75-8"><a id="__codelineno-75-8" name="__codelineno-75-8" href="#__codelineno-75-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>class Test {
+</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>public:
+</span><span id="__span-76-3"><a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>  static def main(args: String[]): void {
+</span><span id="__span-76-4"><a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a>    foreach i: Int in 0..3 {
+</span><span id="__span-76-5"><a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>      break nosuch   // E0058: no enclosing loop labeled nosuch
+</span><span id="__span-76-6"><a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a>    }
+</span><span id="__span-76-7"><a id="__codelineno-76-7" name="__codelineno-76-7" href="#__codelineno-76-7"></a>  }
+</span><span id="__span-76-8"><a id="__codelineno-76-8" name="__codelineno-76-8" href="#__codelineno-76-8"></a>}
 </span></code></pre></div>
 <p>Fix: label the target loop (<code>outer: foreach ... { break outer }</code>), or
 correct the spelling of the label.</p>
 <h2 id="pattern-matching-errors">Pattern-matching errors<a class="headerlink" href="#pattern-matching-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0042-non-exhaustive-pattern-match"><code>E0042</code> — Non-exhaustive pattern match<a class="headerlink" href="#e0042-non-exhaustive-pattern-match" title="Permanent link">&para;</a></h3>
 <p>A <code>select</code> on a sealed type does not cover all cases.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>sealed interface Shape {}
-</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-76-3"><a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-76-4"><a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a>
-</span><span id="__span-76-5"><a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>select shape {
-</span><span id="__span-76-6"><a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-76-7"><a id="__codelineno-76-7" name="__codelineno-76-7" href="#__codelineno-76-7"></a>  // missing Rect case → E0042
-</span><span id="__span-76-8"><a id="__codelineno-76-8" name="__codelineno-76-8" href="#__codelineno-76-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>sealed interface Shape {}
+</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-77-4"><a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a>
+</span><span id="__span-77-5"><a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>select shape {
+</span><span id="__span-77-6"><a id="__codelineno-77-6" name="__codelineno-77-6" href="#__codelineno-77-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-77-7"><a id="__codelineno-77-7" name="__codelineno-77-7" href="#__codelineno-77-7"></a>  // missing Rect case → E0042
+</span><span id="__span-77-8"><a id="__codelineno-77-8" name="__codelineno-77-8" href="#__codelineno-77-8"></a>}
 </span></code></pre></div>
 <h3 id="e0043-unknown-named-argument"><code>E0043</code> — Unknown named argument<a class="headerlink" href="#e0043-unknown-named-argument" title="Permanent link">&para;</a></h3>
 <p>A call used <code>name = value</code> syntax for an argument name that does not match
 any parameter of the resolved method, constructor, or function.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>class T {
-</span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>public:
-</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-77-4"><a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a>  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f has no parameter named nope
-</span><span id="__span-77-5"><a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>class T {
+</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>public:
+</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f has no parameter named nope
+</span><span id="__span-78-5"><a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>}
 </span></code></pre></div>
 <p>Fix: check the argument name's spelling against the target's declaration.</p>
 <h3 id="e0044-duplicate-argument"><code>E0044</code> — Duplicate argument<a class="headerlink" href="#e0044-duplicate-argument" title="Permanent link">&para;</a></h3>
 <p>The same parameter was bound twice in one call — for example by a named
 argument that repeats a name already used earlier in the same call.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>class Test {
-</span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>public:
-</span><span id="__span-78-3"><a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-78-4"><a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x is already bound
-</span><span id="__span-78-5"><a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>class Test {
+</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>public:
+</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x is already bound
+</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>}
 </span></code></pre></div>
 <p>Fix: remove the duplicate binding.</p>
 <h3 id="e0045-positional-argument-after-named-argument"><code>E0045</code> — Positional argument after named argument<a class="headerlink" href="#e0045-positional-argument-after-named-argument" title="Permanent link">&para;</a></h3>
 <p>A call places a positional argument after a named one. Once a call starts
 naming arguments, every argument after that point must also be named —
 otherwise it is ambiguous which parameter the positional value fills.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>class Test {
-</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>public:
-</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>  static def f(x: Int, y: Int): Int = x + y
-</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 comes after a named argument
-</span><span id="__span-79-5"><a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>class Test {
+</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>public:
+</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>  static def f(x: Int, y: Int): Int = x + y
+</span><span id="__span-80-4"><a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 comes after a named argument
+</span><span id="__span-80-5"><a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>}
 </span></code></pre></div>
 <p>Fix: name every remaining argument, or move the positional ones first.</p>
 <h3 id="e0046-wrong-number-of-bindings-in-destructuring-pattern"><code>E0046</code> — Wrong number of bindings in destructuring pattern<a class="headerlink" href="#e0046-wrong-number-of-bindings-in-destructuring-pattern" title="Permanent link">&para;</a></h3>
 <p>A destructuring <code>val</code>/<code>var (a, b, ...)</code> declaration (or a nested destructuring
 pattern) named a different number of variables than the record has
 components.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>record Point(x: Int, y: Int)
-</span><span id="__span-80-2"><a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>class Test {
-</span><span id="__span-80-3"><a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>public:
-</span><span id="__span-80-4"><a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>  static def main(args: String[]): Int {
-</span><span id="__span-80-5"><a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>    val (a, b, c) = new Point(1, 2)   // E0046: Point has 2 fields, 3 bindings given
-</span><span id="__span-80-6"><a id="__codelineno-80-6" name="__codelineno-80-6" href="#__codelineno-80-6"></a>    return 0
-</span><span id="__span-80-7"><a id="__codelineno-80-7" name="__codelineno-80-7" href="#__codelineno-80-7"></a>  }
-</span><span id="__span-80-8"><a id="__codelineno-80-8" name="__codelineno-80-8" href="#__codelineno-80-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>record Point(x: Int, y: Int)
+</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>class Test {
+</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>public:
+</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>  static def main(args: String[]): Int {
+</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>    val (a, b, c) = new Point(1, 2)   // E0046: Point has 2 fields, 3 bindings given
+</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>    return 0
+</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>  }
+</span><span id="__span-81-8"><a id="__codelineno-81-8" name="__codelineno-81-8" href="#__codelineno-81-8"></a>}
 </span></code></pre></div>
 <p>Fix: match the binding count to the record's component count.</p>
 <h3 id="e0047-not-a-record-type"><code>E0047</code> — Not a record type<a class="headerlink" href="#e0047-not-a-record-type" title="Permanent link">&para;</a></h3>
 <p>A destructuring <code>val</code>/<code>var (a, b, ...) = expr</code> was used against a value whose
 type is not a record, so there are no positional components to bind.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a>class Test {
-</span><span id="__span-81-2"><a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>public:
-</span><span id="__span-81-3"><a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>  static def main(args: String[]): Int {
-</span><span id="__span-81-4"><a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a>    val (a, b) = &quot;not a record&quot;   // E0047: String is not a record type
-</span><span id="__span-81-5"><a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>    return 0
-</span><span id="__span-81-6"><a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>  }
-</span><span id="__span-81-7"><a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>class Test {
+</span><span id="__span-82-2"><a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>public:
+</span><span id="__span-82-3"><a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>  static def main(args: String[]): Int {
+</span><span id="__span-82-4"><a id="__codelineno-82-4" name="__codelineno-82-4" href="#__codelineno-82-4"></a>    val (a, b) = &quot;not a record&quot;   // E0047: String is not a record type
+</span><span id="__span-82-5"><a id="__codelineno-82-5" name="__codelineno-82-5" href="#__codelineno-82-5"></a>    return 0
+</span><span id="__span-82-6"><a id="__codelineno-82-6" name="__codelineno-82-6" href="#__codelineno-82-6"></a>  }
+</span><span id="__span-82-7"><a id="__codelineno-82-7" name="__codelineno-82-7" href="#__codelineno-82-7"></a>}
 </span></code></pre></div>
 <p>Fix: destructure a record value, or bind the whole value with a plain
 <code>val</code>/<code>var</code> instead.</p>
@@ -7461,23 +7492,23 @@ type is not a record, so there are no positional components to bind.</p>
 clause) is not a well-formed regular expression. It is validated at compile
 time so a bad pattern is caught there instead of throwing
 <code>PatternSyntaxException</code> at run time.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-82-1"><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>val p = re&quot;(unclosed&quot;   // E0059: invalid regular expression literal
+<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>val p = re&quot;(unclosed&quot;   // E0059: invalid regular expression literal
 </span></code></pre></div>
 <p>Fix: correct the pattern.</p>
 <h3 id="e0060-regex-capture-group-binding-count-mismatch"><code>E0060</code> — Regex capture group / binding count mismatch<a class="headerlink" href="#e0060-regex-capture-group-binding-count-mismatch" title="Permanent link">&para;</a></h3>
 <p>A <code>case re"..." (b1, b2, ...)</code> pattern (or a <code>record ... from re"..."</code>
 clause) named a different number of bindings/components than the pattern
 has capture groups.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-83-1"><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>select &quot;x&quot; {
-</span><span id="__span-83-2"><a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>  case re&quot;(\d+)-(\d+)&quot; (a): a   // E0060: pattern has 2 groups, 1 binding given
-</span><span id="__span-83-3"><a id="__codelineno-83-3" name="__codelineno-83-3" href="#__codelineno-83-3"></a>  else: &quot;no&quot;
-</span><span id="__span-83-4"><a id="__codelineno-83-4" name="__codelineno-83-4" href="#__codelineno-83-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>select &quot;x&quot; {
+</span><span id="__span-84-2"><a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>  case re&quot;(\d+)-(\d+)&quot; (a): a   // E0060: pattern has 2 groups, 1 binding given
+</span><span id="__span-84-3"><a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>  else: &quot;no&quot;
+</span><span id="__span-84-4"><a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a>}
 </span></code></pre></div>
 <p>Fix: match the binding (or record component) count to the pattern's capture
 group count.</p>
 <h2 id="parser-errors">Parser errors<a class="headerlink" href="#parser-errors" title="Permanent link">&para;</a></h2>
 <p>Parser errors do not carry <code>E</code> codes; they report the encountered token and the expected tokens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-84-1"><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-85-1"><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="every-diagnostic-code">Every diagnostic code<a class="headerlink" href="#every-diagnostic-code" title="Permanent link">&para;</a></h2>
 <p>The sections above explain the codes you are most likely to meet, with examples. This
@@ -7825,6 +7856,10 @@ table lists all of them, so a code seen in a build log can always be looked up.<
 <tr>
 <td><code>E0085</code></td>
 <td>static method … must have a body</td>
+</tr>
+<tr>
+<td><code>E0086</code></td>
+<td>duplicated record component … in …</td>
 </tr>
 </tbody>
 </table>

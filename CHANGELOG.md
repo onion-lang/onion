@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transposition) with round-trip verification, a data-carrying enum
   (`CipherKind`), frequency analysis with `groupBy`/`sortedBy`, and
   `String`/`Int` extension methods for report formatting.
+- **`run/SpellCheck.on`, a 312-line Levenshtein edit-distance spell checker
+  sample.** Covers dynamically-sized `Int[]` arrays, an iterative two-row
+  edit-distance DP, an interface/class pair (`Dictionary`/`SimpleDictionary`),
+  records with method bodies, `select` on `Int` distance bands, and
+  collection pipelines (`filter`, `map`, `sortedBy`, `groupBy`, `take`,
+  `find`, `join`, `fold`).
 
 ### Fixed
 

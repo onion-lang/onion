@@ -1,0 +1,420 @@
+// CipherSuite.on — Classical cryptography toolkit.
+// Exercises: homogeneous enum, data-carrying enum, records with body methods,
+// classes, extension methods on String and Int, collection pipelines
+// (map/filter/fold/sortedBy/groupBy/distinct/find), foreach on map (k,v),
+// nullable types and null checks, string interpolation, try/catch,
+// while loops, foreach on ranges, closures, char arithmetic.
+
+import { java.util.ArrayList }
+
+// ─── enums ────────────────────────────────────────────────────────────────
+
+// Category of cipher
+enum CipherFamily { Substitution, Transposition, Polyalphabetic }
+
+// Named cipher algorithms available in this suite
+enum CipherKind(family: CipherFamily) {
+  Caesar(CipherFamily::Substitution),
+  ROT13(CipherFamily::Substitution),
+  Atbash(CipherFamily::Substitution),
+  Vigenere(CipherFamily::Polyalphabetic),
+  RailFence(CipherFamily::Transposition)
+public:
+  def describe(): String = select this {
+    case CipherKind::Caesar:    "Caesar shift cipher (key = shift amount)"
+    case CipherKind::ROT13:     "ROT-13 (fixed shift of 13, self-inverse)"
+    case CipherKind::Atbash:    "Atbash (A<->Z mirror, self-inverse)"
+    case CipherKind::Vigenere:  "Vigenère polyalphabetic cipher (key = keyword)"
+    case CipherKind::RailFence: "Rail-fence transposition (key = rail count)"
+  }
+  def isSelfInverse(): Boolean = select this {
+    case CipherKind::ROT13:  true
+    case CipherKind::Atbash: true
+    else: false
+  }
+}
+
+// ─── records ──────────────────────────────────────────────────────────────
+
+record CipherResult(kind: CipherKind, plaintext: String, ciphertext: String, key: String) {
+public:
+  def roundTripOk(decrypted: String): Boolean = decrypted == plaintext()
+  def expansionRatio(): Double = (ciphertext().length() * 1.0) / (plaintext().length() * 1.0)
+  def summary(): String = "[#{kind()}] #{plaintext()} -> #{ciphertext()} (key=#{key()})"
+}
+
+record FrequencyEntry(letter: String, count: Int, percent: Double) {
+public:
+  def bar(maxCount: Int, width: Int): String {
+    val filled: Int = if maxCount == 0 { 0 } else { count() * width / maxCount }
+    var b: String = "|"
+    foreach i: Int in 0..<width {
+      b = b + (if i < filled { "#" } else { " " })
+    }
+    return b + "| " + count()
+  }
+}
+
+// ─── extension methods ────────────────────────────────────────────────────
+
+extension String {
+  def lettersOnly(): String {
+    var result: String = ""
+    foreach i: Int in 0..<self.length() {
+      val code: Int = self.charAt(i) as Int
+      if (code >= 65 && code <= 90) || (code >= 97 && code <= 122) {
+        result = result + self.charAt(i)
+      }
+    }
+    return result
+  }
+
+  def countLetters(): Int {
+    var n: Int = 0
+    foreach i: Int in 0..<self.length() {
+      val code: Int = self.charAt(i) as Int
+      if (code >= 65 && code <= 90) || (code >= 97 && code <= 122) { n = n + 1 }
+    }
+    return n
+  }
+
+  def pad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def rpad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── cipher implementations ───────────────────────────────────────────────
+
+def shiftChar(code: Int, base: Int, shift: Int): Char =
+  ((code - base + shift + 26) % 26 + base) as Char
+
+def caesarEncrypt(text: String, shift: Int): String {
+  val s: Int = ((shift % 26) + 26) % 26
+  var result: String = ""
+  foreach i: Int in 0..<text.length() {
+    val ch: Char = text.charAt(i)
+    val code: Int = ch as Int
+    if code >= 65 && code <= 90 {
+      result = result + shiftChar(code, 65, s)
+    } else if code >= 97 && code <= 122 {
+      result = result + shiftChar(code, 97, s)
+    } else {
+      result = result + ch
+    }
+  }
+  return result
+}
+
+def caesarDecrypt(text: String, shift: Int): String = caesarEncrypt(text, 26 - (shift % 26))
+
+def rot13(text: String): String = caesarEncrypt(text, 13)
+
+def atbash(text: String): String {
+  var result: String = ""
+  foreach i: Int in 0..<text.length() {
+    val code: Int = text.charAt(i) as Int
+    if code >= 65 && code <= 90 {
+      result = result + ((90 - (code - 65)) as Char)
+    } else if code >= 97 && code <= 122 {
+      result = result + ((122 - (code - 97)) as Char)
+    } else {
+      result = result + text.charAt(i)
+    }
+  }
+  return result
+}
+
+def vigenereProcess(text: String, key: String, encrypt: Boolean): String {
+  val k: String = key.toUpperCase()
+  val kLen: Int = k.length()
+  if kLen == 0 { return text }
+  var result: String = ""
+  var keyIdx: Int = 0
+  foreach i: Int in 0..<text.length() {
+    val code: Int = text.charAt(i) as Int
+    val isUpper: Boolean = code >= 65 && code <= 90
+    val isLower: Boolean = code >= 97 && code <= 122
+    if isUpper || isLower {
+      val base: Int = if isUpper { 65 } else { 97 }
+      val shift: Int = (k.charAt(keyIdx % kLen) as Int) - 65
+      val out: Char = if encrypt {
+        shiftChar(code, base, shift)
+      } else {
+        shiftChar(code, base, 26 - shift)
+      }
+      result  = result + out
+      keyIdx = keyIdx + 1
+    } else {
+      result = result + text.charAt(i)
+    }
+  }
+  return result
+}
+
+def vigenereEncrypt(text: String, key: String): String = vigenereProcess(text, key, true)
+def vigenereDecrypt(text: String, key: String): String = vigenereProcess(text, key, false)
+
+def railFenceEncrypt(text: String, rails: Int): String {
+  if rails <= 1 || rails >= text.length() { return text }
+  val fence: List[String] = []
+  foreach i: Int in 0..<rails { fence.add("") }
+  var rail: Int = 0
+  var direction: Int = 1
+  foreach i: Int in 0..<text.length() {
+    fence.set(rail, (fence.get(rail) as String) + text.charAt(i))
+    if rail == 0 { direction = 1 }
+    else if rail == rails - 1 { direction = -1 }
+    rail = rail + direction
+  }
+  var result: String = ""
+  foreach i: Int in 0..<rails { result = result + (fence.get(i) as String) }
+  return result
+}
+
+def railFenceDecrypt(text: String, rails: Int): String {
+  if rails <= 1 || rails >= text.length() { return text }
+  val n: Int = text.length()
+  val railLens: List[Int] = []
+  foreach i: Int in 0..<rails { railLens.add(0) }
+  var rail: Int = 0
+  var direction: Int = 1
+  foreach i: Int in 0..<n {
+    railLens.set(rail, (railLens.get(rail) as Int) + 1)
+    if rail == 0 { direction = 1 }
+    else if rail == rails - 1 { direction = -1 }
+    rail = rail + direction
+  }
+  val railStrs: List[String] = []
+  var pos: Int = 0
+  foreach r: Int in 0..<rails {
+    val len: Int = railLens.get(r) as Int
+    railStrs.add(text.substring(pos, pos + len))
+    pos = pos + len
+  }
+  val indices: List[Int] = []
+  foreach r: Int in 0..<rails { indices.add(0) }
+  var result: String = ""
+  rail = 0
+  direction = 1
+  foreach i: Int in 0..<n {
+    val idx: Int = indices.get(rail) as Int
+    val rs: String = railStrs.get(rail) as String
+    result = result + rs.charAt(idx)
+    indices.set(rail, idx + 1)
+    if rail == 0 { direction = 1 }
+    else if rail == rails - 1 { direction = -1 }
+    rail = rail + direction
+  }
+  return result
+}
+
+// ─── frequency analysis ───────────────────────────────────────────────────
+
+def analyzeFrequency(text: String): List[FrequencyEntry] {
+  val freq: Map[String, Int] = [:]
+  val total: Int = text.countLetters()
+  if total == 0 { return [] }
+  foreach i: Int in 0..<text.length() {
+    val code: Int = text.charAt(i) as Int
+    var lc: String? = null
+    if code >= 65 && code <= 90 { lc = "" + ((code + 32) as Char) }
+    else if code >= 97 && code <= 122 { lc = "" + text.charAt(i) }
+    if lc != null {
+      val l: String = lc as String
+      val prev: Int? = freq.get(l)
+      freq.put(l, if prev == null { 1 } else { (prev as Int) + 1 })
+    }
+  }
+  val entries: List[FrequencyEntry] = []
+  foreach (letter, count) in freq {
+    val pct: Double = (count as Int) * 100.0 / total
+    entries.add(new FrequencyEntry(letter as String, count as Int, pct))
+  }
+  return entries.sortedBy { e => 0 - (e as FrequencyEntry).count() }
+}
+
+// Safely parse an integer key, defaulting to `fallback` on error
+def safeParseKey(key: String, fallback: Int): Int {
+  try { return Integer::parseInt(key) } catch _: Exception { return fallback }
+}
+
+// ─── cipher registry class ────────────────────────────────────────────────
+
+class CipherRegistry {
+  var results: List[CipherResult]
+public:
+  def this() { results = [] }
+
+  def apply(kind: CipherKind, text: String, key: String): CipherResult {
+    val ct: String = select kind {
+      case CipherKind::Caesar:    caesarEncrypt(text, safeParseKey(key, 3))
+      case CipherKind::ROT13:     rot13(text)
+      case CipherKind::Atbash:    atbash(text)
+      case CipherKind::Vigenere:  vigenereEncrypt(text, key)
+      case CipherKind::RailFence: railFenceEncrypt(text, safeParseKey(key, 3))
+    }
+    val r: CipherResult = new CipherResult(kind, text, ct, key)
+    results.add(r)
+    return r
+  }
+
+  def decrypt(kind: CipherKind, text: String, key: String): String = select kind {
+    case CipherKind::Caesar:    caesarDecrypt(text, safeParseKey(key, 3))
+    case CipherKind::ROT13:     rot13(text)
+    case CipherKind::Atbash:    atbash(text)
+    case CipherKind::Vigenere:  vigenereDecrypt(text, key)
+    case CipherKind::RailFence: railFenceDecrypt(text, safeParseKey(key, 3))
+  }
+
+  def getResultCount(): Int = results.size
+
+  def selfInverseResults(): List[CipherResult] =
+    results.filter { r => (r as CipherResult).kind().isSelfInverse() }
+
+  def byFamily(): Map[String, List[CipherResult]] =
+    results.groupBy { r => "" + (r as CipherResult).kind().family() }
+
+  def allRoundTripOk(reg: CipherRegistry): Boolean =
+    results.filter { r =>
+      val cr: CipherResult = r as CipherResult
+      !cr.roundTripOk(reg.decrypt(cr.kind(), cr.ciphertext(), cr.key()))
+    }.size == 0
+}
+
+// ─── main program ─────────────────────────────────────────────────────────
+
+def separator(): void {
+  var s: String = ""
+  foreach i: Int in 0..<50 { s = s + "─" }
+  IO::println(s)
+}
+
+def repeat(ch: String, n: Int): String {
+  var s: String = ""
+  foreach i: Int in 0..<n { s = s + ch }
+  return s
+}
+
+IO::println(repeat("═", 50))
+IO::println("         CLASSICAL CIPHER SUITE")
+IO::println(repeat("═", 50))
+IO::println("")
+
+val messages: List[String] = [
+  "Attack at dawn",
+  "The quick brown fox",
+  "SECRETMESSAGE",
+  "Hello World, this is Onion!"
+]
+
+val reg: CipherRegistry = new CipherRegistry()
+
+// Apply all ciphers to each message
+foreach msg: String in messages {
+  IO::println("Message: \"#{msg}\"")
+  separator()
+
+  val r1: CipherResult = reg.apply(CipherKind::Caesar, msg, "7")
+  val d1: String = reg.decrypt(CipherKind::Caesar, r1.ciphertext(), "7")
+  IO::println("Caesar+7  : #{r1.ciphertext().pad(30)} RT=#{r1.roundTripOk(d1)}")
+
+  val r2: CipherResult = reg.apply(CipherKind::ROT13, msg, "13")
+  val d2: String = reg.decrypt(CipherKind::ROT13, r2.ciphertext(), "13")
+  IO::println("ROT-13    : #{r2.ciphertext().pad(30)} RT=#{r2.roundTripOk(d2)}")
+
+  val r3: CipherResult = reg.apply(CipherKind::Atbash, msg, "mirror")
+  val d3: String = reg.decrypt(CipherKind::Atbash, r3.ciphertext(), "mirror")
+  IO::println("Atbash    : #{r3.ciphertext().pad(30)} RT=#{r3.roundTripOk(d3)}")
+
+  val r4: CipherResult = reg.apply(CipherKind::Vigenere, msg, "ONION")
+  val d4: String = reg.decrypt(CipherKind::Vigenere, r4.ciphertext(), "ONION")
+  IO::println("Vigenere  : #{r4.ciphertext().pad(30)} RT=#{r4.roundTripOk(d4)}")
+
+  val r5: CipherResult = reg.apply(CipherKind::RailFence, msg, "3")
+  val d5: String = reg.decrypt(CipherKind::RailFence, r5.ciphertext(), "3")
+  IO::println("RailFence : #{r5.ciphertext().pad(30)} RT=#{r5.roundTripOk(d5)}")
+  IO::println("")
+}
+
+// ─── aggregate statistics ──────────────────────────────────────────────────
+
+IO::println(repeat("═", 50))
+IO::println("           AGGREGATE STATISTICS")
+IO::println(repeat("═", 50))
+IO::println("")
+
+val allOk: Boolean = reg.allRoundTripOk(reg)
+IO::println("All round-trip checks OK: " + allOk)
+IO::println("Total cipher operations:  " + reg.getResultCount())
+
+val selfInv: List[CipherResult] = reg.selfInverseResults()
+IO::println("Self-inverse results:     " + selfInv.size)
+IO::println("Self-inverse ciphers:     " + selfInv.map { r => "" + (r as CipherResult).kind() }.distinct().toString())
+
+IO::println("")
+IO::println("Results by cipher family:")
+val byFam: Map[String, List[CipherResult]] = reg.byFamily()
+foreach (fam, rs) in byFam {
+  IO::println("  " + fam + ": " + (rs as List).size + " result(s)")
+}
+
+IO::println("")
+IO::println("Cipher descriptions:")
+val kinds: List[CipherKind] = [CipherKind::Caesar, CipherKind::ROT13, CipherKind::Atbash,
+                                CipherKind::Vigenere, CipherKind::RailFence]
+foreach k: CipherKind in kinds {
+  IO::println("  " + ("" + k).pad(12) + " " + k.family() + "  " + k.describe())
+}
+
+// ─── frequency analysis ────────────────────────────────────────────────────
+
+IO::println("")
+IO::println(repeat("═", 50))
+IO::println("         FREQUENCY ANALYSIS")
+IO::println(repeat("═", 50))
+
+val longMsg: String = "To be or not to be that is the question whether tis nobler in the mind to suffer"
+IO::println("Sample: \"#{longMsg}\"")
+IO::println("")
+
+val plainFreq: List[FrequencyEntry] = analyzeFrequency(longMsg)
+val plainMax: Int = if plainFreq.size == 0 { 1 } else { (plainFreq.get(0) as FrequencyEntry).count() }
+IO::println("Plaintext letter frequencies (top 8):")
+var shown: Int = 0
+foreach entry: FrequencyEntry in plainFreq {
+  if shown < 8 {
+    IO::println("  " + entry.letter().pad(3) + entry.count().rpad(4) + " " + entry.bar(plainMax, 20))
+    shown = shown + 1
+  }
+}
+
+val vigEnc: String = vigenereEncrypt(longMsg, "KEY")
+val encFreq: List[FrequencyEntry] = analyzeFrequency(vigEnc)
+val encMax: Int = if encFreq.size == 0 { 1 } else { (encFreq.get(0) as FrequencyEntry).count() }
+IO::println("")
+IO::println("After Vigenere(KEY) — frequency flattening effect:")
+shown = 0
+foreach entry: FrequencyEntry in encFreq {
+  if shown < 8 {
+    IO::println("  " + entry.letter().pad(3) + entry.count().rpad(4) + " " + entry.bar(encMax, 20))
+    shown = shown + 1
+  }
+}
+
+IO::println("")
+IO::println("Plaintext peak frequency : " + plainMax)
+IO::println("Ciphertext peak frequency: " + encMax)
+IO::println("Flattening achieved      : " + (encMax < plainMax))
+
+IO::println("")
+IO::println("Done.")

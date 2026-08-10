@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.29] - 2026-08-10
+
+### Added
+
+- **`run/HuffmanCoding.on`, a 318-line Huffman lossless compression demo.**
+  Builds a Huffman tree as an ADT case-enum (`HLeaf`/`HNode`) with recursive
+  `depth`/`leafCount`/`isLeaf` methods, generates prefix codes via DFS, and
+  encodes/decodes 5 corpus texts with verified exact round-trip. Covers
+  records with an inline `example`, extension methods (`Int.rjust`,
+  `Int.percent`, `Double.fmt2`, `String.times`, `String.padLeft/Right`),
+  collection pipelines (`filter`, `fold`, `sortedBy`, `groupBy`, `indexOf`),
+  a mutable `Map` frequency/code table, nullable downcasts, and nested
+  `select` dispatch during decode.
+- **`run/CipherSuite.on`, a 420-line classical cryptography toolkit sample.**
+  Covers five ciphers (Caesar, ROT-13, Atbash, Vigenère, rail-fence
+  transposition) with round-trip verification, a data-carrying enum
+  (`CipherKind`), frequency analysis with `groupBy`/`sortedBy`, and
+  `String`/`Int` extension methods for report formatting.
+- **`run/SpellCheck.on`, a 312-line Levenshtein edit-distance spell checker
+  sample.** Covers dynamically-sized `Int[]` arrays, an iterative two-row
+  edit-distance DP, an interface/class pair (`Dictionary`/`SimpleDictionary`),
+  records with method bodies, `select` on `Int` distance bands, and
+  collection pipelines (`filter`, `map`, `sortedBy`, `groupBy`, `take`,
+  `find`, `join`, `fold`).
+- **`run/SudokuSolver.on`, a 317-line Sudoku solver.** Exercises a plain enum
+  (`Difficulty`), a result record (`SolveResult`), extension methods on `Int`
+  (`toCell`, `isGiven`), a `SudokuBoard` class with a public accessor method
+  (`btCount`), backtracking recursion, 2D list mutation (`List[Object]` as a
+  9×9 grid), a `hintSummary` method using closures, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`map`), `select`-based difficulty-bar rendering,
+  and `Timing::nanos` for elapsed-time measurement. Solves Easy (30 clues,
+  ~4 000 backtracks), Medium (~36 clues, 9 backtracks), and Hard/AI-Escargot
+  (23 clues, ~9 000 backtracks) puzzles with verified correct solutions.
+- **`run/HRSystem.on`, a 374-line human-resources management system sample.**
+  Covers a data-carrying ADT enum (`EmploymentType` with `FullTime`/`PartTime`/
+  `Contractor` cases), a plain enum (`Rating`) with `stars`/`order`/
+  `raisePercent` methods, records with `example` clauses (`Employee`,
+  `PayRaise`, `DeptStats`), extension methods on `Int`/`Double`/`String`,
+  an `HRDatabase` class with nullable lookups (`findById(): Employee?`),
+  collection pipelines (`filter`, `sortedBy`, `fold`, `find`, `take`, `map`,
+  `any`), `foreach (k, v) in map` iteration, and exhaustive `select` dispatch
+  over the ADT enum. Generates six reports: employee directory, department
+  statistics, workforce summary, top earners, proposed raises, and a tenure
+  distribution bar chart.
+
+### Fixed
+
+- **A record with a duplicate component name (`record R(a: Int, a: Int)`) no
+  longer crashes the compiler.** Two components sharing a name generate two
+  same-named accessor methods and fields, which previously went completely
+  unchecked and only surfaced later as an internal compiler error (I0000,
+  a JVM `ClassFormatError`) once the class was loaded. It is now reported as
+  a normal `E0086` semantic error at the offending component's location.
+  Found by the mutation fuzzer (issue #666).
+
 ## [0.10.28] - 2026-08-09
 
 ### Added

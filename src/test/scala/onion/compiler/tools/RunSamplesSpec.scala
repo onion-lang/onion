@@ -334,6 +334,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(output.contains("You input: hello there"))
     }
 
+    it("runs SpellCheck.on") {
+      assert(Shell.Success(null) == runSample("run/SpellCheck.on"))
+    }
+
     it("runs WeatherReport.on") {
       assert(Shell.Success(null) == runSample("run/WeatherReport.on"))
     }

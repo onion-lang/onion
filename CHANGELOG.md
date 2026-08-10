@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CipherSuite.on`, a 420-line classical cryptography toolkit sample.**
+  Covers five ciphers (Caesar, ROT-13, Atbash, Vigenère, rail-fence
+  transposition) with round-trip verification, a data-carrying enum
+  (`CipherKind`), frequency analysis with `groupBy`/`sortedBy`, and
+  `String`/`Int` extension methods for report formatting.
+
 ### Fixed
 
 - **A record with a duplicate component name (`record R(a: Int, a: Int)`) no

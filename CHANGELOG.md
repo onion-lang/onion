@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   records with method bodies, `select` on `Int` distance bands, and
   collection pipelines (`filter`, `map`, `sortedBy`, `groupBy`, `take`,
   `find`, `join`, `fold`).
+- **`run/SudokuSolver.on`, a 348-line recursive-backtracking Sudoku solver
+  sample.** Solves four puzzles of increasing difficulty over a flat `Int[]`
+  81-cell grid, with a plain enum (`Difficulty`), a record with a method body
+  (`SolveResult`), nested `foreach` over ranges for row/column/box checks,
+  `try`/`catch` around the solve call, and collection pipelines (`groupBy`,
+  `sortedBy`, `partition`, `fold`, `find`, `map`).
 
 ### Fixed
 

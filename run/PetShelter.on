@@ -1,0 +1,268 @@
+// PetShelter — 269-line end-to-end sample exercising:
+//   data-carrying enum (PetType with avgDaysToAdopt)
+//   ADT case-enum (AdoptionStatus with four cases + shared methods)
+//   records (Pet, Adopter, FosterRecord)
+//   interface Describable + class Shelter with public/private sections
+//   extension methods on String (truncate, padEnd) and Int (stars, ageLabel)
+//   collection pipelines: filter, sortedBy, groupBy, find, partition, fold
+//   foreach over map (k, v) entries and ranges
+//   while loop inside extension methods
+//   nullable find result guard (found == null check)
+//   try/catch for intake validation
+//   mutable class state with replace-on-update pattern (pet status transitions)
+
+import {
+  java.util.*
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+enum PetType(avgDaysToAdopt: Int) {
+  Dog(14), Cat(21), Rabbit(30), Bird(25), Guinea(35)
+}
+
+enum AdoptionStatus {
+  case Available
+  case Foster(fosterName: String)
+  case Adopted(owner: String, adoptedOn: String)
+  case Quarantine(reason: String)
+public:
+  def label(): String = select this {
+    case a is Available:   "Available"
+    case f is Foster:      "Foster → " + f.fosterName()
+    case ad is Adopted:    "Adopted by " + ad.owner() + " on " + ad.adoptedOn()
+    case q is Quarantine:  "Quarantine: " + q.reason()
+  }
+  def isAvailable(): Boolean = select this {
+    case a is Available: true
+    else: false
+  }
+  def isAdopted(): Boolean = select this {
+    case ad is Adopted: true
+    else: false
+  }
+}
+
+record Pet(id: Int, name: String, petType: PetType, ageMonths: Int, breed: String, status: AdoptionStatus)
+
+record Adopter(name: String, email: String, petId: Int, date: String)
+
+record FosterRecord(fosterName: String, phone: String, petId: Int, startDate: String)
+
+// ── Extensions ─────────────────────────────────────────────────────────────────
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "…"
+  }
+  def padEnd(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def stars(): String {
+    var s = ""
+    var i = 0
+    while i < self { s = s + "★"; i = i + 1 }
+    return s
+  }
+  def ageLabel(): String {
+    if self < 12 { return self + " months" }
+    val years: Int = self / 12
+    val months: Int = self % 12
+    if months == 0 { return years + " yr" }
+    return years + " yr " + months + " mo"
+  }
+}
+
+// ── Interface ──────────────────────────────────────────────────────────────────
+
+interface Describable {
+  def describe(): String
+}
+
+// ── Shelter class ──────────────────────────────────────────────────────────────
+
+class Shelter {
+  var name: String
+  var nextId: Int
+public:
+  var pets: List[Object]
+  var adopters: List[Object]
+  var fosters: List[Object]
+
+  def this(name: String) {
+    self.name = name
+    self.pets = []
+    self.adopters = []
+    self.fosters = []
+    self.nextId = 1
+  }
+
+  def intake(petName: String, petType: PetType, ageMonths: Int, breed: String): Pet? {
+    try {
+      if petName == null { throw new Exception("name required") }
+      if breed == null { throw new Exception("breed required") }
+      val pet: Pet = new Pet(self.nextId, petName, petType, ageMonths, breed, new Available())
+      self.nextId = self.nextId + 1
+      self.pets.add(pet)
+      return pet
+    } catch e: Exception {
+      IO::println("Intake error: " + e.message())
+      return null
+    }
+  }
+
+  def adopt(petId: Int, adopterName: String, email: String, date: String): Boolean {
+    val found = self.pets.find { p => (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    if found == null {
+      IO::println("Pet #" + petId + " is not available for adoption.")
+      return false
+    }
+    val f: Pet = found as Pet
+    val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Adopted(adopterName, date))
+    self.pets.remove(f)
+    self.pets.add(updated)
+    self.adopters.add(new Adopter(adopterName, email, petId, date))
+    return true
+  }
+
+  def foster(petId: Int, fosterName: String, phone: String, date: String): Boolean {
+    val found = self.pets.find { p => (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    if found == null {
+      IO::println("Pet #" + petId + " is not available for fostering.")
+      return false
+    }
+    val f: Pet = found as Pet
+    val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Foster(fosterName))
+    self.pets.remove(f)
+    self.pets.add(updated)
+    self.fosters.add(new FosterRecord(fosterName, phone, petId, date))
+    return true
+  }
+
+  def quarantine(petId: Int, reason: String): Boolean {
+    val found = self.pets.find { p => (p as Pet).id() == petId }
+    if found == null { return false }
+    val f: Pet = found as Pet
+    val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Quarantine(reason))
+    self.pets.remove(f)
+    self.pets.add(updated)
+    return true
+  }
+
+  def available(): List[Object] = self.pets.filter { p => (p as Pet).status().isAvailable() }
+
+  def adoptedCount(): Int = self.pets.filter { p => (p as Pet).status().isAdopted() }.size
+
+  def printRoster(): void {
+    IO::println("\n═══ " + self.name + " — Pet Roster ═══")
+    if self.pets.isEmpty {
+      IO::println("  (no pets on record)")
+      return
+    }
+    val sorted: List[Object] = self.pets.sortedBy { p => (p as Pet).name() }
+    foreach p: Object in sorted {
+      val pet: Pet = p as Pet
+      val typeTag: String = select pet.petType() {
+        case PetType::Dog:    "Dog"
+        case PetType::Cat:    "Cat"
+        case PetType::Rabbit: "Rabbit"
+        case PetType::Bird:   "Bird"
+        case PetType::Guinea: "Guinea"
+      }
+      IO::println("  [#" + pet.id() + "] " + pet.name().padEnd(12) + " " + typeTag.padEnd(8) + " " + pet.ageMonths().ageLabel().padEnd(10) + " | " + pet.status().label())
+    }
+  }
+
+  def printSummary(): void {
+    IO::println("\n── Summary for " + self.name + " ──")
+    val byType: Map[Object, List[Object]] = self.pets.groupBy { p => (p as Pet).petType() }
+    foreach (pt, list) in byType {
+      val petType: PetType = pt as PetType
+      val subList: List[Object] = list as List[Object]
+      val avail: Int = subList.filter { p => (p as Pet).status().isAvailable() }.size
+      val total: Int = subList.size
+      val bar: String = avail.stars()
+      IO::println("  " + petType.name().padEnd(8) + " total=" + total + " available=" + avail + "  " + bar)
+    }
+    IO::println("  Adoptions this period: " + self.adoptedCount())
+    IO::println("  Avg days-to-adopt forecast: " + self.forecastDays())
+  }
+
+  def forecastDays(): Double {
+    val avail: List[Object] = self.available()
+    if avail.isEmpty { return 0.0 }
+    var total: Double = 0.0
+    foreach p: Object in avail {
+      total = total + (p as Pet).petType().avgDaysToAdopt()
+    }
+    return total / avail.size
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
+val shelter: Shelter = new Shelter("Happy Paws Rescue")
+
+// Intake
+shelter.intake("Biscuit",  PetType::Dog,    18, "Labrador")
+shelter.intake("Mittens",  PetType::Cat,     8, "Tabby")
+shelter.intake("Clover",   PetType::Rabbit, 12, "Holland Lop")
+shelter.intake("Tweety",   PetType::Bird,   24, "Cockatiel")
+shelter.intake("Peanut",   PetType::Guinea,  6, "American")
+shelter.intake("Shadow",   PetType::Dog,    36, "German Shepherd")
+shelter.intake("Luna",     PetType::Cat,     5, "Siamese")
+shelter.intake("Bongo",    PetType::Rabbit, 30, "Mini Rex")
+shelter.intake("Skittles", PetType::Bird,   15, "Parakeet")
+shelter.intake("Chip",     PetType::Guinea,  9, "Peruvian")
+
+// Adoptions & fostering
+shelter.adopt(1,  "Alice Brown",   "alice@example.com",  "2026-01-10")
+shelter.adopt(3,  "Bob Carter",    "bob@example.com",    "2026-01-15")
+shelter.foster(5, "Carol Davis",   "555-1234",           "2026-01-20")
+shelter.quarantine(7, "upper-respiratory infection")
+shelter.adopt(9,  "David Evans",   "david@example.com",  "2026-02-01")
+shelter.foster(10, "Eve Foster",   "555-5678",           "2026-02-05")
+
+// Print full roster
+shelter.printRoster()
+
+// Available list
+IO::println("\n── Available pets ──")
+val available: List[Object] = shelter.available()
+if available.isEmpty {
+  IO::println("  None currently available.")
+} else {
+  val sorted: List[Object] = available.sortedBy { p => (p as Pet).petType().avgDaysToAdopt() }
+  foreach p: Object in sorted {
+    val pet: Pet = p as Pet
+    IO::println("  • " + pet.name() + " (" + pet.breed() + ") — est. " + pet.petType().avgDaysToAdopt() + " days to adopt")
+  }
+}
+
+// Summary by type
+shelter.printSummary()
+
+// Adopters report
+IO::println("\n── Adopters ──")
+val sortedAdopters: List[Object] = shelter.adopters.sortedBy { a => (a as Adopter).name() }
+foreach a: Object in sortedAdopters {
+  val ad: Adopter = a as Adopter
+  IO::println("  " + ad.name().padEnd(16) + " → pet #" + ad.petId() + " on " + ad.date())
+}
+
+// Partition by young / adult (< 12 months = young)
+val parts: List[List[Object]] = shelter.pets.partition { p => (p as Pet).ageMonths() < 12 }
+val young: List[Object] = parts[0] as List[Object]
+val adult: List[Object] = parts[1] as List[Object]
+IO::println("\n── Young (<1 yr): " + young.size + "  Adult: " + adult.size + " ──")
+val youngSorted: List[Object] = young.sortedBy { p => (p as Pet).ageMonths() }
+foreach p: Object in youngSorted {
+  val pet: Pet = p as Pet
+  IO::println("  " + pet.name() + " — " + pet.ageMonths().ageLabel())
+}

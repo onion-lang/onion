@@ -636,6 +636,20 @@ record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bo
 
 対処: `derive!(Json)` を使うか、この句を削除してください。
 
+### `E0086` — レコード成分名の重複
+
+同じレコード内の2つの成分が同じ名前を宣言しています。成分名はそれぞれ private
+フィールドと public アクセサメソッドを1つずつ生成するため、名前が重複すると
+それ自身と衝突します。以前はこれを検査しておらず、生成されたクラスが実際に
+ロードされたときに初めて（`ClassFormatError` が内部エラー I0000 として現れる
+形で）失敗していました。
+
+```onion
+record R(a: Int, a: Int)   // E0086: レコード R の成分 a が重複しています
+```
+
+対処: どちらかの成分名を変更してください。
+
 ### `E0064` — law の反証
 
 `law name(p: T) { boolExpr }` 句は、ビルド時に `p` の生成されたサンプル値に対して
@@ -1412,6 +1426,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
+| `E0086` | duplicated record component … in … |
 
 ## 関連項目
 

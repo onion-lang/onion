@@ -1,0 +1,620 @@
+// RecipeBook.on — a realistic recipe management system.
+// Exercises: records, data-carrying enums (Measurement), classes with interface,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/partition),
+// select/type-pattern matching with exhaustiveness, nullable, closures,
+// string interpolation, while/foreach (ranges and map (k,v)), |> pipeline,
+// extension methods on Int and Double.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Cuisine {
+  case Italian
+  case Japanese
+  case Mexican
+  case American
+  case Thai
+  case Mediterranean
+  case Indian
+public:
+  def label(): String = select this {
+    case c is Italian:      "Italian"
+    case c is Japanese:     "Japanese"
+    case c is Mexican:      "Mexican"
+    case c is American:     "American"
+    case c is Thai:         "Thai"
+    case c is Mediterranean:"Mediterranean"
+    case c is Indian:       "Indian"
+  }
+}
+
+enum MealType {
+  case Breakfast
+  case Lunch
+  case Dinner
+  case Snack
+  case Dessert
+public:
+  def label(): String = select this {
+    case m is Breakfast: "Breakfast"
+    case m is Lunch:     "Lunch"
+    case m is Dinner:    "Dinner"
+    case m is Snack:     "Snack"
+    case m is Dessert:   "Dessert"
+  }
+}
+
+enum Difficulty {
+  case Easy
+  case Medium
+  case Hard
+public:
+  def label(): String = select this {
+    case d is Easy:   "Easy"
+    case d is Medium: "Medium"
+    case d is Hard:   "Hard"
+  }
+  def stars(): Int = select this {
+    case d is Easy:   1
+    case d is Medium: 2
+    case d is Hard:   3
+  }
+}
+
+enum Measurement {
+  case Grams(g: Int)
+  case Milliliters(ml: Int)
+  case Pieces(n: Int)
+  case Tablespoons(t: Int)
+  case Teaspoons(t: Int)
+  case Cups(c: Double)
+public:
+  def display(): String = select this {
+    case m is Grams:       "#{m.g()}g"
+    case m is Milliliters: "#{m.ml()}ml"
+    case m is Pieces:      "#{m.n()} pc"
+    case m is Tablespoons: "#{m.t()} tbsp"
+    case m is Teaspoons:   "#{m.t()} tsp"
+    case m is Cups:        "#{m.c()} cups"
+  }
+  def scaleTo(factor: Double): Measurement = select this {
+    case m is Grams:       new Grams((m.g() * factor).intValue())
+    case m is Milliliters: new Milliliters((m.ml() * factor).intValue())
+    case m is Pieces:      new Pieces((m.n() * factor).intValue())
+    case m is Tablespoons: new Tablespoons((m.t() * factor).intValue())
+    case m is Teaspoons:   new Teaspoons((m.t() * factor).intValue())
+    case m is Cups:        new Cups(m.c() * factor)
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Ingredient(name: String, amount: Measurement) {
+public:
+  def display(): String = "#{amount().display()} #{name()}"
+  def scale(factor: Double): Ingredient = new Ingredient(name(), amount().scaleTo(factor))
+}
+  example { new Ingredient("flour", new Grams(200)).display() == "200g flour" }
+
+record NutritionInfo(calories: Int, proteinG: Double, carbsG: Double, fatG: Double) {
+public:
+  def summary(): String =
+    "#{calories()} kcal | P:#{proteinG().fmt1()}g | C:#{carbsG().fmt1()}g | F:#{fatG().fmt1()}g"
+  def scale(factor: Double): NutritionInfo =
+    new NutritionInfo(
+      (calories() * factor).intValue(),
+      proteinG() * factor,
+      carbsG() * factor,
+      fatG() * factor
+    )
+}
+
+record Recipe(
+  id: Int, name: String, cuisine: Cuisine, mealType: MealType, difficulty: Difficulty,
+  servings: Int, prepMinutes: Int, cookMinutes: Int,
+  ingredients: List[Ingredient], steps: List[String],
+  nutrition: NutritionInfo, tags: List[String]
+) {
+public:
+  def totalMinutes(): Int = prepMinutes() + cookMinutes()
+  def caloriesPerServing(): Int = nutrition().calories()
+  def difficultyStars(): String {
+    var s = ""
+    var i = 0
+    while i < difficulty().stars() { s = s + "*"; i++ }
+    while i < 3 { s = s + " "; i++ }
+    return s
+  }
+  def header(): String =
+    "[#{id()}] #{name()} | #{cuisine().label()} | #{mealType().label()} | #{difficultyStars()} | #{totalMinutes()} min | #{caloriesPerServing()} kcal/srv"
+  def scaledIngredients(forServings: Int): List[Ingredient] {
+    val factor: Double = forServings.toDouble() / servings().toDouble()
+    return ingredients().map { ing => (ing as Ingredient).scale(factor) }
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt1(): String {
+    val scaled: Long = (self * 10.0).longValue()
+    val neg = scaled < 0L
+    val abs: Long = if neg { -scaled } else { scaled }
+    val i: Long = abs / 10L
+    val f: Long = abs % 10L
+    val sign: String = if neg { "-" } else { "" }
+    return "#{sign}#{i}.#{f}"
+  }
+  def fmt2(): String {
+    val scaled: Long = (self * 100.0).longValue()
+    val neg = scaled < 0L
+    val abs: Long = if neg { -scaled } else { scaled }
+    val i: Long = abs / 100L
+    val f: Long = abs % 100L
+    val fs: String = if f < 10L { "0" + f } else { "" + f }
+    val sign: String = if neg { "-" } else { "" }
+    return "#{sign}#{i}.#{fs}"
+  }
+}
+
+extension Int {
+  def toDouble(): Double = (self * 1.0)
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ─── RecipeBook class ─────────────────────────────────────────────────────────
+
+class RecipeBook {
+  var recipes: List[Recipe]
+  var nextId:  Int
+
+public:
+  def this {
+    recipes = []
+    nextId  = 1
+  }
+
+  def add(recipe: Recipe): void {
+    recipes.add(recipe)
+    nextId = recipe.id() + 1
+  }
+
+  def allRecipes(): List[Recipe] = recipes
+
+  def findById(id: Int): Recipe? {
+    return recipes.find { r => (r as Recipe).id() == id } as Recipe?
+  }
+
+  def findByName(query: String): List[Recipe] {
+    val q: String = query.toLowerCase()
+    return recipes.filter { r => (r as Recipe).name().toLowerCase().contains(q) }
+  }
+
+  def filterByCuisine(c: Cuisine): List[Recipe] =
+    recipes.filter { r => (r as Recipe).cuisine().label() == c.label() }
+
+  def filterByMealType(m: MealType): List[Recipe] =
+    recipes.filter { r => (r as Recipe).mealType().label() == m.label() }
+
+  def filterByDifficulty(d: Difficulty): List[Recipe] =
+    recipes.filter { r => (r as Recipe).difficulty().label() == d.label() }
+
+  def quickRecipes(maxMinutes: Int): List[Recipe] =
+    recipes.filter { r => (r as Recipe).totalMinutes() <= maxMinutes }
+           .sortedBy { r => (r as Recipe).totalMinutes() }
+
+  def lowCalorie(maxKcal: Int): List[Recipe] =
+    recipes.filter { r => (r as Recipe).caloriesPerServing() <= maxKcal }
+           .sortedBy { r => (r as Recipe).caloriesPerServing() }
+
+  def byTag(tag: String): List[Recipe] =
+    recipes.filter { r => (r as Recipe).tags().find { t => (t as String) == tag } != null }
+
+  def cuisineGroups(): Map[String, List[Recipe]] {
+    val groups: Map[String, List[Recipe]] = [:]
+    foreach r: Recipe in recipes {
+      val rr: Recipe = r
+      val key: String = rr.cuisine().label()
+      val existing: List[Recipe]? = groups[key]
+      if existing == null {
+        val newList: List[Recipe] = []
+        newList.add(rr)
+        groups[key] = newList
+      } else {
+        existing.add(rr)
+      }
+    }
+    return groups
+  }
+
+  def generateShoppingList(ids: List[Int], targetServings: Int): Map[String, String] {
+    val list: Map[String, String] = [:]
+    foreach id: Int in ids {
+      val recipe: Recipe? = findById(id)
+      if recipe != null {
+        val scaled: List[Ingredient] = recipe.scaledIngredients(targetServings)
+        foreach ing: Ingredient in scaled {
+          list[ing.name()] = ing.amount().display()
+        }
+      }
+    }
+    return list
+  }
+
+  def nutritionReport(ids: List[Int]): void {
+    IO::println("\n=== Nutrition Summary ===")
+    foreach id: Int in ids {
+      val r: Recipe? = findById(id)
+      if r != null {
+        IO::println("  #{r.name()} | #{r.nutrition().summary()}")
+      }
+    }
+  }
+
+  def statistics(): void {
+    val count: Int = recipes.size
+    if count == 0 { IO::println("No recipes."); return }
+
+    val totalCal: Int = recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).caloriesPerServing() }
+    val avgCal: Double = totalCal.toDouble() / count.toDouble()
+
+    val totalTime: Int = recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).totalMinutes() }
+    val avgTime: Double = totalTime.toDouble() / count.toDouble()
+
+    val easyCount: Int  = recipes.count { r => (r as Recipe).difficulty().label() == "Easy" }
+    val medCount: Int   = recipes.count { r => (r as Recipe).difficulty().label() == "Medium" }
+    val hardCount: Int  = recipes.count { r => (r as Recipe).difficulty().label() == "Hard" }
+
+    val cuisines: List[String] = recipes.map { r => (r as Recipe).cuisine().label() }.distinct()
+    val mealTypes: List[String] = recipes.map { r => (r as Recipe).mealType().label() }.distinct()
+
+    IO::println("\n=== Recipe Book Statistics ===")
+    IO::println("  Total recipes : #{count}")
+    val cuisineList: String = cuisines.fold("") { acc, c => if (acc as String) == "" { c as String } else { (acc as String) + ", " + (c as String) } }
+    val mealTypeList: String = mealTypes.fold("") { acc, m => if (acc as String) == "" { m as String } else { (acc as String) + ", " + (m as String) } }
+    IO::println("  Cuisines      : #{cuisines.size} (#{cuisineList})")
+    IO::println("  Meal types    : #{mealTypeList}")
+    IO::println("  Avg calories  : #{avgCal.fmt1()} kcal/serving")
+    IO::println("  Avg time      : #{avgTime.fmt1()} minutes")
+    IO::println("  By difficulty : Easy=#{easyCount} Medium=#{medCount} Hard=#{hardCount}")
+
+    val fastest: Recipe? = recipes.fold(null) { acc, r =>
+      val rr = r as Recipe
+      if acc == null { rr }
+      else if rr.totalMinutes() < (acc as Recipe).totalMinutes() { rr }
+      else { acc as Recipe }
+    }
+    if fastest != null {
+      IO::println("  Fastest       : #{fastest.name()} (#{fastest.totalMinutes()} min)")
+    }
+  }
+
+  def printMenu(list: List[Recipe]): void {
+    if list.isEmpty {
+      IO::println("  (no recipes found)")
+      return
+    }
+    foreach r: Recipe in list {
+      IO::println("  #{r.header()}")
+    }
+  }
+
+  def printRecipe(id: Int): void {
+    val r: Recipe? = findById(id)
+    if r == null { IO::println("Recipe ##{id} not found."); return }
+
+    val sep: String = "─".repeat(60)
+    IO::println(sep)
+    IO::println("  #{r.name()}")
+    IO::println("  #{r.cuisine().label()} | #{r.mealType().label()} | #{r.difficulty().label()}")
+    IO::println("  Prep: #{r.prepMinutes()} min  Cook: #{r.cookMinutes()} min  Serves: #{r.servings()}")
+    IO::println("  Nutrition: #{r.nutrition().summary()}")
+    val tagList: String = r.tags().fold("") { acc, t => if (acc as String) == "" { t as String } else { (acc as String) + " #" + (t as String) } }
+    IO::println("  Tags: #{tagList}")
+    IO::println(sep)
+    IO::println("  Ingredients:")
+    foreach ing: Ingredient in r.ingredients() {
+      IO::println("    - #{ing.display()}")
+    }
+    IO::println("  Steps:")
+    var step = 1
+    foreach s: String in r.steps() {
+      IO::println("  #{step}. #{s}")
+      step++
+    }
+    IO::println(sep)
+  }
+}
+
+// ─── Sample data ──────────────────────────────────────────────────────────────
+
+def makeBook(): RecipeBook {
+  val book = new RecipeBook()
+
+  // 1 — Spaghetti Carbonara
+  book.add(new Recipe(
+    1, "Spaghetti Carbonara", new Italian(), new Dinner(), new Medium(),
+    4, 10, 20,
+    [
+      new Ingredient("spaghetti",       new Grams(400)),
+      new Ingredient("guanciale",       new Grams(150)),
+      new Ingredient("eggs",            new Pieces(4)),
+      new Ingredient("pecorino romano", new Grams(80)),
+      new Ingredient("black pepper",    new Teaspoons(1))
+    ],
+    [
+      "Boil spaghetti in salted water until al dente.",
+      "Fry guanciale until crispy, reserve fat.",
+      "Beat eggs with grated pecorino and pepper.",
+      "Toss hot pasta with guanciale, remove from heat.",
+      "Add egg mixture quickly, toss to coat without scrambling.",
+      "Serve immediately with extra pecorino."
+    ],
+    new NutritionInfo(680, 32.0, 72.0, 28.0),
+    ["pasta", "Italian-classic", "quick"]
+  ))
+
+  // 2 — Avocado Toast
+  book.add(new Recipe(
+    2, "Avocado Toast", new American(), new Breakfast(), new Easy(),
+    2, 5, 5,
+    [
+      new Ingredient("bread slices",  new Pieces(2)),
+      new Ingredient("avocado",       new Pieces(1)),
+      new Ingredient("lemon juice",   new Tablespoons(1)),
+      new Ingredient("chili flakes",  new Teaspoons(1)),
+      new Ingredient("salt",          new Teaspoons(1))
+    ],
+    [
+      "Toast the bread until golden.",
+      "Mash avocado with lemon juice, salt, and chili.",
+      "Spread mixture on toast. Serve at once."
+    ],
+    new NutritionInfo(320, 6.0, 34.0, 18.0),
+    ["vegan", "healthy", "quick"]
+  ))
+
+  // 3 — Chicken Pad Thai
+  book.add(new Recipe(
+    3, "Chicken Pad Thai", new Thai(), new Lunch(), new Medium(),
+    3, 15, 15,
+    [
+      new Ingredient("rice noodles",   new Grams(200)),
+      new Ingredient("chicken breast", new Grams(300)),
+      new Ingredient("eggs",           new Pieces(2)),
+      new Ingredient("bean sprouts",   new Grams(100)),
+      new Ingredient("fish sauce",     new Tablespoons(2)),
+      new Ingredient("tamarind paste", new Tablespoons(2)),
+      new Ingredient("peanuts",        new Grams(40)),
+      new Ingredient("spring onion",   new Pieces(3))
+    ],
+    [
+      "Soak rice noodles in warm water for 20 minutes.",
+      "Stir-fry chicken in hot oil until cooked.",
+      "Push to side, scramble eggs in the same pan.",
+      "Add noodles, fish sauce, and tamarind; toss well.",
+      "Add bean sprouts and spring onion; toss 1 minute.",
+      "Serve topped with crushed peanuts and lime wedge."
+    ],
+    new NutritionInfo(520, 38.0, 55.0, 14.0),
+    ["protein", "Asian", "noodles"]
+  ))
+
+  // 4 — Margherita Pizza
+  book.add(new Recipe(
+    4, "Margherita Pizza", new Italian(), new Dinner(), new Hard(),
+    4, 60, 15,
+    [
+      new Ingredient("pizza flour",    new Grams(500)),
+      new Ingredient("yeast",          new Teaspoons(2)),
+      new Ingredient("tomato sauce",   new Milliliters(200)),
+      new Ingredient("mozzarella",     new Grams(200)),
+      new Ingredient("fresh basil",    new Pieces(10)),
+      new Ingredient("olive oil",      new Tablespoons(2))
+    ],
+    [
+      "Mix flour, yeast, water, and salt; knead 10 min.",
+      "Let dough rise 1 hour in a warm place.",
+      "Preheat oven to 250°C with a baking stone.",
+      "Roll dough thin; spread tomato sauce.",
+      "Add torn mozzarella and bake 12-15 minutes.",
+      "Top with fresh basil and olive oil before serving."
+    ],
+    new NutritionInfo(580, 25.0, 78.0, 18.0),
+    ["vegetarian", "Italian-classic", "weekend"]
+  ))
+
+  // 5 — Miso Soup
+  book.add(new Recipe(
+    5, "Miso Soup", new Japanese(), new Snack(), new Easy(),
+    2, 5, 10,
+    [
+      new Ingredient("dashi stock",  new Milliliters(500)),
+      new Ingredient("miso paste",   new Tablespoons(3)),
+      new Ingredient("tofu",         new Grams(100)),
+      new Ingredient("wakame",       new Grams(10)),
+      new Ingredient("spring onion", new Pieces(2))
+    ],
+    [
+      "Bring dashi to a gentle simmer.",
+      "Dissolve miso paste in a ladle of hot dashi; stir in.",
+      "Add cubed tofu and rehydrated wakame.",
+      "Serve in bowls with sliced spring onion."
+    ],
+    new NutritionInfo(110, 8.0, 9.0, 4.0),
+    ["vegan", "low-calorie", "Japanese-classic"]
+  ))
+
+  // 6 — Beef Tacos
+  book.add(new Recipe(
+    6, "Beef Tacos", new Mexican(), new Dinner(), new Easy(),
+    4, 10, 15,
+    [
+      new Ingredient("corn tortillas",  new Pieces(8)),
+      new Ingredient("ground beef",     new Grams(400)),
+      new Ingredient("taco seasoning",  new Tablespoons(2)),
+      new Ingredient("cheddar cheese",  new Grams(80)),
+      new Ingredient("salsa",           new Milliliters(120)),
+      new Ingredient("sour cream",      new Milliliters(80)),
+      new Ingredient("lettuce",         new Grams(60))
+    ],
+    [
+      "Brown ground beef in a skillet over medium heat.",
+      "Add taco seasoning and 60ml water; simmer 3 minutes.",
+      "Warm tortillas on a dry pan for 30 seconds each side.",
+      "Fill tortillas with beef, cheese, lettuce, salsa, sour cream."
+    ],
+    new NutritionInfo(490, 29.0, 38.0, 22.0),
+    ["Mexican-classic", "family", "quick"]
+  ))
+
+  // 7 — Greek Salad
+  book.add(new Recipe(
+    7, "Greek Salad", new Mediterranean(), new Lunch(), new Easy(),
+    2, 10, 0,
+    [
+      new Ingredient("tomatoes",    new Pieces(3)),
+      new Ingredient("cucumber",    new Pieces(1)),
+      new Ingredient("feta cheese", new Grams(100)),
+      new Ingredient("Kalamata olives", new Pieces(12)),
+      new Ingredient("red onion",   new Pieces(1)),
+      new Ingredient("olive oil",   new Tablespoons(3)),
+      new Ingredient("oregano",     new Teaspoons(1))
+    ],
+    [
+      "Chop tomatoes, cucumber, and onion into chunks.",
+      "Add olives and crumbled feta.",
+      "Drizzle with olive oil, sprinkle oregano.",
+      "Toss gently and serve."
+    ],
+    new NutritionInfo(280, 10.0, 14.0, 22.0),
+    ["vegetarian", "healthy", "no-cook", "low-calorie"]
+  ))
+
+  // 8 — Dal Tadka
+  book.add(new Recipe(
+    8, "Dal Tadka", new Indian(), new Dinner(), new Medium(),
+    4, 10, 30,
+    [
+      new Ingredient("red lentils",  new Grams(250)),
+      new Ingredient("ghee",         new Tablespoons(2)),
+      new Ingredient("onion",        new Pieces(1)),
+      new Ingredient("garlic cloves",new Pieces(4)),
+      new Ingredient("tomatoes",     new Pieces(2)),
+      new Ingredient("cumin seeds",  new Teaspoons(1)),
+      new Ingredient("turmeric",     new Teaspoons(1)),
+      new Ingredient("garam masala", new Teaspoons(1))
+    ],
+    [
+      "Rinse lentils and boil in 750ml water until soft.",
+      "Heat ghee; add cumin seeds until they splutter.",
+      "Fry onion golden, add garlic, fry 1 min.",
+      "Add tomatoes, turmeric, garam masala; cook 5 min.",
+      "Combine with lentils; simmer 10 min.",
+      "Season and serve with rice or naan."
+    ],
+    new NutritionInfo(340, 18.0, 48.0, 9.0),
+    ["vegan", "high-protein", "comfort-food"]
+  ))
+
+  return book
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val book: RecipeBook = makeBook()
+
+IO::println("╔══════════════════════════════════════════════════════════════╗")
+IO::println("║                 RECIPE BOOK MANAGER                         ║")
+IO::println("╚══════════════════════════════════════════════════════════════╝")
+
+// --- All recipes overview
+IO::println("\n── All Recipes ─────────────────────────────────────────────────")
+book.printMenu(book.allRecipes())
+
+// --- Filter: quick recipes (≤20 min)
+IO::println("\n── Quick Recipes (≤ 20 min) ────────────────────────────────────")
+book.printMenu(book.quickRecipes(20))
+
+// --- Filter: by cuisine
+IO::println("\n── Italian Recipes ─────────────────────────────────────────────")
+book.printMenu(book.filterByCuisine(new Italian()))
+
+// --- Filter: vegan tag
+IO::println("\n── Vegan Recipes ───────────────────────────────────────────────")
+book.printMenu(book.byTag("vegan"))
+
+// --- Filter: low calorie (≤350 kcal)
+IO::println("\n── Low-Calorie (≤ 350 kcal) ────────────────────────────────────")
+book.printMenu(book.lowCalorie(350))
+
+// --- Cuisine groups
+IO::println("\n── Recipes by Cuisine ───────────────────────────────────────────")
+val groups: Map[String, List[Recipe]] = book.cuisineGroups()
+foreach (cuisineKey, recipeList) in groups {
+  val names: String = recipeList.fold("") { acc, r =>
+    val rr = r as Recipe
+    if (acc as String) == "" { rr.name() } else { (acc as String) + ", " + rr.name() }
+  }
+  IO::println("  #{cuisineKey}: #{names}")
+}
+
+// --- Shopping list for recipes 1, 3 scaled to 6 servings
+IO::println("\n── Shopping List (Carbonara + Pad Thai for 6) ───────────────────")
+val shoppingIds: List[Int] = [1, 3]
+val shopping: Map[String, String] = book.generateShoppingList(shoppingIds, 6)
+foreach (ingName, amount) in shopping {
+  IO::println("  #{(ingName as String).padRight(20)} #{amount as String}")
+}
+
+// --- Nutrition report
+book.nutritionReport([1, 3, 5, 7])
+
+// --- Detailed recipe printout
+IO::println("")
+book.printRecipe(3)
+
+// --- Statistics
+book.statistics()
+
+// --- Pipeline demo: calories per meal type
+IO::println("\n── Avg Calories by Meal Type ────────────────────────────────────")
+val allR: List[Recipe] = book.allRecipes()
+val mealTypeNames: List[String] = ["Breakfast", "Lunch", "Dinner", "Snack", "Dessert"]
+foreach typeName: String in mealTypeNames {
+  val filtered: List[Recipe] = allR.filter { r => (r as Recipe).mealType().label() == typeName }
+  if !filtered.isEmpty {
+    val total: Int = filtered.fold(0) { acc, r => (acc as Int) + (r as Recipe).caloriesPerServing() }
+    val avg: Double = total.toDouble() / filtered.size.toDouble()
+    IO::println("  #{typeName.padRight(12)} #{avg.fmt1()} kcal (#{filtered.size} recipe(s))")
+  }
+}
+
+// --- Difficulty distribution
+IO::println("\n── Difficulty Distribution ──────────────────────────────────────")
+val n: Double = allR.size.toDouble()
+val easyPct: Double  = allR.count { r => (r as Recipe).difficulty().label() == "Easy" }.toDouble() / n * 100.0
+val medPct: Double   = allR.count { r => (r as Recipe).difficulty().label() == "Medium" }.toDouble() / n * 100.0
+val hardPct: Double  = allR.count { r => (r as Recipe).difficulty().label() == "Hard" }.toDouble() / n * 100.0
+IO::println("  Easy:   #{easyPct.fmt1()}%")
+IO::println("  Medium: #{medPct.fmt1()}%")
+IO::println("  Hard:   #{hardPct.fmt1()}%")
+
+IO::println("\n[Done]")

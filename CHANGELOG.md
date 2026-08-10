@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/HuffmanCoding.on`, a 318-line Huffman lossless compression demo.**
+  Builds a Huffman tree as an ADT case-enum (`HLeaf`/`HNode`) with recursive
+  `depth`/`leafCount`/`isLeaf` methods, generates prefix codes via DFS, and
+  encodes/decodes 5 corpus texts with verified exact round-trip. Covers
+  records with an inline `example`, extension methods (`Int.rjust`,
+  `Int.percent`, `Double.fmt2`, `String.times`, `String.padLeft/Right`),
+  collection pipelines (`filter`, `fold`, `sortedBy`, `groupBy`, `indexOf`),
+  a mutable `Map` frequency/code table, nullable downcasts, and nested
+  `select` dispatch during decode.
 - **`run/CipherSuite.on`, a 420-line classical cryptography toolkit sample.**
   Covers five ciphers (Caesar, ROT-13, Atbash, Vigenère, rail-fence
   transposition) with round-trip verification, a data-carrying enum

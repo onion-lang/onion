@@ -153,6 +153,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
   inclusive range and over `Map` entries, nullable return types, recursion,
   and `try`/`catch`.
+- **`run/ConferenceSchedule.on`, a 451-line conference schedule management sample.**
+  Exercises a data-carrying enum (`Verdict` with `Approved`/`Rejected`/`Pending`,
+  dispatched via `select case is`), a plain enum (`Track`), an interface
+  (`Summarizable`) implemented by two records, records with methods and `conforms`
+  (`Speaker`, `Session`, `Proposal`), a generic `Box[T]` class with a `map[U]`
+  method, extension methods on `Int` (`hourStr`) and `String` (`padRight`,
+  `truncate`), collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/
+  `partition`/`zip`/`flatten`/`distinct`/`any`/`count`), `foreach (k, v)` on
+  `Map`, nullable types with null guards, a tail-recursive prefix search, a
+  `while` loop, `try`/`catch`, and `string interpolation` throughout.
 - **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
   a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
   a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,

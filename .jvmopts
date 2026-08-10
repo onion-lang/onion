@@ -1,4 +1,4 @@
 -Dsbt.supershell=false
--Xmx4g
+-Xmx10g
 -XX:+UseG1GC
 -Xss16m

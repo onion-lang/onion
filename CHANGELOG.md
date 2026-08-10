@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   records with method bodies, `select` on `Int` distance bands, and
   collection pipelines (`filter`, `map`, `sortedBy`, `groupBy`, `take`,
   `find`, `join`, `fold`).
+- **`run/SudokuSolver.on`, a 317-line Sudoku solver.** Exercises a plain enum
+  (`Difficulty`), a result record (`SolveResult`), extension methods on `Int`
+  (`toCell`, `isGiven`), a `SudokuBoard` class with a public accessor method
+  (`btCount`), backtracking recursion, 2D list mutation (`List[Object]` as a
+  9×9 grid), a `hintSummary` method using closures, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`map`), `select`-based difficulty-bar rendering,
+  and `Timing::nanos` for elapsed-time measurement. Solves Easy (30 clues,
+  ~4 000 backtracks), Medium (~36 clues, 9 backtracks), and Hard/AI-Escargot
+  (23 clues, ~9 000 backtracks) puzzles with verified correct solutions.
 
 ### Fixed
 

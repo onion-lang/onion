@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `Timing::nanos` for elapsed-time measurement. Solves Easy (30 clues,
   ~4 000 backtracks), Medium (~36 clues, 9 backtracks), and Hard/AI-Escargot
   (23 clues, ~9 000 backtracks) puzzles with verified correct solutions.
+- **`run/HRSystem.on`, a 374-line human-resources management system sample.**
+  Covers a data-carrying ADT enum (`EmploymentType` with `FullTime`/`PartTime`/
+  `Contractor` cases), a plain enum (`Rating`) with `stars`/`order`/
+  `raisePercent` methods, records with `example` clauses (`Employee`,
+  `PayRaise`, `DeptStats`), extension methods on `Int`/`Double`/`String`,
+  an `HRDatabase` class with nullable lookups (`findById(): Employee?`),
+  collection pipelines (`filter`, `sortedBy`, `fold`, `find`, `take`, `map`,
+  `any`), `foreach (k, v) in map` iteration, and exhaustive `select` dispatch
+  over the ADT enum. Generates six reports: employee directory, department
+  statistics, workforce summary, top earners, proposed raises, and a tenure
+  distribution bar chart.
 
 ### Fixed
 

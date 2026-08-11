@@ -872,6 +872,7 @@ val age = Json::getInt(obj, "age")                     // 3
 val m = Json::object()                                  // 空の Map
 m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
+val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -897,7 +898,7 @@ v["users"][0]["name"].asString()
 
 キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
-要素数を調べられます。
+要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
 
 ## Yaml モジュール
 

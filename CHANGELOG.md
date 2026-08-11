@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Documented `Json::object()`/`Json::array()` and `Value.isNull()`/`Value.size()`/
+  `Value.raw()` in the English Json Module reference (`docs/reference/stdlib.md`),
+  and added the missing `Json::array()`/`Value.raw()` mentions to the Japanese
+  reference (`docs/ja/reference/stdlib.md`).** These `onion.Json` builder helpers
+  and `Value` accessors existed in code but were absent (or partially absent) from
+  the docs in both languages, making them undiscoverable without reading the
+  Java source.
+
 ## [0.10.30] - 2026-08-11
 
 ### Documentation

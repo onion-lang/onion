@@ -389,5 +389,25 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs PropertyManager.on") {
       assert(Shell.Success(null) == runSample("run/PropertyManager.on"))
     }
+
+    it("runs BankLedger.on") {
+      assert(Shell.Success(null) == runSample("run/BankLedger.on"))
+    }
+
+    it("runs Inventory.on") {
+      assert(Shell.Success(null) == runSample("run/Inventory.on"))
+    }
+
+    it("runs MathParser.on") {
+      assert(Shell.Success(null) == runSample("run/MathParser.on"))
+    }
+
+    it("runs TicTacToe.on") {
+      assert(Shell.Success(null) == runSample("run/TicTacToe.on"))
+    }
+
+    it("runs GraphAlgorithms.on") {
+      assert(Shell.Success(null) == runSample("run/GraphAlgorithms.on"))
+    }
   }
 }

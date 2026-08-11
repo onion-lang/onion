@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Added the missing `E0032` (`TYPE_ARGUMENT_MUST_BE_REFERENCE`) walkthrough
+  section to `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`.**
+  Every other code had a numbered `### EXXXX` section except this one, leaving
+  a visible gap between `E0031` and `E0033`. The new section explains that the
+  check has live report sites but is not reachable from valid Onion source
+  today, since the grammar never routes a type-argument position through
+  `void_type()` — matching the reasoning already recorded in
+  `SemanticErrorCodeCoverageSpec`.
+
 ### Fixed
 
 - **`[I0000]` internal compiler crash when a `try`/`catch` expression is used

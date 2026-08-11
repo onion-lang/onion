@@ -152,6 +152,18 @@ public:
 This also fires when the mismatch is written inside a nullable type
 annotation, e.g. `val b: Box[String, String]? = null`.
 
+### `E0032` — Type argument must be a reference type
+
+Guards against substituting `void` for a type parameter. The check has live
+report sites in the type checker, but is not reachable from valid Onion
+source today: the grammar's `type()` production, used at every
+type-argument and type-alias-target position, never routes through
+`void_type()` (only a method's `return_type()` does). So `void`/`Unit`
+cannot actually be written as a type argument — `new Box[void]()`,
+`Box[void]`, and `type T = void` are all syntax errors, not E0032. See
+`SemanticErrorCodeCoverageSpec` for the reasoning behind leaving this one
+untriggered rather than fabricating a non-existent example.
+
 ### `E0033` — Method is not generic
 
 Type arguments were supplied at a call site for a method that takes none.

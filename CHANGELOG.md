@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.30] - 2026-08-11
+
 ### Documentation
 
 - **Added the missing `E0032` (`TYPE_ARGUMENT_MUST_BE_REFERENCE`) walkthrough

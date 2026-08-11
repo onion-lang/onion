@@ -489,5 +489,25 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs EventTicketing.on") {
       assert(Shell.Success(null) == runSample("run/EventTicketing.on"))
     }
+
+    it("runs FitnessTracker.on") {
+      assert(Shell.Success(null) == runSample("run/FitnessTracker.on"))
+    }
+
+    it("runs FleetManager.on") {
+      assert(Shell.Success(null) == runSample("run/FleetManager.on"))
+    }
+
+    it("runs HRSystem.on") {
+      assert(Shell.Success(null) == runSample("run/HRSystem.on"))
+    }
+
+    it("runs HotelReservation.on") {
+      assert(Shell.Success(null) == runSample("run/HotelReservation.on"))
+    }
+
+    it("runs HuffmanCoding.on") {
+      assert(Shell.Success(null) == runSample("run/HuffmanCoding.on"))
+    }
   }
 }

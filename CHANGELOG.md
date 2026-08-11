@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Map[String, List[Drug]]`), collection pipelines (`filter`/`map`/`fold`/
   `groupBy`/`sortedBy`), `foreach (k, v)` map destructuring, nullable-aware
   lookup helpers, and `string interpolation` across a ten-section report.
+- **`run/PropertyManager.on`, a 351-line rental property portfolio management
+  sample.** Covers an ADT enum (`MaintenancePriority`) with `label()`/`score()`
+  methods, homogeneous enums (`PropertyType`, `LeaseStatus`), records with
+  inline bodies (`Address`, `Property`, `Tenant`, `Lease`, `MaintenanceRequest`),
+  extension methods on `Int`/`Double`/`String`, collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`),
+  `foreach i: Int in 1..12`, `foreach (k, v)` map destructuring, and
+  `String::format`-based currency/percentage formatting across a ten-section
+  report.
 
 ## [0.10.29] - 2026-08-10
 

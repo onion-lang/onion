@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`[I0000]` internal compiler crash when a `try`/`catch` expression is used
+  as a non-first call or constructor argument (issue #669).** The JVM clears
+  the operand stack when it dispatches to an exception handler, so any
+  argument already pushed before an inline `try { ... } catch { ... }`
+  argument was silently discarded, producing invalid bytecode (mismatched
+  stackmap frames) instead of a working method or a normal diagnostic.
+  `AsmCodeGenerationVisitor` now spills already-pushed operands (including a
+  call receiver) into locals before evaluating an argument that may run its
+  own `try`, and reloads them afterward, preserving left-to-right evaluation
+  order.
+
 ### Added
 
 - **`run/ConferenceSchedule.on`, a 451-line conference schedule management sample.**

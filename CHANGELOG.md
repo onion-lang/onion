@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented nine undocumented `onion.Iterables` methods (`mapMap`,
+  `toList`, `reduce`, `newList`, `first`, `last`, `reverse`, `take`, `drop`)
+  in the Iterables Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocIterablesModuleParitySpec`) so future additions to
+  `Iterables`'s public API get caught the same way.
 - **Documented `Http::getResponse`/`Http::postResponse` and the `Response`
   object they return (`status`, `body`, `headers`, `isOk()`, `isError()`) in
   the Http section of both `docs/reference/stdlib.md` and

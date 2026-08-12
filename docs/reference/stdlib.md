@@ -1102,10 +1102,19 @@ File I/O (`onion.Files`):
 Files::readText("path.txt")            // whole file as String
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] -> one line per entry
+Files::appendText("out.txt", content)  // appends, creating the file if needed
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
+Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // creates dir + missing parents
+Files::size(path)                      // Long, size in bytes (0 if missing)
+Files::copy(src, dst)                  // replaces dst if it exists
+Files::move(src, dst)                  // rename; replaces dst if it exists
+Files::copyDir(src, dst)               // recursive directory copy
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -1113,6 +1122,7 @@ Path helpers — file names, parents, joining, and extensions:
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // absolute path resolved against the cwd
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"   (extension, keyword-safe name)
 Files::stem("report.txt")              // "report"

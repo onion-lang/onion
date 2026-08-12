@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented eleven undocumented `onion.Files` methods
+  (`isFile`, `isDirectory`, `mkdirs`, `listFiles`, `size`, `getAbsolutePath`,
+  `copy`, `move`, `copyDir`, `writeLines`, `appendText`) in the Files Module
+  section of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  These public static methods existed in code but were absent from the docs in
+  both languages, making them undiscoverable without reading the Java source.
+  Added a drift-guard spec (`StdlibDocFilesModuleParitySpec`) so future
+  additions to `Files`'s public API get caught the same way.
 - **Fixed stale/actively-misleading heap guidance in `docs/quality-bar.md`,
   `docs/ja/quality-bar.md`, `docs/contributing/building.md`, and
   `docs/ja/contributing/building.md`.** `.jvmopts` raised the project's

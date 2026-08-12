@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented five undocumented `onion.Colls` batching/aggregation helpers
+  (`chunked`, `windowed`, `sumBy`, `averageBy`/`maxBy`/`minBy`) in a new
+  "Batching, windowing, and selector aggregation" subsection of the Colls
+  Module section in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** The "Modules at a glance" summary table
+  already promised "chunked/windowed, sumBy/maxBy" for `Colls`, but the Colls
+  Module section itself never mentioned them, and — unlike `map`/`filter`/
+  `reduce`/`fold` — no other part of the doc covered them either, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocCollsBatchingAggregationParitySpec`) so future additions to
+  `Colls`'s public API get caught the same way.
 - **Documented nine undocumented `onion.Iterables` methods (`mapMap`,
   `toList`, `reduce`, `newList`, `first`, `last`, `reverse`, `take`, `drop`)
   in the Iterables Module section of both `docs/reference/stdlib.md` and

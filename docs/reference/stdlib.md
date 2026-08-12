@@ -1450,6 +1450,22 @@ Colls::sortedBy(people) { p => p.age() }
 // List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### Batching, windowing, and selector aggregation
+
+Also available as `Colls::` static calls and, like the rest of `Colls`, as
+List extensions that chain into a pipeline:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - batches of at most 3, last may be smaller
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - sliding windows, one step at a time
+ps.sumBy((p) -> p.age())          // Double - sum of the selector over every element
+ps.averageBy((p) -> p.age())      // Double - average of the selector, 0.0 if empty
+ps.maxBy((p) -> p.age())          // the element with the greatest selector value, null if empty
+ps.minBy((p) -> p.age())          // the element with the smallest selector value, null if empty
+
+xs.chunked(2).map { b => (b as List).size() }   // chains like any other pipeline stage
+```
+
 ## Http
 
 HTTP client utilities (uses Java 11+ HttpClient).

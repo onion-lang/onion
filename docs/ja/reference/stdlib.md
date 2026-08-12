@@ -1463,6 +1463,22 @@ Colls::sortedBy(people) { p => p.age() }
 // xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### バッチ化・ウィンドウ化・セレクタ集計
+
+これらも `Colls::` の静的呼び出しとして、また `Colls` の他のメソッドと同様に
+パイプラインとして連結できる List の拡張メソッドとして利用できる:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - 最大3件のバッチ、最後は少なくなることがある
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - 1要素ずつスライドする窓
+ps.sumBy((p) -> p.age())          // Double - 各要素にセレクタを適用した合計
+ps.averageBy((p) -> p.age())      // Double - セレクタの平均、空なら0.0
+ps.maxBy((p) -> p.age())          // セレクタの値が最大の要素、空ならnull
+ps.minBy((p) -> p.age())          // セレクタの値が最小の要素、空ならnull
+
+xs.chunked(2).map { b => (b as List).size() }   // 他のパイプライン段と同様に連結できる
+```
+
 ## Http
 
 HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用）。

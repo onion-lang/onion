@@ -21,9 +21,13 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
 | 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 84 | every common error has a dedicated code |
 
-**Do not set `SBT_OPTS`.** The previous version of this file recommended
-`SBT_OPTS="-Xmx2g"`, which now *lowers* the heap below the project's own default of 4g and
-makes the suite die with an `OutOfMemoryError` partway through. The default is correct.
+**Do not set `SBT_OPTS` to a heap below the project default.** `.jvmopts` pins the
+default to `-Xmx10g` (raised from 4g as the `run/` sample corpus grew — see
+CHANGELOG 0.10.18). Any `SBT_OPTS` heap lower than that — `-Xmx2g` was one
+previous bad recommendation, `-Xmx4G` is another one seen in the wild — lowers
+the effective heap below what the full suite needs and makes it die with an
+`OutOfMemoryError` partway through (see #691). If you need to override
+`SBT_OPTS` for another flag, keep the heap at `-Xmx10G` or higher.
 
 `-Duser.language=en` matters: error messages are bilingual and resolved from the JVM
 default locale, so a test asserting on message text passes in a Japanese locale and fails

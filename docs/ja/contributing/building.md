@@ -336,16 +336,14 @@ sbt compile
 
 ### メモリ不足
 
-SBTのメモリを増やします。
-```bash
-export SBT_OPTS="-Xmx2G"
-sbt compile
-```
+`.jvmopts` はすでにプロジェクト既定を `-Xmx10g` に設定しています。それでも
+`OutOfMemoryError`（多くは `compile` ではなくフルテストスイート実行時）が起きる場合は、
+さらに引き上げてください。`SBT_OPTS` を 10g 未満に設定しないでください——`.jvmopts` を
+上書きしてしまい、かえって悪化します:
 
-または `.sbtopts` を編集:
-```
--Xmx2G
--Xss2M
+```bash
+export SBT_OPTS="-Xmx12G"
+sbt test
 ```
 
 ### 依存関係の問題

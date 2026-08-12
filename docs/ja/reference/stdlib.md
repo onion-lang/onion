@@ -670,8 +670,9 @@ val startMillis: Long = Timing::millis()   // 壁時計 (System.currentTimeMilli
 ```onion
 val start: Long = Timing::nanos()
 // ... 何らかの処理 ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // ナノ秒での経過時間
-val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時間
+val elapsedNs: Long = Timing::elapsedNanos(start)      // ナノ秒での経過時間
+val elapsedMs: Double = Timing::elapsedMs(start)       // ミリ秒での経過時間（サブミリ秒精度のdouble）
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Timing::millis()起点のミリ秒での経過時間
 ```
 
 ### 時間のフォーマット
@@ -680,12 +681,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // 出力形式: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// 出力形式: "500ms", "1.23s", "2m30s"
 ```
 
 ### スリープ
 
 ```onion
-Timing::sleep(1000L)  // 1000ミリ秒スリープ
+Timing::sleep(1000L)        // 1000ミリ秒スリープ
+Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
 ### 関数実行時間の計測
@@ -694,6 +700,12 @@ Timing::sleep(1000L)  // 1000ミリ秒スリープ
 // 実行時間を計測して表示し、結果を返す
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // 出力: "Elapsed: 123.45ms"
+
+// 戻り値のない関数版
+Timing::measureVoid(() -> { expensiveOperation(); })
+// 出力: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// 出力: "task: 123.45ms"
 
 // 表示なしで実行時間（ナノ秒）を取得
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })

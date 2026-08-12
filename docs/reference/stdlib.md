@@ -898,8 +898,9 @@ val startMillis: Long = Timing::millis()   // Wall clock (System.currentTimeMill
 ```onion
 val start: Long = Timing::nanos()
 // ... some operation ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // Elapsed in nanoseconds
-val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
+val elapsedNs: Long = Timing::elapsedNanos(start)      // Elapsed in nanoseconds
+val elapsedMs: Double = Timing::elapsedMs(start)       // Elapsed in milliseconds (double, sub-ms precision)
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Elapsed in milliseconds since a Timing::millis() start
 ```
 
 ### Formatting Time
@@ -908,12 +909,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // Output formats: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// Output formats: "500ms", "1.23s", "2m30s"
 ```
 
 ### Sleep
 
 ```onion
-Timing::sleep(1000L)  // Sleep for 1000 milliseconds
+Timing::sleep(1000L)        // Sleep for 1000 milliseconds
+Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
 
 ### Measuring Function Execution
@@ -922,6 +928,12 @@ Timing::sleep(1000L)  // Sleep for 1000 milliseconds
 // Measure and print execution time, return result
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // Prints: "Elapsed: 123.45ms"
+
+// Same, but for a function that returns nothing
+Timing::measureVoid(() -> { expensiveOperation(); })
+// Prints: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// Prints: "task: 123.45ms"
 
 // Get execution time in nanoseconds without printing
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })

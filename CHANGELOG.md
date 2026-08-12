@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented ten undocumented `onion.Regex` `Pattern`-typed overloads
+  (`matches`, `find`, `findAll`, `findFirst`, `groups`, `groupsAll`,
+  `replace`, `replaceFirst`, `split`/`split` with limit) in a new "Pattern
+  literal overloads" subsection of the Regex Module section in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  overloads exist specifically so a `re"..."` literal (which compiles to
+  `java.util.regex.Pattern`, not `String`) can be passed straight into the
+  `Regex::` helpers, but the docs only ever showed the `String`-pattern
+  signatures, making the `Pattern` overloads undiscoverable without reading
+  the Java source. Added a drift-guard spec
+  (`StdlibDocRegexModuleParitySpec`) so future additions to `Regex`'s public
+  API get caught the same way.
 - **Documented eleven undocumented `onion.Files` methods
   (`isFile`, `isDirectory`, `mkdirs`, `listFiles`, `size`, `getAbsolutePath`,
   `copy`, `move`, `copyDir`, `writeLines`, `appendText`) in the Files Module

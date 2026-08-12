@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Http::getResponse`/`Http::postResponse` and the `Response`
+  object they return (`status`, `body`, `headers`, `isOk()`, `isError()`) in
+  the Http section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public `onion.Http` methods existed
+  in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source — the only documented way to
+  make a request was the body-only `get`/`post`, with no way to see the
+  status code or response headers. Added a drift-guard spec
+  (`StdlibDocHttpModuleParitySpec`) so future additions to `Http`'s public
+  API get caught the same way.
 - **Documented ten undocumented `onion.Regex` `Pattern`-typed overloads
   (`matches`, `find`, `findAll`, `findFirst`, `groups`, `groupsAll`,
   `replace`, `replaceFirst`, `split`/`split` with limit) in a new "Pattern

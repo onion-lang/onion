@@ -1462,6 +1462,17 @@ Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
 Http::post(url, body, headers): String   // headers: as for get
 ```
 
+### Response Object
+
+```
+Http::getResponse(url): Response                  // status/body/headers, instead of just the body
+Http::postResponse(url, body): Response
+```
+
+`Response` has `status: Int`, `body: String`, and `headers: List` fields,
+plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers — use
+these when the status code or headers matter, not just the body.
+
 ### Other Methods
 
 ```

@@ -1475,6 +1475,17 @@ Http::postJson(url, jsonBody): String    // Content-Type: application/json を�
 Http::post(url, body, headers): String   // headers は get と同じ
 ```
 
+### Response オブジェクト
+
+```
+Http::getResponse(url): Response                  // ボディだけでなく status/body/headers を返す
+Http::postResponse(url, body): Response
+```
+
+`Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
+`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパーを持つ。
+ボディだけでなくステータスコードやヘッダーが必要なときに使う。
+
 ### その他のメソッド
 
 ```

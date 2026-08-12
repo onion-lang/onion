@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Fixed stale/actively-misleading heap guidance in `docs/quality-bar.md`,
+  `docs/ja/quality-bar.md`, `docs/contributing/building.md`, and
+  `docs/ja/contributing/building.md`.** `.jvmopts` raised the project's
+  default heap from `4g` to `10g` back at 0.10.18, but these four docs still
+  described (or, in `building.md`'s "Out of Memory" section, actively
+  recommended) a heap at or below the old `4g`/`2g` figures — advice that,
+  followed literally, overrides `.jvmopts` down to a lower ceiling and
+  reproduces the `OutOfMemoryError` it claims to fix (#691). Updated all four
+  to state the real `10g` default and to warn against setting `SBT_OPTS` to
+  anything below it.
+
 ## [0.10.31] - 2026-08-12
 
 ### Documentation

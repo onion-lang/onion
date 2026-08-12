@@ -55,6 +55,78 @@ val name: String = IO::readln("名前は？ ")
 IO::println("こんにちは、" + name)
 ```
 
+### IO::readLine
+
+標準入力から1行読み取り、入力の終端では `null` を返す。プロンプトなしの
+`IO::readln()` はこのメソッドの別名：
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+残りの標準入力全体を1つの文字列として読み取り：
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### フォーマット出力
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### エラー出力（stderr）
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### 型安全な入力
+
+1行を指定の型として読み取ってパースし、不正な入力なら例外を投げる。各メソッドには
+先にプロンプトを表示するオーバーロードがある：
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // true/yes/1、false/no/0 を受け付け
+```
+
+### 安全な入力
+
+上記の型安全な読み取りと同様だが、不正な入力や入力終端では例外を投げず
+`null` を返す：
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### 行単位の入出力
+
+```onion
+val lines: List = IO::readLines()          // 入力の終端まで読み取り
+IO::eachLine { line => IO::println(line) } // 残りの各行にコールバックを適用
+IO::printLines(["a", "b", "c"])            // 1項目1行で出力
+IO::printAll("a", "b", "c")                // printLines の可変長引数版
+```
+
+### ユーティリティ
+
+```onion
+IO::flush()    // 標準出力をフラッシュ
+IO::newline()  // 空行を出力
+IO::clear()    // ターミナル画面をクリア（ANSIエスケープコード）
+```
+
 ## Math モジュール
 
 Javaの`Math`クラス経由の数学演算。

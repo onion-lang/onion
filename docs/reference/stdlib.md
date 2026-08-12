@@ -915,6 +915,23 @@ Generate a random integer in a range:
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
 val percent: Int = Rand::nextInt(100)     // 0 to 99
+val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
+```
+
+### Rand::nextDouble (bounded)
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0 to 10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0 to 2.0
+```
+
+### Rand::choice
+
+Pick one random element from a list:
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -924,6 +941,23 @@ Shuffle an array, returning a shuffled list:
 ```onion
 val cards: List[String] = ["A", "B", "C", "D"]
 val shuffled: List[String] = Rand::shuffle(cards)
+```
+
+### Rand::sample
+
+Pick `n` distinct random elements from a list, without replacement:
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 3 distinct cards
+```
+
+### Rand::uuid
+
+Generate a random UUID string:
+
+```onion
+val id: String = Rand::uuid()   // e.g. "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert Module

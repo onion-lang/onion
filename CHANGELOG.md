@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproduces the `OutOfMemoryError` it claims to fix (#691). Updated all four
   to state the real `10g` default and to warn against setting `SBT_OPTS` to
   anything below it.
+- **Documented six undocumented `onion.Rand` methods
+  (`nextInt(min, max)`, `nextDouble(bound)`, `nextDouble(min, max)`, `choice`,
+  `sample`, `uuid`) in the Rand Module section of both `docs/reference/stdlib.md`
+  and `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code and were already name-dropped in the "Modules at a glance" table, but
+  had no actual signature or example in the Rand Module section itself, making
+  them undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocRandModuleParitySpec`) so future additions to `Rand`'s public API
+  get caught the same way.
 
 ## [0.10.31] - 2026-08-12
 

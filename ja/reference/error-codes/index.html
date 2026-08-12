@@ -2118,6 +2118,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0032 — 型引数は参照型でなければならない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0033" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5600,6 +5611,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0032 — 型引数は参照型でなければならない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0033" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6710,6 +6732,15 @@
 </span></code></pre></div>
 <p>このエラーは、<code>val b: Box[String, String]? = null</code> のように nullable な型注釈の
 中に個数不一致が書かれた場合にも発生します。</p>
+<h3 id="e0032"><code>E0032</code> — 型引数は参照型でなければならない<a class="headerlink" href="#e0032" title="Permanent link">&para;</a></h3>
+<p>型パラメータに <code>void</code> を代入することを防ぐチェックです。型チェッカ内には実際に
+報告箇所がありますが、現時点の Onion の正しい構文からは到達できません。文法上、
+型引数や型エイリアスの代入先など <code>type()</code> が使われる位置は <code>void_type()</code> を経由
+せず（メソッドの <code>return_type()</code> だけが経由します）、そのため <code>void</code>/<code>Unit</code> を型
+引数として書くこと自体ができません。<code>new Box[void]()</code>・<code>Box[void]</code>・
+<code>type T = void</code> はいずれも E0032 ではなく構文エラーになります。この状態をあえて
+実例で無理に到達させず未到達のままにしている理由は <code>SemanticErrorCodeCoverageSpec</code>
+を参照してください。</p>
 <h3 id="e0033"><code>E0033</code> — メソッドはジェネリックではない<a class="headerlink" href="#e0033" title="Permanent link">&para;</a></h3>
 <p>型引数を取らないメソッドの呼び出しに型引数が渡されました。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>class Test {

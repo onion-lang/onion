@@ -3890,6 +3890,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0032-type-argument-must-be-a-reference-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0032 — Type argument must be a reference type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0033-method-is-not-generic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5582,6 +5593,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0032-type-argument-must-be-a-reference-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0032 — Type argument must be a reference type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0033-method-is-not-generic" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6692,6 +6714,16 @@ its initial assignment.</p>
 </span></code></pre></div>
 <p>This also fires when the mismatch is written inside a nullable type
 annotation, e.g. <code>val b: Box[String, String]? = null</code>.</p>
+<h3 id="e0032-type-argument-must-be-a-reference-type"><code>E0032</code> — Type argument must be a reference type<a class="headerlink" href="#e0032-type-argument-must-be-a-reference-type" title="Permanent link">&para;</a></h3>
+<p>Guards against substituting <code>void</code> for a type parameter. The check has live
+report sites in the type checker, but is not reachable from valid Onion
+source today: the grammar's <code>type()</code> production, used at every
+type-argument and type-alias-target position, never routes through
+<code>void_type()</code> (only a method's <code>return_type()</code> does). So <code>void</code>/<code>Unit</code>
+cannot actually be written as a type argument — <code>new Box[void]()</code>,
+<code>Box[void]</code>, and <code>type T = void</code> are all syntax errors, not E0032. See
+<code>SemanticErrorCodeCoverageSpec</code> for the reasoning behind leaving this one
+untriggered rather than fabricating a non-existent example.</p>
 <h3 id="e0033-method-is-not-generic"><code>E0033</code> — Method is not generic<a class="headerlink" href="#e0033-method-is-not-generic" title="Permanent link">&para;</a></h3>
 <p>Type arguments were supplied at a call site for a method that takes none.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>class Test {

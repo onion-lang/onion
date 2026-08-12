@@ -55,6 +55,78 @@ val name: String = IO::readln("名前は？ ")
 IO::println("こんにちは、" + name)
 ```
 
+### IO::readLine
+
+標準入力から1行読み取り、入力の終端では `null` を返す。プロンプトなしの
+`IO::readln()` はこのメソッドの別名：
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+残りの標準入力全体を1つの文字列として読み取り：
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### フォーマット出力
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### エラー出力（stderr）
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### 型安全な入力
+
+1行を指定の型として読み取ってパースし、不正な入力なら例外を投げる。各メソッドには
+先にプロンプトを表示するオーバーロードがある：
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // true/yes/1、false/no/0 を受け付け
+```
+
+### 安全な入力
+
+上記の型安全な読み取りと同様だが、不正な入力や入力終端では例外を投げず
+`null` を返す：
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### 行単位の入出力
+
+```onion
+val lines: List = IO::readLines()          // 入力の終端まで読み取り
+IO::eachLine { line => IO::println(line) } // 残りの各行にコールバックを適用
+IO::printLines(["a", "b", "c"])            // 1項目1行で出力
+IO::printAll("a", "b", "c")                // printLines の可変長引数版
+```
+
+### ユーティリティ
+
+```onion
+IO::flush()    // 標準出力をフラッシュ
+IO::newline()  // 空行を出力
+IO::clear()    // ターミナル画面をクリア（ANSIエスケープコード）
+```
+
 ## Math モジュール
 
 Javaの`Math`クラス経由の数学演算。
@@ -670,8 +742,9 @@ val startMillis: Long = Timing::millis()   // 壁時計 (System.currentTimeMilli
 ```onion
 val start: Long = Timing::nanos()
 // ... 何らかの処理 ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // ナノ秒での経過時間
-val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時間
+val elapsedNs: Long = Timing::elapsedNanos(start)      // ナノ秒での経過時間
+val elapsedMs: Double = Timing::elapsedMs(start)       // ミリ秒での経過時間（サブミリ秒精度のdouble）
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Timing::millis()起点のミリ秒での経過時間
 ```
 
 ### 時間のフォーマット
@@ -680,12 +753,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // 出力形式: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// 出力形式: "500ms", "1.23s", "2m30s"
 ```
 
 ### スリープ
 
 ```onion
-Timing::sleep(1000L)  // 1000ミリ秒スリープ
+Timing::sleep(1000L)        // 1000ミリ秒スリープ
+Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
 ### 関数実行時間の計測
@@ -694,6 +772,12 @@ Timing::sleep(1000L)  // 1000ミリ秒スリープ
 // 実行時間を計測して表示し、結果を返す
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // 出力: "Elapsed: 123.45ms"
+
+// 戻り値のない関数版
+Timing::measureVoid(() -> { expensiveOperation(); })
+// 出力: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// 出力: "task: 123.45ms"
 
 // 表示なしで実行時間（ナノ秒）を取得
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
@@ -872,6 +956,7 @@ val age = Json::getInt(obj, "age")                     // 3
 val m = Json::object()                                  // 空の Map
 m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
+val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -897,7 +982,25 @@ v["users"][0]["name"].asString()
 
 キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
-要素数を調べられます。
+要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
+
+`Json::parseOrNull(json)` は `Json::parse(json)` と同じですが、不正な入力に対して例外
+`Json.JsonParseException` を投げる代わりに `null` を返します。パース失敗を別扱いのエラーではなく
+単なる「値が無い」ケースとして扱いたいときに便利です:
+
+```onion
+val obj = Json::parseOrNull("not json")   // 例外を投げず null
+```
+
+`Json::asObject(obj)` と `Json::asArray(obj)` は素の `Map`/`List` 表現に対する型安全なキャストです。
+実行時の型が一致していれば `Map`/`List` にキャストした値を、そうでなければ `null` を返します。
+`Json::get`・`Json::parse`・`Json::parseOrNull` が `Object` を返した後、Map/List として
+イテレートしたいときに使います:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List。"tags" が配列でなければ null
+```
 
 ## Yaml モジュール
 
@@ -1017,6 +1120,7 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // 配列・List どちらも可
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1028,9 +1132,13 @@ Strings::padLeft(s, 8, '0') / Strings::padRight(s, 8, ' ') / Strings::repeat(s, 
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 Strings::removePrefix("unhappy", "un")   // "happy"
 Strings::removeSuffix("running", "ing")  // "runn"
 Strings::truncate("hello world", 8, "...")   // "hello..."
@@ -1038,6 +1146,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0

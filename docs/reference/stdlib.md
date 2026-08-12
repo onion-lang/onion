@@ -55,6 +55,78 @@ val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name)
 ```
 
+### IO::readLine
+
+Read a line from standard input, or `null` at end of input. `IO::readln()` (no
+prompt) is an alias for this:
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+Read all remaining standard input as a single string:
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### Formatted Output
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### Error Output (stderr)
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### Type-Safe Input
+
+Read and parse a line as a specific type, throwing on invalid input; each has
+an overload that prints a prompt first:
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // accepts true/yes/1, false/no/0
+```
+
+### Safe Input
+
+Like the type-safe readers above, but return `null` instead of throwing on
+invalid input or end of stream:
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### Line-Oriented I/O
+
+```onion
+val lines: List = IO::readLines()          // reads until end of input
+IO::eachLine { line => IO::println(line) } // applies a callback to each remaining line
+IO::printLines(["a", "b", "c"])            // one item per line
+IO::printAll("a", "b", "c")                // varargs form of printLines
+```
+
+### Utility
+
+```onion
+IO::flush()    // flushes standard output
+IO::newline()  // prints a blank line
+IO::clear()    // clears the terminal screen (ANSI escape codes)
+```
+
 ## System Module
 
 Access to system-level operations via Java's `System` class.
@@ -898,8 +970,9 @@ val startMillis: Long = Timing::millis()   // Wall clock (System.currentTimeMill
 ```onion
 val start: Long = Timing::nanos()
 // ... some operation ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // Elapsed in nanoseconds
-val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
+val elapsedNs: Long = Timing::elapsedNanos(start)      // Elapsed in nanoseconds
+val elapsedMs: Double = Timing::elapsedMs(start)       // Elapsed in milliseconds (double, sub-ms precision)
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Elapsed in milliseconds since a Timing::millis() start
 ```
 
 ### Formatting Time
@@ -908,12 +981,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // Output formats: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// Output formats: "500ms", "1.23s", "2m30s"
 ```
 
 ### Sleep
 
 ```onion
-Timing::sleep(1000L)  // Sleep for 1000 milliseconds
+Timing::sleep(1000L)        // Sleep for 1000 milliseconds
+Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
 
 ### Measuring Function Execution
@@ -922,6 +1000,12 @@ Timing::sleep(1000L)  // Sleep for 1000 milliseconds
 // Measure and print execution time, return result
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // Prints: "Elapsed: 123.45ms"
+
+// Same, but for a function that returns nothing
+Timing::measureVoid(() -> { expensiveOperation(); })
+// Prints: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// Prints: "task: 123.45ms"
 
 // Get execution time in nanoseconds without printing
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
@@ -933,6 +1017,7 @@ String utilities (`onion.Strings`, auto-imported):
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -944,9 +1029,13 @@ Case and inspection helpers:
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::equalsIgnoreCase(a, b) / Strings::containsIgnoreCase(s, sub)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 ```
 
 Shaping and decomposition:
@@ -959,6 +1048,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
 Null-safe parsing (return `null`/fallback instead of throwing):
@@ -996,12 +1087,19 @@ Files::withExtension("report.txt", "md")   // "report.md"
 
 ## Json Module
 
-JSON parsing and serialization (`onion.Json`):
+JSON parsing and serialization (`onion.Json`). The intermediate representation is
+plain Java `Map`/`List`/scalars (`String`/`Long`/`Double`/`Boolean`/`null`):
 
 ```onion
 val obj = Json::parse("{\"name\": \"kota\"}")
 Json::getString(obj, "name")           // typed accessors: getInt/getDouble/getBoolean
 Json::stringify(obj) / Json::stringifyPretty(obj)
+
+// Building a value to stringify
+val m = Json::object()                 // empty Map
+m.put("x", 1)
+Json::stringify(m)                     // {"x":1}
+val a = Json::array()                  // empty List, for JSON array values
 
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
@@ -1018,6 +1116,30 @@ an explicit fallback instead:
 val obj = Json::parse("{}")
 Json::getIntOr(obj, "missing", 42)     // 42, no NPE
 Json::getStringOr(obj, "name", "anon") // "anon"
+```
+
+A missing key or out-of-range index on the `Json::value` wrapper yields a null-holding
+`Value` instead of throwing, so a chain like `v["users"][99]["name"]` stays safe until you
+convert it — `asString()`/`asInt()`/etc. return `null`/`0`/`false` at the end of the chain.
+`Value` also has `isNull()` (was the underlying value `null`?), `size()` (element count for
+an array/object Value, `0` otherwise), and `raw()` (the underlying `Map`/`List`/scalar/`null`).
+
+`Json::parseOrNull(json)` behaves like `Json::parse(json)` but returns `null` on malformed
+input instead of throwing `Json.JsonParseException` — useful when a parse failure is just
+another "absent" case rather than an error to handle separately:
+
+```onion
+val obj = Json::parseOrNull("not json")   // null, no exception
+```
+
+`Json::asObject(obj)` and `Json::asArray(obj)` are type-safe casts on the plain
+`Map`/`List` representation: each returns its argument cast to `Map`/`List` when the
+runtime type matches, or `null` otherwise. They're handy after `Json::get`, `Json::parse`,
+or `Json::parseOrNull` return `Object` and you need the Map/List view back to iterate:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List, or null if "tags" wasn't an array
 ```
 
 ## Yaml Module

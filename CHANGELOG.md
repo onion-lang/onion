@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.31] - 2026-08-12
+
+### Documentation
+
+- **Documented nine undocumented `onion.Strings` methods
+  (`splitRegex`, `isEmpty`, `isBlank`, `substring`, `indexOf`, `lastIndexOf`,
+  `lines`, `reverse`, `decapitalize`) in the Strings Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocStringsAccessorParitySpec`) so future
+  additions to `Strings`'s public API get caught the same way.
+- **Documented `Json::asObject()`/`Json::asArray()`/`Json::parseOrNull()` in the
+  Json Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These `onion.Json` public static methods
+  existed in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocJsonAccessorParitySpec`) so future additions to `Json`'s public
+  API get caught the same way.
+- **Documented `Json::object()`/`Json::array()` and `Value.isNull()`/`Value.size()`/
+  `Value.raw()` in the English Json Module reference (`docs/reference/stdlib.md`),
+  and added the missing `Json::array()`/`Value.raw()` mentions to the Japanese
+  reference (`docs/ja/reference/stdlib.md`).** These `onion.Json` builder helpers
+  and `Value` accessors existed in code but were absent (or partially absent) from
+  the docs in both languages, making them undiscoverable without reading the
+  Java source.
+- **Documented `Timing::elapsedMillis`, `Timing::formatMillis`,
+  `Timing::measureVoid`, and `Timing::sleepNanos` in the Timing Module section
+  of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  `onion.Timing` public static methods existed in code but were absent from the
+  docs in both languages, making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`StdlibDocTimingModuleParitySpec`) so
+  future additions to `Timing`'s public API get caught the same way.
+- **Documented 21 undocumented `onion.IO` methods
+  (`readLine`, `readAll`, `printf`, `format`, `eprint`, `eprintln`, `eprintf`,
+  `readInt`, `readLong`, `readDouble`, `readBoolean`, `tryReadInt`,
+  `tryReadDouble`, `tryReadLong`, `readLines`, `eachLine`, `printLines`,
+  `printAll`, `flush`, `newline`, `clear`) in the IO Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocIOAccessorParitySpec`) so future additions to
+  `IO`'s public API get caught the same way.
+
+## [0.10.30] - 2026-08-11
+
+### Documentation
+
+- **Added the missing `E0032` (`TYPE_ARGUMENT_MUST_BE_REFERENCE`) walkthrough
+  section to `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`.**
+  Every other code had a numbered `### EXXXX` section except this one, leaving
+  a visible gap between `E0031` and `E0033`. The new section explains that the
+  check has live report sites but is not reachable from valid Onion source
+  today, since the grammar never routes a type-argument position through
+  `void_type()` — matching the reasoning already recorded in
+  `SemanticErrorCodeCoverageSpec`.
+
+### Fixed
+
+- **`[I0000]` internal compiler crash when a `try`/`catch` expression is used
+  as a non-first call or constructor argument (issue #669).** The JVM clears
+  the operand stack when it dispatches to an exception handler, so any
+  argument already pushed before an inline `try { ... } catch { ... }`
+  argument was silently discarded, producing invalid bytecode (mismatched
+  stackmap frames) instead of a working method or a normal diagnostic.
+  `AsmCodeGenerationVisitor` now spills already-pushed operands (including a
+  call receiver) into locals before evaluating an argument that may run its
+  own `try`, and reloads them afterward, preserving left-to-right evaluation
+  order.
+
+### Added
+
+- **`run/ConferenceSchedule.on`, a 451-line conference schedule management sample.**
+  Exercises a data-carrying enum (`Verdict` with `Approved`/`Rejected`/`Pending`,
+  dispatched via `select case is`), a plain enum (`Track`), an interface
+  (`Summarizable`) implemented by two records, records with methods and `conforms`
+  (`Speaker`, `Session`, `Proposal`), a generic `Box[T]` class with a `map[U]`
+  method, extension methods on `Int` (`hourStr`) and `String` (`padRight`,
+  `truncate`), collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/
+  `partition`/`zip`/`flatten`/`distinct`/`any`/`count`), `foreach (k, v)` on
+  `Map`, nullable types with null guards, a tail-recursive prefix search, a
+  `while` loop, `try`/`catch`, and `string interpolation` throughout.
+- **`run/PharmacySystem.on`, a 320-line pharmacy/prescription management
+  sample.** Covers ADT enums (`DrugCategory`, `PrescriptionStatus`) with
+  exhaustive `select this { case x is Y: ... }` dispatch, records (`Drug`,
+  `Patient`, `Prescription`, `FilledRx`), typed generics (`List[T]`,
+  `Map[String, List[Drug]]`), collection pipelines (`filter`/`map`/`fold`/
+  `groupBy`/`sortedBy`), `foreach (k, v)` map destructuring, nullable-aware
+  lookup helpers, and `string interpolation` across a ten-section report.
+- **`run/PropertyManager.on`, a 351-line rental property portfolio management
+  sample.** Covers an ADT enum (`MaintenancePriority`) with `label()`/`score()`
+  methods, homogeneous enums (`PropertyType`, `LeaseStatus`), records with
+  inline bodies (`Address`, `Property`, `Tenant`, `Lease`, `MaintenanceRequest`),
+  extension methods on `Int`/`Double`/`String`, collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`),
+  `foreach i: Int in 1..12`, `foreach (k, v)` map destructuring, and
+  `String::format`-based currency/percentage formatting across a ten-section
+  report.
+
 ## [0.10.29] - 2026-08-10
 
 ### Added

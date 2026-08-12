@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `Value` accessors existed in code but were absent (or partially absent) from
   the docs in both languages, making them undiscoverable without reading the
   Java source.
+- **Documented `Timing::elapsedMillis`, `Timing::formatMillis`,
+  `Timing::measureVoid`, and `Timing::sleepNanos` in the Timing Module section
+  of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  `onion.Timing` public static methods existed in code but were absent from the
+  docs in both languages, making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`StdlibDocTimingModuleParitySpec`) so
+  future additions to `Timing`'s public API get caught the same way.
 
 ## [0.10.30] - 2026-08-11
 

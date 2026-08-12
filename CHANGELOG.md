@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Json::asObject()`/`Json::asArray()`/`Json::parseOrNull()` in the
+  Json Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These `onion.Json` public static methods
+  existed in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocJsonAccessorParitySpec`) so future additions to `Json`'s public
+  API get caught the same way.
 - **Documented `Json::object()`/`Json::array()` and `Value.isNull()`/`Value.size()`/
   `Value.raw()` in the English Json Module reference (`docs/reference/stdlib.md`),
   and added the missing `Json::array()`/`Value.raw()` mentions to the Japanese

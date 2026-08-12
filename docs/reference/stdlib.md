@@ -1033,6 +1033,24 @@ convert it — `asString()`/`asInt()`/etc. return `null`/`0`/`false` at the end 
 `Value` also has `isNull()` (was the underlying value `null`?), `size()` (element count for
 an array/object Value, `0` otherwise), and `raw()` (the underlying `Map`/`List`/scalar/`null`).
 
+`Json::parseOrNull(json)` behaves like `Json::parse(json)` but returns `null` on malformed
+input instead of throwing `Json.JsonParseException` — useful when a parse failure is just
+another "absent" case rather than an error to handle separately:
+
+```onion
+val obj = Json::parseOrNull("not json")   // null, no exception
+```
+
+`Json::asObject(obj)` and `Json::asArray(obj)` are type-safe casts on the plain
+`Map`/`List` representation: each returns its argument cast to `Map`/`List` when the
+runtime type matches, or `null` otherwise. They're handy after `Json::get`, `Json::parse`,
+or `Json::parseOrNull` return `Object` and you need the Map/List view back to iterate:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List, or null if "tags" wasn't an array
+```
+
 ## Yaml Module
 
 YAML serialization and parsing for flat block-mapping documents

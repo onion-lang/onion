@@ -900,6 +900,24 @@ v["users"][0]["name"].asString()
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
 要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
 
+`Json::parseOrNull(json)` は `Json::parse(json)` と同じですが、不正な入力に対して例外
+`Json.JsonParseException` を投げる代わりに `null` を返します。パース失敗を別扱いのエラーではなく
+単なる「値が無い」ケースとして扱いたいときに便利です:
+
+```onion
+val obj = Json::parseOrNull("not json")   // 例外を投げず null
+```
+
+`Json::asObject(obj)` と `Json::asArray(obj)` は素の `Map`/`List` 表現に対する型安全なキャストです。
+実行時の型が一致していれば `Map`/`List` にキャストした値を、そうでなければ `null` を返します。
+`Json::get`・`Json::parse`・`Json::parseOrNull` が `Object` を返した後、Map/List として
+イテレートしたいときに使います:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List。"tags" が配列でなければ null
+```
+
 ## Yaml モジュール
 
 flat block mapping ドキュメント限定の YAML パースとシリアライズ（`onion.Yaml`）。

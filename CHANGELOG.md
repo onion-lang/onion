@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented nine undocumented `onion.Strings` methods
+  (`splitRegex`, `isEmpty`, `isBlank`, `substring`, `indexOf`, `lastIndexOf`,
+  `lines`, `reverse`, `decapitalize`) in the Strings Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocStringsAccessorParitySpec`) so future
+  additions to `Strings`'s public API get caught the same way.
 - **Documented `Json::asObject()`/`Json::asArray()`/`Json::parseOrNull()` in the
   Json Module section of both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** These `onion.Json` public static methods

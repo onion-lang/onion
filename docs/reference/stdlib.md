@@ -1621,6 +1621,31 @@ Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
 ```
 
+### Pattern literal overloads
+
+A `re"..."` literal compiles to a `java.util.regex.Pattern`, not a `String`.
+Every matching/extraction/replacement/splitting method above also has an
+overload that takes a compiled `Pattern` directly, so a `re"..."` literal can
+be passed straight in without going through a `String` pattern:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
+```
+
 ### Example
 
 ```

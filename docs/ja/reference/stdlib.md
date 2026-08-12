@@ -1634,6 +1634,31 @@ Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
 ```
 
+### Pattern リテラルのオーバーロード
+
+`re"..."` リテラルは `String` ではなく `java.util.regex.Pattern` にコンパイルされます。
+上記のマッチング／抽出／置換／分割の各メソッドには、コンパイル済み `Pattern` を直接
+受け取るオーバーロードも用意されており、`re"..."` リテラルを `String` パターンを
+経由せずそのまま渡せます:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
+```
+
 ### 例
 
 ```

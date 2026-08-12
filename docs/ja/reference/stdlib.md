@@ -682,6 +682,23 @@ val randomBool: Boolean = Rand::nextBoolean()   // ランダムなBoolean
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1から6
 val percent: Int = Rand::nextInt(100)     // 0から99
+val d20: Int = Rand::nextInt(1, 21)       // 1から20（min, 排他的max）
+```
+
+### Rand::nextDouble（範囲指定）
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0から10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0から2.0
+```
+
+### Rand::choice
+
+リストからランダムに1要素を選ぶ：
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -696,6 +713,23 @@ list.add("A")
 list.add("B")
 list.add("C")
 Rand::shuffle(list)  // その場でシャッフル
+```
+
+### Rand::sample
+
+リストから重複なくn個の要素をランダムに選ぶ：
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 重複しない3枚
+```
+
+### Rand::uuid
+
+ランダムなUUID文字列を生成：
+
+```onion
+val id: String = Rand::uuid()   // 例: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert モジュール

@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   docs in both languages, making them undiscoverable without reading the Java
   source. Added a drift-guard spec (`StdlibDocTimingModuleParitySpec`) so
   future additions to `Timing`'s public API get caught the same way.
+- **Documented 21 undocumented `onion.IO` methods
+  (`readLine`, `readAll`, `printf`, `format`, `eprint`, `eprintln`, `eprintf`,
+  `readInt`, `readLong`, `readDouble`, `readBoolean`, `tryReadInt`,
+  `tryReadDouble`, `tryReadLong`, `readLines`, `eachLine`, `printLines`,
+  `printAll`, `flush`, `newline`, `clear`) in the IO Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocIOAccessorParitySpec`) so future additions to
+  `IO`'s public API get caught the same way.
 
 ## [0.10.30] - 2026-08-11
 

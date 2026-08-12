@@ -55,6 +55,78 @@ val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name)
 ```
 
+### IO::readLine
+
+Read a line from standard input, or `null` at end of input. `IO::readln()` (no
+prompt) is an alias for this:
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+Read all remaining standard input as a single string:
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### Formatted Output
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### Error Output (stderr)
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### Type-Safe Input
+
+Read and parse a line as a specific type, throwing on invalid input; each has
+an overload that prints a prompt first:
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // accepts true/yes/1, false/no/0
+```
+
+### Safe Input
+
+Like the type-safe readers above, but return `null` instead of throwing on
+invalid input or end of stream:
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### Line-Oriented I/O
+
+```onion
+val lines: List = IO::readLines()          // reads until end of input
+IO::eachLine { line => IO::println(line) } // applies a callback to each remaining line
+IO::printLines(["a", "b", "c"])            // one item per line
+IO::printAll("a", "b", "c")                // varargs form of printLines
+```
+
+### Utility
+
+```onion
+IO::flush()    // flushes standard output
+IO::newline()  // prints a blank line
+IO::clear()    // clears the terminal screen (ANSI escape codes)
+```
+
 ## System Module
 
 Access to system-level operations via Java's `System` class.

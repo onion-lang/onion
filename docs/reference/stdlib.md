@@ -726,13 +726,20 @@ Provided via `onion.Iterables` (Java interface).
 
 Access iteration utilities for collections and arrays:
 
-- `Iterables::map(list|iterable, f)`
+- `Iterables::map(list|iterable|set, f)`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
+- `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
-- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
+- `Iterables::newList(size)` - a new empty `List` pre-sized for `size` elements
+- `Iterables::first(list)` / `Iterables::last(list)` - `null` if the list is empty
+- `Iterables::reverse(list)`
+- `Iterables::take(list, n)` / `Iterables::drop(list, n)`
+- `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - the second overload requires `Comparable` elements
 
 ## Option Module
 

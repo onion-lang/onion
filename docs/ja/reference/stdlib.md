@@ -1378,10 +1378,19 @@ System::exit(1)  // エラー
 Files::readText("path.txt")            // ファイル全体を String として
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] を1行ずつ書き込む
+Files::appendText("out.txt", content)  // 追記。ファイルが無ければ新規作成
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
+Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
+Files::size(path)                      // Long。バイト数（存在しなければ0）
+Files::copy(src, dst)                  // dst が既にあれば置き換える
+Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -1389,6 +1398,7 @@ Files::delete(path) / Files::exists(path)
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // カレントディレクトリ基準の絶対パス
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"（拡張子。予約語を避けた名前）
 Files::stem("report.txt")              // "report"

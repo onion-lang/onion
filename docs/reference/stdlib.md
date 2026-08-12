@@ -933,6 +933,7 @@ String utilities (`onion.Strings`, auto-imported):
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -944,9 +945,13 @@ Case and inspection helpers:
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::equalsIgnoreCase(a, b) / Strings::containsIgnoreCase(s, sub)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 ```
 
 Shaping and decomposition:
@@ -959,6 +964,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
 Null-safe parsing (return `null`/fallback instead of throwing):

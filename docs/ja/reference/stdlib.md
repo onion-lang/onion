@@ -1036,6 +1036,7 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // 配列・List どちらも可
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1047,9 +1048,13 @@ Strings::padLeft(s, 8, '0') / Strings::padRight(s, 8, ' ') / Strings::repeat(s, 
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 Strings::removePrefix("unhappy", "un")   // "happy"
 Strings::removeSuffix("running", "ing")  // "runn"
 Strings::truncate("hello world", 8, "...")   // "hello..."
@@ -1057,6 +1062,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0

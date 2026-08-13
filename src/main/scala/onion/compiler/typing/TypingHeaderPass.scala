@@ -202,7 +202,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def extractTypeName(typeNode: AST.TypeNode): String = {
     typeNode.desc match {
       case AST.ReferenceType(name, _) => name.replace(".", "_")
-      case AST.ParameterizedType(component, _) => extractTypeDescName(component)
+      case AST.ParameterizedType(component, params) =>
+        extractTypeDescName(component) + "_" + params.map(extractTypeDescName).mkString("_")
       case AST.ArrayType(component) => extractTypeDescName(component) + "_Array"
       case AST.PrimitiveType(kind) => kind.toString
       case _ => "Unknown"
@@ -212,7 +213,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def extractTypeDescName(desc: AST.TypeDescriptor): String = {
     desc match {
       case AST.ReferenceType(name, _) => name.replace(".", "_")
-      case AST.ParameterizedType(component, _) => extractTypeDescName(component)
+      case AST.ParameterizedType(component, params) =>
+        extractTypeDescName(component) + "_" + params.map(extractTypeDescName).mkString("_")
       case AST.ArrayType(component) => extractTypeDescName(component) + "_Array"
       case AST.PrimitiveType(kind) => kind.toString
       case _ => "Unknown"

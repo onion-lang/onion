@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via cofactor expansion (1×1 through 4×4+), `List[Int]` + `(x as Int)`
   unboxing for row/column sums, `foreach x: Object in list` with an
   explicit cast, `select` on an `Int`, and nested `while` loops.
+- **`run/SnippetLibrary.on`, a 664-line code snippet library manager
+  sample.** Covers an ADT data-carrying enum (`Language`, 7 cases) with
+  `displayName()`/`fileExt()`/`isCompiled()` dispatched via `select`
+  type patterns, plain enums (`Category`, `Difficulty` with
+  `stars()`/`rank()`, `SortOrder`), records with method bodies
+  (`Snippet`, `Tag`) including `upvotedCopy()`/`viewedCopy()`/`hasTag()`,
+  an interface (`Searchable`), a typed-generic class over
+  `ArrayList[Snippet]`, a broad collection pipeline (`map`, `filter`,
+  `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`, `zip`,
+  `any`, `count`), a nullable (`Snippet?`) lookup with a null guard,
+  `String`/`Int` extension methods, the `|>` pipeline operator, and
+  `try`/`catch`.
 
 ## [0.10.32] - 2026-08-13
 

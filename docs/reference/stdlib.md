@@ -522,6 +522,42 @@ the method silently not existing.
 Reading two `Int` components out of `"abc,def"` reports **two** defects, not the first
 one. That is what `Outcome`'s accumulating `zip` is for.
 
+### Lossless shapes and lenses
+
+A shape that also satisfies L2 is *lossless* — `isLossless()` says so, and
+`parseLossless(text[, origin])` reads a `Lossless[T]` instead of a plain `T`: the value
+plus the `Residue` of everything around it (comments, spacing, key order, original
+value spellings). `printLossless(value, residue)` renders back through that residue —
+unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
+`Residue` is opaque; hand it back only to the shape that produced it.
+
+`Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
+swaps the value while keeping the residue, and `edit { v => ... }` focuses an update.
+`render()` reassembles the text:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  one changed line
+```
+
+`Shapes::config` and `Shapes::yaml` build the lossless shapes behind `shape name =
+config` / `shape name = yaml` when you want the `Shape[T]` value directly instead of
+the sugar.
+
+### Combinators
+
+- `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that
+  read and the defects of the ones that didn't (`Outcome::values`/`Outcome::defects`
+  split them apart). Use this over `lines()` when a partial result is meaningful, as in
+  a log file where most lines parse.
+- `lines()` — a `Shape[List[T]]` reading one value per line, all or nothing.
+- `sepBy(separator)` — a `Shape[List[T]]` split on a literal separator, all or nothing.
+- `xmap(forward, backward)` — transports a shape along an isomorphism; both directions
+  are required so `print` isn't silently destroyed.
+- `orElse(other)` — this shape, or `other` when it doesn't read; reports both shapes'
+  defects when neither does. Prints with this shape.
+
 ## Function Interfaces
 
 Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.

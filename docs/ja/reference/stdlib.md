@@ -462,6 +462,42 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 `"abc,def"` から `Int` を2つ読むと defect は**2件**報告されます。最初の1件ではありません。
 `Outcome` の蓄積する `zip` はそのためにあります。
 
+### Lossless shape と lens
+
+L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそれを伝え、
+`parseLossless(text[, origin])` は素の `T` の代わりに `Lossless[T]` を読みます:値と、
+その周辺すべての `Residue`（コメント、空白、キーの順序、元の値の書き方）です。
+`printLossless(value, residue)` はその residue を通して書き戻します——変更していない
+部分はバイト単位で再現され、意図的に変更した値だけが書き直されます。`Residue` は
+不透明な値で、生成した shape にだけ渡し戻してください。
+
+`Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
+`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v => ... }` は更新を
+値にフォーカスします。`render()` がテキストを再構成します:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  1行だけ変わる
+```
+
+`Shapes::config` と `Shapes::yaml` は、`shape name = config` / `shape name = yaml` の
+糖衣構文の裏にある lossless shape を、`Shape[T]` の値として直接組み立てます。
+
+### コンビネータ
+
+- `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
+  行の defect の両方を保持します（`Outcome::values`/`Outcome::defects` で分離できます）。
+  ログファイルのように大半の行が読めるケースなど、部分的な結果に意味がある場合は
+  `lines()` よりこちらを使います。
+- `lines()` — 1行1値、全部読めるか失敗するかの `Shape[List[T]]` です。
+- `sepBy(separator)` — リテラルな区切り文字で分割する、全部読めるか失敗するかの
+  `Shape[List[T]]` です。
+- `xmap(forward, backward)` — 同型写像に沿って shape を運びます。`print` が黙って
+  壊れないよう、両方向の関数が必要です。
+- `orElse(other)` — この shape、読めなければ `other`。どちらも読めない場合は両方の
+  defect を報告します。印字はこの shape で行います。
+
 ## 関数インターフェース
 
 ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。

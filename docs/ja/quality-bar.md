@@ -8,19 +8,22 @@
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-08-03） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値（2026-08-13） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3164 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 112 / 112 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 55（AirlineReservation、AuctionHouse、BankLedger、BankSystem、Blackjack、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、CinemaBooking、CourseRegistration、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameStore、GradeBook、GraphAlgorithms、GraphSearch、HotelReservation、Inventory、InventoryManager、InventoryReport、JobScheduler、LibraryCatalog、LibrarySystem、LogAnalytics、MathParser、MiniRpg、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PlaylistManager、PokerHands、RankedChoice、RecipeManager、ShapeProcessor、ShipmentTracker、ShoppingCart、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、TaskPlanner、TextAnalyzer、TicTacToe、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3410 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 150 / 150 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 93（AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、CinemaBooking、CipherSuite、ClinicRecords、ConferenceSchedule、ConwayLife、CourseRegistration、DependencyResolver、DoctorScheduler、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HotelReservation、HRSystem、HuffmanCoding、Inventory、InventoryManager、InventoryReport、JobScheduler、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MathParser、MatrixCalc、MazeSolver、MiniRpg、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NutritionTracker、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RestaurantOrders、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 83 | よくあるエラーごとに専用コード |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 84 | よくあるエラーごとに専用コード |
 
-**`SBT_OPTS` は設定しないでください。** 以前のこのファイルは `SBT_OPTS="-Xmx2g"` を薦めて
-いましたが、これは現在プロジェクト既定の 4g を*下げて*しまい、スイートの途中で
-`OutOfMemoryError` を起こします。既定のままが正しい値です。
+**`SBT_OPTS` にプロジェクト既定を下回るヒープ値を設定しないでください。** `.jvmopts` は既定を
+`-Xmx10g` に固定しています（`run/` サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の
+0.10.18 を参照）。これを下回るヒープを `SBT_OPTS` に設定すると——以前の悪い例だった
+`-Xmx2g` に限らず、`-Xmx4G` も実際に踏まれています——スイートの途中で
+`OutOfMemoryError` を起こします（#691 参照）。`SBT_OPTS` を他のフラグのために設定する
+場合も、ヒープは `-Xmx10G` 以上を維持してください。
 
 `-Duser.language=en` は重要です。エラーメッセージは二言語で JVM の既定ロケールから解決される
 ため、メッセージ文字列を検査するテストは日本語ロケールでは通り、英語ロケールで走るリリース CI

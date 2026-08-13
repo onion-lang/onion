@@ -1,0 +1,377 @@
+// SortAlgorithms.on — a benchmark of five classic sorting algorithms.
+// Exercises: interface, class hierarchy with mutable state, 1D arrays,
+// for / while loops, recursion (merge / quick sort), records with methods,
+// plain enum, data-carrying ADT enum, collection pipelines
+// (map / filter / sortedBy / fold / find / groupBy), select + exhaustiveness,
+// nullable types, closures, string interpolation, try/catch, foreach on
+// lists and foreach (k,v) on Map.
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+def copyArr(a: Int[]): Int[] {
+  val b = new Int[a.length]
+  for var i: Int = 0; i < a.length; i++ { b[i] = a[i] }
+  return b
+}
+
+def copyRange(a: Int[], from: Int, to: Int): Int[] {
+  val b = new Int[to - from]
+  for var i: Int = 0; i < b.length; i++ { b[i] = a[from + i] }
+  return b
+}
+
+def swap(a: Int[], i: Int, j: Int): void {
+  val tmp = a[i]; a[i] = a[j]; a[j] = tmp
+}
+
+def arrToStr(a: Int[]): String {
+  if a.length == 0 { return "[]" }
+  var s = "[" + a[0]
+  for var i: Int = 1; i < a.length; i++ { s = s + ", " + a[i] }
+  return s + "]"
+}
+
+def isSorted(a: Int[]): Boolean {
+  for var i: Int = 0; i < a.length - 1; i++ {
+    if a[i] > a[i + 1] { return false }
+  }
+  return true
+}
+
+// LCG pseudo-random arrays — deterministic for reproducible benchmarks
+def genArray(n: Int, seed: Int): Int[] {
+  val a = new Int[n]
+  var s = seed
+  for var i: Int = 0; i < n; i++ {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff
+    a[i] = (s % (n * 2)) + 1
+  }
+  return a
+}
+
+// Build an Int[] from five explicit values
+def arr5(a0: Int, a1: Int, a2: Int, a3: Int, a4: Int): Int[] {
+  val a = new Int[5]
+  a[0] = a0; a[1] = a1; a[2] = a2; a[3] = a3; a[4] = a4
+  return a
+}
+
+// ── Plain enum — Complexity ────────────────────────────────────────────────────
+
+enum Complexity {
+  QUADRATIC, LINEARITHMIC, LINEAR
+public:
+  def bigO(): String = select this {
+    case Complexity::QUADRATIC:    "O(n²)"
+    case Complexity::LINEARITHMIC: "O(n log n)"
+    case Complexity::LINEAR:       "O(n)"
+    else: "?"
+  }
+  def isEfficient(): Boolean = select this {
+    case Complexity::QUADRATIC: false
+    else: true
+  }
+}
+
+// ── Data-carrying (ADT) enum — SortFamily ─────────────────────────────────────
+
+enum SortFamily {
+  case Comparison(label: String, complexity: Complexity)
+  case Distribution(label: String, range: Int)
+public:
+  def display(): String = select this {
+    case c is Comparison:   c.label() + " — " + c.complexity().bigO()
+    case d is Distribution: d.label() + " — O(n + k), k=" + d.range()
+  }
+  def efficient(): Boolean = select this {
+    case c is Comparison:   c.complexity().isEfficient()
+    case d is Distribution: true
+  }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────────
+
+record SortStats(
+  algorithm: String,
+  n: Int,
+  comparisons: Int,
+  swaps: Int,
+  elapsed: Long
+) {
+public:
+  def summary(): String =
+    "  #{algorithm()} | n=#{n()} cmps=#{comparisons()} swaps=#{swaps()} #{Timing::formatNanos(elapsed())}"
+}
+
+record TestCase(label: String, data: Int[])
+
+// ── Interface ──────────────────────────────────────────────────────────────────
+
+interface Sorter {
+  def sort(arr: Int[]): SortStats
+  def label(): String
+  def family(): SortFamily
+}
+
+// ── Bubble Sort ────────────────────────────────────────────────────────────────
+
+class BubbleSorter conforms Sorter {
+public:
+  def label(): String = "Bubble Sort"
+  def family(): SortFamily = new Comparison("Bubble Sort", Complexity::QUADRATIC)
+  def sort(arr: Int[]): SortStats {
+    val n = arr.length
+    var cmps = 0; var swps = 0
+    val t0 = Timing::nanos()
+    for var i: Int = 0; i < n - 1; i++ {
+      for var j: Int = 0; j < n - 1 - i; j++ {
+        cmps++
+        if arr[j] > arr[j + 1] { swap(arr, j, j + 1); swps++ }
+      }
+    }
+    return new SortStats(label(), n, cmps, swps, Timing::elapsedNanos(t0))
+  }
+}
+
+// ── Insertion Sort ────────────────────────────────────────────────────────────
+
+class InsertionSorter conforms Sorter {
+public:
+  def label(): String = "Insertion Sort"
+  def family(): SortFamily = new Comparison("Insertion Sort", Complexity::QUADRATIC)
+  def sort(arr: Int[]): SortStats {
+    val n = arr.length
+    var cmps = 0; var swps = 0
+    val t0 = Timing::nanos()
+    for var i: Int = 1; i < n; i++ {
+      val key = arr[i]
+      var j = i - 1
+      var done = false
+      while j >= 0 && !done {
+        cmps++
+        if arr[j] > key { arr[j + 1] = arr[j]; j--; swps++ }
+        else { done = true }
+      }
+      arr[j + 1] = key
+    }
+    return new SortStats(label(), n, cmps, swps, Timing::elapsedNanos(t0))
+  }
+}
+
+// ── Selection Sort ────────────────────────────────────────────────────────────
+
+class SelectionSorter conforms Sorter {
+public:
+  def label(): String = "Selection Sort"
+  def family(): SortFamily = new Comparison("Selection Sort", Complexity::QUADRATIC)
+  def sort(arr: Int[]): SortStats {
+    val n = arr.length
+    var cmps = 0; var swps = 0
+    val t0 = Timing::nanos()
+    for var i: Int = 0; i < n - 1; i++ {
+      var minIdx = i
+      for var j: Int = i + 1; j < n; j++ {
+        cmps++
+        if arr[j] < arr[minIdx] { minIdx = j }
+      }
+      if minIdx != i { swap(arr, i, minIdx); swps++ }
+    }
+    return new SortStats(label(), n, cmps, swps, Timing::elapsedNanos(t0))
+  }
+}
+
+// ── Merge Sort (recursive, stable) ───────────────────────────────────────────
+
+class MergeSorter conforms Sorter {
+  var cmps: Int
+  var swps: Int
+public:
+  def this { this.cmps = 0; this.swps = 0 }
+  def label(): String = "Merge Sort"
+  def family(): SortFamily = new Comparison("Merge Sort", Complexity::LINEARITHMIC)
+  def sort(arr: Int[]): SortStats {
+    cmps = 0; swps = 0
+    val t0 = Timing::nanos()
+    mergeSort(arr, 0, arr.length - 1)
+    return new SortStats(label(), arr.length, cmps, swps, Timing::elapsedNanos(t0))
+  }
+  def mergeSort(arr: Int[], lo: Int, hi: Int): void {
+    if lo < hi {
+      val mid = lo + (hi - lo) / 2
+      mergeSort(arr, lo, mid)
+      mergeSort(arr, mid + 1, hi)
+      merge(arr, lo, mid, hi)
+    }
+  }
+  def merge(arr: Int[], lo: Int, mid: Int, hi: Int): void {
+    val left  = copyRange(arr, lo, mid + 1)
+    val right = copyRange(arr, mid + 1, hi + 1)
+    var i = 0; var j = 0; var k = lo
+    while i < left.length && j < right.length {
+      cmps++
+      if left[i] <= right[j] { arr[k] = left[i]; i++ }
+      else { arr[k] = right[j]; j++; swps++ }
+      k++
+    }
+    while i < left.length  { arr[k] = left[i];  i++; k++ }
+    while j < right.length { arr[k] = right[j]; j++; k++ }
+  }
+}
+
+// ── Quick Sort (Lomuto partition) ─────────────────────────────────────────────
+
+class QuickSorter conforms Sorter {
+  var cmps: Int
+  var swps: Int
+public:
+  def this { this.cmps = 0; this.swps = 0 }
+  def label(): String = "Quick Sort"
+  def family(): SortFamily = new Comparison("Quick Sort", Complexity::LINEARITHMIC)
+  def sort(arr: Int[]): SortStats {
+    cmps = 0; swps = 0
+    val t0 = Timing::nanos()
+    quickSort(arr, 0, arr.length - 1)
+    return new SortStats(label(), arr.length, cmps, swps, Timing::elapsedNanos(t0))
+  }
+  def quickSort(arr: Int[], lo: Int, hi: Int): void {
+    if lo < hi {
+      val p = partition(arr, lo, hi)
+      quickSort(arr, lo, p - 1)
+      quickSort(arr, p + 1, hi)
+    }
+  }
+  def partition(arr: Int[], lo: Int, hi: Int): Int {
+    val pivot = arr[hi]
+    var i = lo - 1
+    for var j: Int = lo; j < hi; j++ {
+      cmps++
+      if arr[j] <= pivot { i++; swap(arr, i, j); swps++ }
+    }
+    swap(arr, i + 1, hi)
+    return i + 1
+  }
+}
+
+// ── Benchmark ─────────────────────────────────────────────────────────────────
+
+val sorters = [
+  new BubbleSorter(),
+  new InsertionSorter(),
+  new SelectionSorter(),
+  new MergeSorter(),
+  new QuickSorter()
+]
+
+val testCases = [
+  new TestCase("random-20",  genArray(20, 42)),
+  new TestCase("reverse-15", genArray(15, 7)),
+  new TestCase("random-12",  genArray(12, 99)),
+  new TestCase("tiny-5",     arr5(5, 3, 1, 4, 2))
+]
+
+IO::println("╔══════════════════════════════════════════════════════════════╗")
+IO::println("║           SORTING ALGORITHM BENCHMARK (Onion)               ║")
+IO::println("╚══════════════════════════════════════════════════════════════╝")
+
+foreach tc: Object in testCases {
+  val t = tc as TestCase
+  IO::println("\n── Test: #{t.label()} ──")
+  IO::println("  Input: #{arrToStr(t.data())}")
+
+  val allStats = sorters.map { s =>
+    val sorter = s as Sorter
+    val copy = copyArr(t.data())
+    val st = sorter.sort(copy)
+    if !isSorted(copy) {
+      IO::println("  BUG: #{sorter.label()} produced unsorted output!")
+    }
+    st
+  }
+
+  val ranked = allStats.sortedBy { x => (x as SortStats).comparisons() }
+  foreach r: Object in ranked {
+    IO::println((r as SortStats).summary())
+  }
+
+  val winner: SortStats? = ranked.find { x => true } as SortStats?
+  if winner != null {
+    IO::println("  Winner: #{winner.algorithm()} (#{winner.comparisons()} cmps)")
+  }
+}
+
+// ── Family & Complexity Report ─────────────────────────────────────────────────
+
+IO::println("\n── Sort Families ──")
+foreach s: Object in sorters {
+  val sorter = s as Sorter
+  IO::println("  #{sorter.family().display()}")
+}
+
+val efficientCount = sorters.filter { s => (s as Sorter).family().efficient() }.size
+val quadraticCount = sorters.filter { s => !(s as Sorter).family().efficient() }.size
+IO::println("\nEfficient (sub-quadratic): #{efficientCount}")
+IO::println("Quadratic: #{quadraticCount}")
+
+// ── Complexity reference map with (k,v) foreach ──────────────────────────────
+
+val bigOMap = [
+  "Bubble Sort":    "O(n²)",
+  "Insertion Sort": "O(n²) — best O(n) on nearly-sorted",
+  "Selection Sort": "O(n²)",
+  "Merge Sort":     "O(n log n) — stable",
+  "Quick Sort":     "O(n log n) avg, O(n²) worst"
+]
+IO::println("\n── Big-O Reference ──")
+foreach (name, info) in bigOMap {
+  IO::println("  #{name}: #{info}")
+}
+
+// ── Growth experiment: bubble vs merge by n ────────────────────────────────────
+
+IO::println("\n── Bubble vs Merge: comparisons by size ──")
+foreach sz: Int in [10, 20, 30, 40, 50] {
+  val data = genArray(sz, sz * 13)
+  val bStats = new BubbleSorter().sort(copyArr(data))
+  val mStats = new MergeSorter().sort(copyArr(data))
+  IO::println("  n=#{sz}: bubble=#{bStats.comparisons()} merge=#{mStats.comparisons()}")
+}
+
+// ── Fold: total merge-sort comparisons across all test cases ──────────────────
+
+IO::println("\n── Total merge-sort comparisons across test cases ──")
+val totalCmps = testCases.fold(0) { acc, tc =>
+  val t = tc as TestCase
+  val copy = copyArr(t.data())
+  val st = new MergeSorter().sort(copy)
+  (acc as Int) + st.comparisons()
+}
+IO::println("  Total: #{totalCmps}")
+
+// ── GroupBy: group test cases by size bucket ───────────────────────────────────
+
+def sizeBucket(n: Int): String =
+  if n <= 5 { "tiny" } else if n <= 15 { "small" } else { "medium" }
+
+val byBucket = testCases.groupBy { tc => sizeBucket((tc as TestCase).data().length) }
+IO::println("\n── Test cases by size bucket ──")
+foreach (bucket, group) in byBucket {
+  val names = (group as List).map { tc => (tc as TestCase).label() }
+  IO::println("  #{bucket}: #{names.toString()}")
+}
+
+// ── Edge cases ────────────────────────────────────────────────────────────────
+
+IO::println("\n── Edge cases ──")
+try {
+  val emptyArr = new Int[0]
+  val st = new BubbleSorter().sort(emptyArr)
+  IO::println("  empty array: #{st.summary()}")
+  val oneArr = new Int[1]
+  oneArr[0] = 99
+  val st2 = new MergeSorter().sort(oneArr)
+  IO::println("  single-element: #{st2.summary()}")
+} catch e: Exception {
+  IO::println("  Exception: #{e.getMessage()}")
+}
+
+IO::println("\nDone.")

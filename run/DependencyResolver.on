@@ -1,0 +1,366 @@
+// DependencyResolver.on — a package-manager dependency resolver simulation.
+// Exercises: records, data-carrying enums, ADT enums, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/find/distinct), pattern matching, closures,
+// recursion, nullable types, string interpolation, try/catch, foreach ranges.
+
+import {
+  java.util.*
+}
+
+// ── Domain records ───────────────────────────────────────────────────────────
+
+record Version(major: Int, minor: Int, patch: Int) {
+public:
+  def toString(): String = "#{major}.#{minor}.#{patch}"
+  def isCompatibleWith(other: Version): Boolean =
+    major == other.major() && minor >= other.minor()
+  static def parse(s: String): Version? {
+    val parts: List[String] = Strings::split(s, ".") as List[String]
+    if parts.size != 3 { return null }
+    try {
+      val maj: Int = Integer::parseInt(parts.get(0))
+      val min: Int = Integer::parseInt(parts.get(1))
+      val pat: Int = Integer::parseInt(parts.get(2))
+      return new Version(maj, min, pat)
+    } catch e: Exception {
+      return null
+    }
+  }
+}
+
+record Dep(name: String, minVersion: Version) {
+public:
+  def toString(): String = "#{name} >= #{minVersion.toString()}"
+}
+
+record Package(name: String, version: Version, deps: List[Dep], description: String) {
+public:
+  def id(): String = "#{name}@#{version.toString()}"
+}
+
+// ── Resolution status (ADT enum) ─────────────────────────────────────────────
+
+enum ResolutionStatus {
+  case Resolved(pkg: Package)
+  case Missing(name: String, required: Version)
+  case Conflict(name: String, installed: Version, required: Version)
+  case Cycle(path: List[String])
+public:
+  def isOk(): Boolean = select this {
+    case r is Resolved: true
+    else: false
+  }
+  def label(): String = select this {
+    case r is Resolved:  "OK      "
+    case m is Missing:   "MISSING "
+    case c is Conflict:  "CONFLICT"
+    case cy is Cycle:    "CYCLE   "
+  }
+}
+
+// ── Package registry ─────────────────────────────────────────────────────────
+
+class PackageRegistry {
+  var packages: List[Package]
+public:
+  def this {
+    packages = []
+  }
+
+  def register(pkg: Package): void {
+    packages.add(pkg)
+  }
+
+  def find(name: String, minVer: Version): Package? {
+    val candidates: List[Package] = packages.filter { p =>
+      val pkg: Package = p as Package
+      pkg.name() == name && pkg.version().isCompatibleWith(minVer)
+    } as List[Package]
+    if candidates.size == 0 { return null }
+    var best: Package = candidates.get(0) as Package
+    var i: Int = 1
+    while i < candidates.size {
+      val cand: Package = candidates.get(i) as Package
+      if cand.version().patch() > best.version().patch() {
+        best = cand
+      }
+      i = i + 1
+    }
+    return best
+  }
+
+  def allPackages(): List[Package] = packages
+}
+
+// ── Dependency resolver ───────────────────────────────────────────────────────
+
+class Resolver {
+  var registry: PackageRegistry
+  var resolved: List[ResolutionStatus]
+  var visited: List[String]    // names currently on the DFS stack (cycle detection)
+  var installed: List[String]  // names already resolved this session
+public:
+  def this(reg: PackageRegistry) {
+    registry = reg
+    resolved = []
+    visited = []
+    installed = []
+  }
+
+  def resolve(name: String, minVer: Version): ResolutionStatus {
+    // Cycle detection
+    if visited.contains(name) {
+      val pathCopy: List[String] = []
+      foreach vn: Object in visited {
+        pathCopy.add(vn as String)
+      }
+      pathCopy.add(name)
+      return new Cycle(pathCopy)
+    }
+
+    val pkg: Package? = registry.find(name, minVer)
+    if pkg == null {
+      return new Missing(name, minVer)
+    }
+
+    // Already installed and same major.minor — skip
+    if installed.contains(name) {
+      return new Resolved(pkg)
+    }
+
+    visited.add(name)
+    installed.add(name)
+
+    // Resolve transitive dependencies
+    foreach dep: Object in pkg.deps() {
+      val d: Dep = dep as Dep
+      val subStatus: ResolutionStatus = resolve(d.name(), d.minVersion())
+      resolved.add(subStatus)
+      if subStatus is Cycle {
+        visited.remove(name)
+        return subStatus
+      }
+    }
+
+    visited.remove(name)
+    return new Resolved(pkg)
+  }
+
+  def resolveAll(roots: List[Dep]): List[ResolutionStatus] {
+    resolved = []
+    visited = []
+    installed = []
+    foreach root: Object in roots {
+      val dep: Dep = root as Dep
+      val status: ResolutionStatus = resolve(dep.name(), dep.minVersion())
+      resolved.add(status)
+    }
+    return resolved
+  }
+
+  def results(): List[ResolutionStatus] = resolved
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  val line: String = "─".repeat(52)
+  println(line)
+  println("  #{title}")
+  println(line)
+}
+
+def printResolution(status: ResolutionStatus): void {
+  select status {
+    case r is Resolved: {
+      val p: Package = r.pkg()
+      println("  [#{r.label()}] #{p.id()} — #{p.description()}")
+    }
+    case m is Missing: {
+      println("  [#{m.label()}] #{m.name()} (need >= #{m.required().toString()})")
+    }
+    case c is Conflict: {
+      println("  [#{c.label()}] #{c.name()}: have #{c.installed().toString()}, need #{c.required().toString()}")
+    }
+    case cy is Cycle: {
+      val path: List[String] = cy.path()
+      val joined: String = path.fold("") { acc, p => (if (acc as String) == "" { "" } else { acc as String + " -> " }) + (p as String) } as String
+      println("  [#{cy.label()}] #{joined}")
+    }
+  }
+}
+
+def countOk(statuses: List[ResolutionStatus]): Int {
+  return statuses.filter { s => (s as ResolutionStatus).isOk() }.size
+}
+
+def countFailed(statuses: List[ResolutionStatus]): Int {
+  return statuses.filter { s => !(s as ResolutionStatus).isOk() }.size
+}
+
+// ── Package registry population ───────────────────────────────────────────────
+
+def buildRegistry(): PackageRegistry {
+  val reg: PackageRegistry = new PackageRegistry()
+
+  // core
+  reg.register(new Package("core",    new Version(1, 0, 0), [], "Core runtime utilities"))
+  reg.register(new Package("core",    new Version(1, 0, 3), [], "Core runtime utilities (patched)"))
+  reg.register(new Package("core",    new Version(2, 0, 0), [], "Core runtime v2 — breaking API changes"))
+
+  // logging
+  val logDeps: List[Dep] = [new Dep("core", new Version(1, 0, 0))]
+  reg.register(new Package("logging", new Version(1, 2, 0), logDeps, "Structured logging"))
+  reg.register(new Package("logging", new Version(1, 2, 5), logDeps, "Structured logging (security patch)"))
+
+  // config
+  val cfgDeps: List[Dep] = [new Dep("core", new Version(1, 0, 0)), new Dep("logging", new Version(1, 2, 0))]
+  reg.register(new Package("config",  new Version(3, 1, 0), cfgDeps, "Configuration loader"))
+
+  // http-client
+  val httpDeps: List[Dep] = [new Dep("core", new Version(1, 0, 0)), new Dep("logging", new Version(1, 2, 5))]
+  reg.register(new Package("http-client", new Version(2, 0, 1), httpDeps, "HTTP client library"))
+
+  // json
+  val jsonDeps: List[Dep] = [new Dep("core", new Version(1, 0, 0))]
+  reg.register(new Package("json",    new Version(4, 0, 0), jsonDeps, "JSON serialization"))
+
+  // auth — depends on http-client and json
+  val authDeps: List[Dep] = [
+    new Dep("http-client", new Version(2, 0, 0)),
+    new Dep("json",        new Version(4, 0, 0))
+  ]
+  reg.register(new Package("auth",    new Version(1, 5, 0), authDeps, "OAuth2 authentication"))
+
+  // metrics — no deps
+  reg.register(new Package("metrics", new Version(0, 9, 0), [], "Application metrics"))
+
+  // scheduler — depends on core and metrics
+  val schedDeps: List[Dep] = [
+    new Dep("core",    new Version(1, 0, 0)),
+    new Dep("metrics", new Version(0, 9, 0))
+  ]
+  reg.register(new Package("scheduler", new Version(1, 0, 2), schedDeps, "Job scheduler"))
+
+  return reg
+}
+
+// ── Main script ───────────────────────────────────────────────────────────────
+
+val reg: PackageRegistry = buildRegistry()
+val resolver: Resolver = new Resolver(reg)
+
+// Scenario 1 — typical app with transitive deps
+printHeader("Scenario 1: Full-stack web app")
+val appDeps: List[Dep] = [
+  new Dep("auth",      new Version(1, 5, 0)),
+  new Dep("config",    new Version(3, 1, 0)),
+  new Dep("scheduler", new Version(1, 0, 0))
+]
+val s1: List[ResolutionStatus] = resolver.resolveAll(appDeps)
+foreach st: Object in s1 {
+  printResolution(st as ResolutionStatus)
+}
+println("  Summary: #{countOk(s1)} resolved, #{countFailed(s1)} failed")
+IO::println("")
+
+// Scenario 2 — missing dependency
+printHeader("Scenario 2: Missing package")
+val missingDeps: List[Dep] = [
+  new Dep("core",    new Version(1, 0, 0)),
+  new Dep("orm",     new Version(2, 0, 0)),   // 'orm' is not in registry
+  new Dep("logging", new Version(1, 2, 0))
+]
+val s2: List[ResolutionStatus] = resolver.resolveAll(missingDeps)
+foreach st: Object in s2 {
+  printResolution(st as ResolutionStatus)
+}
+println("  Summary: #{countOk(s2)} resolved, #{countFailed(s2)} failed")
+IO::println("")
+
+// Scenario 3 — version not compatible (need core v2 which breaks logging v1)
+printHeader("Scenario 3: Incompatible version requirement")
+val badVersionDeps: List[Dep] = [
+  new Dep("logging", new Version(1, 2, 0)),   // needs core >= 1.0
+  new Dep("core",    new Version(2, 0, 0))    // install core 2.x instead
+]
+val s3: List[ResolutionStatus] = resolver.resolveAll(badVersionDeps)
+foreach st: Object in s3 {
+  printResolution(st as ResolutionStatus)
+}
+println("  Summary: #{countOk(s3)} resolved, #{countFailed(s3)} failed")
+IO::println("")
+
+// Scenario 4 — registry statistics
+printHeader("Registry overview")
+val all: List[Package] = reg.allPackages()
+println("  Total packages in registry: #{all.size}")
+val byName: Map[String, List[Package]] = all.groupBy { p => (p as Package).name() } as Map[String, List[Package]]
+println("  Unique package names: #{byName.size}")
+val multiVersion: List[Package] = all.filter { p =>
+  val name: String = (p as Package).name()
+  (byName.get(name) as List[Package]).size > 1
+} as List[Package]
+println("  Packages with multiple versions: #{multiVersion.size}")
+
+// Show packages sorted by number of deps (most deps first)
+IO::println("")
+println("  Dependency count per package:")
+val sorted: List[Package] = all.sortedBy { p => -(p as Package).deps().size } as List[Package]
+foreach p: Object in sorted {
+  val pkg: Package = p as Package
+  println("    #{pkg.name()} #{pkg.version().toString()} — #{pkg.deps().size} dep(s)")
+}
+
+// Version parse demo
+IO::println("")
+printHeader("Version parsing")
+val versions: List[String] = ["1.0.0", "2.3.7", "bad", "1.x.0", "4.0.0"]
+foreach v: Object in versions {
+  val s: String = v as String
+  val parsed: Version? = Version::parse(s)
+  if parsed != null {
+    println("  \"#{s}\" -> #{parsed.toString()} (compat with 1.0? #{parsed.isCompatibleWith(new Version(1, 0, 0))})")
+  } else {
+    println("  \"#{s}\" -> parse error")
+  }
+}
+
+// Scenario 5 — cycle detection
+IO::println("")
+printHeader("Scenario 5: Circular dependency detection")
+val cyclicReg: PackageRegistry = new PackageRegistry()
+val cyclicDeps: List[Dep] = [new Dep("plugin-b", new Version(1, 0, 0))]
+val cycleBackDeps: List[Dep] = [new Dep("plugin-a", new Version(1, 0, 0))]
+cyclicReg.register(new Package("plugin-a", new Version(1, 0, 0), cyclicDeps,  "Plugin A"))
+cyclicReg.register(new Package("plugin-b", new Version(1, 0, 0), cycleBackDeps, "Plugin B (cycles back to A)"))
+val cyclicResolver: Resolver = new Resolver(cyclicReg)
+val cycleRoots: List[Dep] = [new Dep("plugin-a", new Version(1, 0, 0))]
+val s5: List[ResolutionStatus] = cyclicResolver.resolveAll(cycleRoots)
+foreach st: Object in s5 {
+  printResolution(st as ResolutionStatus)
+}
+println("  Summary: #{countOk(s5)} resolved, #{countFailed(s5)} failed")
+
+// Scenario 6 — installation order (topological sort via DFS output)
+IO::println("")
+printHeader("Scenario 6: Installation order (dependency-first)")
+val topoReg: PackageRegistry = buildRegistry()
+val topoResolver: Resolver = new Resolver(topoReg)
+val topoDeps: List[Dep] = [new Dep("auth", new Version(1, 5, 0))]
+val s6: List[ResolutionStatus] = topoResolver.resolveAll(topoDeps)
+// The resolver's DFS naturally produces a bottom-up (deps-first) order in `results()`
+println("  Install sequence:")
+var installIdx: Int = 1
+foreach st: Object in topoResolver.results() {
+  select (st as ResolutionStatus) {
+    case r is Resolved: {
+      println("    #{installIdx}. #{r.pkg().id()}")
+      installIdx = installIdx + 1
+    }
+    else: {}
+  }
+}
+
+IO::println("")
+println("Done.")

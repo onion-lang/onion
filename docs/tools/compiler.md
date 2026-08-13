@@ -122,6 +122,26 @@ Suppress specific warning categories by code or name.
 onionc --Wno W0001,unused-parameter MyProgram.on
 ```
 
+Every code accepts either its `W####` form or the `--Wno` name shown below:
+
+| Code | Name | Description |
+|------|------|--------------|
+| `W0001` | `unused-variable` | Unused variable |
+| `W0002` | `unused-import` | Unused import |
+| `W0003` | `unreachable-code` | Unreachable code |
+| `W0004` | `deprecated`, `deprecated-feature` | Deprecated feature |
+| `W0005` | `shadowed-variable` | Shadowed variable |
+| `W0006` | `unused-parameter` | Unused parameter |
+| `W0007` | `empty-block` | Empty block |
+| `W0008` | `redundant-cast` | Redundant cast |
+| `W0009` | `possible-null-deref`, `null-deref` | Possible null dereference |
+| `W0010` | `unnecessary-conversion` | Unnecessary type conversion |
+| `W0011` | `unchecked-cast` | Unchecked cast |
+| `W0012` | `null-to-non-nullable` | Null assigned to non-nullable type |
+| `W0013` | `suspicious-interpolation` | Suspicious string interpolation syntax |
+| `W0014` | `discarded-toplevel` | Top-level statements ignored because a main is defined |
+| `W0015` | `platform-unboxing` | Boxed platform value implicitly unboxed to a non-null primitive |
+
 ### `--no-check-laws`
 
 Do not execute a record's `law` / `example` clauses.

@@ -1,0 +1,434 @@
+// MatrixCalc.on — integer-matrix arithmetic with pretty printing
+// Exercises: Int[][] 2D arrays, records, extension methods on Int/String,
+// nested while loops, collection pipelines (map/filter/fold/sortedBy/zip),
+// foreach over ranges, string interpolation, nullable types,
+// select/pattern matching, recursion (determinant via cofactor expansion),
+// static factory methods, private helper methods, mutable class state.
+
+import { java.lang.Integer as JInteger; }
+
+// ── Extension helpers ──────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def max(other: Int): Int = if self >= other { self } else { other }
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def repeat(n: Int): String {
+    var out: String = ""
+    var i: Int = 0
+    while i < n { out = out + self.toString(); i++ }
+    return out
+  }
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def center(width: Int): String {
+    if self.length() >= width { return self }
+    val total = width - self.length()
+    val left  = total / 2
+    val right = total - left
+    var s: String = self
+    var i: Int = 0
+    while i < left  { s = " " + s; i++ }
+    i = 0
+    while i < right { s = s + " "; i++ }
+    return s
+  }
+}
+
+// ── Matrix class ───────────────────────────────────────────────────────────
+
+class Matrix {
+  val data: Int[][]
+
+public:
+  val rows: Int
+  val cols: Int
+
+  def this(r: Int, c: Int) {
+    rows = r
+    cols = c
+    data = new Int[r][c]
+  }
+
+  // ── Element access ────────────────────────────────────────────────────
+
+  def get(r: Int, c: Int): Int = data[r][c]
+
+  def set(r: Int, c: Int, v: Int): void { data[r][c] = v }
+
+  // ── Factory methods ───────────────────────────────────────────────────
+
+  static def zeros(r: Int, c: Int): Matrix = new Matrix(r, c)
+
+  static def identity(n: Int): Matrix {
+    val m = new Matrix(n, n)
+    var i: Int = 0
+    while i < n { m.set(i, i, 1); i++ }
+    return m
+  }
+
+  static def of(r: Int, c: Int, flat: List[Int]): Matrix {
+    val m = new Matrix(r, c)
+    var i: Int = 0
+    while i < r {
+      var j: Int = 0
+      while j < c {
+        m.set(i, j, (flat.get(i * c + j) as Int))
+        j++
+      }
+      i++
+    }
+    return m
+  }
+
+  // ── Arithmetic ────────────────────────────────────────────────────────
+
+  def plus(other: Matrix): Matrix {
+    val result = new Matrix(rows, cols)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        result.set(i, j, get(i, j) + other.get(i, j))
+        j++
+      }
+      i++
+    }
+    return result
+  }
+
+  def minus(other: Matrix): Matrix {
+    val result = new Matrix(rows, cols)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        result.set(i, j, get(i, j) - other.get(i, j))
+        j++
+      }
+      i++
+    }
+    return result
+  }
+
+  def times(other: Matrix): Matrix {
+    val result = new Matrix(rows, other.cols)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < other.cols {
+        var sum: Int = 0
+        var k: Int = 0
+        while k < cols {
+          sum = sum + get(i, k) * other.get(k, j)
+          k++
+        }
+        result.set(i, j, sum)
+        j++
+      }
+      i++
+    }
+    return result
+  }
+
+  def scale(s: Int): Matrix {
+    val result = new Matrix(rows, cols)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        result.set(i, j, get(i, j) * s)
+        j++
+      }
+      i++
+    }
+    return result
+  }
+
+  def negate(): Matrix = scale(0 - 1)
+
+  // ── Structural ops ────────────────────────────────────────────────────
+
+  def transpose(): Matrix {
+    val result = new Matrix(cols, rows)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        result.set(j, i, get(i, j))
+        j++
+      }
+      i++
+    }
+    return result
+  }
+
+  def minor(skipR: Int, skipC: Int): Matrix {
+    val result = new Matrix(rows - 1, cols - 1)
+    var r: Int = 0
+    var ri: Int = 0
+    while r < rows {
+      if r != skipR {
+        var c: Int = 0
+        var ci: Int = 0
+        while c < cols {
+          if c != skipC {
+            result.set(ri, ci, get(r, c))
+            ci++
+          }
+          c++
+        }
+        ri++
+      }
+      r++
+    }
+    return result
+  }
+
+  // ── Scalar statistics ─────────────────────────────────────────────────
+
+  def trace(): Int {
+    val n = if rows < cols { rows } else { cols }
+    var s: Int = 0
+    var i: Int = 0
+    while i < n { s = s + get(i, i); i++ }
+    return s
+  }
+
+  def determinant(): Int {
+    if rows != cols { return 0 }
+    select rows {
+      case 1: return get(0, 0)
+      case 2: return get(0, 0) * get(1, 1) - get(0, 1) * get(1, 0)
+      else: {
+        var det: Int = 0
+        var c: Int = 0
+        while c < cols {
+          val sign = if c % 2 == 0 { 1 } else { 0 - 1 }
+          det = det + sign * get(0, c) * minor(0, c).determinant()
+          c++
+        }
+        return det
+      }
+    }
+  }
+
+  def rowSums(): List[Int] {
+    val result: List[Int] = []
+    var i: Int = 0
+    while i < rows {
+      var s: Int = 0
+      var j: Int = 0
+      while j < cols { s = s + get(i, j); j++ }
+      result.add(s)
+      i++
+    }
+    return result
+  }
+
+  def colSums(): List[Int] {
+    val result: List[Int] = []
+    var j: Int = 0
+    while j < cols {
+      var s: Int = 0
+      var i: Int = 0
+      while i < rows { s = s + get(i, j); i++ }
+      result.add(s)
+      j++
+    }
+    return result
+  }
+
+  def maxElement(): Int {
+    var m = get(0, 0)
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        val v = get(i, j)
+        if v > m { m = v }
+        j++
+      }
+      i++
+    }
+    return m
+  }
+
+  def isSquare(): Boolean = rows == cols
+
+  def isSymmetric(): Boolean {
+    if !isSquare() { return false }
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        if get(i, j) != get(j, i) { return false }
+        j++
+      }
+      i++
+    }
+    return true
+  }
+
+  // ── Display ───────────────────────────────────────────────────────────
+
+  def show(): String {
+    var maxW: Int = 1
+    var i: Int = 0
+    while i < rows {
+      var j: Int = 0
+      while j < cols {
+        val w = ("" + get(i, j)).length()
+        if w > maxW { maxW = w }
+        j++
+      }
+      i++
+    }
+    var sb: String = ""
+    i = 0
+    while i < rows {
+      sb = sb + "  ["
+      var j: Int = 0
+      while j < cols {
+        if j > 0 { sb = sb + " " }
+        sb = sb + get(i, j).padLeft(maxW)
+        j++
+      }
+      sb = sb + "]\n"
+      i++
+    }
+    return sb
+  }
+}
+
+// ── Formatting helpers ─────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  val line = "─".repeat(title.length() + 4)
+  IO::println("\n┌" + line + "┐")
+  IO::println("│  " + title + "  │")
+  IO::println("└" + line + "┘")
+}
+
+def show(label: String, m: Matrix): void {
+  IO::println(label + " [" + m.rows + "×" + m.cols + "]:")
+  IO::print(m.show())
+}
+
+def listStr(xs: List[Int]): String {
+  var s: String = "["
+  var i: Int = 0
+  foreach x: Object in xs {
+    if i > 0 { s = s + ", " }
+    s = s + (x as Int)
+    i++
+  }
+  return s + "]"
+}
+
+// ── Demo ───────────────────────────────────────────────────────────────────
+
+banner("2×2 Integer Matrices")
+
+val A = Matrix::of(2, 2, [1, 2, 3, 4])
+val B = Matrix::of(2, 2, [5, 6, 7, 8])
+
+show("A", A)
+show("B", B)
+show("A + B", A.plus(B))
+show("A - B", A.minus(B))
+show("A × B", A.times(B))
+show("A^T  ", A.transpose())
+IO::println("trace(A)  = " + A.trace())
+IO::println("det(A)    = " + A.determinant())
+IO::println("rowSums(A) = " + listStr(A.rowSums()))
+IO::println("colSums(A) = " + listStr(A.colSums()))
+
+banner("3×3 Matrix Operations")
+
+val C = Matrix::of(3, 3, [
+  1, 2, 3,
+  4, 5, 6,
+  7, 8, 9
+])
+val D = Matrix::of(3, 3, [
+  2,  0,  1,
+  0,  3, -1,
+  1, -1,  2
+])
+
+show("C", C)
+IO::println("symmetric? " + C.isSymmetric())
+IO::println("trace(C)   = " + C.trace())
+IO::println("det(C)     = " + C.determinant())
+
+show("D", D)
+IO::println("symmetric? " + D.isSymmetric())
+IO::println("trace(D)   = " + D.trace())
+IO::println("det(D)     = " + D.determinant())
+show("D + D  ", D.plus(D))
+show("D × 3  ", D.scale(3))
+show("D × D  ", D.times(D))
+show("D^T    ", D.transpose())
+IO::println("rowSums(D) = " + listStr(D.rowSums()))
+IO::println("colSums(D) = " + listStr(D.colSums()))
+
+banner("Identity & Scale Properties")
+
+val I3 = Matrix::identity(3)
+show("I₃", I3)
+IO::println("det(I₃)   = " + I3.determinant())
+IO::println("trace(I₃) = " + I3.trace())
+show("D × I₃ ", D.times(I3))
+show("I₃ × D ", I3.times(D))
+
+banner("Symmetric Matrix")
+
+val S = Matrix::of(3, 3, [
+  4, 2, 1,
+  2, 5, 3,
+  1, 3, 6
+])
+show("S", S)
+IO::println("symmetric? " + S.isSymmetric())
+IO::println("trace(S)   = " + S.trace())
+IO::println("det(S)     = " + S.determinant())
+show("S^T    ", S.transpose())
+IO::println("S == S^T?  " + (S.isSymmetric()))
+
+banner("4×4 Determinant")
+
+val E = Matrix::of(4, 4, [
+   1,  2,  0,  3,
+   0,  4,  1,  2,
+   3,  0,  2,  1,
+   2,  1,  3,  0
+])
+show("E", E)
+IO::println("trace(E)   = " + E.trace())
+IO::println("det(E)     = " + E.determinant())
+IO::println("maxElem(E) = " + E.maxElement())
+
+banner("Minor Matrix")
+
+show("D.minor(0,0)", D.minor(0, 0))
+show("D.minor(1,1)", D.minor(1, 1))
+IO::println("cofactor(D,0,0) = " + D.minor(0, 0).determinant())
+
+banner("Negation and Zero")
+
+val Z = Matrix::zeros(3, 3)
+show("zeros(3,3)", Z)
+show("D + zeros  ", D.plus(Z))
+show("negate(D)  ", D.negate())
+show("D + neg(D) ", D.plus(D.negate()))

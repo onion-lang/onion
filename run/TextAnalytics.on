@@ -1,0 +1,272 @@
+// TextAnalytics.on — multi-document analysis: sentence stats, readability,
+// top-word comparison, and a Jaccard similarity score between documents.
+// Exercises records, data-carrying enums, classes, Map/List pipelines, closures,
+// nullable types, select / pattern matching, foreach, and sorting.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Document(title: String, body: String)
+
+record WordFreq(word: String, count: Int) {
+public:
+  def pct(total: Int): String = Format::fixed((count * 100.0) / total, 1) + "%"
+}
+
+record SentenceInfo(text: String, wordCount: Int) {
+public:
+  def label(): String =
+    select wordCount {
+      case 0, 1, 2, 3, 4, 5: "very short"
+      case 6, 7, 8, 9, 10:    "short"
+      case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20: "medium"
+      else:                    "long"
+    }
+}
+
+record AnalysisResult(
+  title:         String,
+  wordCount:     Int,
+  sentenceCount: Int,
+  uniqueWords:   Int,
+  avgSentLen:    Double,
+  topWords:      List[WordFreq],
+  readability:   String
+)
+
+// ── Readability enum ──────────────────────────────────────────────────────────
+
+enum ReadabilityLevel {
+  case VeryEasy
+  case Easy
+  case Medium
+  case Hard
+  case VeryHard
+
+public:
+  def label(): String = select this {
+    case v is VeryEasy: "Very Easy"
+    case e is Easy:     "Easy"
+    case m is Medium:   "Standard"
+    case h is Hard:     "Hard"
+    case v is VeryHard: "Very Hard"
+  }
+}
+
+// ── Stop-word list ────────────────────────────────────────────────────────────
+
+val STOP_WORDS: List[String] = [
+  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+  "of", "with", "is", "it", "as", "be", "was", "are", "by", "from",
+  "this", "that", "have", "has", "not", "we", "you", "he", "she", "they",
+  "i", "my", "me", "your", "our", "do", "did", "will", "can", "its",
+  "were", "been", "being", "so", "if", "then", "when", "where",
+  "which", "who", "how", "all", "any", "both", "each", "few", "more",
+  "most", "other", "some", "such", "no", "nor", "only", "same", "than",
+  "too", "very", "just", "because", "while", "about", "into", "through"
+]
+
+def isStopWord(w: String): Boolean {
+  foreach s: String in STOP_WORDS {
+    if s == w { return true }
+  }
+  return false
+}
+
+// ── Core analysis helpers ─────────────────────────────────────────────────────
+
+def tokenize(text: String): List[String] {
+  return text.toLowerCase().split("[^a-z]+").toList().filter { w => w.length() > 1 }
+}
+
+def contentWords(tokens: List[String]): List[String] {
+  return tokens.filter { w => !isStopWord(w) }
+}
+
+def splitSentences(text: String): List[String] {
+  return Strings::splitRegex(text, "[.!?]+").filter { s => s.trim().length() > 0 }
+}
+
+def readabilityLevel(avgLen: Double, uniqueRatio: Double): ReadabilityLevel {
+  if avgLen <= 8.0 && uniqueRatio <= 0.4 { return new VeryEasy() }
+  if avgLen <= 12.0 && uniqueRatio <= 0.55 { return new Easy() }
+  if avgLen <= 17.0 && uniqueRatio <= 0.65 { return new Medium() }
+  if avgLen <= 22.0 { return new Hard() }
+  return new VeryHard()
+}
+
+// ── Analyzer class ────────────────────────────────────────────────────────────
+
+class TextAnalyzer {
+  val topN: Int
+public:
+  def this(topN: Int) { self.topN = topN }
+
+  def analyze(doc: Document): AnalysisResult {
+    val tokens    = tokenize(doc.body())
+    val words     = contentWords(tokens)
+    val wordCount = tokens.size
+
+    val sentences  = splitSentences(doc.body())
+    val sentCount  = if sentences.size == 0 { 1 } else { sentences.size }
+    val avgSentLen = wordCount * 1.0 / sentCount
+
+    val freq        = Maps::countBy(words as List[Object]) { w => w }
+    val uniqueWords = freq.size
+
+    val uniqueRatio = if wordCount == 0 { 0.0 } else { uniqueWords * 1.0 / wordCount }
+    val level       = readabilityLevel(avgSentLen, uniqueRatio)
+
+    val allFreqs = Maps::toList(freq) { k, v =>
+      new WordFreq(k as String, v as Int)
+    }
+    val topWords: List[WordFreq] =
+      allFreqs.sortedByDescending { wf => (wf as WordFreq).count() }.take(topN) as List[WordFreq]
+
+    return new AnalysisResult(
+      doc.title(), wordCount, sentCount, uniqueWords,
+      avgSentLen, topWords, level.label()
+    )
+  }
+
+  def sentenceBreakdown(doc: Document): Map[String, Int] {
+    val result: Map[String, Int] = ["very short": 0, "short": 0, "medium": 0, "long": 0]
+    val sentences = splitSentences(doc.body())
+    foreach s: String in sentences {
+      val trimmed = s.trim()
+      if trimmed.length() > 0 {
+        val wc   = trimmed.split("\\s+").length
+        val info = new SentenceInfo(trimmed, wc)
+        val lbl  = info.label()
+        val cur: Int? = result.get(lbl) as Int?
+        result.put(lbl, if cur == null { 1 } else { cur + 1 })
+      }
+    }
+    return result
+  }
+}
+
+// ── Jaccard similarity ────────────────────────────────────────────────────────
+
+def jaccardSim(tokA: List[String], tokB: List[String]): Double {
+  val setA = tokA.distinct()
+  val setB = tokB.distinct()
+  val intersection = setA.filter { w => setB.contains(w) }
+  val unionSize = setA.size + setB.size - intersection.size
+  if unionSize == 0 { return 0.0 }
+  return intersection.size * 1.0 / unionSize
+}
+
+// ── Banner helper ─────────────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  IO::println(Strings::repeat("─", 60))
+  IO::println("  " + title)
+  IO::println(Strings::repeat("─", 60))
+}
+
+// ── Print analysis result ─────────────────────────────────────────────────────
+
+def printResult(r: AnalysisResult): void {
+  banner(r.title())
+  IO::println("  Words:         " + r.wordCount())
+  IO::println("  Sentences:     " + r.sentenceCount())
+  IO::println("  Unique words:  " + r.uniqueWords())
+  IO::println("  Avg sent len:  " + Format::fixed(r.avgSentLen(), 1) + " words")
+  IO::println("  Readability:   " + r.readability())
+  IO::println("  Top words (no stop words):")
+  var rank: Int = 1
+  foreach wf: WordFreq in r.topWords() {
+    IO::println("    #{rank}. #{wf.word()} (#{wf.count()}x, #{wf.pct(r.wordCount())})")
+    rank = rank + 1
+  }
+}
+
+// ── Documents ─────────────────────────────────────────────────────────────────
+
+val DOC1 = new Document(
+  "The Raven (fragment)",
+  "Once upon a midnight dreary, while I pondered, weak and weary, " +
+  "over many a quaint and curious volume of forgotten lore. " +
+  "While I nodded, nearly napping, suddenly there came a tapping, " +
+  "as of someone gently rapping, rapping at my chamber door. " +
+  "Tis some visitor, I muttered, tapping at my chamber door. " +
+  "Only this and nothing more. Ah, distinctly I remember it was in the bleak December. " +
+  "And each separate dying ember wrought its ghost upon the floor. " +
+  "Eagerly I wished the morrow, vainly I had sought to borrow " +
+  "from my books surcease of sorrow, sorrow for the lost Lenore. " +
+  "For the rare and radiant maiden whom the angels name Lenore."
+)
+
+val DOC2 = new Document(
+  "Tech Blog Post",
+  "Machine learning models require large datasets and significant compute resources. " +
+  "Deep neural networks can learn complex patterns from raw data automatically. " +
+  "Transformer architectures have revolutionized natural language processing tasks. " +
+  "Fine-tuning pre-trained models on domain-specific data improves performance. " +
+  "Hyperparameter tuning remains a critical step in model development. " +
+  "Gradient descent optimizes model weights by minimizing the loss function. " +
+  "Regularization techniques prevent overfitting on training data. " +
+  "Cross-validation helps estimate generalization performance on unseen data. " +
+  "Feature engineering can boost model accuracy even with simpler algorithms. " +
+  "Ensemble methods combine multiple models to reduce prediction variance."
+)
+
+val DOC3 = new Document(
+  "Children's Story",
+  "The little cat sat on the mat. The cat was very happy. " +
+  "A big dog came by. The cat ran up the tree. The dog barked and barked. " +
+  "The cat looked down and laughed. The dog went home. " +
+  "The cat came down from the tree and sat on the mat again. " +
+  "The sun was warm and bright. The cat took a nap. " +
+  "A bird sang a sweet song. The cat opened one eye. " +
+  "The bird flew away. The cat smiled and slept again."
+)
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  val analyzer = new TextAnalyzer(5)
+  val docs: List[Document] = [DOC1, DOC2, DOC3]
+
+  // Per-document profiles
+  val results: List[Object] = docs.map { d => analyzer.analyze(d as Document) }
+  foreach r: Object in results { printResult(r as AnalysisResult) }
+
+  // Sentence-length breakdown
+  banner("Sentence-Length Breakdown")
+  foreach doc: Document in docs {
+    IO::println("  " + doc.title() + ":")
+    val bd = analyzer.sentenceBreakdown(doc)
+    foreach label: String in ["very short", "short", "medium", "long"] {
+      val cnt: Int? = bd.get(label) as Int?
+      IO::println("    #{label}: #{if cnt == null { 0 } else { cnt }}")
+    }
+  }
+
+  // Pairwise Jaccard similarity
+  banner("Pairwise Jaccard Similarity (content words)")
+  var i: Int = 0
+  while i < docs.size {
+    var j: Int = i + 1
+    while j < docs.size {
+      val docA = docs.get(i) as Document
+      val docB = docs.get(j) as Document
+      val tA = contentWords(tokenize(docA.body()))
+      val tB = contentWords(tokenize(docB.body()))
+      val sim = jaccardSim(tA, tB)
+      IO::println("  #{docA.title()} vs #{docB.title()}: #{Format::fixed(sim * 100.0, 1)}%")
+      j = j + 1
+    }
+    i = i + 1
+  }
+
+  // Complexity ranking
+  banner("Complexity Ranking (avg sentence length)")
+  val ranked = results.sortedByDescending { r => (r as AnalysisResult).avgSentLen() }
+  var rank: Int = 1
+  foreach r: Object in ranked {
+    val res = r as AnalysisResult
+    IO::println("  #{rank}. #{res.title()} — #{Format::fixed(res.avgSentLen(), 1)} words/sent (#{res.readability()})")
+    rank = rank + 1
+  }
+}

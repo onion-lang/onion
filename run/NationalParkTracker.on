@@ -1,0 +1,478 @@
+// NationalParkTracker.on — Tracks visits and statistics across national and state parks.
+// Exercises: plain/data-carrying/ADT enums with methods, records with methods,
+// interface + conforms, extension methods (Int/Double/String), collection pipelines
+// (filter/map/fold/sortedBy/groupBy/find/partition/distinct/zip),
+// select/pattern-matching, nullable types, string interpolation,
+// foreach (ranges, Map k,v), while loops, closures, try/catch, recursion.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int    = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+extension Int {
+  def ipad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def thousands(): String = (self as Int).thousandsRec()
+  def thousandsRec(): String {
+    if self < 0 { return "-" + (0 - self).thousandsRec() }
+    if self < 1000 { return "" + self }
+    val hi: Int  = self / 1000
+    val lo: Int  = self % 1000
+    val loStr: String = if lo < 10 { "00" + lo } else if lo < 100 { "0" + lo } else { "" + lo }
+    return hi.thousandsRec() + "," + loStr
+  }
+}
+
+extension Double {
+  def round1(): Double {
+    val factor: Long = 10L
+    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+  }
+  def dfmt(): String {
+    val whole: Int  = self.intValue()
+    val rem: Double = self - (whole as Double)
+    val frac: Int   = (rem * 10.0 + 0.5).intValue()
+    return "" + whole + "." + frac
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ParkType {
+  National, State, Regional, Wilderness
+public:
+  def label(): String = select this {
+    case ParkType::National:   "National Park"
+    case ParkType::State:      "State Park"
+    case ParkType::Regional:   "Regional Park"
+    case ParkType::Wilderness: "Wilderness Area"
+    else: "Park"
+  }
+  def code(): String = select this {
+    case ParkType::National:   "NP"
+    case ParkType::State:      "SP"
+    case ParkType::Regional:   "RP"
+    case ParkType::Wilderness: "WA"
+    else: "??"
+  }
+}
+
+enum Season {
+  Spring, Summer, Autumn, Winter
+public:
+  def label(): String = select this {
+    case Season::Spring: "Spring"
+    case Season::Summer: "Summer"
+    case Season::Autumn: "Autumn"
+    case Season::Winter: "Winter"
+    else: "?"
+  }
+  def isPeak(): Boolean = select this {
+    case Season::Summer: true
+    case Season::Autumn: true
+    else: false
+  }
+}
+
+enum ConservationStatus(description: String) {
+  STABLE("Population stable"),
+  VULNERABLE("Declining; monitoring needed"),
+  ENDANGERED("Critically threatened"),
+  RESTORED("In active recovery")
+public:
+  def icon(): String = select this {
+    case ConservationStatus::STABLE:     "[OK] "
+    case ConservationStatus::VULNERABLE: "[!!] "
+    case ConservationStatus::ENDANGERED: "[SOS]"
+    case ConservationStatus::RESTORED:   "[~]  "
+    else: "[?]  "
+  }
+  def isAtRisk(): Boolean = select this {
+    case ConservationStatus::VULNERABLE: true
+    case ConservationStatus::ENDANGERED: true
+    else: false
+  }
+}
+
+// ADT enum: primary activity kind recorded per visit
+enum Activity {
+  case Hiking(miles: Double)
+  case WildlifeWatch(speciesCount: Int)
+  case Camping(nights: Int)
+  case Boating(vessels: Int)
+  case Climbing(routes: Int)
+public:
+  def label(): String = select this {
+    case a is Hiking:        "Hiking #{a.miles()} mi"
+    case a is WildlifeWatch: "Wildlife #{a.speciesCount()} spp"
+    case a is Camping:       "Camping #{a.nights()} nights"
+    case a is Boating:       "Boating #{a.vessels()} vessels"
+    case a is Climbing:      "Climbing #{a.routes()} routes"
+  }
+  def impactScore(): Int = select this {
+    case a is Hiking:        (a.miles() * 15.0).intValue()
+    case a is WildlifeWatch: a.speciesCount() * 20
+    case a is Camping:       a.nights() * 40
+    case a is Boating:       a.vessels() * 50
+    case a is Climbing:      a.routes() * 30
+  }
+  def kind(): String = select this {
+    case a is Hiking:        "Hiking"
+    case a is WildlifeWatch: "Wildlife"
+    case a is Camping:       "Camping"
+    case a is Boating:       "Boating"
+    case a is Climbing:      "Climbing"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Park(name: String, state: String, parkType: ParkType,
+            areaSqKm: Int, status: ConservationStatus) {
+public:
+  def fullName(): String = "#{name()} (#{state()})"
+  def isProtected(): Boolean = status().isAtRisk()
+  def displayLine(): String =
+    "#{name().padRight(20)} #{state()}  #{parkType().code()}  #{areaSqKm().ipad(6)} km2  #{status().icon()}"
+}
+
+record Visit(parkName: String, season: Season, year: Int,
+             visitors: Int, revenueDollars: Int, activity: Activity) {
+public:
+  def revenuePerVisitor(): Double {
+    if visitors() == 0 { return 0.0 }
+    return revenueDollars().doubleValue() / visitors().doubleValue()
+  }
+  def impactScore(): Int = visitors() * activity().impactScore() / 1000000
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def header(): String
+  def report(): String
+}
+
+// ─── ParkSummary ─────────────────────────────────────────────────────────────
+
+class ParkSummary conforms Reportable {
+  val park: Park
+  val visits: List[Object]
+public:
+  def this(park: Park, visits: List[Object]) {
+    this.park   = park
+    this.visits = visits
+  }
+
+  def getPark(): Park = park
+
+  def totalVisitors(): Int =
+    visits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+
+  def totalRevenue(): Int =
+    visits.fold(0) { acc, v => (acc as Int) + (v as Visit).revenueDollars() } as Int
+
+  def avgRevPerVisitor(): Double {
+    val total: Int = totalVisitors()
+    if total == 0 { return 0.0 }
+    return totalRevenue().doubleValue() / total.doubleValue()
+  }
+
+  def busiestSeason(): String {
+    val bySeason = visits.groupBy { v => (v as Visit).season().label() }
+    var bestSeason: String = "n/a"
+    var bestCount: Int     = -1
+    foreach (k, v) in bySeason {
+      val cnt: Int = (v as List[Object]).fold(0) { acc, vis =>
+        (acc as Int) + (vis as Visit).visitors()
+      } as Int
+      if cnt > bestCount { bestSeason = (k as String); bestCount = cnt }
+    }
+    return bestSeason
+  }
+
+  def yearRange(): String {
+    if visits.size == 0 { return "n/a" }
+    val minY: Int = visits.fold(9999) { a, b =>
+      val ai: Int = (a as Int); val bi: Int = (b as Visit).year()
+      if ai < bi { ai } else { bi }
+    } as Int
+    val maxY: Int = visits.fold(0) { a, b =>
+      val ai: Int = (a as Int); val bi: Int = (b as Visit).year()
+      if ai > bi { ai } else { bi }
+    } as Int
+    if minY == maxY { return "" + minY }
+    return "#{minY}-#{maxY}"
+  }
+
+  def header(): String = "=== #{park.fullName()} [#{park.parkType().label()}] ==="
+
+  def report(): String {
+    val sep: String = "-".rep(52)
+    var out: String = header() + "\n" + sep + "\n"
+    out = out + "  Area       : #{park.areaSqKm().thousands()} km2\n"
+    out = out + "  Status     : #{park.status().icon()} #{park.status().description()}\n"
+    out = out + "  Records    : #{visits.size} visit entries (#{yearRange()})\n"
+    out = out + "  Visitors   : #{totalVisitors().thousands()}\n"
+    out = out + "  Revenue    : $#{totalRevenue().thousands()}\n"
+    out = out + "  Rev/Visitor: $#{avgRevPerVisitor().round1().dfmt()}\n"
+    out = out + "  Peak Season: #{busiestSeason()}\n"
+    out = out + "  Protected  : #{park.isProtected()}\n"
+    return out
+  }
+}
+
+// ─── ParkRegistry ────────────────────────────────────────────────────────────
+
+class ParkRegistry {
+  var parks: List[Object]
+  var visits: List[Object]
+public:
+  def this {
+    parks  = []
+    visits = []
+  }
+
+  def addPark(p: Park): void   { parks  << p }
+  def addVisit(v: Visit): void { visits << v }
+
+  def parkCount(): Int  = parks.size
+  def visitCount(): Int = visits.size
+  def allParks(): List[Object] = parks
+  def allVisits(): List[Object] = visits
+
+  def findPark(name: String): Park? {
+    val found = parks.find { p => (p as Park).name() == name }
+    if found == null { return null }
+    return (found as Park)
+  }
+
+  def visitsFor(parkName: String): List[Object] =
+    visits.filter { v => (v as Visit).parkName() == parkName }
+
+  def summaryFor(parkName: String): ParkSummary? {
+    val p: Park? = findPark(parkName)
+    if p == null { return null }
+    return new ParkSummary((p as Park), visitsFor(parkName))
+  }
+
+  def atRiskParks(): List[Object] =
+    parks.filter { p => (p as Park).isProtected() }
+
+  def topByVisitors(): List[Object] {
+    val summaries: List[Object] = []
+    foreach p: Object in parks {
+      summaries.add(new ParkSummary((p as Park), visitsFor((p as Park).name())))
+    }
+    return summaries.sortedBy { s => -(s as ParkSummary).totalVisitors() }
+  }
+
+  def visitsBySeasonReport(): void {
+    val all = visits.groupBy { v => (v as Visit).season().label() }
+    IO::println("\nVisitor Count by Season:")
+    IO::println("-".rep(40))
+    foreach (season, seasonVisits) in all {
+      val total: Int = (seasonVisits as List[Object])
+        .fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+      IO::println("  #{(season as String).padRight(8)}: #{total.thousands()}")
+    }
+  }
+
+  def activityBreakdown(): void {
+    IO::println("\nActivity Breakdown (visit count):")
+    IO::println("-".rep(40))
+    val byKind = visits.groupBy { v => (v as Visit).activity().kind() }
+    foreach (kind, kindVisits) in byKind {
+      val count: Int = (kindVisits as List[Object]).size
+      IO::println("  #{(kind as String).padRight(12)}: #{count}")
+    }
+  }
+
+  def revenueLeaderboard(): void {
+    IO::println("\nRevenue Leaderboard:")
+    IO::println("-".rep(52))
+    val summaries: List[Object] = []
+    foreach p: Object in parks {
+      summaries.add(new ParkSummary((p as Park), visitsFor((p as Park).name())))
+    }
+    val ranked = summaries.sortedBy { s => -(s as ParkSummary).totalRevenue() }
+    var rank: Int = 1
+    foreach s: Object in ranked {
+      val summary = (s as ParkSummary)
+      val badge: String = if rank == 1 { "#1 " } else if rank == 2 { "#2 " } else if rank == 3 { "#3 " } else { "   " }
+      val nameCol: String = summary.getPark().fullName().padRight(24)
+      IO::println("  #{badge}#{nameCol} $#{summary.totalRevenue().thousands()}")
+      rank = rank + 1
+    }
+  }
+}
+
+// ─── Sample Data ─────────────────────────────────────────────────────────────
+
+val reg = new ParkRegistry()
+
+reg.addPark(new Park("Yellowstone",    "WY", ParkType::National,   8983, ConservationStatus::RESTORED))
+reg.addPark(new Park("Yosemite",       "CA", ParkType::National,   3080, ConservationStatus::STABLE))
+reg.addPark(new Park("Zion",           "UT", ParkType::National,    593, ConservationStatus::STABLE))
+reg.addPark(new Park("Olympic",        "WA", ParkType::National,   3734, ConservationStatus::VULNERABLE))
+reg.addPark(new Park("Sequoia",        "CA", ParkType::National,   1635, ConservationStatus::VULNERABLE))
+reg.addPark(new Park("Rocky Mountain", "CO", ParkType::National,   1076, ConservationStatus::STABLE))
+
+// Yellowstone
+reg.addVisit(new Visit("Yellowstone", Season::Summer, 2023, 480000, 15000000, new Hiking(8.5)))
+reg.addVisit(new Visit("Yellowstone", Season::Winter, 2023,  45000,  2000000, new WildlifeWatch(12)))
+reg.addVisit(new Visit("Yellowstone", Season::Spring, 2023,  90000,  4500000, new WildlifeWatch(8)))
+reg.addVisit(new Visit("Yellowstone", Season::Autumn, 2023, 120000,  6000000, new Camping(4)))
+// Yosemite
+reg.addVisit(new Visit("Yosemite", Season::Summer, 2023, 550000, 18000000, new Hiking(6.0)))
+reg.addVisit(new Visit("Yosemite", Season::Autumn, 2023, 210000,  7000000, new Climbing(45)))
+reg.addVisit(new Visit("Yosemite", Season::Winter, 2023,  40000,  1500000, new Hiking(2.5)))
+reg.addVisit(new Visit("Yosemite", Season::Spring, 2023, 150000,  5000000, new WildlifeWatch(6)))
+// Zion
+reg.addVisit(new Visit("Zion", Season::Spring, 2023, 220000,  8000000, new Hiking(9.0)))
+reg.addVisit(new Visit("Zion", Season::Summer, 2023, 280000, 10500000, new Hiking(7.5)))
+reg.addVisit(new Visit("Zion", Season::Autumn, 2023, 190000,  7200000, new Camping(3)))
+reg.addVisit(new Visit("Zion", Season::Winter, 2023,  30000,  1100000, new Boating(2)))
+// Olympic
+reg.addVisit(new Visit("Olympic", Season::Summer, 2023, 180000, 5500000, new WildlifeWatch(20)))
+reg.addVisit(new Visit("Olympic", Season::Autumn, 2023,  90000, 2800000, new Hiking(5.0)))
+reg.addVisit(new Visit("Olympic", Season::Spring, 2023,  70000, 2200000, new Hiking(3.5)))
+// Sequoia
+reg.addVisit(new Visit("Sequoia", Season::Summer, 2023, 160000, 4800000, new Hiking(4.5)))
+reg.addVisit(new Visit("Sequoia", Season::Spring, 2023,  80000, 2400000, new WildlifeWatch(5)))
+// Rocky Mountain
+reg.addVisit(new Visit("Rocky Mountain", Season::Summer, 2023, 220000, 7000000, new Climbing(30)))
+reg.addVisit(new Visit("Rocky Mountain", Season::Autumn, 2023, 140000, 4500000, new Hiking(6.5)))
+reg.addVisit(new Visit("Rocky Mountain", Season::Winter, 2023,  25000,  900000, new Boating(3)))
+
+// ─── Output ─────────────────────────────────────────────────────────────────
+
+IO::println("=".rep(60))
+IO::println("     NATIONAL PARK VISITOR TRACKER -- 2023 ANNUAL REPORT")
+IO::println("=".rep(60))
+
+// Individual park reports
+val parkNames = ["Yellowstone", "Yosemite", "Zion", "Olympic", "Sequoia", "Rocky Mountain"]
+foreach name: String in parkNames {
+  val sumOpt: ParkSummary? = reg.summaryFor(name)
+  if sumOpt != null {
+    IO::println("\n" + (sumOpt as ParkSummary).report())
+  }
+}
+
+// At-risk parks
+val atRisk = reg.atRiskParks()
+IO::println("\nAt-Risk Parks (#{atRisk.size} of #{reg.parkCount()}):")
+IO::println("-".rep(52))
+foreach p: Object in atRisk {
+  IO::println("  " + (p as Park).displayLine())
+}
+
+// Season breakdown
+reg.visitsBySeasonReport()
+
+// Activity breakdown
+reg.activityBreakdown()
+
+// Revenue leaderboard
+reg.revenueLeaderboard()
+
+// Top by visitors (top 3)
+IO::println("\nTop 3 by Visitor Count:")
+IO::println("-".rep(40))
+val topList = reg.topByVisitors()
+var topRank: Int = 1
+foreach s: Object in topList {
+  val summary = (s as ParkSummary)
+  if topRank <= 3 {
+    IO::println("  ##{topRank} #{summary.getPark().name().padRight(18)}: #{summary.totalVisitors().thousands()}")
+  }
+  topRank = topRank + 1
+}
+
+// Grand totals
+IO::println("\n" + "=".rep(60))
+IO::println("GRAND TOTALS")
+IO::println("=".rep(60))
+val allVisits = reg.allVisits()
+val grandVisitors: Int = allVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+val grandRevenue: Int  = allVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).revenueDollars() } as Int
+IO::println("  Parks          : #{reg.parkCount()}")
+IO::println("  Visit records  : #{reg.visitCount()}")
+IO::println("  Total visitors : #{grandVisitors.thousands()}")
+IO::println("  Total revenue  : $#{grandRevenue.thousands()}")
+
+// try/catch safe division
+def safeAvg(total: Int, n: Int): String {
+  try {
+    return "$" + (total / n).thousands()
+  } catch e: Exception {
+    return "n/a"
+  }
+}
+IO::println("  Avg rev/park   : #{safeAvg(grandRevenue, reg.parkCount())}")
+
+// Partition: peak vs off-peak
+val partitioned = allVisits.partition { v => (v as Visit).season().isPeak() }
+val peakVisits    = (partitioned.get(0) as List[Object])
+val offPeakVisits = (partitioned.get(1) as List[Object])
+val peakVis: Int    = peakVisits.fold(0)    { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+val offPeakVis: Int = offPeakVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+IO::println("  Peak-season    : #{peakVis.thousands()} visitors in #{peakVisits.size} records")
+IO::println("  Off-peak       : #{offPeakVis.thousands()} visitors in #{offPeakVisits.size} records")
+
+// Distinct states represented
+val allParks = reg.allParks()
+val states = allParks.map { p => (p as Park).state() }.distinct()
+IO::println("  States         : #{states.size} -- #{states.toString()}")
+
+// Find highest-impact visit
+val byImpact = allVisits.sortedBy { v => -(v as Visit).impactScore() }
+if byImpact.size > 0 {
+  val top = (byImpact.get(0) as Visit)
+  IO::println("  Top impact     : #{top.parkName()} #{top.season().label()} (score #{top.impactScore()}, #{top.activity().label()})")
+}
+
+// Park visitor quick table (using explicit summaries list)
+IO::println("\nPark Visitor Quick Table:")
+IO::println("-".rep(44))
+val parkSummaries: List[Object] = []
+foreach p: Object in allParks {
+  parkSummaries.add(new ParkSummary((p as Park), reg.visitsFor((p as Park).name())))
+}
+foreach s: Object in parkSummaries {
+  val sum = (s as ParkSummary)
+  IO::println("  #{sum.getPark().name().padRight(20)}: #{sum.totalVisitors().thousands().padLeft(10)}")
+}
+
+// Range foreach: simulate 5-year visitor growth projection at 3% per year
+IO::println("\n5-Year Visitor Growth Projection (3%/yr, base = 2023 total):")
+IO::println("-".rep(52))
+var projected: Int = grandVisitors
+foreach yr: Int in 2024..2028 {
+  projected = projected + projected / 33
+  IO::println("  #{yr}: #{projected.thousands()}")
+}
+
+IO::println("\n" + "=".rep(60))
+IO::println("Report complete.")

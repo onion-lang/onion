@@ -152,6 +152,17 @@ public:
 このエラーは、`val b: Box[String, String]? = null` のように nullable な型注釈の
 中に個数不一致が書かれた場合にも発生します。
 
+### `E0032` — 型引数は参照型でなければならない
+
+型パラメータに `void` を代入することを防ぐチェックです。型チェッカ内には実際に
+報告箇所がありますが、現時点の Onion の正しい構文からは到達できません。文法上、
+型引数や型エイリアスの代入先など `type()` が使われる位置は `void_type()` を経由
+せず（メソッドの `return_type()` だけが経由します）、そのため `void`/`Unit` を型
+引数として書くこと自体ができません。`new Box[void]()`・`Box[void]`・
+`type T = void` はいずれも E0032 ではなく構文エラーになります。この状態をあえて
+実例で無理に到達させず未到達のままにしている理由は `SemanticErrorCodeCoverageSpec`
+を参照してください。
+
 ### `E0033` — メソッドはジェネリックではない
 
 型引数を取らないメソッドの呼び出しに型引数が渡されました。
@@ -635,6 +646,20 @@ record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bo
 ```
 
 対処: `derive!(Json)` を使うか、この句を削除してください。
+
+### `E0086` — レコード成分名の重複
+
+同じレコード内の2つの成分が同じ名前を宣言しています。成分名はそれぞれ private
+フィールドと public アクセサメソッドを1つずつ生成するため、名前が重複すると
+それ自身と衝突します。以前はこれを検査しておらず、生成されたクラスが実際に
+ロードされたときに初めて（`ClassFormatError` が内部エラー I0000 として現れる
+形で）失敗していました。
+
+```onion
+record R(a: Int, a: Int)   // E0086: レコード R の成分 a が重複しています
+```
+
+対処: どちらかの成分名を変更してください。
 
 ### `E0064` — law の反証
 
@@ -1412,6 +1437,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
+| `E0086` | duplicated record component … in … |
 
 ## 関連項目
 

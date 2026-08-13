@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/NationalParkTracker.on`, a 478-line national-park visitor tracking and
+  reporting sample.** Covers extension methods on `String`/`Int`/`Double`, a
+  plain enum (`ParkType`, `Season`) with `public:` methods, a data-carrying
+  enum (`ConservationStatus(description: String)`), an ADT case-enum
+  (`Activity`) matched via `select`/`is`, records with methods (`Park`,
+  `Visit`, including nullable-safe derived fields), an interface implemented
+  with `conforms` (`Reportable`), a mutable class (`ParkRegistry`) built on
+  `List[Object]` and `<<`, a broad collection pipeline (`filter`, `map`,
+  `fold`, `sortedBy`, `groupBy`, `find`, `partition`, `distinct`),
+  `foreach (k, v)` over a `groupBy` result, `foreach` over an inclusive
+  range, closures, string interpolation, `try`/`catch`, and recursion.
 - **`run/RestaurantOrders.on`, a 327-line restaurant order management sample.**
   Covers records with method bodies (`MenuItem`, `OrderLine`), a plain enum
   matched via `select this` (`ItemCategory`, `OrderStatus`), an ADT

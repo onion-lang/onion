@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatting, collection pipelines (`fold`, `filter`, `sortedBy`), a
   nullable-returning tip generator with the `?:` operator, and `string
   interpolation` across a multi-section macro/calorie report.
+- **`run/MatrixCalc.on`, a 434-line integer-matrix calculator sample.**
+  Covers `Int[][]` 2D arrays as class fields, public `val` fields alongside
+  private data (section-based access), extension methods on `Int`
+  (`abs`/`max`/`padLeft`) and `String` (`padRight`/`center`), static
+  factory methods (`Matrix::zeros`/`identity`/`of`), recursive determinant
+  via cofactor expansion (1×1 through 4×4+), `List[Int]` + `(x as Int)`
+  unboxing for row/column sums, `foreach x: Object in list` with an
+  explicit cast, `select` on an `Int`, and nested `while` loops.
 
 ## [0.10.32] - 2026-08-13
 

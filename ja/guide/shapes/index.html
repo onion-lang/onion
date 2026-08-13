@@ -4820,8 +4820,15 @@ defect をすべてまとめて報告します。</p>
 乗り物です。他の law と同じくビルド時に実行され、偽の主張は E0065 になります。
 parse 専用の shape は <code>canPrint(): false</code> でそう言い、読む方向の法則を主張します。</p>
 <h2 id="shapes"><code>Shapes</code> を直接使うとき<a class="headerlink" href="#shapes" title="Permanent link">&para;</a></h2>
-<p><code>onion.Shapes::regex</code> と <code>::json</code> は同じ構築を通常の API として公開しています。自分で
-宣言していない型に対する shape はこちらで書けます。</p>
+<p><code>onion.Shapes</code> は <code>shape name = ...</code> が導出するのと同じ4つの構築を、通常の API として
+公開しています。自分で宣言していない型に対する shape はこちらで書けます:</p>
+<ul>
+<li><code>Shapes::regex</code> — <code>re"..."</code> 形式</li>
+<li><code>Shapes::json</code> — <code>json</code> 形式</li>
+<li><code>Shapes::yaml</code> — <code>yaml</code> 形式</li>
+<li><code>Shapes::config</code> — <code>config</code> 形式。<code>shape name = config</code> と同様に lossless
+  （<code>parseLossless</code>/<code>printLossless</code>）</li>
+</ul>
 <h2 id="_7">関連項目<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../scripting/">スクリプティング</a> — scheme リテラル、<code>|&gt;</code>、auto-CLI</li>

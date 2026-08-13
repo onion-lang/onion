@@ -4802,8 +4802,15 @@ the canonical claim; top-level <code>example [name] { expr }</code> is the vehic
 at build time like every other law — a false claim is E0065. A parse-only shape says
 so through <code>canPrint(): false</code> and asserts whatever laws its reading direction has.</p>
 <h2 id="when-to-reach-for-shapes-directly">When to reach for <code>Shapes</code> directly<a class="headerlink" href="#when-to-reach-for-shapes-directly" title="Permanent link">&para;</a></h2>
-<p><code>onion.Shapes::regex</code> and <code>::json</code> are the same construction as ordinary API, for a shape
-over a type you did not declare.</p>
+<p><code>onion.Shapes</code> exposes the same four constructions <code>shape name = ...</code> derives, as
+ordinary API, for a shape over a type you did not declare:</p>
+<ul>
+<li><code>Shapes::regex</code> — the <code>re"..."</code> form</li>
+<li><code>Shapes::json</code> — the <code>json</code> form</li>
+<li><code>Shapes::yaml</code> — the <code>yaml</code> form</li>
+<li><code>Shapes::config</code> — the <code>config</code> form, lossless (<code>parseLossless</code>/<code>printLossless</code>) like
+  <code>shape name = config</code></li>
+</ul>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../scripting/">Scripting</a> — scheme literals, <code>|&gt;</code>, auto-CLI</li>

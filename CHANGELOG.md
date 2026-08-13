@@ -70,6 +70,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `any`, `count`), a nullable (`Snippet?`) lookup with a null guard,
   `String`/`Int` extension methods, the `|>` pipeline operator, and
   `try`/`catch`.
+- **`run/SortAlgorithms.on`, a 377-line sorting-algorithm benchmark.**
+  Covers a plain enum with `select` exhaustiveness (`Complexity`, with
+  `bigO()`/`isEfficient()`), a data-carrying ADT enum (`SortFamily`, with
+  `Comparison`/`Distribution` cases), a record with a method body
+  (`SortStats::summary()`), an interface with polymorphic dispatch
+  (`Sorter`, five implementing classes: bubble/insertion/selection/merge/
+  quick sort), classes with mutable state tracking comparisons/swaps,
+  1D arrays with manual allocation and copying, recursion (`mergeSort`/
+  `merge`, `quickSort`/`partition`), a collection pipeline (`map`,
+  `filter`, `sortedBy`, `fold`, `find`, `groupBy`), a nullable
+  (`SortStats?`) winner lookup, closures stored in `val`s, `foreach` over
+  a list and over a `Map` (k, v), `try`/`catch`, and string
+  interpolation.
 
 ## [0.10.32] - 2026-08-13
 

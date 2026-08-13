@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented the lossless-shapes/lens API and combinators in the `## Shape`
+  section of `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  The section covered `parse`, `print`, `canPrint`, and the L1/L2 laws, but
+  never mentioned `isLossless`, `parseLossless`, `printLossless`, `Lossless`,
+  `Residue`, the combinators (`eachLine`, `lines`, `sepBy`, `xmap`,
+  `orElse`), or `Shapes::config`/`Shapes::yaml` — leaving a real,
+  actively-used feature (lossless config editing, see
+  `docs/guide/shapes.md`) undiscoverable from the API reference a user would
+  actually search. Added a drift-guard spec
+  (`StdlibDocShapeModuleParitySpec`) so future additions to the `Shape`/
+  `Lossless` public API get caught the same way.
 - **Documented `Shapes::config` and `Shapes::yaml` in the "When to reach for
   `Shapes` directly" section of `docs/guide/shapes.md` and
   `docs/ja/guide/shapes.md`.** The section only mentioned `Shapes::regex` and

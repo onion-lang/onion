@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Documented all 15 `--Wno` warning codes (`W0001`–`W0015`) in a new
+  reference table in `docs/tools/compiler.md` and `docs/ja/tools/compiler.md`.**
+  The `--Wno <codes>` option showed a single example (`W0001,unused-parameter`)
+  but never enumerated the warning categories, their codes, or their
+  `--Wno` name aliases defined in `WarningCategory` (`Warning.scala`) —
+  unlike `E0xxx` error codes, which get a full guarded reference page. Added
+  a drift-guard spec (`WarningCodeDocCoverageSpec`), mirroring
+  `ErrorCodeDocCoverageSpec`, so future warning categories get caught the
+  same way.
+
 ### Added
 
 - **`run/RestaurantOrders.on`, a 327-line restaurant order management sample.**

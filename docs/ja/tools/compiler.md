@@ -122,6 +122,26 @@ onionc --warn error MyProgram.on
 onionc --Wno W0001,unused-parameter MyProgram.on
 ```
 
+各コードは `W####` 形式、または以下に示す `--Wno` 用の名前のどちらでも指定できます。
+
+| コード | 名前 | 説明 |
+|------|------|--------------|
+| `W0001` | `unused-variable` | 未使用の変数 |
+| `W0002` | `unused-import` | 未使用の import |
+| `W0003` | `unreachable-code` | 到達不能コード |
+| `W0004` | `deprecated`, `deprecated-feature` | 非推奨の機能 |
+| `W0005` | `shadowed-variable` | 変数のシャドーイング |
+| `W0006` | `unused-parameter` | 未使用の引数 |
+| `W0007` | `empty-block` | 空のブロック |
+| `W0008` | `redundant-cast` | 冗長なキャスト |
+| `W0009` | `possible-null-deref`, `null-deref` | null 参照の可能性 |
+| `W0010` | `unnecessary-conversion` | 不要な型変換 |
+| `W0011` | `unchecked-cast` | 未検査キャスト |
+| `W0012` | `null-to-non-nullable` | 非 null 型への null 代入 |
+| `W0013` | `suspicious-interpolation` | 疑わしい文字列補間構文 |
+| `W0014` | `discarded-toplevel` | main が定義されているためトップレベル文が無視された |
+| `W0015` | `platform-unboxing` | ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた |
+
 ### `--no-check-laws`
 
 レコードの `law` / `example` 句を実行しません。

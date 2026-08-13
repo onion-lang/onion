@@ -1,0 +1,277 @@
+// MovieRecommender.on — a movie recommendation engine
+// Exercises: ADT enums, records (with method bodies), generic class, classes,
+// collection pipelines (map/filter/sortedBy/groupBy/partition/find/fold),
+// closures, nullable, string interpolation, select/pattern matching,
+// foreach over Map (k,v), try/catch, recursion.
+
+import {
+  java.lang.Math as JMath
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Genre {
+  ACTION, COMEDY, DRAMA, THRILLER, SCI_FI, ANIMATION, DOCUMENTARY
+}
+
+// ADT: release era — Classic carries a decade, Modern carries exact year
+enum Era {
+  case Classic(decade: Int)
+  case Modern(year: Int)
+public:
+  def label(): String = select this {
+    case c is Classic: "Classic (#{c.decade()}s)"
+    case m is Modern:  "#{m.year()}"
+  }
+  def isRecent(): Boolean = select this {
+    case m is Modern: m.year() >= 2010
+    else:             false
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Movie(title: String, genre: Genre, era: Era, rating: Double, votes: Int) {
+public:
+  def isHighlyRated(): Boolean = rating() >= 8.0
+  def popularityScore(): Double = rating() * JMath::log((votes() as Double) + 1.0)
+  def display(): String = "#{title()} [#{genre().name()}] #{era().label()} ★#{rating()}"
+}
+
+record UserProfile(name: String, favoriteGenres: List[Genre], minRating: Double, maxResults: Int) {
+public:
+  def likesGenre(g: Genre): Boolean = favoriteGenres().contains(g)
+}
+
+record ScoredMovie(movie: Movie, score: Double) {
+public:
+  def display(): String {
+    val rounded: Double = (JMath::round(score() * 10.0) as Double) / 10.0
+    return "  #{movie().title()} [score=#{rounded}]"
+  }
+}
+
+// ── Generic top-N helper ──────────────────────────────────────────────────────
+
+class TopN[T extends Object] {
+  val items: List[T]
+public:
+  def this(list: List[T]) {
+    this.items = list
+  }
+  def take(n: Int): List[T] {
+    val result: List[T] = []
+    var i: Int = 0
+    foreach item: T in items {
+      if i >= n { break }
+      result.add(item)
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ── Movie database ────────────────────────────────────────────────────────────
+
+class MovieDatabase {
+public:
+  var catalog: List[Movie]
+
+  def this() {
+    this.catalog = []
+  }
+
+  def add(m: Movie): void {
+    catalog.add(m)
+  }
+
+  def size: Int = catalog.size
+
+  def findByTitle(title: String): Movie? {
+    return catalog.find { m => (m as Movie).title() == title } as Movie?
+  }
+
+  def byGenre(g: Genre): List[Movie] {
+    return catalog.filter { m: Movie => m.genre() == g }
+  }
+
+  def topRated(n: Int): List[Movie] {
+    val sorted: List[Movie] = catalog.sortedBy { m: Movie => -(m.rating()) }
+    return new TopN[Movie](sorted).take(n)
+  }
+
+  def avgRating(): Double {
+    if catalog.size == 0 { return 0.0 }
+    val sum: Double = catalog.fold(0.0) { acc: Double, m: Movie => acc + m.rating() }
+    return sum / (catalog.size as Double)
+  }
+
+  def printGenreStats(): void {
+    val byGenre: Map[String, List[Movie]] = catalog.groupBy { m: Movie => m.genre().name() }
+    foreach (genre, movies) in byGenre {
+      val movieList: List[Movie] = movies as List[Movie]
+      val count: Int = movieList.size
+      val sum: Double = movieList.fold(0.0) { acc: Double, m: Movie => acc + m.rating() }
+      val avg: Double = sum / (count as Double)
+      val rounded: Double = (JMath::round(avg * 10.0) as Double) / 10.0
+      IO::println("    #{genre}: #{count} films, avg ★#{rounded}")
+    }
+  }
+}
+
+// ── Recommendation engine ─────────────────────────────────────────────────────
+
+class RecommendationEngine {
+  var db: MovieDatabase
+
+public:
+  def this(database: MovieDatabase) {
+    this.db = database
+  }
+
+  def scoreFor(movie: Movie, profile: UserProfile): Double {
+    var score: Double = movie.rating() * 10.0
+    if profile.likesGenre(movie.genre()) { score = score + 25.0 }
+    score = score + JMath::log((movie.votes() as Double) + 1.0) * 2.0
+    select movie.era() {
+      case m is Modern:
+        if m.year() >= 2015 { score = score + 5.0 }
+      case c is Classic:
+        if profile.likesGenre(Genre::DRAMA) || profile.likesGenre(Genre::THRILLER) {
+          score = score + 10.0
+        }
+    }
+    return score
+  }
+
+  def recommend(profile: UserProfile): List[ScoredMovie] {
+    val eligible: List[Movie] = db.catalog
+      .filter { m: Movie => m.rating() >= profile.minRating() }
+    val scored: List[ScoredMovie] = eligible.map { m: Movie =>
+      new ScoredMovie(m, scoreFor(m, profile))
+    }
+    val sorted: List[ScoredMovie] = scored.sortedBy { s: ScoredMovie => -(s.score()) }
+    return new TopN[ScoredMovie](sorted).take(profile.maxResults())
+  }
+
+  def findBestInGenre(g: Genre): Movie? {
+    val candidates: List[Movie] = db.byGenre(g)
+    if candidates.size == 0 { return null }
+    return candidates.sortedBy { m: Movie => -(m.rating()) }.find { m => true } as Movie?
+  }
+}
+
+// ── Data setup ────────────────────────────────────────────────────────────────
+
+def buildDatabase(): MovieDatabase {
+  val db: MovieDatabase = new MovieDatabase()
+  db.add(new Movie("Inception",             Genre::SCI_FI,   new Modern(2010), 8.8, 2400000))
+  db.add(new Movie("The Dark Knight",       Genre::ACTION,   new Modern(2008), 9.0, 2700000))
+  db.add(new Movie("Pulp Fiction",          Genre::THRILLER, new Classic(1990), 8.9, 2000000))
+  db.add(new Movie("Parasite",              Genre::THRILLER, new Modern(2019), 8.5,  800000))
+  db.add(new Movie("Spirited Away",         Genre::ANIMATION,new Modern(2001), 8.6,  750000))
+  db.add(new Movie("The Godfather",         Genre::DRAMA,    new Classic(1970), 9.2, 1900000))
+  db.add(new Movie("Interstellar",          Genre::SCI_FI,   new Modern(2014), 8.6, 1800000))
+  db.add(new Movie("Amelie",               Genre::COMEDY,   new Modern(2001), 8.3,  750000))
+  db.add(new Movie("Schindler's List",      Genre::DRAMA,    new Classic(1990), 9.0, 1400000))
+  db.add(new Movie("Everything Everywhere", Genre::SCI_FI,   new Modern(2022), 7.8,  600000))
+  db.add(new Movie("Casablanca",            Genre::DRAMA,    new Classic(1940), 8.5,  600000))
+  db.add(new Movie("Get Out",               Genre::THRILLER, new Modern(2017), 7.7,  650000))
+  db.add(new Movie("WALL-E",               Genre::ANIMATION,new Modern(2008), 8.4, 1100000))
+  db.add(new Movie("Tenet",                Genre::ACTION,   new Modern(2020), 7.3,  500000))
+  db.add(new Movie("The Shining",          Genre::THRILLER, new Classic(1980), 8.4, 1000000))
+  return db
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val db: MovieDatabase = buildDatabase()
+  val engine: RecommendationEngine = new RecommendationEngine(db)
+
+  IO::println("=== Movie Recommender ===")
+  val avgRounded: Double = (JMath::round(db.avgRating() * 100.0) as Double) / 100.0
+  IO::println("Catalog: #{db.size} films, average rating ★#{avgRounded}\n")
+
+  // ─ Top-rated films ─
+  IO::println("── Top 5 by rating ──")
+  foreach m: Movie in db.topRated(5) {
+    IO::println("  #{m.display()}")
+  }
+
+  // ─ Genre statistics (groupBy + fold) ─
+  IO::println("\n── Genre statistics ──")
+  db.printGenreStats()
+
+  // ─ Rating partition ─
+  IO::println("\n── Rating split at ★8.5 ──")
+  val rateParts = db.catalog.partition { m: Movie => m.rating() >= 8.5 }
+  val above = rateParts[0] as List[Object]
+  val below = rateParts[1] as List[Object]
+  IO::println("  Above ★8.5: #{above.size} films")
+  IO::println("  Below ★8.5: #{below.size} films")
+
+  // ─ Sci-Fi fan recommendations ─
+  val sciFiLover: UserProfile = new UserProfile(
+    "Alex", [Genre::SCI_FI, Genre::THRILLER], 7.5, 5
+  )
+  IO::println("\n── Recommendations for #{sciFiLover.name()} (Sci-Fi + Thriller) ──")
+  foreach s: ScoredMovie in engine.recommend(sciFiLover) {
+    IO::println(s.display())
+  }
+
+  // ─ Drama enthusiast recommendations ─
+  val dramaFan: UserProfile = new UserProfile(
+    "Morgan", [Genre::DRAMA, Genre::DOCUMENTARY], 8.0, 5
+  )
+  IO::println("\n── Recommendations for #{dramaFan.name()} (Drama) ──")
+  foreach s: ScoredMovie in engine.recommend(dramaFan) {
+    IO::println(s.display())
+  }
+
+  // ─ Title lookup (nullable) ─
+  IO::println("\n── Title lookup ──")
+  val found: Movie? = db.findByTitle("Parasite")
+  if found != null {
+    IO::println("  Found: #{found.display()}")
+    val pop: Double = (JMath::round(found.popularityScore() * 10.0) as Double) / 10.0
+    IO::println("  Popularity score: #{pop}")
+  }
+  val missing: Movie? = db.findByTitle("Avatar")
+  if missing == null { IO::println("  'Avatar' not in catalog") }
+
+  // ─ Best film per genre ─
+  IO::println("\n── Best film per genre ──")
+  val genres: List[Genre] = [
+    Genre::ACTION, Genre::DRAMA, Genre::SCI_FI,
+    Genre::THRILLER, Genre::ANIMATION, Genre::COMEDY
+  ]
+  foreach g: Genre in genres {
+    val best: Movie? = engine.findBestInGenre(g)
+    if best != null {
+      IO::println("  #{g.name()}: #{best.title()} ★#{best.rating()}")
+    }
+  }
+
+  // ─ Recent vs classic breakdown ─
+  IO::println("\n── Recent (2010+) vs Classic ──")
+  val eraParts = db.catalog.partition { m: Movie => m.era().isRecent() }
+  val recent = eraParts[0] as List[Object]
+  val classic = eraParts[1] as List[Object]
+  IO::println("  Recent: #{recent.size} films")
+  IO::println("  Classic: #{classic.size} films")
+
+  // ─ Highly-rated per genre (groupBy + filter) ─
+  IO::println("\n── Highly rated (★8.0+) titles per genre ──")
+  val genreMap: Map[String, List[Movie]] = db.catalog.groupBy { m: Movie => m.genre().name() }
+  foreach (genre, movies) in genreMap {
+    val ms: List[Movie] = movies as List[Movie]
+    val highly: List[Movie] = ms.filter { m: Movie => m.isHighlyRated() }
+    if highly.size > 0 {
+      val titles: List[String] = highly.map { m: Movie => m.title() }
+      IO::println("  #{genre}: #{titles}")
+    }
+  }
+
+  IO::println("\nDone.")
+}

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/NutritionTracker.on`, a 296-line daily nutrition log sample.**
+  Covers a homogeneous enum (`MacroKind`) matched via `select`, an ADT
+  case-enum (`MealType`) with `label()`/`isMainMeal()` methods, records
+  with method bodies (`FoodItem`, `Serving`, `DailyGoal`), a mutable
+  `Meal`/`DailyLog` class pair over `List`, `Double` extension methods for
+  formatting, collection pipelines (`fold`, `filter`, `sortedBy`), a
+  nullable-returning tip generator with the `?:` operator, and `string
+  interpolation` across a multi-section macro/calorie report.
+
 ## [0.10.32] - 2026-08-13
 
 ### Documentation

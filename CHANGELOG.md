@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.32] - 2026-08-13
+
 ### Documentation
 
 - **Documented the lossless-shapes/lens API and combinators in the `## Shape`

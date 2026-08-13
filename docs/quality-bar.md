@@ -11,19 +11,23 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-08-03) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-08-10) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3164 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 112 / 112 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 55 (AirlineReservation, AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CensusAnalyzer, CinemaBooking, CourseRegistration, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameStore, GradeBook, GraphAlgorithms, GraphSearch, HotelReservation, Inventory, InventoryManager, InventoryReport, JobScheduler, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MiniRpg, MusicLibrary, NationalParkTracker, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, PokerHands, RankedChoice, RecipeManager, ShapeProcessor, ShipmentTracker, ShoppingCart, StatsApp, StockPortfolio, StudentGradeBook, TaskPlanner, TextAnalyzer, TicTacToe, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine, VirtualShell, WeatherReport) | ≥ 5 |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3399 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 147 / 147 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 90 (AirlineReservation, AuctionHouse, Automaton, BankLedger, BankSystem, Blackjack, BookClub, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CensusAnalyzer, CinemaBooking, CipherSuite, ClinicRecords, ConferenceSchedule, ConwayLife, CourseRegistration, DoctorScheduler, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameOfLife, GameStore, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HotelReservation, HRSystem, HuffmanCoding, Inventory, InventoryManager, InventoryReport, JobScheduler, KingdomSim, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MatrixCalc, MazeSolver, MiniRpg, MovieRecommender, MuseumCollection, MusicFestival, MusicLibrary, NationalParkTracker, NutritionTracker, OrderReport, ParkingGarage, PayrollReport, PerfReview, PetShelter, PharmacySystem, PlaylistManager, PokerHands, PropertyManager, RankedChoice, RecipeBook, RecipeManager, RestaurantOrders, ShapeProcessor, ShipmentTracker, ShoppingCart, SnippetLibrary, SocialNetwork, SortingShowcase, SpaceMission, SpellCheck, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, TaskPlanner, TextAnalytics, TextAnalyzer, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine, VirtualShell, WeatherReport) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 83 | every common error has a dedicated code |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 84 | every common error has a dedicated code |
 
-**Do not set `SBT_OPTS`.** The previous version of this file recommended
-`SBT_OPTS="-Xmx2g"`, which now *lowers* the heap below the project's own default of 4g and
-makes the suite die with an `OutOfMemoryError` partway through. The default is correct.
+**Do not set `SBT_OPTS` to a heap below the project default.** `.jvmopts` pins the
+default to `-Xmx10g` (raised from 4g as the `run/` sample corpus grew — see
+CHANGELOG 0.10.18). Any `SBT_OPTS` heap lower than that — `-Xmx2g` was one
+previous bad recommendation, `-Xmx4G` is another one seen in the wild — lowers
+the effective heap below what the full suite needs and makes it die with an
+`OutOfMemoryError` partway through (see #691). If you need to override
+`SBT_OPTS` for another flag, keep the heap at `-Xmx10G` or higher.
 
 `-Duser.language=en` matters: error messages are bilingual and resolved from the JVM
 default locale, so a test asserting on message text passes in a Japanese locale and fails

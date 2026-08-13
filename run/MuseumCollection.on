@@ -1,0 +1,458 @@
+// MuseumCollection.on — an art museum's collection management system.
+// Exercises: records, data-carrying enums, ADT enums, extension methods on Int/Double,
+//            from re"..." parsing, collection pipelines, do[List], |> pipeline,
+//            foreach (k,v) on Map, nullable types, select/pattern matching,
+//            classes with methods, string interpolation, closures, recursion.
+
+// ─── primitive helpers ────────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def thousands(): String {
+    if self < 0   { return "-" + (0 - self).thousands() }
+    if self < 1000 { return "" + self }
+    if self < 1000000 {
+      val hi = self / 1000
+      val lo = self - hi * 1000
+      if lo < 10  { return "" + hi + ",00" + lo }
+      if lo < 100 { return "" + hi + ",0"  + lo }
+      return "" + hi + "," + lo
+    }
+    val m = self / 1000000
+    val r = self - m * 1000000
+    val k = r / 1000
+    val u = r - k * 1000
+    val kStr = if k < 10 { ",00" + k } else if k < 100 { ",0" + k } else { "," + k }
+    val uStr = if u < 10 { ",00" + u } else if u < 100 { ",0" + u } else { "," + u }
+    return "" + m + kStr + uStr
+  }
+}
+
+extension Double {
+  def round1(): Double {
+    val f: Long = 10L
+    return (self * f.doubleValue()).longValue().doubleValue() / f.doubleValue()
+  }
+}
+
+// ─── medium / era enums ───────────────────────────────────────────────────────
+
+enum Medium {
+  OilPainting, Watercolor, Sculpture, Photography, PrintEtching, DigitalArt, Fresco, Mosaic
+public:
+  def label(): String = select this {
+    case Medium::OilPainting:   "Oil Painting"
+    case Medium::Watercolor:    "Watercolor"
+    case Medium::Sculpture:     "Sculpture"
+    case Medium::Photography:   "Photography"
+    case Medium::PrintEtching:  "Print/Etching"
+    case Medium::DigitalArt:    "Digital Art"
+    case Medium::Fresco:        "Fresco"
+    case Medium::Mosaic:        "Mosaic"
+    else: "Unknown"
+  }
+}
+
+// ─── condition ADT ────────────────────────────────────────────────────────────
+
+enum Condition {
+  case Pristine
+  case Good
+  case Fair(notes: String)
+  case RequiresRestoration(priority: Int)
+public:
+  def label(): String = select this {
+    case p is Pristine:              "Pristine"
+    case g is Good:                  "Good"
+    case f is Fair:                  "Fair (#{f.notes()})"
+    case r is RequiresRestoration:   "Needs Restoration [P#{r.priority()}]"
+  }
+  def score(): Int = select this {
+    case p is Pristine:              10
+    case g is Good:                   8
+    case f is Fair:                   5
+    case r is RequiresRestoration:   10 - (r.priority().clamp(1, 9))
+  }
+}
+
+// ─── artist record parsed from CSV ────────────────────────────────────────────
+
+record Artist(name: String, nationality: String, birthYear: Int, deathYear: Int)
+  from re"([^,]+),([A-Za-z]+),(\d+),(\d+)"
+
+example { Artist::parse("Vincent van Gogh,Dutch,1853,1890") != null }
+example { Artist::parse("bad") == null }
+
+// ─── artwork core record ──────────────────────────────────────────────────────
+
+record Artwork(id: Int, title: String, artistName: String, year: Int,
+               medium: Medium, valueUSD: Int, onDisplay: Boolean) {
+public:
+  def era(): String = select 0 {
+    case 0 when year < 1400:  "Medieval"
+    case 0 when year < 1600:  "Renaissance"
+    case 0 when year < 1800:  "Baroque/Rococo"
+    case 0 when year < 1900:  "19th Century"
+    case 0 when year < 1950:  "Early Modern"
+    case 0 when year < 2000:  "Late Modern"
+    else:                     "Contemporary"
+  }
+  def age(): Int = 2024 - year
+  def summary(): String {
+    val tag = if onDisplay() { " [ON DISPLAY]" } else { "" }
+    return "[#{ id() }] \"#{ title() }\" — #{ artistName() }, #{ year() } " +
+           "(#{ medium().label() }) $#{ valueUSD().thousands() }" + tag
+  }
+}
+
+// ─── exhibition record ────────────────────────────────────────────────────────
+
+record Exhibition(title: String, wing: String, artworkCount: Int, startYear: Int, durationDays: Int) {
+public:
+  def endYear(): Int = startYear + (durationDays / 365)
+  def display(): String = "\"#{ title() }\" in #{ wing() } (#{ startYear() }, #{ artworkCount() } works)"
+}
+
+// ─── condition tracker ────────────────────────────────────────────────────────
+
+record ConditionRecord(artworkId: Int, condition: Condition, inspectedYear: Int) {
+public:
+  def display(): String =
+    "ID #{ artworkId() } (#{ inspectedYear() }): #{ condition().label() } [score=#{ condition().score() }]"
+}
+
+// ─── stats record ─────────────────────────────────────────────────────────────
+
+record ValStats(count: Int, total: Int, lo: Int, hi: Int) {
+public:
+  def mean(): Double = if count == 0 { 0.0 } else { total.doubleValue() / count.doubleValue() }
+  def display(): String = "n=#{count()}, total=$#{total().thousands()}, " +
+                          "mean=$#{mean().round1()}, lo=$#{lo().thousands()}, hi=$#{hi().thousands()}"
+  static def of(values: List[Object]): ValStats {
+    if values.size == 0 { return new ValStats(0, 0, 0, 0) }
+    var total = 0
+    var lo    = 2000000000
+    var hi    = 0
+    foreach v: Object in values {
+      val n = v as Int
+      total = total + n
+      if n < lo { lo = n }
+      if n > hi { hi = n }
+    }
+    return new ValStats(values.size, total, lo, hi)
+  }
+}
+
+// ─── museum class ─────────────────────────────────────────────────────────────
+
+class Museum {
+  var artworks:    List[Object]
+  var artists:     List[Object]
+  var exhibitions: List[Object]
+  var conditions:  List[Object]
+
+public:
+  def this {
+    artworks    = []
+    artists     = []
+    exhibitions = []
+    conditions  = []
+  }
+
+  def addArtwork(a: Artwork): void       { artworks.add(a)    }
+  def addArtist(a: Artist): void         { artists.add(a)     }
+  def addExhibition(e: Exhibition): void { exhibitions.add(e) }
+  def addCondition(c: ConditionRecord): void { conditions.add(c) }
+
+  def artworkCount(): Int    = artworks.size
+  def artistCount(): Int     = artists.size
+  def exhibitionCount(): Int = exhibitions.size
+  def allArtworks(): List[Object]    = artworks
+  def allArtists(): List[Object]     = artists
+  def allExhibitions(): List[Object] = exhibitions
+  def allConditions(): List[Object]  = conditions
+
+  def findArtistByName(name: String): Artist? {
+    val match = artists.find { a => (a as Artist).name() == name }
+    return if match != null { match as Artist } else { null }
+  }
+
+  def artworksByArtist(name: String): List[Object] =
+    artworks.filter { a => (a as Artwork).artistName() == name }
+
+  def artworksByMedium(m: Medium): List[Object] =
+    artworks.filter { a => (a as Artwork).medium() == m }
+
+  def artworksByEra(era: String): List[Object] =
+    artworks.filter { a => (a as Artwork).era() == era }
+
+  def onDisplay(): List[Object] =
+    artworks.filter { a => (a as Artwork).onDisplay() }
+
+  def totalCollectionValue(): Int =
+    artworks.fold(0) { acc, a => (acc as Int) + (a as Artwork).valueUSD() }
+
+  def valueStats(): ValStats {
+    val values: List[Object] = artworks.map { a => (a as Artwork).valueUSD() }
+    return ValStats::of(values)
+  }
+
+  def topByValue(n: Int): List[Object] =
+    artworks.sortedBy { a => -(a as Artwork).valueUSD() }.take(n)
+
+  def artworksByEraMap(): Map[String, List[Object]] {
+    val result: Map[String, List[Object]] = [:]
+    foreach a: Object in artworks {
+      val era = (a as Artwork).era()
+      val existing: List[Object]? = result.get(era) as List[Object]?
+      if existing != null {
+        existing.add(a)
+      } else {
+        val bucket: List[Object] = [a]
+        result.put(era, bucket)
+      }
+    }
+    return result
+  }
+
+  def valueByMedium(): Map[String, Int] {
+    val result: Map[String, Int] = [:]
+    foreach a: Object in artworks {
+      val art = a as Artwork
+      val key = art.medium().label()
+      val prev: Int? = result.get(key) as Int?
+      result.put(key, if prev != null { prev + art.valueUSD() } else { art.valueUSD() })
+    }
+    return result
+  }
+
+  def needsRestoration(): List[Object] =
+    conditions.filter { c =>
+      val cond = (c as ConditionRecord).condition()
+      select cond {
+        case r is RequiresRestoration: true
+        else: false
+      }
+    }.sortedBy { c =>
+      val cond = (c as ConditionRecord).condition()
+      select cond {
+        case r is RequiresRestoration: r.priority()
+        else: 999
+      }
+    }
+
+  def averageConditionScore(): Double {
+    if conditions.size == 0 { return 0.0 }
+    val total = conditions.fold(0) { acc, c =>
+      (acc as Int) + (c as ConditionRecord).condition().score()
+    }
+    return (total as Int).doubleValue() / conditions.size.doubleValue()
+  }
+
+  def artistNationalities(): List[Object] {
+    val result: List[Object] = []
+    foreach a: Object in artists {
+      val nat = (a as Artist).nationality()
+      if !result.contains(nat) { result.add(nat) }
+    }
+    return result.sortedBy { n => n as String }
+  }
+
+  def artworksByNationality(nat: String): List[Object] {
+    val artistNames: List[Object] = artists
+      .filter { a => (a as Artist).nationality() == nat }
+      .map    { a => (a as Artist).name() }
+    return artworks.filter { a => artistNames.contains((a as Artwork).artistName()) }
+  }
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+def bar(n: Int, max: Int, width: Int): String {
+  val filled = if max == 0 { 0 } else { (n.doubleValue() / max.doubleValue() * width.doubleValue()).longValue() as Int }
+  var s: String = "["
+  foreach i: Int in 1..width {
+    val ch = if i <= filled { "█" } else { "░" }
+    s = s + ch
+  }
+  return s + "]"
+}
+
+def printSection(title: String): void {
+  println("")
+  println("═══════════════════════════════════════════════")
+  println("  " + title)
+  println("═══════════════════════════════════════════════")
+}
+
+// ─── seed data ────────────────────────────────────────────────────────────────
+
+val museum = new Museum()
+
+val artistLines: List[Object] = [
+  "Vincent van Gogh,Dutch,1853,1890",
+  "Claude Monet,French,1840,1926",
+  "Pablo Picasso,Spanish,1881,1973",
+  "Frida Kahlo,Mexican,1907,1954",
+  "Leonardo da Vinci,Italian,1452,1519",
+  "Georgia O'Keeffe,American,1887,1986",
+  "Salvador Dali,Spanish,1904,1989",
+  "Mary Cassatt,American,1844,1926"
+]
+
+foreach line: Object in artistLines {
+  val a: Artist? = Artist::parse(line as String)
+  if a != null { museum.addArtist(a) }
+}
+
+museum.addArtwork(new Artwork(1,  "Starry Night",              "Vincent van Gogh",  1889, Medium::OilPainting,  100000000, true))
+museum.addArtwork(new Artwork(2,  "Water Lilies",              "Claude Monet",      1906, Medium::OilPainting,   25000000, true))
+museum.addArtwork(new Artwork(3,  "Guernica",                  "Pablo Picasso",     1937, Medium::OilPainting,   20000000, false))
+museum.addArtwork(new Artwork(4,  "The Two Fridas",            "Frida Kahlo",       1939, Medium::OilPainting,    3500000, true))
+museum.addArtwork(new Artwork(5,  "Mona Lisa Study",           "Leonardo da Vinci", 1500, Medium::Fresco,         8000000, false))
+museum.addArtwork(new Artwork(6,  "Jimson Weed",               "Georgia O'Keeffe",  1936, Medium::OilPainting,    4440000, true))
+museum.addArtwork(new Artwork(7,  "The Persistence of Memory", "Salvador Dali",     1931, Medium::OilPainting,   15000000, true))
+museum.addArtwork(new Artwork(8,  "The Child's Bath",          "Mary Cassatt",      1893, Medium::OilPainting,     800000, true))
+museum.addArtwork(new Artwork(9,  "Sunflowers",                "Vincent van Gogh",  1888, Medium::OilPainting,    9000000, true))
+museum.addArtwork(new Artwork(10, "Impression, Sunrise",       "Claude Monet",      1872, Medium::OilPainting,    4000000, false))
+museum.addArtwork(new Artwork(11, "Les Demoiselles d'Avignon", "Pablo Picasso",     1907, Medium::OilPainting,   30000000, false))
+museum.addArtwork(new Artwork(12, "Self Portrait 1940",        "Frida Kahlo",       1940, Medium::OilPainting,     500000, true))
+museum.addArtwork(new Artwork(13, "The Vitruvian Man",         "Leonardo da Vinci", 1490, Medium::PrintEtching,  30000000, true))
+museum.addArtwork(new Artwork(14, "Poplars on the Epte",       "Claude Monet",      1891, Medium::OilPainting,    2700000, true))
+museum.addArtwork(new Artwork(15, "Weeping Woman",             "Pablo Picasso",     1937, Medium::OilPainting,    5500000, false))
+
+museum.addExhibition(new Exhibition("Van Gogh: Luminary",       "East Wing",  3,  2020, 180))
+museum.addExhibition(new Exhibition("Impressionism Revisited",   "West Wing",  5,  2021, 365))
+museum.addExhibition(new Exhibition("Surrealism & The Mind",     "North Gallery", 4, 2022, 270))
+museum.addExhibition(new Exhibition("Women Artists of the 20th C","South Gallery", 3, 2023, 210))
+museum.addExhibition(new Exhibition("Renaissance Masters",        "Central Hall",  2, 2024, 150))
+
+museum.addCondition(new ConditionRecord(1,  new Good(),                               2023))
+museum.addCondition(new ConditionRecord(2,  new Pristine(),                           2024))
+museum.addCondition(new ConditionRecord(3,  new RequiresRestoration(2),                    2022))
+museum.addCondition(new ConditionRecord(4,  new Fair("minor cracking"),                    2023))
+museum.addCondition(new ConditionRecord(5,  new RequiresRestoration(1),                    2021))
+museum.addCondition(new ConditionRecord(6,  new Good(),                               2024))
+museum.addCondition(new ConditionRecord(7,  new Pristine(),                           2023))
+museum.addCondition(new ConditionRecord(8,  new Fair("slight discolouration"),             2022))
+museum.addCondition(new ConditionRecord(9,  new RequiresRestoration(3),                    2023))
+museum.addCondition(new ConditionRecord(10, new Good(),                               2024))
+museum.addCondition(new ConditionRecord(11, new Fair("frame damage"),                      2021))
+museum.addCondition(new ConditionRecord(12, new Pristine(),                           2024))
+museum.addCondition(new ConditionRecord(13, new Good(),                               2023))
+museum.addCondition(new ConditionRecord(14, new Good(),                               2024))
+museum.addCondition(new ConditionRecord(15, new RequiresRestoration(4),                    2020))
+
+// ─── reports ──────────────────────────────────────────────────────────────────
+
+printSection("Collection Overview")
+println("  Total artworks:      " + museum.artworkCount())
+println("  Artists represented: " + museum.artistCount())
+println("  Exhibitions:         " + museum.exhibitionCount())
+println("  Collection value:    $" + museum.totalCollectionValue().thousands())
+val vstats = museum.valueStats()
+println("  Value stats:         " + vstats.display())
+println("  On display:          " + museum.onDisplay().size + " works")
+println("  Avg condition score: " + museum.averageConditionScore().round1() + "/10")
+
+printSection("Top 5 Most Valuable Works")
+var rank = 1
+foreach a: Object in museum.topByValue(5) {
+  val art = a as Artwork
+  println("  #{rank}. " + art.summary())
+  rank = rank + 1
+}
+
+printSection("Artworks by Era")
+val eraMap = museum.artworksByEraMap()
+val eraOrder: List[Object] = ["Medieval","Renaissance","Baroque/Rococo","19th Century",
+                               "Early Modern","Late Modern","Contemporary"]
+foreach e: Object in eraOrder {
+  val era = e as String
+  val list: List[Object]? = eraMap.get(era) as List[Object]?
+  if list != null && list.size > 0 {
+    val vals: List[Object] = list.map { a => (a as Artwork).valueUSD() }
+    val st = ValStats::of(vals)
+    println("  #{era}: #{list.size} work(s), total=$#{st.total().thousands()}")
+  }
+}
+
+printSection("Value by Medium")
+val byMedium = museum.valueByMedium()
+// Find max for bar chart
+var maxMedVal = 1
+foreach a: Object in museum.allArtworks() {
+  val key = (a as Artwork).medium().label()
+  val v: Int? = byMedium.get(key) as Int?
+  if v != null && v > maxMedVal { maxMedVal = v }
+}
+foreach (k, v) in byMedium {
+  val value = v as Int
+  val medName = k as String
+  println("  #{medName}: $#{value.thousands()} #{bar(value, maxMedVal, 20)}")
+}
+
+printSection("Artists by Nationality")
+foreach nat: Object in museum.artistNationalities() {
+  val n = nat as String
+  val works = museum.artworksByNationality(n)
+  val artNames: List[Object] = museum.allArtists()
+    .filter { a => (a as Artist).nationality() == n }
+    .map    { a => (a as Artist).name() }
+  println("  #{n}: #{artNames.size} artist(s), #{works.size} work(s)")
+}
+
+printSection("Condition Report")
+println("  Pristine / Good works:")
+foreach c: Object in museum.allConditions() {
+  val cr = c as ConditionRecord
+  select cr.condition() {
+    case p is Pristine: println("    " + cr.display())
+    case g is Good:     println("    " + cr.display())
+    else: {}
+  }
+}
+println("  Works needing attention:")
+foreach c: Object in museum.needsRestoration() {
+  println("    " + (c as ConditionRecord).display())
+}
+
+printSection("Exhibitions")
+foreach e: Object in museum.allExhibitions() {
+  println("  " + (e as Exhibition).display())
+}
+
+printSection("do[List]: Nationality × Era Cross-table (top combinations)")
+val nats   = museum.artistNationalities()
+val eras: List[Object] = ["19th Century", "Early Modern", "Late Modern"]
+val crossRows = do[List] {
+  nat <- nats
+  era <- eras
+  ret "  #{nat as String} × #{era as String}: " +
+      museum.artworksByNationality(nat as String)
+            .filter { a => (a as Artwork).era() == era as String }.size + " work(s)"
+}
+foreach row: Object in crossRows {
+  println(row as String)
+}
+
+printSection("|> Pipeline: on-display works sorted by value")
+museum.onDisplay()
+  .sortedBy { a => -(a as Artwork).valueUSD() }
+  .map { a => "  $#{(a as Artwork).valueUSD().thousands()} — #{(a as Artwork).title()} (#{(a as Artwork).year()})" }
+  |> println
+
+printSection("Van Gogh Collection")
+foreach a: Object in museum.artworksByArtist("Vincent van Gogh") {
+  println("  " + (a as Artwork).summary())
+}
+
+printSection("Age of Each Work")
+val ageList: List[Object] = museum.allArtworks()
+  .sortedBy { a => (a as Artwork).year() }
+  .map { a => "  #{(a as Artwork).title()} — #{(a as Artwork).age()} years old" }
+foreach line: Object in ageList { println(line as String) }
+
+println("")
+println("Museum report complete. #{museum.artworkCount()} works catalogued.")

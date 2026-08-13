@@ -446,6 +446,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.DUPLICATE_RECORD_COMPONENT -> ErrorDef(
+      "error.semantic.duplicateRecordComponent",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
     // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
     // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
     // sweeping E-code coverage for 0.10.1).

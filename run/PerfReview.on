@@ -1,0 +1,284 @@
+// Employee Performance Review System
+// Exercises: ADT enums, homogeneous enums, records with example clauses,
+// collection pipelines (filter/map/fold/groupBy/sortedBy/partition/zip),
+// closures, string interpolation, nullable, foreach, extensions, select
+
+import {
+  java.util.*
+}
+
+// ADT enum: performance band
+enum PerformanceBand {
+  case Exceptional
+  case Strong
+  case Meets
+  case BelowTarget
+  case Critical
+
+public:
+  def label(): String = select this {
+    case e is Exceptional: "Exceptional     "
+    case s is Strong:      "Strong          "
+    case m is Meets:       "Meets Expects.  "
+    case b is BelowTarget: "Below Target    "
+    case c is Critical:    "Critical        "
+  }
+
+  def numeric(): Int = select this {
+    case e is Exceptional: 5
+    case s is Strong:      4
+    case m is Meets:       3
+    case b is BelowTarget: 2
+    case c is Critical:    1
+  }
+
+  def isStrong(): Boolean = select this {
+    case e is Exceptional: true
+    case s is Strong:      true
+    else:                  false
+  }
+}
+
+// Homogeneous enum for review lifecycle state
+enum ReviewStatus {
+  DRAFT, SUBMITTED, APPROVED, APPEALED
+public:
+  def label(): String = select this {
+    case ReviewStatus::DRAFT:     "Draft"
+    case ReviewStatus::SUBMITTED: "Submitted"
+    case ReviewStatus::APPROVED:  "Approved"
+    case ReviewStatus::APPEALED:  "Appealed"
+    else: "Unknown"
+  }
+}
+
+// Dimension scores; example clauses verified at compile time
+record ReviewMetrics(
+  deliveryScore: Int,
+  qualityScore: Int,
+  teamworkScore: Int,
+  innovationScore: Int
+)
+  example { new ReviewMetrics(4, 4, 4, 4).average() == 4 }
+  example { new ReviewMetrics(5, 3, 4, 4).average() == 4 }
+  example { new ReviewMetrics(1, 1, 1, 1).average() == 1 }
+
+extension ReviewMetrics {
+  def average(): Int =
+    (self.deliveryScore() + self.qualityScore() + self.teamworkScore() + self.innovationScore()) / 4
+}
+
+def scoreToBand(avg: Int): PerformanceBand = {
+  if avg >= 5 { return new Exceptional() }
+  if avg >= 4 { return new Strong() }
+  if avg >= 3 { return new Meets() }
+  if avg >= 2 { return new BelowTarget() }
+  new Critical()
+}
+
+record Employee(id: Int, name: String, department: String, yearsAtCompany: Int)
+
+record Review(
+  employee: Employee,
+  quarter: String,
+  metrics: ReviewMetrics,
+  comments: String,
+  status: ReviewStatus
+)
+
+extension Review {
+  def score(): Int            = self.metrics().average()
+  def band():  PerformanceBand = scoreToBand(self.score())
+}
+
+def mkReview(emp: Employee, q: String, d: Int, qual: Int, team: Int, inn: Int, note: String): Review =
+  new Review(emp, q, new ReviewMetrics(d, qual, team, inn), note, ReviewStatus::SUBMITTED)
+
+def bar(n: Int): String = Strings::repeat("*", n)
+
+def main(): void {
+  // ── Employees ────────────────────────────────────────────────────────────────
+  val alice  = new Employee(1, "Alice Chen",   "Engineering", 5)
+  val bob    = new Employee(2, "Bob Kim",      "Engineering", 3)
+  val carol  = new Employee(3, "Carol Davis",  "Product",     7)
+  val dan    = new Employee(4, "Dan Lee",      "Design",      2)
+  val eve    = new Employee(5, "Eve Martinez", "Engineering", 4)
+  val frank  = new Employee(6, "Frank Nguyen", "Product",     6)
+  val grace  = new Employee(7, "Grace Park",   "Design",      1)
+  val henry  = new Employee(8, "Henry Wong",   "Engineering", 8)
+
+  // ── Q1 Reviews ───────────────────────────────────────────────────────────────
+  val q1: List[Object] = [
+    mkReview(alice, "Q1", 5, 5, 4, 5, "Outstanding delivery and technical depth"),
+    mkReview(bob,   "Q1", 4, 3, 4, 3, "Solid contributor, needs to improve quality"),
+    mkReview(carol, "Q1", 4, 5, 5, 4, "Excellent cross-functional leadership"),
+    mkReview(dan,   "Q1", 3, 4, 3, 5, "Creative output; delivery consistency varies"),
+    mkReview(eve,   "Q1", 3, 3, 3, 3, "Meeting baseline expectations"),
+    mkReview(frank, "Q1", 5, 4, 4, 4, "Consistent execution, strong stakeholder mgmt"),
+    mkReview(grace, "Q1", 2, 3, 4, 3, "Early career; ramping up"),
+    mkReview(henry, "Q1", 4, 5, 4, 4, "Deep expertise, reliable senior contributor")
+  ]
+
+  // ── Q2 Reviews ───────────────────────────────────────────────────────────────
+  val q2: List[Object] = [
+    mkReview(alice, "Q2", 5, 5, 5, 5, "Top performer, led architecture redesign"),
+    mkReview(bob,   "Q2", 4, 4, 4, 4, "Clear improvement across all dimensions"),
+    mkReview(carol, "Q2", 4, 4, 5, 5, "Expanded scope, delivered new product line"),
+    mkReview(dan,   "Q2", 4, 4, 3, 5, "Stronger delivery, creative work standout"),
+    mkReview(eve,   "Q2", 3, 3, 3, 4, "Stable performance; one strong initiative"),
+    mkReview(frank, "Q2", 5, 5, 4, 4, "Flawless execution on major launch"),
+    mkReview(grace, "Q2", 3, 3, 4, 4, "Noticeable growth, onboarded quickly"),
+    mkReview(henry, "Q2", 4, 5, 5, 4, "Mentored 3 junior engineers effectively")
+  ]
+
+  val all: List[Object] = []
+  all.addAll(q1)
+  all.addAll(q2)
+
+  // ── 1. Header ────────────────────────────────────────────────────────────────
+  IO::println("╔══════════════════════════════════════╗")
+  IO::println("║  PERFORMANCE REVIEW DASHBOARD        ║")
+  IO::println("╚══════════════════════════════════════╝")
+  IO::println("")
+  IO::println("Total reviews: #{all.size}  (#{q1.size} in Q1, #{q2.size} in Q2)")
+  val totalScore: Int = all.map { r => (r as Review).score() }.fold(0) { acc, x => acc + (x as Int) }
+  val avgScore: Int = totalScore / all.size
+  IO::println("Company average: #{avgScore}/5\n")
+
+  // ── 2. Q1 band distribution ───────────────────────────────────────────────────
+  IO::println("── Q1 Band Distribution ─────────────────────────────────────────────────────")
+  val q1by = q1.groupBy { r => (r as Review).band().label() }
+  foreach (bandLabel, revs) in q1by {
+    IO::println("  #{bandLabel} #{(revs as List).size}")
+  }
+  IO::println("")
+
+  // ── 3. Department averages (all quarters) ─────────────────────────────────────
+  IO::println("── Department Averages (All Quarters) ───────────────────────────────────────")
+  val byDept = all.groupBy { r => (r as Review).employee().department() }
+  foreach (dept, revs) in byDept {
+    val rl: List[Object] = revs as List[Object]
+    val dt: Int = rl.map { r => (r as Review).score() }.fold(0) { acc, x => acc + (x as Int) }
+    val da: Int = dt / rl.size
+    IO::println("  #{dept}: #{da}/5  (#{rl.size} reviews)")
+  }
+  IO::println("")
+
+  // ── 4. Q2 top performers (score >= 4) ────────────────────────────────────────
+  IO::println("── Q2 Top Performers (score >= 4) ───────────────────────────────────────────")
+  val topQ2: List[Object] = q2.filter { r => (r as Review).score() >= 4 }
+                               .sortedBy { r => -(r as Review).score() }
+  foreach item: Object in topQ2 {
+    val r: Review = item as Review
+    IO::println("  #{r.employee().name()} [#{r.employee().department()}] — #{r.band().label()} #{r.score()}/5")
+  }
+  IO::println("")
+
+  // ── 5. Q1→Q2 score improvement ───────────────────────────────────────────────
+  IO::println("── Q1→Q2 Improvers ──────────────────────────────────────────────────────────")
+  val q1map = q1.groupBy { r => (r as Review).employee().id() }
+  val q2map = q2.groupBy { r => (r as Review).employee().id() }
+  foreach (empId, q2list) in q2map {
+    val q1list: Object? = q1map.get(empId)
+    if q1list != null {
+      val q1s: Int = ((q1list as List).get(0) as Review).score()
+      val q2s: Int = ((q2list as List).get(0) as Review).score()
+      if q2s > q1s {
+        val n: String = ((q2list as List).get(0) as Review).employee().name()
+        IO::println("  #{n}: #{q1s} → #{q2s} (+#{q2s - q1s})")
+      }
+    }
+  }
+  IO::println("")
+
+  // ── 6. Attention list (score <= 2) ───────────────────────────────────────────
+  IO::println("── Attention Required (score <= 2) ──────────────────────────────────────────")
+  val low: List[Object] = all.filter { r => (r as Review).score() <= 2 }
+  if low.size == 0 {
+    IO::println("  None")
+  } else {
+    foreach item: Object in low {
+      val r: Review = item as Review
+      IO::println("  #{r.employee().name()} [#{r.quarter()}] #{r.band().label()} — #{r.comments()}")
+    }
+  }
+  IO::println("")
+
+  // ── 7. Score histogram ────────────────────────────────────────────────────────
+  IO::println("── Score Distribution (All Reviews) ─────────────────────────────────────────")
+  var s: Int = 1
+  while s <= 5 {
+    val cnt: Int = all.filter { r => (r as Review).score() == s }.size
+    IO::println("  #{s}: #{bar(cnt)} (#{cnt})")
+    s = s + 1
+  }
+  IO::println("")
+
+  // ── 8. Tenure-weighted top-3 in Q2 ───────────────────────────────────────────
+  IO::println("── Tenure-Weighted Top-3 (Q2) ───────────────────────────────────────────────")
+  val weighted: List[Object] = q2.sortedBy { r =>
+    -(r as Review).score() * (r as Review).employee().yearsAtCompany()
+  }
+  var shown: Int = 0
+  foreach item: Object in weighted {
+    if shown < 3 {
+      val r: Review = item as Review
+      val w: Int = r.score() * r.employee().yearsAtCompany()
+      IO::println("  #{r.employee().name()} (#{r.employee().yearsAtCompany()} yrs × #{r.score()} score = #{w})")
+      shown = shown + 1
+    }
+  }
+  IO::println("")
+
+  // ── 9. Partition: strong vs developing ───────────────────────────────────────
+  IO::println("── Q2 Partition: Strong vs Developing ───────────────────────────────────────")
+  val parts = q2.partition { r => (r as Review).band().isStrong() }
+  val strong:     List[Object] = parts[0] as List[Object]
+  val developing: List[Object] = parts[1] as List[Object]
+  IO::println("  Strong performers:    #{strong.size}")
+  IO::println("  Developing:           #{developing.size}")
+  IO::println("  Strong names: #{strong.map { r => (r as Review).employee().name() }}")
+  IO::println("")
+
+  // ── 10. Zip: Q1 vs Q2 scores side-by-side ───────────────────────────────────
+  IO::println("── Q1 vs Q2 Score Comparison ────────────────────────────────────────────────")
+  val zipped = q1.zip(q2)
+  foreach pair: Object in zipped {
+    val row: List[Object] = pair as List[Object]
+    val r1: Review = row[0] as Review
+    val r2: Review = row[1] as Review
+    val diff: Int = r2.score() - r1.score()
+    val arrow: String = if diff > 0 { "▲#{diff}" } else { if diff < 0 { "▼#{-diff}" } else { "—" } }
+    IO::println("  #{r1.employee().name()}: Q1=#{r1.score()} Q2=#{r2.score()} #{arrow}")
+  }
+  IO::println("")
+
+  // ── 11. who improved the most? ───────────────────────────────────────────────
+  IO::println("── Most Improved (Q1→Q2) ────────────────────────────────────────────────────")
+  var bestGain: Int   = -999
+  var bestName: String = ""
+  var bestOld:  Int   = 0
+  var bestNew:  Int   = 0
+  val zipped2 = q1.zip(q2)
+  foreach pair: Object in zipped2 {
+    val row: List[Object] = pair as List[Object]
+    val r1: Review = row[0] as Review
+    val r2: Review = row[1] as Review
+    val gain: Int = r2.score() - r1.score()
+    if gain > bestGain {
+      bestGain = gain
+      bestName = r1.employee().name()
+      bestOld  = r1.score()
+      bestNew  = r2.score()
+    }
+  }
+  IO::println("  #{bestName}: #{bestOld}→#{bestNew} (+#{bestGain})")
+  IO::println("")
+
+  // ── 12. distinct departments ──────────────────────────────────────────────────
+  IO::println("── Departments Represented ──────────────────────────────────────────────────")
+  val depts = all.map { r => (r as Review).employee().department() }
+                 .distinct()
+                 .sortedBy { d => d as String }
+  IO::println("  #{depts}")
+}

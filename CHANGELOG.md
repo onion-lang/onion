@@ -7,6 +7,473 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Documented all 15 `--Wno` warning codes (`W0001`–`W0015`) in a new
+  reference table in `docs/tools/compiler.md` and `docs/ja/tools/compiler.md`.**
+  The `--Wno <codes>` option showed a single example (`W0001,unused-parameter`)
+  but never enumerated the warning categories, their codes, or their
+  `--Wno` name aliases defined in `WarningCategory` (`Warning.scala`) —
+  unlike `E0xxx` error codes, which get a full guarded reference page. Added
+  a drift-guard spec (`WarningCodeDocCoverageSpec`), mirroring
+  `ErrorCodeDocCoverageSpec`, so future warning categories get caught the
+  same way.
+
+### Added
+
+- **`run/RestaurantOrders.on`, a 327-line restaurant order management sample.**
+  Covers records with method bodies (`MenuItem`, `OrderLine`), a plain enum
+  matched via `select this` (`ItemCategory`, `OrderStatus`), an ADT
+  case-enum (`Payment { case Cash, case Card, case Voucher }`), an
+  interface implemented with `conforms` (`Billable`), `Double`/`String`
+  extension methods, `groupBy` + `foreach (k, v)`, a broad collection
+  pipeline (`filter`, `flatMap`, `fold`, `sortedBy`, `distinct`, `find`,
+  `partition`, `take`, `zip`), ADT `select` type patterns, a nullable
+  (`Payment?`) field, string interpolation, `try`/`catch`, and `foreach`
+  over an inclusive range.
+- **`run/NutritionTracker.on`, a 296-line daily nutrition log sample.**
+  Covers a homogeneous enum (`MacroKind`) matched via `select`, an ADT
+  case-enum (`MealType`) with `label()`/`isMainMeal()` methods, records
+  with method bodies (`FoodItem`, `Serving`, `DailyGoal`), a mutable
+  `Meal`/`DailyLog` class pair over `List`, `Double` extension methods for
+  formatting, collection pipelines (`fold`, `filter`, `sortedBy`), a
+  nullable-returning tip generator with the `?:` operator, and `string
+  interpolation` across a multi-section macro/calorie report.
+- **`run/MatrixCalc.on`, a 434-line integer-matrix calculator sample.**
+  Covers `Int[][]` 2D arrays as class fields, public `val` fields alongside
+  private data (section-based access), extension methods on `Int`
+  (`abs`/`max`/`padLeft`) and `String` (`padRight`/`center`), static
+  factory methods (`Matrix::zeros`/`identity`/`of`), recursive determinant
+  via cofactor expansion (1×1 through 4×4+), `List[Int]` + `(x as Int)`
+  unboxing for row/column sums, `foreach x: Object in list` with an
+  explicit cast, `select` on an `Int`, and nested `while` loops.
+- **`run/SnippetLibrary.on`, a 664-line code snippet library manager
+  sample.** Covers an ADT data-carrying enum (`Language`, 7 cases) with
+  `displayName()`/`fileExt()`/`isCompiled()` dispatched via `select`
+  type patterns, plain enums (`Category`, `Difficulty` with
+  `stars()`/`rank()`, `SortOrder`), records with method bodies
+  (`Snippet`, `Tag`) including `upvotedCopy()`/`viewedCopy()`/`hasTag()`,
+  an interface (`Searchable`), a typed-generic class over
+  `ArrayList[Snippet]`, a broad collection pipeline (`map`, `filter`,
+  `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`, `zip`,
+  `any`, `count`), a nullable (`Snippet?`) lookup with a null guard,
+  `String`/`Int` extension methods, the `|>` pipeline operator, and
+  `try`/`catch`.
+
+## [0.10.32] - 2026-08-13
+
+### Documentation
+
+- **Documented the lossless-shapes/lens API and combinators in the `## Shape`
+  section of `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  The section covered `parse`, `print`, `canPrint`, and the L1/L2 laws, but
+  never mentioned `isLossless`, `parseLossless`, `printLossless`, `Lossless`,
+  `Residue`, the combinators (`eachLine`, `lines`, `sepBy`, `xmap`,
+  `orElse`), or `Shapes::config`/`Shapes::yaml` — leaving a real,
+  actively-used feature (lossless config editing, see
+  `docs/guide/shapes.md`) undiscoverable from the API reference a user would
+  actually search. Added a drift-guard spec
+  (`StdlibDocShapeModuleParitySpec`) so future additions to the `Shape`/
+  `Lossless` public API get caught the same way.
+- **Documented `Shapes::config` and `Shapes::yaml` in the "When to reach for
+  `Shapes` directly" section of `docs/guide/shapes.md` and
+  `docs/ja/guide/shapes.md`.** The section only mentioned `Shapes::regex` and
+  `Shapes::json`, even though `onion.Shapes` also exposes `config` and `yaml`
+  factories — the hand-written equivalents of `shape name = config` /
+  `shape name = yaml` — making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`ShapesGuideDirectApiParitySpec`) so
+  future additions to `Shapes`'s public API get caught the same way.
+- **Documented five undocumented `onion.Colls` batching/aggregation helpers
+  (`chunked`, `windowed`, `sumBy`, `averageBy`/`maxBy`/`minBy`) in a new
+  "Batching, windowing, and selector aggregation" subsection of the Colls
+  Module section in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** The "Modules at a glance" summary table
+  already promised "chunked/windowed, sumBy/maxBy" for `Colls`, but the Colls
+  Module section itself never mentioned them, and — unlike `map`/`filter`/
+  `reduce`/`fold` — no other part of the doc covered them either, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocCollsBatchingAggregationParitySpec`) so future additions to
+  `Colls`'s public API get caught the same way.
+- **Documented nine undocumented `onion.Iterables` methods (`mapMap`,
+  `toList`, `reduce`, `newList`, `first`, `last`, `reverse`, `take`, `drop`)
+  in the Iterables Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocIterablesModuleParitySpec`) so future additions to
+  `Iterables`'s public API get caught the same way.
+- **Documented `Http::getResponse`/`Http::postResponse` and the `Response`
+  object they return (`status`, `body`, `headers`, `isOk()`, `isError()`) in
+  the Http section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public `onion.Http` methods existed
+  in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source — the only documented way to
+  make a request was the body-only `get`/`post`, with no way to see the
+  status code or response headers. Added a drift-guard spec
+  (`StdlibDocHttpModuleParitySpec`) so future additions to `Http`'s public
+  API get caught the same way.
+- **Documented ten undocumented `onion.Regex` `Pattern`-typed overloads
+  (`matches`, `find`, `findAll`, `findFirst`, `groups`, `groupsAll`,
+  `replace`, `replaceFirst`, `split`/`split` with limit) in a new "Pattern
+  literal overloads" subsection of the Regex Module section in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  overloads exist specifically so a `re"..."` literal (which compiles to
+  `java.util.regex.Pattern`, not `String`) can be passed straight into the
+  `Regex::` helpers, but the docs only ever showed the `String`-pattern
+  signatures, making the `Pattern` overloads undiscoverable without reading
+  the Java source. Added a drift-guard spec
+  (`StdlibDocRegexModuleParitySpec`) so future additions to `Regex`'s public
+  API get caught the same way.
+- **Documented eleven undocumented `onion.Files` methods
+  (`isFile`, `isDirectory`, `mkdirs`, `listFiles`, `size`, `getAbsolutePath`,
+  `copy`, `move`, `copyDir`, `writeLines`, `appendText`) in the Files Module
+  section of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  These public static methods existed in code but were absent from the docs in
+  both languages, making them undiscoverable without reading the Java source.
+  Added a drift-guard spec (`StdlibDocFilesModuleParitySpec`) so future
+  additions to `Files`'s public API get caught the same way.
+- **Fixed stale/actively-misleading heap guidance in `docs/quality-bar.md`,
+  `docs/ja/quality-bar.md`, `docs/contributing/building.md`, and
+  `docs/ja/contributing/building.md`.** `.jvmopts` raised the project's
+  default heap from `4g` to `10g` back at 0.10.18, but these four docs still
+  described (or, in `building.md`'s "Out of Memory" section, actively
+  recommended) a heap at or below the old `4g`/`2g` figures — advice that,
+  followed literally, overrides `.jvmopts` down to a lower ceiling and
+  reproduces the `OutOfMemoryError` it claims to fix (#691). Updated all four
+  to state the real `10g` default and to warn against setting `SBT_OPTS` to
+  anything below it.
+- **Documented six undocumented `onion.Rand` methods
+  (`nextInt(min, max)`, `nextDouble(bound)`, `nextDouble(min, max)`, `choice`,
+  `sample`, `uuid`) in the Rand Module section of both `docs/reference/stdlib.md`
+  and `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code and were already name-dropped in the "Modules at a glance" table, but
+  had no actual signature or example in the Rand Module section itself, making
+  them undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocRandModuleParitySpec`) so future additions to `Rand`'s public API
+  get caught the same way.
+
+## [0.10.31] - 2026-08-12
+
+### Documentation
+
+- **Documented nine undocumented `onion.Strings` methods
+  (`splitRegex`, `isEmpty`, `isBlank`, `substring`, `indexOf`, `lastIndexOf`,
+  `lines`, `reverse`, `decapitalize`) in the Strings Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocStringsAccessorParitySpec`) so future
+  additions to `Strings`'s public API get caught the same way.
+- **Documented `Json::asObject()`/`Json::asArray()`/`Json::parseOrNull()` in the
+  Json Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These `onion.Json` public static methods
+  existed in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocJsonAccessorParitySpec`) so future additions to `Json`'s public
+  API get caught the same way.
+- **Documented `Json::object()`/`Json::array()` and `Value.isNull()`/`Value.size()`/
+  `Value.raw()` in the English Json Module reference (`docs/reference/stdlib.md`),
+  and added the missing `Json::array()`/`Value.raw()` mentions to the Japanese
+  reference (`docs/ja/reference/stdlib.md`).** These `onion.Json` builder helpers
+  and `Value` accessors existed in code but were absent (or partially absent) from
+  the docs in both languages, making them undiscoverable without reading the
+  Java source.
+- **Documented `Timing::elapsedMillis`, `Timing::formatMillis`,
+  `Timing::measureVoid`, and `Timing::sleepNanos` in the Timing Module section
+  of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  `onion.Timing` public static methods existed in code but were absent from the
+  docs in both languages, making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`StdlibDocTimingModuleParitySpec`) so
+  future additions to `Timing`'s public API get caught the same way.
+- **Documented 21 undocumented `onion.IO` methods
+  (`readLine`, `readAll`, `printf`, `format`, `eprint`, `eprintln`, `eprintf`,
+  `readInt`, `readLong`, `readDouble`, `readBoolean`, `tryReadInt`,
+  `tryReadDouble`, `tryReadLong`, `readLines`, `eachLine`, `printLines`,
+  `printAll`, `flush`, `newline`, `clear`) in the IO Module section of both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These public
+  static methods existed in code but were absent from the docs in both
+  languages, making them undiscoverable without reading the Java source. Added
+  a drift-guard spec (`StdlibDocIOAccessorParitySpec`) so future additions to
+  `IO`'s public API get caught the same way.
+
+## [0.10.30] - 2026-08-11
+
+### Documentation
+
+- **Added the missing `E0032` (`TYPE_ARGUMENT_MUST_BE_REFERENCE`) walkthrough
+  section to `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`.**
+  Every other code had a numbered `### EXXXX` section except this one, leaving
+  a visible gap between `E0031` and `E0033`. The new section explains that the
+  check has live report sites but is not reachable from valid Onion source
+  today, since the grammar never routes a type-argument position through
+  `void_type()` — matching the reasoning already recorded in
+  `SemanticErrorCodeCoverageSpec`.
+
+### Fixed
+
+- **`[I0000]` internal compiler crash when a `try`/`catch` expression is used
+  as a non-first call or constructor argument (issue #669).** The JVM clears
+  the operand stack when it dispatches to an exception handler, so any
+  argument already pushed before an inline `try { ... } catch { ... }`
+  argument was silently discarded, producing invalid bytecode (mismatched
+  stackmap frames) instead of a working method or a normal diagnostic.
+  `AsmCodeGenerationVisitor` now spills already-pushed operands (including a
+  call receiver) into locals before evaluating an argument that may run its
+  own `try`, and reloads them afterward, preserving left-to-right evaluation
+  order.
+
+### Added
+
+- **`run/ConferenceSchedule.on`, a 451-line conference schedule management sample.**
+  Exercises a data-carrying enum (`Verdict` with `Approved`/`Rejected`/`Pending`,
+  dispatched via `select case is`), a plain enum (`Track`), an interface
+  (`Summarizable`) implemented by two records, records with methods and `conforms`
+  (`Speaker`, `Session`, `Proposal`), a generic `Box[T]` class with a `map[U]`
+  method, extension methods on `Int` (`hourStr`) and `String` (`padRight`,
+  `truncate`), collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/
+  `partition`/`zip`/`flatten`/`distinct`/`any`/`count`), `foreach (k, v)` on
+  `Map`, nullable types with null guards, a tail-recursive prefix search, a
+  `while` loop, `try`/`catch`, and `string interpolation` throughout.
+- **`run/PharmacySystem.on`, a 320-line pharmacy/prescription management
+  sample.** Covers ADT enums (`DrugCategory`, `PrescriptionStatus`) with
+  exhaustive `select this { case x is Y: ... }` dispatch, records (`Drug`,
+  `Patient`, `Prescription`, `FilledRx`), typed generics (`List[T]`,
+  `Map[String, List[Drug]]`), collection pipelines (`filter`/`map`/`fold`/
+  `groupBy`/`sortedBy`), `foreach (k, v)` map destructuring, nullable-aware
+  lookup helpers, and `string interpolation` across a ten-section report.
+- **`run/PropertyManager.on`, a 351-line rental property portfolio management
+  sample.** Covers an ADT enum (`MaintenancePriority`) with `label()`/`score()`
+  methods, homogeneous enums (`PropertyType`, `LeaseStatus`), records with
+  inline bodies (`Address`, `Property`, `Tenant`, `Lease`, `MaintenanceRequest`),
+  extension methods on `Int`/`Double`/`String`, collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`),
+  `foreach i: Int in 1..12`, `foreach (k, v)` map destructuring, and
+  `String::format`-based currency/percentage formatting across a ten-section
+  report.
+
+## [0.10.29] - 2026-08-10
+
+### Added
+
+- **`run/HuffmanCoding.on`, a 318-line Huffman lossless compression demo.**
+  Builds a Huffman tree as an ADT case-enum (`HLeaf`/`HNode`) with recursive
+  `depth`/`leafCount`/`isLeaf` methods, generates prefix codes via DFS, and
+  encodes/decodes 5 corpus texts with verified exact round-trip. Covers
+  records with an inline `example`, extension methods (`Int.rjust`,
+  `Int.percent`, `Double.fmt2`, `String.times`, `String.padLeft/Right`),
+  collection pipelines (`filter`, `fold`, `sortedBy`, `groupBy`, `indexOf`),
+  a mutable `Map` frequency/code table, nullable downcasts, and nested
+  `select` dispatch during decode.
+- **`run/CipherSuite.on`, a 420-line classical cryptography toolkit sample.**
+  Covers five ciphers (Caesar, ROT-13, Atbash, Vigenère, rail-fence
+  transposition) with round-trip verification, a data-carrying enum
+  (`CipherKind`), frequency analysis with `groupBy`/`sortedBy`, and
+  `String`/`Int` extension methods for report formatting.
+- **`run/SpellCheck.on`, a 312-line Levenshtein edit-distance spell checker
+  sample.** Covers dynamically-sized `Int[]` arrays, an iterative two-row
+  edit-distance DP, an interface/class pair (`Dictionary`/`SimpleDictionary`),
+  records with method bodies, `select` on `Int` distance bands, and
+  collection pipelines (`filter`, `map`, `sortedBy`, `groupBy`, `take`,
+  `find`, `join`, `fold`).
+- **`run/SudokuSolver.on`, a 317-line Sudoku solver.** Exercises a plain enum
+  (`Difficulty`), a result record (`SolveResult`), extension methods on `Int`
+  (`toCell`, `isGiven`), a `SudokuBoard` class with a public accessor method
+  (`btCount`), backtracking recursion, 2D list mutation (`List[Object]` as a
+  9×9 grid), a `hintSummary` method using closures, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`map`), `select`-based difficulty-bar rendering,
+  and `Timing::nanos` for elapsed-time measurement. Solves Easy (30 clues,
+  ~4 000 backtracks), Medium (~36 clues, 9 backtracks), and Hard/AI-Escargot
+  (23 clues, ~9 000 backtracks) puzzles with verified correct solutions.
+- **`run/HRSystem.on`, a 374-line human-resources management system sample.**
+  Covers a data-carrying ADT enum (`EmploymentType` with `FullTime`/`PartTime`/
+  `Contractor` cases), a plain enum (`Rating`) with `stars`/`order`/
+  `raisePercent` methods, records with `example` clauses (`Employee`,
+  `PayRaise`, `DeptStats`), extension methods on `Int`/`Double`/`String`,
+  an `HRDatabase` class with nullable lookups (`findById(): Employee?`),
+  collection pipelines (`filter`, `sortedBy`, `fold`, `find`, `take`, `map`,
+  `any`), `foreach (k, v) in map` iteration, and exhaustive `select` dispatch
+  over the ADT enum. Generates six reports: employee directory, department
+  statistics, workforce summary, top earners, proposed raises, and a tenure
+  distribution bar chart.
+
+### Fixed
+
+- **A record with a duplicate component name (`record R(a: Int, a: Int)`) no
+  longer crashes the compiler.** Two components sharing a name generate two
+  same-named accessor methods and fields, which previously went completely
+  unchecked and only surfaced later as an internal compiler error (I0000,
+  a JVM `ClassFormatError`) once the class was loaded. It is now reported as
+  a normal `E0086` semantic error at the offending component's location.
+  Found by the mutation fuzzer (issue #666).
+
+## [0.10.28] - 2026-08-09
+
+### Added
+
+- **`run/MazeSolver.on`, a 295-line maze generator + BFS solver sample.**
+  Generates a perfect maze via recursive-backtracking DFS with a Fisher-Yates
+  shuffle, then finds the shortest path with an iterative BFS using
+  array-based visited/parent trackers. Exercises an ADT enum (`Cell`) matched
+  with `select`/`is`, a `Point` record, classes with `public:`/`private:`
+  sections (`Maze`, `BfsSolver`, `MazeStats`), extension methods on `String`,
+  a flat row-major `List[Cell]` grid, `Boolean[]`/`Int[]` primitive arrays,
+  recursion, `while`/`foreach` loops, and string interpolation.
+- **`run/TextAnalytics.on`, a 272-line multi-document text-analysis sample.**
+  Exercises records (`Document`, `WordFreq`, `SentenceInfo`, `AnalysisResult`),
+  a data-carrying enum (`ReadabilityLevel`) matched via `select this`, a class
+  with a constructor argument (`TextAnalyzer(topN)`), `Map[String, Int]`
+  frequency tables built with `Maps::countBy`/`Maps::toList`, nullable `Int?`
+  lookups, closures, `foreach` over lists, string interpolation, and
+  `Format::fixed` percentage/float formatting. Reports word-frequency
+  profiles, sentence-length breakdown, readability classification, pairwise
+  Jaccard similarity, and a complexity ranking across three sample documents.
+- **`run/SpaceMission.on`, a 324-line space mission planner sample.** Exercises
+  records with body methods (`Planet`, `Spacecraft.wetMass`/`massRatio`,
+  `MissionLog`), a plain enum (`MissionStatus`), a data-carrying enum
+  (`MissionOutcome`), an ADT case-enum (`MissionEvent` with 4 cases), a class
+  with mutable state (`MissionController`), collection pipelines (`filter`,
+  `map`, `fold`, `groupBy`, `sortedBy`, `find`), exhaustive `select` over the
+  ADT cases, nullable lookups (`findPlanet(): Planet?`), closures, string
+  interpolation, recursion (Newton's method for orbital period), `foreach`
+  over a range, `while`, `try`/`catch`, and `foreach (k, v) in map`.
+- **`run/KingdomSim.on`, a 550-line medieval kingdom simulation sample.**
+  Exercises operator overloading (`plus`/`times`/`minus` on a `Resource`
+  record), `do[List]` comprehension for trade-pair generation, multiple
+  interface conformance, `foreach (k, v)` map iteration, extension methods
+  on `Int`/`Double`/`String`, the `|>` pipeline operator, an ADT case-enum
+  (`KingdomEvent`) with 5 data-carrying cases, `example`/`law` clauses on a
+  record, `try`/`catch`, nullable returns, exhaustive `select`, and a broad
+  set of collection pipelines (`groupBy`, `sortedBy`, `fold`, `partition`,
+  `zip`, `distinct`, `find`, `any`, `take`).
+
+## [0.10.27] - 2026-08-09
+
+### Added
+
+- **`run/Sudoku.on`, a 261-line Sudoku solver with backtracking search.** Exercises
+  a flat `List[Int]` as a 2D 9×9 grid (row-major `row*9+col` indexing), records
+  with methods (`Puzzle.label`, `SolveResult.summary`), a class with a mutable
+  field and a public getter (`Solver.numSteps`/`steps()`), extension methods on
+  `Int` (`cellChar`, `boxStart`), nested `foreach` over ranges (`0..<9`, `1..9`),
+  collection pipelines (`count`/`filter`/`sortedBy`), recursion (backtracking
+  solver), and explicit `return` statements in block-body methods. Solves an easy
+  puzzle (30 givens, 4208 steps), a medium (36 givens, 54 steps), and a hard (23
+  givens, 879417 steps) with full row/column/box validation confirming each
+  solution. `SampleProgramsSpec` passes (120/120) including `Sudoku.on`.
+- **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
+  Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
+  fields, a class with public-section fields, `foreach (k, v) in map` map-entry
+  destructuring, string interpolation, and collection grouping.
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum (`Category`) with `select`-based methods, records
+  with body methods and `example` clauses, a class backed by `Map[String, Employee]`
+  and `Map[String, Double]` registries, nullable `Double?` lookups, collection
+  pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
+  methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
+- **`run/LibrarySystem.on` expanded from a 374-line stub to a 529-line library
+  management system.** Exercises extension methods on `String`/`Int`/`Double`,
+  homogeneous enums with `public:` methods (`Genre`, `MemberStatus`,
+  `LoanStatus`), records with inline `public:` methods, interface conformance
+  (`Reportable`), classes with mutable typed-list fields, in-place mutation via
+  `indexOf`/`List.set`, collection pipelines (`filter`/`map`/`fold`/`groupBy`/
+  `sortedBy`/`partition`/`zip`/`any`/`count`), `foreach (k, v) in map`, nullable
+  types with null guards, closures stored in `val`s, and a tail-recursive helper.
+
+## [0.10.26] - 2026-08-08
+
+### Added
+
+- **`run/SortingShowcase.on`, a 402-line sorting-algorithms showcase.** Implements
+  bubble, insertion, selection, merge (recursive), quick, and counting sort behind
+  a `SortKind` enum dispatched via `select`, with `TestCase`/`SortResult` records,
+  extension methods on `Int`, in-place `List[Int]` mutation, collection pipelines,
+  recursive algorithms, and `try`/`catch`.
+- **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
+  homogeneous enum (`Genre`) with public methods, an ADT case-enum
+  (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records
+  (`Book`, `MemberBook`, `Meeting`), classes backed by `List` state (`Member`,
+  `BookClub`), extension methods on `Int`, collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`reduce`),
+  `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
+  inclusive range and over `Map` entries, nullable return types, recursion,
+  and `try`/`catch`.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
+  a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
+  a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
+  `Generation.summary`/`isStable`/`isEmpty`/`delta`), extension methods on `Int`
+  (`wrapIn`, `sign`) and `String` (`padLeft`, `padRight`), a sparse
+  `Map[String,Boolean]` grid with toroidal wrapping, `foreach (k, v) in map`,
+  collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/`distinct`), and
+  closures stored in `val`s. Verified oscillators: Glider (period-4), Blinker
+  (period-2), Pulsar (period-3), and a 50-generation R-Pentomino run.
+
+- **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
+  data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
+  `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`
+  destructuring), plain enums (`Cuisine`, `MealType`, `Difficulty`), records
+  with methods and `static def of(...)` factories (`Ingredient`,
+  `NutritionInfo`, `Recipe`), extension methods on `Double`/`Int`/`String`,
+  collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`distinct`/`find`),
+  nullable types with safe calls and null coalescing, and a mutable
+  `RecipeBook` class with query and report-generation methods.
+
+- **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
+  Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
+  `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum
+  (`ReviewStatus` with `::` constant access), records with compile-time `example`
+  clauses (`ReviewMetrics`), extension methods on records, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`zip`/`distinct`),
+  nullable map lookups, `foreach (k, v) in map` destructuring, and `foreach :
+  Type in list` typed iteration.
+
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.**
+  Exercises a homogeneous enum (`CellState`), an enum with a `select`-based
+  method (`PatternKind.label()`), records with methods (`Cell.distanceTo()`,
+  `Generation.summary/isStable/isEmpty`), extension methods on `Int`
+  (`wrapIn`/`sign`) and `String` (`padLeft`/`padRight`), a `Map`-backed
+  sparse grid with toroidal wrapping, `foreach (k, v) in map`, nullable map
+  lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
+  `distinct`/`forEach`), and closures stored in `val`s. Verified against
+  canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
+
+### Fixed
+
+- **`sbt test` could hit a real JVM `OutOfMemoryError`** (in `SampleProgramsSpec`
+  and `MutationFuzzSpec`) as the `run/` corpus grew past 121 samples, wedging
+  CI on `develop` instead of failing cleanly — the same failure mode fixed at
+  0.10.17 (78 samples, `-Xmx6G`) recurring as the corpus kept growing. Raised
+  the heap headroom again, both locally (`.jvmopts`: 4g → 10g) and in CI
+  (`SBT_OPTS`: `-Xmx6G` → `-Xmx10G`); a clean run now completes in ~4 minutes
+  with room to spare. `docs/quality-bar.md` / `docs/ja/quality-bar.md` rows 2–3
+  (sample count 119→121, large-program count 62→64, adding `EspressoShop` and
+  `MusicFestival`) updated to match, fixing the two `QualityBarSpec` failures
+  those additions had left behind.
+
+## [0.10.25] - 2026-08-07
+
 ### Added
 
 - **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
@@ -46,6 +513,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
   `record example {}` build-time parse round-trip assertions.
   111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
 
 ### Documentation
 

@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0085) for identification
+ * type checking. Each error has a unique code (E0000-E0086) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -52,9 +52,9 @@ package onion.compiler
  * '''Regex and Label Errors (E0058-E0060)'''
  *   - LABEL_NOT_FOUND, REGEX_PATTERN_INVALID, REGEX_GROUP_MISMATCH
  *
- * '''Record Errors (E0061-E0063)'''
+ * '''Record Errors (E0061-E0063, E0086)'''
  *   - RECORD_FROM_COMPONENT_UNSUPPORTED, RECORD_DERIVE_COMPONENT_UNSUPPORTED
- *   - RECORD_DERIVE_UNKNOWN_MARKER
+ *   - RECORD_DERIVE_UNKNOWN_MARKER, DUPLICATE_RECORD_COMPONENT
  *
  * '''Law and Example Errors (E0064-E0065, E0074-E0075)'''
  *   - LAW_VIOLATION, EXAMPLE_FAILED, LAW_PARAMETER_NOT_GENERATABLE, LAW_CLASS_NOT_LOADABLE
@@ -166,6 +166,7 @@ object SemanticError {
   case object UNREACHABLE_CATCH_CLAUSE extends SemanticError(83)
   case object DUPLICATE_EXTENSION_METHOD extends SemanticError(84)
   case object STATIC_METHOD_WITHOUT_BODY extends SemanticError(85)
+  case object DUPLICATE_RECORD_COMPONENT extends SemanticError(86)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

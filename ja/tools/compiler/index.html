@@ -5292,6 +5292,93 @@
 <p>特定の警告カテゴリをコードまたは名前で抑制します。</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>onionc<span class="w"> </span>--Wno<span class="w"> </span>W0001,unused-parameter<span class="w"> </span>MyProgram.on
 </span></code></pre></div>
+<p>各コードは <code>W####</code> 形式、または以下に示す <code>--Wno</code> 用の名前のどちらでも指定できます。</p>
+<table>
+<thead>
+<tr>
+<th>コード</th>
+<th>名前</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>W0001</code></td>
+<td><code>unused-variable</code></td>
+<td>未使用の変数</td>
+</tr>
+<tr>
+<td><code>W0002</code></td>
+<td><code>unused-import</code></td>
+<td>未使用の import</td>
+</tr>
+<tr>
+<td><code>W0003</code></td>
+<td><code>unreachable-code</code></td>
+<td>到達不能コード</td>
+</tr>
+<tr>
+<td><code>W0004</code></td>
+<td><code>deprecated</code>, <code>deprecated-feature</code></td>
+<td>非推奨の機能</td>
+</tr>
+<tr>
+<td><code>W0005</code></td>
+<td><code>shadowed-variable</code></td>
+<td>変数のシャドーイング</td>
+</tr>
+<tr>
+<td><code>W0006</code></td>
+<td><code>unused-parameter</code></td>
+<td>未使用の引数</td>
+</tr>
+<tr>
+<td><code>W0007</code></td>
+<td><code>empty-block</code></td>
+<td>空のブロック</td>
+</tr>
+<tr>
+<td><code>W0008</code></td>
+<td><code>redundant-cast</code></td>
+<td>冗長なキャスト</td>
+</tr>
+<tr>
+<td><code>W0009</code></td>
+<td><code>possible-null-deref</code>, <code>null-deref</code></td>
+<td>null 参照の可能性</td>
+</tr>
+<tr>
+<td><code>W0010</code></td>
+<td><code>unnecessary-conversion</code></td>
+<td>不要な型変換</td>
+</tr>
+<tr>
+<td><code>W0011</code></td>
+<td><code>unchecked-cast</code></td>
+<td>未検査キャスト</td>
+</tr>
+<tr>
+<td><code>W0012</code></td>
+<td><code>null-to-non-nullable</code></td>
+<td>非 null 型への null 代入</td>
+</tr>
+<tr>
+<td><code>W0013</code></td>
+<td><code>suspicious-interpolation</code></td>
+<td>疑わしい文字列補間構文</td>
+</tr>
+<tr>
+<td><code>W0014</code></td>
+<td><code>discarded-toplevel</code></td>
+<td>main が定義されているためトップレベル文が無視された</td>
+</tr>
+<tr>
+<td><code>W0015</code></td>
+<td><code>platform-unboxing</code></td>
+<td>ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた</td>
+</tr>
+</tbody>
+</table>
 <h3 id="-no-check-laws"><code>--no-check-laws</code><a class="headerlink" href="#-no-check-laws" title="Permanent link">&para;</a></h3>
 <p>レコードの <code>law</code> / <code>example</code> 句を実行しません。</p>
 <p>既定ではコンパイル時に実行される——つまりコンパイラがそのコードを走らせます。

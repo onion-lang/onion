@@ -4520,6 +4520,13 @@
 
 
 <h1 id="todo">ジェネリクス（消去ベース）— 設計と TODO<a class="headerlink" href="#todo" title="Permanent link">&para;</a></h1>
+<p>ステータス: <strong>出荷済み。</strong> 以下のチェックポイントはすべて完了している: クラス/メソッドへの型パラメータ、
+<code>[T extends Bound]</code> による上限境界、括弧による型適用、ブリッジメソッドを伴う消去ベースのコード生成、
+一般的なジェネリック呼び出しに対する型推論。現在の構文と意味論については
+<a href="../reference/specification/#ジェネリクス">docs/reference/specification.md</a>と
+<a href="../guide/classes-and-objects/#ジェネリッククラス">docs/guide/classes-and-objects.md</a>を、
+意図的にスコープ外としている点（消去ベース、不変、実行時型情報なし）については CLAUDE.md の
+「Known Limitations」を参照。このページは元の段階的計画の歴史的記録として残している。</p>
 <p>目標: Scala スタイルの消去（上限境界、ジェネリッククラス/メソッド、オーバーライド時のブリッジ生成）を備えた基本的なジェネリクスを追加する。小さなPRサイズのステップで段階的に導入する。</p>
 <h2 id="_1">スコープ<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <ul>

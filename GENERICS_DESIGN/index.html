@@ -4499,6 +4499,14 @@
 
 
 <h1 id="generics-erasure-based-design-todo">Generics (Erasure-Based) – Design &amp; TODO<a class="headerlink" href="#generics-erasure-based-design-todo" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>shipped.</strong> Every checkpoint below has landed: type parameters on classes and
+methods, <code>[T extends Bound]</code> upper bounds, bracket type applications, erasure-based
+codegen with bridge methods, and inference for common generic calls. See
+<a href="../reference/specification/#generics">docs/reference/specification.md</a> and
+<a href="../guide/classes-and-objects/#generic-classes">docs/guide/classes-and-objects.md</a> for the
+syntax and semantics as they exist today, and CLAUDE.md ("Known Limitations") for what
+remains deliberately out of scope (erasure, invariance, no reified type info). This page
+is kept as a historical record of the original incremental plan.</p>
 <p>Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes/methods, bridge emission for overriding). Deliver in small PR-sized steps.</p>
 <h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>

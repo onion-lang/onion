@@ -5271,6 +5271,93 @@ generation) as it runs.</p>
 <p>Suppress specific warning categories by code or name.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>onionc<span class="w"> </span>--Wno<span class="w"> </span>W0001,unused-parameter<span class="w"> </span>MyProgram.on
 </span></code></pre></div>
+<p>Every code accepts either its <code>W####</code> form or the <code>--Wno</code> name shown below:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>W0001</code></td>
+<td><code>unused-variable</code></td>
+<td>Unused variable</td>
+</tr>
+<tr>
+<td><code>W0002</code></td>
+<td><code>unused-import</code></td>
+<td>Unused import</td>
+</tr>
+<tr>
+<td><code>W0003</code></td>
+<td><code>unreachable-code</code></td>
+<td>Unreachable code</td>
+</tr>
+<tr>
+<td><code>W0004</code></td>
+<td><code>deprecated</code>, <code>deprecated-feature</code></td>
+<td>Deprecated feature</td>
+</tr>
+<tr>
+<td><code>W0005</code></td>
+<td><code>shadowed-variable</code></td>
+<td>Shadowed variable</td>
+</tr>
+<tr>
+<td><code>W0006</code></td>
+<td><code>unused-parameter</code></td>
+<td>Unused parameter</td>
+</tr>
+<tr>
+<td><code>W0007</code></td>
+<td><code>empty-block</code></td>
+<td>Empty block</td>
+</tr>
+<tr>
+<td><code>W0008</code></td>
+<td><code>redundant-cast</code></td>
+<td>Redundant cast</td>
+</tr>
+<tr>
+<td><code>W0009</code></td>
+<td><code>possible-null-deref</code>, <code>null-deref</code></td>
+<td>Possible null dereference</td>
+</tr>
+<tr>
+<td><code>W0010</code></td>
+<td><code>unnecessary-conversion</code></td>
+<td>Unnecessary type conversion</td>
+</tr>
+<tr>
+<td><code>W0011</code></td>
+<td><code>unchecked-cast</code></td>
+<td>Unchecked cast</td>
+</tr>
+<tr>
+<td><code>W0012</code></td>
+<td><code>null-to-non-nullable</code></td>
+<td>Null assigned to non-nullable type</td>
+</tr>
+<tr>
+<td><code>W0013</code></td>
+<td><code>suspicious-interpolation</code></td>
+<td>Suspicious string interpolation syntax</td>
+</tr>
+<tr>
+<td><code>W0014</code></td>
+<td><code>discarded-toplevel</code></td>
+<td>Top-level statements ignored because a main is defined</td>
+</tr>
+<tr>
+<td><code>W0015</code></td>
+<td><code>platform-unboxing</code></td>
+<td>Boxed platform value implicitly unboxed to a non-null primitive</td>
+</tr>
+</tbody>
+</table>
 <h3 id="-no-check-laws"><code>--no-check-laws</code><a class="headerlink" href="#-no-check-laws" title="Permanent link">&para;</a></h3>
 <p>Do not execute a record's <code>law</code> / <code>example</code> clauses.</p>
 <p>They run at compile time by default, which means the compiler executes that code.

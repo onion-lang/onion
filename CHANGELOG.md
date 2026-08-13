@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Marked `docs/GENERICS_DESIGN.md` (and its ja copy) as shipped.** The
+  page, linked from the mkdocs nav under "Design Notes", still framed
+  generics as an unimplemented TODO plan ("Goal: Add basic generics...")
+  even though generics have been fully implemented for a long time.
+  Added a "Status: shipped" note pointing to
+  `docs/reference/specification.md` and `docs/guide/classes-and-objects.md`
+  for the current syntax/semantics, following the same pattern already
+  used by `docs/design/roadmap.md`.
 - **Documented all 15 `--Wno` warning codes (`W0001`–`W0015`) in a new
   reference table in `docs/tools/compiler.md` and `docs/ja/tools/compiler.md`.**
   The `--Wno <codes>` option showed a single example (`W0001,unused-parameter`)

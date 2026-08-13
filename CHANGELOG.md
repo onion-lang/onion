@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/SprintPlanner.on`, a 291-line agile sprint-planning sample.** Covers
+  a data-carrying enum (`Priority(weight: Int)`), a plain enum (`Status`)
+  matched via `select this`, an ADT case-enum (`CapacityStatus` with
+  `CapOk`/`CapWarn`/`CapOver`) matched by type pattern, a record with a
+  nullable field (`Task(..., assignee: String?)`), a generic record
+  (`Ranked[T](value: T, score: Int)`), an interface implemented with
+  `conforms` (`Reportable`), extension methods on `Int`/`String`, broad
+  collection pipelines (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/
+  `distinct`/`partition`/`zip`/`reduce`/`find`), a closure stored in a
+  `val`, string interpolation, `try`/`catch`, a tail-recursive helper, and
+  `foreach` over both exclusive and inclusive ranges.
 - **`run/NationalParkTracker.on`, a 478-line national-park visitor tracking and
   reporting sample.** Covers extension methods on `String`/`Int`/`Double`, a
   plain enum (`ParkType`, `Season`) with `public:` methods, a data-carrying

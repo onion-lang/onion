@@ -1,0 +1,664 @@
+// SnippetLibrary.on — a programmer's code-snippet library manager.
+// Exercises: records (with methods); ADT data-carrying enums (Language with
+// version fields, Difficulty); plain enums (Category, SortOrder); class with
+// ArrayList-backed store; interfaces (Searchable); generics (List[T], Map[K,V]);
+// collection pipelines (map/filter/fold/sortedBy/groupBy/distinct/find/
+// partition/any/count); select / type-pattern matching; nullable types and null
+// checks; closures; string interpolation; try/catch; while and foreach (ranges
+// and map (k,v)); extension methods on String and Int; |> pipeline.
+
+import { java.util.ArrayList }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = this
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padLeft(w: Int): String {
+    var s: String = this
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "..."
+  }
+  def containsIgnoreCase(sub: String): Boolean {
+    return this.toLowerCase().contains(sub.toLowerCase())
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Category {
+  Algorithm, DataStructure, Pattern, Utility, Networking, UI, Database, Testing
+public:
+  def label(): String = select this {
+    case Category::Algorithm:     "Algorithm"
+    case Category::DataStructure: "Data Structure"
+    case Category::Pattern:       "Design Pattern"
+    case Category::Utility:       "Utility"
+    case Category::Networking:    "Networking"
+    case Category::UI:            "UI / Frontend"
+    case Category::Database:      "Database"
+    case Category::Testing:       "Testing"
+    else: "Other"
+  }
+}
+
+enum Difficulty {
+  Beginner, Intermediate, Advanced, Expert
+public:
+  def label(): String = select this {
+    case Difficulty::Beginner:     "Beginner"
+    case Difficulty::Intermediate: "Intermediate"
+    case Difficulty::Advanced:     "Advanced"
+    case Difficulty::Expert:       "Expert"
+    else: "Unknown"
+  }
+  def stars(): String = select this {
+    case Difficulty::Beginner:     "[*   ]"
+    case Difficulty::Intermediate: "[**  ]"
+    case Difficulty::Advanced:     "[*** ]"
+    case Difficulty::Expert:       "[****]"
+    else: "[    ]"
+  }
+  def rank(): Int = select this {
+    case Difficulty::Beginner:     1
+    case Difficulty::Intermediate: 2
+    case Difficulty::Advanced:     3
+    case Difficulty::Expert:       4
+    else: 0
+  }
+}
+
+enum SortOrder {
+  ByUpvotes, ByViews, ByTitle, ByDifficulty
+}
+
+// ─── Data-carrying enum: Language ─────────────────────────────────────────────
+
+enum Language {
+  case Python(minorVer: Int)
+  case Java(jdkVer: Int)
+  case Scala(minorVer: Int)
+  case JavaScript(isTypescript: Boolean)
+  case Rust(edition: Int)
+  case Onion
+  case Other(name: String)
+public:
+  def displayName(): String = select this {
+    case l is Python:     "Python 3.#{l.minorVer()}"
+    case l is Java:       "Java #{l.jdkVer()}"
+    case l is Scala:      "Scala 3.#{l.minorVer()}"
+    case l is JavaScript: if l.isTypescript() { "TypeScript" } else { "JavaScript" }
+    case l is Rust:       "Rust (#{l.edition()} edition)"
+    case l is Onion:      "Onion"
+    case l is Other:      l.name()
+  }
+  def fileExt(): String = select this {
+    case l is Python:     ".py"
+    case l is Java:       ".java"
+    case l is Scala:      ".scala"
+    case l is JavaScript: if l.isTypescript() { ".ts" } else { ".js" }
+    case l is Rust:       ".rs"
+    case l is Onion:      ".on"
+    case l is Other:      ".txt"
+  }
+  def isCompiled(): Boolean = select this {
+    case l is Python:     false
+    case l is JavaScript: false
+    case l is Onion:      true
+    case l is Java:       true
+    case l is Scala:      true
+    case l is Rust:       true
+    else:                 false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Tag(name: String, color: String) {
+public:
+  def render(): String = "[#{name()}]"
+}
+
+record Snippet(id: Int, title: String, description: String, language: Language, category: Category, difficulty: Difficulty, code: String, tags: List[Tag], upvotes: Int, views: Int, author: String) {
+public:
+  def tagNames(): List[String] { return tags().map { t => (t as Tag).name() } }
+  def hasTag(tname: String): Boolean { return tagNames().any { n => (n as String) == tname } }
+  def shortCode(): String { return code().truncate(60) }
+  def header(): String {
+    return "#{(""+id()).padLeft(3)}. #{title().padRight(36)} #{language().displayName().padRight(16)} #{difficulty().stars()}"
+  }
+  def upvotedCopy(): Snippet {
+    return new Snippet(id(), title(), description(), language(), category(), difficulty(), code(), tags(), upvotes() + 1, views(), author())
+  }
+  def viewedCopy(): Snippet {
+    return new Snippet(id(), title(), description(), language(), category(), difficulty(), code(), tags(), upvotes(), views() + 1, author())
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Searchable {
+  def matches(query: String): Boolean
+}
+
+// ─── Main store class ─────────────────────────────────────────────────────────
+
+class SnippetLibrary {
+  var items: ArrayList[Snippet]
+  var nextId: Int
+public:
+  def this {
+    this.items = new ArrayList[Snippet]()
+    this.nextId = 1
+  }
+
+  def add(title: String, desc: String, lang: Language, cat: Category, diff: Difficulty, code: String, tags: List[Tag], author: String): Snippet {
+    val s: Snippet = new Snippet(nextId, title, desc, lang, cat, diff, code, tags, 0, 0, author)
+    items.add(s)
+    nextId = nextId + 1
+    return s
+  }
+
+  def findById(id: Int): Snippet? {
+    return allSnippets().find { x => (x as Snippet).id() == id } as Snippet?
+  }
+
+  def search(query: String): List[Object] {
+    return allSnippets().filter { x =>
+      val s: Snippet = x as Snippet
+      s.title().containsIgnoreCase(query) ||
+      s.description().containsIgnoreCase(query) ||
+      s.tagNames().any { n => (n as String).containsIgnoreCase(query) }
+    }
+  }
+
+  def byLanguage(langName: String): List[Object] {
+    return allSnippets().filter { x => (x as Snippet).language().displayName() == langName }
+  }
+
+  def byCategory(cat: Category): List[Object] {
+    return allSnippets().filter { x => (x as Snippet).category() == cat }
+  }
+
+  def byDifficulty(diff: Difficulty): List[Object] {
+    return allSnippets().filter { x => (x as Snippet).difficulty() == diff }
+  }
+
+  def byTag(tagName: String): List[Object] {
+    return allSnippets().filter { x => (x as Snippet).hasTag(tagName) }
+  }
+
+  def upvote(id: Int): Boolean {
+    var found: Boolean = false
+    val updated: ArrayList[Snippet] = new ArrayList[Snippet]()
+    foreach s: Snippet in items {
+      if s.id() == id {
+        updated.add(s.upvotedCopy())
+        found = true
+      } else {
+        updated.add(s)
+      }
+    }
+    items = updated
+    return found
+  }
+
+  def recordView(id: Int): Boolean {
+    var found: Boolean = false
+    val updated: ArrayList[Snippet] = new ArrayList[Snippet]()
+    foreach s: Snippet in items {
+      if s.id() == id {
+        updated.add(s.viewedCopy())
+        found = true
+      } else {
+        updated.add(s)
+      }
+    }
+    items = updated
+    return found
+  }
+
+  def allSnippets(): List[Object] {
+    val out: List[Object] = []
+    foreach s: Snippet in items { out << s }
+    return out
+  }
+
+  def sorted(order: SortOrder): List[Object] {
+    val all: List[Object] = allSnippets()
+    return select order {
+      case SortOrder::ByUpvotes:    all.sortedBy { x => 0 - (x as Snippet).upvotes() }
+      case SortOrder::ByViews:      all.sortedBy { x => 0 - (x as Snippet).views() }
+      case SortOrder::ByTitle:      all.sortedBy { x => (x as Snippet).title() }
+      case SortOrder::ByDifficulty: all.sortedBy { x => (x as Snippet).difficulty().rank() }
+      else: all
+    }
+  }
+
+  def top(n: Int): List[Object] {
+    val all: List[Object] = sorted(SortOrder::ByUpvotes)
+    val cap: Int = n.clamp(0, all.size())
+    val result: List[Object] = []
+    var i: Int = 0
+    while i < cap { result << all[i]; i = i + 1 }
+    return result
+  }
+
+  def totalCount(): Int { return items.size() }
+
+  def languageReport(): String {
+    val groups: Map[String, List[Object]] = allSnippets().groupBy { x => (x as Snippet).language().displayName() }
+    var out: String = "Language breakdown:\n"
+    foreach (lang, snips) in groups {
+      val count: Int = (snips as List[Object]).size()
+      out = out + "  #{lang.padRight(20)} #{count} snippet(s)\n"
+    }
+    return out
+  }
+
+  def categoryReport(): String {
+    val groups: Map[String, List[Object]] = allSnippets().groupBy { x => (x as Snippet).category().label() }
+    var out: String = "Category breakdown:\n"
+    foreach (cat, snips) in groups {
+      val count: Int = (snips as List[Object]).size()
+      out = out + "  #{cat.padRight(20)} #{count} snippet(s)\n"
+    }
+    return out
+  }
+
+  def authorLeaderboard(): String {
+    val groups: Map[String, List[Object]] = allSnippets().groupBy { x => (x as Snippet).author() }
+    val ranked: List[String] = groups.keys().sortedBy { k =>
+      0 - (groups[k as String] as List[Object]).fold(0) { acc, x => (acc as Int) + (x as Snippet).upvotes() }
+    }
+    var out: String = "Author leaderboard (by total upvotes):\n"
+    var rank: Int = 1
+    foreach k: Object in ranked {
+      val snips: List[Object] = groups[k as String] as List[Object]
+      val total: Int = snips.fold(0) { acc, x => (acc as Int) + (x as Snippet).upvotes() }
+      out = out + "  #{rank}. #{(k as String).padRight(16)} #{total} upvote(s) / #{snips.size()} snippet(s)\n"
+      rank = rank + 1
+    }
+    return out
+  }
+
+  def difficultyStats(): String {
+    val all: List[Object] = allSnippets()
+    var out: String = "Difficulty stats:\n"
+    val diffs: List[Object] = [Difficulty::Beginner, Difficulty::Intermediate, Difficulty::Advanced, Difficulty::Expert]
+    foreach d: Object in diffs {
+      val diff: Difficulty = d as Difficulty
+      val n: Int = all.count { x => (x as Snippet).difficulty() == diff }
+      out = out + "  #{diff.label().padRight(14)} #{n}\n"
+    }
+    return out
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def hr(ch: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + ch; i = i + 1 }
+  return s
+}
+
+def printDetail(s: Snippet): void {
+  IO::println(hr("-", 64))
+  IO::println("ID:          #{s.id()}")
+  IO::println("Title:       #{s.title()}")
+  IO::println("Language:    #{s.language().displayName()}  (compiled=#{s.language().isCompiled()})")
+  IO::println("Category:    #{s.category().label()}")
+  IO::println("Difficulty:  #{s.difficulty().label()} #{s.difficulty().stars()}")
+  IO::println("Author:      #{s.author()}")
+  IO::println("Upvotes:     #{s.upvotes()}   Views: #{s.views()}")
+  val tagsStr: String = s.tagNames().fold("") { acc, t => if (acc as String) == "" { t as String } else { (acc as String) + ", " + (t as String) } }
+  IO::println("Tags:        #{tagsStr}")
+  IO::println("Description: #{s.description()}")
+  IO::println("Code snippet:")
+  IO::println("  #{s.shortCode()}")
+  IO::println(hr("-", 64))
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val lib: SnippetLibrary = new SnippetLibrary()
+
+  // ── Seed tags ─────────────────────────────────────────────────────────────
+  val tRecursion: Tag = new Tag("recursion", "red")
+  val tSort:      Tag = new Tag("sort",      "teal")
+  val tSearch:    Tag = new Tag("search",    "blue")
+  val tTree:      Tag = new Tag("tree",      "green")
+  val tGraph:     Tag = new Tag("graph",     "olive")
+  val tString:    Tag = new Tag("string",    "gold")
+  val tDP:        Tag = new Tag("dp",        "pink")
+  val tAsync:     Tag = new Tag("async",     "sky")
+  val tOOP:       Tag = new Tag("oop",       "purple")
+  val tFP:        Tag = new Tag("fp",        "cyan")
+  val tPattern:   Tag = new Tag("pattern",   "mint")
+  val tUtil:      Tag = new Tag("util",      "gray")
+
+  // ── Seed snippets ─────────────────────────────────────────────────────────
+  lib.add("Binary Search", "Classic binary search on sorted int array",
+    new Java(17), Category::Algorithm, Difficulty::Beginner,
+    "int lo=0,hi=a.length-1; while(lo<=hi){int m=(lo+hi)/2; if(a[m]==t)return m; else if(a[m]<t)lo=m+1; else hi=m-1;} return -1;",
+    [tSearch, tSort], "alice")
+
+  lib.add("Fibonacci (DP)", "Bottom-up dynamic programming Fibonacci",
+    new Python(11), Category::Algorithm, Difficulty::Intermediate,
+    "dp=[0,1]; [dp.append(dp[-1]+dp[-2]) for _ in range(n-1)]; return dp[n]",
+    [tDP, tRecursion], "bob")
+
+  lib.add("Observer Pattern", "Classic observer / event pattern in Scala",
+    new Scala(3), Category::Pattern, Difficulty::Intermediate,
+    "trait Observer{def update(e:Event):Unit}; class Subject{val obs=mutable.ListBuffer.empty[Observer]; def notify(e:Event)=obs.foreach(_.update(e))}",
+    [tPattern, tOOP], "carol")
+
+  lib.add("Async Retry", "Retry a failed async operation with exponential back-off",
+    new JavaScript(true), Category::Utility, Difficulty::Advanced,
+    "async function retry(fn,n=3,d=100){try{return await fn()}catch(e){if(!n)throw e; await sleep(d); return retry(fn,n-1,d*2)}}",
+    [tAsync, tUtil], "dave")
+
+  lib.add("Trie Insert/Search", "Prefix tree with insert and search in Rust",
+    new Rust(2021), Category::DataStructure, Difficulty::Advanced,
+    "struct Trie{children:[Option<Box<Trie>>;26],end:bool} impl Trie{fn insert(&mut self,w:&str){..} fn search(&self,w:&str)->bool{..}}",
+    [tTree, tSearch], "alice")
+
+  lib.add("Merge Sort", "Divide-and-conquer merge sort in Onion",
+    new Onion(), Category::Algorithm, Difficulty::Intermediate,
+    "def mergeSort(xs: List[Int]): List[Int] { if xs.size() <= 1 { return xs } val mid = xs.size() / 2; ... }",
+    [tSort, tRecursion], "eve")
+
+  lib.add("BFS Shortest Path", "Breadth-first search for shortest path in a graph",
+    new Python(11), Category::Algorithm, Difficulty::Advanced,
+    "from collections import deque; def bfs(g,s,e): q=deque([(s,[s])]); seen={s}; ...",
+    [tGraph, tSearch], "bob")
+
+  lib.add("LRU Cache", "Least-recently-used cache using LinkedHashMap",
+    new Java(17), Category::DataStructure, Difficulty::Expert,
+    "class LRU<K,V> extends LinkedHashMap<K,V>{LRU(int cap){super(cap,.75f,true);}protected boolean removeEldestEntry(Map.Entry e){return size()>cap;}}",
+    [tUtil], "carol")
+
+  lib.add("Curry and Compose", "Functional currying and function composition in TypeScript",
+    new JavaScript(true), Category::Utility, Difficulty::Intermediate,
+    "const curry=f=>x=>y=>f(x,y); const compose=(...fns)=>x=>fns.reduceRight((v,f)=>f(v),x);",
+    [tFP, tUtil], "dave")
+
+  lib.add("AVL Tree Rotation", "Left and right rotations for AVL balancing in Scala",
+    new Scala(3), Category::DataStructure, Difficulty::Expert,
+    "def rotateLeft(n:Node):Node={val r=n.right; n.right=r.left; r.left=n; r} def rotateRight(n:Node):Node={...}",
+    [tTree, tOOP], "alice")
+
+  lib.add("String KMP Search", "Knuth-Morris-Pratt substring search in Java",
+    new Java(17), Category::Algorithm, Difficulty::Expert,
+    "int[] lps=buildLPS(pat); int i=0,j=0; while(i<txt.length()){if(txt[i]==pat[j]){i++;j++;} else if(j>0){j=lps[j-1];} else{i++;}}",
+    [tString, tSearch], "eve")
+
+  lib.add("Event Bus", "Lightweight publish/subscribe event bus in Onion",
+    new Onion(), Category::Pattern, Difficulty::Intermediate,
+    "class EventBus { var handlers: Map; def on(evt: String, h: Function1[Object,void]): void {...} def emit(evt: String, data: Object): void {...} }",
+    [tPattern, tAsync, tOOP], "alice")
+
+  lib.add("Pipeline Demo", "Onion |> pipeline with collection transforms",
+    new Onion(), Category::Utility, Difficulty::Beginner,
+    "[1,2,3,4,5].filter { x => x % 2 == 1 } |> println",
+    [tFP, tUtil], "carol")
+
+  lib.add("Dijkstra Algorithm", "Single-source shortest path in Python",
+    new Python(11), Category::Algorithm, Difficulty::Expert,
+    "import heapq; def dijkstra(g,s): dist={s:0}; pq=[(0,s)]; ... return dist",
+    [tGraph, tSearch, tDP], "dave")
+
+  lib.add("React useReducer", "State management with useReducer plus TypeScript",
+    new JavaScript(true), Category::UI, Difficulty::Intermediate,
+    "const [state,dispatch]=useReducer(reducer,init); // reducer:(state,action)=>newState",
+    [tPattern, tUtil], "bob")
+
+  lib.add("SQL Query Builder", "Type-safe query builder pattern in Scala",
+    new Scala(3), Category::Database, Difficulty::Advanced,
+    "case class Query(table:String,conds:List[Cond],limit:Option[Int]){ def where(c:Cond)=copy(conds=conds:+c) def render:String=... }",
+    [tPattern, tOOP], "eve")
+
+  lib.add("Property-Based Tests", "Quickcheck-style property test scaffolding in Scala",
+    new Scala(3), Category::Testing, Difficulty::Advanced,
+    "def forAll[A](gen:Gen[A])(prop:A=>Boolean):Result=...",
+    [tUtil], "alice")
+
+  lib.add("Sieve of Eratosthenes", "Classic prime sieve in Onion",
+    new Onion(), Category::Algorithm, Difficulty::Beginner,
+    "var composite: Boolean[] = new Boolean[n+1]; foreach i: Int in 2..<n { if !composite[i] { foreach j: Int in i*2..n step i { composite[j] = true } } }",
+    [tUtil], "bob")
+
+  lib.add("HTTP Route Dispatch", "Pattern-matching request routing in Python",
+    new Python(11), Category::Networking, Difficulty::Intermediate,
+    "routes={'GET /users':get_users,'POST /users':create_user}; handler=routes.get(f'{method} {path}',not_found); return handler(req)",
+    [tPattern, tUtil], "carol")
+
+  lib.add("Debounce Utility", "Debounce function calls in TypeScript",
+    new JavaScript(true), Category::Utility, Difficulty::Intermediate,
+    "function debounce<T extends (...a:any[])=>any>(fn:T,ms:number):T{let t:any; return ((...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}) as T}",
+    [tAsync, tUtil], "dave")
+
+  // ── Upvotes and views ────────────────────────────────────────────────────
+  lib.upvote(1); lib.upvote(1); lib.upvote(1)
+  lib.upvote(2); lib.upvote(2)
+  lib.upvote(3); lib.upvote(3); lib.upvote(3); lib.upvote(3)
+  lib.upvote(5); lib.upvote(5); lib.upvote(5); lib.upvote(5); lib.upvote(5)
+  lib.upvote(8); lib.upvote(8)
+  lib.upvote(10); lib.upvote(10); lib.upvote(10)
+  lib.upvote(14); lib.upvote(14); lib.upvote(14); lib.upvote(14)
+  lib.upvote(17); lib.upvote(17)
+  lib.upvote(18); lib.upvote(18); lib.upvote(18)
+
+  lib.recordView(1); lib.recordView(1); lib.recordView(1); lib.recordView(1); lib.recordView(1)
+  lib.recordView(5); lib.recordView(5); lib.recordView(5); lib.recordView(5)
+  lib.recordView(14); lib.recordView(14); lib.recordView(14)
+  lib.recordView(18); lib.recordView(18); lib.recordView(18); lib.recordView(18)
+
+  // ── Library header ────────────────────────────────────────────────────────
+  IO::println(hr("=", 64))
+  IO::println("  CODE SNIPPET LIBRARY  --  #{lib.totalCount()} snippets")
+  IO::println(hr("=", 64))
+
+  // ── List all snippets sorted by title ─────────────────────────────────────
+  IO::println("\nAll snippets (sorted by title):")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.sorted(SortOrder::ByTitle) {
+    IO::println((x as Snippet).header())
+  }
+
+  // ── Top 5 by upvotes ──────────────────────────────────────────────────────
+  IO::println("\nTop 5 by upvotes:")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.top(5) {
+    val s: Snippet = x as Snippet
+    IO::println("  #{(""+s.upvotes()).padLeft(3)} v  #{s.title().padRight(36)} by #{s.author()}")
+  }
+
+  // ── Search demos ─────────────────────────────────────────────────────────
+  IO::println("\nSearch results for \"sort\":")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.search("sort") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()} (#{s.language().displayName()})")
+  }
+
+  IO::println("\nSearch results for \"graph\":")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.search("graph") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()} (#{s.language().displayName()})")
+  }
+
+  // ── Filter by language ────────────────────────────────────────────────────
+  IO::println("\nOnion snippets:")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.byLanguage("Onion") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()} -- #{s.category().label()}")
+  }
+
+  IO::println("\nPython snippets:")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.byLanguage("Python 3.11") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()}")
+  }
+
+  // ── Filter by tag ─────────────────────────────────────────────────────────
+  IO::println("\nSnippets tagged 'recursion':")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.byTag("recursion") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()} (#{s.difficulty().label()})")
+  }
+
+  IO::println("\nSnippets tagged 'fp':")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.byTag("fp") {
+    val s: Snippet = x as Snippet
+    IO::println("  [#{s.id()}] #{s.title()}")
+  }
+
+  // ── Filter by difficulty ──────────────────────────────────────────────────
+  IO::println("\nExpert-level snippets:")
+  IO::println(hr("-", 64))
+  foreach x: Object in lib.byDifficulty(Difficulty::Expert) {
+    val s: Snippet = x as Snippet
+    IO::println("  #{s.difficulty().stars()} #{s.title()} (#{s.language().displayName()})")
+  }
+
+  // ── Detailed view ─────────────────────────────────────────────────────────
+  IO::println("\nDetailed view: snippet #14")
+  val detail: Snippet? = lib.findById(14)
+  if detail != null {
+    printDetail(detail as Snippet)
+  } else {
+    IO::println("  Not found.")
+  }
+
+  // ── Compiled vs interpreted breakdown ────────────────────────────────────
+  IO::println("\nCompiled vs Interpreted:")
+  IO::println(hr("-", 64))
+  val allItems: List[Object] = lib.sorted(SortOrder::ByTitle)
+  val parts = allItems.partition { x => (x as Snippet).language().isCompiled() }
+  val compiled: List[Object]    = parts[0] as List[Object]
+  val interpreted: List[Object] = parts[1] as List[Object]
+  IO::println("  Compiled:    #{compiled.size()} snippet(s)")
+  IO::println("  Interpreted: #{interpreted.size()} snippet(s)")
+
+  // ── File extensions used ──────────────────────────────────────────────────
+  IO::println("\nFile extensions used:")
+  val exts: List[String] = allItems.map { x => (x as Snippet).language().fileExt() }.distinct()
+  foreach ext: Object in exts.sortedBy { e => e as String } {
+    IO::println("  #{ext as String}")
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  IO::println("")
+  IO::println(lib.languageReport())
+  IO::println(lib.categoryReport())
+  IO::println(lib.difficultyStats())
+  IO::println(lib.authorLeaderboard())
+
+  // ── Average upvotes per author ────────────────────────────────────────────
+  IO::println("Average upvotes per author:")
+  val byAuthor: Map[String, List[Object]] = allItems.groupBy { x => (x as Snippet).author() }
+  foreach (auth, snips) in byAuthor {
+    val lst: List[Object] = snips as List[Object]
+    val total: Int = lst.fold(0) { acc, x => (acc as Int) + (x as Snippet).upvotes() }
+    val avgNum: Double = if lst.size() > 0 { (total as Double) / (lst.size() as Double) } else { 0.0 }
+    IO::println("  #{auth.padRight(12)} avg #{avgNum} upvotes/snippet")
+  }
+
+  // ── Snippets with no upvotes ──────────────────────────────────────────────
+  IO::println("\nUnloved snippets (0 upvotes):")
+  val unloved: List[Object] = allItems.filter { x => (x as Snippet).upvotes() == 0 }
+  if unloved.size() == 0 {
+    IO::println("  None — every snippet has at least one upvote!")
+  } else {
+    foreach x: Object in unloved {
+      val s: Snippet = x as Snippet
+      IO::println("  [#{s.id()}] #{s.title()}")
+    }
+  }
+
+  // ── Language feature breakdown via pattern matching ───────────────────────
+  IO::println("\nLanguage feature notes:")
+  IO::println(hr("-", 64))
+  foreach x: Object in allItems {
+    val s: Snippet = x as Snippet
+    val note: String = select s.language() {
+      case l is Python:     "scripted, v3.#{l.minorVer()}"
+      case l is Java:       "JVM, JDK#{l.jdkVer()}"
+      case l is Scala:      "JVM+FP, v3.#{l.minorVer()}"
+      case l is JavaScript: if l.isTypescript() { "typed JS" } else { "dynamic JS" }
+      case l is Rust:       "systems, #{l.edition()} ed"
+      case l is Onion:      "Onion JVM lang"
+      case l is Other:      l.name()
+    }
+    IO::println("  #{s.title().truncate(30).padRight(33)} #{note}")
+  }
+
+  // ── Collection pipeline: top 3 most-searched languages ────────────────────
+  IO::println("\nMost-represented languages (top 3):")
+  val langGroups: Map[String, List[Object]] = allItems.groupBy { x => (x as Snippet).language().displayName() }
+  val langsSorted: List[String] = langGroups.keys().sortedBy { k =>
+    0 - (langGroups[k as String] as List[Object]).size()
+  }
+  var shown: Int = 0
+  foreach k: Object in langsSorted {
+    if shown < 3 {
+      val cnt: Int = (langGroups[k as String] as List[Object]).size()
+      IO::println("  #{(k as String).padRight(20)} #{cnt} snippet(s)")
+      shown = shown + 1
+    }
+  }
+
+  // ── Try/catch demo ────────────────────────────────────────────────────────
+  IO::println("\nLookup #999 (non-existent):")
+  try {
+    val s: Snippet? = lib.findById(999)
+    if s == null {
+      IO::println("  Not found (as expected).")
+    } else {
+      IO::println("  Found: #{(s as Snippet).title()}")
+    }
+  } catch e: Exception {
+    IO::println("  Error: #{e.message()}")
+  }
+
+  // ── Zip: pair top-upvoted and top-viewed ──────────────────────────────────
+  IO::println("\nTop upvoted vs most viewed (zipped):")
+  IO::println(hr("-", 64))
+  val topUp:   List[Object] = lib.top(5)
+  val topView: List[Object] = lib.sorted(SortOrder::ByViews)
+  val pairs: List[List[Object]] = topUp.zip(topView)
+  foreach p: Object in pairs {
+    val pair: List[Object] = p as List[Object]
+    val a: Snippet = pair[0] as Snippet
+    val b: Snippet = pair[1] as Snippet
+    IO::println("  upvoted: #{a.title().truncate(24).padRight(26)} | viewed: #{b.title().truncate(24)}")
+  }
+
+  IO::println("\n" + hr("=", 64))
+  IO::println("Done. Total snippets in library: #{lib.totalCount()}")
+  IO::println(hr("=", 64))
+}

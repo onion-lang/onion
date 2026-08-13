@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.33] - 2026-08-13
+
+### Documentation
+
+- **Marked `docs/GENERICS_DESIGN.md` (and its ja copy) as shipped.** The
+  page, linked from the mkdocs nav under "Design Notes", still framed
+  generics as an unimplemented TODO plan ("Goal: Add basic generics...")
+  even though generics have been fully implemented for a long time.
+  Added a "Status: shipped" note pointing to
+  `docs/reference/specification.md` and `docs/guide/classes-and-objects.md`
+  for the current syntax/semantics, following the same pattern already
+  used by `docs/design/roadmap.md`.
+- **Documented all 15 `--Wno` warning codes (`W0001`–`W0015`) in a new
+  reference table in `docs/tools/compiler.md` and `docs/ja/tools/compiler.md`.**
+  The `--Wno <codes>` option showed a single example (`W0001,unused-parameter`)
+  but never enumerated the warning categories, their codes, or their
+  `--Wno` name aliases defined in `WarningCategory` (`Warning.scala`) —
+  unlike `E0xxx` error codes, which get a full guarded reference page. Added
+  a drift-guard spec (`WarningCodeDocCoverageSpec`), mirroring
+  `ErrorCodeDocCoverageSpec`, so future warning categories get caught the
+  same way.
+
+### Added
+
+- **`run/SprintPlanner.on`, a 291-line agile sprint-planning sample.** Covers
+  a data-carrying enum (`Priority(weight: Int)`), a plain enum (`Status`)
+  matched via `select this`, an ADT case-enum (`CapacityStatus` with
+  `CapOk`/`CapWarn`/`CapOver`) matched by type pattern, a record with a
+  nullable field (`Task(..., assignee: String?)`), a generic record
+  (`Ranked[T](value: T, score: Int)`), an interface implemented with
+  `conforms` (`Reportable`), extension methods on `Int`/`String`, broad
+  collection pipelines (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/
+  `distinct`/`partition`/`zip`/`reduce`/`find`), a closure stored in a
+  `val`, string interpolation, `try`/`catch`, a tail-recursive helper, and
+  `foreach` over both exclusive and inclusive ranges.
+- **`run/NationalParkTracker.on`, a 478-line national-park visitor tracking and
+  reporting sample.** Covers extension methods on `String`/`Int`/`Double`, a
+  plain enum (`ParkType`, `Season`) with `public:` methods, a data-carrying
+  enum (`ConservationStatus(description: String)`), an ADT case-enum
+  (`Activity`) matched via `select`/`is`, records with methods (`Park`,
+  `Visit`, including nullable-safe derived fields), an interface implemented
+  with `conforms` (`Reportable`), a mutable class (`ParkRegistry`) built on
+  `List[Object]` and `<<`, a broad collection pipeline (`filter`, `map`,
+  `fold`, `sortedBy`, `groupBy`, `find`, `partition`, `distinct`),
+  `foreach (k, v)` over a `groupBy` result, `foreach` over an inclusive
+  range, closures, string interpolation, `try`/`catch`, and recursion.
+- **`run/RestaurantOrders.on`, a 327-line restaurant order management sample.**
+  Covers records with method bodies (`MenuItem`, `OrderLine`), a plain enum
+  matched via `select this` (`ItemCategory`, `OrderStatus`), an ADT
+  case-enum (`Payment { case Cash, case Card, case Voucher }`), an
+  interface implemented with `conforms` (`Billable`), `Double`/`String`
+  extension methods, `groupBy` + `foreach (k, v)`, a broad collection
+  pipeline (`filter`, `flatMap`, `fold`, `sortedBy`, `distinct`, `find`,
+  `partition`, `take`, `zip`), ADT `select` type patterns, a nullable
+  (`Payment?`) field, string interpolation, `try`/`catch`, and `foreach`
+  over an inclusive range.
+- **`run/NutritionTracker.on`, a 296-line daily nutrition log sample.**
+  Covers a homogeneous enum (`MacroKind`) matched via `select`, an ADT
+  case-enum (`MealType`) with `label()`/`isMainMeal()` methods, records
+  with method bodies (`FoodItem`, `Serving`, `DailyGoal`), a mutable
+  `Meal`/`DailyLog` class pair over `List`, `Double` extension methods for
+  formatting, collection pipelines (`fold`, `filter`, `sortedBy`), a
+  nullable-returning tip generator with the `?:` operator, and `string
+  interpolation` across a multi-section macro/calorie report.
+- **`run/MatrixCalc.on`, a 434-line integer-matrix calculator sample.**
+  Covers `Int[][]` 2D arrays as class fields, public `val` fields alongside
+  private data (section-based access), extension methods on `Int`
+  (`abs`/`max`/`padLeft`) and `String` (`padRight`/`center`), static
+  factory methods (`Matrix::zeros`/`identity`/`of`), recursive determinant
+  via cofactor expansion (1×1 through 4×4+), `List[Int]` + `(x as Int)`
+  unboxing for row/column sums, `foreach x: Object in list` with an
+  explicit cast, `select` on an `Int`, and nested `while` loops.
+- **`run/SnippetLibrary.on`, a 664-line code snippet library manager
+  sample.** Covers an ADT data-carrying enum (`Language`, 7 cases) with
+  `displayName()`/`fileExt()`/`isCompiled()` dispatched via `select`
+  type patterns, plain enums (`Category`, `Difficulty` with
+  `stars()`/`rank()`, `SortOrder`), records with method bodies
+  (`Snippet`, `Tag`) including `upvotedCopy()`/`viewedCopy()`/`hasTag()`,
+  an interface (`Searchable`), a typed-generic class over
+  `ArrayList[Snippet]`, a broad collection pipeline (`map`, `filter`,
+  `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`, `zip`,
+  `any`, `count`), a nullable (`Snippet?`) lookup with a null guard,
+  `String`/`Int` extension methods, the `|>` pipeline operator, and
+  `try`/`catch`.
+- **`run/SortAlgorithms.on`, a 377-line sorting-algorithm benchmark.**
+  Covers a plain enum with `select` exhaustiveness (`Complexity`, with
+  `bigO()`/`isEfficient()`), a data-carrying ADT enum (`SortFamily`, with
+  `Comparison`/`Distribution` cases), a record with a method body
+  (`SortStats::summary()`), an interface with polymorphic dispatch
+  (`Sorter`, five implementing classes: bubble/insertion/selection/merge/
+  quick sort), classes with mutable state tracking comparisons/swaps,
+  1D arrays with manual allocation and copying, recursion (`mergeSort`/
+  `merge`, `quickSort`/`partition`), a collection pipeline (`map`,
+  `filter`, `sortedBy`, `fold`, `find`, `groupBy`), a nullable
+  (`SortStats?`) winner lookup, closures stored in `val`s, `foreach` over
+  a list and over a `Map` (k, v), `try`/`catch`, and string
+  interpolation.
+
 ## [0.10.32] - 2026-08-13
 
 ### Documentation

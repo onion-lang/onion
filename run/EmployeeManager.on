@@ -1,0 +1,356 @@
+// EmployeeManager.on — Employee management system exercising many Onion features:
+// ADT case enums, data-carrying enums, records with laws, interfaces, class
+// inheritance, generics, collection pipelines, closures, nullable, try/catch,
+// string interpolation, select/pattern-matching, foreach (list + map + range),
+// while, and tail-recursive salary projection.
+
+import { java.util.ArrayList }
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Department(label: String) {
+  ENGINEERING("Engineering"),
+  MARKETING("Marketing"),
+  FINANCE("Finance"),
+  HR("Human Resources"),
+  OPERATIONS("Operations")
+}
+
+// ADT case enum: employment status with optional payload
+enum EmployeeStatus {
+  case Active
+  case OnLeave(reason: String)
+  case Terminated(exitDate: String)
+  case Probation(endsOn: String)
+
+public:
+  def isActive(): Boolean =
+    select this {
+      case s is Active:    true
+      case s is Probation: true
+      else:                false
+    }
+
+  def label(): String =
+    select this {
+      case s is Active:     "Active"
+      case s is OnLeave:    "On leave: " + s.reason()
+      case s is Terminated: "Terminated " + s.exitDate()
+      case s is Probation:  "Probation until " + s.endsOn()
+    }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Address(street: String, city: String, country: String)
+
+record PerformanceReview(year: Int, score: Int, comment: String)
+
+record Salary(base: Int, bonus: Int) {
+public:
+  def total(): Int  = base() + bonus()
+  def annual(): Int = total() * 12
+}
+
+// Laws that are structurally guaranteed — testing Onion's law system.
+example salaryTotalIsBaseAndBonus { new Salary(500, 100).total() == 600 }
+example salaryAnnualIsTwelveMonths { new Salary(1000, 0).annual() == 12000 }
+
+record DeptSummary(dept: String, headcount: Int, avgBase: Int, topScorer: String)
+
+// ─── Interface ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── Base employee class ──────────────────────────────────────────────────────
+
+class Employee conforms Reportable {
+public:
+  val id:         Int
+  val name:       String
+  val department: Department
+  var salary:     Salary
+  var status:     EmployeeStatus
+  val address:    Address
+  val reviews:    ArrayList[PerformanceReview]
+
+  def this(id: Int, name: String, dept: Department, sal: Salary, addr: Address) {
+    this.id         = id
+    this.name       = name
+    this.department = dept
+    this.salary     = sal
+    this.status     = new Active()
+    this.address    = addr
+    this.reviews    = new ArrayList[PerformanceReview]()
+  }
+
+  def addReview(r: PerformanceReview): void { reviews.add(r) }
+
+  def reviewCount(): Int = reviews.size()
+
+  def latestScore(): Int {
+    if reviews.isEmpty() { return 0 }
+    return reviews.get(reviews.size() - 1).score()
+  }
+
+  def avgScore(): Double {
+    if reviews.isEmpty() { return 0.0 }
+    var sum: Int = 0
+    var i: Int = 0
+    while i < reviews.size() {
+      sum = sum + reviews.get(i).score()
+      i = i + 1
+    }
+    return (sum as Double) / (reviews.size() as Double)
+  }
+
+  def raiseSalary(pct: Int): void {
+    val bump = salary.base() * pct / 100
+    salary = new Salary(salary.base() + bump, salary.bonus())
+  }
+
+  override def report(): String =
+    "Employee[#{id}] #{name} | #{department.label()} | #{status.label()} | base=#{salary.base()}"
+}
+
+// ─── Manager subclass ─────────────────────────────────────────────────────────
+
+class Manager extends Employee {
+public:
+  val directReports: ArrayList[Employee]
+
+  // Call super(id, name, dept, sal, addr), then init directReports
+  def this(id: Int, name: String, dept: Department, sal: Salary, addr: Address): (id, name, dept, sal, addr) {
+    this.directReports = new ArrayList[Employee]()
+  }
+
+  def addReport(emp: Employee): void { directReports.add(emp) }
+
+  def teamSize(): Int = directReports.size()
+
+  override def report(): String =
+    "Manager[#{id}] #{name} | #{department.label()} | team=#{teamSize()} | base=#{salary.base()}"
+}
+
+// ─── Recursive org-chart headcount ───────────────────────────────────────────
+
+def orgHeadcount(mgr: Manager): Int {
+  var count: Int = 1   // count the manager themselves
+  var i: Int = 0
+  while i < mgr.directReports.size() {
+    val emp = mgr.directReports.get(i)
+    if emp is Manager {
+      count = count + orgHeadcount(emp as Manager)
+    } else {
+      count = count + 1
+    }
+    i = i + 1
+  }
+  return count
+}
+
+// ─── Pipeline helpers ─────────────────────────────────────────────────────────
+
+def activeOnly(all: List[Employee]): List[Employee] =
+  all.filter { e => e.status.isActive() }
+
+def topEarners(all: List[Employee]): List[Employee] =
+  all
+    .filter  { e => e.status.isActive() }
+    .sortedBy{ e => 0 - e.salary.base() }
+
+def buildSummaries(all: List[Employee]): List[DeptSummary] {
+  val grouped = all.groupBy { e => e.department.label() }
+  val result: List[DeptSummary] = []
+  foreach (dept, members) in grouped {
+    val ml = members as List[Employee]
+    var totalBase: Int = 0
+    var bestName: String = ""
+    var bestScore: Int = 0
+    var i: Int = 0
+    while i < ml.size() {
+      val emp = ml.get(i)
+      totalBase = totalBase + emp.salary.base()
+      val sc = emp.latestScore()
+      if sc > bestScore {
+        bestScore = sc
+        bestName  = emp.name
+      }
+      i = i + 1
+    }
+    val avg = if ml.size() > 0 { totalBase / ml.size() } else { 0 }
+    result.add(new DeptSummary(dept as String, ml.size(), avg, bestName))
+  }
+  return result
+}
+
+// ─── Grade from score ─────────────────────────────────────────────────────────
+
+def scoreGrade(score: Int): String =
+  select score {
+    case 5: "Outstanding"
+    case 4: "Exceeds Expectations"
+    case 3: "Meets Expectations"
+    case 2: "Needs Improvement"
+    case 1: "Unsatisfactory"
+    else:   "Unknown"
+  }
+
+// ─── Salary-raise with validation ────────────────────────────────────────────
+
+def applyRaise(emp: Employee, pct: Int): String {
+  try {
+    if pct < 0 || pct > 50 {
+      throw new IllegalArgumentException("raise pct out of range: " + pct)
+    }
+    val before = emp.salary.base()
+    emp.raiseSalary(pct)
+    return "#{emp.name}: #{before} → #{emp.salary.base()} (+#{pct}%)"
+  } catch e: Exception {
+    return "ERROR for #{emp.name}: " + e.message()
+  }
+}
+
+// ─── Compound-interest salary growth (tail-recursive) ────────────────────────
+
+def compoundGrowth(base: Int, ratePerYear: Int, years: Int): Int {
+  if years <= 0 { return base }
+  return compoundGrowth(base + base * ratePerYear / 100, ratePerYear, years - 1)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val sfAddr  = new Address("1 Tech Lane",   "San Francisco", "US")
+  val nyAddr  = new Address("22 Market St",  "New York",      "US")
+  val chiAddr = new Address("8 Finance Ave", "Chicago",       "US")
+  val ausAddr = new Address("5 People Sq",   "Austin",        "US")
+  val seaAddr = new Address("3 Ops Blvd",    "Seattle",       "US")
+
+  val mgr1 = new Manager(1, "Alice Chen",   Department::ENGINEERING, new Salary(12000, 2000), sfAddr)
+  val mgr2 = new Manager(2, "Bob Kumar",    Department::MARKETING,   new Salary(10000, 1500), nyAddr)
+  val emp3 = new Employee(3, "Carol White", Department::ENGINEERING,  new Salary(8000,  500),  chiAddr)
+  val emp4 = new Employee(4, "David Park",  Department::ENGINEERING,  new Salary(7500,  400),  ausAddr)
+  val emp5 = new Employee(5, "Eve Tanaka",  Department::MARKETING,    new Salary(6500,  300),  seaAddr)
+  val emp6 = new Employee(6, "Frank Liu",   Department::FINANCE,      new Salary(9000,  800),  sfAddr)
+
+  mgr1.addReport(emp3)
+  mgr1.addReport(emp4)
+  mgr2.addReport(emp5)
+
+  // Performance reviews
+  emp3.addReview(new PerformanceReview(2023, 4, "Good work"))
+  emp3.addReview(new PerformanceReview(2024, 5, "Outstanding"))
+  emp4.addReview(new PerformanceReview(2023, 3, "Meeting expectations"))
+  emp4.addReview(new PerformanceReview(2024, 4, "Improved significantly"))
+  mgr1.addReview(new PerformanceReview(2023, 5, "Exceptional leadership"))
+  mgr1.addReview(new PerformanceReview(2024, 5, "Continued excellence"))
+  emp5.addReview(new PerformanceReview(2024, 3, "Solid performance"))
+  emp6.addReview(new PerformanceReview(2024, 4, "Strong finance skills"))
+
+  // Change some statuses to exercise ADT pattern matching
+  emp4.status = new OnLeave("medical leave")
+  emp5.status = new Probation("2025-06-01")
+
+  val all: List[Employee] = [mgr1, mgr2, emp3, emp4, emp5, emp6]
+
+  // ── Reports ──────────────────────────────────────────────────────────────
+  println("=== Employee Reports ===")
+  foreach e: Employee in all {
+    println("  " + (e as Reportable).report())
+  }
+
+  // ── Active filter ─────────────────────────────────────────────────────────
+  println("\n=== Active Employees ===")
+  val active = activeOnly(all)
+  println("Active: " + active.size + "/" + all.size)
+  foreach e: Employee in active {
+    println("  " + e.name + " (" + e.department.label() + ")")
+  }
+
+  // ── Department breakdown from groupBy with (k,v) foreach ──────────────────
+  println("\n=== By Department ===")
+  val grouped = all.groupBy { e => e.department.label() }
+  foreach (dept, members) in grouped {
+    val ml = members as List[Employee]
+    println("  " + dept + ": " + ml.size + " employee(s)")
+  }
+
+  // ── Department summaries ──────────────────────────────────────────────────
+  println("\n=== Department Summaries ===")
+  val summaries = buildSummaries(all)
+  foreach s: DeptSummary in summaries {
+    println("  #{s.dept()}: n=#{s.headcount()}, avgBase=#{s.avgBase()}, top=#{s.topScorer()}")
+  }
+
+  // ── Top 3 earners (active, sorted by base salary) ─────────────────────────
+  println("\n=== Top 3 Active Earners ===")
+  val top = topEarners(all)
+  var rank: Int = 1
+  foreach e: Employee in top {
+    println("  ##{rank}. #{e.name} (#{e.department.label()}) base=#{e.salary.base()}")
+    rank = rank + 1
+    if rank > 3 { break }
+  }
+
+  // ── Performance scores ────────────────────────────────────────────────────
+  println("\n=== Performance Scores ===")
+  foreach e: Employee in all {
+    if e.reviewCount() > 0 {
+      val grade = scoreGrade(e.latestScore())
+      println("  #{e.name}: avg=#{e.avgScore()}, latest=#{grade}")
+    }
+  }
+
+  // ── Salary raises with validation ─────────────────────────────────────────
+  println("\n=== Salary Raises ===")
+  println("  " + applyRaise(emp3, 10))
+  println("  " + applyRaise(emp6, 15))
+  println("  " + applyRaise(mgr1, 75))   // triggers validation error
+
+  // ── Org chart headcount (recursive) ───────────────────────────────────────
+  println("\n=== Org Headcount ===")
+  println("  Under Alice: " + orgHeadcount(mgr1) + " (incl. self)")
+  println("  Under Bob:   " + orgHeadcount(mgr2) + " (incl. self)")
+
+  // ── Total payroll via fold ─────────────────────────────────────────────────
+  println("\n=== Annual Payroll ===")
+  val totalAnnual = all.fold(0) { acc, e => (acc as Int) + e.salary.annual() }
+  println("  Total annual: " + totalAnnual)
+  println("  Avg per employee: " + (totalAnnual / all.size))
+
+  // ── Status labels ─────────────────────────────────────────────────────────
+  println("\n=== Status Labels ===")
+  foreach e: Employee in all {
+    println("  #{e.name}: " + e.status.label())
+  }
+
+  // ── 5-year salary growth (compound, tail-recursive) ───────────────────────
+  println("\n=== 5-Year Salary Projections (5% annual) ===")
+  foreach e: Employee in all {
+    val proj = compoundGrowth(e.salary.base(), 5, 5)
+    println("  #{e.name}: #{e.salary.base()} → #{proj}")
+  }
+
+  // ── Quarterly budget allocation (range foreach 1..4) ─────────────────────
+  println("\n=== Quarterly Budget ===")
+  val qBudget = totalAnnual / 4
+  foreach q: Int in 1..4 {
+    val alloc = if q == 4 { totalAnnual - qBudget * 3 } else { qBudget }
+    println("  Q#{q}: " + alloc)
+  }
+
+  // ── Distinct departments visited ──────────────────────────────────────────
+  println("\n=== Distinct Departments ===")
+  val depts = all.map { e => e.department.label() }.distinct()
+  foreach d: String in depts {
+    println("  " + d)
+  }
+
+  // ── Summary string interpolation ──────────────────────────────────────────
+  val activeCount = active.size
+  val total       = all.size
+  println("\nSummary: #{activeCount}/#{total} active, payroll=#{totalAnnual}/yr")
+}

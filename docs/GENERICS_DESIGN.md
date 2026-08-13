@@ -1,5 +1,14 @@
 # Generics (Erasure-Based) – Design & TODO
 
+Status: **shipped.** Every checkpoint below has landed: type parameters on classes and
+methods, `[T extends Bound]` upper bounds, bracket type applications, erasure-based
+codegen with bridge methods, and inference for common generic calls. See
+[docs/reference/specification.md](reference/specification.md#generics) and
+[docs/guide/classes-and-objects.md](guide/classes-and-objects.md#generic-classes) for the
+syntax and semantics as they exist today, and CLAUDE.md ("Known Limitations") for what
+remains deliberately out of scope (erasure, invariance, no reified type info). This page
+is kept as a historical record of the original incremental plan.
+
 Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes/methods, bridge emission for overriding). Deliver in small PR-sized steps.
 
 ## Scope

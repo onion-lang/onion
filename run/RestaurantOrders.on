@@ -1,0 +1,327 @@
+// RestaurantOrders.on — A restaurant order management system (~260 lines)
+// Exercises: records with methods, plain/data-carrying/ADT enums, interface+conforms,
+// extension Double/String, collection pipelines (filter/map/fold/groupBy/sortedBy/
+// partition/find/distinct/zip), select + type patterns, nullable, string interpolation,
+// try/catch, closures, foreach (ranges and map k,v), while loop.
+
+import { java.util.ArrayList }
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt(): String {
+    val whole: Int  = self.intValue()
+    val frac: Int   = ((self - (whole as Double)) * 100.0 + 0.5).intValue()
+    val fs: String  = if frac < 10 { "0" + frac } else { "" + frac }
+    return whole + "." + fs
+  }
+  def dabs(): Double = if self < 0.0 { 0.0 - self } else { self }
+}
+
+extension String {
+  def padTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum ItemCategory {
+  Starter, Main, Dessert, Drink
+public:
+  def label(): String = select this {
+    case ItemCategory::Starter: "Starter"
+    case ItemCategory::Main:    "Main Course"
+    case ItemCategory::Dessert: "Dessert"
+    case ItemCategory::Drink:   "Drink"
+    else:                       "Unknown"
+  }
+  def abbr(): String = select this {
+    case ItemCategory::Starter: "[S]"
+    case ItemCategory::Main:    "[M]"
+    case ItemCategory::Dessert: "[D]"
+    case ItemCategory::Drink:   "[K]"
+    else:                       "[?]"
+  }
+}
+
+enum OrderStatus {
+  Open, Preparing, Ready, Served, Cancelled
+public:
+  def label(): String = select this {
+    case OrderStatus::Open:      "OPEN"
+    case OrderStatus::Preparing: "PREPARING"
+    case OrderStatus::Ready:     "READY"
+    case OrderStatus::Served:    "SERVED"
+    case OrderStatus::Cancelled: "CANCELLED"
+    else:                        "UNKNOWN"
+  }
+}
+
+// ADT payment method
+enum Payment {
+  case Cash(amount: Double)
+  case Card(last4: String, amount: Double)
+  case Voucher(code: String, amount: Double)
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record MenuItem(name: String, category: ItemCategory, price: Double, veg: Boolean) {
+public:
+  def display(): String =
+    category.abbr() + " " + name.padTo(22) + "$" + price.fmt() +
+    (if veg { " [V]" } else { "    " })
+}
+
+record OrderLine(item: MenuItem, qty: Int) {
+public:
+  def subtotal(): Double = item.price() * (qty as Double)
+  def summary(): String  = "" + qty + "x " + item.name().padTo(22) + " $" + subtotal().fmt()
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Billable {
+  def total(): Double
+  def lineCount(): Int
+}
+
+// ── Order class ───────────────────────────────────────────────────────────────
+
+class RestaurantOrder conforms Billable {
+  val tableNum: Int
+  var status: OrderStatus
+  val lines: List[OrderLine]
+  var payment: Payment?
+
+public:
+  def this(tableNum: Int) {
+    this.tableNum = tableNum
+    this.status   = OrderStatus::Open
+    this.lines    = []
+    this.payment  = null
+  }
+
+  def getTableNum(): Int          = tableNum
+  def getStatus(): OrderStatus    = status
+  def getLines(): List[OrderLine] = lines
+  def getPayment(): Payment?      = payment
+
+  def addItem(item: MenuItem, qty: Int): void {
+    if qty <= 0 { throw new IllegalArgumentException("qty must be > 0") }
+    lines.add(new OrderLine(item, qty))
+  }
+
+  def advance(): void {
+    status = select status {
+      case OrderStatus::Open:      OrderStatus::Preparing
+      case OrderStatus::Preparing: OrderStatus::Ready
+      case OrderStatus::Ready:     OrderStatus::Served
+      else:                        status
+    }
+  }
+
+  def cancel(): void { status = OrderStatus::Cancelled }
+
+  def pay(p: Payment): void { payment = p }
+
+  def total(): Double =
+    lines.fold(0.0) { acc, ln => (acc as Double) + (ln as OrderLine).subtotal() } as Double
+
+  def lineCount(): Int = lines.size
+
+  def receipt(): String {
+    var r: String = "=".rep(40) + "\n"
+    r = r + "TABLE #{tableNum}   Status: #{status.label()}\n"
+    r = r + "-".rep(40) + "\n"
+    foreach ln: OrderLine in lines {
+      r = r + ln.summary() + "\n"
+    }
+    r = r + "-".rep(40) + "\n"
+    r = r + "TOTAL  $#{total().fmt()}\n"
+    val pm: Payment? = payment
+    if pm != null {
+      val payStr: String = select pm {
+        case c is Cash:    "Cash $#{(c as Cash).amount().fmt()}"
+        case d is Card:    "Card *" + (d as Card).last4()
+        case v is Voucher: "Voucher " + (v as Voucher).code()
+        else:              "Unknown"
+      }
+      r = r + "PAID   " + payStr + "\n"
+    }
+    r = r + "=".rep(40)
+    return r
+  }
+}
+
+// ── Menu data ─────────────────────────────────────────────────────────────────
+
+val menu: List[MenuItem] = [
+  new MenuItem("Tomato Soup",      ItemCategory::Starter, 8.50,  true),
+  new MenuItem("Caesar Salad",     ItemCategory::Starter, 9.00,  true),
+  new MenuItem("Garlic Bread",     ItemCategory::Starter, 5.00,  true),
+  new MenuItem("Grilled Salmon",   ItemCategory::Main,    24.00, false),
+  new MenuItem("Beef Tenderloin",  ItemCategory::Main,    32.00, false),
+  new MenuItem("Mushroom Risotto", ItemCategory::Main,    18.50, true),
+  new MenuItem("Veggie Burger",    ItemCategory::Main,    14.00, true),
+  new MenuItem("Cheesecake",       ItemCategory::Dessert, 7.50,  true),
+  new MenuItem("Tiramisu",         ItemCategory::Dessert, 8.00,  true),
+  new MenuItem("Soft Drink",       ItemCategory::Drink,   3.50,  true),
+  new MenuItem("House Wine",       ItemCategory::Drink,   6.00,  true),
+  new MenuItem("Craft Beer",       ItemCategory::Drink,   5.50,  false)
+]
+
+// Print full menu grouped by category
+IO::println("=".rep(40))
+IO::println("         RESTAURANT MENU")
+IO::println("=".rep(40))
+val byCategory: Map[String, List[MenuItem]] = menu.groupBy { item => item.category().label() }
+val catOrder: List[String] = ["Starter", "Main Course", "Dessert", "Drink"]
+foreach cat: String in catOrder {
+  val items: List[MenuItem] = byCategory.getOrDefault(cat, [])
+  if items.size > 0 {
+    IO::println("\n  " + cat.toUpperCase())
+    foreach item: MenuItem in items {
+      IO::println("  " + item.display())
+    }
+  }
+}
+IO::println("")
+
+// ── Build three orders ────────────────────────────────────────────────────────
+
+// Table 1: two guests
+val order1 = new RestaurantOrder(1)
+order1.addItem(new MenuItem("Tomato Soup",     ItemCategory::Starter, 8.50, true), 2)
+order1.addItem(new MenuItem("Grilled Salmon",  ItemCategory::Main,    24.00,false), 1)
+order1.addItem(new MenuItem("Beef Tenderloin", ItemCategory::Main,    32.00,false), 1)
+order1.addItem(new MenuItem("House Wine",      ItemCategory::Drink,   6.00, true), 2)
+order1.addItem(new MenuItem("Cheesecake",      ItemCategory::Dessert, 7.50, true), 2)
+
+// Table 2: vegetarian table
+val order2 = new RestaurantOrder(2)
+order2.addItem(new MenuItem("Caesar Salad",    ItemCategory::Starter, 9.00, true), 3)
+order2.addItem(new MenuItem("Mushroom Risotto",ItemCategory::Main,    18.50,true), 2)
+order2.addItem(new MenuItem("Veggie Burger",   ItemCategory::Main,    14.00,true), 1)
+order2.addItem(new MenuItem("Soft Drink",      ItemCategory::Drink,   3.50, true), 3)
+order2.addItem(new MenuItem("Tiramisu",        ItemCategory::Dessert, 8.00, true), 2)
+
+// Table 3: walk-out, cancelled
+val order3 = new RestaurantOrder(3)
+order3.addItem(new MenuItem("Garlic Bread",    ItemCategory::Starter, 5.00, true),  2)
+order3.addItem(new MenuItem("Craft Beer",      ItemCategory::Drink,   5.50, false),  2)
+order3.cancel()
+
+// Advance orders through the kitchen pipeline
+order1.advance()   // Open -> Preparing
+order1.advance()   // Preparing -> Ready
+order1.advance()   // Ready -> Served
+order1.pay(new Cash(100.0))
+
+order2.advance()   // Open -> Preparing
+order2.advance()   // Preparing -> Ready
+order2.pay(new Card("4242", 82.50))
+
+// ── Collection pipeline analysis ──────────────────────────────────────────────
+
+val orders: List[RestaurantOrder] = [order1, order2, order3]
+
+val served    = orders.filter { o => (o as RestaurantOrder).getStatus() == OrderStatus::Served }
+val cancelled = orders.filter { o => (o as RestaurantOrder).getStatus() == OrderStatus::Cancelled }
+IO::println("Served orders:    " + served.size)
+IO::println("Cancelled orders: " + cancelled.size)
+
+// Revenue from served orders only
+val revenue = served.fold(0.0) { acc, o => (acc as Double) + (o as RestaurantOrder).total() }
+IO::println("Revenue (served): $" + (revenue as Double).fmt())
+
+// All lines across served orders (flatMap)
+val allLines = served.flatMap { o => (o as RestaurantOrder).getLines() }
+IO::println("Line items served: " + allLines.size)
+
+// Highest-value line
+val topLine = allLines.sortedBy { ln => 0.0 - (ln as OrderLine).subtotal() }.head() as OrderLine
+IO::println("Highest line: " + topLine.item().name() + " $" + topLine.subtotal().fmt())
+
+// Unique item names served (distinct)
+val itemNames = allLines.map { ln => (ln as OrderLine).item().name() }.distinct()
+IO::println("Distinct items served: " + itemNames.size)
+
+// Partition active lines into veg / non-veg
+val activeLns = orders.filter { o =>
+  (o as RestaurantOrder).getStatus() != OrderStatus::Cancelled
+}.flatMap { o => (o as RestaurantOrder).getLines() }
+
+val parts       = activeLns.partition { ln => (ln as OrderLine).item().veg() }
+val vegLines    = parts[0] as List[Object]
+val nonVegLines = parts[1] as List[Object]
+IO::println("Vegetarian lines:     " + vegLines.size)
+IO::println("Non-vegetarian lines: " + nonVegLines.size)
+
+// Average price per category
+IO::println("\n-- Average price by category --")
+foreach cat: String in catOrder {
+  val items: List[MenuItem] = byCategory.getOrDefault(cat, [])
+  if items.size > 0 {
+    val tot: Double = items.fold(0.0) { acc, item => (acc as Double) + (item as MenuItem).price() } as Double
+    val avg: Double = tot / (items.size as Double)
+    IO::println("  " + cat.padTo(12) + ": $" + avg.fmt())
+  }
+}
+
+// try/catch: invalid quantity
+IO::println("\n-- Error handling --")
+try {
+  order1.addItem(new MenuItem("Water", ItemCategory::Drink, 0.0, true), 0 - 1)
+  IO::println("Should not reach here")
+} catch e: Exception {
+  IO::println("Caught: " + e.message())
+}
+
+// Print receipts
+IO::println("")
+IO::println(order1.receipt())
+IO::println("")
+IO::println(order2.receipt())
+
+// Range-based table summary
+IO::println("\n-- Table summary --")
+foreach t: Int in 1..3 {
+  val found = orders.find { o => (o as RestaurantOrder).getTableNum() == t }
+  if found != null {
+    val fo = found as RestaurantOrder
+    IO::println("  Table " + t + " [" + fo.getStatus().label() + "]  lines=" +
+                fo.lineCount() + "  total=$" + fo.total().fmt())
+  }
+}
+
+// Zip item names with prices (top 4 most expensive)
+val top4    = menu.sortedBy { m => 0.0 - (m as MenuItem).price() }.take(4)
+val tNames  = top4.map { m => (m as MenuItem).name() }
+val tPrices = top4.map { m => "$" + (m as MenuItem).price().fmt() }
+val zipped  = tNames.zip(tPrices)
+IO::println("\n-- Top 4 items by price --")
+foreach pair: Object in zipped {
+  val p  = pair as List[Object]
+  IO::println("  " + p[0] + "  " + p[1])
+}
+
+// Sorted menu overview (cheapest first)
+IO::println("\n-- Menu by price (asc) --")
+val sorted = menu.sortedBy { m => (m as MenuItem).price() }
+var rank: Int = 1
+foreach m: MenuItem in sorted {
+  IO::println("  " + rank + ". " + m.name().padTo(22) + "$" + m.price().fmt())
+  rank = rank + 1
+}
+
+IO::println("\nDone.")

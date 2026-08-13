@@ -1,0 +1,320 @@
+// PharmacySystem.on — pharmacy prescription management system
+// Exercises: records, ADT enums, classes, collection pipelines,
+//            nullable, select/pattern matching, string interpolation,
+//            foreach over maps and ranges
+
+import {
+  java.util.*
+}
+
+enum DrugCategory {
+  case Antibiotic
+  case Analgesic
+  case Antidepressant
+  case Antihypertensive
+  case Antihistamine
+  case Supplement
+public:
+  def label(): String = select this {
+    case c is Antibiotic:       "Antibiotic"
+    case c is Analgesic:        "Analgesic"
+    case c is Antidepressant:   "Antidepressant"
+    case c is Antihypertensive: "Antihypertensive"
+    case c is Antihistamine:    "Antihistamine"
+    case c is Supplement:       "Supplement"
+  }
+}
+
+enum PrescriptionStatus {
+  case Active
+  case Filled
+  case Expired
+  case Cancelled
+public:
+  def label(): String = select this {
+    case s is Active:    "ACTIVE"
+    case s is Filled:    "FILLED"
+    case s is Expired:   "EXPIRED"
+    case s is Cancelled: "CANCELLED"
+  }
+  def isOpen(): Boolean = select this {
+    case s is Active: true
+    else: false
+  }
+}
+
+record Drug(id: String, name: String, category: DrugCategory, unitPrice: Double, stockUnits: Int)
+
+record Patient(id: String, name: String, age: Int, insurancePct: Double)
+
+record Prescription(
+  id: String,
+  patientId: String,
+  drugId: String,
+  dosageMg: Int,
+  daysSupply: Int,
+  refillsRemaining: Int,
+  status: PrescriptionStatus
+)
+
+record FilledRx(rxId: String, patientName: String, drugName: String, cost: Double, copay: Double)
+
+// ─── Drug catalogue ───────────────────────────────────────────────────────────
+
+val drugs: List[Drug] = [
+  new Drug("D001", "Amoxicillin",   new Antibiotic(),       0.50d, 500),
+  new Drug("D002", "Ibuprofen",     new Analgesic(),        0.10d, 1200),
+  new Drug("D003", "Sertraline",    new Antidepressant(),   1.20d, 300),
+  new Drug("D004", "Lisinopril",    new Antihypertensive(), 0.30d, 800),
+  new Drug("D005", "Cetirizine",    new Antihistamine(),    0.20d, 600),
+  new Drug("D006", "Vitamin D",     new Supplement(),       0.05d, 2000),
+  new Drug("D007", "Azithromycin",  new Antibiotic(),       2.50d, 150),
+  new Drug("D008", "Acetaminophen", new Analgesic(),        0.08d, 1500)
+]
+
+// ─── Patient registry ──────────────────────────────────────────────────────────
+
+val patients: List[Patient] = [
+  new Patient("P001", "Alice Chen",    34, 0.80d),
+  new Patient("P002", "Bob Martinez",  58, 0.60d),
+  new Patient("P003", "Carol Johnson", 45, 0.90d),
+  new Patient("P004", "David Park",    29, 0.70d),
+  new Patient("P005", "Emma Wilson",   67, 0.85d)
+]
+
+// ─── Prescriptions ────────────────────────────────────────────────────────────
+
+val prescriptions: List[Prescription] = [
+  new Prescription("RX001", "P001", "D001", 500, 10, 2, new Active()),
+  new Prescription("RX002", "P001", "D005", 10,  30, 5, new Active()),
+  new Prescription("RX003", "P002", "D004", 10,  90, 3, new Active()),
+  new Prescription("RX004", "P002", "D003", 50,  30, 1, new Filled()),
+  new Prescription("RX005", "P003", "D002", 400, 14, 0, new Active()),
+  new Prescription("RX006", "P003", "D008", 500, 7,  0, new Expired()),
+  new Prescription("RX007", "P004", "D007", 250, 5,  0, new Active()),
+  new Prescription("RX008", "P004", "D006", 1000,90, 11,new Active()),
+  new Prescription("RX009", "P005", "D004", 20,  90, 2, new Active()),
+  new Prescription("RX010", "P005", "D003", 100, 30, 2, new Cancelled())
+]
+
+// ─── Lookup helpers ───────────────────────────────────────────────────────────
+
+def findDrug(drugId: String): Drug? {
+  foreach d: Drug in drugs {
+    if d.id() == drugId { return d }
+  }
+  return null
+}
+
+def findPatient(patientId: String): Patient? {
+  foreach p: Patient in patients {
+    if p.id() == patientId { return p }
+  }
+  return null
+}
+
+def calcCost(rx: Prescription, drug: Drug): Double =
+  drug.unitPrice() * rx.daysSupply()
+
+def calcCopay(rx: Prescription, drug: Drug, patient: Patient): Double = {
+  val total: Double = calcCost(rx, drug)
+  return total * (1.0d - patient.insurancePct())
+}
+
+def fillRx(rx: Prescription): FilledRx? {
+  val drug: Drug? = findDrug(rx.drugId())
+  val patient: Patient? = findPatient(rx.patientId())
+  if drug == null { return null }
+  if patient == null { return null }
+  val cost: Double = calcCost(rx, drug)
+  val copay: Double = calcCopay(rx, drug, patient)
+  return new FilledRx(rx.id(), patient.name(), drug.name(), cost, copay)
+}
+
+def activeRxFor(patientId: String): List[Prescription] =
+  prescriptions.filter { rx => rx.patientId() == patientId && rx.status().isOpen() }
+
+IO::println("=== Pharmacy Management System ===")
+IO::println("")
+
+// ─── Section helpers ──────────────────────────────────────────────────────────
+
+def pad(s: String, width: Int): String {
+  var result: String = s
+  while result.length() < width { result = result + " " }
+  return result
+}
+
+def roundTwo(v: Double): Double = Math::round(v * 100.0d) / 100.0d
+
+// ─── 1. Drug Catalogue ────────────────────────────────────────────────────────
+
+IO::println("── Drug Catalogue ──────────────────────────────")
+IO::println("ID    Name              Category          Price  Stock")
+IO::println("────  ────────────────  ────────────────  ─────  ─────")
+foreach d: Drug in drugs {
+  val price: String = "$#{d.unitPrice()}"
+  IO::println("#{d.id()}  #{pad(d.name(), 16)}  #{pad(d.category().label(), 16)}  #{price}")
+}
+IO::println("")
+
+// ─── 2. Category breakdown ────────────────────────────────────────────────────
+
+IO::println("── Drugs by Category ───────────────────────────")
+val byCategory: Map[String, List[Drug]] = drugs.groupBy { d => d.category().label() }
+foreach (cat, catDrugs) in byCategory {
+  val names: List[String] = catDrugs.map { d => d.name() }
+  var joined: String = ""
+  var first: Boolean = true
+  foreach n: String in names {
+    if first { joined = n; first = false } else { joined = joined + ", " + n }
+  }
+  IO::println("  #{cat}: #{joined}")
+}
+IO::println("")
+
+// ─── 3. Inventory alerts ─────────────────────────────────────────────────────
+
+IO::println("── Low Stock Alerts (< 200 units) ─────────────")
+val lowStock: List[Drug] = drugs.filter { d => d.stockUnits() < 200 }
+if lowStock.size == 0 {
+  IO::println("  No low-stock items.")
+} else {
+  foreach d: Drug in lowStock {
+    IO::println("  [ALERT] #{d.name()} (#{d.id()}): #{d.stockUnits()} units remaining")
+  }
+}
+IO::println("")
+
+// ─── 4. Prescriptions per patient ────────────────────────────────────────────
+
+IO::println("── Active Prescriptions by Patient ────────────")
+foreach patient: Patient in patients {
+  val active: List[Prescription] = activeRxFor(patient.id())
+  if active.size == 0 { continue }
+  IO::println("  #{patient.name()} (#{patient.id()}, age #{patient.age()}, ins #{patient.insurancePct() * 100.0d}%):")
+  foreach rx: Prescription in active {
+    val drug: Drug? = findDrug(rx.drugId())
+    if drug == null { continue }
+    val cost: Double = roundTwo(calcCost(rx, drug))
+    val copay: Double = roundTwo(calcCopay(rx, drug, patient))
+    IO::println("    #{rx.id()}: #{drug.name()} #{rx.dosageMg()}mg x#{rx.daysSupply()}d  cost=$#{cost}  copay=$#{copay}  refills=#{rx.refillsRemaining()}")
+  }
+}
+IO::println("")
+
+// ─── 5. Full prescription status report ──────────────────────────────────────
+
+IO::println("── All Prescriptions ───────────────────────────")
+IO::println("ID      Patient         Drug              Status     Days  Refills")
+IO::println("──────  ──────────────  ────────────────  ─────────  ────  ───────")
+foreach rx: Prescription in prescriptions {
+  val patient: Patient? = findPatient(rx.patientId())
+  val drug: Drug? = findDrug(rx.drugId())
+  val pName: String = if patient == null { "???" } else { patient.name() }
+  val dName: String = if drug == null { "???" } else { drug.name() }
+  IO::println("#{rx.id()}  #{pad(pName, 14)}  #{pad(dName, 16)}  #{pad(rx.status().label(), 9)}  #{rx.daysSupply()}     #{rx.refillsRemaining()}")
+}
+IO::println("")
+
+// ─── 6. Cost summary ─────────────────────────────────────────────────────────
+
+IO::println("── Billing Summary (active prescriptions) ──────")
+val activeRxAll: List[Prescription] = prescriptions.filter { rx => rx.status().isOpen() }
+var totalCost: Double = 0.0d
+var totalCopay: Double = 0.0d
+foreach rx: Prescription in activeRxAll {
+  val drug: Drug? = findDrug(rx.drugId())
+  val patient: Patient? = findPatient(rx.patientId())
+  if drug == null { continue }
+  if patient == null { continue }
+  totalCost  = totalCost  + calcCost(rx, drug)
+  totalCopay = totalCopay + calcCopay(rx, drug, patient)
+}
+val totalInsurance: Double = roundTwo(totalCost - totalCopay)
+IO::println("  Active prescriptions : #{activeRxAll.size}")
+IO::println("  Total drug cost      : $#{roundTwo(totalCost)}")
+IO::println("  Insurance covers     : $#{totalInsurance}")
+IO::println("  Patient copays       : $#{roundTwo(totalCopay)}")
+IO::println("")
+
+// ─── 7. Per-patient spending ──────────────────────────────────────────────────
+
+IO::println("── Patient Copay Summary ───────────────────────")
+foreach patient: Patient in patients {
+  val rxList: List[Prescription] = activeRxFor(patient.id())
+  var copayTotal: Double = 0.0d
+  var costTotal: Double = 0.0d
+  foreach rx: Prescription in rxList {
+    val drug: Drug? = findDrug(rx.drugId())
+    if drug == null { continue }
+    costTotal  = costTotal  + calcCost(rx, drug)
+    copayTotal = copayTotal + calcCopay(rx, drug, patient)
+  }
+  if rxList.size == 0 { continue }
+  IO::println("  #{pad(patient.name(), 16)}  #{rxList.size} rx  cost=$#{roundTwo(costTotal)}  copay=$#{roundTwo(copayTotal)}")
+}
+IO::println("")
+
+// ─── 8. Drug popularity ───────────────────────────────────────────────────────
+
+IO::println("── Drug Prescription Counts ────────────────────")
+val byDrug: Map[String, List[Prescription]] = prescriptions.groupBy { rx => rx.drugId() }
+val drugCounts: List[String] = drugs.map { d =>
+  val rxForDrug: List[Prescription] = prescriptions.filter { rx => rx.drugId() == d.id() }
+  val activeCount: Int = rxForDrug.filter { rx => rx.status().isOpen() }.size
+  "#{d.name()}|#{rxForDrug.size}|#{activeCount}"
+}
+IO::println("  Drug              Total  Active")
+IO::println("  ────────────────  ─────  ──────")
+foreach entry: String in drugCounts {
+  val idx1: Int = entry.indexOf("|")
+  val idx2: Int = entry.indexOf("|", idx1 + 1)
+  val name: String = entry.substring(0, idx1)
+  val total: String = entry.substring(idx1 + 1, idx2)
+  val active: String = entry.substring(idx2 + 1, entry.length())
+  IO::println("  #{pad(name, 16)}  #{total}      #{active}")
+}
+IO::println("")
+
+// ─── 9. Refill eligibility ────────────────────────────────────────────────────
+
+IO::println("── Refill-Eligible Prescriptions ───────────────")
+val refillEligible: List[Prescription] = prescriptions.filter { rx =>
+  rx.status().isOpen() && rx.refillsRemaining() > 0
+}
+if refillEligible.size == 0 {
+  IO::println("  None.")
+} else {
+  foreach rx: Prescription in refillEligible {
+    val patient: Patient? = findPatient(rx.patientId())
+    val drug: Drug? = findDrug(rx.drugId())
+    val pName: String = if patient == null { "???" } else { patient.name() }
+    val dName: String = if drug == null { "???" } else { drug.name() }
+    IO::println("  #{rx.id()}  #{pad(pName, 14)}  #{dName}  (#{rx.refillsRemaining()} refills left)")
+  }
+}
+IO::println("")
+
+// ─── 10. Summary statistics ───────────────────────────────────────────────────
+
+IO::println("── Summary ─────────────────────────────────────")
+val totalRx: Int = prescriptions.size
+val activeCount: Int = prescriptions.filter { rx => rx.status().isOpen() }.size
+val filledCount: Int = prescriptions.filter { rx =>
+  select rx.status() { case s is Filled: true; else: false }
+}.size
+val expiredCount: Int = prescriptions.filter { rx =>
+  select rx.status() { case s is Expired: true; else: false }
+}.size
+val cancelledCount: Int = prescriptions.filter { rx =>
+  select rx.status() { case s is Cancelled: true; else: false }
+}.size
+val avgAge: Int = patients.fold(0) { acc, p => acc + p.age() } / patients.size
+IO::println("  Patients         : #{patients.size}  (avg age: #{avgAge})")
+IO::println("  Drugs in catalog : #{drugs.size}")
+IO::println("  Prescriptions    : #{totalRx} total  (#{activeCount} active, #{filledCount} filled, #{expiredCount} expired, #{cancelledCount} cancelled)")
+IO::println("  Low-stock drugs  : #{lowStock.size}")
+IO::println("  Refill-eligible  : #{refillEligible.size}")
+IO::println("")
+IO::println("=== End of Report ===")

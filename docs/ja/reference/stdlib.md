@@ -55,6 +55,78 @@ val name: String = IO::readln("名前は？ ")
 IO::println("こんにちは、" + name)
 ```
 
+### IO::readLine
+
+標準入力から1行読み取り、入力の終端では `null` を返す。プロンプトなしの
+`IO::readln()` はこのメソッドの別名：
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+残りの標準入力全体を1つの文字列として読み取り：
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### フォーマット出力
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### エラー出力（stderr）
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### 型安全な入力
+
+1行を指定の型として読み取ってパースし、不正な入力なら例外を投げる。各メソッドには
+先にプロンプトを表示するオーバーロードがある：
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // true/yes/1、false/no/0 を受け付け
+```
+
+### 安全な入力
+
+上記の型安全な読み取りと同様だが、不正な入力や入力終端では例外を投げず
+`null` を返す：
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### 行単位の入出力
+
+```onion
+val lines: List = IO::readLines()          // 入力の終端まで読み取り
+IO::eachLine { line => IO::println(line) } // 残りの各行にコールバックを適用
+IO::printLines(["a", "b", "c"])            // 1項目1行で出力
+IO::printAll("a", "b", "c")                // printLines の可変長引数版
+```
+
+### ユーティリティ
+
+```onion
+IO::flush()    // 標準出力をフラッシュ
+IO::newline()  // 空行を出力
+IO::clear()    // ターミナル画面をクリア（ANSIエスケープコード）
+```
+
 ## Math モジュール
 
 Javaの`Math`クラス経由の数学演算。
@@ -390,6 +462,42 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 `"abc,def"` から `Int` を2つ読むと defect は**2件**報告されます。最初の1件ではありません。
 `Outcome` の蓄積する `zip` はそのためにあります。
 
+### Lossless shape と lens
+
+L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそれを伝え、
+`parseLossless(text[, origin])` は素の `T` の代わりに `Lossless[T]` を読みます:値と、
+その周辺すべての `Residue`（コメント、空白、キーの順序、元の値の書き方）です。
+`printLossless(value, residue)` はその residue を通して書き戻します——変更していない
+部分はバイト単位で再現され、意図的に変更した値だけが書き直されます。`Residue` は
+不透明な値で、生成した shape にだけ渡し戻してください。
+
+`Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
+`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v => ... }` は更新を
+値にフォーカスします。`render()` がテキストを再構成します:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  1行だけ変わる
+```
+
+`Shapes::config` と `Shapes::yaml` は、`shape name = config` / `shape name = yaml` の
+糖衣構文の裏にある lossless shape を、`Shape[T]` の値として直接組み立てます。
+
+### コンビネータ
+
+- `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
+  行の defect の両方を保持します（`Outcome::values`/`Outcome::defects` で分離できます）。
+  ログファイルのように大半の行が読めるケースなど、部分的な結果に意味がある場合は
+  `lines()` よりこちらを使います。
+- `lines()` — 1行1値、全部読めるか失敗するかの `Shape[List[T]]` です。
+- `sepBy(separator)` — リテラルな区切り文字で分割する、全部読めるか失敗するかの
+  `Shape[List[T]]` です。
+- `xmap(forward, backward)` — 同型写像に沿って shape を運びます。`print` が黙って
+  壊れないよう、両方向の関数が必要です。
+- `orElse(other)` — この shape、読めなければ `other`。どちらも読めない場合は両方の
+  defect を報告します。印字はこの shape で行います。
+
 ## 関数インターフェース
 
 ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。
@@ -610,6 +718,23 @@ val randomBool: Boolean = Rand::nextBoolean()   // ランダムなBoolean
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1から6
 val percent: Int = Rand::nextInt(100)     // 0から99
+val d20: Int = Rand::nextInt(1, 21)       // 1から20（min, 排他的max）
+```
+
+### Rand::nextDouble（範囲指定）
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0から10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0から2.0
+```
+
+### Rand::choice
+
+リストからランダムに1要素を選ぶ：
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -624,6 +749,23 @@ list.add("A")
 list.add("B")
 list.add("C")
 Rand::shuffle(list)  // その場でシャッフル
+```
+
+### Rand::sample
+
+リストから重複なくn個の要素をランダムに選ぶ：
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 重複しない3枚
+```
+
+### Rand::uuid
+
+ランダムなUUID文字列を生成：
+
+```onion
+val id: String = Rand::uuid()   // 例: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert モジュール
@@ -670,8 +812,9 @@ val startMillis: Long = Timing::millis()   // 壁時計 (System.currentTimeMilli
 ```onion
 val start: Long = Timing::nanos()
 // ... 何らかの処理 ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // ナノ秒での経過時間
-val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時間
+val elapsedNs: Long = Timing::elapsedNanos(start)      // ナノ秒での経過時間
+val elapsedMs: Double = Timing::elapsedMs(start)       // ミリ秒での経過時間（サブミリ秒精度のdouble）
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Timing::millis()起点のミリ秒での経過時間
 ```
 
 ### 時間のフォーマット
@@ -680,12 +823,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // ミリ秒での経過時
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // 出力形式: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// 出力形式: "500ms", "1.23s", "2m30s"
 ```
 
 ### スリープ
 
 ```onion
-Timing::sleep(1000L)  // 1000ミリ秒スリープ
+Timing::sleep(1000L)        // 1000ミリ秒スリープ
+Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
 ### 関数実行時間の計測
@@ -694,6 +842,12 @@ Timing::sleep(1000L)  // 1000ミリ秒スリープ
 // 実行時間を計測して表示し、結果を返す
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // 出力: "Elapsed: 123.45ms"
+
+// 戻り値のない関数版
+Timing::measureVoid(() -> { expensiveOperation(); })
+// 出力: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// 出力: "task: 123.45ms"
 
 // 表示なしで実行時間（ナノ秒）を取得
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
@@ -872,6 +1026,7 @@ val age = Json::getInt(obj, "age")                     // 3
 val m = Json::object()                                  // 空の Map
 m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
+val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -897,7 +1052,25 @@ v["users"][0]["name"].asString()
 
 キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
-要素数を調べられます。
+要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
+
+`Json::parseOrNull(json)` は `Json::parse(json)` と同じですが、不正な入力に対して例外
+`Json.JsonParseException` を投げる代わりに `null` を返します。パース失敗を別扱いのエラーではなく
+単なる「値が無い」ケースとして扱いたいときに便利です:
+
+```onion
+val obj = Json::parseOrNull("not json")   // 例外を投げず null
+```
+
+`Json::asObject(obj)` と `Json::asArray(obj)` は素の `Map`/`List` 表現に対する型安全なキャストです。
+実行時の型が一致していれば `Map`/`List` にキャストした値を、そうでなければ `null` を返します。
+`Json::get`・`Json::parse`・`Json::parseOrNull` が `Object` を返した後、Map/List として
+イテレートしたいときに使います:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List。"tags" が配列でなければ null
+```
 
 ## Yaml モジュール
 
@@ -1017,6 +1190,7 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // 配列・List どちらも可
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1028,9 +1202,13 @@ Strings::padLeft(s, 8, '0') / Strings::padRight(s, 8, ' ') / Strings::repeat(s, 
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 Strings::removePrefix("unhappy", "un")   // "happy"
 Strings::removeSuffix("running", "ing")  // "runn"
 Strings::truncate("hello world", 8, "...")   // "hello..."
@@ -1038,6 +1216,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
@@ -1218,13 +1398,20 @@ System::exit(1)  // エラー
 
 コレクションや配列向けのイテレーションユーティリティ:
 
-- `Iterables::map(list|iterable, f)`
+- `Iterables::map(list|iterable|set, f)`
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
+- `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
-- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
+- `Iterables::newList(size)` - `size` 個分の容量を確保した空の `List`
+- `Iterables::first(list)` / `Iterables::last(list)` - リストが空なら `null`
+- `Iterables::reverse(list)`
+- `Iterables::take(list, n)` / `Iterables::drop(list, n)`
+- `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - 後者は要素が `Comparable` であることが必要
 
 ## Files モジュール
 
@@ -1234,10 +1421,19 @@ System::exit(1)  // エラー
 Files::readText("path.txt")            // ファイル全体を String として
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] を1行ずつ書き込む
+Files::appendText("out.txt", content)  // 追記。ファイルが無ければ新規作成
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
+Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
+Files::size(path)                      // Long。バイト数（存在しなければ0）
+Files::copy(src, dst)                  // dst が既にあれば置き換える
+Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -1245,6 +1441,7 @@ Files::delete(path) / Files::exists(path)
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // カレントディレクトリ基準の絶対パス
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"（拡張子。予約語を避けた名前）
 Files::stem("report.txt")              // "report"
@@ -1302,6 +1499,22 @@ Colls::sortedBy(people) { p => p.age() }
 // xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### バッチ化・ウィンドウ化・セレクタ集計
+
+これらも `Colls::` の静的呼び出しとして、また `Colls` の他のメソッドと同様に
+パイプラインとして連結できる List の拡張メソッドとして利用できる:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - 最大3件のバッチ、最後は少なくなることがある
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - 1要素ずつスライドする窓
+ps.sumBy((p) -> p.age())          // Double - 各要素にセレクタを適用した合計
+ps.averageBy((p) -> p.age())      // Double - セレクタの平均、空なら0.0
+ps.maxBy((p) -> p.age())          // セレクタの値が最大の要素、空ならnull
+ps.minBy((p) -> p.age())          // セレクタの値が最小の要素、空ならnull
+
+xs.chunked(2).map { b => (b as List).size() }   // 他のパイプライン段と同様に連結できる
+```
+
 ## Http
 
 HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用）。
@@ -1320,6 +1533,17 @@ Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
 Http::post(url, body, headers): String   // headers は get と同じ
 ```
+
+### Response オブジェクト
+
+```
+Http::getResponse(url): Response                  // ボディだけでなく status/body/headers を返す
+Http::postResponse(url, body): Response
+```
+
+`Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
+`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパーを持つ。
+ボディだけでなくステータスコードやヘッダーが必要なときに使う。
 
 ### その他のメソッド
 
@@ -1478,6 +1702,31 @@ Regex::split(input, pattern, limit): List[String]
 ```
 Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
+```
+
+### Pattern リテラルのオーバーロード
+
+`re"..."` リテラルは `String` ではなく `java.util.regex.Pattern` にコンパイルされます。
+上記のマッチング／抽出／置換／分割の各メソッドには、コンパイル済み `Pattern` を直接
+受け取るオーバーロードも用意されており、`re"..."` リテラルを `String` パターンを
+経由せずそのまま渡せます:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
 ```
 
 ### 例

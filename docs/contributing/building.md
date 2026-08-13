@@ -336,16 +336,14 @@ sbt compile
 
 ### Out of Memory
 
-Increase SBT memory:
-```bash
-export SBT_OPTS="-Xmx2G"
-sbt compile
-```
+`.jvmopts` already sets the project default to `-Xmx10g`. If you still hit an
+`OutOfMemoryError` (most likely running the full test suite, not `compile`),
+raise it further — do not set `SBT_OPTS` to something *below* 10g, since that
+overrides `.jvmopts` and makes things worse, not better:
 
-Or edit `.sbtopts`:
-```
--Xmx2G
--Xss2M
+```bash
+export SBT_OPTS="-Xmx12G"
+sbt test
 ```
 
 ### Dependency Issues

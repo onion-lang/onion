@@ -1,0 +1,255 @@
+// GradeReport — a 230-line end-to-end sample exercising:
+//   ADT enum (case-enum) with type-pattern select + shared methods
+//   data-carrying enum for LetterGrade
+//   records (Course, Enrollment, Student) including a record with a List field
+//   interface + implementing class (Reportable / StudentReport)
+//   extension methods on Double and Int (round2, bar)
+//   collection pipelines: map, filter, sortedBy, groupBy, reduce, fold
+//   recursive index-based iteration (countGrade)
+//   nested foreach over students and enrollments
+//   while loop with index for grade distribution
+//   foreach over inclusive range (GPA scale table)
+//   nullable find guard (top != null)
+//   string interpolation throughout
+//   try/catch for number parsing
+
+record Course(code: String, name: String, credits: Int)
+
+enum LetterGrade(points: Double) {
+  A(4.0), B(3.0), C(2.0), D(1.0), F(0.0)
+}
+
+record Enrollment(course: Course, score: Double, grade: LetterGrade)
+record Student(id: Int, name: String, major: String, enrollments: List[Enrollment])
+
+def scoreToGrade(score: Double): LetterGrade {
+  if score >= 90.0 { return LetterGrade::A }
+  if score >= 80.0 { return LetterGrade::B }
+  if score >= 70.0 { return LetterGrade::C }
+  if score >= 60.0 { return LetterGrade::D }
+  return LetterGrade::F
+}
+
+// ADT enum: four distinct cases with different payloads, shared methods via select this
+enum Standing {
+  case Honors(gpa: Double)
+  case Good(gpa: Double)
+  case Probation(gpa: Double, reason: String)
+  case Suspended(reason: String)
+public:
+  def label(): String = select this {
+    case h is Honors:    "Honors (GPA: " + h.gpa() + ")"
+    case g is Good:      "Good Standing (GPA: " + g.gpa() + ")"
+    case p is Probation: "Probation (GPA: " + p.gpa() + ") — " + p.reason()
+    case s is Suspended: "Suspended: " + s.reason()
+  }
+  def isEnrolled(): Boolean = select this {
+    case s is Suspended: false
+    else: true
+  }
+  def isHonors(): Boolean = select this {
+    case h is Honors: true
+    else: false
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    return Math::round(self * 100.0) / 100.0
+  }
+}
+
+// Extension on Int: build a bar of # characters for histogram display
+extension Int {
+  def bar(): String {
+    var s = ""
+    var i = 0
+    while i < self {
+      s = s + "#"
+      i = i + 1
+    }
+    return s
+  }
+}
+
+def computeGpa(enrollments: List[Enrollment]): Double {
+  var totalPoints = 0.0
+  var totalCredits = 0
+  foreach e: Enrollment in enrollments {
+    totalPoints = totalPoints + e.grade().points() * e.course().credits()
+    totalCredits = totalCredits + e.course().credits()
+  }
+  if totalCredits == 0 { return 0.0 }
+  return (totalPoints / totalCredits).round2()
+}
+
+def standingFor(gpa: Double): Standing {
+  if gpa >= 3.5 { return new Honors(gpa) }
+  if gpa >= 2.0 { return new Good(gpa) }
+  if gpa >= 1.0 { return new Probation(gpa, "GPA below 2.0") }
+  return new Suspended("GPA below 1.0")
+}
+
+// Recursive index-based count — avoids casting issues with generic accumulate
+def countGrade(enrollments: List[Enrollment], target: LetterGrade, idx: Int): Int {
+  if idx >= enrollments.size { return 0 }
+  val e = enrollments.get(idx) as Enrollment
+  val hit = if e.grade() == target { 1 } else { 0 }
+  return hit + countGrade(enrollments, target, idx + 1)
+}
+
+def countAllGrades(students: List[Student], target: LetterGrade): Int {
+  var total = 0
+  foreach s: Student in students {
+    total = total + countGrade(s.enrollments(), target, 0)
+  }
+  return total
+}
+
+interface Reportable {
+  def reportLine(): String
+}
+
+class StudentReport conforms Reportable {
+  val student: Student
+public:
+  val gpa: Double
+  val standing: Standing
+  def this(s: Student) {
+    this.student = s
+    this.gpa = computeGpa(s.enrollments())
+    this.standing = standingFor(this.gpa)
+  }
+  def reportLine(): String {
+    val status = if standing.isEnrolled() { "enrolled" } else { "not enrolled" }
+    return "  [#{student.id()}] #{student.name()} (#{student.major()}): GPA=#{gpa} — #{standing.label()} — #{status}"
+  }
+  def studentName(): String = student.name()
+  def majorName(): String   = student.major()
+}
+
+// --- Sample data ---
+val math = new Course("MATH101", "Calculus I", 4)
+val cs   = new Course("CS200",   "Data Structures", 3)
+val eng  = new Course("ENG110",  "Composition", 3)
+val phys = new Course("PHYS201", "Physics II", 4)
+val bio  = new Course("BIO150",  "Biology", 3)
+val chem = new Course("CHEM301", "Organic Chemistry", 4)
+
+val students: List[Student] = [
+  new Student(1001, "Alice Chen", "Computer Science", [
+    new Enrollment(math, 92.0, scoreToGrade(92.0)),
+    new Enrollment(cs,   97.5, scoreToGrade(97.5)),
+    new Enrollment(eng,  85.0, scoreToGrade(85.0))
+  ]),
+  new Student(1002, "Bob Kim", "Physics", [
+    new Enrollment(phys, 78.5, scoreToGrade(78.5)),
+    new Enrollment(math, 65.0, scoreToGrade(65.0)),
+    new Enrollment(eng,  71.0, scoreToGrade(71.0))
+  ]),
+  new Student(1003, "Carol Jones", "Biology", [
+    new Enrollment(bio,  95.0, scoreToGrade(95.0)),
+    new Enrollment(eng,  88.0, scoreToGrade(88.0)),
+    new Enrollment(math, 55.0, scoreToGrade(55.0))
+  ]),
+  new Student(1004, "David Park", "Chemistry", [
+    new Enrollment(chem, 45.0, scoreToGrade(45.0)),
+    new Enrollment(phys, 50.0, scoreToGrade(50.0)),
+    new Enrollment(eng,  62.0, scoreToGrade(62.0))
+  ]),
+  new Student(1005, "Eva Rossi", "Computer Science", [
+    new Enrollment(cs,   88.0, scoreToGrade(88.0)),
+    new Enrollment(math, 91.0, scoreToGrade(91.0)),
+    new Enrollment(eng,  79.0, scoreToGrade(79.0))
+  ])
+]
+
+val reports: List[StudentReport] = students.map { s => new StudentReport(s as Student) }
+
+// --- Main report ---
+IO::println("=== Student Grade Report ===")
+foreach r: StudentReport in reports {
+  IO::println(r.reportLine())
+}
+
+// --- Honor roll: filter + type-pattern check via isHonors ---
+IO::println("\n--- Honor Roll ---")
+val honorRoll = reports.filter { r => (r as StudentReport).standing.isHonors() }
+if honorRoll.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach r: StudentReport in honorRoll {
+    IO::println("  * #{(r as StudentReport).studentName()}")
+  }
+}
+
+// --- Rankings: sortedBy on a negated key ---
+IO::println("\n--- Ranked by GPA ---")
+val ranked = reports.sortedBy { r => 0.0 - (r as StudentReport).gpa }
+var rank = 1
+foreach r: StudentReport in ranked {
+  val sr = r as StudentReport
+  IO::println("  #{rank}. #{sr.studentName()}: #{sr.gpa}")
+  rank = rank + 1
+}
+
+// --- Grade distribution: while loop + recursive count ---
+IO::println("\n--- Grade Distribution (all enrollments) ---")
+val gradeLetters = ["A", "B", "C", "D", "F"]
+val gradeVals    = [LetterGrade::A, LetterGrade::B, LetterGrade::C, LetterGrade::D, LetterGrade::F]
+var gi = 0
+while gi < gradeLetters.size {
+  val gname = gradeLetters.get(gi) as String
+  val gval  = gradeVals.get(gi) as LetterGrade
+  val cnt   = countAllGrades(students, gval)
+  IO::println("  " + gname + ": " + cnt.bar() + " (" + cnt + ")")
+  gi = gi + 1
+}
+
+// --- Top student: reduce ---
+IO::println("\n--- Top Student ---")
+val top = reports.reduce { a, b =>
+  if (a as StudentReport).gpa >= (b as StudentReport).gpa { a } else { b }
+}
+if top != null {
+  val t = top as StudentReport
+  IO::println("  #{t.studentName()} with GPA #{t.gpa}")
+}
+
+// --- Class average: fold ---
+val sumGpa = reports.fold(0.0) { acc, r => (acc as Double) + (r as StudentReport).gpa }
+val avgGpa = (sumGpa / reports.size).round2()
+IO::println("\nClass average GPA: " + avgGpa)
+
+// --- Summary by major: groupBy + nested fold ---
+IO::println("\n--- Summary by Major ---")
+val byMajor = reports.groupBy { r => (r as StudentReport).majorName() }
+foreach (major, group) in byMajor {
+  val grp = group as List
+  val majorSum = grp.fold(0.0) { acc, r => (acc as Double) + (r as StudentReport).gpa }
+  val majorAvg = (majorSum / grp.size).round2()
+  IO::println("  #{major} (#{grp.size} student(s), avg GPA #{majorAvg})")
+}
+
+// --- Enrollment summary: string interpolation ---
+val n = students.size
+val activeCount = reports.filter { r => (r as StudentReport).standing.isEnrolled() }.size
+IO::println("\n#{activeCount}/#{n} students currently enrolled")
+
+// --- try/catch: safe parse of an external GPA value ---
+def parseGpa(s: String): Double {
+  try {
+    return JDouble::parseDouble(s)
+  } catch e: Exception {
+    return 0.0 - 1.0
+  }
+}
+IO::println("parseGpa(\"3.5\"): " + parseGpa("3.5"))
+IO::println("parseGpa(\"oops\"): " + parseGpa("oops"))
+
+// --- Range-based loop: GPA scale reference table ---
+IO::println("\n--- GPA Scale ---")
+foreach pts: Int in 0..4 {
+  val label = if pts >= 4 { "A" } else if pts >= 3 { "B" } else if pts >= 2 { "C" } else if pts >= 1 { "D" } else { "F" }
+  IO::println("  " + pts + ".0 pts -> " + label)
+}

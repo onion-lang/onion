@@ -37,16 +37,44 @@ class AsmCodeGenerationVisitor(
         lastEmittedLine = loc.line
       case _ => // Same line, skip
 
-  // Emit method arguments with boxing/unboxing adaptation
+  // Emit method arguments with boxing/unboxing adaptation. `pendingTypes` lists
+  // the types of values already sitting on the operand stack below these
+  // arguments (e.g. a call receiver), bottom to top.
+  //
+  // A `try`/`catch` used as a non-first argument (or nested inside one) is
+  // dangerous: the JVM clears the operand stack when it dispatches to the
+  // catch handler, silently discarding any earlier arguments already pushed
+  // underneath (issue #669). So whenever an argument may run its own `try`,
+  // everything currently on the stack is spilled into fresh locals first and
+  // reloaded afterward — this preserves left-to-right evaluation order while
+  // guaranteeing nothing sits on the stack across the try's protected region.
   private def emitArgumentsWithAdaptation(
     params: Array[Term],
-    expectedTypes: Array[AsmType]
+    expectedTypes: Array[AsmType],
+    pendingTypes: Array[AsmType] = Array.empty
   ): Unit =
+    val pending = scala.collection.mutable.ArrayBuffer[AsmType](pendingTypes*)
     var i = 0
     while i < params.length do
       val param = params(i)
-      visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedTypes(i))
+      val expectedType = expectedTypes(i)
+      if pending.nonEmpty && TermContainsTry.contains(param) then
+        val slots = new Array[Int](pending.length)
+        for j <- (pending.length - 1) to 0 by -1 do
+          val slot = gen.newLocal(pending(j))
+          gen.storeLocal(slot)
+          slots(j) = slot
+        visitTerm(param)
+        asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedType)
+        val ownSlot = gen.newLocal(expectedType)
+        gen.storeLocal(ownSlot)
+        for j <- slots.indices do
+          gen.loadLocal(slots(j))
+        gen.loadLocal(ownSlot)
+      else
+        visitTerm(param)
+        asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedType)
+      pending += expectedType
       i += 1
 
   // Expression visitors
@@ -144,7 +172,7 @@ class AsmCodeGenerationVisitor(
   override def visitCall(node: Call): Unit =
     visitTerm(node.target)
     val argTypes = node.method.arguments.map(asmType)
-    emitArgumentsWithAdaptation(node.parameters, argTypes)
+    emitArgumentsWithAdaptation(node.parameters, argTypes, Array(asmType(node.target.`type`)))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -179,7 +207,7 @@ class AsmCodeGenerationVisitor(
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
     val argTypes = node.method.arguments.map(asmType)
-    emitArgumentsWithAdaptation(node.params, argTypes)
+    emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),

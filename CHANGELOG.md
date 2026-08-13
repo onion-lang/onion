@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/RestaurantOrders.on`, a 327-line restaurant order management sample.**
+  Covers records with method bodies (`MenuItem`, `OrderLine`), a plain enum
+  matched via `select this` (`ItemCategory`, `OrderStatus`), an ADT
+  case-enum (`Payment { case Cash, case Card, case Voucher }`), an
+  interface implemented with `conforms` (`Billable`), `Double`/`String`
+  extension methods, `groupBy` + `foreach (k, v)`, a broad collection
+  pipeline (`filter`, `flatMap`, `fold`, `sortedBy`, `distinct`, `find`,
+  `partition`, `take`, `zip`), ADT `select` type patterns, a nullable
+  (`Payment?`) field, string interpolation, `try`/`catch`, and `foreach`
+  over an inclusive range.
 - **`run/NutritionTracker.on`, a 296-line daily nutrition log sample.**
   Covers a homogeneous enum (`MacroKind`) matched via `select`, an ADT
   case-enum (`MealType`) with `label()`/`isMainMeal()` methods, records

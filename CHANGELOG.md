@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Shapes::config` and `Shapes::yaml` in the "When to reach for
+  `Shapes` directly" section of `docs/guide/shapes.md` and
+  `docs/ja/guide/shapes.md`.** The section only mentioned `Shapes::regex` and
+  `Shapes::json`, even though `onion.Shapes` also exposes `config` and `yaml`
+  factories — the hand-written equivalents of `shape name = config` /
+  `shape name = yaml` — making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`ShapesGuideDirectApiParitySpec`) so
+  future additions to `Shapes`'s public API get caught the same way.
 - **Documented five undocumented `onion.Colls` batching/aggregation helpers
   (`chunked`, `windowed`, `sumBy`, `averageBy`/`maxBy`/`minBy`) in a new
   "Batching, windowing, and selector aggregation" subsection of the Colls

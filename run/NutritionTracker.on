@@ -1,0 +1,296 @@
+// NutritionTracker.on
+// A daily nutrition log: food database, meals, macros, goals, and a report.
+// Exercises: records, enums (both homogeneous and ADT), classes, extension
+// methods, collection pipelines (fold/sortedBy/filter), nullable types,
+// closures, select / pattern matching, string interpolation, while loop.
+
+// ── Double formatting helpers ─────────────────────────────────────────────────
+extension Double {
+  def fmt1(): String {
+    if self < 0.0 {
+      return "-" + (0.0 - self).fmt1()
+    }
+    val whole: Int = self.intValue()
+    val frac: Int  = ((self - (whole as Double)) * 10.0 + 0.5).intValue()
+    return "" + whole + "." + frac
+  }
+  def fmt2(): String {
+    if self < 0.0 {
+      return "-" + (0.0 - self).fmt2()
+    }
+    val whole: Int = self.intValue()
+    val frac: Int  = ((self - (whole as Double)) * 100.0 + 0.5).intValue()
+    val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "" + whole + "." + fs
+  }
+  def pct(): String {
+    val p: Double = self * 100.0
+    return p.fmt1() + "%"
+  }
+}
+
+// ── Macro kind: homogeneous enum -> java.lang.Enum ───────────────────────────
+enum MacroKind {
+  PROTEIN, CARBS, FAT, FIBER
+}
+
+def macroLabel(k: MacroKind): String = select k {
+  case MacroKind::PROTEIN: "Protein"
+  case MacroKind::CARBS:   "Carbs"
+  case MacroKind::FAT:     "Fat"
+  case MacroKind::FIBER:   "Fiber"
+}
+
+def kcalPerGram(k: MacroKind): Double = select k {
+  case MacroKind::PROTEIN: 4.0
+  case MacroKind::CARBS:   4.0
+  case MacroKind::FAT:     9.0
+  case MacroKind::FIBER:   2.0
+}
+
+// ── Meal type: ADT enum (case-style, sealed) ──────────────────────────────────
+enum MealType {
+  case Breakfast
+  case Lunch
+  case Dinner
+  case Snack
+  case PreWorkout
+  case PostWorkout
+public:
+  def label(): String = select this {
+    case mt is Breakfast:   "Breakfast"
+    case mt is Lunch:       "Lunch"
+    case mt is Dinner:      "Dinner"
+    case mt is Snack:       "Snack"
+    case mt is PreWorkout:  "Pre-Workout"
+    case mt is PostWorkout: "Post-Workout"
+  }
+  def isMainMeal(): Boolean = select this {
+    case mt is Breakfast: true
+    case mt is Lunch:     true
+    case mt is Dinner:    true
+    case mt is Snack:     false
+    case mt is PreWorkout: false
+    case mt is PostWorkout: false
+  }
+}
+
+// ── Food item: nutrition facts per 100 g ─────────────────────────────────────
+record FoodItem(name: String, calories: Int, protein: Double, carbs: Double, fat: Double, fiber: Double) {
+public:
+  def macroOf(k: MacroKind): Double = select k {
+    case MacroKind::PROTEIN: protein()
+    case MacroKind::CARBS:   carbs()
+    case MacroKind::FAT:     fat()
+    case MacroKind::FIBER:   fiber()
+  }
+  def summary(): String = "#{name()} | #{calories()} kcal/100g | P:#{protein()}g C:#{carbs()}g F:#{fat()}g Fb:#{fiber()}g"
+}
+
+// ── Serving: one food item at a specific gram weight ──────────────────────────
+record Serving(food: FoodItem, grams: Double) {
+public:
+  def scaledCalories(): Double  = food().calories().doubleValue() * grams() / 100.0
+  def scaledMacro(k: MacroKind): Double = food().macroOf(k) * grams() / 100.0
+  def label(): String = "    #{food().name()} (#{grams()}g) -> #{scaledCalories().fmt1()} kcal"
+}
+
+// ── Meal: named collection of servings with a type ────────────────────────────
+class Meal {
+  val mealType: MealType
+  val servings:  List[Serving]
+public:
+  def this(t: MealType) {
+    mealType = t
+    servings  = []
+  }
+  def mealTyp(): MealType = mealType
+  def name(): String = mealType.label()
+  def isMain(): Boolean = mealType.isMainMeal()
+  def add(s: Serving): void {
+    servings.add(s)
+  }
+  def totalCalories(): Double = servings.fold(0.0) { acc, s => acc + s.scaledCalories() }
+  def totalMacro(k: MacroKind): Double = servings.fold(0.0) { acc, s => acc + s.scaledMacro(k) }
+  def itemCount(): Int = servings.size
+  def printMeal(): void {
+    IO::println("  [#{name()}] #{totalCalories().fmt1()} kcal | #{itemCount()} items")
+    foreach s: Serving in servings {
+      IO::println(s.label())
+    }
+  }
+}
+
+// ── Daily nutrition goal ──────────────────────────────────────────────────────
+record DailyGoal(targetCalories: Int, targetProtein: Double, targetCarbs: Double, targetFat: Double, targetFiber: Double) {
+public:
+  def macroTarget(k: MacroKind): Double = select k {
+    case MacroKind::PROTEIN: targetProtein()
+    case MacroKind::CARBS:   targetCarbs()
+    case MacroKind::FAT:     targetFat()
+    case MacroKind::FIBER:   targetFiber()
+  }
+  def summary(): String = "Goal: #{targetCalories()} kcal | P:#{targetProtein()}g C:#{targetCarbs()}g F:#{targetFat()}g Fb:#{targetFiber()}g"
+}
+
+// ── Daily log: tracks all meals for one day ───────────────────────────────────
+class DailyLog {
+  val date:  String
+  val meals: List[Meal]
+  val goal:  DailyGoal
+public:
+  def this(d: String, g: DailyGoal) {
+    date  = d
+    meals = []
+    goal  = g
+  }
+  def addMeal(m: Meal): void { meals.add(m) }
+
+  def totalCalories(): Double = meals.fold(0.0) { acc, m => acc + m.totalCalories() }
+  def totalMacro(k: MacroKind): Double = meals.fold(0.0) { acc, m => acc + m.totalMacro(k) }
+  def calorieBalance(): Double = goal.targetCalories().doubleValue() - totalCalories()
+
+  def macroProgress(k: MacroKind): Double {
+    val target: Double = goal.macroTarget(k)
+    return if target == 0.0 { 0.0 } else { totalMacro(k) / target }
+  }
+
+  def printReport(): void {
+    IO::println("===== Nutrition Report: #{date} =====")
+    IO::println(goal.summary())
+    IO::println("")
+    foreach m: Meal in meals { m.printMeal(); IO::println("") }
+
+    IO::println("--- Daily Macro Totals ---")
+    val kinds: List[MacroKind] = [MacroKind::PROTEIN, MacroKind::CARBS, MacroKind::FAT, MacroKind::FIBER]
+    foreach k: MacroKind in kinds {
+      val got: Double    = totalMacro(k)
+      val target: Double = goal.macroTarget(k)
+      val prog: Double   = macroProgress(k)
+      IO::println("  #{macroLabel(k)}: #{got.fmt1()}g / #{target}g (#{prog.pct()})")
+    }
+    IO::println("")
+    val kcal: Double = totalCalories()
+    val pct: Double  = kcal / goal.targetCalories().doubleValue()
+    IO::println("  Calories: #{kcal.fmt1()} / #{goal.targetCalories()} kcal (#{pct.pct()})")
+    IO::println("  Balance : #{calorieBalance().fmt1()} kcal remaining")
+    IO::println("")
+  }
+}
+
+// ── Nutrition tip based on macro balance ─────────────────────────────────────
+def nutritionTip(log: DailyLog): String? {
+  val proteinPct: Double = log.macroProgress(MacroKind::PROTEIN)
+  val fatPct: Double     = log.macroProgress(MacroKind::FAT)
+  val carbPct: Double    = log.macroProgress(MacroKind::CARBS)
+  if proteinPct < 0.7 {
+    return "Low on protein — consider adding lean meats, eggs, or legumes."
+  }
+  if fatPct > 1.2 {
+    return "Fat intake is high — reduce oils, nuts, or fatty meats."
+  }
+  if carbPct < 0.6 {
+    return "Carbohydrate intake is low — add whole grains, fruit, or legumes."
+  }
+  return null
+}
+
+// ── Food database ─────────────────────────────────────────────────────────────
+val chicken:  FoodItem = new FoodItem("Grilled Chicken Breast", 165, 31.0,  0.0, 3.6, 0.0)
+val egg:      FoodItem = new FoodItem("Whole Egg",              155, 13.0,  1.1, 11.0, 0.0)
+val oats:     FoodItem = new FoodItem("Rolled Oats",            389, 17.0, 66.0,  7.0, 10.0)
+val broccoli: FoodItem = new FoodItem("Steamed Broccoli",        55,  3.7, 11.0,  0.6,  5.1)
+val rice:     FoodItem = new FoodItem("Brown Rice",             216,  5.0, 45.0,  1.8,  3.5)
+val salmon:   FoodItem = new FoodItem("Atlantic Salmon",        208, 20.0,  0.0, 13.0,  0.0)
+val avocado:  FoodItem = new FoodItem("Avocado",                160,  2.0,  9.0, 15.0,  7.0)
+val banana:   FoodItem = new FoodItem("Banana",                  89,  1.1, 23.0,  0.3,  2.6)
+val almonds:  FoodItem = new FoodItem("Almonds",                579, 21.0, 22.0, 50.0, 12.0)
+val milk:     FoodItem = new FoodItem("Whole Milk",              61,  3.2,  4.8,  3.3,  0.0)
+val tofu:     FoodItem = new FoodItem("Firm Tofu",               76,  8.0,  1.9,  4.8,  0.3)
+val sweetPotato: FoodItem = new FoodItem("Sweet Potato",         86,  1.6, 20.0,  0.1,  3.0)
+val greekYogurt: FoodItem = new FoodItem("Greek Yogurt (plain)", 59, 10.0,  3.6,  0.4,  0.0)
+
+val allFoods: List[FoodItem] = [chicken, egg, oats, broccoli, rice, salmon, avocado, banana, almonds, milk, tofu, sweetPotato, greekYogurt]
+
+IO::println("===== Food Database (#{allFoods.size} items) =====")
+foreach f: FoodItem in allFoods {
+  IO::println("  " + f.summary())
+}
+IO::println("")
+
+// ── Build meals ───────────────────────────────────────────────────────────────
+val breakfast: Meal = new Meal(new Breakfast())
+breakfast.add(new Serving(oats,        80.0))
+breakfast.add(new Serving(milk,       200.0))
+breakfast.add(new Serving(banana,     120.0))
+breakfast.add(new Serving(greekYogurt,150.0))
+
+val snack1: Meal = new Meal(new PreWorkout())
+snack1.add(new Serving(banana,   80.0))
+snack1.add(new Serving(almonds,  25.0))
+
+val lunch: Meal = new Meal(new Lunch())
+lunch.add(new Serving(rice,     180.0))
+lunch.add(new Serving(chicken,  200.0))
+lunch.add(new Serving(broccoli, 200.0))
+lunch.add(new Serving(avocado,   50.0))
+
+val snack2: Meal = new Meal(new PostWorkout())
+snack2.add(new Serving(greekYogurt, 200.0))
+snack2.add(new Serving(banana,       80.0))
+
+val dinner: Meal = new Meal(new Dinner())
+dinner.add(new Serving(salmon,      200.0))
+dinner.add(new Serving(sweetPotato, 150.0))
+dinner.add(new Serving(broccoli,    200.0))
+dinner.add(new Serving(tofu,        100.0))
+
+// ── Assemble the daily log ────────────────────────────────────────────────────
+val goal: DailyGoal = new DailyGoal(2400, 170.0, 240.0, 75.0, 32.0)
+val log: DailyLog   = new DailyLog("2026-08-13", goal)
+log.addMeal(breakfast)
+log.addMeal(snack1)
+log.addMeal(lunch)
+log.addMeal(snack2)
+log.addMeal(dinner)
+
+log.printReport()
+
+// ── Meals sorted by calorie count ────────────────────────────────────────────
+IO::println("===== Meals by Calorie Count (descending) =====")
+val mealList: List[Meal] = [breakfast, snack1, lunch, snack2, dinner]
+val sorted: List[Meal]   = mealList.sortedBy { m => 0.0 - m.totalCalories() }
+var rank: Int = 1
+foreach m: Meal in sorted {
+  IO::println("  #{rank}. #{m.name()}: #{m.totalCalories().fmt1()} kcal")
+  rank = rank + 1
+}
+IO::println("")
+
+// ── Top 3 high-protein foods from database ────────────────────────────────────
+IO::println("===== Top 3 Foods by Protein (per 100g) =====")
+val byProtein: List[FoodItem] = allFoods.sortedBy { f => 0.0 - f.protein() }
+var prank: Int = 1
+foreach f: FoodItem in byProtein {
+  if prank <= 3 {
+    IO::println("  #{prank}. #{f.name()}: #{f.protein()}g")
+    prank = prank + 1
+  }
+}
+IO::println("")
+
+// ── Main meals vs snacks calorie split ───────────────────────────────────────
+IO::println("===== Main Meals vs Snacks =====")
+val mainKcal: Double  = mealList.filter { m => m.isMain() }.fold(0.0) { acc, m => acc + m.totalCalories() }
+val snackKcal: Double = mealList.filter { m => !m.isMain() }.fold(0.0) { acc, m => acc + m.totalCalories() }
+val total: Double     = log.totalCalories()
+IO::println("  Main meals: #{mainKcal.fmt1()} kcal (#{(mainKcal / total).pct()})")
+IO::println("  Snacks:     #{snackKcal.fmt1()} kcal (#{(snackKcal / total).pct()})")
+IO::println("")
+
+// ── Nutrition advice ──────────────────────────────────────────────────────────
+IO::println("===== Nutrition Tip =====")
+val tip: String? = nutritionTip(log)
+IO::println(tip ?: "Macros look balanced — great work!")
+IO::println("")
+IO::println("Tracking complete.")

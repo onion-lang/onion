@@ -55,6 +55,78 @@ val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name)
 ```
 
+### IO::readLine
+
+Read a line from standard input, or `null` at end of input. `IO::readln()` (no
+prompt) is an alias for this:
+
+```onion
+val line: String? = IO::readLine()
+```
+
+### IO::readAll
+
+Read all remaining standard input as a single string:
+
+```onion
+val everything: String = IO::readAll()
+```
+
+### Formatted Output
+
+```onion
+IO::printf("%s is %d\n", "age", 30)
+val s: String = IO::format("%.2f", 3.14159)
+```
+
+### Error Output (stderr)
+
+```onion
+IO::eprint("warning: ")
+IO::eprintln("disk almost full")
+IO::eprintf("failed after %d retries\n", 3)
+```
+
+### Type-Safe Input
+
+Read and parse a line as a specific type, throwing on invalid input; each has
+an overload that prints a prompt first:
+
+```onion
+val age: Int = IO::readInt("Age: ")
+val price: Long = IO::readLong("Price: ")
+val ratio: Double = IO::readDouble("Ratio: ")
+val ok: Boolean = IO::readBoolean("Continue? ")  // accepts true/yes/1, false/no/0
+```
+
+### Safe Input
+
+Like the type-safe readers above, but return `null` instead of throwing on
+invalid input or end of stream:
+
+```onion
+val n: Int? = IO::tryReadInt("N: ")
+val d: Double? = IO::tryReadDouble("D: ")
+val l: Long? = IO::tryReadLong("L: ")
+```
+
+### Line-Oriented I/O
+
+```onion
+val lines: List = IO::readLines()          // reads until end of input
+IO::eachLine { line => IO::println(line) } // applies a callback to each remaining line
+IO::printLines(["a", "b", "c"])            // one item per line
+IO::printAll("a", "b", "c")                // varargs form of printLines
+```
+
+### Utility
+
+```onion
+IO::flush()    // flushes standard output
+IO::newline()  // prints a blank line
+IO::clear()    // clears the terminal screen (ANSI escape codes)
+```
+
 ## System Module
 
 Access to system-level operations via Java's `System` class.
@@ -450,6 +522,42 @@ the method silently not existing.
 Reading two `Int` components out of `"abc,def"` reports **two** defects, not the first
 one. That is what `Outcome`'s accumulating `zip` is for.
 
+### Lossless shapes and lenses
+
+A shape that also satisfies L2 is *lossless* — `isLossless()` says so, and
+`parseLossless(text[, origin])` reads a `Lossless[T]` instead of a plain `T`: the value
+plus the `Residue` of everything around it (comments, spacing, key order, original
+value spellings). `printLossless(value, residue)` renders back through that residue —
+unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
+`Residue` is opaque; hand it back only to the shape that produced it.
+
+`Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
+swaps the value while keeping the residue, and `edit { v => ... }` focuses an update.
+`render()` reassembles the text:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  one changed line
+```
+
+`Shapes::config` and `Shapes::yaml` build the lossless shapes behind `shape name =
+config` / `shape name = yaml` when you want the `Shape[T]` value directly instead of
+the sugar.
+
+### Combinators
+
+- `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that
+  read and the defects of the ones that didn't (`Outcome::values`/`Outcome::defects`
+  split them apart). Use this over `lines()` when a partial result is meaningful, as in
+  a log file where most lines parse.
+- `lines()` — a `Shape[List[T]]` reading one value per line, all or nothing.
+- `sepBy(separator)` — a `Shape[List[T]]` split on a literal separator, all or nothing.
+- `xmap(forward, backward)` — transports a shape along an isomorphism; both directions
+  are required so `print` isn't silently destroyed.
+- `orElse(other)` — this shape, or `other` when it doesn't read; reports both shapes'
+  defects when neither does. Prints with this shape.
+
 ## Function Interfaces
 
 Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
@@ -654,13 +762,20 @@ Provided via `onion.Iterables` (Java interface).
 
 Access iteration utilities for collections and arrays:
 
-- `Iterables::map(list|iterable, f)`
+- `Iterables::map(list|iterable|set, f)`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
+- `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
-- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
+- `Iterables::newList(size)` - a new empty `List` pre-sized for `size` elements
+- `Iterables::first(list)` / `Iterables::last(list)` - `null` if the list is empty
+- `Iterables::reverse(list)`
+- `Iterables::take(list, n)` / `Iterables::drop(list, n)`
+- `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - the second overload requires `Comparable` elements
 
 ## Option Module
 
@@ -843,6 +958,23 @@ Generate a random integer in a range:
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
 val percent: Int = Rand::nextInt(100)     // 0 to 99
+val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
+```
+
+### Rand::nextDouble (bounded)
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0 to 10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0 to 2.0
+```
+
+### Rand::choice
+
+Pick one random element from a list:
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -852,6 +984,23 @@ Shuffle an array, returning a shuffled list:
 ```onion
 val cards: List[String] = ["A", "B", "C", "D"]
 val shuffled: List[String] = Rand::shuffle(cards)
+```
+
+### Rand::sample
+
+Pick `n` distinct random elements from a list, without replacement:
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 3 distinct cards
+```
+
+### Rand::uuid
+
+Generate a random UUID string:
+
+```onion
+val id: String = Rand::uuid()   // e.g. "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert Module
@@ -898,8 +1047,9 @@ val startMillis: Long = Timing::millis()   // Wall clock (System.currentTimeMill
 ```onion
 val start: Long = Timing::nanos()
 // ... some operation ...
-val elapsedNs: Long = Timing::elapsedNanos(start)    // Elapsed in nanoseconds
-val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
+val elapsedNs: Long = Timing::elapsedNanos(start)      // Elapsed in nanoseconds
+val elapsedMs: Double = Timing::elapsedMs(start)       // Elapsed in milliseconds (double, sub-ms precision)
+val elapsedMillis: Long = Timing::elapsedMillis(start) // Elapsed in milliseconds since a Timing::millis() start
 ```
 
 ### Formatting Time
@@ -908,12 +1058,17 @@ val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
 // Output formats: "123ns", "45.67μs", "12.34ms", "1.23s"
+
+val millis: Long = 125000L
+val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
+// Output formats: "500ms", "1.23s", "2m30s"
 ```
 
 ### Sleep
 
 ```onion
-Timing::sleep(1000L)  // Sleep for 1000 milliseconds
+Timing::sleep(1000L)        // Sleep for 1000 milliseconds
+Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
 
 ### Measuring Function Execution
@@ -922,6 +1077,12 @@ Timing::sleep(1000L)  // Sleep for 1000 milliseconds
 // Measure and print execution time, return result
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // Prints: "Elapsed: 123.45ms"
+
+// Same, but for a function that returns nothing
+Timing::measureVoid(() -> { expensiveOperation(); })
+// Prints: "Elapsed: 123.45ms"
+Timing::measureVoid("task", () -> { expensiveOperation(); })
+// Prints: "task: 123.45ms"
 
 // Get execution time in nanoseconds without printing
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
@@ -933,6 +1094,7 @@ String utilities (`onion.Strings`, auto-imported):
 
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -944,9 +1106,13 @@ Case and inspection helpers:
 
 ```onion
 Strings::capitalize("hello")             // "Hello"
+Strings::decapitalize("Hello")           // "hello"
 Strings::capitalizeWords("a b c")        // "A B C"
 Strings::equalsIgnoreCase(a, b) / Strings::containsIgnoreCase(s, sub)
 Strings::count("banana", "a")            // 3
+Strings::isEmpty("") / Strings::isBlank("   ")   // true / true
+Strings::reverse("abc")                  // "cba"
+Strings::lines("a\nb\r\nc")              // List[String] ["a","b","c"]
 ```
 
 Shaping and decomposition:
@@ -959,6 +1125,8 @@ Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
 Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
+Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
+Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
 Null-safe parsing (return `null`/fallback instead of throwing):
@@ -977,10 +1145,19 @@ File I/O (`onion.Files`):
 Files::readText("path.txt")            // whole file as String
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] -> one line per entry
+Files::appendText("out.txt", content)  // appends, creating the file if needed
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
+Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // creates dir + missing parents
+Files::size(path)                      // Long, size in bytes (0 if missing)
+Files::copy(src, dst)                  // replaces dst if it exists
+Files::move(src, dst)                  // rename; replaces dst if it exists
+Files::copyDir(src, dst)               // recursive directory copy
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -988,6 +1165,7 @@ Path helpers — file names, parents, joining, and extensions:
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // absolute path resolved against the cwd
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"   (extension, keyword-safe name)
 Files::stem("report.txt")              // "report"
@@ -996,12 +1174,19 @@ Files::withExtension("report.txt", "md")   // "report.md"
 
 ## Json Module
 
-JSON parsing and serialization (`onion.Json`):
+JSON parsing and serialization (`onion.Json`). The intermediate representation is
+plain Java `Map`/`List`/scalars (`String`/`Long`/`Double`/`Boolean`/`null`):
 
 ```onion
 val obj = Json::parse("{\"name\": \"kota\"}")
 Json::getString(obj, "name")           // typed accessors: getInt/getDouble/getBoolean
 Json::stringify(obj) / Json::stringifyPretty(obj)
+
+// Building a value to stringify
+val m = Json::object()                 // empty Map
+m.put("x", 1)
+Json::stringify(m)                     // {"x":1}
+val a = Json::array()                  // empty List, for JSON array values
 
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
@@ -1018,6 +1203,30 @@ an explicit fallback instead:
 val obj = Json::parse("{}")
 Json::getIntOr(obj, "missing", 42)     // 42, no NPE
 Json::getStringOr(obj, "name", "anon") // "anon"
+```
+
+A missing key or out-of-range index on the `Json::value` wrapper yields a null-holding
+`Value` instead of throwing, so a chain like `v["users"][99]["name"]` stays safe until you
+convert it — `asString()`/`asInt()`/etc. return `null`/`0`/`false` at the end of the chain.
+`Value` also has `isNull()` (was the underlying value `null`?), `size()` (element count for
+an array/object Value, `0` otherwise), and `raw()` (the underlying `Map`/`List`/scalar/`null`).
+
+`Json::parseOrNull(json)` behaves like `Json::parse(json)` but returns `null` on malformed
+input instead of throwing `Json.JsonParseException` — useful when a parse failure is just
+another "absent" case rather than an error to handle separately:
+
+```onion
+val obj = Json::parseOrNull("not json")   // null, no exception
+```
+
+`Json::asObject(obj)` and `Json::asArray(obj)` are type-safe casts on the plain
+`Map`/`List` representation: each returns its argument cast to `Map`/`List` when the
+runtime type matches, or `null` otherwise. They're handy after `Json::get`, `Json::parse`,
+or `Json::parseOrNull` return `Object` and you need the Map/List view back to iterate:
+
+```onion
+val obj = Json::parse("{\"tags\": [\"a\", \"b\"]}")
+val tags = Json::asArray(Json::get(obj, "tags"))   // List, or null if "tags" wasn't an array
 ```
 
 ## Yaml Module
@@ -1277,6 +1486,22 @@ Colls::sortedBy(people) { p => p.age() }
 // List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### Batching, windowing, and selector aggregation
+
+Also available as `Colls::` static calls and, like the rest of `Colls`, as
+List extensions that chain into a pipeline:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - batches of at most 3, last may be smaller
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - sliding windows, one step at a time
+ps.sumBy((p) -> p.age())          // Double - sum of the selector over every element
+ps.averageBy((p) -> p.age())      // Double - average of the selector, 0.0 if empty
+ps.maxBy((p) -> p.age())          // the element with the greatest selector value, null if empty
+ps.minBy((p) -> p.age())          // the element with the smallest selector value, null if empty
+
+xs.chunked(2).map { b => (b as List).size() }   // chains like any other pipeline stage
+```
+
 ## Http
 
 HTTP client utilities (uses Java 11+ HttpClient).
@@ -1295,6 +1520,17 @@ Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
 Http::post(url, body, headers): String   // headers: as for get
 ```
+
+### Response Object
+
+```
+Http::getResponse(url): Response                  // status/body/headers, instead of just the body
+Http::postResponse(url, body): Response
+```
+
+`Response` has `status: Int`, `body: String`, and `headers: List` fields,
+plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers — use
+these when the status code or headers matter, not just the body.
 
 ### Other Methods
 
@@ -1453,6 +1689,31 @@ Regex::split(input, pattern, limit): List[String]
 ```
 Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
+```
+
+### Pattern literal overloads
+
+A `re"..."` literal compiles to a `java.util.regex.Pattern`, not a `String`.
+Every matching/extraction/replacement/splitting method above also has an
+overload that takes a compiled `Pattern` directly, so a `re"..."` literal can
+be passed straight in without going through a `String` pattern:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
 ```
 
 ### Example

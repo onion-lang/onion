@@ -1,0 +1,523 @@
+// ClinicRecords.on — Simulated medical clinic: patients, doctors, appointments,
+// diagnoses, and prescriptions, with full reporting and statistics.
+// Exercises: homogeneous/ADT enums with methods, records with methods,
+// class with typed list fields and <<, collection pipelines (filter/map/fold/
+// sortedBy/groupBy/find/partition), select + type patterns, nullable types,
+// string interpolation, extension methods on String/Int/Double, try/catch,
+// foreach + while, foreach (k,v) on map, Map[Object,Object] lookups.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 3) + "..." }
+}
+
+extension Int {
+  def ipad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val whole: Int = self.intValue()
+    val frac: Int  = ((self - (whole as Double)) * 10.0 + 0.5).intValue()
+    return "" + whole + "." + frac
+  }
+}
+
+// ─── Blood-type enum ──────────────────────────────────────────────────────────
+
+enum BloodType {
+  A_POS, A_NEG, B_POS, B_NEG, AB_POS, AB_NEG, O_POS, O_NEG
+public:
+  def label(): String = select this {
+    case BloodType::A_POS:  "A+"
+    case BloodType::A_NEG:  "A-"
+    case BloodType::B_POS:  "B+"
+    case BloodType::B_NEG:  "B-"
+    case BloodType::AB_POS: "AB+"
+    case BloodType::AB_NEG: "AB-"
+    case BloodType::O_POS:  "O+"
+    case BloodType::O_NEG:  "O-"
+    else:                   "??"
+  }
+  def isUniversalDonor(): Boolean = select this {
+    case BloodType::O_NEG: true
+    else: false
+  }
+  def isUniversalRecipient(): Boolean = select this {
+    case BloodType::AB_POS: true
+    else: false
+  }
+}
+
+// ─── Severity enum ────────────────────────────────────────────────────────────
+
+enum Severity {
+  Low, Medium, High, Critical
+public:
+  def label(): String = select this {
+    case Severity::Low:      "Low"
+    case Severity::Medium:   "Medium"
+    case Severity::High:     "High"
+    case Severity::Critical: "Critical"
+    else:                    "Unknown"
+  }
+  def icon(): String = select this {
+    case Severity::Low:      "[L]"
+    case Severity::Medium:   "[M]"
+    case Severity::High:     "[H]"
+    case Severity::Critical: "[!]"
+    else:                    "[?]"
+  }
+  def score(): Int = select this {
+    case Severity::Low:      1
+    case Severity::Medium:   2
+    case Severity::High:     3
+    case Severity::Critical: 4
+    else:                    0
+  }
+}
+
+// ─── Appointment-status enum ──────────────────────────────────────────────────
+
+enum ApptStatus {
+  Scheduled, CheckedIn, InProgress, Completed, Cancelled
+public:
+  def label(): String = select this {
+    case ApptStatus::Scheduled:  "Scheduled "
+    case ApptStatus::CheckedIn:  "Checked-In"
+    case ApptStatus::InProgress: "In-Progress"
+    case ApptStatus::Completed:  "Completed "
+    case ApptStatus::Cancelled:  "Cancelled "
+    else:                        "Unknown   "
+  }
+  def isActive(): Boolean = select this {
+    case ApptStatus::Scheduled:  true
+    case ApptStatus::CheckedIn:  true
+    case ApptStatus::InProgress: true
+    else: false
+  }
+}
+
+// ─── ADT enum: diagnosis outcome ─────────────────────────────────────────────
+
+enum DiagnosisResult {
+  case Clear
+  case Condition(name: String, severity: Severity)
+  case Referral(name: String, specialist: String)
+public:
+  def describe(): String = select this {
+    case d is Clear:
+      "No issues found"
+    case d is Condition:
+      "#{d.name()} [#{d.severity().icon()} #{d.severity().label()}]"
+    case d is Referral:
+      "#{d.name()} → refer to #{d.specialist()}"
+    else:
+      "Unknown result"
+  }
+  def severityScore(): Int = select this {
+    case d is Condition: d.severity().score()
+    else: 0
+  }
+  def isCondition(): Boolean = select this {
+    case c is Condition: true
+    else: false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Doctor(id: String, name: String, specialty: String, license: String) {
+public:
+  def display(): String = "Dr. #{name()} [#{specialty()}] Lic:#{license()}"
+  def shortName(): String = "Dr. " + name()
+  def row(): String = "#{id().padRight(6)} #{name().padRight(20)} #{specialty().padRight(14)} #{license()}"
+}
+
+record Patient(id: String, name: String, dob: String, bloodType: BloodType, phone: String) {
+public:
+  def display(): String = "#{name()} (DOB:#{dob()}) #{bloodType().label()}"
+  def row(): String =
+    "#{id().padRight(6)} #{name().padRight(22)} #{dob().padRight(12)} #{bloodType().label().padRight(4)} #{phone()}"
+}
+
+record Prescription(drug: String, dosage: String, days: Int) {
+public:
+  def describe(): String = "#{drug()} #{dosage()} x#{days()}d"
+}
+
+record Appointment(id: String, patientId: String, doctorId: String,
+                   date: String, status: ApptStatus, notes: String?) {
+public:
+  def isActive(): Boolean = status().isActive()
+  def row(): String {
+    val notePart: String = if notes() != null { " | " + notes() } else { "" }
+    return "#{id().padRight(6)} #{patientId().padRight(8)} #{doctorId().padRight(8)} #{date()} #{status().label()}#{notePart}"
+  }
+}
+
+record MedicalRecord(patientId: String, apptId: String,
+                     date: String, diagnosis: DiagnosisResult,
+                     prescriptions: List[Prescription]) {
+public:
+  def summary(): String = "#{date()} | #{diagnosis().describe()}"
+  def rxText(): String {
+    if prescriptions().size == 0 { return "none" }
+    var out: String = ""
+    foreach rx: Object in prescriptions() {
+      val r = rx as Prescription
+      if out.length() > 0 { out = out + ", " }
+      out = out + r.describe()
+    }
+    return out
+  }
+}
+
+// ─── Clinic class ─────────────────────────────────────────────────────────────
+
+class Clinic {
+  val clinicName: String
+  val patients:     List[Patient]
+  val doctors:      List[Doctor]
+  val appointments: List[Appointment]
+  val medRecords:   List[MedicalRecord]
+
+public:
+
+  def this(name: String) {
+    this.clinicName   = name
+    this.patients     = []
+    this.doctors      = []
+    this.appointments = []
+    this.medRecords   = []
+  }
+
+  // ── Registration ──────────────────────────────────────────────────
+
+  def addPatient(p: Patient): void     { patients << p }
+  def addDoctor(d: Doctor): void       { doctors << d }
+  def addAppointment(a: Appointment): void { appointments << a }
+  def fileRecord(r: MedicalRecord): void   { medRecords << r }
+
+  // ── Lookups ───────────────────────────────────────────────────────
+
+  def findPatient(id: String): Patient? {
+    foreach p: Object in patients {
+      val pat = p as Patient
+      if pat.id() == id { return pat }
+    }
+    return null
+  }
+
+  def findDoctor(id: String): Doctor? {
+    foreach d: Object in doctors {
+      val doc = d as Doctor
+      if doc.id() == id { return doc }
+    }
+    return null
+  }
+
+  def patientHistory(patientId: String): List[MedicalRecord] {
+    val result: List[MedicalRecord] = []
+    foreach r: Object in medRecords {
+      val rec = r as MedicalRecord
+      if rec.patientId() == patientId { result << rec }
+    }
+    return result
+  }
+
+  def activeAppointments(): List[Appointment] {
+    val result: List[Appointment] = []
+    foreach a: Object in appointments {
+      val appt = a as Appointment
+      if appt.isActive() { result << appt }
+    }
+    return result
+  }
+
+  def appointmentsForDoctor(docId: String): List[Appointment] {
+    val result: List[Appointment] = []
+    foreach a: Object in appointments {
+      val appt = a as Appointment
+      if appt.doctorId() == docId { result << appt }
+    }
+    return result
+  }
+
+  // ── Statistics ────────────────────────────────────────────────────
+
+  def conditionCount(): Int {
+    var n: Int = 0
+    foreach r: Object in medRecords {
+      val rec = r as MedicalRecord
+      if rec.diagnosis().isCondition() { n = n + 1 }
+    }
+    return n
+  }
+
+  def avgSeverityScore(): Double {
+    var total: Int = 0
+    var n: Int = 0
+    foreach r: Object in medRecords {
+      val rec = r as MedicalRecord
+      val sc: Int = rec.diagnosis().severityScore()
+      if sc > 0 { total = total + sc; n = n + 1 }
+    }
+    if n == 0 { return 0.0 }
+    return (total as Double) / (n as Double)
+  }
+
+  def mostPrescribedDrug(): String? {
+    val counts: Map[Object, Object] = [:]
+    foreach r: Object in medRecords {
+      val rec = r as MedicalRecord
+      foreach rx: Object in rec.prescriptions() {
+        val p = rx as Prescription
+        val drug: String = p.drug()
+        val prev: Int = if counts[drug] != null { counts[drug] as Int } else { 0 }
+        counts[drug] = prev + 1
+      }
+    }
+    if counts.size == 0 { return null }
+    var best: String? = null
+    var bestN: Int = 0
+    foreach (k, v) in counts {
+      val cnt = v as Int
+      if cnt > bestN { best = k as String; bestN = cnt }
+    }
+    return best
+  }
+
+  def universalDonors(): Int {
+    var n: Int = 0
+    foreach p: Object in patients {
+      if (p as Patient).bloodType().isUniversalDonor() { n = n + 1 }
+    }
+    return n
+  }
+
+  def universalRecipients(): Int {
+    var n: Int = 0
+    foreach p: Object in patients {
+      if (p as Patient).bloodType().isUniversalRecipient() { n = n + 1 }
+    }
+    return n
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────
+
+  def banner(title: String): void {
+    val bar: String = "=".rep(60)
+    IO::println(bar)
+    val pad: Int = (60 - title.length()) / 2
+    var ln: String = "".padRight(pad)
+    IO::println(ln + title)
+    IO::println(bar)
+  }
+
+  def section(title: String): void {
+    val dashes: Int = 54 - title.length()
+    val ds: String  = if dashes > 0 { "-".rep(dashes) } else { "" }
+    IO::println("\n── " + title + " " + ds)
+  }
+
+  def printDoctors(): void {
+    section("DOCTORS (" + doctors.size + ")")
+    IO::println("  ID     Name                 Specialty      License")
+    IO::println("  " + "-".rep(56))
+    foreach d: Object in doctors {
+      IO::println("  " + (d as Doctor).row())
+    }
+  }
+
+  def printPatients(): void {
+    section("PATIENTS (" + patients.size + ")")
+    IO::println("  ID     Name                   DOB          BT   Phone")
+    IO::println("  " + "-".rep(56))
+    foreach p: Object in patients {
+      IO::println("  " + (p as Patient).row())
+    }
+    IO::println("  Universal donors (O-):     " + universalDonors())
+    IO::println("  Universal recipients (AB+): " + universalRecipients())
+  }
+
+  def printAppointments(): void {
+    section("APPOINTMENTS (" + appointments.size + ")")
+    IO::println("  ID     Patient  Doctor   Date       Status")
+    IO::println("  " + "-".rep(56))
+    val sorted: List[Appointment] = appointments.sortedBy { a => (a as Appointment).date() }
+    foreach a: Object in sorted {
+      IO::println("  " + (a as Appointment).row())
+    }
+    val active: List[Appointment] = activeAppointments()
+    IO::println("  Active (non-cancelled/completed): " + active.size)
+  }
+
+  def printMedicalRecords(): void {
+    section("MEDICAL RECORDS (" + medRecords.size + ")")
+    foreach p: Object in patients {
+      val pat = p as Patient
+      val hist: List[MedicalRecord] = patientHistory(pat.id())
+      if hist.size > 0 {
+        IO::println("  Patient: " + pat.display())
+        foreach r: Object in hist {
+          val rec = r as MedicalRecord
+          IO::println("    " + rec.summary())
+          IO::println("    Rx: " + rec.rxText())
+        }
+      }
+    }
+  }
+
+  def printStatistics(): void {
+    section("CLINIC STATISTICS")
+    IO::println("  Clinic:              " + clinicName)
+    IO::println("  Total patients:      " + patients.size)
+    IO::println("  Total doctors:       " + doctors.size)
+    IO::println("  Total appointments:  " + appointments.size)
+    IO::println("  Total records:       " + medRecords.size)
+    IO::println("  Conditions logged:   " + conditionCount())
+    IO::println("  Avg severity score:  " + avgSeverityScore().fmt1())
+    val drug: String? = mostPrescribedDrug()
+    val drugLabel: String = if drug != null { drug } else { "n/a" }
+    IO::println("  Top prescribed drug: " + drugLabel)
+
+    section("Appointments by status")
+    val byStatus = appointments.groupBy { a => (a as Appointment).status().label() }
+    foreach (status, appts) in byStatus {
+      IO::println("    " + status + ": " + (appts as List[Object]).size)
+    }
+
+    section("Appointments per doctor")
+    foreach d: Object in doctors {
+      val doc = d as Doctor
+      val appts: List[Appointment] = appointmentsForDoctor(doc.id())
+      IO::println("    " + doc.shortName().padRight(22) + " [" + doc.specialty().padRight(14) + "]: " + appts.size)
+    }
+
+    section("Diagnosis breakdown")
+    var clears: Int = 0; var conditions: Int = 0; var referrals: Int = 0
+    foreach r: Object in medRecords {
+      val rec = r as MedicalRecord
+      select rec.diagnosis() {
+        case c is Clear:     clears = clears + 1
+        case c is Condition: conditions = conditions + 1
+        case c is Referral:  referrals = referrals + 1
+        else: {}
+      }
+    }
+    IO::println("    Clear:      " + clears)
+    IO::println("    Condition:  " + conditions)
+    IO::println("    Referral:   " + referrals)
+  }
+
+  def printFullReport(): void {
+    banner("RIVERSIDE MEDICAL CENTER — CLINIC REPORT")
+    printDoctors()
+    printPatients()
+    printAppointments()
+    printMedicalRecords()
+    printStatistics()
+    IO::println("\n" + "=".rep(60))
+    IO::println("  End of report.")
+    IO::println("=".rep(60))
+  }
+}
+
+// ─── Helper: build empty prescription list ─────────────────────────────────────
+
+def noRx(): List[Prescription] = []
+
+def rx1(drug: String, dose: String, days: Int): List[Prescription] {
+  val list: List[Prescription] = []
+  list << new Prescription(drug, dose, days)
+  return list
+}
+
+def rx2(d1: String, dose1: String, days1: Int,
+        d2: String, dose2: String, days2: Int): List[Prescription] {
+  val list: List[Prescription] = []
+  list << new Prescription(d1, dose1, days1)
+  list << new Prescription(d2, dose2, days2)
+  return list
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val clinic: Clinic = new Clinic("Riverside Medical Center")
+
+  // ── Doctors ────────────────────────────────────────────────────────
+  clinic.addDoctor(new Doctor("D01", "Sarah Chen",   "Cardiology",  "LIC-8821"))
+  clinic.addDoctor(new Doctor("D02", "Mark Okafor",  "Neurology",   "LIC-4453"))
+  clinic.addDoctor(new Doctor("D03", "Priya Sharma", "Pediatrics",  "LIC-7712"))
+  clinic.addDoctor(new Doctor("D04", "James Murphy", "Oncology",    "LIC-3344"))
+
+  // ── Patients ───────────────────────────────────────────────────────
+  clinic.addPatient(new Patient("P001", "Alice Monroe",   "1985-03-12", BloodType::A_POS,  "555-0101"))
+  clinic.addPatient(new Patient("P002", "Bob Tanaka",     "1972-11-24", BloodType::O_NEG,  "555-0102"))
+  clinic.addPatient(new Patient("P003", "Clara Diaz",     "1990-07-08", BloodType::B_POS,  "555-0103"))
+  clinic.addPatient(new Patient("P004", "David Kim",      "1965-02-19", BloodType::AB_POS, "555-0104"))
+  clinic.addPatient(new Patient("P005", "Eva Johansson",  "2001-09-30", BloodType::A_NEG,  "555-0105"))
+  clinic.addPatient(new Patient("P006", "Frank Williams", "1958-06-15", BloodType::O_NEG,  "555-0106"))
+  clinic.addPatient(new Patient("P007", "Grace Lee",      "1995-12-03", BloodType::B_NEG,  "555-0107"))
+
+  // ── Appointments ───────────────────────────────────────────────────
+  clinic.addAppointment(new Appointment("A001","P001","D01","2026-07-01",ApptStatus::Completed, null))
+  clinic.addAppointment(new Appointment("A002","P002","D02","2026-07-02",ApptStatus::Completed, "Follow-up MRI"))
+  clinic.addAppointment(new Appointment("A003","P003","D03","2026-07-03",ApptStatus::Completed, null))
+  clinic.addAppointment(new Appointment("A004","P004","D01","2026-07-05",ApptStatus::Completed, "Monitor BP"))
+  clinic.addAppointment(new Appointment("A005","P005","D03","2026-07-08",ApptStatus::Cancelled, "Patient rescheduled"))
+  clinic.addAppointment(new Appointment("A006","P006","D04","2026-07-10",ApptStatus::InProgress,null))
+  clinic.addAppointment(new Appointment("A007","P007","D02","2026-07-12",ApptStatus::Scheduled, null))
+  clinic.addAppointment(new Appointment("A008","P001","D01","2026-07-15",ApptStatus::Scheduled, "Annual checkup"))
+  clinic.addAppointment(new Appointment("A009","P003","D04","2026-07-18",ApptStatus::Scheduled, null))
+  clinic.addAppointment(new Appointment("A010","P002","D01","2026-07-20",ApptStatus::CheckedIn, null))
+
+  // ── Medical records ────────────────────────────────────────────────
+  clinic.fileRecord(new MedicalRecord("P001","A001","2026-07-01",
+    new Condition("Hypertension", Severity::High),
+    rx2("Lisinopril","10mg",30,"Atorvastatin","20mg",30)))
+
+  clinic.fileRecord(new MedicalRecord("P002","A002","2026-07-02",
+    new Condition("Epilepsy", Severity::Medium),
+    rx1("Levetiracetam","500mg",90)))
+
+  clinic.fileRecord(new MedicalRecord("P003","A003","2026-07-03",
+    new Clear(), noRx()))
+
+  clinic.fileRecord(new MedicalRecord("P004","A004","2026-07-05",
+    new Condition("Arrhythmia", Severity::High),
+    rx2("Metoprolol","25mg",60,"Atorvastatin","40mg",30)))
+
+  clinic.fileRecord(new MedicalRecord("P006","A006","2026-07-10",
+    new Referral("Lung mass", "Pulmonology"),
+    noRx()))
+
+  // ── Print full report ──────────────────────────────────────────────
+  clinic.printFullReport()
+}

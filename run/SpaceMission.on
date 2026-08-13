@@ -1,0 +1,324 @@
+// SpaceMission.on — a space mission planner exercising records, enums, ADTs,
+// generics, collection pipelines, pattern matching, closures, recursion, ranges.
+
+// ── Core data records ────────────────────────────────────────────────────────
+
+record Planet(name: String, distanceAU: Double, gravityMs2: Double, hasAtmosphere: Boolean)
+
+record Spacecraft(name: String, dryMassKg: Double, maxFuelKg: Double) {
+public:
+  def wetMass(): Double = dryMassKg() + maxFuelKg()
+  def massRatio(): Double = wetMass() / dryMassKg()
+}
+
+record MissionLog(phase: String, message: String, fuelUsed: Double)
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum MissionStatus {
+  PLANNED, IN_FLIGHT, COMPLETE, ABORTED
+}
+
+enum MissionOutcome(label: String, successCode: Int) {
+  SUCCESS("Mission success", 0),
+  PARTIAL("Partial success", 1),
+  FAILURE("Mission failure", -1)
+}
+
+// ── ADT: mission event ────────────────────────────────────────────────────────
+
+enum MissionEvent {
+  case ThrusterFire(deltaVms: Double)
+  case DataRelay(mbSent: Int)
+  case Anomaly(description: String)
+  case Touchdown
+}
+
+// ── Planet catalogue ──────────────────────────────────────────────────────────
+
+val planets = [
+  new Planet("Mercury",  0.39, 3.7,  false),
+  new Planet("Venus",    0.72, 8.87, true),
+  new Planet("Mars",     1.52, 3.72, true),
+  new Planet("Jupiter",  5.2,  24.8, true),
+  new Planet("Saturn",   9.58, 10.4, true),
+  new Planet("Uranus",  19.2,  8.7,  true),
+  new Planet("Neptune", 30.1,  11.2, true)
+]
+
+IO::println("=== Solar System Catalogue ===")
+foreach p: Planet in planets {
+  val atm = if p.hasAtmosphere() { "atm" } else { "no-atm" }
+  IO::println("  #{p.name()} dist=#{p.distanceAU()} AU  g=#{p.gravityMs2()} m/s²  #{atm}")
+}
+
+// ── Spacecraft fleet ──────────────────────────────────────────────────────────
+
+val fleet = [
+  new Spacecraft("Voyager-X",   800.0, 2200.0),
+  new Spacecraft("Ares-I",     1500.0, 4500.0),
+  new Spacecraft("Swift-Probe",  400.0,  800.0),
+  new Spacecraft("Titan-Heavy", 3000.0, 9000.0)
+]
+
+IO::println("\n=== Fleet Manifest ===")
+foreach sc: Spacecraft in fleet {
+  IO::println("  #{sc.name()} wet=#{sc.wetMass()} kg  ratio=#{sc.massRatio()}")
+}
+
+// ── Mission planning helpers ──────────────────────────────────────────────────
+
+// Simplified delta-V budget based on distance (AU): 2.5 km/s per AU as proxy
+def deltaVBudget(distAU: Double): Double = distAU * 2.5
+
+// Tsiolkovsky rocket equation: Δv = Isp * g0 * ln(m0/mf)
+// Using Isp=311s (hydrazine), g0=9.81 m/s²; returns km/s achievable
+def achievableDeltaV(sc: Spacecraft): Double = {
+  val isp = 311.0
+  val g0  = 9.81 / 1000.0   // convert to km/s²
+  val lnRatio = Math::log(sc.massRatio())
+  return isp * g0 * lnRatio
+}
+
+// Score a mission: higher gravity target and atmospheres earn more "science points"
+def scienceScore(p: Planet): Int {
+  val base = (p.gravityMs2() * 10.0) as Int
+  val bonus = if p.hasAtmosphere() { 25 } else { 10 }
+  return base + bonus
+}
+
+IO::println("\n=== Achievable ΔV per spacecraft ===")
+foreach sc: Spacecraft in fleet {
+  val dv = achievableDeltaV(sc)
+  IO::println("  #{sc.name()}: #{dv} km/s")
+}
+
+// ── Collection pipelines ──────────────────────────────────────────────────────
+
+// Inner planets only (< 2 AU)
+val innerPlanets = planets.filter { p => p.distanceAU() < 2.0 }
+IO::println("\nInner planets: " + innerPlanets.map { p => p.name() }.toString())
+
+// Ranked by science score
+val byScience = planets.sortedBy { p => scienceScore(p) }
+IO::println("Ranked by science (asc): " + byScience.map { p => p.name() }.toString())
+
+// Total science potential
+val totalScience = planets.fold(0) { acc, p => (acc as Int) + scienceScore(p as Planet) }
+IO::println("Total science potential: #{totalScience} pts")
+
+// Group planets by atmosphere presence
+val grouped = planets.groupBy { p => if (p as Planet).hasAtmosphere() { "with-atm" } else { "no-atm" } }
+foreach (k, v) in grouped {
+  val names = (v as List).map { p => (p as Planet).name() }
+  IO::println("#{k}: #{names.toString()}")
+}
+
+// ── ADT pattern matching: process mission events ──────────────────────────────
+
+def describeEvent(ev: MissionEvent): String {
+  select ev {
+    case tf is ThrusterFire: return "Thruster fired Δv=#{tf.deltaVms()} m/s"
+    case dr is DataRelay:    return "Data relay: #{dr.mbSent()} MB transmitted"
+    case an is Anomaly:      return "ANOMALY: #{an.description()}"
+    case td is Touchdown:    return "Touchdown confirmed"
+  }
+}
+
+def fuelCostForEvent(ev: MissionEvent): Double {
+  select ev {
+    case tf is ThrusterFire: return tf.deltaVms() * 0.45
+    case dr is DataRelay:    return 0.0
+    case an is Anomaly:      return 5.0
+    case td is Touchdown:    return 0.0
+  }
+}
+
+val missionLog = [
+  new ThrusterFire(350.0),
+  new DataRelay(120),
+  new ThrusterFire(210.0),
+  new Anomaly("Solar panel deployment delayed"),
+  new DataRelay(85),
+  new ThrusterFire(180.0),
+  new Touchdown
+]
+
+IO::println("\n=== Mission Event Log ===")
+var totalFuel = 0.0
+foreach ev: MissionEvent in missionLog {
+  val cost = fuelCostForEvent(ev)
+  totalFuel = totalFuel + cost
+  IO::println("  " + describeEvent(ev) + "  [fuel: #{cost} kg]")
+}
+IO::println("Total fuel consumed: #{totalFuel} kg")
+
+// Count anomalies using filter + pattern
+val anomalyCount = missionLog.filter { ev => ev is Anomaly }.size
+IO::println("Anomaly count: #{anomalyCount}")
+
+// ── Mission controller class ──────────────────────────────────────────────────
+
+class MissionController {
+  val spacecraft: Spacecraft
+  val target: Planet
+  var status: MissionStatus
+  val logs: List[MissionLog]
+public:
+  def this(sc: Spacecraft, planet: Planet) {
+    this.spacecraft = sc
+    this.target = planet
+    this.status = MissionStatus::PLANNED
+    this.logs = []
+  }
+  def launch(): void {
+    this.status = MissionStatus::IN_FLIGHT
+    this.logs.add(new MissionLog("LAUNCH", "Spacecraft #{spacecraft.name()} launched toward #{target.name()}", 50.0))
+  }
+  def recordCruise(fuelKg: Double): void {
+    this.logs.add(new MissionLog("CRUISE", "Cruising at #{target.distanceAU()} AU distance", fuelKg))
+  }
+  def complete(outcome: MissionOutcome): void {
+    this.status = MissionStatus::COMPLETE
+    this.logs.add(new MissionLog("END", outcome.label(), 0.0))
+  }
+  def totalFuelUsed(): Double {
+    var sum = 0.0
+    foreach entry: MissionLog in logs { sum = sum + entry.fuelUsed() }
+    return sum
+  }
+  def report(): void {
+    IO::println("\n--- Mission Report: #{spacecraft.name()} → #{target.name()} ---")
+    IO::println("Status: #{status}")
+    IO::println("Total fuel used: #{totalFuelUsed()} kg  (capacity: #{spacecraft.maxFuelKg()} kg)")
+    foreach entry: MissionLog in logs {
+      IO::println("  [#{entry.phase()}] #{entry.message()}")
+    }
+  }
+}
+
+// ── Run two missions ──────────────────────────────────────────────────────────
+
+val marsVoyager = new MissionController(
+  fleet.find { sc => (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft,
+  planets.find { p => (p as Planet).name() == "Mars" } as Planet
+)
+marsVoyager.launch()
+marsVoyager.recordCruise(320.0)
+marsVoyager.complete(MissionOutcome::SUCCESS)
+marsVoyager.report()
+
+val jupiterAres = new MissionController(
+  fleet.find { sc => (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft,
+  planets.find { p => (p as Planet).name() == "Jupiter" } as Planet
+)
+jupiterAres.launch()
+jupiterAres.recordCruise(1450.0)
+jupiterAres.recordCruise(800.0)
+jupiterAres.complete(MissionOutcome::PARTIAL)
+jupiterAres.report()
+
+// ── Recursion: orbital period (Kepler's 3rd law, simplified) ─────────────────
+// T² ∝ a³  →  T(years) = sqrt(distAU³)  using Newton's method for sqrt
+
+def newtSqrt(x: Double, guess: Double, iter: Int): Double {
+  if iter <= 0 { return guess }
+  val next = (guess + x / guess) / 2.0
+  return newtSqrt(x, next, iter - 1)
+}
+
+def orbitalPeriodYears(distAU: Double): Double {
+  val cube = distAU * distAU * distAU
+  return newtSqrt(cube, cube / 2.0, 20)
+}
+
+IO::println("\n=== Orbital Periods (Kepler) ===")
+foreach p: Planet in planets {
+  val period = orbitalPeriodYears(p.distanceAU())
+  IO::println("  #{p.name()}: #{period} years")
+}
+
+// ── Ranges: launch window simulation ─────────────────────────────────────────
+
+IO::println("\n=== Launch Windows (years 1..10) ===")
+var bestYear = 0
+var bestScore = 0
+foreach yr: Int in 1..10 {
+  val score = (yr * 17 + 3) % 100
+  if score > bestScore {
+    bestScore = score
+    bestYear = yr
+  }
+  IO::println("  Year #{yr}: alignment score #{score}")
+}
+IO::println("Best launch window: year #{bestYear} (score #{bestScore})")
+
+// ── Closures and higher-order functions ───────────────────────────────────────
+
+val formatDist = (au: Double) -> "#{au} AU (#{au * 149.6} Mkm)"
+IO::println("\n=== Formatted Distances ===")
+foreach p: Planet in planets {
+  IO::println("  #{p.name()}: " + formatDist(p.distanceAU()))
+}
+
+// Pipeline using a stored closure for filtering
+val isReachable = (sc: Spacecraft, p: Planet) -> achievableDeltaV(sc) >= deltaVBudget(p.distanceAU())
+val voyager = fleet.find { sc => (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft
+val reachable = planets.filter { p => isReachable(voyager, p as Planet) }
+IO::println("\nVoyager-X can reach: " + reachable.map { p => (p as Planet).name() }.toString())
+
+// ── Nullable: find an unknown planet ─────────────────────────────────────────
+
+def findPlanet(name: String): Planet? {
+  return planets.find { p => (p as Planet).name() == name } as Planet?
+}
+
+val known = findPlanet("Mars")
+val unknown = findPlanet("Pluto")
+
+if known != null {
+  IO::println("\nFound: #{known.name()} at #{known.distanceAU()} AU")
+} else {
+  IO::println("\nMars not found (unexpected)")
+}
+
+if unknown == null {
+  IO::println("Pluto: not in catalogue (expected)")
+} else {
+  IO::println("Pluto found: #{unknown.name()}")
+}
+
+// ── Try / catch: safe division for fuel margin ────────────────────────────────
+
+def fuelMargin(used: Double, capacity: Double): Double {
+  try {
+    if capacity == 0.0 { throw new Exception("zero capacity") }
+    return (capacity - used) / capacity * 100.0
+  } catch e: Exception {
+    return 0.0 - 1.0
+  }
+}
+
+IO::println("\n=== Fuel Margins ===")
+IO::println("  Mars mission:    #{fuelMargin(marsVoyager.totalFuelUsed(), voyager.maxFuelKg())}%")
+val heavyCapacity = (fleet.find { sc => (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft).maxFuelKg()
+IO::println("  Jupiter mission: #{fuelMargin(jupiterAres.totalFuelUsed(), heavyCapacity)}%")
+IO::println("  Bad capacity:    #{fuelMargin(100.0, 0.0)}%")
+
+// ── While loop: countdown ─────────────────────────────────────────────────────
+
+IO::println("\n=== Launch Countdown ===")
+var countdown = 5
+while countdown > 0 {
+  IO::println("  T-#{countdown}...")
+  countdown = countdown - 1
+}
+IO::println("  LIFTOFF!")
+
+// ── String interpolation summary ──────────────────────────────────────────────
+
+val missionCount = 2
+val fleetCount = fleet.size
+val planetCount = planets.size
+IO::println("\n=== Summary ===")
+IO::println("Catalogue: #{planetCount} planets | Fleet: #{fleetCount} spacecraft | Missions run: #{missionCount}")

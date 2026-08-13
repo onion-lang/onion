@@ -242,8 +242,14 @@ so through `canPrint(): false` and asserts whatever laws its reading direction h
 
 ## When to reach for `Shapes` directly
 
-`onion.Shapes::regex` and `::json` are the same construction as ordinary API, for a shape
-over a type you did not declare.
+`onion.Shapes` exposes the same four constructions `shape name = ...` derives, as
+ordinary API, for a shape over a type you did not declare:
+
+- `Shapes::regex` — the `re"..."` form
+- `Shapes::json` — the `json` form
+- `Shapes::yaml` — the `yaml` form
+- `Shapes::config` — the `config` form, lossless (`parseLossless`/`printLossless`) like
+  `shape name = config`
 
 ## See also
 

@@ -1,374 +1,543 @@
-// LibrarySystem.on — A library management system exercising records,
-// plain enums, classes with methods, collection operations, pattern
-// matching, extension methods, string interpolation, and closures.
+// LibrarySystem.on — Public library management system.
+// Exercises: extension methods on String/Int/Double, homogeneous enums with
+// methods, records with inline methods, interface + class conformance, classes
+// with mutable typed fields, collection pipelines (filter/map/fold/groupBy/
+// sortedBy/find/partition/zip/any/count/distinct), select, type-pattern select,
+// nullable types, closures, string interpolation, try/catch, recursion,
+// foreach (item and k,v), while, indexOf/set for in-place mutation.
 
-enum Genre { FICTION, NONFICTION, SCIENCE, MYSTERY, BIOGRAPHY, THRILLER }
-
-record Book(title: String, author: String, year: Int, pages: Int, genre: Genre)
-record Member(id: Int, name: String, email: String)
-record Loan(memberId: Int, bookTitle: String, dueDay: Int)
-record SearchResult(book: Book, score: Int)
-
-// ── Extension methods ──────────────────────────────────────────────────────
+// ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension String {
-  def truncate(maxLen: Int): String {
-    if this.length() <= maxLen { return this }
-    return this.substring(0, maxLen - 3) + "..."
-  }
-  def padRight(width: Int): String {
-    var s: String = this
-    while s.length() < width { s = s + " " }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
     return s
   }
-  def containsIgnoreCase(sub: String): Boolean {
-    return this.toLowerCase().contains(sub.toLowerCase())
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 3) + "..." }
+  def wordCount(): Int {
+    val parts: List[String] = Strings::split(self, " ")
+    return parts.filter { p => (p as String).length() > 0 }.size
   }
 }
 
 extension Int {
-  def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
-  }
-  def toStars(): String {
-    var s: String = ""
-    var i: Int = 0
-    while i < self { s = s + "*"; i = i + 1 }
+  def ipad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
     return s
   }
+  def abs(): Int = if self < 0 { -self } else { self }
 }
 
-// ── Genre utilities ────────────────────────────────────────────────────────
-
-def genreLabel(g: Genre): String {
-  select g {
-    case Genre::FICTION:    return "Fiction"
-    case Genre::NONFICTION: return "Non-Fiction"
-    case Genre::SCIENCE:    return "Science"
-    case Genre::MYSTERY:    return "Mystery"
-    case Genre::BIOGRAPHY:  return "Biography"
-    case Genre::THRILLER:   return "Thriller"
-    else:                   return "Other"
+extension Double {
+  def fmt2(): String {
+    val whole: Int = self.intValue()
+    val frac: Int  = ((self - (whole as Double)) * 100.0 + 0.5).intValue()
+    val fs: String = "" + frac
+    return "" + whole + "." + (if fs.length() < 2 { "0" + fs } else { fs })
   }
 }
 
-// ── Library class ──────────────────────────────────────────────────────────
+// ─── Genre enum ───────────────────────────────────────────────────────────────
 
-class Library {
+enum Genre {
+  FICTION, NON_FICTION, SCIENCE, HISTORY, BIOGRAPHY, TECHNOLOGY, MYSTERY, POETRY
 public:
-  val books: List[Book]
-  val members: List[Member]
-  val loans: List[Loan]
-  var nextId: Int
+  def label(): String = select this {
+    case Genre::FICTION:     "Fiction"
+    case Genre::NON_FICTION: "Non-Fiction"
+    case Genre::SCIENCE:     "Science"
+    case Genre::HISTORY:     "History"
+    case Genre::BIOGRAPHY:   "Biography"
+    case Genre::TECHNOLOGY:  "Technology"
+    case Genre::MYSTERY:     "Mystery"
+    case Genre::POETRY:      "Poetry"
+    else:                    "Other"
+  }
+  def section(): String = select this {
+    case Genre::FICTION:  "A"
+    case Genre::MYSTERY:  "A"
+    case Genre::POETRY:   "A"
+    else:                 "B"
+  }
+}
 
+// ─── MemberStatus enum ────────────────────────────────────────────────────────
+
+enum MemberStatus {
+  ACTIVE, SUSPENDED, EXPIRED
+public:
+  def label(): String = select this {
+    case MemberStatus::ACTIVE:    "Active"
+    case MemberStatus::SUSPENDED: "Suspended"
+    case MemberStatus::EXPIRED:   "Expired"
+    else:                         "Unknown"
+  }
+  def canBorrow(): Boolean = select this {
+    case MemberStatus::ACTIVE: true
+    else:                      false
+  }
+}
+
+// ─── LoanStatus enum ─────────────────────────────────────────────────────────
+
+enum LoanStatus {
+  ACTIVE, RETURNED, OVERDUE
+public:
+  def label(): String = select this {
+    case LoanStatus::ACTIVE:   "Active"
+    case LoanStatus::RETURNED: "Returned"
+    case LoanStatus::OVERDUE:  "Overdue"
+    else:                      "Unknown"
+  }
+  def isClosed(): Boolean = select this {
+    case LoanStatus::RETURNED: true
+    case LoanStatus::OVERDUE:  true
+    else:                      false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Book(id: Int, title: String, author: String, genre: Genre, year: Int, copies: Int) {
+public:
+  def shortTitle(): String = title().truncate(28)
+  def era(): String = if year() >= 2000 { "Modern" } else if year() >= 1950 { "Contemporary" } else { "Classic" }
+  def available(activeLoanCount: Int): Boolean = activeLoanCount < copies()
+}
+
+record Member(id: Int, name: String, email: String, status: MemberStatus) {
+public:
+  def shortName(): String = name().truncate(20)
+  def canBorrow(): Boolean = status().canBorrow()
+}
+
+record Loan(id: Int, bookId: Int, memberId: Int, borrowDay: Int, dueDay: Int, status: LoanStatus) {
+public:
+  def daysOverdue(today: Int): Int {
+    if status() == LoanStatus::ACTIVE && today > dueDay() { return today - dueDay() }
+    return 0
+  }
+  def isActive(): Boolean = status() == LoanStatus::ACTIVE
+  def withStatus(s: LoanStatus): Loan =
+    new Loan(id(), bookId(), memberId(), borrowDay(), dueDay(), s)
+}
+
+record LoanSummary(memberName: String, total: Int, returned: Int, active: Int, overdue: Int) {
+public:
+  def display(): String =
+    "#{memberName().padRight(22)} total=#{total().ipad(2)} " +
+    "returned=#{returned().ipad(2)} active=#{active().ipad(2)} overdue=#{overdue().ipad(2)}"
+}
+
+// ─── Reportable interface ─────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── BookCatalog ──────────────────────────────────────────────────────────────
+
+class BookCatalog {
+  val books: List[Book]
+  var nextId: Int
+public:
   def this() {
     this.books = []
-    this.members = []
-    this.loans = []
     this.nextId = 1
   }
-
-  def addBook(title: String, author: String, year: Int, pages: Int, genre: Genre): void {
-    this.books << new Book(title, author, year, pages, genre)
+  def add(title: String, author: String, genre: Genre, year: Int, copies: Int): Book {
+    val b = new Book(nextId, title, author, genre, year, copies)
+    books << b
+    nextId = nextId + 1
+    return b
   }
+  def all(): List[Book] = books
+  def byId(id: Int): Book? {
+    foreach b: Book in books { if b.id() == id { return b } }
+    return null
+  }
+  def byGenre(g: Genre): List[Book] = books.filter { b => (b as Book).genre() == g }
+  def byAuthor(author: String): List[Book] = books.filter { b => (b as Book).author() == author }
+  def byTitle(): List[Book] = books.sortedBy { b => (b as Book).title() }
+  def byYear(): List[Book] = books.sortedBy { b => (b as Book).year() }
+  def totalCopies(): Int = books.fold(0) { acc, b => (acc as Int) + (b as Book).copies() }
+  def genreMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).genre().label() }
+  def eraMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).era() }
+  def sectionMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).genre().section() }
+}
 
-  def registerMember(name: String, email: String): Member {
-    val m = new Member(this.nextId, name, email)
-    this.members << m
-    this.nextId = this.nextId + 1
+// ─── MemberRegistry ──────────────────────────────────────────────────────────
+
+class MemberRegistry {
+  val members: List[Member]
+  var nextId: Int
+public:
+  def this() {
+    this.members = []
+    this.nextId = 1
+  }
+  def register(name: String, email: String): Member {
+    val m = new Member(nextId, name, email, MemberStatus::ACTIVE)
+    members << m
+    nextId = nextId + 1
     return m
   }
-
-  def checkout(memberId: Int, title: String, dueDay: Int): Boolean {
-    if !this.isAvailable(title) { return false }
-    this.loans << new Loan(memberId, title, dueDay)
+  def suspend(id: Int): Boolean {
+    var found: Member? = null
+    foreach m: Member in members { if m.id() == id { found = m } }
+    if found == null { return false }
+    val old = found as Member
+    val idx: Int = members.indexOf(old)
+    members.set(idx, new Member(old.id(), old.name(), old.email(), MemberStatus::SUSPENDED))
     return true
   }
+  def all(): List[Member] = members
+  def byId(id: Int): Member? {
+    foreach m: Member in members { if m.id() == id { return m } }
+    return null
+  }
+  def activeCount(): Int = members.count { m => (m as Member).status().canBorrow() }
+}
 
-  def isAvailable(title: String): Boolean {
-    foreach l: Object in this.loans {
-      if (l as Loan).bookTitle() == title { return false }
+// ─── LoanDesk ────────────────────────────────────────────────────────────────
+
+class LoanDesk {
+  val loans: List[Loan]
+  val catalog: BookCatalog
+  val registry: MemberRegistry
+  val loanDays: Int
+  var nextId: Int
+public:
+  def this(cat: BookCatalog, reg: MemberRegistry, days: Int) {
+    this.loans    = []
+    this.catalog  = cat
+    this.registry = reg
+    this.loanDays = days
+    this.nextId   = 1
+  }
+  def borrow(bookId: Int, memberId: Int, day: Int): String {
+    val book = catalog.byId(bookId)
+    if book == null { return "ERROR: Book ##{bookId} not found" }
+    val member = registry.byId(memberId)
+    if member == null { return "ERROR: Member ##{memberId} not found" }
+    val bk = book as Book
+    val mem = member as Member
+    if !mem.canBorrow() {
+      return "ERROR: #{mem.name()} cannot borrow (#{mem.status().label()})"
     }
-    return true
-  }
-
-  def returnBook(memberId: Int, title: String): Boolean {
-    var idx: Int = -1
-    var i: Int = 0
-    foreach l: Object in this.loans {
+    val activeCount: Int = loans.count { l =>
       val loan = l as Loan
-      if loan.memberId() == memberId && loan.bookTitle() == title { idx = i }
+      loan.bookId() == bookId && loan.isActive()
+    }
+    if !bk.available(activeCount) {
+      return "UNAVAIL: No copies of \"#{bk.title()}\" available"
+    }
+    val loan = new Loan(nextId, bookId, memberId, day, day + loanDays, LoanStatus::ACTIVE)
+    loans << loan
+    nextId = nextId + 1
+    return "OK: \"#{bk.shortTitle()}\" lent to #{mem.name()} — due day #{loan.dueDay()}"
+  }
+  def returnBook(loanId: Int, today: Int): String {
+    var foundLoan: Loan? = null
+    var foundIdx: Int = -1
+    var i: Int = 0
+    while i < loans.size {
+      val cur = loans[i] as Loan
+      if cur.id() == loanId && cur.isActive() { foundLoan = cur; foundIdx = i }
       i = i + 1
     }
-    if idx < 0 { return false }
-    this.loans.remove(idx)
-    return true
+    if foundLoan == null { return "ERROR: Loan ##{loanId} not found or already closed" }
+    val l = foundLoan as Loan
+    val late: Boolean = today > l.dueDay()
+    val newStatus = if late { LoanStatus::OVERDUE } else { LoanStatus::RETURNED }
+    loans.set(foundIdx, l.withStatus(newStatus))
+    val bk = catalog.byId(l.bookId())
+    val title = if bk != null { (bk as Book).shortTitle() } else { "?" }
+    if late {
+      return "LATE: \"#{title}\" — #{today - l.dueDay()} day(s) overdue"
+    }
+    return "OK: \"#{title}\" returned on day #{today}"
   }
-
-  def findByAuthor(author: String): List[Book] {
-    val result: List[Book] = []
-    foreach b: Object in this.books {
-      val book = b as Book
-      if book.author().containsIgnoreCase(author) { result << book }
-    }
-    return result
+  def active(): List[Loan] = loans.filter { l => (l as Loan).isActive() }
+  def overdue(today: Int): List[Loan] = loans.filter { l =>
+    val loan = l as Loan
+    loan.isActive() && today > loan.dueDay()
   }
-
-  def findByGenre(genre: Genre): List[Book] {
-    val result: List[Book] = []
-    foreach b: Object in this.books {
-      val book = b as Book
-      if book.genre() == genre { result << book }
-    }
-    return result
-  }
-
-  def findByYearRange(from: Int, to: Int): List[Book] {
-    val result: List[Book] = []
-    foreach b: Object in this.books {
-      val book = b as Book
-      if book.year() >= from && book.year() <= to { result << book }
-    }
-    return result
-  }
-
-  def countByAuthor(author: String): Int {
-    var count: Int = 0
-    foreach b: Object in this.books {
-      if (b as Book).author() == author { count = count + 1 }
-    }
-    return count
-  }
-
-  def topAuthors(n: Int): List[String] {
-    val names: List[String] = []
-    foreach b: Object in this.books {
-      val a = (b as Book).author()
-      if !names.contains(a) { names << a }
-    }
-    // Bubble sort descending by book count
-    var i: Int = 0
-    while i < names.size {
-      var j: Int = 0
-      while j < names.size - 1 {
-        if this.countByAuthor(names[j] as String) < this.countByAuthor(names[j + 1] as String) {
-          val tmp = names[j]
-          names[j] = names[j + 1]
-          names[j + 1] = tmp
-        }
-        j = j + 1
-      }
-      i = i + 1
-    }
-    val result: List[String] = []
-    var k: Int = 0
-    while k < n && k < names.size { result << names[k] as String; k = k + 1 }
-    return result
-  }
-
-  def computeStats(): void {
-    val total = this.books.size
-    if total == 0 { IO::println("  No books."); return }
-    var totalPages: Int = 0
-    var minYear: Int = 9999
-    var maxYear: Int = 0
-    var oldest: String = ""
-    var newest: String = ""
-    foreach b: Object in this.books {
-      val book = b as Book
-      totalPages = totalPages + book.pages()
-      if book.year() < minYear { minYear = book.year(); oldest = book.title() }
-      if book.year() > maxYear { maxYear = book.year(); newest = book.title() }
-    }
-    val avg = totalPages / total
-    IO::println("  Total books    : #{total}")
-    IO::println("  Total pages    : #{totalPages}")
-    IO::println("  Average pages  : #{avg}")
-    IO::println("  Oldest (#{minYear}): #{oldest}")
-    IO::println("  Newest (#{maxYear}): #{newest}")
-    IO::println("  On loan        : #{this.loans.size}")
-  }
-
-  def overdueSummary(today: Int): void {
-    var count: Int = 0
-    foreach l: Object in this.loans {
-      val loan = l as Loan
-      if loan.dueDay() < today {
-        IO::println("  OVERDUE: '#{loan.bookTitle().truncate(30)}' (member #{loan.memberId()}, was due day #{loan.dueDay()})")
-        count = count + 1
-      }
-    }
-    if count == 0 { IO::println("  No overdue loans.") }
-    else { IO::println("  Total overdue: #{count}") }
+  def forMember(memberId: Int): List[Loan] = loans.filter { l => (l as Loan).memberId() == memberId }
+  def memberSummary(memberId: Int, today: Int): LoanSummary? {
+    val mem = registry.byId(memberId)
+    if mem == null { return null }
+    val mLoans = forMember(memberId)
+    val returned: Int  = mLoans.count { l => (l as Loan).status() == LoanStatus::RETURNED }
+    val activeM: Int   = mLoans.count { l => (l as Loan).isActive() }
+    val overdueM: Int  = mLoans.count { l => (l as Loan).daysOverdue(today) > 0 }
+    return new LoanSummary((mem as Member).name(), mLoans.size, returned, activeM, overdueM)
   }
 }
 
-// ── Ranked search ──────────────────────────────────────────────────────────
+// ─── LibraryReport conforms Reportable ───────────────────────────────────────
 
-def scoreBook(book: Book, query: String): Int {
-  var score: Int = 0
-  if book.title().containsIgnoreCase(query) { score = score + 10 }
-  if book.author().containsIgnoreCase(query) { score = score + 5 }
-  if genreLabel(book.genre()).containsIgnoreCase(query) { score = score + 3 }
-  return score
-}
-
-def rankSearch(books: List[Book], query: String): List[SearchResult] {
-  val results: List[SearchResult] = []
-  foreach b: Object in books {
-    val book = b as Book
-    val s = scoreBook(book, query)
-    if s > 0 { results << new SearchResult(book, s) }
+class LibraryReport conforms Reportable {
+  val catalog:  BookCatalog
+  val registry: MemberRegistry
+  val desk:     LoanDesk
+  val today:    Int
+public:
+  def this(cat: BookCatalog, reg: MemberRegistry, d: LoanDesk, t: Int) {
+    this.catalog  = cat
+    this.registry = reg
+    this.desk     = d
+    this.today    = t
   }
-  // Sort descending by score
-  var i: Int = 0
-  while i < results.size {
-    var j: Int = 0
-    while j < results.size - 1 {
-      val ra = results[j] as SearchResult
-      val rb = results[j + 1] as SearchResult
-      if ra.score() < rb.score() { results[j] = rb; results[j + 1] = ra }
-      j = j + 1
-    }
-    i = i + 1
+  def report(): String {
+    val sb: List[String] = []
+    sb << "=== Library Status Report (Day #{today}) ==="
+    sb << "Books in catalog:  #{catalog.all().size}"
+    sb << "Total copies:      #{catalog.totalCopies()}"
+    sb << "Registered members:#{registry.all().size}"
+    sb << "Active members:    #{registry.activeCount()}"
+    sb << "Active loans:      #{desk.active().size}"
+    sb << "Overdue loans:     #{desk.overdue(today).size}"
+    return sb.fold("") { acc, s => (acc as String) + (s as String) + "\n" }
   }
-  return results
 }
 
-// ── Formatting helpers ─────────────────────────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
-def printBook(b: Book): void {
-  val avail = if b.pages() > 400 { "long" } else { "short" }
-  val title = b.title().truncate(32).padRight(34)
-  val auth = b.author().padRight(22)
-  IO::println("  #{title}#{auth}#{b.year()}  #{b.pages()}p (#{avail})  [#{genreLabel(b.genre())}]")
+def sep(n: Int): String {
+  var s: String = ""
+  foreach i: Int in 0..<n { s = s + "-" }
+  return s
 }
 
-def printHeader(title: String): void {
-  IO::println("")
-  IO::println(title)
-  IO::println("-".repeat(title.length()))
+// Recursive: count total characters in a list of strings
+def totalChars(words: List[String], idx: Int): Int {
+  if idx >= words.size { return 0 }
+  return (words[idx] as String).length() + totalChars(words, idx + 1)
 }
 
-// ── Sample data ────────────────────────────────────────────────────────────
-
-val lib = new Library()
-
-lib.addBook("The Great Gatsby",            "F. Scott Fitzgerald",  1925, 180, Genre::FICTION)
-lib.addBook("To Kill a Mockingbird",       "Harper Lee",           1960, 281, Genre::FICTION)
-lib.addBook("1984",                        "George Orwell",        1949, 328, Genre::FICTION)
-lib.addBook("Animal Farm",                 "George Orwell",        1945, 112, Genre::FICTION)
-lib.addBook("A Brief History of Time",     "Stephen Hawking",      1988, 212, Genre::SCIENCE)
-lib.addBook("The Selfish Gene",            "Richard Dawkins",      1976, 360, Genre::SCIENCE)
-lib.addBook("Cosmos",                      "Carl Sagan",           1980, 365, Genre::SCIENCE)
-lib.addBook("Sherlock Holmes",             "Arthur Conan Doyle",   1892, 307, Genre::MYSTERY)
-lib.addBook("And Then There Were None",    "Agatha Christie",      1939, 272, Genre::MYSTERY)
-lib.addBook("Murder on the Orient Express","Agatha Christie",      1934, 256, Genre::MYSTERY)
-lib.addBook("The Girl with the Dragon Tattoo","Stieg Larsson",     2005, 672, Genre::THRILLER)
-lib.addBook("Gone Girl",                   "Gillian Flynn",        2012, 422, Genre::THRILLER)
-lib.addBook("Steve Jobs",                  "Walter Isaacson",      2011, 630, Genre::BIOGRAPHY)
-lib.addBook("The Diary of a Young Girl",   "Anne Frank",           1947, 283, Genre::BIOGRAPHY)
-lib.addBook("Sapiens",                     "Yuval Noah Harari",    2011, 443, Genre::NONFICTION)
-lib.addBook("Thinking, Fast and Slow",     "Daniel Kahneman",      2011, 499, Genre::NONFICTION)
-
-val alice = lib.registerMember("Alice Smith",  "alice@example.com")
-val bob   = lib.registerMember("Bob Jones",   "bob@example.com")
-val carol = lib.registerMember("Carol White", "carol@example.com")
-
-lib.checkout(alice.id(), "1984",        30)
-lib.checkout(alice.id(), "Sapiens",     14)
-lib.checkout(bob.id(),   "Sherlock Holmes", 7)
-lib.checkout(carol.id(), "Gone Girl",   21)
-// Bob's loan is already overdue (today = day 20, due day 7)
-
-// ── Output ─────────────────────────────────────────────────────────────────
-
-printHeader("FULL CATALOG (#{lib.books.size} books)")
-foreach b: Object in lib.books { printBook(b as Book) }
-
-printHeader("LIBRARY STATISTICS")
-lib.computeStats()
-
-printHeader("TOP AUTHORS")
-foreach a: Object in lib.topAuthors(5) {
-  val author = a as String
-  IO::println("  #{author.padRight(24)} #{lib.countByAuthor(author)} book(s)  #{lib.countByAuthor(author).toStars()}")
+def printBookRow(b: Book): void {
+  IO::println(
+    b.id().ipad(3) + "  " +
+    b.shortTitle().padRight(30) +
+    b.author().truncate(20).padRight(22) +
+    b.genre().label().padRight(14) +
+    b.year().ipad(4) + "  " +
+    b.copies().ipad(2) + " cop."
+  )
 }
 
-printHeader("SCIENCE BOOKS")
-foreach b: Object in lib.findByGenre(Genre::SCIENCE) { printBook(b as Book) }
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
-printHeader("MYSTERY BOOKS")
-foreach b: Object in lib.findByGenre(Genre::MYSTERY) { printBook(b as Book) }
+val catalog  = new BookCatalog()
+val registry = new MemberRegistry()
+val desk     = new LoanDesk(catalog, registry, 14)
 
-printHeader("BOOKS BY GEORGE ORWELL")
-foreach b: Object in lib.findByAuthor("Orwell") { printBook(b as Book) }
+// ── Add books ─────────────────────────────────────────────────────────────────
+catalog.add("The Great Gatsby",          "F. Scott Fitzgerald",  Genre::FICTION,     1925, 3)
+catalog.add("A Brief History of Time",   "Stephen Hawking",      Genre::SCIENCE,     1988, 2)
+catalog.add("Sapiens",                   "Yuval Noah Harari",    Genre::HISTORY,     2011, 4)
+catalog.add("Clean Code",               "Robert C. Martin",     Genre::TECHNOLOGY,  2008, 2)
+catalog.add("The Pragmatic Programmer", "David Thomas",         Genre::TECHNOLOGY,  1999, 3)
+catalog.add("The Hound of Baskervilles","Arthur Conan Doyle",   Genre::MYSTERY,     1902, 5)
+catalog.add("Steve Jobs",               "Walter Isaacson",      Genre::BIOGRAPHY,   2011, 2)
+catalog.add("The Name of the Rose",     "Umberto Eco",          Genre::MYSTERY,     1980, 2)
+catalog.add("Cosmos",                   "Carl Sagan",           Genre::SCIENCE,     1980, 3)
+catalog.add("Dune",                     "Frank Herbert",        Genre::FICTION,     1965, 4)
+catalog.add("The Hobbit",               "J.R.R. Tolkien",       Genre::FICTION,     1937, 3)
+catalog.add("Thinking, Fast and Slow",  "Daniel Kahneman",      Genre::NON_FICTION, 2011, 2)
+catalog.add("The Raven",                "Edgar Allan Poe",      Genre::POETRY,      1845, 6)
+catalog.add("Educated",                 "Tara Westover",        Genre::BIOGRAPHY,   2018, 3)
+catalog.add("The Martian",              "Andy Weir",            Genre::SCIENCE,     2011, 4)
 
-printHeader("BOOKS BY AGATHA CHRISTIE")
-foreach b: Object in lib.findByAuthor("Christie") { printBook(b as Book) }
+// ── Register members ──────────────────────────────────────────────────────────
+val alice  = registry.register("Alice Chen",    "alice@lib.org")
+val bob    = registry.register("Bob Smith",     "bob@lib.org")
+val carol  = registry.register("Carol Davis",   "carol@lib.org")
+val dave   = registry.register("Dave Wilson",   "dave@lib.org")
+val eve    = registry.register("Eve Martinez",  "eve@lib.org")
+val frank  = registry.register("Frank Lee",     "frank@lib.org")
 
-printHeader("BOOKS FROM 1980-2015")
-foreach b: Object in lib.findByYearRange(1980, 2015) { printBook(b as Book) }
+// ── Borrowing ─────────────────────────────────────────────────────────────────
+IO::println("=== Library Management System ===")
+IO::println("")
+IO::println("--- Book Catalog (by title) " + sep(45))
+IO::println(" ID  " + "Title".padRight(30) + "Author".padRight(22) + "Genre".padRight(14) + "Year  Copies")
+IO::println(sep(90))
+foreach bk: Object in catalog.byTitle() {
+  printBookRow(bk as Book)
+}
+IO::println("")
 
-printHeader("ACTIVE LOANS (today = day 20)")
-foreach l: Object in lib.loans {
+IO::println("--- Genre Distribution " + sep(50))
+val genreMap = catalog.genreMap()
+foreach (genre, bks) in genreMap {
+  val count = (bks as List[Object]).size
+  IO::println("  #{(genre as String).padRight(14)}: #{count} book(s)")
+}
+IO::println("")
+
+IO::println("--- Era Distribution " + sep(52))
+val eraMap = catalog.eraMap()
+foreach (era, bks) in eraMap {
+  IO::println("  #{(era as String).padRight(14)}: #{(bks as List[Object]).size} title(s)")
+}
+IO::println("")
+
+IO::println("--- Borrowing Activity (day 1–10) " + sep(38))
+IO::println(desk.borrow(1,  alice.id(), 1))   // Alice → Gatsby
+IO::println(desk.borrow(4,  alice.id(), 1))   // Alice → Clean Code
+IO::println(desk.borrow(2,  bob.id(),   2))   // Bob → Brief History
+IO::println(desk.borrow(6,  carol.id(), 3))   // Carol → Hound
+IO::println(desk.borrow(4,  dave.id(),  4))   // Dave → Clean Code (last copy)
+IO::println(desk.borrow(4,  eve.id(),   5))   // Eve → Clean Code — UNAVAIL
+IO::println(desk.borrow(9,  bob.id(),   5))   // Bob → Cosmos
+IO::println(desk.borrow(10, carol.id(), 6))   // Carol → Dune
+IO::println(desk.borrow(3,  eve.id(),   7))   // Eve → Sapiens
+IO::println(desk.borrow(15, frank.id(), 8))   // Frank → The Martian
+IO::println(desk.borrow(12, frank.id(), 8))   // Frank → Thinking, Fast and Slow
+IO::println("")
+
+IO::println("--- Returns " + sep(60))
+IO::println(desk.returnBook(1, 10))   // Alice returns Gatsby on time
+IO::println(desk.returnBook(3, 22))   // Bob returns Brief History — LATE (due 16)
+IO::println(desk.returnBook(6, 13))   // Carol returns Hound on time
+IO::println("")
+
+// ── Suspend a member ──────────────────────────────────────────────────────────
+registry.suspend(eve.id())
+IO::println("Suspended member: #{eve.name()}")
+IO::println(desk.borrow(13, eve.id(), 14))  // Eve tries to borrow — SUSPENDED
+IO::println("")
+
+IO::println("--- Active Loans on Day 20 " + sep(46))
+val activeLoans = desk.active()
+IO::println("Count: #{activeLoans.size}")
+foreach l: Object in activeLoans {
   val loan = l as Loan
-  val days = loan.dueDay() - 20
-  val status = if days < 0 { "OVERDUE by #{0 - days} day(s)" } else { "due in #{days} day(s)" }
-  IO::println("  Member #{loan.memberId()} → '#{loan.bookTitle().truncate(28)}' [#{status}]")
+  val bk = catalog.byId(loan.bookId())
+  val mem = registry.byId(loan.memberId())
+  val title  = if bk  != null { (bk  as Book).shortTitle() }   else { "?" }
+  val mname  = if mem != null { (mem as Member).shortName() }   else { "?" }
+  val over   = loan.daysOverdue(20)
+  val tag    = if over > 0 { " [OVERDUE #{over}d]" } else { "" }
+  IO::println("  ##{loan.id().ipad(2)}  #{title.padRight(30)} #{mname.padRight(22)} due=#{loan.dueDay()}#{tag}")
 }
+IO::println("")
 
-printHeader("OVERDUE LOANS")
-lib.overdueSummary(20)
-
-// Return a book and check availability
-val returned = lib.returnBook(alice.id(), "1984")
-printHeader("AFTER ALICE RETURNS '1984'")
-IO::println("  Return success  : #{returned}")
-IO::println("  '1984' available: #{lib.isAvailable("1984")}")
-IO::println("  Active loans    : #{lib.loans.size}")
-
-// Try to checkout an already-borrowed book
-val canCheckout = lib.checkout(bob.id(), "Sapiens", 25)
-IO::println("  Bob checkout 'Sapiens' (still out): #{canCheckout}")
-
-// Ranked search
-printHeader("RANKED SEARCH: 'the'")
-foreach r: Object in rankSearch(lib.books, "the") {
-  val sr = r as SearchResult
-  IO::println("  score=#{sr.score()} '#{sr.book().title().truncate(35)}' by #{sr.book().author()}")
+IO::println("--- Overdue on Day 20 " + sep(51))
+val overdueLoans = desk.overdue(20)
+if overdueLoans.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach l: Object in overdueLoans {
+    val loan = l as Loan
+    val bk  = catalog.byId(loan.bookId())
+    val mem = registry.byId(loan.memberId())
+    val title = if bk  != null { (bk  as Book).title() }   else { "?" }
+    val mname = if mem != null { (mem as Member).name() } else { "?" }
+    IO::println("  #{title.padRight(32)} — #{mname} (#{loan.daysOverdue(20)}d late)")
+  }
 }
+IO::println("")
 
-printHeader("RANKED SEARCH: 'science'")
-foreach r: Object in rankSearch(lib.books, "science") {
-  val sr = r as SearchResult
-  IO::println("  score=#{sr.score()} '#{sr.book().title().truncate(35)}' by #{sr.book().author()}")
+IO::println("--- Per-Member Summary " + sep(50))
+IO::println("  Member".padRight(24) + "total  returned  active  overdue")
+IO::println("  " + sep(60))
+foreach mem: Object in registry.all() {
+  val m   = mem as Member
+  val sumOpt = desk.memberSummary(m.id(), 20)
+  if sumOpt != null {
+    IO::println("  " + (sumOpt as LoanSummary).display())
+  }
 }
+IO::println("")
 
-// Extension method showcase
-printHeader("EXTENSION METHOD DEMOS")
-IO::println("  10.clamp(1, 5)          = #{10.clamp(1, 5)}")
-IO::println("  3.clamp(1, 5)           = #{3.clamp(1, 5)}")
-IO::println("  0.clamp(1, 5)           = #{0.clamp(1, 5)}")
-IO::println("  5.toStars()             = #{5.toStars()}")
-IO::println("  'Long Title Here'.truncate(10) = #{"Long Title Here".truncate(10)}")
-IO::println("  'hi'.padRight(8) + '|' = #{"hi".padRight(8)}|")
-IO::println("  'Hello'.containsIgnoreCase('ell') = #{"Hello".containsIgnoreCase("ell")}")
+// ── Pipeline demos ────────────────────────────────────────────────────────────
+IO::println("--- Pipeline Demos " + sep(54))
 
-// Recursive factorial using extension Int method
-def factorial(n: Int): Int {
-  if n <= 1 { return 1 }
-  return n * factorial(n - 1)
+// Partition books by section
+val parts = catalog.all().partition { b => (b as Book).genre().section() == "A" }
+val fiction  = parts[0] as List[Object]
+val nonFictn = parts[1] as List[Object]
+IO::println("Section A (fiction/mystery/poetry): #{fiction.size} titles")
+IO::println("Section B (all others):             #{nonFictn.size} titles")
+
+// Closure stored in val
+val recent = (cutoff: Int) -> catalog.all().filter { b => (b as Book).year() >= cutoff }
+IO::println("Post-2000 titles:   #{recent(2000).size}")
+IO::println("Post-2010 titles:   #{recent(2010).size}")
+
+// any: any science book before 1990?
+val hasClassicSci: Boolean = catalog.byGenre(Genre::SCIENCE).any { b => (b as Book).year() < 1990 }
+IO::println("Classic science book exists: #{hasClassicSci}")
+
+// fold: total character count of all book titles
+val allTitles = catalog.all().map { b => (b as Book).title() }
+val totalLen: Int = allTitles.fold(0) { acc, s => (acc as Int) + (s as String).length() }
+IO::println("Total chars in all titles: #{totalLen}")
+
+// Recursive helper: count via recursion
+val wordTotal: Int = totalChars(allTitles, 0)
+IO::println("Total chars (recursive):   #{wordTotal}")
+
+// Word count per title via extension
+val multiWordTitles = allTitles.filter { t => (t as String).wordCount() >= 3 }
+IO::println("Titles with 3+ words: #{multiWordTitles.size}")
+
+// Zip: pair sorted titles with their years
+val sortedBooks = catalog.byTitle()
+val titleList   = sortedBooks.map { b => (b as Book).title() }
+val yearList    = sortedBooks.map { b => "" + (b as Book).year() }
+val titleYears  = titleList.zip(yearList)
+IO::println("")
+IO::println("--- Alphabetical Title → Year " + sep(43))
+foreach pair: Object in titleYears {
+  val tup = pair as List[Object]
+  IO::println("  #{(tup[0] as String).padRight(35)} #{tup[1]}")
 }
+IO::println("")
 
-printHeader("BONUS: FACTORIAL (recursive)")
-var i: Int = 1
-while i <= 10 {
-  IO::println("  #{i}! = #{factorial(i)}")
-  i = i + 1
+// Double.fmt2 demo
+val avgYear: Double = catalog.all().fold(0) { acc, b => (acc as Int) + (b as Book).year() }.doubleValue() / catalog.all().size.doubleValue()
+IO::println("Average publication year: #{avgYear.fmt2()}")
+
+// Technology books sorted by year
+IO::println("")
+IO::println("--- Technology Books (by year) " + sep(42))
+val techBooks = catalog.byGenre(Genre::TECHNOLOGY).sortedBy { b => (b as Book).year() }
+foreach b: Object in techBooks {
+  val bk = b as Book
+  IO::println("  #{bk.year()}  #{bk.title()} by #{bk.author()}")
+}
+IO::println("")
+
+// ── Full status report via Reportable interface ───────────────────────────────
+val reporter: Reportable = new LibraryReport(catalog, registry, desk, 20)
+IO::println(reporter.report())
+
+// ── try/catch: borrow with bad IDs ───────────────────────────────────────────
+IO::println("--- Error Handling " + sep(54))
+try {
+  val r = desk.borrow(999, 1, 20)
+  IO::println(r)
+} catch e: Exception {
+  IO::println("Caught: #{e.message()}")
+}
+try {
+  val r2 = desk.borrow(1, 999, 20)
+  IO::println(r2)
+} catch e: Exception {
+  IO::println("Caught: #{e.message()}")
 }
 
 IO::println("")
-IO::println("Done. Library has #{lib.books.size} books and #{lib.members.size} members.")
+IO::println("=== Done ===")

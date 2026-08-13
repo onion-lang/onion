@@ -11,16 +11,19 @@
 | # | 次元 | 測定方法 | 現在値（2026-08-10） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3305 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 138 / 138 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 81（AirlineReservation、AuctionHouse、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、CinemaBooking、CipherSuite、ClinicRecords、ConferenceSchedule、ConwayLife、CourseRegistration、DoctorScheduler、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HotelReservation、HRSystem、HuffmanCoding、Inventory、InventoryManager、InventoryReport、JobScheduler、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MathParser、MazeSolver、MiniRpg、MusicFestival、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、ShapeProcessor、ShipmentTracker、ShoppingCart、SocialNetwork、SortingShowcase、SpaceMission、SpellCheck、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 139 / 139 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 82（AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、CinemaBooking、CipherSuite、ClinicRecords、ConferenceSchedule、ConwayLife、CourseRegistration、DoctorScheduler、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HotelReservation、HRSystem、HuffmanCoding、Inventory、InventoryManager、InventoryReport、JobScheduler、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MathParser、MazeSolver、MiniRpg、MusicFestival、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、ShapeProcessor、ShipmentTracker、ShoppingCart、SocialNetwork、SortingShowcase、SpaceMission、SpellCheck、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
 | 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 84 | よくあるエラーごとに専用コード |
 
-**`SBT_OPTS` は設定しないでください。** 以前のこのファイルは `SBT_OPTS="-Xmx2g"` を薦めて
-いましたが、これは現在プロジェクト既定の 4g を*下げて*しまい、スイートの途中で
-`OutOfMemoryError` を起こします。既定のままが正しい値です。
+**`SBT_OPTS` にプロジェクト既定を下回るヒープ値を設定しないでください。** `.jvmopts` は既定を
+`-Xmx10g` に固定しています（`run/` サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の
+0.10.18 を参照）。これを下回るヒープを `SBT_OPTS` に設定すると——以前の悪い例だった
+`-Xmx2g` に限らず、`-Xmx4G` も実際に踏まれています——スイートの途中で
+`OutOfMemoryError` を起こします（#691 参照）。`SBT_OPTS` を他のフラグのために設定する
+場合も、ヒープは `-Xmx10G` 以上を維持してください。
 
 `-Duser.language=en` は重要です。エラーメッセージは二言語で JVM の既定ロケールから解決される
 ため、メッセージ文字列を検査するテストは日本語ロケールでは通り、英語ロケールで走るリリース CI

@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.32] - 2026-08-13
+
+### Documentation
+
+- **Documented the lossless-shapes/lens API and combinators in the `## Shape`
+  section of `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  The section covered `parse`, `print`, `canPrint`, and the L1/L2 laws, but
+  never mentioned `isLossless`, `parseLossless`, `printLossless`, `Lossless`,
+  `Residue`, the combinators (`eachLine`, `lines`, `sepBy`, `xmap`,
+  `orElse`), or `Shapes::config`/`Shapes::yaml` — leaving a real,
+  actively-used feature (lossless config editing, see
+  `docs/guide/shapes.md`) undiscoverable from the API reference a user would
+  actually search. Added a drift-guard spec
+  (`StdlibDocShapeModuleParitySpec`) so future additions to the `Shape`/
+  `Lossless` public API get caught the same way.
+- **Documented `Shapes::config` and `Shapes::yaml` in the "When to reach for
+  `Shapes` directly" section of `docs/guide/shapes.md` and
+  `docs/ja/guide/shapes.md`.** The section only mentioned `Shapes::regex` and
+  `Shapes::json`, even though `onion.Shapes` also exposes `config` and `yaml`
+  factories — the hand-written equivalents of `shape name = config` /
+  `shape name = yaml` — making them undiscoverable without reading the Java
+  source. Added a drift-guard spec (`ShapesGuideDirectApiParitySpec`) so
+  future additions to `Shapes`'s public API get caught the same way.
+- **Documented five undocumented `onion.Colls` batching/aggregation helpers
+  (`chunked`, `windowed`, `sumBy`, `averageBy`/`maxBy`/`minBy`) in a new
+  "Batching, windowing, and selector aggregation" subsection of the Colls
+  Module section in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** The "Modules at a glance" summary table
+  already promised "chunked/windowed, sumBy/maxBy" for `Colls`, but the Colls
+  Module section itself never mentioned them, and — unlike `map`/`filter`/
+  `reduce`/`fold` — no other part of the doc covered them either, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocCollsBatchingAggregationParitySpec`) so future additions to
+  `Colls`'s public API get caught the same way.
+- **Documented nine undocumented `onion.Iterables` methods (`mapMap`,
+  `toList`, `reduce`, `newList`, `first`, `last`, `reverse`, `take`, `drop`)
+  in the Iterables Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocIterablesModuleParitySpec`) so future additions to
+  `Iterables`'s public API get caught the same way.
+- **Documented `Http::getResponse`/`Http::postResponse` and the `Response`
+  object they return (`status`, `body`, `headers`, `isOk()`, `isError()`) in
+  the Http section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** These public `onion.Http` methods existed
+  in code but were absent from the docs in both languages, making them
+  undiscoverable without reading the Java source — the only documented way to
+  make a request was the body-only `get`/`post`, with no way to see the
+  status code or response headers. Added a drift-guard spec
+  (`StdlibDocHttpModuleParitySpec`) so future additions to `Http`'s public
+  API get caught the same way.
+- **Documented ten undocumented `onion.Regex` `Pattern`-typed overloads
+  (`matches`, `find`, `findAll`, `findFirst`, `groups`, `groupsAll`,
+  `replace`, `replaceFirst`, `split`/`split` with limit) in a new "Pattern
+  literal overloads" subsection of the Regex Module section in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.** These
+  overloads exist specifically so a `re"..."` literal (which compiles to
+  `java.util.regex.Pattern`, not `String`) can be passed straight into the
+  `Regex::` helpers, but the docs only ever showed the `String`-pattern
+  signatures, making the `Pattern` overloads undiscoverable without reading
+  the Java source. Added a drift-guard spec
+  (`StdlibDocRegexModuleParitySpec`) so future additions to `Regex`'s public
+  API get caught the same way.
+- **Documented eleven undocumented `onion.Files` methods
+  (`isFile`, `isDirectory`, `mkdirs`, `listFiles`, `size`, `getAbsolutePath`,
+  `copy`, `move`, `copyDir`, `writeLines`, `appendText`) in the Files Module
+  section of both `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  These public static methods existed in code but were absent from the docs in
+  both languages, making them undiscoverable without reading the Java source.
+  Added a drift-guard spec (`StdlibDocFilesModuleParitySpec`) so future
+  additions to `Files`'s public API get caught the same way.
+- **Fixed stale/actively-misleading heap guidance in `docs/quality-bar.md`,
+  `docs/ja/quality-bar.md`, `docs/contributing/building.md`, and
+  `docs/ja/contributing/building.md`.** `.jvmopts` raised the project's
+  default heap from `4g` to `10g` back at 0.10.18, but these four docs still
+  described (or, in `building.md`'s "Out of Memory" section, actively
+  recommended) a heap at or below the old `4g`/`2g` figures — advice that,
+  followed literally, overrides `.jvmopts` down to a lower ceiling and
+  reproduces the `OutOfMemoryError` it claims to fix (#691). Updated all four
+  to state the real `10g` default and to warn against setting `SBT_OPTS` to
+  anything below it.
+- **Documented six undocumented `onion.Rand` methods
+  (`nextInt(min, max)`, `nextDouble(bound)`, `nextDouble(min, max)`, `choice`,
+  `sample`, `uuid`) in the Rand Module section of both `docs/reference/stdlib.md`
+  and `docs/ja/reference/stdlib.md`.** These public static methods existed in
+  code and were already name-dropped in the "Modules at a glance" table, but
+  had no actual signature or example in the Rand Module section itself, making
+  them undiscoverable without reading the Java source. Added a drift-guard spec
+  (`StdlibDocRandModuleParitySpec`) so future additions to `Rand`'s public API
+  get caught the same way.
+
 ## [0.10.31] - 2026-08-12
 
 ### Documentation

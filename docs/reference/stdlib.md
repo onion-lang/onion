@@ -522,6 +522,42 @@ the method silently not existing.
 Reading two `Int` components out of `"abc,def"` reports **two** defects, not the first
 one. That is what `Outcome`'s accumulating `zip` is for.
 
+### Lossless shapes and lenses
+
+A shape that also satisfies L2 is *lossless* — `isLossless()` says so, and
+`parseLossless(text[, origin])` reads a `Lossless[T]` instead of a plain `T`: the value
+plus the `Residue` of everything around it (comments, spacing, key order, original
+value spellings). `printLossless(value, residue)` renders back through that residue —
+unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
+`Residue` is opaque; hand it back only to the shape that produced it.
+
+`Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
+swaps the value while keeping the residue, and `edit { v => ... }` focuses an update.
+`render()` reassembles the text:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  one changed line
+```
+
+`Shapes::config` and `Shapes::yaml` build the lossless shapes behind `shape name =
+config` / `shape name = yaml` when you want the `Shape[T]` value directly instead of
+the sugar.
+
+### Combinators
+
+- `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that
+  read and the defects of the ones that didn't (`Outcome::values`/`Outcome::defects`
+  split them apart). Use this over `lines()` when a partial result is meaningful, as in
+  a log file where most lines parse.
+- `lines()` — a `Shape[List[T]]` reading one value per line, all or nothing.
+- `sepBy(separator)` — a `Shape[List[T]]` split on a literal separator, all or nothing.
+- `xmap(forward, backward)` — transports a shape along an isomorphism; both directions
+  are required so `print` isn't silently destroyed.
+- `orElse(other)` — this shape, or `other` when it doesn't read; reports both shapes'
+  defects when neither does. Prints with this shape.
+
 ## Function Interfaces
 
 Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
@@ -726,13 +762,20 @@ Provided via `onion.Iterables` (Java interface).
 
 Access iteration utilities for collections and arrays:
 
-- `Iterables::map(list|iterable, f)`
+- `Iterables::map(list|iterable|set, f)`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
+- `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
-- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
+- `Iterables::newList(size)` - a new empty `List` pre-sized for `size` elements
+- `Iterables::first(list)` / `Iterables::last(list)` - `null` if the list is empty
+- `Iterables::reverse(list)`
+- `Iterables::take(list, n)` / `Iterables::drop(list, n)`
+- `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - the second overload requires `Comparable` elements
 
 ## Option Module
 
@@ -915,6 +958,23 @@ Generate a random integer in a range:
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
 val percent: Int = Rand::nextInt(100)     // 0 to 99
+val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
+```
+
+### Rand::nextDouble (bounded)
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0 to 10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0 to 2.0
+```
+
+### Rand::choice
+
+Pick one random element from a list:
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -924,6 +984,23 @@ Shuffle an array, returning a shuffled list:
 ```onion
 val cards: List[String] = ["A", "B", "C", "D"]
 val shuffled: List[String] = Rand::shuffle(cards)
+```
+
+### Rand::sample
+
+Pick `n` distinct random elements from a list, without replacement:
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 3 distinct cards
+```
+
+### Rand::uuid
+
+Generate a random UUID string:
+
+```onion
+val id: String = Rand::uuid()   // e.g. "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert Module
@@ -1068,10 +1145,19 @@ File I/O (`onion.Files`):
 Files::readText("path.txt")            // whole file as String
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] -> one line per entry
+Files::appendText("out.txt", content)  // appends, creating the file if needed
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
+Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // creates dir + missing parents
+Files::size(path)                      // Long, size in bytes (0 if missing)
+Files::copy(src, dst)                  // replaces dst if it exists
+Files::move(src, dst)                  // rename; replaces dst if it exists
+Files::copyDir(src, dst)               // recursive directory copy
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -1079,6 +1165,7 @@ Path helpers — file names, parents, joining, and extensions:
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // absolute path resolved against the cwd
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"   (extension, keyword-safe name)
 Files::stem("report.txt")              // "report"
@@ -1399,6 +1486,22 @@ Colls::sortedBy(people) { p => p.age() }
 // List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### Batching, windowing, and selector aggregation
+
+Also available as `Colls::` static calls and, like the rest of `Colls`, as
+List extensions that chain into a pipeline:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - batches of at most 3, last may be smaller
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - sliding windows, one step at a time
+ps.sumBy((p) -> p.age())          // Double - sum of the selector over every element
+ps.averageBy((p) -> p.age())      // Double - average of the selector, 0.0 if empty
+ps.maxBy((p) -> p.age())          // the element with the greatest selector value, null if empty
+ps.minBy((p) -> p.age())          // the element with the smallest selector value, null if empty
+
+xs.chunked(2).map { b => (b as List).size() }   // chains like any other pipeline stage
+```
+
 ## Http
 
 HTTP client utilities (uses Java 11+ HttpClient).
@@ -1417,6 +1520,17 @@ Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
 Http::post(url, body, headers): String   // headers: as for get
 ```
+
+### Response Object
+
+```
+Http::getResponse(url): Response                  // status/body/headers, instead of just the body
+Http::postResponse(url, body): Response
+```
+
+`Response` has `status: Int`, `body: String`, and `headers: List` fields,
+plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers — use
+these when the status code or headers matter, not just the body.
 
 ### Other Methods
 
@@ -1575,6 +1689,31 @@ Regex::split(input, pattern, limit): List[String]
 ```
 Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
+```
+
+### Pattern literal overloads
+
+A `re"..."` literal compiles to a `java.util.regex.Pattern`, not a `String`.
+Every matching/extraction/replacement/splitting method above also has an
+overload that takes a compiled `Pattern` directly, so a `re"..."` literal can
+be passed straight in without going through a `String` pattern:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
 ```
 
 ### Example

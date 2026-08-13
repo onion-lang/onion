@@ -462,6 +462,42 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 `"abc,def"` から `Int` を2つ読むと defect は**2件**報告されます。最初の1件ではありません。
 `Outcome` の蓄積する `zip` はそのためにあります。
 
+### Lossless shape と lens
+
+L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそれを伝え、
+`parseLossless(text[, origin])` は素の `T` の代わりに `Lossless[T]` を読みます:値と、
+その周辺すべての `Residue`（コメント、空白、キーの順序、元の値の書き方）です。
+`printLossless(value, residue)` はその residue を通して書き戻します——変更していない
+部分はバイト単位で再現され、意図的に変更した値だけが書き直されます。`Residue` は
+不透明な値で、生成した shape にだけ渡し戻してください。
+
+`Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
+`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v => ... }` は更新を
+値にフォーカスします。`render()` がテキストを再構成します:
+
+```onion
+val r   = configShape.parseLossless(file"app.conf".text()).get()
+val out = r.edit { v => v.copy(port = 9090) }.render()
+// diff app.conf out  ->  1行だけ変わる
+```
+
+`Shapes::config` と `Shapes::yaml` は、`shape name = config` / `shape name = yaml` の
+糖衣構文の裏にある lossless shape を、`Shape[T]` の値として直接組み立てます。
+
+### コンビネータ
+
+- `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
+  行の defect の両方を保持します（`Outcome::values`/`Outcome::defects` で分離できます）。
+  ログファイルのように大半の行が読めるケースなど、部分的な結果に意味がある場合は
+  `lines()` よりこちらを使います。
+- `lines()` — 1行1値、全部読めるか失敗するかの `Shape[List[T]]` です。
+- `sepBy(separator)` — リテラルな区切り文字で分割する、全部読めるか失敗するかの
+  `Shape[List[T]]` です。
+- `xmap(forward, backward)` — 同型写像に沿って shape を運びます。`print` が黙って
+  壊れないよう、両方向の関数が必要です。
+- `orElse(other)` — この shape、読めなければ `other`。どちらも読めない場合は両方の
+  defect を報告します。印字はこの shape で行います。
+
 ## 関数インターフェース
 
 ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。
@@ -682,6 +718,23 @@ val randomBool: Boolean = Rand::nextBoolean()   // ランダムなBoolean
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1から6
 val percent: Int = Rand::nextInt(100)     // 0から99
+val d20: Int = Rand::nextInt(1, 21)       // 1から20（min, 排他的max）
+```
+
+### Rand::nextDouble（範囲指定）
+
+```onion
+val small: Double = Rand::nextDouble(10.0)         // 0.0から10.0
+val ranged: Double = Rand::nextDouble(1.0, 2.0)    // 1.0から2.0
+```
+
+### Rand::choice
+
+リストからランダムに1要素を選ぶ：
+
+```onion
+val colors: List[String] = ["red", "green", "blue"]
+val picked: String = Rand::choice(colors)
 ```
 
 ### Rand::shuffle
@@ -696,6 +749,23 @@ list.add("A")
 list.add("B")
 list.add("C")
 Rand::shuffle(list)  // その場でシャッフル
+```
+
+### Rand::sample
+
+リストから重複なくn個の要素をランダムに選ぶ：
+
+```onion
+val deck: List[String] = ["A", "B", "C", "D", "E"]
+val hand: List[String] = Rand::sample(deck, 3)   // 重複しない3枚
+```
+
+### Rand::uuid
+
+ランダムなUUID文字列を生成：
+
+```onion
+val id: String = Rand::uuid()   // 例: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 ```
 
 ## Assert モジュール
@@ -1328,13 +1398,20 @@ System::exit(1)  // エラー
 
 コレクションや配列向けのイテレーションユーティリティ:
 
-- `Iterables::map(list|iterable, f)`
+- `Iterables::map(list|iterable|set, f)`
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
+- `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
-- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
+- `Iterables::newList(size)` - `size` 個分の容量を確保した空の `List`
+- `Iterables::first(list)` / `Iterables::last(list)` - リストが空なら `null`
+- `Iterables::reverse(list)`
+- `Iterables::take(list, n)` / `Iterables::drop(list, n)`
+- `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - 後者は要素が `Comparable` であることが必要
 
 ## Files モジュール
 
@@ -1344,10 +1421,19 @@ System::exit(1)  // エラー
 Files::readText("path.txt")            // ファイル全体を String として
 Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
+Files::writeLines("out.txt", lines)    // List[String] を1行ずつ書き込む
+Files::appendText("out.txt", content)  // 追記。ファイルが無ければ新規作成
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
+Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
 Files::delete(path) / Files::exists(path)
+Files::isFile(path) / Files::isDirectory(path)
+Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
+Files::size(path)                      // Long。バイト数（存在しなければ0）
+Files::copy(src, dst)                  // dst が既にあれば置き換える
+Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -1355,6 +1441,7 @@ Files::delete(path) / Files::exists(path)
 ```onion
 Files::getFileName("a/b/c.txt")        // "c.txt"
 Files::getParent("a/b/c.txt")          // "a/b"
+Files::getAbsolutePath("a/b/c.txt")    // カレントディレクトリ基準の絶対パス
 Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
 Files::ext("report.txt")               // "txt"（拡張子。予約語を避けた名前）
 Files::stem("report.txt")              // "report"
@@ -1412,6 +1499,22 @@ Colls::sortedBy(people) { p => p.age() }
 // xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+### バッチ化・ウィンドウ化・セレクタ集計
+
+これらも `Colls::` の静的呼び出しとして、また `Colls` の他のメソッドと同様に
+パイプラインとして連結できる List の拡張メソッドとして利用できる:
+
+```onion
+xs.chunked(3)                     // [[1,2,3],[4,5,6],[7]] - 最大3件のバッチ、最後は少なくなることがある
+xs.windowed(3)                    // [[1,2,3],[2,3,4],[3,4,5]] - 1要素ずつスライドする窓
+ps.sumBy((p) -> p.age())          // Double - 各要素にセレクタを適用した合計
+ps.averageBy((p) -> p.age())      // Double - セレクタの平均、空なら0.0
+ps.maxBy((p) -> p.age())          // セレクタの値が最大の要素、空ならnull
+ps.minBy((p) -> p.age())          // セレクタの値が最小の要素、空ならnull
+
+xs.chunked(2).map { b => (b as List).size() }   // 他のパイプライン段と同様に連結できる
+```
+
 ## Http
 
 HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用）。
@@ -1430,6 +1533,17 @@ Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
 Http::post(url, body, headers): String   // headers は get と同じ
 ```
+
+### Response オブジェクト
+
+```
+Http::getResponse(url): Response                  // ボディだけでなく status/body/headers を返す
+Http::postResponse(url, body): Response
+```
+
+`Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
+`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパーを持つ。
+ボディだけでなくステータスコードやヘッダーが必要なときに使う。
 
 ### その他のメソッド
 
@@ -1588,6 +1702,31 @@ Regex::split(input, pattern, limit): List[String]
 ```
 Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
+```
+
+### Pattern リテラルのオーバーロード
+
+`re"..."` リテラルは `String` ではなく `java.util.regex.Pattern` にコンパイルされます。
+上記のマッチング／抽出／置換／分割の各メソッドには、コンパイル済み `Pattern` を直接
+受け取るオーバーロードも用意されており、`re"..."` リテラルを `String` パターンを
+経由せずそのまま渡せます:
+
+```
+Regex::matches(input, pattern: Pattern): Boolean
+Regex::find(input, pattern: Pattern): Boolean
+Regex::findAll(input, pattern: Pattern): List[String]
+Regex::findFirst(input, pattern: Pattern): String
+Regex::groups(input, pattern: Pattern): List[String]
+Regex::groupsAll(input, pattern: Pattern): List[List[String]]
+Regex::replace(input, pattern: Pattern, replacement): String
+Regex::replaceFirst(input, pattern: Pattern, replacement): String
+Regex::split(input, pattern: Pattern): List[String]
+Regex::split(input, pattern: Pattern, limit): List[String]
+```
+
+```
+val p = re"[\w.]+@[\w.]+";
+val emails: List[String] = Regex::findAll("alice@example.com", p);
 ```
 
 ### 例

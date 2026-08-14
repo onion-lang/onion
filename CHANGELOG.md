@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-constraint generic function (`[T: Scoreable + Formattable]`), and
   `Trait[T]::method()` dictionary dispatch, shared across two domains
   (chess ratings and F1 standings).
+- **`run/GeneticSequencer.on`, a 482-line DNA sequence analysis toolkit.**
+  Covers a bioinformatics domain not yet in the corpus: records with
+  methods (`Sequence`, `ORF`, `RestrictionSite`), a 21-variant
+  data-carrying enum (`AminoAcid`), a plain enum with `select` dispatch
+  (`Nucleotide`), an interface/class validator hierarchy, collection
+  pipelines (`map`/`filter`/`fold`/`groupBy`/`flatMap`/`sortedBy`/`find`),
+  and tail-recursive k-mer frequency building.
 
 ## [0.10.34] - 2026-08-14
 

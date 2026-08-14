@@ -1,0 +1,489 @@
+// MiniTypeChecker.on — A bidirectional type checker for a tiny lambda calculus.
+// Exercises: recursive ADT enums; records; classes with HashMap; collection
+// pipelines (map/filter/fold/reduce/find/groupBy/partition); select + type-
+// pattern matching; nullable types and null checks; closures; string
+// interpolation; try/catch; recursion; foreach over ranges and map (k,v);
+// while loops; extension methods on Int and String.
+
+import {
+  java.util.HashMap;
+  java.util.ArrayList;
+  java.lang.Integer as JInt;
+}
+
+// ─── Extensions ─────────────────────────────────────────────────────────────
+
+extension Int {
+  def times(s: String): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < self { r = r + s; i = i + 1 }
+    return r
+  }
+}
+
+extension String {
+  def pad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Type language ───────────────────────────────────────────────────────────
+
+enum Ty {
+  case TInt
+  case TBool
+  case TStr
+  case TFun(fromTy: Ty, toTy: Ty)
+public:
+  def show(): String = select this {
+    case x is TInt:  "Int"
+    case x is TBool: "Bool"
+    case x is TStr:  "Str"
+    case f is TFun:  "(#{f.fromTy().show()} -> #{f.toTy().show()})"
+  }
+  def tyEq(other: Ty): Boolean = select this {
+    case x is TInt:  other is TInt
+    case x is TBool: other is TBool
+    case x is TStr:  other is TStr
+    case f is TFun:
+      select other {
+        case g is TFun: f.fromTy().tyEq(g.fromTy()) && f.toTy().tyEq(g.toTy())
+        else:           false
+      }
+    else: false
+  }
+}
+
+// ─── Expression language ─────────────────────────────────────────────────────
+
+enum Expr {
+  case Lit(value: Int)
+  case BoolLit(flag: Boolean)
+  case StrLit(text: String)
+  case Var(varName: String)
+  case Lam(param: String, paramTy: Ty, body: Expr)
+  case App(func: Expr, arg: Expr)
+  case AddE(left: Expr, right: Expr)
+  case MulE(left: Expr, right: Expr)
+  case EqE(left: Expr, right: Expr)
+  case IfE(cond: Expr, thenE: Expr, elseE: Expr)
+  case LetE(bindName: String, value: Expr, body: Expr)
+  case Concat(left: Expr, right: Expr)
+public:
+  def show(): String = select this {
+    case n is Lit:    "" + n.value()
+    case b is BoolLit: if b.flag() { "true" } else { "false" }
+    case s is StrLit:  "\"#{s.text()}\""
+    case v is Var:     v.varName()
+    case l is Lam:     "(fun #{l.param()}: #{l.paramTy().show()} => #{l.body().show()})"
+    case a is App:     "(#{a.func().show()} #{a.arg().show()})"
+    case a is AddE:    "(#{a.left().show()} + #{a.right().show()})"
+    case m is MulE:    "(#{m.left().show()} * #{m.right().show()})"
+    case e is EqE:     "(#{e.left().show()} == #{e.right().show()})"
+    case i is IfE:     "(if #{i.cond().show()} then #{i.thenE().show()} else #{i.elseE().show()})"
+    case l is LetE:    "(let #{l.bindName()} = #{l.value().show()} in #{l.body().show()})"
+    case c is Concat:  "(#{c.left().show()} ++ #{c.right().show()})"
+  }
+}
+
+// ─── Type error ───────────────────────────────────────────────────────────────
+
+record TypeError(location: String, message: String)
+
+// ─── Type environment ─────────────────────────────────────────────────────────
+
+class TypeEnv {
+  var bindings: HashMap[String, Object]
+
+public:
+  def this { this.bindings = new HashMap[String, Object]() }
+
+  def lookup(name: String): Ty? {
+    val v: Object? = bindings.get(name)
+    if v == null { return null }
+    return v as Ty
+  }
+
+  def extend(name: String, ty: Ty): TypeEnv {
+    val env2: TypeEnv = new TypeEnv()
+    foreach (k, v) in bindings { env2.bindings.put(k, v) }
+    env2.bindings.put(name, ty)
+    return env2
+  }
+
+  def size(): Int = bindings.size()
+}
+
+// ─── Type checker ─────────────────────────────────────────────────────────────
+
+class TypeChecker {
+  var errors: ArrayList[TypeError]
+
+public:
+  def this { this.errors = new ArrayList[TypeError]() }
+
+  def addError(expr: Expr, msg: String): void {
+    errors.add(new TypeError(expr.show(), msg))
+  }
+
+  def check(expr: Expr, env: TypeEnv): Ty? {
+    select expr {
+      case n is Lit:     { return new TInt() }
+      case b is BoolLit: { return new TBool() }
+      case s is StrLit:  { return new TStr() }
+
+      case v is Var: {
+        val ty: Ty? = env.lookup(v.varName())
+        if ty == null { addError(expr, "Unbound variable: " + v.varName()) }
+        return ty
+      }
+
+      case l is Lam: {
+        val env2: TypeEnv = env.extend(l.param(), l.paramTy())
+        val bodyTy: Ty? = check(l.body(), env2)
+        if bodyTy == null { return null }
+        return new TFun(l.paramTy(), bodyTy)
+      }
+
+      case a is App: {
+        val funcTy: Ty? = check(a.func(), env)
+        val argTy: Ty? = check(a.arg(), env)
+        if funcTy == null || argTy == null { return null }
+        select funcTy {
+          case f is TFun: {
+            if f.fromTy().tyEq(argTy) { return f.toTy() }
+            addError(expr, "Argument type mismatch: expected " + f.fromTy().show() + ", got " + argTy.show())
+            return null
+          }
+          else: {
+            addError(expr, "Applied a non-function: " + funcTy.show())
+            return null
+          }
+        }
+      }
+
+      case a is AddE: {
+        val lt: Ty? = check(a.left(), env)
+        val rt: Ty? = check(a.right(), env)
+        if lt == null || rt == null { return null }
+        if (lt is TInt) && (rt is TInt) { return new TInt() }
+        addError(expr, "Addition requires Int + Int, got " + lt.show() + " + " + rt.show())
+        return null
+      }
+
+      case m is MulE: {
+        val lt: Ty? = check(m.left(), env)
+        val rt: Ty? = check(m.right(), env)
+        if lt == null || rt == null { return null }
+        if (lt is TInt) && (rt is TInt) { return new TInt() }
+        addError(expr, "Multiplication requires Int * Int, got " + lt.show() + " * " + rt.show())
+        return null
+      }
+
+      case e is EqE: {
+        val lt: Ty? = check(e.left(), env)
+        val rt: Ty? = check(e.right(), env)
+        if lt == null || rt == null { return null }
+        if lt.tyEq(rt) { return new TBool() }
+        addError(expr, "Equality requires same types, got " + lt.show() + " == " + rt.show())
+        return null
+      }
+
+      case i is IfE: {
+        val condTy: Ty? = check(i.cond(), env)
+        val thenTy: Ty? = check(i.thenE(), env)
+        val elseTy: Ty? = check(i.elseE(), env)
+        if condTy == null || thenTy == null || elseTy == null { return null }
+        if !(condTy is TBool) {
+          addError(expr, "If condition must be Bool, got " + condTy.show())
+          return null
+        }
+        if !thenTy.tyEq(elseTy) {
+          addError(expr, "If branches have different types: " + thenTy.show() + " vs " + elseTy.show())
+          return null
+        }
+        return thenTy
+      }
+
+      case l is LetE: {
+        val valTy: Ty? = check(l.value(), env)
+        if valTy == null { return null }
+        val env2: TypeEnv = env.extend(l.bindName(), valTy)
+        return check(l.body(), env2)
+      }
+
+      case c is Concat: {
+        val lt: Ty? = check(c.left(), env)
+        val rt: Ty? = check(c.right(), env)
+        if lt == null || rt == null { return null }
+        if (lt is TStr) && (rt is TStr) { return new TStr() }
+        addError(expr, "Concat requires Str ++ Str, got " + lt.show() + " ++ " + rt.show())
+        return null
+      }
+    }
+    return null
+  }
+
+  def errorCount(): Int = errors.size()
+  def hasErrors(): Boolean = errors.size() > 0
+  def clearErrors(): void { errors = new ArrayList[TypeError]() }
+  def getErrors(): ArrayList[TypeError] = errors
+}
+
+// ─── Test runner ──────────────────────────────────────────────────────────────
+
+record CheckResult(label: String, expected: String, actual: String, passed: Boolean)
+
+class TestRunner {
+  var results: ArrayList[CheckResult]
+  var checker: TypeChecker
+
+public:
+  def this {
+    this.results = new ArrayList[CheckResult]()
+    this.checker = new TypeChecker()
+  }
+
+  def run(label: String, expr: Expr, env: TypeEnv, expected: String): void {
+    checker.clearErrors()
+    val ty: Ty? = checker.check(expr, env)
+    val actual: String = if ty == null { "ERROR" } else { ty.show() }
+    val passed: Boolean = actual == expected
+    results.add(new CheckResult(label, expected, actual, passed))
+    val mark: String = if passed { "[PASS]" } else { "[FAIL]" }
+    println(mark.pad(8) + label)
+    println("         expr:     " + expr.show())
+    if !passed {
+      println("         expected: " + expected)
+      println("         got:      " + actual)
+    }
+    if checker.hasErrors() {
+      foreach e: Object in checker.getErrors() {
+        val err: TypeError = e as TypeError
+        println("         error:    " + err.message())
+      }
+    }
+  }
+
+  def total(): Int = results.size()
+  def getResults(): ArrayList[CheckResult] = results
+
+  def passCount(): Int {
+    var n: Int = 0
+    foreach r: Object in results {
+      val res: CheckResult = r as CheckResult
+      if res.passed() { n = n + 1 }
+    }
+    return n
+  }
+
+  def summary(): void {
+    val t: Int = total()
+    val p: Int = passCount()
+    val f: Int = t - p
+    println("─────────────────────────────────────────")
+    println("Results: " + p + "/" + t + " passed, " + f + " failed")
+    if f == 0 { println("All checks passed!") }
+    else { println("Some checks FAILED — see above.") }
+  }
+}
+
+// ─── Builder helpers ──────────────────────────────────────────────────────────
+
+def lit(n: Int): Expr     = new Lit(n)
+def blit(b: Boolean): Expr= new BoolLit(b)
+def slit(s: String): Expr = new StrLit(s)
+def vr(name: String): Expr= new Var(name)
+def lam(p: String, t: Ty, b: Expr): Expr = new Lam(p, t, b)
+def app(f: Expr, a: Expr): Expr   = new App(f, a)
+def add(l: Expr, r: Expr): Expr   = new AddE(l, r)
+def mul(l: Expr, r: Expr): Expr   = new MulE(l, r)
+def eq(l: Expr, r: Expr): Expr    = new EqE(l, r)
+def ifE(c: Expr, t: Expr, e: Expr): Expr = new IfE(c, t, e)
+def letE(n: String, v: Expr, b: Expr): Expr = new LetE(n, v, b)
+def cat(l: Expr, r: Expr): Expr   = new Concat(l, r)
+def tint(): Ty  = new TInt()
+def tbool(): Ty = new TBool()
+def tstr(): Ty  = new TStr()
+def tfun(a: Ty, b: Ty): Ty = new TFun(a, b)
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+val runner: TestRunner = new TestRunner()
+val emptyEnv: TypeEnv  = new TypeEnv()
+
+println("═══════════════════════════════════════════")
+println("  MiniTypeChecker — Lambda Calculus Types  ")
+println("═══════════════════════════════════════════")
+println("")
+
+// 1. Literals
+println("── Literals ──────────────────────────────")
+runner.run("integer literal", lit(42),       emptyEnv, "Int")
+runner.run("boolean literal", blit(true),    emptyEnv, "Bool")
+runner.run("string literal",  slit("hello"), emptyEnv, "Str")
+
+// 2. Arithmetic
+println("")
+println("── Arithmetic ────────────────────────────")
+runner.run("1 + 2",       add(lit(1), lit(2)),              emptyEnv, "Int")
+runner.run("3 * 4",       mul(lit(3), lit(4)),              emptyEnv, "Int")
+runner.run("(1+2) * 3",   mul(add(lit(1), lit(2)), lit(3)), emptyEnv, "Int")
+runner.run("true + 1",    add(blit(true), lit(1)),          emptyEnv, "ERROR")
+runner.run("1 * false",   mul(lit(1), blit(false)),         emptyEnv, "ERROR")
+
+// 3. Variables and let
+println("")
+println("── Variables / Let ───────────────────────")
+val xyEnv: TypeEnv = emptyEnv.extend("x", tint()).extend("y", tbool())
+runner.run("bound x",        vr("x"),    xyEnv,    "Int")
+runner.run("bound y",        vr("y"),    xyEnv,    "Bool")
+runner.run("unbound z",      vr("z"),    emptyEnv, "ERROR")
+runner.run("let x=2 in x+x", letE("x", lit(2), add(vr("x"), vr("x"))), emptyEnv, "Int")
+runner.run("nested let",
+  letE("a", lit(3), letE("b", mul(vr("a"), lit(2)), add(vr("a"), vr("b")))),
+  emptyEnv, "Int")
+
+// 4. Lambdas and application
+println("")
+println("── Lambdas / Application ─────────────────")
+val idInt: Expr  = lam("x", tint(), vr("x"))
+val dbl: Expr    = lam("x", tint(), mul(vr("x"), lit(2)))
+runner.run("identity Int",   idInt,               emptyEnv, "(Int -> Int)")
+runner.run("apply id 5",     app(idInt, lit(5)),  emptyEnv, "Int")
+runner.run("double fn",      dbl,                 emptyEnv, "(Int -> Int)")
+runner.run("apply double 7", app(dbl, lit(7)),    emptyEnv, "Int")
+runner.run("wrong arg type", app(idInt, blit(false)), emptyEnv, "ERROR")
+runner.run("apply non-fn",   app(lit(1), lit(2)), emptyEnv, "ERROR")
+
+// 5. Higher-order functions
+println("")
+println("── Higher-Order Functions ────────────────")
+val applyFn: Expr = lam("f", tfun(tint(), tint()),
+                      lam("x", tint(), app(vr("f"), vr("x"))))
+runner.run("apply :: (Int->Int)->Int->Int", applyFn, emptyEnv,
+  "((Int -> Int) -> (Int -> Int))")
+val addOne: Expr = lam("n", tint(), add(vr("n"), lit(1)))
+runner.run("apply addOne 41",
+  app(app(applyFn, addOne), lit(41)), emptyEnv, "Int")
+
+// 6. Equality
+println("")
+println("── Equality ──────────────────────────────")
+runner.run("1 == 1",        eq(lit(1), lit(1)),             emptyEnv, "Bool")
+runner.run("true == false", eq(blit(true), blit(false)),    emptyEnv, "Bool")
+runner.run("1 == true",     eq(lit(1), blit(true)),         emptyEnv, "ERROR")
+runner.run("s == s",        eq(slit("a"), slit("b")),       emptyEnv, "Bool")
+
+// 7. Conditionals
+println("")
+println("── Conditionals ──────────────────────────")
+runner.run("if true then 1 else 2",
+  ifE(blit(true), lit(1), lit(2)), emptyEnv, "Int")
+runner.run("if (1==1) then str else str",
+  ifE(eq(lit(1), lit(1)), slit("yes"), slit("no")), emptyEnv, "Str")
+runner.run("branch type mismatch",
+  ifE(blit(true), lit(1), slit("x")), emptyEnv, "ERROR")
+runner.run("non-bool condition",
+  ifE(lit(0), lit(1), lit(2)), emptyEnv, "ERROR")
+runner.run("if in let",
+  letE("ok", eq(lit(3), lit(3)), ifE(vr("ok"), lit(1), lit(0))), emptyEnv, "Int")
+
+// 8. String concatenation
+println("")
+println("── String Concatenation ──────────────────")
+runner.run("\"hi\" ++ \" there\"", cat(slit("hi"), slit(" there")), emptyEnv, "Str")
+runner.run("concat type error",     cat(slit("x"), lit(1)),          emptyEnv, "ERROR")
+
+// 9. Complex programs
+println("")
+println("── Complex Programs ──────────────────────")
+// let-defined helper used multiple times
+val multiUse: Expr = letE("two", lit(2),
+  add(mul(vr("two"), lit(3)), add(vr("two"), lit(1))))
+runner.run("let two=2 in two*3 + two+1", multiUse, emptyEnv, "Int")
+
+// curried addition: (fun a => (fun b => a + b))
+val currAdd: Expr = lam("a", tint(), lam("b", tint(), add(vr("a"), vr("b"))))
+runner.run("curried add :: Int->Int->Int", currAdd, emptyEnv, "(Int -> (Int -> Int))")
+runner.run("apply curried add",
+  app(app(currAdd, lit(10)), lit(32)), emptyEnv, "Int")
+
+// predefined environment: known variables
+val richEnv: TypeEnv = emptyEnv
+  .extend("toString", tfun(tint(), tstr()))
+  .extend("greeting", tstr())
+  .extend("limit",    tint())
+runner.run("toString 42",
+  app(vr("toString"), lit(42)), richEnv, "Str")
+runner.run("greeting ++ \" world\"",
+  cat(vr("greeting"), slit(" world")), richEnv, "Str")
+runner.run("limit + 1",
+  add(vr("limit"), lit(1)), richEnv, "Int")
+
+// deeply nested: let a = let b = 1+2 in b*b in a+a
+val deep: Expr = letE("a",
+  letE("b", add(lit(1), lit(2)), mul(vr("b"), vr("b"))),
+  add(vr("a"), vr("a")))
+runner.run("deeply nested let", deep, emptyEnv, "Int")
+
+// 10. Summary
+println("")
+runner.summary()
+
+// ─── Statistics on error patterns ─────────────────────────────────────────────
+println("")
+println("── Error analysis ────────────────────────")
+
+val allResults: ArrayList[CheckResult] = runner.getResults()
+var errorCases: Int = 0
+foreach r: Object in allResults {
+  val res: CheckResult = r as CheckResult
+  if res.expected() == "ERROR" { errorCases = errorCases + 1 }
+}
+println("Total test cases:  " + runner.total())
+println("Expected-pass:     " + (runner.total() - errorCases))
+println("Expected-error:    " + errorCases)
+println("Actually passed:   " + runner.passCount())
+println("")
+
+// ─── Type environment inspection ─────────────────────────────────────────────
+println("── Environment inspection ────────────────")
+val demoEnv: TypeEnv = emptyEnv
+  .extend("x", tint())
+  .extend("y", tbool())
+  .extend("f", tfun(tint(), tint()))
+  .extend("g", tfun(tstr(), tstr()))
+  .extend("s", tstr())
+
+println("demoEnv has " + demoEnv.size() + " bindings:")
+val varNames: List[String] = ["x", "y", "f", "g", "s", "z"]
+foreach name: String in varNames {
+  val ty: Ty?   = demoEnv.lookup(name)
+  val label: String = if ty == null { "(unbound)" } else { ty.show() }
+  println("  " + name.pad(4) + " : " + label)
+}
+
+// ─── Ty equality and display showcase ────────────────────────────────────────
+println("")
+println("── Type equality ─────────────────────────")
+val types: List[Ty] = [tint(), tbool(), tstr(),
+                   tfun(tint(), tint()),
+                   tfun(tstr(), tbool()),
+                   tfun(tfun(tint(), tint()), tint())]
+val names: List[String] = ["Int", "Bool", "Str",
+                   "(Int->Int)", "(Str->Bool)", "((Int->Int)->Int)"]
+var ti: Int = 0
+foreach ty: Ty in types {
+  val tn: String = (names.get(ti)) as String
+  println("  " + tn.pad(22) + ".show() = " + ty.show())
+  ti = ti + 1
+}
+println("")
+println("  Int == Int?  " + tint().tyEq(tint()))
+println("  Int == Bool? " + tint().tyEq(tbool()))
+println("  (Int->Int) == (Int->Int)?  " + tfun(tint(), tint()).tyEq(tfun(tint(), tint())))
+println("  (Int->Int) == (Int->Bool)? " + tfun(tint(), tint()).tyEq(tfun(tint(), tbool())))

@@ -1122,7 +1122,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#generic-classes" class="md-nav__link">
     <span class="md-ellipsis">
       
         ジェネリッククラス
@@ -1133,7 +1133,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4544,7 +4544,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#generic-classes" class="md-nav__link">
     <span class="md-ellipsis">
       
         ジェネリッククラス
@@ -4555,7 +4555,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4759,7 +4759,7 @@ enum は case ごとに <code>record</code> を持つ <code>sealed interface</co
 マッチすると <code>Some[String]</code> に束縛され、<code>s.value()</code> は裸の <code>T</code> ではなく <code>String</code> に
 なります。定数形式の enum は型パラメータを取れません（<code>java.lang.Enum</code> になり、
 JVM がジェネリックな enum を許さないためです）。</p>
-<h2 id="_6">ジェネリッククラス<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="generic-classes">ジェネリッククラス<a class="headerlink" href="#generic-classes" title="Permanent link">&para;</a></h2>
 <p>クラスは <code>[]</code> で型パラメータを取れます。型パラメータは本体で通常の型として使えます：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>class Box[T] {
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  val v: T
@@ -4780,7 +4780,7 @@ JVM がジェネリックな enum を許さないためです）。</p>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>                            // `new Empty[String]()` と書くか、期待型を注釈する
 </span></code></pre></div>
 <p>型引数は不変です（<code>Box[Dog]</code> は <code>Box[Animal]</code> ではありません。<a href="../variables-and-types/">変数と型</a>を参照）。</p>
-<h2 id="_7">次のステップ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<h2 id="_6">次のステップ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../inheritance/">継承</a> - クラスの拡張とインターフェースの実装</li>
 <li><a href="../java-interop/">Javaとの相互運用</a> - Javaクラスの活用</li>

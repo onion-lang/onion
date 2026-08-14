@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension container class name, so both produced `Extension$List`. Now the
   type-argument names are folded into the generated name (`Extension$List_Int` vs
   `Extension$List_String`).
+- **`select` with an empty `else:` body silently re-executed the preceding
+  `case` branch's body instead of doing nothing.** In the JavaCC
+  `select_expression()` production the shared accumulator `ss` was
+  initialized to `null` and reassigned per `case`; an empty `else:` skipped
+  the optional `[ss=block_elements()]` assignment, so `ss` still held the
+  last `case` branch's statement list and the generated `elseBlock` was a
+  copy of it. Reset `ss` to an empty list immediately before the optional
+  assignment (mirroring the existing pattern in `block()`), so an empty
+  `else:` now correctly executes nothing.
 
 ### Added
 
@@ -24,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   methods, extension methods on `Int`/`Double`, collection pipelines
   (`groupBy`/`sortedBy`/`filter`/`fold`/`partition`/`find`), foreach
   map-destructuring, nullable find with a null guard, closures, and recursion.
+- **`run/RecipeVault.on`, a recipe-management sample.** Exercises ADT enums,
+  records, collection pipelines, closures, do-notation, and nullable fields.
 
 ## [0.10.33] - 2026-08-13
 

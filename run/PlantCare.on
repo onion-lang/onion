@@ -1,0 +1,299 @@
+import {
+  java.util.*
+}
+
+// ── PlantFamily: sealed ADT enum ─────────────────────────────────────────────
+
+enum PlantFamily {
+  case Succulent
+  case Tropical
+  case Herb
+  case Flower
+  case Fern
+public:
+  def label(): String = select this {
+    case f is Succulent: "Succulent"
+    case f is Tropical:  "Tropical"
+    case f is Herb:      "Herb"
+    case f is Flower:    "Flower"
+    case f is Fern:      "Fern"
+  }
+  def waterNote(): String = select this {
+    case f is Succulent: "drought-tolerant, water sparingly"
+    case f is Tropical:  "loves humidity, water regularly"
+    case f is Herb:      "keep moist but not soggy"
+    case f is Flower:    "water when top soil is dry"
+    case f is Fern:      "keep consistently moist"
+  }
+  def weeklyGrowthMm(): Int = select this {
+    case f is Succulent: 1
+    case f is Tropical:  8
+    case f is Herb:      12
+    case f is Flower:    6
+    case f is Fern:      4
+  }
+}
+
+// ── CareAction: sealed ADT enum ───────────────────────────────────────────────
+
+enum CareAction {
+  case Water
+  case Fertilize
+  case Repot
+  case Prune
+  case Mist
+public:
+  def label(): String = select this {
+    case a is Water:     "Water"
+    case a is Fertilize: "Fertilize"
+    case a is Repot:     "Repot"
+    case a is Prune:     "Prune"
+    case a is Mist:      "Mist"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record CareEvent(plantName: String, action: CareAction, day: Int)
+
+record Plant(
+  name: String,
+  family: PlantFamily,
+  waterEveryDays: Int,
+  acquiredDay: Int
+) {
+public:
+  def ageInDays(today: Int): Int = today - acquiredDay()
+
+  def estimatedGrowthMm(today: Int): Int =
+    (ageInDays(today) / 7) * family().weeklyGrowthMm()
+
+  def summary(today: Int): String =
+    "#{name()} [#{family().label()}] age=#{ageInDays(today)}d " +
+    "growth~#{estimatedGrowthMm(today)}mm"
+}
+
+// ── PlantShelf ────────────────────────────────────────────────────────────────
+
+class PlantShelf {
+  var nextId: Int
+
+public:
+  val plants: List[Plant]
+  val events: List[CareEvent]
+
+  def this {
+    val emptyPlants: List[Plant] = []
+    val emptyEvents: List[CareEvent] = []
+    plants = emptyPlants
+    events = emptyEvents
+    nextId = 0
+  }
+
+  def addPlant(p: Plant): void {
+    plants.add(p)
+    nextId = nextId + 1
+  }
+
+  def recordCare(plantName: String, action: CareAction, day: Int): void {
+    events.add(new CareEvent(plantName, action, day))
+  }
+
+  def lastWateredDay(plantName: String): Int {
+    var best: Int = -1
+    foreach e: CareEvent in events {
+      if e.plantName() == plantName && (e.action() is Water) {
+        if e.day() > best { best = e.day() }
+      }
+    }
+    return best
+  }
+
+  def isDueForWater(p: Plant, today: Int): Boolean {
+    val last: Int = lastWateredDay(p.name())
+    if last < 0 { return true }
+    return (today - last) >= p.waterEveryDays()
+  }
+
+  def overduePlants(today: Int): List[Plant] {
+    val result: List[Plant] = []
+    foreach p: Plant in plants {
+      if isDueForWater(p, today) { result.add(p) }
+    }
+    return result
+  }
+
+  def careHistory(plantName: String): List[CareEvent] {
+    val result: List[CareEvent] = []
+    foreach e: CareEvent in events {
+      if e.plantName() == plantName { result.add(e) }
+    }
+    return result
+  }
+
+  def groupByFamily(): Map[String, List[Plant]] {
+    return plants.groupBy { p: Plant => p.family().label() }
+  }
+
+  def countByAction(action: CareAction): Int {
+    var n: Int = 0
+    foreach e: CareEvent in events {
+      if e.action() == action { n = n + 1 }
+    }
+    return n
+  }
+
+  def nextWaterDay(p: Plant): Int {
+    val last: Int = lastWateredDay(p.name())
+    if last < 0 { return p.acquiredDay() + p.waterEveryDays() }
+    return last + p.waterEveryDays()
+  }
+}
+
+// ── formatting helpers ────────────────────────────────────────────────────────
+
+def bar(n: Int, total: Int, width: Int): String {
+  val filled: Int = if total == 0 { 0 } else { (n * width) / total }
+  var s: String = "["
+  var i: Int = 0
+  while i < width {
+    if i < filled { s = s + "#" } else { s = s + "." }
+    i = i + 1
+  }
+  return s + "]"
+}
+
+def pad(s: String, width: Int): String {
+  var result: String = s
+  while result.length() < width { result = result + " " }
+  return result
+}
+
+def sep(): void {
+  IO::println("------------------------------------------------")
+}
+
+// ── setup ─────────────────────────────────────────────────────────────────────
+
+val shelf: PlantShelf = new PlantShelf()
+val today: Int = 100
+
+shelf.addPlant(new Plant("Aloe Vera",   new Succulent(), 14,  1))
+shelf.addPlant(new Plant("Monstera",    new Tropical(),   7, 10))
+shelf.addPlant(new Plant("Basil",       new Herb(),       3, 50))
+shelf.addPlant(new Plant("Lavender",    new Flower(),     5, 20))
+shelf.addPlant(new Plant("Boston Fern", new Fern(),       2, 30))
+shelf.addPlant(new Plant("Cactus",      new Succulent(), 21,  5))
+shelf.addPlant(new Plant("Mint",        new Herb(),       2, 60))
+shelf.addPlant(new Plant("Peace Lily",  new Tropical(),   5, 15))
+
+shelf.recordCare("Aloe Vera",   new Water(),     85)
+shelf.recordCare("Monstera",    new Water(),     97)
+shelf.recordCare("Monstera",    new Fertilize(), 80)
+shelf.recordCare("Basil",       new Water(),     99)
+shelf.recordCare("Basil",       new Mist(),      97)
+shelf.recordCare("Lavender",    new Water(),     96)
+shelf.recordCare("Lavender",    new Prune(),     90)
+shelf.recordCare("Boston Fern", new Water(),     99)
+shelf.recordCare("Boston Fern", new Mist(),      98)
+shelf.recordCare("Cactus",      new Water(),     60)
+shelf.recordCare("Mint",        new Water(),     98)
+shelf.recordCare("Peace Lily",  new Water(),     94)
+shelf.recordCare("Peace Lily",  new Repot(),     70)
+shelf.recordCare("Peace Lily",  new Fertilize(), 85)
+shelf.recordCare("Aloe Vera",   new Fertilize(), 50)
+shelf.recordCare("Mint",        new Mist(),      95)
+
+// ── header ────────────────────────────────────────────────────────────────────
+IO::println("================================================")
+IO::println("           PLANT CARE TRACKER v1.0             ")
+IO::println("================================================")
+IO::println("Tracking day: #{today}")
+IO::println("")
+
+// ── catalogue ────────────────────────────────────────────────────────────────
+sep()
+IO::println("PLANT CATALOGUE")
+sep()
+foreach p: Plant in shelf.plants {
+  IO::println(
+    "  #{pad(p.name(), 14)} #{pad(p.family().label(), 10)} " +
+    "water/#{p.waterEveryDays()}d  est. #{p.estimatedGrowthMm(today)}mm grown"
+  )
+  IO::println("    Note: #{p.family().waterNote()}")
+}
+IO::println("")
+
+// ── watering status ───────────────────────────────────────────────────────────
+sep()
+IO::println("WATERING STATUS (Day #{today})")
+sep()
+val overdue: List[Plant] = shelf.overduePlants(today)
+foreach p: Plant in shelf.plants {
+  val last: Int = shelf.lastWateredDay(p.name())
+  val sinceStr: String = if last < 0 { "never" } else { "#{today - last}d ago" }
+  val nextDay: Int = shelf.nextWaterDay(p)
+  val flag: String = if shelf.isDueForWater(p, today) { " <-- DUE" } else { "" }
+  IO::println(
+    "  #{pad(p.name(), 14)} last: #{pad(sinceStr, 8)} next: day #{nextDay}#{flag}"
+  )
+}
+IO::println("")
+IO::println("  Plants overdue: #{overdue.size} / #{shelf.plants.size}")
+IO::println("")
+
+// ── care history ─────────────────────────────────────────────────────────────
+sep()
+IO::println("CARE HISTORY: Peace Lily")
+sep()
+val plHistory: List[CareEvent] = shelf.careHistory("Peace Lily")
+foreach e: CareEvent in plHistory {
+  IO::println("  Day #{pad("" + e.day(), 4)}  #{e.action().label()}")
+}
+IO::println("")
+
+// ── grouped by family ────────────────────────────────────────────────────────
+sep()
+IO::println("PLANTS BY FAMILY")
+sep()
+val byFamily: Map[String, List[Plant]] = shelf.groupByFamily()
+foreach (familyName, members) in byFamily {
+  IO::println("  #{familyName} (#{members.size} plants):")
+  foreach p: Plant in members {
+    IO::println("    * #{p.summary(today)}")
+  }
+}
+IO::println("")
+
+// ── action statistics ────────────────────────────────────────────────────────
+sep()
+IO::println("CARE ACTION STATISTICS")
+sep()
+val total: Int       = shelf.events.size
+val waterCt: Int     = shelf.countByAction(new Water())
+val fertCt: Int      = shelf.countByAction(new Fertilize())
+val repotCt: Int     = shelf.countByAction(new Repot())
+val pruneCt: Int     = shelf.countByAction(new Prune())
+val mistCt: Int      = shelf.countByAction(new Mist())
+
+IO::println("  Total events : #{total}")
+IO::println("  Water        #{waterCt}  #{bar(waterCt, total, 20)}")
+IO::println("  Fertilize    #{fertCt}  #{bar(fertCt, total, 20)}")
+IO::println("  Repot        #{repotCt}  #{bar(repotCt, total, 20)}")
+IO::println("  Prune        #{pruneCt}  #{bar(pruneCt, total, 20)}")
+IO::println("  Mist         #{mistCt}  #{bar(mistCt, total, 20)}")
+IO::println("")
+
+// ── growth leaderboard ────────────────────────────────────────────────────────
+sep()
+IO::println("ESTIMATED GROWTH LEADERBOARD")
+sep()
+val sorted: List[Plant] =
+  shelf.plants.sortedBy { p: Plant => 0 - p.estimatedGrowthMm(today) }
+var rank: Int = 1
+foreach p: Plant in sorted {
+  IO::println("  ##{rank}  #{pad(p.name(), 14)}  #{p.estimatedGrowthMm(today)}mm")
+  rank = rank + 1
+}
+IO::println("")
+IO::println("Done. Happy gardening!")

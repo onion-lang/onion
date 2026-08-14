@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   methods on `Int`, `Double`, `String`; collection pipelines
   (`filter`/`groupBy`/`partition`/`find`); `select`/type-pattern dispatch;
   nullable types; closures; and `try`/`catch`.
+- **`run/PlantCare.on`, a 299-line plant care and growth tracker.** ADT
+  sealed enums with embedded methods (`PlantFamily`, `CareAction`);
+  records with instance methods (`Plant`, `CareEvent`); typed generic
+  collections (`List[Plant]`, `Map[String, List[Plant]]`); `groupBy`/
+  `sortedBy` collection pipelines; `foreach` map destructuring; `while`
+  loops; string interpolation; and `select`/`is` pattern matching.
 
 ## [0.10.34] - 2026-08-14
 

@@ -2272,7 +2272,7 @@ AST.SelectExpression select_expression() :{
     )*
     eols()
     [LOOKAHEAD({la("else")})
-      t2="else" ":" eols() [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); } [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
     ]
   eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);

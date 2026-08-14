@@ -1,0 +1,345 @@
+// TransitPlanner.on — Public transit route planner (~250 lines).
+// Exercises: data-carrying enum, plain enum with methods, records with body
+// methods, class with mutable state, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/partition/flatMap/distinct), foreach map-entry
+// destructuring, select pattern matching, nullable, closures, extension
+// methods (Int, String), string interpolation, try/catch, while loop.
+
+// ── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def minuteLabel(): String {
+    if self < 60 { return "#{self}min" }
+    val h: Int = self / 60
+    val m: Int = self % 60
+    if m == 0 { return "#{h}h" }
+    val ms: String = if m < 10 { "0#{m}" } else { "#{m}" }
+    return "#{h}h#{ms}m"
+  }
+  def centLabel(): String {
+    val dollars: Int = self / 100
+    val cents: Int   = self % 100
+    val cs: String = if cents < 10 { "0#{cents}" } else { "#{cents}" }
+    return "$#{dollars}.#{cs}"
+  }
+}
+
+extension String {
+  def pad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ── Transport mode ───────────────────────────────────────────────────────────
+
+enum TransportMode(baseFareCents: Int) {
+  BUS(250), SUBWAY(300), TRAM(200)
+
+public:
+  def label(): String = select this {
+    case TransportMode::BUS:    "Bus"
+    case TransportMode::SUBWAY: "Subway"
+    else:                       "Tram"
+  }
+  def icon(): String = select this {
+    case TransportMode::BUS:    "[B]"
+    case TransportMode::SUBWAY: "[S]"
+    else:                       "[T]"
+  }
+}
+
+// ── Line status ──────────────────────────────────────────────────────────────
+
+enum LineStatus {
+  NORMAL, DELAYED, SUSPENDED
+
+public:
+  def isOperating(): Boolean = select this {
+    case LineStatus::SUSPENDED: false
+    else:                       true
+  }
+  def tag(): String = select this {
+    case LineStatus::NORMAL:    "OK "
+    case LineStatus::DELAYED:   "DLY"
+    else:                       "SUS"
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Stop(id: Int, name: String, zone: Int) {
+public:
+  def label(): String = "#{name()} (Z#{zone()})"
+}
+
+record Line(id: String, name: String, mode: TransportMode, stops: List[Stop], status: LineStatus) {
+public:
+  def stopNames(): List[String] = stops().map { s: Stop => s.name() }
+  def fareFor(numZones: Int): Int {
+    val base: Int = mode().baseFareCents()
+    if numZones == 1 { return base }
+    if numZones == 2 { return base + 100 }
+    return base + 200
+  }
+}
+
+record JourneyLeg(line: Line, fromStop: Stop, toStop: Stop, travelMin: Int, fareCents: Int) {
+public:
+  def describe(): String {
+    val icon: String   = line().mode().icon()
+    val status: String = line().status().tag()
+    return "  #{icon} #{line().name().pad(20)} #{fromStop().name().pad(12)}" +
+           " -> #{toStop().name().pad(12)} #{travelMin().minuteLabel().pad(6)} #{fareCents().centLabel()} [#{status}]"
+  }
+}
+
+record Journey(legs: List[JourneyLeg], totalMin: Int, totalFareCents: Int) {
+public:
+  def summary(): String =
+    "#{legs().size()} leg(s), #{totalMin().minuteLabel()}, #{totalFareCents().centLabel()}"
+}
+
+// ── Transit network ──────────────────────────────────────────────────────────
+
+class TransitNetwork {
+  var lines_: List[Line]
+
+public:
+  def this {
+    lines_ = []
+  }
+
+  def addLine(line: Line): void { lines_.add(line) }
+
+  def operatingLines(): List[Line] =
+    lines_.filter { l: Line => l.status().isOperating() }
+
+  def findStop(name: String): Stop? {
+    foreach l: Line in lines_ {
+      val idx: Int = l.stopNames().indexOf(name)
+      if idx >= 0 { return l.stops()[idx] }
+    }
+    return null
+  }
+
+  def linesThrough(stopName: String): List[Line] =
+    lines_.filter { l: Line => l.stopNames().indexOf(stopName) >= 0 }
+
+  def planJourney(fromName: String, toName: String): Journey? {
+    // Direct: find a single line serving both stops in order
+    val direct: Line? = operatingLines().find { l =>
+      val line: Line = l as Line
+      val fi: Int = line.stopNames().indexOf(fromName)
+      val ti: Int = line.stopNames().indexOf(toName)
+      fi >= 0 && ti >= 0 && fi < ti
+    } as Line?
+
+    if direct != null {
+      val leg: JourneyLeg? = buildLeg(direct, fromName, toName)
+      if leg != null {
+        return new Journey([leg], leg.travelMin(), leg.fareCents())
+      }
+    }
+
+    // Two-hop: look for an interchange stop on two different lines
+    val fromLines: List[Line] = operatingLines().filter { l: Line =>
+      l.stopNames().indexOf(fromName) >= 0
+    }
+    val toLines: List[Line] = operatingLines().filter { l: Line =>
+      l.stopNames().indexOf(toName) >= 0
+    }
+
+    var bestJourney: Journey? = null
+
+    foreach fl: Line in fromLines {
+      foreach tl: Line in toLines {
+        val common: List[String] = fl.stopNames().filter { sn: String =>
+          tl.stopNames().indexOf(sn) >= 0 &&
+          fl.stopNames().indexOf(sn) > fl.stopNames().indexOf(fromName) &&
+          tl.stopNames().indexOf(sn) < tl.stopNames().indexOf(toName)
+        }
+        if common.size() > 0 {
+          val interchange: String = common.get(0)
+          val leg1: JourneyLeg? = buildLeg(fl, fromName, interchange)
+          val leg2: JourneyLeg? = buildLeg(tl, interchange, toName)
+          if leg1 != null && leg2 != null {
+            val total: Int = leg1.travelMin() + 5 + leg2.travelMin()
+            val fare: Int  = leg1.fareCents() + leg2.fareCents()
+            val j: Journey = new Journey([leg1, leg2], total, fare)
+            if bestJourney == null || total < bestJourney.totalMin() {
+              bestJourney = j
+            }
+          }
+        }
+      }
+    }
+    return bestJourney
+  }
+
+  def buildLeg(line: Line, fromName: String, toName: String): JourneyLeg? {
+    val stops: List[String] = line.stopNames()
+    val fi: Int = stops.indexOf(fromName)
+    val ti: Int = stops.indexOf(toName)
+    if fi < 0 || ti < 0 || fi >= ti { return null }
+    val fromStop: Stop = line.stops().get(fi)
+    val toStop: Stop   = line.stops().get(ti)
+    val travelMin: Int = (ti - fi) * 8
+    val fromZone: Int  = fromStop.zone()
+    val toZone: Int    = toStop.zone()
+    val zDiff: Int     = fromZone - toZone
+    val absZDiff: Int  = if zDiff < 0 { -zDiff } else { zDiff }
+    val numZones: Int  = if absZDiff == 0 { 1 } else if absZDiff == 1 { 2 } else { 3 }
+    val fare: Int      = line.fareFor(numZones)
+    return new JourneyLeg(line, fromStop, toStop, travelMin, fare)
+  }
+
+  def zoneReport(): void {
+    val allStops: List[Stop] = lines_.flatMap { l: Line => l.stops() }
+    val byZone               = allStops.groupBy { s: Stop => s.zone() }
+    IO::println("-- Zone breakdown ------------------------------------------")
+    foreach (zone, stops) in byZone {
+      val names: List[String] = (stops as List[Stop]).map { s: Stop => s.name() }.distinct()
+      var joined: String = ""
+      foreach nm: String in names {
+        if joined.length() > 0 { joined = joined + ", " }
+        joined = joined + nm
+      }
+      IO::println("  Zone #{zone}: #{names.size()} stop(s) -- #{joined}")
+    }
+  }
+
+  def modeStats(): void {
+    val byMode = lines_.groupBy { l: Line => l.mode().label() }
+    IO::println("-- Mode breakdown ------------------------------------------")
+    foreach (mode, ls) in byMode {
+      val lineList: List[Line] = ls as List[Line]
+      val opCount: Int = lineList.filter { l: Line => l.status().isOperating() }.size()
+      IO::println("  #{(mode as String).pad(8)}: #{lineList.size()} line(s), #{opCount} operating")
+    }
+  }
+
+  def statusSummary(): void {
+    val parts: List[List[Line]] = lines_.partition { l: Line => l.status() != LineStatus::NORMAL }
+    val abnormal: List[Line] = parts.get(0)
+    val normal: List[Line]   = parts.get(1)
+    IO::println("-- Status summary ------------------------------------------")
+    IO::println("  Normal : #{normal.size()}")
+    IO::println("  Issues : #{abnormal.size()}")
+    foreach l: Line in abnormal {
+      IO::println("    [#{l.status().tag()}] #{l.id()} #{l.name()}")
+    }
+  }
+}
+
+// ── Build the network ────────────────────────────────────────────────────────
+
+val net: TransitNetwork = new TransitNetwork()
+
+val s1:  Stop = new Stop(1,  "Central",    1)
+val s2:  Stop = new Stop(2,  "Northgate",  1)
+val s3:  Stop = new Stop(3,  "Riverside",  2)
+val s4:  Stop = new Stop(4,  "Parkway",    2)
+val s5:  Stop = new Stop(5,  "Airport",    3)
+val s6:  Stop = new Stop(6,  "Eastfield",  2)
+val s7:  Stop = new Stop(7,  "Westbridge", 1)
+val s8:  Stop = new Stop(8,  "Hillcrest",  3)
+val s9:  Stop = new Stop(9,  "Southport",  2)
+val s10: Stop = new Stop(10, "Midtown",    1)
+
+net.addLine(new Line("R1", "Red Line",    TransportMode::SUBWAY, [s1, s2, s3, s4, s5], LineStatus::NORMAL))
+net.addLine(new Line("B2", "Blue Line",   TransportMode::BUS,    [s7, s1, s6, s9, s8], LineStatus::DELAYED))
+net.addLine(new Line("G3", "Green Line",  TransportMode::TRAM,   [s2, s10, s6, s9],    LineStatus::NORMAL))
+net.addLine(new Line("Y4", "Yellow Line", TransportMode::SUBWAY, [s3, s10, s7],        LineStatus::NORMAL))
+net.addLine(new Line("O5", "Orange Line", TransportMode::BUS,    [s5, s8, s9, s4],     LineStatus::SUSPENDED))
+
+// ── Reports ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Transit Network Overview ===")
+net.modeStats()
+net.statusSummary()
+net.zoneReport()
+
+// ── Journey planner ──────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Journey Planner ===")
+
+val pairs: List[List[String]] = [
+  ["Central",    "Airport"],
+  ["Northgate",  "Southport"],
+  ["Westbridge", "Eastfield"],
+  ["Midtown",    "Riverside"]
+]
+
+foreach pair: List[String] in pairs {
+  val from: String = pair.get(0)
+  val to: String   = pair.get(1)
+  IO::println("")
+  IO::println("#{from} -> #{to}")
+  try {
+    val j: Journey? = net.planJourney(from, to)
+    if j == null {
+      IO::println("  No route found.")
+    } else {
+      IO::println("  #{j.summary()}")
+      foreach leg: JourneyLeg in j.legs() {
+        IO::println(leg.describe())
+      }
+    }
+  } catch e: Exception {
+    IO::println("  Error: #{e.message()}")
+  }
+}
+
+// ── Fastest from Central ─────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Fastest routes from Central ===")
+
+val dests: List[String] = ["Northgate", "Riverside", "Parkway", "Airport", "Eastfield", "Midtown"]
+val results = dests.map { dest: String =>
+  val j: Journey? = net.planJourney("Central", dest)
+  [dest, j]
+}.filter { pair =>
+  (pair as List).get(1) != null
+}.sortedBy { pair =>
+  ((pair as List).get(1) as Journey).totalMin()
+}
+
+foreach pair: List in results {
+  val dest: String = pair.get(0) as String
+  val j: Journey   = pair.get(1) as Journey
+  IO::println("  #{dest.pad(14)} #{j.totalMin().minuteLabel().pad(8)} #{j.totalFareCents().centLabel()}")
+}
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Network Stats ===")
+
+val totalStops: Int = net.operatingLines()
+  .flatMap { l: Line => l.stops() }
+  .map { s: Stop => s.name() }
+  .distinct()
+  .size()
+
+val avgFareOp: Int = net.operatingLines()
+  .map { l: Line => l.mode().baseFareCents() }
+  .fold(0) { acc, v => (acc as Int) + (v as Int) } as Int
+
+val opCount: Int = net.operatingLines().size()
+val avgFare: Int = if opCount > 0 { avgFareOp / opCount } else { 0 }
+
+IO::println("  Operating lines   : #{opCount}")
+IO::println("  Reachable stops   : #{totalStops}")
+IO::println("  Avg base fare     : #{avgFare.centLabel()}")
+
+val zoneSpread: List[Stop] = net.operatingLines()
+  .flatMap { l: Line => l.stops() }
+  .sortedBy { s: Stop => s.zone() }
+
+val minZone: Int = zoneSpread.get(0).zone()
+val maxZone: Int = zoneSpread.get(zoneSpread.size() - 1).zone()
+IO::println("  Zone range        : #{minZone} to #{maxZone}")

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.34] - 2026-08-14
+
 ### Fixed
 
 - **`extension List[Int]` and `extension List[String]` (or any two primitive-extension

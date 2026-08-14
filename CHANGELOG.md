@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.34] - 2026-08-14
+
 ### Fixed
 
 - **`extension List[Int]` and `extension List[String]` (or any two primitive-extension
@@ -35,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   map-destructuring, nullable find with a null guard, closures, and recursion.
 - **`run/RecipeVault.on`, a recipe-management sample.** Exercises ADT enums,
   records, collection pipelines, closures, do-notation, and nullable fields.
+- **`run/MiniTypeChecker.on`, a 489-line bidirectional type checker for a small
+  lambda calculus.** Exercises self-referential ADT enums (`Ty`, `Expr`),
+  records, a `HashMap`-backed functional-update environment, extension
+  methods on `Int`/`String`, `select` + type-pattern dispatch, and a
+  39-case self-checking test runner.
+- **`run/SupplyChain.on`, a 338-line purchase-order monitoring sample.**
+  Exercises data-carrying and ADT case-enums, records with body methods,
+  extension methods on `Int`/`String`/`Double`, and a broad collection
+  pipeline (`groupBy`/`sortedBy`/`distinct`/`partition`/`zip`/`flatMap`).
 
 ## [0.10.33] - 2026-08-13
 

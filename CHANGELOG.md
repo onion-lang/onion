@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`extension List[Int]` and `extension List[String]` (or any two primitive-extension
+  blocks differing only in type argument) in the same file collided as duplicate class
+  definitions (E0008).** `TypingHeaderPass.extractTypeName` / `extractTypeDescName`
+  discarded the type-argument list from `ParameterizedType` when generating the
+  extension container class name, so both produced `Extension$List`. Now the
+  type-argument names are folded into the generated name (`Extension$List_Int` vs
+  `Extension$List_String`).
+
+### Added
+
+- **`run/HospitalWard.on`, a 261-line hospital patient-ward management sample.**
+  Exercises case-enum ADTs, a data-carrying homogeneous enum, records with body
+  methods, extension methods on `Int`/`Double`, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`fold`/`partition`/`find`), foreach
+  map-destructuring, nullable find with a null guard, closures, and recursion.
+
 ## [0.10.33] - 2026-08-13
 
 ### Documentation

@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GenericLeaderboard.on`, a 273-line polymorphic leaderboard sample.**
+  The first `run/` sample to exercise Onion's type-class machinery
+  (`trait`/`instance`) as a first-class feature of a realistic program:
+  two independent type classes (`Scoreable[T]`, `Formattable[T]`), a
+  multi-constraint generic function (`[T: Scoreable + Formattable]`), and
+  `Trait[T]::method()` dictionary dispatch, shared across two domains
+  (chess ratings and F1 standings).
+- **`run/GeneticSequencer.on`, a 482-line DNA sequence analysis toolkit.**
+  Covers a bioinformatics domain not yet in the corpus: records with
+  methods (`Sequence`, `ORF`, `RestrictionSite`), a 21-variant
+  data-carrying enum (`AminoAcid`), a plain enum with `select` dispatch
+  (`Nucleotide`), an interface/class validator hierarchy, collection
+  pipelines (`map`/`filter`/`fold`/`groupBy`/`flatMap`/`sortedBy`/`find`),
+  and tail-recursive k-mer frequency building.
+- **`run/KaraokeNight.on`, a 529-line karaoke night management simulator.**
+  Records with methods (`Song`, `Singer`, `Performance`); a data-carrying
+  enum (`Difficulty` with a multiplier); an ADT case-enum (`ScoreGrade`:
+  `Perfect`/`Good`/`Okay`/`NeedsWork`); interfaces (`Reportable`,
+  `Rankable`); classes with mutable state; extension methods on `Int`,
+  `Double`, `String`; collection pipelines including `zip` and
+  `partition`; and `select`/type-pattern dispatch.
+- **`run/CodeContest.on`, a 543-line ICPC-style competitive programming
+  contest simulator.** Data-carrying enum (`Language`), plain enum
+  (`Verdict`), ADT case-enum (`ContestPhase`); records with `example`
+  clauses (`Problem`, `Submission`) and a generic record (`Ranked[T]`);
+  a class/interface pair (`Contest`, `Contestant conforms Scorable`);
+  `do[Option]` and `do[List]` monadic notation; collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`); and
+  the `|>` pipeline operator.
+- **`run/InsuranceClaims.on`, a 349-line insurance claims processing
+  system.** Data-carrying enum (`CoverageType`), ADT case-enum
+  (`AdjustmentDecision`: `FullApproval`/`PartialApproval`/`Denial`);
+  records with methods (`Claimant`, `Policy`, `Claim`, `AdjustmentRecord`);
+  an interface/class pair (`Auditable`, `ClaimsProcessor`); extension
+  methods on `Int`, `Double`, `String`; collection pipelines
+  (`filter`/`groupBy`/`partition`/`find`); `select`/type-pattern dispatch;
+  nullable types; closures; and `try`/`catch`.
+
+## [0.10.34] - 2026-08-14
+
+### Fixed
+
+- **`extension List[Int]` and `extension List[String]` (or any two primitive-extension
+  blocks differing only in type argument) in the same file collided as duplicate class
+  definitions (E0008).** `TypingHeaderPass.extractTypeName` / `extractTypeDescName`
+  discarded the type-argument list from `ParameterizedType` when generating the
+  extension container class name, so both produced `Extension$List`. Now the
+  type-argument names are folded into the generated name (`Extension$List_Int` vs
+  `Extension$List_String`).
+- **`select` with an empty `else:` body silently re-executed the preceding
+  `case` branch's body instead of doing nothing.** In the JavaCC
+  `select_expression()` production the shared accumulator `ss` was
+  initialized to `null` and reassigned per `case`; an empty `else:` skipped
+  the optional `[ss=block_elements()]` assignment, so `ss` still held the
+  last `case` branch's statement list and the generated `elseBlock` was a
+  copy of it. Reset `ss` to an empty list immediately before the optional
+  assignment (mirroring the existing pattern in `block()`), so an empty
+  `else:` now correctly executes nothing.
+
+### Added
+
+- **`run/HospitalWard.on`, a 261-line hospital patient-ward management sample.**
+  Exercises case-enum ADTs, a data-carrying homogeneous enum, records with body
+  methods, extension methods on `Int`/`Double`, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`fold`/`partition`/`find`), foreach
+  map-destructuring, nullable find with a null guard, closures, and recursion.
+- **`run/RecipeVault.on`, a recipe-management sample.** Exercises ADT enums,
+  records, collection pipelines, closures, do-notation, and nullable fields.
+- **`run/MiniTypeChecker.on`, a 489-line bidirectional type checker for a small
+  lambda calculus.** Exercises self-referential ADT enums (`Ty`, `Expr`),
+  records, a `HashMap`-backed functional-update environment, extension
+  methods on `Int`/`String`, `select` + type-pattern dispatch, and a
+  39-case self-checking test runner.
+- **`run/SupplyChain.on`, a 338-line purchase-order monitoring sample.**
+  Exercises data-carrying and ADT case-enums, records with body methods,
+  extension methods on `Int`/`String`/`Double`, and a broad collection
+  pipeline (`groupBy`/`sortedBy`/`distinct`/`partition`/`zip`/`flatMap`).
+
 ## [0.10.33] - 2026-08-13
 
 ### Documentation

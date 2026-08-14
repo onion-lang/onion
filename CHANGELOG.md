@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.34] - 2026-08-14
+
+### Fixed
+
+- **`extension List[Int]` and `extension List[String]` (or any two primitive-extension
+  blocks differing only in type argument) in the same file collided as duplicate class
+  definitions (E0008).** `TypingHeaderPass.extractTypeName` / `extractTypeDescName`
+  discarded the type-argument list from `ParameterizedType` when generating the
+  extension container class name, so both produced `Extension$List`. Now the
+  type-argument names are folded into the generated name (`Extension$List_Int` vs
+  `Extension$List_String`).
+- **`select` with an empty `else:` body silently re-executed the preceding
+  `case` branch's body instead of doing nothing.** In the JavaCC
+  `select_expression()` production the shared accumulator `ss` was
+  initialized to `null` and reassigned per `case`; an empty `else:` skipped
+  the optional `[ss=block_elements()]` assignment, so `ss` still held the
+  last `case` branch's statement list and the generated `elseBlock` was a
+  copy of it. Reset `ss` to an empty list immediately before the optional
+  assignment (mirroring the existing pattern in `block()`), so an empty
+  `else:` now correctly executes nothing.
+
+### Added
+
+- **`run/HospitalWard.on`, a 261-line hospital patient-ward management sample.**
+  Exercises case-enum ADTs, a data-carrying homogeneous enum, records with body
+  methods, extension methods on `Int`/`Double`, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`fold`/`partition`/`find`), foreach
+  map-destructuring, nullable find with a null guard, closures, and recursion.
+- **`run/RecipeVault.on`, a recipe-management sample.** Exercises ADT enums,
+  records, collection pipelines, closures, do-notation, and nullable fields.
+- **`run/MiniTypeChecker.on`, a 489-line bidirectional type checker for a small
+  lambda calculus.** Exercises self-referential ADT enums (`Ty`, `Expr`),
+  records, a `HashMap`-backed functional-update environment, extension
+  methods on `Int`/`String`, `select` + type-pattern dispatch, and a
+  39-case self-checking test runner.
+- **`run/SupplyChain.on`, a 338-line purchase-order monitoring sample.**
+  Exercises data-carrying and ADT case-enums, records with body methods,
+  extension methods on `Int`/`String`/`Double`, and a broad collection
+  pipeline (`groupBy`/`sortedBy`/`distinct`/`partition`/`zip`/`flatMap`).
+
 ## [0.10.33] - 2026-08-13
 
 ### Documentation

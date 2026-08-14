@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sortedBy` collection pipelines; `foreach` map destructuring; `while`
   loops; string interpolation; and `select`/`is` pattern matching.
 
+### Fixed
+
+- **`docs/ja/GENERICS_DESIGN.md` linked to two anchors that MkDocs could
+  never generate.** Its cross-references to `reference/specification.md#ジェネリクス`
+  and `guide/classes-and-objects.md#ジェネリッククラス` relied on MkDocs
+  slugifying Japanese heading text, but the slugifier can't build a stable
+  slug from it and falls back to positional ids (`#_6`, `#_9`) instead —
+  confirmed broken via `mkdocs build --strict`. The two target headings now
+  carry explicit `attr_list` ids (`#generics`, `#generic-classes`, mirroring
+  the English page's slugs) and the links point at those.
+
 ## [0.10.34] - 2026-08-14
 
 ### Fixed

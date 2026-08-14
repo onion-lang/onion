@@ -221,7 +221,7 @@ def describe(o: Opt[String]): String = select o {
 なります。定数形式の enum は型パラメータを取れません（`java.lang.Enum` になり、
 JVM がジェネリックな enum を許さないためです）。
 
-## ジェネリッククラス
+## ジェネリッククラス {: #generic-classes }
 
 クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：
 

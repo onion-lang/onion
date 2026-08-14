@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Calling `.method()` (not `?.method()`) on a nullable class-typed value
+  (e.g. `x: Box?`) reported the generic, unhelpful `E0041`
+  ("type Box? is not a valid method call target.") instead of the dedicated
+  null-safety diagnostic `E0070`, which points at `?.` / `?:` / `!!` / a null
+  check.** Field access on the same nullable value already reported `E0070`;
+  `MethodTargetTypingSupport`'s method-call path just never had a
+  `NullableType` case to route through it.
+
 ## [0.10.35] - 2026-08-14
 
 ### Added

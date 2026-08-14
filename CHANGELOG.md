@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Rankable`); classes with mutable state; extension methods on `Int`,
   `Double`, `String`; collection pipelines including `zip` and
   `partition`; and `select`/type-pattern dispatch.
+- **`run/CodeContest.on`, a 543-line ICPC-style competitive programming
+  contest simulator.** Data-carrying enum (`Language`), plain enum
+  (`Verdict`), ADT case-enum (`ContestPhase`); records with `example`
+  clauses (`Problem`, `Submission`) and a generic record (`Ranked[T]`);
+  a class/interface pair (`Contest`, `Contestant conforms Scorable`);
+  `do[Option]` and `do[List]` monadic notation; collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`); and
+  the `|>` pipeline operator.
 
 ## [0.10.34] - 2026-08-14
 

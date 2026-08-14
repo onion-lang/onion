@@ -239,8 +239,14 @@ parse 専用の shape は `canPrint(): false` でそう言い、読む方向の�
 
 ## `Shapes` を直接使うとき
 
-`onion.Shapes::regex` と `::json` は同じ構築を通常の API として公開しています。自分で
-宣言していない型に対する shape はこちらで書けます。
+`onion.Shapes` は `shape name = ...` が導出するのと同じ4つの構築を、通常の API として
+公開しています。自分で宣言していない型に対する shape はこちらで書けます:
+
+- `Shapes::regex` — `re"..."` 形式
+- `Shapes::json` — `json` 形式
+- `Shapes::yaml` — `yaml` 形式
+- `Shapes::config` — `config` 形式。`shape name = config` と同様に lossless
+  （`parseLossless`/`printLossless`）
 
 ## 関連項目
 

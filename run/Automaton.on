@@ -1,0 +1,243 @@
+// Automaton.on — 1-D Wolfram Elementary Cellular Automaton simulator.
+// Exercises: records with examples, ADT case-enum, extension methods on String
+// and Int, Boolean[] arrays, collection pipelines (map/filter/fold/sortedBy),
+// foreach over ranges and lists, select/type-pattern matching, string
+// interpolation, closures, recursion, and nullable types.
+
+// ─── Extension: string repetition ─────────────────────────────────────────────
+extension String {
+  def times(n: Int): String {
+    var result: String = ""
+    for var i: Int = 0; i < n; i++ { result = result + self }
+    return result
+  }
+}
+
+// ─── Extension: Int left-padding ──────────────────────────────────────────────
+extension Int {
+  def padLeft(width: Int): String {
+    val s: String = "" + self
+    if s.length() >= width { return s }
+    return " ".times(width - s.length()) + s
+  }
+}
+
+// ─── Rule record ──────────────────────────────────────────────────────────────
+// A Wolfram rule is an 8-bit integer 0-255. Each triple of cells (l, c, r)
+// maps a 3-bit neighbourhood index to the next center value.
+record Rule(number: Int)
+  example { new Rule(30).number() == 30 }
+{
+public:
+  def name(): String = "Rule " + number()
+
+  // Apply the rule to one neighbourhood (l, c, r) — next center value.
+  def step(l: Boolean, c: Boolean, r: Boolean): Boolean {
+    val pattern: Int = (if l { 4 } else { 0 }) +
+                       (if c { 2 } else { 0 }) +
+                       (if r { 1 } else { 0 })
+    return (number() >> pattern) % 2 != 0
+  }
+
+  // Apply the rule to an entire row → the next generation.
+  def evolve(row: Boolean[]): Boolean[] {
+    val n: Int = row.length
+    val next: Boolean[] = new Boolean[n]
+    for var i: Int = 0; i < n; i++ {
+      val l: Boolean = if i > 0 { row[i - 1] } else { false }
+      val c: Boolean = row[i]
+      val r: Boolean = if i < n - 1 { row[i + 1] } else { false }
+      next[i] = step(l, c, r)
+    }
+    return next
+  }
+}
+
+// ─── Simulation state ─────────────────────────────────────────────────────────
+record SimState(rule: Rule, rows: List[Object], width: Int) {
+public:
+  def generations(): Int = rows().size
+}
+
+// Build the "single-cell-in-center" seed for width w.
+def centerSeed(w: Int): Boolean[] {
+  val seed: Boolean[] = new Boolean[w]
+  seed[w / 2] = true
+  return seed
+}
+
+// Convert a Boolean row to a printable string (filled or empty cell).
+def rowToString(row: Boolean[]): String {
+  var sb: String = ""
+  for var i: Int = 0; i < row.length; i++ {
+    sb = sb + (if row[i] { "#" } else { "." })
+  }
+  return sb
+}
+
+// Count live cells in a row.
+def liveCount(row: Boolean[]): Int {
+  var count: Int = 0
+  for var i: Int = 0; i < row.length; i++ {
+    if row[i] { count++ }
+  }
+  return count
+}
+
+// ─── Simulation engine ────────────────────────────────────────────────────────
+def simulate(rule: Rule, seed: Boolean[], steps: Int): SimState {
+  val allRows: List[Object] = [seed]
+  var current: Boolean[] = seed
+  for var g: Int = 0; g < steps; g++ {
+    current = rule.evolve(current)
+    allRows.add(current)
+  }
+  return new SimState(rule, allRows, seed.length)
+}
+
+// ─── Per-generation statistics ────────────────────────────────────────────────
+record GenStats(generation: Int, live: Int, density: Double) {
+public:
+  def describe(): String {
+    val pct: Int = (density() * 100.0) as Int
+    return "gen #{generation().padLeft(3)}: #{live().padLeft(3)} live (#{pct}%)"
+  }
+}
+
+def computeStats(sim: SimState): List[Object] {
+  val result: List[Object] = []
+  val rows: List[Object] = sim.rows()
+  for var i: Int = 0; i < rows.size; i++ {
+    val row: Boolean[] = rows[i] as Boolean[]
+    val live: Int = liveCount(row)
+    val density: Double = (live as Double) / (sim.width() as Double)
+    result.add(new GenStats(i, live, density))
+  }
+  return result
+}
+
+// ─── Automaton behavior classification (ADT case-enum) ────────────────────────
+enum AutomatonClass {
+  case Chaotic    // complex, pseudo-random patterns (e.g. Rule 30)
+  case Periodic   // repeating or self-similar patterns (e.g. Rule 90)
+  case Complex    // complex global structure (e.g. Rule 110)
+  case Simple     // quickly reaches a fixed point or dies
+public:
+  def label(): String = select this {
+    case x is Chaotic:  "Chaotic (Class III)"
+    case x is Periodic: "Periodic / Self-Similar (Class II)"
+    case x is Complex:  "Complex / Universal (Class IV)"
+    case x is Simple:   "Simple (Class I)"
+  }
+}
+
+def classify(ruleNum: Int): AutomatonClass {
+  select ruleNum {
+    case 30, 45, 73, 86, 89, 101, 105, 106, 109:
+      return new Chaotic()
+    case 90, 18, 22, 60:
+      return new Periodic()
+    case 110:
+      return new Complex()
+    else:
+      return new Simple()
+  }
+}
+
+// ─── Display helpers ──────────────────────────────────────────────────────────
+def separator(): String = "-".times(64)
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(separator())
+  IO::println("  " + title)
+  IO::println(separator())
+}
+
+def runDemo(ruleNum: Int, width: Int, steps: Int): void {
+  val rule: Rule = new Rule(ruleNum)
+  val cls: AutomatonClass = classify(ruleNum)
+  printHeader("#{rule.name()} -- #{cls.label()}")
+
+  val seed: Boolean[] = centerSeed(width)
+  val sim: SimState = simulate(rule, seed, steps)
+  val rows: List[Object] = sim.rows()
+
+  // Print the evolution grid.
+  for var i: Int = 0; i < rows.size; i++ {
+    val row: Boolean[] = rows[i] as Boolean[]
+    IO::println("  " + i.padLeft(2) + " | " + rowToString(row))
+  }
+
+  // Summary statistics via collection pipelines.
+  val stats: List[Object] = computeStats(sim)
+  val liveCounts: List[Object] = stats.map { s => (s as GenStats).live() }
+
+  val maxLive: Int = liveCounts.fold(0) { acc, x =>
+    val xi: Int = x as Int
+    if xi > acc { xi } else { acc }
+  } as Int
+  val minLive: Int = liveCounts.fold(width) { acc, x =>
+    val xi: Int = x as Int
+    if xi < acc { xi } else { acc }
+  } as Int
+  val totalLive: Int = liveCounts.fold(0) { acc, x => acc + (x as Int) } as Int
+  val avgLive: Double = (totalLive as Double) / (rows.size as Double)
+
+  IO::println("")
+  IO::println("  Width: #{width}, Generations: #{rows.size}")
+  IO::println("  Live cells -- min: #{minLive}, max: #{maxLive}, avg: #{avgLive as Int}")
+
+  // Show sampled generations.
+  IO::println("")
+  IO::println("  Sampled generations:")
+  var si: Int = 0
+  while si < stats.size {
+    val s: GenStats = stats[si] as GenStats
+    IO::println("    " + s.describe())
+    si += 5
+  }
+}
+
+// ─── Cross-rule summary ────────────────────────────────────────────────────────
+def crossRuleSummary(ruleNums: List[Object], width: Int, steps: Int): void {
+  printHeader("Cross-rule comparison (width=#{width}, steps=#{steps})")
+
+  val summaries: List[Object] = ruleNums.map { rn =>
+    val n: Int = rn as Int
+    val rule: Rule = new Rule(n)
+    val sim: SimState = simulate(rule, centerSeed(width), steps)
+    val rows: List[Object] = sim.rows()
+    val totalLive: Int = rows.fold(0) { acc, row =>
+      acc + liveCount(row as Boolean[])
+    } as Int
+    val avg: Int = totalLive / rows.size
+    val cls: AutomatonClass = classify(n)
+    "Rule #{n.padLeft(3)}: avg #{avg.padLeft(3)} live -- #{cls.label()}"
+  }
+
+  val sorted: List[Object] = summaries.sortedBy { s => s as String }
+  foreach s: Object in sorted {
+    IO::println("  " + (s as String))
+  }
+}
+
+// ─── Entry point ───────────────────────────────────────────────────────────────
+def main(args: String[]): void {
+  val WIDTH: Int = 41
+  val STEPS: Int = 20
+
+  IO::println("=".times(64))
+  IO::println("  Wolfram Elementary Cellular Automata -- Onion Demo")
+  IO::println("=".times(64))
+
+  runDemo(30, WIDTH, STEPS)    // chaotic / pseudo-random
+  runDemo(110, WIDTH, STEPS)   // universal computation (Turing-complete)
+  runDemo(90, WIDTH, STEPS)    // Sierpinski triangle
+  runDemo(45, WIDTH, STEPS)    // interesting mixed pattern
+
+  crossRuleSummary([30, 45, 90, 110, 18, 22, 60, 73, 86], WIDTH, STEPS)
+
+  IO::println("")
+  IO::println("Done.")
+}

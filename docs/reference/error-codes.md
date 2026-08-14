@@ -152,6 +152,18 @@ public:
 This also fires when the mismatch is written inside a nullable type
 annotation, e.g. `val b: Box[String, String]? = null`.
 
+### `E0032` — Type argument must be a reference type
+
+Guards against substituting `void` for a type parameter. The check has live
+report sites in the type checker, but is not reachable from valid Onion
+source today: the grammar's `type()` production, used at every
+type-argument and type-alias-target position, never routes through
+`void_type()` (only a method's `return_type()` does). So `void`/`Unit`
+cannot actually be written as a type argument — `new Box[void]()`,
+`Box[void]`, and `type T = void` are all syntax errors, not E0032. See
+`SemanticErrorCodeCoverageSpec` for the reasoning behind leaving this one
+untriggered rather than fabricating a non-existent example.
+
 ### `E0033` — Method is not generic
 
 Type arguments were supplied at a call site for a method that takes none.
@@ -637,6 +649,20 @@ record U(a: String) derive!(Bogus)   // E0063: unknown derive! marker Bogus
 ```
 
 Fix: use `derive!(Json)`, or remove the clause.
+
+### `E0086` — Duplicate record component
+
+Two components of the same record declare the same name. Each component name
+generates a private field and a public accessor method, so a repeated name
+would collide with itself — left unchecked, this only failed once something
+loaded the generated class (a `ClassFormatError`, surfaced as an internal
+I0000 error) rather than at compile time.
+
+```onion
+record R(a: Int, a: Int)   // E0086: duplicated record component a in R
+```
+
+Fix: rename one of the components.
 
 ### `E0064` — Law violation
 
@@ -1419,6 +1445,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
+| `E0086` | duplicated record component … in … |
 
 ## See also
 

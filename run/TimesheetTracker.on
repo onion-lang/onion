@@ -1,0 +1,329 @@
+// TimesheetTracker.on (~270 lines)
+// A weekly employee timesheet system.
+// Features: records with examples/laws, data-carrying enum, class with
+// Map[String,Employee] registry, Map[String,Double] accumulation,
+// collection pipelines (filter/groupBy/sortedBy/fold), nullable Double?
+// for Map.get, foreach on Map (k,v) and List, closures, extension String,
+// string interpolation, try/catch, overtime pay logic.
+
+import {
+  java.util.*
+}
+
+// ── String formatting extension ───────────────────────────────────────────────
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── Project category enum ─────────────────────────────────────────────────────
+
+enum Category {
+  DEVELOPMENT, DESIGN, TESTING, MANAGEMENT, SUPPORT
+public:
+  def label(): String = select this {
+    case Category::DEVELOPMENT: "Development"
+    case Category::DESIGN:      "Design"
+    case Category::TESTING:     "Testing"
+    case Category::MANAGEMENT:  "Management"
+    case Category::SUPPORT:     "Support"
+  }
+  def isBillable(): Boolean = select this {
+    case Category::MANAGEMENT: false
+    else:                      true
+  }
+}
+
+// ── Project record ────────────────────────────────────────────────────────────
+
+record Project(code: String, name: String, category: Category) {
+public:
+  def isBillable(): Boolean = self.category().isBillable()
+  def summary(): String = "#{self.code()} #{self.name()} [#{self.category().label()}]"
+}
+
+// ── TimeEntry record ──────────────────────────────────────────────────────────
+
+record TimeEntry(employeeId: String, projectCode: String, weekDay: Int, hours: Double)
+  example { new TimeEntry("E01", "DEV-01", 1, 8.0d).hours() == 8.0d }
+  example { new TimeEntry("E01", "DEV-01", 3, 8.5d).weekDay() == 3 }
+
+// ── Employee record ───────────────────────────────────────────────────────────
+
+record Employee(id: String, name: String, hourlyRate: Double, isContractor: Boolean) {
+public:
+  def typeLabel(): String {
+    if self.isContractor() { return "Contractor" }
+    return "Full-time"
+  }
+}
+
+// ── Timesheet manager ─────────────────────────────────────────────────────────
+
+class TimesheetManager {
+  val employees: Map[String, Employee]
+  val projects: Map[String, Project]
+  val entries: List[TimeEntry]
+
+public:
+  def this {
+    this.employees = [:]
+    this.projects  = [:]
+    this.entries   = []
+  }
+
+  def addEmployee(emp: Employee): void {
+    employees.put(emp.id(), emp)
+  }
+
+  def addProject(proj: Project): void {
+    projects.put(proj.code(), proj)
+  }
+
+  def logTime(empId: String, projCode: String, day: Int, hours: Double): Boolean {
+    val emp: Employee = employees.get(empId)
+    if emp == null { return false }
+    val proj: Project = projects.get(projCode)
+    if proj == null { return false }
+    if hours <= 0.0d || hours > 24.0d { return false }
+    entries.add(new TimeEntry(empId, projCode, day, hours))
+    return true
+  }
+
+  def entriesFor(empId: String): List[TimeEntry] =
+    entries.filter { e => (e as TimeEntry).employeeId() == empId }
+
+  def totalHoursFor(empId: String): Double =
+    entriesFor(empId).fold(0.0d) { acc, e => (acc as Double) + (e as TimeEntry).hours() }
+
+  def regularHours(empId: String): Double {
+    val total: Double = totalHoursFor(empId)
+    if total <= 40.0d { return total }
+    return 40.0d
+  }
+
+  def overtimeHours(empId: String): Double {
+    val total: Double = totalHoursFor(empId)
+    if total <= 40.0d { return 0.0d }
+    return total - 40.0d
+  }
+
+  def weeklyPay(empId: String): Double {
+    val empRaw: Employee = employees.get(empId)
+    if empRaw == null { return 0.0d }
+    val emp: Employee = empRaw as Employee
+    val reg: Double = regularHours(empId)
+    val ot: Double  = overtimeHours(empId)
+    if emp.isContractor() {
+      return totalHoursFor(empId) * emp.hourlyRate()
+    }
+    return reg * emp.hourlyRate() + ot * emp.hourlyRate() * 1.5d
+  }
+
+  def billableHoursFor(empId: String): Double {
+    var total: Double = 0.0d
+    val empEntries: List[TimeEntry] = entriesFor(empId)
+    foreach e: Object in empEntries {
+      val entry = e as TimeEntry
+      val projRaw: Project = projects.get(entry.projectCode())
+      if projRaw != null {
+        val proj = projRaw as Project
+        if proj.isBillable() {
+          total = total + entry.hours()
+        }
+      }
+    }
+    return total
+  }
+
+  def hoursPerProject(empId: String): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    val empEntries: List[TimeEntry] = entriesFor(empId)
+    foreach e: Object in empEntries {
+      val entry = e as TimeEntry
+      val code: String = entry.projectCode()
+      val prev: Double? = result.get(code)
+      val prevVal: Double = if prev == null { 0.0d } else { prev as Double }
+      result.put(code, prevVal + entry.hours())
+    }
+    return result
+  }
+
+  def teamHoursPerProject(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    foreach e: Object in entries {
+      val entry = e as TimeEntry
+      val code: String = entry.projectCode()
+      val prev: Double? = result.get(code)
+      val prevVal: Double = if prev == null { 0.0d } else { prev as Double }
+      result.put(code, prevVal + entry.hours())
+    }
+    return result
+  }
+
+  def overtimeEmployees(): List[String] {
+    val result: List[String] = []
+    foreach (id, _) in employees {
+      val empId: String = id as String
+      if overtimeHours(empId) > 0.0d {
+        val emp: Employee = employees.get(empId) as Employee
+        result.add("#{emp.name()} (#{overtimeHours(empId)}h OT)")
+      }
+    }
+    return result
+  }
+
+  def printSummary(): void {
+    IO::println("╔══════════════════════════════════════════════════════╗")
+    IO::println("║          WEEKLY TIMESHEET SUMMARY                    ║")
+    IO::println("╠══════════════════════════════════════════════════════╣")
+    IO::println("║  #{"Name".padRight(18)} #{"Type".padRight(10)} #{"Total".padLeft(5)} #{"OT".padLeft(4)} #{"Pay".padLeft(10)}  ║")
+    IO::println("╠══════════════════════════════════════════════════════╣")
+    foreach (id, _) in employees {
+      val empId: String = id as String
+      val emp: Employee = employees.get(empId) as Employee
+      val total: Double = totalHoursFor(empId)
+      val ot: Double    = overtimeHours(empId)
+      val pay: Double   = weeklyPay(empId)
+      val payStr: String = "$#{pay}"
+      IO::println("║  #{emp.name().padRight(18)} #{emp.typeLabel().padRight(10)} #{("" + total).padLeft(5)} #{("" + ot).padLeft(4)} #{payStr.padLeft(10)}  ║")
+    }
+    IO::println("╚══════════════════════════════════════════════════════╝")
+    IO::println("")
+  }
+
+  def getEmployee(empId: String): Employee? {
+    val emp: Employee = employees.get(empId)
+    return emp
+  }
+
+  def printBillableReport(empIds: List[String]): void {
+    IO::println("  Billable vs. Total Hours:")
+    foreach eid: Object in empIds {
+      val empId: String = eid as String
+      val empRaw: Employee = employees.get(empId)
+      if empRaw != null {
+        val emp: Employee = empRaw as Employee
+        val billable: Double = billableHoursFor(empId)
+        val total: Double    = totalHoursFor(empId)
+        IO::println("  #{emp.name().padRight(18)}: #{billable}h billable / #{total}h total")
+      }
+    }
+    IO::println("")
+  }
+
+  def printProjectBreakdown(): void {
+    IO::println("  Project Hours This Week:")
+    val hrs: Map[String, Double] = teamHoursPerProject()
+    foreach (code, h) in hrs {
+      val projRaw: Project = projects.get(code as String)
+      if projRaw != null {
+        val proj = projRaw as Project
+        val bill: String = if proj.isBillable() { "billable" } else { "internal" }
+        IO::println("    #{(code as String).padRight(8)} #{proj.name().padRight(24)} #{("" + h).padLeft(6)}h  [#{bill}]")
+      }
+    }
+    IO::println("")
+  }
+}
+
+// ── Build sample data ─────────────────────────────────────────────────────────
+
+def makeManager(): TimesheetManager {
+  val mgr: TimesheetManager = new TimesheetManager()
+
+  mgr.addEmployee(new Employee("E01", "Alice Chen",     55.0d, false))
+  mgr.addEmployee(new Employee("E02", "Bob Tanaka",     48.0d, false))
+  mgr.addEmployee(new Employee("E03", "Carol Okafor",   72.0d, true))
+  mgr.addEmployee(new Employee("E04", "David Singh",    45.0d, false))
+  mgr.addEmployee(new Employee("E05", "Eve Rosenberg",  60.0d, false))
+
+  mgr.addProject(new Project("DEV-01", "Core API",         Category::DEVELOPMENT))
+  mgr.addProject(new Project("DEV-02", "Mobile App",       Category::DEVELOPMENT))
+  mgr.addProject(new Project("DES-01", "UI Redesign",      Category::DESIGN))
+  mgr.addProject(new Project("TST-01", "QA Automation",    Category::TESTING))
+  mgr.addProject(new Project("MGT-01", "Sprint Planning",  Category::MANAGEMENT))
+  mgr.addProject(new Project("SUP-01", "Customer Support", Category::SUPPORT))
+
+  // Mon=1, Tue=2, Wed=3, Thu=4, Fri=5
+  mgr.logTime("E01", "DEV-01", 1, 9.0d)
+  mgr.logTime("E01", "DEV-01", 2, 8.5d)
+  mgr.logTime("E01", "DEV-02", 3, 8.0d)
+  mgr.logTime("E01", "DEV-01", 4, 9.5d)
+  mgr.logTime("E01", "DEV-02", 5, 8.0d)   // 43h total → 3h OT
+
+  mgr.logTime("E02", "TST-01", 1, 8.0d)
+  mgr.logTime("E02", "TST-01", 2, 8.0d)
+  mgr.logTime("E02", "DES-01", 3, 8.0d)
+  mgr.logTime("E02", "TST-01", 4, 8.0d)
+  mgr.logTime("E02", "MGT-01", 5, 4.0d)   // 36h total, no OT
+
+  mgr.logTime("E03", "DEV-01", 1, 10.0d)
+  mgr.logTime("E03", "DEV-01", 2, 10.0d)
+  mgr.logTime("E03", "DEV-02", 3, 10.0d)
+  mgr.logTime("E03", "DEV-01", 4, 10.0d)
+  mgr.logTime("E03", "DEV-02", 5, 10.0d)  // 50h contractor, flat rate
+
+  mgr.logTime("E04", "SUP-01", 1, 8.0d)
+  mgr.logTime("E04", "SUP-01", 2, 8.0d)
+  mgr.logTime("E04", "MGT-01", 3, 4.0d)
+  mgr.logTime("E04", "SUP-01", 4, 8.0d)
+  mgr.logTime("E04", "SUP-01", 5, 8.0d)   // 36h total, no OT
+
+  mgr.logTime("E05", "DES-01", 1, 9.0d)
+  mgr.logTime("E05", "DES-01", 2, 9.0d)
+  mgr.logTime("E05", "TST-01", 3, 9.0d)
+  mgr.logTime("E05", "DES-01", 4, 9.0d)
+  mgr.logTime("E05", "DES-01", 5, 9.0d)   // 45h total → 5h OT
+
+  return mgr
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+val mgr: TimesheetManager = makeManager()
+
+mgr.printSummary()
+mgr.printProjectBreakdown()
+
+// Overtime alerts
+val overtime: List[String] = mgr.overtimeEmployees()
+if overtime.size > 0 {
+  IO::println("  Overtime Alerts:")
+  foreach a: Object in overtime {
+    IO::println("    ! #{a}")
+  }
+  IO::println("")
+}
+
+// Alice's per-project hours
+IO::println("  Alice Chen — Per-Project Breakdown:")
+val aliceProj: Map[String, Double] = mgr.hoursPerProject("E01")
+foreach (code, h) in aliceProj {
+  IO::println("    #{code}: #{h}h")
+}
+IO::println("")
+
+// Billable hours for each employee
+val empIds: List[String] = ["E01", "E02", "E03", "E04", "E05"]
+mgr.printBillableReport(empIds)
+
+// Input validation
+IO::println("  Input Validation:")
+val badEmp: Boolean = mgr.logTime("UNKNOWN", "DEV-01", 1, 8.0d)
+IO::println("  Unknown employee:  #{badEmp}")
+val badProj: Boolean = mgr.logTime("E01", "UNKNOWN", 1, 8.0d)
+IO::println("  Unknown project:   #{badProj}")
+val badHours: Boolean = mgr.logTime("E01", "DEV-01", 1, 25.0d)
+IO::println("  Too many hours:    #{badHours}")
+val goodEntry: Boolean = mgr.logTime("E01", "MGT-01", 1, 1.0d)
+IO::println("  Valid extra entry: #{goodEntry}")

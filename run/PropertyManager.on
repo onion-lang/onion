@@ -1,0 +1,351 @@
+// Property Management System
+// Exercises: ADT enums, records with example clauses, classes, interfaces,
+// generics, collection pipelines (filter/map/fold/groupBy/sortedBy/distinct/
+// find/partition/zip), select/pattern-matching, nullable, closures,
+// string interpolation, foreach (ranges and maps), try/catch, recursion,
+// extension methods on Int/String/Double.
+
+import {
+  java.util.*
+}
+
+// ── Enumerations ─────────────────────────────────────────────────────────────
+
+enum PropertyType {
+  APARTMENT, HOUSE, STUDIO, COMMERCIAL
+public:
+  def label(): String = select this {
+    case PropertyType::APARTMENT:  "Apartment"
+    case PropertyType::HOUSE:      "House"
+    case PropertyType::STUDIO:     "Studio"
+    case PropertyType::COMMERCIAL: "Commercial"
+    else: "Unknown"
+  }
+}
+
+enum LeaseStatus {
+  ACTIVE, EXPIRED, TERMINATED, PENDING
+public:
+  def label(): String = select this {
+    case LeaseStatus::ACTIVE:     "Active"
+    case LeaseStatus::EXPIRED:    "Expired"
+    case LeaseStatus::TERMINATED: "Terminated"
+    case LeaseStatus::PENDING:    "Pending"
+    else: "Unknown"
+  }
+  def isLive(): Boolean = select this {
+    case LeaseStatus::ACTIVE:  true
+    case LeaseStatus::PENDING: true
+    else: false
+  }
+}
+
+enum MaintenancePriority {
+  LOW, NORMAL, HIGH, EMERGENCY
+public:
+  def label(): String = select this {
+    case MaintenancePriority::LOW:       "Low"
+    case MaintenancePriority::NORMAL:    "Normal"
+    case MaintenancePriority::HIGH:      "High"
+    case MaintenancePriority::EMERGENCY: "EMERGENCY"
+    else: "?"
+  }
+  def score(): Int = select this {
+    case MaintenancePriority::LOW:       1
+    case MaintenancePriority::NORMAL:    2
+    case MaintenancePriority::HIGH:      3
+    case MaintenancePriority::EMERGENCY: 4
+    else: 0
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Address(street: String, city: String, postcode: String) {
+public:
+  def full(): String = "#{self.street()}, #{self.city()} #{self.postcode()}"
+}
+
+record Property(
+  id: Int,
+  address: Address,
+  kind: PropertyType,
+  bedrooms: Int,
+  areaSqm: Double,
+  monthlyRent: Double
+) {
+public:
+  def label(): String = "P#{self.id()} [#{self.kind().label()}]"
+  def rentPerSqm(): Double = self.monthlyRent() / self.areaSqm()
+}
+
+record Tenant(id: Int, name: String, email: String, annualIncome: Double) {
+public:
+  def affordabilityRatio(monthlyRent: Double): Double =
+    (monthlyRent * 12.0) / self.annualIncome()
+}
+
+record Lease(
+  id: Int,
+  property: Property,
+  tenant: Tenant,
+  startMonth: Int, startYear: Int,
+  endMonth: Int,   endYear: Int,
+  monthlyRent: Double,
+  status: LeaseStatus
+) {
+public:
+  def durationMonths(): Int =
+    (self.endYear() - self.startYear()) * 12 + (self.endMonth() - self.startMonth())
+  def totalValue(): Double = self.monthlyRent() * (self.durationMonths() * 1.0)
+  def isActive(): Boolean  = self.status().isLive()
+}
+
+record MaintenanceRequest(
+  id: Int,
+  property: Property,
+  description: String,
+  priority: MaintenancePriority,
+  resolved: Boolean
+) {
+public:
+  def label(): String = "[#{self.priority().label()}] #{self.description()}"
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def bedroomLabel(): String = select self {
+    case 0: "Studio"
+    case 1: "1 bed"
+    else:   "#{self} beds"
+  }
+  def monthName(): String = select self {
+    case 1:  "Jan"; case 2:  "Feb"; case 3:  "Mar"; case 4:  "Apr"
+    case 5:  "May"; case 6:  "Jun"; case 7:  "Jul"; case 8:  "Aug"
+    case 9:  "Sep"; case 10: "Oct"; case 11: "Nov"; case 12: "Dec"
+    else: "???"
+  }
+  def toDouble(): Double = self * 1.0
+}
+
+extension Double {
+  def gbp(): String = "£#{String::format("%.2f", self)}"
+  def pct(): String = "#{String::format("%.1f", self * 100.0)}%"
+}
+
+extension String {
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ── Reporting helpers ──────────────────────────────────────────────────────────
+
+def hr(ch: String, n: Int): String = Strings::repeat(ch, n)
+
+def printSection(title: String): void {
+  IO::println("\n" + hr("─", 68))
+  IO::println("  " + title)
+  IO::println(hr("─", 68))
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // ── Properties ────────────────────────────────────────────────────────────
+  val p1 = new Property(1, new Address("12 Maple St",    "Bristol",    "BS1 1AA"), PropertyType::APARTMENT,  2, 65.0,  1200.0)
+  val p2 = new Property(2, new Address("8 Oak Lane",     "Bristol",    "BS2 3BB"), PropertyType::HOUSE,       4, 130.0, 2000.0)
+  val p3 = new Property(3, new Address("3 Pine Court",   "Bath",       "BA1 2CC"), PropertyType::STUDIO,      0, 30.0,  700.0)
+  val p4 = new Property(4, new Address("99 Elm Road",    "Bath",       "BA2 4DD"), PropertyType::APARTMENT,   1, 45.0,  950.0)
+  val p5 = new Property(5, new Address("7 Cedar Ave",    "Bristol",    "BS3 5EE"), PropertyType::HOUSE,       3, 110.0, 1800.0)
+  val p6 = new Property(6, new Address("22 Birch Blvd",  "Swindon",   "SN1 1FF"), PropertyType::COMMERCIAL,  0, 200.0, 3500.0)
+  val p7 = new Property(7, new Address("6 Willow Rd",    "Swindon",   "SN2 2GG"), PropertyType::APARTMENT,   2, 60.0,  1100.0)
+  val p8 = new Property(8, new Address("14 Ash Close",   "Bristol",    "BS4 6HH"), PropertyType::STUDIO,      0, 28.0,  650.0)
+
+  val properties: List[Object] = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+  // ── Tenants ───────────────────────────────────────────────────────────────
+  val t1  = new Tenant(1,  "Alice Parrish",  "alice@ex.com",   38000.0)
+  val t2  = new Tenant(2,  "Ben Okafor",     "ben@ex.com",     52000.0)
+  val t3  = new Tenant(3,  "Cara Singh",     "cara@ex.com",    28000.0)
+  val t4  = new Tenant(4,  "Derek Ford",     "derek@ex.com",   75000.0)
+  val t5  = new Tenant(5,  "Elena Moss",     "elena@ex.com",   34000.0)
+  val t6  = new Tenant(6,  "FTech Ltd",      "info@ftech.com", 200000.0)
+  val t7  = new Tenant(7,  "George Hall",    "g@ex.com",       31000.0)
+
+  // ── Leases ───────────────────────────────────────────────────────────────
+  val leases: List[Object] = [
+    new Lease(1,  p1, t1, 1, 2024, 12, 2024, 1200.0, LeaseStatus::ACTIVE),
+    new Lease(2,  p2, t2, 3, 2023, 2,  2025, 2000.0, LeaseStatus::ACTIVE),
+    new Lease(3,  p3, t3, 6, 2024, 5,  2025, 700.0,  LeaseStatus::ACTIVE),
+    new Lease(4,  p4, t5, 9, 2023, 8,  2024, 950.0,  LeaseStatus::EXPIRED),
+    new Lease(5,  p5, t4, 1, 2025, 12, 2025, 1800.0, LeaseStatus::ACTIVE),
+    new Lease(6,  p6, t6, 4, 2024, 3,  2026, 3500.0, LeaseStatus::ACTIVE),
+    new Lease(7,  p7, t7, 2, 2025, 1,  2026, 1100.0, LeaseStatus::ACTIVE),
+    new Lease(8,  p8, t3, 7, 2024, 6,  2025, 650.0,  LeaseStatus::TERMINATED)
+  ]
+
+  // ── Maintenance Requests ──────────────────────────────────────────────────
+  val requests: List[Object] = [
+    new MaintenanceRequest(1,  p1, "Leaking kitchen tap",        MaintenancePriority::NORMAL,    true),
+    new MaintenanceRequest(2,  p2, "Broken heating system",      MaintenancePriority::HIGH,      false),
+    new MaintenanceRequest(3,  p3, "Window latch faulty",        MaintenancePriority::LOW,       true),
+    new MaintenanceRequest(4,  p4, "Burst pipe in bathroom",     MaintenancePriority::EMERGENCY, false),
+    new MaintenanceRequest(5,  p5, "Garden fence damaged",       MaintenancePriority::LOW,       false),
+    new MaintenanceRequest(6,  p6, "AC unit not cooling",        MaintenancePriority::HIGH,      false),
+    new MaintenanceRequest(7,  p7, "Smoke alarm battery low",    MaintenancePriority::NORMAL,    true),
+    new MaintenanceRequest(8,  p1, "Paint peeling in hallway",   MaintenancePriority::LOW,       false),
+    new MaintenanceRequest(9,  p5, "Roof tile dislodged",        MaintenancePriority::HIGH,      false),
+    new MaintenanceRequest(10, p3, "No hot water",               MaintenancePriority::EMERGENCY, true)
+  ]
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 1. Portfolio Overview
+  // ════════════════════════════════════════════════════════════════════════════
+  IO::println("╔══════════════════════════════════════════════════════════════════════╗")
+  IO::println("║            PROPERTY MANAGEMENT SYSTEM — PORTFOLIO REPORT            ║")
+  IO::println("╚══════════════════════════════════════════════════════════════════════╝")
+
+  val activeLeases  = leases.filter { l => (l as Lease).isActive() }
+  val occupiedIds   = activeLeases.map   { l => (l as Lease).property().id() }
+  val vacantProps   = properties.filter  { p =>
+    val pid = (p as Property).id()
+    occupiedIds.find { id => (id as Int) == pid } == null
+  }
+
+  val totalRent     = activeLeases.map { l => (l as Lease).monthlyRent() }
+                        .fold(0.0) { acc, v => acc + (v as Double) }
+  val totalArea     = properties.map { p => (p as Property).areaSqm() }
+                        .fold(0.0) { acc, v => acc + (v as Double) }
+
+  IO::println("\nPortfolio size : #{properties.size} properties  (#{totalArea.gbp().truncate(1)} sqm total)")
+  IO::println("Occupied       : #{activeLeases.size}  /  #{properties.size} (#{vacantProps.size} vacant)")
+  IO::println("Monthly income : #{totalRent.gbp()}")
+  IO::println("Annual income  : #{(totalRent * 12.0).gbp()}")
+
+  // ── Occupancy by city ─────────────────────────────────────────────────────
+  printSection("Occupancy by City")
+  val byCity = properties.groupBy { p => (p as Property).address().city() }
+  foreach (city, cityProps) in byCity {
+    val cProps  = (cityProps as List)
+    val cActive = cProps.filter { p =>
+      val pid = (p as Property).id()
+      occupiedIds.find { id => (id as Int) == pid } != null
+    }
+    val cityRent = activeLeases
+      .filter { l => (l as Lease).property().address().city() == city }
+      .map    { l => (l as Lease).monthlyRent() }
+      .fold(0.0) { acc, v => acc + (v as Double) }
+    IO::println("  #{(city as String).rpad(12)} #{cActive.size}/#{cProps.size} occupied   income: #{cityRent.gbp()}")
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 2. Property Inventory
+  // ════════════════════════════════════════════════════════════════════════════
+  printSection("Property Inventory (sorted by rent desc)")
+  val sorted = properties.sortedBy { p => -(p as Property).monthlyRent() }
+  IO::println("  #{"ID".rpad(5)} #{"Type".rpad(12)} #{"Beds".rpad(7)} #{"Rent/mo".rpad(10)} #{"Rent/sqm".rpad(10)} #{"Status".rpad(12)} Address")
+  foreach prop: Object in sorted {
+    val p       = prop as Property
+    val pid     = p.id()
+    val isOcc   = occupiedIds.find { id => (id as Int) == pid } != null
+    val status  = if isOcc { "Occupied" } else { "VACANT  " }
+    IO::println("  #{("P" + pid).rpad(5)} #{p.kind().label().rpad(12)} #{p.bedrooms().bedroomLabel().rpad(7)} #{p.monthlyRent().gbp().rpad(10)} #{p.rentPerSqm().gbp().rpad(10)} #{status.rpad(12)} #{p.address().full()}")
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 3. Active Leases
+  // ════════════════════════════════════════════════════════════════════════════
+  printSection("Active Leases")
+  IO::println("  #{"Lease".rpad(7)} #{"Property".rpad(12)} #{"Tenant".rpad(18)} #{"Period".rpad(16)} #{"Rent/mo".rpad(10)} #{"Total Value"}")
+  foreach lraw: Object in activeLeases {
+    val l   = lraw as Lease
+    val per = "#{l.startMonth().monthName()} #{l.startYear()}–#{l.endMonth().monthName()} #{l.endYear()}"
+    IO::println("  #{("L" + l.id()).rpad(7)} #{l.property().label().rpad(12)} #{l.tenant().name().truncate(18).rpad(18)} #{per.rpad(16)} #{l.monthlyRent().gbp().rpad(10)} #{l.totalValue().gbp()}")
+  }
+
+  // ── Affordability check ───────────────────────────────────────────────────
+  printSection("Tenant Affordability (active leases)")
+  IO::println("  Rule of thumb: rent should be ≤ 33% of gross annual income")
+  foreach lraw: Object in activeLeases {
+    val l     = lraw as Lease
+    val ratio = l.tenant().affordabilityRatio(l.monthlyRent())
+    val flag  = if ratio > 0.33 { " ⚠ over budget" } else { " ✓ within budget" }
+    IO::println("  #{l.tenant().name().rpad(18)} #{ratio.pct().rpad(8)} of income#{flag}")
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 4. Maintenance
+  // ════════════════════════════════════════════════════════════════════════════
+  printSection("Open Maintenance Requests (sorted by priority)")
+  val open   = requests.filter   { r => !(r as MaintenanceRequest).resolved() }
+  val bySev  = open.sortedBy     { r => -(r as MaintenanceRequest).priority().score() }
+  foreach rraw: Object in bySev {
+    val r = rraw as MaintenanceRequest
+    IO::println("  [#{r.priority().label().rpad(10)}] #{r.property().label().rpad(15)} #{r.description()}")
+  }
+
+  val parts     = open.partition { r => (r as MaintenanceRequest).priority() == MaintenancePriority::EMERGENCY }
+  val emergency = parts.get(0) as List
+  val other     = parts.get(1) as List
+  IO::println("\n  Open: #{open.size}  (#{emergency.size} emergency, #{other.size} other)")
+  IO::println("  Resolved: #{requests.size - open.size} / #{requests.size}")
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 5. Financial Summary
+  // ════════════════════════════════════════════════════════════════════════════
+  printSection("Financial Summary — Rent by Property Type")
+  val byType = activeLeases.groupBy { l => (l as Lease).property().kind().label() }
+  val typeSummary: List[Object] = []
+  foreach (typeLabel, typeLeases) in byType {
+    val tl      = typeLeases as List
+    val income  = tl.map { l => (l as Lease).monthlyRent() }
+                     .fold(0.0) { acc, v => acc + (v as Double) }
+    typeSummary.add("#{(typeLabel as String).rpad(12)} #{tl.size} lease(s)   #{income.gbp()}/mo")
+  }
+  foreach line: Object in typeSummary.sortedBy { s => s as String } {
+    IO::println("  " + line)
+  }
+
+  // ── Year-over-year projection ──────────────────────────────────────────────
+  printSection("12-Month Rental Projection")
+  foreach i: Int in 1..12 {
+    val month   = i
+    val revenue = totalRent
+    val bar     = Strings::repeat("█", (revenue / 200.0).intValue())
+    IO::println("  #{month.monthName().rpad(4)} #{revenue.gbp().rpad(10)} #{bar}")
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 6. Lease Expiry Risk
+  // ════════════════════════════════════════════════════════════════════════════
+  printSection("Lease Expiry by Year-End (endYear 2025 or earlier)")
+  val expiringSoon = activeLeases.filter { l => (l as Lease).endYear() <= 2025 }
+  if expiringSoon.size == 0 {
+    IO::println("  None expiring within the reporting window.")
+  } else {
+    foreach lraw: Object in expiringSoon.sortedBy { l => (l as Lease).endYear() * 100 + (l as Lease).endMonth() } {
+      val l = lraw as Lease
+      IO::println("  #{l.property().label().rpad(15)} tenant: #{l.tenant().name().rpad(18)} expires: #{l.endMonth().monthName()} #{l.endYear()}")
+    }
+  }
+
+  // ── Vacant properties highlight ───────────────────────────────────────────
+  if vacantProps.size > 0 {
+    printSection("Vacant Properties")
+    foreach vraw: Object in vacantProps {
+      val v = vraw as Property
+      IO::println("  #{v.label().rpad(15)} #{v.bedrooms().bedroomLabel().rpad(8)} #{v.monthlyRent().gbp()}/mo  #{v.address().full()}")
+    }
+  }
+
+  IO::println("\n" + hr("═", 68))
+  IO::println("  Report complete. Total properties managed: #{properties.size}")
+  IO::println(hr("═", 68))
+}

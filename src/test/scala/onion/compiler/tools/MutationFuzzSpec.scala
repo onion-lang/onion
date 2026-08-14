@@ -17,11 +17,19 @@ import scala.util.Random
  *
  * The seed is fixed so this is an ordinary regression test, not a flaky one.
  * Bump MUTATIONS_PER_SEED or change the seed locally to hunt for new crashes.
+ *
+ * Total compiler instantiations are capped at MAX_TOTAL_MUTATIONS regardless
+ * of how many seed programs exist in run/: each new example added there
+ * (encouraged elsewhere) would otherwise multiply this test's heap usage
+ * without bound, which previously OOM'd under the prescribed -Xmx4G once
+ * run/ grew past ~130 files (8280 compilations). Growing the corpus now
+ * scales down the effective per-seed mutation count instead.
  */
 class MutationFuzzSpec extends AnyFunSpec {
 
   private val SEED = sys.props.get("onion.fuzz.seed").map(_.toLong).getOrElse(20260610L)
   private val MUTATIONS_PER_SEED = sys.props.get("onion.fuzz.mutations").map(_.toInt).getOrElse(60)
+  private val MAX_TOTAL_MUTATIONS = sys.props.get("onion.fuzz.maxTotal").map(_.toInt).getOrElse(3000)
 
   private def newConfig: CompilerConfig =
     CompilerConfig(Seq("."), null, "UTF-8", "", 10)
@@ -80,11 +88,14 @@ class MutationFuzzSpec extends AnyFunSpec {
       .map(_.toSeq.filter(_.getName.endsWith(".on")).sortBy(_.getName)).getOrElse(Seq.empty)
     assert(seeds.nonEmpty, "no seed programs found in run/")
 
+    val mutationsPerSeed =
+      math.max(1, math.min(MUTATIONS_PER_SEED, MAX_TOTAL_MUTATIONS / seeds.size))
+
     val outDir = new File("/tmp/onion-fuzz")
     val crashers = scala.collection.mutable.Buffer[(String, String)]()
     for (seed <- seeds) {
       val original = scala.io.Source.fromFile(seed, "UTF-8").mkString
-      for (i <- 0 until MUTATIONS_PER_SEED) {
+      for (i <- 0 until mutationsPerSeed) {
         var mutated = original
         val mutations = 1 + rng.nextInt(3)
         for (_ <- 0 until mutations) mutated = mutate(mutated, rng)

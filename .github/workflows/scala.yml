@@ -6,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
     - name: Install sbt
       uses: sbt/setup-sbt@v1
@@ -19,5 +20,5 @@ jobs:
         cache: 'sbt'
     - name: Build and Test
       env:
-        SBT_OPTS: "-Xmx6G -XX:+UseG1GC -Xss16m"
+        SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m"
       run: sbt -v +test

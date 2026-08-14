@@ -1,0 +1,317 @@
+// SudokuSolver.on — classic 9×9 Sudoku solver using backtracking
+// Exercises: enums, records, classes, extension methods on Int,
+// collection pipelines (filter/fold/sortedBy/map), 2D list mutation,
+// recursive backtracking, string interpolation, foreach/while loops,
+// select/pattern matching, Timing utilities.
+
+// ── Difficulty classification ────────────────────────────────────────────────
+
+enum Difficulty { Easy, Medium, Hard }
+
+// ── Solve-attempt result record ───────────────────────────────────────────────
+
+record SolveResult(name: String, difficulty: String, clues: Int,
+                   solved: Boolean, backtracks: Int, elapsedMs: Long)
+
+// ── Int extensions for cell rendering ────────────────────────────────────────
+
+extension Int {
+  def toCell(): String {
+    if self == 0 { return "." }
+    return self.toString()
+  }
+  def isGiven(): Boolean = self != 0
+}
+
+// ── 9×9 board ─────────────────────────────────────────────────────────────────
+
+class SudokuBoard {
+  var grid:       List[Object]   // 9 rows, each a List[Object] of Int
+  var given:      List[Object]   // parallel structure: true if clue cell
+  var backtracks: Int
+
+public:
+  def this(flatData: List[Object]) {
+    this.backtracks = 0
+    this.grid  = []
+    this.given = []
+    var row: Int = 0
+    while row < 9 {
+      val rowCells:  List[Object] = []
+      val rowGiven:  List[Object] = []
+      var col: Int = 0
+      while col < 9 {
+        val v = flatData[row * 9 + col] as Int
+        rowCells.add(v)
+        rowGiven.add(v != 0)
+        col++
+      }
+      grid.add(rowCells)
+      given.add(rowGiven)
+      row++
+    }
+  }
+
+  def get(r: Int, c: Int): Int =
+    ((grid[r]) as List[Object])[c] as Int
+
+  def set(r: Int, c: Int, v: Int): void {
+    ((grid[r]) as List[Object])[c] = v
+  }
+
+  def isGiven(r: Int, c: Int): Boolean =
+    ((given[r]) as List[Object])[c] as Boolean
+
+  def countClues(): Int {
+    var count: Int = 0
+    var r: Int = 0
+    while r < 9 {
+      var c: Int = 0
+      while c < 9 {
+        if get(r, c) != 0 { count++ }
+        c++
+      }
+      r++
+    }
+    return count
+  }
+
+  def isValidInRow(row: Int, num: Int): Boolean {
+    var col: Int = 0
+    while col < 9 {
+      if get(row, col) == num { return false }
+      col++
+    }
+    return true
+  }
+
+  def isValidInCol(col: Int, num: Int): Boolean {
+    var row: Int = 0
+    while row < 9 {
+      if get(row, col) == num { return false }
+      row++
+    }
+    return true
+  }
+
+  def isValidInBox(startRow: Int, startCol: Int, num: Int): Boolean {
+    var r: Int = 0
+    while r < 3 {
+      var c: Int = 0
+      while c < 3 {
+        if get(startRow + r, startCol + c) == num { return false }
+        c++
+      }
+      r++
+    }
+    return true
+  }
+
+  def canPlace(row: Int, col: Int, num: Int): Boolean =
+    isValidInRow(row, num) &&
+    isValidInCol(col, num) &&
+    isValidInBox(row - row % 3, col - col % 3, num)
+
+  def btCount(): Int = backtracks
+
+  def solve(): Boolean {
+    var row: Int = 0
+    while row < 9 {
+      var col: Int = 0
+      while col < 9 {
+        if get(row, col) == 0 {
+          var num: Int = 1
+          while num <= 9 {
+            if canPlace(row, col, num) {
+              set(row, col, num)
+              if solve() { return true }
+              set(row, col, 0)
+              backtracks++
+            }
+            num++
+          }
+          return false
+        }
+        col++
+      }
+      row++
+    }
+    return true
+  }
+
+  def format(): String {
+    var result: String = ""
+    var row: Int = 0
+    while row < 9 {
+      if row == 3 || row == 6 {
+        result = result + "------+-------+------\n"
+      }
+      var line: String = ""
+      var col: Int = 0
+      while col < 9 {
+        if col == 3 || col == 6 { line = line + " |" }
+        line = line + " " + get(row, col).toCell()
+        col++
+      }
+      result = result + line + "\n"
+      row++
+    }
+    return result
+  }
+
+  // Build a row-of-candidates view: for each empty cell list legal values
+  def hintSummary(): String {
+    val lines: List[Object] = []
+    var row: Int = 0
+    while row < 9 {
+      var col: Int = 0
+      while col < 9 {
+        if get(row, col) == 0 {
+          val cands: List[Object] = []
+          var n: Int = 1
+          while n <= 9 {
+            if canPlace(row, col, n) { cands.add(n) }
+            n++
+          }
+          val cs = (cands.map { x => (x as Int).toString() }) as List[Object]
+          lines.add("  (#{row},#{col}): [#{cs.join(",")}]")
+        }
+        col++
+      }
+      row++
+    }
+    return (lines as List[Object]).join("\n")
+  }
+}
+
+// ── Puzzle library ────────────────────────────────────────────────────────────
+
+// Easy: the classic Wikipedia example (30 clues)
+val easyData: List[Object] = [
+  5, 3, 0,  0, 7, 0,  0, 0, 0,
+  6, 0, 0,  1, 9, 5,  0, 0, 0,
+  0, 9, 8,  0, 0, 0,  0, 6, 0,
+  8, 0, 0,  0, 6, 0,  0, 0, 3,
+  4, 0, 0,  8, 0, 3,  0, 0, 1,
+  7, 0, 0,  0, 2, 0,  0, 0, 6,
+  0, 6, 0,  0, 0, 0,  2, 8, 0,
+  0, 0, 0,  4, 1, 9,  0, 0, 5,
+  0, 0, 0,  0, 8, 0,  0, 7, 9
+]
+
+// Medium: ~36 clues
+val mediumData: List[Object] = [
+  0, 0, 0,  2, 6, 0,  7, 0, 1,
+  6, 8, 0,  0, 7, 0,  0, 9, 0,
+  1, 9, 0,  0, 0, 4,  5, 0, 0,
+  8, 2, 0,  1, 0, 0,  0, 4, 0,
+  0, 0, 4,  6, 0, 2,  9, 0, 0,
+  0, 5, 0,  0, 0, 3,  0, 2, 8,
+  0, 0, 9,  3, 0, 0,  0, 7, 4,
+  0, 4, 0,  0, 5, 0,  0, 3, 6,
+  7, 0, 3,  0, 1, 8,  0, 0, 0
+]
+
+// Hard: AI Escargot — one of the hardest published Sudoku puzzles (23 clues)
+val hardData: List[Object] = [
+  1, 0, 0,  0, 0, 7,  0, 9, 0,
+  0, 3, 0,  0, 2, 0,  0, 0, 8,
+  0, 0, 9,  6, 0, 0,  5, 0, 0,
+  0, 0, 5,  3, 0, 0,  9, 0, 0,
+  0, 1, 0,  0, 8, 0,  0, 0, 2,
+  6, 0, 0,  0, 0, 4,  0, 0, 0,
+  3, 0, 0,  0, 0, 0,  0, 1, 0,
+  0, 4, 0,  0, 0, 0,  0, 0, 7,
+  0, 0, 7,  0, 0, 0,  3, 0, 0
+]
+
+// ── Puzzle-solving helper ─────────────────────────────────────────────────────
+
+def solvePuzzle(name: String, difficulty: String,
+                data: List[Object]): SolveResult {
+  val board = new SudokuBoard(data)
+  val clues = board.countClues()
+
+  IO::println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  IO::println(" #{name}  [#{difficulty}]  #{clues} clues")
+  IO::println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  IO::println("Puzzle:")
+  IO::print(board.format())
+
+  // Show candidates for a sample of empty cells before solving
+  if difficulty == "Hard" {
+    IO::println("Initial candidates (first few empty cells):")
+    val hints = board.hintSummary()
+    val hintLines = (Strings::split(hints, "\n") as List[Object]).filter { l =>
+      (l as String).length > 0
+    }
+    val preview = hintLines.filter { l => true }
+    var shown: Int = 0
+    foreach h: Object in preview {
+      if shown < 3 {
+        IO::println(h as String)
+        shown++
+      }
+    }
+  }
+
+  val start = Timing::nanos()
+  val solved = board.solve()
+  val elapsedMs = (Timing::nanos() - start) / 1000000L
+
+  if solved {
+    IO::println("\nSolution:")
+    IO::print(board.format())
+    IO::println("Solved in #{elapsedMs}ms  |  backtracks: #{board.btCount()}")
+  } else {
+    IO::println("No solution found!")
+  }
+  IO::println("")
+  return new SolveResult(name, difficulty, clues, solved, board.btCount(), elapsedMs)
+}
+
+// ── Solve all three puzzles ───────────────────────────────────────────────────
+
+val results: List[Object] = [
+  solvePuzzle("Puzzle 1", "Easy",   easyData),
+  solvePuzzle("Puzzle 2", "Medium", mediumData),
+  solvePuzzle("Puzzle 3", "Hard",   hardData)
+]
+
+// ── Aggregate statistics ──────────────────────────────────────────────────────
+
+val solvedList = results.filter { r => (r as SolveResult).solved() }
+val totalBt    = results.fold(0) { acc, r => acc + (r as SolveResult).backtracks() }
+val avgClues   = results.fold(0) { acc, r => acc + (r as SolveResult).clues() } / results.size
+
+val sortedByBt: List[Object] = results.sortedBy { r => (r as SolveResult).backtracks() }
+val easiest = (sortedByBt[0]) as SolveResult
+val hardest = (sortedByBt[sortedByBt.size - 1]) as SolveResult
+
+IO::println("╔══════════════════════════════════════╗")
+IO::println("║            SUMMARY                   ║")
+IO::println("╠══════════════════════════════════════╣")
+IO::println("║ Puzzles solved:  #{solvedList.size}/#{results.size}                   ║")
+IO::println("║ Avg clues:       #{avgClues}                     ║")
+IO::println("║ Total backtracks:#{totalBt}                 ║")
+IO::println("╠══════════════════════════════════════╣")
+IO::println("║ Fewest backtracks: #{easiest.name()}          ║")
+IO::println("║   (#{easiest.backtracks()} backtracks)                   ║")
+IO::println("║ Most backtracks:  #{hardest.name()}          ║")
+IO::println("║   (#{hardest.backtracks()} backtracks)                 ║")
+IO::println("╚══════════════════════════════════════╝")
+
+// ── Per-result difficulty mapping ─────────────────────────────────────────────
+
+IO::println("\nDifficulty breakdown:")
+foreach r: Object in results {
+  val sr = r as SolveResult
+  val bar = select sr.difficulty() {
+    case "Easy":   "▓▓▓░░░░░░░"
+    case "Medium": "▓▓▓▓▓▓░░░░"
+    case "Hard":   "▓▓▓▓▓▓▓▓▓░"
+    else:          "▓▓▓▓▓▓▓▓▓▓"
+  }
+  val status = if sr.solved() { "✓" } else { "✗" }
+  IO::println("  #{status} #{sr.name()} [#{sr.difficulty()}]  #{bar}  #{sr.backtracks()} bt")
+}

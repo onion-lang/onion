@@ -1,0 +1,291 @@
+// SprintPlanner.on — Agile sprint planning simulator (~200 lines).
+// Exercises: data-carrying enum, ADT enum, plain enum with methods,
+// records (incl. generic), class implementing interface, extension methods
+// (Int, String), collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/partition/zip/reduce/find), select + type-pattern matching,
+// nullable assignees, closures, string interpolation, try/catch, recursion,
+// foreach over ranges and map (k,v) entries, while loop.
+
+// ─── Extensions ─────────────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "0%" }
+    return "#{self * 100 / total}%"
+  }
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word } else { return "#{self} " + word + "s" }
+  }
+}
+
+extension String {
+  def abbrev(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + ".."
+  }
+}
+
+// ─── Priority: data-carrying enum with numeric weight ────────────────────────
+
+enum Priority(weight: Int) {
+  HIGH(3), MEDIUM(2), LOW(1)
+public:
+  def label(): String = select this {
+    case Priority::HIGH:   "HIGH"
+    case Priority::MEDIUM: "MED"
+    else:                  "LOW"
+  }
+}
+
+// ─── Status: plain enum with methods ─────────────────────────────────────────
+
+enum Status {
+  TODO, IN_PROGRESS, DONE, BLOCKED
+public:
+  def symbol(): String = select this {
+    case Status::DONE:        "[x]"
+    case Status::IN_PROGRESS: "[>]"
+    case Status::BLOCKED:     "[!]"
+    else:                     "[ ]"
+  }
+  def isOpen(): Boolean = self != Status::DONE
+}
+
+// ─── CapacityStatus: ADT enum for sprint health ──────────────────────────────
+
+enum CapacityStatus {
+  case CapOk(pct: Int)
+  case CapWarn(pct: Int)
+  case CapOver(pct: Int, excess: Int)
+public:
+  def banner(): String = select this {
+    case c is CapOk:   "[OK]   #{c.pct()}% capacity used"
+    case w is CapWarn: "[WARN] #{w.pct()}% capacity used"
+    case o is CapOver: "[OVER] #{o.pct()}% capacity (#{o.excess()} pts over)"
+  }
+}
+
+// ─── Task record ─────────────────────────────────────────────────────────────
+
+record Task(id: Int, title: String, priority: Priority, status: Status,
+            estimate: Int, assignee: String?)
+
+// ─── Generic ranking wrapper ──────────────────────────────────────────────────
+
+record Ranked[T](value: T, score: Int)
+
+// ─── Reportable interface ─────────────────────────────────────────────────────
+
+interface Reportable {
+  def header(): String
+  def summary(): String
+}
+
+// ─── Sprint class implementing Reportable ────────────────────────────────────
+
+class Sprint conforms Reportable {
+  val sprintName: String
+  val sprintTasks: List[Task]
+  val capacity: Int
+public:
+  def this(n: String, ts: List[Task], cap: Int) {
+    this.sprintName = n
+    this.sprintTasks = ts
+    this.capacity = cap
+  }
+  def header(): String = "=== #{sprintName} === (#{capacity} pts cap)"
+  def summary(): String = "#{sprintTasks.size.plural("task")}, #{totalEstimate()} pts"
+  def totalEstimate(): Int =
+    sprintTasks.fold(0) { acc, t => (acc as Int) + (t as Task).estimate() }
+  def doneCount(): Int =
+    sprintTasks.filter { t => (t as Task).status() == Status::DONE }.size
+  def openCount(): Int =
+    sprintTasks.filter { t => (t as Task).status().isOpen() }.size
+  def health(): CapacityStatus {
+    val used = totalEstimate()
+    val pct = used * 100 / capacity
+    if pct > 100 { return new CapOver(pct, used - capacity) }
+    if pct >= 80  { return new CapWarn(pct) }
+    return new CapOk(pct)
+  }
+}
+
+// ─── Task data ────────────────────────────────────────────────────────────────
+
+val tasks = [
+  new Task(1,  "Setup CI pipeline",  Priority::HIGH,   Status::DONE,        5, "Alice"),
+  new Task(2,  "Database schema",    Priority::HIGH,   Status::IN_PROGRESS, 8, "Bob"),
+  new Task(3,  "API endpoints",      Priority::HIGH,   Status::TODO,       13, null),
+  new Task(4,  "Unit tests",         Priority::MEDIUM, Status::TODO,        5, "Alice"),
+  new Task(5,  "Update docs",        Priority::LOW,    Status::TODO,        2, "Carol"),
+  new Task(6,  "Fix login bug",      Priority::HIGH,   Status::DONE,        3, "Bob"),
+  new Task(7,  "Mobile UI",          Priority::MEDIUM, Status::BLOCKED,     8, "Dave"),
+  new Task(8,  "Perf tuning",        Priority::LOW,    Status::TODO,        5, null),
+  new Task(9,  "Security audit",     Priority::HIGH,   Status::IN_PROGRESS, 8, "Alice"),
+  new Task(10, "Deploy to staging",  Priority::MEDIUM, Status::TODO,        3, "Carol")
+]
+
+val CAP = 72
+val sprint = new Sprint("Sprint 7", tasks, CAP)
+
+// ─── 1. Header and summary ────────────────────────────────────────────────────
+
+IO::println(sprint.header())
+IO::println(sprint.summary())
+
+// ─── 2. Total estimate vs capacity ───────────────────────────────────────────
+
+val total = sprint.totalEstimate()
+IO::println("total: #{total} / #{CAP} pts")
+
+// ─── 3. Sprint health (ADT pattern match) ────────────────────────────────────
+
+IO::println("health: " + sprint.health().banner())
+
+// ─── 4. Completion percentage (extension pct on Int) ─────────────────────────
+
+val doneCnt = sprint.doneCount()
+IO::println("completion: #{doneCnt.pct(tasks.size)} (#{doneCnt}/#{tasks.size} done)")
+
+// ─── 5. By-priority counts (deterministic, no Map iteration needed) ──────────
+
+val highCnt = tasks.filter { t => (t as Task).priority() == Priority::HIGH }.size
+val medCnt  = tasks.filter { t => (t as Task).priority() == Priority::MEDIUM }.size
+val lowCnt  = tasks.filter { t => (t as Task).priority() == Priority::LOW }.size
+IO::println("by priority: HIGH=#{highCnt} MED=#{medCnt} LOW=#{lowCnt}")
+
+// ─── 6. High-priority open tasks, sorted by estimate desc ────────────────────
+
+IO::println("--- high-priority open ---")
+val highOpen = tasks
+  .filter  { t => (t as Task).priority() == Priority::HIGH && (t as Task).status().isOpen() }
+  .sortedBy { t => 0 - (t as Task).estimate() }
+foreach t: Object in highOpen {
+  val tk = t as Task
+  val who = if tk.assignee() != null { tk.assignee() as String } else { "unassigned" }
+  IO::println("  #{tk.status().symbol()} [#{tk.priority().label()}] #{tk.title().abbrev(18)} (#{tk.estimate()} pts) -> #{who}")
+}
+
+// ─── 7. Assignee workload (groupBy + foreach known keys) ─────────────────────
+
+IO::println("--- assignee workload ---")
+val assigned = tasks.filter { t => (t as Task).assignee() != null }
+val byAssignee = assigned.groupBy { t => (t as Task).assignee() as String }
+val memberNames = ["Alice", "Bob", "Carol", "Dave"]
+foreach name: Object in memberNames {
+  val key = name as String
+  val grp = byAssignee.get(key)
+  if grp != null {
+    val pts = (grp as List).fold(0) { acc, t => (acc as Int) + (t as Task).estimate() }
+    IO::println("  #{key}: #{pts} pts")
+  }
+}
+
+// ─── 8. Unassigned tasks (extension plural on Int) ───────────────────────────
+
+val unassignedCnt = tasks.filter { t => (t as Task).assignee() == null }.size
+IO::println("unassigned: #{unassignedCnt.plural("task")}")
+
+// ─── 9. Top 3 by weighted rank (generic Ranked[T]) ───────────────────────────
+
+IO::println("--- top 3 by rank ---")
+val ranked = tasks
+  .map { t => new Ranked[Task](t as Task, (t as Task).priority().weight() * (t as Task).estimate()) }
+  .sortedBy { r => 0 - (r as Ranked[Task]).score() }
+var ri: Int = 0
+foreach r: Object in ranked {
+  if ri >= 3 { break }
+  val rk = r as Ranked[Task]
+  IO::println("  #{rk.score()} -- #{(rk.value() as Task).title()}")
+  ri = ri + 1
+}
+
+// ─── 10. Partition: done vs still open ───────────────────────────────────────
+
+val parts = tasks.partition { t => (t as Task).status() == Status::DONE }
+val doneList = parts[0] as List
+val openList = parts[1] as List
+IO::println("done/open: #{doneList.size}/#{openList.size}")
+
+// ─── 11. Zip: task IDs with estimates ────────────────────────────────────────
+
+val ids  = tasks.map { t => (t as Task).id() }
+val ests = tasks.map { t => (t as Task).estimate() }
+val zipped = ids.zip(ests)
+val lastPair = zipped.get(zipped.size - 1) as List
+IO::println("last id/est: #{lastPair[0]}/#{lastPair[1]}")
+
+// ─── 12. Distinct status symbols ────────────────────────────────────────────
+
+val symbols = tasks.map { t => (t as Task).status().symbol() }.distinct()
+IO::println("status symbols used: #{symbols.toString()}")
+
+// ─── 13. Reduce: task with the highest weighted score ─────────────────────────
+
+def taskWeight(t: Task): Int = t.priority().weight() * t.estimate()
+val heaviest = tasks.reduce { a, b =>
+  if taskWeight(a as Task) >= taskWeight(b as Task) { a } else { b }
+}
+IO::println("heaviest task: #{(heaviest as Task).title()} (score #{taskWeight(heaviest as Task)})")
+
+// ─── 14. Find: first blocked task ────────────────────────────────────────────
+
+val blocked = tasks.find { t => (t as Task).status() == Status::BLOCKED }
+if blocked != null {
+  IO::println("first blocked: #{(blocked as Task).title()}")
+} else {
+  IO::println("no blocked tasks")
+}
+
+// ─── 15. Recursion: sum of HIGH-priority estimates ───────────────────────────
+
+def sumHigh(ts: List[Task], i: Int): Int {
+  if i >= ts.size { return 0 }
+  val t = ts.get(i) as Task
+  val add = if t.priority() == Priority::HIGH { t.estimate() } else { 0 }
+  return add + sumHigh(ts, i + 1)
+}
+IO::println("high-pri total: #{sumHigh(tasks, 0)} pts")
+
+// ─── 16. Foreach over exclusive range (days at 8 pts/day) ────────────────────
+
+val days = total / 8
+var daySum: Int = 0
+foreach d: Int in 1..<days {
+  daySum = daySum + d
+}
+IO::println("day range 1..<#{days} sum: #{daySum}")
+
+// ─── 17. Closure stored in val ────────────────────────────────────────────────
+
+val scoreOf = (t: Task) -> t.priority().weight() * t.estimate()
+val topTask = tasks.sortedBy { t => 0 - scoreOf(t as Task) }.get(0) as Task
+IO::println("top by weight: #{topTask.title()} (#{scoreOf(topTask)})")
+
+// ─── 18. Try/catch: parse a string estimate ───────────────────────────────────
+
+def parseEst(s: String): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch e: Exception {
+    return -1
+  }
+}
+IO::println("parse '13': #{parseEst("13")}")
+IO::println("parse '??': #{parseEst("??")}")
+
+// ─── 19. While loop: accumulate estimates until over half capacity ─────────────
+
+val halfCap = CAP / 2
+var wAcc: Int = 0
+var wIdx: Int = 0
+while wAcc <= halfCap && wIdx < tasks.size {
+  wAcc = wAcc + (tasks.get(wIdx) as Task).estimate()
+  wIdx = wIdx + 1
+}
+IO::println("tasks to reach >${halfCap} pts: #{wIdx}")
+
+// ─── 20. Open count via extension method ─────────────────────────────────────
+
+val openCnt = sprint.openCount()
+IO::println("open: #{openCnt.plural("task")} (#{openCnt.pct(tasks.size)} of total)")

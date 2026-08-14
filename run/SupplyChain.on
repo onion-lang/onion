@@ -1,0 +1,338 @@
+// SupplyChain.on — Supply-chain purchase-order monitor (~300 lines).
+// Exercises: data-carrying enum, ADT enum, plain enum with methods,
+// records (with methods), class with interface, extension methods (Int, String),
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition/zip/any/count), select + type-pattern matching, nullable checks,
+// closures, string interpolation, try/catch, recursion, foreach over ranges
+// and map (k,v) entries, while loop.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def dollars(): String = "$" + self
+  def pad(n: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length() < n { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var r: String = self
+    while r.length() < n { r = r + " " }
+    return r
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 2) + ".."
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val rounded: Long = (self * 100.0).longValue()
+    val neg: Boolean  = rounded < 0L
+    val abs: Long     = if neg { -rounded } else { rounded }
+    val ip: Long      = abs / 100L
+    val fp: Long      = abs % 100L
+    val fpStr: String = if fp < 10L { "0" + fp } else { "" + fp }
+    val sign: String  = if neg { "-" } else { "" }
+    return sign + ip + "." + fpStr
+  }
+}
+
+// ─── Category: data-carrying enum ────────────────────────────────────────────
+
+enum Category(label: String) {
+  ELECTRONICS("Electronics"), RAW_MATERIAL("Raw Material"),
+  PACKAGING("Packaging"), CONSUMABLE("Consumable"), EQUIPMENT("Equipment")
+public:
+  def abbrev(): String = select this {
+    case Category::ELECTRONICS:  "ELEC"
+    case Category::RAW_MATERIAL: "RAW "
+    case Category::PACKAGING:    "PKG "
+    case Category::CONSUMABLE:   "CONS"
+    else:                        "EQUP"
+  }
+}
+
+// ─── OrderStatus: plain enum with a display label ────────────────────────────
+
+enum OrderStatus {
+  PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+public:
+  def label(): String = select this {
+    case OrderStatus::PENDING:    "PENDING   "
+    case OrderStatus::PROCESSING: "PROCESSING"
+    case OrderStatus::SHIPPED:    "SHIPPED   "
+    case OrderStatus::DELIVERED:  "DELIVERED "
+    else:                         "CANCELLED "
+  }
+  def isActive(): Boolean = select this {
+    case OrderStatus::CANCELLED: false
+    case OrderStatus::DELIVERED: false
+    else: true
+  }
+}
+
+// ─── StockAlert: ADT enum ─────────────────────────────────────────────────────
+
+enum StockAlert {
+  case OK
+  case LowStock(sku: String, remaining: Int, reorder: Int)
+  case OutOfStock(sku: String)
+public:
+  def isCritical(): Boolean = select this {
+    case a is OutOfStock: true
+    else: false
+  }
+  def describe(): String = select this {
+    case a is OK:         "OK"
+    case a is LowStock:   "LOW  #{a.sku()} (#{a.remaining()} left, reorder ≥#{a.reorder()})"
+    case a is OutOfStock: "OUT  #{a.sku()} — reorder immediately"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Supplier(id: String, name: String, country: String, leadDays: Int, rating: Double)
+
+record Product(sku: String, name: String, cat: Category, unitCost: Double, stock: Int, reorder: Int) {
+public:
+  def stockAlert(): StockAlert {
+    if stock == 0        { return new OutOfStock(sku) }
+    if stock <= reorder  { return new LowStock(sku, stock, reorder) }
+    return new OK()
+  }
+}
+
+record OrderLine(product: Product, qty: Int) {
+public:
+  def lineTotal(): Double = product().unitCost() * qty() as Double
+}
+
+record PurchaseOrder(
+  orderId: String, supplier: Supplier, lines: List[OrderLine],
+  status: OrderStatus, orderDate: String
+) {
+public:
+  def orderTotal(): Double {
+    var t: Double = 0.0
+    foreach l: Object in lines() { t = t + (l as OrderLine).lineTotal() }
+    return t
+  }
+  def itemCount(): Int {
+    var c: Int = 0
+    foreach l: Object in lines() { c = c + (l as OrderLine).qty() }
+    return c
+  }
+  def isActive(): Boolean  = status().isActive()
+}
+
+// ─── Monitor ─────────────────────────────────────────────────────────────────
+
+class SupplyChainMonitor {
+  val orders:   List[PurchaseOrder]
+  val products: List[Product]
+
+public:
+  def this(orders: List[PurchaseOrder], products: List[Product]) {
+    self.orders   = orders
+    self.products = products
+  }
+
+  def activeOrders(): List[PurchaseOrder] =
+    orders.filter { o => (o as PurchaseOrder).isActive() }
+
+  def totalByStatus(st: OrderStatus): Double {
+    var t: Double = 0.0
+    foreach o: Object in orders {
+      val ord = o as PurchaseOrder
+      if ord.status() == st { t = t + ord.orderTotal() }
+    }
+    return t
+  }
+
+  def bySupplier(): Map[String, List[PurchaseOrder]] =
+    activeOrders().groupBy { o => (o as PurchaseOrder).supplier().name() }
+
+  def byStatus(): Map[String, List[PurchaseOrder]] =
+    orders.groupBy { o => (o as PurchaseOrder).status().label().trim() }
+
+  def stockAlerts(): List[StockAlert] =
+    products.map { p => (p as Product).stockAlert() }
+            .filter { a => !(a is OK) }
+
+  def criticalCount(): Int =
+    stockAlerts().count { a => (a as StockAlert).isCritical() }
+
+  def topCategories(n: Int): List[String] {
+    val byCategory = activeOrders()
+      .flatMap { o => (o as PurchaseOrder).lines() }
+      .groupBy { l => (l as OrderLine).product().cat().label() }
+    val cats: List[String] = []
+    foreach (cat, ls) in byCategory {
+      cats.add(cat as String)
+    }
+    return cats.sortedBy { c =>
+      val ls = byCategory.get(c)
+      if ls == null { 0.0 } else {
+        0.0 - ((ls as List).fold(0.0) { acc, l => acc + (l as OrderLine).lineTotal() } as Double)
+      }
+    }.filter { c => (cats.indexOf(c) + 1) <= n }
+  }
+
+  def ordersBetween(lo: Double, hi: Double): List[PurchaseOrder] =
+    activeOrders().filter { o =>
+      val t = (o as PurchaseOrder).orderTotal()
+      t >= lo && t <= hi
+    }
+
+  def supplierIds(): List[String] =
+    orders.map { o => (o as PurchaseOrder).supplier().id() }.distinct()
+
+  def hasLargeOrders(threshold: Double): Boolean =
+    activeOrders().any { o => (o as PurchaseOrder).orderTotal() >= threshold }
+
+  def printReport(): void {
+    println("═══════════════════════════════════════════════════")
+    println("  SUPPLY CHAIN MONITOR — PURCHASE ORDER REPORT")
+    println("═══════════════════════════════════════════════════")
+
+    // ── Order counts by status ────────────────────────────────
+    println("\n── Order counts by status ──")
+    val bySt = byStatus()
+    foreach (label, os) in bySt {
+      val cnt = (os as List).size
+      println("  #{(label as String).padRight(12)}  #{cnt.pad(3)} order(s)")
+    }
+
+    // ── Active orders by supplier ─────────────────────────────
+    println("\n── Active spend by supplier ──")
+    val bySup = bySupplier()
+    val supNames: List[String] = []
+    foreach k: Object in bySup.keySet() { supNames.add(k as String) }
+    val sortedSups = supNames.sortedBy { nm =>
+      0.0 - ((bySup.get(nm) as List).fold(0.0) { acc, o =>
+        acc + (o as PurchaseOrder).orderTotal()
+      } as Double)
+    }
+    foreach sup: Object in sortedSups {
+      val nm  = sup as String
+      val os  = bySup.get(nm) as List
+      val tot = (os.fold(0.0) { acc, o => acc + (o as PurchaseOrder).orderTotal() } as Double)
+      val cnt = os.size
+      println("  #{nm.truncate(20).padRight(22)}  #{cnt.pad(2)} order(s)  $#{tot.fmt2()}")
+    }
+
+    // ── Stock alerts ──────────────────────────────────────────
+    println("\n── Stock alerts ──")
+    val alerts = stockAlerts()
+    if alerts.size == 0 {
+      println("  All products adequately stocked.")
+    } else {
+      foreach a: Object in alerts {
+        val alert = a as StockAlert
+        val prefix = if alert.isCritical() { "  !! " } else { "   ! " }
+        println(prefix + alert.describe())
+      }
+    }
+
+    // ── Partition: high-value vs regular ─────────────────────
+    println("\n── Order value segmentation (threshold $5 000) ──")
+    val parts = activeOrders().partition { o => (o as PurchaseOrder).orderTotal() >= 5000.0 }
+    val highVal = parts[0] as List
+    val regular = parts[1] as List
+    println("  High-value (≥$5 000): #{highVal.size} order(s)")
+    println("  Regular    (<$5 000): #{regular.size} order(s)")
+
+    // ── Totals ────────────────────────────────────────────────
+    println("\n── Financial summary ──")
+    val pendingAmt   = totalByStatus(OrderStatus::PENDING)
+    val processingAmt = totalByStatus(OrderStatus::PROCESSING)
+    val shippedAmt   = totalByStatus(OrderStatus::SHIPPED)
+    val deliveredAmt = totalByStatus(OrderStatus::DELIVERED)
+    println("  Pending    : $#{pendingAmt.fmt2()}")
+    println("  Processing : $#{processingAmt.fmt2()}")
+    println("  Shipped    : $#{shippedAmt.fmt2()}")
+    println("  Delivered  : $#{deliveredAmt.fmt2()}")
+    val grandTotal = pendingAmt + processingAmt + shippedAmt + deliveredAmt
+    println("  ─────────────────────────────────")
+    println("  Grand Total: $#{grandTotal.fmt2()}")
+
+    // ── Supplier count ────────────────────────────────────────
+    val uniqSups = supplierIds()
+    println("\n  Unique suppliers: #{uniqSups.size}")
+    println("  Large-order flag (≥$10 000): #{hasLargeOrders(10000.0)}")
+    println("═══════════════════════════════════════════════════")
+  }
+}
+
+// ─── Sample data ─────────────────────────────────────────────────────────────
+
+val sup1 = new Supplier("S001", "TechParts GmbH",    "Germany",  14, 4.7)
+val sup2 = new Supplier("S002", "AsiaSource Ltd",    "China",    21, 4.2)
+val sup3 = new Supplier("S003", "LocalSupplies Inc", "USA",       5, 4.9)
+val sup4 = new Supplier("S004", "PackRight Co",      "Mexico",    8, 4.5)
+
+val p1  = new Product("CPUA-100", "CPU Module A",       Category::ELECTRONICS,  85.00, 120, 40)
+val p2  = new Product("CPUB-200", "CPU Module B",       Category::ELECTRONICS, 130.00,  18, 25)
+val p3  = new Product("STLP-010", "Steel Plate 5mm",   Category::RAW_MATERIAL,  12.50, 500, 100)
+val p4  = new Product("PKGB-001", "Bubble Wrap Roll",  Category::PACKAGING,      3.20,  15, 50)
+val p5  = new Product("LUBR-005", "Industrial Grease", Category::CONSUMABLE,     8.75,   0, 20)
+val p6  = new Product("DRIL-300", "Drill Press 300W",  Category::EQUIPMENT,    320.00,   4, 2)
+
+val lines1: List[OrderLine] = [new OrderLine(p1, 50), new OrderLine(p2, 10)]
+val lines2: List[OrderLine] = [new OrderLine(p3, 400)]
+val lines3: List[OrderLine] = [new OrderLine(p4, 200), new OrderLine(p5, 100)]
+val lines4: List[OrderLine] = [new OrderLine(p6, 2), new OrderLine(p1, 20)]
+val lines5: List[OrderLine] = [new OrderLine(p2, 30), new OrderLine(p3, 150)]
+val lines6: List[OrderLine] = [new OrderLine(p4, 500)]
+val lines7: List[OrderLine] = [new OrderLine(p5, 60), new OrderLine(p6, 1)]
+
+val o1 = new PurchaseOrder("PO-0001", sup1, lines1, OrderStatus::SHIPPED,     "2026-07-01")
+val o2 = new PurchaseOrder("PO-0002", sup2, lines2, OrderStatus::DELIVERED,   "2026-07-05")
+val o3 = new PurchaseOrder("PO-0003", sup4, lines3, OrderStatus::CANCELLED,   "2026-07-08")
+val o4 = new PurchaseOrder("PO-0004", sup3, lines4, OrderStatus::PROCESSING,  "2026-07-10")
+val o5 = new PurchaseOrder("PO-0005", sup1, lines5, OrderStatus::PENDING,     "2026-07-12")
+val o6 = new PurchaseOrder("PO-0006", sup2, lines6, OrderStatus::DELIVERED,   "2026-07-14")
+val o7 = new PurchaseOrder("PO-0007", sup3, lines7, OrderStatus::PENDING,     "2026-07-15")
+
+val allOrders:   List[PurchaseOrder] = [o1, o2, o3, o4, o5, o6, o7]
+val allProducts: List[Product]       = [p1, p2, p3, p4, p5, p6]
+
+// ─── Spot-checks ─────────────────────────────────────────────────────────────
+
+val mon = new SupplyChainMonitor(allOrders, allProducts)
+
+try {
+  val midRange = mon.ordersBetween(1000.0, 8000.0)
+  println("Orders $1k–$8k: #{midRange.size}")
+} catch e: Exception {
+  println("Error in range query: " + e.message())
+}
+
+// Demonstrate zip: pair each supplier name with its lead time
+val supPairs = [sup1, sup2, sup3, sup4]
+val leadLabels: List[String] = ["14d", "21d", "5d", "8d"]
+val zipped = supPairs.zip(leadLabels)
+println("\nSupplier lead times:")
+foreach pair: Object in zipped {
+  val p  = pair as List
+  val s  = p[0] as Supplier
+  val ld = p[1] as String
+  println("  #{s.name().truncate(20).padRight(22)} lead: #{ld}  rating: #{s.rating()}")
+}
+
+// Recursive helper: count active lines across all active orders
+def countActiveLines(pos: List[PurchaseOrder], idx: Int): Int {
+  if idx >= pos.size { return 0 }
+  val ord = pos[idx] as PurchaseOrder
+  return ord.lines().size + countActiveLines(pos, idx + 1)
+}
+val totalLines = countActiveLines(mon.activeOrders(), 0)
+println("\nTotal line-items across active orders: #{totalLines}")
+
+mon.printReport()

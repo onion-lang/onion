@@ -87,7 +87,7 @@ val         var         when        while
 - `null` リテラルを non-null 型に代入すると警告（W0012）
 - `Object` はあらゆる nullable 値を受け入れる（Scala の `Any` のようなトップ型）
 
-### ジェネリクス
+### ジェネリクス {: #generics }
 
 `[]` 構文の消去ベースジェネリクス: `class Box[T]`、`def first[T](xs: List[T]): T`、
 `record Pair[A, B](first: A, second: B)`。ワイルドカード `?`、`? extends T`、

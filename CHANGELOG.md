@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Nucleotide`), an interface/class validator hierarchy, collection
   pipelines (`map`/`filter`/`fold`/`groupBy`/`flatMap`/`sortedBy`/`find`),
   and tail-recursive k-mer frequency building.
+- **`run/KaraokeNight.on`, a 529-line karaoke night management simulator.**
+  Records with methods (`Song`, `Singer`, `Performance`); a data-carrying
+  enum (`Difficulty` with a multiplier); an ADT case-enum (`ScoreGrade`:
+  `Perfect`/`Good`/`Okay`/`NeedsWork`); interfaces (`Reportable`,
+  `Rankable`); classes with mutable state; extension methods on `Int`,
+  `Double`, `String`; collection pipelines including `zip` and
+  `partition`; and `select`/type-pattern dispatch.
 
 ## [0.10.34] - 2026-08-14
 

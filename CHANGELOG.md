@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `do[Option]` and `do[List]` monadic notation; collection pipelines
   (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`); and
   the `|>` pipeline operator.
+- **`run/InsuranceClaims.on`, a 349-line insurance claims processing
+  system.** Data-carrying enum (`CoverageType`), ADT case-enum
+  (`AdjustmentDecision`: `FullApproval`/`PartialApproval`/`Denial`);
+  records with methods (`Claimant`, `Policy`, `Claim`, `AdjustmentRecord`);
+  an interface/class pair (`Auditable`, `ClaimsProcessor`); extension
+  methods on `Int`, `Double`, `String`; collection pipelines
+  (`filter`/`groupBy`/`partition`/`find`); `select`/type-pattern dispatch;
+  nullable types; closures; and `try`/`catch`.
 
 ## [0.10.34] - 2026-08-14
 

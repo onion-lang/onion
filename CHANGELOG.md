@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GenericLeaderboard.on`, a 273-line polymorphic leaderboard sample.**
+  The first `run/` sample to exercise Onion's type-class machinery
+  (`trait`/`instance`) as a first-class feature of a realistic program:
+  two independent type classes (`Scoreable[T]`, `Formattable[T]`), a
+  multi-constraint generic function (`[T: Scoreable + Formattable]`), and
+  `Trait[T]::method()` dictionary dispatch, shared across two domains
+  (chess ratings and F1 standings).
+
 ## [0.10.34] - 2026-08-14
 
 ### Fixed

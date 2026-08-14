@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GenericLeaderboard.on`, a 273-line polymorphic leaderboard sample.**
+  The first `run/` sample to exercise Onion's type-class machinery
+  (`trait`/`instance`) as a first-class feature of a realistic program:
+  two independent type classes (`Scoreable[T]`, `Formattable[T]`), a
+  multi-constraint generic function (`[T: Scoreable + Formattable]`), and
+  `Trait[T]::method()` dictionary dispatch, shared across two domains
+  (chess ratings and F1 standings).
+- **`run/GeneticSequencer.on`, a 482-line DNA sequence analysis toolkit.**
+  Covers a bioinformatics domain not yet in the corpus: records with
+  methods (`Sequence`, `ORF`, `RestrictionSite`), a 21-variant
+  data-carrying enum (`AminoAcid`), a plain enum with `select` dispatch
+  (`Nucleotide`), an interface/class validator hierarchy, collection
+  pipelines (`map`/`filter`/`fold`/`groupBy`/`flatMap`/`sortedBy`/`find`),
+  and tail-recursive k-mer frequency building.
+- **`run/KaraokeNight.on`, a 529-line karaoke night management simulator.**
+  Records with methods (`Song`, `Singer`, `Performance`); a data-carrying
+  enum (`Difficulty` with a multiplier); an ADT case-enum (`ScoreGrade`:
+  `Perfect`/`Good`/`Okay`/`NeedsWork`); interfaces (`Reportable`,
+  `Rankable`); classes with mutable state; extension methods on `Int`,
+  `Double`, `String`; collection pipelines including `zip` and
+  `partition`; and `select`/type-pattern dispatch.
+- **`run/CodeContest.on`, a 543-line ICPC-style competitive programming
+  contest simulator.** Data-carrying enum (`Language`), plain enum
+  (`Verdict`), ADT case-enum (`ContestPhase`); records with `example`
+  clauses (`Problem`, `Submission`) and a generic record (`Ranked[T]`);
+  a class/interface pair (`Contest`, `Contestant conforms Scorable`);
+  `do[Option]` and `do[List]` monadic notation; collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`); and
+  the `|>` pipeline operator.
+- **`run/InsuranceClaims.on`, a 349-line insurance claims processing
+  system.** Data-carrying enum (`CoverageType`), ADT case-enum
+  (`AdjustmentDecision`: `FullApproval`/`PartialApproval`/`Denial`);
+  records with methods (`Claimant`, `Policy`, `Claim`, `AdjustmentRecord`);
+  an interface/class pair (`Auditable`, `ClaimsProcessor`); extension
+  methods on `Int`, `Double`, `String`; collection pipelines
+  (`filter`/`groupBy`/`partition`/`find`); `select`/type-pattern dispatch;
+  nullable types; closures; and `try`/`catch`.
+- **`run/PlantCare.on`, a 299-line plant care and growth tracker.** ADT
+  sealed enums with embedded methods (`PlantFamily`, `CareAction`);
+  records with instance methods (`Plant`, `CareEvent`); typed generic
+  collections (`List[Plant]`, `Map[String, List[Plant]]`); `groupBy`/
+  `sortedBy` collection pipelines; `foreach` map destructuring; `while`
+  loops; string interpolation; and `select`/`is` pattern matching.
+
+### Fixed
+
+- **`docs/ja/GENERICS_DESIGN.md` linked to two anchors that MkDocs could
+  never generate.** Its cross-references to `reference/specification.md#ジェネリクス`
+  and `guide/classes-and-objects.md#ジェネリッククラス` relied on MkDocs
+  slugifying Japanese heading text, but the slugifier can't build a stable
+  slug from it and falls back to positional ids (`#_6`, `#_9`) instead —
+  confirmed broken via `mkdocs build --strict`. The two target headings now
+  carry explicit `attr_list` ids (`#generics`, `#generic-classes`, mirroring
+  the English page's slugs) and the links point at those.
+
 ## [0.10.34] - 2026-08-14
 
 ### Fixed

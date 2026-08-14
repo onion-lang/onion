@@ -89,5 +89,47 @@ class ExtensionGenericParamNameSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("6") == result)
     }
+
+    it("can define extension List[List[Int]] alongside extension List[List[String]] (nested type args)") {
+      val result = shell.run(
+        """
+          |extension List[List[Int]] {
+          |  def sumAll(): Int {
+          |    var total: Int = 0
+          |    foreach inner: List in this {
+          |      foreach v: Int in inner {
+          |        total = total + v
+          |      }
+          |    }
+          |    return total
+          |  }
+          |}
+          |
+          |extension List[List[String]] {
+          |  def joinAll(): String {
+          |    var s: String = ""
+          |    foreach inner: List in this {
+          |      foreach v: String in inner {
+          |        s = s + v
+          |      }
+          |    }
+          |    return s
+          |  }
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val nums: List[List[Int]] = [[1, 2], [3, 4]]
+          |    val words: List[List[String]] = [["a", "b"], ["c"]]
+          |    return "" + nums.sumAll() + "/" + words.joinAll()
+          |  }
+          |}
+          |""".stripMargin,
+        "ExtNestedGenericParam.on",
+        Array()
+      )
+      assert(Shell.Success("10/abc") == result)
+    }
   }
 }

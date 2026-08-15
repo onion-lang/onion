@@ -1,0 +1,270 @@
+// NetworkMonitor.on — Network traffic analysis and alerting (~260 lines).
+// Exercises: record from re"...", ADT enum (Alert), data-carrying enum (Method),
+// plain enum (AlertLevel), record with body methods (PathStats), extension
+// methods (Int, String), collection pipelines (groupBy/sortedBy/filter/map/
+// count/any/partition/find), do[List] comprehension, regex select patterns,
+// foreach over map (k, v), closures, string interpolation, try/catch, recursion,
+// nullable, while loop.
+import { java.util.* }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def fmtMs(): String {
+    if self < 1000 { return "#{self}ms" }
+    return "#{self / 1000}.#{(self % 1000) / 100}s"
+  }
+  def fmtBytes(): String {
+    if self < 1024          { return "#{self}B"  }
+    if self < 1024 * 1024   { return "#{self / 1024}KB" }
+    return "#{self / 1024 / 1024}MB"
+  }
+  def pad(w: Int): String {
+    val s: String = "#{self}"
+    if s.length() >= w { return s }
+    var r: String = s
+    while r.length() < w { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    if self.length() >= w { return self }
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def pad(w: Int): String {
+    if self.length() >= w { return self }
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def pathCategory(): String {
+    return select self {
+      case re"/(api|v\d+)/(.+)" (_, sub): "api/#{sub.split("/")[0]}"
+      case re"/static/(.+)"     (_):       "static"
+      case re"/health.*":                  "health"
+      case re"/metrics.*":                 "metrics"
+      else:                                "other"
+    }
+  }
+  def isApiPath(): Boolean = select self {
+    case re"/(api|v\d+)/.*": true
+    else:                    false
+  }
+}
+
+// ─── Log record parsed from Apache-style access log ──────────────────────────
+// Format: IP METHOD PATH STATUS BYTES MS
+
+record LogEntry(ip: String, method: String, path: String,
+                status: Int, bytes: Int, ms: Int)
+  from re"(\S+) (\w+) (\S+) (\d+) (\d+) (\d+)"
+  example { new LogEntry("1.2.3.4", "GET", "/", 200, 512, 45).status() == 200 }
+  example { LogEntry::parse("10.0.0.1 GET /api/users 200 1024 85") != null }
+  example { LogEntry::parse("bad line") == null }
+
+// ─── Method: data-carrying enum ───────────────────────────────────────────────
+
+enum Method(safe: Boolean, idempotent: Boolean) {
+  GET(true, true), HEAD(true, true), POST(false, false),
+  PUT(false, true), DELETE(false, true), PATCH(false, false)
+public:
+  def isMutating(): Boolean = !safe()
+}
+
+// ─── AlertLevel: plain enum ───────────────────────────────────────────────────
+
+enum AlertLevel { INFO, WARN, CRITICAL
+public:
+  def tag(): String = select this {
+    case AlertLevel::INFO:     "INFO"
+    case AlertLevel::WARN:     "WARN"
+    case AlertLevel::CRITICAL: "CRIT"
+    else:                      "???"
+  }
+  def symbol(): String = select this {
+    case AlertLevel::INFO:     "ℹ"
+    case AlertLevel::WARN:     "⚠"
+    case AlertLevel::CRITICAL: "✖"
+    else:                      "?"
+  }
+}
+
+// ─── Alert: ADT enum ──────────────────────────────────────────────────────────
+
+enum Alert {
+  case HighErrorRate(path: String, errPct: Int, limit: Int)
+  case SlowEndpoint(path: String, avgMs: Int, limitMs: Int)
+  case SuspiciousIp(ip: String, count: Int, threshold: Int)
+  case QuotaExceeded(ip: String, requests: Int, quota: Int)
+public:
+  def level(): AlertLevel = select this {
+    case a is HighErrorRate: if a.errPct() > a.limit() * 2 { AlertLevel::CRITICAL } else { AlertLevel::WARN }
+    case a is SlowEndpoint:  if a.avgMs() > a.limitMs() * 3 { AlertLevel::CRITICAL } else { AlertLevel::WARN }
+    case a is SuspiciousIp:  AlertLevel::WARN
+    case a is QuotaExceeded: AlertLevel::CRITICAL
+  }
+  def message(): String = select this {
+    case a is HighErrorRate: "Error rate #{a.errPct()}% on #{a.path()} (limit #{a.limit()}%)"
+    case a is SlowEndpoint:  "Avg latency #{a.avgMs().fmtMs()} on #{a.path()} (limit #{a.limitMs().fmtMs()})"
+    case a is SuspiciousIp:  "Unusual traffic from #{a.ip()}: #{a.count()} reqs (threshold #{a.threshold()})"
+    case a is QuotaExceeded: "Quota exceeded for #{a.ip()}: #{a.requests()} reqs (quota #{a.quota()})"
+  }
+}
+
+// ─── PathStats: record with body ─────────────────────────────────────────────
+
+record PathStats(path: String, total: Int, errors: Int, totalMs: Int, totalBytes: Int) {
+public:
+  def errPct(): Int = if total == 0 { 0 } else { errors * 100 / total }
+  def avgMs(): Int  = if total == 0 { 0 } else { totalMs / total }
+  def avgBytes(): Int = if total == 0 { 0 } else { totalBytes / total }
+  static def empty(p: String): PathStats = new PathStats(p, 0, 0, 0, 0)
+  def add(e: LogEntry): PathStats {
+    return new PathStats(path, total + 1,
+      errors + (if e.status() >= 400 { 1 } else { 0 }),
+      totalMs + e.ms(), totalBytes + e.bytes())
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def joinNewlines(lines: List[String]): String {
+  var s: String = ""
+  var first: Boolean = true
+  foreach line: String in lines {
+    if first { s = line; first = false } else { s = s + "\n" + line }
+  }
+  return s
+}
+
+def buildPathStats(entries: List[LogEntry]): List[PathStats] {
+  val byPath: Map[String, List[LogEntry]] = entries.groupBy { e => e.path() }
+  val result: List[PathStats] = []
+  foreach (path, ents) in byPath {
+    var stats: PathStats = PathStats::empty(path as String)
+    foreach e: LogEntry in (ents as List[LogEntry]) { stats = stats.add(e) }
+    result.add(stats)
+  }
+  return result.sortedBy { s => s.path() }
+}
+
+def generateAlerts(statsList: List[PathStats], ipCounts: Map[String, List[LogEntry]]): List[Alert] {
+  val alerts: List[Alert] = []
+  // Path-level alerts
+  foreach s: PathStats in statsList {
+    if s.errPct() > 25 { alerts.add(new HighErrorRate(s.path(), s.errPct(), 25)) }
+    if s.avgMs() > 200 { alerts.add(new SlowEndpoint(s.path(), s.avgMs(), 200)) }
+  }
+  // IP-level alerts
+  foreach (ip, ents) in ipCounts {
+    val ipStr: String = ip as String
+    val count: Int = (ents as List[LogEntry]).size
+    if count > 4 { alerts.add(new SuspiciousIp(ipStr, count, 4)) }
+    if count > 5 { alerts.add(new QuotaExceeded(ipStr, count, 5)) }
+  }
+  // Sort: critical first, then warn
+  val critical: List[Alert] = alerts.filter { a => a.level() == AlertLevel::CRITICAL }
+  val warn:     List[Alert] = alerts.filter { a => a.level() == AlertLevel::WARN }
+  val result: List[Alert] = []
+  foreach a: Alert in critical { result.add(a) }
+  foreach a: Alert in warn     { result.add(a) }
+  return result
+}
+
+// Recursive helper: count 5xx errors in a list
+def count5xx(entries: List[LogEntry], idx: Int): Int {
+  if idx >= entries.size { return 0 }
+  val e: LogEntry = entries[idx]
+  return (if e.status() >= 500 { 1 } else { 0 }) + count5xx(entries, idx + 1)
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val SAMPLE_LOGS: List[String] = [
+  "10.0.0.1 GET /api/users 200 1024 85",
+  "10.0.0.2 GET /api/users 200 512 95",
+  "10.0.0.3 GET /api/users 500 128 210",
+  "10.0.0.1 POST /api/users 201 2048 320",
+  "10.0.0.1 GET /api/orders 200 4096 180",
+  "10.0.0.4 GET /api/orders 200 3072 155",
+  "10.0.0.5 GET /api/orders 404 64 20",
+  "10.0.0.2 DELETE /api/orders 500 128 450",
+  "10.0.0.1 GET /static/app.js 200 51200 30",
+  "10.0.0.6 GET /health 200 12 5",
+  "10.0.0.6 GET /health 200 12 4",
+  "10.0.0.7 GET /metrics 200 2048 12",
+  "10.0.0.1 GET /api/users 200 1024 88",
+  "10.0.0.1 GET /api/users 200 768 92"
+]
+
+// Parse entries
+val entries: List[LogEntry] = try {
+  LogEntry::parseAll(joinNewlines(SAMPLE_LOGS))
+} catch e: Exception {
+  println("Parse error: #{e.getMessage()}")
+  []
+}
+
+println("═══ Network Traffic Monitor ═══")
+println("Parsed #{entries.size} log entries")
+
+// Summary stats
+var totalBytes: Int = 0
+foreach e: LogEntry in entries { totalBytes = totalBytes + e.bytes() }
+val apiEntries: List[LogEntry] = entries.filter { e => e.path().isApiPath() }
+val serverErrors: Int = count5xx(entries, 0)
+println("Total traffic : #{totalBytes.fmtBytes()}")
+println("API requests  : #{apiEntries.size}/#{entries.size}")
+println("5xx errors    : #{serverErrors}")
+
+// Path stats
+val statsList: List[PathStats] = buildPathStats(entries)
+println("\n── Path Statistics ──────────────────────────────────")
+println("#{"Path".padRight(24)} #{"Reqs".pad(5)} #{"Errs".pad(5)} #{"AvgMs".pad(7)} #{"AvgSize".pad(8)}")
+println("─".padRight(52))
+foreach s: PathStats in statsList {
+  println("#{s.path().padRight(24)} #{s.total().pad(5)} #{s.errors().pad(5)} #{s.avgMs().fmtMs().padRight(7)} #{s.avgBytes().fmtBytes()}")
+}
+
+// Category breakdown using do[List] comprehension
+val categories: List[String] = entries.map { e => e.path().pathCategory() }.distinct()
+val catPairs: List[String] = do[List] {
+  cat <- categories
+  method <- ["GET", "POST"]
+  ret "#{cat}:#{method}"
+}
+println("\n── Category×Method Combinations (do[List]) ─────────")
+foreach pair: String in catPairs.filter { p => entries.any { e => e.path().pathCategory() + ":" + e.method() == p } } {
+  val matchCount: Int = entries.count { e => e.path().pathCategory() + ":" + e.method() == pair }
+  println("  #{pair.padRight(26)} #{matchCount} req(s)")
+}
+
+// IP traffic distribution
+val byIp: Map[String, List[LogEntry]] = entries.groupBy { e => e.ip() }
+println("\n── Top IPs ──────────────────────────────────────────")
+val ipStats: List[String] = []
+foreach (ip, ents) in byIp {
+  val c: Int = (ents as List[LogEntry]).size
+  ipStats.add("#{("" + c).pad(4)}  #{ip}")
+}
+foreach row: String in ipStats.sortedBy { s => s }.distinct() {
+  println("  #{row}")
+}
+
+// Alerts
+val ipMap: Map[String, List[LogEntry]] = entries.groupBy { e => e.ip() }
+val alerts: List[Alert] = generateAlerts(statsList, ipMap)
+if alerts.isEmpty() {
+  println("\n── Alerts ── none")
+} else {
+  println("\n── Alerts ───────────────────────────────────────────")
+  foreach a: Alert in alerts {
+    println("  #{a.level().symbol()} [#{a.level().tag()}] #{a.message()}")
+  }
+}
+
+println("\n═══ Report complete ═══")

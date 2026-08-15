@@ -533,5 +533,23 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs LogAnalytics.on") {
       assert(Shell.Success(null) == runSample("run/LogAnalytics.on"))
     }
+
+    it("runs AccessLogAnalyzer.on and reports deterministic aggregate stats") {
+      val (result, output) = runSampleWithStdinCapturingStdout("run/AccessLogAnalyzer.on", "")
+      assert(Shell.Success(null) == result)
+      assert(output.contains("Parsed 15 entries"))
+      assert(output.contains("Total requests : 15"))
+      assert(output.contains("Successful     : 9 (60.0%)"))
+      assert(output.contains("Errors         : 5 (33.3%)"))
+      assert(output.contains("Total bytes    : 25353"))
+      assert(output.contains("/api/data                            3 hits  33.0% err  avg 5896.0 B"))
+      assert(output.contains("192.168.1.10       5 req  2 err"))
+      assert(output.contains("[ALERT] 192.168.1.10 -- multiple errors detected"))
+      assert(output.contains("[ALERT] 10.0.0.99 -- multiple errors detected"))
+      assert(output.contains("Last error from 192.168.1.10: 500 GET /api/data"))
+      assert(output.contains("Successes: 9   Failures: 6"))
+      assert(output.contains("Recursive total bytes: 25353"))
+      assert(output.contains("Analysis complete."))
+    }
   }
 }

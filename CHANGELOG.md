@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`try`/`catch` as the right-hand operand of a binary operator no longer
+  crashes the compiler.** `1 + (try { ... } catch { ... })`, and the same for
+  other arithmetic, bitwise, and comparison operators, previously crashed
+  with an `[I0000]` internal error during bytecode verification: the JVM
+  clears the operand stack when dispatching to an exception handler, so a
+  left operand already pushed before the `try`'d right operand ran was
+  silently discarded on the exceptional path. This is the binary-operator
+  sibling of the constructor-argument, list/map-literal, and field/array-
+  assignment fixes for the same underlying issue (#669 and friends).
+
 ## [0.10.36] - 2026-08-15
 
 ### Added

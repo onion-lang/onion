@@ -83,9 +83,23 @@ class AsmCodeGenerationVisitor(
     gen.arrayLength()
   
   override def visitRefArray(node: RefArray): Unit =
-    visitTerm(node.target)
-    visitTerm(node.index)
-    gen.arrayLoad(asmType(node.`type`))
+    if TermContainsTry.contains(node.index) then
+      // See visitSetArray: the target can't stay live on the operand stack
+      // across an index expression that runs its own try/catch, since the
+      // JVM clears the stack when dispatching to an exception handler.
+      visitTerm(node.target)
+      val targetSlot = gen.newLocal(asmType(node.target.`type`))
+      gen.storeLocal(targetSlot)
+      visitTerm(node.index)
+      val indexSlot = gen.newLocal(AsmType.INT_TYPE)
+      gen.storeLocal(indexSlot)
+      gen.loadLocal(targetSlot)
+      gen.loadLocal(indexSlot)
+      gen.arrayLoad(asmType(node.`type`))
+    else
+      visitTerm(node.target)
+      visitTerm(node.index)
+      gen.arrayLoad(asmType(node.`type`))
 
   /**
    * Non-null assertion: target!! — throw NullPointerException on null,

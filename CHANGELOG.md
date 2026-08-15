@@ -51,6 +51,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sortedBy`), nullable types with null-guards, string interpolation,
   `while`/`foreach`, and `Regex::replace`/`Regex::groups` for inline
   transforms.
+- **`run/ElevatorDispatcher.on`, a 352-line multi-car elevator dispatch
+  simulator.** A `record ... from re"..."` dispatcher-log parser
+  (`CallLogEntry`) with `example` clauses, a plain enum (`Direction`), a
+  data-carrying enum (`DoorState`), an ADT case-enum (`DispatchEvent`:
+  `Arrived`/`DoorsOpened`/`Overloaded`/`WentIdle`), a `record` with body
+  methods (`RiderRequest`), an interface (`Dispatchable`) implemented by a
+  class with mutable state (`ElevatorCar`), extension methods on `Int`/
+  `String`, `do[Option]` chaining, regex `select` patterns, collection
+  pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`/
+  `zip`/`distinct`), `foreach (k, v) in map`, nullable types, `try`/`catch`,
+  and tail recursion.
 
 ### Fixed
 

@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discarding earlier dimensions on the exceptional path. This is the
   array-creation sibling of the array-index and array-assignment fixes for
   the same underlying issue (#745, #752, and friends).
+- **`try`/`catch` as the index of a safe array-read (`arr?[...]`) no longer
+  crashes the compiler.** `arr?[try { ... } catch { ... }]` previously
+  crashed with an `[I0000]` internal error during bytecode verification:
+  the array reference (plus a duplicate for the null check) was pushed onto
+  the operand stack before evaluating the index, and the JVM clears the
+  stack when dispatching to an exception handler, silently discarding the
+  pending reference on the exceptional path. This is the safe-indexing
+  sibling of the plain array-index fix for the same underlying issue
+  (#745, #752, and friends).
 
 ## [0.10.36] - 2026-08-15
 

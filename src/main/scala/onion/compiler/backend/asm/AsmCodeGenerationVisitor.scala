@@ -135,8 +135,21 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     gen.dup()
     gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
-    visitTerm(node.index)
-    gen.arrayLoad(asmType(node.arrayType.base))
+    if TermContainsTry.contains(node.index) then
+      // See visitRefArray: the target can't stay live on the operand stack
+      // across an index expression that runs its own try/catch, since the
+      // JVM clears the stack when dispatching to an exception handler.
+      val targetSlot = gen.newLocal(asmType(node.target.`type`))
+      gen.storeLocal(targetSlot)
+      visitTerm(node.index)
+      val indexSlot = gen.newLocal(AsmType.INT_TYPE)
+      gen.storeLocal(indexSlot)
+      gen.loadLocal(targetSlot)
+      gen.loadLocal(indexSlot)
+      gen.arrayLoad(asmType(node.arrayType.base))
+    else
+      visitTerm(node.index)
+      gen.arrayLoad(asmType(node.arrayType.base))
     node.arrayType.base match
       case bt: BasicType if bt != BasicType.VOID => gen.box(asmType(bt))
       case _ =>

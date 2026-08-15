@@ -61,6 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check.** Field access on the same nullable value already reported `E0070`;
   `MethodTargetTypingSupport`'s method-call path just never had a
   `NullableType` case to route through it.
+- **Assigning a `try { ... } catch e: T { ... }` expression directly to a
+  field or array element crashed the compiler with `[I0000] Internal
+  compiler error in LawCheck: Inconsistent stackmap frames`** (issue #745),
+  most visibly inside a constructor. The JVM clears the operand stack when
+  it dispatches to an exception handler, so a receiver (or array ref/index)
+  already pushed before the `try` silently vanished on the exceptional path,
+  desyncing the merged stack shape from the normal path — the field/array
+  sibling of issue #669's call-argument bug. `visitSetField`/`visitSetArray`
+  now spill an already-pushed target (and index) into locals before
+  evaluating a value that may run its own `try`, mirroring the existing
+  `emitArgumentsWithAdaptation` fix for call arguments.
 
 ## [0.10.35] - 2026-08-14
 

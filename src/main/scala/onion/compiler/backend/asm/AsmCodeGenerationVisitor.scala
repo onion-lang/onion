@@ -133,16 +133,36 @@ class AsmCodeGenerationVisitor(
     gen.visitLabel(endLabel)
   
   override def visitSetArray(node: SetArray): Unit =
-    visitTerm(node.target)
-    visitTerm(node.index)
-    visitTerm(node.value)
-    // Duplicate value for return
     val valueType = asmType(node.`type`)
-    if valueType.getSize() == 2 then
-      gen.dup2X2()
+    if TermContainsTry.contains(node.value) then
+      // See visitSetField: the target/index can't stay live on the operand
+      // stack across a value that runs its own try/catch, since the JVM
+      // clears the stack when dispatching to an exception handler.
+      visitTerm(node.target)
+      val targetSlot = gen.newLocal(asmType(node.target.`type`))
+      gen.storeLocal(targetSlot)
+      visitTerm(node.index)
+      val indexSlot = gen.newLocal(AsmType.INT_TYPE)
+      gen.storeLocal(indexSlot)
+      visitTerm(node.value)
+      val valueSlot = gen.newLocal(valueType)
+      gen.storeLocal(valueSlot)
+      gen.loadLocal(targetSlot)
+      gen.loadLocal(indexSlot)
+      gen.loadLocal(valueSlot)
+      gen.arrayStore(valueType)
+      // Assignment is itself an expression; leave the assigned value as its result.
+      gen.loadLocal(valueSlot)
     else
-      gen.dupX2()
-    gen.arrayStore(valueType)
+      visitTerm(node.target)
+      visitTerm(node.index)
+      visitTerm(node.value)
+      // Duplicate value for return
+      if valueType.getSize() == 2 then
+        gen.dup2X2()
+      else
+        gen.dupX2()
+      gen.arrayStore(valueType)
   
   override def visitBegin(node: Begin): Unit =
     for i <- node.terms.indices do
@@ -401,17 +421,38 @@ class AsmCodeGenerationVisitor(
     gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitSetField(node: SetField): Unit =
-    visitTerm(node.target)
-    visitTerm(node.value)
-    // Duplicate value for return
     val valueType = asmType(node.`type`)
-    asmCodeGen.adaptValueOnStack(gen, node.value.`type`, valueType)
-    if valueType.getSize() == 2 then
-      gen.dup2X1()
-    else
-      gen.dupX1()
     val ownerType = AsmUtil.objectType(node.field.affiliation.name)
-    gen.putField(ownerType, node.field.name, valueType)
+    if TermContainsTry.contains(node.value) then
+      // The target must survive node.value's evaluation, but it can't stay on
+      // the operand stack if node.value runs its own try/catch: the JVM
+      // clears the stack when dispatching to an exception handler, so a bare
+      // target pushed before the try region would vanish on the exceptional
+      // path, desyncing the merged stack shape from the normal path (issue
+      // #745, the field-assignment sibling of issue #669's call-argument fix).
+      // Stash it in a local instead and reload it once the value is settled.
+      visitTerm(node.target)
+      val targetSlot = gen.newLocal(asmType(node.target.`type`))
+      gen.storeLocal(targetSlot)
+      visitTerm(node.value)
+      asmCodeGen.adaptValueOnStack(gen, node.value.`type`, valueType)
+      val valueSlot = gen.newLocal(valueType)
+      gen.storeLocal(valueSlot)
+      gen.loadLocal(targetSlot)
+      gen.loadLocal(valueSlot)
+      gen.putField(ownerType, node.field.name, valueType)
+      // Assignment is itself an expression; leave the assigned value as its result.
+      gen.loadLocal(valueSlot)
+    else
+      visitTerm(node.target)
+      visitTerm(node.value)
+      // Duplicate value for return
+      asmCodeGen.adaptValueOnStack(gen, node.value.`type`, valueType)
+      if valueType.getSize() == 2 then
+        gen.dup2X1()
+      else
+        gen.dupX1()
+      gen.putField(ownerType, node.field.name, valueType)
   
   override def visitNewObject(node: NewObject): Unit =
     val classType = AsmUtil.objectType(node.constructor.affiliation.name)

@@ -196,18 +196,37 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
 
     if ctor.superInitializer != null then
-      gen.loadThis()
-      var i = 0
-      while i < ctor.superInitializer.terms.length do
-        val arg = ctor.superInitializer.terms(i)
-        emitExpressionWithContext(gen, arg, className, localVars)
-        adaptValueOnStack(gen, arg.`type`, asmType(ctor.superInitializer.arguments(i)))
-        i += 1
+      val superArgTypes = ctor.superInitializer.arguments.map(asmType)
+      if ctor.superInitializer.terms.exists(TermContainsTry.contains) then
+        // `this` is `uninitializedThis` until this super/self-delegation call
+        // completes, and (like visitNewObject's freshly-`new`'d instance) that
+        // special verifier type cannot survive being spilled into a local
+        // across a try/catch merge. So `this` is not loaded until every
+        // argument has been evaluated into a plain local first.
+        val slots = new Array[Int](ctor.superInitializer.terms.length)
+        var i = 0
+        while i < ctor.superInitializer.terms.length do
+          val arg = ctor.superInitializer.terms(i)
+          emitExpressionWithContext(gen, arg, className, localVars)
+          adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
+          val slot = gen.newLocal(superArgTypes(i))
+          gen.storeLocal(slot)
+          slots(i) = slot
+          i += 1
+        gen.loadThis()
+        for slot <- slots do gen.loadLocal(slot)
+      else
+        gen.loadThis()
+        var i = 0
+        while i < ctor.superInitializer.terms.length do
+          val arg = ctor.superInitializer.terms(i)
+          emitExpressionWithContext(gen, arg, className, localVars)
+          adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
+          i += 1
       val targetClass =
         if ctor.superInitializer.selfDelegation then AsmUtil.internalName(ctor.classType.name)
         else if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name)
         else "java/lang/Object"
-      val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
         AsmUtil.objectType(targetClass),
         AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, superArgTypes*))

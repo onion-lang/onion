@@ -93,6 +93,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that may run its own `try` first with an empty operand stack, stashes the
   result in a local, and only then reloads the array reference, index, and
   value for the `arrayStore`, mirroring `visitSetField`/`visitSetArray`.
+- **A `try { ... } catch e: T { ... }` expression used as a constructor
+  argument, a super-constructor argument, a safe-call (`?.`) argument, a
+  `List`-literal element, or a `Map`-literal key/value crashed the compiler
+  with the same `[I0000] Inconsistent stackmap frames` error** — four more
+  siblings of the fixes above. For the safe-call case, the already-pushed,
+  already-initialized target just needed the same "spill to a local, reload
+  after" treatment as `visitSetField`/`visitNewArrayWithValues` (now applied
+  in `visitSafeCall`), and the `List`/`Map`-literal fix follows the same
+  pattern. The constructor and super-constructor cases needed a different
+  fix: the value `new` pushes (or `this`, before `super(...)`/`this(...)`
+  runs) is not an ordinary reference but a JVM-tracked "uninitialized"
+  value, which cannot survive being spilled into a local across a `try`'s
+  merge the way an already-initialized receiver can — attempting that
+  produced a *different* verifier rejection. `visitNewObject` and
+  `codeConstructor`'s super/self-delegation call now evaluate every
+  argument into a plain local *before* emitting `new`/loading `this` at
+  all, so no uninitialized value is ever in flight while an argument's own
+  `try` runs.
 
 ## [0.10.35] - 2026-08-14
 

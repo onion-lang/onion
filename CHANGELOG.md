@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regex `select` patterns, `do[List]` comprehension, collection pipelines
   (`groupBy`/`sortedBy`/`filter`/`map`/`count`/`any`/`partition`),
   `foreach (k, v) in map`, and tail recursion.
+- **`run/MarkdownConverter.on`, a 371-line Markdown-to-HTML converter.**
+  Exercises an ADT case-enum with shared methods (`Block`: `Heading`/
+  `Paragraph`/`BulletItem`/`OrderedItem`/`CodeBlock`/`Blockquote`/`HRule`),
+  `select` + type-pattern binding, a `record` (`DocStats`), `extension
+  String` helpers, a cursor-style parser class with mutable state,
+  collection pipelines (`filter`/`map`/`groupBy`/`partition`/`find`/
+  `sortedBy`), nullable types with null-guards, string interpolation,
+  `while`/`foreach`, and `Regex::replace`/`Regex::groups` for inline
+  transforms.
 
 ### Fixed
 

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/ChemCalculator.on`, a 274-line chemical formula analyser.**
+  Exercises a plain enum (`ElementGroup`) alongside a data-carrying enum
+  (`BondType`), records with body methods (`Element`, `FormulaComponent`),
+  an interface (`Describable`) implemented by a class (`Compound`), `select`
+  pattern matching on enum values, closures stored in `val` and passed as
+  arguments, and a wide sweep of collection pipelines (`filter`/`map`/
+  `fold`/`sortedBy`/`groupBy`/`find`/`partition`/`zip`/`distinct`/
+  `Colls::concat`), plus `try`/`catch`, tail recursion, and
+  `foreach (k, v) in map`.
 - **`run/NetworkMonitor.on`, a 270-line network traffic analysis and
   alerting sample.** Parses Apache-style access log lines via
   `record ... from re"..."` (`LogEntry`), and exercises an ADT case-enum

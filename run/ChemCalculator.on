@@ -1,0 +1,274 @@
+// ChemCalculator — Chemical formula analyser
+// Exercises: records, plain + data-carrying enums, classes, interfaces, generics,
+// collection pipelines (filter/map/fold/groupBy/sortedBy/find/partition/zip/distinct),
+// pattern matching, closures, string interpolation, while, foreach, ranges,
+// try/catch, recursion, nullable
+
+enum ElementGroup { NONMETAL, METAL, NOBLE_GAS, METALLOID, HALOGEN, ALKALI_METAL, ALKALINE_EARTH }
+
+// data-carrying enum: bond type with relative strength score
+enum BondType(strength: Int) { IONIC(1), COVALENT(2), METALLIC(3) }
+
+record Element(symbol: String, name: String, atomicNumber: Int, atomicWeight: Double, group: ElementGroup)
+
+// element data
+val H  = new Element("H",  "Hydrogen",    1,   1.008,  ElementGroup::NONMETAL)
+val C  = new Element("C",  "Carbon",      6,  12.011,  ElementGroup::NONMETAL)
+val N  = new Element("N",  "Nitrogen",    7,  14.007,  ElementGroup::NONMETAL)
+val O  = new Element("O",  "Oxygen",      8,  15.999,  ElementGroup::NONMETAL)
+val Na = new Element("Na", "Sodium",     11,  22.990,  ElementGroup::ALKALI_METAL)
+val Mg = new Element("Mg", "Magnesium",  12,  24.305,  ElementGroup::ALKALINE_EARTH)
+val Al = new Element("Al", "Aluminium",  13,  26.982,  ElementGroup::METAL)
+val Si = new Element("Si", "Silicon",    14,  28.085,  ElementGroup::METALLOID)
+val S  = new Element("S",  "Sulfur",     16,  32.06,   ElementGroup::NONMETAL)
+val Cl = new Element("Cl", "Chlorine",   17,  35.45,   ElementGroup::HALOGEN)
+val K  = new Element("K",  "Potassium",  19,  39.098,  ElementGroup::ALKALI_METAL)
+val Ca = new Element("Ca", "Calcium",    20,  40.078,  ElementGroup::ALKALINE_EARTH)
+val Fe = new Element("Fe", "Iron",       26,  55.845,  ElementGroup::METAL)
+val Cu = new Element("Cu", "Copper",     29,  63.546,  ElementGroup::METAL)
+val Zn = new Element("Zn", "Zinc",       30,  65.38,   ElementGroup::METAL)
+val Pb = new Element("Pb", "Lead",       82, 207.2,    ElementGroup::METAL)
+
+val allElements: List[Element] = [H, C, N, O, Na, Mg, Al, Si, S, Cl, K, Ca, Fe, Cu, Zn, Pb]
+
+def groupLabel(g: ElementGroup): String {
+  select g {
+    case ElementGroup::NONMETAL:       return "Nonmetal"
+    case ElementGroup::METAL:          return "Metal"
+    case ElementGroup::NOBLE_GAS:      return "Noble Gas"
+    case ElementGroup::METALLOID:      return "Metalloid"
+    case ElementGroup::HALOGEN:        return "Halogen"
+    case ElementGroup::ALKALI_METAL:   return "Alkali Metal"
+    case ElementGroup::ALKALINE_EARTH: return "Alkaline Earth"
+    else:                              return "Unknown"
+  }
+}
+
+// per-element contribution in a compound
+record FormulaComponent(element: Element, count: Int) {
+  public:
+    def contribution(): Double = element().atomicWeight() * count()
+    def label(): String {
+      if count() == 1 { return element().symbol() }
+      return element().symbol() + count()
+    }
+}
+
+interface Describable {
+  def summary(): String
+}
+
+class Compound conforms Describable {
+  val compoundName: String
+  val components: List[FormulaComponent]
+  val bondType: BondType
+public:
+  def this(n: String, comps: List[FormulaComponent], bond: BondType) {
+    this.compoundName = n
+    this.components = comps
+    this.bondType = bond
+  }
+  def name(): String = compoundName
+  def bond(): BondType = bondType
+  def molecularWeight(): Double =
+    components.fold(0.0) { acc, c => (acc as Double) + (c as FormulaComponent).contribution() }
+  def formulaString(): String =
+    components.fold("") { acc, c => (acc as String) + (c as FormulaComponent).label() }
+  def elementCount(): Int = components.size
+  def elementSymbols(): List[String] =
+    components.map { fc => (fc as FormulaComponent).element().symbol() }
+  def containsElement(sym: String): Boolean =
+    components.find { c => (c as FormulaComponent).element().symbol() == sym } != null
+  def isOrganic(): Boolean = containsElement("C")
+  def percentOf(sym: String): Double {
+    val mw = molecularWeight()
+    if mw == 0.0 { return 0.0 }
+    val found = components.find { c => (c as FormulaComponent).element().symbol() == sym }
+    if found == null { return 0.0 }
+    return (found as FormulaComponent).contribution() / mw * 100.0
+  }
+  def bondLabel(): String {
+    select bondType {
+      case BondType::IONIC:    return "ionic"
+      case BondType::COVALENT: return "covalent"
+      case BondType::METALLIC: return "metallic"
+      else:                    return "?"
+    }
+  }
+  def summary(): String {
+    val fw = formulaString()
+    val mw = molecularWeight()
+    return "#{compoundName} (#{fw}) MW=#{mw} bond=#{bondLabel()}"
+  }
+}
+
+// shorthand constructors
+def fc(e: Element, n: Int): FormulaComponent = new FormulaComponent(e, n)
+def fc1(e: Element): FormulaComponent = new FormulaComponent(e, 1)
+def cov(n: String, comps: List[FormulaComponent]): Compound =
+  new Compound(n, comps, BondType::COVALENT)
+def ion(n: String, comps: List[FormulaComponent]): Compound =
+  new Compound(n, comps, BondType::IONIC)
+
+// compound database
+val water        = cov("Water",             [fc(H, 2), fc1(O)])
+val ammonia      = cov("Ammonia",           [fc1(N), fc(H, 3)])
+val glucose      = cov("Glucose",           [fc(C, 6), fc(H, 12), fc(O, 6)])
+val salt         = ion("Table Salt",        [fc1(Na), fc1(Cl)])
+val sulfuricAcid = cov("Sulfuric Acid",     [fc(H, 2), fc1(S), fc(O, 4)])
+val calciumCarb  = ion("Calcium Carbonate", [fc1(Ca), fc1(C), fc(O, 3)])
+val ironOxide    = ion("Iron(III) Oxide",   [fc(Fe, 2), fc(O, 3)])
+val alumOxide    = ion("Aluminium Oxide",   [fc(Al, 2), fc(O, 3)])
+val methane      = cov("Methane",           [fc1(C), fc(H, 4)])
+val ethanol      = cov("Ethanol",           [fc(C, 2), fc(H, 6), fc1(O)])
+val sodiumOH     = ion("Sodium Hydroxide",  [fc1(Na), fc1(O), fc1(H)])
+val hcl          = ion("Hydrochloric Acid", [fc1(H), fc1(Cl)])
+
+val compounds: List[Compound] =
+  [water, ammonia, glucose, salt, sulfuricAcid, calciumCarb,
+   ironOxide, alumOxide, methane, ethanol, sodiumOH, hcl]
+
+// round a Double to 2 dp as a String
+def round2(d: Double): String {
+  if d < 0.0 { return "-" + round2(0.0 - d) }
+  val intPart = (d * 100.0 + 0.5).longValue() as Long
+  val major   = intPart / 100L
+  val minor   = intPart % 100L
+  var mStr: String = "" + minor
+  if minor < 10L { mStr = "0" + minor }
+  return "" + major + "." + mStr
+}
+
+// ── Section 1: overview ──
+IO::println("=== Compound Overview ===")
+foreach c: Compound in compounds {
+  IO::println(c.summary())
+}
+
+// ── Section 2: sorted by molecular weight ──
+IO::println("")
+IO::println("=== By Molecular Weight (heavy → light) ===")
+val byMW = compounds.sortedBy { c => 0.0 - (c as Compound).molecularWeight() }
+var rank = 1
+foreach c: Compound in byMW {
+  IO::println("  ##{rank} #{c.name()} #{round2(c.molecularWeight())} g/mol")
+  rank = rank + 1
+}
+
+// ── Section 3: organic vs inorganic (partition) ──
+IO::println("")
+val parts = compounds.partition { c => (c as Compound).isOrganic() }
+val organics   = parts.get(0) as List
+val inorganics = parts.get(1) as List
+IO::println("=== Organic Compounds (#{organics.size}) ===")
+foreach c: Compound in organics {
+  IO::println("  " + c.name() + " (" + c.formulaString() + ")")
+}
+IO::println("=== Inorganic Compounds (#{inorganics.size}) ===")
+foreach c: Compound in inorganics {
+  IO::println("  " + c.name() + " (" + c.formulaString() + ")")
+}
+
+// ── Section 4: oxygen % in oxygen-bearing compounds ──
+IO::println("")
+IO::println("=== Oxygen Content ===")
+val oCmps = compounds.filter { c => (c as Compound).containsElement("O") }
+foreach c: Compound in oCmps {
+  IO::println("  " + c.name() + ": " + round2(c.percentOf("O")) + "% O")
+}
+
+// ── Section 5: elements by group ──
+IO::println("")
+IO::println("=== Elements by Group ===")
+val byGroup = allElements.groupBy { e => groupLabel(e.group()) }
+foreach (grp, elems) in byGroup {
+  val symbols = (elems as List).map { e => (e as Element).symbol() }
+  IO::println("  " + grp + ": " + symbols.toString())
+}
+
+// ── Section 6: statistics with closures ──
+IO::println("")
+IO::println("=== Statistics ===")
+val mwOf   = (c: Compound) -> c.molecularWeight()
+val nameOf = (c: Compound) -> c.name()
+
+val totalMW = compounds.fold(0.0) { acc, c => (acc as Double) + mwOf(c as Compound) }
+val avgMW   = totalMW / compounds.size
+IO::println("Average MW: " + round2(avgMW) + " g/mol")
+
+val heaviest = compounds.fold(water) { acc, c =>
+  if mwOf(c as Compound) > mwOf(acc as Compound) { c } else { acc }
+}
+val lightest = compounds.fold(water) { acc, c =>
+  if mwOf(c as Compound) < mwOf(acc as Compound) { c } else { acc }
+}
+IO::println("Heaviest: " + nameOf(heaviest as Compound) + " (" + round2(mwOf(heaviest as Compound)) + ")")
+IO::println("Lightest: " + nameOf(lightest as Compound) + " (" + round2(mwOf(lightest as Compound)) + ")")
+
+// zip compound names with MWs for compact display
+val names: List[String] = compounds.map { c => (c as Compound).name() }
+val mws:   List[Double] = compounds.map { c => (c as Compound).molecularWeight() }
+IO::println("")
+IO::println("=== Name ↔ MW (zip) ===")
+val zipped = names.zip(mws)
+foreach pair: Object in zipped {
+  val p = pair as List
+  IO::println("  " + p.get(0) + " → " + round2(p.get(1) as Double))
+}
+
+// ── Section 7: elements with Z ≤ 10, via while loop ──
+IO::println("")
+IO::println("=== Light Elements (Z ≤ 10) ===")
+val lightZ = allElements.filter { e => e.atomicNumber() <= 10 }.sortedBy { e => e.atomicNumber() }
+var idx = 0
+while idx < lightZ.size {
+  val e = lightZ.get(idx) as Element
+  IO::println("  Z=#{e.atomicNumber()} #{e.symbol()} #{e.name()} (#{groupLabel(e.group())})")
+  idx = idx + 1
+}
+
+// ── Section 8: try/catch ──
+IO::println("")
+def mwByName(nm: String): Double {
+  try {
+    val found = compounds.find { c => (c as Compound).name() == nm }
+    if found == null { throw new Exception("not found: " + nm) }
+    return (found as Compound).molecularWeight()
+  } catch ex: Exception {
+    IO::println("  Error: " + ex.getMessage())
+    return 0.0 - 1.0
+  }
+}
+IO::println("=== MW Lookups ===")
+IO::println("  Water: "    + round2(mwByName("Water")))
+IO::println("  Glucose: "  + round2(mwByName("Glucose")))
+IO::println("  Unknown: "  + round2(mwByName("Unobtainium")))
+
+// ── Section 9: recursive sum ──
+def sumMW(lst: List[Compound], i: Int): Double {
+  if i >= lst.size { return 0.0 }
+  return (lst.get(i) as Compound).molecularWeight() + sumMW(lst, i + 1)
+}
+IO::println("")
+IO::println("Total MW (recursive sum): " + round2(sumMW(compounds, 0)))
+
+// ── Section 10: bond-type groups ──
+IO::println("")
+IO::println("=== By Bond Type ===")
+val byBond = compounds.groupBy { c => (c as Compound).bondLabel() }
+foreach (bond, cmps) in byBond {
+  val ns = (cmps as List).map { c => (c as Compound).name() }
+  IO::println("  " + bond + ": " + ns.toString())
+}
+
+// ── Section 11: element symbols – distinct across all compounds ──
+var allSymbols: List[String] = []
+var ci = 0
+while ci < compounds.size {
+  val syms = (compounds.get(ci) as Compound).elementSymbols()
+  allSymbols = Colls::concat(allSymbols, syms)
+  ci = ci + 1
+}
+val uniqueSymbols = allSymbols.distinct()
+IO::println("")
+IO::println("Unique elements in database (#{uniqueSymbols.size}): " + uniqueSymbols.toString())

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/AccessLogAnalyzer.on`, a 325-line HTTP access-log analyzer.**
+  Parses Common-Log-Format lines via `record LogEntry from re"..."`
+  (`parseAll`), an ADT case-enum (`HttpStatus`: `Info`/`Success`/
+  `Redirect`/`ClientError`/`ServerError`), a class with mutable state
+  (`LogAnalyzer`, `PathSummary`), extension methods on `Int`/`Double`/
+  `String`, `do[Option]` monadic chaining, `|>` pipeline, collection
+  pipelines (`groupBy`/`sortedBy`/`filter`/`map`/`fold`/`count`/
+  `partition`/`distinct`), `foreach (k, v) in map`, and recursion.
+- **`run/DnaAnalyzer.on`, a 469-line DNA sequence analysis toolkit.**
+  Exercises an ADT enum with shared methods (`Nucleotide`), a
+  data-carrying ADT enum (`GCCategory`), records with `from re"..."`
+  and `example` clauses (`FastaHeader`, `SequenceRegion`, `MotifMatch`),
+  extension methods on `Int`/`String`, `do[Option]` composition,
+  collection pipelines (`map`/`filter`/`fold`/`partition`/`flatMap`/
+  `sortedBy`/`groupBy`), regex `select` patterns, and nullable types.
 - **`run/ChemCalculator.on`, a 274-line chemical formula analyser.**
   Exercises a plain enum (`ElementGroup`) alongside a data-carrying enum
   (`BondType`), records with body methods (`Element`, `FormulaComponent`),

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.37] - 2026-08-15
+
 ### Fixed
 
 - **`try`/`catch` as the right-hand operand of a binary operator no longer

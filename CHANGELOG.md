@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/NetworkMonitor.on`, a 270-line network traffic analysis and
+  alerting sample.** Parses Apache-style access log lines via
+  `record ... from re"..."` (`LogEntry`), and exercises an ADT case-enum
+  (`Alert`: `HighErrorRate`/`SlowEndpoint`/`SuspiciousIp`/`QuotaExceeded`),
+  a data-carrying enum (`Method`), a plain enum (`AlertLevel`), a record
+  with body methods (`PathStats`), extension methods on `Int`/`String`,
+  regex `select` patterns, `do[List]` comprehension, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`map`/`count`/`any`/`partition`),
+  `foreach (k, v) in map`, and tail recursion.
+
 ### Fixed
 
 - **Calling `.method()` (not `?.method()`) on a nullable class-typed value

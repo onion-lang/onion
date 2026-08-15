@@ -1,0 +1,372 @@
+// MarkdownConverter.on — a Markdown-to-HTML converter (~370 lines).
+//
+// Exercises: ADT case-enum with methods, records, class with mutable state,
+// extension String helpers, collection pipelines (map/filter/fold/groupBy/
+// partition/find/sortedBy), select + type-pattern matching, nullable types,
+// while/foreach, string interpolation, try/catch, closures,
+// Regex::replace for inline transforms.
+//
+// NOTE: String literals containing `#{` are treated as interpolation by
+// the Onion compiler, so regex patterns like "(#{1,6}) (.*)" must be
+// avoided — use manual char-by-char parsing instead.
+
+import {
+  java.lang.Integer as JInteger;
+}
+
+// ── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def repeated(n: Int): String {
+    var acc: String = ""
+    var i: Int = 0
+    while i < n { acc = acc + self; i++ }
+    return acc
+  }
+  def prefixedWith(p: String): Boolean = self.indexOf(p) == 0
+}
+
+// ── Block-level element (ADT enum) ───────────────────────────────────────────
+
+enum Block {
+  case Heading(level: Int, text: String)
+  case Paragraph(text: String)
+  case BulletItem(text: String)
+  case OrderedItem(num: Int, text: String)
+  case CodeBlock(lang: String, code: String)
+  case Blockquote(text: String)
+  case HRule
+
+public:
+  def typeName(): String = select this {
+    case h is Heading:     "heading"
+    case p is Paragraph:   "paragraph"
+    case b is BulletItem:  "bullet"
+    case o is OrderedItem: "ordered"
+    case c is CodeBlock:   "code"
+    case q is Blockquote:  "quote"
+    case hr is HRule:      "rule"
+  }
+  def isBullet(): Boolean  = select this { case b is BulletItem:  true; else: false }
+  def isOrdered(): Boolean = select this { case o is OrderedItem: true; else: false }
+}
+
+// ── Inline-formatting helpers ─────────────────────────────────────────────────
+
+def escapeHtml(s: String): String {
+  var r: String = s
+  r = Regex::replace(r, "&",  "&amp;")
+  r = Regex::replace(r, "<",  "&lt;")
+  r = Regex::replace(r, ">",  "&gt;")
+  r = Regex::replace(r, "\"", "&quot;")
+  return r
+}
+
+def applyInline(raw: String): String {
+  var s: String = escapeHtml(raw)
+  // code spans first (avoids double-processing content inside backticks)
+  s = Regex::replace(s, "`([^`]+)`",           "<code>$1</code>")
+  s = Regex::replace(s, "\\*\\*([^*]+)\\*\\*", "<strong>$1</strong>")
+  s = Regex::replace(s, "__([^_]+)__",          "<strong>$1</strong>")
+  s = Regex::replace(s, "\\*([^*]+)\\*",        "<em>$1</em>")
+  s = Regex::replace(s, "_([^_]+)_",            "<em>$1</em>")
+  s = Regex::replace(s, "\\[([^\\]]+)\\]\\(([^)]+)\\)", "<a href=\"$2\">$1</a>")
+  return s
+}
+
+// ── Parser: source → List[Block] ─────────────────────────────────────────────
+
+class MarkdownParser {
+  var lines: List[String]
+  var pos: Int
+
+public:
+  def this(src: String) {
+    lines = Strings::split(src, "\n") as List[String]
+    pos   = 0
+  }
+
+  def peek(): String? = if pos < lines.size { lines.get(pos) as String } else { null }
+
+  def consume(): String {
+    val line: String = lines.get(pos) as String
+    pos++
+    return line
+  }
+
+  def parseAll(): List[Block] {
+    val result: List[Block] = []
+    while pos < lines.size {
+      val block: Block? = parseBlock()
+      if block != null { result.add(block) }
+    }
+    return result
+  }
+
+  def parseBlock(): Block? {
+    val raw: String? = peek()
+    if raw == null { return null }
+    val line: String = raw as String
+    val trimmed: String = line.trim()
+
+    // blank line → skip
+    if trimmed.length() == 0 { consume(); return null }
+
+    // Setext-style heading (next line is === or ---)
+    if pos + 1 < lines.size {
+      val next: String = (lines.get(pos + 1) as String).trim()
+      if Regex::matches(next, "=+") && next.length() > 0 {
+        consume(); consume()
+        return new Heading(1, trimmed)
+      }
+      if Regex::matches(next, "-+") && next.length() > 2 && !trimmed.prefixedWith("#") {
+        consume(); consume()
+        return new Heading(2, trimmed)
+      }
+    }
+
+    // Horizontal rule: --- or *** or ___
+    if Regex::matches(trimmed, "(-{3,}|\\*{3,}|_{3,})") { consume(); return new HRule() }
+
+    // ATX heading: # to ###### (manual parse to avoid #{ interpolation in regex)
+    if trimmed.charAt(0) == '#' {
+      var hLevel: Int = 0
+      while hLevel < trimmed.length() && trimmed.charAt(hLevel) == '#' { hLevel++ }
+      if hLevel <= 6 && hLevel < trimmed.length() && trimmed.charAt(hLevel) == ' ' {
+        val hText: String = trimmed.substring(hLevel + 1)
+        consume()
+        return new Heading(hLevel, hText)
+      }
+    }
+
+    // Fenced code block ```lang
+    if trimmed.prefixedWith("```") {
+      val lang: String = trimmed.substring(3).trim()
+      consume()
+      val codeAcc: StringBuilder = new StringBuilder()
+      while pos < lines.size {
+        val codeLine: String = lines.get(pos) as String
+        if codeLine.trim().prefixedWith("```") { consume(); break }
+        if codeAcc.length() > 0 { codeAcc.append("\n") }
+        codeAcc.append(codeLine)
+        pos++
+      }
+      return new CodeBlock(lang, codeAcc.toString())
+    }
+
+    // Blockquote
+    if trimmed.prefixedWith("> ") {
+      consume()
+      return new Blockquote(trimmed.substring(2))
+    }
+
+    // Bullet list item: - text or * text
+    val blGroups: List[String] = Regex::groups(trimmed, "[*-] (.*)")
+    if blGroups.size >= 2 {
+      consume()
+      return new BulletItem(blGroups.get(1) as String)
+    }
+
+    // Ordered list item: 1. text
+    val olGroups: List[String] = Regex::groups(trimmed, "(\\d+)\\. (.*)")
+    if olGroups.size >= 3 {
+      val num: Int = JInteger::parseInt(olGroups.get(1) as String)
+      consume()
+      return new OrderedItem(num, olGroups.get(2) as String)
+    }
+
+    // Paragraph: accumulate until blank or structural line
+    val paraAcc: StringBuilder = new StringBuilder()
+    while pos < lines.size {
+      val pl: String = (lines.get(pos) as String).trim()
+      if pl.length() == 0 { break }
+      if pl.prefixedWith("#") || pl.prefixedWith("```") || pl.prefixedWith(">")
+          || Regex::matches(pl, "(-{3,}|\\*{3,}|_{3,})")
+          || Regex::matches(pl, "[*-] .*")
+          || Regex::matches(pl, "\\d+\\. .*") { break }
+      if paraAcc.length() > 0 { paraAcc.append(" ") }
+      paraAcc.append(pl)
+      pos++
+    }
+    if paraAcc.length() == 0 { consume(); return null }
+    return new Paragraph(paraAcc.toString())
+  }
+}
+
+// ── Renderer: List[Block] → HTML string ──────────────────────────────────────
+
+class HtmlRenderer {
+public:
+  def render(blocks: List[Block]): String {
+    val sb: StringBuilder = new StringBuilder()
+    var i: Int = 0
+    while i < blocks.size {
+      val block: Block = blocks.get(i) as Block
+      if block.isBullet() {
+        sb.append("<ul>\n")
+        while i < blocks.size && (blocks.get(i) as Block).isBullet() {
+          val bi: BulletItem = blocks.get(i) as BulletItem
+          sb.append("  <li>"); sb.append(applyInline(bi.text())); sb.append("</li>\n")
+          i++
+        }
+        sb.append("</ul>\n")
+      } else if block.isOrdered() {
+        sb.append("<ol>\n")
+        while i < blocks.size && (blocks.get(i) as Block).isOrdered() {
+          val od: OrderedItem = blocks.get(i) as OrderedItem
+          sb.append("  <li>"); sb.append(applyInline(od.text())); sb.append("</li>\n")
+          i++
+        }
+        sb.append("</ol>\n")
+      } else {
+        sb.append(renderOne(block))
+        sb.append("\n")
+        i++
+      }
+    }
+    return sb.toString()
+  }
+
+  def renderOne(block: Block): String = select block {
+    case h is Heading: {
+      val tag: String = "h#{h.level()}"
+      "<#{tag}>#{applyInline(h.text())}</#{tag}>"
+    }
+    case p is Paragraph: "<p>#{applyInline(p.text())}</p>"
+    case c is CodeBlock: {
+      val langAttr: String = if c.lang().length() > 0 {
+        " class=\"language-#{c.lang()}\""
+      } else { "" }
+      "<pre><code#{langAttr}>#{escapeHtml(c.code())}</code></pre>"
+    }
+    case q is Blockquote: "<blockquote><p>#{applyInline(q.text())}</p></blockquote>"
+    case hr is HRule: "<hr/>"
+    else: ""
+  }
+}
+
+// ── Document statistics ───────────────────────────────────────────────────────
+
+record DocStats(headings: Int, paragraphs: Int, codeBlocks: Int, listItems: Int, words: Int) {
+public:
+  def show(): String =
+    "headings=#{headings()}, paragraphs=#{paragraphs()}, " +
+    "code=#{codeBlocks()}, lists=#{listItems()}, ~words=#{words()}"
+}
+
+def countWords(text: String): Int = Strings::split(text.trim(), "\\s+").size
+
+def computeStats(blocks: List[Block]): DocStats {
+  var h: Int = 0; var p: Int = 0; var c: Int = 0; var li: Int = 0; var w: Int = 0
+  var i: Int = 0
+  while i < blocks.size {
+    val b: Block = blocks.get(i) as Block
+    val typN: String = b.typeName()
+    if typN == "heading" {
+      val hd: Heading = b as Heading
+      h++; w = w + countWords(hd.text())
+    } else if typN == "paragraph" {
+      val pg: Paragraph = b as Paragraph
+      p++; w = w + countWords(pg.text())
+    } else if typN == "code" {
+      c++
+    } else if typN == "bullet" {
+      val bi: BulletItem = b as BulletItem
+      li++; w = w + countWords(bi.text())
+    } else if typN == "ordered" {
+      val od: OrderedItem = b as OrderedItem
+      li++; w = w + countWords(od.text())
+    }
+    // else: rule or quote — no word count
+    i++
+  }
+  return new DocStats(h, p, c, li, w)
+}
+
+// ── Demo document ─────────────────────────────────────────────────────────────
+
+val markdown: String =
+  "# Onion Language Guide\n\n" +
+  "Welcome to **Onion**, a statically-typed JVM language.\n\n" +
+  "## Features\n\n" +
+  "- Strong *type* system\n" +
+  "- Closures and `lambdas`\n" +
+  "- ADT enums with pattern matching\n\n" +
+  "## Installation\n\n" +
+  "Install via `sbt assembly` then copy `onion.jar` to your path.\n\n" +
+  "### Quick Start\n\n" +
+  "```onion\n" +
+  "println(\"Hello, world!\")\n" +
+  "```\n\n" +
+  "## Example Workflow\n\n" +
+  "1. Define a recursive function\n" +
+  "2. Call it with a positive integer\n" +
+  "3. Observe tail-call optimisation\n\n" +
+  "> Note: Tail call optimisation is applied automatically.\n\n" +
+  "See [the docs](https://onion-lang.org) for more.\n\n" +
+  "---\n\n" +
+  "Copyright 2025 Onion Contributors"
+
+val parser: MarkdownParser = new MarkdownParser(markdown)
+val blocks: List[Block] = parser.parseAll()
+
+IO::println("=== HTML Output (" + blocks.size + " blocks) ===")
+val renderer: HtmlRenderer = new HtmlRenderer()
+IO::println(renderer.render(blocks))
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+val stats: DocStats = computeStats(blocks)
+IO::println("=== Document Statistics ===")
+IO::println(stats.show())
+
+// ── Collection pipelines over blocks ─────────────────────────────────────────
+val headingBlocks: List[Block] = blocks.filter { b =>
+  (b as Block).typeName() == "heading"
+}
+val toc: List[String] = headingBlocks.map { b =>
+  val h: Heading = (b as Block) as Heading
+  "  " + "#".repeated(h.level()) + " " + h.text()
+} as List[String]
+
+IO::println("\n=== Table of Contents ===")
+foreach entry: String in toc { IO::println(entry) }
+
+// ── groupBy block type ────────────────────────────────────────────────────────
+val byType: Map[String, List[Block]] = blocks.groupBy { b =>
+  (b as Block).typeName()
+}
+
+IO::println("\n=== Block type distribution ===")
+foreach (kind, items) in byType {
+  IO::println("  " + (kind as String) + ": " + (items as List[Block]).size)
+}
+
+// ── Partition: structural vs textual ─────────────────────────────────────────
+val parts = blocks.partition { b =>
+  val t: String = (b as Block).typeName()
+  t == "rule" || t == "code"
+}
+val structural: List[Block] = parts.get(0) as List[Block]
+val textual: List[Block] = parts.get(1) as List[Block]
+IO::println("\nStructural elements: " + structural.size)
+IO::println("Textual elements   : " + textual.size)
+
+// ── Find first code block ────────────────────────────────────────────────────
+val firstCode = blocks.find { b =>
+  (b as Block).typeName() == "code"
+}
+if firstCode != null {
+  val cb: CodeBlock = (firstCode as Block) as CodeBlock
+  IO::println("\nFirst code block language: \"" + cb.lang() + "\"")
+  IO::println("First code block:\n" + cb.code())
+}
+
+// ── sortedBy heading level ─────────────────────────────────────────────────
+val headingsSorted: List[Block] = headingBlocks.sortedBy { b =>
+  ((b as Block) as Heading).level()
+}
+IO::println("\nHeadings sorted by level:")
+foreach hb: Block in headingsSorted {
+  val h: Heading = hb as Heading
+  IO::println("  [H#{h.level()}] #{h.text()}")
+}

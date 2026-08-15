@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently discarded on the exceptional path. This is the binary-operator
   sibling of the constructor-argument, list/map-literal, and field/array-
   assignment fixes for the same underlying issue (#669 and friends).
+- **`try`/`catch` as an array-index expression no longer crashes the
+  compiler.** `arr[try { ... } catch { ... }]` previously crashed with an
+  `[I0000]` internal error during bytecode verification: the array reference
+  was pushed onto the operand stack before evaluating the index, and the JVM
+  clears the stack when dispatching to an exception handler, silently
+  discarding that reference on the exceptional path. This is the array-read
+  sibling of the array-write fix for the same underlying issue (#745 and
+  friends).
 
 ## [0.10.36] - 2026-08-15
 

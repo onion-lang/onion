@@ -266,9 +266,11 @@ class AsmCodeGenerationVisitor(
     gen.dup()
     gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
-    // Non-null path: call the method
+    // Non-null path: call the method. The target survives the null check on
+    // the stack (the dup'd copy IFNULL consumed was the other one), so it is
+    // a pending operand across the arguments just like visitCall's receiver.
     val argTypes = node.method.arguments.map(asmType)
-    emitArgumentsWithAdaptation(node.parameters, argTypes)
+    emitArgumentsWithAdaptation(node.parameters, argTypes, Array(asmType(node.target.`type`)))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -366,17 +368,38 @@ class AsmCodeGenerationVisitor(
     gen.dup()
     gen.push(node.elements.length)
     gen.invokeConstructor(listType, listCtor)
-    
-    // Add elements
-    for elem <- node.elements do
-      gen.dup() // Duplicate list reference
-      visitTerm(elem)
-      // Box primitive if needed
-      elem.`type` match
-        case bt: BasicType => gen.box(asmType(bt))
-        case _ => // Already an object
-      gen.invokeVirtual(listType, listAdd)
-      gen.pop() // Pop boolean result
+
+    if node.elements.exists(TermContainsTry.contains) then
+      // See visitNewArrayWithValues: the list reference can't stay on the
+      // operand stack across an element that may run its own try/catch, since
+      // the JVM clears the stack when dispatching to an exception handler.
+      // Spill it into a local instead and reload it for each add().
+      val objectType = AsmUtil.objectType(AsmUtil.JavaLangObject)
+      val listSlot = gen.newLocal(listType)
+      gen.storeLocal(listSlot)
+      for elem <- node.elements do
+        visitTerm(elem)
+        elem.`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        val elemSlot = gen.newLocal(objectType)
+        gen.storeLocal(elemSlot)
+        gen.loadLocal(listSlot)
+        gen.loadLocal(elemSlot)
+        gen.invokeVirtual(listType, listAdd)
+        gen.pop() // Pop boolean result
+      gen.loadLocal(listSlot)
+    else
+      // Add elements
+      for elem <- node.elements do
+        gen.dup() // Duplicate list reference
+        visitTerm(elem)
+        // Box primitive if needed
+        elem.`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        gen.invokeVirtual(listType, listAdd)
+        gen.pop() // Pop boolean result
 
   override def visitMapLiteral(node: MapLiteral): Unit =
     // Create LinkedHashMap (preserves literal entry order)
@@ -387,19 +410,46 @@ class AsmCodeGenerationVisitor(
     gen.dup()
     gen.invokeConstructor(mapType, mapCtor)
 
-    // Put entries
-    for i <- node.keys.indices do
-      gen.dup() // Duplicate map reference
-      visitTerm(node.keys(i))
-      node.keys(i).`type` match
-        case bt: BasicType => gen.box(asmType(bt))
-        case _ => // Already an object
-      visitTerm(node.values(i))
-      node.values(i).`type` match
-        case bt: BasicType => gen.box(asmType(bt))
-        case _ => // Already an object
-      gen.invokeVirtual(mapType, mapPut)
-      gen.pop() // Pop previous value
+    if (node.keys.iterator ++ node.values.iterator).exists(TermContainsTry.contains) then
+      // See visitListLiteral/visitNewArrayWithValues: the map reference can't
+      // stay on the operand stack across a key/value that may run its own
+      // try/catch. Spill it into a local instead and reload it for each put().
+      val objectType = AsmUtil.objectType(AsmUtil.JavaLangObject)
+      val mapSlot = gen.newLocal(mapType)
+      gen.storeLocal(mapSlot)
+      for i <- node.keys.indices do
+        visitTerm(node.keys(i))
+        node.keys(i).`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        val keySlot = gen.newLocal(objectType)
+        gen.storeLocal(keySlot)
+        visitTerm(node.values(i))
+        node.values(i).`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        val valueSlot = gen.newLocal(objectType)
+        gen.storeLocal(valueSlot)
+        gen.loadLocal(mapSlot)
+        gen.loadLocal(keySlot)
+        gen.loadLocal(valueSlot)
+        gen.invokeVirtual(mapType, mapPut)
+        gen.pop() // Pop previous value
+      gen.loadLocal(mapSlot)
+    else
+      // Put entries
+      for i <- node.keys.indices do
+        gen.dup() // Duplicate map reference
+        visitTerm(node.keys(i))
+        node.keys(i).`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        visitTerm(node.values(i))
+        node.values(i).`type` match
+          case bt: BasicType => gen.box(asmType(bt))
+          case _ => // Already an object
+        gen.invokeVirtual(mapType, mapPut)
+        gen.pop() // Pop previous value
   
   override def visitRefLocal(node: RefLocal): Unit =
     asmCodeGen.emitRefLocal(gen, node, localVars)
@@ -456,11 +506,34 @@ class AsmCodeGenerationVisitor(
   
   override def visitNewObject(node: NewObject): Unit =
     val classType = AsmUtil.objectType(node.constructor.affiliation.name)
-    gen.newInstance(classType)
-    gen.dup()
     val argTypes = node.constructor.getArgs.map(asmType)
-    emitArgumentsWithAdaptation(node.parameters, argTypes)
-    gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
+    if node.parameters.exists(TermContainsTry.contains) then
+      // Unlike an ordinary receiver (visitCall), the value `new` pushes is not
+      // yet a real object -- the verifier tracks it as "uninitialized(new-site)"
+      // until the matching invokespecial runs, and that special type cannot
+      // safely cross a try/catch merge the way a spilled, already-initialized
+      // reference can (spilling it into a local and reloading it, as
+      // emitArgumentsWithAdaptation does for visitCall/visitSafeCall, produced
+      // bytecode the JVM verifier rejected: "Inconsistent stackmap frames").
+      // So no `new` may be in flight while an argument's own try runs: every
+      // argument is evaluated into a plain local first, and only then does
+      // `new`/`dup`/reload-args/<init> run as one straight, branch-free run.
+      val argSlots = new Array[Int](node.parameters.length)
+      for i <- node.parameters.indices do
+        visitTerm(node.parameters(i))
+        asmCodeGen.adaptValueOnStack(gen, node.parameters(i).`type`, argTypes(i))
+        val slot = gen.newLocal(argTypes(i))
+        gen.storeLocal(slot)
+        argSlots(i) = slot
+      gen.newInstance(classType)
+      gen.dup()
+      for slot <- argSlots do gen.loadLocal(slot)
+      gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
+    else
+      gen.newInstance(classType)
+      gen.dup()
+      emitArgumentsWithAdaptation(node.parameters, argTypes)
+      gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
   
   override def visitNewArray(node: NewArray): Unit =
     for param <- node.parameters do

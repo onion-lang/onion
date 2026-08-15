@@ -1,0 +1,469 @@
+// DnaAnalyzer.on — DNA sequence analysis toolkit
+// Exercises: records with from re"..." and example/law, ADT case-enum with
+// shared methods and exhaustive select, extension methods on String and Int,
+// do[Option] with Option[T], collection pipelines (map/filter/fold/sortedBy/
+// partition/find/groupBy/flatMap), foreach on Map (k,v) and ranges,
+// string interpolation, while loop, recursion, closures, nullable types.
+
+import { java.util.List; java.util.ArrayList; java.util.Map; java.util.LinkedHashMap }
+
+// ── Nucleotide ADT ───────────────────────────────────────────────────────────
+
+enum Nucleotide {
+  case Adenine
+  case Thymine
+  case Guanine
+  case Cytosine
+  case Unknown
+public:
+  def symbol(): String = select this {
+    case a is Adenine:  "A"
+    case t is Thymine:  "T"
+    case g is Guanine:  "G"
+    case c is Cytosine: "C"
+    case u is Unknown:  "N"
+  }
+  def complement(): Nucleotide = select this {
+    case a is Adenine:  new Thymine()
+    case t is Thymine:  new Adenine()
+    case g is Guanine:  new Cytosine()
+    case c is Cytosine: new Guanine()
+    case u is Unknown:  new Unknown()
+  }
+  def isPurine(): Boolean = select this {
+    case a is Adenine: true
+    case g is Guanine: true
+    else: false
+  }
+  def isPyrimidine(): Boolean = select this {
+    case t is Thymine: true
+    case c is Cytosine: true
+    else: false
+  }
+}
+
+// ── FASTA header record with regex parser ────────────────────────────────────
+
+record FastaHeader(id: String, description: String)
+  from re"([A-Za-z0-9._|]+)\s+(.*)"
+  example { FastaHeader::parse("NM_001234 Homo sapiens gene mRNA") != null }
+  example {
+    val h: FastaHeader? = FastaHeader::parse("NP_005219 EGFR protein")
+    h != null && h.id() == "NP_005219"
+  }
+
+// ── Sequence region record ───────────────────────────────────────────────────
+
+record SequenceRegion(start: Int, end: Int, label: String)
+  example { new SequenceRegion(5, 20, "exon").end() == 20 }
+  example { new SequenceRegion(0, 30, "intron").start() == 0 }
+
+def regionLength(r: SequenceRegion): Int = r.end() - r.start()
+
+def regionOverlaps(a: SequenceRegion, b: SequenceRegion): Boolean =
+  a.start() < b.end() && a.end() > b.start()
+
+def regionDisplay(r: SequenceRegion): String =
+  "#{r.label()}[#{r.start()}..#{r.end()}](#{regionLength(r)} bp)"
+
+// ── Motif match record ───────────────────────────────────────────────────────
+
+record MotifMatch(motif: String, position: Int)
+  example { new MotifMatch("ATG", 3).position() == 3 }
+  example { new MotifMatch("ATG", 0).motif() == "ATG" }
+
+// ── GC classification ADT ────────────────────────────────────────────────────
+
+enum GCCategory {
+  case GCHigh(seqId: String, gc: Double)
+  case GCLow(seqId: String, gc: Double)
+  case GCMedium(seqId: String, gc: Double)
+public:
+  def seqId(): String = select this {
+    case h is GCHigh:   h.seqId()
+    case l is GCLow:    l.seqId()
+    case m is GCMedium: m.seqId()
+  }
+  def gcValue(): Double = select this {
+    case h is GCHigh:   h.gc()
+    case l is GCLow:    l.gc()
+    case m is GCMedium: m.gc()
+  }
+  def tag(): String = select this {
+    case h is GCHigh:   "HIGH  "
+    case l is GCLow:    "LOW   "
+    case m is GCMedium: "MEDIUM"
+  }
+  def display(): String = "#{seqId()} GC=#{gcValue()}%  [#{tag()}]"
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def toPercent(total: Int): String {
+    if total == 0 { return "0.0%" }
+    val p: Double = (self * 100.0) / total
+    return "#{p}%"
+  }
+  def formatBp(): String = "#{self} bp"
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+extension String {
+  def countChar(ch: String): Int {
+    var count: Int = 0
+    var i: Int = 0
+    while i < self.length() {
+      if self.substring(i, i + 1) == ch { count++ }
+      i++
+    }
+    return count
+  }
+  def reverseStr(): String {
+    var result: String = ""
+    var i: Int = self.length() - 1
+    while i >= 0 {
+      result = result + self.substring(i, i + 1)
+      i--
+    }
+    return result
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "..."
+  }
+  def isPalindrome(): Boolean = self == self.reverseStr()
+}
+
+// ── DnaSequence class ─────────────────────────────────────────────────────────
+
+class DnaSequence {
+public:
+  val id: String
+  val raw: String
+  val nucleotides: List[Nucleotide]
+
+  def this(id: String, seq: String) {
+    this.id = id
+    this.raw = seq.toUpperCase()
+    this.nucleotides = DnaSequence::parseNucleotides(this.raw)
+  }
+
+  static def parseNucleotides(seq: String): List[Nucleotide] {
+    val result: List[Nucleotide] = new ArrayList[Nucleotide]()
+    var i: Int = 0
+    while i < seq.length() {
+      val ch: String = seq.substring(i, i + 1)
+      val n: Nucleotide = select ch {
+        case "A": new Adenine()
+        case "T": new Thymine()
+        case "G": new Guanine()
+        case "C": new Cytosine()
+        else: new Unknown()
+      }
+      result.add(n)
+      i++
+    }
+    return result
+  }
+
+  def length(): Int = raw.length()
+
+  def gcContent(): Double {
+    if raw.length() == 0 { return 0.0 }
+    val gc: Int = raw.countChar("G") + raw.countChar("C")
+    return (gc * 100.0) / raw.length()
+  }
+
+  def classifyGC(): GCCategory {
+    val gc: Double = gcContent()
+    if gc >= 60.0 { return new GCHigh(id, gc) }
+    if gc <= 40.0 { return new GCLow(id, gc) }
+    return new GCMedium(id, gc)
+  }
+
+  def nucleotideCounts(): Map[String, Int] {
+    val m: Map[String, Int] = new LinkedHashMap[String, Int]()
+    m.put("A", raw.countChar("A"))
+    m.put("T", raw.countChar("T"))
+    m.put("G", raw.countChar("G"))
+    m.put("C", raw.countChar("C"))
+    return m
+  }
+
+  def complement(): DnaSequence {
+    val compStr: String = nucleotides
+      .map { n: Nucleotide => n.complement().symbol() }
+      .fold("") { acc: String, s: String => acc + s }
+    return new DnaSequence(id + "_comp", compStr)
+  }
+
+  def reverseComplement(): DnaSequence {
+    val rc: String = complement().raw.reverseStr()
+    return new DnaSequence(id + "_rc", rc)
+  }
+
+  def findMotif(motif: String): List[MotifMatch] {
+    val results: List[MotifMatch] = new ArrayList[MotifMatch]()
+    val mLen: Int = motif.length()
+    if mLen > raw.length() { return results }
+    var i: Int = 0
+    while i <= raw.length() - mLen {
+      if raw.substring(i, i + mLen) == motif {
+        results.add(new MotifMatch(motif, i))
+      }
+      i++
+    }
+    return results
+  }
+
+  def kmerFrequency(k: Int): Map[String, Int] {
+    val freq: Map[String, Int] = new LinkedHashMap[String, Int]()
+    if k > raw.length() { return freq }
+    var i: Int = 0
+    while i <= raw.length() - k {
+      val kmer: String = raw.substring(i, i + k)
+      val prev: Int? = freq.get(kmer)
+      freq.put(kmer, if prev != null { prev + 1 } else { 1 })
+      i++
+    }
+    return freq
+  }
+
+  def display(): String = "#{id}(#{length().formatBp()}): #{raw.truncate(24)}"
+}
+
+// ── Sequence comparison ───────────────────────────────────────────────────────
+
+def hammingDistance(a: DnaSequence, b: DnaSequence): Option[Int] {
+  if a.length() != b.length() { return Option::none() }
+  var dist: Int = 0
+  var i: Int = 0
+  while i < a.length() {
+    if a.raw.substring(i, i + 1) != b.raw.substring(i, i + 1) { dist++ }
+    i++
+  }
+  return Option::some(dist)
+}
+
+// ── Sequence library ──────────────────────────────────────────────────────────
+
+class SequenceLibrary {
+public:
+  val sequences: List[DnaSequence]
+
+  def this() {
+    this.sequences = new ArrayList[DnaSequence]()
+  }
+
+  def add(seq: DnaSequence): void {
+    sequences.add(seq)
+  }
+
+  def findById(id: String): Option[DnaSequence] {
+    val found: DnaSequence? = sequences.find { s => (s as DnaSequence).id == id } as DnaSequence?
+    if found != null { return Option::some(found) }
+    return Option::none()
+  }
+
+  def sortedByGC(): List[DnaSequence] =
+    sequences.sortedBy { s: DnaSequence => 0.0 - s.gcContent() }
+
+  def totalBases(): Int {
+    var total: Int = 0
+    foreach s: DnaSequence in sequences { total = total + s.length() }
+    return total
+  }
+
+  def motifSearchAll(motif: String): List[MotifMatch] =
+    sequences.flatMap { s: DnaSequence => s.findMotif(motif) }
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+
+def printNucleotideCounts(seq: DnaSequence): void {
+  IO::println("  Nucleotide composition:")
+  val counts: Map[String, Int] = seq.nucleotideCounts()
+  foreach (base, count) in counts {
+    IO::println("    #{base}: #{count}  (#{count.toPercent(seq.length())})")
+  }
+}
+
+def printKmerTop(seq: DnaSequence, k: Int, topN: Int): void {
+  val freq: Map[String, Int] = seq.kmerFrequency(k)
+  val allKmers: List[String] = new ArrayList[String](freq.keySet())
+  val sorted: List[String] = allKmers.sortedBy { kmer: String => 0 - freq.get(kmer) }
+  val limit: Int = if sorted.size() < topN { sorted.size() } else { topN }
+  IO::println("  Top #{limit} #{k}-mers:")
+  var i: Int = 0
+  while i < limit {
+    val kmer: String = sorted.get(i)
+    IO::println("    #{kmer}: #{freq.get(kmer)}")
+    i++
+  }
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+def main(): void {
+  val lib: SequenceLibrary = new SequenceLibrary()
+  lib.add(new DnaSequence("seq1", "ATGCGATCGATCGATCGATCGTAGCTAGCTAGCTAGCTAGCGATCGATCGATCG"))
+  lib.add(new DnaSequence("seq2", "GCTAGCTAGCGATCGATCGTAGCATGCATGCATGCTAGCGATCGATCGATCGATCG"))
+  lib.add(new DnaSequence("seq3", "ATGATGATGATGATGATGATGATGATGATGATG"))
+  lib.add(new DnaSequence("seq4", "GCGCGCGCGCGCGCGCGCGCGCG"))
+  lib.add(new DnaSequence("seq5", "AAAAATTTTTAAAAATTTTTAAAAA"))
+
+  // ── FASTA header parsing ──────────────────────────────────────────────────
+  IO::println("=== FASTA Header Parsing ===")
+  val rawHeaders: List[String] = [
+    "NM_001234 Homo sapiens BRCA1 gene mRNA",
+    "NP_005219 EGFR protein sequence",
+    "badhdr"
+  ]
+  foreach hdr: String in rawHeaders {
+    val h: FastaHeader? = FastaHeader::parse(hdr)
+    if h != null {
+      IO::println("  id=#{h.id()}  desc=#{h.description().truncate(30)}")
+    } else {
+      IO::println("  (no match for: #{hdr})")
+    }
+  }
+
+  // ── Sequence overview ──────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Sequence Library (#{lib.sequences.size()} sequences, #{lib.totalBases().formatBp()} total) ===")
+  foreach seq: DnaSequence in lib.sequences {
+    IO::println("  #{seq.display()}")
+  }
+
+  // ── Per-sequence nucleotide breakdown ──────────────────────────────────────
+  IO::println("")
+  IO::println("=== Nucleotide Composition ===")
+  foreach seq: DnaSequence in lib.sequences {
+    IO::println("#{seq.id}:")
+    printNucleotideCounts(seq)
+  }
+
+  // ── GC content + classification ────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== GC Content Classification ===")
+  lib.sortedByGC().forEach { seq: DnaSequence =>
+    IO::println("  #{seq.classifyGC().display()}")
+  }
+
+  // partition returns a List[List]: [0]=matching, [1]=non-matching
+  val parts  = lib.sequences.partition { s: DnaSequence => s.gcContent() >= 50.0 }
+  val high   = parts[0] as List[Object]
+  val notHigh = parts[1] as List[Object]
+  val parts2 = notHigh.partition { s: Object => (s as DnaSequence).gcContent() > 40.0 }
+  val med    = parts2[0] as List[Object]
+  val lowGC  = parts2[1] as List[Object]
+  IO::println("  HIGH(>=50%): #{high.size()}  MEDIUM(>40%): #{med.size()}  LOW(<=40%): #{lowGC.size()}")
+
+  // ── Reverse complement ─────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Reverse Complements ===")
+  lib.sequences.forEach { seq: DnaSequence =>
+    val rc: DnaSequence = seq.reverseComplement()
+    IO::println("  #{seq.id} => #{rc.raw.truncate(30)}")
+  }
+
+  // ── Motif search ───────────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Motif Search (ATG) ===")
+  lib.sequences.forEach { seq: DnaSequence =>
+    val hits: List[MotifMatch] = seq.findMotif("ATG")
+    if hits.isEmpty() {
+      IO::println("  #{seq.id}: no ATG found")
+    } else {
+      val positions: String = hits
+        .map { m: MotifMatch => "" + m.position() }
+        .fold("") { acc: String, s: String => if acc == "" { s } else { acc + ", " + s } }
+      IO::println("  #{seq.id}: #{hits.size()} hit(s) at [#{positions}]")
+    }
+  }
+  val allAtg: List[MotifMatch] = lib.motifSearchAll("ATG")
+  IO::println("  Total ATG hits across library: #{allAtg.size()}")
+
+  // ── 3-mer frequency for seq1 ───────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== 3-mer Frequency (seq1) ===")
+  val seq1Opt: Option[DnaSequence] = lib.findById("seq1")
+  if seq1Opt.isEmpty() {
+    IO::println("  seq1 not found")
+  } else {
+    printKmerTop(seq1Opt.get(), 3, 5)
+  }
+
+  // ── do[Option]: compute GC of a looked-up sequence ────────────────────────
+  IO::println("")
+  IO::println("=== do[Option] GC lookup ===")
+  val lookups: List[String] = ["seq3", "seq4", "seq99"]
+  foreach lkId: String in lookups {
+    val gcStr: String = do[Option] {
+      s <- lib.findById(lkId)
+      ret "#{lkId} GC=#{s.gcContent()}%"
+    }.getOrElse("#{lkId}: not found")
+    IO::println("  #{gcStr}")
+  }
+
+  // ── Hamming distance ───────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Hamming Distance ===")
+  val s3: DnaSequence = lib.findById("seq3").get()
+  val s5: DnaSequence = lib.findById("seq5").get()
+  IO::println("  seq3 length: #{s3.length().formatBp()}")
+  IO::println("  seq5 length: #{s5.length().formatBp()}")
+  val hOpt: Option[Int] = hammingDistance(s3, s5)
+  if hOpt.isEmpty() {
+    IO::println("  seq3 vs seq5: different lengths, N/A")
+  } else {
+    IO::println("  seq3 vs seq5: #{hOpt.get()} differences")
+  }
+
+  // ── Sequence region overlap ────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Sequence Region Overlap ===")
+  val r1: SequenceRegion = new SequenceRegion(0, 15, "promoter")
+  val r2: SequenceRegion = new SequenceRegion(10, 25, "exon1")
+  val r3: SequenceRegion = new SequenceRegion(30, 45, "exon2")
+  val regions: List[SequenceRegion] = [r1, r2, r3]
+  regions.forEach { r: SequenceRegion => IO::println("  #{regionDisplay(r)}") }
+  IO::println("  promoter overlaps exon1: #{regionOverlaps(r1, r2)}")
+  IO::println("  exon1 overlaps exon2:   #{regionOverlaps(r2, r3)}")
+  IO::println("  promoter overlaps exon2: #{regionOverlaps(r1, r3)}")
+
+  // ── Palindrome check ───────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Palindrome Check ===")
+  val palTests: List[String] = ["ATCGCTA", "GCGCGCG", "ATAT"]
+  palTests.forEach { seq: String =>
+    IO::println("  \"#{seq}\" is palindrome: #{seq.isPalindrome()}")
+  }
+
+  // ── Extension Int.clamp demo ───────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Extension Int.clamp ===")
+  val gcPct: Int = s3.gcContent().intValue()
+  IO::println("  seq3 GC% = #{gcPct}, clamped [20..80] = #{gcPct.clamp(20, 80)}")
+  IO::println("  seq4 GC% = 100 clamped [0..90] = #{100.clamp(0, 90)}")
+
+  // ── Nucleotide complement chain ────────────────────────────────────────────
+  IO::println("")
+  IO::println("=== Nucleotide Complement Chain ===")
+  val nucleotides: List[Nucleotide] = [
+    new Adenine(), new Thymine(), new Guanine(), new Cytosine(), new Unknown()
+  ]
+  nucleotides.forEach { n: Nucleotide =>
+    val sym: String = n.symbol()
+    val comp: Nucleotide = n.complement()
+    IO::println("  #{sym} -> #{comp.symbol()}  purine=#{n.isPurine()}  pyrimidine=#{n.isPyrimidine()}")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

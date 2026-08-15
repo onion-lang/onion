@@ -476,12 +476,32 @@ class AsmCodeGenerationVisitor(
     val componentType = asmType(node.arrayType.component)
     gen.push(node.values.length)
     gen.newArray(componentType)
-    for (i <- node.values.indices) {
-      gen.dup()
-      gen.push(i)
-      visitTerm(node.values(i))
-      gen.arrayStore(componentType)
-    }
+    if node.values.exists(TermContainsTry.contains) then
+      // See visitSetField/visitSetArray: nothing may be left on the operand
+      // stack (array ref, index, or otherwise) while an element's own
+      // evaluation runs a try/catch, since the JVM clears the stack when
+      // dispatching to an exception handler — it must be evaluated with an
+      // empty stack, then the array ref/index/value reloaded from locals
+      // for the store.
+      val arraySlot = gen.newLocal(asmType(node.arrayType))
+      gen.storeLocal(arraySlot)
+      for (i <- node.values.indices) {
+        visitTerm(node.values(i))
+        val valueSlot = gen.newLocal(componentType)
+        gen.storeLocal(valueSlot)
+        gen.loadLocal(arraySlot)
+        gen.push(i)
+        gen.loadLocal(valueSlot)
+        gen.arrayStore(componentType)
+      }
+      gen.loadLocal(arraySlot)
+    else
+      for (i <- node.values.indices) {
+        gen.dup()
+        gen.push(i)
+        visitTerm(node.values(i))
+        gen.arrayStore(componentType)
+      }
 
   override def visitRefStaticField(node: RefStaticField): Unit =
     val ownerType = AsmUtil.objectType(node.target.name)

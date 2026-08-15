@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discarding that reference on the exceptional path. This is the array-read
   sibling of the array-write fix for the same underlying issue (#745 and
   friends).
+- **`try`/`catch` as a later dimension of a multi-dimensional array creation
+  no longer crashes the compiler.** `new Int[3][try { ... } catch { ... }]`
+  previously crashed with an `[I0000]` internal error during bytecode
+  verification: every dimension was pushed onto the operand stack
+  unconditionally before the `multianewarray` instruction, and the JVM
+  clears the stack when dispatching to an exception handler, silently
+  discarding earlier dimensions on the exceptional path. This is the
+  array-creation sibling of the array-index and array-assignment fixes for
+  the same underlying issue (#745, #752, and friends).
 
 ## [0.10.36] - 2026-08-15
 

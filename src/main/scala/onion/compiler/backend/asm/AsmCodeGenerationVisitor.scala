@@ -550,13 +550,27 @@ class AsmCodeGenerationVisitor(
       gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
   
   override def visitNewArray(node: NewArray): Unit =
-    for param <- node.parameters do
-      visitTerm(param)
     val componentType = asmType(node.arrayType.component)
     if node.parameters.length == 1 then
+      visitTerm(node.parameters(0))
       gen.newArray(componentType)
+    else if node.parameters.exists(TermContainsTry.contains) then
+      // See visitNewObject: a later dimension's own try/catch would otherwise
+      // discard earlier dimensions already sitting on the operand stack,
+      // since the JVM clears the stack when dispatching to an exception
+      // handler. So every dimension is evaluated into a plain local first,
+      // and only then are they reloaded for multianewarray.
+      val slots = new Array[Int](node.parameters.length)
+      for i <- node.parameters.indices do
+        visitTerm(node.parameters(i))
+        val slot = gen.newLocal(AsmType.INT_TYPE)
+        gen.storeLocal(slot)
+        slots(i) = slot
+      for slot <- slots do gen.loadLocal(slot)
+      gen.visitMultiANewArrayInsn(asmType(node.arrayType).getDescriptor, node.parameters.length)
     else
-      val dims = Array.fill(node.parameters.length)(AsmType.INT_TYPE)
+      for param <- node.parameters do
+        visitTerm(param)
       gen.visitMultiANewArrayInsn(asmType(node.arrayType).getDescriptor, node.parameters.length)
 
   override def visitNewArrayWithValues(node: NewArrayWithValues): Unit =

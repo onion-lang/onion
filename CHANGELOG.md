@@ -83,6 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now spill an already-pushed target (and index) into locals before
   evaluating a value that may run its own `try`, mirroring the existing
   `emitArgumentsWithAdaptation` fix for call arguments.
+- **A `try { ... } catch e: T { ... }` expression used as an array-literal
+  element (`new Int[]{1, try { ... } catch _: Exception { -1 }, 3}`) crashed
+  the compiler with the same `[I0000] Inconsistent stackmap frames` error**,
+  the array-literal sibling of the fix above. `visitNewArrayWithValues` left
+  the array reference and element index on the operand stack (via `dup()`
+  and a pushed constant) while evaluating each element, which the JVM
+  silently discards on the exceptional path; it now evaluates any element
+  that may run its own `try` first with an empty operand stack, stashes the
+  result in a local, and only then reloads the array reference, index, and
+  value for the `arrayStore`, mirroring `visitSetField`/`visitSetArray`.
 
 ## [0.10.35] - 2026-08-14
 

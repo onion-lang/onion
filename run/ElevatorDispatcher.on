@@ -1,0 +1,352 @@
+// ElevatorDispatcher.on — Multi-car elevator dispatch simulator (~310 lines)
+//
+// Exercises: record from re"..." with example clauses, plain enum (Direction),
+// data-carrying enum (DoorState), ADT case-enum with shared methods
+// (DispatchEvent), record with body methods (RiderRequest), an interface
+// (Dispatchable) implemented by a class with mutable state (ElevatorCar),
+// extension methods on Int/String, do[Option] chaining, regex select
+// patterns, collection pipelines (filter/map/fold/sortedBy/groupBy/find/
+// partition/zip/distinct), foreach (k, v) in map, nullable types, try/catch,
+// tail recursion, while/foreach loops, and string interpolation.
+
+val MAX_FLOOR: Int = 20
+
+// ─── Extensions ────────────────────────────────────────────────────────────
+
+extension Int {
+  def floorLabel(): String = "F#{self}"
+  def clampFloor(): Int {
+    if self < 1 { return 1 }
+    if self > MAX_FLOOR { return MAX_FLOOR }
+    return self
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── CallLogEntry: hall-call record parsed from a dispatcher log line ───────
+// Format: HH:MM CALL floor=N dir=UP|DOWN
+
+record CallLogEntry(time: String, floor: Int, dir: String)
+  from re"(\d+:\d+) CALL floor=(\d+) dir=(UP|DOWN)"
+  example { new CallLogEntry("08:00", 5, "UP").floor() == 5 }
+  example { CallLogEntry::parse("08:15 CALL floor=3 dir=DOWN") != null }
+  example { CallLogEntry::parse("garbage") == null }
+
+// ─── Direction: plain enum ───────────────────────────────────────────────────
+
+enum Direction { UP, DOWN, IDLE
+public:
+  def label(): String = select this {
+    case Direction::UP:   "UP"
+    case Direction::DOWN: "DOWN"
+    case Direction::IDLE: "IDLE"
+    else:                 "?"
+  }
+  def opposite(): Direction = select this {
+    case Direction::UP:   Direction::DOWN
+    case Direction::DOWN: Direction::UP
+    else:                 Direction::IDLE
+  }
+}
+
+// ─── DoorState: data-carrying enum ───────────────────────────────────────────
+
+enum DoorState(cycleSeconds: Int) { OPEN(3), CLOSED(0), OPENING(1), CLOSING(1)
+public:
+  def isTransitioning(): Boolean = select this {
+    case DoorState::OPENING: true
+    case DoorState::CLOSING: true
+    else:                    false
+  }
+}
+
+// ─── DispatchEvent: ADT case-enum ────────────────────────────────────────────
+
+enum DispatchEvent {
+  case Arrived(car: Int, floor: Int)
+  case DoorsOpened(car: Int, floor: Int)
+  case Overloaded(car: Int, weightKg: Int, capacityKg: Int)
+  case WentIdle(car: Int, floor: Int)
+public:
+  def describe(): String = select this {
+    case a is Arrived:     "Car #{a.car()} passing floor #{a.floor().floorLabel()}"
+    case d is DoorsOpened: "Car #{d.car()} opened doors at #{d.floor().floorLabel()}"
+    case o is Overloaded:  "Car #{o.car()} overloaded: #{o.weightKg()}kg > #{o.capacityKg()}kg"
+    case w is WentIdle:    "Car #{w.car()} went idle at #{w.floor().floorLabel()}"
+  }
+}
+
+// ─── RiderRequest: record with body methods ──────────────────────────────────
+
+record RiderRequest(id: Int, originFloor: Int, destFloor: Int, weightKg: Int) {
+public:
+  def direction(): Direction {
+    if destFloor() > originFloor() { return Direction::UP }
+    if destFloor() < originFloor() { return Direction::DOWN }
+    return Direction::IDLE
+  }
+  def distance(): Int {
+    val d: Int = destFloor() - originFloor()
+    if d < 0 { return 0 - d }
+    return d
+  }
+}
+
+// ─── Dispatchable interface ──────────────────────────────────────────────────
+
+interface Dispatchable {
+  def handleRequest(r: RiderRequest): Boolean
+  def status(): String
+}
+
+// ─── ElevatorCar: class with mutable state ───────────────────────────────────
+
+class ElevatorCar conforms Dispatchable {
+  val carId:      Int
+  val capacityKg: Int
+  var currentFloor: Int
+  var direction:    Direction
+  var doorState:    DoorState
+  var queue:        List[Int]
+  var weightKg:      Int
+public:
+  def this(id: Int, capacity: Int, startFloor: Int) {
+    this.carId = id
+    this.capacityKg = capacity
+    currentFloor = startFloor
+    direction = Direction::IDLE
+    doorState = DoorState::CLOSED
+    queue = []
+    weightKg = 0
+  }
+  def id(): Int = carId
+  def floor(): Int = currentFloor
+  def queueSize(): Int = queue.size
+  def isIdle(): Boolean = queue.isEmpty()
+  def availableKg(): Int = capacityKg - weightKg
+
+  def addStop(floor: Int): void {
+    if queue.find { f => (f as Int) == floor } != null { return }
+    queue.add(floor)
+    queue = queue.sortedBy { f =>
+      val diff: Int = (f as Int) - currentFloor
+      if diff < 0 { 0 - diff } else { diff }
+    }
+  }
+
+  def handleRequest(r: RiderRequest): Boolean {
+    if r.weightKg() > availableKg() { return false }
+    weightKg = weightKg + r.weightKg()
+    addStop(r.originFloor())
+    addStop(r.destFloor())
+    if direction == Direction::IDLE { direction = r.direction() }
+    return true
+  }
+
+  def step(): DispatchEvent {
+    if queue.isEmpty() {
+      doorState = DoorState::CLOSED
+      return new WentIdle(carId, currentFloor)
+    }
+    val target: Int = queue.get(0) as Int
+    if target > currentFloor { currentFloor++; direction = Direction::UP }
+    else if target < currentFloor { currentFloor--; direction = Direction::DOWN }
+    if currentFloor == target {
+      queue = queue.filter { f => (f as Int) != target }
+      doorState = DoorState::OPEN
+      if queue.isEmpty() { weightKg = 0; direction = Direction::IDLE }
+      return new DoorsOpened(carId, currentFloor)
+    }
+    return new Arrived(carId, currentFloor)
+  }
+
+  def status(): String =
+    "Car #{carId} @#{currentFloor.floorLabel()} dir=#{direction.label()} " +
+    "load=#{weightKg}/#{capacityKg}kg queue=#{queue.toString()}"
+}
+
+// ─── Building: dispatch coordinator ──────────────────────────────────────────
+
+class Building {
+  val cars: List[ElevatorCar]
+public:
+  def this(cs: List[ElevatorCar]) { this.cars = cs }
+
+  def carList(): List[ElevatorCar] = cars
+
+  def findCar(carId: Int): Option[ElevatorCar] {
+    val found: ElevatorCar = cars.find { c => (c as ElevatorCar).id() == carId } as ElevatorCar
+    if found != null { return Option::some(found) }
+    return Option::none()
+  }
+
+  // nearest car with enough spare capacity, or null if none can take the ride
+  def dispatch(r: RiderRequest): ElevatorCar? {
+    val eligible: List[ElevatorCar] = cars.filter { c => (c as ElevatorCar).availableKg() >= r.weightKg() }
+    if eligible.isEmpty() { return null }
+    val nearest: List[ElevatorCar] = eligible.sortedBy { c =>
+      val diff: Int = (c as ElevatorCar).floor() - r.originFloor()
+      if diff < 0 { 0 - diff } else { diff }
+    }
+    val chosen: ElevatorCar = nearest.get(0) as ElevatorCar
+    if chosen.handleRequest(r) { return chosen }
+    return null
+  }
+
+  def simulateStep(): List[DispatchEvent] {
+    val events: List[DispatchEvent] = []
+    foreach c: ElevatorCar in cars { events.add(c.step()) }
+    return events
+  }
+}
+
+// combined status of two cars via do[Option] — None if either id is missing
+def pairStatus(b: Building, id1: Int, id2: Int): Option[String] {
+  return do[Option] {
+    c1 <- b.findCar(id1)
+    c2 <- b.findCar(id2)
+    ret "#{c1.status()} | #{c2.status()}"
+  }
+}
+
+// tail-recursive sum of queued stops across every car
+def totalQueueLength(cs: List[ElevatorCar], i: Int): Int {
+  if i >= cs.size { return 0 }
+  return (cs.get(i) as ElevatorCar).queueSize() + totalQueueLength(cs, i + 1)
+}
+
+def validateFloor(f: Int): Int {
+  if f < 1 || f > MAX_FLOOR { throw new Exception("invalid floor: #{f}") }
+  return f
+}
+
+// dispatcher-console command parser via regex select patterns
+def classifyCommand(cmd: String): String = select cmd {
+  case re"CALL floor=(\d+) dir=(UP|DOWN)" (floor, dir): "hall call at F#{floor} going #{dir}"
+  case re"CANCEL (\d+)" (id):                            "cancel request ##{id}"
+  else:                                                  "unknown command"
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────
+
+IO::println("═══ Elevator Dispatch Simulator ═══")
+
+val building: Building = new Building([
+  new ElevatorCar(1, 150, 1), new ElevatorCar(2, 150, 10), new ElevatorCar(3, 100, 15)
+])
+
+val requests: List[RiderRequest] = [
+  new RiderRequest(1,  1, 10, 70),
+  new RiderRequest(2,  3,  1, 55),
+  new RiderRequest(3,  1, 15, 90),
+  new RiderRequest(4,  8,  2, 60),
+  new RiderRequest(5,  1,  5, 65),
+  new RiderRequest(6, 12, 20, 40),
+  new RiderRequest(7,  1, 18, 85)
+]
+
+// ── Section 1: parse a sample dispatcher log ──
+IO::println("\n── Dispatcher Log ──────────────────────────")
+val logLines: List[String] = [
+  "08:00 CALL floor=1 dir=UP",
+  "08:02 CALL floor=8 dir=DOWN",
+  "08:05 CALL floor=12 dir=UP"
+]
+var joined: String = ""
+foreach line: String in logLines { joined = joined + line + "\n" }
+val calls: List[CallLogEntry] = CallLogEntry::parseAll(joined)
+foreach c: CallLogEntry in calls {
+  IO::println("  [#{c.time()}] #{classifyCommand("CALL floor=#{c.floor()} dir=#{c.dir()}")}")
+}
+
+// ── Section 2: dispatch every request, guarding against bad floors ──
+IO::println("\n── Dispatch ─────────────────────────────────")
+val assignedCarIds: List[Int] = []
+foreach r: RiderRequest in requests {
+  try {
+    validateFloor(r.originFloor())
+    validateFloor(r.destFloor())
+    val car: ElevatorCar? = building.dispatch(r)
+    if car == null {
+      IO::println("  Request ##{r.id()}: no car available")
+      assignedCarIds.add(0)
+    } else {
+      IO::println("  Request ##{r.id()} (#{r.originFloor().floorLabel()}->#{r.destFloor().floorLabel()}, " +
+        "#{r.weightKg()}kg) -> Car #{(car as ElevatorCar).id()}")
+      assignedCarIds.add((car as ElevatorCar).id())
+    }
+  } catch e: Exception {
+    IO::println("  Request ##{r.id()}: rejected — #{e.getMessage()}")
+    assignedCarIds.add(0)
+  }
+}
+
+// deliberately invalid request to exercise the try/catch path
+try {
+  validateFloor(99)
+} catch e: Exception {
+  IO::println("  Validation check: #{e.getMessage()}")
+}
+
+// a capacity breach reported directly through the ADT, without a live car
+val overloadWarning: DispatchEvent = new Overloaded(3, 120, 100)
+IO::println("  " + overloadWarning.describe())
+
+// ── Section 3: run the simulation for a few ticks ──
+IO::println("\n── Simulation ───────────────────────────────")
+var tick: Int = 0
+while tick < 6 {
+  IO::println("  -- tick #{tick} --")
+  val events: List[DispatchEvent] = building.simulateStep()
+  foreach ev: DispatchEvent in events { IO::println("    " + ev.describe()) }
+  tick++
+}
+IO::println("  Total remaining queued stops (tail recursion): #{totalQueueLength(building.carList(), 0)}")
+
+// ── Section 4: fleet status and do[Option] lookups ──
+IO::println("\n── Fleet Status ─────────────────────────────")
+foreach c: ElevatorCar in building.carList() { IO::println("  " + c.status()) }
+
+IO::println("\n── Paired Status (do[Option]) ───────────────")
+IO::println("  cars 1,2: " + pairStatus(building, 1, 2).getOrElse("not found"))
+IO::println("  cars 1,9: " + pairStatus(building, 1, 9).getOrElse("cars not found"))
+
+// ── Section 5: request analytics ──
+IO::println("\n── Request Analytics ────────────────────────")
+val byDirection: Map[String, List[RiderRequest]] = requests.groupBy { r => (r as RiderRequest).direction().label() }
+foreach (dir, reqs) in byDirection {
+  val ids: List[Int] = (reqs as List[RiderRequest]).map { r => (r as RiderRequest).id() }
+  IO::println("  #{dir.padRight(6)}: #{ids.toString()}")
+}
+
+val parts = requests.partition { r => (r as RiderRequest).weightKg() >= 70 }
+val heavy: List[RiderRequest] = parts.get(0) as List[RiderRequest]
+val light: List[RiderRequest] = parts.get(1) as List[RiderRequest]
+IO::println("  Heavy (>=70kg): #{heavy.size}, Light (<70kg): #{light.size}")
+
+val byDistance: List[RiderRequest] = requests.sortedBy { r => (r as RiderRequest).distance() }
+IO::println("  Shortest hop: ##{(byDistance.get(0) as RiderRequest).id()}, " +
+  "Longest hop: ##{(byDistance.get(byDistance.size - 1) as RiderRequest).id()}")
+
+var allFloors: List[Int] = []
+foreach r: RiderRequest in requests {
+  allFloors.add(r.originFloor())
+  allFloors.add(r.destFloor())
+}
+IO::println("  Distinct floors visited: #{allFloors.distinct().sortedBy { f => f as Int }.toString()}")
+
+val totalWeight: Int = requests.fold(0) { acc, r => (acc as Int) + (r as RiderRequest).weightKg() }
+IO::println("  Total weight carried: #{totalWeight}kg")
+
+val ids: List[Int] = requests.map { r => (r as RiderRequest).id() }
+val zipped = ids.zip(assignedCarIds)
+IO::println("  Request -> Car assignments (zip): #{zipped.toString()}")
+
+IO::println("\n═══ Simulation complete ═══")

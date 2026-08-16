@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handling were each tested individually, but never combined in the same
   write; the combination already passed, so this closes a coverage gap rather
   than a live bug.
+- **`TryInEnumCaseArgSpec`, regression coverage for `try`/`catch` used as an
+  argument to an `enum case` constructor invocation**
+  (`new Circle(try {...} catch {...})`). The generated constructor already
+  flows through the same `visitNewObject` path ordinary records use (already
+  hardened by the #669/#745/#752 fixes), so this already passed; this closes
+  a coverage gap rather than a live bug.
 
 ## [0.10.37] - 2026-08-16
 

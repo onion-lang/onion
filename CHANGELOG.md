@@ -44,6 +44,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pending reference on the exceptional path. This is the safe-indexing
   sibling of the plain array-index fix for the same underlying issue
   (#745, #752, and friends).
+- **`try`/`catch` assigned to a closure-captured (boxed) `var` no longer
+  crashes the compiler.** `x = try { ... } catch { ... }`, where `x` is a
+  `var` that some closure captures and mutates (so it is stored in a heap
+  box rather than a plain local slot), previously crashed with an `[I0000]`
+  internal error during bytecode verification whether the assignment ran
+  inside the capturing closure or in the variable's declaring scope: the
+  box reference was pushed onto the operand stack before evaluating the
+  right-hand side, and the JVM clears the stack when dispatching to an
+  exception handler, silently discarding the pending box reference on the
+  exceptional path. This is the boxed-local-variable sibling of the
+  field/array-assignment fixes for the same underlying issue (#745 and
+  friends).
 
 ## [0.10.36] - 2026-08-15
 

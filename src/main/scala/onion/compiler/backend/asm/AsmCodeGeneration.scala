@@ -769,21 +769,40 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         // Use frameIndex to handle nested closures correctly
         closureCtx.capturedBinding(set.frame, set.index) match
           case Some(binding) if binding.isBoxed =>
-            // Boxed captured variable: load box, compute value, put value into box
-            gen.loadThis()
+            // Boxed captured variable: load box, compute value, put value into box.
+            // If the value may run its own try/catch, the box reference can't stay
+            // on the operand stack across it -- the JVM clears the stack when
+            // dispatching to an exception handler, silently discarding the pending
+            // box reference on the exceptional path (the boxed-local sibling of the
+            // field/array-assignment fix for issue #745/#669).
             val boxType = boxAsmType(binding.tp)
-            gen.getField(
-              AsmUtil.objectType(closureCtx.closureClassName),
-              closureCtx.capturedFieldName(binding),
-              boxType
-            )
-            emitExpressionWithContext(gen, set.value, className, localVars)
             val valueType = boxedValueType(set.`type`)
-            if valueType.getSize() == 2 then
-              gen.dup2X1()
+            if TermContainsTry.contains(set.value) then
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueSlot = gen.newLocal(valueType)
+              gen.storeLocal(valueSlot)
+              gen.loadThis()
+              gen.getField(
+                AsmUtil.objectType(closureCtx.closureClassName),
+                closureCtx.capturedFieldName(binding),
+                boxType
+              )
+              gen.loadLocal(valueSlot)
+              gen.putField(boxType, "value", valueType)
+              gen.loadLocal(valueSlot)
             else
-              gen.dupX1()
-            gen.putField(boxType, "value", valueType)
+              gen.loadThis()
+              gen.getField(
+                AsmUtil.objectType(closureCtx.closureClassName),
+                closureCtx.capturedFieldName(binding),
+                boxType
+              )
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              if valueType.getSize() == 2 then
+                gen.dup2X1()
+              else
+                gen.dupX1()
+              gen.putField(boxType, "value", valueType)
           case Some(binding) =>
             gen.loadThis()
             emitExpressionWithContext(gen, set.value, className, localVars)
@@ -820,14 +839,26 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           val valueType = boxedValueType(set.`type`)
           localVars.slotOf(set.index) match
             case Some(slot) =>
-              // Update: load box, compute value, put into box.value
-              gen.loadLocal(slot)
-              emitExpressionWithContext(gen, set.value, className, localVars)
-              if valueType.getSize() == 2 then
-                gen.dup2X1()
+              // Update: load box, compute value, put into box.value.
+              // If the value may run its own try/catch, the box reference can't
+              // stay on the operand stack across it -- see the boxed-captured-
+              // variable branch above for why (issue #745/#669 sibling).
+              if TermContainsTry.contains(set.value) then
+                emitExpressionWithContext(gen, set.value, className, localVars)
+                val valueSlot = gen.newLocal(valueType)
+                gen.storeLocal(valueSlot)
+                gen.loadLocal(slot)
+                gen.loadLocal(valueSlot)
+                gen.putField(boxType, "value", valueType)
+                gen.loadLocal(valueSlot)
               else
-                gen.dupX1()
-              gen.putField(boxType, "value", valueType)
+                gen.loadLocal(slot)
+                emitExpressionWithContext(gen, set.value, className, localVars)
+                if valueType.getSize() == 2 then
+                  gen.dup2X1()
+                else
+                  gen.dupX1()
+                gen.putField(boxType, "value", valueType)
             case None =>
               // Initialize: compute value, create box, store box, return value
               emitExpressionWithContext(gen, set.value, className, localVars)

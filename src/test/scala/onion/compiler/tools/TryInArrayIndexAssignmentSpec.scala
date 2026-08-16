@@ -15,6 +15,12 @@ import onion.tools.Shell
  *
  * `AsmCodeGenerationVisitor.visitSetArray` now also spills the array
  * reference when the index may run its own `try`.
+ *
+ * The final case below combines the index-side fix with the pre-existing
+ * value-side handling: both the index and the assigned value run their own
+ * `try`/`catch` in the same array write, which no earlier spec exercised
+ * together. It already passes, so this closes a coverage gap rather than a
+ * live bug.
  */
 class TryInArrayIndexAssignmentSpec extends AbstractShellSpec {
   describe("try/catch expression as an array-write index") {
@@ -120,6 +126,30 @@ class TryInArrayIndexAssignmentSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success("42,42") == result)
+    }
+
+    it("does not corrupt the array reference when both the index and the value run their own try/catch") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val arr: Int[] = new Int[3]
+          |    arr[0] = 100
+          |    arr[1] = 200
+          |    arr[2] = 300
+          |    arr[try { Integer::parseInt("1") } catch _: Exception { -1 }] =
+          |      try { Integer::parseInt("nope") } catch _: Exception { 999 }
+          |    arr[try { Integer::parseInt("nope") } catch _: Exception { 2 }] =
+          |      try { Integer::parseInt("42") } catch _: Exception { -1 }
+          |    return arr[0] + "," + arr[1] + "," + arr[2]
+          |  }
+          |}
+          |""".stripMargin,
+        "TryInArrayIndexAndValueAssignment.on",
+        Array()
+      )
+      assert(Shell.Success("100,999,42") == result)
     }
   }
 }

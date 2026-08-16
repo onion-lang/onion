@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`TryInArrayIndexAssignmentSpec`, regression coverage for `try`/`catch` used
+  as *both* the index and the assigned value of the same array write**
+  (`arr[try {...} catch {...}] = try {...} catch {...}`). The existing index-side
+  fix (#758 write-side sibling of #745/#669) and the pre-existing value-side
+  handling were each tested individually, but never combined in the same
+  write; the combination already passed, so this closes a coverage gap rather
+  than a live bug.
+
 ## [0.10.37] - 2026-08-16
 
 ### Added

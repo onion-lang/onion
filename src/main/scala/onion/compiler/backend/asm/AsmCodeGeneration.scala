@@ -836,6 +836,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               // the same operand-stack-clearing reason as issue #745/#669.
               val boxType = boxAsmType(set.`type`)
               val valueType = boxedValueType(set.`type`)
+              System.err.println(s"[DEBUG] set.index=${set.index} isParameter=${closureCtx.isParameter(set.index)} slotOf=${closureCtx.slotOf(set.index)} isCapturedIdx=${closureCtx.isCapturedVariable(set.index)}")
               closureCtx.slotOf(set.index) match
                 case Some(slot) =>
                   if TermContainsTry.contains(set.value) then

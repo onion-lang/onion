@@ -743,6 +743,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // For frame=0 (current closure's own variables/parameters)
             if ref.frame == 0 && closureCtx.isParameter(ref.index) then
               gen.loadArg(ref.index)
+            else if ref.frame == 0 && closureCtx.isBoxed(ref.index) then
+              // Boxed own local (captured and mutated by a closure nested inside
+              // this one): load box, then get value field, mirroring the
+              // top-level-method boxed-local path below.
+              val boxType = boxAsmType(ref.`type`)
+              val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, boxType))
+              gen.loadLocal(slot)
+              gen.getField(boxType, "value", boxedValueType(ref.`type`))
+              if !ref.`type`.isBasicType then gen.checkCast(asmType(ref.`type`))
             else if ref.frame == 0 then
               val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
               gen.loadLocal(slot)
@@ -820,14 +829,53 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // For frame=0 (current closure's own variables/parameters)
             if set.frame != 0 then
               throw new IllegalStateException(s"Non-captured variable with frame=${set.frame}, index=${set.index} in closure context")
-            emitExpressionWithContext(gen, set.value, className, localVars)
-            val valueType = asmType(set.`type`)
-            if valueType.getSize() == 2 then gen.dup2() else gen.dup()
-            if closureCtx.isParameter(set.index) then
-              gen.storeArg(set.index)
+            if closureCtx.isBoxed(set.index) then
+              // Boxed own local (captured and mutated by a closure nested inside
+              // this one): mirror the top-level-method boxed-local path below --
+              // box-reference-then-value ordering, with the try/catch guard for
+              // the same operand-stack-clearing reason as issue #745/#669.
+              val boxType = boxAsmType(set.`type`)
+              val valueType = boxedValueType(set.`type`)
+              closureCtx.slotOf(set.index) match
+                case Some(slot) =>
+                  if TermContainsTry.contains(set.value) then
+                    emitExpressionWithContext(gen, set.value, className, localVars)
+                    val valueSlot = gen.newLocal(valueType)
+                    gen.storeLocal(valueSlot)
+                    gen.loadLocal(slot)
+                    gen.loadLocal(valueSlot)
+                    gen.putField(boxType, "value", valueType)
+                    gen.loadLocal(valueSlot)
+                  else
+                    gen.loadLocal(slot)
+                    emitExpressionWithContext(gen, set.value, className, localVars)
+                    if valueType.getSize() == 2 then
+                      gen.dup2X1()
+                    else
+                      gen.dupX1()
+                    gen.putField(boxType, "value", valueType)
+                case None =>
+                  // Initialize: compute value, create box, store box, return value
+                  emitExpressionWithContext(gen, set.value, className, localVars)
+                  val tempSlot = gen.newLocal(valueType)
+                  gen.storeLocal(tempSlot)
+                  gen.newInstance(boxType)
+                  gen.dup()
+                  gen.loadLocal(tempSlot)
+                  val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
+                  gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
+                  val slot = closureCtx.allocateSlot(set.index, boxType)
+                  gen.storeLocal(slot)
+                  gen.loadLocal(tempSlot) // Return the value
             else
-              val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
-              gen.storeLocal(slot)
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueType = asmType(set.`type`)
+              if valueType.getSize() == 2 then gen.dup2() else gen.dup()
+              if closureCtx.isParameter(set.index) then
+                gen.storeArg(set.index)
+              else
+                val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
+                gen.storeLocal(slot)
       case _ =>
         val setValueType = asmType(set.`type`)
         if localVars.isParameter(set.index) then

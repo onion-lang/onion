@@ -551,5 +551,9 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(output.contains("Recursive total bytes: 25353"))
       assert(output.contains("Analysis complete."))
     }
+
+    it("runs TryCatchEdgeCases.on") {
+      assert(Shell.Success(138) == runSample("run/TryCatchEdgeCases.on"))
+    }
   }
 }

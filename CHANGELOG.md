@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ThreeLevelNestedClosureCapturedVariableSpec`, regression coverage for a
+  `var` relayed through *three* levels of closure nesting.**
+  `NestedClosureCapturedVariableSpec` (#756) locked in the two-levels-deep
+  case for a variable captured from an outer scope, relayed through one
+  intermediate closure, and mutated only by the innermost one. Both
+  `CapturedVariableScanner` (typing) and `ClosureCodegen.emitNewClosure`'s
+  `adjustedFrame`-based boxed-ness lookup (codegen) were written to recurse
+  to arbitrary depth rather than special-cased for exactly two levels, but
+  nothing exercised a third level of relay -- including the case where the
+  innermost closure's assigned value runs its own `try`/`catch` (the
+  #745/#669 stack-corruption family, reached via the relay path). Both new
+  cases already passed, so this closes a coverage gap rather than a live bug.
 - **`TryInCompoundFieldArrayAssignmentSpec`, regression coverage for `try`/`catch`
   as the right-hand side of a compound assignment (`+=`) on a field or array
   element** (`obj.field += try {...} catch {...}`, `arr[i] += try {...} catch

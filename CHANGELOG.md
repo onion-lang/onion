@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `var` mutated only by a closure nested two (or more) levels deep now
+  correctly shares storage with the declaring scope.** `CapturedVariableScanner`
+  (used during typing to decide which variables need heap-boxed storage)
+  only ever examined the closure immediately enclosing a variable's use; a
+  variable referenced solely inside a closure nested *inside* that one was
+  never marked as boxed, so each closure level silently got its own
+  disconnected copy instead of sharing one cell — a write from the innermost
+  closure was invisible to the declaring scope. This is the transitive-capture
+  sibling of the single-level fix in #214. A related codegen bug compounded
+  it: even once boxing was correctly inferred, `ClosureCodegen.emitNewClosure`
+  determined a captured variable's boxed-ness via a lookup that only
+  understood a closure's own frame-0 locals, so a variable merely *relayed*
+  through an intermediate closure was still treated as unboxed. Combined with
+  a `try`/`catch` as the assigned value, the unboxed path also crashed the
+  compiler with an `[I0000]` internal error (inconsistent stackmap frames):
+  the JVM clears the operand stack when dispatching to the `catch` handler,
+  discarding the pending `this` reference the unboxed-assignment path had
+  already pushed, desyncing the merged stack shape from the normal path (the
+  same family of issue as #745/#669, reached via a different unguarded path).
 - **`try`/`catch` as the right-hand operand of a binary operator no longer
   crashes the compiler.** `1 + (try { ... } catch { ... })`, and the same for
   other arithmetic, bitwise, and comparison operators, previously crashed

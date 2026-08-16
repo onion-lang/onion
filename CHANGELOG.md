@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`try`/`catch` as the index of an array *write* (`arr[try {...} catch
+  {...}] = value`) no longer crashes the compiler.** `visitSetArray` only
+  spilled the array reference into a local when the assigned *value* could
+  run its own `try`, never when the *index* could -- so an array reference
+  already pushed before evaluating such an index was silently discarded by
+  the JVM clearing the operand stack on the exceptional path, desyncing the
+  merged stack shape from the normal path with an `[I0000]` internal error.
+  This is the write-side sibling of the array-read fix for the same
+  underlying issue (#745, #752, and friends) -- the read path (`visitRefArray`)
+  already checked its index; the write path was missing the same check.
 - **A `var` declared inside a closure's own body and mutated only by a
   closure nested inside it now correctly shares storage with the declaring
   closure.** `ClosureCodegen.generateClosureMethod` built each closure's own

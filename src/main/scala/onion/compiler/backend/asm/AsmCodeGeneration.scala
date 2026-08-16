@@ -829,14 +829,28 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // For frame=0 (current closure's own variables/parameters)
             if set.frame != 0 then
               throw new IllegalStateException(s"Non-captured variable with frame=${set.frame}, index=${set.index} in closure context")
-            if closureCtx.isBoxed(set.index) then
+            // Parameters take precedence over the boxed-own-local path below,
+            // mirroring the top-level-method precedence a few lines down
+            // (isParameter is checked before isBoxed there too): a closure's
+            // own parameter slot already holds the raw argument value (from
+            // withParameters), not a box, even when CapturedVariableScanner
+            // marks that index boxed -- e.g. a synthetic type-cast-adaptation
+            // self-assignment the closure-typing prologue inserts for a
+            // generic parameter. Treating that pre-existing slot as an
+            // already-allocated box would read/write through a JVM slot that
+            // actually holds a plain (unboxed) value.
+            if closureCtx.isParameter(set.index) then
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueType = asmType(set.`type`)
+              if valueType.getSize() == 2 then gen.dup2() else gen.dup()
+              gen.storeArg(set.index)
+            else if closureCtx.isBoxed(set.index) then
               // Boxed own local (captured and mutated by a closure nested inside
               // this one): mirror the top-level-method boxed-local path below --
               // box-reference-then-value ordering, with the try/catch guard for
               // the same operand-stack-clearing reason as issue #745/#669.
               val boxType = boxAsmType(set.`type`)
               val valueType = boxedValueType(set.`type`)
-              System.err.println(s"[DEBUG] set.index=${set.index} isParameter=${closureCtx.isParameter(set.index)} slotOf=${closureCtx.slotOf(set.index)} isCapturedIdx=${closureCtx.isCapturedVariable(set.index)}")
               closureCtx.slotOf(set.index) match
                 case Some(slot) =>
                   if TermContainsTry.contains(set.value) then
@@ -872,11 +886,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               emitExpressionWithContext(gen, set.value, className, localVars)
               val valueType = asmType(set.`type`)
               if valueType.getSize() == 2 then gen.dup2() else gen.dup()
-              if closureCtx.isParameter(set.index) then
-                gen.storeArg(set.index)
-              else
-                val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
-                gen.storeLocal(slot)
+              val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
+              gen.storeLocal(slot)
       case _ =>
         val setValueType = asmType(set.`type`)
         if localVars.isParameter(set.index) then

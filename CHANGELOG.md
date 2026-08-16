@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/TryCatchEdgeCases.on`, a regression sample combining `try`/`catch`
+  with expression positions not covered by any single existing
+  `TryInXxxSpec`.** A `select` scrutinee, a `select` case guard, a `while`
+  condition, a `foreach` iterable, a record constructor argument, an
+  `is`/`as` target, a compound-assignment (`+=`) right-hand side, a string
+  interpolation segment, and a closure reassigning a per-iteration
+  captured `var` -- all via `try`/`catch` -- exercised together as one
+  combined integration check (`Shell.Success(138)`), on top of the
+  existing narrowly-scoped unit coverage for the array-index,
+  binary-operand, and field/local-assignment positions (#669, #745, #752
+  and friends).
+
 ### Fixed
 
 - **`try`/`catch` as the index of an array *write* (`arr[try {...} catch

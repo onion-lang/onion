@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`TryInCompoundFieldArrayAssignmentSpec`, regression coverage for `try`/`catch`
+  as the right-hand side of a compound assignment (`+=`) on a field or array
+  element** (`obj.field += try {...} catch {...}`, `arr[i] += try {...} catch
+  {...}`). Compound assignment desugars `target op= value` to `target = target
+  op value`, so the `try` ends up nested inside a `BinaryTerm` rather than
+  directly as the assigned value -- unlike the plain-assignment cases already
+  covered by `TryInFieldAssignmentSpec`/`TryInArrayIndexAssignmentSpec`. This
+  locks in that `TermContainsTry.contains`'s generic recursion still finds the
+  nested `try` and `visitSetField`/`visitSetArray` still spill the
+  receiver/array-and-index correctly (the #745/#752 stack-corruption family);
+  all three new cases already passed, so this closes a coverage gap rather
+  than a live bug.
 - **`run/TryCatchEdgeCases.on`, a regression sample combining `try`/`catch`
   with expression positions not covered by any single existing
   `TryInXxxSpec`.** A `select` scrutinee, a `select` case guard, a `while`

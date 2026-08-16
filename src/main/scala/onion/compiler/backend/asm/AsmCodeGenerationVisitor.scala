@@ -161,10 +161,13 @@ class AsmCodeGenerationVisitor(
   
   override def visitSetArray(node: SetArray): Unit =
     val valueType = asmType(node.`type`)
-    if TermContainsTry.contains(node.value) then
+    if TermContainsTry.contains(node.index) || TermContainsTry.contains(node.value) then
       // See visitSetField: the target/index can't stay live on the operand
-      // stack across a value that runs its own try/catch, since the JVM
-      // clears the stack when dispatching to an exception handler.
+      // stack across an index or value that runs its own try/catch, since
+      // the JVM clears the stack when dispatching to an exception handler.
+      // (The read-side sibling of this gap -- visitRefArray checking only
+      // its index -- was fixed already; this write side was missing the
+      // index check and only guarded against the value.)
       visitTerm(node.target)
       val targetSlot = gen.newLocal(asmType(node.target.`type`))
       gen.storeLocal(targetSlot)

@@ -25,9 +25,26 @@ final class ClosureCodegen(
     // (Do not capture the closure's own parameters/locals.)
     val rawCapturedVars = CapturedVariableCollector.collect(closure.block, closure.frame)
 
-    // Correct the isBoxed flags using localVars (which has the correct info from parent scope)
+    // Correct the isBoxed flags using localVars (which has the correct info from parent scope).
+    // `v.frameIndex` is relative to the closure being created; adjusting by one
+    // level closer gives its meaning in the CURRENT (enclosing) context. When
+    // that adjusted frame is > 0, the variable is not the enclosing closure's
+    // own local -- it is itself a variable the enclosing closure captured (and
+    // is merely relaying), so its boxed-ness lives in that closure's own
+    // capturedBinding table, keyed by (frame, index). `LocalVarContext.isBoxed`
+    // only tracks frame-0 locals (via boxedSet), so calling it here for a
+    // relayed capture always answered false, silently un-boxing any variable
+    // captured through two or more levels of closure nesting -- which then
+    // either dropped a nested closure's mutation on the floor or (when paired
+    // with a `try`/`catch` RHS) crashed codegen (the same operand-stack-
+    // clearing issue as #745/#669, but reached via a different unguarded path).
     val capturedVars = rawCapturedVars.map { v =>
-      val isBoxed = localVars.isBoxed(v.index)
+      val adjustedFrame = v.frameIndex - 1
+      val isBoxed = localVars match
+        case closureCtx: ClosureLocalVarContext if adjustedFrame > 0 =>
+          closureCtx.capturedBinding(adjustedFrame, v.index).exists(_.isBoxed)
+        case _ =>
+          localVars.isBoxed(v.index)
       new ClosureLocalBinding(v.frameIndex, v.index, v.tp, v.isMutable, isBoxed)
     }
 

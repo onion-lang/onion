@@ -50,7 +50,7 @@ final class ClosureCodegen(
 
     val outerThisType = CapturedVariableCollector.findOuterThis(closure.block)
 
-    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, capturedVars, outerThisType)
+    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, closure.frame, capturedVars, outerThisType)
     registerCompiledClass(CompiledClass(closureClassName.replace('/', '.'), outputDirectory, closureBytes))
 
     val closureType = AsmUtil.objectType(closureClassName)
@@ -121,6 +121,7 @@ final class ClosureCodegen(
     interfaceType: ClassType,
     method: TypedAST.Method,
     block: ActionStatement,
+    frame: onion.compiler.LocalFrame,
     capturedVars: Seq[ClosureLocalBinding],
     outerThisType: Option[ClassType]
   ): Array[Byte] = {
@@ -153,7 +154,7 @@ final class ClosureCodegen(
       )
 
     generateClosureConstructor(cw, className, capturedVars, outerThisType)
-    generateClosureMethod(cw, className, method, block, capturedVars)
+    generateClosureMethod(cw, className, method, block, frame, capturedVars)
     generateBridgeMethod(cw, className, interfaceType, method)
 
     cw.visitEnd()
@@ -250,6 +251,7 @@ final class ClosureCodegen(
     className: String,
     method: TypedAST.Method,
     block: ActionStatement,
+    frame: onion.compiler.LocalFrame,
     capturedVars: Seq[ClosureLocalBinding]
   ): Unit = {
     val argTypes = method.arguments.map(asmType)
@@ -265,6 +267,7 @@ final class ClosureCodegen(
 
     val closureLocalVars = new ClosureLocalVarContext(gen, className, capturedVars)
       .withParameters(isStatic = false, argTypes)
+      .withBoxedVariables(frame)
 
     asmCodeGen.emitStatementWithContext(gen, block, className, closureLocalVars)
 

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `var` declared inside a closure's own body and mutated only by a
+  closure nested inside it now correctly shares storage with the declaring
+  closure.** `ClosureCodegen.generateClosureMethod` built each closure's own
+  local-variable context with only parameter registration, never consulting
+  the boxed-variable information typing already computes for the closure's
+  frame -- unlike the top-level-method codegen path, which always does
+  both. So a `var` declared inside a closure and mutated by a closure
+  nested inside it got a disconnected unboxed copy per closure level
+  instead of sharing one heap-boxed cell, silently dropping the inner
+  closure's write. When the assigned value ran its own `try`/`catch`, the
+  same gap crashed the compiler with `[I0000] Inconsistent stackmap
+  frames` (the same family as #745/#669). This is the same-closure sibling
+  of the cross-closure-relay fix for issue #756.
+
 - **A `var` mutated only by a closure nested two (or more) levels deep now
   correctly shares storage with the declaring scope.** `CapturedVariableScanner`
   (used during typing to decide which variables need heap-boxed storage)

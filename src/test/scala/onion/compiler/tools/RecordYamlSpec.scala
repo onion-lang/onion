@@ -107,6 +107,40 @@ class RecordYamlSpec extends AbstractShellSpec {
       assert(Shell.Success("123,true") == result)
     }
 
+    it("rejects an unsupported component type (E0062)") {
+      // RecordJsonSpec covers this for derive!(Json); derive!(Yaml) shares the same
+      // TypingOutlinePass.isDataDerivableType check (both markers reuse one toMap/fromMap
+      // core), but had no direct regression here before this test.
+      val result = shell.run(
+        """
+          |record Inner(z: Int)
+          |record Bad(a: String, b: Inner) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "x" }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a nullable scalar component (String?) (E0062)") {
+      val result = shell.run(
+        """
+          |record Person(name: String, nickname: String?) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "x" }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
     it("coexists with derive!(Json) — all four methods on one record") {
       val result = shell.run(
         """

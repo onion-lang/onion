@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`RecordJsonSpec`/`RecordYamlSpec`, regression coverage for `derive!(Json, Yaml)`
+  rejecting a nullable scalar record component** (`nickname: String?`). Docs describe
+  `derive!` as supporting "scalar components only"; `ScalarConversions.isDerivable`
+  only matches the exact non-null scalar types, so a nullable wrapper around an
+  otherwise-supported type is already rejected with E0062 the same way a wholly
+  unsupported component type (a nested record) is -- but only the JSON side had a
+  regression for the nested-record case, and neither side tested the nullable case.
+  Both already behaved correctly; this closes a coverage gap rather than a live bug.
+
 - **`TryInArrayIndexAssignmentSpec`, regression coverage for `try`/`catch` used
   as *both* the index and the assigned value of the same array write**
   (`arr[try {...} catch {...}] = try {...} catch {...}`). The existing index-side

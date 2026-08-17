@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **docs(project-cli): stop `onion.lock` from contradicting itself two sections down.**
+  `#788` (feat/dependency-lock) added the `### onion.lock` section documenting the lock
+  file but left the `### Not yet supported` section above it, and the `## Deferred` list
+  further down, still claiming "there is no lock file" / listing "dependency lock files"
+  as out of scope — on both the English and Japanese pages. Trimmed both sections to the
+  one thing that is still actually deferred: offline resolution.
+
 ## [0.11.2] - 2026-08-18
 
 ### Added

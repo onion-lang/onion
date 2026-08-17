@@ -215,10 +215,9 @@ in the file.
 
 ### Not yet supported
 
-There is no lock file and no offline mode. Resolution runs on every build, reading
-coursier's cache (`~/.cache/coursier`) for anything already fetched, so a warm build does
-not hit the network — but it is not *prevented* from doing so, and nothing pins a
-transitive against a repository that republishes one. Onion embeds coursier's Java API,
+There is no offline mode. Resolution runs on every build, reading coursier's cache
+(`~/.cache/coursier`) for anything already fetched, so a warm build does not hit the
+network — but it is not *prevented* from doing so. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
 left out rather than made to look like a guarantee it is not.
 
@@ -345,7 +344,7 @@ interactive shell.
 
 The following are intentionally out of scope for this first version, to keep
 `onion.toml` from becoming another large build language before real usage
-justifies it: publishing, dependency lock files and offline resolution, multiple modules
+justifies it: publishing, offline resolution, multiple modules
 or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
 a new test framework, package/archive commands, formatter or linter

@@ -30,7 +30,7 @@ import java.util.zip.ZipOutputStream;
  *   val written = Archive::unzip("out.zip", "extracted")
  *
  *   Archive::gzipFile("big.log", "big.log.gz")
- *   val text = Strings::fromBytes(Archive::gunzip(Files::readBytes("big.log.gz")))
+ *   val text = new String(Archive::gunzip(Files::readBytes("big.log.gz")))
  *
  * Tar is not here: it needs a dependency, and zip plus gzip covers what the JDK can do
  * on its own.

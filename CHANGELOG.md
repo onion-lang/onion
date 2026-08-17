@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ONION_JAVA_OPTS`, so JVM flags can be set at all.** Neither launcher passed anything
+  through, so setting a heap size or attaching a debug agent meant abandoning `onion` and
+  hand-writing a `java -cp` command:
+
+  ```bash
+  ONION_JAVA_OPTS="-Xmx4g" onion big-job.on
+  ```
+
+  `ONION_DEBUG_STARTUP=1` also stops the launcher silencing the JVM's class-sharing
+  messages, which is how to find out why an archive is being ignored.
+
 - **`[dependencies]` in `onion.toml`: a project can finally use a Java library.**
   `ProjectBuilder` compiled every project with `classPath = Seq.empty` and the manifest
   rejected any key outside `[package]`, so a project could not reference a single
@@ -149,6 +160,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a coverage gap rather than a live bug.
 
 ### Fixed
+
+- **Onion started in half the time depending on how you got it, and nothing noticed.**
+  There are two launcher implementations — the `bin/` scripts, which the distribution zip
+  ships and a source checkout runs, and the ones `install.sh` writes for a `curl | sh`
+  install — and they had drifted apart. The installed launchers had a class-data-sharing
+  archive and the `--sun-misc-unsafe-memory-access=allow` workaround; the `bin/` ones had
+  neither. So the same program took 0.73s from the zip and 0.38s from the installer
+  (JDK 25, `onion run/Hello.on`), and printed four lines of JVM deprecation warnings on
+  every single run in the first case and none in the second.
+
+  The `bin/` launchers now share one `bin/onion-jvm.sh` (and `onion-jvm.bat`) that does
+  both. `LauncherParitySpec` fails the build if either implementation gains a capability
+  the other lacks — it caught the archive filename disagreeing between the POSIX and
+  Windows halves while it was being written.
+
+  The Unsafe workaround needs a JDK version check, and the option does not exist before
+  JDK 23 — an unknown `--` option makes the JVM refuse to start. The version is read from
+  the JDK's own `release` file rather than probed by running `java`, which would add a
+  process launch to every invocation. The Windows scripts do not do this check yet, so
+  they still show the warnings.
+
+- **A stale class-data-sharing archive narrated itself on every run.** After a JDK
+  upgrade or a moved install the JVM refuses the archive and carries on correctly — but
+  says so on stderr each time, which lands in anything capturing a tool's output. Both
+  launchers now pass `-Xshare:auto` with the CDS log tags off, so a stale archive costs
+  the speedup and nothing else. `ONION_DEBUG_STARTUP=1` shows the messages again.
 
 - **The build cache could serve classes compiled against an old classpath.** The build
   fingerprint hashed the manifest bytes, which pin only *direct* dependencies; a transitive

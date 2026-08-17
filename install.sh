@@ -163,9 +163,16 @@ else
     JAVA_CMD="\$JAVA_HOME/bin/java"
 fi
 CDS_FLAGS=""
-[ -f "$LIB_DIR/onion.jsa" ] && CDS_FLAGS="-XX:SharedArchiveFile=$LIB_DIR/onion.jsa"
+if [ -f "$LIB_DIR/onion.jsa" ]; then
+    # -Xshare:auto means an archive built by a different JDK, or for an install that has
+    # since moved, is refused and the JVM carries on normally -- but it says so on stderr
+    # every run, which lands in anything capturing this tool's output. Silence it unless
+    # ONION_DEBUG_STARTUP asks to see it.
+    CDS_FLAGS="-XX:SharedArchiveFile=$LIB_DIR/onion.jsa -Xshare:auto"
+    [ -z "\$ONION_DEBUG_STARTUP" ] && CDS_FLAGS="\$CDS_FLAGS -Xlog:cds=off -Xlog:cds+dynamic=off"
+fi
 $extra
-exec "\$JAVA_CMD" $JVM_FLAGS \$CDS_FLAGS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
+exec "\$JAVA_CMD" $JVM_FLAGS \$CDS_FLAGS \$ONION_JAVA_OPTS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
 LAUNCHER
   chmod +x "$BIN_DIR/$name"
   echo "  $BIN_DIR/$name"

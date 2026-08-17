@@ -96,6 +96,14 @@ object OnionFormatter:
 
   def format(source: String): FormatResult =
     val lexemes = lex(source)
+    // A source with no real token and no comment -- whitespace only, or empty -- has no
+    // lexeme for the loop below to visit, so it fell straight through to an empty
+    // StringBuilder and collapsed a whitespace-only file to nothing. No rule anchors to
+    // whitespace with no token around it, so it is left exactly as written.
+    if lexemes.isEmpty then FormatResult(source, changed = false)
+    else formatLexemes(source, lexemes)
+
+  private def formatLexemes(source: String, lexemes: Seq[Lexeme]): FormatResult =
     val out = new StringBuilder
     var previous: Option[Lexeme] = None
 

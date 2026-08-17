@@ -127,6 +127,12 @@ lazy val onionSettings = Seq(
     "org.jline" % "jline" % "3.25.1",
     "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.21.1",
     "org.tomlj" % "tomlj" % "1.1.1",
+    // Maven resolution for a project's [dependencies]. This is coursier's embedding
+    // artifact: a Java API with everything shaded, so it adds no transitive baggage
+    // beyond slf4j-api and cannot collide with anything Onion already ships. The Scala
+    // API (`io.get-coursier::coursier`) has no Scala 3 build, so it would have to come
+    // in through for3Use2_13 and drag its own dependency graph along.
+    "io.get-coursier" % "interface" % "1.0.28",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.2.19" % "test"
   ),

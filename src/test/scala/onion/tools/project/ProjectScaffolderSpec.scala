@@ -20,7 +20,9 @@ class ProjectScaffolderSpec extends AnyFunSuite with Matchers:
 
     paths.root shouldBe parent.resolve("hello").toRealPath()
     String(Files.readAllBytes(paths.manifest), StandardCharsets.UTF_8) shouldBe
-      "[package]\nname = \"hello\"\nversion = \"0.1.0\"\n"
+      "[package]\nname = \"hello\"\nversion = \"0.1.0\"\n" +
+      "\n# Maven coordinates, resolved for build, run and test alike.\n" +
+      "# [dependencies]\n# \"org.postgresql:postgresql\" = \"42.7.3\"\n"
     String(Files.readAllBytes(paths.root.resolve("src/main.on")), StandardCharsets.UTF_8) shouldBe
       "def main(): void {\n  println(\"Hello, hello!\")\n}\n"
     String(Files.readAllBytes(paths.root.resolve("tests/main_test.on")), StandardCharsets.UTF_8) shouldBe

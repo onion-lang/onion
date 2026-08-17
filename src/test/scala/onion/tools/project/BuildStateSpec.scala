@@ -20,7 +20,7 @@ class BuildStateSpec extends AnyFunSuite with Matchers:
 
   private val canonicalJson =
     s"""{
-       |  "schemaVersion": 1,
+       |  "schemaVersion": ${BuildFingerprint.SchemaVersion},
        |  "fingerprint": "$fingerprint",
        |  "classes": [
        |    "MainMain",
@@ -43,7 +43,7 @@ class BuildStateSpec extends AnyFunSuite with Matchers:
        |}""".stripMargin
 
   private def json(
-    schemaVersion: String = "1",
+    schemaVersion: String = BuildFingerprint.SchemaVersion.toString,
     fingerprintValue: String = s"\"$fingerprint\"",
     classes: String = """["MainMain", "demo.Widget"]""",
     entryPoints: String =
@@ -96,7 +96,7 @@ class BuildStateSpec extends AnyFunSuite with Matchers:
     BuildState.decode(json().dropRight(1) + """, "unknown": true}""").isLeft shouldBe true
     BuildState.decode(
       s"""{
-         |  "schemaVersion": 1,
+         |  "schemaVersion": ${BuildFingerprint.SchemaVersion},
          |  "fingerprint": "$fingerprint",
          |  "classes": ["MainMain"]
          |}""".stripMargin
@@ -104,7 +104,7 @@ class BuildStateSpec extends AnyFunSuite with Matchers:
 
   test("rejects wrong root field types"):
     Vector(
-      json(schemaVersion = "\"1\""),
+      json(schemaVersion = "\"" + BuildFingerprint.SchemaVersion + "\""),
       json(fingerprintValue = "1"),
       json(classes = "\"MainMain\""),
       json(classes = "[1]"),
@@ -123,7 +123,11 @@ class BuildStateSpec extends AnyFunSuite with Matchers:
     ).foreach(BuildState.decode(_).isLeft shouldBe true)
 
   test("rejects unknown schema versions and invalid fingerprints"):
-    BuildState.decode(json(schemaVersion = "2")).isLeft shouldBe true
+    // Any version other than the current one, on either side of it, must be rejected --
+    // that is what makes a SchemaVersion bump invalidate stale build state rather than
+    // let it be read back with the wrong meaning.
+    BuildState.decode(json(schemaVersion = (BuildFingerprint.SchemaVersion - 1).toString)).isLeft shouldBe true
+    BuildState.decode(json(schemaVersion = (BuildFingerprint.SchemaVersion + 1).toString)).isLeft shouldBe true
     BuildState.decode(json(fingerprintValue = "\"abc\"")).isLeft shouldBe true
     BuildState.decode(json(fingerprintValue = s""""${"A" * 64}"""")).isLeft shouldBe true
 

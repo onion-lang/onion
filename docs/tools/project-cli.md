@@ -74,13 +74,65 @@ Exit codes are stable across every project command:
 
 ## Manifest
 
-The manifest accepts exactly one table, `[package]`, with exactly two
-required string keys: `name` (matching `[A-Za-z][A-Za-z0-9_-]*`) and
-`version` (a valid [SemVer 2.0](https://semver.org/spec/v2.0.0.html)
-version). Unknown keys or tables, duplicate keys, malformed TOML, and invalid
-names or versions are all reported as errors, with a line and column when the
-TOML parser can supply one. No dependencies, source-root overrides,
+The manifest requires `[package]`, with exactly two required string keys: `name`
+(matching `[A-Za-z][A-Za-z0-9_-]*`) and `version` (a valid
+[SemVer 2.0](https://semver.org/spec/v2.0.0.html) version). Unknown keys or tables,
+duplicate keys, malformed TOML, and invalid names or versions are all reported as errors,
+with a line and column when the TOML parser can supply one. No source-root overrides,
 entrypoint overrides, compiler flags, or scripts are accepted.
+
+### `[dependencies]`
+
+Maven coordinates, one per line, as `"group:artifact" = "version"`:
+
+```toml
+[package]
+name = "report"
+version = "0.1.0"
+
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+"com.fasterxml.jackson.core:jackson-databind" = "2.17.0"
+```
+
+The key has to be quoted, because a Maven coordinate contains a colon. Versions are
+exact — no ranges, no `latest`. Transitive dependencies are resolved and land on the
+classpath for `build`, `run` and `test` alike, so a library you compile against is also
+there when the program runs.
+
+The **resolved** set — transitives included — is part of the build fingerprint, not just
+the manifest text. A transitive moving underneath you invalidates the cache and forces a
+recompile, rather than serving classes compiled against the old classpath as current.
+
+A coordinate that cannot be resolved fails the build with coursier's message, which names
+the coordinate it could not find.
+
+### `[[repositories]]`
+
+Extra Maven repositories, searched **before** Maven Central and in the order written:
+
+```toml
+[[repositories]]
+url = "https://nexus.example.com/repository/maven-public"
+```
+
+Maven Central stays available; these are added to it rather than replacing it. Only
+absolute `http`, `https` and `file` URLs are accepted — a relative or misspelled entry is
+rejected here rather than surfacing later as a resolution failure blamed on a dependency.
+
+This is an array of tables rather than a plain `repositories = [...]` array on purpose. A
+bare key-value pair belongs to whatever table header precedes it, so written after
+`[package]` it would quietly become `package.repositories`; a table header can go anywhere
+in the file.
+
+### Not yet supported
+
+There is no lock file and no offline mode. Resolution runs on every build, reading
+coursier's cache (`~/.cache/coursier`) for anything already fetched, so a warm build does
+not hit the network — but it is not *prevented* from doing so, and nothing pins a
+transitive against a repository that republishes one. Onion embeds coursier's Java API,
+which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
+left out rather than made to look like a guarantee it is not.
 
 ## Source Layout
 
@@ -169,8 +221,8 @@ interactive shell.
 
 The following are intentionally out of scope for this first version, to keep
 `onion.toml` from becoming another large build language before real usage
-justifies it: dependency resolution or publishing, multiple modules or
-workspaces, configurable source/test/output/entrypoint paths, incremental
+justifies it: publishing, dependency lock files and offline resolution, multiple modules
+or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
 a new test framework, package/archive commands, formatter or linter
 integration, lifecycle hooks or manifest scripts, terminal color, and an

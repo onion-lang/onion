@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This was the last item deferred from the highlighting work, and it was waiting on the
   parser recording real spans rather than single columns.
 
+### Documentation
+
+- **Documented `Archive::gunzipFile` in the stdlib reference (en/ja).** It sits
+  right next to its documented sibling `gzipFile` in `Archive.java`, but was
+  never mentioned in either `docs/reference/stdlib.md` or its Japanese copy,
+  making it undiscoverable without reading the Java source. Added a
+  `StdlibDocArchiveModuleParitySpec` drift guard, mirroring the existing
+  `StdlibDocFilesModuleParitySpec`, so a future Archive method that lands
+  without a doc update gets caught the same way.
+
 ## [0.11.0] - 2026-08-17
 
 ### Added

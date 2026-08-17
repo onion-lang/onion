@@ -62,9 +62,9 @@ To build the same artifacts locally without creating a release:
 sbt "assembly; dist"
 ```
 
-Outputs:
-- `target/scala-3.3.7/onion-<version>.jar` (fat jar)
-- `target/onion-dist-<version>.zip` (distribution archive)
+Outputs (sbt 2's default layout nests build products under `target/out/<platform>/<scalaVersion>/<project>/`):
+- `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar` (fat jar)
+- `target/out/jvm/scala-3.3.7/onion/onion-dist-<version>.zip` (distribution archive)
 
 ## Hotfix releases
 

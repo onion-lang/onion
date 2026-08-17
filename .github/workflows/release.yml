@@ -107,10 +107,11 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p release-artifacts
-          FAT_JAR="target/scala-3.3.7/onion-${VERSION}.jar"
+          OUT_DIR="target/out/jvm/scala-3.3.7/onion"
+          FAT_JAR="$OUT_DIR/onion-${VERSION}.jar"
           test -f "$FAT_JAR"
           cp "$FAT_JAR" "release-artifacts/onion-${VERSION}.jar"
-          cp "target/onion-dist-${VERSION}.zip" "release-artifacts/onion-dist-${VERSION}.zip"
+          cp "$OUT_DIR/onion-dist-${VERSION}.zip" "release-artifacts/onion-dist-${VERSION}.zip"
       - name: Generate checksums
         run: |
           cd release-artifacts

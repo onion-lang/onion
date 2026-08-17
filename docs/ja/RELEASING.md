@@ -54,7 +54,7 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 リリースを作成せずに同じ成果物をローカルでビルドするには:
 
 ```bash
-sbt assembly dist
+sbt "assembly; dist"
 ```
 
 出力:

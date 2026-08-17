@@ -155,6 +155,11 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Http` - HTTPクライアント
 - `Regex` - 正規表現
 - `Option`, `Result`, `Future` - 関数型
+- `Db` - JDBCアクセス (connect, query, update, トランザクション)
+- `Archive` - Zip/gzipの作成と展開
+- `Concurrent` - スレッドプール、カウンタ、ロック、チャネル
+- `Net` - TCPソケット (connect, listen)
+- `Server` - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)
 
 ## テスト
 

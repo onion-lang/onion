@@ -161,6 +161,11 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Http` - HTTP client
 - `Regex` - Regular expressions
 - `Option`, `Result`, `Future` - Functional types
+- `Db` - JDBC access (connect, query, update, transactions)
+- `Archive` - Zip/gzip creation and extraction
+- `Concurrent` - Thread pools, counters, locks, channels
+- `Net` - TCP sockets (connect, listen)
+- `Server` - Minimal HTTP server (routing, request/response)
 
 ## Testing
 

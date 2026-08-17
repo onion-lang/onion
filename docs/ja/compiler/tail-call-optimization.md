@@ -69,6 +69,53 @@ def factorial(n: Int, acc: Int): Int {
 }
 ```
 
+## `@TailRecursive` による相互再帰
+
+互いに末尾呼び出しし合う2つ以上のメソッド（`isEven` が `isOdd` を呼び、`isOdd` が
+`isEven` を呼ぶ）は、上記の検出フェーズでは書き換えられません。各呼び出しの対象は
+「別のメソッド」であり、「自己呼び出し」チェックには一致しないためです。グループの
+全メソッドに `@TailRecursive` を付けると、`MutualRecursionOptimization` がそれらを
+1つの状態機械メソッドへ統合します。
+
+```onion
+class Parity {
+private:
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+public:
+  def check(n: Int): Boolean = isEven(n)
+}
+```
+
+グループが最適化されるのは、**すべて**の条件を満たしたときだけです
+（`MutualRecursionOptimization.validateGroup`）。
+
+- グループ内の全メソッドが **private** であること（直接 TCO と同じ理由: public
+  メソッドはオーバーライドされ得るため、共有ループへ書き換えると挙動が黙って変わる
+  おそれがある）
+- 全メソッドの **戻り値の型が同じ** であること
+- 全メソッドの **パラメータ数と型が同じ** であること
+- グループ内メソッドからの末尾呼び出しが、すべて同じグループ内の別メソッドを
+  対象としていること（グループ外への末尾呼び出しがあると対象から外れる）
+
+**検証に失敗したグループはエラーにはならず、アノテーションが単に効かないだけ**
+です。メソッド同士は通常の（末尾でない）呼び出しとして呼び合い続けます。アノテー
+ションを見ても何も指摘されないため気づきにくく、十分深い再帰で初めて実行時に
+JVM スタックが溢れて発覚します。これをコンパイル時に検出できるよう、コンパイラは
+最適化できなかった `@TailRecursive` グループの各メソッドについて **`W0016`** を
+出力し、満たせなかった条件（例: "All methods must be private for mutual
+recursion optimization"）を示します。意図的に最適化しないままにする場合は
+[`--Wno`](../tools/compiler.md#--wno-codes) で抑制してください。
+
 ## 最適化の様子を確認する
 
 `--verbose` フラグを付けてコンパイルすると、どのメソッドが変換され、どのメソッドがなぜスキップされたかを追跡できます。

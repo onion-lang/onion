@@ -67,6 +67,13 @@ class MutualRecursionOptimization(config: CompilerConfig)
   private inline def trace(message: => String): Unit =
     if (config.verbose) System.err.println(message)
 
+  private val warnings = mutable.ArrayBuffer[CompileWarning]()
+
+  /** Warnings accumulated by the most recent `process` call (e.g. a `@TailRecursive`
+    * group that could not be optimized). Read after `process` returns.
+    */
+  def collectedWarnings: Seq[CompileWarning] = warnings.toSeq
+
   def newEnvironment(source: Seq[ClassDefinition]): Environment =
     new OptimizationEnvironment
 
@@ -74,6 +81,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     source: Seq[ClassDefinition],
     environment: OptimizationEnvironment
   ): Seq[ClassDefinition] = {
+    warnings.clear()
     source.map { classDef =>
       optimizeClass(classDef)
     }
@@ -114,6 +122,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
             if (config.verbose) {
               trace(s"[Mutual TCO] Cannot optimize: $error")
             }
+            reportIneffective(classDef, group, error)
           case None =>
             if (config.verbose) {
               trace(s"[Mutual TCO] Optimization will be applied")
@@ -183,6 +192,22 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     validationError
+  }
+
+  /**
+   * Warn that a detected `@TailRecursive` mutual-recursion group could not be
+   * optimized, so callers relying on the annotation for stack safety find out
+   * at compile time instead of via a runtime StackOverflowError.
+   */
+  private def reportIneffective(classDef: ClassDefinition, group: Seq[MethodDefinition], reason: String): Unit = {
+    val sourceFile = Option(classDef.getSourceFile).getOrElse("")
+    val groupNames = group.map(_.name).mkString(", ")
+    group.foreach { method =>
+      val message = s"method '${method.name}' is annotated @TailRecursive but its mutual-recursion " +
+        s"group ($groupNames) could not be optimized: $reason; without the state-machine rewrite, " +
+        s"deep recursion between these methods can still overflow the JVM stack"
+      warnings += CompileWarning(sourceFile, method.location, WarningCategory.IneffectiveTailRecursive, message)
+    }
   }
 
   /**

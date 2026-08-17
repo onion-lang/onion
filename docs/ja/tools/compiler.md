@@ -141,6 +141,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0013` | `suspicious-interpolation` | 疑わしい文字列補間構文 |
 | `W0014` | `discarded-toplevel` | main が定義されているためトップレベル文が無視された |
 | `W0015` | `platform-unboxing` | ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた |
+| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` が付与されているが、その相互再帰グループを最適化できなかった |
 
 ### `--no-check-laws`
 

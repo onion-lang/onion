@@ -437,6 +437,19 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     }
   }
 
+  /**
+   * Rename is file-local and not scope-aware: it rewrites every *code* occurrence of the
+   * identifier in the open document. It does not distinguish two unrelated locals that
+   * happen to share a name, and it cannot see other files.
+   *
+   * What it will no longer do is edit comments and string literals. Renaming `count` used
+   * to rewrite `"count of items"` and `// count starts at zero` along with the code — an
+   * edit that changes a program's output while calling itself a rename, which the compiler
+   * still accepts, so nothing catches it.
+   *
+   * A `#{ … }` interpolation is code, so the `count` in `"n=#{count}"` is renamed with the
+   * rest; skipping everything between quotes would have broken the file the other way.
+   */
   override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = {
     CompletableFuture.supplyAsync { () =>
       val uri = params.getTextDocument.getUri
@@ -449,7 +462,14 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
         val position = params.getPosition
         val line = getLineAt(state.content, position.getLine)
         val word = extractWordAt(line, position.getCharacter)
-        if (word.isEmpty) {
+        val mask = SourceRegions.codeMask(state.content)
+        val lineStarts = lineStartOffsets(state.content)
+
+        // Refuse when the cursor is on a comment or a literal rather than on a name.
+        // Renaming from inside a comment would rewrite every occurrence in the file on
+        // the strength of a word that is not a reference to anything.
+        val cursorOffset = offsetOf(lineStarts, position.getLine, position.getCharacter)
+        if (word.isEmpty || !SourceRegions.isCode(mask, cursorOffset)) {
           null
         } else {
           val changes = new java.util.HashMap[String, java.util.List[TextEdit]]()
@@ -459,11 +479,13 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
           lines.zipWithIndex.foreach { case (lineText, lineNum) =>
             wordPattern.findAllMatchIn(lineText).foreach { m =>
-              val range = new Range(
-                new Position(lineNum, m.start),
-                new Position(lineNum, m.end)
-              )
-              edits.add(new TextEdit(range, newName))
+              if (SourceRegions.isCode(mask, offsetOf(lineStarts, lineNum, m.start))) {
+                val range = new Range(
+                  new Position(lineNum, m.start),
+                  new Position(lineNum, m.end)
+                )
+                edits.add(new TextEdit(range, newName))
+              }
             }
           }
 
@@ -479,6 +501,20 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
       }
     }
   }
+
+  /** Byte-free offset of the first character of each line. */
+  private def lineStartOffsets(content: String): Array[Int] = {
+    val starts = scala.collection.mutable.ArrayBuffer(0)
+    var i = 0
+    while (i < content.length) {
+      if (content.charAt(i) == '\n') starts += (i + 1)
+      i += 1
+    }
+    starts.toArray
+  }
+
+  private def offsetOf(lineStarts: Array[Int], line: Int, character: Int): Int =
+    if (line < 0 || line >= lineStarts.length) -1 else lineStarts(line) + character
 
   private def extractWordAt(line: String, char: Int): String = {
     if (char < 0 || char >= line.length) {

@@ -267,6 +267,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rename in the editor rewrote comments and string literals.** It replaced every
+  whole-word occurrence of the identifier in the file, so renaming `count` also rewrote
+  `"count of items"` and `// count starts at zero`. An edit that changes a program's output
+  while calling itself a rename is the worst kind: the file still compiles, so nothing
+  downstream catches it.
+
+  A new `SourceRegions` scanner classifies each offset as code or not, handling `//` and
+  `/* */`, string escapes, character literals, and scheme-prefixed raw literals (`re"…"`).
+  `#{ … }` interpolation counts as **code** — the `count` in `"n=#{count}"` is a real
+  reference, and skipping everything between quotes would have broken the file the other
+  way. Renaming from a position inside a comment or a literal is now refused, since the
+  word there is not a reference to anything.
+
+  Rename remains file-local and not scope-aware, and the language-server documentation now
+  says so plainly rather than leaving it to be discovered. Fixing that needs the typed AST
+  with real source ranges, and the parser currently produces spans only a token wide.
+
 - **Onion started in half the time depending on how you got it, and nothing noticed.**
   There are two launcher implementations — the `bin/` scripts, which the distribution zip
   ships and a source checkout runs, and the ones `install.sh` writes for a `curl | sh`

@@ -4534,11 +4534,11 @@
 </ol>
 <h2 id="_2">ローカルでの成果物確認<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>リリースを作成せずに同じ成果物をローカルでビルドするには:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span>assembly<span class="w"> </span>dist
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span><span class="s2">"assembly; dist"</span>
 </span></code></pre></div>
-<p>出力:
-- <code>target/scala-3.3.7/onion-&lt;version&gt;.jar</code> (fat jar)
-- <code>target/onion-dist-&lt;version&gt;.zip</code> (配布用アーカイブ)</p>
+<p>出力 (sbt 2 の既定レイアウトではビルド成果物が <code>target/out/&lt;platform&gt;/&lt;scalaVersion&gt;/&lt;project&gt;/</code> 以下に配置される):
+- <code>target/out/jvm/scala-3.3.7/onion/onion-&lt;version&gt;.jar</code> (fat jar)
+- <code>target/out/jvm/scala-3.3.7/onion/onion-dist-&lt;version&gt;.zip</code> (配布用アーカイブ)</p>
 <h2 id="_3">ホットフィックスリリース<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>既にリリースされているバージョンに対するホットフィックスは、リリースタグからブランチを作成し、修正を適用してから新しいパッチタグ（例: <code>v0.2.1</code>）をプッシュします。</p>
 

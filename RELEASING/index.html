@@ -4518,11 +4518,11 @@ is no manual <code>version := ...</code> line to update in <code>build.sbt</code
 </ol>
 <h2 id="local-artifact-inspection">Local artifact inspection<a class="headerlink" href="#local-artifact-inspection" title="Permanent link">&para;</a></h2>
 <p>To build the same artifacts locally without creating a release:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span>assembly<span class="w"> </span>dist
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span><span class="s2">"assembly; dist"</span>
 </span></code></pre></div>
-<p>Outputs:
-- <code>target/scala-3.3.7/onion-&lt;version&gt;.jar</code> (fat jar)
-- <code>target/onion-dist-&lt;version&gt;.zip</code> (distribution archive)</p>
+<p>Outputs (sbt 2's default layout nests build products under <code>target/out/&lt;platform&gt;/&lt;scalaVersion&gt;/&lt;project&gt;/</code>):
+- <code>target/out/jvm/scala-3.3.7/onion/onion-&lt;version&gt;.jar</code> (fat jar)
+- <code>target/out/jvm/scala-3.3.7/onion/onion-dist-&lt;version&gt;.zip</code> (distribution archive)</p>
 <h2 id="hotfix-releases">Hotfix releases<a class="headerlink" href="#hotfix-releases" title="Permanent link">&para;</a></h2>
 <p>For a hotfix against an already-released version, branch from the release tag,
 apply the fix, and push a new patch tag (e.g. <code>v0.2.1</code>).</p>

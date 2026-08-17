@@ -3584,6 +3584,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#semantic-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#formatting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4475,6 +4486,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#semantic-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#formatting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4585,6 +4607,10 @@ editor that supports the Language Server Protocol.</p>
 <td>Formatting</td>
 <td>Normalises spacing, sharing its implementation with <code>onion fmt</code></td>
 </tr>
+<tr>
+<td>Semantic tokens</td>
+<td>Colours each identifier by what the document declares it to be</td>
+</tr>
 </tbody>
 </table>
 <h3 id="what-rename-does-and-does-not-do">What rename does, and does not, do<a class="headerlink" href="#what-rename-does-and-does-not-do" title="Permanent link">&para;</a></h3>
@@ -4599,6 +4625,24 @@ references in other files are not touched at all. Scope-aware rename needs the t
 with real source ranges, and the parser currently produces spans only a token wide; that is
 the work this depends on. Until then, review the edits your editor previews before applying
 them.</p>
+<h3 id="semantic-tokens">Semantic tokens<a class="headerlink" href="#semantic-tokens" title="Permanent link">&para;</a></h3>
+<p>This is the colouring a TextMate grammar cannot produce. A grammar decides what a word is
+from the shape of the line around it, so <code>Greeter</code>, <code>greet</code> and <code>count</code> all look alike — they
+are words. The server classifies each identifier by what the document actually declares it
+to be: class, interface, enum, record, method, field, or local.</p>
+<p><strong>It emits nothing it is unsure of.</strong> An identifier the document does not declare produces no
+token at all, and the editor falls back to the TextMate grammar for it. Semantic tokens
+override the grammar, so a guess would replace a right answer with a wrong one. Soft keywords
+are left alone for the same reason: <code>conforms</code> reaches the server as an identifier, because
+only the parser's lookahead decides whether it is a keyword there — colouring it from the
+lexer alone would light up a method named <code>conforms</code>.</p>
+<p>Keyword and operator kinds are read from the generated parser's own token table rather than
+listed in the server, so a keyword added to the grammar is classified without anyone
+remembering to update it. That is the duplication that let the TextMate grammar rot to 70%
+coverage; here there is nothing to keep in step. Onion's primitive types are the capitalised
+entries in that same table, which is how <code>Int</code> is coloured as a type rather than a keyword.</p>
+<p>Your theme has to opt in. In VS Code, semantic highlighting is on by default for themes that
+declare support; <code>"editor.semanticHighlighting.enabled": true</code> forces it on for any theme.</p>
 <h3 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h3>
 <p>The formatting provider calls the same code as <code>onion fmt</code>, so an editor and a CI check can
 never disagree about what formatted means — a difference there shows up as a file that

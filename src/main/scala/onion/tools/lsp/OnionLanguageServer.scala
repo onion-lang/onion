@@ -69,6 +69,9 @@ class OnionLanguageServer extends LanguageServer with LanguageClientAware {
       // Rename
       capabilities.setRenameProvider(true)
 
+      // Formatting, sharing its implementation with `onion fmt`
+      capabilities.setDocumentFormattingProvider(true)
+
       val result = new InitializeResult(capabilities)
       val serverInfo = new ServerInfo("Onion Language Server", "1.0.0")
       result.setServerInfo(serverInfo)

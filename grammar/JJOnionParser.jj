@@ -535,6 +535,36 @@ public class JJOnionParser implements Parser {
   }
 
   /*
+   * A Location covering both operands of a compound expression.
+   *
+   * Anchoring a binary node at its operator token put a single '^' under the '*' of
+   * `3 * "x"`; every leaf already spans its own token, so the whole expression can be
+   * covered by starting where the left operand starts and ending where the right one
+   * ends. The reported position moves from the operator to the start of the expression,
+   * which is what every other compiler does and what a reader expects.
+   */
+  /*
+   * A Location from `start` through the token the parser has just consumed -- the ')' of
+   * a call, say. Anchoring a call at its name alone underlined `someUndefinedThing` and
+   * left the `(1, 2)` out of the diagnostic entirely.
+   *
+   * Not static: `token` is the parser's own cursor over what it has already read.
+   */
+  private Location through(Token start) {
+    return p(start).spanningTo(p(token));
+  }
+
+  private static Location span(AST.Expression from, AST.Expression to) {
+    if (from == null || from.location() == null) {
+      return to == null ? null : to.location();
+    }
+    if (to == null || to.location() == null) {
+      return from.location();
+    }
+    return from.location().spanningTo(to.location());
+  }
+
+  /*
    * convenience method to get image of a Token
    * For QUOTED_ID tokens, strips the backticks
    */
@@ -2358,18 +2388,18 @@ AST.Expression term() :{AST.Expression e;}{
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   a=pipeline()
   [ LOOKAHEAD(2)
-    ( t="="  eols() b=expression() {a = new AST.Assignment(p(t), a, b);}
-    | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(p(t), a, b);}
-    | t="-=" eols() b=expression() {a = new AST.SubtractionAssignment(p(t), a, b);}
-    | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(p(t), a, b);}
-    | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(p(t), a, b);}
-    | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(p(t), a, b);}
-    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(p(t), a, b);}
-    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(p(t), a, b);}
-    | t="^=" eols() b=expression() {a = new AST.XorAssignment(p(t), a, b);}
-    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(p(t), a, b);}
-    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(p(t), a, b);}
-    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(p(t), a, b);}
+    ( t="="  eols() b=expression() {a = new AST.Assignment(span(a, b), a, b);}
+    | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(span(a, b), a, b);}
+    | t="-=" eols() b=expression() {a = new AST.SubtractionAssignment(span(a, b), a, b);}
+    | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(span(a, b), a, b);}
+    | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(span(a, b), a, b);}
+    | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(span(a, b), a, b);}
+    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(span(a, b), a, b);}
+    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(span(a, b), a, b);}
+    | t="^=" eols() b=expression() {a = new AST.XorAssignment(span(a, b), a, b);}
+    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(span(a, b), a, b);}
+    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(span(a, b), a, b);}
+    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(span(a, b), a, b);}
     )
   ]{return a;}
 }
@@ -2392,36 +2422,36 @@ AST.Expression pipeline() :{Token t; AST.Expression a, b; }{
 AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
   a=logical_and()
   ( LOOKAHEAD(2)
-    ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
-    | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(p(t), a, b);}
+    ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(span(a, b), a, b);}
+    | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(span(a, b), a, b);}
     )
   )*
   { return a; }
 }
 
 AST.Expression logical_and() :{Token t; AST.Expression a, b; }{
-  a=bit_or() (LOOKAHEAD(2) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(p(t), a, b);})* {return a;}
+  a=bit_or() (LOOKAHEAD(2) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_or() :{Token t; AST.Expression a, b; }{
-  a=xor() (LOOKAHEAD(2) t="|" eols() b=xor() {a = new AST.BitOr(p(t), a, b);})* {return a;}
+  a=xor() (LOOKAHEAD(2) t="|" eols() b=xor() {a = new AST.BitOr(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression xor() :{Token t; AST.Expression a, b;}{
-  a = bit_and() (LOOKAHEAD(2) t="^" eols() b=bit_and() {a = new AST.XOR(p(t), a, b);})* {return a;}
+  a = bit_and() (LOOKAHEAD(2) t="^" eols() b=bit_and() {a = new AST.XOR(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_and() :{Token t; AST.Expression a, b; }{
-  a=equal() (LOOKAHEAD(2) t = "&" eols() b=equal() {a = new AST.BitAnd(p(t), a, b);})* {return a;}
+  a=equal() (LOOKAHEAD(2) t = "&" eols() b=equal() {a = new AST.BitAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression equal() :{ Token t; AST.Expression a, b; }{
   a=comparative()
   ( LOOKAHEAD(2)
-    ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(p(t), a, b);}
-    | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(p(t), a, b);}
-    | t="=="  eols() b=comparative() {a= new AST.Equal(p(t), a, b);}
-    | t="!="  eols() b=comparative() {a= new AST.NotEqual(p(t), a, b);}
+    ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(span(a, b), a, b);}
+    | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(span(a, b), a, b);}
+    | t="=="  eols() b=comparative() {a= new AST.Equal(span(a, b), a, b);}
+    | t="!="  eols() b=comparative() {a= new AST.NotEqual(span(a, b), a, b);}
     )
   )* {return a;}
 }
@@ -2429,10 +2459,10 @@ AST.Expression equal() :{ Token t; AST.Expression a, b; }{
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
   a=range_expr()
   ( LOOKAHEAD(2)
-    ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(p(t), a, b);}
-    | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(p(t), a, b);}
-    | t="<"  eols() b=range_expr() {a = new AST.LessThan(p(t), a, b);}
-    | t=">"  eols() b=range_expr() {a = new AST.GreaterThan(p(t), a, b);}
+    ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(span(a, b), a, b);}
+    | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(span(a, b), a, b);}
+    | t="<"  eols() b=range_expr() {a = new AST.LessThan(span(a, b), a, b);}
+    | t=">"  eols() b=range_expr() {a = new AST.GreaterThan(span(a, b), a, b);}
     | t="is" eols() type = type() {a = new AST.IsInstance(p(t), a, type);}
     )
   )* {return a;}
@@ -2454,9 +2484,9 @@ AST.Expression range_expr() :{Token t; AST.Expression a, b;}{
 AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
   e1=additive()
 ( LOOKAHEAD(2)
-  ( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(p(t), e1, e2);}
-  | t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(p(t), e1, e2);}
-  | t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(p(t), e1, e2);}
+  ( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(span(e1, e2), e1, e2);}
+  | t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(span(e1, e2), e1, e2);}
+  | t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(span(e1, e2), e1, e2);}
   )
 )* { return e1; }
 }
@@ -2464,8 +2494,8 @@ AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
 AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
   e1=unary_prefix()
 ( LOOKAHEAD(2)
-  ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
-  | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+  ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(span(e1, e2), e1, e2);}
+  | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(span(e1, e2), e1, e2);}
   )
 )* {return e1;}
 }
@@ -2482,9 +2512,9 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
   e1=primary_suffix()
 ( LOOKAHEAD(2)
-  ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(p(t), e1, e2);}
-  | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(p(t), e1, e2);}
-  | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(p(t), e1, e2);}
+  ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(span(e1, e2), e1, e2);}
+  | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(span(e1, e2), e1, e2);}
+  | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(span(e1, e2), e1, e2);}
   )
 )* {return e1;}
 }
@@ -2536,16 +2566,16 @@ AST.Expression dot_suffix(AST.Expression e) : {
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args, tas); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args); }
     | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
         if (tl != null) {
           args = (List<AST.Expression>)AST.NIL();
           args = AST.appendToList(args, tl);
           tl = null;
-          e = new AST.MethodCall(p(t), e, c(n), args);
+          e = new AST.MethodCall(through(n), e, c(n), args);
         } else {
           e = new AST.MemberSelection(p(t), e, c(n));
         }
@@ -2592,39 +2622,39 @@ AST.Expression primary() : {
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(through(n), c(n), es); }
 | LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(p(t), ty, tas, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( boxed_class_type() "::" id() "(" ) ty=boxed_class_type() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
     { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( dotted_class_type() "::" id() "(" ) ty=dotted_class_type() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
     { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
 | LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es, tas); }
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es); }
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es); }
 | LOOKAHEAD(2, id() <ARROW>) e=arrow_anonymous_function()                 {return e;}
 | LOOKAHEAD(1) t=id()                                               {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() e=bracket_literal_rest(t) {leaveDefault();} {return e;}

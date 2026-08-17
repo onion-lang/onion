@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-08-17
-
 ### Added
 
 - **`onion fmt` — a formatter, and an LSP formatting provider sharing its implementation.**

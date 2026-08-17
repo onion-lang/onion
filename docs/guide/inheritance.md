@@ -408,7 +408,7 @@ class PrefixLogger conforms Logger {
 
 Avoid deep inheritance chains:
 
-```onion
+```text
 // Good: Shallow hierarchy
 Animal
   ├─ Dog

@@ -11,9 +11,9 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-08-13) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-08-17) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3410 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | Test suite | `sbt shutdown && sbt -Duser.language=en testFull` (see the note below) | 3595 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 170 / 170 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 112 (AccessLogAnalyzer, AirlineReservation, AuctionHouse, Automaton, BankLedger, BankSystem, Blackjack, BookClub, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CensusAnalyzer, ChemCalculator, CinemaBooking, CipherSuite, ClinicRecords, CodeContest, ConferenceSchedule, ConwayLife, CourseRegistration, CryptoPortfolio, DependencyResolver, DnaAnalyzer, DoctorScheduler, ElevatorDispatcher, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameOfLife, GameStore, GenericLeaderboard, GeneticSequencer, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HospitalWard, HotelReservation, HRSystem, HuffmanCoding, InsuranceClaims, Inventory, InventoryManager, InventoryReport, JobScheduler, KaraokeNight, KingdomSim, LibraryCatalog, LibrarySystem, LogAnalytics, MarkdownConverter, MathParser, MatrixCalc, MazeSolver, MiniRpg, MiniTypeChecker, MovieRecommender, MuseumCollection, MusicFestival, MusicLibrary, NationalParkTracker, NetworkMonitor, NutritionTracker, OrderReport, ParkingGarage, PayrollReport, PerfReview, PetShelter, PharmacySystem, PlantCare, PlaylistManager, PokerHands, PropertyManager, RankedChoice, RecipeBook, RecipeManager, RecipeVault, RestaurantOrders, RuleEngine, ShapeProcessor, ShipmentTracker, ShoppingCart, SnippetLibrary, SocialNetwork, SortAlgorithms, SortingShowcase, SpaceMission, SpellCheck, SprintPlanner, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, SupplyChain, TaskPlanner, TextAnalytics, TextAnalyzer, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, TransitPlanner, VirtualMachine, VirtualShell, WeatherReport) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
@@ -32,6 +32,20 @@ the effective heap below what the full suite needs and makes it die with an
 `-Duser.language=en` matters: error messages are bilingual and resolved from the JVM
 default locale, so a test asserting on message text passes in a Japanese locale and fails
 in release CI, which runs in English. Assert on error **codes**, not localized text.
+
+Two sbt 2 behaviours make that easy to get wrong locally, and both fail *quietly*:
+
+- **`test` is incremental.** It delegates to `testQuick`, so running it a second time with
+  no source change prints `No tests to run` and exits 0 — which reads exactly like a pass.
+  `testFull` runs everything.
+- **`-D` only reaches a fresh server.** The sbt server persists across invocations, so
+  `-Duser.language=ja` handed to a server already started under `en` changes nothing;
+  `java.util.Locale.getDefault()` keeps reporting the old locale. `sbt shutdown` first.
+
+Together those mean the obvious `sbt -Duser.language=en test` followed by
+`sbt -Duser.language=ja test` can report two green runs having tested one locale once.
+CI is unaffected: the incremental state lives in `target/`, which `setup-java`'s
+`cache: 'sbt'` does not cache, so every CI run starts cold.
 
 The one cancelled test is the distribution smoke test, gated behind `-Donion.dist.path`.
 

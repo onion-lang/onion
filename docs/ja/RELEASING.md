@@ -4,10 +4,16 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 
 ## リリースチェックリスト
 
-1. **`develop` が正常であることを確認する。**
+1. **`develop` が両ロケールで green であることを確認する。**
    ```bash
-   sbt test
+   sbt shutdown && sbt -Duser.language=en testFull
+   sbt shutdown && sbt -Duser.language=ja testFull
    ```
+   どちらも必要です。診断は二言語で、リリース CI は英語ロケール、ローカル開発は多くの場合
+   `ja_JP` なので、メッセージ文字列を検査するテストは片方でだけ通ることがあります。
+   sbt 2 では `test` が `testQuick` に委譲され、変更のないツリーでは `No tests to run` を
+   返します。また `-D` は**新規起動した**サーバにしか反映されません。そのため `shutdown` と
+   `testFull` なしでは、何も実行していないのに green に見えることがあります。
 
 2. **次のバージョンを決める。**
    Onion は [Semantic Versioning](https://semver.org/) に従い、必要に応じてマイルストーンやRCプレリリースを行います。

@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Syntax highlighting on the documentation site.** The site is built with MkDocs,
+  which highlights through Pygments, and Pygments had no `onion` lexer — so all
+  1213 ` ```onion ` fences across 71 pages rendered as unstyled plain text, with no
+  warning from the build. `tools/pygments-onion/` is a Pygments lexer registered
+  through the `pygments.lexers` entry point; `.github/workflows/docs.yml` installs
+  it next to `mkdocs-material`, and because `mkdocs.yml` already sets
+  `pygments_lang_class`, not a single markdown file had to change. The TextMate
+  grammar could not be reused here: Pygments cannot read one, and the paths that
+  would let it (a browser-side highlighter) give up static generation.
+
+- **A drift guard over every highlighting grammar Onion ships**
+  (`SyntaxHighlightingDriftSpec`). It derives the keyword set mechanically from
+  `grammar/JJOnionParser.jj` — hard keywords from the `TOKEN` block, soft keywords
+  from both spellings of semantic lookahead the grammar uses (`getToken(n).image
+  .equals(...)` and the `la(...)` helpers, since `in` only ever appears as the
+  latter) — and holds both the TextMate grammar and the Pygments lexer to it, in
+  both directions. Forward catches a keyword added to the parser and forgotten in a
+  highlighter; reverse catches a stale entry left behind after a keyword is removed.
+  Keeping two extra grammars is only defensible with this in place.
+
+- **Contributor documentation for highlighting**
+  (`docs/contributing/syntax-highlighting.md` and its Japanese counterpart, both
+  linked from the nav): why there are two highlighters, how to add a keyword, why
+  soft-keyword rules are pinned with lookaheads, and why ` ```onion ` fences cannot
+  be highlighted on github.com.
+
+- **`.gitattributes` mapping `*.on` to Scala for display**
+  (`linguist-language=Scala linguist-detectable=false`), so the ~170 sample programs
+  under `run/` are no longer rendered as colourless text on github.com. Shared
+  constructs come out right; Onion-only keywords such as `conforms` and `tool` do
+  not, which is the honest cost of borrowing another grammar. The statistics
+  override keeps the repository language bar from claiming these files are Scala.
+  Fenced blocks are unaffected — GitHub resolves a fence's info string against
+  Linguist's language list, which requires roughly 2000 indexed files per extension,
+  and no per-repository override exists for it.
+
+- **`tools/pygments-onion/check_docs.py`, run in CI before deploy and on pull
+  requests.** A missing rule for a non-keyword form does not show up as a keyword
+  gap — it shows up as a Pygments `Error` token, which renders as unstyled text and
+  fails nothing. This lexes the fences directly and fails on any such token. The
+  docs workflow now also builds (without deploying) on pull requests, so a broken
+  site is caught before it reaches `main` rather than after.
+
 - **`RunSamplesSpec` coverage for 34 more `run/` examples that were added
   without a corresponding test** (`Automaton`, `EmployeeManager`,
   `ExpenseAuditor`, `GameStore`, `MatrixCalc`, `MazeSolver`, `MiniRpg`,
@@ -59,6 +102,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows through the same `visitNewObject` path ordinary records use (already
   hardened by the #669/#745/#752 fixes), so this already passed; this closes
   a coverage gap rather than a live bug.
+
+### Fixed
+
+- **The TextMate grammar was missing the most distinctive parts of the language.**
+  It had drifted to roughly 70% keyword coverage: `trait`, `instance` and the
+  lowercase `void` were absent, as was every soft keyword (`tool`, `requires`,
+  `shape`, `law`, `example`, `from`, `derive`), along with scheme-prefixed raw
+  literals (`re"…"`, `file"…"`, `http"…"` — 225 occurrences in the docs alone), the
+  `|>` pipeline operator, and backtick-quoted identifiers. Soft-keyword rules are
+  pinned with lookaheads so that a variable named `shape` or `tool` stays
+  uncoloured, and keyword rules deliberately precede the scheme-literal rules so
+  that `return"x"` highlights as a keyword followed by a string, matching the
+  push-back the lexer in `JJOnionParser.jj` performs. Verified against
+  `vscode-textmate` and `vscode-oniguruma` — the engine VS Code itself uses.
+  (`vscode-onion` 1.1.0 → 1.2.0.)
+
+- **A `#!` shebang was unlexable.** `Parsing.scala` strips a shebang from the first
+  line of a script, but neither highlighter knew about it, so seven code blocks
+  across five documentation pages were emitting an error token for the `#`. Pinned
+  to line one with `\A`, matching what the compiler accepts.
+
+- **An ASCII-art inheritance diagram in `docs/guide/inheritance.md` was tagged
+  ` ```onion `.** It is a tree drawing, not code. It survived because
+  `DocExamplesCompileSpec` only scans `docs/examples/`, so nothing under
+  `docs/guide/` was ever checked; the new fence lexing is what surfaced it.
+
+- **Three tests failed under `-Duser.language=ja`, which nobody could see.** Once the
+  locale flag actually took effect, `ErrorCountMessageSpec` and
+  `ErrorMessageJapaneseTranslationSpec` went red — and both for the same reason.
+  `ResourceBundle.getBundle("errorMessage", Locale.ENGLISH)` does not return English
+  here: there is no `errorMessage_en.properties` (the base file *is* the English one),
+  and when the requested locale has no bundle of its own the JDK falls back to the
+  **default locale** before it falls back to the base file. On a `ja_JP` machine the
+  "English" bundle was therefore the Japanese one, so a test asserting the Japanese text
+  differs from the English text compared Japanese with Japanese. The two specs now take
+  their bundles from a new `MessageBundles` test helper, which pins each language with
+  `ResourceBundle.Control.getNoFallbackControl`. Production behaviour is unchanged and
+  deliberately different: `onion.compiler.toolbox.Message` follows the ambient locale,
+  because a user's diagnostics should follow their machine.
+
+- **`QualityBarSpec`'s test-count check used fixed bounds, and the recorded figure had
+  drifted inside them.** The bar said 3410 against an actual 3595 while sitting
+  comfortably within a hardcoded 2700–4000 window — and that window rots in both
+  directions as the suite grows, eventually failing spuriously at the ceiling while the
+  floor stops catching anything. The band is now derived from the number of tests
+  declared by hand across `src/test/scala`, so it moves with the suite.
+
+- **The documented way to verify a release stopped working after the move to sbt 2, and
+  failed silently.** `CLAUDE.md`, `docs/quality-bar.md` and `docs/RELEASING.md` all told
+  you to run `sbt -Duser.language=en test`. Under sbt 2.0.6 that command can test nothing
+  and still exit 0, for two independent reasons: `test` now delegates to `testQuick`, so a
+  second run over an unchanged tree prints `No tests to run`; and `-D` flags only reach a
+  *freshly started* sbt server, so passing `-Duser.language=ja` to a server already running
+  under `en` leaves `java.util.Locale.getDefault()` reporting `en_JP`. Running the two
+  locales back to back therefore reported two green runs having tested one locale once.
+  All three documents (and their Japanese copies) now say
+  `sbt shutdown && sbt -Duser.language=<xx> testFull`. CI was never affected — the
+  incremental state lives in `target/`, which `setup-java`'s `cache: 'sbt'` does not
+  cache, so every CI run starts cold.
+
+- **A change to the highlighting lexer did not redeploy the documentation site.**
+  The docs workflow triggered only on `docs/**`, `mkdocs.yml` and itself, so a fix
+  to how every code block renders would have sat unpublished. `tools/pygments-onion/**`
+  is now a trigger path.
 
 ## [0.10.37] - 2026-08-16
 

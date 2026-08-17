@@ -50,7 +50,10 @@ class ProjectCommands:
             1
           case Vector(entryPoint) =>
             ProjectClassRunner.run(
-              Vector(build.paths.classes),
+              // The dependency jars have to be on the *run* classpath too, not only the
+              // compile one, or every project that compiles against a library dies with
+              // NoClassDefFoundError the moment it touches it.
+              build.paths.classes +: build.dependencies.classpath.toVector,
               entryPoint.className,
               args
             ) match

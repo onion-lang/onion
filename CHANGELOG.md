@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`[dependencies]` in `onion.toml`: a project can finally use a Java library.**
+  `ProjectBuilder` compiled every project with `classPath = Seq.empty` and the manifest
+  rejected any key outside `[package]`, so a project could not reference a single
+  third-party jar — while the README described Onion as a language that "runs on the JVM
+  and calls Java directly". Scripts could always take `-classpath`; projects could not.
+
+  ```toml
+  [dependencies]
+  "org.postgresql:postgresql" = "42.7.3"
+  ```
+
+  Resolution is coursier's, embedded through `io.get-coursier:interface` — its Java API,
+  with everything shaded, so it adds no transitive baggage beyond `slf4j-api` and cannot
+  collide with anything Onion already ships. (The Scala API has no Scala 3 build and would
+  have had to come in through `for3Use2_13` with its own dependency graph.) Transitives are
+  resolved, and the jars reach the compile classpath, the run classpath and the test
+  classpath alike — a library you compile against is there when the program runs.
+
+- **`[[repositories]]`, searched before Maven Central and in the order written.**
+
+  ```toml
+  [[repositories]]
+  url = "https://nexus.example.com/repository/maven-public"
+  ```
+
+  Central is kept rather than replaced. An array of tables rather than a plain
+  `repositories = [...]`, because a bare key-value pair belongs to whatever table header
+  precedes it: written after `[package]` the array form silently becomes
+  `package.repositories`, and the table form can go anywhere in the file. Only absolute
+  `http`/`https`/`file` URLs are accepted, so a typo is rejected at the repository line
+  instead of resurfacing later as a resolution failure blamed on a dependency.
+
+- **The editor now validates against the project's classpath** (`LspProjectClasspath`).
+  Validation used a fixed classpath of `.`, so a symbol defined in a sibling file read as
+  undefined, and — once dependencies existed — every type coming from a jar would have been
+  underlined while `onion build` succeeded. Diagnostics that disagree with the build are
+  worse than no diagnostics. Resolution is cached per project root and invalidated by the
+  manifest's size and modification time, since resolving on every keystroke would be
+  unusable. A malformed manifest or an unresolvable dependency degrades to validating
+  without them and says so on the server's stderr, rather than refusing to validate the
+  file the author is looking at.
+
+- **`onion new` scaffolds a commented `[dependencies]` block.** Otherwise a new project
+  gives no hint that Maven coordinates are accepted at all.
+
 - **Syntax highlighting on the documentation site.** The site is built with MkDocs,
   which highlights through Pygments, and Pygments had no `onion` lexer — so all
   1213 ` ```onion ` fences across 71 pages rendered as unstyled plain text, with no
@@ -104,6 +149,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a coverage gap rather than a live bug.
 
 ### Fixed
+
+- **The build cache could serve classes compiled against an old classpath.** The build
+  fingerprint hashed the manifest bytes, which pin only *direct* dependencies; a transitive
+  version can move without `onion.toml` changing a byte. The whole resolved set now feeds
+  the fingerprint, and `BuildFingerprint.SchemaVersion` is bumped to 2 so build state
+  written before this is rejected rather than read back with the wrong meaning.
 
 - **The TextMate grammar was missing the most distinctive parts of the language.**
   It had drifted to roughly 70% keyword coverage: `trait`, `instance` and the

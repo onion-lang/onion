@@ -87,8 +87,16 @@ object OnionTextDocumentService {
    * belong to the build -- `onionc`, `onion`, `onion build`, `onion test` -- where they
    * run once against a file the author considers finished.
    */
-  def validationConfig: CompilerConfig =
-    CompilerConfig(Seq("."), null, "UTF-8", "", 100, checkLaws = false)
+  def validationConfig: CompilerConfig = validationConfig(None)
+
+  /**
+   * @param file the document being validated, used to find its `onion.toml` and validate
+   *             against the project's own classes and resolved dependencies. Without it
+   *             the classpath is just `.`, which is right for a standalone script and
+   *             wrong for anything in a project.
+   */
+  def validationConfig(file: Option[java.nio.file.Path]): CompilerConfig =
+    CompilerConfig(LspProjectClasspath.forDocument(file), null, "UTF-8", "", 100, checkLaws = false)
 }
 
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
@@ -586,7 +594,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def validateDocument(uri: String, content: String): Unit = {
     val fileName = extractFileName(uri)
-    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig)
+    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(extractPath(uri)))
 
     val diagnostics =
       try {
@@ -689,6 +697,11 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def isIdentifierPart(c: Char): Boolean =
     c.isLetterOrDigit || c == '_' || c == ':' || c == '.'
+
+  /** The document as a filesystem path, when the client gave a `file:` URI. */
+  private def extractPath(uri: String): Option[java.nio.file.Path] =
+    try Option(java.nio.file.Paths.get(new URI(uri)))
+    catch { case _: Exception => None }
 
   private def extractFileName(uri: String): String = {
     try {

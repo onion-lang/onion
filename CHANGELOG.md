@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Semantic tokens in the language server — the colouring a TextMate grammar cannot
+  produce.** A grammar decides what a word is from the shape of the line around it, so
+  `Greeter`, `greet` and `count` all look alike: they are words. The server now classifies
+  each identifier by what the document declares it to be — class, interface, enum, record,
+  method, field, local — and marks declaration sites with the `declaration` modifier. Regex
+  literals are distinguished from other scheme literals, and `Int` is coloured as a type
+  rather than as the keyword the lexer calls it.
+
+  **It emits nothing it is unsure of.** An identifier the document does not declare produces
+  no token, and the editor falls back to the grammar. Semantic tokens override the grammar,
+  so a guess would replace a right answer with a wrong one — which is also why soft keywords
+  are left alone: `conforms` arrives as an identifier because only the parser's lookahead
+  decides whether it is a keyword there, and colouring it from the lexer would light up a
+  method of that name.
+
+  Keyword, operator and primitive-type kinds are read from the generated parser's own token
+  table rather than listed in the server, so a keyword added to the grammar is classified
+  with no edit here. That hand-maintained duplication is exactly what let the TextMate
+  grammar rot to 70% coverage; there is nothing to keep in step this time.
+
+  This was the last item deferred from the highlighting work, and it was waiting on the
+  parser recording real spans rather than single columns.
+
 ## [0.11.0] - 2026-08-17
 
 ### Added

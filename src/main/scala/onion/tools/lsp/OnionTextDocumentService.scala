@@ -503,6 +503,34 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
   }
 
   /**
+   * Semantic tokens, which is the colouring the TextMate grammar cannot produce: it decides
+   * what a word is from the shape of the line around it, so a class, a method, a field and
+   * a local all look alike. This classifies each identifier by what the document declares
+   * it to be.
+   *
+   * Identifiers the document does not declare produce no token at all, and the editor falls
+   * back to the grammar for them. Semantic tokens override the grammar, so a guess here
+   * would replace a right answer with a wrong one.
+   */
+  override def semanticTokensFull(
+    params: SemanticTokensParams
+  ): CompletableFuture[SemanticTokens] = {
+    CompletableFuture.supplyAsync { () =>
+      val uri = params.getTextDocument.getUri
+      val state = documents.get(uri)
+      if (state == null) new SemanticTokens(java.util.Collections.emptyList())
+      else {
+        val classify = (name: String) =>
+          symbolTable.lookupInUri(name, uri).headOption.map(_.kind)
+        val isDeclarationAt = (name: String, line: Int, column: Int) =>
+          symbolTable.lookupInUri(name, uri).exists(symbol => symbol.line == line)
+        new SemanticTokens(
+          OnionSemanticTokens.encode(state.content, classify, isDeclarationAt))
+      }
+    }
+  }
+
+  /**
    * Formatting, sharing its implementation with `onion fmt` so the editor and the command
    * line can never disagree about what formatted means.
    *

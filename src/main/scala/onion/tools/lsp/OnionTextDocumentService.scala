@@ -502,6 +502,42 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     }
   }
 
+  /**
+   * Formatting, sharing its implementation with `onion fmt` so the editor and the command
+   * line can never disagree about what formatted means.
+   *
+   * The result is one edit replacing the whole document. A minimal diff would preserve the
+   * editor's decorations better, but computing one from two strings risks producing an edit
+   * that does not reconstruct the formatted text — and a formatter that corrupts a buffer on
+   * save is worse than one that scrolls it.
+   *
+   * The formatted text is re-lexed and compared token for token before being offered. That
+   * cannot fail for a whitespace-only formatter, which is precisely why it is checked here:
+   * an editor applies this on every save, without anyone reading the result first.
+   */
+  override def formatting(
+    params: DocumentFormattingParams
+  ): CompletableFuture[java.util.List[? <: TextEdit]] = {
+    CompletableFuture.supplyAsync { () =>
+      val state = documents.get(params.getTextDocument.getUri)
+      if (state == null) java.util.Collections.emptyList[TextEdit]()
+      else {
+        val result = onion.tools.format.OnionFormatter.format(state.content)
+        val safe =
+          result.changed &&
+            onion.tools.format.OnionFormatter.signature(result.text) ==
+              onion.tools.format.OnionFormatter.signature(state.content)
+        if (!safe) java.util.Collections.emptyList[TextEdit]()
+        else {
+          val lines = state.content.split("\n", -1)
+          val end = new Position(lines.length - 1, lines.last.length)
+          java.util.Collections.singletonList(
+            new TextEdit(new Range(new Position(0, 0), end), result.text))
+        }
+      }
+    }
+  }
+
   /** Byte-free offset of the first character of each line. */
   private def lineStartOffsets(content: String): Array[Int] = {
     val starts = scala.collection.mutable.ArrayBuffer(0)

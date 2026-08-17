@@ -19,6 +19,7 @@ object OnionCli:
       |  onion test [--verbose] [--report-xml <path>]
       |  onion clean
       |  onion doc [-d <dir>] [<source.on>...]
+      |  onion fmt [--check] [<path>...]
       |  onion repl [repl-options...]
       |  onion [script-runner-options...] <source.on> [arguments...]
       |""".stripMargin
@@ -80,6 +81,8 @@ object OnionCli:
         else usageError("clean does not accept arguments", err)
       case Some("doc") =>
         projects.doc(cwd, args.drop(1), out, err)
+      case Some("fmt") =>
+        onion.tools.format.FormatCommand.run(cwd, args.drop(1), out, err)
       case Some("repl") =>
         legacy.repl(args.drop(1))
       case Some(_) =>

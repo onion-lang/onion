@@ -252,9 +252,9 @@ val sequences: List[Sequence] = [
 
 // ─── Analysis ────────────────────────────────────────────────────────────────
 
-IO::println("=" .rep(60))
+IO::println("=".rep(60))
 IO::println("GENETIC SEQUENCE ANALYSIS REPORT")
-IO::println("=" .rep(60))
+IO::println("=".rep(60))
 IO::println("")
 
 // Basic stats per sequence
@@ -478,5 +478,5 @@ IO::println("  Total ORFs found   : #{allORFs.size}")
 val validSeqs: List[Sequence] = sequences.filter { seq => validator.validate(seq as Sequence) }
 IO::println("  Sequences passing  : #{validSeqs.size} / #{sequences.size}")
 IO::println("")
-IO::println("=" .rep(60))
+IO::println("=".rep(60))
 IO::println("Analysis complete.")

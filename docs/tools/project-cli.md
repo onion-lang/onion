@@ -60,6 +60,7 @@ onion run [--verbose] [-- <arguments...>]
 onion test [--verbose] [--report-xml <path>]
 onion clean
 onion doc [-d <dir>] [<source.on>...]
+onion fmt [--check] [<path>...]
 ```
 
 ### `onion test --report-xml`
@@ -74,6 +75,60 @@ onion test --report-xml target/test-reports/junit.xml
 The summary line and the exit code are unchanged. A report that cannot be written is an
 error in its own right — it does not silently turn a failing run into a passing one, and it
 does not hide a genuine test failure behind an I/O problem.
+
+### `onion fmt`
+
+Normalises spacing. With no arguments inside a project it formats everything under `src/`
+and `tests/`:
+
+```bash
+onion fmt
+```
+
+A path may be a file or a directory, and a directory is walked for `.on` files, so it also
+works outside a project:
+
+```bash
+onion fmt scripts/
+```
+
+`--check` writes nothing, lists the files that would change, and exits `1` if there are
+any — the shape a CI step needs:
+
+```bash
+onion fmt --check
+```
+
+**What it changes is deliberately small**, and each boundary was measured rather than
+guessed. It tightens the punctuation that binds to what it touches — `f(a , b)` to
+`f(a, b)`, `"=" .rep(60)` to `"=".rep(60)`, `f(- 1)` to `f(-1)` — and adds a missing
+newline at the end of a file. Everything else is reproduced byte for byte, tabs included.
+
+It does **not** reindent. Onion's continuations are not bracketed: an expression body on
+the line after `=`, a method chain led by `.filter`, an expression carried on by a trailing
+`+`, a `from re"…"` clause under a record. Nothing lexical separates those from a
+misindented line, so a formatter that computes indentation from brace depth reindents
+correct code — measured against the sample programs, that design rewrote 36% of their
+lines, almost all of it wrongly.
+
+It does **not** move a line break. A line break can end a statement in Onion, so moving one
+would be a semantic change rather than a cosmetic one.
+
+It does **not** touch a bracket, in either direction, and the sample programs are why.
+Closing `f( a )` up to `f(a)` reads like an improvement until you meet `new Employee( 1, …)`
+sitting above `new Employee(10, …)`, where the space is a right-aligned ID column. Closing
+`f (1)` up reads like an improvement until you meet an enum whose cases are padded so their
+argument lists line up — with five spaces on one line and a single space on the next, so not
+even "collapse a lone space" separates the typo from the intent. Across the 182 sample
+programs those two rules fired dozens of times and every firing was damage.
+
+The result is a small tool. Run over the whole sample corpus it changes four lines. That is
+the honest size of the problem a formatter working from tokens alone can see here; the rest
+needs a parser.
+
+Before writing any file, the formatted text is re-lexed and compared token for token,
+comments included, against the original. If they differ the file is left untouched and the
+command reports it as a bug.
 
 ### `onion doc`
 
@@ -94,7 +149,7 @@ onion doc -d api src/main.on src/util.on
 Doc comments (`/** … */`) on classes, interfaces, records, enums and methods are carried
 across, not just the signatures.
 
-`build`, `run`, `test`, `doc`, and `clean` start at the current directory and walk
+`build`, `run`, `test`, `doc`, `fmt`, and `clean` start at the current directory and walk
 upward until they find `onion.toml`, so any of them also work from `src/`,
 `tests/`, or another nested subdirectory of the project — there is no need to
 `cd` back to the project root first.

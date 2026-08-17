@@ -9,6 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`onion fmt` — a formatter, and an LSP formatting provider sharing its implementation.**
+  Onion had neither. The editor and the command line call the same code, so they cannot
+  disagree about what formatted means; a difference there shows up as a file that changes
+  every time it crosses between them.
+
+  ```bash
+  onion fmt              # src/ and tests/, or the paths you name
+  onion fmt --check      # writes nothing, lists what would change, exits 1 if any
+  ```
+
+  **What it changes is deliberately small**, and every boundary was measured against the 182
+  sample programs rather than guessed. It tightens the punctuation that binds to what it
+  touches — `f(a , b)` to `f(a, b)`, `"=" .rep(60)` to `"=".rep(60)`, `f(- 1)` to `f(-1)` —
+  and adds a missing newline at the end of a file. Everything else is reproduced byte for
+  byte, tabs included.
+
+  Three larger rules were built, measured, and removed, and the measurements are the
+  interesting part:
+
+  - **Reindenting from brace depth** rewrote 36% of the corpus, almost all of it wrongly.
+    Onion's continuations are not bracketed — an expression body on the line after `=`, a
+    method chain led by `.filter`, an expression carried on by a trailing `+`, a
+    `from re"…"` clause under a record — and nothing lexical separates those from a
+    misindented line, so the rule *reindents correct code*.
+  - **Rebuilding whitespace from column numbers** turned two tab-indented programs into
+    eight-space-indented ones, 110 lines in one file, because JavaCC advances a column to
+    the next multiple of eight for a tab. Whitespace is now sliced out of the source text.
+  - **Tightening brackets** (`f( a )` to `f(a)`, `f (1)` to `f(1)`) fired dozens of times
+    and every firing was damage: `new Employee( 1, …)` above `new Employee(10, …)` is a
+    right-aligned ID column, and an enum padded so its cases' argument lists line up uses
+    five spaces on one line and one space on the next — so not even "collapse a lone space"
+    separates the typo from the intent. There was no misplaced bracket space in the corpus
+    for the rule to fix. A rule with no true positives is not a rule.
+
+  A line break can end a statement in Onion, so the formatter never re-wraps either; moving
+  one would be a semantic change rather than a cosmetic one.
+
+  Two implementation notes worth recording. Onion's lexer is state-dependent and the parser
+  drives those states, so a token manager run on its own never emits the `EOL` tokens a
+  parse would see — the first version produced every file on a single line. And comments
+  arrive attached to the *following* token, which means a comment at the end of a file hangs
+  off `EOF`, and an implementation that stops at `EOF` deletes it without a word.
+
+  Every file is verified before it is written: the formatted text must lex to the same token
+  and comment stream, comments included, or the file is left untouched and reported. Three
+  properties are checked over the whole corpus rather than on toy inputs — idempotence,
+  every line break preserved, and the token stream unchanged. Worth recording that those
+  properties caught none of the three bugs above: dedenting a whole class body, or expanding
+  every tab, or closing up an aligned column, is idempotent and preserves every token.
+  Running it over the corpus and reading the diff is what caught all three.
+
+  Run over the corpus now, the whole formatter changes four lines. That is the honest size
+  of the problem a formatter working from tokens alone can see here.
+
+- **A drift guard tying `OnionCli`'s subcommands to both project CLI pages.** `onion doc`
+  was a complete generator that no launcher, subcommand or documentation page ever named,
+  and nothing failed for months because nothing was checking. The guard runs in both
+  directions, so a page describing a command that no longer exists fails too.
+
 - **`onion test --report-xml <path>` writes a JUnit XML report.** The run printed
   `N tests, N passed, N failed` and returned an exit code, which tells CI *that* something
   broke and never *what*. Every JVM CI system reads this format, so producing it is what

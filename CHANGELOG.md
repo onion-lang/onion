@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`W0016`: warn when `@TailRecursive` is on a mutual-recursion group that
+  `MutualRecursionOptimization` cannot actually optimize.** The optimization only
+  rewrites a group into a state machine when every member is private, shares one
+  return type, shares one parameter list, and only tail-calls within the group
+  (`MutualRecursionOptimization.validateGroup`). A group that fails one of those
+  checks was left silently unoptimized — the methods still called each other, just
+  as ordinary non-tail calls — so the annotation looked honored right up until deep
+  recursion overflowed the JVM stack at runtime, with nothing at compile time
+  pointing back at the annotation. `W0016` now fires at compile time, naming the
+  failed requirement, on every method in the group. Docs
+  (`docs/compiler/tail-call-optimization.md`, ja) gained the `@TailRecursive`
+  requirements and a worked example, since neither previously said what mutual
+  recursion needs to actually be optimized.
+
 ### Fixed
 
 - **docs(project-cli): stop `onion.lock` from contradicting itself two sections down.**

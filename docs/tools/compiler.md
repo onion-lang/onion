@@ -141,6 +141,7 @@ Every code accepts either its `W####` form or the `--Wno` name shown below:
 | `W0013` | `suspicious-interpolation` | Suspicious string interpolation syntax |
 | `W0014` | `discarded-toplevel` | Top-level statements ignored because a main is defined |
 | `W0015` | `platform-unboxing` | Boxed platform value implicitly unboxed to a non-null primitive |
+| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
 
 ### `--no-check-laws`
 

@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -3923,6 +3951,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4992,7 +5048,7 @@ numeric case is caught only incidentally, by the unbox NPE being trapped at
 <p><strong>A law over a non-generatable parameter type is skipped with no diagnostic.</strong>
 <code>LawCheckPhase.scala:80-81</code>:</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">perParam</span><span class="p">:</span><span class="w"> </span><span class="nc">Array</span><span class="p">[</span><span class="nc">List</span><span class="p">[</span><span class="nc">AnyRef</span><span class="p">]]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paramTypes</span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">t</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">ArgGenerator</span><span class="p">.</span><span class="n">generateValues</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">loader</span><span class="p">).</span><span class="n">orNull</span><span class="p">)</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">perParam</span><span class="p">.</span><span class="n">exists</span><span class="p">(</span><span class="n">_</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="c1">// a parameter type isn&#39;t generatable — skip this law (MVP)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">perParam</span><span class="p">.</span><span class="n">exists</span><span class="p">(</span><span class="n">_</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="c1">// a parameter type isn't generatable — skip this law (MVP)</span>
 </span></code></pre></div>
 <p><code>ArgGenerator</code> can generate the 8 scalars plus their boxed forms and <code>String</code>
 (<code>verification/ArgGenerator.scala:72-82</code>), and "flat records" — exactly one declared

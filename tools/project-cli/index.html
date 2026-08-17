@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -3485,6 +3513,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#onion-test-report-xml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion test --report-xml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onion-fmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion fmt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onion-doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion doc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3495,6 +3562,45 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Manifest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [dependencies]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [[repositories]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-yet-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not yet supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4094,6 +4200,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4453,6 +4587,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#onion-test-report-xml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion test --report-xml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onion-fmt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion fmt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onion-doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion doc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4463,6 +4636,45 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Manifest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [dependencies]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [[repositories]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-yet-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not yet supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4598,25 +4810,84 @@ first argument, so every existing <code>onion [options] file.on [args...]</code>
 No Git repository is initialized and no existing path is ever overwritten.</p>
 <p>The generated manifest:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[package]</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;hello&quot;</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.0&quot;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
 </span></code></pre></div>
 <p>The generated program:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>def main(): void {
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  println(&quot;Hello, hello!&quot;)
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>}
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Hello, hello!"</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>The generated test:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Assert::equals(4, 2 + 2)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">Assert</span><span class="o">::</span><span class="nf">equals</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>onion new &lt;name&gt;
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>onion build [--verbose]
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>onion run [--verbose] [-- &lt;arguments...&gt;]
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>onion test [--verbose]
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>onion test [--verbose] [--report-xml &lt;path&gt;]
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>onion clean
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>onion doc [-d &lt;dir&gt;] [&lt;source.on&gt;...]
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>onion fmt [--check] [&lt;path&gt;...]
 </span></code></pre></div>
-<p><code>build</code>, <code>run</code>, <code>test</code>, and <code>clean</code> start at the current directory and walk
+<h3 id="onion-test-report-xml"><code>onion test --report-xml</code><a class="headerlink" href="#onion-test-report-xml" title="Permanent link">&para;</a></h3>
+<p>Writes the run as JUnit XML, which is what CI reads to annotate a build with the tests that
+failed rather than only that something did:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>onion<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--report-xml<span class="w"> </span>target/test-reports/junit.xml
+</span></code></pre></div>
+<p>The summary line and the exit code are unchanged. A report that cannot be written is an
+error in its own right — it does not silently turn a failing run into a passing one, and it
+does not hide a genuine test failure behind an I/O problem.</p>
+<h3 id="onion-fmt"><code>onion fmt</code><a class="headerlink" href="#onion-fmt" title="Permanent link">&para;</a></h3>
+<p>Normalises spacing. With no arguments inside a project it formats everything under <code>src/</code>
+and <code>tests/</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>onion<span class="w"> </span>fmt
+</span></code></pre></div>
+<p>A path may be a file or a directory, and a directory is walked for <code>.on</code> files, so it also
+works outside a project:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>onion<span class="w"> </span>fmt<span class="w"> </span>scripts/
+</span></code></pre></div>
+<p><code>--check</code> writes nothing, lists the files that would change, and exits <code>1</code> if there are
+any — the shape a CI step needs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>onion<span class="w"> </span>fmt<span class="w"> </span>--check
+</span></code></pre></div>
+<p><strong>What it changes is deliberately small</strong>, and each boundary was measured rather than
+guessed. It tightens the punctuation that binds to what it touches — <code>f(a , b)</code> to
+<code>f(a, b)</code>, <code>"=" .rep(60)</code> to <code>"=".rep(60)</code>, <code>f(- 1)</code> to <code>f(-1)</code> — and adds a missing
+newline at the end of a file. Everything else is reproduced byte for byte, tabs included.</p>
+<p>It does <strong>not</strong> reindent. Onion's continuations are not bracketed: an expression body on
+the line after <code>=</code>, a method chain led by <code>.filter</code>, an expression carried on by a trailing
+<code>+</code>, a <code>from re"…"</code> clause under a record. Nothing lexical separates those from a
+misindented line, so a formatter that computes indentation from brace depth reindents
+correct code — measured against the sample programs, that design rewrote 36% of their
+lines, almost all of it wrongly.</p>
+<p>It does <strong>not</strong> move a line break. A line break can end a statement in Onion, so moving one
+would be a semantic change rather than a cosmetic one.</p>
+<p>It does <strong>not</strong> touch a bracket, in either direction, and the sample programs are why.
+Closing <code>f( a )</code> up to <code>f(a)</code> reads like an improvement until you meet <code>new Employee( 1, …)</code>
+sitting above <code>new Employee(10, …)</code>, where the space is a right-aligned ID column. Closing
+<code>f (1)</code> up reads like an improvement until you meet an enum whose cases are padded so their
+argument lists line up — with five spaces on one line and a single space on the next, so not
+even "collapse a lone space" separates the typo from the intent. Across the 182 sample
+programs those two rules fired dozens of times and every firing was damage.</p>
+<p>The result is a small tool. Run over the whole sample corpus it changes four lines. That is
+the honest size of the problem a formatter working from tokens alone can see here; the rest
+needs a parser.</p>
+<p>Before writing any file, the formatted text is re-lexed and compared token for token,
+comments included, against the original. If they differ the file is left untouched and the
+command reports it as a bug.</p>
+<h3 id="onion-doc"><code>onion doc</code><a class="headerlink" href="#onion-doc" title="Permanent link">&para;</a></h3>
+<p>Generates API documentation as HTML. With no arguments inside a project it documents the
+production sources under <code>src/</code> into <code>target/doc</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>onion<span class="w"> </span>doc
+</span></code></pre></div>
+<p><code>-d &lt;dir&gt;</code> writes somewhere else, and naming source files explicitly makes it work outside
+a project entirely:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>onion<span class="w"> </span>doc<span class="w"> </span>-d<span class="w"> </span>api<span class="w"> </span>src/main.on<span class="w"> </span>src/util.on
+</span></code></pre></div>
+<p>Doc comments (<code>/** … */</code>) on classes, interfaces, records, enums and methods are carried
+across, not just the signatures.</p>
+<p><code>build</code>, <code>run</code>, <code>test</code>, <code>doc</code>, <code>fmt</code>, and <code>clean</code> start at the current directory and walk
 upward until they find <code>onion.toml</code>, so any of them also work from <code>src/</code>,
 <code>tests/</code>, or another nested subdirectory of the project — there is no need to
 <code>cd</code> back to the project root first.</p>
@@ -4627,13 +4898,50 @@ upward until they find <code>onion.toml</code>, so any of them also work from <c
 <li><code>2</code> — invalid command-line usage.</li>
 </ul>
 <h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
-<p>The manifest accepts exactly one table, <code>[package]</code>, with exactly two
-required string keys: <code>name</code> (matching <code>[A-Za-z][A-Za-z0-9_-]*</code>) and
-<code>version</code> (a valid <a href="https://semver.org/spec/v2.0.0.html">SemVer 2.0</a>
-version). Unknown keys or tables, duplicate keys, malformed TOML, and invalid
-names or versions are all reported as errors, with a line and column when the
-TOML parser can supply one. No dependencies, source-root overrides,
+<p>The manifest requires <code>[package]</code>, with exactly two required string keys: <code>name</code>
+(matching <code>[A-Za-z][A-Za-z0-9_-]*</code>) and <code>version</code> (a valid
+<a href="https://semver.org/spec/v2.0.0.html">SemVer 2.0</a> version). Unknown keys or tables,
+duplicate keys, malformed TOML, and invalid names or versions are all reported as errors,
+with a line and column when the TOML parser can supply one. No source-root overrides,
 entrypoint overrides, compiler flags, or scripts are accepted.</p>
+<h3 id="dependencies"><code>[dependencies]</code><a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>
+<p>Maven coordinates, one per line, as <code>"group:artifact" = "version"</code>:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[package]</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"report"</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">[dependencies]</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s2">"org.postgresql:postgresql"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"42.7.3"</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
+</span></code></pre></div>
+<p>The key has to be quoted, because a Maven coordinate contains a colon. Versions are
+exact — no ranges, no <code>latest</code>. Transitive dependencies are resolved and land on the
+classpath for <code>build</code>, <code>run</code> and <code>test</code> alike, so a library you compile against is also
+there when the program runs.</p>
+<p>The <strong>resolved</strong> set — transitives included — is part of the build fingerprint, not just
+the manifest text. A transitive moving underneath you invalidates the cache and forces a
+recompile, rather than serving classes compiled against the old classpath as current.</p>
+<p>A coordinate that cannot be resolved fails the build with coursier's message, which names
+the coordinate it could not find.</p>
+<h3 id="repositories"><code>[[repositories]]</code><a class="headerlink" href="#repositories" title="Permanent link">&para;</a></h3>
+<p>Extra Maven repositories, searched <strong>before</strong> Maven Central and in the order written:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[[repositories]]</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://nexus.example.com/repository/maven-public"</span>
+</span></code></pre></div>
+<p>Maven Central stays available; these are added to it rather than replacing it. Only
+absolute <code>http</code>, <code>https</code> and <code>file</code> URLs are accepted — a relative or misspelled entry is
+rejected here rather than surfacing later as a resolution failure blamed on a dependency.</p>
+<p>This is an array of tables rather than a plain <code>repositories = [...]</code> array on purpose. A
+bare key-value pair belongs to whatever table header precedes it, so written after
+<code>[package]</code> it would quietly become <code>package.repositories</code>; a table header can go anywhere
+in the file.</p>
+<h3 id="not-yet-supported">Not yet supported<a class="headerlink" href="#not-yet-supported" title="Permanent link">&para;</a></h3>
+<p>There is no lock file and no offline mode. Resolution runs on every build, reading
+coursier's cache (<code>~/.cache/coursier</code>) for anything already fetched, so a warm build does
+not hit the network — but it is not <em>prevented</em> from doing so, and nothing pins a
+transitive against a repository that republishes one. Onion embeds coursier's Java API,
+which does not expose a cache policy, so an <code>--offline</code> flag would have to be faked; it is
+left out rather than made to look like a guarantee it is not.</p>
 <h2 id="source-layout">Source Layout<a class="headerlink" href="#source-layout" title="Permanent link">&para;</a></h2>
 <p>Production sources are every <code>.on</code> file under <code>src/</code>; tests are every
 <code>_test.on</code> file under <code>tests/</code>. Both are discovered recursively, sorted by
@@ -4645,10 +4953,10 @@ directory is a successful test run with a zero-test summary.</p>
 (or the build that <code>run</code> and <code>test</code> perform first) reuses that output when a
 SHA-256 fingerprint over the compiler version, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>$ onion build
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Built hello (1 classes)
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>$ onion build
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>$ onion build
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Built hello (1 classes)
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>$ onion build
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>Any source addition, removal, rename, or content change invalidates the
 cache and triggers a full rebuild. A failed rebuild never destroys the
@@ -4672,10 +4980,10 @@ ambiguity can be resolved.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p><code>test</code> builds production sources once, then compiles and runs each discovered
 test file in sorted order, sequentially:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$ onion test
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion test
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>A test's own <code>stdout</code>/<code>stderr</code> are shown only when it fails, unless
 <code>--verbose</code> is given. One test's compile failure, assertion failure, runtime
@@ -4684,8 +4992,8 @@ every remaining test still runs, and a project with no tests at all succeeds
 with a <code>0 tests, 0 passed, 0 failed</code> summary.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> removes exactly the project's canonical <code>target/</code> directory:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ onion clean
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion clean
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Cleaned target
 </span></code></pre></div>
 <p>It requires a valid, located project first, succeeds (printing the same
 message) whether <code>target/</code> exists or not, and refuses to touch a <code>target</code>
@@ -4699,8 +5007,8 @@ interactive shell.</p>
 <h2 id="deferred">Deferred<a class="headerlink" href="#deferred" title="Permanent link">&para;</a></h2>
 <p>The following are intentionally out of scope for this first version, to keep
 <code>onion.toml</code> from becoming another large build language before real usage
-justifies it: dependency resolution or publishing, multiple modules or
-workspaces, configurable source/test/output/entrypoint paths, incremental
+justifies it: publishing, dependency lock files and offline resolution, multiple modules
+or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
 a new test framework, package/archive commands, formatter or linter
 integration, lifecycle hooks or manifest scripts, terminal color, and an

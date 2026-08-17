@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -3923,6 +3951,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -5011,7 +5067,7 @@ and they are where most of the v0.6 work goes. Two are the <em>moat</em>.</p>
 </table>
 <hr />
 <h2 id="3-core-1-origin">3. Core 1 — <code>Origin</code><a class="headerlink" href="#3-core-1-origin" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>record Origin(source: String, line: Int, column: Int, span: Int)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Origin</span><span class="p">(</span><span class="n">source</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">line</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">column</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">span</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The runtime counterpart to the compiler's <code>onion.compiler.Location</code>. Onion has nothing
 like it today: <code>grep -rniE "provenance|sourceSpan|valueOrigin" src/main src/test</code> returns
@@ -5029,12 +5085,12 @@ returning 1 and <code>DiagnosticRenderer.underlineAt</code> (<code>:129-138</cod
 A language selling diagnostics quality cannot ship one-character carets.</p>
 <hr />
 <h2 id="4-core-2-outcomet-and-defect">4. Core 2 — <code>Outcome[T]</code> and <code>Defect</code><a class="headerlink" href="#4-core-2-outcomet-and-defect" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Defect(origin: Origin?, path: String, expected: String, actual: String)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">record</span><span class="w"> </span><span class="nb">Defect</span><span class="p">(</span><span class="n">origin</span><span class="p">:</span><span class="w"> </span><span class="nc">Origin</span><span class="p">?,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">expected</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">actual</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>enum Outcome[T] {
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  case Ok(value: T)
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  case Bad(defects: List[Defect])
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>}
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">enum</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Ok</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Bad</span><span class="p">(</span><span class="n">defects</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nb">Defect</span><span class="p">])</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">}</span>
 </span></code></pre></div>
 <p><code>path</code> locates the failure <em>inside</em> the value (<code>"status"</code>, <code>"items[3].price"</code>);
 <code>origin</code> locates it in the <em>text</em>. Both are needed: one answers "which field", the other
@@ -5126,11 +5182,11 @@ with an unchecked side condition, and nothing verifies it (audit §1, §3).</p>
 <p><strong>(L3) Failure carries position.</strong> <code>S.parse(t, o)</code> returning <code>Bad(ds)</code> implies every
 <code>d ∈ ds</code> has <code>d.origin</code> derived from <code>o</code> — a defect always points somewhere.</p>
 <h3 id="52-shapes-are-named-values-not-record-attachments">5.2 Shapes are named values, not record attachments<a class="headerlink" href="#52-shapes-are-named-values-not-record-attachments" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>record Access(time: String, method: String, path: String, status: Int)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Access</span><span class="p">(</span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>shape AccessLine : Access = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>shape AccessJson : Access = json
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>shape AccessCsv  : Access = csv
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">shape</span><span class="w"> </span><span class="nc">AccessLine</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nc">Access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\w</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">shape</span><span class="w"> </span><span class="nc">AccessJson</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nc">Access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">shape</span><span class="w"> </span><span class="nc">AccessCsv</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="nc">Access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">csv</span>
 </span></code></pre></div>
 <p>Today a record may have <strong>one</strong> <code>from re"..."</code> and a fixed marker set
 <code>derive!(Json, Yaml)</code>, which bolts nine statics onto the record (<code>parse</code>, <code>parseAll</code>,
@@ -5138,12 +5194,12 @@ with an unchecked side condition, and nothing verifies it (audit §1, §3).</p>
 scale past two formats, and the names collide the moment you want two regex shapes for
 the same type — a v1 log line and a v2 log line, say.</p>
 <p>Making shapes named values fixes all of it and buys composition:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>val r: Outcome[Access] = AccessLine.parse(line)
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>val s: String          = AccessLine.print(rec)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">Access</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">AccessLine</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nc">AccessLine</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>// many shapes for one type; pick at the call site
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>val rows: Outcome[List[Access]] = file&quot;access.log&quot;.as(AccessLine.lines)
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>val body: Outcome[Access]       = http&quot;…/latest&quot;.as(AccessJson)
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1">// many shapes for one type; pick at the call site</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="kd">val</span><span class="w"> </span><span class="n">rows</span><span class="p">:</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">List</span><span class="p">[</span><span class="nc">Access</span><span class="p">]]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"access.log"</span><span class="p">.</span><span class="k">as</span><span class="p">(</span><span class="nc">AccessLine</span><span class="p">.</span><span class="n">lines</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="kd">val</span><span class="w"> </span><span class="n">body</span><span class="p">:</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">Access</span><span class="p">]</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">http</span><span class="sx">"…/latest"</span><span class="p">.</span><span class="k">as</span><span class="p">(</span><span class="nc">AccessJson</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="53-combinators">5.3 Combinators<a class="headerlink" href="#53-combinators" title="Permanent link">&para;</a></h3>
 <p>Shapes compose, which is what makes them an abstraction rather than a fourth macro:</p>
@@ -5210,7 +5266,7 @@ scalar an <em>L1-checked</em> print, since a scalar shape is exactly a tiny bidi
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  ∀i. τᵢ ∈ ScalarRegistry
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  p compiles;  groups(p) = n
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>─────────────────────────────────────────────── (S-Regex)
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  Γ ⊢ shape S : τ = re&quot;p&quot;    ⇒    S : Shape[τ]
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  Γ ⊢ shape S : τ = re"p"    ⇒    S : Shape[τ]
 </span></code></pre></div>
 <p>Failing premises map onto the existing codes, which is deliberate — <code>E0059</code> (bad pattern)
 and <code>E0060</code> (group/component mismatch) already exist and already fire for
@@ -5232,12 +5288,12 @@ construct that made it non-invertible</strong> — see the error model below. To
 <p><code>Shape</code> types the <strong>data</strong> crossing the boundary. <code>Capability</code> types the <strong>effects</strong>
 crossing it. Same principle, other axis — which is why this is a completion of the thesis
 rather than a second feature.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tool ingest(src: File, dst: File, dry: Boolean = false)
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  requires { read(src), write(dst) }
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>{
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  val rows = file(src).as(AccessLine.lines)
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  ...
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>}
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">ingest</span><span class="p">(</span><span class="n">src</span><span class="p">:</span><span class="w"> </span><span class="nc">File</span><span class="p">,</span><span class="w"> </span><span class="n">dst</span><span class="p">:</span><span class="w"> </span><span class="nc">File</span><span class="p">,</span><span class="w"> </span><span class="n">dry</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="n">src</span><span class="p">),</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="n">dst</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="p">{</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="n">src</span><span class="p">).</span><span class="k">as</span><span class="p">(</span><span class="nc">AccessLine</span><span class="p">.</span><span class="n">lines</span><span class="p">)</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="o">..</span><span class="p">.</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>One declaration derives four things:</p>
 <ol>
@@ -5283,7 +5339,7 @@ drops the field it does have. So:</p>
 </ul>
 <p><strong>The proposal is: <code>unknown</code> is a real effect that propagates.</strong> It costs nothing inside
 ordinary code, but it must be explicitly admitted at a tool boundary:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tool scrape(url: String) requires { net(url), unknown } { ... }
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">scrape</span><span class="p">(</span><span class="n">url</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">net</span><span class="p">(</span><span class="n">url</span><span class="p">),</span><span class="w"> </span><span class="n">unknown</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
 </span></code></pre></div>
 <p><code>--plan</code> then honestly reports <code>unknown</code> for the parts it cannot characterize, instead of
 claiming a clean bill of health. The user can shrink the surface by adding table entries.
@@ -5454,8 +5510,8 @@ declaration. Change 9 is the largest and is scheduled separately.</p>
 <p>A <strong>lossless</strong> shape satisfies L2 as well as L1 (§5.1): parsing and reprinting is the
 identity on the text, comments and whitespace included. That makes a <em>lens</em> possible —
 read a config, change one field, write it back, and the diff is one line:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>val cfg = file&quot;app.conf&quot;.as(ConfShape)     // lossless
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>val out = ConfShape.print(cfg.value.with(port = 9090))
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">cfg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"app.conf"</span><span class="p">.</span><span class="k">as</span><span class="p">(</span><span class="nc">ConfShape</span><span class="p">)</span><span class="w">     </span><span class="c1">// lossless</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">ConfShape</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">cfg</span><span class="p">.</span><span class="n">value</span><span class="p">.</span><span class="nf">with</span><span class="p">(</span><span class="n">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">9090</span><span class="p">))</span>
 </span></code></pre></div>
 <p>This is worth flagging as <strong>the payoff that motivates <code>Origin</code></strong>. Provenance is not
 decoration: it is what lets the printer put untouched text back exactly where it was.</p>

@@ -2135,6 +2135,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ja/RELEASING/" class="md-nav__link">
         
   
@@ -3921,6 +3949,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../RELEASING/" class="md-nav__link">
         
   
@@ -4301,7 +4357,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <th>#</th>
 <th>Dimension</th>
 <th>How to measure</th>
-<th>Current (2026-08-13)</th>
+<th>Current (2026-08-17)</th>
 <th>Pass threshold</th>
 </tr>
 </thead>
@@ -4309,15 +4365,15 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <tr>
 <td>1</td>
 <td>Test suite</td>
-<td><code>sbt -batch -Duser.language=en test</code></td>
-<td>3410 pass / 0 fail / 1 cancelled</td>
+<td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code> (see the note below)</td>
+<td>3752 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Sample health</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
-<td>170 / 170 compile</td>
+<td>171 / 171 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
@@ -4367,6 +4423,19 @@ the effective heap below what the full suite needs and makes it die with an
 <p><code>-Duser.language=en</code> matters: error messages are bilingual and resolved from the JVM
 default locale, so a test asserting on message text passes in a Japanese locale and fails
 in release CI, which runs in English. Assert on error <strong>codes</strong>, not localized text.</p>
+<p>Two sbt 2 behaviours make that easy to get wrong locally, and both fail <em>quietly</em>:</p>
+<ul>
+<li><strong><code>test</code> is incremental.</strong> It delegates to <code>testQuick</code>, so running it a second time with
+  no source change prints <code>No tests to run</code> and exits 0 — which reads exactly like a pass.
+  <code>testFull</code> runs everything.</li>
+<li><strong><code>-D</code> only reaches a fresh server.</strong> The sbt server persists across invocations, so
+  <code>-Duser.language=ja</code> handed to a server already started under <code>en</code> changes nothing;
+  <code>java.util.Locale.getDefault()</code> keeps reporting the old locale. <code>sbt shutdown</code> first.</li>
+</ul>
+<p>Together those mean the obvious <code>sbt -Duser.language=en test</code> followed by
+<code>sbt -Duser.language=ja test</code> can report two green runs having tested one locale once.
+CI is unaffected: the incremental state lives in <code>target/</code>, which <code>setup-java</code>'s
+<code>cache: 'sbt'</code> does not cache, so every CI run starts cold.</p>
 <p>The one cancelled test is the distribution smoke test, gated behind <code>-Donion.dist.path</code>.</p>
 <p><strong>Practical quality is reached when rows 1–7 all pass.</strong> This turns the open-ended
 goal "reach practical quality" into a checkable state.</p>

@@ -1832,6 +1832,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#-gnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -g:none
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2622,6 +2633,34 @@
     
   
     ソースからビルド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
   
 
     
@@ -4431,6 +4470,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -4969,6 +5036,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#-gnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -g:none
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5396,88 +5474,98 @@
 <p>コンパイルされた各メソッドの推論済みエフェクト集合（<code>read write net exec env clock rand console unknown</code>。空はpureを意味する）を標準エラー出力に表示します。</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>onionc<span class="w"> </span>--effects<span class="w"> </span>MyProgram.on
 </span></code></pre></div>
+<h3 id="-gnone"><code>-g:none</code><a class="headerlink" href="#-gnone" title="Permanent link">&para;</a></h3>
+<p>生成するクラスファイルから LocalVariableTable を省きます。</p>
+<p>これが無くても JVM デバッガは <code>.on</code> のソースをステップ実行できます（行番号は常に出力されます）が、
+<strong>変数の値が一切表示されません</strong>。値を見られないステップ実行はほとんど用をなしません。テーブルは
+既定で出力され、メソッドあたり数バイトのコストです。クラスファイルを小さくしたい場合の逃げ道が
+このオプションです。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>onionc<span class="w"> </span>-g:none<span class="w"> </span>MyProgram.on
+</span></code></pre></div>
+<p><code>onion</code> でスクリプトを実行する場合は常にテーブルを出力します。スクリプトはメモリ上で
+コンパイルされ、小さく保つべき成果物が存在しないためです。</p>
 <h2 id="_3">例<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <h3 id="_4">基本的なコンパイル<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <p>1つのファイルをコンパイルします。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>onionc<span class="w"> </span>Hello.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>onionc<span class="w"> </span>Hello.on
 </span></code></pre></div>
 <p>これにより、カレントディレクトリに <code>Hello.class</code> が作成されます。</p>
 <h3 id="_5">複数ファイルのコンパイル<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>複数のソースファイルを同時にコンパイルします。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>onionc<span class="w"> </span>Person.on<span class="w"> </span>Employee.on<span class="w"> </span>Manager.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>onionc<span class="w"> </span>Person.on<span class="w"> </span>Employee.on<span class="w"> </span>Manager.on
 </span></code></pre></div>
 <h3 id="_6">出力ディレクトリの指定<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <p>出力を整理します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/classes<span class="w"> </span>src/Main.on<span class="w"> </span>src/Utils.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/classes<span class="w"> </span>src/Main.on<span class="w"> </span>src/Utils.on
 </span></code></pre></div>
 <p>クラスファイルは <code>out/classes/</code> に出力されます。</p>
 <h3 id="_7">クラスパス付きのコンパイル<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
 <p>外部ライブラリを参照します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>onionc<span class="w"> </span>-classpath<span class="w"> </span>lib/gson-2.8.jar:lib/commons-lang.jar<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">       </span>src/JsonParser.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>onionc<span class="w"> </span>-classpath<span class="w"> </span>lib/gson-2.8.jar:lib/commons-lang.jar<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">       </span>src/JsonParser.on
 </span></code></pre></div>
 <h3 id="_8">完全な例<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>onionc<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span>-d<span class="w"> </span>build/classes<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span>-classpath<span class="w"> </span>lib/external.jar<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span>-encoding<span class="w"> </span>UTF-8<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span>-maxErrorReport<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span>src/*.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>onionc<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span>-d<span class="w"> </span>build/classes<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span>-classpath<span class="w"> </span>lib/external.jar<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span>-encoding<span class="w"> </span>UTF-8<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">  </span>-maxErrorReport<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span>src/*.on
 </span></code></pre></div>
 <h2 id="_9">コンパイル後の実行<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <p>コンパイル後は、Javaで実行します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># コンパイル</span>
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>Main.on
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Javaで実行</span>
-</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>java<span class="w"> </span>-cp<span class="w"> </span>build<span class="w"> </span>Main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># コンパイル</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>Main.on
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Javaで実行</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>java<span class="w"> </span>-cp<span class="w"> </span>build<span class="w"> </span>Main
 </span></code></pre></div>
 <p>またはJARで実行します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># コンパイル</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>Main.on<span class="w"> </span>Helper.on
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># JARの作成</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>jar<span class="w"> </span>cvfe<span class="w"> </span>program.jar<span class="w"> </span>Main<span class="w"> </span>-C<span class="w"> </span>build<span class="w"> </span>.
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># JARの実行</span>
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>java<span class="w"> </span>-jar<span class="w"> </span>program.jar
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># コンパイル</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>Main.on<span class="w"> </span>Helper.on
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># JARの作成</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>jar<span class="w"> </span>cvfe<span class="w"> </span>program.jar<span class="w"> </span>Main<span class="w"> </span>-C<span class="w"> </span>build<span class="w"> </span>.
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="c1"># JARの実行</span>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>java<span class="w"> </span>-jar<span class="w"> </span>program.jar
 </span></code></pre></div>
 <h2 id="_10">モジュール構成<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p>OnionはJavaと同様のモジュール名（パッケージ）を使用します。</p>
 <p><strong>MyClass.on:</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>module com.example.myapp
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>class MyClass {
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>  public:
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    static def main(args :String[]): void {
-</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>      println(&quot;Hello&quot;)
-</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>    }
-</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>}
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">module</span><span class="w"> </span><span class="n">com</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">myapp</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">class</span><span class="w"> </span><span class="nc">MyClass</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">  </span><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="w"> </span><span class="p">:</span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">      </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Hello"</span><span class="p">)</span>
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="p">}</span>
 </span></code></pre></div></p>
 <p>コンパイル:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>MyClass.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>onionc<span class="w"> </span>-d<span class="w"> </span>build<span class="w"> </span>MyClass.on
 </span></code></pre></div></p>
 <p>出力:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>build/com/example/myapp/MyClass.class
+<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>build/com/example/myapp/MyClass.class
 </span></code></pre></div></p>
 <p>実行:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>build<span class="w"> </span>com.example.myapp.MyClass
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>build<span class="w"> </span>com.example.myapp.MyClass
 </span></code></pre></div></p>
 <h2 id="_11">コンパイルエラー<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <h3 id="_12">よくあるエラー<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <p><strong>型の不一致:</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>Error: Type mismatch
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>  Expected: Int
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>  Found: String
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>  at MyProgram.on:10
+<div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>Error: Type mismatch
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>  Expected: Int
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>  Found: String
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>  at MyProgram.on:10
 </span></code></pre></div></p>
 <p><strong>未定義の変数:</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>Error: Undefined variable &#39;count&#39;
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>  at MyProgram.on:15
+<div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>Error: Undefined variable 'count'
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>  at MyProgram.on:15
 </span></code></pre></div></p>
 <p><strong>メソッドが見つからない:</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>Error: Method &#39;getValue()&#39; not found in class Person
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>  at MyProgram.on:23
+<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>Error: Method 'getValue()' not found in class Person
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>  at MyProgram.on:23
 </span></code></pre></div></p>
 <h2 id="_13">インクリメンタルコンパイル<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <p><code>onionc</code> は指定したファイルを毎回すべてコンパイルします。大規模プロジェクトでは以下を検討してください。</p>
@@ -5488,69 +5576,69 @@
 </ol>
 <h2 id="_14">ビルドツールとの統合<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <h3 id="makefile">Makefileの例<a class="headerlink" href="#makefile" title="Permanent link">&para;</a></h3>
-<div class="language-makefile highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nv">SRC_DIR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>src
-</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="nv">OUT_DIR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>build/classes
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="nv">SOURCES</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">$(</span>wildcard<span class="w"> </span><span class="k">$(</span>SRC_DIR<span class="k">)</span>/*.on<span class="k">)</span>
-</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>
-</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="nf">all</span><span class="o">:</span><span class="w"> </span><span class="n">compile</span>
-</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>
-</span><span id="__span-31-7"><a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a><span class="nf">compile</span><span class="o">:</span>
-</span><span id="__span-31-8"><a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a><span class="w">    </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span>
-</span><span id="__span-31-9"><a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a><span class="w">    </span>onionc<span class="w"> </span>-d<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span><span class="w"> </span><span class="k">$(</span>SOURCES<span class="k">)</span>
-</span><span id="__span-31-10"><a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a>
-</span><span id="__span-31-11"><a id="__codelineno-31-11" name="__codelineno-31-11" href="#__codelineno-31-11"></a><span class="nf">clean</span><span class="o">:</span>
-</span><span id="__span-31-12"><a id="__codelineno-31-12" name="__codelineno-31-12" href="#__codelineno-31-12"></a><span class="w">    </span>rm<span class="w"> </span>-rf<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span>
-</span><span id="__span-31-13"><a id="__codelineno-31-13" name="__codelineno-31-13" href="#__codelineno-31-13"></a>
-</span><span id="__span-31-14"><a id="__codelineno-31-14" name="__codelineno-31-14" href="#__codelineno-31-14"></a><span class="nf">run</span><span class="o">:</span><span class="w"> </span><span class="n">compile</span>
-</span><span id="__span-31-15"><a id="__codelineno-31-15" name="__codelineno-31-15" href="#__codelineno-31-15"></a><span class="w">    </span>java<span class="w"> </span>-cp<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span><span class="w"> </span>Main
+<div class="language-makefile highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="nv">SRC_DIR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>src
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="nv">OUT_DIR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>build/classes
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="nv">SOURCES</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">$(</span>wildcard<span class="w"> </span><span class="k">$(</span>SRC_DIR<span class="k">)</span>/*.on<span class="k">)</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>
+</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="nf">all</span><span class="o">:</span><span class="w"> </span><span class="n">compile</span>
+</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>
+</span><span id="__span-32-7"><a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="nf">compile</span><span class="o">:</span>
+</span><span id="__span-32-8"><a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a><span class="w">    </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span>
+</span><span id="__span-32-9"><a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a><span class="w">    </span>onionc<span class="w"> </span>-d<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span><span class="w"> </span><span class="k">$(</span>SOURCES<span class="k">)</span>
+</span><span id="__span-32-10"><a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>
+</span><span id="__span-32-11"><a id="__codelineno-32-11" name="__codelineno-32-11" href="#__codelineno-32-11"></a><span class="nf">clean</span><span class="o">:</span>
+</span><span id="__span-32-12"><a id="__codelineno-32-12" name="__codelineno-32-12" href="#__codelineno-32-12"></a><span class="w">    </span>rm<span class="w"> </span>-rf<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span>
+</span><span id="__span-32-13"><a id="__codelineno-32-13" name="__codelineno-32-13" href="#__codelineno-32-13"></a>
+</span><span id="__span-32-14"><a id="__codelineno-32-14" name="__codelineno-32-14" href="#__codelineno-32-14"></a><span class="nf">run</span><span class="o">:</span><span class="w"> </span><span class="n">compile</span>
+</span><span id="__span-32-15"><a id="__codelineno-32-15" name="__codelineno-32-15" href="#__codelineno-32-15"></a><span class="w">    </span>java<span class="w"> </span>-cp<span class="w"> </span><span class="k">$(</span>OUT_DIR<span class="k">)</span><span class="w"> </span>Main
 </span></code></pre></div>
 <h3 id="_15">シェルスクリプトの例<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="ch">#!/bin/bash</span>
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>
-</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="nv">SRC_DIR</span><span class="o">=</span><span class="s2">&quot;src&quot;</span>
-</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="nv">OUT_DIR</span><span class="o">=</span><span class="s2">&quot;build/classes&quot;</span>
-</span><span id="__span-32-5"><a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="nv">CLASSPATH</span><span class="o">=</span><span class="s2">&quot;lib/*&quot;</span>
-</span><span id="__span-32-6"><a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>
-</span><span id="__span-32-7"><a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$OUT_DIR</span><span class="s2">&quot;</span>
-</span><span id="__span-32-8"><a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>
-</span><span id="__span-32-9"><a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Compiling Onion sources...&quot;</span>
-</span><span id="__span-32-10"><a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>onionc<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$OUT_DIR</span><span class="s2">&quot;</span><span class="w"> </span>-classpath<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CLASSPATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SRC_DIR</span><span class="s2">&quot;</span>/*.on
-</span><span id="__span-32-11"><a id="__codelineno-32-11" name="__codelineno-32-11" href="#__codelineno-32-11"></a>
-</span><span id="__span-32-12"><a id="__codelineno-32-12" name="__codelineno-32-12" href="#__codelineno-32-12"></a><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span>-eq<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
-</span><span id="__span-32-13"><a id="__codelineno-32-13" name="__codelineno-32-13" href="#__codelineno-32-13"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Compilation successful&quot;</span>
-</span><span id="__span-32-14"><a id="__codelineno-32-14" name="__codelineno-32-14" href="#__codelineno-32-14"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running program...&quot;</span>
-</span><span id="__span-32-15"><a id="__codelineno-32-15" name="__codelineno-32-15" href="#__codelineno-32-15"></a><span class="w">    </span>java<span class="w"> </span>-cp<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$OUT_DIR</span><span class="s2">:</span><span class="nv">$CLASSPATH</span><span class="s2">&quot;</span><span class="w"> </span>Main
-</span><span id="__span-32-16"><a id="__codelineno-32-16" name="__codelineno-32-16" href="#__codelineno-32-16"></a><span class="k">else</span>
-</span><span id="__span-32-17"><a id="__codelineno-32-17" name="__codelineno-32-17" href="#__codelineno-32-17"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Compilation failed&quot;</span>
-</span><span id="__span-32-18"><a id="__codelineno-32-18" name="__codelineno-32-18" href="#__codelineno-32-18"></a><span class="w">    </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
-</span><span id="__span-32-19"><a id="__codelineno-32-19" name="__codelineno-32-19" href="#__codelineno-32-19"></a><span class="k">fi</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="ch">#!/bin/bash</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="nv">SRC_DIR</span><span class="o">=</span><span class="s2">"src"</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="nv">OUT_DIR</span><span class="o">=</span><span class="s2">"build/classes"</span>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="nv">CLASSPATH</span><span class="o">=</span><span class="s2">"lib/*"</span>
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>
+</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">"</span><span class="nv">$OUT_DIR</span><span class="s2">"</span>
+</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>
+</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"Compiling Onion sources..."</span>
+</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>onionc<span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="nv">$OUT_DIR</span><span class="s2">"</span><span class="w"> </span>-classpath<span class="w"> </span><span class="s2">"</span><span class="nv">$CLASSPATH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$SRC_DIR</span><span class="s2">"</span>/*.on
+</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a>
+</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span>-eq<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"Compilation successful"</span>
+</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"Running program..."</span>
+</span><span id="__span-33-15"><a id="__codelineno-33-15" name="__codelineno-33-15" href="#__codelineno-33-15"></a><span class="w">    </span>java<span class="w"> </span>-cp<span class="w"> </span><span class="s2">"</span><span class="nv">$OUT_DIR</span><span class="s2">:</span><span class="nv">$CLASSPATH</span><span class="s2">"</span><span class="w"> </span>Main
+</span><span id="__span-33-16"><a id="__codelineno-33-16" name="__codelineno-33-16" href="#__codelineno-33-16"></a><span class="k">else</span>
+</span><span id="__span-33-17"><a id="__codelineno-33-17" name="__codelineno-33-17" href="#__codelineno-33-17"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"Compilation failed"</span>
+</span><span id="__span-33-18"><a id="__codelineno-33-18" name="__codelineno-33-18" href="#__codelineno-33-18"></a><span class="w">    </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+</span><span id="__span-33-19"><a id="__codelineno-33-19" name="__codelineno-33-19" href="#__codelineno-33-19"></a><span class="k">fi</span>
 </span></code></pre></div>
 <h2 id="_16">コンパイラ出力<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
 <h3 id="_17">成功時のコンパイル<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
 <p>通常、成功時は何も出力されません。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>$<span class="w"> </span>onionc<span class="w"> </span>Hello.on
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>$<span class="w"> </span>ls
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>Hello.class<span class="w">  </span>Hello.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>$<span class="w"> </span>onionc<span class="w"> </span>Hello.on
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>$<span class="w"> </span>ls
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>Hello.class<span class="w">  </span>Hello.on
 </span></code></pre></div>
 <h3 id="_18">コンパイルエラー<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
 <p>エラーは標準エラー出力に書き出されます。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>$<span class="w"> </span>onionc<span class="w"> </span>BadProgram.on
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>Error:<span class="w"> </span>Type<span class="w"> </span>mismatch<span class="w"> </span>at<span class="w"> </span>BadProgram.on:5
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>Error:<span class="w"> </span>Undefined<span class="w"> </span>variable<span class="w"> </span>at<span class="w"> </span>BadProgram.on:10
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>Compilation<span class="w"> </span>failed<span class="w"> </span>with<span class="w"> </span><span class="m">2</span><span class="w"> </span>errors
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>$<span class="w"> </span>onionc<span class="w"> </span>BadProgram.on
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>Error:<span class="w"> </span>Type<span class="w"> </span>mismatch<span class="w"> </span>at<span class="w"> </span>BadProgram.on:5
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>Error:<span class="w"> </span>Undefined<span class="w"> </span>variable<span class="w"> </span>at<span class="w"> </span>BadProgram.on:10
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>Compilation<span class="w"> </span>failed<span class="w"> </span>with<span class="w"> </span><span class="m">2</span><span class="w"> </span>errors
 </span></code></pre></div>
 <h2 id="_19">分割コンパイルとリンク<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
 <p>Onion のユニットは独立してコンパイルでき、クラスパスを介してロード時にリンクされます
 ——すべてのソースを 1 回の <code>onionc</code> 呼び出しに含める必要はありません。ライブラリを先に
 コンパイルし、生成された <code>.class</code> に対してクライアントをコンパイルします。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1"># ライブラリを先にコンパイル</span>
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/lib<span class="w"> </span>greeter/Greeter.on
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
-</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="c1"># ライブラリ出力をクラスパスに置いてクライアントをコンパイル</span>
-</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/app<span class="w"> </span>-classpath<span class="w"> </span>out/lib<span class="w"> </span>app/Main.on
-</span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a>
-</span><span id="__span-35-7"><a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="c1"># リンクは JVM の仕事——全出力ディレクトリ（と onion.jar）をクラスパスに</span>
-</span><span id="__span-35-8"><a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a>java<span class="w"> </span>-cp<span class="w"> </span>onion.jar:out/lib:out/app<span class="w"> </span>Main<span class="w">   </span><span class="c1"># =&gt; Hello, Onion</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># ライブラリを先にコンパイル</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/lib<span class="w"> </span>greeter/Greeter.on
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="c1"># ライブラリ出力をクラスパスに置いてクライアントをコンパイル</span>
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>onionc<span class="w"> </span>-d<span class="w"> </span>out/app<span class="w"> </span>-classpath<span class="w"> </span>out/lib<span class="w"> </span>app/Main.on
+</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>
+</span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="c1"># リンクは JVM の仕事——全出力ディレクトリ（と onion.jar）をクラスパスに</span>
+</span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a>java<span class="w"> </span>-cp<span class="w"> </span>onion.jar:out/lib:out/app<span class="w"> </span>Main<span class="w">   </span><span class="c1"># =&gt; Hello, Onion</span>
 </span></code></pre></div>
 <p>クラス・インターフェース・レコード・enum・継承・静的メンバ、<strong>そしてジェネリック型</strong>が
 ユニット境界を越えられます。<code>onionc</code> が <code>.class</code> に JVM ジェネリックシグネチャを書き込むため、

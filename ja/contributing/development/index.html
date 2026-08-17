@@ -2704,6 +2704,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4493,6 +4521,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -5409,11 +5465,11 @@
 </span></code></pre></div>
 <h3 id="5">5. 手動での確認<a class="headerlink" href="#5" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># サンプルを実行</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sbt<span class="w"> </span><span class="s1">&#39;runScript run/Hello.on&#39;</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sbt<span class="w"> </span><span class="s1">'runScript run/Hello.on'</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># またはコンパイラを使う</span>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>sbt<span class="w"> </span>compile
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>sbt<span class="w"> </span><span class="s1">&#39;run-main onion.tools.CompilerFrontend run/Hello.on&#39;</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>sbt<span class="w"> </span><span class="s1">'run-main onion.tools.CompilerFrontend run/Hello.on'</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>java<span class="w"> </span>-cp<span class="w"> </span>.<span class="w"> </span>Hello
 </span></code></pre></div>
 <h3 id="6">6. コードの整形<a class="headerlink" href="#6" title="Permanent link">&para;</a></h3>
@@ -5423,7 +5479,7 @@
 - 意味のある変数名を使う</p>
 <h3 id="7">7. 変更をコミット<a class="headerlink" href="#7" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>add<span class="w"> </span>.
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Add feature: description of change&quot;</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Add feature: description of change"</span>
 </span></code></pre></div>
 <h3 id="8">8. プッシュしてプルリクエストを作成<a class="headerlink" href="#8" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature/my-new-feature
@@ -5449,24 +5505,24 @@
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">package</span><span class="w"> </span><span class="nn">onion</span><span class="p">.</span><span class="nn">compiler</span><span class="p">.</span><span class="n">tools</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyFeatureSpec</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">AbstractShellSpec</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="s">&quot;MyFeature&quot;</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">&quot;work correctly&quot;</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;&quot;</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="s">"MyFeature"</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">"work correctly"</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"""</span>
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">      |// Your test code here</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">      |println(&quot;Test&quot;)</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">    &quot;&quot;&quot;</span><span class="p">.</span><span class="n">stripMargin</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">      |println("Test")</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">    """</span><span class="p">.</span><span class="n">stripMargin</span>
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
 </span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">runShell</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="n">result</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="n">include</span><span class="p">(</span><span class="s">&quot;Test&quot;</span><span class="p">)</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="n">result</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="n">include</span><span class="p">(</span><span class="s">"Test"</span><span class="p">)</span>
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>テストの実行:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sbt<span class="w"> </span><span class="s1">&#39;testOnly *MyFeatureSpec&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sbt<span class="w"> </span><span class="s1">'testOnly *MyFeatureSpec'</span>
 </span></code></pre></div>
 <h3 id="_12">コンパイラのデバッグ<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <p>print文の追加またはデバッガの使用:</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// コンパイラコード内</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">println</span><span class="p">(</span><span class="s">s&quot;Debug: AST = </span><span class="si">$</span><span class="n">ast</span><span class="s">&quot;</span><span class="p">)</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">println</span><span class="p">(</span><span class="s">s"Debug: AST = </span><span class="si">$</span><span class="n">ast</span><span class="s">"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>またはIntelliJ IDEAのデバッガを使います。
 1. ブレークポイントを設定
@@ -5502,7 +5558,7 @@
 <h3 id="_16">ユニットテスト<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
 <p>個別のコンポーネントをテストします。</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">TypingSpec</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">AnyFlatSpec</span><span class="w"> </span><span class="k">with</span><span class="w"> </span><span class="nc">Matchers</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="s">&quot;Type checker&quot;</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">&quot;infer Int type&quot;</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="s">"Type checker"</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">"infer Int type"</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="c1">// 型推論のテスト</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="p">}</span>
@@ -5510,10 +5566,10 @@
 <h3 id="_17">統合テスト<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
 <p>完全なコンパイルをテストします。</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">IntegrationSpec</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">AbstractShellSpec</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="s">&quot;Compiler&quot;</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">&quot;compile and run program&quot;</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;&quot;println(&quot;Hello&quot;)&quot;&quot;&quot;</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="s">"Compiler"</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="s">"compile and run program"</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"""println("Hello")"""</span>
 </span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">runShell</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="n">result</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="n">include</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">)</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="n">result</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="n">include</span><span class="p">(</span><span class="s">"Hello"</span><span class="p">)</span>
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">}</span>
 </span></code></pre></div>

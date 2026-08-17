@@ -2327,6 +2327,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4116,6 +4144,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -4600,42 +4656,42 @@
 <h1 id="_1">変数と型<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
 <h2 id="_2">変数宣言<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p><code>val</code> は不変、<code>var</code> は可変です。型は推論されますが、明示もできます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val x: Int = 42
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>var name: String = &quot;ko&quot;
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val inferred = 3.14        // 型推論で Double
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">var</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ko"</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">inferred</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3.14</span><span class="w">        </span><span class="c1">// 型推論で Double</span>
 </span></code></pre></div>
 <h2 id="_3">型システム<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <h3 id="_4">プリミティブ型<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <p>先頭が大文字です：<code>Int</code> / <code>Long</code> / <code>Double</code> / <code>Float</code> / <code>Boolean</code> / <code>Byte</code> / <code>Short</code> / <code>Char</code>。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val i: Int = 42
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val l: Long = 100L         // L 接尾辞
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val d: Double = 3.14
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>val f: Float = 2.5f        // f/F 接尾辞（d/D も可）
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">l</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100L</span><span class="w">         </span><span class="c1">// L 接尾辞</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="kt">Double</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3.14</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="kt">Float</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.5f</span><span class="w">        </span><span class="c1">// f/F 接尾辞（d/D も可）</span>
 </span></code></pre></div>
 <p><code>Double</code> / <code>Int</code> などはプリミティブとして直接書け、<code>Object</code> / <code>Number</code> のスロットへは自動的にボクシングされます（ラッパークラスは <code>JDouble</code> / <code>JInteger</code> …）。</p>
 <h3 id="_5">参照型・配列型<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p><code>String</code>、クラス型、インターフェース型、そして <code>List[T]</code> / <code>Map[K, V]</code>。後の2つには
 リテラル形式があるので、型を書かずに済むことがほとんどです。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val s: String = &quot;hello&quot;
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>val names = [&quot;ann&quot;, &quot;bo&quot;]              // List[String] と推論される
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>val ages  = [&quot;ann&quot;: 30, &quot;bo&quot;: 25]      // Map[String, Int] と推論される
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val empty: List[String] = []           // 推論の手がかりが無いときは型を書く
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ann"</span><span class="p">,</span><span class="w"> </span><span class="s2">"bo"</span><span class="p">]</span><span class="w">              </span><span class="c1">// List[String] と推論される</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">ages</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ann"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="s2">"bo"</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">]</span><span class="w">      </span><span class="c1">// Map[String, Int] と推論される</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">empty</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w">           </span><span class="c1">// 推論の手がかりが無いときは型を書く</span>
 </span></code></pre></div>
 <p>標準ライブラリはリストを受け取り・返すので、プログラムを流れるのはこれらの型です。</p>
 <p>配列もありますが、使うのは Java と話すときです——<code>main(args: String[])</code>、バイナリ I/O の
 <code>byte[]</code>、可変長引数。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val arr: Int[] = new Int[5]
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>arr[0] = 10
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>val len = arr.length       // 配列は .length、リストは .size
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">arr</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="kt">Int</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arr</span><span class="p">.</span><span class="n">length</span><span class="w">       </span><span class="c1">// 配列は .length、リストは .size</span>
 </span></code></pre></div>
 <h3 id="nullable">Nullable型<a class="headerlink" href="#nullable" title="Permanent link">&para;</a></h3>
 <p><code>T?</code> で <code>null</code> を許可します。詳細は <a href="../null-safety/">Null安全</a> を参照してください。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val maybe: String? = null
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">maybe</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
 </span></code></pre></div>
 <h2 id="_6">型キャスト<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p><code>as</code> 演算子を使います。メソッドチェーンには括弧が必要です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val btn = (event.source as JButton)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val text = (obj as JButton).getText()
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">btn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">.</span><span class="n">source</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JButton</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">obj</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JButton</span><span class="p">).</span><span class="nf">getText</span><span class="p">()</span>
 </span></code></pre></div>
 <ul>
 <li>拡大変換（<code>Int</code> → <code>Long</code> → <code>Double</code>）は自動です</li>
@@ -4645,25 +4701,25 @@
 <p>ローカル変数、フィールド、static 変数があります。トップレベルの <code>val</code> はスクリプトの合成クラスのフィールドに昇格されつつ、<code>if x != null</code> のスマートキャストも効きます。</p>
 <h2 id="_8">ジェネリック型<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p>ジェネリック型は <code>[]</code> で型引数を指定します（raw 型は禁止 = E0066）。型引数にはプリミティブ型（<code>Int</code> など）も使え、JVM の消去に伴い境界で自動的にボックス化／アンボックス化されます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val list: ArrayList[Int] = new ArrayList[Int]
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>list.add(1)
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>val x: Int = list.get(0)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">list</span><span class="p">:</span><span class="w"> </span><span class="nc">ArrayList</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">ArrayList</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">list</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">list</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="_9">型引数の不変性<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
 <p>型引数は<strong>不変</strong>です。<code>Dog</code> が <code>Animal</code> の派生型であっても、<code>Box[Dog]</code> は <code>Box[Animal]</code> に代入できません（ヒープ汚染を防ぐため）。互換なのは同一のパラメータ化だけです：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>class Animal { public: def this {} }
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>class Dog extends Animal { public: def this {} }
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Animal</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">public</span><span class="p">:</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Dog</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Animal</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">public</span><span class="p">:</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>class Box[T] {
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>  val v: T
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>public:
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>  def this(x: T) { v = x }
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>  def get(): T = v
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>}
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Box</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">get</span><span class="p">():</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="p">}</span>
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>val bd: Box[Dog] = new Box(new Dog())
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>val same: Box[Dog] = bd        // OK: 同一のパラメータ化
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>// val wide: Box[Animal] = bd  // エラー E0000: Box[Dog] は Box[Animal] ではない
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="kd">val</span><span class="w"> </span><span class="n">bd</span><span class="p">:</span><span class="w"> </span><span class="nc">Box</span><span class="p">[</span><span class="nc">Dog</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Box</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">Dog</span><span class="p">())</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="kd">val</span><span class="w"> </span><span class="n">same</span><span class="p">:</span><span class="w"> </span><span class="nc">Box</span><span class="p">[</span><span class="nc">Dog</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bd</span><span class="w">        </span><span class="c1">// OK: 同一のパラメータ化</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="c1">// val wide: Box[Animal] = bd  // エラー E0000: Box[Dog] は Box[Animal] ではない</span>
 </span></code></pre></div>
 <p>不変性は型<em>引数</em>に適用されるもので、ジェネリッククラス自体は通常の派生関係に従います（例: <code>ArrayList[String]</code> は <code>List[String]</code>）。</p>
 <h2 id="_10">次のステップ<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>

@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -2525,6 +2553,17 @@
     <span class="md-ellipsis">
       
         Verify Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-time-and-jvm-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Time and JVM Flags
       
     </span>
   </a>
@@ -4084,6 +4123,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4485,6 +4552,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#startup-time-and-jvm-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Time and JVM Flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ide-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4615,6 +4693,24 @@
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># If using the JAR directly</span>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>java<span class="w"> </span>-jar<span class="w"> </span>onion.jar<span class="w"> </span>--help
 </span></code></pre></div>
+<h2 id="startup-time-and-jvm-flags">Startup Time and JVM Flags<a class="headerlink" href="#startup-time-and-jvm-flags" title="Permanent link">&para;</a></h2>
+<p>Onion starts a JVM per invocation, and loading the compiler accounts for most of that.
+Sharing those classes through an <a href="https://openjdk.org/jeps/350">AppCDS</a> archive roughly
+halves it — measured on JDK 25, <code>onion run/Hello.on</code> goes from 0.73s to 0.38s.</p>
+<p>The <code>curl | sh</code> installer builds the archive for you. If you installed from the
+distribution zip, build it once after unpacking:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">ONION_GENERATE_CDS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>onion<span class="w"> </span>run/Hello.on
+</span></code></pre></div>
+<p>That writes <code>lib/onion.jsa</code> (about 15 MB) next to <code>onion.jar</code>. Generation goes through the
+launcher on purpose: an archive is only usable when the classpath matches the one it was
+built with. Rebuild it after upgrading Onion or switching JDKs — until you do, the JVM
+quietly refuses the stale archive and runs normally, just without the speedup.</p>
+<p>Extra JVM flags go in <code>ONION_JAVA_OPTS</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">ONION_JAVA_OPTS</span><span class="o">=</span><span class="s2">"-Xmx4g"</span><span class="w"> </span>onion<span class="w"> </span>big-job.on
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">ONION_JAVA_OPTS</span><span class="o">=</span><span class="s2">"-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"</span><span class="w"> </span>onion<span class="w"> </span>script.on
+</span></code></pre></div>
+<p><code>ONION_DEBUG_STARTUP=1</code> stops the launcher silencing the JVM's class-sharing messages,
+which is how to find out why an archive is being ignored.</p>
 <h2 id="ide-setup">IDE Setup<a class="headerlink" href="#ide-setup" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>While there's no official Onion extension yet, you can use:</p>

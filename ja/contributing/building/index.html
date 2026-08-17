@@ -18,7 +18,7 @@
         <link rel="prev" href="../development/">
       
       
-        <link rel="next" href="../../RELEASING/">
+        <link rel="next" href="../syntax-highlighting/">
       
       
         
@@ -2711,6 +2711,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4500,6 +4528,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -5429,11 +5485,11 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sbt<span class="w"> </span><span class="nb">test</span>
 </span></code></pre></div>
 <h3 id="_11">特定のテストスイートを実行<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sbt<span class="w"> </span><span class="s1">&#39;testOnly *HelloWorldSpec&#39;</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sbt<span class="w"> </span><span class="s1">&#39;testOnly *FactorialSpec&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sbt<span class="w"> </span><span class="s1">'testOnly *HelloWorldSpec'</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sbt<span class="w"> </span><span class="s1">'testOnly *FactorialSpec'</span>
 </span></code></pre></div>
 <h3 id="_12">パターンに一致するテストを実行<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sbt<span class="w"> </span><span class="s1">&#39;testOnly *String*&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sbt<span class="w"> </span><span class="s1">'testOnly *String*'</span>
 </span></code></pre></div>
 <h2 id="_13">ディストリビューションの作成<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <h3 id="jar">スタンドアロンJAR<a class="headerlink" href="#jar" title="Permanent link">&para;</a></h3>
@@ -5484,10 +5540,10 @@
 </span></code></pre></div>
 <h3 id="sbt">SBTから実行<a class="headerlink" href="#sbt" title="Permanent link">&para;</a></h3>
 <p>JARを作成せずに実行します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sbt<span class="w"> </span><span class="s1">&#39;run Hello.on&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sbt<span class="w"> </span><span class="s1">'run Hello.on'</span>
 </span></code></pre></div>
 <p>スクリプトランナーを実行:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runScript run/Hello.on&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>sbt<span class="w"> </span><span class="s1">'runScript run/Hello.on'</span>
 </span></code></pre></div>
 <p>推奨REPLを実行:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sbt<span class="w"> </span>repl
@@ -5558,11 +5614,11 @@ x86-64、Eclipse Adoptium Temurin JDK 21、割り当て processor 2個、
 release evidence にはなりません。</p>
 <p>機械可読レポートは <code>target/readiness/benchmark-v3.json</code> に書き出されます。
 プロトコルだけを短時間で確認するには次を実行します:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">&#39;benchmark --warmups 0 --iterations 1&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">'benchmark --warmups 0 --iterations 1'</span>
 </span></code></pre></div>
 <p><code>sbt bench</code> は互換エイリアスとして残り、同じオプションを受け付けます。</p>
 <p>コンパイルプロファイルを出力:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt<span class="w"> </span><span class="s1">'runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on'</span>
 </span></code></pre></div>
 <h3 id="sbt_1">対話型SBT<a class="headerlink" href="#sbt_1" title="Permanent link">&para;</a></h3>
 <p>SBTシェルを起動:</p>
@@ -5631,7 +5687,7 @@ release evidence にはなりません。</p>
 <code>OutOfMemoryError</code>（多くは <code>compile</code> ではなくフルテストスイート実行時）が起きる場合は、
 さらに引き上げてください。<code>SBT_OPTS</code> を 10g 未満に設定しないでください——<code>.jvmopts</code> を
 上書きしてしまい、かえって悪化します:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">&quot;-Xmx12G&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">"-Xmx12G"</span>
 </span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>sbt<span class="w"> </span><span class="nb">test</span>
 </span></code></pre></div>
 <h3 id="_23">依存関係の問題<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
@@ -5652,33 +5708,33 @@ release evidence にはなりません。</p>
 <h3 id="buildsbt">build.sbt<a class="headerlink" href="#buildsbt" title="Permanent link">&para;</a></h3>
 <p>主な設定:</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1">// バージョンは sbt-dynver によって git タグから導出される</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;3.3.7&quot;</span>
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;onion&quot;</span>
-</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;org.onion_lang&quot;</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">"3.3.7"</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">"onion"</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">"org.onion_lang"</span>
 </span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>
 </span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="c1">// 依存関係</span>
 </span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="n">libraryDependencies</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">  </span><span class="s">&quot;org.ow2.asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;9.8&quot;</span><span class="p">,</span>
-</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">  </span><span class="s">&quot;net.java.dev.javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;5.0&quot;</span><span class="p">,</span>
-</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">  </span><span class="s">&quot;org.scalatest&quot;</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">&quot;scalatest&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;3.2.19&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
+</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">  </span><span class="s">"org.ow2.asm"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"asm"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"9.8"</span><span class="p">,</span>
+</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">  </span><span class="s">"net.java.dev.javacc"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"javacc"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"5.0"</span><span class="p">,</span>
+</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">  </span><span class="s">"org.scalatest"</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">"scalatest"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"3.2.19"</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">"test"</span>
 </span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a><span class="p">)</span>
 </span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>
 </span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="c1">// メインクラス</span>
-</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">&quot;onion.tools.CompilerFrontend&quot;</span><span class="p">)</span>
+</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">"onion.tools.CompilerFrontend"</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="_26">コンパイラオプション<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
 <p>Scalaコンパイラオプション:
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">scalacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="s">&quot;-encoding&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;utf8&quot;</span><span class="p">,</span>
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span><span class="s">&quot;-unchecked&quot;</span><span class="p">,</span>
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span><span class="s">&quot;-deprecation&quot;</span><span class="p">,</span>
-</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span><span class="s">&quot;-feature&quot;</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="s">"-encoding"</span><span class="p">,</span><span class="w"> </span><span class="s">"utf8"</span><span class="p">,</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span><span class="s">"-unchecked"</span><span class="p">,</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span><span class="s">"-deprecation"</span><span class="p">,</span>
+</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span><span class="s">"-feature"</span>
 </span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <p>Javaコンパイラオプション:
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">javacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">&quot;-source&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;17&quot;</span><span class="p">,</span>
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">&quot;-Xlint:unchecked&quot;</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">"-source"</span><span class="p">,</span><span class="w"> </span><span class="s">"17"</span><span class="p">,</span>
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">"-Xlint:unchecked"</span>
 </span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <h2 id="_27">パフォーマンスのヒント<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>
@@ -5771,13 +5827,13 @@ release evidence にはなりません。</p>
         
         
           
-          <a href="../../RELEASING/" class="md-footer__link md-footer__link--next" aria-label="Next: リリース手順">
+          <a href="../syntax-highlighting/" class="md-footer__link md-footer__link--next" aria-label="Next: シンタックスハイライト">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                リリース手順
+                シンタックスハイライト
               </div>
             </div>
             <div class="md-footer__button md-icon">

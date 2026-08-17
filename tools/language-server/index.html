@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -3541,6 +3569,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Supported features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-rename-does-and-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What rename does, and does not, do
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4017,6 +4073,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4376,6 +4460,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Supported features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-rename-does-and-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What rename does, and does not, do
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4469,8 +4581,36 @@ editor that supports the Language Server Protocol.</p>
 <td>Rename symbol</td>
 <td>Rename occurrences of the symbol at the cursor in the current file</td>
 </tr>
+<tr>
+<td>Formatting</td>
+<td>Normalises spacing, sharing its implementation with <code>onion fmt</code></td>
+</tr>
 </tbody>
 </table>
+<h3 id="what-rename-does-and-does-not-do">What rename does, and does not, do<a class="headerlink" href="#what-rename-does-and-does-not-do" title="Permanent link">&para;</a></h3>
+<p>Rename rewrites every <strong>code</strong> occurrence of the identifier in the open document. It skips
+comments and string literals — renaming <code>count</code> no longer rewrites <code>"count of items"</code> or
+<code>// count starts at zero</code> — while a <code>#{ … }</code> interpolation counts as code, so the <code>count</code>
+in <code>"n=#{count}"</code> is renamed with the rest. Renaming from a position inside a comment or a
+literal is refused: the word there is not a reference to anything.</p>
+<p>It is <strong>not scope-aware and not cross-file</strong>. Two unrelated locals that happen to share a
+name are renamed together, a local and a field of the same name are renamed together, and
+references in other files are not touched at all. Scope-aware rename needs the typed AST
+with real source ranges, and the parser currently produces spans only a token wide; that is
+the work this depends on. Until then, review the edits your editor previews before applying
+them.</p>
+<h3 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h3>
+<p>The formatting provider calls the same code as <code>onion fmt</code>, so an editor and a CI check can
+never disagree about what formatted means — a difference there shows up as a file that
+changes every time it crosses between the two.</p>
+<p>It tightens punctuation and converts leading tabs to spaces. It does not reindent, does not
+move a line break, and does not collapse runs of spaces used for alignment; the reasoning
+is in <a href="../project-cli/#onion-fmt">the <code>onion fmt</code> section of the project CLI page</a>.</p>
+<p>The result is one edit replacing the whole document. A minimal diff would preserve editor
+decorations better, but computing one from two strings risks producing an edit that does not
+reconstruct the formatted text, and a formatter that corrupts a buffer on save is worse than
+one that scrolls it. Before any edit is offered the formatted text is re-lexed and compared
+token for token against the original; if they differ, no edit is offered at all.</p>
 <h2 id="symbol-support">Symbol support<a class="headerlink" href="#symbol-support" title="Permanent link">&para;</a></h2>
 <p>The language server indexes the following symbols from open documents:</p>
 <ul>

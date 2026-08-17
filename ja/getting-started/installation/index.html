@@ -744,6 +744,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#jvm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動時間と JVM フラグ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ide" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2296,6 +2307,34 @@
     
   
     ソースからビルド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
   
 
     
@@ -4105,6 +4144,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -4506,6 +4573,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#jvm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動時間と JVM フラグ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ide" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4636,6 +4714,24 @@
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># JARを直接使用する場合</span>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>java<span class="w"> </span>-jar<span class="w"> </span>onion.jar<span class="w"> </span>--help
 </span></code></pre></div>
+<h2 id="jvm">起動時間と JVM フラグ<a class="headerlink" href="#jvm" title="Permanent link">&para;</a></h2>
+<p>Onion は実行のたびに JVM を起動し、その大半はコンパイラのクラスロードに費やされます。
+<a href="https://openjdk.org/jeps/350">AppCDS</a> のアーカイブでクラスを共有すると、これがおよそ半分に
+なります。JDK 25 での実測で、<code>onion run/Hello.on</code> が 0.73 秒から 0.38 秒になりました。</p>
+<p><code>curl | sh</code> のインストーラはアーカイブを自動で作ります。配布 zip から入れた場合は、展開後に
+一度だけ次を実行してください。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">ONION_GENERATE_CDS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>onion<span class="w"> </span>run/Hello.on
+</span></code></pre></div>
+<p><code>onion.jar</code> と同じ場所に <code>lib/onion.jsa</code>（約 15MB）が作られます。生成をランチャ経由にしている
+のは意図的で、アーカイブは作成時と同じ classpath でしか使えないためです。Onion を更新したときや
+JDK を切り替えたときは作り直してください。作り直すまでの間、JVM は古いアーカイブを黙って拒否し、
+高速化なしで通常どおり動作します。</p>
+<p>追加の JVM フラグは <code>ONION_JAVA_OPTS</code> で渡します。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">ONION_JAVA_OPTS</span><span class="o">=</span><span class="s2">"-Xmx4g"</span><span class="w"> </span>onion<span class="w"> </span>big-job.on
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">ONION_JAVA_OPTS</span><span class="o">=</span><span class="s2">"-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"</span><span class="w"> </span>onion<span class="w"> </span>script.on
+</span></code></pre></div>
+<p><code>ONION_DEBUG_STARTUP=1</code> を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
+表示されます。アーカイブが使われない理由はこれで分かります。</p>
 <h2 id="ide">IDEセットアップ<a class="headerlink" href="#ide" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>公式のOnion拡張機能はまだありませんが、以下を使用できます：</p>

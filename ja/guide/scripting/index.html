@@ -2348,6 +2348,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4137,6 +4165,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../RELEASING/" class="md-nav__link">
         
   
@@ -4648,59 +4704,59 @@
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>onion<span class="w"> </span>repl<span class="w">                    </span><span class="c1"># 対話的な REPL</span>
 </span></code></pre></div>
 <p>スクリプトは shebang を使えます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>#!/usr/bin/env onion
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>println(&quot;hello&quot;)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="ch">#!/usr/bin/env onion</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nf">println</span><span class="p">(</span><span class="s2">"hello"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>トップレベルの文は上から順に実行され、<code>args</code> にコマンドライン引数が入ります。
 コンパイルエラーが起きると非ゼロの終了ステータスで終了します。</p>
 <h2 id="_3">コマンドライン引数<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val opts = Args::parse(args)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">opts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Args</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>if opts.flag(&quot;verbose&quot;) { ... }          // --verbose または -v
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val out = opts.option(&quot;output&quot;, &quot;a.txt&quot;) // --output=x または --output x
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>val n = opts.intOption(&quot;count&quot;, 1)       // デフォルト付きの数値
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>val files = opts.positional()            // それ以外すべて
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">if</span><span class="w"> </span><span class="n">opts</span><span class="p">.</span><span class="nf">flag</span><span class="p">(</span><span class="s2">"verbose"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">          </span><span class="c1">// --verbose または -v</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">opts</span><span class="p">.</span><span class="nf">option</span><span class="p">(</span><span class="s2">"output"</span><span class="p">,</span><span class="w"> </span><span class="s2">"a.txt"</span><span class="p">)</span><span class="w"> </span><span class="c1">// --output=x または --output x</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">opts</span><span class="p">.</span><span class="nf">intOption</span><span class="p">(</span><span class="s2">"count"</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w">       </span><span class="c1">// デフォルト付きの数値</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="kd">val</span><span class="w"> </span><span class="n">files</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">opts</span><span class="p">.</span><span class="nf">positional</span><span class="p">()</span><span class="w">            </span><span class="c1">// それ以外すべて</span>
 </span></code></pre></div>
 <h2 id="_4">外部コマンドの実行<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val branch = Proc::run(&quot;git&quot;, &quot;branch&quot;, &quot;--show-current&quot;)  // 標準出力を取得、失敗時は例外
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">branch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Proc</span><span class="o">::</span><span class="nf">run</span><span class="p">(</span><span class="s2">"git"</span><span class="p">,</span><span class="w"> </span><span class="s2">"branch"</span><span class="p">,</span><span class="w"> </span><span class="s2">"--show-current"</span><span class="p">)</span><span class="w">  </span><span class="c1">// 標準出力を取得、失敗時は例外</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>val r = Proc::capture(&quot;sh&quot;, &quot;-c&quot;, &quot;ls missing&quot;)            // 例外を投げない
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>if r.failed() { println(r.stderr()) }
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Proc</span><span class="o">::</span><span class="nf">capture</span><span class="p">(</span><span class="s2">"sh"</span><span class="p">,</span><span class="w"> </span><span class="s2">"-c"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ls missing"</span><span class="p">)</span><span class="w">            </span><span class="c1">// 例外を投げない</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">if</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="nf">failed</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">stderr</span><span class="p">())</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>val code = Proc::exec(&quot;make&quot;, &quot;build&quot;)                     // コンソールを継承、終了コードを返す
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="kd">val</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Proc</span><span class="o">::</span><span class="nf">exec</span><span class="p">(</span><span class="s2">"make"</span><span class="p">,</span><span class="w"> </span><span class="s2">"build"</span><span class="p">)</span><span class="w">                     </span><span class="c1">// コンソールを継承、終了コードを返す</span>
 </span></code></pre></div>
 <p><code>Proc::runIn(dir, ...)</code> は作業ディレクトリを指定できるバリアントです。</p>
 <h2 id="glob">ファイルと glob<a class="headerlink" href="#glob" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val text = Files::readText(&quot;config.txt&quot;)
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Files::writeText(&quot;out.txt&quot;, text.toUpperCase())
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Files</span><span class="o">::</span><span class="nf">readText</span><span class="p">(</span><span class="s2">"config.txt"</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">Files</span><span class="o">::</span><span class="nf">writeText</span><span class="p">(</span><span class="s2">"out.txt"</span><span class="p">,</span><span class="w"> </span><span class="n">text</span><span class="p">.</span><span class="nf">toUpperCase</span><span class="p">())</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>foreach f: String in Files::glob(&quot;.&quot;, &quot;*.on&quot;) {
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  println(f)
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Files::glob(&quot;src&quot;, &quot;**/*.java&quot;)    // 再帰的に検索
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">foreach</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="nb">Files</span><span class="o">::</span><span class="nf">glob</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span><span class="w"> </span><span class="s2">"*.on"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nb">Files</span><span class="o">::</span><span class="nf">glob</span><span class="p">(</span><span class="s2">"src"</span><span class="p">,</span><span class="w"> </span><span class="s2">"**/*.java"</span><span class="p">)</span><span class="w">    </span><span class="c1">// 再帰的に検索</span>
 </span></code></pre></div>
 <h2 id="json-http">JSON と HTTP<a class="headerlink" href="#json-http" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val body = Http::get(&quot;https://api.github.com/repos/onion-lang/onion&quot;)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val v = Json::value(body)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>println(v[&quot;name&quot;].asString() + &quot; stars=&quot; + v[&quot;stargazers_count&quot;].asInt())
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Http</span><span class="o">::</span><span class="nf">get</span><span class="p">(</span><span class="s2">"https://api.github.com/repos/onion-lang/onion"</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Json</span><span class="o">::</span><span class="nf">value</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nf">println</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="s2">"name"</span><span class="p">].</span><span class="nf">asString</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s2">" stars="</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">v</span><span class="p">[</span><span class="s2">"stargazers_count"</span><span class="p">].</span><span class="nf">asInt</span><span class="p">())</span>
 </span></code></pre></div>
 <p><code>Json::value</code> はナビゲート可能な値を返します。オブジェクトや配列を添字アクセスした上で、
 <code>asString</code> / <code>asInt</code> / <code>asDouble</code> / <code>asBoolean</code> で変換します。存在しないパスは例外ではなく
 <code>isNull()</code> で判定できます。</p>
 <h2 id="_5">スキームプレフィックス付きリテラル<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p><code>re"..."</code> / <code>file"..."</code> / <code>http"..."</code> は RAW 文字列リテラル（バックスラッシュをそのまま通す）で、<code>re(...)</code> / <code>file(...)</code> / <code>http(...)</code> の呼び出しに展開されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val p    = re&quot;\d+-\d+&quot;                   // コンパイル済み Pattern
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>val text = file&quot;notes.txt&quot;.text()         // lines() / json() / csv() なども
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>val body = http&quot;https://api.example.com&quot;.get()
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">p</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="se">\d</span><span class="o">+</span><span class="sr">-</span><span class="se">\d</span><span class="o">+</span><span class="sr">"</span><span class="w">                   </span><span class="c1">// コンパイル済み Pattern</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"notes.txt"</span><span class="p">.</span><span class="nf">text</span><span class="p">()</span><span class="w">         </span><span class="c1">// lines() / json() / csv() なども</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">http</span><span class="sx">"https://api.example.com"</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
 </span></code></pre></div>
 <p>プレフィックスは <code>re</code>/<code>file</code>/<code>http</code> に限りません。<strong>任意の識別子</strong>に直接続く RAW 文字列は
 <code>prefix("...")</code> に展開されるスキームリテラルなので、その名前の関数を定義するだけで
 自分のプレフィックスを作れます（新しい機構は不要）：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>def sql(query: String): String = &quot;[SQL] &quot; + query.trim()
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>def money(raw: String): Double = Double::parseDouble(raw.substring(1))
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">sql</span><span class="p">(</span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"[SQL] "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">query</span><span class="p">.</span><span class="nf">trim</span><span class="p">()</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">money</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="kt">Double</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">Double</span><span class="o">::</span><span class="nf">parseDouble</span><span class="p">(</span><span class="n">raw</span><span class="p">.</span><span class="nf">substring</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>sql&quot;SELECT * FROM users WHERE id = 5&quot;   // -&gt; sql(&quot;SELECT ...&quot;)
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>money&quot;$19.99&quot;                            // -&gt; money(&quot;$19.99&quot;) -&gt; 19.99
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nf">sql</span><span class="sx">"SELECT * FROM users WHERE id = 5"</span><span class="w">   </span><span class="c1">// -&gt; sql("SELECT ...")</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nf">money</span><span class="sx">"$19.99"</span><span class="w">                            </span><span class="c1">// -&gt; money("$19.99") -&gt; 19.99</span>
 </span></code></pre></div>
 <p>識別子は引用符に直接隣接している必要があります（<code>prefix"..."</code>）。空白があると
 （<code>prefix "..."</code>）通常の識別子＋文字列になります。予約語に直接続く文字列は影響を
@@ -4708,53 +4764,53 @@
 未定義のプレフィックスは lexer エラーではなく通常の「メソッドが見つかりません」エラーです。</p>
 <h2 id="from-re">パターン付きレコード（from re"..."）<a class="headerlink" href="#from-re" title="Permanent link">&para;</a></h2>
 <p>レコードに正規表現を付けると、その形から型付きパーサが導出されます。キャプチャグループが各成分の型に変換されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record Access(time: String, method: String, path: String, status: Int)
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Access</span><span class="p">(</span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\w</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access]、不正行はスキップ
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>val one  = Access::parse(line)                          // Access?（不一致なら null）
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">hits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Access</span><span class="o">::</span><span class="nf">parseAll</span><span class="p">(</span><span class="nf">file</span><span class="sx">"access.log"</span><span class="p">.</span><span class="nf">text</span><span class="p">())</span><span class="w">   </span><span class="c1">// List[Access]、不正行はスキップ</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="kd">val</span><span class="w"> </span><span class="n">one</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nc">Access</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="n">line</span><span class="p">)</span><span class="w">                          </span><span class="c1">// Access?（不一致なら null）</span>
 </span></code></pre></div>
 <p>パターンが可逆（リテラル断片＋グループのみ）なら <code>format</code> も導出され、<code>parse∘format == id</code> が成り立ちます。</p>
 <h2 id="derive">シリアライズの導出（derive!）<a class="headerlink" href="#derive" title="Permanent link">&para;</a></h2>
 <p><code>derive!(Json)</code> / <code>derive!(Yaml)</code> でレコードの形から双方向のシリアライズを導出します。<code>derive!</code> は型クラスではなくマクロです（<code>!</code> が展開の印）。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">age</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nb">Json</span><span class="p">,</span><span class="w"> </span><span class="nb">Yaml</span><span class="p">)</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>User::toJson(u)            // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>val a = User::fromJson(s)  // User?
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>User::toYaml(u)            // name: ko\nage: 3
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>val b = User::fromYaml(s)  // User?
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nc">User</span><span class="o">::</span><span class="nf">toJson</span><span class="p">(</span><span class="n">u</span><span class="p">)</span><span class="w">            </span><span class="c1">// {"name":"ko","age":3}</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">User</span><span class="o">::</span><span class="nf">fromJson</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w">  </span><span class="c1">// User?</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nc">User</span><span class="o">::</span><span class="nf">toYaml</span><span class="p">(</span><span class="n">u</span><span class="p">)</span><span class="w">            </span><span class="c1">// name: ko\nage: 3</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">User</span><span class="o">::</span><span class="nf">fromYaml</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w">  </span><span class="c1">// User?</span>
 </span></code></pre></div>
 <p>全フォーマットが <code>toMap</code> / <code>fromMap</code> のコアを共有するので、新フォーマットは stdlib に <code>parse</code> / <code>stringify</code> を足すだけで済みます。成分は scalar 型のみ（非対応は E0062、未知のマーカーは E0063）。<code>from re"..."</code> と1つのレコードに共存できます。</p>
 <h2 id="law-example">コンパイル時の法則・用例（law / example）<a class="headerlink" href="#law-example" title="Permanent link">&para;</a></h2>
 <p>レコードに <code>law</code> / <code>example</code> を書くと、<strong>コンパイラがビルド時に実行検証</strong>します。仕様をテストやドキュメントではなく言語の中に置けます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"3,4"</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
 </span></code></pre></div>
 <p><code>example</code> は <code>true</code> でなければコンパイルエラー（E0065）。<code>law</code> は生成された値で property 検査され、反例が見つかればコンパイルエラー（E0064、反例つき）。<code>parse∘format == id</code> が機械検証される仕組みです。</p>
 <h2 id="_6">パイプライン演算子<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p><code>e |&gt; f</code> は <code>f(e)</code>、<code>e |&gt; f(a)</code> は <code>f(e, a)</code> です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>xs.map { x =&gt; x * 2 } |&gt; println
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">xs</span><span class="p">.</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="n">println</span>
 </span></code></pre></div>
 <h2 id="auto-cli">auto-CLI<a class="headerlink" href="#auto-cli" title="Permanent link">&para;</a></h2>
 <p>トップレベル <code>main</code> の型付き引数から、コマンドライン引数の解析が導出されます。必須引数は位置引数、デフォルト付きは <code>--name</code> フラグになります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>// $ onion script.on world --count 5 --loud
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>// $ onion script.on world --count=5 --loud   （--name=value 形式も可）
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">loud</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1">// $ onion script.on world --count 5 --loud</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1">// $ onion script.on world --count=5 --loud   （--name=value 形式も可）</span>
 </span></code></pre></div>
 <p>フラグは <code>--name value</code> と <code>--name=value</code> の両形式を受け付けます。<code>--help</code>（または <code>-h</code>）で生成された usage を表示して終了します。</p>
 <h2 id="_7">まとめて使う<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>#!/usr/bin/env onion
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>record Hit(ip: String, method: String, path: String, status: Int)
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="ch">#!/usr/bin/env onion</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Hit</span><span class="p">(</span><span class="n">ip</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\w</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>def main(log: String, minStatus: Int = 500): void {
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  Hit::parseAll(file(log).text())
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    .filter { h =&gt; h.status() &gt;= minStatus }
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    .groupBy { h =&gt; h.path() }
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    .mapValues { xs =&gt; xs.size }
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    |&gt; println
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>}
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">log</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">minStatus</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">500</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="nc">Hit</span><span class="o">::</span><span class="nf">parseAll</span><span class="p">(</span><span class="nf">file</span><span class="p">(</span><span class="n">log</span><span class="p">).</span><span class="nf">text</span><span class="p">())</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="p">.</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">h</span><span class="p">.</span><span class="nf">status</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">minStatus</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="p">.</span><span class="n">groupBy</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">h</span><span class="p">.</span><span class="nf">path</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="p">.</span><span class="n">mapValues</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">    </span><span class="o">|&gt;</span><span class="w"> </span><span class="n">println</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="_8">次のステップ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>

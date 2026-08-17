@@ -2137,6 +2137,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
@@ -4525,6 +4553,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -5634,7 +5690,7 @@
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  Expected: Int
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Found: String
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  at MyProgram.on:15
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    val x: Int = &quot;hello&quot;
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    val x: Int = "hello"
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                 ^^^^^^^
 </span></code></pre></div>
 <h2 id="utilities">Utilities<a class="headerlink" href="#utilities" title="Permanent link">&para;</a></h2>
@@ -5665,11 +5721,11 @@
 <h3 id="parser-generation">Parser Generation<a class="headerlink" href="#parser-generation" title="Permanent link">&para;</a></h3>
 <p>Automatically regenerates parser when grammar changes:</p>
 <div class="language-scala highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sourceGenerators</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="nc">Compile</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="nc">Def</span><span class="p">.</span><span class="n">task</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">grammar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file</span><span class="p">(</span><span class="s">&quot;grammar/JJOnionParser.jj&quot;</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">parser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sourceManaged</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;java&quot;</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;onion&quot;</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;compiler&quot;</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;parser&quot;</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;JJOnionParser.java&quot;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">grammar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file</span><span class="p">(</span><span class="s">"grammar/JJOnionParser.jj"</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">parser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sourceManaged</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"java"</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"onion"</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"compiler"</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"parser"</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"JJOnionParser.java"</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">grammar</span><span class="p">.</span><span class="n">lastModified</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">parser</span><span class="p">.</span><span class="n">lastModified</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="n">javacc</span><span class="p">(</span><span class="n">classpath</span><span class="p">.</span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">sourceManaged</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">&quot;java&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">streams</span><span class="p">.</span><span class="n">value</span><span class="p">.</span><span class="n">log</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="n">javacc</span><span class="p">(</span><span class="n">classpath</span><span class="p">.</span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">sourceManaged</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s">"java"</span><span class="p">,</span><span class="w"> </span><span class="n">streams</span><span class="p">.</span><span class="n">value</span><span class="p">.</span><span class="n">log</span><span class="p">)</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">}</span>
 </span></code></pre></div>

@@ -2158,6 +2158,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../RELEASING/" class="md-nav__link">
         
   
@@ -4016,6 +4044,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../RELEASING/" class="md-nav__link">
         
   
@@ -4410,7 +4466,7 @@
 <th>#</th>
 <th>次元</th>
 <th>測定方法</th>
-<th>現在値（2026-08-13）</th>
+<th>現在値（2026-08-17）</th>
 <th>合格閾値</th>
 </tr>
 </thead>
@@ -4418,15 +4474,15 @@
 <tr>
 <td>1</td>
 <td>テストスイート</td>
-<td><code>sbt -batch -Duser.language=en test</code></td>
-<td>3410 pass / 0 fail / 1 cancelled</td>
+<td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code>（下記の注記を参照）</td>
+<td>3752 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
-<td>170 / 170 compile</td>
+<td>171 / 171 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
@@ -4475,6 +4531,19 @@
 <p><code>-Duser.language=en</code> は重要です。エラーメッセージは二言語で JVM の既定ロケールから解決される
 ため、メッセージ文字列を検査するテストは日本語ロケールでは通り、英語ロケールで走るリリース CI
 で落ちます。<strong>エラーコード</strong>を検査してください。</p>
+<p>sbt 2 の挙動が2つ、これをローカルで踏み外しやすくしています。どちらも<strong>静かに</strong>失敗します。</p>
+<ul>
+<li><strong><code>test</code> は差分実行です。</strong> <code>testQuick</code> に委譲されるため、ソース無変更での2回目は
+  <code>No tests to run</code> と表示して終了コード 0 を返します——見た目は完全に成功です。
+  全件実行は <code>testFull</code> です。</li>
+<li><strong><code>-D</code> は新規サーバにしか届きません。</strong> sbt サーバは実行間で常駐するため、<code>en</code> で起動済みの
+  サーバに <code>-Duser.language=ja</code> を渡しても何も変わりません。<code>java.util.Locale.getDefault()</code> は
+  古いロケールを返し続けます。先に <code>sbt shutdown</code> してください。</li>
+</ul>
+<p>この2つが重なると、素直に <code>sbt -Duser.language=en test</code> と <code>sbt -Duser.language=ja test</code> を
+続けて実行しても、「1つのロケールを1回テストしただけ」で2回 green に見えます。
+CI は影響を受けません。差分実行の状態は <code>target/</code> にあり、<code>setup-java</code> の <code>cache: 'sbt'</code> は
+そこをキャッシュしないため、CI は毎回コールドスタートになります。</p>
 <p>cancelled の1件は <code>-Donion.dist.path</code> で切られている配布物 smoke テストです。</p>
 <p><strong>実用的品質は、行1〜7がすべて合格したときに達成されます。</strong> これにより、「実用的品質に到達する」という漠然とした目標を検証可能な状態に変換します。</p>
 <h2 id="4">行4 — 機能網羅性チェックリスト<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>

@@ -6,19 +6,50 @@ import org.objectweb.asm.commons.GeneratorAdapter
 
 import scala.collection.mutable
 
+/** One LocalVariableTable row: the JVM slot, the author's name for it, and its type. */
+final case class DebugLocal(slot: Int, name: String, descriptor: String)
+
 class LocalVarContext(gen: GeneratorAdapter) {
   private val indexMap = mutable.Map[Int, Int]()
   private val parameterSet = mutable.Set[Int]()
   private val boxedSet = mutable.Set[Int]()
 
+  // Debug info. Names come from the frame, because `LocalBinding` does not carry one and
+  // the scopes are the only thing that still knows what the author called a variable by
+  // the time codegen runs. A slot with no name is simply left out of the table rather
+  // than invented — a debugger showing `var3` is worse than showing nothing.
+  private var names: Map[Int, String] = Map.empty
+  private val debugLocals = mutable.Buffer[DebugLocal]()
+
+  /** Must be called before slots are allocated, or those allocations go unnamed. */
+  def withNames(frame: onion.compiler.LocalFrame): LocalVarContext = {
+    if (frame != null) names = frame.namesByIndex
+    this
+  }
+
+  def declaredLocals: Seq[DebugLocal] = debugLocals.toSeq
+
+  private def recordDebug(typedIndex: Int, slot: Int, tp: AsmType): Unit =
+    names.get(typedIndex).foreach { name =>
+      debugLocals += DebugLocal(slot, name, tp.getDescriptor)
+    }
+
   def slotOf(typedIndex: Int): Option[Int] = indexMap.get(typedIndex)
 
   def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
-    indexMap.getOrElseUpdate(typedIndex, gen.newLocal(tp))
+    indexMap.get(typedIndex) match {
+      case Some(slot) => slot
+      case None =>
+        val slot = gen.newLocal(tp)
+        indexMap(typedIndex) = slot
+        recordDebug(typedIndex, slot, tp)
+        slot
+    }
 
   def allocateSlot(typedIndex: Int, tp: AsmType): Int = {
     val slot = gen.newLocal(tp)
     indexMap(typedIndex) = slot
+    recordDebug(typedIndex, slot, tp)
     slot
   }
 
@@ -36,8 +67,15 @@ class LocalVarContext(gen: GeneratorAdapter) {
     argTypes.zipWithIndex.foldLeft(startSlot) { case (slot, (tp, i)) =>
       indexMap(i) = slot
       parameterSet += i
+      recordDebug(i, slot, tp)
       slot + tp.getSize
     }
+    this
+  }
+
+  /** Records slot 0 of an instance method, which no frame knows about. */
+  def withThis(ownerDescriptor: String): LocalVarContext = {
+    debugLocals += DebugLocal(0, "this", ownerDescriptor)
     this
   }
 

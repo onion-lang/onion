@@ -72,6 +72,14 @@ class OnionLanguageServer extends LanguageServer with LanguageClientAware {
       // Formatting, sharing its implementation with `onion fmt`
       capabilities.setDocumentFormattingProvider(true)
 
+      // Semantic tokens: the colouring a TextMate grammar cannot produce, since it can only
+      // see the shape of a line and not what the document declares a name to be.
+      val semanticTokensOptions = new SemanticTokensWithRegistrationOptions()
+      semanticTokensOptions.setLegend(
+        new SemanticTokensLegend(OnionSemanticTokens.TokenTypes, OnionSemanticTokens.TokenModifiers))
+      semanticTokensOptions.setFull(true)
+      capabilities.setSemanticTokensProvider(semanticTokensOptions)
+
       val result = new InitializeResult(capabilities)
       val serverInfo = new ServerInfo("Onion Language Server", "1.0.0")
       result.setServerInfo(serverInfo)

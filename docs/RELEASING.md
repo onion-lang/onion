@@ -6,10 +6,17 @@ is no manual `version := ...` line to update in `build.sbt`.
 
 ## Release checklist
 
-1. **Make sure `develop` is green.**
+1. **Make sure `develop` is green — in both locales.**
    ```bash
-   sbt test
+   sbt shutdown && sbt -Duser.language=en testFull
+   sbt shutdown && sbt -Duser.language=ja testFull
    ```
+   Both parts matter. Diagnostics are bilingual, and release CI runs in English while
+   local development is usually `ja_JP`, so a test asserting on message text can pass
+   in one locale and fail in the other. Under sbt 2, `test` delegates to `testQuick`
+   and reports `No tests to run` on an unchanged tree, and `-D` is only picked up by a
+   *freshly started* server — so without `shutdown` and `testFull` this step can look
+   green having run nothing.
 
 2. **Decide the next version.**
    Onion follows [Semantic Versioning](https://semver.org/) with milestone and

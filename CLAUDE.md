@@ -170,7 +170,22 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 
 **Base Class:** Tests extend `AbstractShellSpec` for integration testing
 
-**Locale-independence (IMPORTANT):** error messages are bilingual (`errorMessage.properties` / `errorMessage_ja.properties`), resolved from the JVM default locale. The release CI runs in an **English** locale while local dev is often `ja_JP`. Assert on error **codes** (`E0002`, `E0069`), `Shell.Failure(-1)`, or locale-agnostic substrings — never on localized message text like `"重複"` alone, or the test passes locally but fails only in CI. Run `sbt -Duser.language=en test` before release to catch this.
+**Locale-independence (IMPORTANT):** error messages are bilingual (`errorMessage.properties` / `errorMessage_ja.properties`), resolved from the JVM default locale. The release CI runs in an **English** locale while local dev is often `ja_JP`. Assert on error **codes** (`E0002`, `E0069`), `Shell.Failure(-1)`, or locale-agnostic substrings — never on localized message text like `"重複"` alone, or the test passes locally but fails only in CI.
+
+**Running the suite (sbt 2.0.6 — two traps):**
+
+```bash
+sbt shutdown && sbt -Duser.language=en testFull    # then repeat with =ja
+```
+
+1. **`test` is incremental.** In sbt 2 it delegates to `testQuick`, so a second run with no
+   source change reports `No tests to run` and exits 0. Use `testFull` to actually run everything.
+2. **`-D` only reaches a *fresh* server.** The sbt server persists between invocations, so
+   passing `-Duser.language=ja` to a server already started under `en` silently does nothing
+   (`java.util.Locale.getDefault()` still reports the old one). `sbt shutdown` first.
+
+CI is unaffected by both: the incremental state lives in `target/`, which `setup-java`'s
+`cache: 'sbt'` does not cache, so every CI run starts cold and runs the full suite.
 
 **Test Suites:**
 - `HelloWorldSpec.scala` - Basic output

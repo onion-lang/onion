@@ -73,14 +73,38 @@ class ProjectCommands:
             }
             1
 
-  def test(cwd: Path, verbose: Boolean, out: PrintStream, err: PrintStream): Int =
+  /**
+   * @param reportXml where to write a JUnit XML report, if anywhere. `onion test` printed
+   *   a summary line and returned an exit code, which tells CI *that* something broke and
+   *   never *what*; this is the machine-readable half.
+   */
+  def test(
+    cwd: Path,
+    verbose: Boolean,
+    out: PrintStream,
+    err: PrintStream,
+    reportXml: Option[Path] = None
+  ): Int =
     buildProject(cwd, err) match
       case Left(error) =>
         err.println(s"error: ${error.message}")
         1
       case Right(build) =>
         val result = ProjectTestRunner().run(build, out, err, verbose)
-        if result.successful then 0 else 1
+        val reported = reportXml match
+          case None => Right(())
+          case Some(path) =>
+            JUnitXmlReport.write(result, path, build.manifest.name).map { _ =>
+              out.println(s"Wrote $path")
+            }
+        reported match
+          case Left(error) =>
+            // A report that could not be written must not be mistaken for a passing run,
+            // nor hide a genuine test failure behind an I/O error.
+            err.println(s"error: ${error.message}")
+            1
+          case Right(_) =>
+            if result.successful then 0 else 1
 
   def clean(cwd: Path, out: PrintStream, err: PrintStream): Int =
     (for

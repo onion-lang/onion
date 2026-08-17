@@ -57,10 +57,22 @@ Assert::equals(4, 2 + 2)
 onion new <name>
 onion build [--verbose]
 onion run [--verbose] [-- <引数...>]
-onion test [--verbose]
+onion test [--verbose] [--report-xml <パス>]
 onion clean
 onion doc [-d <ディレクトリ>] [<source.on>...]
 ```
+
+### `onion test --report-xml`
+
+実行結果を JUnit XML で書き出します。CI がこれを読むことで、「何かが失敗した」だけでなく
+「どのテストが失敗したか」をビルドに注釈できます。
+
+```bash
+onion test --report-xml target/test-reports/junit.xml
+```
+
+サマリ行と終了コードは変わりません。レポートを書けなかった場合はそれ自体をエラーとして扱います。
+失敗した実行を黙って成功に変えることも、本物のテスト失敗を I/O エラーで覆い隠すこともありません。
 
 ### `onion doc`
 

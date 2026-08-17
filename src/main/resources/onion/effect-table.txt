@@ -83,6 +83,42 @@ onion.Http#decodeUrl=pure
 onion.Http#isOk=pure
 onion.Http#isError=pure
 
+# TCP sockets. Everything that touches the socket is `net`; the accessors that only
+# report what was already established are not.
+onion.Net#connect=net
+onion.Net#listen=net
+onion.Net$Conn#readLine=net
+onion.Net$Conn#readAll=net
+onion.Net$Conn#readBytes=net
+onion.Net$Conn#write=net
+onion.Net$Conn#writeLine=net
+onion.Net$Conn#writeBytes=net
+onion.Net$Conn#closeWrite=net
+onion.Net$Conn#close=net
+onion.Net$Conn#timeout=pure
+onion.Net$Conn#remoteAddress=pure
+onion.Net$Conn#isClosed=pure
+onion.Net$Listener#accept=net
+onion.Net$Listener#close=net
+onion.Net$Listener#port=pure
+onion.Net$Listener#isClosed=pure
+
+# HTTP server. Starting or stopping one is `net`; building a response value is not,
+# which is what lets a handler be tested without a socket.
+onion.Server#start=net
+onion.Server#text=pure
+onion.Server#json=pure
+onion.Server#html=pure
+onion.Server#notFound=pure
+onion.Server#status=pure
+onion.Server$Instance#handle=pure
+onion.Server$Instance#handleAll=pure
+onion.Server$Instance#port=pure
+onion.Server$Instance#await=net
+onion.Server$Instance#stop=net
+onion.Server$Request#*=pure
+onion.Server$Response#*=pure
+
 onion.HttpResource#<init>=pure
 onion.HttpResource#url=pure
 onion.HttpResource#toString=pure

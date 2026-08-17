@@ -780,5 +780,18 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs VirtualShell.on") {
       assert(Shell.Success(null) == runSample("run/VirtualShell.on"))
     }
+
+    it("runs MiniWebService.on: it answers its own requests and stops") {
+      // Binds port 0 on localhost, so this needs no fixed port and is not reachable from
+      // the network. The assertions cover the regex route capturing its group, the
+      // catch-all falling through to 404, and -- because a non-daemon handler pool would
+      // keep the JVM alive after `main` returned -- that the program actually terminates.
+      val (result, output) = runSampleWithStdinCapturingStdout("run/MiniWebService.on", "")
+      assert(Shell.Success(null) == result)
+      assert(output.contains("/health -> HTTP/1.1 200 OK | ok"))
+      assert(output.contains("""/users/42 -> HTTP/1.1 200 OK | {"id": 42}"""))
+      assert(output.contains("/missing -> HTTP/1.1 404 Not Found | Not Found"))
+      assert(output.contains("stopped"))
+    }
   }
 }

@@ -6,7 +6,8 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI）, `Http`（HTTPクライアント） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **ネットワーク** | `Http`（HTTPクライアント）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
@@ -1660,6 +1661,104 @@ IO::println("明日: " + DateTime::format(tomorrow));
 val birthday: Long = DateTime::of(1990, 5, 15);
 val age: Int = DateTime::diffDays(now, birthday) / 365;
 ```
+
+---
+
+## Net
+
+TCP ソケット。`Http` がリクエストを送る側なのに対し、こちらは任意のプロトコルを話し、接続を受けられます。
+
+### Net::connect
+
+```onion
+val conn = Net::connect("example.com", 80)
+conn.writeLine("GET / HTTP/1.0")
+conn.writeLine("Host: example.com")
+conn.writeLine("")
+IO::println(conn.readAll())
+conn.close()
+```
+
+`Net::connect(host, port, timeoutMillis)` はタイムアウトを指定できます。OS 既定のままだと、
+パケットが落ちた場合に 1 分以上待つことがあります。
+
+接続は `readLine()`（終端で null）、`readAll()`（UTF-8、相手が閉じるまで）、`readBytes()` で読み、
+`write(text)`、`writeLine(text)`（CRLF を付加。行指向プロトコルが期待する形）、`writeBytes(bytes)`
+で書きます。書き込みは毎回フラッシュするので、バッファに溜まったまま送られないことはありません。
+`timeout(millis)` はブロックする読み込みの上限、`closeWrite()` は読みを続けたまま書き側だけ閉じて
+EOF を通知します。`close()` は冪等です。
+
+### Net::listen
+
+```onion
+val listener = Net::listen("localhost", 0, 4)   // 0 で OS に空きポートを選ばせる
+IO::println("listening on " + listener.port())
+
+val peer = listener.accept()
+peer.writeLine("hello " + peer.remoteAddress())
+peer.close()
+listener.close()
+```
+
+ポート 0 は OS に空きポートを選ばせ、`port()` が実際のポートを返します。番号を決め打ちして祈らずに
+サーバをテストできるのはこのためです。`"localhost"` を指定するとネットワークからは到達できません。
+ホストに `null` を渡すとすべてのローカルアドレスにバインドします。`accept()` でブロックしている
+スレッドを解除するにはリスナーを閉じます。
+
+失敗時は失敗したアドレスがメッセージに入るので、Onion の `catch` で「connection refused」だけでなく
+どのホストかが分かります。
+
+---
+
+## Server
+
+HTTP サーバ。JDK 同梱の実装を使うので依存は増えません。
+
+### Server::start
+
+```onion
+val server = Server::start("localhost", 8080)
+server.handle("/hello", (req) -> Server::text("hi " + req.method()))
+server.await()
+```
+
+`Server::start(port)` はすべてのローカルアドレス、`Server::start(host, port)` は 1 つだけに
+バインドします。ポート 0 なら OS が空きポートを選び、`port()` が返します。`await()` はプロセスが
+終わるまでブロックし、`stop()` は受付を止めて処理中のリクエストを 1 秒待ちます。
+
+### ルーティング
+
+`handle(path, handler)` は完全一致、`handleAll(handler)` はそれ以外すべてを受けます。Onion 側で
+ルーティングを書くならこちらです。
+
+```onion
+server.handleAll((req) -> select req.path() {
+  case re"/users/(\d+)" (id): Server::json("{\"id\":" + id + "}")
+  case "/health":             Server::text("ok")
+  else:                       Server::notFound()
+})
+```
+
+ハンドラが例外を投げた場合は 500 を返します。サーバが落ちたり、クライアントが応答のないソケットで
+待ち続けたりすることはありません。
+
+### Request
+
+`method()`、`path()`（クエリ文字列を含まない）、`query()`（生のクエリ文字列。無ければ `""`）、
+`body()`（ハンドラ実行前に全部読み込み済み）、`header(name)`、`headers()`、`params()`。
+最後の 2 つは記述順を保った `Map` を返します。
+
+### Response
+
+`Server::text`・`Server::json`・`Server::html` は対応する Content-Type 付きの 200、
+`Server::notFound()` は 404、`Server::status(code, body)` はそれ以外です。レスポンスは不変なので、
+`withStatus` と `withHeader` は新しい値を返します。
+
+```onion
+val r = Server::json("{\"a\":1}").withStatus(201).withHeader("X-Test", "yes")
+```
+
+レスポンスの構築はソケットに一切触れません。ハンドラを単体でテストできるのはこのためです。
 
 ---
 

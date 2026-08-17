@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`onion.Db`: SQL over JDBC.** The driver is never bundled — it is whatever the project
+  declares in `[dependencies]`, which is the first thing that became possible now that a
+  project can depend on a jar at all.
+
+  ```onion
+  val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+  db.transaction((conn) -> {
+    conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+    conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+  })
+  ```
+
+  Values are always bound, never pasted into the SQL, so the API gives no way to write an
+  injection by accident. A transaction commits when the body returns and rolls back when
+  it throws — there is no `begin`/`commit` pair to forget between. Rows are `Map`s from
+  column label to value in the order selected; two columns sharing a label is refused
+  rather than silently losing one.
+
+  `DriverManager` only offers drivers its *caller* can see, so a driver pulled in through
+  `[dependencies]` — loaded by Onion's own classpath loader — would have come back as "No
+  suitable driver" in exactly the case this class exists to serve. `Db` falls back to
+  asking the context classloader directly.
+
+- **`onion.Archive`: zip and gzip.** Onion could read and write files but not archives,
+  which is most of what a release, a backup or a log rotation touches. **Extraction
+  refuses to write outside the target directory** — an entry named
+  `../../.ssh/authorized_keys` is the standard "zip slip" attack, and a naive extractor
+  writes exactly where it is told. Entries carry a fixed timestamp, so zipping the same
+  inputs twice produces the same bytes; an artefact that differs run to run cannot be
+  checksummed or cached. Tar is left out: it needs a dependency.
+
+- **`onion.Concurrent`: bounded parallelism, and the pieces needed to use it safely.**
+  `Future` could already run one thing off the current thread, but there was no way to
+  bound how many run at once, to share a counter, to hold a lock, or to hand work between
+  threads.
+
+  ```onion
+  val pool = Concurrent::pool(4)
+  val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+  pool.close()
+  ```
+
+  `mapAll` returns results in the *input's* order, not the order they finished — output
+  that depends on timing cannot be tested — and reports a failing element only once every
+  task has settled, so one bad input cannot leave workers running behind a caller that has
+  given up. `withLock` releases even when the body throws. Channels are bounded, because
+  an unbounded one hides a producer outrunning its consumer until memory runs out, and
+  refuse `null`, which would be indistinguishable from an empty receive. Pool threads are
+  daemons, so a forgotten `close()` cannot keep the JVM alive. Virtual threads are absent:
+  they need Java 21 and Onion targets 17.
+
 - **`onion.Net`: TCP sockets.** Onion could reach the network only as an HTTP client —
   there was no way to speak any other protocol, and no way to accept a connection at all.
 

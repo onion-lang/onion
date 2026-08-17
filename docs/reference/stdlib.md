@@ -8,6 +8,9 @@ Onion's standard library consists of built-in modules and interfaces for common 
 |------|---------|
 | **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
 | **Network** | `Http` (HTTP client), `Net` (TCP sockets), `Server` (HTTP server) |
+| **Data stores** | `Db` (SQL over JDBC) |
+| **Archives** | `Archive` (zip, gzip) |
+| **Concurrency** | `Future`, `Concurrent` (pools, counters, locks, channels) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
@@ -1746,6 +1749,116 @@ val r = Server::json("{\"a\":1}").withStatus(201).withHeader("X-Test", "yes")
 ```
 
 Building a response touches no socket, which is what lets a handler be tested on its own.
+
+---
+
+## Archive
+
+Zip and gzip. Tar is not here: it needs a dependency, and these two are what the JDK can
+do on its own.
+
+```onion
+Archive::zip("out.zip", ["a.txt", "b.txt"])
+Archive::zipDir("site.zip", "site")          // keeps paths relative to "site"
+val names = Archive::entries("out.zip")      // without extracting
+val written = Archive::unzip("out.zip", "extracted")
+
+Archive::gzipFile("big.log", "big.log.gz")   // streams, rather than reading it all in
+val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
+```
+
+**Extraction refuses to write outside the target directory.** An entry named
+`../../.ssh/authorized_keys` is the standard "zip slip" attack, and an extractor that
+resolves entry names naively writes exactly where it is told; this throws instead, naming
+the entry.
+
+Entries are written with a fixed timestamp, so zipping the same inputs twice produces the
+same bytes — an artefact that differs run to run cannot be checksummed or cached.
+
+---
+
+## Concurrent
+
+Threads, and the pieces needed to use them safely. `Future` could already run one thing off
+the current thread, but there was no way to bound how many run at once, to share a counter
+between them, to hold a lock, or to hand work from one to another.
+
+Virtual threads are deliberately absent: they need Java 21, and Onion targets 17.
+
+### Pool
+
+```onion
+val pool = Concurrent::pool(4)                     // or Concurrent::pool() for one per CPU
+val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+pool.close()
+```
+
+`mapAll` returns results **in the input's order**, not in the order they finished — output
+that depends on timing is output you cannot test. A failing element is reported once every
+task has settled, so one bad input cannot leave workers running behind a caller that has
+already given up. `submit(f)` returns a `Future` for a single piece of work.
+
+Pool threads are daemons, so a pool someone forgot to close cannot keep the JVM alive after
+`main` returns. `close()` is still the right thing to call; `awaitClose(millis)` waits for
+work in flight.
+
+### Counter, Lock, Channel
+
+```onion
+val hits = Concurrent::counter()
+hits.increment()
+
+val lock = Concurrent::lock()
+lock.withLock(() -> { /* … */ })     // releases even if the body throws
+
+val chan = Concurrent::channel(16)   // bounded on purpose
+chan.send("work")
+val item = chan.receiveTimeout(1000) // null rather than blocking forever
+```
+
+Prefer `withLock` to `acquire`/`release`: a body that throws between a manual pair leaks
+the lock and every other thread waits forever. A channel is bounded because an unbounded
+one hides a producer outrunning its consumer until memory runs out, and it refuses `null`,
+which would be indistinguishable from an empty receive.
+
+---
+
+## Db
+
+SQL over JDBC. The driver is not bundled — it is whatever the project declares:
+
+```toml
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+```
+
+```onion
+val db = Db::connect("jdbc:postgresql://localhost/app", "user", "secret")
+
+val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+val one  = db.queryOne("SELECT * FROM users WHERE id = ?", 7)   // null when nothing matches
+val n    = db.queryValue("SELECT COUNT(*) FROM users")          // first column of first row
+db.update("INSERT INTO users VALUES (?, ?)", 8, "ada")
+
+db.transaction((conn) -> {
+  conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+  conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+})
+
+db.close()
+```
+
+Values are always **bound**, never pasted into the SQL, so `WHERE name = ?` is safe with
+any name and there is no way to build the string by accident.
+
+A transaction commits when the body returns and rolls back when it throws, then rethrows.
+There is no `begin`/`commit` pair to forget: a body that throws between a manual pair
+leaves the connection holding an open transaction, and the next unrelated statement joins
+it.
+
+A row is a `Map` from column label to value, in the order selected — the label, so
+`SELECT x AS y` gives `y`. Two columns sharing a label is refused rather than silently
+losing one; alias one with `AS`.
 
 ---
 

@@ -267,6 +267,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostics underlined one token instead of the construct they were about.** Every
+  leaf already spanned its own token, but a compound expression was anchored at its
+  operator and a call at its name, so:
+
+  ```
+    5 |     val n: Int = 3 * "x"
+      |                    ^
+    4 |     val total: Int = "hello" + someUndefinedThing(1, 2)
+      |                                ~~~~~~~~~~~~~~~~~~
+  ```
+
+  became:
+
+  ```
+    5 |     val n: Int = 3 * "x"
+      |                  ~~~~~~~
+    4 |     val total: Int = "hello" + someUndefinedThing(1, 2)
+      |                                ~~~~~~~~~~~~~~~~~~~~~~~~
+  ```
+
+  Binary expressions get their extent by merging their operands' locations
+  (`Location.spanningTo`) rather than by capturing tokens, which is why it composes: the
+  left operand of `1 + 2 + "x"` is itself a binary expression and the outer span covers
+  all of it. Calls run from the method name through the closing paren. A call
+  deliberately does **not** include its receiver: in a chain like `a.b().c()` every link
+  would otherwise underline everything before it.
+
+  The reported column moves with the underline — from the operator to the start of the
+  expression, and from `::` to the method name. `onion run` reporting a project's entry
+  point now points at `println` rather than at the `::` before it.
+
 - **Rename in the editor rewrote comments and string literals.** It replaced every
   whole-word occurrence of the identifier in the file, so renaming `count` also rewrote
   `"count of items"` and `// count starts at zero`. An edit that changes a program's output

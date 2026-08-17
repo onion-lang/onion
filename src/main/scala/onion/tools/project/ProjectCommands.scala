@@ -106,6 +106,70 @@ class ProjectCommands:
         case NonFatal(error) =>
           Left(ProjectError(s"Could not clean target: ${error.getMessage}", Some(error)))
 
+  /**
+   * `onion doc` — API documentation.
+   *
+   * `OnionDoc` has been a complete generator for a while (six files, HTML output, its own
+   * `-d` and `--help`) with no way to run it: no launcher, no subcommand, no build task.
+   * A feature nobody can invoke is indistinguishable from one that does not exist.
+   *
+   * Inside a project with no files named, it documents the production sources into
+   * `target/doc`, so the common case is `onion doc` and nothing else.
+   */
+  def doc(cwd: Path, args: Array[String], out: PrintStream, err: PrintStream): Int =
+    parseDocArgs(args) match
+      case Left(message) =>
+        err.println(s"error: $message")
+        2
+      case Right((explicitOut, sources)) if sources.nonEmpty =>
+        generateDoc(explicitOut.getOrElse("doc"), sources, out, err)
+      case Right((explicitOut, _)) =>
+        // No files given: fall back to the project's own sources.
+        val located =
+          for
+            paths <- ProjectLocator.locate(cwd)
+            layout <- ProjectLayout.discover(paths)
+          yield (paths, layout)
+        located match
+          case Left(error) =>
+            err.println(s"error: ${error.message}")
+            err.println("Name source files explicitly, or run inside a project.")
+            2
+          case Right((paths, layout)) if layout.productionSources.isEmpty =>
+            err.println("error: Project has no production sources")
+            1
+          case Right((paths, layout)) =>
+            val target = explicitOut.getOrElse(paths.target.resolve("doc").toString)
+            generateDoc(target, layout.productionSources.map(_.path.toString), out, err)
+
+  private def generateDoc(
+    outDir: String,
+    sources: Seq[String],
+    out: PrintStream,
+    err: PrintStream
+  ): Int =
+    val exit = onion.tools.doc.OnionDoc.run((Array("-d", outDir) ++ sources))
+    if exit == 0 then out.println(s"Documented ${sources.size} source(s) into $outDir")
+    exit
+
+  /** `[-d <dir>] [<source.on>...]`, kept deliberately small. */
+  private def parseDocArgs(args: Array[String]): Either[String, (Option[String], Seq[String])] =
+    var outDir: Option[String] = None
+    val sources = scala.collection.mutable.ListBuffer[String]()
+    var i = 0
+    while i < args.length do
+      args(i) match
+        case "-d" =>
+          if i + 1 >= args.length then return Left("doc: -d requires an output directory")
+          outDir = Some(args(i + 1))
+          i += 2
+        case flag if flag.startsWith("-") =>
+          return Left(s"doc: unknown option: $flag")
+        case path =>
+          sources += path
+          i += 1
+    Right((outDir, sources.toSeq))
+
   private def buildProject(
     cwd: Path,
     err: PrintStream

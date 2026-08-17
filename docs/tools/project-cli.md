@@ -59,9 +59,29 @@ onion build [--verbose]
 onion run [--verbose] [-- <arguments...>]
 onion test [--verbose]
 onion clean
+onion doc [-d <dir>] [<source.on>...]
 ```
 
-`build`, `run`, `test`, and `clean` start at the current directory and walk
+### `onion doc`
+
+Generates API documentation as HTML. With no arguments inside a project it documents the
+production sources under `src/` into `target/doc`:
+
+```bash
+onion doc
+```
+
+`-d <dir>` writes somewhere else, and naming source files explicitly makes it work outside
+a project entirely:
+
+```bash
+onion doc -d api src/main.on src/util.on
+```
+
+Doc comments (`/** … */`) on classes, interfaces, records, enums and methods are carried
+across, not just the signatures.
+
+`build`, `run`, `test`, `doc`, and `clean` start at the current directory and walk
 upward until they find `onion.toml`, so any of them also work from `src/`,
 `tests/`, or another nested subdirectory of the project — there is no need to
 `cd` back to the project root first.

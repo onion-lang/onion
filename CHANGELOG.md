@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`onion doc` — the documentation generator is reachable.** `onion.tools.doc.OnionDoc`
+  has been a complete generator for a while: six files, HTML output, its own `-d` and
+  `--help`. Nothing could invoke it — no launcher script, no subcommand, no build task, no
+  mention in any documentation — and a feature nobody can run is indistinguishable from one
+  that does not exist.
+
+  ```bash
+  onion doc                                   # src/ into target/doc
+  onion doc -d api src/main.on src/util.on    # explicit, works outside a project too
+  ```
+
+  Doc comments are carried across, not just signatures. Running it outside a project with
+  no files named says where to run it instead of failing obscurely.
+
 - **A debugger can now see variables.** Generated methods carried line numbers but no
   LocalVariableTable — `visitLocalVariable` appeared nowhere in the compiler — so a JVM
   debugger could step through `.on` source and then show nothing at all for any variable.

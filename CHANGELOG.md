@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`onion.Net`: TCP sockets.** Onion could reach the network only as an HTTP client —
+  there was no way to speak any other protocol, and no way to accept a connection at all.
+
+  ```onion
+  val listener = Net::listen("localhost", 0, 4)   // 0 asks the OS for a free port
+  val peer = listener.accept()
+  peer.writeLine("echo: " + peer.readLine())
+  peer.close()
+  ```
+
+  Reads with `readLine`/`readAll`/`readBytes`, writes with `write`/`writeLine`/`writeBytes`
+  (every write flushes), plus `timeout`, `closeWrite` for protocols that signal EOF by
+  half-closing, and an idempotent `close`. Failures name the address that failed, so a
+  `catch` says which host rather than just "connection refused".
+
+- **`onion.Server`: an HTTP server**, on the JDK's own implementation, so it adds no
+  dependency. A language that can only make requests and never answer one is missing half
+  of what people write tools for.
+
+  ```onion
+  server.handleAll((req) -> select req.path() {
+    case re"/users/(\d+)" (id): Server::json("{\"id\": " + id + "}")
+    case "/health":             Server::text("ok")
+    else:                       Server::notFound()
+  })
+  ```
+
+  `handleAll` exists so routing can live in Onion — `select` over the path with `re"…"`
+  patterns, the captured group bound as a value — rather than in a table of registered
+  paths. Port 0 asks the OS for a free port and `port()` reports it, which is what makes a
+  server testable without picking a number and hoping. Responses are immutable values
+  built without touching a socket, so a handler is testable on its own, and a handler that
+  throws produces a 500 instead of taking the server down or leaving a client waiting on a
+  socket that never answers.
+
+  `run/MiniWebService.on` is a complete service that answers its own requests and exits.
+
 - **`ONION_JAVA_OPTS`, so JVM flags can be set at all.** Neither launcher passed anything
   through, so setting a heap size or attaching a debug agent meant abandoning `onion` and
   hand-writing a `java -cp` command:

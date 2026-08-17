@@ -18,6 +18,7 @@ object OnionCli:
       |  onion run [--verbose] [-- <arguments...>]
       |  onion test [--verbose]
       |  onion clean
+      |  onion doc [-d <dir>] [<source.on>...]
       |  onion repl [repl-options...]
       |  onion [script-runner-options...] <source.on> [arguments...]
       |""".stripMargin
@@ -77,6 +78,8 @@ object OnionCli:
       case Some("clean") =>
         if args.length == 1 then projects.clean(cwd, out, err)
         else usageError("clean does not accept arguments", err)
+      case Some("doc") =>
+        projects.doc(cwd, args.drop(1), out, err)
       case Some("repl") =>
         legacy.repl(args.drop(1))
       case Some(_) =>

@@ -59,9 +59,29 @@ onion build [--verbose]
 onion run [--verbose] [-- <引数...>]
 onion test [--verbose]
 onion clean
+onion doc [-d <ディレクトリ>] [<source.on>...]
 ```
 
-`build`・`run`・`test`・`clean` はカレントディレクトリから開始して
+### `onion doc`
+
+API ドキュメントを HTML で生成します。プロジェクト内で引数なしに実行すると、`src/` 配下の
+production ソースを対象に `target/doc` へ出力します。
+
+```bash
+onion doc
+```
+
+`-d <ディレクトリ>` で出力先を変えられます。ソースファイルを明示すれば、プロジェクトの外でも
+使えます。
+
+```bash
+onion doc -d api src/main.on src/util.on
+```
+
+クラス・インターフェース・record・enum・メソッドに付けたドキュメントコメント（`/** … */`）は
+シグネチャだけでなく本文も引き継がれます。
+
+`build`・`run`・`test`・`doc`・`clean` はカレントディレクトリから開始して
 `onion.toml` が見つかるまで親方向に探索するため、`src/` や `tests/` など
 プロジェクト配下のネストしたディレクトリからでも実行できます。
 プロジェクトルートに戻る必要はありません。

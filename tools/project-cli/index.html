@@ -3599,6 +3599,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#onionlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion.lock
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4673,6 +4684,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#onionlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion.lock
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4942,6 +4964,34 @@ not hit the network — but it is not <em>prevented</em> from doing so, and noth
 transitive against a repository that republishes one. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an <code>--offline</code> flag would have to be faked; it is
 left out rather than made to look like a guarantee it is not.</p>
+<h3 id="onionlock"><code>onion.lock</code><a class="headerlink" href="#onionlock" title="Permanent link">&para;</a></h3>
+<p>A build writes <code>onion.lock</code> next to <code>onion.toml</code>, and later builds resolve from it.
+<strong>Commit it.</strong></p>
+<p><code>[dependencies]</code> names direct dependencies at a version each, which is not enough to
+reproduce a build: a transitive dependency's version is chosen at resolution time, so two
+builds of a byte-identical <code>onion.toml</code> can compile against different jars the moment a
+transitive publishes a release. That failure appears on one machine, cannot be reproduced on
+another, and nothing in the project changed.</p>
+<p>The lock records the whole transitive coordinate set, so a later build resolves <em>those</em>
+versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
+anything is compiled. Different bytes for a version that was already published stops the
+build:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    locked 8f3a...
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    found  1c90...
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
+</span></code></pre></div>
+<p>Change a version in <code>onion.toml</code>, or add a repository, and the lock no longer describes what
+you are asking for -- it is discarded and rewritten rather than enforced against a different
+question. Reordering <code>[dependencies]</code> is not a change and does not discard it. <code>onion clean</code>
+does not remove it: it is an input to the next build, not an output of this one.</p>
+<p><strong>It is not an offline mode.</strong> coursier's embedding API exposes a cache location, a thread
+pool and a logger, and no cache policy at all, so there is no honest way to promise a build
+that never reaches the network. The lock gives the same answer every time, not the absence
+of the question.</p>
 <h2 id="source-layout">Source Layout<a class="headerlink" href="#source-layout" title="Permanent link">&para;</a></h2>
 <p>Production sources are every <code>.on</code> file under <code>src/</code>; tests are every
 <code>_test.on</code> file under <code>tests/</code>. Both are discovered recursively, sorted by
@@ -4953,10 +5003,10 @@ directory is a successful test run with a zero-test summary.</p>
 (or the build that <code>run</code> and <code>test</code> perform first) reuses that output when a
 SHA-256 fingerprint over the compiler version, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>$ onion build
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Built hello (1 classes)
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>$ onion build
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion build
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>Built hello (1 classes)
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>$ onion build
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>Any source addition, removal, rename, or content change invalidates the
 cache and triggers a full rebuild. A failed rebuild never destroys the
@@ -4980,10 +5030,10 @@ ambiguity can be resolved.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p><code>test</code> builds production sources once, then compiles and runs each discovered
 test file in sorted order, sequentially:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion test
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion test
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>A test's own <code>stdout</code>/<code>stderr</code> are shown only when it fails, unless
 <code>--verbose</code> is given. One test's compile failure, assertion failure, runtime
@@ -4992,8 +5042,8 @@ every remaining test still runs, and a project with no tests at all succeeds
 with a <code>0 tests, 0 passed, 0 failed</code> summary.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> removes exactly the project's canonical <code>target/</code> directory:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion clean
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion clean
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Cleaned target
 </span></code></pre></div>
 <p>It requires a valid, located project first, succeeds (printing the same
 message) whether <code>target/</code> exists or not, and refuses to touch a <code>target</code>

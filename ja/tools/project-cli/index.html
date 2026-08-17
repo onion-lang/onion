@@ -1795,6 +1795,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#onionlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion.lock
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4694,6 +4705,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#onionlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion.lock
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4961,6 +4983,33 @@ URL の <code>http</code>・<code>https</code>・<code>file</code> のみです�
 リポジトリが再公開した推移的依存を固定する仕組みもありません。Onion が組み込んでいる
 coursier の Java API はキャッシュポリシーを公開していないため、<code>--offline</code> フラグは
 偽装するしかありません。保証でないものを保証のように見せないため、あえて入れていません。</p>
+<h3 id="onionlock"><code>onion.lock</code><a class="headerlink" href="#onionlock" title="Permanent link">&para;</a></h3>
+<p>ビルドは <code>onion.toml</code> の隣に <code>onion.lock</code> を書き、以降のビルドはそこから解決します。
+<strong>コミットしてください。</strong></p>
+<p><code>[dependencies]</code> が書き留めるのは直接依存のバージョンだけで、それではビルドは再現しません。
+推移的依存のバージョンは解決時に決まるため、<code>onion.toml</code> が1バイトも変わっていなくても、
+推移的依存が新しい版を publish した瞬間に別の jar でコンパイルされます。この種の失敗は
+「片方のマシンでだけ起き、もう片方では再現せず、プロジェクトは何も変わっていない」という
+一番厄介な形で出ます。</p>
+<p>ロックは推移的依存を含む座標集合全体を記録するので、以降のビルドは<strong>その</strong>バージョンを
+解決します。さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish
+された版のバイト列が変わっていたらビルドを止めます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    locked 8f3a...
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    found  1c90...
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
+</span></code></pre></div>
+<p><code>onion.toml</code> のバージョンを変えたりリポジトリを足したりすると、ロックはもう「今きいている
+問い」を説明していないので、その問いに対して強制するのではなく破棄して書き直します。
+<code>[dependencies]</code> の並べ替えは変更に当たらず、ロックは維持されます。<code>onion clean</code> はロックを
+消しません。これは今回のビルドの出力ではなく、次のビルドの入力だからです。</p>
+<p><strong>これは offline モードではありません。</strong> coursier の埋め込み API が露出しているのは
+キャッシュの場所・スレッドプール・ロガーだけで、キャッシュ方針は一切ありません。したがって
+「ネットワークに一切触れないビルド」を約束する誠実な方法がありません。ロックが与えるのは
+毎回同じ答えであって、問いを無くすことではありません。</p>
 <h2 id="_5">ソースレイアウト<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>プロダクションソースは <code>src/</code> 以下のすべての <code>.on</code> ファイル、テストは
 <code>tests/</code> 以下のすべての <code>_test.on</code> ファイルです。どちらも再帰的に探索され、
@@ -4973,10 +5022,10 @@ coursier の Java API はキャッシュポリシーを公開していないた�
 すべてのソースパスとその内容から計算したSHA-256フィンガープリントが
 一致する限り、2回目以降の <code>build</code>（および <code>run</code>・<code>test</code> が最初に行う
 ビルド）はそのキャッシュを再利用します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>$ onion build
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Built hello (1 classes)
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>$ onion build
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion build
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>Built hello (1 classes)
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>$ onion build
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>ソースの追加・削除・リネーム・内容の変更はいずれもキャッシュを無効化し、
 フルリビルドを引き起こします。リビルドに失敗しても、直前の成功した
@@ -5002,10 +5051,10 @@ coursier の Java API はキャッシュポリシーを公開していないた�
 <h2 id="_8">テスト<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p><code>test</code> はまずプロダクションソースを一度だけビルドし、その後、発見した
 各テストファイルをソート順に1つずつ、順番にコンパイル・実行します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion test
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion test
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>各テストの <code>stdout</code>/<code>stderr</code> は、<code>--verbose</code> を指定しない限り失敗した
 場合にのみ表示されます。あるテストのコンパイル失敗・アサーション失敗・
@@ -5014,8 +5063,8 @@ coursier の Java API はキャッシュポリシーを公開していないた�
 <code>0 tests, 0 passed, 0 failed</code> というサマリーとともに成功します。</p>
 <h2 id="_9">クリーン<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> はプロジェクトの正規の <code>target/</code> ディレクトリだけを削除します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion clean
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion clean
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Cleaned target
 </span></code></pre></div>
 <p>実行には有効な、発見済みのプロジェクトであることが前提となり、
 <code>target/</code> が存在するかどうかにかかわらず同じメッセージで成功します。

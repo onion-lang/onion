@@ -356,6 +356,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`onion fmt` collapsed a whitespace-only file to empty.** A source with no real token
+  and no comment produced no lexeme at all, so the formatter's main loop was a no-op and
+  the trailing-newline logic never ran either — a file of nothing but blank lines was
+  silently rewritten down to an empty string and reported as changed. No rule anchors to
+  whitespace with no token around it, so it is now left exactly as written, the same
+  guarantee already held for whitespace next to a token.
+
 - **Diagnostics underlined one token instead of the construct they were about.** Every
   leaf already spanned its own token, but a compound expression was anchored at its
   operator and a call at its name, so:

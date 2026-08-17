@@ -555,5 +555,85 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs TryCatchEdgeCases.on") {
       assert(Shell.Success(138) == runSample("run/TryCatchEdgeCases.on"))
     }
+
+    it("runs ChemCalculator.on") {
+      assert(Shell.Success(null) == runSample("run/ChemCalculator.on"))
+    }
+
+    it("runs CodeContest.on") {
+      assert(Shell.Success(null) == runSample("run/CodeContest.on"))
+    }
+
+    it("runs CryptoPortfolio.on") {
+      assert(Shell.Success(null) == runSample("run/CryptoPortfolio.on"))
+    }
+
+    it("runs DependencyResolver.on") {
+      assert(Shell.Success(null) == runSample("run/DependencyResolver.on"))
+    }
+
+    it("runs DnaAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/DnaAnalyzer.on"))
+    }
+
+    it("runs ElevatorDispatcher.on") {
+      assert(Shell.Success(null) == runSample("run/ElevatorDispatcher.on"))
+    }
+
+    it("runs GenericLeaderboard.on") {
+      assert(Shell.Success(null) == runSample("run/GenericLeaderboard.on"))
+    }
+
+    it("runs GeneticSequencer.on") {
+      assert(Shell.Success(null) == runSample("run/GeneticSequencer.on"))
+    }
+
+    it("runs HospitalWard.on") {
+      assert(Shell.Success(null) == runSample("run/HospitalWard.on"))
+    }
+
+    it("runs InsuranceClaims.on") {
+      assert(Shell.Success(null) == runSample("run/InsuranceClaims.on"))
+    }
+
+    it("runs KaraokeNight.on") {
+      assert(Shell.Success(null) == runSample("run/KaraokeNight.on"))
+    }
+
+    it("runs MarkdownConverter.on") {
+      assert(Shell.Success(null) == runSample("run/MarkdownConverter.on"))
+    }
+
+    it("runs MiniTypeChecker.on") {
+      assert(Shell.Success(null) == runSample("run/MiniTypeChecker.on"))
+    }
+
+    it("runs NetworkMonitor.on") {
+      assert(Shell.Success(null) == runSample("run/NetworkMonitor.on"))
+    }
+
+    it("runs PlantCare.on") {
+      assert(Shell.Success(null) == runSample("run/PlantCare.on"))
+    }
+
+    it("runs RecipeVault.on") {
+      assert(Shell.Success(null) == runSample("run/RecipeVault.on"))
+    }
+
+    it("runs RuleEngine.on") {
+      assert(Shell.Success(null) == runSample("run/RuleEngine.on"))
+    }
+
+    it("runs SortAlgorithms.on") {
+      assert(Shell.Success(null) == runSample("run/SortAlgorithms.on"))
+    }
+
+    it("runs SupplyChain.on") {
+      assert(Shell.Success(null) == runSample("run/SupplyChain.on"))
+    }
+
+    it("runs TransitPlanner.on") {
+      assert(Shell.Success(null) == runSample("run/TransitPlanner.on"))
+    }
   }
 }

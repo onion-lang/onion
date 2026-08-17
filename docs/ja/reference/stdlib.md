@@ -1776,6 +1776,7 @@ val names = Archive::entries("out.zip")      // 展開せずに一覧
 val written = Archive::unzip("out.zip", "extracted")
 
 Archive::gzipFile("big.log", "big.log.gz")   // 全部をメモリに読まずストリーミング
+Archive::gunzipFile("big.log.gz", "big.log") // その逆
 val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
 ```
 

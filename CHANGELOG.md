@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`RunSamplesSpec` coverage for 34 more `run/` examples that were added
+  without a corresponding test** (`Automaton`, `EmployeeManager`,
+  `ExpenseAuditor`, `GameStore`, `MatrixCalc`, `MazeSolver`, `MiniRpg`,
+  `MovieRecommender`, `MuseumCollection`, `MusicLibrary`,
+  `NationalParkTracker`, `NutritionTracker`, `ParkingGarage`,
+  `PayrollReport`, `PlaylistManager`, `PokerHands`, `RankedChoice`,
+  `RecipeManager`, `RestaurantOrders`, `ShipmentTracker`, `ShoppingCart`,
+  `SnippetLibrary`, `SortingShowcase`, `SpaceMission`, `StockPortfolio`,
+  `StudentGradeBook`, `Sudoku`, `SudokuSolver`, `TaskPlanner`,
+  `TimesheetTracker`, `TournamentStandings`, `TournamentTracker`,
+  `VirtualMachine`, `VirtualShell`). Each already ran and compiled cleanly;
+  `sbt test` simply never exercised them, so a regression in any of them
+  would have gone unnoticed. `ExpenseAuditor` is a `tool`-declared script, so
+  its test drives the auto-CLI with a temp input/output file pair rather
+  than calling it with no arguments. `Calculator.on` (a Swing GUI program
+  requiring a display) is intentionally left uncovered, matching how the
+  repository already treats headless-incompatible samples.
+
 - **`RunSamplesSpec` coverage for 20 `run/` examples that were added without a
   corresponding test** (`ChemCalculator`, `CodeContest`, `CryptoPortfolio`,
   `DependencyResolver`, `DnaAnalyzer`, `ElevatorDispatcher`,

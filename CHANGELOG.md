@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`onion.lock`: a build resolves the same artifacts the next time, and says so if it
+  cannot.** `[dependencies]` names direct dependencies at a version each, which does not
+  reproduce a build — a transitive dependency's version is chosen at resolution time, so two
+  builds of a byte-identical `onion.toml` compile against different jars the moment a
+  transitive publishes. That failure appears on one machine, cannot be reproduced on
+  another, and nothing in the project changed.
+
+  The lock records the whole transitive coordinate set, which a later build resolves
+  *instead of* re-deriving, and a SHA-256 per artifact compared before anything compiles.
+  Different bytes behind an already-published version stop the build and name the file, both
+  hashes, and the way out. That is not paranoia: a published version's bytes are supposed to
+  be immutable, and a repository serving different ones is broken or hostile.
+
+  The two halves are deliberately kept apart rather than paired. coursier returns resolved
+  coordinates sorted and downloaded files in resolution order, with no stated
+  correspondence; zipping them looks obvious, writes a plausible-looking lock, and pairs the
+  wrong hash with the wrong coordinate — which then surfaces as an integrity failure on a
+  perfectly good build. Comparing hashes as a set needs no correspondence and tolerates two
+  artifacts sharing a file name.
+
+  A lock that no longer describes the manifest is discarded and rewritten rather than
+  enforced against a question it does not answer. Reordering `[dependencies]` is not such a
+  change. `onion clean` leaves the lock alone — it is an input to the next build, not an
+  output of this one.
+
+  **It is not an offline mode**, and the reason was checked rather than assumed:
+  `coursierapi.Cache` exposes a location, a thread pool and a logger, and no cache policy at
+  all, so there is no honest way to promise a build that never reaches the network.
+
 ## [0.11.1] - 2026-08-18
 
 ### Added

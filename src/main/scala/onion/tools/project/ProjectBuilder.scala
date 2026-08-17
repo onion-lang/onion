@@ -65,7 +65,7 @@ final class ProjectBuilder(
         _ <- validatePaths(paths)
         sources <- readSources(layout.productionSources)
         // Resolution happens before the fingerprint because its result is part of it.
-        resolved <- DependencyResolver.resolve(manifest.dependencies, manifest.repositories, Some(err))
+        resolved <- resolveDependencies(paths, manifest, err)
         fingerprint = BuildFingerprint.compute(
           manifest.bytes,
           sources.map(snapshot => snapshot.source.relative -> snapshot.bytes),
@@ -77,6 +77,52 @@ final class ProjectBuilder(
           case Some(hit) => Right(hit)
           case None => compile(paths, manifest, layout, sources, fingerprint, resolved, err)
       yield result
+
+  /**
+   * Resolves through `onion.lock` when there is one that answers this manifest's question.
+   *
+   * A usable lock is resolved from its own pinned coordinate set rather than from
+   * `[dependencies]`, which is what fixes the transitive versions — the ones nobody wrote
+   * down and which otherwise change under the project without `onion.toml` changing a byte.
+   * The artifacts are then checked against the recorded hashes before anything compiles.
+   *
+   * With no usable lock, resolution proceeds from the manifest and the result is written out.
+   * A lock that cannot be written is reported but does not fail the build: the resolution
+   * itself succeeded, and refusing to compile over a file that is only there to help the
+   * *next* build would be a strange way to help.
+   */
+  private def resolveDependencies(
+    paths: ProjectPaths,
+    manifest: ProjectManifest,
+    err: PrintStream
+  ): Either[ProjectError, ResolvedDependencies] =
+    DependencyLock.read(paths).filter(_.matches(manifest)) match
+      case Some(locked) =>
+        for
+          resolved <- DependencyResolver.resolve(
+            pinned(locked.coordinates), manifest.repositories, Some(err))
+          _ <- DependencyLock.verify(locked, resolved)
+        yield resolved
+      case None =>
+        DependencyResolver
+          .resolve(manifest.dependencies, manifest.repositories, Some(err))
+          .map { resolved =>
+            if manifest.dependencies.nonEmpty then
+              DependencyLock.write(paths, manifest, resolved).left.foreach { error =>
+                err.println(s"warning: ${error.message}")
+              }
+            resolved
+          }
+
+  /** `group:artifact:version` back into a dependency; anything malformed is skipped. */
+  private def pinned(coordinates: Seq[String]): Seq[Dependency] =
+    coordinates.flatMap { coordinate =>
+      coordinate.split(":") match
+        case Array(group, artifact, version)
+          if group.nonEmpty && artifact.nonEmpty && version.nonEmpty =>
+          Some(Dependency(group, artifact, version))
+        case _ => None
+    }
 
   private def cachedBuild(
     paths: ProjectPaths,

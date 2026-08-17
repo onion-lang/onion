@@ -25,6 +25,21 @@ The server communicates over stdin/stdout using LSP.
 | Signature help | Method signatures while typing a call |
 | Rename symbol | Rename occurrences of the symbol at the cursor in the current file |
 
+### What rename does, and does not, do
+
+Rename rewrites every **code** occurrence of the identifier in the open document. It skips
+comments and string literals — renaming `count` no longer rewrites `"count of items"` or
+`// count starts at zero` — while a `#{ … }` interpolation counts as code, so the `count`
+in `"n=#{count}"` is renamed with the rest. Renaming from a position inside a comment or a
+literal is refused: the word there is not a reference to anything.
+
+It is **not scope-aware and not cross-file**. Two unrelated locals that happen to share a
+name are renamed together, a local and a field of the same name are renamed together, and
+references in other files are not touched at all. Scope-aware rename needs the typed AST
+with real source ranges, and the parser currently produces spans only a token wide; that is
+the work this depends on. Until then, review the edits your editor previews before applying
+them.
+
 ## Symbol support
 
 The language server indexes the following symbols from open documents:

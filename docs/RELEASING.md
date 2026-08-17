@@ -59,7 +59,7 @@ is no manual `version := ...` line to update in `build.sbt`.
 To build the same artifacts locally without creating a release:
 
 ```bash
-sbt assembly dist
+sbt "assembly; dist"
 ```
 
 Outputs:

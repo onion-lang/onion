@@ -174,6 +174,22 @@ console unknown`; empty means pure) to stderr.
 onionc --effects MyProgram.on
 ```
 
+### `-g:none`
+
+Omit the LocalVariableTable from the generated class files.
+
+Without it a JVM debugger can still step through `.on` source — line numbers are always
+emitted — but shows nothing for any variable, which is most of the way to useless. The
+table is on by default and costs a few bytes per method; this is the way out for anyone
+who wants the smaller class file.
+
+```bash
+onionc -g:none MyProgram.on
+```
+
+Running a script with `onion` always emits the table, since a script is compiled in
+memory and there is no artefact to keep small.
+
 ## Examples
 
 ### Basic Compilation

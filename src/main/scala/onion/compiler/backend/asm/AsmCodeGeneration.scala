@@ -307,6 +307,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
     mv.visitEnd()
 
+  /**
+   * Writes the LocalVariableTable, unless `-g:none` asked for a smaller class file.
+   *
+   * Must run before `endMethod`, which is what calls `visitMaxs`; after that the method is
+   * closed and the entries would be dropped on the floor without complaint.
+   */
+  private def emitLocalVariableTable(
+    gen: DebugGeneratorAdapter,
+    localVars: LocalVarContext,
+    methodStart: org.objectweb.asm.Label
+  ): Unit =
+    if config.emitDebugInfo then
+      val methodEnd = gen.mark()
+      for entry <- localVars.declaredLocals do
+        gen.emitLocalVariableEntry(entry.name, entry.descriptor, methodStart, methodEnd, entry.slot)
+
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     var access = toAsmModifier(node.modifier)
     if (node.isVararg) access |= Opcodes.ACC_VARARGS
@@ -318,6 +334,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
 
+    // Bounds for every LocalVariableTable entry. Marked before anything else is emitted,
+    // so the range covers the whole body. Each slot is allocated fresh (newLocal never
+    // reuses one), so whole-method scope cannot describe two variables at once.
+    val methodStart = gen.mark()
+
     // Emit line number for method declaration
     if node.location != null then
       val label = gen.mark()
@@ -325,8 +346,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen)
+      // Names first: withParameters records debug entries as it goes, and would have
+      // nothing to name them with if the frame arrived afterwards.
+      .withNames(node.getFrame)
       .withParameters(isStatic, argTypes)
       .withBoxedVariables(node.getFrame)
+    if !isStatic then localVars.withThis(AsmUtil.objectType(className).getDescriptor)
 
     // TCO: Pre-allocate JVM slots for loop variables before emitting method body
     node.getTcoLoopVars match {
@@ -397,6 +422,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
       gen.returnValue()
+    emitLocalVariableTable(gen, localVars, methodStart)
     try gen.endMethod()
     catch
       case e: Throwable =>

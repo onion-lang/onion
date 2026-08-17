@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A debugger can now see variables.** Generated methods carried line numbers but no
+  LocalVariableTable — `visitLocalVariable` appeared nowhere in the compiler — so a JVM
+  debugger could step through `.on` source and then show nothing at all for any variable.
+  Stepping without being able to look at a value is most of the way to useless.
+
+  Verified with `jdb`, not just by inspecting the class file: stopping on a line of Onion
+  source now prints `factor = 40`, `doubled = 80`, `running = 0`, `i = 0`.
+
+  The names were the hard part. `LocalBinding` carries an index, a type and two flags but
+  no name — by codegen the scopes are the only thing that still knows what the author
+  called anything — so `LocalFrame` now exposes its index-to-name mapping. A slot with no
+  name is left out rather than invented; a debugger showing `var3` is worse than showing
+  nothing.
+
+  `-g:none` omits the table for anyone who wants the smaller class file. Scripts run with
+  `onion` always emit it, since they are compiled in memory and there is no artefact to
+  keep small.
+
 - **`onion.Db`: SQL over JDBC.** The driver is never bundled — it is whatever the project
   declares in `[dependencies]`, which is the first thing that became possible now that a
   project can depend on a jar at all.

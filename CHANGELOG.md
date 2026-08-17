@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`RunSamplesSpec` coverage for 20 `run/` examples that were added without a
+  corresponding test** (`ChemCalculator`, `CodeContest`, `CryptoPortfolio`,
+  `DependencyResolver`, `DnaAnalyzer`, `ElevatorDispatcher`,
+  `GenericLeaderboard`, `GeneticSequencer`, `HospitalWard`, `InsuranceClaims`,
+  `KaraokeNight`, `MarkdownConverter`, `MiniTypeChecker`, `NetworkMonitor`,
+  `PlantCare`, `RecipeVault`, `RuleEngine`, `SortAlgorithms`, `SupplyChain`,
+  `TransitPlanner`). Each already ran and compiled cleanly; `sbt test` simply
+  never exercised them, so a future regression in any of them would have gone
+  unnoticed. This closes the coverage gap.
+
 - **`RecordJsonSpec`/`RecordYamlSpec`, regression coverage for `derive!(Json, Yaml)`
   rejecting a nullable scalar record component** (`nickname: String?`). Docs describe
   `derive!` as supporting "scalar components only"; `ScalarConversions.isDerivable`

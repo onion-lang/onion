@@ -8,6 +8,9 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 |------|-----------|
 | **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
 | **ネットワーク** | `Http`（HTTPクライアント）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
+| **データストア** | `Db`（JDBC経由のSQL） |
+| **アーカイブ** | `Archive`（zip・gzip） |
+| **並行処理** | `Future`, `Concurrent`（プール・カウンタ・ロック・チャネル） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
@@ -1759,6 +1762,112 @@ val r = Server::json("{\"a\":1}").withStatus(201).withHeader("X-Test", "yes")
 ```
 
 レスポンスの構築はソケットに一切触れません。ハンドラを単体でテストできるのはこのためです。
+
+---
+
+## Archive
+
+zip と gzip。tar は依存が必要になるため入れていません。この 2 つが JDK 単体でできる範囲です。
+
+```onion
+Archive::zip("out.zip", ["a.txt", "b.txt"])
+Archive::zipDir("site.zip", "site")          // "site" からの相対パスを保つ
+val names = Archive::entries("out.zip")      // 展開せずに一覧
+val written = Archive::unzip("out.zip", "extracted")
+
+Archive::gzipFile("big.log", "big.log.gz")   // 全部をメモリに読まずストリーミング
+val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
+```
+
+**展開は、対象ディレクトリの外に書き出すことを拒否します。** `../../.ssh/authorized_keys` という
+名前のエントリは「zip slip」と呼ばれる古典的な攻撃で、エントリ名を素直に解決する展開処理は
+言われたとおりの場所に書き込んでしまいます。ここではエントリ名を示して例外を投げます。
+
+エントリのタイムスタンプは固定値で書き込むので、同じ入力を 2 回 zip すると同じバイト列になります。
+実行のたびに変わる成果物はチェックサムもキャッシュもできません。
+
+---
+
+## Concurrent
+
+スレッドと、それを安全に使うための部品。`Future` は既に「1 つの処理を別スレッドで走らせる」ことは
+できましたが、同時実行数を制限する手段、スレッド間でカウンタを共有する手段、ロックを取る手段、
+処理を受け渡す手段がありませんでした。
+
+仮想スレッドは意図的に入れていません。Java 21 が必要で、Onion のターゲットは 17 です。
+
+### Pool
+
+```onion
+val pool = Concurrent::pool(4)                     // Concurrent::pool() で CPU 数
+val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+pool.close()
+```
+
+`mapAll` は結果を**入力の順序**で返します。完了順ではありません——タイミングに依存する出力は
+テストできない出力です。失敗した要素は全タスクが決着してから報告されるので、1 つの不正な入力の
+せいで、諦めた呼び出し元の裏でワーカーが走り続けることはありません。単発の処理には
+`submit(f)` が `Future` を返します。
+
+プールのスレッドはデーモンなので、閉じ忘れたプールが `main` の後も JVM を生かし続けることは
+ありません。とはいえ `close()` は呼ぶべきですし、処理中のものを待つなら `awaitClose(millis)` です。
+
+### Counter・Lock・Channel
+
+```onion
+val hits = Concurrent::counter()
+hits.increment()
+
+val lock = Concurrent::lock()
+lock.withLock(() -> { /* … */ })     // 本体が例外を投げても解放される
+
+val chan = Concurrent::channel(16)   // 意図的に上限つき
+chan.send("work")
+val item = chan.receiveTimeout(1000) // 永久にブロックせず null を返す
+```
+
+`acquire`/`release` の手動ペアより `withLock` を使ってください。ペアの間で例外が投げられると
+ロックが漏れ、他のスレッドが永久に待ちます。チャネルに上限があるのは、無制限だと生産者が
+消費者を追い越していることがメモリ枯渇まで見えないからです。`null` の送信は拒否します——
+受信側で「何も来なかった」と区別できなくなるためです。
+
+---
+
+## Db
+
+JDBC 経由の SQL。ドライバは同梱していません。プロジェクトが宣言したものを使います。
+
+```toml
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+```
+
+```onion
+val db = Db::connect("jdbc:postgresql://localhost/app", "user", "secret")
+
+val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+val one  = db.queryOne("SELECT * FROM users WHERE id = ?", 7)   // 該当なしなら null
+val n    = db.queryValue("SELECT COUNT(*) FROM users")          // 先頭行の先頭列
+db.update("INSERT INTO users VALUES (?, ?)", 8, "ada")
+
+db.transaction((conn) -> {
+  conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+  conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+})
+
+db.close()
+```
+
+値は常に**バインド**され、SQL 文字列に埋め込まれることはありません。`WHERE name = ?` は
+どんな名前でも安全で、うっかり文字列連結してしまう余地がそもそもありません。
+
+トランザクションは本体が正常終了すればコミット、例外を投げればロールバックし、そのうえで
+再スローします。`begin`/`commit` のペアを忘れる余地はありません。手動のペアの間で例外が投げられると
+接続はトランザクションを開いたままになり、次の無関係な文がそれに巻き込まれます。
+
+行は「列ラベル → 値」の `Map` で、選択した順序を保ちます。列名ではなくラベルなので
+`SELECT x AS y` は `y` になります。同じラベルの列が 2 つある場合は、片方を黙って失う代わりに
+拒否します。`AS` で別名を付けてください。
 
 ---
 

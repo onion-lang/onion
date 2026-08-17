@@ -16,6 +16,17 @@
 
 # ---- filesystem ------------------------------------------------------------
 
+# Archives. The byte-array forms are transformations, not I/O; only the file forms and
+# the archive readers touch the disk.
+onion.Archive#zip=read,write
+onion.Archive#zipDir=read,write
+onion.Archive#unzip=read,write
+onion.Archive#entries=read
+onion.Archive#gzipFile=read,write
+onion.Archive#gunzipFile=read,write
+onion.Archive#gzip=pure
+onion.Archive#gunzip=pure
+
 onion.Files#readText=read
 onion.Files#readBytes=read
 onion.Files#readLines=read
@@ -85,6 +96,18 @@ onion.Http#isError=pure
 
 # TCP sockets. Everything that touches the socket is `net`; the accessors that only
 # report what was already established are not.
+# JDBC. Classified `net` because the ordinary case is a database on another host; an
+# embedded file database would really be read/write, but the table's granularity is
+# per-type, and over-reporting a boundary is safer than under-reporting one.
+onion.Db#connect=net
+onion.Db$Conn#query=net
+onion.Db$Conn#queryOne=net
+onion.Db$Conn#queryValue=net
+onion.Db$Conn#update=net
+onion.Db$Conn#transaction=net
+onion.Db$Conn#close=net
+onion.Db$Conn#isClosed=pure
+
 onion.Net#connect=net
 onion.Net#listen=net
 onion.Net$Conn#readLine=net
@@ -172,6 +195,18 @@ onion.DateTime#nowString=clock
 onion.Timing#*=clock
 onion.Timing#formatMillis=pure
 onion.Timing#formatNanos=pure
+
+# Threads. Creating one is not in the vocabulary (read/write/net/exec/env/clock/rand/
+# console), and `exec` means running a process, not a thread -- so the pool itself is
+# pure. The closure a pool runs is charged to whoever built the closure, exactly as with
+# Future::async. Only the waits touch the clock.
+onion.Concurrent#*=pure
+onion.Concurrent$Pool#*=pure
+onion.Concurrent$Pool#awaitClose=clock
+onion.Concurrent$Counter#*=pure
+onion.Concurrent$Lock#*=pure
+onion.Concurrent$Channel#*=pure
+onion.Concurrent$Channel#receiveTimeout=clock
 
 onion.Future#*=pure
 onion.Future#delay=clock

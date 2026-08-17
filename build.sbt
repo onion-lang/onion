@@ -133,6 +133,9 @@ lazy val onionSettings = Seq(
     // API (`io.get-coursier::coursier`) has no Scala 3 build, so it would have to come
     // in through for3Use2_13 and drag its own dependency graph along.
     "io.get-coursier" % "interface" % "1.0.28",
+    // A pure-Java in-memory database, test scope only, so onion.Db can be tested against
+    // a real JDBC driver without a server and without growing the shipped jar.
+    "com.h2database" % "h2" % "2.3.232" % "test",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.2.19" % "test"
   ),

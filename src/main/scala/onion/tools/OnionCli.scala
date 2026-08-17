@@ -16,7 +16,7 @@ object OnionCli:
       |  onion new <name>
       |  onion build [--verbose]
       |  onion run [--verbose] [-- <arguments...>]
-      |  onion test [--verbose]
+      |  onion test [--verbose] [--report-xml <path>]
       |  onion clean
       |  onion doc [-d <dir>] [<source.on>...]
       |  onion repl [repl-options...]
@@ -72,9 +72,9 @@ object OnionCli:
           case None =>
             usageError("run arguments must follow --", err)
       case Some("test") =>
-        optionalVerbose(args.drop(1)) match
-          case Some(verbose) => projects.test(cwd, verbose, out, err)
-          case None => usageError("test accepts only --verbose", err)
+        parseTest(args.drop(1)) match
+          case Some((verbose, report)) => projects.test(cwd, verbose, out, err, report)
+          case None => usageError("test accepts only --verbose and --report-xml <path>", err)
       case Some("clean") =>
         if args.length == 1 then projects.clean(cwd, out, err)
         else usageError("clean does not accept arguments", err)
@@ -84,6 +84,23 @@ object OnionCli:
         legacy.repl(args.drop(1))
       case Some(_) =>
         legacy.script(args)
+
+  /** `[--verbose] [--report-xml <path>]`, in either order. */
+  private def parseTest(args: Array[String]): Option[(Boolean, Option[Path])] =
+    var verbose = false
+    var report: Option[Path] = None
+    var i = 0
+    while i < args.length do
+      args(i) match
+        case "--verbose" =>
+          verbose = true
+          i += 1
+        case "--report-xml" =>
+          if i + 1 >= args.length then return None
+          report = Some(Paths.get(args(i + 1)))
+          i += 2
+        case _ => return None
+    Some((verbose, report))
 
   private def optionalVerbose(args: Array[String]): Option[Boolean] =
     args match

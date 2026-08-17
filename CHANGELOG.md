@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`onion test --report-xml <path>` writes a JUnit XML report.** The run printed
+  `N tests, N passed, N failed` and returned an exit code, which tells CI *that* something
+  broke and never *what*. Every JVM CI system reads this format, so producing it is what
+  turns a red build into an annotated diff.
+
+  The escaping is the part that has to be right rather than approximately right: a test's
+  captured output is arbitrary, and an XML file the CI parser rejects is worse than no file
+  at all, because the failure then looks like a broken pipeline instead of a failing test.
+  Markup, quotes and newlines are escaped; control characters XML 1.0 cannot represent at
+  all — not even as a numeric reference — are replaced. Every assertion about this goes
+  through a real XML parser, since only a parser can tell "looks wrong" from "will be
+  rejected".
+
+  A report that cannot be written is an error in its own right, so it neither turns a
+  failing run into a passing one nor hides a real failure behind an I/O problem.
+
 - **`onion doc` — the documentation generator is reachable.** `onion.tools.doc.OnionDoc`
   has been a complete generator for a while: six files, HTML output, its own `-d` and
   `--help`. Nothing could invoke it — no launcher script, no subcommand, no build task, no

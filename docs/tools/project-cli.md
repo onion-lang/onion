@@ -57,10 +57,23 @@ Assert::equals(4, 2 + 2)
 onion new <name>
 onion build [--verbose]
 onion run [--verbose] [-- <arguments...>]
-onion test [--verbose]
+onion test [--verbose] [--report-xml <path>]
 onion clean
 onion doc [-d <dir>] [<source.on>...]
 ```
+
+### `onion test --report-xml`
+
+Writes the run as JUnit XML, which is what CI reads to annotate a build with the tests that
+failed rather than only that something did:
+
+```bash
+onion test --report-xml target/test-reports/junit.xml
+```
+
+The summary line and the exit code are unchanged. A report that cannot be written is an
+error in its own right — it does not silently turn a failing run into a passing one, and it
+does not hide a genuine test failure behind an I/O problem.
 
 ### `onion doc`
 

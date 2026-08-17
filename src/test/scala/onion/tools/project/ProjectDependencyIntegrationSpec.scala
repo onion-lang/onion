@@ -74,6 +74,64 @@ class ProjectDependencyIntegrationSpec extends AnyFunSuite with Matchers:
   test("a project declaring no dependencies resolves to an empty classpath"):
     DependencyResolver.resolve(Seq.empty) shouldBe Right(ResolvedDependencies.empty)
 
+  test("a build writes onion.lock, pinning the transitive nobody wrote down"):
+    val project = fixture(FixtureMavenRepository.publish(), "IO::println(\"hi\")\n")
+
+    invoke(project).exitCode shouldBe 0
+
+    val lock = Files.readString(project.resolve("onion.lock"), UTF_8)
+    // The direct dependency is in `onion.toml` already; the transitive is the one that
+    // changes under a project without the manifest changing a byte.
+    lock should include(s"${FixtureMavenRepository.Group}:core:1.0.0")
+    lock should include("[[artifact]]")
+
+  test("a second build honours the lock rather than resolving afresh"):
+    val project = fixture(FixtureMavenRepository.publish(), "IO::println(\"hi\")\n")
+    invoke(project).exitCode shouldBe 0
+    val first = Files.readString(project.resolve("onion.lock"), UTF_8)
+
+    // Force a recompile so resolution runs again rather than being served from the cache.
+    Files.writeString(project.resolve("src").resolve("main.on"), "IO::println(\"hi2\")\n", UTF_8)
+    val result = invoke(project)
+
+    withClue(s"stderr was: ${result.stderr}") { result.exitCode shouldBe 0 }
+    Files.readString(project.resolve("onion.lock"), UTF_8) shouldBe first
+
+  test("a lock recording bytes that are no longer there stops the build"):
+    val project = fixture(FixtureMavenRepository.publish(), "IO::println(\"hi\")\n")
+    invoke(project).exitCode shouldBe 0
+
+    // Stand in for a repository that re-published a version: the lock now disagrees with
+    // what resolution produces. Compiling anyway would mean not knowing what it compiled
+    // against.
+    val tampered = Files.readString(project.resolve("onion.lock"), UTF_8)
+      .replaceAll("""sha256 = "[0-9a-f]{64}"""", """sha256 = "%s"""".format("0" * 64))
+    Files.writeString(project.resolve("onion.lock"), tampered, UTF_8)
+    Files.writeString(project.resolve("src").resolve("main.on"), "IO::println(\"hi3\")\n", UTF_8)
+
+    val result = invoke(project)
+
+    result.exitCode should not be 0
+    result.stderr should include("onion.lock")
+
+  test("changing a declared version discards the lock instead of half-honouring it"):
+    val repository = FixtureMavenRepository.publish()
+    val project = fixture(repository, "IO::println(\"hi\")\n")
+    invoke(project).exitCode shouldBe 0
+
+    // A lock that answers a different question is not an answer: it is replaced, not
+    // enforced against a manifest it no longer describes.
+    val stale = Files.readString(project.resolve("onion.lock"), UTF_8)
+      .replace(s"${FixtureMavenRepository.Group}:greeter:1.0.0", s"${FixtureMavenRepository.Group}:greeter:0.0.1")
+    Files.writeString(project.resolve("onion.lock"), stale, UTF_8)
+    Files.writeString(project.resolve("src").resolve("main.on"), "IO::println(\"hi4\")\n", UTF_8)
+
+    val result = invoke(project)
+
+    withClue(s"stderr was: ${result.stderr}") { result.exitCode shouldBe 0 }
+    Files.readString(project.resolve("onion.lock"), UTF_8) should include(
+      s"${FixtureMavenRepository.Group}:greeter:1.0.0")
+
   // ------------------------------------------------------------------ fixture plumbing
 
   private def fixture(repository: Path, source: String): Path =

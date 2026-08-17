@@ -222,6 +222,42 @@ transitive against a repository that republishes one. Onion embeds coursier's Ja
 which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
 left out rather than made to look like a guarantee it is not.
 
+### `onion.lock`
+
+A build writes `onion.lock` next to `onion.toml`, and later builds resolve from it.
+**Commit it.**
+
+`[dependencies]` names direct dependencies at a version each, which is not enough to
+reproduce a build: a transitive dependency's version is chosen at resolution time, so two
+builds of a byte-identical `onion.toml` can compile against different jars the moment a
+transitive publishes a release. That failure appears on one machine, cannot be reproduced on
+another, and nothing in the project changed.
+
+The lock records the whole transitive coordinate set, so a later build resolves *those*
+versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
+anything is compiled. Different bytes for a version that was already published stops the
+build:
+
+```text
+error: Resolved dependencies do not match onion.lock:
+different bytes for the same file:
+  postgresql-42.7.3.jar
+    locked 8f3a...
+    found  1c90...
+A published version's bytes should never change. Check the repository, or delete onion.lock
+to accept what it is serving now.
+```
+
+Change a version in `onion.toml`, or add a repository, and the lock no longer describes what
+you are asking for -- it is discarded and rewritten rather than enforced against a different
+question. Reordering `[dependencies]` is not a change and does not discard it. `onion clean`
+does not remove it: it is an input to the next build, not an output of this one.
+
+**It is not an offline mode.** coursier's embedding API exposes a cache location, a thread
+pool and a logger, and no cache policy at all, so there is no honest way to promise a build
+that never reaches the network. The lock gives the same answer every time, not the absence
+of the question.
+
 ## Source Layout
 
 Production sources are every `.on` file under `src/`; tests are every

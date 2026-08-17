@@ -57,9 +57,9 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 sbt "assembly; dist"
 ```
 
-出力:
-- `target/scala-3.3.7/onion-<version>.jar` (fat jar)
-- `target/onion-dist-<version>.zip` (配布用アーカイブ)
+出力 (sbt 2 の既定レイアウトではビルド成果物が `target/out/<platform>/<scalaVersion>/<project>/` 以下に配置される):
+- `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar` (fat jar)
+- `target/out/jvm/scala-3.3.7/onion/onion-dist-<version>.zip` (配布用アーカイブ)
 
 ## ホットフィックスリリース
 

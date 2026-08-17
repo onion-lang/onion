@@ -156,3 +156,12 @@ class OnionFormatterSpec extends AnyFunSuite with Matchers:
     OnionFormatter.format("val a = 1\n").changed shouldBe false
     OnionFormatter.format("val  a = 1\n").changed shouldBe false // no rule applies
     OnionFormatter.format("f(a , b)\n").changed shouldBe true
+
+  test("leaves a whitespace-only file untouched, since it has no tokens for a rule to apply to"):
+    // The lexer produces no lexeme at all when a source has neither a real token nor a
+    // comment, and the main loop is a no-op over an empty sequence -- which silently
+    // collapsed the file to an empty string instead of leaving whitespace it has no rule
+    // for exactly as written, the same "byte for byte" guarantee every other test here
+    // checks for whitespace that does have a token around it.
+    val source = "   \n\n  \t \n"
+    OnionFormatter.format(source) shouldBe OnionFormatter.FormatResult(source, changed = false)

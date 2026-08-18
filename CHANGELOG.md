@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A stray `cond ? a : b` ternary now gets a hint instead of a bare expected-token
+  dump.** Onion has no ternary operator — `if`/`else` works as an expression instead —
+  but a newcomer writing `?` still hits the parser at a point where the expected-token
+  list (`<EOF>, <EOL>, ";"`) never mentions the operator or the rewrite. `commonSyntaxHint`
+  in `Parsing.scala` gained a `case "?"` alongside the existing hints for old `<:`/`:`
+  inheritance syntax, `for x in xs`, and the retired `=>` arrow, naming the operator and
+  pointing at `if cond { a } else { b }`.
+
 - **`W0016` now also fires when a `@TailRecursive` mutual-recursion group's parameter
   lists don't match.** `0.12.0` documented `W0016` as covering all four requirements
   `MutualRecursionOptimization` places on a group, but the parameter-list check was the

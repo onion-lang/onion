@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`W0016` now also fires when a `@TailRecursive` mutual-recursion group's parameter
+  lists don't match.** `0.12.0` documented `W0016` as covering all four requirements
+  `MutualRecursionOptimization` places on a group, but the parameter-list check was the
+  one requirement `validateGroup` never made — it lived in `transformGroup`, which
+  silently `return`ed instead of reporting. A group whose members differed only in
+  argument count or per-position types therefore compiled with no diagnostic at all,
+  which is the same silent `StackOverflowError` risk `W0016` exists to prevent. The
+  check moved into `validateGroup`, so it now reaches the `W0016` path like the other
+  three.
+
 ## [0.12.0] - 2026-08-18
 
 ### Changed

@@ -135,7 +135,7 @@ public:
   def pay(p: Payment): void { payment = p }
 
   def total(): Double =
-    lines.fold(0.0) { acc, ln => (acc as Double) + (ln as OrderLine).subtotal() } as Double
+    lines.fold(0.0) { acc, ln -> (acc as Double) + (ln as OrderLine).subtotal() } as Double
 
   def lineCount(): Int = lines.size
 
@@ -184,7 +184,7 @@ val menu: List[MenuItem] = [
 IO::println("=".rep(40))
 IO::println("         RESTAURANT MENU")
 IO::println("=".rep(40))
-val byCategory: Map[String, List[MenuItem]] = menu.groupBy { item => item.category().label() }
+val byCategory: Map[String, List[MenuItem]] = menu.groupBy { item -> item.category().label() }
 val catOrder: List[String] = ["Starter", "Main Course", "Dessert", "Drink"]
 foreach cat: String in catOrder {
   val items: List[MenuItem] = byCategory.getOrDefault(cat, [])
@@ -235,33 +235,33 @@ order2.pay(new Card("4242", 82.50))
 
 val orders: List[RestaurantOrder] = [order1, order2, order3]
 
-val served    = orders.filter { o => (o as RestaurantOrder).getStatus() == OrderStatus::Served }
-val cancelled = orders.filter { o => (o as RestaurantOrder).getStatus() == OrderStatus::Cancelled }
+val served    = orders.filter { o -> (o as RestaurantOrder).getStatus() == OrderStatus::Served }
+val cancelled = orders.filter { o -> (o as RestaurantOrder).getStatus() == OrderStatus::Cancelled }
 IO::println("Served orders:    " + served.size)
 IO::println("Cancelled orders: " + cancelled.size)
 
 // Revenue from served orders only
-val revenue = served.fold(0.0) { acc, o => (acc as Double) + (o as RestaurantOrder).total() }
+val revenue = served.fold(0.0) { acc, o -> (acc as Double) + (o as RestaurantOrder).total() }
 IO::println("Revenue (served): $" + (revenue as Double).fmt())
 
 // All lines across served orders (flatMap)
-val allLines = served.flatMap { o => (o as RestaurantOrder).getLines() }
+val allLines = served.flatMap { o -> (o as RestaurantOrder).getLines() }
 IO::println("Line items served: " + allLines.size)
 
 // Highest-value line
-val topLine = allLines.sortedBy { ln => 0.0 - (ln as OrderLine).subtotal() }.head() as OrderLine
+val topLine = allLines.sortedBy { ln -> 0.0 - (ln as OrderLine).subtotal() }.head() as OrderLine
 IO::println("Highest line: " + topLine.item().name() + " $" + topLine.subtotal().fmt())
 
 // Unique item names served (distinct)
-val itemNames = allLines.map { ln => (ln as OrderLine).item().name() }.distinct()
+val itemNames = allLines.map { ln -> (ln as OrderLine).item().name() }.distinct()
 IO::println("Distinct items served: " + itemNames.size)
 
 // Partition active lines into veg / non-veg
-val activeLns = orders.filter { o =>
+val activeLns = orders.filter { o ->
   (o as RestaurantOrder).getStatus() != OrderStatus::Cancelled
-}.flatMap { o => (o as RestaurantOrder).getLines() }
+}.flatMap { o -> (o as RestaurantOrder).getLines() }
 
-val parts       = activeLns.partition { ln => (ln as OrderLine).item().veg() }
+val parts       = activeLns.partition { ln -> (ln as OrderLine).item().veg() }
 val vegLines    = parts[0] as List[Object]
 val nonVegLines = parts[1] as List[Object]
 IO::println("Vegetarian lines:     " + vegLines.size)
@@ -272,7 +272,7 @@ IO::println("\n-- Average price by category --")
 foreach cat: String in catOrder {
   val items: List[MenuItem] = byCategory.getOrDefault(cat, [])
   if items.size > 0 {
-    val tot: Double = items.fold(0.0) { acc, item => (acc as Double) + (item as MenuItem).price() } as Double
+    val tot: Double = items.fold(0.0) { acc, item -> (acc as Double) + (item as MenuItem).price() } as Double
     val avg: Double = tot / (items.size as Double)
     IO::println("  " + cat.padTo(12) + ": $" + avg.fmt())
   }
@@ -296,7 +296,7 @@ IO::println(order2.receipt())
 // Range-based table summary
 IO::println("\n-- Table summary --")
 foreach t: Int in 1..3 {
-  val found = orders.find { o => (o as RestaurantOrder).getTableNum() == t }
+  val found = orders.find { o -> (o as RestaurantOrder).getTableNum() == t }
   if found != null {
     val fo = found as RestaurantOrder
     IO::println("  Table " + t + " [" + fo.getStatus().label() + "]  lines=" +
@@ -305,9 +305,9 @@ foreach t: Int in 1..3 {
 }
 
 // Zip item names with prices (top 4 most expensive)
-val top4    = menu.sortedBy { m => 0.0 - (m as MenuItem).price() }.take(4)
-val tNames  = top4.map { m => (m as MenuItem).name() }
-val tPrices = top4.map { m => "$" + (m as MenuItem).price().fmt() }
+val top4    = menu.sortedBy { m -> 0.0 - (m as MenuItem).price() }.take(4)
+val tNames  = top4.map { m -> (m as MenuItem).name() }
+val tPrices = top4.map { m -> "$" + (m as MenuItem).price().fmt() }
 val zipped  = tNames.zip(tPrices)
 IO::println("\n-- Top 4 items by price --")
 foreach pair: Object in zipped {
@@ -317,7 +317,7 @@ foreach pair: Object in zipped {
 
 // Sorted menu overview (cheapest first)
 IO::println("\n-- Menu by price (asc) --")
-val sorted = menu.sortedBy { m => (m as MenuItem).price() }
+val sorted = menu.sortedBy { m -> (m as MenuItem).price() }
 var rank: Int = 1
 foreach m: MenuItem in sorted {
   IO::println("  " + rank + ". " + m.name().padTo(22) + "$" + m.price().fmt())

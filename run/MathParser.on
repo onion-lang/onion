@@ -367,21 +367,21 @@ val batch: List[String] = [
 ]
 
 val env0: HashMap[String, Object] = new HashMap[String, Object]()
-val results = batch.map { src => tryEval(src as String, env0) }
+val results = batch.map { src -> tryEval(src as String, env0) }
 
-val successes = results.filter { r => (r as EvalResult).ok() }
-val failures  = results.filter { r => !(r as EvalResult).ok() }
+val successes = results.filter { r -> (r as EvalResult).ok() }
+val failures  = results.filter { r -> !(r as EvalResult).ok() }
 
 IO::println("  Total expressions : #{batch.size}")
 IO::println("  Successful        : #{successes.size}")
 IO::println("  Errors            : #{failures.size}")
 
-val values: List[Int] = successes.map { r => (r as EvalResult).result() as Int }
-val total = values.fold(0) { acc, v => (acc as Int) + (v as Int) } as Int
-val minV  = values.fold(values.get(0) as Int) { acc, v =>
+val values: List[Int] = successes.map { r -> (r as EvalResult).result() as Int }
+val total = values.fold(0) { acc, v -> (acc as Int) + (v as Int) } as Int
+val minV  = values.fold(values.get(0) as Int) { acc, v ->
   if (v as Int) < (acc as Int) { v as Int } else { acc as Int }
 } as Int
-val maxV  = values.fold(values.get(0) as Int) { acc, v =>
+val maxV  = values.fold(values.get(0) as Int) { acc, v ->
   if (v as Int) > (acc as Int) { v as Int } else { acc as Int }
 } as Int
 val avg = total / successes.size
@@ -393,7 +393,7 @@ IO::println("  Average (int div) : #{avg}")
 
 IO::println("")
 IO::println("  Sorted by value descending:")
-val sorted = successes.sortedBy { r => 0 - ((r as EvalResult).result() as Int) }
+val sorted = successes.sortedBy { r -> 0 - ((r as EvalResult).result() as Int) }
 foreach r: Object in sorted {
   IO::println("   " + (r as EvalResult).display())
 }
@@ -401,7 +401,7 @@ foreach r: Object in sorted {
 IO::println("")
 IO::println(sep)
 IO::println("Grouped by sign (positive / negative / zero):")
-val grouped = successes.groupBy { r =>
+val grouped = successes.groupBy { r ->
   val v = (r as EvalResult).result() as Int
   if v > 0 { "positive" } else if v < 0 { "negative" } else { "zero" }
 }

@@ -777,6 +777,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/TournamentTracker.on"))
     }
 
+    it("runs LambdaArrows.on") {
+      assert(Shell.Success(null) == runSample("run/LambdaArrows.on"))
+    }
+
     it("runs VirtualMachine.on") {
       assert(Shell.Success(null) == runSample("run/VirtualMachine.on"))
     }

@@ -92,7 +92,7 @@ println(message)
 // ラムダ構文: (params) -> { body }
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
-val result: Int = add.call(5, 3)  // 8
+val result: Int = add(5, 3)  // 8
 println(result)
 ```
 
@@ -122,8 +122,8 @@ foreach color: String in colors {
 パイプラインが組み込まれているので、添字を使う場面はほとんどありません。
 
 ```onion
-val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
-val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+val odds = [1, 2, 3, 4, 5].filter { n -> n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n -> n * 10 }                     // [10, 30, 50]
 ```
 
 標準ライブラリはリストを受け取り・返します。配列は Java と話すときのもので——

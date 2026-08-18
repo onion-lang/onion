@@ -131,7 +131,7 @@ def printBoard[T: Scoreable + Formattable](label: String, entries: List[T]): voi
   println(sep)
   println("  " + label)
   println(sep)
-  val sorted: List[T] = entries.sortedBy { e => 0 - Scoreable[T]::score(e) }
+  val sorted: List[T] = entries.sortedBy { e -> 0 - Scoreable[T]::score(e) }
   var rank: Int = 1
   foreach e: T in sorted {
     println("#{rank.padLeft(2)}.#{rank.medal()} #{Formattable[T]::format(e)}")
@@ -176,10 +176,10 @@ def histogram[T: Scoreable](entries: List[T], buckets: Int, lo: Int, hi: Int): v
 
 // ─── Constructors/team standings: sum scores by category ─────────────────────
 def teamStandings[T: Scoreable](label: String, entries: List[T]): void {
-  val cats: List[String] = entries.map { e => Scoreable[T]::category(e) }.distinct()
+  val cats: List[String] = entries.map { e -> Scoreable[T]::category(e) }.distinct()
   // Build (cat, sum) totals as parallel lists, then print sorted by sum descending
   val catList: List[String] = cats
-  val sumList: List[Integer] = cats.map { cat =>
+  val sumList: List[Integer] = cats.map { cat ->
     var s: Int = 0
     foreach e: T in entries {
       if Scoreable[T]::category(e) == cat { s = s + Scoreable[T]::score(e) }
@@ -188,8 +188,8 @@ def teamStandings[T: Scoreable](label: String, entries: List[T]): void {
   }
   // Sort by descending sum using index-based selection sort on a small list
   val n: Int = catList.size
-  val idxList: List[Integer] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter { i => (i as Int) < n }
-  val sorted: List[Integer] = idxList.sortedBy { i => 0 - (sumList.get(i as Int) as Int) }
+  val idxList: List[Integer] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter { i -> (i as Int) < n }
+  val sorted: List[Integer] = idxList.sortedBy { i -> 0 - (sumList.get(i as Int) as Int) }
   println("  " + label + " standings by category:")
   var pos: Int = 1
   foreach idx: Object in sorted {
@@ -244,7 +244,7 @@ def main(): void {
   println("")
 
   // ── Cross-analysis ────────────────────────────────────────────────────────
-  val partitioned = chess.partition { p => p.rating() >= 2740 }
+  val partitioned = chess.partition { p -> p.rating() >= 2740 }
   val topChess: List[ChessPlayer] = partitioned.get(0) as List[ChessPlayer]
   val midChess: List[ChessPlayer] = partitioned.get(1) as List[ChessPlayer]
   println("Top tier (>= 2740): #{topChess.size} players")
@@ -256,8 +256,8 @@ def main(): void {
 
   // Reliable drivers — sorted by points
   val reliableDrivers: List[Driver] = drivers
-    .filter { d => d.dnfs() <= 2 }
-    .sortedBy { d => 0 - d.points() }
+    .filter { d -> d.dnfs() <= 2 }
+    .sortedBy { d -> 0 - d.points() }
   println("Reliable drivers (DNF <= 2):")
   foreach d: Driver in reliableDrivers {
     println("  #{d.driverName().pad(12)} #{d.points()} pts  rel #{d.reliability()}%")
@@ -265,8 +265,8 @@ def main(): void {
   println("")
 
   // Leaders
-  val chessLeader: ChessPlayer = chess.sortedBy { p => 0 - p.rating() }.get(0)
-  val f1Leader: Driver = drivers.sortedBy { d => 0 - d.points() }.get(0)
+  val chessLeader: ChessPlayer = chess.sortedBy { p -> 0 - p.rating() }.get(0)
+  val f1Leader: Driver = drivers.sortedBy { d -> 0 - d.points() }.get(0)
   println("Current leaders:")
   println("  Chess: #{chessLeader.titleStr()} #{chessLeader.playerName()} (#{chessLeader.rating()})")
   println("  F1:    #{f1Leader.driverName()} / #{f1Leader.team()} (#{f1Leader.points()} pts)")

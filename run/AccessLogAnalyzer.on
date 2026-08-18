@@ -124,27 +124,27 @@ public:
   def size():         Int = _entries.size
   def allEntries(): List[LogEntry] = _entries
 
-  def successCount(): Int = _entries.count { e => HttpStatus::of(e.status()).isSuccess() }
-  def errorCount():   Int = _entries.count { e => HttpStatus::of(e.status()).isError() }
-  def totalBytes():   Int = _entries.fold(0) { acc, e => acc + e.bytes() }
+  def successCount(): Int = _entries.count { e -> HttpStatus::of(e.status()).isSuccess() }
+  def errorCount():   Int = _entries.count { e -> HttpStatus::of(e.status()).isError() }
+  def totalBytes():   Int = _entries.fold(0) { acc, e -> acc + e.bytes() }
 
-  def byIp():        Map[Object, List[LogEntry]] = _entries.groupBy { e => e.ip() }
-  def byMethod():    Map[Object, List[LogEntry]] = _entries.groupBy { e => e.method() }
-  def byStatusCat(): Map[Object, List[LogEntry]] = _entries.groupBy { e => HttpStatus::of(e.status()).label() }
+  def byIp():        Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
+  def byMethod():    Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.method() }
+  def byStatusCat(): Map[Object, List[LogEntry]] = _entries.groupBy { e -> HttpStatus::of(e.status()).label() }
 
   def buildPathSummaries(): List[PathSummary] {
-    val byPath: Map[Object, List[LogEntry]] = _entries.groupBy { e => e.path() }
+    val byPath: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.path() }
     val summaries: List[PathSummary] = []
     foreach (p, pathEntries) in byPath {
       val ps: PathSummary = new PathSummary(p as String)
       foreach e: LogEntry in pathEntries { ps.accumulate(e) }
       summaries.add(ps)
     }
-    return summaries.sortedBy { ps => -(ps as PathSummary).hits() }
+    return summaries.sortedBy { ps -> -(ps as PathSummary).hits() }
   }
 
   def mostActiveIp(): String? {
-    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e => e.ip() }
+    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
     var bestIp: String? = null
     var bestCount: Int = 0
     foreach (ip, ipEntries) in grouped {
@@ -167,10 +167,10 @@ public:
   }
 
   def suspiciousIps(): List[String] {
-    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e => e.ip() }
+    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
     val suspect: List[String] = []
     foreach (ip, ipEntries) in grouped {
-      val errs: List[LogEntry] = ipEntries.filter { e => HttpStatus::of(e.status()).isError() }
+      val errs: List[LogEntry] = ipEntries.filter { e -> HttpStatus::of(e.status()).isError() }
       if errs.size >= 2 { suspect.add(ip as String) }
     }
     return suspect
@@ -265,12 +265,12 @@ val byIp: Map[Object, List[LogEntry]] = analyzer.byIp()
 // Prefix each line with a zero-padded count for lexicographic sort, then strip it.
 val ipLinesKeyed: List[String] = []
 foreach (ip, ipReqs) in byIp {
-  val errReqs: List[LogEntry] = ipReqs.filter { e => HttpStatus::of(e.status()).isError() }
+  val errReqs: List[LogEntry] = ipReqs.filter { e -> HttpStatus::of(e.status()).isError() }
   val cnt: Int = ipReqs.size
   val prefix: String = if cnt >= 10 { "#{cnt}" } else { "0#{cnt}" }
   ipLinesKeyed.add("#{prefix}|#{(ip as String).padRight(18)} #{cnt} req  #{errReqs.size} err")
 }
-val ipLinesSorted: List[String] = ipLinesKeyed.sortedBy { l => l as String }
+val ipLinesSorted: List[String] = ipLinesKeyed.sortedBy { l -> l as String }
 // Iterate in reverse for descending order
 var ipIdx: Int = ipLinesSorted.size - 1
 while ipIdx >= 0 {
@@ -303,12 +303,12 @@ IO::println("  #{lastErrMsg}")
 // 8. Partition successes vs failures and distinct error paths
 headerLine("Partition: Successes vs Failures")
 val allEntries: List[LogEntry] = analyzer.allEntries()
-val parts = allEntries.partition { e => HttpStatus::of(e.status()).isSuccess() }
+val parts = allEntries.partition { e -> HttpStatus::of(e.status()).isSuccess() }
 val successes: List[Object] = parts[0] as List[Object]
 val failures:  List[Object] = parts[1] as List[Object]
 IO::println("  Successes: #{successes.size}   Failures: #{failures.size}")
-val errorPaths: List[String] = failures.map { e => (e as LogEntry).path() }
-val allErrorPathObjs: List[Object] = errorPaths.map { p => p as Object }
+val errorPaths: List[String] = failures.map { e -> (e as LogEntry).path() }
+val allErrorPathObjs: List[Object] = errorPaths.map { p -> p as Object }
 val uniqueErrorPaths: List[Object] = allErrorPathObjs.distinct()
 val joinSep: String = ", "
 IO::println("  Distinct error paths (#{uniqueErrorPaths.size}): #{uniqueErrorPaths.join(joinSep)}")

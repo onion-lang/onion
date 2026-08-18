@@ -35,7 +35,7 @@ class ArrayExtensionNoClosureSpec extends AbstractShellSpec {
     it("closure array extensions still work alongside no-closure ones") {
       runInt(
         "val a = Strings::split(\"1,2,3,4\", \",\")\n" +
-        "return a.map { s => (s as String).length() }.size() + a.toList().size()",
+        "return a.map { s -> (s as String).length() }.size() + a.toList().size()",
         Shell.Success(8))
     }
   }

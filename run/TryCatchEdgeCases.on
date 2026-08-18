@@ -70,7 +70,7 @@ public:
         localSum = try { localSum + 1 } catch e: Exception { localSum }
         return localSum
       }
-      results.add(bump.call())
+      results.add(bump())
     }
     total = total + results.size
 

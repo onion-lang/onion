@@ -197,8 +197,8 @@ public:
 
   def complement(): DnaSequence {
     val compStr: String = nucleotides
-      .map { n: Nucleotide => n.complement().symbol() }
-      .fold("") { acc: String, s: String => acc + s }
+      .map { n: Nucleotide -> n.complement().symbol() }
+      .fold("") { acc: String, s: String -> acc + s }
     return new DnaSequence(id + "_comp", compStr)
   }
 
@@ -265,13 +265,13 @@ public:
   }
 
   def findById(id: String): Option[DnaSequence] {
-    val found: DnaSequence? = sequences.find { s => (s as DnaSequence).id == id } as DnaSequence?
+    val found: DnaSequence? = sequences.find { s -> (s as DnaSequence).id == id } as DnaSequence?
     if found != null { return Option::some(found) }
     return Option::none()
   }
 
   def sortedByGC(): List[DnaSequence] =
-    sequences.sortedBy { s: DnaSequence => 0.0 - s.gcContent() }
+    sequences.sortedBy { s: DnaSequence -> 0.0 - s.gcContent() }
 
   def totalBases(): Int {
     var total: Int = 0
@@ -280,7 +280,7 @@ public:
   }
 
   def motifSearchAll(motif: String): List[MotifMatch] =
-    sequences.flatMap { s: DnaSequence => s.findMotif(motif) }
+    sequences.flatMap { s: DnaSequence -> s.findMotif(motif) }
 }
 
 // ── Report helpers ────────────────────────────────────────────────────────────
@@ -296,7 +296,7 @@ def printNucleotideCounts(seq: DnaSequence): void {
 def printKmerTop(seq: DnaSequence, k: Int, topN: Int): void {
   val freq: Map[String, Int] = seq.kmerFrequency(k)
   val allKmers: List[String] = new ArrayList[String](freq.keySet())
-  val sorted: List[String] = allKmers.sortedBy { kmer: String => 0 - freq.get(kmer) }
+  val sorted: List[String] = allKmers.sortedBy { kmer: String -> 0 - freq.get(kmer) }
   val limit: Int = if sorted.size() < topN { sorted.size() } else { topN }
   IO::println("  Top #{limit} #{k}-mers:")
   var i: Int = 0
@@ -351,15 +351,15 @@ def main(): void {
   // ── GC content + classification ────────────────────────────────────────────
   IO::println("")
   IO::println("=== GC Content Classification ===")
-  lib.sortedByGC().forEach { seq: DnaSequence =>
+  lib.sortedByGC().forEach { seq: DnaSequence ->
     IO::println("  #{seq.classifyGC().display()}")
   }
 
   // partition returns a List[List]: [0]=matching, [1]=non-matching
-  val parts  = lib.sequences.partition { s: DnaSequence => s.gcContent() >= 50.0 }
+  val parts  = lib.sequences.partition { s: DnaSequence -> s.gcContent() >= 50.0 }
   val high   = parts[0] as List[Object]
   val notHigh = parts[1] as List[Object]
-  val parts2 = notHigh.partition { s: Object => (s as DnaSequence).gcContent() > 40.0 }
+  val parts2 = notHigh.partition { s: Object -> (s as DnaSequence).gcContent() > 40.0 }
   val med    = parts2[0] as List[Object]
   val lowGC  = parts2[1] as List[Object]
   IO::println("  HIGH(>=50%): #{high.size()}  MEDIUM(>40%): #{med.size()}  LOW(<=40%): #{lowGC.size()}")
@@ -367,7 +367,7 @@ def main(): void {
   // ── Reverse complement ─────────────────────────────────────────────────────
   IO::println("")
   IO::println("=== Reverse Complements ===")
-  lib.sequences.forEach { seq: DnaSequence =>
+  lib.sequences.forEach { seq: DnaSequence ->
     val rc: DnaSequence = seq.reverseComplement()
     IO::println("  #{seq.id} => #{rc.raw.truncate(30)}")
   }
@@ -375,14 +375,14 @@ def main(): void {
   // ── Motif search ───────────────────────────────────────────────────────────
   IO::println("")
   IO::println("=== Motif Search (ATG) ===")
-  lib.sequences.forEach { seq: DnaSequence =>
+  lib.sequences.forEach { seq: DnaSequence ->
     val hits: List[MotifMatch] = seq.findMotif("ATG")
     if hits.isEmpty() {
       IO::println("  #{seq.id}: no ATG found")
     } else {
       val positions: String = hits
-        .map { m: MotifMatch => "" + m.position() }
-        .fold("") { acc: String, s: String => if acc == "" { s } else { acc + ", " + s } }
+        .map { m: MotifMatch -> "" + m.position() }
+        .fold("") { acc: String, s: String -> if acc == "" { s } else { acc + ", " + s } }
       IO::println("  #{seq.id}: #{hits.size()} hit(s) at [#{positions}]")
     }
   }
@@ -432,7 +432,7 @@ def main(): void {
   val r2: SequenceRegion = new SequenceRegion(10, 25, "exon1")
   val r3: SequenceRegion = new SequenceRegion(30, 45, "exon2")
   val regions: List[SequenceRegion] = [r1, r2, r3]
-  regions.forEach { r: SequenceRegion => IO::println("  #{regionDisplay(r)}") }
+  regions.forEach { r: SequenceRegion -> IO::println("  #{regionDisplay(r)}") }
   IO::println("  promoter overlaps exon1: #{regionOverlaps(r1, r2)}")
   IO::println("  exon1 overlaps exon2:   #{regionOverlaps(r2, r3)}")
   IO::println("  promoter overlaps exon2: #{regionOverlaps(r1, r3)}")
@@ -441,7 +441,7 @@ def main(): void {
   IO::println("")
   IO::println("=== Palindrome Check ===")
   val palTests: List[String] = ["ATCGCTA", "GCGCGCG", "ATAT"]
-  palTests.forEach { seq: String =>
+  palTests.forEach { seq: String ->
     IO::println("  \"#{seq}\" is palindrome: #{seq.isPalindrome()}")
   }
 
@@ -458,7 +458,7 @@ def main(): void {
   val nucleotides: List[Nucleotide] = [
     new Adenine(), new Thymine(), new Guanine(), new Cytosine(), new Unknown()
   ]
-  nucleotides.forEach { n: Nucleotide =>
+  nucleotides.forEach { n: Nucleotide ->
     val sym: String = n.symbol()
     val comp: Nucleotide = n.complement()
     IO::println("  #{sym} -> #{comp.symbol()}  purine=#{n.isPurine()}  pyrimidine=#{n.isPyrimidine()}")

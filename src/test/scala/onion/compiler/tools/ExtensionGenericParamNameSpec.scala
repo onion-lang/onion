@@ -21,7 +21,7 @@ class ExtensionGenericParamNameSpec extends AbstractShellSpec {
         """
           |extension List[Int] {
           |  def intSum(): Int {
-          |    return this.fold(0) { acc, x => (acc as Int) + (x as Int) }
+          |    return this.fold(0) { acc, x -> (acc as Int) + (x as Int) }
           |  }
           |}
           |

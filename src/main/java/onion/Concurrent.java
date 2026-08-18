@@ -19,7 +19,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * Usage:
  *   val pool = Concurrent::pool(4)
- *   val results = pool.mapAll(urls) { url => Http::get(url) }
+ *   val results = pool.mapAll(urls) { url -> Http::get(url) }
  *   pool.close()
  *
  *   val hits = Concurrent::counter()

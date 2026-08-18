@@ -118,7 +118,7 @@ public:
   }
 
   def adopt(petId: Int, adopterName: String, email: String, date: String): Boolean {
-    val found = self.pets.find { p => (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    val found = self.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
     if found == null {
       IO::println("Pet #" + petId + " is not available for adoption.")
       return false
@@ -132,7 +132,7 @@ public:
   }
 
   def foster(petId: Int, fosterName: String, phone: String, date: String): Boolean {
-    val found = self.pets.find { p => (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    val found = self.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
     if found == null {
       IO::println("Pet #" + petId + " is not available for fostering.")
       return false
@@ -146,7 +146,7 @@ public:
   }
 
   def quarantine(petId: Int, reason: String): Boolean {
-    val found = self.pets.find { p => (p as Pet).id() == petId }
+    val found = self.pets.find { p -> (p as Pet).id() == petId }
     if found == null { return false }
     val f: Pet = found as Pet
     val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Quarantine(reason))
@@ -155,9 +155,9 @@ public:
     return true
   }
 
-  def available(): List[Object] = self.pets.filter { p => (p as Pet).status().isAvailable() }
+  def available(): List[Object] = self.pets.filter { p -> (p as Pet).status().isAvailable() }
 
-  def adoptedCount(): Int = self.pets.filter { p => (p as Pet).status().isAdopted() }.size
+  def adoptedCount(): Int = self.pets.filter { p -> (p as Pet).status().isAdopted() }.size
 
   def printRoster(): void {
     IO::println("\n═══ " + self.name + " — Pet Roster ═══")
@@ -165,7 +165,7 @@ public:
       IO::println("  (no pets on record)")
       return
     }
-    val sorted: List[Object] = self.pets.sortedBy { p => (p as Pet).name() }
+    val sorted: List[Object] = self.pets.sortedBy { p -> (p as Pet).name() }
     foreach p: Object in sorted {
       val pet: Pet = p as Pet
       val typeTag: String = select pet.petType() {
@@ -181,11 +181,11 @@ public:
 
   def printSummary(): void {
     IO::println("\n── Summary for " + self.name + " ──")
-    val byType: Map[Object, List[Object]] = self.pets.groupBy { p => (p as Pet).petType() }
+    val byType: Map[Object, List[Object]] = self.pets.groupBy { p -> (p as Pet).petType() }
     foreach (pt, list) in byType {
       val petType: PetType = pt as PetType
       val subList: List[Object] = list as List[Object]
-      val avail: Int = subList.filter { p => (p as Pet).status().isAvailable() }.size
+      val avail: Int = subList.filter { p -> (p as Pet).status().isAvailable() }.size
       val total: Int = subList.size
       val bar: String = avail.stars()
       IO::println("  " + petType.name().padEnd(8) + " total=" + total + " available=" + avail + "  " + bar)
@@ -238,7 +238,7 @@ val available: List[Object] = shelter.available()
 if available.isEmpty {
   IO::println("  None currently available.")
 } else {
-  val sorted: List[Object] = available.sortedBy { p => (p as Pet).petType().avgDaysToAdopt() }
+  val sorted: List[Object] = available.sortedBy { p -> (p as Pet).petType().avgDaysToAdopt() }
   foreach p: Object in sorted {
     val pet: Pet = p as Pet
     IO::println("  • " + pet.name() + " (" + pet.breed() + ") — est. " + pet.petType().avgDaysToAdopt() + " days to adopt")
@@ -250,18 +250,18 @@ shelter.printSummary()
 
 // Adopters report
 IO::println("\n── Adopters ──")
-val sortedAdopters: List[Object] = shelter.adopters.sortedBy { a => (a as Adopter).name() }
+val sortedAdopters: List[Object] = shelter.adopters.sortedBy { a -> (a as Adopter).name() }
 foreach a: Object in sortedAdopters {
   val ad: Adopter = a as Adopter
   IO::println("  " + ad.name().padEnd(16) + " → pet #" + ad.petId() + " on " + ad.date())
 }
 
 // Partition by young / adult (< 12 months = young)
-val parts: List[List[Object]] = shelter.pets.partition { p => (p as Pet).ageMonths() < 12 }
+val parts: List[List[Object]] = shelter.pets.partition { p -> (p as Pet).ageMonths() < 12 }
 val young: List[Object] = parts[0] as List[Object]
 val adult: List[Object] = parts[1] as List[Object]
 IO::println("\n── Young (<1 yr): " + young.size + "  Adult: " + adult.size + " ──")
-val youngSorted: List[Object] = young.sortedBy { p => (p as Pet).ageMonths() }
+val youngSorted: List[Object] = young.sortedBy { p -> (p as Pet).ageMonths() }
 foreach p: Object in youngSorted {
   val pet: Pet = p as Pet
   IO::println("  " + pet.name() + " — " + pet.ageMonths().ageLabel())

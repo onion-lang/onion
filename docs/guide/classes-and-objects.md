@@ -55,8 +55,9 @@ val p = new Point(3, 4)        // p.x, p.y readable; p.x = 9 is an error (val)
 val c = new Conf(port = 9090)  // host defaults to "localhost"
 ```
 
-`def this(...)` constructors remain available for classes that need
-explicit bodies or multiple overloads.
+A class with a primary constructor can still declare more constructors with
+`def this`, and each of them **delegates to the primary** with `: this(...)`.
+See [Constructors](#constructors) below.
 
 ## Fields
 
@@ -128,59 +129,109 @@ val area: Double = MathUtils::circleArea(5.0)
 
 ## Constructors
 
-### Default Constructor
+Onion has the primary/secondary constructor model of Scala and Kotlin.
 
-Define constructors with `def this`:
+- The **primary constructor** is the parameter list after the class name, together
+  with the arguments on the `extends` clause. It is where the superclass constructor
+  is called, and it stores every `val`/`var` parameter into its field.
+- A **secondary constructor** is a `def this(...)` in the class body. In a class that
+  has a primary constructor, every secondary delegates to it with `: this(...)`,
+  directly or through another secondary. That rule is what guarantees a `val` field
+  from the primary can never be observed uninitialized, and that the superclass is
+  always constructed the way the `extends` clause says.
 
 ```onion
-class Point {
-  val x: Int
-  val y: Int
-
-  public:
-    def this(x: Int, y: Int) {
-      this.x = x
-      this.y = y
-    }
+class Point(val x: Int, val y: Int) {
+public:
+  def this(x: Int) : this(x, 0) { }      // secondary: delegates to the primary
+  def this : this(0) { }                 // secondaries may chain
+  def dist(): Int { return x * x + y * y }
 }
 
-val point: Point = new Point(10, 20)
+val a = new Point(3, 4)
+val b = new Point(3)                     // y == 0
+val c = new Point()                      // x == 0, y == 0
 ```
 
-### Multiple Constructors
+A `def this` in a class with a primary constructor that does not delegate is an
+error (`E0087`). Before this rule existed, `class P(val x: Int) { def this { } }`
+compiled and `new P().x` was `0`.
 
-Overload constructors for different initialization patterns:
+### Superclass Arguments
+
+Arguments for the superclass constructor are written on the `extends` clause, and
+only there. A secondary constructor reaches them by delegating to the primary:
+
+```onion
+class Animal(val name: String)
+
+class Dog(name: String, val breed: String) extends Animal(name) {
+public:
+  def this(name: String) : this(name, "mixed") { }
+}
+```
+
+A class with no parameter list but arguments on `extends` has a no-arg primary
+constructor that passes them along -- the same reading Kotlin and Scala give it:
+
+```onion
+class Rex extends Animal("Rex") { }      // new Rex().name == "Rex"
+```
+
+### Classes Without a Primary Constructor
+
+A class that declares neither a parameter list nor `extends` arguments has no
+primary constructor. Its `def this` constructors call the superclass no-arg
+constructor implicitly, and may delegate to one another:
 
 ```onion
 class Rectangle {
   val width: Int
   val height: Int
-
-  public:
-    def this {
-      this.width = 0
-      this.height = 0
-    }
-
-    def this(size: Int) {
-      this.width = size
-      this.height = size
-    }
-
-    def this(w: Int, h: Int) {
-      this.width = w
-      this.height = h
-    }
+public:
+  def this(w: Int, h: Int) {
+    this.width = w
+    this.height = h
+  }
+  def this(size: Int) : this(size, size) { }
+  def this : this(0) { }
 }
-
-val rect1: Rectangle = new Rectangle()
-val rect2: Rectangle = new Rectangle(10)
-val rect3: Rectangle = new Rectangle(10, 20)
 ```
 
-### Calling Super Constructors
+Such a class cannot pass arguments to its superclass; write a primary constructor
+when it needs to. (An older form, `def this(x) : (x) { }`, used to do that and no
+longer exists -- the compiler points at the `extends` clause if it meets it.)
 
-To call a superclass constructor, add a super-initializer list: `def this(args): (superArgs) { ... }`.
+### Field Initializers
+
+Field initializers run after the primary constructor has stored its parameters, so
+they can read the `val`/`var` parameter fields:
+
+```onion
+class Account(val opening: Int) {
+public:
+  var balance: Int = opening        // reads the field the primary just stored
+  var history: List[Int] = [opening]
+}
+```
+
+They run once, in the primary, regardless of which constructor `new` went through.
+A plain (non-`val`/`var`) primary parameter is not a field and is not visible to an
+initializer.
+
+### What a Constructor's Arguments May Not Do
+
+The object does not exist yet while its delegation arguments are being evaluated,
+so neither `this` nor a field can be read inside `: this(...)` or `extends B(...)`
+(`E0090`); pass a parameter or a constant instead. A closure in that position is
+fine -- it captures `this` and runs later. Two constructors delegating to each other
+in a cycle are rejected (`E0088`) rather than left to overflow the stack at `new`.
+Records and enums have their canonical constructor and cannot declare `def this`
+(`E0089`).
+
+The primary constructor is always public. A class that wants a private constructor
+-- the factory-method pattern -- declares no primary and uses `def this` in the
+default (private) section.
 
 ## Methods
 

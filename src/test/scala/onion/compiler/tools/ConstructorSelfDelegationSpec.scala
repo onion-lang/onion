@@ -71,7 +71,9 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
       assert(Shell.Success("init;full;deleg;n=99|init;full;n=7") == result)
     }
 
-    it("coexists with a superclass super-init clause") {
+    it("coexists with a primary constructor that passes arguments to the superclass") {
+      // The superclass arguments live on `extends`; the secondary reaches them by
+      // delegating to the primary. (`def this(x, y) : (x)` used to spell this.)
       val result = shell.run(
         """
           | class Base {
@@ -80,10 +82,8 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   def this(x: Int) { self.x = x }
           |   def getX(): Int { return x }
           | }
-          | class Sub extends Base {
-          |   val y: Int
+          | class Sub(x: Int, val y: Int) extends Base(x) {
           | public:
-          |   def this(x: Int, y: Int) : (x) { self.y = y }
           |   def this(v: Int) : this(v, v * 2) { }
           |   def total(): Int { return getX() + y }
           |   static def main(args: String[]): String {
@@ -114,7 +114,9 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == result)
     }
 
-    it("still supports the plain super-init ': (args)' clause") {
+    it("passes constant superclass arguments through the extends clause") {
+      // A class with no parameter list but arguments on `extends` has a no-arg primary
+      // that calls the superclass with them. (`def this() : ("Rex")` used to spell this.)
       val result = shell.run(
         """
           | class Animal {
@@ -123,9 +125,8 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   def this(name: String) { self.name = name }
           |   def getName(): String { return name }
           | }
-          | class Dog extends Animal {
+          | class Dog extends Animal("Rex") {
           | public:
-          |   def this() : ("Rex") { }
           |   static def main(args: String[]): String { return new Dog().getName() }
           | }
         """.stripMargin,

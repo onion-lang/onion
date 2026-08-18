@@ -110,8 +110,8 @@ public:
   def add(s: Serving): void {
     servings.add(s)
   }
-  def totalCalories(): Double = servings.fold(0.0) { acc, s => acc + s.scaledCalories() }
-  def totalMacro(k: MacroKind): Double = servings.fold(0.0) { acc, s => acc + s.scaledMacro(k) }
+  def totalCalories(): Double = servings.fold(0.0) { acc, s -> acc + s.scaledCalories() }
+  def totalMacro(k: MacroKind): Double = servings.fold(0.0) { acc, s -> acc + s.scaledMacro(k) }
   def itemCount(): Int = servings.size
   def printMeal(): void {
     IO::println("  [#{name()}] #{totalCalories().fmt1()} kcal | #{itemCount()} items")
@@ -146,8 +146,8 @@ public:
   }
   def addMeal(m: Meal): void { meals.add(m) }
 
-  def totalCalories(): Double = meals.fold(0.0) { acc, m => acc + m.totalCalories() }
-  def totalMacro(k: MacroKind): Double = meals.fold(0.0) { acc, m => acc + m.totalMacro(k) }
+  def totalCalories(): Double = meals.fold(0.0) { acc, m -> acc + m.totalCalories() }
+  def totalMacro(k: MacroKind): Double = meals.fold(0.0) { acc, m -> acc + m.totalMacro(k) }
   def calorieBalance(): Double = goal.targetCalories().doubleValue() - totalCalories()
 
   def macroProgress(k: MacroKind): Double {
@@ -259,7 +259,7 @@ log.printReport()
 // ── Meals sorted by calorie count ────────────────────────────────────────────
 IO::println("===== Meals by Calorie Count (descending) =====")
 val mealList: List[Meal] = [breakfast, snack1, lunch, snack2, dinner]
-val sorted: List[Meal]   = mealList.sortedBy { m => 0.0 - m.totalCalories() }
+val sorted: List[Meal]   = mealList.sortedBy { m -> 0.0 - m.totalCalories() }
 var rank: Int = 1
 foreach m: Meal in sorted {
   IO::println("  #{rank}. #{m.name()}: #{m.totalCalories().fmt1()} kcal")
@@ -269,7 +269,7 @@ IO::println("")
 
 // ── Top 3 high-protein foods from database ────────────────────────────────────
 IO::println("===== Top 3 Foods by Protein (per 100g) =====")
-val byProtein: List[FoodItem] = allFoods.sortedBy { f => 0.0 - f.protein() }
+val byProtein: List[FoodItem] = allFoods.sortedBy { f -> 0.0 - f.protein() }
 var prank: Int = 1
 foreach f: FoodItem in byProtein {
   if prank <= 3 {
@@ -281,8 +281,8 @@ IO::println("")
 
 // ── Main meals vs snacks calorie split ───────────────────────────────────────
 IO::println("===== Main Meals vs Snacks =====")
-val mainKcal: Double  = mealList.filter { m => m.isMain() }.fold(0.0) { acc, m => acc + m.totalCalories() }
-val snackKcal: Double = mealList.filter { m => !m.isMain() }.fold(0.0) { acc, m => acc + m.totalCalories() }
+val mainKcal: Double  = mealList.filter { m -> m.isMain() }.fold(0.0) { acc, m -> acc + m.totalCalories() }
+val snackKcal: Double = mealList.filter { m -> !m.isMain() }.fold(0.0) { acc, m -> acc + m.totalCalories() }
 val total: Double     = log.totalCalories()
 IO::println("  Main meals: #{mainKcal.fmt1()} kcal (#{(mainKcal / total).pct()})")
 IO::println("  Snacks:     #{snackKcal.fmt1()} kcal (#{(snackKcal / total).pct()})")

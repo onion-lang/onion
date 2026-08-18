@@ -320,10 +320,10 @@ IO::println("=== Document Statistics ===")
 IO::println(stats.show())
 
 // ── Collection pipelines over blocks ─────────────────────────────────────────
-val headingBlocks: List[Block] = blocks.filter { b =>
+val headingBlocks: List[Block] = blocks.filter { b ->
   (b as Block).typeName() == "heading"
 }
-val toc: List[String] = headingBlocks.map { b =>
+val toc: List[String] = headingBlocks.map { b ->
   val h: Heading = (b as Block) as Heading
   "  " + "#".repeated(h.level()) + " " + h.text()
 } as List[String]
@@ -332,7 +332,7 @@ IO::println("\n=== Table of Contents ===")
 foreach entry: String in toc { IO::println(entry) }
 
 // ── groupBy block type ────────────────────────────────────────────────────────
-val byType: Map[String, List[Block]] = blocks.groupBy { b =>
+val byType: Map[String, List[Block]] = blocks.groupBy { b ->
   (b as Block).typeName()
 }
 
@@ -342,7 +342,7 @@ foreach (kind, items) in byType {
 }
 
 // ── Partition: structural vs textual ─────────────────────────────────────────
-val parts = blocks.partition { b =>
+val parts = blocks.partition { b ->
   val t: String = (b as Block).typeName()
   t == "rule" || t == "code"
 }
@@ -352,7 +352,7 @@ IO::println("\nStructural elements: " + structural.size)
 IO::println("Textual elements   : " + textual.size)
 
 // ── Find first code block ────────────────────────────────────────────────────
-val firstCode = blocks.find { b =>
+val firstCode = blocks.find { b ->
   (b as Block).typeName() == "code"
 }
 if firstCode != null {
@@ -362,7 +362,7 @@ if firstCode != null {
 }
 
 // ── sortedBy heading level ─────────────────────────────────────────────────
-val headingsSorted: List[Block] = headingBlocks.sortedBy { b =>
+val headingsSorted: List[Block] = headingBlocks.sortedBy { b ->
   ((b as Block) as Heading).level()
 }
 IO::println("\nHeadings sorted by level:")

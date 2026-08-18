@@ -157,17 +157,17 @@ public:
   def addClaim(c: Claim): void      { claims.add(c) }
 
   def findPolicy(id: String): Policy? =
-    policies.find { p => (p as Policy).id() == id } as Policy?
+    policies.find { p -> (p as Policy).id() == id } as Policy?
 
   def findClaimant(id: String): Claimant? =
-    claimants.find { c => (c as Claimant).id() == id } as Claimant?
+    claimants.find { c -> (c as Claimant).id() == id } as Claimant?
 
   // Recursive: count all claims for a claimant across their policies
   def claimsForClaimant(claimantId: String, policyList: List[Policy], idx: Int, acc: List[Claim]): List[Claim] {
     if idx >= policyList.size() { return acc }
     val pol: Policy = policyList.get(idx) as Policy
     if pol.claimantId() == claimantId {
-      val matching: List[Claim] = claims.filter { c => (c as Claim).policyId() == pol.id() }
+      val matching: List[Claim] = claims.filter { c -> (c as Claim).policyId() == pol.id() }
       foreach mc: Object in matching { acc.add(mc as Claim) }
     }
     return claimsForClaimant(claimantId, policyList, idx + 1, acc)
@@ -224,7 +224,7 @@ public:
 
   def approvalRate(): Double {
     if adjustments.size() == 0 { return 0.0 }
-    val approved: Int = adjustments.filter { a => (a as AdjustmentRecord).decision.isApproved() }.size()
+    val approved: Int = adjustments.filter { a -> (a as AdjustmentRecord).decision.isApproved() }.size()
     return (approved as Double) / (adjustments.size() as Double)
   }
 
@@ -254,7 +254,7 @@ public:
     // Breakdown by coverage type
     println("  ── By Coverage Type ──")
     val byCoverage: Map[String, List[AdjustmentRecord]] =
-      adjustments.groupBy { a =>
+      adjustments.groupBy { a ->
         val ar: AdjustmentRecord = a as AdjustmentRecord
         val label: String? = claimCovMap.get(ar.claimId()) as String?
         if label == null { "Unknown" } else { label }
@@ -284,7 +284,7 @@ public:
       foreach mc: Object in claimsForThis {
         val mclaim: Claim = mc as Claim
         val ar: AdjustmentRecord? = adjustments
-          .find { a => (a as AdjustmentRecord).claimId() == mclaim.id() } as AdjustmentRecord?
+          .find { a -> (a as AdjustmentRecord).claimId() == mclaim.id() } as AdjustmentRecord?
         if ar != null { claimantPayout = claimantPayout + ar.decision.payoutAmount() }
       }
       println("    " + claimant.name().padRight(18) + claimsForThis.size().pad(2) +
@@ -294,7 +294,7 @@ public:
 
     // Stats: partition into approved vs denied
     val parts: List[List[AdjustmentRecord]] =
-      adjustments.partition { a => (a as AdjustmentRecord).decision.isApproved() }
+      adjustments.partition { a -> (a as AdjustmentRecord).decision.isApproved() }
     val approved: List[AdjustmentRecord] = parts.get(0) as List[AdjustmentRecord]
     val denied:   List[AdjustmentRecord] = parts.get(1) as List[AdjustmentRecord]
     println("  Approved : " + approved.size() + "  |  Denied: " + denied.size())

@@ -118,7 +118,7 @@ val l: Long? = IO::tryReadLong("L: ")
 
 ```onion
 val lines: List = IO::readLines()          // 入力の終端まで読み取り
-IO::eachLine { line => IO::println(line) } // 残りの各行にコールバックを適用
+IO::eachLine { line -> IO::println(line) } // 残りの各行にコールバックを適用
 IO::printLines(["a", "b", "c"])            // 1項目1行で出力
 IO::printAll("a", "b", "c")                // printLines の可変長引数版
 ```
@@ -401,7 +401,7 @@ Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- この型が存在する理由
 ```onion
 val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
 val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
-println(a.zip(b) { p, q => p + q }.defects().size)   // 1 ではなく 2
+println(a.zip(b) { p, q -> p + q }.defects().size)   // 1 ではなく 2
 ```
 
 `bind` は短絡したままです——後続の計算が前の値に依存しうる以上、そうでなければなりません。
@@ -476,12 +476,12 @@ L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそ�
 不透明な値で、生成した shape にだけ渡し戻してください。
 
 `Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
-`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v => ... }` は更新を
+`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v -> ... }` は更新を
 値にフォーカスします。`render()` がテキストを再構成します:
 
 ```onion
 val r   = configShape.parseLossless(file"app.conf".text()).get()
-val out = r.edit { v => v.copy(port = 9090) }.render()
+val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  1行だけ変わる
 ```
 
@@ -504,7 +504,7 @@ val out = r.edit { v => v.copy(port = 9090) }.render()
 
 ## 関数インターフェース
 
-ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。
+ラムダとクロージャのための組み込み関数型。`f(args)`の代わりに`f(args)`として呼び出せます。
 
 ### Function0
 
@@ -512,7 +512,7 @@ val out = r.edit { v => v.copy(port = 9090) }.render()
 
 ```onion
 val func: Function0[Int] = () -> { return 42; }
-val result: Int = func.call()
+val result: Int = func()
 ```
 
 ### Function1
@@ -521,7 +521,7 @@ val result: Int = func.call()
 
 ```onion
 val double: Function1[Int, Int] = (x: Int) -> { return x * 2; }
-val result: Int = double.call(5)
+val result: Int = double(5)
 ```
 
 ### Function2
@@ -530,7 +530,7 @@ val result: Int = double.call(5)
 
 ```onion
 val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
-val result: Int = add.call(3, 7)
+val result: Int = add(3, 7)
 ```
 
 ### Function3 から Function10 まで
@@ -1498,9 +1498,9 @@ parsed.positional()                     // オプション以外の引数の Lis
 Colls::listOf("a", "b", "c")            // 不変の List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
-Colls::sortedBy(people) { p => p.age() }
+Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
-// xs.map { x => x * 2 }.filter { x => x > 0 }
+// xs.map { x -> x * 2 }.filter { x -> x > 0 }
 ```
 
 ### バッチ化・ウィンドウ化・セレクタ集計
@@ -1516,7 +1516,7 @@ ps.averageBy((p) -> p.age())      // Double - セレクタの平均、空なら0
 ps.maxBy((p) -> p.age())          // セレクタの値が最大の要素、空ならnull
 ps.minBy((p) -> p.age())          // セレクタの値が最小の要素、空ならnull
 
-xs.chunked(2).map { b => (b as List).size() }   // 他のパイプライン段と同様に連結できる
+xs.chunked(2).map { b -> (b as List).size() }   // 他のパイプライン段と同様に連結できる
 ```
 
 ## Http

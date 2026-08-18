@@ -297,7 +297,7 @@ foreach h: Hero in heroes {
 // Summarise wins per fighter
 IO::println("\n══════════════ WIN COUNTS ═══════════════════")
 val winCounts = allResults
-  .groupBy { r => (r as BattleResult).winner() }
+  .groupBy { r -> (r as BattleResult).winner() }
 val names: ArrayList[String] = new ArrayList[String]()
 names.add(warrior.name)
 names.add(mage.name)
@@ -314,7 +314,7 @@ allGear.add(ironSword); allGear.add(silverBow); allGear.add(kiteShield)
 allGear.add(leatherHelm); allGear.add(speedRing); allGear.add(powerRing)
 allGear.add(flameSword); allGear.add(towerShield)
 val ranked = allGear
-  .sortedBy { g => 0 - ((g as GearKind).atkBonus() + (g as GearKind).defBonus() + (g as GearKind).spdBonus()) }
+  .sortedBy { g -> 0 - ((g as GearKind).atkBonus() + (g as GearKind).defBonus() + (g as GearKind).spdBonus()) }
 var rank: Int = 1
 foreach g: GearKind in ranked {
   val gk = g as GearKind
@@ -325,9 +325,9 @@ foreach g: GearKind in ranked {
 // Best surviving HP across hero victories only
 IO::println("\n══════════════ BEST SURVIVAL ════════════════")
 val heroNames = [warrior.name, mage.name, rogue.name]
-val heroWins  = allResults.filter { r => heroNames.contains((r as BattleResult).winner()) }
+val heroWins  = allResults.filter { r -> heroNames.contains((r as BattleResult).winner()) }
 if heroWins.size > 0 {
-  val best = heroWins.reduce { a, b =>
+  val best = heroWins.reduce { a, b ->
     if (a as BattleResult).hpLeft() > (b as BattleResult).hpLeft() { a } else { b }
   }
   IO::println("  Hero with most HP left: " + (best as BattleResult).summary())
@@ -368,7 +368,7 @@ foreach h: Hero in heroes {
 var foundShield: GearKind? = null
 foreach h: Hero in heroes {
   if foundShield == null {
-    val found = h.backpack.find { g => (g as GearKind).slot() == "offhand" }
+    val found = h.backpack.find { g -> (g as GearKind).slot() == "offhand" }
     if found != null { foundShield = found as GearKind }
   }
 }

@@ -171,7 +171,7 @@ class Name [TypeParams] [(primary params)] [extends Super[(args)]] [conforms I1,
 
 **Primary constructors:** `val`/`var` parameters declare public
 (final/mutable) fields assigned automatically; plain parameters exist only
-in the constructor (e.g. to feed `: Super(args)`). Class bodies are
+in the constructor (to feed `extends Super(args)`). Class bodies are
 optional.
 
 ```onion
@@ -179,16 +179,25 @@ class Point(val x: Int, val y: Int)
 class Dog(name: String, val breed: String) extends Animal(name)
 ```
 
-**Classic constructors** remain available:
+**Secondary constructors** are declared with `def this` and delegate to a sibling
+constructor with `: this(...)`. In a class that has a primary constructor -- a
+parameter list, or arguments on `extends`, or both -- every secondary must
+delegate to it (E0087); the primary alone calls the superclass constructor and
+stores the `val`/`var` parameter fields. A class with no primary may declare
+`def this` constructors that call the superclass no-arg constructor implicitly.
 
 ```onion
-def this(params) { body }
-def this(params): (superArgs) { body }
+def this(params) : this(args) { body }   // delegate to a sibling constructor
+def this(params) { body }                // only in a class with no primary
 ```
 
 Members default to private; `public:` / `protected:` / `private:` sections
 set accessibility. `static def` declares static methods; `static val`
-constants. Field initializers run in declaration order.
+constants. Field initializers run in declaration order, after the primary
+constructor has stored its parameters, and only in the primary constructor.
+Neither `this` nor a field may be read inside `: this(...)` or `extends B(...)`
+arguments (E0090); a delegation cycle is rejected (E0088); records and enums
+cannot declare `def this` (E0089).
 
 ### Interfaces
 
@@ -541,7 +550,7 @@ Resources close automatically in reverse declaration order.
 ```onion
 val f: Int -> Int = x -> x * 2          // bare param, expression body
 val g = (a: Int, b: Int) -> a + b
-list.map { x => x * 2 }                 // trailing lambda
+list.map { x -> x * 2 }                 // trailing lambda
 Future::async(() -> { return compute() })
 val r: Runnable = () -> println("hi")   // SAM conversion
 ```
@@ -610,7 +619,7 @@ The method is `read`, not `as`: `as` is the cast keyword.
 ```onion
 5 |> double               // double(5)
 5 |> add(3)               // add(5, 3) — first-argument injection
-xs.map { x => x * 2 }
+xs.map { x -> x * 2 }
   |> println              // a newline before |> continues the pipeline
 ```
 

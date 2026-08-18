@@ -1,0 +1,31 @@
+// LambdaArrows — one arrow, everywhere a function is written.
+//
+// `->` is the arrow of a function type, of a parenthesized lambda, and of a trailing
+// lambda. There is no second spelling to remember, so a pipeline can be written by
+// reading it aloud: filter the evens, map them, fold them.
+
+val nums = [1, 2, 3, 4, 5, 6]
+
+// Trailing lambda after a call, no parentheses needed
+val evens = nums.filter { x -> x % 2 == 0 }
+IO::println("evens: #{evens}")
+
+// A typed parameter in a trailing lambda
+val squares = evens.map { n: Int -> n * n }
+IO::println("squares: #{squares}")
+
+// Two parameters, and a body that is itself a lambda
+val total = squares.fold(0) { acc, n -> acc + n }
+val adders = [1, 2].map { x -> (y: Int) -> x + y }
+IO::println("total: #{total}, adders applied: #{adders.map { f -> f(10) }}")
+
+// The same arrow names a function type and builds a parenthesized lambda
+val twice: Int -> Int = (k: Int) -> k * 2
+def compose(f: Int -> Int, g: Int -> Int): Int -> Int = (x: Int) -> g(f(x))
+val plusThree = (v: Int) -> v + 3
+val both = compose(twice, plusThree)
+IO::println("compose: #{both(5)}")
+
+// A pipeline reads left to right
+val big = nums.filter { x -> x > 3 }.map { x -> x * 10 }
+IO::println("big: #{big}")

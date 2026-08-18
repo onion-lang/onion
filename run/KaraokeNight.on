@@ -180,22 +180,22 @@ public:
   }
 
   def totalScore(): Int =
-    performances.fold(0) { acc, p => acc + p.finalScore() }
+    performances.fold(0) { acc, p -> acc + p.finalScore() }
 
   def avgEffective(): Double =
     if performances.size == 0 { 0.0 } else {
-      val sum: Double = performances.fold(0.0) { acc, p => acc + p.effectiveScore() }
+      val sum: Double = performances.fold(0.0) { acc, p -> acc + p.effectiveScore() }
       sum / (performances.size as Double)
     }
 
   def bestPerf(): Performance? {
-    val found: List[Performance] = performances.filter { p => p.finalScore() >= 90 }
+    val found: List[Performance] = performances.filter { p -> p.finalScore() >= 90 }
     if found.size == 0 { return null }
     return found[0]
   }
 
   def favGenreSongs(): Int =
-    performances.filter { p => p.song().genre() == singer.favoriteGenre() }.size
+    performances.filter { p -> p.song().genre() == singer.favoriteGenre() }.size
 
   def rank(): Int = position
   def displayName(): String = singer.name()
@@ -218,10 +218,10 @@ public:
 
   def add(s: Song): void { songs << s }
 
-  def totalDurationSec(): Int = songs.fold(0) { acc, s => acc + s.durationSec() }
+  def totalDurationSec(): Int = songs.fold(0) { acc, s -> acc + s.durationSec() }
 
   def avgBpm(): Int =
-    if songs.size == 0 { 0 } else { songs.fold(0) { acc, s => acc + s.bpm() } / songs.size }
+    if songs.size == 0 { 0 } else { songs.fold(0) { acc, s -> acc + s.bpm() } / songs.size }
 
   def genreBreakdown(): Map[String, Int] {
     val result: Map[String, Int] = [:]
@@ -257,11 +257,11 @@ public:
   def addPerformance(p: Performance): void { performances << p }
 
   def topN(n: Int): List[Performance] =
-    performances.sortedBy { p => 0 - p.finalScore() }.take(n)
+    performances.sortedBy { p -> 0 - p.finalScore() }.take(n)
 
   def singerStats(): List[SingerStats] {
     val grouped: Map[String, List[Performance]] =
-      performances.groupBy { p => p.singer().name() }
+      performances.groupBy { p -> p.singer().name() }
     val result: List[SingerStats] = []
     foreach (singerName, ps) in grouped {
       val anyP: Performance = ps[0]
@@ -269,7 +269,7 @@ public:
       if anyP.singer().name() != singerName { println("  [warn] name mismatch") }
       result << stats
     }
-    return result.sortedBy { s => 0 - s.totalScore() }
+    return result.sortedBy { s -> 0 - s.totalScore() }
   }
 
   def genreCounts(): Map[String, Int] {
@@ -283,14 +283,14 @@ public:
   }
 
   def highScorers(): List[Performance] =
-    performances.filter { p => p.finalScore() >= 90 }
+    performances.filter { p -> p.finalScore() >= 90 }
 
   def avgScoreByDifficulty(): Map[String, Double] {
     val grouped: Map[String, List[Performance]] =
-      performances.groupBy { p => p.song().difficulty().label() }
+      performances.groupBy { p -> p.song().difficulty().label() }
     val result: Map[String, Double] = [:]
     foreach (diff, ps) in grouped {
-      val sum2: Double = ps.fold(0.0) { acc, p => acc + (p.finalScore() as Double) }
+      val sum2: Double = ps.fold(0.0) { acc, p -> acc + (p.finalScore() as Double) }
       val avg: Double = sum2 / (ps.size as Double)
       result.put(diff, avg)
     }
@@ -420,7 +420,7 @@ def main(): void {
   // ── High scorers (>= 90) ─────────────────────────────────────────────────
   println("--- High Scorers (final >= 90) ---")
   val hs: List[Performance] = event.highScorers()
-  val parts = hs.partition { p => p.finalScore() >= 95 }
+  val parts = hs.partition { p -> p.finalScore() >= 95 }
   val topTier  = parts[0] as List[Object]
   val restTier = parts[1] as List[Object]
   println("  S-tier (95+): #{topTier.size} performance(s)")
@@ -456,7 +456,7 @@ def main(): void {
 
   // ── Zip: pair songs with their difficulty multiplier ─────────────────────
   println("--- Song Difficulty Multipliers ---")
-  val multipliers: List[Double] = songs.map { s => s.difficulty().multiplier() }
+  val multipliers: List[Double] = songs.map { s -> s.difficulty().multiplier() }
   val paired = songs.zip(multipliers)
   foreach pair: Object in paired {
     val row = pair as List
@@ -480,7 +480,7 @@ def main(): void {
 
   // ── Try/catch demo ────────────────────────────────────────────────────────
   println("--- Nullable / Try-Catch Demo ---")
-  val impossibles: List[Performance] = allPs.filter { p => p.finalScore() > 110 }
+  val impossibles: List[Performance] = allPs.filter { p -> p.finalScore() > 110 }
   if impossibles.size == 0 {
     println("  No score above 110 found (max bonus is 10, so this is correct).")
   } else {
@@ -497,7 +497,7 @@ def main(): void {
   println("")
 
   // ── Distinct artists ──────────────────────────────────────────────────────
-  val artists: List[String] = songs.map { s => s.artist() }.distinct()
+  val artists: List[String] = songs.map { s -> s.artist() }.distinct()
   println("--- Distinct Artists (#{artists.size}) ---")
   foreach a: String in artists {
     println("  - #{a}")
@@ -508,11 +508,11 @@ def main(): void {
   println("--- Score Buckets ---")
   val buckets: List[String] = ["<60", "60-79", "80-89", "90-94", "95+"]
   val counts: List[Int] = [
-    allPs.filter { p => p.finalScore() < 60 }.size,
-    allPs.filter { p => p.finalScore() >= 60 && p.finalScore() < 80 }.size,
-    allPs.filter { p => p.finalScore() >= 80 && p.finalScore() < 90 }.size,
-    allPs.filter { p => p.finalScore() >= 90 && p.finalScore() < 95 }.size,
-    allPs.filter { p => p.finalScore() >= 95 }.size
+    allPs.filter { p -> p.finalScore() < 60 }.size,
+    allPs.filter { p -> p.finalScore() >= 60 && p.finalScore() < 80 }.size,
+    allPs.filter { p -> p.finalScore() >= 80 && p.finalScore() < 90 }.size,
+    allPs.filter { p -> p.finalScore() >= 90 && p.finalScore() < 95 }.size,
+    allPs.filter { p -> p.finalScore() >= 95 }.size
   ]
   val bpairs = buckets.zip(counts)
   foreach bpair: Object in bpairs {

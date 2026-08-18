@@ -141,13 +141,13 @@ def main(): void {
   IO::println("╚══════════════════════════════════════╝")
   IO::println("")
   IO::println("Total reviews: #{all.size}  (#{q1.size} in Q1, #{q2.size} in Q2)")
-  val totalScore: Int = all.map { r => (r as Review).score() }.fold(0) { acc, x => acc + (x as Int) }
+  val totalScore: Int = all.map { r -> (r as Review).score() }.fold(0) { acc, x -> acc + (x as Int) }
   val avgScore: Int = totalScore / all.size
   IO::println("Company average: #{avgScore}/5\n")
 
   // ── 2. Q1 band distribution ───────────────────────────────────────────────────
   IO::println("── Q1 Band Distribution ─────────────────────────────────────────────────────")
-  val q1by = q1.groupBy { r => (r as Review).band().label() }
+  val q1by = q1.groupBy { r -> (r as Review).band().label() }
   foreach (bandLabel, revs) in q1by {
     IO::println("  #{bandLabel} #{(revs as List).size}")
   }
@@ -155,10 +155,10 @@ def main(): void {
 
   // ── 3. Department averages (all quarters) ─────────────────────────────────────
   IO::println("── Department Averages (All Quarters) ───────────────────────────────────────")
-  val byDept = all.groupBy { r => (r as Review).employee().department() }
+  val byDept = all.groupBy { r -> (r as Review).employee().department() }
   foreach (dept, revs) in byDept {
     val rl: List[Object] = revs as List[Object]
-    val dt: Int = rl.map { r => (r as Review).score() }.fold(0) { acc, x => acc + (x as Int) }
+    val dt: Int = rl.map { r -> (r as Review).score() }.fold(0) { acc, x -> acc + (x as Int) }
     val da: Int = dt / rl.size
     IO::println("  #{dept}: #{da}/5  (#{rl.size} reviews)")
   }
@@ -166,8 +166,8 @@ def main(): void {
 
   // ── 4. Q2 top performers (score >= 4) ────────────────────────────────────────
   IO::println("── Q2 Top Performers (score >= 4) ───────────────────────────────────────────")
-  val topQ2: List[Object] = q2.filter { r => (r as Review).score() >= 4 }
-                               .sortedBy { r => -(r as Review).score() }
+  val topQ2: List[Object] = q2.filter { r -> (r as Review).score() >= 4 }
+                               .sortedBy { r -> -(r as Review).score() }
   foreach item: Object in topQ2 {
     val r: Review = item as Review
     IO::println("  #{r.employee().name()} [#{r.employee().department()}] — #{r.band().label()} #{r.score()}/5")
@@ -176,8 +176,8 @@ def main(): void {
 
   // ── 5. Q1→Q2 score improvement ───────────────────────────────────────────────
   IO::println("── Q1→Q2 Improvers ──────────────────────────────────────────────────────────")
-  val q1map = q1.groupBy { r => (r as Review).employee().id() }
-  val q2map = q2.groupBy { r => (r as Review).employee().id() }
+  val q1map = q1.groupBy { r -> (r as Review).employee().id() }
+  val q2map = q2.groupBy { r -> (r as Review).employee().id() }
   foreach (empId, q2list) in q2map {
     val q1list: Object? = q1map.get(empId)
     if q1list != null {
@@ -193,7 +193,7 @@ def main(): void {
 
   // ── 6. Attention list (score <= 2) ───────────────────────────────────────────
   IO::println("── Attention Required (score <= 2) ──────────────────────────────────────────")
-  val low: List[Object] = all.filter { r => (r as Review).score() <= 2 }
+  val low: List[Object] = all.filter { r -> (r as Review).score() <= 2 }
   if low.size == 0 {
     IO::println("  None")
   } else {
@@ -208,7 +208,7 @@ def main(): void {
   IO::println("── Score Distribution (All Reviews) ─────────────────────────────────────────")
   var s: Int = 1
   while s <= 5 {
-    val cnt: Int = all.filter { r => (r as Review).score() == s }.size
+    val cnt: Int = all.filter { r -> (r as Review).score() == s }.size
     IO::println("  #{s}: #{bar(cnt)} (#{cnt})")
     s = s + 1
   }
@@ -216,7 +216,7 @@ def main(): void {
 
   // ── 8. Tenure-weighted top-3 in Q2 ───────────────────────────────────────────
   IO::println("── Tenure-Weighted Top-3 (Q2) ───────────────────────────────────────────────")
-  val weighted: List[Object] = q2.sortedBy { r =>
+  val weighted: List[Object] = q2.sortedBy { r ->
     -(r as Review).score() * (r as Review).employee().yearsAtCompany()
   }
   var shown: Int = 0
@@ -232,12 +232,12 @@ def main(): void {
 
   // ── 9. Partition: strong vs developing ───────────────────────────────────────
   IO::println("── Q2 Partition: Strong vs Developing ───────────────────────────────────────")
-  val parts = q2.partition { r => (r as Review).band().isStrong() }
+  val parts = q2.partition { r -> (r as Review).band().isStrong() }
   val strong:     List[Object] = parts[0] as List[Object]
   val developing: List[Object] = parts[1] as List[Object]
   IO::println("  Strong performers:    #{strong.size}")
   IO::println("  Developing:           #{developing.size}")
-  IO::println("  Strong names: #{strong.map { r => (r as Review).employee().name() }}")
+  IO::println("  Strong names: #{strong.map { r -> (r as Review).employee().name() }}")
   IO::println("")
 
   // ── 10. Zip: Q1 vs Q2 scores side-by-side ───────────────────────────────────
@@ -277,8 +277,8 @@ def main(): void {
 
   // ── 12. distinct departments ──────────────────────────────────────────────────
   IO::println("── Departments Represented ──────────────────────────────────────────────────")
-  val depts = all.map { r => (r as Review).employee().department() }
+  val depts = all.map { r -> (r as Review).employee().department() }
                  .distinct()
-                 .sortedBy { d => d as String }
+                 .sortedBy { d -> d as String }
   IO::println("  #{depts}")
 }

@@ -27,13 +27,10 @@ public:
   }
 }
 
-class CircleShape extends Shape {
+// The bug: a class *type* name where a super-constructor argument goes. Written on the
+// `extends` clause now that that is the only place super arguments live.
+class CircleShape(val data: Circle) extends Shape(Shape) {
 public:
-  val data: Circle
-
-  def this(c: Circle): (Shape) {
-    this.data = c
-  }
   def area(): Double {
     return Math::PI * this.data.radius().squared()
   }
@@ -42,13 +39,8 @@ public:
   }
 }
 
-class RectangleShape extends Shape {
+class RectangleShape(val data: Rectangle) extends Shape(ShapeKind::RECTANGLE) {
 public:
-  val data: Rectangle
-
-  def this(r: Rectangle): (ShapeKind::RECTANGLE) {
-    this.data = r
-  }
   def area(): Double {
     return this.data.width() * this.data.height()
   }
@@ -57,13 +49,8 @@ public:
   }
 }
 
-class PointShape extends Shape {
+class PointShape(val data: Point) extends Shape(ShapeKind::POINT) {
 public:
-  val data: Point
-
-  def this(p: Point): (ShapeKind::POINT) {
-    this.data = p
-  }
 }
 
 extension Shape {

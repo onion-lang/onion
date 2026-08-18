@@ -64,7 +64,7 @@ class PipelineOperatorSpec extends AbstractShellSpec {
           |  static def size(xs: List[Integer]): Int = xs.size
           |  static def main(args: String[]): Int {
           |    val bits = 5 | 2
-          |    val n = [3, 1, 4].filter { x => x > 1 } |> size
+          |    val n = [3, 1, 4].filter { x -> x > 1 } |> size
           |    return bits + n
           |  }
           |}

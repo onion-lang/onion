@@ -591,6 +591,99 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("constructors") {
+    it("E0087 a def this in a class with a primary constructor that does not delegate") {
+      // `new P()` used to compile and leave x at 0: the primary's field stores were in the
+      // synthesized constructor's own block, which a sibling never ran.
+      failsWith("E0087",
+        """
+          |class P(val x: Int) {
+          |public:
+          |  def this { }
+          |}
+          |class Test { public: static def main(args: String[]): String { return "" + new P().x } }
+          |""".stripMargin)
+    }
+
+    it("E0087 also when the primary is only an extends(args) clause") {
+      // No parameter list, but arguments on `extends`: that is a no-arg primary, and the
+      // `def this(x)` below used to resolve super() against Base's *no-arg* constructor.
+      failsWith("E0087",
+        """
+          |class Base { public: def this(v: Int) { } }
+          |class Sub extends Base(1) {
+          |public:
+          |  def this(x: Int) { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0088 constructor delegation cycle") {
+      failsWith("E0088",
+        """
+          |class C {
+          |public:
+          |  def this(a: Int) : this("s") { }
+          |  def this(s: String) : this(1) { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0088 a constructor delegating to itself") {
+      failsWith("E0088",
+        """
+          |class C {
+          |public:
+          |  def this(a: Int) : this(a) { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0089 def this in a record body") {
+      // Was a compiler crash (I0000): never typed, then codegen emitted the record's
+      // synthetic field stores against a constructor of the wrong arity.
+      failsWith("E0089",
+        """
+          |record R(a: Int, b: Int) {
+          |public:
+          |  def this(a: Int) { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0089 def this in an enum body") {
+      failsWith("E0089",
+        """
+          |enum E {
+          |  A, B
+          |public:
+          |  def this { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0090 a field read inside delegation arguments") {
+      // GETFIELD on uninitializedThis: the verifier rejected the class at load time and
+      // the compiler reported I0000.
+      failsWith("E0090",
+        """
+          |class F(val x: Int) {
+          |public:
+          |  var seed: Int = 3
+          |  def this : this(seed) { }
+          |}
+          |""".stripMargin)
+    }
+
+    it("E0090 an explicit this inside super arguments") {
+      failsWith("E0090",
+        """
+          |class B { public: def this(x: Int) { } }
+          |class D extends B(this.hashCode()) { }
+          |""".stripMargin)
+    }
+  }
+
   describe("drift guard: the dead-code registry") {
     it("codes listed as dead have no report site; every other code has one") {
       val srcDir = java.nio.file.Path.of("src/main/scala")

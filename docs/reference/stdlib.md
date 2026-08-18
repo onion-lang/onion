@@ -118,7 +118,7 @@ val l: Long? = IO::tryReadLong("L: ")
 
 ```onion
 val lines: List = IO::readLines()          // reads until end of input
-IO::eachLine { line => IO::println(line) } // applies a callback to each remaining line
+IO::eachLine { line -> IO::println(line) } // applies a callback to each remaining line
 IO::printLines(["a", "b", "c"])            // one item per line
 IO::printAll("a", "b", "c")                // varargs form of printLines
 ```
@@ -459,7 +459,7 @@ Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- the reason this type exists
 ```onion
 val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
 val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
-println(a.zip(b) { p, q => p + q }.defects().size)   // 2, not 1
+println(a.zip(b) { p, q -> p + q }.defects().size)   // 2, not 1
 ```
 
 `bind` still short-circuits, because it must — the second computation may depend on the
@@ -536,12 +536,12 @@ unchanged parts reproduce byte for byte, and only deliberately changed values re
 `Residue` is opaque; hand it back only to the shape that produced it.
 
 `Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
-swaps the value while keeping the residue, and `edit { v => ... }` focuses an update.
+swaps the value while keeping the residue, and `edit { v -> ... }` focuses an update.
 `render()` reassembles the text:
 
 ```onion
 val r   = configShape.parseLossless(file"app.conf".text()).get()
-val out = r.edit { v => v.copy(port = 9090) }.render()
+val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  one changed line
 ```
 
@@ -564,7 +564,7 @@ the sugar.
 
 ## Function Interfaces
 
-Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
+Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f(args)`.
 
 ### Function0
 
@@ -572,7 +572,7 @@ Function with no parameters:
 
 ```onion
 val func: Function0[Int] = () -> { return 42; }
-val result: Int = func.call()
+val result: Int = func()
 ```
 
 ### Function1
@@ -581,7 +581,7 @@ Function with one parameter:
 
 ```onion
 val double: Function1[Int, Int] = (x: Int) -> { return x * 2; }
-val result: Int = double.call(5)
+val result: Int = double(5)
 ```
 
 ### Function2
@@ -590,7 +590,7 @@ Function with two parameters:
 
 ```onion
 val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
-val result: Int = add.call(3, 7)
+val result: Int = add(3, 7)
 ```
 
 ### Function3 through Function10
@@ -1485,9 +1485,9 @@ Collection factories and pipelines (`onion.Colls`):
 Colls::listOf("a", "b", "c")            // immutable List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
-Colls::sortedBy(people) { p => p.age() }
+Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold pipelines are extension methods on
-// List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
+// List/Iterable/arrays: xs.map { x -> x * 2 }.filter { x -> x > 0 }
 ```
 
 ### Batching, windowing, and selector aggregation
@@ -1503,7 +1503,7 @@ ps.averageBy((p) -> p.age())      // Double - average of the selector, 0.0 if em
 ps.maxBy((p) -> p.age())          // the element with the greatest selector value, null if empty
 ps.minBy((p) -> p.age())          // the element with the smallest selector value, null if empty
 
-xs.chunked(2).map { b => (b as List).size() }   // chains like any other pipeline stage
+xs.chunked(2).map { b -> (b as List).size() }   // chains like any other pipeline stage
 ```
 
 ## Http

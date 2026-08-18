@@ -124,7 +124,7 @@ public:
 
   def cancelOrder(orderId: String): Boolean {
     val before: Int = orders.size
-    orders = orders.filter { o => (o as Order).orderId() != orderId }
+    orders = orders.filter { o -> (o as Order).orderId() != orderId }
     return orders.size < before
   }
 
@@ -155,7 +155,7 @@ public:
     foreach (name, total) in spend {
       spends.add(new CustomerSpend(name, total))
     }
-    val sorted: List[CustomerSpend] = spends.sortedBy { cs => 0.0d - (cs as CustomerSpend).total() }
+    val sorted: List[CustomerSpend] = spends.sortedBy { cs -> 0.0d - (cs as CustomerSpend).total() }
     return sorted.subList(0, if n < sorted.size { n } else { sorted.size })
   }
 

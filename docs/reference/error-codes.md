@@ -1149,6 +1149,84 @@ Fix: give it an initializer at the declaration (`val x: String = ...`), or
 use `var` if the value genuinely needs to be assigned later. A field `val`
 initialized in the constructor is unaffected.
 
+## Constructor errors
+
+### `E0087` — Secondary constructor must delegate to the primary
+
+A class with a primary constructor — a parameter list after the class name, or
+arguments on the `extends` clause, or both — declares a `def this` that does not
+delegate to it with `: this(...)`. The primary constructor is the only place the
+superclass constructor is called and the only place the `val`/`var` parameter
+fields are stored; a constructor that goes around it reaches the superclass with
+an implicit `super()` the class never wrote and leaves those fields at their
+defaults. Before this check, `class P(val x: Int) { def this { } }` compiled and
+`new P().x` was `0`.
+
+```onion
+class Point(val x: Int, val y: Int) {
+public:
+  def this(x: Int) { }   // E0087: must delegate — write `: this(x, 0)`
+}
+```
+
+Fix: add the delegation, `def this(x: Int) : this(x, 0) { }`. A class with no
+primary constructor is unaffected: its `def this` constructors call the superclass
+no-arg constructor as they always did.
+
+### `E0088` — Constructor delegation cycle
+
+Two or more constructors delegate to each other in a cycle, so no path ever
+reaches a constructor that calls the superclass. At `new` this is a
+`StackOverflowError`.
+
+```onion
+class C {
+public:
+  def this(a: Int) : this("s") { }   // E0088
+  def this(s: String) : this(1) { }
+}
+```
+
+Fix: make one constructor in the cycle the one that does not delegate (or, in a
+class with a primary, delegate to the primary).
+
+### `E0089` — Constructor in a record or enum body
+
+A `def this` inside a `record` or `enum` body. Both have their canonical
+constructor generated from their component or parameter list, and there is
+nothing a second constructor could mean. This used to be a compiler crash rather
+than a diagnostic: the body was never typed, and code generation then emitted the
+record's parameter-to-field stores against a constructor of the wrong arity.
+
+```onion
+record R(a: Int, b: Int) {
+public:
+  def this(a: Int) { }   // E0089
+}
+```
+
+Fix: use a static factory method (`static def of(a: Int): R = new R(a, 0)`).
+
+### `E0090` — `this` before constructor delegation
+
+`this` — explicitly, or through a bare field name — is used inside the argument
+list of a `: this(...)` delegation or an `extends B(...)` super call. The object
+does not exist yet at that point: the JVM verifier rejects a field read on
+`uninitializedThis`, so without this check the program compiled to a class that
+failed to load, reported as an internal error. Java's "cannot reference `x` before
+supertype constructor has been called" is the same rule.
+
+```onion
+class F(val x: Int) {
+public:
+  var seed: Int = 3
+  def this : this(seed) { }   // E0090: `seed` is a field of the not-yet-built object
+}
+```
+
+Fix: pass a parameter or a constant. A closure in that position is fine — it
+captures `this` and runs later, when the object exists.
+
 ## Control-flow errors
 
 ### `E0048` — Break outside loop
@@ -1446,6 +1524,10 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
 | `E0086` | duplicated record component … in … |
+| `E0087` | class … has a primary constructor, so every `def this` must delegate to it |
+| `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
+| `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
+| `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 
 ## See also
 

@@ -125,11 +125,11 @@ public:
 
 def isFlush(cards: List[Card]): Boolean {
   val firstSuit = (cards[0] as Card).suit()
-  return cards.filter { c => c.suit() == firstSuit }.size == 5
+  return cards.filter { c -> c.suit() == firstSuit }.size == 5
 }
 
 def countDistinctRanks(cards: List[Card]): Int {
-  val groups = cards.groupBy { c => c.rank().value() }
+  val groups = cards.groupBy { c -> c.rank().value() }
   var n: Int = 0
   foreach (k, v) in groups { n = n + 1 }
   return n
@@ -137,14 +137,14 @@ def countDistinctRanks(cards: List[Card]): Int {
 
 def isStraight(cards: List[Card]): Boolean {
   if countDistinctRanks(cards) != 5 { return false }
-  val sorted: List[Card] = cards.sortedBy { c => c.rank().value() }
+  val sorted: List[Card] = cards.sortedBy { c -> c.rank().value() }
   val lo = (sorted[0] as Card).rank().value()
   val hi = (sorted[4] as Card).rank().value()
   return (hi - lo) == 4
 }
 
 def maxGroupSize(cards: List[Card]): Int {
-  val groups = cards.groupBy { c => c.rank().value() }
+  val groups = cards.groupBy { c -> c.rank().value() }
   var mx: Int = 0
   foreach (k, v) in groups {
     val sz = (v as List[Object]).size
@@ -154,7 +154,7 @@ def maxGroupSize(cards: List[Card]): Int {
 }
 
 def secondGroupSize(cards: List[Card]): Int {
-  val groups = cards.groupBy { c => c.rank().value() }
+  val groups = cards.groupBy { c -> c.rank().value() }
   var first: Int = 0
   var second: Int = 0
   foreach (k, v) in groups {
@@ -171,7 +171,7 @@ def classify(cards: List[Card]): HandKind {
   val mx       = maxGroupSize(cards)
   val sec      = secondGroupSize(cards)
   if flush && straight {
-    val sorted: List[Card] = cards.sortedBy { c => c.rank().value() }
+    val sorted: List[Card] = cards.sortedBy { c -> c.rank().value() }
     if (sorted[4] as Card).rank().value() == 14 { return new RoyalFlush() }
     return new StraightFlush()
   }
@@ -347,7 +347,7 @@ foreach c: Object in deck {
 IO::println("  Red cards: #{redCount}, Black cards: #{blackCount}")
 
 // Group deck by rank name
-val byRank = (deck as List[Object]).groupBy { c => (c as Card).rank().name() }
+val byRank = (deck as List[Object]).groupBy { c -> (c as Card).rank().name() }
 var rankLine: String = ""
 foreach (rankName, group) in byRank {
   val sz = (group as List[Object]).size
@@ -372,7 +372,7 @@ foreach h: Object in dealt {
   IO::println("  Hand #{pos}: " + er.show())
   pos = pos + 1
 }
-val bestHand: EvalResult = (dealt as List[Object]).fold(dealt[0] as EvalResult) { best, h =>
+val bestHand: EvalResult = (dealt as List[Object]).fold(dealt[0] as EvalResult) { best, h ->
   val er = h as EvalResult
   val b  = best as EvalResult
   if er.rank() > b.rank() { er } else { b }
@@ -425,7 +425,7 @@ IO::println("")
 // ── 8. Nullable lookup (find a Straight Flush in dealt hands) ────────────────
 
 IO::println("── Nullable Find ──")
-val sfHand = (dealt as List[Object]).find { h =>
+val sfHand = (dealt as List[Object]).find { h ->
   val er = h as EvalResult
   select er.kind() {
     case x is StraightFlush: true

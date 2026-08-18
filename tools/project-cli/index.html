@@ -4958,10 +4958,9 @@ bare key-value pair belongs to whatever table header precedes it, so written aft
 <code>[package]</code> it would quietly become <code>package.repositories</code>; a table header can go anywhere
 in the file.</p>
 <h3 id="not-yet-supported">Not yet supported<a class="headerlink" href="#not-yet-supported" title="Permanent link">&para;</a></h3>
-<p>There is no lock file and no offline mode. Resolution runs on every build, reading
-coursier's cache (<code>~/.cache/coursier</code>) for anything already fetched, so a warm build does
-not hit the network — but it is not <em>prevented</em> from doing so, and nothing pins a
-transitive against a repository that republishes one. Onion embeds coursier's Java API,
+<p>There is no offline mode. Resolution runs on every build, reading coursier's cache
+(<code>~/.cache/coursier</code>) for anything already fetched, so a warm build does not hit the
+network — but it is not <em>prevented</em> from doing so. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an <code>--offline</code> flag would have to be faked; it is
 left out rather than made to look like a guarantee it is not.</p>
 <h3 id="onionlock"><code>onion.lock</code><a class="headerlink" href="#onionlock" title="Permanent link">&para;</a></h3>
@@ -5057,7 +5056,7 @@ interactive shell.</p>
 <h2 id="deferred">Deferred<a class="headerlink" href="#deferred" title="Permanent link">&para;</a></h2>
 <p>The following are intentionally out of scope for this first version, to keep
 <code>onion.toml</code> from becoming another large build language before real usage
-justifies it: publishing, dependency lock files and offline resolution, multiple modules
+justifies it: publishing, offline resolution, multiple modules
 or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
 a new test framework, package/archive commands, formatter or linter

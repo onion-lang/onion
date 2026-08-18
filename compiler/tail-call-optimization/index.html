@@ -3936,6 +3936,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mutual-recursion-with-tailrecursive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutual Recursion with @TailRecursive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#viewing-the-optimization" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4588,6 +4599,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mutual-recursion-with-tailrecursive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutual Recursion with @TailRecursive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#viewing-the-optimization" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4752,16 +4774,58 @@ runs immediately afterward in the pipeline.</p>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">}</span>
 </span></code></pre></div>
+<h2 id="mutual-recursion-with-tailrecursive">Mutual Recursion with <code>@TailRecursive</code><a class="headerlink" href="#mutual-recursion-with-tailrecursive" title="Permanent link">&para;</a></h2>
+<p>Two or more methods that tail-call each other (<code>isEven</code> calling <code>isOdd</code>, <code>isOdd</code>
+calling <code>isEven</code>) are not rewritten by the detection phase above — each call
+targets a <em>different</em> method, so the "self-call" check never matches. Mark every
+method in the group <code>@TailRecursive</code> and <code>MutualRecursionOptimization</code> merges them
+into one state-machine method instead:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Parity</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">private</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nd">@TailRecursive</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nf">isOdd</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nd">@TailRecursive</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">isOdd</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>The group is optimized only when <strong>all</strong> of the following hold — <code>MutualRecursionOptimization.validateGroup</code>:</p>
+<ul>
+<li>every method in the group is <strong>private</strong> (same dispatch-safety reasoning as
+  direct TCO: a public method could be overridden, so rewriting it into a shared
+  loop could silently change behavior)</li>
+<li>every method has the <strong>same return type</strong></li>
+<li>every method has the <strong>same parameter count and parameter types</strong></li>
+<li>every tail call from a group member targets another member of the same group
+  (a tail call out of the group leaves it ineligible)</li>
+</ul>
+<p><strong>A group that fails validation is not an error — the annotation is simply
+ineffective</strong>, and the methods keep calling each other as ordinary (non-tail)
+calls. That is easy to miss, since nothing points at the annotation until deep
+enough recursion overflows the JVM stack at runtime. To catch this at compile
+time instead, the compiler emits <strong><code>W0016</code></strong> for every method in a <code>@TailRecursive</code>
+group that could not be optimized, naming the failed requirement (e.g. "All
+methods must be private for mutual recursion optimization"). See
+<a href="../../tools/compiler/#--wno-codes"><code>--Wno</code></a> to suppress it if the group is
+intentionally left unoptimized.</p>
 <h2 id="viewing-the-optimization">Viewing the Optimization<a class="headerlink" href="#viewing-the-optimization" title="Permanent link">&para;</a></h2>
 <p>Compile with the <code>--verbose</code> flag to trace which methods are transformed and why
 others are skipped:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sbt<span class="w"> </span><span class="s1">'runScript --verbose your_program.on'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span><span class="s1">'runScript --verbose your_program.on'</span>
 </span></code></pre></div>
 <p>Sample output:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[TCO] Method YourClass.factorial: hasTailCall=true
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>[TCO] Optimizing tail-recursive method: YourClass.factorial
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>[TCO] Skipping overridable method: YourClass.someOverridableMethod
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>[TCO] Skipping @TailRecursive annotated method: YourClass.mutuallyRecursiveMethod
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>[TCO] Method YourClass.factorial: hasTailCall=true
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[TCO] Optimizing tail-recursive method: YourClass.factorial
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>[TCO] Skipping overridable method: YourClass.someOverridableMethod
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>[TCO] Skipping @TailRecursive annotated method: YourClass.mutuallyRecursiveMethod
 </span></code></pre></div></p>
 <h2 id="implementation-details">Implementation Details<a class="headerlink" href="#implementation-details" title="Permanent link">&para;</a></h2>
 <h3 id="file-location">File Location<a class="headerlink" href="#file-location" title="Permanent link">&para;</a></h3>
@@ -4771,7 +4835,7 @@ others are skipped:</p>
   before <code>MutualRecursionOptimization</code></li>
 </ul>
 <h3 id="compiler-pipeline">Compiler Pipeline<a class="headerlink" href="#compiler-pipeline" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → AsmCodeGeneration
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → AsmCodeGeneration
 </span></code></pre></div>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <ul>

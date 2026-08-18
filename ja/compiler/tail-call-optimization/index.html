@@ -2133,6 +2133,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#tailrecursive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @TailRecursive による相互再帰
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4606,6 +4617,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#tailrecursive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @TailRecursive による相互再帰
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4754,15 +4776,57 @@
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">}</span>
 </span></code></pre></div>
+<h2 id="tailrecursive"><code>@TailRecursive</code> による相互再帰<a class="headerlink" href="#tailrecursive" title="Permanent link">&para;</a></h2>
+<p>互いに末尾呼び出しし合う2つ以上のメソッド（<code>isEven</code> が <code>isOdd</code> を呼び、<code>isOdd</code> が
+<code>isEven</code> を呼ぶ）は、上記の検出フェーズでは書き換えられません。各呼び出しの対象は
+「別のメソッド」であり、「自己呼び出し」チェックには一致しないためです。グループの
+全メソッドに <code>@TailRecursive</code> を付けると、<code>MutualRecursionOptimization</code> がそれらを
+1つの状態機械メソッドへ統合します。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Parity</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">private</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nd">@TailRecursive</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nf">isOdd</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nd">@TailRecursive</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">isOdd</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">isEven</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>グループが最適化されるのは、<strong>すべて</strong>の条件を満たしたときだけです
+（<code>MutualRecursionOptimization.validateGroup</code>）。</p>
+<ul>
+<li>グループ内の全メソッドが <strong>private</strong> であること（直接 TCO と同じ理由: public
+  メソッドはオーバーライドされ得るため、共有ループへ書き換えると挙動が黙って変わる
+  おそれがある）</li>
+<li>全メソッドの <strong>戻り値の型が同じ</strong> であること</li>
+<li>全メソッドの <strong>パラメータ数と型が同じ</strong> であること</li>
+<li>グループ内メソッドからの末尾呼び出しが、すべて同じグループ内の別メソッドを
+  対象としていること（グループ外への末尾呼び出しがあると対象から外れる）</li>
+</ul>
+<p><strong>検証に失敗したグループはエラーにはならず、アノテーションが単に効かないだけ</strong>
+です。メソッド同士は通常の（末尾でない）呼び出しとして呼び合い続けます。アノテー
+ションを見ても何も指摘されないため気づきにくく、十分深い再帰で初めて実行時に
+JVM スタックが溢れて発覚します。これをコンパイル時に検出できるよう、コンパイラは
+最適化できなかった <code>@TailRecursive</code> グループの各メソッドについて <strong><code>W0016</code></strong> を
+出力し、満たせなかった条件（例: "All methods must be private for mutual
+recursion optimization"）を示します。意図的に最適化しないままにする場合は
+<a href="../../tools/compiler/#--wno-codes"><code>--Wno</code></a> で抑制してください。</p>
 <h2 id="_8">最適化の様子を確認する<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p><code>--verbose</code> フラグを付けてコンパイルすると、どのメソッドが変換され、どのメソッドがなぜスキップされたかを追跡できます。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sbt<span class="w"> </span><span class="s1">'runScript --verbose your_program.on'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span><span class="s1">'runScript --verbose your_program.on'</span>
 </span></code></pre></div>
 <p>出力例:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[TCO] Method YourClass.factorial: hasTailCall=true
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>[TCO] Optimizing tail-recursive method: YourClass.factorial
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>[TCO] Skipping overridable method: YourClass.someOverridableMethod
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>[TCO] Skipping @TailRecursive annotated method: YourClass.mutuallyRecursiveMethod
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>[TCO] Method YourClass.factorial: hasTailCall=true
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[TCO] Optimizing tail-recursive method: YourClass.factorial
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>[TCO] Skipping overridable method: YourClass.someOverridableMethod
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>[TCO] Skipping @TailRecursive annotated method: YourClass.mutuallyRecursiveMethod
 </span></code></pre></div></p>
 <h2 id="_9">実装の詳細<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <h3 id="_10">ファイルの場所<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
@@ -4771,7 +4835,7 @@
 <li>パイプライン統合: <code>Typing</code> と <code>AsmCodeGeneration</code> の間、<code>MutualRecursionOptimization</code> の直前で実行される</li>
 </ul>
 <h3 id="_11">コンパイラパイプライン<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → AsmCodeGeneration
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → AsmCodeGeneration
 </span></code></pre></div>
 <h2 id="_12">テスト<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <ul>

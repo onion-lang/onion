@@ -4977,12 +4977,12 @@ URL の <code>http</code>・<code>https</code>・<code>file</code> のみです�
 <code>package.repositories</code> になってしまいます。テーブルヘッダならファイル中のどこに書いても
 同じ意味になります。</p>
 <h3 id="_4">まだ対応していないこと<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
-<p>ロックファイルとオフラインモードはありません。解決はビルドのたびに実行され、取得済みの
+<p>オフラインモードはありません。解決はビルドのたびに実行され、取得済みの
 ものは coursier のキャッシュ（<code>~/.cache/coursier</code>）から読まれるため、ウォームな状態では
-ネットワークに出ません。ただしネットワークアクセスを<strong>禁止</strong>しているわけではなく、
-リポジトリが再公開した推移的依存を固定する仕組みもありません。Onion が組み込んでいる
-coursier の Java API はキャッシュポリシーを公開していないため、<code>--offline</code> フラグは
-偽装するしかありません。保証でないものを保証のように見せないため、あえて入れていません。</p>
+ネットワークに出ません。ただしネットワークアクセスを<strong>禁止</strong>しているわけではありません。
+Onion が組み込んでいる coursier の Java API はキャッシュポリシーを公開していないため、
+<code>--offline</code> フラグは偽装するしかありません。保証でないものを保証のように見せないため、
+あえて入れていません。</p>
 <h3 id="onionlock"><code>onion.lock</code><a class="headerlink" href="#onionlock" title="Permanent link">&para;</a></h3>
 <p>ビルドは <code>onion.toml</code> の隣に <code>onion.lock</code> を書き、以降のビルドはそこから解決します。
 <strong>コミットしてください。</strong></p>
@@ -5079,7 +5079,7 @@ coursier の Java API はキャッシュポリシーを公開していないた�
 <h2 id="_10">対象外の機能<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p>このバージョンでは、実際の利用実績に基づく判断より先に <code>onion.toml</code> が
 巨大なビルド言語になってしまうのを避けるため、次の機能を意図的に
-対象外としています: 公開、依存のロックファイルとオフライン解決、複数モジュール・
+対象外としています: 公開、オフライン解決、複数モジュール・
 ワークスペース、ソース・テスト・出力・エントリーポイントの
 パス変更、ファイル単位の差分コンパイルや並列コンパイル、
 プロジェクトのウォッチモード、テスト用アノテーションや新しい

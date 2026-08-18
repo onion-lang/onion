@@ -5437,8 +5437,8 @@
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">// 末尾ラムダ構文</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">list</span><span class="p">.</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">list</span><span class="p">.</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">list</span><span class="p">.</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">list</span><span class="p">.</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">// メソッド参照（静的）</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="nc">Type</span><span class="o">::</span><span class="n">methodName</span>
@@ -5746,7 +5746,7 @@
 </tr>
 <tr>
 <td><code>func(arg)</code> でラムダ呼び出し</td>
-<td><code>func.call(arg)</code> または <code>func(arg)</code> - 両方OK</td>
+<td><code>func(arg)</code> または <code>func(arg)</code> - 両方OK</td>
 </tr>
 <tr>
 <td><code>Int -&gt; Int</code></td>
@@ -5757,8 +5757,8 @@
 <td>✓ 正しい - 複数引数の関数型</td>
 </tr>
 <tr>
-<td><code>list.map(x -&gt; x * 2)</code></td>
-<td><code>list.map { x =&gt; x * 2 }</code> - トレイリングラムダは<code>=&gt;</code>を使用</td>
+<td><code>list.map(x =&gt; x * 2)</code></td>
+<td><code>list.map { x -&gt; x * 2 }</code> - トレイリングラムダも <code>-&gt;</code>。矢印は言語全体で <code>-&gt;</code> の一種類だけ</td>
 </tr>
 </tbody>
 </table>
@@ -5835,7 +5835,7 @@
 </tr>
 <tr>
 <td>コメントを保持したい場合の<code>shape doc = json</code></td>
-<td><code>shape doc = config</code> — コメント付きの<code>key = value</code>形式ファイル向けのLOSSLESSなshape。<code>parseLossless</code>は<code>Residue</code>（コメント、空白、キー順序、未知キー、値の表記）を保持し、<code>r.edit { v =&gt; v.copy(port = 9090) }.render()</code>は該当する値のスロットだけを書き換える</td>
+<td><code>shape doc = config</code> — コメント付きの<code>key = value</code>形式ファイル向けのLOSSLESSなshape。<code>parseLossless</code>は<code>Residue</code>（コメント、空白、キー順序、未知キー、値の表記）を保持し、<code>r.edit { v -&gt; v.copy(port = 9090) }.render()</code>は該当する値のスロットだけを書き換える</td>
 </tr>
 <tr>
 <td>その場しのぎのカスタムフォーマット実装</td>

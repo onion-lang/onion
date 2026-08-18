@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check moved into `validateGroup`, so it now reaches the `W0016` path like the other
   three.
 
+- **README trailing-lambda examples still used the retired `=>` arrow.** `0.12.0`'s
+  one-arrow change (`->` everywhere, `=>` no longer part of the language) missed three
+  examples in `README.md` and one in `docs/guide/control-flow.md`, left over from before
+  the rename. One of them (`future.onComplete(onSuccess, onFailure) { result => ... }`)
+  was also calling a two-argument `onComplete` as if it took a third trailing block, so it
+  never compiled even with the arrow fixed — replaced with a `list.fold(0) { acc, x -> ... }`
+  example that actually demonstrates positional args plus a trailing lambda. All four
+  snippets are now verified against the compiler.
+
 ## [0.12.0] - 2026-08-18
 
 ### Changed

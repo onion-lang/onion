@@ -76,7 +76,7 @@ public:
 
 record Line(id: String, name: String, mode: TransportMode, stops: List[Stop], status: LineStatus) {
 public:
-  def stopNames(): List[String] = stops().map { s: Stop => s.name() }
+  def stopNames(): List[String] = stops().map { s: Stop -> s.name() }
   def fareFor(numZones: Int): Int {
     val base: Int = mode().baseFareCents()
     if numZones == 1 { return base }
@@ -114,7 +114,7 @@ public:
   def addLine(line: Line): void { lines_.add(line) }
 
   def operatingLines(): List[Line] =
-    lines_.filter { l: Line => l.status().isOperating() }
+    lines_.filter { l: Line -> l.status().isOperating() }
 
   def findStop(name: String): Stop? {
     foreach l: Line in lines_ {
@@ -125,11 +125,11 @@ public:
   }
 
   def linesThrough(stopName: String): List[Line] =
-    lines_.filter { l: Line => l.stopNames().indexOf(stopName) >= 0 }
+    lines_.filter { l: Line -> l.stopNames().indexOf(stopName) >= 0 }
 
   def planJourney(fromName: String, toName: String): Journey? {
     // Direct: find a single line serving both stops in order
-    val direct: Line? = operatingLines().find { l =>
+    val direct: Line? = operatingLines().find { l ->
       val line: Line = l as Line
       val fi: Int = line.stopNames().indexOf(fromName)
       val ti: Int = line.stopNames().indexOf(toName)
@@ -144,10 +144,10 @@ public:
     }
 
     // Two-hop: look for an interchange stop on two different lines
-    val fromLines: List[Line] = operatingLines().filter { l: Line =>
+    val fromLines: List[Line] = operatingLines().filter { l: Line ->
       l.stopNames().indexOf(fromName) >= 0
     }
-    val toLines: List[Line] = operatingLines().filter { l: Line =>
+    val toLines: List[Line] = operatingLines().filter { l: Line ->
       l.stopNames().indexOf(toName) >= 0
     }
 
@@ -155,7 +155,7 @@ public:
 
     foreach fl: Line in fromLines {
       foreach tl: Line in toLines {
-        val common: List[String] = fl.stopNames().filter { sn: String =>
+        val common: List[String] = fl.stopNames().filter { sn: String ->
           tl.stopNames().indexOf(sn) >= 0 &&
           fl.stopNames().indexOf(sn) > fl.stopNames().indexOf(fromName) &&
           tl.stopNames().indexOf(sn) < tl.stopNames().indexOf(toName)
@@ -196,11 +196,11 @@ public:
   }
 
   def zoneReport(): void {
-    val allStops: List[Stop] = lines_.flatMap { l: Line => l.stops() }
-    val byZone               = allStops.groupBy { s: Stop => s.zone() }
+    val allStops: List[Stop] = lines_.flatMap { l: Line -> l.stops() }
+    val byZone               = allStops.groupBy { s: Stop -> s.zone() }
     IO::println("-- Zone breakdown ------------------------------------------")
     foreach (zone, stops) in byZone {
-      val names: List[String] = (stops as List[Stop]).map { s: Stop => s.name() }.distinct()
+      val names: List[String] = (stops as List[Stop]).map { s: Stop -> s.name() }.distinct()
       var joined: String = ""
       foreach nm: String in names {
         if joined.length() > 0 { joined = joined + ", " }
@@ -211,17 +211,17 @@ public:
   }
 
   def modeStats(): void {
-    val byMode = lines_.groupBy { l: Line => l.mode().label() }
+    val byMode = lines_.groupBy { l: Line -> l.mode().label() }
     IO::println("-- Mode breakdown ------------------------------------------")
     foreach (mode, ls) in byMode {
       val lineList: List[Line] = ls as List[Line]
-      val opCount: Int = lineList.filter { l: Line => l.status().isOperating() }.size()
+      val opCount: Int = lineList.filter { l: Line -> l.status().isOperating() }.size()
       IO::println("  #{(mode as String).pad(8)}: #{lineList.size()} line(s), #{opCount} operating")
     }
   }
 
   def statusSummary(): void {
-    val parts: List[List[Line]] = lines_.partition { l: Line => l.status() != LineStatus::NORMAL }
+    val parts: List[List[Line]] = lines_.partition { l: Line -> l.status() != LineStatus::NORMAL }
     val abnormal: List[Line] = parts.get(0)
     val normal: List[Line]   = parts.get(1)
     IO::println("-- Status summary ------------------------------------------")
@@ -299,12 +299,12 @@ IO::println("")
 IO::println("=== Fastest routes from Central ===")
 
 val dests: List[String] = ["Northgate", "Riverside", "Parkway", "Airport", "Eastfield", "Midtown"]
-val results = dests.map { dest: String =>
+val results = dests.map { dest: String ->
   val j: Journey? = net.planJourney("Central", dest)
   [dest, j]
-}.filter { pair =>
+}.filter { pair ->
   (pair as List).get(1) != null
-}.sortedBy { pair =>
+}.sortedBy { pair ->
   ((pair as List).get(1) as Journey).totalMin()
 }
 
@@ -320,14 +320,14 @@ IO::println("")
 IO::println("=== Network Stats ===")
 
 val totalStops: Int = net.operatingLines()
-  .flatMap { l: Line => l.stops() }
-  .map { s: Stop => s.name() }
+  .flatMap { l: Line -> l.stops() }
+  .map { s: Stop -> s.name() }
   .distinct()
   .size()
 
 val avgFareOp: Int = net.operatingLines()
-  .map { l: Line => l.mode().baseFareCents() }
-  .fold(0) { acc, v => (acc as Int) + (v as Int) } as Int
+  .map { l: Line -> l.mode().baseFareCents() }
+  .fold(0) { acc, v -> (acc as Int) + (v as Int) } as Int
 
 val opCount: Int = net.operatingLines().size()
 val avgFare: Int = if opCount > 0 { avgFareOp / opCount } else { 0 }
@@ -337,8 +337,8 @@ IO::println("  Reachable stops   : #{totalStops}")
 IO::println("  Avg base fare     : #{avgFare.centLabel()}")
 
 val zoneSpread: List[Stop] = net.operatingLines()
-  .flatMap { l: Line => l.stops() }
-  .sortedBy { s: Stop => s.zone() }
+  .flatMap { l: Line -> l.stops() }
+  .sortedBy { s: Stop -> s.zone() }
 
 val minZone: Int = zoneSpread.get(0).zone()
 val maxZone: Int = zoneSpread.get(zoneSpread.size() - 1).zone()

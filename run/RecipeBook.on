@@ -128,7 +128,7 @@ public:
     "[#{id()}] #{name()} | #{cuisine().label()} | #{mealType().label()} | #{difficultyStars()} | #{totalMinutes()} min | #{caloriesPerServing()} kcal/srv"
   def scaledIngredients(forServings: Int): List[Ingredient] {
     val factor: Double = forServings.toDouble() / servings().toDouble()
-    return ingredients().map { ing => (ing as Ingredient).scale(factor) }
+    return ingredients().map { ing -> (ing as Ingredient).scale(factor) }
   }
 }
 
@@ -199,33 +199,33 @@ public:
   def allRecipes(): List[Recipe] = recipes
 
   def findById(id: Int): Recipe? {
-    return recipes.find { r => (r as Recipe).id() == id } as Recipe?
+    return recipes.find { r -> (r as Recipe).id() == id } as Recipe?
   }
 
   def findByName(query: String): List[Recipe] {
     val q: String = query.toLowerCase()
-    return recipes.filter { r => (r as Recipe).name().toLowerCase().contains(q) }
+    return recipes.filter { r -> (r as Recipe).name().toLowerCase().contains(q) }
   }
 
   def filterByCuisine(c: Cuisine): List[Recipe] =
-    recipes.filter { r => (r as Recipe).cuisine().label() == c.label() }
+    recipes.filter { r -> (r as Recipe).cuisine().label() == c.label() }
 
   def filterByMealType(m: MealType): List[Recipe] =
-    recipes.filter { r => (r as Recipe).mealType().label() == m.label() }
+    recipes.filter { r -> (r as Recipe).mealType().label() == m.label() }
 
   def filterByDifficulty(d: Difficulty): List[Recipe] =
-    recipes.filter { r => (r as Recipe).difficulty().label() == d.label() }
+    recipes.filter { r -> (r as Recipe).difficulty().label() == d.label() }
 
   def quickRecipes(maxMinutes: Int): List[Recipe] =
-    recipes.filter { r => (r as Recipe).totalMinutes() <= maxMinutes }
-           .sortedBy { r => (r as Recipe).totalMinutes() }
+    recipes.filter { r -> (r as Recipe).totalMinutes() <= maxMinutes }
+           .sortedBy { r -> (r as Recipe).totalMinutes() }
 
   def lowCalorie(maxKcal: Int): List[Recipe] =
-    recipes.filter { r => (r as Recipe).caloriesPerServing() <= maxKcal }
-           .sortedBy { r => (r as Recipe).caloriesPerServing() }
+    recipes.filter { r -> (r as Recipe).caloriesPerServing() <= maxKcal }
+           .sortedBy { r -> (r as Recipe).caloriesPerServing() }
 
   def byTag(tag: String): List[Recipe] =
-    recipes.filter { r => (r as Recipe).tags().find { t => (t as String) == tag } != null }
+    recipes.filter { r -> (r as Recipe).tags().find { t -> (t as String) == tag } != null }
 
   def cuisineGroups(): Map[String, List[Recipe]] {
     val groups: Map[String, List[Recipe]] = [:]
@@ -272,30 +272,30 @@ public:
     val count: Int = recipes.size
     if count == 0 { IO::println("No recipes."); return }
 
-    val totalCal: Int = recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).caloriesPerServing() }
+    val totalCal: Int = recipes.fold(0) { acc, r -> (acc as Int) + (r as Recipe).caloriesPerServing() }
     val avgCal: Double = totalCal.toDouble() / count.toDouble()
 
-    val totalTime: Int = recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).totalMinutes() }
+    val totalTime: Int = recipes.fold(0) { acc, r -> (acc as Int) + (r as Recipe).totalMinutes() }
     val avgTime: Double = totalTime.toDouble() / count.toDouble()
 
-    val easyCount: Int  = recipes.count { r => (r as Recipe).difficulty().label() == "Easy" }
-    val medCount: Int   = recipes.count { r => (r as Recipe).difficulty().label() == "Medium" }
-    val hardCount: Int  = recipes.count { r => (r as Recipe).difficulty().label() == "Hard" }
+    val easyCount: Int  = recipes.count { r -> (r as Recipe).difficulty().label() == "Easy" }
+    val medCount: Int   = recipes.count { r -> (r as Recipe).difficulty().label() == "Medium" }
+    val hardCount: Int  = recipes.count { r -> (r as Recipe).difficulty().label() == "Hard" }
 
-    val cuisines: List[String] = recipes.map { r => (r as Recipe).cuisine().label() }.distinct()
-    val mealTypes: List[String] = recipes.map { r => (r as Recipe).mealType().label() }.distinct()
+    val cuisines: List[String] = recipes.map { r -> (r as Recipe).cuisine().label() }.distinct()
+    val mealTypes: List[String] = recipes.map { r -> (r as Recipe).mealType().label() }.distinct()
 
     IO::println("\n=== Recipe Book Statistics ===")
     IO::println("  Total recipes : #{count}")
-    val cuisineList: String = cuisines.fold("") { acc, c => if (acc as String) == "" { c as String } else { (acc as String) + ", " + (c as String) } }
-    val mealTypeList: String = mealTypes.fold("") { acc, m => if (acc as String) == "" { m as String } else { (acc as String) + ", " + (m as String) } }
+    val cuisineList: String = cuisines.fold("") { acc, c -> if (acc as String) == "" { c as String } else { (acc as String) + ", " + (c as String) } }
+    val mealTypeList: String = mealTypes.fold("") { acc, m -> if (acc as String) == "" { m as String } else { (acc as String) + ", " + (m as String) } }
     IO::println("  Cuisines      : #{cuisines.size} (#{cuisineList})")
     IO::println("  Meal types    : #{mealTypeList}")
     IO::println("  Avg calories  : #{avgCal.fmt1()} kcal/serving")
     IO::println("  Avg time      : #{avgTime.fmt1()} minutes")
     IO::println("  By difficulty : Easy=#{easyCount} Medium=#{medCount} Hard=#{hardCount}")
 
-    val fastest: Recipe? = recipes.fold(null) { acc, r =>
+    val fastest: Recipe? = recipes.fold(null) { acc, r ->
       val rr = r as Recipe
       if acc == null { rr }
       else if rr.totalMinutes() < (acc as Recipe).totalMinutes() { rr }
@@ -326,7 +326,7 @@ public:
     IO::println("  #{r.cuisine().label()} | #{r.mealType().label()} | #{r.difficulty().label()}")
     IO::println("  Prep: #{r.prepMinutes()} min  Cook: #{r.cookMinutes()} min  Serves: #{r.servings()}")
     IO::println("  Nutrition: #{r.nutrition().summary()}")
-    val tagList: String = r.tags().fold("") { acc, t => if (acc as String) == "" { t as String } else { (acc as String) + " #" + (t as String) } }
+    val tagList: String = r.tags().fold("") { acc, t -> if (acc as String) == "" { t as String } else { (acc as String) + " #" + (t as String) } }
     IO::println("  Tags: #{tagList}")
     IO::println(sep)
     IO::println("  Ingredients:")
@@ -569,7 +569,7 @@ book.printMenu(book.lowCalorie(350))
 IO::println("\n── Recipes by Cuisine ───────────────────────────────────────────")
 val groups: Map[String, List[Recipe]] = book.cuisineGroups()
 foreach (cuisineKey, recipeList) in groups {
-  val names: String = recipeList.fold("") { acc, r =>
+  val names: String = recipeList.fold("") { acc, r ->
     val rr = r as Recipe
     if (acc as String) == "" { rr.name() } else { (acc as String) + ", " + rr.name() }
   }
@@ -599,9 +599,9 @@ IO::println("\n── Avg Calories by Meal Type ──────────�
 val allR: List[Recipe] = book.allRecipes()
 val mealTypeNames: List[String] = ["Breakfast", "Lunch", "Dinner", "Snack", "Dessert"]
 foreach typeName: String in mealTypeNames {
-  val filtered: List[Recipe] = allR.filter { r => (r as Recipe).mealType().label() == typeName }
+  val filtered: List[Recipe] = allR.filter { r -> (r as Recipe).mealType().label() == typeName }
   if !filtered.isEmpty {
-    val total: Int = filtered.fold(0) { acc, r => (acc as Int) + (r as Recipe).caloriesPerServing() }
+    val total: Int = filtered.fold(0) { acc, r -> (acc as Int) + (r as Recipe).caloriesPerServing() }
     val avg: Double = total.toDouble() / filtered.size.toDouble()
     IO::println("  #{typeName.padRight(12)} #{avg.fmt1()} kcal (#{filtered.size} recipe(s))")
   }
@@ -610,9 +610,9 @@ foreach typeName: String in mealTypeNames {
 // --- Difficulty distribution
 IO::println("\n── Difficulty Distribution ──────────────────────────────────────")
 val n: Double = allR.size.toDouble()
-val easyPct: Double  = allR.count { r => (r as Recipe).difficulty().label() == "Easy" }.toDouble() / n * 100.0
-val medPct: Double   = allR.count { r => (r as Recipe).difficulty().label() == "Medium" }.toDouble() / n * 100.0
-val hardPct: Double  = allR.count { r => (r as Recipe).difficulty().label() == "Hard" }.toDouble() / n * 100.0
+val easyPct: Double  = allR.count { r -> (r as Recipe).difficulty().label() == "Easy" }.toDouble() / n * 100.0
+val medPct: Double   = allR.count { r -> (r as Recipe).difficulty().label() == "Medium" }.toDouble() / n * 100.0
+val hardPct: Double  = allR.count { r -> (r as Recipe).difficulty().label() == "Hard" }.toDouble() / n * 100.0
 IO::println("  Easy:   #{easyPct.fmt1()}%")
 IO::println("  Medium: #{medPct.fmt1()}%")
 IO::println("  Hard:   #{hardPct.fmt1()}%")

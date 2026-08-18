@@ -52,7 +52,7 @@ public:
 record Condition(factName: String, op: Operator, value: String) {
 public:
   def evaluate(facts: List[Fact]): Boolean {
-    val found: Fact? = facts.find { f => (f as Fact).name() == factName } as Fact?
+    val found: Fact? = facts.find { f -> (f as Fact).name() == factName } as Fact?
     if found == null { return false }
     val f: Fact = found!!
     val textOk: Boolean = select op {
@@ -129,17 +129,17 @@ public:
 
   def setFact(name: String, kind: FactType, value: String): void {
     val newFact: Fact = new Fact(name, kind, value)
-    val existing: Fact? = facts.find { f => (f as Fact).name() == name } as Fact?
+    val existing: Fact? = facts.find { f -> (f as Fact).name() == name } as Fact?
     if existing == null {
       facts.add(newFact)
     } else {
-      facts = facts.map { f => if (f as Fact).name() == name { newFact } else { f as Fact } }
+      facts = facts.map { f -> if (f as Fact).name() == name { newFact } else { f as Fact } }
     }
   }
 
   def evaluate(): List[RuleResult] {
-    val sorted: List[Rule] = rules.sortedBy { r => (r as Rule).priority() }
-    return sorted.map { r => evaluateRule(r as Rule) }
+    val sorted: List[Rule] = rules.sortedBy { r -> (r as Rule).priority() }
+    return sorted.map { r -> evaluateRule(r as Rule) }
   }
 
   def evaluateRule(r: Rule): RuleResult {
@@ -173,10 +173,10 @@ public:
 // ── Report helper ──────────────────────────────────────────────────────────
 
 def printResults(results: List[RuleResult]): void {
-  val matched:    List[RuleResult] = results.filter { r => (r as RuleResult).matched()  }
-  val unmatched:  List[RuleResult] = results.filter { r => !(r as RuleResult).matched() }
-  val totalScore: Int = matched.fold(0) { acc: Int, r => acc + (r as RuleResult).score() }
-  val failCount:  Int = matched.filter { r => (r as RuleResult).failed() }.size
+  val matched:    List[RuleResult] = results.filter { r -> (r as RuleResult).matched()  }
+  val unmatched:  List[RuleResult] = results.filter { r -> !(r as RuleResult).matched() }
+  val totalScore: Int = matched.fold(0) { acc: Int, r -> acc + (r as RuleResult).score() }
+  val failCount:  Int = matched.filter { r -> (r as RuleResult).failed() }.size
 
   IO::println("=== Rule Engine Report ===")
   IO::println("Rules fired : #{matched.size}/#{results.size}")

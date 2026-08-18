@@ -24,12 +24,12 @@ import java.util.concurrent.Executors;
  *
  * Usage:
  *   val server = Server::start(8080)
- *   server.handle("/hello") { req => Server::text("hi") }
+ *   server.handle("/hello") { req -> Server::text("hi") }
  *   server.await()
  *
  * Routing by regex, which is what pairs with Onion's `re"…"` select patterns:
  *
- *   server.handleAll { req =>
+ *   server.handleAll { req ->
  *     select req.path() {
  *       case re"/users/(\d+)" (id): Server::json("{\"id\":" + id + "}")
  *       case "/health":             Server::text("ok")

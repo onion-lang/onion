@@ -76,15 +76,15 @@ public:
   }
 
   def allEntries(): List[WorkoutEntry] {
-    return logs.flatMap { log => log.entries() }
+    return logs.flatMap { log -> log.entries() }
   }
 
   def totalCalories(): Double {
-    return allEntries().fold(0.0) { acc, e => acc + caloriesBurned(e, weightKg) }
+    return allEntries().fold(0.0) { acc, e -> acc + caloriesBurned(e, weightKg) }
   }
 
   def totalMinutes(): Int {
-    return allEntries().fold(0) { acc, e => acc + e.durationMin() }
+    return allEntries().fold(0) { acc, e -> acc + e.durationMin() }
   }
 
   def getLogs(): List[DailyLog] = logs
@@ -172,22 +172,22 @@ IO::println(bob.summary())
 // ── Collection pipelines: group by kind, count minutes per category ───────────
 IO::println("")
 IO::println("── Alice's minutes by kind ───────────────────────────────────────────")
-val byKind = alice.allEntries().groupBy { e => kindLabel(e.exercise().kind()) }
+val byKind = alice.allEntries().groupBy { e -> kindLabel(e.exercise().kind()) }
 foreach (kind, entries) in byKind {
-  val mins = entries.fold(0) { acc, e => acc + (e as WorkoutEntry).durationMin() }
+  val mins = entries.fold(0) { acc, e -> acc + (e as WorkoutEntry).durationMin() }
   IO::println("  #{kind}: #{mins} min")
 }
 
 // ── Find hardest workout (highest intensity × duration) ───────────────────────
 IO::println("")
 IO::println("── Hardest entries (vigorous) ───────────────────────────────────────")
-val vigorous = alice.allEntries().filter { e =>
+val vigorous = alice.allEntries().filter { e ->
   select e.intensity() {
     case x is Vigorous: true
     else: false
   }
 }
-val sorted = vigorous.sortedBy { e => -(e as WorkoutEntry).durationMin() }
+val sorted = vigorous.sortedBy { e -> -(e as WorkoutEntry).durationMin() }
 foreach e: WorkoutEntry in sorted {
   IO::println("  #{e.exercise().name()}: #{e.durationMin()} min (vigorous)")
 }
@@ -195,7 +195,7 @@ foreach e: WorkoutEntry in sorted {
 // ── Partition: over/under 30 min sessions ────────────────────────────────────
 IO::println("")
 IO::println("── Session length split (>30 vs ≤30 min) ───────────────────────────")
-val partitioned = alice.allEntries().partition { e => (e as WorkoutEntry).durationMin() > 30 }
+val partitioned = alice.allEntries().partition { e -> (e as WorkoutEntry).durationMin() > 30 }
 IO::println("  Long (>30 min): #{(partitioned[0] as List[WorkoutEntry]).size} entries")
 IO::println("  Short (≤30 min): #{(partitioned[1] as List[WorkoutEntry]).size} entries")
 
@@ -226,10 +226,10 @@ extension Int {
 IO::println("")
 IO::println("── Alice's calories per session ─────────────────────────────────────")
 foreach log: DailyLog in alice.getLogs() {
-  val dayCals = log.entries().fold(0.0) { acc, e =>
+  val dayCals = log.entries().fold(0.0) { acc, e ->
     acc + caloriesBurned(e as WorkoutEntry, alice.getWeightKg())
   }
-  val mins = log.entries().fold(0) { acc, e => acc + (e as WorkoutEntry).durationMin() }
+  val mins = log.entries().fold(0) { acc, e -> acc + (e as WorkoutEntry).durationMin() }
   IO::println("  #{log.date()}: #{dayCals.twoDecimals()} kcal, #{mins} min")
 }
 
@@ -260,11 +260,11 @@ foreach i: Int in 0..<exercises.size {
 // ── Goal tracking with map iteration ─────────────────────────────────────────
 IO::println("")
 IO::println("── Alice's goal progress ────────────────────────────────────────────")
-val aliceByKind = alice.allEntries().groupBy { e => kindLabel(e.exercise().kind()) }
+val aliceByKind = alice.allEntries().groupBy { e -> kindLabel(e.exercise().kind()) }
 foreach (goalKind, targetMins) in alice.getGoals() {
   val entries = aliceByKind[goalKind]
   val actual = if entries == null { 0 } else {
-    (entries as List[WorkoutEntry]).fold(0) { acc, e => acc + e.durationMin() }
+    (entries as List[WorkoutEntry]).fold(0) { acc, e -> acc + e.durationMin() }
   }
   val pct = if targetMins == 0 { 100 } else { (actual * 100) / targetMins }
   val status = if actual >= targetMins { "DONE" } else { "#{pct}%" }
@@ -275,16 +275,16 @@ foreach (goalKind, targetMins) in alice.getGoals() {
 IO::println("")
 IO::println("── Distinct exercises this week ─────────────────────────────────────")
 val distinctNames = alice.allEntries()
-  .map { e => (e as WorkoutEntry).exercise().name() }
+  .map { e -> (e as WorkoutEntry).exercise().name() }
   .distinct()
-  .sortedBy { n => n as String }
+  .sortedBy { n -> n as String }
 IO::println("  #{distinctNames}")
 
 // ── Zip: pair exercise with calorie estimates ─────────────────────────────────
 IO::println("")
 IO::println("── 30-min calorie guide (Alice's weight) ────────────────────────────")
 val exList:   List[Exercise] = [running, cycling, squats, yoga, plank, hiit]
-val demoEntry = exList.map { ex =>
+val demoEntry = exList.map { ex ->
   val e = new WorkoutEntry(ex as Exercise, 30, new Moderate(1.0))
   val cal = caloriesBurned(e, alice.getWeightKg())
   "#{(ex as Exercise).name()}: #{cal.twoDecimals()} kcal"
@@ -297,7 +297,7 @@ foreach line: String in demoEntry {
 IO::println("")
 IO::println("── Error handling demo ──────────────────────────────────────────────")
 try {
-  val first = alice.allEntries().find { entry => (entry as WorkoutEntry).durationMin() > 100 }
+  val first = alice.allEntries().find { entry -> (entry as WorkoutEntry).durationMin() > 100 }
   if first == null {
     IO::println("  No session over 100 min found (expected)")
   } else {
@@ -310,11 +310,11 @@ try {
 // ── Reduce: total calorie sum across all athletes ─────────────────────────────
 IO::println("")
 val athletes: List[Athlete] = [alice, bob]
-val totalCals = athletes.map { a => (a as Athlete).totalCalories() }
-  .reduce { a, b => a + b }
+val totalCals = athletes.map { a -> (a as Athlete).totalCalories() }
+  .reduce { a, b -> a + b }
 IO::println("── Grand total across all athletes ──────────────────────────────────")
 IO::println("  Combined calories burned: #{totalCals.twoDecimals()} kcal")
-IO::println("  Sessions: #{athletes.map { a => (a as Athlete).getLogs().size }.reduce { a, b => a + b }}")
+IO::println("  Sessions: #{athletes.map { a -> (a as Athlete).getLogs().size }.reduce { a, b -> a + b }}")
 
 IO::println("")
 IO::println("=== Done ===")

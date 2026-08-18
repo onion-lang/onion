@@ -191,11 +191,20 @@ class Parsing(config: CompilerConfig) extends AnyRef
   }
 
   /**
-   * A trailing lambda's parameter list is never parenthesized (`{ k, v => ... }`,
-   * unlike the non-trailing `(k, v) -> ...` form), so `{ (k, v) => ... }` fails
+   * A trailing lambda's parameter list is never parenthesized (`{ k, v -> ... }`,
+   * unlike the non-trailing `(k, v) -> ...` form), so `{ (k, v) -> ... }` fails
    * right at the `{` with an unhelpful expected-token dump.
    */
-  private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*=>""".r
+  private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
+
+  /**
+   * The trailing-lambda arrow used to be `=>`, and nothing else in the language ever was.
+   * `=>` is no longer a token, so `{ x => ... }` fails at the `{` — the lookahead for a
+   * trailing lambda no longer matches and the brace is left where a statement cannot
+   * start. Without a hint the message is an expected-token dump that never mentions the
+   * arrow, which is the one thing that is wrong.
+   */
+  private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
 
   /**
    * Add friendly hints for common syntax mistakes.
@@ -207,10 +216,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_conforms")
     case ":" if expected.contains("extends") =>
       Message("error.parsing.hint.old_extends")
+    // The removed anonymous super-call form: `def this(x) : (x) { }`. After the colon the
+    // parser now expects only `this`, so that expected-set is the discriminator -- checking
+    // for `super` or `(` alone would fire at every expression position.
+    case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
+      Message("error.parsing.hint.old_super_init")
     case "in" =>
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
     case "else" =>
       "Hint: `else` must follow an `if` block. Onion does not support `if` as an expression; use `if (cond) { ... } else { ... }`."
+    // Checked before the paren hint: `{ (k, v) => ... }` is wrong twice, and the arrow
+    // is the part the writer will not spot on their own.
+    case "{" if OldArrowTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
+      Message("error.parsing.hint.old_trailing_arrow")
     case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
       val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
       Message("error.parsing.hint.trailing_lambda_parens", params)

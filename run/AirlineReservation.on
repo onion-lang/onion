@@ -225,18 +225,18 @@ public:
     return true
   }
 
-  def activeBookings(): List[Booking] = bookings.filter { b => b.status().isActive() }
+  def activeBookings(): List[Booking] = bookings.filter { b -> b.status().isActive() }
 
   def bookingsForFlight(flightNo: String): List[Booking] =
-    bookings.filter { b => b.flight().flightNo() == flightNo }
+    bookings.filter { b -> b.flight().flightNo() == flightNo }
 
-  def revenue(): Double = activeBookings().fold(0.0) { acc, b => acc + b.price() }
+  def revenue(): Double = activeBookings().fold(0.0) { acc, b -> acc + b.price() }
 
   def revenueByFlight(): Map[String, Double] {
     val result: Map[String, Double] = [:]
-    val byFlight: Map[String, List[Booking]] = activeBookings().groupBy { b => b.flight().flightNo() }
+    val byFlight: Map[String, List[Booking]] = activeBookings().groupBy { b -> b.flight().flightNo() }
     foreach (fn, bks) in byFlight {
-      result.put(fn, bks.fold(0.0) { acc, b => acc + b.price() })
+      result.put(fn, bks.fold(0.0) { acc, b -> acc + b.price() })
     }
     return result
   }
@@ -251,7 +251,7 @@ public:
 
   def cabinBreakdown(): Map[String, Int] {
     val result: Map[String, Int] = [:]
-    val byCabin: Map[String, List[Booking]] = activeBookings().groupBy { b => b.seat().cabin().label() }
+    val byCabin: Map[String, List[Booking]] = activeBookings().groupBy { b -> b.seat().cabin().label() }
     foreach (cabin, bks) in byCabin {
       result.put(cabin, bks.size)
     }
@@ -259,10 +259,10 @@ public:
   }
 
   def topDestinations(n: Int): List[String] {
-    val counts: Map[String, List[Booking]] = activeBookings().groupBy { b => b.flight().dest().city() }
+    val counts: Map[String, List[Booking]] = activeBookings().groupBy { b -> b.flight().dest().city() }
     val keys: List[String] = []
     foreach k: Object in counts.keySet() { keys.add(k as String) }
-    val sorted: List[String] = keys.sortedBy { k => -(counts.get(k).size) }
+    val sorted: List[String] = keys.sortedBy { k -> -(counts.get(k).size) }
     var result: List[String] = []
     var i: Int = 0
     foreach dest: String in sorted {
@@ -276,14 +276,14 @@ public:
   def flightLoad(flightNo: String): Double {
     val f: Flight? = findFlight(flightNo)
     if f == null { return 0.0 }
-    val booked: Int = bookingsForFlight(flightNo).count { b => b.status().isActive() }
+    val booked: Int = bookingsForFlight(flightNo).count { b -> b.status().isActive() }
     return (booked as Double) / (f.capacity() as Double) * 100.0
   }
 
   def printManifest(flightNo: String): void {
     val bks: List[Booking] = bookingsForFlight(flightNo)
-      .filter { b => b.status().isActive() }
-      .sortedBy { b => b.seat().row() }
+      .filter { b -> b.status().isActive() }
+      .sortedBy { b -> b.seat().row() }
     println("-- Manifest: #{flightNo} (#{bks.size} passengers) --")
     foreach bk: Booking in bks {
       println("  #{bk.seat().description().padRight(18)} #{bk.passenger().fullName()}")
@@ -330,7 +330,7 @@ def toOptBooking(bk: Booking?): Option[Booking] {
 }
 
 def upgradeInfoOpt(airline: Airline, ref: String): Option[String] {
-  val econBk = airline.activeBookings().find { b => b.ref() == ref && (b.seat().cabin() is Economy) }
+  val econBk = airline.activeBookings().find { b -> b.ref() == ref && (b.seat().cabin() is Economy) }
   return do[Option] {
     bk <- toOptBooking(econBk)
     ret "Upgrade #{bk.passenger().fullName()} from #{bk.seat().description()} to Business for $#{(bk.flight().priceFor(new Business()) - bk.price()).fmt2()}"
@@ -407,7 +407,7 @@ println("-- Revenue by Flight --------------------------------")
 val rev: Map[String, Double] = airline.revenueByFlight()
 val revKeys: List[String] = []
 foreach k: Object in rev.keySet() { revKeys.add(k as String) }
-val sortedFlights: List[String] = revKeys.sortedBy { k => k }
+val sortedFlights: List[String] = revKeys.sortedBy { k -> k }
 foreach fn: String in sortedFlights {
   val amount: Double = rev.get(fn)
   println("  #{fn}: $#{amount.fmt2()}")
@@ -482,7 +482,7 @@ println("")
 
 // ─── Partition: international vs domestic ────────────────────────────────────
 println("-- International vs Domestic ------------------------")
-val parts = airline.allFlights().partition { f => f.origin().country() != f.dest().country() }
+val parts = airline.allFlights().partition { f -> f.origin().country() != f.dest().country() }
 val intl = parts[0] as List[Object]
 val dom  = parts[1] as List[Object]
 println("  International routes: #{intl.size}")
@@ -502,7 +502,7 @@ foreach f: Flight in airline.allFlights() {
   if !countryList.contains(oc) { countryList.add(oc) }
   if !countryList.contains(dc) { countryList.add(dc) }
 }
-val countries: List[String] = countryList.sortedBy { c => c }
+val countries: List[String] = countryList.sortedBy { c -> c }
 foreach c: String in countries { println("  " + c) }
 println("")
 
@@ -511,8 +511,8 @@ println("-- Active Passenger Summary -------------------------")
 println("  Total active: #{airline.passengerCount()}")
 val highValue: List[Booking] =
   airline.activeBookings()
-    .filter { b => b.price() > 1000.0 }
-    .sortedBy { b => -(b.price().intValue()) }
+    .filter { b -> b.price() > 1000.0 }
+    .sortedBy { b -> -(b.price().intValue()) }
 println("  High-value bookings (>$1000): #{highValue.size}")
 foreach bk: Booking in highValue {
   println("    #{bk.passenger().fullName().padRight(16)}: $#{bk.price().fmt2()}")
@@ -521,9 +521,9 @@ println("")
 
 // ─── Average ticket price by cabin ───────────────────────────────────────────
 println("-- Average Ticket Price by Cabin --------------------")
-val byCabin: Map[String, List[Booking]] = airline.activeBookings().groupBy { b => b.seat().cabin().label() }
+val byCabin: Map[String, List[Booking]] = airline.activeBookings().groupBy { b -> b.seat().cabin().label() }
 foreach (cabin, bks) in byCabin {
-  val total: Double = bks.fold(0.0) { acc, b => acc + b.price() }
+  val total: Double = bks.fold(0.0) { acc, b -> acc + b.price() }
   val avg: Double = total / (bks.size as Double)
   println("  #{cabin.padRight(12)}: avg $#{avg.fmt2()} (#{bks.size} booking(s))")
 }
@@ -531,8 +531,8 @@ println("")
 
 // ─── Zip demo: flights with base prices ──────────────────────────────────────
 println("-- Flight Base Prices (zip demo) --------------------")
-val fNos: List[String] = airline.allFlights().map { f => f.flightNo() }
-val fPrices: List[Double] = airline.allFlights().map { f => f.basePrice() }
+val fNos: List[String] = airline.allFlights().map { f -> f.flightNo() }
+val fPrices: List[Double] = airline.allFlights().map { f -> f.basePrice() }
 val fzipped = fNos.zip(fPrices)
 foreach fpair: Object in fzipped {
   val fp = fpair as List
@@ -554,16 +554,16 @@ try {
 }
 val alreadyBooked: Boolean =
   airline.bookingsForFlight("OA101")
-    .any { b => b.passenger().id() == p1.id() && b.status().isActive() }
+    .any { b -> b.passenger().id() == p1.id() && b.status().isActive() }
 println("  Alice already on OA101: #{alreadyBooked}")
 println("")
 
 // ─── Any / count pipeline queries ────────────────────────────────────────────
 println("-- Fleet Queries ------------------------------------")
-val hasFirstClass: Boolean = airline.activeBookings().any { b => b.seat().cabin() is FirstClass }
-val checkedInCount: Int = airline.allBookings().count { b => b.status() is CheckedIn }
-val confirmedCount: Int = airline.allBookings().count { b => b.status() is Confirmed }
-val voidedCount: Int    = airline.allBookings().count { b => b.status() is Voided }
+val hasFirstClass: Boolean = airline.activeBookings().any { b -> b.seat().cabin() is FirstClass }
+val checkedInCount: Int = airline.allBookings().count { b -> b.status() is CheckedIn }
+val confirmedCount: Int = airline.allBookings().count { b -> b.status() is Confirmed }
+val voidedCount: Int    = airline.allBookings().count { b -> b.status() is Voided }
 println("  Any first-class: #{hasFirstClass}")
 println("  Checked-in: #{checkedInCount} | Confirmed: #{confirmedCount} | Voided: #{voidedCount}")
 println("")
@@ -581,8 +581,8 @@ println("")
 println("-- Top Earners via Pipeline -------------------------")
 val topEarners: List[Booking] =
   airline.activeBookings()
-    .sortedBy { b => -(b.price().intValue()) }
-    .filter { b => b.price() > 500.0 }
+    .sortedBy { b -> -(b.price().intValue()) }
+    .filter { b -> b.price() > 500.0 }
 var idx: Int = 0
 foreach bk: Booking in topEarners {
   idx = idx + 1

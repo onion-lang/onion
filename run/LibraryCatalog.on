@@ -100,7 +100,7 @@ public:
     if !isAvailable(isbn)           { return "Not available: #{isbn}" }
     if findMember(memberId) == null { return "Unknown member: #{memberId}" }
     val coKeys: List[String] = checkedOut.keys()
-    val loanCount: Int = coKeys.count { k => checkedOut[k] == memberId }
+    val loanCount: Int = coKeys.count { k -> checkedOut[k] == memberId }
     if loanCount >= 3 { return "Loan limit (3) reached for #{memberId}" }
     checkedOut[isbn] = memberId
     loans << new LoanRecord(isbn, memberId, 14)
@@ -114,13 +114,13 @@ public:
   }
 
   def memberLoans(memberId: String): List[LoanRecord] =
-    loans.filter { l => l.memberId() == memberId }
+    loans.filter { l -> l.memberId() == memberId }
 
   def availableBooks(): List[Book] =
-    books.filter { b => isAvailable(b.isbn()) }
+    books.filter { b -> isAvailable(b.isbn()) }
 
   def booksBySection(): Map[String, List[Book]] =
-    books.groupBy { b => b.section().label() } as Map[String, List[Book]]
+    books.groupBy { b -> b.section().label() } as Map[String, List[Book]]
 
   def summary(): String {
     val total  = books.size
@@ -201,7 +201,7 @@ IO::println(lib.summary())
 IO::println("")
 
 header("All Books by Year")
-foreach b: Book in lib.books.sortedBy { b => b.year() } {
+foreach b: Book in lib.books.sortedBy { b -> b.year() } {
   val mark = if lib.isAvailable(b.isbn()) { "+" } else { "-" }
   IO::println("  #{b.year().padLeft(4)} [#{mark}] #{b.title()} — #{b.author()} (#{b.condition().label()})")
 }
@@ -218,7 +218,7 @@ IO::println("")
 
 // ── Worn books report ─────────────────────────────────────────────────────────
 header("Worn Books (not lendable)")
-val wornBooks = lib.books.filter { b => !b.condition().canLend() } as List[Book]
+val wornBooks = lib.books.filter { b -> !b.condition().canLend() } as List[Book]
 IO::println("  Found #{wornBooks.size} worn book(s):")
 foreach b: Book in wornBooks {
   IO::println("  - '#{b.title()}' (repair fee: #{b.condition().repairFeeCents().centsStr()})")
@@ -240,7 +240,7 @@ IO::println("")
 
 // ── Available books ───────────────────────────────────────────────────────────
 header("Available Books (sorted by section code)")
-val available = lib.availableBooks().sortedBy { b => b.section().code() } as List[Book]
+val available = lib.availableBooks().sortedBy { b -> b.section().code() } as List[Book]
 foreach b: Book in available {
   IO::println("  [#{b.section().code()}] #{b.title()}")
 }
@@ -250,7 +250,7 @@ IO::println("")
 header("Active Loans per Member")
 foreach m: Member in lib.members {
   val myLoans = lib.memberLoans(m.id()) as List[LoanRecord]
-  val activeCount = myLoans.count { lr => lib.checkedOut.containsKey(lr.isbn()) }
+  val activeCount = myLoans.count { lr -> lib.checkedOut.containsKey(lr.isbn()) }
   IO::println("  #{m.name()} (#{m.id()}): #{activeCount} active loan(s)")
   foreach lr: LoanRecord in myLoans {
     if lib.checkedOut.containsKey(lr.isbn()) {
@@ -281,16 +281,16 @@ foreach b: Book in allBooks { yearSum = yearSum + b.year() }
 val avgYear: Int = yearSum / allBooks.size
 IO::println("  Avg publish year: #{avgYear}")
 
-val oldest: Book = allBooks.minBy { b => b.year() } as Book
-val newest: Book = allBooks.maxBy { b => b.year() } as Book
+val oldest: Book = allBooks.minBy { b -> b.year() } as Book
+val newest: Book = allBooks.maxBy { b -> b.year() } as Book
 IO::println("  Oldest book:      '#{oldest.title()}' (#{oldest.year()})")
 IO::println("  Newest book:      '#{newest.title()}' (#{newest.year()})")
 
-val lendable: Int = allBooks.count { b => b.condition().canLend() }
+val lendable: Int = allBooks.count { b -> b.condition().canLend() }
 IO::println("  Lendable copies:  #{lendable} / #{allBooks.size}")
 
 // Science books — with try/catch for empty list guard
-val sciBooks = allBooks.filter { b => b.section() == Section::SCIENCE } as List[Book]
+val sciBooks = allBooks.filter { b -> b.section() == Section::SCIENCE } as List[Book]
 IO::println("  Science & Tech:   #{sciBooks.size} book(s)")
 try {
   var sciYearSum: Int = 0
@@ -303,7 +303,7 @@ try {
 
 // |> pipeline: top-3 oldest titles → comma-separated string → print
 IO::println("  Top-3 oldest titles:")
-allBooks.sortedBy { b => b.year() }.take(3).map { b => b.title() }.mkString(", ") |> IO::println
+allBooks.sortedBy { b -> b.year() }.take(3).map { b -> b.title() }.mkString(", ") |> IO::println
 IO::println("")
 
 IO::println(lib.summary())

@@ -10,13 +10,13 @@
 
 | # | 次元 | 測定方法 | 現在値（2026-08-17） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt shutdown && sbt -Duser.language=en testFull`（下記の注記を参照） | 3792 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 172 / 172 compile | すべてコンパイル、rot なし |
+| 1 | テストスイート | `sbt shutdown && sbt -Duser.language=en testFull`（下記の注記を参照） | 3817 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 173 / 173 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 112（AccessLogAnalyzer、AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ConferenceSchedule、ConwayLife、CourseRegistration、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HospitalWard、HotelReservation、HRSystem、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MarkdownConverter、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 84 | よくあるエラーごとに専用コード |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 88 | よくあるエラーごとに専用コード |
 
 **`SBT_OPTS` にプロジェクト既定を下回るヒープ値を設定しないでください。** `.jvmopts` は既定を
 `-Xmx10g` に固定しています（`run/` サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の

@@ -7,7 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: one arrow. The trailing-lambda arrow is `->`, and `=>` is no longer part of
+  the language.** `->` was already the arrow of a function type (`(Int) -> Int`) and of a
+  parenthesized lambda (`(x) -> x * 2`); only the trailing form spelled it `=>`, so
+  `[1, 2, 3].filter { x -> x % 2 == 0 }` was a syntax error for no reason a reader could see.
+  Now it is the ordinary way to write it, `{ acc, x -> acc + x }` takes several parameters,
+  `{ n: Int -> n * n }` types one, and a trailing lambda's body can itself be a lambda.
+  Nothing else changes: `.filter { … }` with no parentheses worked before and still does.
+
+  Two consequences worth knowing. A trailing-lambda parameter cannot be given a *bare*
+  function type — `{ k: Int -> Int -> k(0) }` has no readable parse — so a lambda whose
+  parameter is a function is written in the parenthesized form, `.map((k: Int -> Int) ->
+  k(0))`, where the `)` ends the type; the grammar reads a trailing parameter's type with a
+  production that stops before `->` (`type_no_arrow`), and the parenthesized form keeps the
+  full type grammar. And old source that still writes `{ x => … }` gets a hint naming the
+  arrow rather than an expected-token dump. Every `run/` sample, every documentation
+  fence, the TextMate grammar, the Pygments lexer, the formatter and the stdlib Javadoc
+  were migrated; the migration touched only `=>` in code, never one inside a string
+  literal or a comment (`SourceRegions.codeMask` decided which was which).
+
+- **BREAKING: constructors are primary/secondary, the way Scala and Kotlin have them.**
+  The primary constructor is the parameter list after the class name together with the
+  arguments on the `extends` clause. It alone calls the superclass constructor and stores
+  the `val`/`var` parameter fields. A `def this` in a class that has a primary must
+  delegate to it with `: this(...)` — directly or through another secondary — and a
+  `def this` that does not is **E0087**. A class with neither a parameter list nor
+  `extends` arguments has no primary; its `def this` constructors keep calling the
+  superclass no-arg constructor implicitly, exactly as before, so the 146 `def this`
+  constructors in `run/` compile unchanged.
+
+  This is not a style rule; it closes a real hole. `class P(val x: Int) { def this { } }`
+  compiled and `new P().x` was `0`, because the primary's field stores lived in the
+  synthesized constructor's own block, which a sibling never ran. And
+  `class Dog(name: String) extends Animal(name) { def this { } }` resolved `super()`
+  against `Animal`'s no-arg constructor — a confusing E0021 for a class that visibly says
+  `extends Animal(name)`. Both are E0087 now, with the primary's parameter types in the
+  message so the fix is copy-pasteable.
+
+  **The anonymous super-call form `def this(x) : (x) { }` is gone.** Arguments for the
+  superclass constructor are written on `extends`, and only there; there is deliberately
+  no `super(...)` clause to reintroduce a second route around the primary. Every use in
+  the repository became shorter by turning into a primary constructor —
+  `class CircleShape(val data: Circle) extends Shape(ShapeKind::CIRCLE) { … }` — and a
+  leftover `: (args)` gets a hint pointing at the `extends` clause.
+
+### Fixed
+
+- **A field initializer can now read the primary constructor's parameter fields.**
+  `class Point(val x: Int) { var total: Int = x * 2 }` gave `total == 0`, always: the
+  initializer was spliced in *before* `this.x = x`, so `x` — resolved to the field, since
+  initializers are typed without the constructor's parameters in scope — was still at its
+  default. Initializers now run after the primary's parameter stores, once, in the primary
+  only, in the order Kotlin and Scala use. A plain (non-`val`/`var`) primary parameter is
+  still not visible to an initializer; that needs the initializer typed in the primary's
+  scope, and is deliberately out of scope here.
+
+- **`def this` inside a record or enum body no longer crashes the compiler (E0089).** The
+  body pass never typed it, and code generation then took the record's synthetic
+  parameter-to-field path against a constructor of the wrong arity — an ASM exception
+  surfacing as I0000. Records and enums have their canonical constructor; a second one has
+  no meaning, and the diagnostic says to use a static factory instead.
+
+- **A field read inside `: this(...)` or `extends B(...)` arguments no longer produces a
+  class the JVM refuses to load (E0090).** The object does not exist while its delegation
+  arguments are evaluated, so `def this : this(seed)` with `seed` a field was a GETFIELD on
+  `uninitializedThis`; the verifier rejected the class and the compiler reported I0000.
+  Closures in that position remain fine — they capture `this` and run later.
+
+- **A constructor delegation cycle is a compile error (E0088), not a `StackOverflowError`
+  at `new`.** `def this(a) : this(b)` with `def this(b) : this(a)` was never checked. Now
+  that `: this(...)` is the ordinary way to write a secondary, the walk — one outgoing
+  edge per self-delegating constructor, O(constructors) — runs once per class.
+
+- **docs(project-cli): stop `onion.lock` from contradicting itself two sections down.**
+  `#788` (feat/dependency-lock) added the `### onion.lock` section documenting the lock
+  file but left the `### Not yet supported` section above it, and the `## Deferred` list
+  further down, still claiming "there is no lock file" / listing "dependency lock files"
+  as out of scope — on both the English and Japanese pages. Trimmed both sections to the
+  one thing that is still actually deferred: offline resolution.
+
 ### Added
+
+- **`run/LambdaArrows.on`**, showing the one arrow in every position it appears in.
+- **`TermWalk`**, a shared structural walk over typed terms and statements; the ASM
+  backend's try-detector and the new `this`-before-delegation check are both expressed on
+  it, so the reflective child enumeration exists once.
 
 - **`W0016`: warn when `@TailRecursive` is on a mutual-recursion group that
   `MutualRecursionOptimization` cannot actually optimize.** The optimization only
@@ -23,14 +109,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requirements and a worked example, since neither previously said what mutual
   recursion needs to actually be optimized.
 
-### Fixed
+### Documentation
 
-- **docs(project-cli): stop `onion.lock` from contradicting itself two sections down.**
-  `#788` (feat/dependency-lock) added the `### onion.lock` section documenting the lock
-  file but left the `### Not yet supported` section above it, and the `## Deferred` list
-  further down, still claiming "there is no lock file" / listing "dependency lock files"
-  as out of scope — on both the English and Japanese pages. Trimmed both sections to the
-  one thing that is still actually deferred: offline resolution.
+- Every documentation page and both `CLAUDE.md` files spell trailing lambdas with `->`.
+  The `.call(f)` spelling for invoking a function value is gone from every example — 85
+  sites became direct calls, `f(x)`, and `this.handler.call(e)` became `handler(e)`;
+  the one paragraph that explains *what* a function value is (`onion.FunctionN` with a
+  `call` method) is the one place `.call` still appears. The constructor sections of the
+  class guide (EN and JA — the JA page had no `def this` documentation at all) are
+  rewritten around the primary/secondary model; `docs/grammar.txt` gained the primary
+  parameter list, the `extends(args)` clause and, for the first time, the lambda and
+  trailing-lambda productions. Every changed guide fragment was compiled: 431 blocks
+  from the touched pages, compared by content against the same blocks on the previous
+  release, with zero regressions.
 
 ## [0.11.2] - 2026-08-18
 

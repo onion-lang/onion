@@ -78,6 +78,15 @@ private[compiler] final class MethodBodySupport(
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
       val params0 = typedTerms(node.superInits.toArray, context)
+      // The object does not exist while its super/self initializer arguments are being
+      // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
+      // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM
+      // verifier rejects; it used to surface as an internal error at class load. Closure
+      // bodies are exempt: they capture `this` and run later, when it does exist.
+      if params0 != null then
+        params0.zip(node.superInits).collectFirst {
+          case (term, source) if TermWalk.exists(term) { case _: This => true; case _ => false } => source
+        }.foreach(source => bodyContext.report(THIS_BEFORE_CONSTRUCTOR_DELEGATION, source, bodyContext.definition))
       val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
       val matched0 = targetClass.findConstructor(params0)
       // Exact matching is substitution-blind: an applied Box[Int] still exposes
@@ -95,7 +104,7 @@ private[compiler] final class MethodBodySupport(
         bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
       else
         val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
-        finishConstructorBody(constructor, init, node.block, context)
+        finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
 
@@ -133,11 +142,13 @@ private[compiler] final class MethodBodySupport(
     constructor: ConstructorDefinition,
     initializer: Super,
     block: AST.BlockExpression,
-    context: LocalContext
+    context: LocalContext,
+    primaryAssignments: Int = 0
   ): Unit = {
     constructor.superInitializer = initializer
     constructor.block = addReturnNode(translate(block, context), BasicType.VOID)
     constructor.frame = context.getContextFrame
+    constructor.primaryAssignments = primaryAssignments
   }
 
   def reportConstructorOnly(context: LocalContext): Unit =

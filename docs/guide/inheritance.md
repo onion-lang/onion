@@ -21,10 +21,8 @@ protected:
     def speak: String = "Some sound"
 }
 
-class Dog extends Animal {
+class Dog(n: String) extends Animal(n) {
   public:
-    def this(n: String): (n) { }
-
     def speak: String = "Woof!"
 }
 
@@ -46,14 +44,7 @@ class Vehicle {
     }
 }
 
-class Car extends Vehicle {
-  val model: String
-
-  public:
-    def this(b: String, m: String): (b) {
-      this.model = m
-    }
-}
+class Car(b: String, val model: String) extends Vehicle(b) { }
 ```
 
 ### Method Overriding

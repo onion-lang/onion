@@ -50,10 +50,7 @@ class TryInConstructorArgAndCollectionLiteralSpec extends AbstractShellSpec {
           |  def this(v: Int) { self.v = v }
           |  val v: Int
           |}
-          |class Sub extends Base {
-          |public:
-          |  def this(x: Int): (try { Integer::parseInt(x + "") } catch _: Exception { -1 }) { }
-          |}
+          |class Sub(x: Int) extends Base(try { Integer::parseInt(x + "") } catch _: Exception { -1 }) { }
           |class Test {
           |public:
           |  static def main(args: String[]): String {

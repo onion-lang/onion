@@ -12,7 +12,7 @@ package onion;
  *
  * <pre>
  *   val r   = Server::cfg().parseLossless(file"app.conf".text()).get()
- *   val out = r.edit { v => v.copy(port = 9090) }.render()
+ *   val out = r.edit { v -> v.copy(port = 9090) }.render()
  *   // diff app.conf out  ->  one changed line
  * </pre>
  */
@@ -35,7 +35,7 @@ public final class Lossless<T> {
         return new Lossless<>(newValue, residue, shape);
     }
 
-    /** Focuses an update on the value: {@code r.edit { v => v.copy(port = 9090) }}. */
+    /** Focuses an update on the value: {@code r.edit { v -> v.copy(port = 9090) }}. */
     public Lossless<T> edit(Function1<T, T> update) {
         return withValue(update.call(value));
     }

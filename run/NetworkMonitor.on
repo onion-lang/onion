@@ -142,14 +142,14 @@ def joinNewlines(lines: List[String]): String {
 }
 
 def buildPathStats(entries: List[LogEntry]): List[PathStats] {
-  val byPath: Map[String, List[LogEntry]] = entries.groupBy { e => e.path() }
+  val byPath: Map[String, List[LogEntry]] = entries.groupBy { e -> e.path() }
   val result: List[PathStats] = []
   foreach (path, ents) in byPath {
     var stats: PathStats = PathStats::empty(path as String)
     foreach e: LogEntry in (ents as List[LogEntry]) { stats = stats.add(e) }
     result.add(stats)
   }
-  return result.sortedBy { s => s.path() }
+  return result.sortedBy { s -> s.path() }
 }
 
 def generateAlerts(statsList: List[PathStats], ipCounts: Map[String, List[LogEntry]]): List[Alert] {
@@ -167,8 +167,8 @@ def generateAlerts(statsList: List[PathStats], ipCounts: Map[String, List[LogEnt
     if count > 5 { alerts.add(new QuotaExceeded(ipStr, count, 5)) }
   }
   // Sort: critical first, then warn
-  val critical: List[Alert] = alerts.filter { a => a.level() == AlertLevel::CRITICAL }
-  val warn:     List[Alert] = alerts.filter { a => a.level() == AlertLevel::WARN }
+  val critical: List[Alert] = alerts.filter { a -> a.level() == AlertLevel::CRITICAL }
+  val warn:     List[Alert] = alerts.filter { a -> a.level() == AlertLevel::WARN }
   val result: List[Alert] = []
   foreach a: Alert in critical { result.add(a) }
   foreach a: Alert in warn     { result.add(a) }
@@ -215,7 +215,7 @@ println("Parsed #{entries.size} log entries")
 // Summary stats
 var totalBytes: Int = 0
 foreach e: LogEntry in entries { totalBytes = totalBytes + e.bytes() }
-val apiEntries: List[LogEntry] = entries.filter { e => e.path().isApiPath() }
+val apiEntries: List[LogEntry] = entries.filter { e -> e.path().isApiPath() }
 val serverErrors: Int = count5xx(entries, 0)
 println("Total traffic : #{totalBytes.fmtBytes()}")
 println("API requests  : #{apiEntries.size}/#{entries.size}")
@@ -231,32 +231,32 @@ foreach s: PathStats in statsList {
 }
 
 // Category breakdown using do[List] comprehension
-val categories: List[String] = entries.map { e => e.path().pathCategory() }.distinct()
+val categories: List[String] = entries.map { e -> e.path().pathCategory() }.distinct()
 val catPairs: List[String] = do[List] {
   cat <- categories
   method <- ["GET", "POST"]
   ret "#{cat}:#{method}"
 }
 println("\n── Category×Method Combinations (do[List]) ─────────")
-foreach pair: String in catPairs.filter { p => entries.any { e => e.path().pathCategory() + ":" + e.method() == p } } {
-  val matchCount: Int = entries.count { e => e.path().pathCategory() + ":" + e.method() == pair }
+foreach pair: String in catPairs.filter { p -> entries.any { e -> e.path().pathCategory() + ":" + e.method() == p } } {
+  val matchCount: Int = entries.count { e -> e.path().pathCategory() + ":" + e.method() == pair }
   println("  #{pair.padRight(26)} #{matchCount} req(s)")
 }
 
 // IP traffic distribution
-val byIp: Map[String, List[LogEntry]] = entries.groupBy { e => e.ip() }
+val byIp: Map[String, List[LogEntry]] = entries.groupBy { e -> e.ip() }
 println("\n── Top IPs ──────────────────────────────────────────")
 val ipStats: List[String] = []
 foreach (ip, ents) in byIp {
   val c: Int = (ents as List[LogEntry]).size
   ipStats.add("#{("" + c).pad(4)}  #{ip}")
 }
-foreach row: String in ipStats.sortedBy { s => s }.distinct() {
+foreach row: String in ipStats.sortedBy { s -> s }.distinct() {
   println("  #{row}")
 }
 
 // Alerts
-val ipMap: Map[String, List[LogEntry]] = entries.groupBy { e => e.ip() }
+val ipMap: Map[String, List[LogEntry]] = entries.groupBy { e -> e.ip() }
 val alerts: List[Alert] = generateAlerts(statsList, ipMap)
 if alerts.isEmpty() {
   println("\n── Alerts ── none")

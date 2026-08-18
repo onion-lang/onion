@@ -195,48 +195,48 @@ public:
   }
 
   def matchesFor(pid: Int): List[Object] {
-    return allResults().filter { r => (r as MatchResult).involves(pid) }
+    return allResults().filter { r -> (r as MatchResult).involves(pid) }
   }
 
   def groupStageMatches(): List[Object] {
-    return allResults().filter { r => !(r as MatchResult).phase().isKnockout() }
+    return allResults().filter { r -> !(r as MatchResult).phase().isKnockout() }
   }
 
   def knockoutMatches(): List[Object] {
-    return allResults().filter { r => (r as MatchResult).phase().isKnockout() }
+    return allResults().filter { r -> (r as MatchResult).phase().isKnockout() }
   }
 
   def totalGoals(pid: Int): Int {
     return matchesFor(pid)
-      .fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
+      .fold(0) { acc, r -> (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
   }
 
   def computeStandings(div: Division): List[Object] {
-    val divPs = allPlayers().filter { p => (p as Player).division() == div }
+    val divPs = allPlayers().filter { p -> (p as Player).division() == div }
     val standings: List[Object] = []
     foreach p: Object in divPs {
       val pl = p as Player
       val pid = pl.id()
-      val ms = matchesFor(pid).filter { r => !(r as MatchResult).phase().isKnockout() }
-      val w = ms.fold(0) { acc, r =>
+      val ms = matchesFor(pid).filter { r -> !(r as MatchResult).phase().isKnockout() }
+      val w = ms.fold(0) { acc, r ->
         val won = (r as MatchResult).winner()
         (acc as Int) + (if won != null && (won as Int) == pid { 1 } else { 0 })
       } as Int
-      val d = ms.fold(0) { acc, r =>
+      val d = ms.fold(0) { acc, r ->
         (acc as Int) + (if (r as MatchResult).isDraw() { 1 } else { 0 })
       } as Int
       val l = (ms.size as Int) - w - d
-      val gf = ms.fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
-      val ga = ms.fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsAgainst(pid) } as Int
+      val gf = ms.fold(0) { acc, r -> (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
+      val ga = ms.fold(0) { acc, r -> (acc as Int) + (r as MatchResult).goalsAgainst(pid) } as Int
       standings << new Standing(pid, pl.name(), pl.country(), w, d, l, gf, ga)
     }
-    return standings.sortedBy { s => 0 - (s as Standing).pts() }
+    return standings.sortedBy { s -> 0 - (s as Standing).pts() }
   }
 
   def topScorer(): Player? {
     if playerList.size == 0 { return null }
-    val ids = allPlayers().map { p => (p as Player).id() }
-    val bestId = ids.reduce { a, b =>
+    val ids = allPlayers().map { p -> (p as Player).id() }
+    val bestId = ids.reduce { a, b ->
       val ga = totalGoals(a as Int)
       val gb = totalGoals(b as Int)
       if ga >= gb { a } else { b }
@@ -246,15 +246,15 @@ public:
   }
 
   def unbeatenPlayers(): List[Object] {
-    return allPlayers().filter { p =>
+    return allPlayers().filter { p ->
       val pid = (p as Player).id()
-      val lossCount = matchesFor(pid).filter { r =>
+      val lossCount = matchesFor(pid).filter { r ->
         val m = r as MatchResult
         val w = m.winner()
         w != null && (w as Int) != pid
       }.size
       lossCount == 0
-    }.map { p => (p as Player).display() }
+    }.map { p -> (p as Player).display() }
   }
 
   def printStandings(div: Division): void {
@@ -390,7 +390,7 @@ if unbeaten.size == 0 {
 IO::println("")
 IO::println("  ── Group-Stage Summary ──")
 val gsMatches = t.groupStageMatches()
-val totalGoalsScored = gsMatches.fold(0) { acc, r =>
+val totalGoalsScored = gsMatches.fold(0) { acc, r ->
   val m = r as MatchResult
   (acc as Int) + m.score1() + m.score2()
 } as Int
@@ -400,7 +400,7 @@ IO::println("  Matches played  : #{matchCount}")
 IO::println("  Total goals     : #{totalGoalsScored}")
 IO::println("  Avg goals/match : #{String::format("%.2f", avgGoals)}")
 
-val parts = gsMatches.partition { r =>
+val parts = gsMatches.partition { r ->
   val m = r as MatchResult
   (m.score1() + m.score2()) >= 4
 }
@@ -412,10 +412,10 @@ IO::println("  Low-scoring  (<4 goals): #{lowScoring.size}")
 // Countries: distinct + groupBy → foreach (k,v)
 IO::println("")
 IO::println("  ── Players by Country ──")
-val byCountry = t.allPlayers().groupBy { p => (p as Player).country() }
+val byCountry = t.allPlayers().groupBy { p -> (p as Player).country() }
 foreach (country, ps) in byCountry {
   val c = country as String
-  val names = (ps as List[Object]).map { p => (p as Player).name() }
+  val names = (ps as List[Object]).map { p -> (p as Player).name() }
   IO::println("  #{c}: #{names}")
 }
 
@@ -423,12 +423,12 @@ foreach (country, ps) in byCountry {
 IO::println("")
 IO::println("  ── Group-Stage Rounds ──")
 val rounds = gsMatches
-  .map { r => (r as MatchResult).phase().groupRound() }
+  .map { r -> (r as MatchResult).phase().groupRound() }
   .distinct()
-  .sortedBy { r => r as Int }
+  .sortedBy { r -> r as Int }
 foreach robj: Object in rounds {
   val rn = robj as Int
-  val rMatches = gsMatches.filter { r => (r as MatchResult).phase().groupRound() == rn }
+  val rMatches = gsMatches.filter { r -> (r as MatchResult).phase().groupRound() == rn }
   IO::println("  Round #{rn}: #{rMatches.size} match(es)")
 }
 
@@ -436,7 +436,7 @@ foreach robj: Object in rounds {
 IO::println("")
 IO::println("  ── Group-A Goal Tallies ──")
 val gAIds: List[Int] = [1, 2, 3, 4]
-val goalLines = gAIds.map { id =>
+val goalLines = gAIds.map { id ->
   val pid = id as Int
   val pl = t.findPlayer(pid)
   val gls = t.totalGoals(pid)

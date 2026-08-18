@@ -165,7 +165,7 @@ class Name [TypeParams] [(primary params)] [extends Super[(args)]] [conforms I1,
 
 **プライマリコンストラクタ:** `val`/`var` パラメータは public
 （final/mutable）フィールドを自動的に宣言します。プレーンなパラメータは
-コンストラクタ内でのみ存在します（例: `: Super(args)` に渡すため）。クラス本体は
+コンストラクタ内でのみ存在します（`extends Super(args)` に渡すため）。クラス本体は
 オプションです。
 
 ```onion
@@ -173,16 +173,24 @@ class Point(val x: Int, val y: Int)
 class Dog(name: String, val breed: String) extends Animal(name)
 ```
 
-**クラシックなコンストラクタ**も利用可能です。
+**セカンダリコンストラクタ**は `def this` で宣言し、`: this(...)` で兄弟コンストラクタに
+委譲します。プライマリコンストラクタ（パラメータリスト、または `extends` の引数、または
+その両方）を持つクラスでは、すべてのセカンダリはプライマリに委譲しなければなりません
+（E0087）。親クラスのコンストラクタを呼び、`val`/`var` パラメータをフィールドに格納するのは
+プライマリだけです。プライマリを持たないクラスでは、`def this` は暗黙に親クラスの引数なし
+コンストラクタを呼びます。
 
 ```onion
-def this(params) { body }
-def this(params): (superArgs) { body }
+def this(params) : this(args) { body }   // 兄弟コンストラクタへ委譲
+def this(params) { body }                // プライマリを持たないクラスでのみ
 ```
 
 メンバーはデフォルトで private です。`public:` / `protected:` / `private:` セクションで
 可視性を設定します。`static def` で static メソッドを、`static val` で定数を宣言。
-フィールドの初期化子は宣言順に実行されます。
+フィールドの初期化子は宣言順に、プライマリコンストラクタがパラメータを格納した後に、
+プライマリの中でだけ実行されます。`: this(...)` や `extends B(...)` の引数の中で `this` や
+フィールドは読めません（E0090）。委譲の循環は拒否され（E0088）、record と enum は
+`def this` を宣言できません（E0089）。
 
 ### インターフェース
 
@@ -515,7 +523,7 @@ throw new IllegalStateException("message")
 ```onion
 val f: Int -> Int = x -> x * 2          // 裸パラメータ、式本体
 val g = (a: Int, b: Int) -> a + b
-list.map { x => x * 2 }                 // 末尾ラムダ
+list.map { x -> x * 2 }                 // 末尾ラムダ
 Future::async(() -> { return compute() })
 val r: Runnable = () -> println("hi")   // SAM 変換
 ```
@@ -581,7 +589,7 @@ val api  = http"https://example.com/p".read(Pt::doc())
 ```onion
 5 |> double               // double(5)
 5 |> add(3)               // add(5, 3) — 第1引数注入
-xs.map { x => x * 2 }
+xs.map { x -> x * 2 }
   |> println              // |> の前の改行でパイプラインを継続
 ```
 

@@ -129,13 +129,13 @@ public:
   }
 
   def byMealType(t: MealType): List[Recipe] =
-    recipes.filter { r => r.mealType() == t }
+    recipes.filter { r -> r.mealType() == t }
 
   def quickRecipes(maxMins: Int): List[Recipe] =
-    recipes.filter { r => r.totalMins() <= maxMins }
+    recipes.filter { r -> r.totalMins() <= maxMins }
 
   def topByCalories(n: Int): List[Recipe] =
-    recipes.sortedBy { r => -(r.kcalPerServing()) }.take(n)
+    recipes.sortedBy { r -> -(r.kcalPerServing()) }.take(n)
 
   def lowCarbRecipes(): List[Recipe] {
     val result: List[Recipe] = []
@@ -163,7 +163,7 @@ public:
   def allRecipes(): List[Recipe] = recipes
 
   def byMealTypeMap(): Map[String, List[Recipe]] =
-    recipes.groupBy { r => r.mealType().label() }
+    recipes.groupBy { r -> r.mealType().label() }
 
   def ingredientFrequency(): Map[String, Int] {
     val freq: Map[String, Int] = [:]
@@ -285,7 +285,7 @@ def main(): void {
   }
 
   printSection("QUICK RECIPES (≤ 20 min total)")
-  foreach r: Recipe in vault.quickRecipes(20).sortedBy { r => r.totalMins() } {
+  foreach r: Recipe in vault.quickRecipes(20).sortedBy { r -> r.totalMins() } {
     IO::println("  [#{r.totalMins().padLeft(2)} min] #{r.name()} — #{r.mealType().label()}")
   }
 
@@ -309,14 +309,14 @@ def main(): void {
   val byType: Map[String, List[Recipe]] = vault.byMealTypeMap()
   foreach (mealLabel, recipes) in byType {
     IO::println("  #{mealLabel} (#{recipes.size.plural("recipe")}):")
-    foreach r: Recipe in recipes.sortedBy { r => r.name() } {
+    foreach r: Recipe in recipes.sortedBy { r -> r.name() } {
       IO::println("    ▸ #{r.name()} — #{r.kcalPerServing().kcal()}/srv")
     }
   }
 
   printSection("TOP 8 MOST-USED INGREDIENTS")
   val freq: Map[String, Int] = vault.ingredientFrequency()
-  val topIngs: List[String] = freq.keys().sortedBy { k => -(freq.get(k)) }.take(8)
+  val topIngs: List[String] = freq.keys().sortedBy { k -> -(freq.get(k)) }.take(8)
   var rank: Int = 1
   foreach ingName: String in topIngs {
     val count: Int = freq.get(ingName)
@@ -325,7 +325,7 @@ def main(): void {
   }
 
   printSection("VEGAN vs NON-VEGAN SPLIT")
-  val veganParts = vault.allRecipes().partition { r => r.hasFlag(new Vegan() as DietaryFlag) }
+  val veganParts = vault.allRecipes().partition { r -> r.hasFlag(new Vegan() as DietaryFlag) }
   val vegan    = veganParts[0] as List[Object]
   val nonVegan = veganParts[1] as List[Object]
   IO::println("  Vegan:     #{vegan.size.plural("recipe")}")
@@ -343,15 +343,15 @@ def main(): void {
   }
 
   printSection("DURATION ANALYSIS")
-  val allMins: List[Int] = vault.allRecipes().map { r => r.totalMins() }
-  val minTime: Int = allMins.fold(9999) { acc, m => if m < acc { m } else { acc } }
-  val maxTime: Int = allMins.fold(0)    { acc, m => if m > acc { m } else { acc } }
-  val totalTime: Int = allMins.fold(0)  { acc, m => acc + m }
+  val allMins: List[Int] = vault.allRecipes().map { r -> r.totalMins() }
+  val minTime: Int = allMins.fold(9999) { acc, m -> if m < acc { m } else { acc } }
+  val maxTime: Int = allMins.fold(0)    { acc, m -> if m > acc { m } else { acc } }
+  val totalTime: Int = allMins.fold(0)  { acc, m -> acc + m }
   IO::println("  Fastest: #{minTime.plural("min")}")
   IO::println("  Slowest: #{maxTime.plural("min")}")
   IO::println("  Average: #{(totalTime / vault.size()).plural("min")}")
 
-  val durParts = vault.allRecipes().partition { r => r.totalMins() <= 20 }
+  val durParts = vault.allRecipes().partition { r -> r.totalMins() <= 20 }
   val quick = durParts[0] as List[Object]
   val slow  = durParts[1] as List[Object]
   IO::println("  Quick (≤20min): #{quick.size.plural("recipe")}")

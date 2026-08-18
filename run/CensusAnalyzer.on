@@ -142,7 +142,7 @@ public:
       val city = (r as Person).city()
       if !result.contains(city) { result.add(city) }
     }
-    return result.sortedBy { c => c as String }
+    return result.sortedBy { c -> c as String }
   }
 
   def occupations(): List[Object] {
@@ -151,41 +151,41 @@ public:
       val occ = (r as Person).occupation()
       if !result.contains(occ) { result.add(occ) }
     }
-    return result.sortedBy { o => o as String }
+    return result.sortedBy { o -> o as String }
   }
 
   def byCity(city: String): List[Object] {
-    return records.filter { r => (r as Person).city() == city }
+    return records.filter { r -> (r as Person).city() == city }
   }
 
   def byOccupation(occ: String): List[Object] {
-    return records.filter { r => (r as Person).occupation() == occ }
+    return records.filter { r -> (r as Person).occupation() == occ }
   }
 
   def ageStats(): Stats {
-    val ages: List[Object] = records.map { r => (r as Person).age() }
+    val ages: List[Object] = records.map { r -> (r as Person).age() }
     return Stats::of(ages)
   }
 
   def incomeStats(): Stats {
-    val incomes: List[Object] = records.map { r => (r as Person).income() }
+    val incomes: List[Object] = records.map { r -> (r as Person).income() }
     return Stats::of(incomes)
   }
 
   def topEarners(n: Int): List[Object] {
-    return records.sortedBy { r => -(r as Person).income() }.take(n)
+    return records.sortedBy { r -> -(r as Person).income() }.take(n)
   }
 
   def youngestIn(city: String): Person? {
     val inCity = byCity(city)
     if inCity.size == 0 { return null }
-    return inCity.sortedBy { r => (r as Person).age() }.get(0) as Person
+    return inCity.sortedBy { r -> (r as Person).age() }.get(0) as Person
   }
 
   def oldestIn(city: String): Person? {
     val inCity = byCity(city)
     if inCity.size == 0 { return null }
-    return inCity.sortedBy { r => -(r as Person).age() }.get(0) as Person
+    return inCity.sortedBy { r -> -(r as Person).age() }.get(0) as Person
   }
 
   def meanIncomeByCity(): Map[String, Double] {
@@ -194,7 +194,7 @@ public:
       val c = city as String
       val people = byCity(c)
       if people.size > 0 {
-        val total = people.fold(0) { acc, r => (acc as Int) + (r as Person).income() }
+        val total = people.fold(0) { acc, r -> (acc as Int) + (r as Person).income() }
         val mean = (total as Int).doubleValue() / people.size.doubleValue()
         result.put(c, mean.round2())
       }
@@ -244,16 +244,16 @@ public:
       val o = occ as String
       val people = byOccupation(o)
       if people.size > 0 {
-        val total = people.fold(0) { acc, r => (acc as Int) + (r as Person).income() }
+        val total = people.fold(0) { acc, r -> (acc as Int) + (r as Person).income() }
         val mean = (total as Int).doubleValue() / people.size.doubleValue()
         result.add(new OccRank(o, mean.round2(), people.size))
       }
     }
-    return result.sortedBy { row => -(row as OccRank).meanIncome() }
+    return result.sortedBy { row -> -(row as OccRank).meanIncome() }
   }
 
   def partitionByAge(threshold: Int): List[List[Object]] {
-    return records.partition { r => (r as Person).age() < threshold }
+    return records.partition { r -> (r as Person).age() < threshold }
   }
 }
 
@@ -325,7 +325,7 @@ printSection("Population by City")
 foreach city: Object in census.cities() {
   val c = city as String
   val people = census.byCity(c)
-  val incomes: List[Object] = people.map { r => (r as Person).income() }
+  val incomes: List[Object] = people.map { r -> (r as Person).income() }
   val st = Stats::of(incomes)
   println("  #{c}: #{people.size} residents, mean income #{st.meanRounded()}")
 }
@@ -408,7 +408,7 @@ val crossRows  = do[List] {
   city   <- cityList
   ret "  under #{thresh as Int} in #{city as String}: " +
         census.byCity(city as String)
-             .filter { r => (r as Person).age() < thresh as Int }
+             .filter { r -> (r as Person).age() < thresh as Int }
              .size
 }
 foreach line: Object in crossRows {
@@ -419,7 +419,7 @@ foreach line: Object in crossRows {
 
 printSection("|> Pipeline: Top 8 Earners Formatted")
 census.topEarners(8)
-  .map { r => "$" + (r as Person).income() + " (" + (r as Person).name() + ")" }
+  .map { r -> "$" + (r as Person).income() + " (" + (r as Person).name() + ")" }
   |> println
 
 // ─── partition by age ─────────────────────────────────────────────────────────
@@ -431,8 +431,8 @@ val matureList = ageParts[1] as List[Object]
 println("  Under 35: #{youngList.size}")
 println("  35 and over: #{matureList.size}")
 
-val youngIncomes: List[Object] = youngList.map { r => (r as Person).income() }
-val matureIncomes: List[Object] = matureList.map { r => (r as Person).income() }
+val youngIncomes: List[Object] = youngList.map { r -> (r as Person).income() }
+val matureIncomes: List[Object] = matureList.map { r -> (r as Person).income() }
 val ySt = Stats::of(youngIncomes)
 val mSt = Stats::of(matureIncomes)
 println("  Under 35 income: #{ySt.display()}")
@@ -442,7 +442,7 @@ println("  35+ income: #{mSt.display()}")
 
 printSection("Senior Summary (age >= 60)")
 val seniors = census.topEarners(census.size())
-              .filter { r => (r as Person).age() >= 60 }
+              .filter { r -> (r as Person).age() >= 60 }
 foreach r: Object in seniors {
   val p = r as Person
   val ext = new PersonExt(p)
@@ -453,11 +453,11 @@ foreach r: Object in seniors {
 
 printSection("Any / Find")
 val allPeople = census.topEarners(census.size())
-val hasHighEarner = allPeople.any { r => (r as Person).income() >= 190000 }
+val hasHighEarner = allPeople.any { r -> (r as Person).income() >= 190000 }
 println("  Any income >= 190k: #{hasHighEarner}")
 
 val firstYoungDoc: Person? = census.byOccupation("Doctor")
-  .find { r => (r as Person).age() < 50 } as Person?
+  .find { r -> (r as Person).age() < 50 } as Person?
 if firstYoungDoc != null {
   println("  First doctor under 50: #{firstYoungDoc.name()} (#{firstYoungDoc.age()})")
 } else {

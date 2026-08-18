@@ -261,9 +261,9 @@ IO::println("")
 
 // Show deck composition
 val fullDeck = buildDeck()
-val faceCount = fullDeck.filter { c => (c as Card).isFace() }.size
-val aceCount  = fullDeck.filter { c => (c as Card).isAce() }.size
-val redCount  = fullDeck.filter { c => (c as Card).suit().isRed() }.size
+val faceCount = fullDeck.filter { c -> (c as Card).isFace() }.size
+val aceCount  = fullDeck.filter { c -> (c as Card).isAce() }.size
+val redCount  = fullDeck.filter { c -> (c as Card).suit().isRed() }.size
 IO::println("Deck: #{fullDeck.size} cards  Aces=#{aceCount}  Face=#{faceCount}  Red=#{redCount}")
 IO::println("")
 
@@ -306,14 +306,14 @@ IO::println("Overall win rate: " + totalWins.pct(totalGames) + " (" + totalWins 
 IO::println("")
 IO::println("--- Ranked by win rate ---")
 val ranked = acc.getAll()
-  .sortedBy { st => 0 - (st as Stats).wins() }
-  .map { st => (st as Stats).winRate().fmt1() + "%" }
+  .sortedBy { st -> 0 - (st as Stats).wins() }
+  .map { st -> (st as Stats).winRate().fmt1() + "%" }
 IO::println("Best to worst: " + ranked.toString())
 
 // Card value distribution: groupBy Blackjack point value
 IO::println("")
 IO::println("--- Card point distribution (full deck) ---")
-val byValue = fullDeck.groupBy { c => "" + (c as Card).blackjackValue() }
+val byValue = fullDeck.groupBy { c -> "" + (c as Card).blackjackValue() }
 foreach (pts, cards) in byValue {
   IO::println("  " + pts + " pts: " + (cards as List[Card]).size + " cards")
 }

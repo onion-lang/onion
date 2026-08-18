@@ -115,16 +115,16 @@ public:
 
   def count(): Int = patients.size
 
-  def urgentCount(): Int = patients.filter { p => (p as Patient).isUrgent() }.size
+  def urgentCount(): Int = patients.filter { p -> (p as Patient).isUrgent() }.size
 
   def averageAge(): Double {
     if patients.size == 0 { return 0.0 }
-    val total: Int = patients.fold(0) { acc, p => (acc as Int) + (p as Patient).age() } as Int
+    val total: Int = patients.fold(0) { acc, p -> (acc as Int) + (p as Patient).age() } as Int
     return (total as Double) / (patients.size as Double)
   }
 
   def highestRisk(): Patient? {
-    val sorted: List[Patient] = patients.sortedBy { p => -riskScore(p as Patient) }
+    val sorted: List[Patient] = patients.sortedBy { p -> -riskScore(p as Patient) }
     if sorted.size == 0 { return null }
     return sorted.get(0) as Patient
   }
@@ -192,14 +192,14 @@ printWardSummary(orthoWard)
 
 IO::println("")
 IO::println("── By severity ──")
-val bySeverity = patients.groupBy { p => (p as Patient).diagnosis().severity().label() }
+val bySeverity = patients.groupBy { p -> (p as Patient).diagnosis().severity().label() }
 foreach (label, group) in bySeverity {
   IO::println("  #{label}: #{(group as List[Patient]).size} patient(s)")
 }
 
 IO::println("")
 IO::println("── Priority ranking (all patients) ──")
-val ranked: List[Patient] = patients.sortedBy { p => -(riskScore(p as Patient)) }
+val ranked: List[Patient] = patients.sortedBy { p -> -(riskScore(p as Patient)) }
 foreach rp: Patient in ranked {
   val score: Int = riskScore(rp)
   IO::println("  #{rp.name()} — #{severityBar(rp.diagnosis().severity())} score=#{score} (#{rp.daysSinceAdmission().dayLabel()})")
@@ -208,7 +208,7 @@ foreach rp: Patient in ranked {
 // ── Partition into urgent / stable ───────────────────────────────────────
 
 IO::println("")
-val parts: List[List[Patient]] = patients.partition { p => p.isUrgent() }
+val parts: List[List[Patient]] = patients.partition { p -> p.isUrgent() }
 val urgent: List[Patient] = parts.get(0)
 val stable: List[Patient] = parts.get(1)
 IO::println("Urgent: #{urgent.size}  Stable: #{stable.size}")
@@ -218,7 +218,7 @@ IO::println("Urgency rate: #{pctWhole}%")
 
 // ── Nullable find ─────────────────────────────────────────────────────────
 
-val found: Patient? = patients.find { p => (p as Patient).age() > 75 } as Patient?
+val found: Patient? = patients.find { p -> (p as Patient).age() > 75 } as Patient?
 if found != null {
   IO::println("")
   IO::println("Oldest critical-eligible: #{(found as Patient).fullLabel()}")
@@ -228,7 +228,7 @@ if found != null {
 
 // ── Closure + fold aggregation ────────────────────────────────────────────
 
-val totalRisk: Int = patients.fold(0) { acc, p => (acc as Int) + riskScore(p as Patient) } as Int
+val totalRisk: Int = patients.fold(0) { acc, p -> (acc as Int) + riskScore(p as Patient) } as Int
 IO::println("")
 IO::println("Total risk load: #{totalRisk}")
 
@@ -248,7 +248,7 @@ IO::println("div/0 guard: " + safeDivide(totalRisk, 0))
 
 IO::println("")
 IO::println("── Complexity indices ──")
-foreach p: Patient in patients.filter { p => (p as Patient).isUrgent() } {
+foreach p: Patient in patients.filter { p -> (p as Patient).isUrgent() } {
   val ci: Int = complexityIndex((p as Patient).diagnosis().code(), 4)
   IO::println("  #{(p as Patient).name()}: code=#{(p as Patient).diagnosis().code()} ci=#{ci}")
 }

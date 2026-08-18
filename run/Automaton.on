@@ -171,17 +171,17 @@ def runDemo(ruleNum: Int, width: Int, steps: Int): void {
 
   // Summary statistics via collection pipelines.
   val stats: List[Object] = computeStats(sim)
-  val liveCounts: List[Object] = stats.map { s => (s as GenStats).live() }
+  val liveCounts: List[Object] = stats.map { s -> (s as GenStats).live() }
 
-  val maxLive: Int = liveCounts.fold(0) { acc, x =>
+  val maxLive: Int = liveCounts.fold(0) { acc, x ->
     val xi: Int = x as Int
     if xi > acc { xi } else { acc }
   } as Int
-  val minLive: Int = liveCounts.fold(width) { acc, x =>
+  val minLive: Int = liveCounts.fold(width) { acc, x ->
     val xi: Int = x as Int
     if xi < acc { xi } else { acc }
   } as Int
-  val totalLive: Int = liveCounts.fold(0) { acc, x => acc + (x as Int) } as Int
+  val totalLive: Int = liveCounts.fold(0) { acc, x -> acc + (x as Int) } as Int
   val avgLive: Double = (totalLive as Double) / (rows.size as Double)
 
   IO::println("")
@@ -203,12 +203,12 @@ def runDemo(ruleNum: Int, width: Int, steps: Int): void {
 def crossRuleSummary(ruleNums: List[Object], width: Int, steps: Int): void {
   printHeader("Cross-rule comparison (width=#{width}, steps=#{steps})")
 
-  val summaries: List[Object] = ruleNums.map { rn =>
+  val summaries: List[Object] = ruleNums.map { rn ->
     val n: Int = rn as Int
     val rule: Rule = new Rule(n)
     val sim: SimState = simulate(rule, centerSeed(width), steps)
     val rows: List[Object] = sim.rows()
-    val totalLive: Int = rows.fold(0) { acc, row =>
+    val totalLive: Int = rows.fold(0) { acc, row ->
       acc + liveCount(row as Boolean[])
     } as Int
     val avg: Int = totalLive / rows.size
@@ -216,7 +216,7 @@ def crossRuleSummary(ruleNums: List[Object], width: Int, steps: Int): void {
     "Rule #{n.padLeft(3)}: avg #{avg.padLeft(3)} live -- #{cls.label()}"
   }
 
-  val sorted: List[Object] = summaries.sortedBy { s => s as String }
+  val sorted: List[Object] = summaries.sortedBy { s -> s as String }
   foreach s: Object in sorted {
     IO::println("  " + (s as String))
   }

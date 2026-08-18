@@ -144,7 +144,7 @@ public:
   }
 
   def activeOrders(): List[PurchaseOrder] =
-    orders.filter { o => (o as PurchaseOrder).isActive() }
+    orders.filter { o -> (o as PurchaseOrder).isActive() }
 
   def totalByStatus(st: OrderStatus): Double {
     var t: Double = 0.0
@@ -156,45 +156,45 @@ public:
   }
 
   def bySupplier(): Map[String, List[PurchaseOrder]] =
-    activeOrders().groupBy { o => (o as PurchaseOrder).supplier().name() }
+    activeOrders().groupBy { o -> (o as PurchaseOrder).supplier().name() }
 
   def byStatus(): Map[String, List[PurchaseOrder]] =
-    orders.groupBy { o => (o as PurchaseOrder).status().label().trim() }
+    orders.groupBy { o -> (o as PurchaseOrder).status().label().trim() }
 
   def stockAlerts(): List[StockAlert] =
-    products.map { p => (p as Product).stockAlert() }
-            .filter { a => !(a is OK) }
+    products.map { p -> (p as Product).stockAlert() }
+            .filter { a -> !(a is OK) }
 
   def criticalCount(): Int =
-    stockAlerts().count { a => (a as StockAlert).isCritical() }
+    stockAlerts().count { a -> (a as StockAlert).isCritical() }
 
   def topCategories(n: Int): List[String] {
     val byCategory = activeOrders()
-      .flatMap { o => (o as PurchaseOrder).lines() }
-      .groupBy { l => (l as OrderLine).product().cat().label() }
+      .flatMap { o -> (o as PurchaseOrder).lines() }
+      .groupBy { l -> (l as OrderLine).product().cat().label() }
     val cats: List[String] = []
     foreach (cat, ls) in byCategory {
       cats.add(cat as String)
     }
-    return cats.sortedBy { c =>
+    return cats.sortedBy { c ->
       val ls = byCategory.get(c)
       if ls == null { 0.0 } else {
-        0.0 - ((ls as List).fold(0.0) { acc, l => acc + (l as OrderLine).lineTotal() } as Double)
+        0.0 - ((ls as List).fold(0.0) { acc, l -> acc + (l as OrderLine).lineTotal() } as Double)
       }
-    }.filter { c => (cats.indexOf(c) + 1) <= n }
+    }.filter { c -> (cats.indexOf(c) + 1) <= n }
   }
 
   def ordersBetween(lo: Double, hi: Double): List[PurchaseOrder] =
-    activeOrders().filter { o =>
+    activeOrders().filter { o ->
       val t = (o as PurchaseOrder).orderTotal()
       t >= lo && t <= hi
     }
 
   def supplierIds(): List[String] =
-    orders.map { o => (o as PurchaseOrder).supplier().id() }.distinct()
+    orders.map { o -> (o as PurchaseOrder).supplier().id() }.distinct()
 
   def hasLargeOrders(threshold: Double): Boolean =
-    activeOrders().any { o => (o as PurchaseOrder).orderTotal() >= threshold }
+    activeOrders().any { o -> (o as PurchaseOrder).orderTotal() >= threshold }
 
   def printReport(): void {
     println("═══════════════════════════════════════════════════")
@@ -214,15 +214,15 @@ public:
     val bySup = bySupplier()
     val supNames: List[String] = []
     foreach k: Object in bySup.keySet() { supNames.add(k as String) }
-    val sortedSups = supNames.sortedBy { nm =>
-      0.0 - ((bySup.get(nm) as List).fold(0.0) { acc, o =>
+    val sortedSups = supNames.sortedBy { nm ->
+      0.0 - ((bySup.get(nm) as List).fold(0.0) { acc, o ->
         acc + (o as PurchaseOrder).orderTotal()
       } as Double)
     }
     foreach sup: Object in sortedSups {
       val nm  = sup as String
       val os  = bySup.get(nm) as List
-      val tot = (os.fold(0.0) { acc, o => acc + (o as PurchaseOrder).orderTotal() } as Double)
+      val tot = (os.fold(0.0) { acc, o -> acc + (o as PurchaseOrder).orderTotal() } as Double)
       val cnt = os.size
       println("  #{nm.truncate(20).padRight(22)}  #{cnt.pad(2)} order(s)  $#{tot.fmt2()}")
     }
@@ -242,7 +242,7 @@ public:
 
     // ── Partition: high-value vs regular ─────────────────────
     println("\n── Order value segmentation (threshold $5 000) ──")
-    val parts = activeOrders().partition { o => (o as PurchaseOrder).orderTotal() >= 5000.0 }
+    val parts = activeOrders().partition { o -> (o as PurchaseOrder).orderTotal() >= 5000.0 }
     val highVal = parts[0] as List
     val regular = parts[1] as List
     println("  High-value (≥$5 000): #{highVal.size} order(s)")

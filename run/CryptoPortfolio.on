@@ -61,7 +61,7 @@ println("Transactions: #{(txLog as List).size}")
 
 // ── Aggregate holdings ─────────────────────────────────────────────────────
 
-val bySymbol = (txLog as List).groupBy { tx => (tx as Transaction).coin().symbol() }
+val bySymbol = (txLog as List).groupBy { tx -> (tx as Transaction).coin().symbol() }
 
 val holdings: List[Object] = []
 foreach (sym, txsObj) in bySymbol {
@@ -111,7 +111,7 @@ println("╔══════════════════════�
 println("║  Holdings Summary                                            ║")
 println("╠══════════════════════════════════════════════════════════════╣")
 
-val sorted = holdings.sortedBy { h => 0.0 - (h as Holding).currentValue() }
+val sorted = holdings.sortedBy { h -> 0.0 - (h as Holding).currentValue() }
 foreach hObj: Object in sorted {
   val h = hObj as Holding
   val sym  = h.coin().symbol()
@@ -143,8 +143,8 @@ println("╚══════════════════════�
 
 // ── Best / worst performer ─────────────────────────────────────────────────
 
-val bestH = sorted.find { h => (h as Holding).pnlPct() == sorted.map { x => (x as Holding).pnlPct() }.fold(0.0) { acc, v => if (v as Double) > (acc as Double) { v } else { acc } } }
-val worstH = holdings.sortedBy { h => (h as Holding).pnlPct() }.find { h => true }
+val bestH = sorted.find { h -> (h as Holding).pnlPct() == sorted.map { x -> (x as Holding).pnlPct() }.fold(0.0) { acc, v -> if (v as Double) > (acc as Double) { v } else { acc } } }
+val worstH = holdings.sortedBy { h -> (h as Holding).pnlPct() }.find { h -> true }
 
 println("")
 if bestH != null {
@@ -160,7 +160,7 @@ if worstH != null {
 
 println("")
 println("--- Risk Exposure ---")
-val byRisk = holdings.groupBy { h => (h as Holding).coin().riskLevel().name() }
+val byRisk = holdings.groupBy { h -> (h as Holding).coin().riskLevel().name() }
 foreach (riskName, riskHoldings) in byRisk {
   var riskValue: Double = 0.0
   foreach rh: Object in riskHoldings as List {
@@ -174,12 +174,12 @@ foreach (riskName, riskHoldings) in byRisk {
 
 println("")
 println("--- Transaction Summary ---")
-val buys    = (txLog as List).filter { tx => (tx as Transaction).txType() == TxType::BUY }
-val sells   = (txLog as List).filter { tx => (tx as Transaction).txType() == TxType::SELL }
-val rewards = (txLog as List).filter { tx => (tx as Transaction).txType() == TxType::RECEIVE }
+val buys    = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::BUY }
+val sells   = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::SELL }
+val rewards = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::RECEIVE }
 
-val totalBuyValue  = buys.fold(0.0) { acc, tx => (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
-val totalSellValue = sells.fold(0.0) { acc, tx => (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
+val totalBuyValue  = buys.fold(0.0) { acc, tx -> (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
+val totalSellValue = sells.fold(0.0) { acc, tx -> (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
 
 println("  Buys:    #{buys.size} transactions, #{fmtUsd(totalBuyValue as Double)}")
 println("  Sells:   #{sells.size} transactions, #{fmtUsd(totalSellValue as Double)}")
@@ -187,14 +187,14 @@ println("  Rewards: #{rewards.size} transactions")
 
 // ── Distinct coins in transaction history ──────────────────────────────────
 
-val distinctSymbols = (txLog as List).map { tx => (tx as Transaction).coin().symbol() }.distinct()
+val distinctSymbols = (txLog as List).map { tx -> (tx as Transaction).coin().symbol() }.distinct()
 println("  Coins traded: #{distinctSymbols.toString()}")
 
 // ── Coins with 24h gain (closure stored in val) ────────────────────────────
 
 val isGainer = (c: Coin) -> c.change24h() > 0.0
-val gainers  = (allCoins as List).filter { c => isGainer(c as Coin) }.map { c => (c as Coin).symbol() }
-val losers   = (allCoins as List).filter { c => !(isGainer(c as Coin)) }.map { c => (c as Coin).symbol() }
+val gainers  = (allCoins as List).filter { c -> isGainer(c as Coin) }.map { c -> (c as Coin).symbol() }
+val losers   = (allCoins as List).filter { c -> !(isGainer(c as Coin)) }.map { c -> (c as Coin).symbol() }
 println("")
 println("24h Gainers: #{gainers.toString()}")
 println("24h Losers:  #{losers.toString()}")

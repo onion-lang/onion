@@ -71,19 +71,19 @@ public:
   def name(): String = compoundName
   def bond(): BondType = bondType
   def molecularWeight(): Double =
-    components.fold(0.0) { acc, c => (acc as Double) + (c as FormulaComponent).contribution() }
+    components.fold(0.0) { acc, c -> (acc as Double) + (c as FormulaComponent).contribution() }
   def formulaString(): String =
-    components.fold("") { acc, c => (acc as String) + (c as FormulaComponent).label() }
+    components.fold("") { acc, c -> (acc as String) + (c as FormulaComponent).label() }
   def elementCount(): Int = components.size
   def elementSymbols(): List[String] =
-    components.map { fc => (fc as FormulaComponent).element().symbol() }
+    components.map { fc -> (fc as FormulaComponent).element().symbol() }
   def containsElement(sym: String): Boolean =
-    components.find { c => (c as FormulaComponent).element().symbol() == sym } != null
+    components.find { c -> (c as FormulaComponent).element().symbol() == sym } != null
   def isOrganic(): Boolean = containsElement("C")
   def percentOf(sym: String): Double {
     val mw = molecularWeight()
     if mw == 0.0 { return 0.0 }
-    val found = components.find { c => (c as FormulaComponent).element().symbol() == sym }
+    val found = components.find { c -> (c as FormulaComponent).element().symbol() == sym }
     if found == null { return 0.0 }
     return (found as FormulaComponent).contribution() / mw * 100.0
   }
@@ -148,7 +148,7 @@ foreach c: Compound in compounds {
 // ── Section 2: sorted by molecular weight ──
 IO::println("")
 IO::println("=== By Molecular Weight (heavy → light) ===")
-val byMW = compounds.sortedBy { c => 0.0 - (c as Compound).molecularWeight() }
+val byMW = compounds.sortedBy { c -> 0.0 - (c as Compound).molecularWeight() }
 var rank = 1
 foreach c: Compound in byMW {
   IO::println("  ##{rank} #{c.name()} #{round2(c.molecularWeight())} g/mol")
@@ -157,7 +157,7 @@ foreach c: Compound in byMW {
 
 // ── Section 3: organic vs inorganic (partition) ──
 IO::println("")
-val parts = compounds.partition { c => (c as Compound).isOrganic() }
+val parts = compounds.partition { c -> (c as Compound).isOrganic() }
 val organics   = parts.get(0) as List
 val inorganics = parts.get(1) as List
 IO::println("=== Organic Compounds (#{organics.size}) ===")
@@ -172,7 +172,7 @@ foreach c: Compound in inorganics {
 // ── Section 4: oxygen % in oxygen-bearing compounds ──
 IO::println("")
 IO::println("=== Oxygen Content ===")
-val oCmps = compounds.filter { c => (c as Compound).containsElement("O") }
+val oCmps = compounds.filter { c -> (c as Compound).containsElement("O") }
 foreach c: Compound in oCmps {
   IO::println("  " + c.name() + ": " + round2(c.percentOf("O")) + "% O")
 }
@@ -180,9 +180,9 @@ foreach c: Compound in oCmps {
 // ── Section 5: elements by group ──
 IO::println("")
 IO::println("=== Elements by Group ===")
-val byGroup = allElements.groupBy { e => groupLabel(e.group()) }
+val byGroup = allElements.groupBy { e -> groupLabel(e.group()) }
 foreach (grp, elems) in byGroup {
-  val symbols = (elems as List).map { e => (e as Element).symbol() }
+  val symbols = (elems as List).map { e -> (e as Element).symbol() }
   IO::println("  " + grp + ": " + symbols.toString())
 }
 
@@ -192,22 +192,22 @@ IO::println("=== Statistics ===")
 val mwOf   = (c: Compound) -> c.molecularWeight()
 val nameOf = (c: Compound) -> c.name()
 
-val totalMW = compounds.fold(0.0) { acc, c => (acc as Double) + mwOf(c as Compound) }
+val totalMW = compounds.fold(0.0) { acc, c -> (acc as Double) + mwOf(c as Compound) }
 val avgMW   = totalMW / compounds.size
 IO::println("Average MW: " + round2(avgMW) + " g/mol")
 
-val heaviest = compounds.fold(water) { acc, c =>
+val heaviest = compounds.fold(water) { acc, c ->
   if mwOf(c as Compound) > mwOf(acc as Compound) { c } else { acc }
 }
-val lightest = compounds.fold(water) { acc, c =>
+val lightest = compounds.fold(water) { acc, c ->
   if mwOf(c as Compound) < mwOf(acc as Compound) { c } else { acc }
 }
 IO::println("Heaviest: " + nameOf(heaviest as Compound) + " (" + round2(mwOf(heaviest as Compound)) + ")")
 IO::println("Lightest: " + nameOf(lightest as Compound) + " (" + round2(mwOf(lightest as Compound)) + ")")
 
 // zip compound names with MWs for compact display
-val names: List[String] = compounds.map { c => (c as Compound).name() }
-val mws:   List[Double] = compounds.map { c => (c as Compound).molecularWeight() }
+val names: List[String] = compounds.map { c -> (c as Compound).name() }
+val mws:   List[Double] = compounds.map { c -> (c as Compound).molecularWeight() }
 IO::println("")
 IO::println("=== Name ↔ MW (zip) ===")
 val zipped = names.zip(mws)
@@ -219,7 +219,7 @@ foreach pair: Object in zipped {
 // ── Section 7: elements with Z ≤ 10, via while loop ──
 IO::println("")
 IO::println("=== Light Elements (Z ≤ 10) ===")
-val lightZ = allElements.filter { e => e.atomicNumber() <= 10 }.sortedBy { e => e.atomicNumber() }
+val lightZ = allElements.filter { e -> e.atomicNumber() <= 10 }.sortedBy { e -> e.atomicNumber() }
 var idx = 0
 while idx < lightZ.size {
   val e = lightZ.get(idx) as Element
@@ -231,7 +231,7 @@ while idx < lightZ.size {
 IO::println("")
 def mwByName(nm: String): Double {
   try {
-    val found = compounds.find { c => (c as Compound).name() == nm }
+    val found = compounds.find { c -> (c as Compound).name() == nm }
     if found == null { throw new Exception("not found: " + nm) }
     return (found as Compound).molecularWeight()
   } catch ex: Exception {
@@ -255,9 +255,9 @@ IO::println("Total MW (recursive sum): " + round2(sumMW(compounds, 0)))
 // ── Section 10: bond-type groups ──
 IO::println("")
 IO::println("=== By Bond Type ===")
-val byBond = compounds.groupBy { c => (c as Compound).bondLabel() }
+val byBond = compounds.groupBy { c -> (c as Compound).bondLabel() }
 foreach (bond, cmps) in byBond {
-  val ns = (cmps as List).map { c => (c as Compound).name() }
+  val ns = (cmps as List).map { c -> (c as Compound).name() }
   IO::println("  " + bond + ": " + ns.toString())
 }
 

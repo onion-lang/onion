@@ -267,8 +267,8 @@ foreach seq: Sequence in sequences {
 IO::println("")
 
 // GC content summary across all sequences
-val totalBp: Int = sequences.fold(0) { acc, s => (acc as Int) + (s as Sequence).len() }
-val totalGC: Int = sequences.fold(0) { acc, s => (acc as Int) + (s as Sequence).gcCount() }
+val totalBp: Int = sequences.fold(0) { acc, s -> (acc as Int) + (s as Sequence).len() }
+val totalGC: Int = sequences.fold(0) { acc, s -> (acc as Int) + (s as Sequence).gcCount() }
 IO::println("  Total bases: #{totalBp}  Average GC: #{totalGC.pct(totalBp)}")
 IO::println("")
 
@@ -303,7 +303,7 @@ foreach seq: Sequence in sequences {
     val site: String = sites.get(i) as String
     val hits: List[RestrictionSite] = findRestriction(seq, enzyme, site)
     if hits.size > 0 {
-      val positions: List[String] = hits.map { h => (h as RestrictionSite).position().toString() }
+      val positions: List[String] = hits.map { h -> (h as RestrictionSite).position().toString() }
       IO::println("    #{enzyme} (#{site}): #{hits.size} site(s) at #{positions.toString()}")
     }
     i = i + 1
@@ -331,10 +331,10 @@ IO::println("")
 
 // Protein length distribution
 IO::println("── PROTEIN LENGTH DISTRIBUTION ─────────────────────────────")
-val allORFs: List[ORF] = sequences.flatMap { seq =>
+val allORFs: List[ORF] = sequences.flatMap { seq ->
   findORFs(seq as Sequence, CODON_TABLE)
 }
-val byLen: Map[String, List[ORF]] = allORFs.groupBy { orf =>
+val byLen: Map[String, List[ORF]] = allORFs.groupBy { orf ->
   val l: Int = (orf as ORF).len()
   if l < 20 { "short (<20nt)" } else if l < 60 { "medium (20-59nt)" } else { "long (60+nt)" }
 }
@@ -350,7 +350,7 @@ foreach seq: Sequence in sequences {
   if orfs.size == 0 {
     IO::println("  #{seq.id()}: no ORF")
   } else {
-    val sorted: List[ORF] = orfs.sortedBy { o => 0 - (o as ORF).len() }
+    val sorted: List[ORF] = orfs.sortedBy { o -> 0 - (o as ORF).len() }
     val o: ORF = sorted.get(0) as ORF
     IO::println("  #{seq.id()}: #{o.protein().length()} aa (#{o.len()} nt)")
   }
@@ -390,13 +390,13 @@ class CompositeValidator conforms Validator {
 public:
   def this(vs: List[Validator]) { validators = vs }
   def validate(seq: Sequence): Boolean {
-    return validators.fold(true) { acc, v =>
+    return validators.fold(true) { acc, v ->
       (acc as Boolean) && (v as Validator).validate(seq)
     } as Boolean
   }
   def description(): String {
-    val descs: List[String] = validators.map { v => (v as Validator).description() }
-    return descs.fold("") { acc, d =>
+    val descs: List[String] = validators.map { v -> (v as Validator).description() }
+    return descs.fold("") { acc, d ->
       val s: String = acc as String
       if s.length() == 0 { d as String } else { s + " AND " + (d as String) }
     } as String
@@ -436,7 +436,7 @@ val kmerEntries: List[String] = []
 foreach (km, freq) in kmerMap {
   kmerEntries.add(km as String)
 }
-val topKmers: List[String] = kmerEntries.sortedBy { km =>
+val topKmers: List[String] = kmerEntries.sortedBy { km ->
   val freq: Int? = kmerMap.get(km as String) as Int?
   if freq == null { 0 } else { 0 - (freq as Int) }
 }
@@ -475,7 +475,7 @@ IO::println("── SUMMARY ─────────────────�
 IO::println("  Sequences analyzed : #{sequences.size}")
 IO::println("  Total bases        : #{totalBp}")
 IO::println("  Total ORFs found   : #{allORFs.size}")
-val validSeqs: List[Sequence] = sequences.filter { seq => validator.validate(seq as Sequence) }
+val validSeqs: List[Sequence] = sequences.filter { seq -> validator.validate(seq as Sequence) }
 IO::println("  Sequences passing  : #{validSeqs.size} / #{sequences.size}")
 IO::println("")
 IO::println("=".rep(60))

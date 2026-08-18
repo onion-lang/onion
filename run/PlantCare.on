@@ -132,7 +132,7 @@ public:
   }
 
   def groupByFamily(): Map[String, List[Plant]] {
-    return plants.groupBy { p: Plant => p.family().label() }
+    return plants.groupBy { p: Plant -> p.family().label() }
   }
 
   def countByAction(action: CareAction): Int {
@@ -289,7 +289,7 @@ sep()
 IO::println("ESTIMATED GROWTH LEADERBOARD")
 sep()
 val sorted: List[Plant] =
-  shelf.plants.sortedBy { p: Plant => 0 - p.estimatedGrowthMm(today) }
+  shelf.plants.sortedBy { p: Plant -> 0 - p.estimatedGrowthMm(today) }
 var rank: Int = 1
 foreach p: Plant in sorted {
   IO::println("  ##{rank}  #{pad(p.name(), 14)}  #{p.estimatedGrowthMm(today)}mm")

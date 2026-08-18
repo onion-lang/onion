@@ -10,7 +10,7 @@ public:
     val buffer: StringBuffer = new StringBuffer;
     var line: String = null;
     while (line = reader.readLine) != null {
-      buffer.append(filter.call(line));
+      buffer.append(filter(line));
     }
     return new String(buffer);
   }

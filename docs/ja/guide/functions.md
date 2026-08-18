@@ -84,8 +84,8 @@ println(factorial(1000))  // スタックオーバーフローなし
 
 ```onion
 def applyTwice(f: (Int) -> Int, value: Int): Int {
-  val temp: Int = f.call(value)
-  return f.call(temp)
+  val temp: Int = f(value)
+  return f(temp)
 }
 
 val increment: (Int) -> Int = (x: Int) -> { return x + 1; }

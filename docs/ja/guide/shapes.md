@@ -183,7 +183,7 @@ losslessness は既定ではなく主張です：`isLossless()` は正直に答�
 
 ```onion
 val lens = file(path).readLossless(Server::cfg()).get()
-val out  = lens.edit { v => v.copy(port = 9090) }.render()
+val out  = lens.edit { v -> v.copy(port = 9090) }.render()
 Files::writeText(path, out)
 ```
 

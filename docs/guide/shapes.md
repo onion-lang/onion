@@ -186,7 +186,7 @@ in a `tool`:
 
 ```onion
 val lens = file(path).readLossless(Server::cfg()).get()
-val out  = lens.edit { v => v.copy(port = 9090) }.render()
+val out  = lens.edit { v -> v.copy(port = 9090) }.render()
 Files::writeText(path, out)
 ```
 

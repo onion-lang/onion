@@ -133,9 +133,9 @@ public:
   def availableKg(): Int = capacityKg - weightKg
 
   def addStop(floor: Int): void {
-    if queue.find { f => (f as Int) == floor } != null { return }
+    if queue.find { f -> (f as Int) == floor } != null { return }
     queue.add(floor)
-    queue = queue.sortedBy { f =>
+    queue = queue.sortedBy { f ->
       val diff: Int = (f as Int) - currentFloor
       if diff < 0 { 0 - diff } else { diff }
     }
@@ -159,7 +159,7 @@ public:
     if target > currentFloor { currentFloor++; direction = Direction::UP }
     else if target < currentFloor { currentFloor--; direction = Direction::DOWN }
     if currentFloor == target {
-      queue = queue.filter { f => (f as Int) != target }
+      queue = queue.filter { f -> (f as Int) != target }
       doorState = DoorState::OPEN
       if queue.isEmpty() { weightKg = 0; direction = Direction::IDLE }
       return new DoorsOpened(carId, currentFloor)
@@ -182,16 +182,16 @@ public:
   def carList(): List[ElevatorCar] = cars
 
   def findCar(carId: Int): Option[ElevatorCar] {
-    val found: ElevatorCar = cars.find { c => (c as ElevatorCar).id() == carId } as ElevatorCar
+    val found: ElevatorCar = cars.find { c -> (c as ElevatorCar).id() == carId } as ElevatorCar
     if found != null { return Option::some(found) }
     return Option::none()
   }
 
   // nearest car with enough spare capacity, or null if none can take the ride
   def dispatch(r: RiderRequest): ElevatorCar? {
-    val eligible: List[ElevatorCar] = cars.filter { c => (c as ElevatorCar).availableKg() >= r.weightKg() }
+    val eligible: List[ElevatorCar] = cars.filter { c -> (c as ElevatorCar).availableKg() >= r.weightKg() }
     if eligible.isEmpty() { return null }
-    val nearest: List[ElevatorCar] = eligible.sortedBy { c =>
+    val nearest: List[ElevatorCar] = eligible.sortedBy { c ->
       val diff: Int = (c as ElevatorCar).floor() - r.originFloor()
       if diff < 0 { 0 - diff } else { diff }
     }
@@ -320,18 +320,18 @@ IO::println("  cars 1,9: " + pairStatus(building, 1, 9).getOrElse("cars not foun
 
 // ── Section 5: request analytics ──
 IO::println("\n── Request Analytics ────────────────────────")
-val byDirection: Map[String, List[RiderRequest]] = requests.groupBy { r => (r as RiderRequest).direction().label() }
+val byDirection: Map[String, List[RiderRequest]] = requests.groupBy { r -> (r as RiderRequest).direction().label() }
 foreach (dir, reqs) in byDirection {
-  val ids: List[Int] = (reqs as List[RiderRequest]).map { r => (r as RiderRequest).id() }
+  val ids: List[Int] = (reqs as List[RiderRequest]).map { r -> (r as RiderRequest).id() }
   IO::println("  #{dir.padRight(6)}: #{ids.toString()}")
 }
 
-val parts = requests.partition { r => (r as RiderRequest).weightKg() >= 70 }
+val parts = requests.partition { r -> (r as RiderRequest).weightKg() >= 70 }
 val heavy: List[RiderRequest] = parts.get(0) as List[RiderRequest]
 val light: List[RiderRequest] = parts.get(1) as List[RiderRequest]
 IO::println("  Heavy (>=70kg): #{heavy.size}, Light (<70kg): #{light.size}")
 
-val byDistance: List[RiderRequest] = requests.sortedBy { r => (r as RiderRequest).distance() }
+val byDistance: List[RiderRequest] = requests.sortedBy { r -> (r as RiderRequest).distance() }
 IO::println("  Shortest hop: ##{(byDistance.get(0) as RiderRequest).id()}, " +
   "Longest hop: ##{(byDistance.get(byDistance.size - 1) as RiderRequest).id()}")
 
@@ -340,12 +340,12 @@ foreach r: RiderRequest in requests {
   allFloors.add(r.originFloor())
   allFloors.add(r.destFloor())
 }
-IO::println("  Distinct floors visited: #{allFloors.distinct().sortedBy { f => f as Int }.toString()}")
+IO::println("  Distinct floors visited: #{allFloors.distinct().sortedBy { f -> f as Int }.toString()}")
 
-val totalWeight: Int = requests.fold(0) { acc, r => (acc as Int) + (r as RiderRequest).weightKg() }
+val totalWeight: Int = requests.fold(0) { acc, r -> (acc as Int) + (r as RiderRequest).weightKg() }
 IO::println("  Total weight carried: #{totalWeight}kg")
 
-val ids: List[Int] = requests.map { r => (r as RiderRequest).id() }
+val ids: List[Int] = requests.map { r -> (r as RiderRequest).id() }
 val zipped = ids.zip(assignedCarIds)
 IO::println("  Request -> Car assignments (zip): #{zipped.toString()}")
 

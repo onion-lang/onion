@@ -154,28 +154,28 @@ public:
   }
 
   def topRated(minRating: Int): List[Song] {
-    return this.asList().filter { s => s.rating() >= minRating }
-                        .sortedBy { s => 0 - s.rating() }
+    return this.asList().filter { s -> s.rating() >= minRating }
+                        .sortedBy { s -> 0 - s.rating() }
   }
 
-  def sortedByArtist(): List[Song] { return this.asList().sortedBy { s => s.artist() } }
-  def sortedByDuration(): List[Song] { return this.asList().sortedBy { s => s.durationSec() } }
-  def sortedByYear(): List[Song] { return this.asList().sortedBy { s => s.year() } }
-  def recentDecade(): List[Song] { return this.asList().filter { s => s.year() >= 2010 } }
+  def sortedByArtist(): List[Song] { return this.asList().sortedBy { s -> s.artist() } }
+  def sortedByDuration(): List[Song] { return this.asList().sortedBy { s -> s.durationSec() } }
+  def sortedByYear(): List[Song] { return this.asList().sortedBy { s -> s.year() } }
+  def recentDecade(): List[Song] { return this.asList().filter { s -> s.year() >= 2010 } }
 
   def totalDurationSec(): Int {
-    return this.asList().fold(0) { acc, s => acc + s.durationSec() }
+    return this.asList().fold(0) { acc, s -> acc + s.durationSec() }
   }
 
   def averageRating(): Double {
     val cnt = this.songs.size()
     if cnt == 0 { return 0.0 }
-    val total: Int = this.asList().fold(0) { acc, s => acc + s.rating() }
+    val total: Int = this.asList().fold(0) { acc, s -> acc + s.rating() }
     return (total as Double) / (cnt as Double)
   }
 
   def topArtist(): String? {
-    val byArtist = this.asList().groupBy { s => s.artist() }
+    val byArtist = this.asList().groupBy { s -> s.artist() }
     var best: String? = null
     var bestCount: Int = 0
     foreach (artist, grp) in byArtist {
@@ -240,7 +240,7 @@ public:
   }
 
   def uniqueArtists(): List[String] {
-    return this.allSongs().map { s => s.artist() }.distinct().sortedBy { a => a as String }
+    return this.allSongs().map { s -> s.artist() }.distinct().sortedBy { a -> a as String }
   }
 }
 
@@ -272,7 +272,7 @@ def printStats(pl: Playlist): void {
     IO::println("  Top   : " + top)
   }
   IO::println("  Genres:")
-  foreach (genre, grp) in pl.asList().groupBy { s => s.genre().label() } {
+  foreach (genre, grp) in pl.asList().groupBy { s -> s.genre().label() } {
     IO::println("    " + (genre as String).padRight(12) + " " + (grp as List[Song]).size + " songs")
   }
 }
@@ -337,11 +337,11 @@ printStats(mainPl)
 // ─── Genre breakdown ──────────────────────────────────────────────────────────
 
 printSection("MY FAVOURITES — by genre")
-val byGenre = mainPl.asList().groupBy { s => s.genre().label() }
+val byGenre = mainPl.asList().groupBy { s -> s.genre().label() }
 foreach (genre, songs) in byGenre {
   val songList = songs as List[Song]
   IO::println("  ── " + (genre as String) + " (" + songList.size + ") ──")
-  foreach s: Song in songList.sortedBy { s => s.title() } {
+  foreach s: Song in songList.sortedBy { s -> s.title() } {
     IO::println("     " + s.title() + " — " + s.artist())
   }
 }
@@ -356,7 +356,7 @@ foreach s: Song in mainPl.topRated(5) {
 // ─── Songs from 2010+ ─────────────────────────────────────────────────────────
 
 printSection("RECENT (2010 onwards)")
-val recent = mainPl.recentDecade().sortedBy { s => s.year() }
+val recent = mainPl.recentDecade().sortedBy { s -> s.year() }
 foreach s: Song in recent {
   IO::println("  " + s.year() + "  " + s.title() + " — " + s.artist())
 }
@@ -365,11 +365,11 @@ foreach s: Song in recent {
 
 printSection("INSTRUMENTAL vs VOCAL (all songs in library)")
 val allSongs = lib.allSongs()
-val parts = allSongs.partition { s => (s as Song).genre().isPrimarilyInstrumental() }
+val parts = allSongs.partition { s -> (s as Song).genre().isPrimarilyInstrumental() }
 val instrumental = (parts as List)[0] as List[Song]
 val vocal        = (parts as List)[1] as List[Song]
 IO::println("  Instrumental: " + instrumental.size.plural("song"))
-foreach s: Song in instrumental.sortedBy { s => s.title() } {
+foreach s: Song in instrumental.sortedBy { s -> s.title() } {
   IO::println("    " + s.title() + " — " + s.artist() + " [" + s.genre().label() + "]")
 }
 IO::println("  Vocal: " + vocal.size.plural("song"))
@@ -420,17 +420,17 @@ foreach a: String in artists {
 // ─── Songs per year (map iteration, k,v) ─────────────────────────────────────
 
 printSection("SONGS PER YEAR (main playlist, chronological)")
-val byYear = mainPl.sortedByYear().groupBy { s => s.year() }
+val byYear = mainPl.sortedByYear().groupBy { s -> s.year() }
 foreach (yr, grp) in byYear {
   val yrSongs = grp as List[Song]
-  val titles  = yrSongs.map { s => s.title() }
+  val titles  = yrSongs.map { s -> s.title() }
   IO::println("  " + yr + ": " + titles)
 }
 
 // ─── Zip: rank + longest songs ────────────────────────────────────────────────
 
 printSection("TOP 5 LONGEST SONGS (zip rank + title)")
-val top5long = mainPl.sortedByDuration().sortedBy { s => 0 - s.durationSec() }
+val top5long = mainPl.sortedByDuration().sortedBy { s -> 0 - s.durationSec() }
 val ranks: List[Int] = [1, 2, 3, 4, 5]
 val zipped = ranks.zip(top5long)
 foreach pair: Object in zipped {
@@ -478,7 +478,7 @@ if found2 != null {
 
 printSection("CHILL VIBES STATS")
 IO::println("  Mode: " + chill.mode.label())
-foreach s: Song in chill.asList().sortedBy { s => s.title() } {
+foreach s: Song in chill.asList().sortedBy { s -> s.title() } {
   printSong(s)
 }
 printSeparator()
@@ -489,7 +489,7 @@ printStats(chill)
 printSection("RATING DISTRIBUTION (recursion demo)")
 def countRating(lst: List[Song], r: Int): Int {
   if r > 5 { return 0 }
-  return lst.filter { s => s.rating() == r }.size
+  return lst.filter { s -> s.rating() == r }.size
 }
 foreach r: Int in 1..5 {
   val cnt = countRating(mainPl.asList(), r)

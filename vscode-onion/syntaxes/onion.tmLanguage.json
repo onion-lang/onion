@@ -318,7 +318,7 @@
         },
         {
           "name": "keyword.operator.arrow.onion",
-          "match": "(->|=>|<-)"
+          "match": "(->|<-)"
         }
       ]
     },

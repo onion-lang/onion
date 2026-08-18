@@ -219,18 +219,18 @@ public:
 
   def submit(s: Submission): void {
     allSubmissions.add(s)
-    val found = contestants.find { c => (c as Contestant).name() == s.handle() }
+    val found = contestants.find { c -> (c as Contestant).name() == s.handle() }
     if found != null { (found as Contestant).addSub(s) }
   }
 
   def findProblem(pid: String): Problem? {
-    val found = problems.find { p => (p as Problem).id() == pid }
+    val found = problems.find { p -> (p as Problem).id() == pid }
     if found == null { return null }
     return found as Problem
   }
 
   def standings(): List[Object] {
-    return contestants.sortedBy { c =>
+    return contestants.sortedBy { c ->
       val con = c as Contestant
       (0 - con.solvedCount()) * 100000 + con.totalPenalty()
     }
@@ -259,7 +259,7 @@ public:
   }
 
   def submissionsFor(pid: String): List[Object] {
-    return allSubmissions.filter { s => (s as Submission).problemId() == pid }
+    return allSubmissions.filter { s -> (s as Submission).problemId() == pid }
   }
 
   def allSubs(): List[Object] = allSubmissions
@@ -283,7 +283,7 @@ def banner(text: String): void {
 // ─── do[Option]: safe contestant lookup + problem solve info ──────────────────
 
 def findContestant(contest: Contest, handle: String): Option[Contestant] {
-  val found = contest.contestants().find { c => (c as Contestant).name() == handle }
+  val found = contest.contestants().find { c -> (c as Contestant).name() == handle }
   if found == null { return Option::none() }
   return Option::some(found as Contestant)
 }
@@ -428,7 +428,7 @@ val diffPairs: List[Object] = do[List] {
   d  <- ["easy", "medium", "hard", "very hard", "extreme"]
   ret "#{(p as Problem).id()}/#{d}"
 }
-val hardOnly = diffPairs.filter { pair =>
+val hardOnly = diffPairs.filter { pair ->
   val s = pair as String
   s.contains("hard") || s.contains("extreme")
 }
@@ -465,7 +465,7 @@ banner("Problem Acceptance Rates")
 foreach prob: Object in contest.problems() {
   val p = prob as Problem
   val psubs: List[Object] = contest.submissionsFor(p.id())
-  val acs: Int = psubs.filter { s => (s as Submission).verdict().isAccepted() }.size
+  val acs: Int = psubs.filter { s -> (s as Submission).verdict().isAccepted() }.size
   val total2: Int = psubs.size
   val rate: Int = if total2 == 0 { 0 } else { acs * 100 / total2 }
   IO::println("  #{p.id()}  #{p.title().truncate(24).padRight(24)}: #{acs}/#{total2} accepted (#{rate}%)")
@@ -476,12 +476,12 @@ IO::println("")
 
 banner("Unique Solvers by Language")
 val byLang = contest.allSubs()
-  .filter { s => (s as Submission).verdict().isAccepted() }
-  .groupBy { s => (s as Submission).lang().label() }
+  .filter { s -> (s as Submission).verdict().isAccepted() }
+  .groupBy { s -> (s as Submission).lang().label() }
 foreach (lang, langSubs) in byLang {
-  val uniq = (langSubs as List).map { s => (s as Submission).handle() }.distinct()
+  val uniq = (langSubs as List).map { s -> (s as Submission).handle() }.distinct()
   val label: String = lang as String
-  val names: String = uniq.fold("") { acc, h => (acc as String) + (h as String) + " " }
+  val names: String = uniq.fold("") { acc, h -> (acc as String) + (h as String) + " " }
   IO::println("  #{label}: #{uniq.size} solver(s) — #{names.trim()}")
 }
 IO::println("")

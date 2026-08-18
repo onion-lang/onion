@@ -95,15 +95,15 @@ val employees: List[Employee] = [
 ]
 
 val payroll: List[EmployeePayroll] =
-  employees.map { e => new EmployeePayroll(e as Employee) }
+  employees.map { e -> new EmployeePayroll(e as Employee) }
 
 // ======================================================================
 // 1. Totals
 // ======================================================================
-val totalMonthly = payroll.fold(0) { acc, p =>
+val totalMonthly = payroll.fold(0) { acc, p ->
   (acc as Int) + (p as EmployeePayroll).monthlyCost()
 }
-val totalAnnual  = payroll.fold(0) { acc, p =>
+val totalAnnual  = payroll.fold(0) { acc, p ->
   (acc as Int) + (p as EmployeePayroll).annualCost()
 }
 IO::println("=== Payroll Summary ===")
@@ -121,7 +121,7 @@ foreach p: Object in payroll {
 // ======================================================================
 // 3. Partition: expensive (>500k/mo) vs. affordable
 // ======================================================================
-val parts     = payroll.partition { p => (p as EmployeePayroll).monthlyCost() > 500000 }
+val parts     = payroll.partition { p -> (p as EmployeePayroll).monthlyCost() > 500000 }
 val expensive = parts[0] as List
 val affordable = parts[1] as List
 IO::println("\nExpensive (>500k/mo) : " + expensive.size)
@@ -131,9 +131,9 @@ IO::println("Affordable           : " + affordable.size)
 // 4. Group by department
 // ======================================================================
 IO::println("\n--- By Department ---")
-val byDept = payroll.groupBy { p => (p as EmployeePayroll).emp().dept() }
+val byDept = payroll.groupBy { p -> (p as EmployeePayroll).emp().dept() }
 foreach (dept, members) in byDept {
-  val deptCost: Int = ((members as List).fold(0) { acc, p =>
+  val deptCost: Int = ((members as List).fold(0) { acc, p ->
     (acc as Int) + (p as EmployeePayroll).monthlyCost()
   }) as Int
   val totalMo: Int = totalMonthly as Int
@@ -144,7 +144,7 @@ foreach (dept, members) in byDept {
 // ======================================================================
 // 5. Top earner
 // ======================================================================
-val ranked = payroll.sortedByDescending { p => (p as EmployeePayroll).monthlyCost() }
+val ranked = payroll.sortedByDescending { p -> (p as EmployeePayroll).monthlyCost() }
 if ranked.size > 0 {
   val top = ranked[0] as EmployeePayroll
   IO::println("\nTop earner: #{top.emp().name()} at #{top.monthlyCost()}/mo")
@@ -153,9 +153,9 @@ if ranked.size > 0 {
 // ======================================================================
 // 6. any / all / count
 // ======================================================================
-val anyHighRoller = payroll.any { p => (p as EmployeePayroll).monthlyCost() > 700000 }
-val allPositive   = payroll.all { p => (p as EmployeePayroll).monthlyCost() > 0 }
-val seniorCount   = employees.count { e => (e as Employee).level() == Level::SENIOR }
+val anyHighRoller = payroll.any { p -> (p as EmployeePayroll).monthlyCost() > 700000 }
+val allPositive   = payroll.all { p -> (p as EmployeePayroll).monthlyCost() > 0 }
+val seniorCount   = employees.count { e -> (e as Employee).level() == Level::SENIOR }
 IO::println("\nAny earner >700k : " + anyHighRoller)
 IO::println("All positive     : " + allPositive)
 IO::println("Senior count     : " + seniorCount)
@@ -163,22 +163,22 @@ IO::println("Senior count     : " + seniorCount)
 // ======================================================================
 // 7. distinct departments
 // ======================================================================
-val depts = employees.map { e => (e as Employee).dept() }.distinct()
+val depts = employees.map { e -> (e as Employee).dept() }.distinct()
 IO::println("\nDistinct departments: " + depts.size)
 
 // ======================================================================
 // 8. Filter senior/lead, then map to names
 // ======================================================================
 val seniorNames = employees
-  .filter { e => (e as Employee).level() == Level::SENIOR || (e as Employee).level() == Level::LEAD }
-  .map { e => (e as Employee).name() }
+  .filter { e -> (e as Employee).level() == Level::SENIOR || (e as Employee).level() == Level::LEAD }
+  .map { e -> (e as Employee).name() }
 IO::println("\nSenior/Lead : " + seniorNames.toString())
 
 // ======================================================================
 // 9. 3-year salary projection (5% raise/year, recursive)
 // ======================================================================
 IO::println("\n--- 3-Year Salary Projection (5% annual raise) ---")
-val projections = payroll.map { p =>
+val projections = payroll.map { p ->
   val ep   = p as EmployeePayroll
   val curr = ep.monthlyCost()
   val proj = withRaises(curr, 5, 3)
@@ -209,8 +209,8 @@ IO::println("Freelance : " + freelanceCount)
 // ======================================================================
 val engBudget = 2000000
 val engTotal: Int = (payroll
-  .filter { p => (p as EmployeePayroll).emp().dept() == Department::ENG }
-  .fold(0) { acc, p => (acc as Int) + (p as EmployeePayroll).monthlyCost() }) as Int
+  .filter { p -> (p as EmployeePayroll).emp().dept() == Department::ENG }
+  .fold(0) { acc, p -> (acc as Int) + (p as EmployeePayroll).monthlyCost() }) as Int
 IO::println("\nEng monthly: #{engTotal}, budget: #{engBudget}")
 IO::println("Eng over budget: " + engTotal.isOverBudget(engBudget))
 
@@ -218,8 +218,8 @@ IO::println("Eng over budget: " + engTotal.isOverBudget(engBudget))
 // 12. zip: monthly vs. annual side-by-side for first 3 employees
 // ======================================================================
 IO::println("\n--- Monthly vs Annual (first 3) ---")
-val first3monthly = payroll.take(3).map { p => (p as EmployeePayroll).monthlyCost() }
-val first3annual  = payroll.take(3).map { p => (p as EmployeePayroll).annualCost() }
+val first3monthly = payroll.take(3).map { p -> (p as EmployeePayroll).monthlyCost() }
+val first3annual  = payroll.take(3).map { p -> (p as EmployeePayroll).annualCost() }
 val zipped = first3monthly.zip(first3annual)
 foreach pair: Object in zipped {
   val row = pair as List
@@ -248,7 +248,7 @@ val levelValues: List[Level] = [Level::JUNIOR, Level::MID, Level::SENIOR, Level:
 var li = 0
 while li < levelValues.size {
   val lv = levelValues[li] as Level
-  val c  = employees.count { e => (e as Employee).level() == lv }
+  val c  = employees.count { e -> (e as Employee).level() == lv }
   IO::println(levelNames[li] + ": " + c)
   li = li + 1
 }
@@ -257,7 +257,7 @@ while li < levelValues.size {
 // 15. flatMap: each employee expands to dept/name and name-only labels
 // ======================================================================
 IO::println("\n--- Dept/Name Labels (via flatMap) ---")
-val allLabels: List[String] = employees.flatMap { e =>
+val allLabels: List[String] = employees.flatMap { e ->
   val emp = e as Employee
   ["" + emp.dept() + "/" + emp.name(), emp.name()]
 }

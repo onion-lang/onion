@@ -450,6 +450,24 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.duplicateRecordComponent",
       Seq(items => typeName(items(0)), items => asString(items(1)))
     ),
+    // {0} = the class, {1} = the primary constructor's parameter types, so the fix is
+    // copy-pasteable: `def this(...) : this(<{1}>) { ... }`.
+    SemanticError.SECONDARY_CONSTRUCTOR_MUST_DELEGATE -> ErrorDef(
+      "error.semantic.secondaryConstructorMustDelegate",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CONSTRUCTOR_DELEGATION_CYCLE -> ErrorDef(
+      "error.semantic.constructorDelegationCycle",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
+      "error.semantic.constructorInRecordOrEnum",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
+    ),
+    SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
+      "error.semantic.thisBeforeConstructorDelegation",
+      Seq(items => typeName(items(0)))
+    ),
     // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
     // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
     // sweeping E-code coverage for 0.10.1).

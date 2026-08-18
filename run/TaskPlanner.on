@@ -166,56 +166,56 @@ public:
   }
 
   def findById(id: Int): Task? {
-    val found = allTasks().find { t => t.id() == id }
+    val found = allTasks().find { t -> t.id() == id }
     if found == null { return null }
     return found as Task
   }
 
   def findByAssignee(name: String): List[Task] {
-    return allTasks().filter { t =>
+    return allTasks().filter { t ->
       val a = t.assignee()
       return a != null && a == name
     }
   }
 
   def byPriority(): List[Task] {
-    return allTasks().sortedBy { t => t.priority().order() }
+    return allTasks().sortedBy { t -> t.priority().order() }
   }
 
   def pending(): List[Task] {
-    return allTasks().filter { t => !t.status().isComplete() }
+    return allTasks().filter { t -> !t.status().isComplete() }
   }
 
   def blockedTasks(): List[Task] {
-    return allTasks().filter { t => t.status().isBlocked() }
+    return allTasks().filter { t -> t.status().isBlocked() }
   }
 
   def criticalOrHigh(): List[Task] {
-    return allTasks().filter { t => t.priority().isCriticalOrHigh() }
+    return allTasks().filter { t -> t.priority().isCriticalOrHigh() }
   }
 
   def totalEstimatedHours(): Double {
-    return allTasks().fold(0.0) { acc, t =>
+    return allTasks().fold(0.0) { acc, t ->
       (acc as Double) + t.estimatedHours()
     } as Double
   }
 
   def completedHours(): Double {
     return allTasks()
-      .filter { t => t.status().isComplete() }
-      .fold(0.0) { acc, t => (acc as Double) + t.estimatedHours() } as Double
+      .filter { t -> t.status().isComplete() }
+      .fold(0.0) { acc, t -> (acc as Double) + t.estimatedHours() } as Double
   }
 
   def hasAnyBlocked(): Boolean {
-    return allTasks().any { t => t.status().isBlocked() }
+    return allTasks().any { t -> t.status().isBlocked() }
   }
 
   def summary(): SprintSummary {
     val total  = allTasks().size
-    val done   = allTasks().filter { t => t.status().isComplete() }.size
+    val done   = allTasks().filter { t -> t.status().isComplete() }.size
     val blk    = blockedTasks().size
-    val inProg = allTasks().filter { t => t.status().isInProgress() }.size
-    val todo   = allTasks().filter { t => t.status().isTodo() }.size
+    val inProg = allTasks().filter { t -> t.status().isInProgress() }.size
+    val todo   = allTasks().filter { t -> t.status().isTodo() }.size
     val est    = totalEstimatedHours()
     val comp   = completedHours()
     val vel    = if total == 0 { 0.0 } else { comp / est * 100.0 }
@@ -271,15 +271,15 @@ def printByPriority(board: TaskBoard): void {
 
 def printByAssignee(board: TaskBoard): void {
   printHeader("Tasks by Assignee")
-  val grouped = board.allTasks().groupBy { t => t.assignee() ?: "[unassigned]" }
+  val grouped = board.allTasks().groupBy { t -> t.assignee() ?: "[unassigned]" }
   foreach (name, tlist) in grouped {
     val grp      = tlist as List[Object]
     val total    = grp.size
-    val doneHrs  = grp.filter  { t => (t as Task).status().isComplete() }
-                      .fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
-    val totalHrs = grp.fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
+    val doneHrs  = grp.filter  { t -> (t as Task).status().isComplete() }
+                      .fold(0.0) { acc, t -> (acc as Double) + (t as Task).estimatedHours() } as Double
+    val totalHrs = grp.fold(0.0) { acc, t -> (acc as Double) + (t as Task).estimatedHours() } as Double
     IO::println("  #{name} (#{total.plural("task")}, #{doneHrs.fmtHrs()} / #{totalHrs.fmtHrs()})")
-    val byPri = grp.sortedBy { t => (t as Task).priority().order() }
+    val byPri = grp.sortedBy { t -> (t as Task).priority().order() }
     foreach t: Object in byPri {
       val tk = t as Task
       IO::println("    [#{tk.priority().label().trim()}]  #{tk.title().truncate(28)}  #{tk.status().label().trim()}")
@@ -303,11 +303,11 @@ def printBlockers(board: TaskBoard): void {
 
 def printTagDistribution(board: TaskBoard): void {
   printHeader("Tag Distribution")
-  val byTag = board.allTasks().groupBy { t => t.tag().label() }
+  val byTag = board.allTasks().groupBy { t -> t.tag().label() }
   foreach (tagLabel, tlist) in byTag {
     val grp   = tlist as List[Object]
     val total = grp.size
-    val hrs   = grp.fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
+    val hrs   = grp.fold(0.0) { acc, t -> (acc as Double) + (t as Task).estimatedHours() } as Double
     IO::println("  [#{tagLabel}]  #{total.plural("task")}, #{hrs.fmtHrs()} estimated")
   }
   IO::println("")
@@ -315,7 +315,7 @@ def printTagDistribution(board: TaskBoard): void {
 
 def printTopN(board: TaskBoard, n: Int): void {
   printHeader("Top #{n} Critical/High Priority Tasks")
-  val top   = board.criticalOrHigh().sortedBy { t => t.priority().order() }.take(n)
+  val top   = board.criticalOrHigh().sortedBy { t -> t.priority().order() }.take(n)
   val ranks: List[Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   val pairs = top.zip(ranks)
   foreach pair: Object in pairs {
@@ -329,7 +329,7 @@ def printTopN(board: TaskBoard, n: Int): void {
 
 // ─── do[Option] lookup helper ─────────────────────────────────────────────────
 def findTask(board: TaskBoard, id: Int): Option[Task] {
-  val found = board.allTasks().find { t => t.id() == id }
+  val found = board.allTasks().find { t -> t.id() == id }
   if found == null { return Option::none() }
   return Option::some(found as Task)
 }
@@ -403,14 +403,14 @@ IO::println("")
 // Partition: done vs pending
 printHeader("Done vs Pending")
 val allTasksList = board.allTasks()
-val parts        = allTasksList.partition { t => t.status().isComplete() }
+val parts        = allTasksList.partition { t -> t.status().isComplete() }
 val doneTasks    = parts[0] as List[Object]
 val pendingTasks = parts[1] as List[Object]
 IO::println("  Done    : #{doneTasks.size.plural("task")}, #{board.completedHours().fmtHrs()} completed")
 IO::println("  Pending : #{pendingTasks.size.plural("task")}")
 
 // Distinct tags in use
-val tagLabels = allTasksList.map { t => t.tag().label() }.distinct()
+val tagLabels = allTasksList.map { t -> t.tag().label() }.distinct()
 IO::println("  Tags in sprint: #{tagLabels.size} distinct")
 var tagStr = ""
 foreach lbl: Object in tagLabels {

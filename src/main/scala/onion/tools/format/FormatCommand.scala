@@ -46,12 +46,17 @@ object FormatCommand:
   private def parse(args: Array[String]): Either[String, Options] =
     val paths = mutable.ListBuffer[Path]()
     var check = false
-    args.foreach {
-      case "--check" => check = true
-      case flag if flag.startsWith("-") => return Left(s"fmt: unknown option: $flag")
-      case path => paths += Path.of(path)
-    }
-    Right(Options(check, paths.toSeq))
+    var error: Option[String] = None
+    var i = 0
+    while i < args.length && error.isEmpty do
+      args(i) match
+        case "--check" => check = true
+        case flag if flag.startsWith("-") => error = Some(s"fmt: unknown option: $flag")
+        case path => paths += Path.of(path)
+      i += 1
+    error match
+      case Some(message) => Left(message)
+      case None => Right(Options(check, paths.toSeq))
 
   /** The files to format: the ones named, or the project's own if none were. */
   private def collect(cwd: Path, paths: Seq[Path], err: PrintStream): Either[Int, Seq[Path]] =

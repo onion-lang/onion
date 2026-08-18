@@ -153,12 +153,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     val args = node.args.toArray
 
     val preliminaryParams = new Array[Term](args.length)
-    for (i <- args.indices if !untypedClosureIndices.contains(i)) {
-      calls.typed(args(i), context) match {
-        case Some(term) => preliminaryParams(i) = term
-        case None => return None
+    var i = 0
+    var failed = false
+    while (i < args.length && !failed) {
+      if (!untypedClosureIndices.contains(i)) {
+        calls.typed(args(i), context) match {
+          case Some(term) => preliminaryParams(i) = term
+          case None => failed = true
+        }
       }
+      i += 1
     }
+    if (failed) return None
 
     val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
     candidates.iterator.flatMap { extMethod =>

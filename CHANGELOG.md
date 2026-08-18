@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The ternary and old-trailing-arrow parser hints printed literal single-quote
+  characters around their braces instead of the braces alone**, e.g. `if cond '{' a '}'
+  else '{' b '}'` instead of `if cond { a } else { b }`. Both hints are looked up through
+  the zero-argument `Message(property)`, which returns the resource bundle string as-is
+  and never runs it through `MessageFormat` — so the `'{'`/`'}'` brace-escaping
+  convention, needed only when a lookup actually formats arguments (as
+  `trailing_lambda_parens` does), leaked its escaping quotes straight into the message.
+  `errorMessage.properties` and `errorMessage_ja.properties` now spell both hints with
+  plain braces.
+
 - **A stray `cond ? a : b` ternary now gets a hint instead of a bare expected-token
   dump.** Onion has no ternary operator — `if`/`else` works as an expression instead —
   but a newcomer writing `?` still hits the parser at a point where the expected-token

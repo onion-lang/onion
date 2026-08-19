@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example that actually demonstrates positional args plus a trailing lambda. All four
   snippets are now verified against the compiler.
 
+- **The `for x in xs` parser hint was hard-coded English, breaking bilingual
+  diagnostics.** Every other hint in `commonSyntaxHint` (`Parsing.scala`) resolves through
+  `Message("error.parsing.hint.*")`, so it follows the JVM's default locale like the rest
+  of the compiler's diagnostics; the `case "in"` hint (suggesting the C-style loop rewrite
+  for the retired `for x in xs` syntax) was still a raw string literal, so a Japanese-locale
+  syntax error came out in Japanese with the hint sentence stuck in English mid-message.
+  Added `error.parsing.hint.old_for_in` to both `errorMessage.properties` and
+  `errorMessage_ja.properties` and pointed the hint at it.
+
 ## [0.12.0] - 2026-08-18
 
 ### Changed

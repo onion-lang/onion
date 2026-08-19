@@ -53,5 +53,23 @@ class HintMessageFormatSpec extends AbstractShellSpec {
       assert(!msgs.contains("'{'") && !msgs.contains("'}'"), s"hint leaked MessageFormat quoting: $msgs")
       assert(msgs.contains("{ x -> ... }"), s"expected literal braces in the hint, got: $msgs")
     }
+
+    it("renders a literal brace for the dangling-else hint, not a quoted placeholder") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    else {
+          |      IO::println("b")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(!msgs.contains("'{'") && !msgs.contains("'}'"), s"hint leaked MessageFormat quoting: $msgs")
+      assert(msgs.contains("`}`"), s"expected a literal closing brace in the hint, got: $msgs")
+    }
   }
 }

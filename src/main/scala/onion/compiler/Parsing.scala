@@ -223,13 +223,13 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_super_init")
     case "in" =>
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
-    // There is no `cond ? a : b` ternary operator -- `if` is a statement, not an
-    // expression, so unlike the hints above this isn't a token swap; name the
-    // rewrite so the reader isn't left guessing what "unsupported" means here.
+    // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
+    // ground as an expression, so unlike the hints above this isn't a token swap;
+    // name the rewrite so the reader isn't left guessing what "unsupported" means here.
     case "?" =>
       Message("error.parsing.hint.ternary")
     case "else" =>
-      "Hint: `else` must follow an `if` block. Onion does not support `if` as an expression; use `if (cond) { ... } else { ... }`."
+      Message("error.parsing.hint.dangling_else")
     // Checked before the paren hint: `{ (k, v) => ... }` is wrong twice, and the arrow
     // is the part the writer will not spot on their own.
     case "{" if OldArrowTrailingLambdaHead.findFirstMatchIn(context).isDefined =>

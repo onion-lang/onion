@@ -222,7 +222,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
       Message("error.parsing.hint.old_super_init")
     case "in" =>
-      "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
+      Message("error.parsing.hint.old_for_in")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

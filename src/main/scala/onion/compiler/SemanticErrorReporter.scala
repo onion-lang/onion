@@ -50,6 +50,7 @@ import onion.compiler.exceptions.CompilationException
  *   - CONSTRUCTOR_NOT_FOUND
  *   - UNKNOWN_PARAMETER_NAME
  *   - LABEL_NOT_FOUND
+ *   - OVERRIDE_TARGET_NOT_FOUND
  *
  * == Compilation Context ==
  *
@@ -288,10 +289,7 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
-    SemanticError.OVERRIDE_TARGET_NOT_FOUND -> ErrorDef(
-      "error.semantic.overrideTargetNotFound",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
+    // OVERRIDE_TARGET_NOT_FOUND handled specially with suggestions
 
     // Generic type errors
     SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
@@ -601,6 +599,24 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles OVERRIDE_TARGET_NOT_FOUND with optional suggestions for similar
+   * method names among the base class's/interfaces' overridable methods.
+   */
+  private def reportOverrideTargetNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val paramDescriptor = asString(items(1))
+    val className = asString(items(2))
+    val baseMessage = format(message("error.semantic.overrideTargetNotFound"), Seq(name, paramDescriptor, className))
+
+    val suggestion = if (items.length > 3) {
+      val candidates = items(3).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
    * Handles CONSTRUCTOR_NOT_FOUND with available constructors display.
    */
   private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
@@ -703,6 +719,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportConstructorNotFound(position, items)
       case SemanticError.UNKNOWN_PARAMETER_NAME =>
         reportUnknownParameterName(position, items)
+      case SemanticError.OVERRIDE_TARGET_NOT_FOUND =>
+        reportOverrideTargetNotFound(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>

@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   labeled loop's name in `labelStack` but exposed no way to read it back;
   it now has a `labels` accessor, and `LABEL_NOT_FOUND` (E0058) has a
   dedicated handler that suggests the closest enclosing label name.
+- **A misspelled `override` target (`override def great()` instead of
+  `override def greet()`) got a bare "does not override any method" with no
+  "did you mean" suggestion**, the last `*_NOT_FOUND` diagnostic still on the
+  plain data-driven message path. `DuplicationChecks.checkOverrideTargets`
+  already collects every overridable base-class/interface method name while
+  checking the override target; it now passes that list along, and
+  `OVERRIDE_TARGET_NOT_FOUND` (E0068) has a dedicated handler that suggests
+  the closest matching base method name.
 
 ## [0.12.1] - 2026-08-19
 

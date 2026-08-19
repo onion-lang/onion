@@ -5566,7 +5566,7 @@ E0060. The body is raw — <code>\d</code> needs no double escaping.</p>
 </span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="p">}</span>
 </span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>
 </span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="c1">// Equivalent to:</span>
-</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="c1">// findUser(42).flatMap(user =&gt; getEmail(user).map(email =&gt; email))</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="c1">// findUser(42).flatMap((user) -&gt; getEmail(user).map((email) -&gt; email))</span>
 </span></code></pre></div>
 <h3 id="with-result">With Result<a class="headerlink" href="#with-result" title="Permanent link">&para;</a></h3>
 <p>Handle errors elegantly:</p>

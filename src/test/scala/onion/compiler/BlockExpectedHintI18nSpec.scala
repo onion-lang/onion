@@ -46,6 +46,10 @@ class BlockExpectedHintI18nSpec extends AnyFunSpec with Diagrams {
       case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
       case _ => ""
     }
-    assert(msgs.contains(en.getString(key)), s"expected the bundled hint text, got: $msgs")
+    // The compiler resolves error.parsing.hint.* through the JVM's ambient default locale
+    // (see onion.compiler.toolbox.Message), not a fixed bundle, so the expected text must
+    // follow the same locale this suite is actually running under.
+    val expected = if (java.util.Locale.getDefault.getLanguage == "ja") ja.getString(key) else en.getString(key)
+    assert(msgs.contains(expected), s"expected the bundled hint text, got: $msgs")
   }
 }

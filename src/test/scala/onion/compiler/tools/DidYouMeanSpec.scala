@@ -3,6 +3,26 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 class DidYouMeanSpec extends AbstractShellSpec {
+
+  /** Runs `source`, capturing stdout+stderr, and asserts it's a compile failure
+    * whose diagnostics contain every string in `mustContain`. Assertions are made
+    * on error codes and on the suggested identifier itself (both locale-independent)
+    * rather than on the localized "did you mean" wording around it.
+    */
+  private def failsWithSuggestion(source: String, mustContain: String*): Unit = {
+    val buf = new java.io.ByteArrayOutputStream()
+    val ps = new java.io.PrintStream(buf, true, "UTF-8")
+    val (o, e) = (System.out, System.err)
+    val r =
+      try {
+        System.setOut(ps); System.setErr(ps)
+        Console.withOut(ps) { Console.withErr(ps) { shell.run(source, "None", Array()) } }
+      } finally { System.setOut(o); System.setErr(e) }
+    val out = new String(buf.toByteArray, "UTF-8")
+    assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure, got $r\n$out")
+    for (s <- mustContain) assert(out.contains(s), s"expected '$s' in diagnostics, got:\n$out")
+  }
+
   describe("Error messages with suggestions") {
     describe("for method names") {
       it("reports error for typo in method name") {
@@ -23,8 +43,11 @@ class DidYouMeanSpec extends AbstractShellSpec {
         assert(result.isInstanceOf[Shell.Failure])
       }
 
-      it("reports error for method name with wrong case") {
-        val result = shell.run(
+      it("reports error and a suggestion for a method name with wrong case") {
+        // A pure case mismatch is the most unambiguous typo there is: the
+        // lowercased name always matches exactly one real member, so the
+        // suggestion must be there, not just the failure.
+        failsWithSuggestion(
           """
             |class Test {
             |public:
@@ -33,11 +56,8 @@ class DidYouMeanSpec extends AbstractShellSpec {
             |  }
             |}
             |""".stripMargin,
-          "None",
-          Array()
+          "E0005", "length"
         )
-        // "did you mean: length" suggestion will be shown
-        assert(result.isInstanceOf[Shell.Failure])
       }
     }
 
@@ -80,6 +100,21 @@ class DidYouMeanSpec extends AbstractShellSpec {
         // "did you mean: userName" suggestion will be shown
         assert(result.isInstanceOf[Shell.Failure])
       }
+
+      it("reports error and a suggestion for a variable name with wrong case") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val userName = "Alice";
+            |    return UserName;
+            |  }
+            |}
+            |""".stripMargin,
+          "E0002", "userName"
+        )
+      }
     }
 
     describe("for class names") {
@@ -100,6 +135,57 @@ class DidYouMeanSpec extends AbstractShellSpec {
         // Class not found error will be shown
         // "did you mean: ArrayList" suggestion may be shown if in import scope
         assert(result.isInstanceOf[Shell.Failure])
+      }
+
+      it("reports error and a suggestion for a local class name with wrong case") {
+        failsWithSuggestion(
+          """
+            |class MyClass {
+            |public:
+            |  def this {}
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var x: myclass = new MyClass();
+            |    return "ok";
+            |  }
+            |}
+            |""".stripMargin,
+          "E0003", "MyClass"
+        )
+      }
+    }
+
+    describe("for primitive type names") {
+      it("reports error and a suggestion for a Java/Scala-style lowercase primitive name") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var x: int = 0;
+            |    return "ok";
+            |  }
+            |}
+            |""".stripMargin,
+          "E0003", "Int"
+        )
+      }
+
+      it("suggests Boolean for the lowercase spelling boolean") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var x: boolean = true;
+            |    return "ok";
+            |  }
+            |}
+            |""".stripMargin,
+          "E0003", "Boolean"
+        )
       }
     }
   }

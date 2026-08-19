@@ -25,6 +25,16 @@ final case class TypeAliasEntry(
   imports: Seq[ImportItem]
 )
 
+object NameResolver {
+  /** Onion's primitive type keywords, capitalized (`void` is the one exception --
+    * it is already lowercase in the grammar). Included as class-not-found
+    * suggestion candidates so a Java/Scala-style lowercase spelling (`int`, `boolean`,
+    * ...), which parses as an ordinary unresolved reference type, gets "did you mean
+    * `Int`?" instead of a bare "check spelling or add import". */
+  private[typing] val PrimitiveTypeNames: Seq[String] =
+    Seq("Int", "Long", "Short", "Byte", "Char", "Float", "Double", "Boolean")
+}
+
 class NameResolver(private val context: NameResolutionContext) {
   private def imports: Seq[ImportItem] = context.imports
 
@@ -62,7 +72,7 @@ class NameResolver(private val context: NameResolutionContext) {
   def getCandidateClassNames: Array[String] = {
     val localClasses = context.table.classes.values.map(_.name).toSeq
     val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
-    (localClasses ++ importedClasses).distinct.toArray
+    (localClasses ++ importedClasses ++ NameResolver.PrimitiveTypeNames).distinct.toArray
   }
 
   def map(descriptor: AST.TypeDescriptor): Type = descriptor match {

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A name that differs from the real one only by case (`.Length()` instead of
+  `.length()`, `UserName` instead of `userName`, `myclass` instead of `MyClass`)
+  got no "did you mean" suggestion**, just a bare not-found error. `Suggestions.findSimilar`
+  compares names case-insensitively but then filtered out `distance == 0` results —
+  meant to skip a self-match, it also threw away the single most common typo of all,
+  since a real case-sensitive exact match would never have reached the not-found path
+  to begin with. The filter now keeps `distance == 0`, so a pure case mismatch is always
+  suggested, for variables, methods, fields, and classes alike.
+- **A lowercase, Java/Scala-style primitive type name (`int`, `boolean`, `long`, ...)
+  got a generic "check spelling or add import" instead of a suggestion**, because
+  Onion's primitive keywords (`Int`, `Boolean`, `Long`, ...) were never in the
+  class-not-found candidate list — they aren't classes, so nothing offered them as
+  a match. They're now added to the candidates the "did you mean" check draws from,
+  so `var x: int = 0` suggests `Int`.
+
 ## [0.12.1] - 2026-08-19
 
 ### Fixed

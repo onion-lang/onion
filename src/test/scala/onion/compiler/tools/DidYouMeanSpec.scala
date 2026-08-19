@@ -188,5 +188,76 @@ class DidYouMeanSpec extends AbstractShellSpec {
         )
       }
     }
+
+    describe("for named-argument names") {
+      // The typo ("kount") shares no substring with the real name ("count"),
+      // so matching on "count" in the output can only be the suggestion --
+      // never an echo of the misspelled argument from the base message.
+      it("suggests the right parameter name on a static call") {
+        failsWithSuggestion(
+          """
+            |class T {
+            |public:
+            |  static def f(x: Int, count: Int): Int = x + count
+            |  static def main(args: String[]): Int { return f(x = 1, kount = 2) }
+            |}
+            |""".stripMargin,
+          "E0043", "count"
+        )
+      }
+
+      it("suggests the right parameter name on an instance call") {
+        failsWithSuggestion(
+          """
+            |class T {
+            |public:
+            |  def this {}
+            |  def f(x: Int, count: Int): Int = x + count
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int { return new T().f(x = 1, kount = 2) }
+            |}
+            |""".stripMargin,
+          "E0043", "count"
+        )
+      }
+
+      it("suggests the right parameter name on an unqualified call") {
+        failsWithSuggestion(
+          """
+            |class T {
+            |public:
+            |  def this {}
+            |  def f(x: Int, count: Int): Int = x + count
+            |  def g(): Int = f(x = 1, kount = 2)
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int { return new T().g() }
+            |}
+            |""".stripMargin,
+          "E0043", "count"
+        )
+      }
+
+      it("suggests the right parameter name on a constructor call") {
+        failsWithSuggestion(
+          """
+            |class P {
+            |  val x: Int
+            |  val count: Int
+            |public:
+            |  def this(x: Int, count: Int) { self.x = x; self.count = count }
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int { val p = new P(x = 1, kount = 2); return 0 }
+            |}
+            |""".stripMargin,
+          "E0043", "count"
+        )
+      }
+    }
   }
 }

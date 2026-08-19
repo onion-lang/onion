@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A dangling `else` (one with no matching `if` immediately before it) got a hint
+  claiming Onion doesn't support `if` as an expression.** `if`/`else` has always worked
+  as an expression (`val x = if cond { a } else { b }`), so the hint's suggested fix —
+  "use `if (cond) { ... } else { ... }`" — didn't even address a dangling `else`, whose
+  actual fix is adding the missing `if`, not rewriting anything as an expression. The
+  `case "else"` branch of `commonSyntaxHint` in `Parsing.scala` now reports a
+  `error.parsing.hint.dangling_else` hint (added to both `errorMessage.properties` and
+  `errorMessage_ja.properties`) that names the real requirement: `else` must directly
+  follow an `if` block's closing `}`.
+
 - **The ternary and old-trailing-arrow parser hints printed literal single-quote
   characters around their braces instead of the braces alone**, e.g. `if cond '{' a '}'
   else '{' b '}'` instead of `if cond { a } else { b }`. Both hints are looked up through

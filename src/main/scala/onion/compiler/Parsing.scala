@@ -238,7 +238,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
       Message("error.parsing.hint.trailing_lambda_parens", params)
     case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
-      "Hint: a block `{ ... }` is expected here."
+      Message("error.parsing.hint.block_expected")
     case _ =>
       ""
   }

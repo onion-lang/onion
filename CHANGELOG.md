@@ -65,6 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added `error.parsing.hint.old_for_in` to both `errorMessage.properties` and
   `errorMessage_ja.properties` and pointed the hint at it.
 
+- **`commonSyntaxHint`'s fallback "a block is expected" hint was also hard-coded
+  English**, same bug as the `for x in xs` hint above: a `while`/`if` head missing its
+  `{ ... }` block (e.g. `while true` / `if true` on its own line) fell through to a raw
+  string literal instead of the `error.parsing.hint.*` bundle lookup every other hint
+  uses, so the hint sentence stayed English even under a Japanese locale. Added
+  `error.parsing.hint.block_expected` to both `errorMessage.properties` and
+  `errorMessage_ja.properties` and pointed the fallback case at it.
+
 ## [0.12.0] - 2026-08-18
 
 ### Changed

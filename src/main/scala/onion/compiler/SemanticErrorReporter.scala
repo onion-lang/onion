@@ -47,6 +47,9 @@ import onion.compiler.exceptions.CompilationException
  *   - METHOD_NOT_FOUND
  *   - FIELD_NOT_FOUND
  *   - CLASS_NOT_FOUND
+ *   - CONSTRUCTOR_NOT_FOUND
+ *   - UNKNOWN_PARAMETER_NAME
+ *   - LABEL_NOT_FOUND
  *
  * == Compilation Context ==
  *
@@ -386,10 +389,7 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.mapNotDirectlyIterable",
       Seq(items => typeName(items(0)))
     ),
-    SemanticError.LABEL_NOT_FOUND -> ErrorDef(
-      "error.semantic.labelNotFound",
-      Seq(items => asString(items(0)))
-    ),
+    // LABEL_NOT_FOUND handled specially with suggestions
     SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
       "error.semantic.regexPatternInvalid",
       Seq(items => asString(items(0)))
@@ -554,6 +554,22 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles LABEL_NOT_FOUND with optional suggestions for similar labels
+   * among the enclosing labeled loops.
+   */
+  private def reportLabelNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.labelNotFound"), Seq(name))
+
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
    * Handles CLASS_NOT_FOUND with optional suggestions for similar class names.
    */
   private def reportClassNotFound(position: Location, items: Array[AnyRef]): Unit = {
@@ -679,6 +695,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
+      case SemanticError.LABEL_NOT_FOUND =>
+        reportLabelNotFound(position, items)
       case SemanticError.CLASS_NOT_FOUND =>
         reportClassNotFound(position, items)
       case SemanticError.CONSTRUCTOR_NOT_FOUND =>

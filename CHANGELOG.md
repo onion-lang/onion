@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   candidate parameter names along. It now has a dedicated handler that builds
   the suggestion from the callee's parameter names, for static calls,
   instance calls, unqualified calls, and constructor calls alike.
+- **`break`/`continue` with a misspelled label (`break outr` instead of
+  `break outer`) got a bare "label not found" with no "did you mean"
+  suggestion**, the one `*_NOT_FOUND` diagnostic still on the plain
+  data-driven message path. `LocalContext` already tracked every enclosing
+  labeled loop's name in `labelStack` but exposed no way to read it back;
+  it now has a `labels` accessor, and `LABEL_NOT_FOUND` (E0058) has a
+  dedicated handler that suggests the closest enclosing label name.
 
 ## [0.12.1] - 2026-08-19
 

@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class-not-found candidate list — they aren't classes, so nothing offered them as
   a match. They're now added to the candidates the "did you mean" check draws from,
   so `var x: int = 0` suggests `Int`.
+- **A misspelled named-argument name (`f(x = 1, kount = 2)`) got a bare
+  "unknown parameter name" with no "did you mean" suggestion**, unlike every
+  sibling not-found diagnostic (variable, method, field, class), which all
+  suggest a similar name. `UNKNOWN_PARAMETER_NAME` (E0043) was the one
+  not-found error still wired through the plain data-driven message path in
+  `SemanticErrorReporter`, so none of its six call sites ever passed the
+  candidate parameter names along. It now has a dedicated handler that builds
+  the suggestion from the callee's parameter names, for static calls,
+  instance calls, unqualified calls, and constructor calls alike.
 
 ## [0.12.1] - 2026-08-19
 

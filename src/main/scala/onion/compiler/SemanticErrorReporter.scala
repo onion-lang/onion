@@ -325,10 +325,6 @@ class SemanticErrorReporter(threshold: Int) {
     ),
 
     // Pattern matching errors
-    SemanticError.UNKNOWN_PARAMETER_NAME -> ErrorDef(
-      "error.semantic.unknownParameterName",
-      Seq(items => asString(items(0)))
-    ),
     SemanticError.DUPLICATE_ARGUMENT -> ErrorDef(
       "error.semantic.duplicateArgument",
       Seq(items => asString(items(0)))
@@ -573,6 +569,22 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles UNKNOWN_PARAMETER_NAME with optional suggestions for similar
+   * parameter names.
+   */
+  private def reportUnknownParameterName(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.unknownParameterName"), Seq(name))
+
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
    * Handles CONSTRUCTOR_NOT_FOUND with available constructors display.
    */
   private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
@@ -671,6 +683,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportClassNotFound(position, items)
       case SemanticError.CONSTRUCTOR_NOT_FOUND =>
         reportConstructorNotFound(position, items)
+      case SemanticError.UNKNOWN_PARAMETER_NAME =>
+        reportUnknownParameterName(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>

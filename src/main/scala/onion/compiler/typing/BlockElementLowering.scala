@@ -70,7 +70,7 @@ final class BlockElementLowering(
         bodyContext.report(BREAK_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else if (node.label != null && !context.hasLabel(node.label)) {
-        bodyContext.report(LABEL_NOT_FOUND, node, node.label)
+        bodyContext.report(LABEL_NOT_FOUND, node, node.label, context.labels)
         new NOP(node.location)
       } else {
         new Break(node.location, node.label)
@@ -80,7 +80,7 @@ final class BlockElementLowering(
         bodyContext.report(CONTINUE_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else if (node.label != null && !context.hasLabel(node.label)) {
-        bodyContext.report(LABEL_NOT_FOUND, node, node.label)
+        bodyContext.report(LABEL_NOT_FOUND, node, node.label, context.labels)
         new NOP(node.location)
       } else {
         new Continue(node.location, node.label)

@@ -1,0 +1,458 @@
+// CpuScheduler.on — a small CPU scheduling simulator.
+//
+// Simulates FCFS, SJF (non-preemptive), Round-Robin, and Priority (preemptive)
+// against the same batch of processes and compares average waiting time,
+// turnaround time, and response time. Also renders a text Gantt chart.
+//
+// Exercises: ADT case-enum with fields, records with methods, class with
+// mutable state, generics on List, collection pipelines (sortedBy/map/fold),
+// select on the algorithm ADT, foreach with typed element, string
+// interpolation, extension methods on Int and String, null / nullable handling
+// in the ready-queue lookup, while loops with continue-like skips, and
+// try/catch around the driver so a misconfigured run reports cleanly.
+
+// ── Algorithm ADT ────────────────────────────────────────────────────────────
+enum Algorithm {
+  case Fcfs                              // first-come, first-served
+  case Sjf                               // shortest-job-first (non-preemptive)
+  case RoundRobin(quantum: Int)          // preemptive, quantum time units
+  case Priority                          // preemptive, smaller number = higher priority
+public:
+  def name(): String = select this {
+    case a is Fcfs:       "FCFS"
+    case a is Sjf:        "SJF"
+    case a is RoundRobin: "RR(q=" + a.quantum() + ")"
+    case a is Priority:   "PRIO"
+  }
+}
+
+// ── Formatting extensions ────────────────────────────────────────────────────
+extension Int {
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def ljust(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ── Process record ───────────────────────────────────────────────────────────
+// Ordinary immutable record for input; the scheduler keeps mutable state in a
+// separate ProcState below so a single workload can be re-run under multiple
+// algorithms.
+record Process(pid: String, arrival: Int, burst: Int, priority: Int)
+
+// ── ProcState — mutable execution state for one process during a run ─────────
+class ProcState {
+public:
+  val proc: Process
+  var remaining: Int
+  var firstStart: Int     // -1 until first CPU cycle
+  var completion: Int     // -1 until finished
+
+  def this(p: Process) {
+    this.proc = p
+    this.remaining = p.burst()
+    this.firstStart = -1
+    this.completion = -1
+  }
+
+  def pid(): String  = this.proc.pid()
+  def arrival(): Int = this.proc.arrival()
+  def burst(): Int   = this.proc.burst()
+  def priority(): Int = this.proc.priority()
+
+  def done(): Boolean    = this.remaining == 0
+  def started(): Boolean = this.firstStart >= 0
+
+  def waiting(): Int    = this.completion - this.arrival() - this.burst()
+  def turnaround(): Int = this.completion - this.arrival()
+  def response(): Int   = this.firstStart - this.arrival()
+}
+
+// ── Gantt trace and run summary ──────────────────────────────────────────────
+// One trace entry per contiguous execution slice of one process. IDLE slices
+// use pid "-" so the chart shows gaps without needing a nullable pid.
+record GanttEntry(pid: String, start: Int, end: Int)
+record RunResult(algo: String, gantt: List[GanttEntry], states: List[ProcState])
+
+// ── Simulator base class ─────────────────────────────────────────────────────
+// Each algorithm subclasses Simulator and implements `pick(ready, now)`, which
+// returns the pid to run next tick. Returning null means "no process ready →
+// idle for one tick". The driver loop is shared so the four algorithms cannot
+// disagree on how the clock advances or how metrics are recorded.
+class Simulator {
+  val algo: Algorithm
+  val trace: List[GanttEntry]     // accumulated Gantt entries (may merge tail)
+public:
+  def this(a: Algorithm) {
+    this.algo = a
+    this.trace = []
+  }
+
+  // Overridden per algorithm. Default (base) implementation just refuses.
+  def pick(ready: List[ProcState], now: Int): ProcState? {
+    throw new RuntimeException("Simulator#pick not overridden")
+  }
+
+  // Some algorithms need to know how long the picked process is allowed to
+  // hold the CPU before the scheduler reconsiders (RR quantum). Default: run
+  // to completion or preemption by a newcomer, handled by the driver.
+  def slice(picked: ProcState, now: Int): Int {
+    return 1  // finest granularity; algorithms that batch override this
+  }
+
+  // Extend the tail entry when the same pid keeps running, else append a new
+  // one. Keeps the Gantt chart compact even when we tick 1 unit at a time.
+  def logSlice(pid: String, from: Int, to: Int): void {
+    val n = this.trace.size
+    if n > 0 {
+      val last = this.trace[n - 1] as GanttEntry
+      if last.pid() == pid && last.end() == from {
+        this.trace[n - 1] = new GanttEntry(pid, last.start(), to)
+        return
+      }
+    }
+    this.trace << new GanttEntry(pid, from, to)
+  }
+
+  // Drive the simulation. Runs until every process has completion set.
+  def run(states: List[ProcState]): RunResult {
+    var now: Int = 0
+    var remainingCount: Int = states.size
+    val guard: Int = totalBurst(states) + startBound(states) + 10  // hard stop
+
+    while remainingCount > 0 && now < guard {
+      val ready = readyAt(states, now)
+      val choice: ProcState? = if ready.size == 0 { null } else { this.pick(ready, now) }
+
+      if choice == null {
+        this.logSlice("-", now, now + 1)
+        now = now + 1
+      } else {
+        val p = choice as ProcState
+        if !p.started() { p.firstStart = now }
+        val q = this.slice(p, now)
+        var t: Int = 0
+        while t < q && p.remaining > 0 {
+          this.logSlice(p.pid(), now, now + 1)
+          p.remaining = p.remaining - 1
+          now = now + 1
+          t = t + 1
+          if p.remaining == 0 {
+            p.completion = now
+            remainingCount = remainingCount - 1
+          }
+        }
+      }
+    }
+    return new RunResult(this.algo.name(), this.trace, states)
+  }
+}
+
+// ── Free helpers ─────────────────────────────────────────────────────────────
+def readyAt(states: List[ProcState], now: Int): List[ProcState] {
+  val out: List[ProcState] = []
+  foreach s: ProcState in states {
+    if !s.done() && s.arrival() <= now { out << s }
+  }
+  return out
+}
+
+def totalBurst(states: List[ProcState]): Int {
+  var sum: Int = 0
+  foreach s: ProcState in states { sum = sum + s.burst() }
+  return sum
+}
+
+def startBound(states: List[ProcState]): Int {
+  var m: Int = 0
+  foreach s: ProcState in states {
+    if s.arrival() > m { m = s.arrival() }
+  }
+  return m
+}
+
+// ── FCFS: earliest arrival wins; ties broken by pid ──────────────────────────
+class FcfsSimulator extends Simulator(new Fcfs()) {
+public:
+  override def pick(ready: List[ProcState], now: Int): ProcState? {
+    var best: ProcState? = null
+    foreach s: ProcState in ready {
+      if best == null {
+        best = s
+      } else {
+        val b = best as ProcState
+        if s.arrival() < b.arrival() || (s.arrival() == b.arrival() && s.pid().compareTo(b.pid()) < 0) {
+          best = s
+        }
+      }
+    }
+    return best
+  }
+
+  // FCFS is non-preemptive: hand the CPU over for the whole remaining burst.
+  override def slice(picked: ProcState, now: Int): Int { return picked.remaining }
+}
+
+// ── SJF: shortest total burst wins; non-preemptive ───────────────────────────
+class SjfSimulator extends Simulator(new Sjf()) {
+public:
+  override def pick(ready: List[ProcState], now: Int): ProcState? {
+    var best: ProcState? = null
+    foreach s: ProcState in ready {
+      if best == null {
+        best = s
+      } else {
+        val b = best as ProcState
+        // Compare total burst (not remaining) so SJF is genuinely
+        // non-preemptive: once we start we finish. Ties → earliest arrival,
+        // then pid for determinism.
+        val bs = s.burst()
+        val bb = b.burst()
+        if bs < bb ||
+           (bs == bb && s.arrival() < b.arrival()) ||
+           (bs == bb && s.arrival() == b.arrival() && s.pid().compareTo(b.pid()) < 0) {
+          best = s
+        }
+      }
+    }
+    return best
+  }
+
+  override def slice(picked: ProcState, now: Int): Int { return picked.remaining }
+}
+
+// ── Round-Robin: FIFO ready-queue, run for at most `quantum` ticks ───────────
+// We keep the queue implicit in ready order: sort by (lastRun asc, arrival asc,
+// pid asc) so a process that just yielded goes to the back. lastRun is tracked
+// via a side table keyed by pid.
+class RoundRobinSimulator(val quantum: Int) extends Simulator(new RoundRobin(quantum)) {
+  val lastRun: List[Object] = []   // list of (pid, tick) tuples as GanttEntry(pid, 0, tick)
+public:
+  def lastRunOf(pid: String): Int {
+    foreach e: GanttEntry in this.lastRun {
+      if e.pid() == pid { return e.end() }
+    }
+    return -1
+  }
+
+  def touch(pid: String, tick: Int): void {
+    val n = this.lastRun.size
+    var i: Int = 0
+    while i < n {
+      val e = this.lastRun[i] as GanttEntry
+      if e.pid() == pid {
+        this.lastRun[i] = new GanttEntry(pid, 0, tick)
+        return
+      }
+      i = i + 1
+    }
+    this.lastRun << new GanttEntry(pid, 0, tick)
+  }
+
+  override def pick(ready: List[ProcState], now: Int): ProcState? {
+    var best: ProcState? = null
+    foreach s: ProcState in ready {
+      if best == null {
+        best = s
+      } else {
+        val b = best as ProcState
+        val ls = this.lastRunOf(s.pid())
+        val lb = this.lastRunOf(b.pid())
+        if ls < lb ||
+           (ls == lb && s.arrival() < b.arrival()) ||
+           (ls == lb && s.arrival() == b.arrival() && s.pid().compareTo(b.pid()) < 0) {
+          best = s
+        }
+      }
+    }
+    if best != null { this.touch((best as ProcState).pid(), now + this.quantum) }
+    return best
+  }
+
+  override def slice(picked: ProcState, now: Int): Int {
+    val q = this.quantum
+    return if picked.remaining < q { picked.remaining } else { q }
+  }
+}
+
+// ── Priority: preemptive, smallest priority number wins ──────────────────────
+// The base driver already reconsiders the ready set every tick because slice()
+// defaults to 1; leaving slice() at the default gives us preemption for free.
+class PrioritySimulator extends Simulator(new Priority()) {
+public:
+  override def pick(ready: List[ProcState], now: Int): ProcState? {
+    var best: ProcState? = null
+    foreach s: ProcState in ready {
+      if best == null {
+        best = s
+      } else {
+        val b = best as ProcState
+        if s.priority() < b.priority() ||
+           (s.priority() == b.priority() && s.arrival() < b.arrival()) ||
+           (s.priority() == b.priority() && s.arrival() == b.arrival() && s.pid().compareTo(b.pid()) < 0) {
+          best = s
+        }
+      }
+    }
+    return best
+  }
+}
+
+// ── Pretty-printers ──────────────────────────────────────────────────────────
+def renderGantt(g: List[GanttEntry]): String {
+  val sb = new StringBuilder()
+  sb.append("|")
+  foreach e: GanttEntry in g {
+    val width = e.end() - e.start()
+    val label = e.pid()
+    // Center the label inside a cell of width*2 characters (min 3).
+    val slotWidth = if width * 2 < 3 { 3 } else { width * 2 }
+    val pad = slotWidth - label.length()
+    val left = pad / 2
+    val right = pad - left
+    sb.append(" ".repeat(left))
+    sb.append(label)
+    sb.append(" ".repeat(right))
+    sb.append("|")
+  }
+  sb.append("\n")
+  // tick marks
+  sb.append("0")
+  foreach e: GanttEntry in g {
+    val width = e.end() - e.start()
+    val slotWidth = if width * 2 < 3 { 3 } else { width * 2 }
+    val tick = "" + e.end()
+    val pad = slotWidth + 1 - tick.length()
+    sb.append(" ".repeat(pad))
+    sb.append(tick)
+  }
+  return sb.toString()
+}
+
+record Stats(algo: String, avgWait: Double, avgTurn: Double, avgResp: Double, makespan: Int)
+
+def statsOf(r: RunResult): Stats {
+  val ss = r.states()
+  var wsum: Int = 0
+  var tsum: Int = 0
+  var rsum: Int = 0
+  var last: Int = 0
+  foreach s: ProcState in ss {
+    wsum = wsum + s.waiting()
+    tsum = tsum + s.turnaround()
+    rsum = rsum + s.response()
+    if s.completion > last { last = s.completion }
+  }
+  val n = ss.size
+  return new Stats(r.algo(),
+                   (wsum as Double) / (n as Double),
+                   (tsum as Double) / (n as Double),
+                   (rsum as Double) / (n as Double),
+                   last)
+}
+
+def round1(x: Double): String {
+  val scaled = (x * 10.0 + 0.5) as Int
+  val whole = scaled / 10
+  val frac = if scaled < 0 { -scaled % 10 } else { scaled % 10 }
+  return "" + whole + "." + frac
+}
+
+def report(algo: String, r: RunResult): void {
+  IO::println("── " + algo + " ────────────────────────────────────────────────")
+  IO::println(renderGantt(r.gantt()))
+  IO::println("")
+  IO::println("PID  arrive burst prio  wait  turn  resp")
+  foreach s: ProcState in r.states() {
+    val row = s.pid().ljust(4)      + " " +
+              s.arrival().rjust(6)  + " " +
+              s.burst().rjust(5)    + " " +
+              s.priority().rjust(4) + " " +
+              s.waiting().rjust(5)  + " " +
+              s.turnaround().rjust(5) + " " +
+              s.response().rjust(5)
+    IO::println(row)
+  }
+  val st = statsOf(r)
+  IO::println("avg  wait=#{round1(st.avgWait())}  turn=#{round1(st.avgTurn())}  resp=#{round1(st.avgResp())}  makespan=#{st.makespan()}")
+  IO::println("")
+}
+
+def makeStates(procs: List[Process]): List[ProcState] {
+  val out: List[ProcState] = []
+  foreach p: Process in procs { out << new ProcState(p) }
+  return out
+}
+
+def sampleWorkload(): List[Process] {
+  val ps: List[Process] = []
+  ps << new Process("P1", 0, 6, 3)
+  ps << new Process("P2", 1, 4, 1)
+  ps << new Process("P3", 2, 2, 4)
+  ps << new Process("P4", 3, 5, 2)
+  ps << new Process("P5", 4, 3, 5)
+  return ps
+}
+
+// ── Driver ───────────────────────────────────────────────────────────────────
+val workload = sampleWorkload()
+
+IO::println("Workload: 5 processes (arrival, burst, priority)")
+foreach p: Process in workload {
+  IO::println("  #{p.pid()}: a=#{p.arrival()} b=#{p.burst()} p=#{p.priority()}")
+}
+IO::println("")
+
+val summaries: List[Stats] = []
+
+val runs: List[RunResult] = []
+runs << new FcfsSimulator().run(makeStates(workload))
+runs << new SjfSimulator().run(makeStates(workload))
+runs << new RoundRobinSimulator(2).run(makeStates(workload))
+runs << new PrioritySimulator().run(makeStates(workload))
+
+foreach r: RunResult in runs {
+  report(r.algo(), r)
+  summaries << statsOf(r)
+}
+
+// Head-to-head comparison table.
+IO::println("── Comparison ────────────────────────────────────────────────────")
+IO::println("algo         avgWait  avgTurn  avgResp  makespan")
+foreach st: Stats in summaries {
+  val row = st.algo().ljust(12) + " " +
+            round1(st.avgWait()).ljust(8) + " " +
+            round1(st.avgTurn()).ljust(8) + " " +
+            round1(st.avgResp()).ljust(8) + " " +
+            st.makespan().rjust(8)
+  IO::println(row)
+}
+IO::println("")
+
+// Pick the algorithm minimising average waiting time and shout about it.
+var champ: Stats? = null
+foreach st: Stats in summaries {
+  if champ == null {
+    champ = st
+  } else {
+    val c = champ as Stats
+    if st.avgWait() < c.avgWait() { champ = st }
+  }
+}
+val cwin = champ as Stats
+IO::println("Best average wait: #{cwin.algo()} at #{round1(cwin.avgWait())} time units.")

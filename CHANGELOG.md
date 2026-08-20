@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Java/JS/C-style `switch` statement (`switch x { case 1: ... }` or
+  `switch (x) { ... }`) got a bare expected-token dump with no mention of
+  `select`.** `switch` isn't a keyword in Onion, so it parses as a bare
+  identifier-reference statement and the parser actually trips on whatever
+  follows it — the condition, or the `{` of a parenthesized condition —
+  never on `switch` itself, so no existing hint (all of which match on the
+  *offending* token) could name it. `commonSyntaxHint` in `Parsing.scala`
+  now also receives the full source line of the error and matches a leading
+  `switch` there, so both spellings now hint at `select value { case 1:
+  ...; else: ... }`.
+
 - **A name that differs from the real one only by case (`.Length()` instead of
   `.length()`, `UserName` instead of `userName`, `myclass` instead of `MyClass`)
   got no "did you mean" suggestion**, just a bare not-found error. `Suggestions.findSimilar`

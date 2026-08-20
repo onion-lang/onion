@@ -123,7 +123,12 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
-        syntaxErrorMessage(error.found, error.expected, contextAt(sourceText, error.line, error.column))
+        syntaxErrorMessage(
+          error.found,
+          error.expected,
+          contextAt(sourceText, error.line, error.column),
+          sourceLineAt(sourceText, error.line)
+        )
       )
     }
   }
@@ -147,7 +152,12 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
-        syntaxErrorMessage(error.image, expected, contextAt(sourceText, error.beginLine, error.beginColumn))
+        syntaxErrorMessage(
+          error.image,
+          expected,
+          contextAt(sourceText, error.beginLine, error.beginColumn),
+          sourceLineAt(sourceText, error.beginLine)
+        )
       )
     }
   }
@@ -157,15 +167,34 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * to look past the offending token (bounded so a pathological file can't
    * make the regex match slow).
    */
-  private def contextAt(sourceText: String, line: Int, column: Int): String = {
+  private def lineStartOffset(sourceText: String, line: Int): Int = {
     var offset = 0
     var currentLine = 1
     while (currentLine < line && offset >= 0 && offset < sourceText.length) {
       val nl = sourceText.indexOf('\n', offset)
       if (nl < 0) offset = sourceText.length else { offset = nl + 1; currentLine += 1 }
     }
-    val start = math.min(sourceText.length, offset + column - 1)
+    offset
+  }
+
+  private def contextAt(sourceText: String, line: Int, column: Int): String = {
+    val start = math.min(sourceText.length, lineStartOffset(sourceText, line) + column - 1)
     sourceText.substring(start, math.min(sourceText.length, start + 200))
+  }
+
+  /**
+   * The full text of the 1-based source line containing (line, column), for
+   * hints that need to recognize a whole malformed statement (e.g. a leading
+   * `switch`) rather than just the token at the error position -- the error
+   * itself is often reported several tokens past the actual mistake.
+   */
+  private def sourceLineAt(sourceText: String, line: Int): String = {
+    val start = lineStartOffset(sourceText, line)
+    val end = sourceText.indexOf('\n', start) match {
+      case -1 => sourceText.length
+      case i => i
+    }
+    sourceText.substring(start, end)
   }
 
   /**
@@ -179,14 +208,14 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * (complete strings lex as a single STRING token); report it as such
    * instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String, context: String = ""): String = {
+  private def syntaxErrorMessage(found: String, expected: String, context: String = "", sourceLine: String = ""): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
     // problem (an unclosed block/paren) instead.
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
-    val hint = commonSyntaxHint(found, expected, context)
+    val hint = commonSyntaxHint(found, expected, context, sourceLine)
     if (hint.isEmpty) base else base + " " + hint
   }
 
@@ -209,7 +238,17 @@ class Parsing(config: CompilerConfig) extends AnyRef
   /**
    * Add friendly hints for common syntax mistakes.
    */
-  private def commonSyntaxHint(found: String, expected: String, context: String): String = found match {
+  /**
+   * A Java/JS/C-style `switch` statement at the start of a source line. `switch`
+   * isn't a keyword in Onion -- it parses as a bare identifier-reference
+   * statement -- so the parser actually trips on whatever follows it (the
+   * condition, or the `{` of a parenthesized condition), never on `switch`
+   * itself. Matching the *line*, not the token that triggered the error,
+   * catches `switch x { ... }` and `switch (x) { ... }` alike.
+   */
+  private val LeadingSwitchStatement = """^\s*switch\b""".r
+
+  private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
     case "<:" =>
@@ -223,6 +262,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_super_init")
     case "in" =>
       Message("error.parsing.hint.old_for_in")
+    case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.switch_not_supported")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

@@ -54,6 +54,25 @@ class HintMessageFormatSpec extends AbstractShellSpec {
       assert(msgs.contains("{ x -> ... }"), s"expected literal braces in the hint, got: $msgs")
     }
 
+    it("renders literal braces for the switch-statement hint, not quoted placeholders") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    switch (1) {
+          |    case 1: IO::println("one")
+          |    else: IO::println("other")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(!msgs.contains("'{'") && !msgs.contains("'}'"), s"hint leaked MessageFormat quoting: $msgs")
+      assert(msgs.contains("select value { case 1: ...; else: ... }"), s"expected literal braces in the hint, got: $msgs")
+    }
+
     it("renders a literal brace for the dangling-else hint, not a quoted placeholder") {
       val msgs = messages(
         """

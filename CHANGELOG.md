@@ -41,6 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method declaration
+  got a bare expected-token dump with no mention of `def`.** None of `fun`, `func`,
+  or `fn` are keywords in Onion, so at statement position the keyword parses as a
+  bare identifier reference and the parser trips on the declaration *name* that
+  follows (`Encountered "greet"`), while inside a class/interface body it trips on
+  the keyword itself — neither message names `def`. `commonSyntaxHint` in
+  `Parsing.scala` now matches the full source line for a `fun`/`func`/`fn <name>(`
+  declaration (the same source-line strategy as the `switch` hint, since the
+  offending token is never the keyword itself at statement position) and hints
+  `def name(...): ReturnType { ... }`. A real call to a method literally named
+  `fun`/`func`/`fn` is unaffected (`fun(...)` has no name between the identifier
+  and the paren, so it never matches).
+
 - **`new T[null]` (a `null` literal used as an array-size expression) crashed the
   compiler with an internal error (`I0000: Bad type on operand stack`)** instead
   of being rejected during type checking. `ConstructionTyping.typeNewArray` typed

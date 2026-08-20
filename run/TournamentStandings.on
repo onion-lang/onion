@@ -96,8 +96,8 @@ val matches: List[Match] = [
 
 // --- Compute and sort standings ---
 val standings = teams
-  .map { t => computeStats(t, matches) }
-  .sortedBy { s => 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
+  .map { t -> computeStats(t, matches) }
+  .sortedBy { s -> 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
 
 IO::println("--- League Standings ---")
 IO::println("#  Team            P   W   D   L  GF  GA  GD  Pts")
@@ -125,14 +125,14 @@ foreach m: Match in matches {
 // --- Goals scored grouped by home city ---
 IO::println("")
 IO::println("--- Goals by City (home matches) ---")
-val homeGoalsByCity = matches.groupBy { m => m.home().city() }
+val homeGoalsByCity = matches.groupBy { m -> m.home().city() }
 foreach (city, cityMatches) in homeGoalsByCity {
-  val totalGoals = (cityMatches as List).fold(0) { acc, m => (acc as Int) + (m as Match).homeGoals() }
+  val totalGoals = (cityMatches as List).fold(0) { acc, m -> (acc as Int) + (m as Match).homeGoals() }
   IO::println("  #{city}: #{totalGoals} goals at home")
 }
 
 // --- Highest-scoring match (nullable find) ---
-val highestScoring = matches.sortedBy { m => 0 - (m.homeGoals() + m.awayGoals()) }.find { m => true }
+val highestScoring = matches.sortedBy { m -> 0 - (m.homeGoals() + m.awayGoals()) }.find { m -> true }
 if highestScoring != null {
   val hm = highestScoring as Match
   IO::println("")
@@ -173,14 +173,14 @@ foreach s: TeamStats in standings {
 }
 
 // --- Partition: teams above and below average ---
-val totalPts = standings.fold(0) { acc, s => (acc as Int) + points(s as TeamStats) }
+val totalPts = standings.fold(0) { acc, s -> (acc as Int) + points(s as TeamStats) }
 val avgPts = totalPts / standings.size
-val parts = standings.partition { s => points(s as TeamStats) >= avgPts }
+val parts = standings.partition { s -> points(s as TeamStats) >= avgPts }
 val topTeams  = parts[0] as List
 val lowTeams  = parts[1] as List
 IO::println("")
-IO::println("--- Teams at/above #{avgPts}-pt average: #{topTeams.map { s => (s as TeamStats).name() }.join(", ")} ---")
-IO::println("--- Teams below average: #{lowTeams.map { s => (s as TeamStats).name() }.join(", ")} ---")
+IO::println("--- Teams at/above #{avgPts}-pt average: #{topTeams.map { s -> (s as TeamStats).name() }.join(", ")} ---")
+IO::println("--- Teams below average: #{lowTeams.map { s -> (s as TeamStats).name() }.join(", ")} ---")
 
 // --- While loop: separator ---
 var sep: String = ""
@@ -204,8 +204,8 @@ public:
   def getName(): String = leagueName
   def standings(): List[TeamStats] {
     return leagueTeams
-      .map { t => computeStats(t, leagueMatches) }
-      .sortedBy { s => 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
+      .map { t -> computeStats(t, leagueMatches) }
+      .sortedBy { s -> 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
   }
   def leader(): TeamStats? {
     val sorted = this.standings()
@@ -213,7 +213,7 @@ public:
     return sorted[0] as TeamStats
   }
   def totalGoals(): Int {
-    return leagueMatches.fold(0) { acc, m => (acc as Int) + (m as Match).homeGoals() + (m as Match).awayGoals() }
+    return leagueMatches.fold(0) { acc, m -> (acc as Int) + (m as Match).homeGoals() + (m as Match).awayGoals() }
   }
   def avgGoalsPerMatch(): Int {
     if leagueMatches.size == 0 { return 0 }

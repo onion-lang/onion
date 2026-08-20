@@ -226,8 +226,8 @@ val nothing: Map[String, Int] = [:]   // the empty map
 Lists come with pipelines built in, so you rarely need an index at all:
 
 ```onion
-val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
-val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+val odds = [1, 2, 3, 4, 5].filter { n -> n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n -> n * 10 }                     // [10, 30, 50]
 ```
 
 See [Collections](collections.md) for the full set.

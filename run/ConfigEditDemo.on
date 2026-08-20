@@ -30,7 +30,7 @@ record Server(host: String, port: Int, debug: Boolean)
   example editTouchesOneSlot {
     val t = "# prod\nhost = a.example\nport = 007\ndebug = false\n"
     val r = Server::cfg().parseLossless(t).get()
-    val out = r.edit { v => v.copy(debug = true) }.render()
+    val out = r.edit { v -> v.copy(debug = true) }.render()
     out == "# prod\nhost = a.example\nport = 007\ndebug = true\n"
   }
 
@@ -56,7 +56,7 @@ tool setport(path: String, port: Int, backup: Boolean = false): Int
     Files::writeText(path + ".bak", Server::cfg().printLossless(doc.value(), doc.residue()))
   }
 
-  val out = doc.edit { v => v.copy(port = port) }.render()
+  val out = doc.edit { v -> v.copy(port = port) }.render()
   Files::writeText(path, out)
   IO::println("setport: " + doc.value().port() + " -> " + port + "; comments, spacing and unknown keys untouched")
   return 0

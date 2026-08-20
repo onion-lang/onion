@@ -175,27 +175,36 @@ object CapturedVariableScanner {
   }
 
   /**
-   * Find all variable references in a closure body
+   * Find all variable references in a closure body, including references made
+   * only by a closure nested inside it (at any depth). A variable mutated
+   * solely by a doubly-(or deeper-)nested closure still needs boxing in the
+   * scope that declares it -- the immediately-enclosing closure merely relays
+   * a reference to it without itself naming the variable, so stopping at one
+   * level (as this used to) silently missed it. Each nested closure's own
+   * parameters shadow any outer variable of the same name, so they are
+   * excluded from the result rather than treated as captures.
    */
-  private def findReferencedVariables(node: AST.Node): Set[String] = {
+  private def findReferencedVariables(node: AST.Node, excluded: Set[String] = Set.empty): Set[String] = {
     val result = mutable.Set[String]()
 
     def visit(n: AST.Node): Unit = {
       n match {
         case id: AST.Id =>
-          result += id.name
+          if (!excluded.contains(id.name)) result += id.name
 
         case assign: AST.Assignment =>
           // Check if lhs is an Id (simple variable assignment)
           assign.lhs match {
-            case id: AST.Id => result += id.name
+            case id: AST.Id => if (!excluded.contains(id.name)) result += id.name
             case other => visit(other)
           }
           visit(assign.rhs)
           return // Special handling done, don't use visitChildren
 
-        case _: AST.ClosureExpression =>
-          return // Don't descend into nested closures
+        case closure: AST.ClosureExpression =>
+          val nestedExcluded = excluded ++ closure.args.map(_.name)
+          result ++= findReferencedVariables(closure.body, nestedExcluded)
+          return // Special handling done, don't use visitChildren
 
         case _ =>
       }

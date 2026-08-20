@@ -69,8 +69,8 @@ val result: Option[Int] = do[Option] {
 
 // Async programming with Future
 val future: Future[String] = Future::async(() -> { return fetchData(); })
-future.map { data => processData(data) }
-      .onSuccess { result => println(result) }
+future.map { data -> processData(data) }
+      .onSuccess { result -> println(result) }
 
 // Null safety with safe call operator
 val name: String? = getUserName()  // Nullable type

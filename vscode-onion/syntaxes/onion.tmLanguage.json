@@ -4,11 +4,13 @@
   "scopeName": "source.onion",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#quoted-identifiers" },
     { "include": "#strings" },
     { "include": "#characters" },
     { "include": "#numbers" },
     { "include": "#keywords" },
     { "include": "#storage" },
+    { "include": "#scheme-strings" },
     { "include": "#constants" },
     { "include": "#types" },
     { "include": "#operators" },
@@ -55,6 +57,74 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    "scheme-strings": {
+      "comment": "Scheme-prefixed RAW string literals: <prefix>\"raw\" desugars to <prefix>(\"raw\"). Raw means a backslash does not escape for the value, but it still does not terminate the literal, so a body escape has to be consumed as a unit. Listed after #keywords/#storage on purpose: the lexer pushes a keyword prefix back (return\"x\" stays keyword + string), and matching keywords first reproduces that.",
+      "patterns": [
+        {
+          "comment": "re\"...\" is a regex literal, so the body is highlighted as a pattern.",
+          "name": "string.regexp.onion",
+          "begin": "\\b(re)(\")",
+          "end": "\"",
+          "beginCaptures": {
+            "1": { "name": "entity.name.function.scheme.onion" },
+            "2": { "name": "punctuation.definition.string.begin.onion" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.onion" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.regexp.onion",
+              "match": "\\\\."
+            },
+            {
+              "name": "constant.other.character-class.set.regexp.onion",
+              "match": "\\[\\^?\\]?(\\\\.|[^\\]])*\\]"
+            },
+            {
+              "name": "keyword.operator.quantifier.regexp.onion",
+              "match": "[*+?]|\\{[0-9]+(,[0-9]*)?\\}"
+            },
+            {
+              "name": "keyword.operator.or.regexp.onion",
+              "match": "\\|"
+            },
+            {
+              "name": "punctuation.definition.group.regexp.onion",
+              "match": "\\((\\?[:=!<])?|\\)"
+            }
+          ]
+        },
+        {
+          "comment": "Any other prefix: file\"...\", http\"...\", json\"...\", sql\"...\", or one the user defined.",
+          "name": "string.quoted.double.raw.onion",
+          "begin": "\\b([a-zA-Z_][a-zA-Z0-9_]*)(\")",
+          "end": "\"",
+          "beginCaptures": {
+            "1": { "name": "entity.name.function.scheme.onion" },
+            "2": { "name": "punctuation.definition.string.begin.onion" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.onion" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.onion",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "quoted-identifiers": {
+      "comment": "Backtick-escaped identifier, which lets a reserved word be used as a name.",
+      "patterns": [
+        {
+          "name": "variable.other.quoted.onion",
+          "match": "`[^`]+`"
         }
       ]
     },
@@ -122,6 +192,36 @@
         {
           "name": "keyword.other.onion",
           "match": "\\b(extends|conforms|forward)\\b"
+        },
+        {
+          "comment": "Soft keywords. Each is a perfectly good identifier elsewhere, so every rule is pinned to the one shape the parser's lookahead accepts; a bare `tool` or `shape` variable must stay uncoloured.",
+          "name": "storage.type.tool.onion",
+          "match": "\\b(tool)\\b(?=\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*\\()"
+        },
+        {
+          "name": "keyword.other.requires.onion",
+          "match": "\\b(requires)\\b(?=\\s*\\{)"
+        },
+        {
+          "name": "storage.type.shape.onion",
+          "match": "\\b(shape)\\b(?=\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*=)"
+        },
+        {
+          "name": "keyword.other.derive.onion",
+          "match": "\\b(derive)\\b(?=!)"
+        },
+        {
+          "name": "keyword.other.law.onion",
+          "match": "\\b(law)\\b(?=\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*[({])"
+        },
+        {
+          "name": "keyword.other.example.onion",
+          "match": "\\b(example)\\b(?=\\s*(\\{|[a-zA-Z_][a-zA-Z0-9_]*\\s*\\{))"
+        },
+        {
+          "comment": "`from` only introduces a pattern-attached record, which is always a scheme literal.",
+          "name": "keyword.other.from.onion",
+          "match": "\\b(from)\\b(?=\\s+[a-zA-Z_][a-zA-Z0-9_]*\")"
         }
       ]
     },
@@ -129,7 +229,7 @@
       "patterns": [
         {
           "name": "storage.type.onion",
-          "match": "\\b(class|interface|enum|record|extension|type)\\b"
+          "match": "\\b(class|interface|trait|instance|enum|record|extension|type)\\b"
         },
         {
           "name": "storage.modifier.onion",
@@ -149,7 +249,7 @@
       "patterns": [
         {
           "name": "support.type.primitive.onion",
-          "match": "\\b(Int|Long|Short|Byte|Float|Double|Boolean|Char|Unit|Void)\\b"
+          "match": "\\b(Int|Long|Short|Byte|Float|Double|Boolean|Char|Unit|void|Void)\\b"
         },
         {
           "name": "support.type.builtin.onion",
@@ -184,6 +284,11 @@
           "match": "\\?\\.|\\?\\[|\\?:|!!"
         },
         {
+          "comment": "Must precede the logical and bitwise rules, which would otherwise eat the `|`.",
+          "name": "keyword.operator.pipeline.onion",
+          "match": "\\|>"
+        },
+        {
           "name": "keyword.operator.comparison.onion",
           "match": "(===|!==|==|!=|<=|>=|<|>)"
         },
@@ -213,7 +318,7 @@
         },
         {
           "name": "keyword.operator.arrow.onion",
-          "match": "(->|=>|<-)"
+          "match": "(->|<-)"
         }
       ]
     },

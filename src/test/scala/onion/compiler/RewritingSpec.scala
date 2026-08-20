@@ -521,7 +521,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val resultField = resultClass.sections.head.members.head.asInstanceOf[AST.FieldDeclaration]
 
       result.toplevels.head match {
-        case AST.ClassDeclaration(_, _, _, _, _, _, sections, _) =>
+        case AST.ClassDeclaration(_, _, _, _, _, _, sections, _, _) =>
           sections.head.members.head match {
             case AST.FieldDeclaration(_, _, "x", _, AST.IntegerLiteral(_, 42)) =>
               // Success

@@ -117,14 +117,13 @@ public:
 
 // ─── Manager subclass ─────────────────────────────────────────────────────────
 
-class Manager extends Employee {
+// The superclass constructor's arguments live on the `extends` clause; the primary
+// constructor is the only place they are written. `directReports` is initialized by its
+// declaration, which runs after the superclass constructor has completed.
+class Manager(id: Int, name: String, dept: Department, sal: Salary, addr: Address)
+    extends Employee(id, name, dept, sal, addr) {
 public:
-  val directReports: ArrayList[Employee]
-
-  // Call super(id, name, dept, sal, addr), then init directReports
-  def this(id: Int, name: String, dept: Department, sal: Salary, addr: Address): (id, name, dept, sal, addr) {
-    this.directReports = new ArrayList[Employee]()
-  }
+  val directReports: ArrayList[Employee] = new ArrayList[Employee]()
 
   def addReport(emp: Employee): void { directReports.add(emp) }
 
@@ -154,15 +153,15 @@ def orgHeadcount(mgr: Manager): Int {
 // ─── Pipeline helpers ─────────────────────────────────────────────────────────
 
 def activeOnly(all: List[Employee]): List[Employee] =
-  all.filter { e => e.status.isActive() }
+  all.filter { e -> e.status.isActive() }
 
 def topEarners(all: List[Employee]): List[Employee] =
   all
-    .filter  { e => e.status.isActive() }
-    .sortedBy{ e => 0 - e.salary.base() }
+    .filter  { e -> e.status.isActive() }
+    .sortedBy{ e -> 0 - e.salary.base() }
 
 def buildSummaries(all: List[Employee]): List[DeptSummary] {
-  val grouped = all.groupBy { e => e.department.label() }
+  val grouped = all.groupBy { e -> e.department.label() }
   val result: List[DeptSummary] = []
   foreach (dept, members) in grouped {
     val ml = members as List[Employee]
@@ -272,7 +271,7 @@ def main(): void {
 
   // ── Department breakdown from groupBy with (k,v) foreach ──────────────────
   println("\n=== By Department ===")
-  val grouped = all.groupBy { e => e.department.label() }
+  val grouped = all.groupBy { e -> e.department.label() }
   foreach (dept, members) in grouped {
     val ml = members as List[Employee]
     println("  " + dept + ": " + ml.size + " employee(s)")
@@ -317,7 +316,7 @@ def main(): void {
 
   // ── Total payroll via fold ─────────────────────────────────────────────────
   println("\n=== Annual Payroll ===")
-  val totalAnnual = all.fold(0) { acc, e => (acc as Int) + e.salary.annual() }
+  val totalAnnual = all.fold(0) { acc, e -> (acc as Int) + e.salary.annual() }
   println("  Total annual: " + totalAnnual)
   println("  Avg per employee: " + (totalAnnual / all.size))
 
@@ -344,7 +343,7 @@ def main(): void {
 
   // ── Distinct departments visited ──────────────────────────────────────────
   println("\n=== Distinct Departments ===")
-  val depts = all.map { e => e.department.label() }.distinct()
+  val depts = all.map { e -> e.department.label() }.distinct()
   foreach d: String in depts {
     println("  " + d)
   }

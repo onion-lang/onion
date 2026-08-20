@@ -132,7 +132,7 @@ def fillRx(rx: Prescription): FilledRx? {
 }
 
 def activeRxFor(patientId: String): List[Prescription] =
-  prescriptions.filter { rx => rx.patientId() == patientId && rx.status().isOpen() }
+  prescriptions.filter { rx -> rx.patientId() == patientId && rx.status().isOpen() }
 
 IO::println("=== Pharmacy Management System ===")
 IO::println("")
@@ -161,9 +161,9 @@ IO::println("")
 // ─── 2. Category breakdown ────────────────────────────────────────────────────
 
 IO::println("── Drugs by Category ───────────────────────────")
-val byCategory: Map[String, List[Drug]] = drugs.groupBy { d => d.category().label() }
+val byCategory: Map[String, List[Drug]] = drugs.groupBy { d -> d.category().label() }
 foreach (cat, catDrugs) in byCategory {
-  val names: List[String] = catDrugs.map { d => d.name() }
+  val names: List[String] = catDrugs.map { d -> d.name() }
   var joined: String = ""
   var first: Boolean = true
   foreach n: String in names {
@@ -176,7 +176,7 @@ IO::println("")
 // ─── 3. Inventory alerts ─────────────────────────────────────────────────────
 
 IO::println("── Low Stock Alerts (< 200 units) ─────────────")
-val lowStock: List[Drug] = drugs.filter { d => d.stockUnits() < 200 }
+val lowStock: List[Drug] = drugs.filter { d -> d.stockUnits() < 200 }
 if lowStock.size == 0 {
   IO::println("  No low-stock items.")
 } else {
@@ -220,7 +220,7 @@ IO::println("")
 // ─── 6. Cost summary ─────────────────────────────────────────────────────────
 
 IO::println("── Billing Summary (active prescriptions) ──────")
-val activeRxAll: List[Prescription] = prescriptions.filter { rx => rx.status().isOpen() }
+val activeRxAll: List[Prescription] = prescriptions.filter { rx -> rx.status().isOpen() }
 var totalCost: Double = 0.0d
 var totalCopay: Double = 0.0d
 foreach rx: Prescription in activeRxAll {
@@ -259,10 +259,10 @@ IO::println("")
 // ─── 8. Drug popularity ───────────────────────────────────────────────────────
 
 IO::println("── Drug Prescription Counts ────────────────────")
-val byDrug: Map[String, List[Prescription]] = prescriptions.groupBy { rx => rx.drugId() }
-val drugCounts: List[String] = drugs.map { d =>
-  val rxForDrug: List[Prescription] = prescriptions.filter { rx => rx.drugId() == d.id() }
-  val activeCount: Int = rxForDrug.filter { rx => rx.status().isOpen() }.size
+val byDrug: Map[String, List[Prescription]] = prescriptions.groupBy { rx -> rx.drugId() }
+val drugCounts: List[String] = drugs.map { d ->
+  val rxForDrug: List[Prescription] = prescriptions.filter { rx -> rx.drugId() == d.id() }
+  val activeCount: Int = rxForDrug.filter { rx -> rx.status().isOpen() }.size
   "#{d.name()}|#{rxForDrug.size}|#{activeCount}"
 }
 IO::println("  Drug              Total  Active")
@@ -280,7 +280,7 @@ IO::println("")
 // ─── 9. Refill eligibility ────────────────────────────────────────────────────
 
 IO::println("── Refill-Eligible Prescriptions ───────────────")
-val refillEligible: List[Prescription] = prescriptions.filter { rx =>
+val refillEligible: List[Prescription] = prescriptions.filter { rx ->
   rx.status().isOpen() && rx.refillsRemaining() > 0
 }
 if refillEligible.size == 0 {
@@ -300,17 +300,17 @@ IO::println("")
 
 IO::println("── Summary ─────────────────────────────────────")
 val totalRx: Int = prescriptions.size
-val activeCount: Int = prescriptions.filter { rx => rx.status().isOpen() }.size
-val filledCount: Int = prescriptions.filter { rx =>
+val activeCount: Int = prescriptions.filter { rx -> rx.status().isOpen() }.size
+val filledCount: Int = prescriptions.filter { rx ->
   select rx.status() { case s is Filled: true; else: false }
 }.size
-val expiredCount: Int = prescriptions.filter { rx =>
+val expiredCount: Int = prescriptions.filter { rx ->
   select rx.status() { case s is Expired: true; else: false }
 }.size
-val cancelledCount: Int = prescriptions.filter { rx =>
+val cancelledCount: Int = prescriptions.filter { rx ->
   select rx.status() { case s is Cancelled: true; else: false }
 }.size
-val avgAge: Int = patients.fold(0) { acc, p => acc + p.age() } / patients.size
+val avgAge: Int = patients.fold(0) { acc, p -> acc + p.age() } / patients.size
 IO::println("  Patients         : #{patients.size}  (avg age: #{avgAge})")
 IO::println("  Drugs in catalog : #{drugs.size}")
 IO::println("  Prescriptions    : #{totalRx} total  (#{activeCount} active, #{filledCount} filled, #{expiredCount} expired, #{cancelledCount} cancelled)")

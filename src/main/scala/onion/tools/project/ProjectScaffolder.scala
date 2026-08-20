@@ -10,8 +10,18 @@ import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 
 object ProjectScaffolder:
+  /**
+   * The commented `[dependencies]` block is discoverability, not decoration: a new project
+   * otherwise gives no hint that Maven coordinates are accepted at all.
+   */
   private val ManifestContents =
-    "[package]\nname = \"%s\"\nversion = \"0.1.0\"\n"
+    "[package]\n" +
+    "name = \"%s\"\n" +
+    "version = \"0.1.0\"\n" +
+    "\n" +
+    "# Maven coordinates, resolved for build, run and test alike.\n" +
+    "# [dependencies]\n" +
+    "# \"org.postgresql:postgresql\" = \"42.7.3\"\n"
 
   private val MainContents =
     "def main(): void {\n  println(\"Hello, %s!\")\n}\n"

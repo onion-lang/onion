@@ -87,8 +87,16 @@ object OnionTextDocumentService {
    * belong to the build -- `onionc`, `onion`, `onion build`, `onion test` -- where they
    * run once against a file the author considers finished.
    */
-  def validationConfig: CompilerConfig =
-    CompilerConfig(Seq("."), null, "UTF-8", "", 100, checkLaws = false)
+  def validationConfig: CompilerConfig = validationConfig(None)
+
+  /**
+   * @param file the document being validated, used to find its `onion.toml` and validate
+   *             against the project's own classes and resolved dependencies. Without it
+   *             the classpath is just `.`, which is right for a standalone script and
+   *             wrong for anything in a project.
+   */
+  def validationConfig(file: Option[java.nio.file.Path]): CompilerConfig =
+    CompilerConfig(LspProjectClasspath.forDocument(file), null, "UTF-8", "", 100, checkLaws = false)
 }
 
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
@@ -429,6 +437,19 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     }
   }
 
+  /**
+   * Rename is file-local and not scope-aware: it rewrites every *code* occurrence of the
+   * identifier in the open document. It does not distinguish two unrelated locals that
+   * happen to share a name, and it cannot see other files.
+   *
+   * What it will no longer do is edit comments and string literals. Renaming `count` used
+   * to rewrite `"count of items"` and `// count starts at zero` along with the code — an
+   * edit that changes a program's output while calling itself a rename, which the compiler
+   * still accepts, so nothing catches it.
+   *
+   * A `#{ … }` interpolation is code, so the `count` in `"n=#{count}"` is renamed with the
+   * rest; skipping everything between quotes would have broken the file the other way.
+   */
   override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = {
     CompletableFuture.supplyAsync { () =>
       val uri = params.getTextDocument.getUri
@@ -441,7 +462,14 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
         val position = params.getPosition
         val line = getLineAt(state.content, position.getLine)
         val word = extractWordAt(line, position.getCharacter)
-        if (word.isEmpty) {
+        val mask = SourceRegions.codeMask(state.content)
+        val lineStarts = lineStartOffsets(state.content)
+
+        // Refuse when the cursor is on a comment or a literal rather than on a name.
+        // Renaming from inside a comment would rewrite every occurrence in the file on
+        // the strength of a word that is not a reference to anything.
+        val cursorOffset = offsetOf(lineStarts, position.getLine, position.getCharacter)
+        if (word.isEmpty || !SourceRegions.isCode(mask, cursorOffset)) {
           null
         } else {
           val changes = new java.util.HashMap[String, java.util.List[TextEdit]]()
@@ -451,11 +479,13 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
           lines.zipWithIndex.foreach { case (lineText, lineNum) =>
             wordPattern.findAllMatchIn(lineText).foreach { m =>
-              val range = new Range(
-                new Position(lineNum, m.start),
-                new Position(lineNum, m.end)
-              )
-              edits.add(new TextEdit(range, newName))
+              if (SourceRegions.isCode(mask, offsetOf(lineStarts, lineNum, m.start))) {
+                val range = new Range(
+                  new Position(lineNum, m.start),
+                  new Position(lineNum, m.end)
+                )
+                edits.add(new TextEdit(range, newName))
+              }
             }
           }
 
@@ -471,6 +501,84 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
       }
     }
   }
+
+  /**
+   * Semantic tokens, which is the colouring the TextMate grammar cannot produce: it decides
+   * what a word is from the shape of the line around it, so a class, a method, a field and
+   * a local all look alike. This classifies each identifier by what the document declares
+   * it to be.
+   *
+   * Identifiers the document does not declare produce no token at all, and the editor falls
+   * back to the grammar for them. Semantic tokens override the grammar, so a guess here
+   * would replace a right answer with a wrong one.
+   */
+  override def semanticTokensFull(
+    params: SemanticTokensParams
+  ): CompletableFuture[SemanticTokens] = {
+    CompletableFuture.supplyAsync { () =>
+      val uri = params.getTextDocument.getUri
+      val state = documents.get(uri)
+      if (state == null) new SemanticTokens(java.util.Collections.emptyList())
+      else {
+        val classify = (name: String) =>
+          symbolTable.lookupInUri(name, uri).headOption.map(_.kind)
+        val isDeclarationAt = (name: String, line: Int, column: Int) =>
+          symbolTable.lookupInUri(name, uri).exists(symbol => symbol.line == line)
+        new SemanticTokens(
+          OnionSemanticTokens.encode(state.content, classify, isDeclarationAt))
+      }
+    }
+  }
+
+  /**
+   * Formatting, sharing its implementation with `onion fmt` so the editor and the command
+   * line can never disagree about what formatted means.
+   *
+   * The result is one edit replacing the whole document. A minimal diff would preserve the
+   * editor's decorations better, but computing one from two strings risks producing an edit
+   * that does not reconstruct the formatted text — and a formatter that corrupts a buffer on
+   * save is worse than one that scrolls it.
+   *
+   * The formatted text is re-lexed and compared token for token before being offered. That
+   * cannot fail for a whitespace-only formatter, which is precisely why it is checked here:
+   * an editor applies this on every save, without anyone reading the result first.
+   */
+  override def formatting(
+    params: DocumentFormattingParams
+  ): CompletableFuture[java.util.List[? <: TextEdit]] = {
+    CompletableFuture.supplyAsync { () =>
+      val state = documents.get(params.getTextDocument.getUri)
+      if (state == null) java.util.Collections.emptyList[TextEdit]()
+      else {
+        val result = onion.tools.format.OnionFormatter.format(state.content)
+        val safe =
+          result.changed &&
+            onion.tools.format.OnionFormatter.signature(result.text) ==
+              onion.tools.format.OnionFormatter.signature(state.content)
+        if (!safe) java.util.Collections.emptyList[TextEdit]()
+        else {
+          val lines = state.content.split("\n", -1)
+          val end = new Position(lines.length - 1, lines.last.length)
+          java.util.Collections.singletonList(
+            new TextEdit(new Range(new Position(0, 0), end), result.text))
+        }
+      }
+    }
+  }
+
+  /** Byte-free offset of the first character of each line. */
+  private def lineStartOffsets(content: String): Array[Int] = {
+    val starts = scala.collection.mutable.ArrayBuffer(0)
+    var i = 0
+    while (i < content.length) {
+      if (content.charAt(i) == '\n') starts += (i + 1)
+      i += 1
+    }
+    starts.toArray
+  }
+
+  private def offsetOf(lineStarts: Array[Int], line: Int, character: Int): Int =
+    if (line < 0 || line >= lineStarts.length) -1 else lineStarts(line) + character
 
   private def extractWordAt(line: String, char: Int): String = {
     if (char < 0 || char >= line.length) {
@@ -586,7 +694,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def validateDocument(uri: String, content: String): Unit = {
     val fileName = extractFileName(uri)
-    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig)
+    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(extractPath(uri)))
 
     val diagnostics =
       try {
@@ -689,6 +797,11 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def isIdentifierPart(c: Char): Boolean =
     c.isLetterOrDigit || c == '_' || c == ':' || c == '.'
+
+  /** The document as a filesystem path, when the client gave a `file:` URI. */
+  private def extractPath(uri: String): Option[java.nio.file.Path] =
+    try Option(java.nio.file.Paths.get(new URI(uri)))
+    catch { case _: Exception => None }
 
   private def extractFileName(uri: String): String = {
     try {

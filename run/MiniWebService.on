@@ -1,0 +1,50 @@
+// A tiny HTTP service that answers its own requests.
+//
+// It binds port 0, so the OS picks a free port and nothing collides with whatever is
+// already running; it binds "localhost", so it is not reachable from the network; and it
+// makes its own requests and stops, so it runs anywhere and exits.
+//
+// Routing lives in Onion rather than in a table of registered paths: `handleAll` hands
+// every request to one handler, and `select` over the path with a `re"..."` pattern does
+// the matching, with the captured group bound as a value.
+
+def request(port: Int, path: String): String {
+  val conn = Net::connect("localhost", port)
+  conn.writeLine("GET " + path + " HTTP/1.0")
+  conn.writeLine("Host: localhost")
+  conn.writeLine("")
+  val text = conn.readAll()
+  conn.close()
+  return text
+}
+
+def statusOf(response: String): String {
+  val lines = Strings::split(response, "\r\n")
+  if lines.size == 0 { return "(no status line)" }
+  return (lines[0] as String)
+}
+
+def bodyOf(response: String): String {
+  val parts = Strings::split(response, "\r\n\r\n")
+  if parts.size < 2 { return "" }
+  return (parts[1] as String).trim()
+}
+
+val server = Server::start("localhost", 0)
+
+server.handleAll((req) -> select req.path() {
+  case re"/users/(\d+)" (id): Server::json("{\"id\": " + id + "}")
+  case "/health":             Server::text("ok")
+  else:                       Server::notFound()
+})
+
+val port = server.port()
+IO::println("serving on localhost (ephemeral port)")
+
+foreach path: String in ["/health", "/users/42", "/missing"] {
+  val response = request(port, path)
+  IO::println(path + " -> " + statusOf(response) + " | " + bodyOf(response))
+}
+
+server.stop()
+IO::println("stopped")

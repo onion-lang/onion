@@ -105,7 +105,7 @@ class RangeSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val sum = (1..100).toList().fold(0) { a, x => (a as Int) + (x as Int) }
+          |    val sum = (1..100).toList().fold(0) { a, x -> (a as Int) + (x as Int) }
           |    return (sum as Int)
           |  }
           |}

@@ -70,6 +70,34 @@ onion-repl
 java -jar onion.jar --help
 ```
 
+## Startup Time and JVM Flags
+
+Onion starts a JVM per invocation, and loading the compiler accounts for most of that.
+Sharing those classes through an [AppCDS](https://openjdk.org/jeps/350) archive roughly
+halves it — measured on JDK 25, `onion run/Hello.on` goes from 0.73s to 0.38s.
+
+The `curl | sh` installer builds the archive for you. If you installed from the
+distribution zip, build it once after unpacking:
+
+```bash
+ONION_GENERATE_CDS=1 onion run/Hello.on
+```
+
+That writes `lib/onion.jsa` (about 15 MB) next to `onion.jar`. Generation goes through the
+launcher on purpose: an archive is only usable when the classpath matches the one it was
+built with. Rebuild it after upgrading Onion or switching JDKs — until you do, the JVM
+quietly refuses the stale archive and runs normally, just without the speedup.
+
+Extra JVM flags go in `ONION_JAVA_OPTS`:
+
+```bash
+ONION_JAVA_OPTS="-Xmx4g" onion big-job.on
+ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005" onion script.on
+```
+
+`ONION_DEBUG_STARTUP=1` stops the launcher silencing the JVM's class-sharing messages,
+which is how to find out why an archive is being ignored.
+
 ## IDE Setup
 
 ### Visual Studio Code

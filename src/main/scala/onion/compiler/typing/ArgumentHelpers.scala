@@ -81,6 +81,13 @@ private[typing] object ArgumentHelpers {
   }
 
   /**
+   * Every parameter name across a set of overload candidates, for use as the
+   * "did you mean" suggestion pool when a named argument matches none of them.
+   */
+  def parameterNameCandidates(candidates: Iterable[Method]): Array[String] =
+    candidates.flatMap(_.argumentsWithDefaults.map(_.name)).toSet.toArray
+
+  /**
    * Fill missing arguments with default values.
    *
    * If params array is smaller than the method's parameter count,

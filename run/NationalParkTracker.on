@@ -187,10 +187,10 @@ public:
   def getPark(): Park = park
 
   def totalVisitors(): Int =
-    visits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+    visits.fold(0) { acc, v -> (acc as Int) + (v as Visit).visitors() } as Int
 
   def totalRevenue(): Int =
-    visits.fold(0) { acc, v => (acc as Int) + (v as Visit).revenueDollars() } as Int
+    visits.fold(0) { acc, v -> (acc as Int) + (v as Visit).revenueDollars() } as Int
 
   def avgRevPerVisitor(): Double {
     val total: Int = totalVisitors()
@@ -199,11 +199,11 @@ public:
   }
 
   def busiestSeason(): String {
-    val bySeason = visits.groupBy { v => (v as Visit).season().label() }
+    val bySeason = visits.groupBy { v -> (v as Visit).season().label() }
     var bestSeason: String = "n/a"
     var bestCount: Int     = -1
     foreach (k, v) in bySeason {
-      val cnt: Int = (v as List[Object]).fold(0) { acc, vis =>
+      val cnt: Int = (v as List[Object]).fold(0) { acc, vis ->
         (acc as Int) + (vis as Visit).visitors()
       } as Int
       if cnt > bestCount { bestSeason = (k as String); bestCount = cnt }
@@ -213,11 +213,11 @@ public:
 
   def yearRange(): String {
     if visits.size == 0 { return "n/a" }
-    val minY: Int = visits.fold(9999) { a, b =>
+    val minY: Int = visits.fold(9999) { a, b ->
       val ai: Int = (a as Int); val bi: Int = (b as Visit).year()
       if ai < bi { ai } else { bi }
     } as Int
-    val maxY: Int = visits.fold(0) { a, b =>
+    val maxY: Int = visits.fold(0) { a, b ->
       val ai: Int = (a as Int); val bi: Int = (b as Visit).year()
       if ai > bi { ai } else { bi }
     } as Int
@@ -262,13 +262,13 @@ public:
   def allVisits(): List[Object] = visits
 
   def findPark(name: String): Park? {
-    val found = parks.find { p => (p as Park).name() == name }
+    val found = parks.find { p -> (p as Park).name() == name }
     if found == null { return null }
     return (found as Park)
   }
 
   def visitsFor(parkName: String): List[Object] =
-    visits.filter { v => (v as Visit).parkName() == parkName }
+    visits.filter { v -> (v as Visit).parkName() == parkName }
 
   def summaryFor(parkName: String): ParkSummary? {
     val p: Park? = findPark(parkName)
@@ -277,23 +277,23 @@ public:
   }
 
   def atRiskParks(): List[Object] =
-    parks.filter { p => (p as Park).isProtected() }
+    parks.filter { p -> (p as Park).isProtected() }
 
   def topByVisitors(): List[Object] {
     val summaries: List[Object] = []
     foreach p: Object in parks {
       summaries.add(new ParkSummary((p as Park), visitsFor((p as Park).name())))
     }
-    return summaries.sortedBy { s => -(s as ParkSummary).totalVisitors() }
+    return summaries.sortedBy { s -> -(s as ParkSummary).totalVisitors() }
   }
 
   def visitsBySeasonReport(): void {
-    val all = visits.groupBy { v => (v as Visit).season().label() }
+    val all = visits.groupBy { v -> (v as Visit).season().label() }
     IO::println("\nVisitor Count by Season:")
     IO::println("-".rep(40))
     foreach (season, seasonVisits) in all {
       val total: Int = (seasonVisits as List[Object])
-        .fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+        .fold(0) { acc, v -> (acc as Int) + (v as Visit).visitors() } as Int
       IO::println("  #{(season as String).padRight(8)}: #{total.thousands()}")
     }
   }
@@ -301,7 +301,7 @@ public:
   def activityBreakdown(): void {
     IO::println("\nActivity Breakdown (visit count):")
     IO::println("-".rep(40))
-    val byKind = visits.groupBy { v => (v as Visit).activity().kind() }
+    val byKind = visits.groupBy { v -> (v as Visit).activity().kind() }
     foreach (kind, kindVisits) in byKind {
       val count: Int = (kindVisits as List[Object]).size
       IO::println("  #{(kind as String).padRight(12)}: #{count}")
@@ -315,7 +315,7 @@ public:
     foreach p: Object in parks {
       summaries.add(new ParkSummary((p as Park), visitsFor((p as Park).name())))
     }
-    val ranked = summaries.sortedBy { s => -(s as ParkSummary).totalRevenue() }
+    val ranked = summaries.sortedBy { s -> -(s as ParkSummary).totalRevenue() }
     var rank: Int = 1
     foreach s: Object in ranked {
       val summary = (s as ParkSummary)
@@ -415,8 +415,8 @@ IO::println("\n" + "=".rep(60))
 IO::println("GRAND TOTALS")
 IO::println("=".rep(60))
 val allVisits = reg.allVisits()
-val grandVisitors: Int = allVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
-val grandRevenue: Int  = allVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).revenueDollars() } as Int
+val grandVisitors: Int = allVisits.fold(0) { acc, v -> (acc as Int) + (v as Visit).visitors() } as Int
+val grandRevenue: Int  = allVisits.fold(0) { acc, v -> (acc as Int) + (v as Visit).revenueDollars() } as Int
 IO::println("  Parks          : #{reg.parkCount()}")
 IO::println("  Visit records  : #{reg.visitCount()}")
 IO::println("  Total visitors : #{grandVisitors.thousands()}")
@@ -433,21 +433,21 @@ def safeAvg(total: Int, n: Int): String {
 IO::println("  Avg rev/park   : #{safeAvg(grandRevenue, reg.parkCount())}")
 
 // Partition: peak vs off-peak
-val partitioned = allVisits.partition { v => (v as Visit).season().isPeak() }
+val partitioned = allVisits.partition { v -> (v as Visit).season().isPeak() }
 val peakVisits    = (partitioned.get(0) as List[Object])
 val offPeakVisits = (partitioned.get(1) as List[Object])
-val peakVis: Int    = peakVisits.fold(0)    { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
-val offPeakVis: Int = offPeakVisits.fold(0) { acc, v => (acc as Int) + (v as Visit).visitors() } as Int
+val peakVis: Int    = peakVisits.fold(0)    { acc, v -> (acc as Int) + (v as Visit).visitors() } as Int
+val offPeakVis: Int = offPeakVisits.fold(0) { acc, v -> (acc as Int) + (v as Visit).visitors() } as Int
 IO::println("  Peak-season    : #{peakVis.thousands()} visitors in #{peakVisits.size} records")
 IO::println("  Off-peak       : #{offPeakVis.thousands()} visitors in #{offPeakVisits.size} records")
 
 // Distinct states represented
 val allParks = reg.allParks()
-val states = allParks.map { p => (p as Park).state() }.distinct()
+val states = allParks.map { p -> (p as Park).state() }.distinct()
 IO::println("  States         : #{states.size} -- #{states.toString()}")
 
 // Find highest-impact visit
-val byImpact = allVisits.sortedBy { v => -(v as Visit).impactScore() }
+val byImpact = allVisits.sortedBy { v -> -(v as Visit).impactScore() }
 if byImpact.size > 0 {
   val top = (byImpact.get(0) as Visit)
   IO::println("  Top impact     : #{top.parkName()} #{top.season().label()} (score #{top.impactScore()}, #{top.activity().label()})")

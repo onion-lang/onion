@@ -6,7 +6,11 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI), `Http` (HTTP client) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **Network** | `Http` (HTTP client), `Net` (TCP sockets), `Server` (HTTP server) |
+| **Data stores** | `Db` (SQL over JDBC) |
+| **Archives** | `Archive` (zip, gzip) |
+| **Concurrency** | `Future`, `Concurrent` (pools, counters, locks, channels) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
@@ -114,7 +118,7 @@ val l: Long? = IO::tryReadLong("L: ")
 
 ```onion
 val lines: List = IO::readLines()          // reads until end of input
-IO::eachLine { line => IO::println(line) } // applies a callback to each remaining line
+IO::eachLine { line -> IO::println(line) } // applies a callback to each remaining line
 IO::printLines(["a", "b", "c"])            // one item per line
 IO::printAll("a", "b", "c")                // varargs form of printLines
 ```
@@ -455,7 +459,7 @@ Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- the reason this type exists
 ```onion
 val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
 val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
-println(a.zip(b) { p, q => p + q }.defects().size)   // 2, not 1
+println(a.zip(b) { p, q -> p + q }.defects().size)   // 2, not 1
 ```
 
 `bind` still short-circuits, because it must — the second computation may depend on the
@@ -532,12 +536,12 @@ unchanged parts reproduce byte for byte, and only deliberately changed values re
 `Residue` is opaque; hand it back only to the shape that produced it.
 
 `Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
-swaps the value while keeping the residue, and `edit { v => ... }` focuses an update.
+swaps the value while keeping the residue, and `edit { v -> ... }` focuses an update.
 `render()` reassembles the text:
 
 ```onion
 val r   = configShape.parseLossless(file"app.conf".text()).get()
-val out = r.edit { v => v.copy(port = 9090) }.render()
+val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  one changed line
 ```
 
@@ -560,7 +564,7 @@ the sugar.
 
 ## Function Interfaces
 
-Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
+Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f(args)`.
 
 ### Function0
 
@@ -568,7 +572,7 @@ Function with no parameters:
 
 ```onion
 val func: Function0[Int] = () -> { return 42; }
-val result: Int = func.call()
+val result: Int = func()
 ```
 
 ### Function1
@@ -577,7 +581,7 @@ Function with one parameter:
 
 ```onion
 val double: Function1[Int, Int] = (x: Int) -> { return x * 2; }
-val result: Int = double.call(5)
+val result: Int = double(5)
 ```
 
 ### Function2
@@ -586,7 +590,7 @@ Function with two parameters:
 
 ```onion
 val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
-val result: Int = add.call(3, 7)
+val result: Int = add(3, 7)
 ```
 
 ### Function3 through Function10
@@ -1481,9 +1485,9 @@ Collection factories and pipelines (`onion.Colls`):
 Colls::listOf("a", "b", "c")            // immutable List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
-Colls::sortedBy(people) { p => p.age() }
+Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold pipelines are extension methods on
-// List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
+// List/Iterable/arrays: xs.map { x -> x * 2 }.filter { x -> x > 0 }
 ```
 
 ### Batching, windowing, and selector aggregation
@@ -1499,7 +1503,7 @@ ps.averageBy((p) -> p.age())      // Double - average of the selector, 0.0 if em
 ps.maxBy((p) -> p.age())          // the element with the greatest selector value, null if empty
 ps.minBy((p) -> p.age())          // the element with the smallest selector value, null if empty
 
-xs.chunked(2).map { b => (b as List).size() }   // chains like any other pipeline stage
+xs.chunked(2).map { b -> (b as List).size() }   // chains like any other pipeline stage
 ```
 
 ## Http
@@ -1647,6 +1651,215 @@ IO::println("Tomorrow: " + DateTime::format(tomorrow));
 val birthday: Long = DateTime::of(1990, 5, 15);
 val age: Int = DateTime::diffDays(now, birthday) / 365;
 ```
+
+---
+
+## Net
+
+TCP sockets. `Http` makes requests; this speaks any protocol, and accepts connections.
+
+### Net::connect
+
+```onion
+val conn = Net::connect("example.com", 80)
+conn.writeLine("GET / HTTP/1.0")
+conn.writeLine("Host: example.com")
+conn.writeLine("")
+IO::println(conn.readAll())
+conn.close()
+```
+
+`Net::connect(host, port, timeoutMillis)` gives up rather than waiting for the OS default,
+which on a dropped packet can be a minute or more.
+
+A connection reads with `readLine()` (null at end of stream), `readAll()` (UTF-8, until the
+peer closes) and `readBytes()`; it writes with `write(text)`, `writeLine(text)` (appends
+CRLF, which is what line-oriented protocols expect) and `writeBytes(bytes)`. Every write
+flushes, so nothing sits in a buffer unsent. `timeout(millis)` bounds a blocking read,
+`closeWrite()` half-closes to signal EOF while still reading, and `close()` is idempotent.
+
+### Net::listen
+
+```onion
+val listener = Net::listen("localhost", 0, 4)   // 0 asks the OS for a free port
+IO::println("listening on " + listener.port())
+
+val peer = listener.accept()
+peer.writeLine("hello " + peer.remoteAddress())
+peer.close()
+listener.close()
+```
+
+Port 0 asks the OS for a free port, and `port()` reports the one it chose — that is what
+makes a server testable without picking a number and hoping. Binding `"localhost"` keeps it
+off the network; passing `null` as the host binds every local address. Closing the listener
+is how to unblock a thread parked in `accept()`.
+
+Failures carry the address that failed, so a `catch` in Onion names the host rather than
+just saying "connection refused".
+
+---
+
+## Server
+
+An HTTP server, on the JDK's own implementation — no dependency.
+
+### Server::start
+
+```onion
+val server = Server::start("localhost", 8080)
+server.handle("/hello", (req) -> Server::text("hi " + req.method()))
+server.await()
+```
+
+`Server::start(port)` binds every local address; `Server::start(host, port)` binds one.
+Port 0 asks the OS for a free port, which `port()` then reports. `await()` blocks until the
+process ends; `stop()` stops accepting and waits a second for handlers in flight.
+
+### Routing
+
+`handle(path, handler)` matches one exact path. `handleAll(handler)` catches everything
+else, which is where routing in Onion belongs:
+
+```onion
+server.handleAll((req) -> select req.path() {
+  case re"/users/(\d+)" (id): Server::json("{\"id\":" + id + "}")
+  case "/health":             Server::text("ok")
+  else:                       Server::notFound()
+})
+```
+
+A handler that throws produces a 500 rather than taking the server down or leaving the
+client waiting on a socket that never answers.
+
+### Request
+
+`method()`, `path()` (without the query string), `query()` (the raw one, `""` when absent),
+`body()` (read in full before the handler runs), `header(name)`, `headers()` and `params()`
+— the last two return `Map`s, in the order written.
+
+### Response
+
+`Server::text`, `Server::json` and `Server::html` are 200s with the matching content type;
+`Server::notFound()` is a 404 and `Server::status(code, body)` is anything else. Responses
+are immutable, so `withStatus` and `withHeader` hand back a new one:
+
+```onion
+val r = Server::json("{\"a\":1}").withStatus(201).withHeader("X-Test", "yes")
+```
+
+Building a response touches no socket, which is what lets a handler be tested on its own.
+
+---
+
+## Archive
+
+Zip and gzip. Tar is not here: it needs a dependency, and these two are what the JDK can
+do on its own.
+
+```onion
+Archive::zip("out.zip", ["a.txt", "b.txt"])
+Archive::zipDir("site.zip", "site")          // keeps paths relative to "site"
+val names = Archive::entries("out.zip")      // without extracting
+val written = Archive::unzip("out.zip", "extracted")
+
+Archive::gzipFile("big.log", "big.log.gz")   // streams, rather than reading it all in
+Archive::gunzipFile("big.log.gz", "big.log") // and the reverse
+val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
+```
+
+**Extraction refuses to write outside the target directory.** An entry named
+`../../.ssh/authorized_keys` is the standard "zip slip" attack, and an extractor that
+resolves entry names naively writes exactly where it is told; this throws instead, naming
+the entry.
+
+Entries are written with a fixed timestamp, so zipping the same inputs twice produces the
+same bytes — an artefact that differs run to run cannot be checksummed or cached.
+
+---
+
+## Concurrent
+
+Threads, and the pieces needed to use them safely. `Future` could already run one thing off
+the current thread, but there was no way to bound how many run at once, to share a counter
+between them, to hold a lock, or to hand work from one to another.
+
+Virtual threads are deliberately absent: they need Java 21, and Onion targets 17.
+
+### Pool
+
+```onion
+val pool = Concurrent::pool(4)                     // or Concurrent::pool() for one per CPU
+val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+pool.close()
+```
+
+`mapAll` returns results **in the input's order**, not in the order they finished — output
+that depends on timing is output you cannot test. A failing element is reported once every
+task has settled, so one bad input cannot leave workers running behind a caller that has
+already given up. `submit(f)` returns a `Future` for a single piece of work.
+
+Pool threads are daemons, so a pool someone forgot to close cannot keep the JVM alive after
+`main` returns. `close()` is still the right thing to call; `awaitClose(millis)` waits for
+work in flight.
+
+### Counter, Lock, Channel
+
+```onion
+val hits = Concurrent::counter()
+hits.increment()
+
+val lock = Concurrent::lock()
+lock.withLock(() -> { /* … */ })     // releases even if the body throws
+
+val chan = Concurrent::channel(16)   // bounded on purpose
+chan.send("work")
+val item = chan.receiveTimeout(1000) // null rather than blocking forever
+```
+
+Prefer `withLock` to `acquire`/`release`: a body that throws between a manual pair leaks
+the lock and every other thread waits forever. A channel is bounded because an unbounded
+one hides a producer outrunning its consumer until memory runs out, and it refuses `null`,
+which would be indistinguishable from an empty receive.
+
+---
+
+## Db
+
+SQL over JDBC. The driver is not bundled — it is whatever the project declares:
+
+```toml
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+```
+
+```onion
+val db = Db::connect("jdbc:postgresql://localhost/app", "user", "secret")
+
+val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+val one  = db.queryOne("SELECT * FROM users WHERE id = ?", 7)   // null when nothing matches
+val n    = db.queryValue("SELECT COUNT(*) FROM users")          // first column of first row
+db.update("INSERT INTO users VALUES (?, ?)", 8, "ada")
+
+db.transaction((conn) -> {
+  conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+  conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+})
+
+db.close()
+```
+
+Values are always **bound**, never pasted into the SQL, so `WHERE name = ?` is safe with
+any name and there is no way to build the string by accident.
+
+A transaction commits when the body returns and rolls back when it throws, then rethrows.
+There is no `begin`/`commit` pair to forget: a body that throws between a manual pair
+leaves the connection holding an open transaction, and the next unrelated statement joins
+it.
+
+A row is a `Map` from column label to value, in the order selected — the label, so
+`SELECT x AS y` gives `y`. Two columns sharing a label is refused rather than silently
+losing one; alias one with `AS`.
 
 ---
 

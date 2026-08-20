@@ -17,45 +17,5 @@ import onion.compiler.TypedAST.*
  */
 private[asm] object TermContainsTry:
 
-  def contains(term: Term): Boolean = term match
-    case _: NewClosure => false
-    case stmt: StatementTerm => containsStatement(stmt.statement)
-    case other =>
-      productChildren(other).exists {
-        case t: Term => contains(t)
-        case s: ActionStatement => containsStatement(s)
-        case _ => false
-      }
-
-  private def containsStatement(statement: ActionStatement): Boolean = statement match
-    case _: Try => true
-    case other =>
-      productChildren(other).exists {
-        case t: Term => contains(t)
-        case s: ActionStatement => containsStatement(s)
-        case _ => false
-      }
-
-  // TypedAST terms/statements are plain classes, not case classes, so walk
-  // their public accessor methods that return Terms/Statements/collections
-  // (mirrors onion.compiler.backend.asm.CapturedVariableCollector).
-  private def productChildren(node: AnyRef): Seq[AnyRef] = node match
-    case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
-    case _ => reflectiveChildren(node)
-
-  private def reflectiveChildren(node: AnyRef): Seq[AnyRef] =
-    node.getClass.getMethods.iterator
-      .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
-        (classOf[Term].isAssignableFrom(m.getReturnType) ||
-         classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
-         m.getReturnType.isArray ||
-         classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
-      .flatMap { m =>
-        try
-          m.invoke(node) match
-            case null => Nil
-            case arr: Array[?] => arr.toSeq.collect { case r: AnyRef => r }
-            case list: java.util.List[?] => scala.jdk.CollectionConverters.ListHasAsScala(list).asScala.toSeq.collect { case r: AnyRef => r }
-            case other: AnyRef => Seq(other)
-        catch case _: Throwable => Nil
-      }.toSeq
+  def contains(term: Term): Boolean =
+    onion.compiler.TermWalk.exists(term) { case _: Try => true; case _ => false }

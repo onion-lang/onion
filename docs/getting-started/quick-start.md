@@ -92,7 +92,7 @@ println(message)
 // Lambda syntax: (params) -> { body }
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
-val result: Int = add.call(5, 3)  // 8
+val result: Int = add(5, 3)  // 8
 println(result)
 ```
 
@@ -122,8 +122,8 @@ foreach color: String in colors {
 Pipelines are built in, so you rarely need an index:
 
 ```onion
-val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
-val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+val odds = [1, 2, 3, 4, 5].filter { n -> n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n -> n * 10 }                     // [10, 30, 50]
 ```
 
 The standard library takes and returns lists. Arrays exist for talking to Java —

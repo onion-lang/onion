@@ -141,7 +141,7 @@ private[compiler] final class CallArgumentTypingSupport(
           sawNamed = true
           val paramIndex = paramNames.indexOf(named.name)
           if (paramIndex < 0) {
-            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
             hasError = true
           } else if (filled(paramIndex)) {
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)

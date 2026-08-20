@@ -38,7 +38,7 @@ class FutureErgonomicsSpec extends AbstractShellSpec {
           |    val f = Future::async(() -> 21 * 2)
           |    val sb = new StringBuffer()
           |    val r = f.await()
-          |    f.onSuccess { v => sb.append("got " + v) }
+          |    f.onSuccess { v -> sb.append("got " + v) }
           |    return sb.toString() + ":" + r
           |  }
           |}
@@ -55,7 +55,7 @@ class FutureErgonomicsSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val g = Future::async(() -> 10).map { x => (x as Int) + 5 }
+          |    val g = Future::async(() -> 10).map { x -> (x as Int) + 5 }
           |    return (g.await() as Int)
           |  }
           |}

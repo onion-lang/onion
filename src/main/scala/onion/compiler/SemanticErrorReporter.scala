@@ -47,6 +47,10 @@ import onion.compiler.exceptions.CompilationException
  *   - METHOD_NOT_FOUND
  *   - FIELD_NOT_FOUND
  *   - CLASS_NOT_FOUND
+ *   - CONSTRUCTOR_NOT_FOUND
+ *   - UNKNOWN_PARAMETER_NAME
+ *   - LABEL_NOT_FOUND
+ *   - OVERRIDE_TARGET_NOT_FOUND
  *
  * == Compilation Context ==
  *
@@ -285,10 +289,7 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
-    SemanticError.OVERRIDE_TARGET_NOT_FOUND -> ErrorDef(
-      "error.semantic.overrideTargetNotFound",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
+    // OVERRIDE_TARGET_NOT_FOUND handled specially with suggestions
 
     // Generic type errors
     SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
@@ -325,10 +326,6 @@ class SemanticErrorReporter(threshold: Int) {
     ),
 
     // Pattern matching errors
-    SemanticError.UNKNOWN_PARAMETER_NAME -> ErrorDef(
-      "error.semantic.unknownParameterName",
-      Seq(items => asString(items(0)))
-    ),
     SemanticError.DUPLICATE_ARGUMENT -> ErrorDef(
       "error.semantic.duplicateArgument",
       Seq(items => asString(items(0)))
@@ -390,10 +387,7 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.mapNotDirectlyIterable",
       Seq(items => typeName(items(0)))
     ),
-    SemanticError.LABEL_NOT_FOUND -> ErrorDef(
-      "error.semantic.labelNotFound",
-      Seq(items => asString(items(0)))
-    ),
+    // LABEL_NOT_FOUND handled specially with suggestions
     SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
       "error.semantic.regexPatternInvalid",
       Seq(items => asString(items(0)))
@@ -449,6 +443,24 @@ class SemanticErrorReporter(threshold: Int) {
     SemanticError.DUPLICATE_RECORD_COMPONENT -> ErrorDef(
       "error.semantic.duplicateRecordComponent",
       Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    // {0} = the class, {1} = the primary constructor's parameter types, so the fix is
+    // copy-pasteable: `def this(...) : this(<{1}>) { ... }`.
+    SemanticError.SECONDARY_CONSTRUCTOR_MUST_DELEGATE -> ErrorDef(
+      "error.semantic.secondaryConstructorMustDelegate",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CONSTRUCTOR_DELEGATION_CYCLE -> ErrorDef(
+      "error.semantic.constructorDelegationCycle",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
+      "error.semantic.constructorInRecordOrEnum",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
+    ),
+    SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
+      "error.semantic.thisBeforeConstructorDelegation",
+      Seq(items => typeName(items(0)))
     ),
     // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
     // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
@@ -540,6 +552,22 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles LABEL_NOT_FOUND with optional suggestions for similar labels
+   * among the enclosing labeled loops.
+   */
+  private def reportLabelNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.labelNotFound"), Seq(name))
+
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
    * Handles CLASS_NOT_FOUND with optional suggestions for similar class names.
    */
   private def reportClassNotFound(position: Location, items: Array[AnyRef]): Unit = {
@@ -548,6 +576,40 @@ class SemanticErrorReporter(threshold: Int) {
 
     val suggestion = if (items.length > 1) {
       val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
+   * Handles UNKNOWN_PARAMETER_NAME with optional suggestions for similar
+   * parameter names.
+   */
+  private def reportUnknownParameterName(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.unknownParameterName"), Seq(name))
+
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
+   * Handles OVERRIDE_TARGET_NOT_FOUND with optional suggestions for similar
+   * method names among the base class's/interfaces' overridable methods.
+   */
+  private def reportOverrideTargetNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val paramDescriptor = asString(items(1))
+    val className = asString(items(2))
+    val baseMessage = format(message("error.semantic.overrideTargetNotFound"), Seq(name, paramDescriptor, className))
+
+    val suggestion = if (items.length > 3) {
+      val candidates = items(3).asInstanceOf[Array[String]]
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
     } else None
 
@@ -568,7 +630,7 @@ class SemanticErrorReporter(threshold: Int) {
         val ctorSignatures = constructors.map { ctor =>
           s"  ${typeRef.name}(${ctor.getArgs.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")})"
         }
-        Some(s"Available constructors:${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
+        Some(s"${message("error.suggestion.availableConstructors")}${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
     } else None
 
@@ -649,10 +711,16 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
+      case SemanticError.LABEL_NOT_FOUND =>
+        reportLabelNotFound(position, items)
       case SemanticError.CLASS_NOT_FOUND =>
         reportClassNotFound(position, items)
       case SemanticError.CONSTRUCTOR_NOT_FOUND =>
         reportConstructorNotFound(position, items)
+      case SemanticError.UNKNOWN_PARAMETER_NAME =>
+        reportUnknownParameterName(position, items)
+      case SemanticError.OVERRIDE_TARGET_NOT_FOUND =>
+        reportOverrideTargetNotFound(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>

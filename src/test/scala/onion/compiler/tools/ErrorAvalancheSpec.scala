@@ -33,7 +33,7 @@ class ErrorAvalancheSpec extends AbstractShellSpec {
       val script =
         """
           |val xs: List[Int] = [1, 2, 3]
-          |val ys = xs.map { x => x.noSuchMethod() }
+          |val ys = xs.map { x -> x.noSuchMethod() }
         """.stripMargin
       // (a) the program fails to compile
       assert(Shell.Failure(-1) == shell.run(script, "Avalanche.on", Array()))
@@ -50,7 +50,7 @@ class ErrorAvalancheSpec extends AbstractShellSpec {
       val script =
         """
           |val xs: List[Int] = [1, 2, 3]
-          |val ys = xs.filter { x => x.noSuchMethod() }
+          |val ys = xs.filter { x -> x.noSuchMethod() }
         """.stripMargin
       assert(Shell.Failure(-1) == shell.run(script, "AvalancheFilter.on", Array()))
       val errors = diagnose(script, "AvalancheFilter.on")
@@ -74,7 +74,7 @@ class ErrorAvalancheSpec extends AbstractShellSpec {
       val script =
         """
           |val xs: List[Int] = [1, 2, 3]
-          |val ys = xs.map { x => x + 1 }.nonExistentMethod()
+          |val ys = xs.map { x -> x + 1 }.nonExistentMethod()
         """.stripMargin
       assert(Shell.Failure(-1) == shell.run(script, "Guard2.on", Array()))
       assert(codes(diagnose(script, "Guard2.on")).contains("E0005"))
@@ -84,7 +84,7 @@ class ErrorAvalancheSpec extends AbstractShellSpec {
       val script =
         """
           |val xs: List[Int] = [1, 2, 3]
-          |val ys = xs.nonExistentMethod { x => x + 1 }
+          |val ys = xs.nonExistentMethod { x -> x + 1 }
         """.stripMargin
       assert(Shell.Failure(-1) == shell.run(script, "Guard3.on", Array()))
       // The closure body is fine; the method is genuinely absent -> must report.
@@ -107,7 +107,7 @@ class ErrorAvalancheSpec extends AbstractShellSpec {
       val script =
         """
           |val xs: List[Int] = [1, 2, 3]
-          |val ys = xs.map { x => x + 1 }
+          |val ys = xs.map { x -> x + 1 }
           |println(ys)
         """.stripMargin
       assert(shell.run(script, "Valid.on", Array()) != Shell.Failure(-1))

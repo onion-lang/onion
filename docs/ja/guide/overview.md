@@ -70,10 +70,8 @@ class Animal {
     def speak: String = "Some sound"
 }
 
-class Dog extends Animal {
+class Dog(n: String) extends Animal(n) {
   public:
-    def this(n: String): (n) { }
-
     def speak: String = "Woof!"
 }
 ```

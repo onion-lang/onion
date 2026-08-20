@@ -95,8 +95,8 @@ class OutcomeSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String {
             |    val good: Outcome[JInteger] = Outcome::ok(2)
             |    val bad: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "nope"))
-            |    val a = good.map { v => v + 1 }
-            |    val b = bad.map { v => v + 1 }
+            |    val a = good.map { v -> v + 1 }
+            |    val b = bad.map { v -> v + 1 }
             |    return "" + a.getOrElse(0) + "/" + b.defects().size + "/" + b.isBad()
             |  }
             |}
@@ -114,7 +114,7 @@ class OutcomeSpec extends AbstractShellSpec {
             |  static def main(args: String[]): Int {
             |    val a: Outcome[JInteger] = Outcome::ok(20)
             |    val b: Outcome[JInteger] = Outcome::ok(22)
-            |    return a.zip(b) { x, y => x + y }.getOrElse(0)
+            |    return a.zip(b) { x, y -> x + y }.getOrElse(0)
             |  }
             |}
             |""".stripMargin, "None", Array())
@@ -129,7 +129,7 @@ class OutcomeSpec extends AbstractShellSpec {
             |  static def main(args: String[]): Int {
             |    val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
             |    val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
-            |    return a.zip(b) { p, q => p + q }.defects().size
+            |    return a.zip(b) { p, q -> p + q }.defects().size
             |  }
             |}
             |""".stripMargin, "None", Array())
@@ -144,7 +144,7 @@ class OutcomeSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String {
             |    val a: Outcome[JInteger] = Outcome::bad(Defect::of("first", "Int", "p"))
             |    val b: Outcome[JInteger] = Outcome::bad(Defect::of("second", "Int", "q"))
-            |    val ds = a.zip(b) { p, q => p + q }.defects()
+            |    val ds = a.zip(b) { p, q -> p + q }.defects()
             |    return (ds[0] as Defect).path() + "," + (ds[1] as Defect).path()
             |  }
             |}
@@ -164,7 +164,7 @@ class OutcomeSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): Int {
             |    val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
-            |    return a.flatMap { v => Outcome::bad(Defect::of("y", "Int", "q")) }.defects().size
+            |    return a.flatMap { v -> Outcome::bad(Defect::of("y", "Int", "q")) }.defects().size
             |  }
             |}
             |""".stripMargin, "None", Array())

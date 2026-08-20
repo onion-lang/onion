@@ -104,21 +104,21 @@ public:
     return total
   }
   def lowStock(): List[Item] {
-    return items.filter { item => (item as Item).stock() < 10 }
+    return items.filter { item -> (item as Item).stock() < 10 }
   }
   def topByValue(n: Int): List[Item] {
     return items
-      .sortedBy { item => 0.0 - (item as Item).unitPrice() * (item as Item).stock() }
+      .sortedBy { item -> 0.0 - (item as Item).unitPrice() * (item as Item).stock() }
       .take(n)
   }
   def skus(): List[String] {
-    return items.map { item => (item as Item).sku() }
+    return items.map { item -> (item as Item).sku() }
   }
   def categories(): List[String] {
-    return items.map { item => (item as Item).category() }.distinct()
+    return items.map { item -> (item as Item).category() }.distinct()
   }
   def findBySku(sku: String): Lookup[Item] {
-    val found = items.find { item => (item as Item).sku() == sku }
+    val found = items.find { item -> (item as Item).sku() == sku }
     if found != null {
       return new Found[Item](found as Item)
     }
@@ -169,7 +169,7 @@ println(inv.summary())
 println("categories: " + inv.categories().toString())
 
 // Group by stock status with foreach (k, v) in map
-val byStatus = items.groupBy { item => item.stock().stockStatus() }
+val byStatus = items.groupBy { item -> item.stock().stockStatus() }
 foreach (status, group) in byStatus {
   println("  #{status}: #{(group as List).size} items")
 }
@@ -189,7 +189,7 @@ def formatLine(item: Item): String {
   val val_ = item.unitPrice() * item.stock()
   return "  #{item.sku().padLeft(4)} #{item.name()} → $#{val_.fmt2()}"
 }
-foreach line: String in inv.topByValue(4).map { i => formatLine(i as Item) } {
+foreach line: String in inv.topByValue(4).map { i -> formatLine(i as Item) } {
   println(line)
 }
 
@@ -239,7 +239,7 @@ println("compoundDiscount(#{originalPrice}, 3) = $#{finalPrice.fmt2()}")
 
 // Distinct categories via |> pipeline to a formatter then to println
 def listToReport(xs: List[String]): String = "distinct categories: " + xs.toString()
-items.map { item => item.category() }.distinct().sortedBy { c => c as String } |> listToReport |> println
+items.map { item -> item.category() }.distinct().sortedBy { c -> c as String } |> listToReport |> println
 
 // Foreach over an exclusive range with accumulator
 var rangeSum = 0

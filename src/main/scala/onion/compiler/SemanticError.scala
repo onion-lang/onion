@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0086) for identification
+ * type checking. Each error has a unique code (E0000-E0090) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -63,6 +63,10 @@ package onion.compiler
  *   - SHAPE_FORMAT_UNKNOWN, TOOL_UNDECLARED_EFFECT, TOOL_UNUSED_CAPABILITY
  *   - TOOL_BAD_CAPABILITY, SHAPE_INSTANCE_WITHOUT_LAW, TOOL_PARAMETER_NOT_CLI_CONVERTIBLE
  *   - DUPLICATE_TOOL_NAME, UNREACHABLE_CATCH_CLAUSE
+ *
+ * '''Constructor Errors (E0087-E0090)'''
+ *   - SECONDARY_CONSTRUCTOR_MUST_DELEGATE, CONSTRUCTOR_DELEGATION_CYCLE
+ *   - CONSTRUCTOR_IN_RECORD_OR_ENUM, THIS_BEFORE_CONSTRUCTOR_DELEGATION
  *
  * == Error Message Lookup ==
  *
@@ -167,6 +171,32 @@ object SemanticError {
   case object DUPLICATE_EXTENSION_METHOD extends SemanticError(84)
   case object STATIC_METHOD_WITHOUT_BODY extends SemanticError(85)
   case object DUPLICATE_RECORD_COMPONENT extends SemanticError(86)
+  /**
+   * A `def this` in a class that has a primary constructor does not delegate to it. The
+   * primary owns the superclass call and the `val`/`var` parameter fields; a secondary
+   * that goes around it leaves those fields at their defaults and reaches the superclass
+   * with the wrong constructor -- `class P(val x: Int) { def this { } }` used to compile
+   * and give `new P().x == 0`.
+   */
+  case object SECONDARY_CONSTRUCTOR_MUST_DELEGATE extends SemanticError(87)
+  /** `def this(a) : this(b)` and `def this(b) : this(a)` -- a StackOverflowError at `new`. */
+  case object CONSTRUCTOR_DELEGATION_CYCLE extends SemanticError(88)
+  /**
+   * `def this` inside a record or enum body. Both have a canonical constructor and no
+   * meaning for a user-written one; the body pass never typed it, and codegen then
+   * emitted the record's synthetic parameter-to-field stores against a constructor with
+   * the wrong arity -- a compiler crash, not a diagnostic.
+   */
+  case object CONSTRUCTOR_IN_RECORD_OR_ENUM extends SemanticError(89)
+  /**
+   * `this` -- explicitly, or through a bare field name -- inside the argument list of a
+   * `: this(...)` delegation or an `extends B(...)` super call. The object does not exist
+   * yet at that point: the JVM verifier rejects a field read on `uninitializedThis`, so
+   * without this check the program compiled to a class that failed to load, reported as
+   * an internal error. Java's "cannot reference x before supertype constructor has been
+   * called" is the same rule.
+   */
+  case object THIS_BEFORE_CONSTRUCTOR_DELEGATION extends SemanticError(90)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -384,7 +384,7 @@ class FutureSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): String {
             |    val f = Future::successful[String]("hello");
-            |    val f2 = f.map() { s => s + " world" };
+            |    val f2 = f.map() { s -> s + " world" };
             |    return f2.await()
             |  }
             |}
@@ -403,7 +403,7 @@ class FutureSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): String {
             |    val f = Future::successful("hi");
-            |    val f2 = f.map() { s => s + "!" };
+            |    val f2 = f.map() { s -> s + "!" };
             |    return f2.await()
             |  }
             |}

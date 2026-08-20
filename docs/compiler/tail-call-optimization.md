@@ -85,6 +85,53 @@ def factorial(n: Int, acc: Int): Int {
 }
 ```
 
+## Mutual Recursion with `@TailRecursive`
+
+Two or more methods that tail-call each other (`isEven` calling `isOdd`, `isOdd`
+calling `isEven`) are not rewritten by the detection phase above — each call
+targets a *different* method, so the "self-call" check never matches. Mark every
+method in the group `@TailRecursive` and `MutualRecursionOptimization` merges them
+into one state-machine method instead:
+
+```onion
+class Parity {
+private:
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+public:
+  def check(n: Int): Boolean = isEven(n)
+}
+```
+
+The group is optimized only when **all** of the following hold — `MutualRecursionOptimization.validateGroup`:
+
+- every method in the group is **private** (same dispatch-safety reasoning as
+  direct TCO: a public method could be overridden, so rewriting it into a shared
+  loop could silently change behavior)
+- every method has the **same return type**
+- every method has the **same parameter count and parameter types**
+- every tail call from a group member targets another member of the same group
+  (a tail call out of the group leaves it ineligible)
+
+**A group that fails validation is not an error — the annotation is simply
+ineffective**, and the methods keep calling each other as ordinary (non-tail)
+calls. That is easy to miss, since nothing points at the annotation until deep
+enough recursion overflows the JVM stack at runtime. To catch this at compile
+time instead, the compiler emits **`W0016`** for every method in a `@TailRecursive`
+group that could not be optimized, naming the failed requirement (e.g. "All
+methods must be private for mutual recursion optimization"). See
+[`--Wno`](../tools/compiler.md#--wno-codes) to suppress it if the group is
+intentionally left unoptimized.
+
 ## Viewing the Optimization
 
 Compile with the `--verbose` flag to trace which methods are transformed and why

@@ -36,4 +36,7 @@ if defined CLASSPATH (
 )
 
 rem Dispatch to project commands, the REPL, or the script runner
-"%JAVA_CMD%" -classpath "%CP%" onion.tools.OnionCli %*
+rem Shared JVM setup: class-data sharing and ONION_JAVA_OPTS.
+if exist "%ONION_HOME%\bin\onion-jvm.bat" call "%ONION_HOME%\bin\onion-jvm.bat"
+
+"%JAVA_CMD%" %ONION_JVM_ARGS% %ONION_JAVA_OPTS% -classpath "%CP%" onion.tools.OnionCli %*

@@ -154,7 +154,7 @@ public:
   def allMaintenance(): List[Object] = _maintenance
 
   def activeVehicles(): List[Object] {
-    return _vehicles.filter { v =>
+    return _vehicles.filter { v ->
       select (v as Vehicle).status() {
         case s is Active: true
         else: false
@@ -163,34 +163,34 @@ public:
   }
 
   def tripsFor(vid: String): List[Object] {
-    return _trips.filter { t => (t as TripEntry).vehicleId() == vid }
+    return _trips.filter { t -> (t as TripEntry).vehicleId() == vid }
   }
 
   def totalDistanceFor(vid: String): Double {
-    return tripsFor(vid).fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
+    return tripsFor(vid).fold(0.0) { acc, t -> acc + (t as TripEntry).distanceKm() }
   }
 
   def fuelEfficiencyFor(vid: String): Double {
     val ts: List[Object] = tripsFor(vid)
-    val dist: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
-    val fuel: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).fuelUsedL() }
+    val dist: Double = ts.fold(0.0) { acc, t -> acc + (t as TripEntry).distanceKm() }
+    val fuel: Double = ts.fold(0.0) { acc, t -> acc + (t as TripEntry).fuelUsedL() }
     if fuel <= 0.0 { return 0.0 }
     return dist / fuel
   }
 
   def maintenanceCostFor(vid: String): Double {
     return _maintenance
-      .filter { m => (m as MaintenanceEntry).vehicleId() == vid }
-      .fold(0.0) { acc, m => acc + (m as MaintenanceEntry).costUsd() }
+      .filter { m -> (m as MaintenanceEntry).vehicleId() == vid }
+      .fold(0.0) { acc, m -> acc + (m as MaintenanceEntry).costUsd() }
   }
 
   def topDriver(): String? {
     if _trips.size == 0 { return null }
-    val byDriver = _trips.groupBy { t => (t as TripEntry).driver() }
+    val byDriver = _trips.groupBy { t -> (t as TripEntry).driver() }
     var bestDriver: String? = null
     var bestDist: Double = 0.0
     foreach (driver, driverTrips) in byDriver {
-      val dist: Double = (driverTrips as List[Object]).fold(0.0) { acc, t =>
+      val dist: Double = (driverTrips as List[Object]).fold(0.0) { acc, t ->
         acc + (t as TripEntry).distanceKm()
       }
       if dist > bestDist { bestDist = dist; bestDriver = driver as String }
@@ -200,7 +200,7 @@ public:
 
   def stats(): FleetStats {
     val active: List[Object] = activeVehicles()
-    val totalDist: Double = _vehicles.fold(0.0) { acc, v =>
+    val totalDist: Double = _vehicles.fold(0.0) { acc, v ->
       acc + totalDistanceFor((v as Vehicle).id())
     }
     var effSum: Double = 0.0
@@ -210,7 +210,7 @@ public:
       if eff > 0.0 { effSum = effSum + eff; effCount = effCount + 1 }
     }
     val avgEff: Double = if effCount == 0 { 0.0 } else { effSum / (effCount as Double) }
-    val totalMaint: Double = _vehicles.fold(0.0) { acc, v =>
+    val totalMaint: Double = _vehicles.fold(0.0) { acc, v ->
       acc + maintenanceCostFor((v as Vehicle).id())
     }
     return new FleetStats(_vehicles.size, active.size, totalDist, avgEff, totalMaint)
@@ -247,11 +247,11 @@ def printTripSummary(fm: FleetManager): void {
   IO::println("")
   IO::println("TRIP LOG BY DRIVER")
   hr(60)
-  val byDriver = fm.allTrips().groupBy { t => (t as TripEntry).driver() }
+  val byDriver = fm.allTrips().groupBy { t -> (t as TripEntry).driver() }
   foreach (driver, driverTrips) in byDriver {
     val ts: List[Object] = driverTrips as List[Object]
-    val totalDist: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
-    val totalFuel: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).fuelUsedL() }
+    val totalDist: Double = ts.fold(0.0) { acc, t -> acc + (t as TripEntry).distanceKm() }
+    val totalFuel: Double = ts.fold(0.0) { acc, t -> acc + (t as TripEntry).fuelUsedL() }
     val eff: Double = if totalFuel > 0.0 { totalDist / totalFuel } else { 0.0 }
     IO::println("#{(driver as String).padRight(10)} trips=#{ts.size}  dist=#{totalDist.fmt2()} km  fuel=#{totalFuel.fmt2()} L  eff=#{eff.fmt2()} km/L")
   }
@@ -262,7 +262,7 @@ def printFuelBreakdown(fm: FleetManager): void {
   IO::println("")
   IO::println("FLEET BY FUEL TYPE")
   hr(40)
-  val byFuel = fm.allVehicles().groupBy { v => (v as Vehicle).fuelType().label() }
+  val byFuel = fm.allVehicles().groupBy { v -> (v as Vehicle).fuelType().label() }
   foreach (ft, vs) in byFuel {
     IO::println("  #{(ft as String).padRight(12)}: #{(vs as List[Object]).size} vehicle(s)")
   }
@@ -327,7 +327,7 @@ IO::println("")
 IO::println("ACTIVE VEHICLE EFFICIENCY RANKING")
 hr(44)
 val active: List[Object] = fm.activeVehicles()
-val ranked: List[Object] = active.sortedBy { v =>
+val ranked: List[Object] = active.sortedBy { v ->
   0.0 - fm.fuelEfficiencyFor((v as Vehicle).id())
 }
 var rank: Int = 1
@@ -348,7 +348,7 @@ try {
 }
 
 // Partition vehicles by active / not active
-val parts = fm.allVehicles().partition { v =>
+val parts = fm.allVehicles().partition { v ->
   select (v as Vehicle).status() { case a is Active: true; else: false }
 }
 val operational: List[Object] = parts[0] as List[Object]
@@ -358,7 +358,7 @@ IO::println("Operational: #{operational.size}  Offline: #{offline.size}")
 
 // Distinct fuel types used
 val usedFuels = fm.allVehicles()
-  .map { v => (v as Vehicle).fuelType().label() }
+  .map { v -> (v as Vehicle).fuelType().label() }
   .distinct()
 IO::println("Fuel types in fleet: #{usedFuels.size}")
 foreach ft: Object in usedFuels { IO::println("  - #{(ft as String).trim()}") }

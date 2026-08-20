@@ -69,8 +69,8 @@ val result: Option[Int] = do[Option] {
 
 // Futureによる非同期プログラミング
 val future: Future[String] = Future::async(() -> { return fetchData(); })
-future.map { data => processData(data) }
-      .onSuccess { result => println(result) }
+future.map { data -> processData(data) }
+      .onSuccess { result -> println(result) }
 
 // 安全呼び出し演算子によるNull安全
 val name: String? = getUserName()  // Nullable型

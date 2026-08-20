@@ -3,8 +3,8 @@
 ステータス: **出荷済み。** 以下のチェックポイントはすべて完了している: クラス/メソッドへの型パラメータ、
 `[T extends Bound]` による上限境界、括弧による型適用、ブリッジメソッドを伴う消去ベースのコード生成、
 一般的なジェネリック呼び出しに対する型推論。現在の構文と意味論については
-[docs/reference/specification.md](reference/specification.md#ジェネリクス)と
-[docs/guide/classes-and-objects.md](guide/classes-and-objects.md#ジェネリッククラス)を、
+[docs/reference/specification.md](reference/specification.md#generics)と
+[docs/guide/classes-and-objects.md](guide/classes-and-objects.md#generic-classes)を、
 意図的にスコープ外としている点（消去ベース、不変、実行時型情報なし）については CLAUDE.md の
 「Known Limitations」を参照。このページは元の段階的計画の歴史的記録として残している。
 

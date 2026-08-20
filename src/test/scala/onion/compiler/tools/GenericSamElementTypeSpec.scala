@@ -130,7 +130,7 @@ class GenericSamElementTypeSpec extends AbstractShellSpec {
           |  static def main(args: String[]): String {
           |    val list = new ArrayList[String]()
           |    list.add("hi")
-          |    return list.map { s => s.toUpperCase() }.toString()
+          |    return list.map { s -> s.toUpperCase() }.toString()
           |  }
           |}
           |""".stripMargin,

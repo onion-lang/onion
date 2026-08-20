@@ -535,6 +535,36 @@ public class JJOnionParser implements Parser {
   }
 
   /*
+   * A Location covering both operands of a compound expression.
+   *
+   * Anchoring a binary node at its operator token put a single '^' under the '*' of
+   * `3 * "x"`; every leaf already spans its own token, so the whole expression can be
+   * covered by starting where the left operand starts and ending where the right one
+   * ends. The reported position moves from the operator to the start of the expression,
+   * which is what every other compiler does and what a reader expects.
+   */
+  /*
+   * A Location from `start` through the token the parser has just consumed -- the ')' of
+   * a call, say. Anchoring a call at its name alone underlined `someUndefinedThing` and
+   * left the `(1, 2)` out of the diagnostic entirely.
+   *
+   * Not static: `token` is the parser's own cursor over what it has already read.
+   */
+  private Location through(Token start) {
+    return p(start).spanningTo(p(token));
+  }
+
+  private static Location span(AST.Expression from, AST.Expression to) {
+    if (from == null || from.location() == null) {
+      return to == null ? null : to.location();
+    }
+    if (to == null || to.location() == null) {
+      return from.location();
+    }
+    return from.location().spanningTo(to.location());
+  }
+
+  /*
    * convenience method to get image of a Token
    * For QUOTED_ID tokens, strips the backticks
    */
@@ -998,7 +1028,6 @@ TOKEN : {
 | <ARROW:          "->"           >
 | <DOTDOT_LT:      "..<"          >
 | <DOTDOT:         ".."           >
-| <ARROW2:         "=>"           >
 | <LARROW:         "<-"           >
 // No longer part of any production: `class A <: I` became `class A conforms I`, and
 // `class A : B` became `class A extends B`. The token is kept so that old source still
@@ -1528,16 +1557,22 @@ AST.ClassDeclaration class_decl(int mset) : {
   | LOOKAHEAD({getToken(1).kind != LBRACE}) {}
   ) {
     if (sec3 == null) { sec3 = option(sec1); }
+    // A class has a primary constructor when it wrote a parameter list, or arguments on the
+    // `extends` clause, or both. `class A extends B(args) { }` with no parameter list is a
+    // no-arg primary that calls B(args) -- the same reading Kotlin and Scala give it. A
+    // class with neither has no primary at all, and its `def this` constructors call the
+    // superclass no-arg constructor directly, as they always have.
+    boolean hasPrimary = primaryParams != null || superArgs != null;
     if (primaryParams == null && superArgs != null) {
-      // class A : B(args) { } without primary params: synthesize the
-      // no-arg constructor delegating to super(args)
       primaryParams = new java.util.ArrayList<AST.Argument>();
       primaryKinds = new java.util.ArrayList<Integer>();
     }
     if (primaryParams != null) {
       // Primary constructor sugar: val/var params become public fields with
       // an auto-generated constructor assigning them; plain params are
-      // constructor-only (usable for super arguments)
+      // constructor-only (usable for super arguments). The typer counts on the
+      // synthesized block holding those assignments and nothing else -- see
+      // AST.ConstructorDeclaration.primaryAssignments.
       ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
       ArrayBuffer<AST.BlockElement> assigns = new ArrayBuffer<AST.BlockElement>();
       ArrayBuffer<AST.Argument> ctorArgs = new ArrayBuffer<AST.Argument>();
@@ -1554,14 +1589,16 @@ AST.ClassDeclaration class_decl(int mset) : {
         }
       }
       List<AST.Expression> superInits = superArgs != null ? superArgs : (List<AST.Expression>)AST.NIL();
+      // Java cannot see Scala default arguments, so every field is passed explicitly:
+      // selfDelegation = false, primary = true, primaryAssignments = the count above.
       append(members, new AST.ConstructorDeclaration(
         p(t1), 0, toList(ctorArgs), superInits,
-        new AST.BlockExpression(p(t1), toList(assigns)), false
+        new AST.BlockExpression(p(t1), toList(assigns)), false, true, assigns.size()
       ));
       append(sec2s, new AST.AccessSection(p(t1), AST.M_PUBLIC(), toList(members)));
     }
     return new AST.ClassDeclaration(
-      p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams
+      p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams, hasPrimary
     );
   }
 }
@@ -1751,6 +1788,16 @@ AST.EnumConstant enum_constant() : {
   }
 }
 
+// A secondary constructor: `def this(args) [: this(args)] { body }`.
+//
+// The only delegation clause is `: this(...)`, to a sibling constructor of the same
+// class. There is deliberately no clause for passing arguments to the superclass: those
+// are written once, on the class's `extends B(args)`, and belong to the primary
+// constructor. (An older anonymous form `def this(x) : (x) { }` did exactly that and was
+// removed -- a parenthesized list after a colon named nothing, and it let a class with a
+// primary constructor bypass its own field initialization.) A `def this` with no clause
+// calls the superclass no-arg constructor, which is only legal in a class with no primary;
+// Parsing.commonSyntaxHint explains the removed form to anyone who still writes it.
 AST.ConstructorDeclaration constructor_decl(int mset) : {
   Token t;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
@@ -1759,10 +1806,9 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
   boolean selfDelegation = false;
 }{
   "def" t="this" ["(" args = args() ")"]
-  [":" ( "this" "(" params = terms() ")" { selfDelegation = true; }
-       | "(" params = terms() ")" )]
+  [":" "this" "(" params = terms() ")" { selfDelegation = true; }]
   block = block() {
-    return new AST.ConstructorDeclaration(p(t), mset, args, params, block, selfDelegation);
+    return new AST.ConstructorDeclaration(p(t), mset, args, params, block, selfDelegation, false, 0);
   }
 }
 
@@ -1925,7 +1971,31 @@ AST.TypeNode void_type() :{Token t;}{
   t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()), false);}
 }
 
-AST.TypeNode type() : {
+AST.TypeNode type() : {AST.TypeNode t;}{
+  t=type_impl()
+  // Single-argument function type `T -> R`. This postfix is what makes `type()` unusable
+  // for an unparenthesized lambda parameter, hence type_no_arrow() below. Lookahead
+  // avoids conflicts with nested expansions that also start with "->".
+  [ LOOKAHEAD(2) t=function_type_tail(t) ]
+  {return t;}
+}
+
+// A type in a position where a following `->` belongs to something else. The only such
+// position is an unparenthesized lambda parameter, `{ b: MinuteBucket -> body }`: with
+// the arrow allowed, `MinuteBucket -> body` reads as the function type `MinuteBucket -> body`
+// and the lambda has no arrow left. A trailing-lambda parameter therefore cannot be given
+// a bare function type; a lambda that needs one is written in the parenthesized form,
+// `.map((k: Int -> Int) -> k(0))`, where the `)` ends the type. (Onion has no grouped
+// type `(T)`, so there is no `{ k: (Int -> Int) -> ... }` spelling to offer instead.)
+AST.TypeNode type_no_arrow() : {AST.TypeNode t;}{
+  t=type_impl() {return t;}
+}
+
+// Everything a type can be except the trailing `T -> R` postfix, which only type() adds.
+// The split is syntactic on purpose: a semantic LOOKAHEAD gate is not evaluated while an
+// enclosing syntactic lookahead (trailing_lambda_head) is scanning, so a flag could not do
+// this job.
+AST.TypeNode type_impl() : {
   int d = 0; ArrayBuffer<AST.TypeDescriptor> args = new ArrayBuffer<AST.TypeDescriptor>();
   ArrayBuffer<AST.TypeDescriptor> fargs = new ArrayBuffer<AST.TypeDescriptor>();
   AST.TypeNode arg, c, r;
@@ -1974,13 +2044,6 @@ AST.TypeNode type() : {
     | <SAFE_INDEX> "]" {left = new AST.ArrayType(new AST.NullableType(left));}
     )
   )*
-  // Lookahead avoids conflicts with nested expansions that also start with "->".
-  [ LOOKAHEAD(2) <ARROW> eols() r=type() {
-      ArrayBuffer<AST.TypeDescriptor> p = new ArrayBuffer<AST.TypeDescriptor>();
-      append(p, left);
-      left = new AST.FunctionType(toList(p), r.desc());
-    }
-  ]
   // Nullable type marker: T?
   [ LOOKAHEAD(1) <QUESTION> { left = new AST.NullableType(left); } ]
   {
@@ -2001,16 +2064,39 @@ List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.A
   [a = argument() {append(as, a);} ("," a = argument() {append(as, a);})*] {return toList(as);}
 }
 
-AST.Argument lambda_argument() :{Token t; AST.TypeNode type = null;}{
-  t=id() [":" type = type()] {return new AST.Argument(p(t), c(t), type, null, false);}
+// Lambda parameters come in two shapes and the shape decides how a parameter's type is
+// read. Inside parentheses, `(k: Int -> Int) -> k(1)`, the `)` says where the type ends,
+// so the full type() grammar is safe. In a trailing lambda, `{ k: Int -> k(1) }`, there is
+// no delimiter between the type and the lambda's own arrow, so `Int -> k(1)` would be read
+// as a function type; those parameters use type_no_arrow(), and a lambda whose parameter
+// has a function type is written in the parenthesized shape.
+AST.Argument lambda_argument(boolean parenthesized) :{Token t; AST.TypeNode type = null;}{
+  t=id() [":" ( type = type_no_arrow() [ LOOKAHEAD({parenthesized && getToken(1).kind == ARROW}) type = function_type_tail(type) ] )]
+  {return new AST.Argument(p(t), c(t), type, null, false);}
 }
 
-List<AST.Argument> lambda_args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
-  [a = lambda_argument() {append(as, a);} ("," a = lambda_argument() {append(as, a);})*] {return toList(as);}
+// The `-> R` postfix of a single-argument function type, applied to an already-parsed
+// argument type. Kept out of type_impl() so type_no_arrow() can omit it.
+AST.TypeNode function_type_tail(AST.TypeNode arg) :{AST.TypeNode r;}{
+  <ARROW> eols() r=type() {
+    ArrayBuffer<AST.TypeDescriptor> ps = new ArrayBuffer<AST.TypeDescriptor>();
+    append(ps, arg.desc());
+    return new AST.TypeNode(arg.location(), new AST.FunctionType(toList(ps), r.desc()), arg.isRelaxed());
+  }
 }
 
+List<AST.Argument> lambda_args(boolean parenthesized) :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
+  [a = lambda_argument(parenthesized) {append(as, a);} ("," a = lambda_argument(parenthesized) {append(as, a);})*] {return toList(as);}
+}
+
+// Lookahead twins of the two shapes. The parenthesized head reads a full type(); the
+// trailing head must not, for the reason above.
 void lambda_arg_head() :{}{
   id() [":" type()]
+}
+
+void trailing_lambda_arg_head() :{}{
+  id() [":" type_no_arrow()]
 }
 
 void lambda_head() :{}{
@@ -2272,7 +2358,7 @@ AST.SelectExpression select_expression() :{
     )*
     eols()
     [LOOKAHEAD({la("else")})
-      t2="else" ":" eols() [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); } [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
     ]
   eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
@@ -2358,18 +2444,18 @@ AST.Expression term() :{AST.Expression e;}{
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   a=pipeline()
   [ LOOKAHEAD(2)
-    ( t="="  eols() b=expression() {a = new AST.Assignment(p(t), a, b);}
-    | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(p(t), a, b);}
-    | t="-=" eols() b=expression() {a = new AST.SubtractionAssignment(p(t), a, b);}
-    | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(p(t), a, b);}
-    | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(p(t), a, b);}
-    | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(p(t), a, b);}
-    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(p(t), a, b);}
-    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(p(t), a, b);}
-    | t="^=" eols() b=expression() {a = new AST.XorAssignment(p(t), a, b);}
-    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(p(t), a, b);}
-    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(p(t), a, b);}
-    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(p(t), a, b);}
+    ( t="="  eols() b=expression() {a = new AST.Assignment(span(a, b), a, b);}
+    | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(span(a, b), a, b);}
+    | t="-=" eols() b=expression() {a = new AST.SubtractionAssignment(span(a, b), a, b);}
+    | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(span(a, b), a, b);}
+    | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(span(a, b), a, b);}
+    | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(span(a, b), a, b);}
+    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(span(a, b), a, b);}
+    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(span(a, b), a, b);}
+    | t="^=" eols() b=expression() {a = new AST.XorAssignment(span(a, b), a, b);}
+    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(span(a, b), a, b);}
+    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(span(a, b), a, b);}
+    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(span(a, b), a, b);}
     )
   ]{return a;}
 }
@@ -2392,36 +2478,36 @@ AST.Expression pipeline() :{Token t; AST.Expression a, b; }{
 AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
   a=logical_and()
   ( LOOKAHEAD(2)
-    ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
-    | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(p(t), a, b);}
+    ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(span(a, b), a, b);}
+    | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(span(a, b), a, b);}
     )
   )*
   { return a; }
 }
 
 AST.Expression logical_and() :{Token t; AST.Expression a, b; }{
-  a=bit_or() (LOOKAHEAD(2) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(p(t), a, b);})* {return a;}
+  a=bit_or() (LOOKAHEAD(2) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_or() :{Token t; AST.Expression a, b; }{
-  a=xor() (LOOKAHEAD(2) t="|" eols() b=xor() {a = new AST.BitOr(p(t), a, b);})* {return a;}
+  a=xor() (LOOKAHEAD(2) t="|" eols() b=xor() {a = new AST.BitOr(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression xor() :{Token t; AST.Expression a, b;}{
-  a = bit_and() (LOOKAHEAD(2) t="^" eols() b=bit_and() {a = new AST.XOR(p(t), a, b);})* {return a;}
+  a = bit_and() (LOOKAHEAD(2) t="^" eols() b=bit_and() {a = new AST.XOR(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_and() :{Token t; AST.Expression a, b; }{
-  a=equal() (LOOKAHEAD(2) t = "&" eols() b=equal() {a = new AST.BitAnd(p(t), a, b);})* {return a;}
+  a=equal() (LOOKAHEAD(2) t = "&" eols() b=equal() {a = new AST.BitAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression equal() :{ Token t; AST.Expression a, b; }{
   a=comparative()
   ( LOOKAHEAD(2)
-    ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(p(t), a, b);}
-    | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(p(t), a, b);}
-    | t="=="  eols() b=comparative() {a= new AST.Equal(p(t), a, b);}
-    | t="!="  eols() b=comparative() {a= new AST.NotEqual(p(t), a, b);}
+    ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(span(a, b), a, b);}
+    | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(span(a, b), a, b);}
+    | t="=="  eols() b=comparative() {a= new AST.Equal(span(a, b), a, b);}
+    | t="!="  eols() b=comparative() {a= new AST.NotEqual(span(a, b), a, b);}
     )
   )* {return a;}
 }
@@ -2429,10 +2515,10 @@ AST.Expression equal() :{ Token t; AST.Expression a, b; }{
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
   a=range_expr()
   ( LOOKAHEAD(2)
-    ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(p(t), a, b);}
-    | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(p(t), a, b);}
-    | t="<"  eols() b=range_expr() {a = new AST.LessThan(p(t), a, b);}
-    | t=">"  eols() b=range_expr() {a = new AST.GreaterThan(p(t), a, b);}
+    ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(span(a, b), a, b);}
+    | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(span(a, b), a, b);}
+    | t="<"  eols() b=range_expr() {a = new AST.LessThan(span(a, b), a, b);}
+    | t=">"  eols() b=range_expr() {a = new AST.GreaterThan(span(a, b), a, b);}
     | t="is" eols() type = type() {a = new AST.IsInstance(p(t), a, type);}
     )
   )* {return a;}
@@ -2454,9 +2540,9 @@ AST.Expression range_expr() :{Token t; AST.Expression a, b;}{
 AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
   e1=additive()
 ( LOOKAHEAD(2)
-  ( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(p(t), e1, e2);}
-  | t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(p(t), e1, e2);}
-  | t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(p(t), e1, e2);}
+  ( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(span(e1, e2), e1, e2);}
+  | t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(span(e1, e2), e1, e2);}
+  | t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(span(e1, e2), e1, e2);}
   )
 )* { return e1; }
 }
@@ -2464,8 +2550,8 @@ AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
 AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
   e1=unary_prefix()
 ( LOOKAHEAD(2)
-  ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
-  | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+  ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(span(e1, e2), e1, e2);}
+  | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(span(e1, e2), e1, e2);}
   )
 )* {return e1;}
 }
@@ -2482,9 +2568,9 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
   e1=primary_suffix()
 ( LOOKAHEAD(2)
-  ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(p(t), e1, e2);}
-  | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(p(t), e1, e2);}
-  | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(p(t), e1, e2);}
+  ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(span(e1, e2), e1, e2);}
+  | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(span(e1, e2), e1, e2);}
+  | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(span(e1, e2), e1, e2);}
   )
 )* {return e1;}
 }
@@ -2536,16 +2622,16 @@ AST.Expression dot_suffix(AST.Expression e) : {
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args, tas); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args); }
     | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
         if (tl != null) {
           args = (List<AST.Expression>)AST.NIL();
           args = AST.appendToList(args, tl);
           tl = null;
-          e = new AST.MethodCall(p(t), e, c(n), args);
+          e = new AST.MethodCall(through(n), e, c(n), args);
         } else {
           e = new AST.MemberSelection(p(t), e, c(n));
         }
@@ -2592,39 +2678,39 @@ AST.Expression primary() : {
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(through(n), c(n), es); }
 | LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(p(t), ty, tas, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( boxed_class_type() "::" id() "(" ) ty=boxed_class_type() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
     { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( dotted_class_type() "::" id() "(" ) ty=dotted_class_type() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
     { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
 | LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas); }
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es, tas); }
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es); }
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es); }
 | LOOKAHEAD(2, id() <ARROW>) e=arrow_anonymous_function()                 {return e;}
 | LOOKAHEAD(1) t=id()                                               {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() e=bracket_literal_rest(t) {leaveDefault();} {return e;}
@@ -2718,7 +2804,7 @@ AST.ClosureExpression arrow_anonymous_function() :{
   AST.Expression eb = null;
 }{
   {enterDefault();}
-  ( t="(" args=lambda_args() ")"
+  ( t="(" args=lambda_args(true) ")"
   | t=id() {
       ArrayBuffer<AST.Argument> single = new ArrayBuffer<AST.Argument>();
       append(single, new AST.Argument(p(t), c(t), null, null, false));
@@ -2784,7 +2870,11 @@ Object do_clause() :{
 | e=term() { return e; }
 }
 
-// Trailing lambda: { x, y => body } or { => body } for zero args
+// Trailing lambda: { x, y -> body } or { -> body } for zero args.
+// The arrow is the same `->` as a parenthesized lambda `(x, y) -> body` and a function
+// type `(Int) -> Int`; the language has exactly one arrow. It used to be `=>` here and
+// nowhere else, which made `[1, 2, 3].filter { x -> x % 2 == 0 }` a syntax error for no
+// reason a reader could see.
 AST.ClosureExpression trailing_lambda() :{
   Token t;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
@@ -2793,7 +2883,7 @@ AST.ClosureExpression trailing_lambda() :{
   AST.TypeNode ty = null;
 }{
   {enterDefault();}
-  t="{" eols() args=lambda_args() eols() <ARROW2> eols() [stmts=block_elements()] eols() "}" {
+  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() [stmts=block_elements()] eols() "}" {
     body = new AST.BlockExpression(p(t), stmts);
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();
@@ -2801,9 +2891,9 @@ AST.ClosureExpression trailing_lambda() :{
   }
 }
 
-// Look-ahead for trailing lambda: { [args] => ... }
+// Look-ahead for trailing lambda: { [args] -> ... }
 void trailing_lambda_head() :{}{
-  "{" eols() [lambda_arg_head() ("," eols() lambda_arg_head())*] eols() <ARROW2>
+  "{" eols() [trailing_lambda_arg_head() ("," eols() trailing_lambda_arg_head())*] eols() <ARROW>
 }
 
 AST.Expression null_literal() :{Token t;}{

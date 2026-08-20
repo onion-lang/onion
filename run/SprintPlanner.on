@@ -96,11 +96,11 @@ public:
   def header(): String = "=== #{sprintName} === (#{capacity} pts cap)"
   def summary(): String = "#{sprintTasks.size.plural("task")}, #{totalEstimate()} pts"
   def totalEstimate(): Int =
-    sprintTasks.fold(0) { acc, t => (acc as Int) + (t as Task).estimate() }
+    sprintTasks.fold(0) { acc, t -> (acc as Int) + (t as Task).estimate() }
   def doneCount(): Int =
-    sprintTasks.filter { t => (t as Task).status() == Status::DONE }.size
+    sprintTasks.filter { t -> (t as Task).status() == Status::DONE }.size
   def openCount(): Int =
-    sprintTasks.filter { t => (t as Task).status().isOpen() }.size
+    sprintTasks.filter { t -> (t as Task).status().isOpen() }.size
   def health(): CapacityStatus {
     val used = totalEstimate()
     val pct = used * 100 / capacity
@@ -149,17 +149,17 @@ IO::println("completion: #{doneCnt.pct(tasks.size)} (#{doneCnt}/#{tasks.size} do
 
 // ─── 5. By-priority counts (deterministic, no Map iteration needed) ──────────
 
-val highCnt = tasks.filter { t => (t as Task).priority() == Priority::HIGH }.size
-val medCnt  = tasks.filter { t => (t as Task).priority() == Priority::MEDIUM }.size
-val lowCnt  = tasks.filter { t => (t as Task).priority() == Priority::LOW }.size
+val highCnt = tasks.filter { t -> (t as Task).priority() == Priority::HIGH }.size
+val medCnt  = tasks.filter { t -> (t as Task).priority() == Priority::MEDIUM }.size
+val lowCnt  = tasks.filter { t -> (t as Task).priority() == Priority::LOW }.size
 IO::println("by priority: HIGH=#{highCnt} MED=#{medCnt} LOW=#{lowCnt}")
 
 // ─── 6. High-priority open tasks, sorted by estimate desc ────────────────────
 
 IO::println("--- high-priority open ---")
 val highOpen = tasks
-  .filter  { t => (t as Task).priority() == Priority::HIGH && (t as Task).status().isOpen() }
-  .sortedBy { t => 0 - (t as Task).estimate() }
+  .filter  { t -> (t as Task).priority() == Priority::HIGH && (t as Task).status().isOpen() }
+  .sortedBy { t -> 0 - (t as Task).estimate() }
 foreach t: Object in highOpen {
   val tk = t as Task
   val who = if tk.assignee() != null { tk.assignee() as String } else { "unassigned" }
@@ -169,29 +169,29 @@ foreach t: Object in highOpen {
 // ─── 7. Assignee workload (groupBy + foreach known keys) ─────────────────────
 
 IO::println("--- assignee workload ---")
-val assigned = tasks.filter { t => (t as Task).assignee() != null }
-val byAssignee = assigned.groupBy { t => (t as Task).assignee() as String }
+val assigned = tasks.filter { t -> (t as Task).assignee() != null }
+val byAssignee = assigned.groupBy { t -> (t as Task).assignee() as String }
 val memberNames = ["Alice", "Bob", "Carol", "Dave"]
 foreach name: Object in memberNames {
   val key = name as String
   val grp = byAssignee.get(key)
   if grp != null {
-    val pts = (grp as List).fold(0) { acc, t => (acc as Int) + (t as Task).estimate() }
+    val pts = (grp as List).fold(0) { acc, t -> (acc as Int) + (t as Task).estimate() }
     IO::println("  #{key}: #{pts} pts")
   }
 }
 
 // ─── 8. Unassigned tasks (extension plural on Int) ───────────────────────────
 
-val unassignedCnt = tasks.filter { t => (t as Task).assignee() == null }.size
+val unassignedCnt = tasks.filter { t -> (t as Task).assignee() == null }.size
 IO::println("unassigned: #{unassignedCnt.plural("task")}")
 
 // ─── 9. Top 3 by weighted rank (generic Ranked[T]) ───────────────────────────
 
 IO::println("--- top 3 by rank ---")
 val ranked = tasks
-  .map { t => new Ranked[Task](t as Task, (t as Task).priority().weight() * (t as Task).estimate()) }
-  .sortedBy { r => 0 - (r as Ranked[Task]).score() }
+  .map { t -> new Ranked[Task](t as Task, (t as Task).priority().weight() * (t as Task).estimate()) }
+  .sortedBy { r -> 0 - (r as Ranked[Task]).score() }
 var ri: Int = 0
 foreach r: Object in ranked {
   if ri >= 3 { break }
@@ -202,35 +202,35 @@ foreach r: Object in ranked {
 
 // ─── 10. Partition: done vs still open ───────────────────────────────────────
 
-val parts = tasks.partition { t => (t as Task).status() == Status::DONE }
+val parts = tasks.partition { t -> (t as Task).status() == Status::DONE }
 val doneList = parts[0] as List
 val openList = parts[1] as List
 IO::println("done/open: #{doneList.size}/#{openList.size}")
 
 // ─── 11. Zip: task IDs with estimates ────────────────────────────────────────
 
-val ids  = tasks.map { t => (t as Task).id() }
-val ests = tasks.map { t => (t as Task).estimate() }
+val ids  = tasks.map { t -> (t as Task).id() }
+val ests = tasks.map { t -> (t as Task).estimate() }
 val zipped = ids.zip(ests)
 val lastPair = zipped.get(zipped.size - 1) as List
 IO::println("last id/est: #{lastPair[0]}/#{lastPair[1]}")
 
 // ─── 12. Distinct status symbols ────────────────────────────────────────────
 
-val symbols = tasks.map { t => (t as Task).status().symbol() }.distinct()
+val symbols = tasks.map { t -> (t as Task).status().symbol() }.distinct()
 IO::println("status symbols used: #{symbols.toString()}")
 
 // ─── 13. Reduce: task with the highest weighted score ─────────────────────────
 
 def taskWeight(t: Task): Int = t.priority().weight() * t.estimate()
-val heaviest = tasks.reduce { a, b =>
+val heaviest = tasks.reduce { a, b ->
   if taskWeight(a as Task) >= taskWeight(b as Task) { a } else { b }
 }
 IO::println("heaviest task: #{(heaviest as Task).title()} (score #{taskWeight(heaviest as Task)})")
 
 // ─── 14. Find: first blocked task ────────────────────────────────────────────
 
-val blocked = tasks.find { t => (t as Task).status() == Status::BLOCKED }
+val blocked = tasks.find { t -> (t as Task).status() == Status::BLOCKED }
 if blocked != null {
   IO::println("first blocked: #{(blocked as Task).title()}")
 } else {
@@ -259,7 +259,7 @@ IO::println("day range 1..<#{days} sum: #{daySum}")
 // ─── 17. Closure stored in val ────────────────────────────────────────────────
 
 val scoreOf = (t: Task) -> t.priority().weight() * t.estimate()
-val topTask = tasks.sortedBy { t => 0 - scoreOf(t as Task) }.get(0) as Task
+val topTask = tasks.sortedBy { t -> 0 - scoreOf(t as Task) }.get(0) as Task
 IO::println("top by weight: #{topTask.title()} (#{scoreOf(topTask)})")
 
 // ─── 18. Try/catch: parse a string estimate ───────────────────────────────────

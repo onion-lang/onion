@@ -212,17 +212,17 @@ def main(): void {
   IO::println("║            PROPERTY MANAGEMENT SYSTEM — PORTFOLIO REPORT            ║")
   IO::println("╚══════════════════════════════════════════════════════════════════════╝")
 
-  val activeLeases  = leases.filter { l => (l as Lease).isActive() }
-  val occupiedIds   = activeLeases.map   { l => (l as Lease).property().id() }
-  val vacantProps   = properties.filter  { p =>
+  val activeLeases  = leases.filter { l -> (l as Lease).isActive() }
+  val occupiedIds   = activeLeases.map   { l -> (l as Lease).property().id() }
+  val vacantProps   = properties.filter  { p ->
     val pid = (p as Property).id()
-    occupiedIds.find { id => (id as Int) == pid } == null
+    occupiedIds.find { id -> (id as Int) == pid } == null
   }
 
-  val totalRent     = activeLeases.map { l => (l as Lease).monthlyRent() }
-                        .fold(0.0) { acc, v => acc + (v as Double) }
-  val totalArea     = properties.map { p => (p as Property).areaSqm() }
-                        .fold(0.0) { acc, v => acc + (v as Double) }
+  val totalRent     = activeLeases.map { l -> (l as Lease).monthlyRent() }
+                        .fold(0.0) { acc, v -> acc + (v as Double) }
+  val totalArea     = properties.map { p -> (p as Property).areaSqm() }
+                        .fold(0.0) { acc, v -> acc + (v as Double) }
 
   IO::println("\nPortfolio size : #{properties.size} properties  (#{totalArea.gbp().truncate(1)} sqm total)")
   IO::println("Occupied       : #{activeLeases.size}  /  #{properties.size} (#{vacantProps.size} vacant)")
@@ -231,17 +231,17 @@ def main(): void {
 
   // ── Occupancy by city ─────────────────────────────────────────────────────
   printSection("Occupancy by City")
-  val byCity = properties.groupBy { p => (p as Property).address().city() }
+  val byCity = properties.groupBy { p -> (p as Property).address().city() }
   foreach (city, cityProps) in byCity {
     val cProps  = (cityProps as List)
-    val cActive = cProps.filter { p =>
+    val cActive = cProps.filter { p ->
       val pid = (p as Property).id()
-      occupiedIds.find { id => (id as Int) == pid } != null
+      occupiedIds.find { id -> (id as Int) == pid } != null
     }
     val cityRent = activeLeases
-      .filter { l => (l as Lease).property().address().city() == city }
-      .map    { l => (l as Lease).monthlyRent() }
-      .fold(0.0) { acc, v => acc + (v as Double) }
+      .filter { l -> (l as Lease).property().address().city() == city }
+      .map    { l -> (l as Lease).monthlyRent() }
+      .fold(0.0) { acc, v -> acc + (v as Double) }
     IO::println("  #{(city as String).rpad(12)} #{cActive.size}/#{cProps.size} occupied   income: #{cityRent.gbp()}")
   }
 
@@ -249,12 +249,12 @@ def main(): void {
   // 2. Property Inventory
   // ════════════════════════════════════════════════════════════════════════════
   printSection("Property Inventory (sorted by rent desc)")
-  val sorted = properties.sortedBy { p => -(p as Property).monthlyRent() }
+  val sorted = properties.sortedBy { p -> -(p as Property).monthlyRent() }
   IO::println("  #{"ID".rpad(5)} #{"Type".rpad(12)} #{"Beds".rpad(7)} #{"Rent/mo".rpad(10)} #{"Rent/sqm".rpad(10)} #{"Status".rpad(12)} Address")
   foreach prop: Object in sorted {
     val p       = prop as Property
     val pid     = p.id()
-    val isOcc   = occupiedIds.find { id => (id as Int) == pid } != null
+    val isOcc   = occupiedIds.find { id -> (id as Int) == pid } != null
     val status  = if isOcc { "Occupied" } else { "VACANT  " }
     IO::println("  #{("P" + pid).rpad(5)} #{p.kind().label().rpad(12)} #{p.bedrooms().bedroomLabel().rpad(7)} #{p.monthlyRent().gbp().rpad(10)} #{p.rentPerSqm().gbp().rpad(10)} #{status.rpad(12)} #{p.address().full()}")
   }
@@ -284,14 +284,14 @@ def main(): void {
   // 4. Maintenance
   // ════════════════════════════════════════════════════════════════════════════
   printSection("Open Maintenance Requests (sorted by priority)")
-  val open   = requests.filter   { r => !(r as MaintenanceRequest).resolved() }
-  val bySev  = open.sortedBy     { r => -(r as MaintenanceRequest).priority().score() }
+  val open   = requests.filter   { r -> !(r as MaintenanceRequest).resolved() }
+  val bySev  = open.sortedBy     { r -> -(r as MaintenanceRequest).priority().score() }
   foreach rraw: Object in bySev {
     val r = rraw as MaintenanceRequest
     IO::println("  [#{r.priority().label().rpad(10)}] #{r.property().label().rpad(15)} #{r.description()}")
   }
 
-  val parts     = open.partition { r => (r as MaintenanceRequest).priority() == MaintenancePriority::EMERGENCY }
+  val parts     = open.partition { r -> (r as MaintenanceRequest).priority() == MaintenancePriority::EMERGENCY }
   val emergency = parts.get(0) as List
   val other     = parts.get(1) as List
   IO::println("\n  Open: #{open.size}  (#{emergency.size} emergency, #{other.size} other)")
@@ -301,15 +301,15 @@ def main(): void {
   // 5. Financial Summary
   // ════════════════════════════════════════════════════════════════════════════
   printSection("Financial Summary — Rent by Property Type")
-  val byType = activeLeases.groupBy { l => (l as Lease).property().kind().label() }
+  val byType = activeLeases.groupBy { l -> (l as Lease).property().kind().label() }
   val typeSummary: List[Object] = []
   foreach (typeLabel, typeLeases) in byType {
     val tl      = typeLeases as List
-    val income  = tl.map { l => (l as Lease).monthlyRent() }
-                     .fold(0.0) { acc, v => acc + (v as Double) }
+    val income  = tl.map { l -> (l as Lease).monthlyRent() }
+                     .fold(0.0) { acc, v -> acc + (v as Double) }
     typeSummary.add("#{(typeLabel as String).rpad(12)} #{tl.size} lease(s)   #{income.gbp()}/mo")
   }
-  foreach line: Object in typeSummary.sortedBy { s => s as String } {
+  foreach line: Object in typeSummary.sortedBy { s -> s as String } {
     IO::println("  " + line)
   }
 
@@ -326,11 +326,11 @@ def main(): void {
   // 6. Lease Expiry Risk
   // ════════════════════════════════════════════════════════════════════════════
   printSection("Lease Expiry by Year-End (endYear 2025 or earlier)")
-  val expiringSoon = activeLeases.filter { l => (l as Lease).endYear() <= 2025 }
+  val expiringSoon = activeLeases.filter { l -> (l as Lease).endYear() <= 2025 }
   if expiringSoon.size == 0 {
     IO::println("  None expiring within the reporting window.")
   } else {
-    foreach lraw: Object in expiringSoon.sortedBy { l => (l as Lease).endYear() * 100 + (l as Lease).endMonth() } {
+    foreach lraw: Object in expiringSoon.sortedBy { l -> (l as Lease).endYear() * 100 + (l as Lease).endMonth() } {
       val l = lraw as Lease
       IO::println("  #{l.property().label().rpad(15)} tenant: #{l.tenant().name().rpad(18)} expires: #{l.endMonth().monthName()} #{l.endYear()}")
     }

@@ -33,9 +33,12 @@ array_suffix          ::= '[]'
 type_params           ::= '[' type_param (',' type_param)* ']'
 type_param            ::= id ['extends' type]
 
-class_decl            ::= modifiers 'class' id type_params? ['extends' type]
+class_decl            ::= modifiers 'class' id type_params?
+                         ['(' primary_param (',' primary_param)* ')']
+                         ['extends' type ['(' terms? ')']]
                          ['conforms' type (',' type)*]
-                         '{' default_section? access_section* '}'
+                         ('{' default_section? access_section* '}' | ';' | )
+primary_param         ::= ('val' | 'var')? argument
 interface_decl        ::= modifiers 'interface' id type_params?
                          ['conforms' type (',' type)*]
                          '{' interface_method_sig* '}'
@@ -55,8 +58,8 @@ delegated_field_decl  ::= modifiers 'forward' ('val' | 'var') id ':' type ['=' t
 method_decl           ::= 'def' modifiers id type_params?
                          ['(' args? ')'] [':' return_type]
                          (block | '=' term eos | eos)
-constructor_decl      ::= 'def' modifiers 'this'
-                         ['(' args? ')'] [':' '(' terms? ')'] block
+constructor_decl      ::= 'def' 'this'
+                         ['(' args? ')'] [':' 'this' '(' terms? ')'] block
 
 function_decl         ::= modifiers 'def' id type_params?
                          ['(' args? ')'] [':' return_type]
@@ -102,9 +105,20 @@ primary               ::= id
                        | type '::' id type_arguments '(' terms? ')'
                        | 'new' type ('[' terms? ']' | ['(' terms? ')'])
                        | list_literal
-                       | '(' [id [':' type] (',' id [':' type])*] ')' '->' block
+                       | lambda
                        | 'this' | 'self' | 'super'
                        | literals
+
+/* One arrow, everywhere a function is written: function types, parenthesized
+   lambdas, and trailing lambdas all use '->'. A trailing lambda follows a call
+   (with or without parentheses) as its last argument; its parameters are not
+   parenthesized, and a parameter's type may not itself be a bare function type
+   (write such a lambda in the parenthesized form). */
+lambda                ::= '(' [lambda_param (',' lambda_param)*] ')' '->' (block | term)
+                       | id '->' (block | term)
+lambda_param          ::= id [':' type]
+trailing_lambda       ::= '{' [trailing_param (',' trailing_param)*] '->' block_elements? '}'
+trailing_param        ::= id [':' type_no_arrow]
 
 list_literal          ::= '[' terms? ']'
 terms                 ::= term (',' term)*

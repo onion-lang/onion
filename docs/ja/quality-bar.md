@@ -8,15 +8,15 @@
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-08-13） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値（2026-08-20） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3410 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 151 / 151 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 94（AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、CinemaBooking、CipherSuite、ClinicRecords、ConferenceSchedule、ConwayLife、CourseRegistration、DependencyResolver、DoctorScheduler、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HotelReservation、HRSystem、HuffmanCoding、Inventory、InventoryManager、InventoryReport、JobScheduler、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MathParser、MatrixCalc、MazeSolver、MiniRpg、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NutritionTracker、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RestaurantOrders、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SpreadsheetCalc、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
+| 1 | テストスイート | `sbt shutdown && sbt -Duser.language=en testFull`（下記の注記を参照） | 3855 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 176 / 176 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 115（AccessLogAnalyzer、AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ConferenceSchedule、ConwayLife、CourseRegistration、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FlashcardDeck、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HospitalWard、HotelReservation、HRSystem、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MarkdownConverter、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、PackageDelivery、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SpreadsheetCalc、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 84 | よくあるエラーごとに専用コード |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 88 | よくあるエラーごとに専用コード |
 
 **`SBT_OPTS` にプロジェクト既定を下回るヒープ値を設定しないでください。** `.jvmopts` は既定を
 `-Xmx10g` に固定しています（`run/` サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の
@@ -28,6 +28,20 @@
 `-Duser.language=en` は重要です。エラーメッセージは二言語で JVM の既定ロケールから解決される
 ため、メッセージ文字列を検査するテストは日本語ロケールでは通り、英語ロケールで走るリリース CI
 で落ちます。**エラーコード**を検査してください。
+
+sbt 2 の挙動が2つ、これをローカルで踏み外しやすくしています。どちらも**静かに**失敗します。
+
+- **`test` は差分実行です。** `testQuick` に委譲されるため、ソース無変更での2回目は
+  `No tests to run` と表示して終了コード 0 を返します——見た目は完全に成功です。
+  全件実行は `testFull` です。
+- **`-D` は新規サーバにしか届きません。** sbt サーバは実行間で常駐するため、`en` で起動済みの
+  サーバに `-Duser.language=ja` を渡しても何も変わりません。`java.util.Locale.getDefault()` は
+  古いロケールを返し続けます。先に `sbt shutdown` してください。
+
+この2つが重なると、素直に `sbt -Duser.language=en test` と `sbt -Duser.language=ja test` を
+続けて実行しても、「1つのロケールを1回テストしただけ」で2回 green に見えます。
+CI は影響を受けません。差分実行の状態は `target/` にあり、`setup-java` の `cache: 'sbt'` は
+そこをキャッシュしないため、CI は毎回コールドスタートになります。
 
 cancelled の1件は `-Donion.dist.path` で切られている配布物 smoke テストです。
 

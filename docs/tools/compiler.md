@@ -141,6 +141,7 @@ Every code accepts either its `W####` form or the `--Wno` name shown below:
 | `W0013` | `suspicious-interpolation` | Suspicious string interpolation syntax |
 | `W0014` | `discarded-toplevel` | Top-level statements ignored because a main is defined |
 | `W0015` | `platform-unboxing` | Boxed platform value implicitly unboxed to a non-null primitive |
+| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
 
 ### `--no-check-laws`
 
@@ -173,6 +174,22 @@ console unknown`; empty means pure) to stderr.
 ```bash
 onionc --effects MyProgram.on
 ```
+
+### `-g:none`
+
+Omit the LocalVariableTable from the generated class files.
+
+Without it a JVM debugger can still step through `.on` source — line numbers are always
+emitted — but shows nothing for any variable, which is most of the way to useless. The
+table is on by default and costs a few bytes per method; this is the way out for anyone
+who wants the smaller class file.
+
+```bash
+onionc -g:none MyProgram.on
+```
+
+Running a script with `onion` always emits the table, since a script is compiled in
+memory and there is no artefact to keep small.
 
 ## Examples
 

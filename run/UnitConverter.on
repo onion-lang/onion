@@ -24,7 +24,7 @@ extension Double {
 extension Int {
   def times(block: () -> Unit): void {
     for var i: Int = 0; i < self; i = i + 1 {
-      block.call()
+      block()
     }
   }
 }

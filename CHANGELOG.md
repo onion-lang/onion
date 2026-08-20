@@ -7,6 +7,1173 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `CONSTRUCTOR_NOT_FOUND` (E0021) diagnostic's "Available constructors:" list header
+  was always English**, even under a Japanese-locale JVM where the rest of the message
+  (`constructor applicable for ... is not found`) was correctly translated —
+  `SemanticErrorReporter.reportConstructorNotFound` built that header from a hard-coded
+  string literal instead of going through the bilingual `errorMessage*.properties` bundle
+  every other suggestion (`error.suggestion.candidates`, `suggestion.didYouMean`, ...) uses.
+  It now resolves `error.suggestion.availableConstructors` from the bundle, so the header
+  is Japanese under `-Duser.language=ja` like the rest of the message.
+
+- **A Java/JS/C-style `switch` statement (`switch x { case 1: ... }` or
+  `switch (x) { ... }`) got a bare expected-token dump with no mention of
+  `select`.** `switch` isn't a keyword in Onion, so it parses as a bare
+  identifier-reference statement and the parser actually trips on whatever
+  follows it — the condition, or the `{` of a parenthesized condition —
+  never on `switch` itself, so no existing hint (all of which match on the
+  *offending* token) could name it. `commonSyntaxHint` in `Parsing.scala`
+  now also receives the full source line of the error and matches a leading
+  `switch` there, so both spellings now hint at `select value { case 1:
+  ...; else: ... }`.
+
+- **A name that differs from the real one only by case (`.Length()` instead of
+  `.length()`, `UserName` instead of `userName`, `myclass` instead of `MyClass`)
+  got no "did you mean" suggestion**, just a bare not-found error. `Suggestions.findSimilar`
+  compares names case-insensitively but then filtered out `distance == 0` results —
+  meant to skip a self-match, it also threw away the single most common typo of all,
+  since a real case-sensitive exact match would never have reached the not-found path
+  to begin with. The filter now keeps `distance == 0`, so a pure case mismatch is always
+  suggested, for variables, methods, fields, and classes alike.
+- **A lowercase, Java/Scala-style primitive type name (`int`, `boolean`, `long`, ...)
+  got a generic "check spelling or add import" instead of a suggestion**, because
+  Onion's primitive keywords (`Int`, `Boolean`, `Long`, ...) were never in the
+  class-not-found candidate list — they aren't classes, so nothing offered them as
+  a match. They're now added to the candidates the "did you mean" check draws from,
+  so `var x: int = 0` suggests `Int`.
+- **A misspelled named-argument name (`f(x = 1, kount = 2)`) got a bare
+  "unknown parameter name" with no "did you mean" suggestion**, unlike every
+  sibling not-found diagnostic (variable, method, field, class), which all
+  suggest a similar name. `UNKNOWN_PARAMETER_NAME` (E0043) was the one
+  not-found error still wired through the plain data-driven message path in
+  `SemanticErrorReporter`, so none of its six call sites ever passed the
+  candidate parameter names along. It now has a dedicated handler that builds
+  the suggestion from the callee's parameter names, for static calls,
+  instance calls, unqualified calls, and constructor calls alike.
+- **`break`/`continue` with a misspelled label (`break outr` instead of
+  `break outer`) got a bare "label not found" with no "did you mean"
+  suggestion**, the one `*_NOT_FOUND` diagnostic still on the plain
+  data-driven message path. `LocalContext` already tracked every enclosing
+  labeled loop's name in `labelStack` but exposed no way to read it back;
+  it now has a `labels` accessor, and `LABEL_NOT_FOUND` (E0058) has a
+  dedicated handler that suggests the closest enclosing label name.
+- **A misspelled `override` target (`override def great()` instead of
+  `override def greet()`) got a bare "does not override any method" with no
+  "did you mean" suggestion**, the last `*_NOT_FOUND` diagnostic still on the
+  plain data-driven message path. `DuplicationChecks.checkOverrideTargets`
+  already collects every overridable base-class/interface method name while
+  checking the override target; it now passes that list along, and
+  `OVERRIDE_TARGET_NOT_FOUND` (E0068) has a dedicated handler that suggests
+  the closest matching base method name.
+
+### Added
+
+- **`run/PackageDelivery.on`, a 413-line package delivery tracking simulation.**
+  Covers an ADT case-enum (`PackageStatus`, 5 cases) matched exhaustively via
+  `select`/`is`, a plain enum (`Priority`), records with `example` laws
+  (`Address`, `Customer`, `RouteStop`), an `extension Int` block (`asTime`,
+  `asCurrency`, `asWeight`), a mutable class with an event log (`Package`),
+  a class built on collection pipelines (`DeliveryCompany`: `filter`,
+  `groupBy`, `sortedBy`, `fold`), closures stored in a `val` and invoked via
+  `.call`, recursive helpers, string interpolation, and nullable-safe lookups.
+
+## [0.12.1] - 2026-08-19
+
+### Fixed
+
+- **A dangling `else` (one with no matching `if` immediately before it) got a hint
+  claiming Onion doesn't support `if` as an expression.** `if`/`else` has always worked
+  as an expression (`val x = if cond { a } else { b }`), so the hint's suggested fix —
+  "use `if (cond) { ... } else { ... }`" — didn't even address a dangling `else`, whose
+  actual fix is adding the missing `if`, not rewriting anything as an expression. The
+  `case "else"` branch of `commonSyntaxHint` in `Parsing.scala` now reports a
+  `error.parsing.hint.dangling_else` hint (added to both `errorMessage.properties` and
+  `errorMessage_ja.properties`) that names the real requirement: `else` must directly
+  follow an `if` block's closing `}`.
+
+- **The ternary and old-trailing-arrow parser hints printed literal single-quote
+  characters around their braces instead of the braces alone**, e.g. `if cond '{' a '}'
+  else '{' b '}'` instead of `if cond { a } else { b }`. Both hints are looked up through
+  the zero-argument `Message(property)`, which returns the resource bundle string as-is
+  and never runs it through `MessageFormat` — so the `'{'`/`'}'` brace-escaping
+  convention, needed only when a lookup actually formats arguments (as
+  `trailing_lambda_parens` does), leaked its escaping quotes straight into the message.
+  `errorMessage.properties` and `errorMessage_ja.properties` now spell both hints with
+  plain braces.
+
+- **A stray `cond ? a : b` ternary now gets a hint instead of a bare expected-token
+  dump.** Onion has no ternary operator — `if`/`else` works as an expression instead —
+  but a newcomer writing `?` still hits the parser at a point where the expected-token
+  list (`<EOF>, <EOL>, ";"`) never mentions the operator or the rewrite. `commonSyntaxHint`
+  in `Parsing.scala` gained a `case "?"` alongside the existing hints for old `<:`/`:`
+  inheritance syntax, `for x in xs`, and the retired `=>` arrow, naming the operator and
+  pointing at `if cond { a } else { b }`.
+
+- **`W0016` now also fires when a `@TailRecursive` mutual-recursion group's parameter
+  lists don't match.** `0.12.0` documented `W0016` as covering all four requirements
+  `MutualRecursionOptimization` places on a group, but the parameter-list check was the
+  one requirement `validateGroup` never made — it lived in `transformGroup`, which
+  silently `return`ed instead of reporting. A group whose members differed only in
+  argument count or per-position types therefore compiled with no diagnostic at all,
+  which is the same silent `StackOverflowError` risk `W0016` exists to prevent. The
+  check moved into `validateGroup`, so it now reaches the `W0016` path like the other
+  three.
+
+- **README trailing-lambda examples still used the retired `=>` arrow.** `0.12.0`'s
+  one-arrow change (`->` everywhere, `=>` no longer part of the language) missed three
+  examples in `README.md` and one in `docs/guide/control-flow.md`, left over from before
+  the rename. One of them (`future.onComplete(onSuccess, onFailure) { result => ... }`)
+  was also calling a two-argument `onComplete` as if it took a third trailing block, so it
+  never compiled even with the arrow fixed — replaced with a `list.fold(0) { acc, x -> ... }`
+  example that actually demonstrates positional args plus a trailing lambda. All four
+  snippets are now verified against the compiler.
+
+- **The `for x in xs` parser hint was hard-coded English, breaking bilingual
+  diagnostics.** Every other hint in `commonSyntaxHint` (`Parsing.scala`) resolves through
+  `Message("error.parsing.hint.*")`, so it follows the JVM's default locale like the rest
+  of the compiler's diagnostics; the `case "in"` hint (suggesting the C-style loop rewrite
+  for the retired `for x in xs` syntax) was still a raw string literal, so a Japanese-locale
+  syntax error came out in Japanese with the hint sentence stuck in English mid-message.
+  Added `error.parsing.hint.old_for_in` to both `errorMessage.properties` and
+  `errorMessage_ja.properties` and pointed the hint at it.
+
+- **`commonSyntaxHint`'s fallback "a block is expected" hint was also hard-coded
+  English**, same bug as the `for x in xs` hint above: a `while`/`if` head missing its
+  `{ ... }` block (e.g. `while true` / `if true` on its own line) fell through to a raw
+  string literal instead of the `error.parsing.hint.*` bundle lookup every other hint
+  uses, so the hint sentence stayed English even under a Japanese locale. Added
+  `error.parsing.hint.block_expected` to both `errorMessage.properties` and
+  `errorMessage_ja.properties` and pointed the fallback case at it.
+
+## [0.12.0] - 2026-08-18
+
+### Changed
+
+- **BREAKING: one arrow. The trailing-lambda arrow is `->`, and `=>` is no longer part of
+  the language.** `->` was already the arrow of a function type (`(Int) -> Int`) and of a
+  parenthesized lambda (`(x) -> x * 2`); only the trailing form spelled it `=>`, so
+  `[1, 2, 3].filter { x -> x % 2 == 0 }` was a syntax error for no reason a reader could see.
+  Now it is the ordinary way to write it, `{ acc, x -> acc + x }` takes several parameters,
+  `{ n: Int -> n * n }` types one, and a trailing lambda's body can itself be a lambda.
+  Nothing else changes: `.filter { … }` with no parentheses worked before and still does.
+
+  Two consequences worth knowing. A trailing-lambda parameter cannot be given a *bare*
+  function type — `{ k: Int -> Int -> k(0) }` has no readable parse — so a lambda whose
+  parameter is a function is written in the parenthesized form, `.map((k: Int -> Int) ->
+  k(0))`, where the `)` ends the type; the grammar reads a trailing parameter's type with a
+  production that stops before `->` (`type_no_arrow`), and the parenthesized form keeps the
+  full type grammar. And old source that still writes `{ x => … }` gets a hint naming the
+  arrow rather than an expected-token dump. Every `run/` sample, every documentation
+  fence, the TextMate grammar, the Pygments lexer, the formatter and the stdlib Javadoc
+  were migrated; the migration touched only `=>` in code, never one inside a string
+  literal or a comment (`SourceRegions.codeMask` decided which was which).
+
+- **BREAKING: constructors are primary/secondary, the way Scala and Kotlin have them.**
+  The primary constructor is the parameter list after the class name together with the
+  arguments on the `extends` clause. It alone calls the superclass constructor and stores
+  the `val`/`var` parameter fields. A `def this` in a class that has a primary must
+  delegate to it with `: this(...)` — directly or through another secondary — and a
+  `def this` that does not is **E0087**. A class with neither a parameter list nor
+  `extends` arguments has no primary; its `def this` constructors keep calling the
+  superclass no-arg constructor implicitly, exactly as before, so the 146 `def this`
+  constructors in `run/` compile unchanged.
+
+  This is not a style rule; it closes a real hole. `class P(val x: Int) { def this { } }`
+  compiled and `new P().x` was `0`, because the primary's field stores lived in the
+  synthesized constructor's own block, which a sibling never ran. And
+  `class Dog(name: String) extends Animal(name) { def this { } }` resolved `super()`
+  against `Animal`'s no-arg constructor — a confusing E0021 for a class that visibly says
+  `extends Animal(name)`. Both are E0087 now, with the primary's parameter types in the
+  message so the fix is copy-pasteable.
+
+  **The anonymous super-call form `def this(x) : (x) { }` is gone.** Arguments for the
+  superclass constructor are written on `extends`, and only there; there is deliberately
+  no `super(...)` clause to reintroduce a second route around the primary. Every use in
+  the repository became shorter by turning into a primary constructor —
+  `class CircleShape(val data: Circle) extends Shape(ShapeKind::CIRCLE) { … }` — and a
+  leftover `: (args)` gets a hint pointing at the `extends` clause.
+
+### Fixed
+
+- **A field initializer can now read the primary constructor's parameter fields.**
+  `class Point(val x: Int) { var total: Int = x * 2 }` gave `total == 0`, always: the
+  initializer was spliced in *before* `this.x = x`, so `x` — resolved to the field, since
+  initializers are typed without the constructor's parameters in scope — was still at its
+  default. Initializers now run after the primary's parameter stores, once, in the primary
+  only, in the order Kotlin and Scala use. A plain (non-`val`/`var`) primary parameter is
+  still not visible to an initializer; that needs the initializer typed in the primary's
+  scope, and is deliberately out of scope here.
+
+- **`def this` inside a record or enum body no longer crashes the compiler (E0089).** The
+  body pass never typed it, and code generation then took the record's synthetic
+  parameter-to-field path against a constructor of the wrong arity — an ASM exception
+  surfacing as I0000. Records and enums have their canonical constructor; a second one has
+  no meaning, and the diagnostic says to use a static factory instead.
+
+- **A field read inside `: this(...)` or `extends B(...)` arguments no longer produces a
+  class the JVM refuses to load (E0090).** The object does not exist while its delegation
+  arguments are evaluated, so `def this : this(seed)` with `seed` a field was a GETFIELD on
+  `uninitializedThis`; the verifier rejected the class and the compiler reported I0000.
+  Closures in that position remain fine — they capture `this` and run later.
+
+- **A constructor delegation cycle is a compile error (E0088), not a `StackOverflowError`
+  at `new`.** `def this(a) : this(b)` with `def this(b) : this(a)` was never checked. Now
+  that `: this(...)` is the ordinary way to write a secondary, the walk — one outgoing
+  edge per self-delegating constructor, O(constructors) — runs once per class.
+
+- **docs(project-cli): stop `onion.lock` from contradicting itself two sections down.**
+  `#788` (feat/dependency-lock) added the `### onion.lock` section documenting the lock
+  file but left the `### Not yet supported` section above it, and the `## Deferred` list
+  further down, still claiming "there is no lock file" / listing "dependency lock files"
+  as out of scope — on both the English and Japanese pages. Trimmed both sections to the
+  one thing that is still actually deferred: offline resolution.
+
+### Added
+
+- **`run/LambdaArrows.on`**, showing the one arrow in every position it appears in.
+- **`TermWalk`**, a shared structural walk over typed terms and statements; the ASM
+  backend's try-detector and the new `this`-before-delegation check are both expressed on
+  it, so the reflective child enumeration exists once.
+
+- **`W0016`: warn when `@TailRecursive` is on a mutual-recursion group that
+  `MutualRecursionOptimization` cannot actually optimize.** The optimization only
+  rewrites a group into a state machine when every member is private, shares one
+  return type, shares one parameter list, and only tail-calls within the group
+  (`MutualRecursionOptimization.validateGroup`). A group that fails one of those
+  checks was left silently unoptimized — the methods still called each other, just
+  as ordinary non-tail calls — so the annotation looked honored right up until deep
+  recursion overflowed the JVM stack at runtime, with nothing at compile time
+  pointing back at the annotation. `W0016` now fires at compile time, naming the
+  failed requirement, on every method in the group. Docs
+  (`docs/compiler/tail-call-optimization.md`, ja) gained the `@TailRecursive`
+  requirements and a worked example, since neither previously said what mutual
+  recursion needs to actually be optimized.
+
+### Documentation
+
+- Every documentation page and both `CLAUDE.md` files spell trailing lambdas with `->`.
+  The `.call(f)` spelling for invoking a function value is gone from every example — 85
+  sites became direct calls, `f(x)`, and `this.handler.call(e)` became `handler(e)`;
+  the one paragraph that explains *what* a function value is (`onion.FunctionN` with a
+  `call` method) is the one place `.call` still appears. The constructor sections of the
+  class guide (EN and JA — the JA page had no `def this` documentation at all) are
+  rewritten around the primary/secondary model; `docs/grammar.txt` gained the primary
+  parameter list, the `extends(args)` clause and, for the first time, the lambda and
+  trailing-lambda productions. Every changed guide fragment was compiled: 431 blocks
+  from the touched pages, compared by content against the same blocks on the previous
+  release, with zero regressions.
+
+## [0.11.2] - 2026-08-18
+
+### Added
+
+- **`onion.lock`: a build resolves the same artifacts the next time, and says so if it
+  cannot.** `[dependencies]` names direct dependencies at a version each, which does not
+  reproduce a build — a transitive dependency's version is chosen at resolution time, so two
+  builds of a byte-identical `onion.toml` compile against different jars the moment a
+  transitive publishes. That failure appears on one machine, cannot be reproduced on
+  another, and nothing in the project changed.
+
+  The lock records the whole transitive coordinate set, which a later build resolves
+  *instead of* re-deriving, and a SHA-256 per artifact compared before anything compiles.
+  Different bytes behind an already-published version stop the build and name the file, both
+  hashes, and the way out. That is not paranoia: a published version's bytes are supposed to
+  be immutable, and a repository serving different ones is broken or hostile.
+
+  The two halves are deliberately kept apart rather than paired. coursier returns resolved
+  coordinates sorted and downloaded files in resolution order, with no stated
+  correspondence; zipping them looks obvious, writes a plausible-looking lock, and pairs the
+  wrong hash with the wrong coordinate — which then surfaces as an integrity failure on a
+  perfectly good build. Comparing hashes as a set needs no correspondence and tolerates two
+  artifacts sharing a file name.
+
+  A lock that no longer describes the manifest is discarded and rewritten rather than
+  enforced against a question it does not answer. Reordering `[dependencies]` is not such a
+  change. `onion clean` leaves the lock alone — it is an input to the next build, not an
+  output of this one.
+
+  **It is not an offline mode**, and the reason was checked rather than assumed:
+  `coursierapi.Cache` exposes a location, a thread pool and a logger, and no cache policy at
+  all, so there is no honest way to promise a build that never reaches the network.
+
+## [0.11.1] - 2026-08-18
+
+### Added
+
+- **Semantic tokens in the language server — the colouring a TextMate grammar cannot
+  produce.** A grammar decides what a word is from the shape of the line around it, so
+  `Greeter`, `greet` and `count` all look alike: they are words. The server now classifies
+  each identifier by what the document declares it to be — class, interface, enum, record,
+  method, field, local — and marks declaration sites with the `declaration` modifier. Regex
+  literals are distinguished from other scheme literals, and `Int` is coloured as a type
+  rather than as the keyword the lexer calls it.
+
+  **It emits nothing it is unsure of.** An identifier the document does not declare produces
+  no token, and the editor falls back to the grammar. Semantic tokens override the grammar,
+  so a guess would replace a right answer with a wrong one — which is also why soft keywords
+  are left alone: `conforms` arrives as an identifier because only the parser's lookahead
+  decides whether it is a keyword there, and colouring it from the lexer would light up a
+  method of that name.
+
+  Keyword, operator and primitive-type kinds are read from the generated parser's own token
+  table rather than listed in the server, so a keyword added to the grammar is classified
+  with no edit here. That hand-maintained duplication is exactly what let the TextMate
+  grammar rot to 70% coverage; there is nothing to keep in step this time.
+
+  This was the last item deferred from the highlighting work, and it was waiting on the
+  parser recording real spans rather than single columns.
+
+### Documentation
+
+- **Documented `Archive::gunzipFile` in the stdlib reference (en/ja).** It sits
+  right next to its documented sibling `gzipFile` in `Archive.java`, but was
+  never mentioned in either `docs/reference/stdlib.md` or its Japanese copy,
+  making it undiscoverable without reading the Java source. Added a
+  `StdlibDocArchiveModuleParitySpec` drift guard, mirroring the existing
+  `StdlibDocFilesModuleParitySpec`, so a future Archive method that lands
+  without a doc update gets caught the same way.
+
+## [0.11.0] - 2026-08-17
+
+### Added
+
+- **`onion fmt` — a formatter, and an LSP formatting provider sharing its implementation.**
+  Onion had neither. The editor and the command line call the same code, so they cannot
+  disagree about what formatted means; a difference there shows up as a file that changes
+  every time it crosses between them.
+
+  ```bash
+  onion fmt              # src/ and tests/, or the paths you name
+  onion fmt --check      # writes nothing, lists what would change, exits 1 if any
+  ```
+
+  **What it changes is deliberately small**, and every boundary was measured against the 182
+  sample programs rather than guessed. It tightens the punctuation that binds to what it
+  touches — `f(a , b)` to `f(a, b)`, `"=" .rep(60)` to `"=".rep(60)`, `f(- 1)` to `f(-1)` —
+  and adds a missing newline at the end of a file. Everything else is reproduced byte for
+  byte, tabs included.
+
+  Three larger rules were built, measured, and removed, and the measurements are the
+  interesting part:
+
+  - **Reindenting from brace depth** rewrote 36% of the corpus, almost all of it wrongly.
+    Onion's continuations are not bracketed — an expression body on the line after `=`, a
+    method chain led by `.filter`, an expression carried on by a trailing `+`, a
+    `from re"…"` clause under a record — and nothing lexical separates those from a
+    misindented line, so the rule *reindents correct code*.
+  - **Rebuilding whitespace from column numbers** turned two tab-indented programs into
+    eight-space-indented ones, 110 lines in one file, because JavaCC advances a column to
+    the next multiple of eight for a tab. Whitespace is now sliced out of the source text.
+  - **Tightening brackets** (`f( a )` to `f(a)`, `f (1)` to `f(1)`) fired dozens of times
+    and every firing was damage: `new Employee( 1, …)` above `new Employee(10, …)` is a
+    right-aligned ID column, and an enum padded so its cases' argument lists line up uses
+    five spaces on one line and one space on the next — so not even "collapse a lone space"
+    separates the typo from the intent. There was no misplaced bracket space in the corpus
+    for the rule to fix. A rule with no true positives is not a rule.
+
+  A line break can end a statement in Onion, so the formatter never re-wraps either; moving
+  one would be a semantic change rather than a cosmetic one.
+
+  Two implementation notes worth recording. Onion's lexer is state-dependent and the parser
+  drives those states, so a token manager run on its own never emits the `EOL` tokens a
+  parse would see — the first version produced every file on a single line. And comments
+  arrive attached to the *following* token, which means a comment at the end of a file hangs
+  off `EOF`, and an implementation that stops at `EOF` deletes it without a word.
+
+  Every file is verified before it is written: the formatted text must lex to the same token
+  and comment stream, comments included, or the file is left untouched and reported. Three
+  properties are checked over the whole corpus rather than on toy inputs — idempotence,
+  every line break preserved, and the token stream unchanged. Worth recording that those
+  properties caught none of the three bugs above: dedenting a whole class body, or expanding
+  every tab, or closing up an aligned column, is idempotent and preserves every token.
+  Running it over the corpus and reading the diff is what caught all three.
+
+  Run over the corpus now, the whole formatter changes four lines. That is the honest size
+  of the problem a formatter working from tokens alone can see here.
+
+- **A drift guard tying `OnionCli`'s subcommands to both project CLI pages.** `onion doc`
+  was a complete generator that no launcher, subcommand or documentation page ever named,
+  and nothing failed for months because nothing was checking. The guard runs in both
+  directions, so a page describing a command that no longer exists fails too.
+
+- **`onion test --report-xml <path>` writes a JUnit XML report.** The run printed
+  `N tests, N passed, N failed` and returned an exit code, which tells CI *that* something
+  broke and never *what*. Every JVM CI system reads this format, so producing it is what
+  turns a red build into an annotated diff.
+
+  The escaping is the part that has to be right rather than approximately right: a test's
+  captured output is arbitrary, and an XML file the CI parser rejects is worse than no file
+  at all, because the failure then looks like a broken pipeline instead of a failing test.
+  Markup, quotes and newlines are escaped; control characters XML 1.0 cannot represent at
+  all — not even as a numeric reference — are replaced. Every assertion about this goes
+  through a real XML parser, since only a parser can tell "looks wrong" from "will be
+  rejected".
+
+  A report that cannot be written is an error in its own right, so it neither turns a
+  failing run into a passing one nor hides a real failure behind an I/O problem.
+
+- **`onion doc` — the documentation generator is reachable.** `onion.tools.doc.OnionDoc`
+  has been a complete generator for a while: six files, HTML output, its own `-d` and
+  `--help`. Nothing could invoke it — no launcher script, no subcommand, no build task, no
+  mention in any documentation — and a feature nobody can run is indistinguishable from one
+  that does not exist.
+
+  ```bash
+  onion doc                                   # src/ into target/doc
+  onion doc -d api src/main.on src/util.on    # explicit, works outside a project too
+  ```
+
+  Doc comments are carried across, not just signatures. Running it outside a project with
+  no files named says where to run it instead of failing obscurely.
+
+- **A debugger can now see variables.** Generated methods carried line numbers but no
+  LocalVariableTable — `visitLocalVariable` appeared nowhere in the compiler — so a JVM
+  debugger could step through `.on` source and then show nothing at all for any variable.
+  Stepping without being able to look at a value is most of the way to useless.
+
+  Verified with `jdb`, not just by inspecting the class file: stopping on a line of Onion
+  source now prints `factor = 40`, `doubled = 80`, `running = 0`, `i = 0`.
+
+  The names were the hard part. `LocalBinding` carries an index, a type and two flags but
+  no name — by codegen the scopes are the only thing that still knows what the author
+  called anything — so `LocalFrame` now exposes its index-to-name mapping. A slot with no
+  name is left out rather than invented; a debugger showing `var3` is worse than showing
+  nothing.
+
+  `-g:none` omits the table for anyone who wants the smaller class file. Scripts run with
+  `onion` always emit it, since they are compiled in memory and there is no artefact to
+  keep small.
+
+- **`onion.Db`: SQL over JDBC.** The driver is never bundled — it is whatever the project
+  declares in `[dependencies]`, which is the first thing that became possible now that a
+  project can depend on a jar at all.
+
+  ```onion
+  val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+  db.transaction((conn) -> {
+    conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+    conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+  })
+  ```
+
+  Values are always bound, never pasted into the SQL, so the API gives no way to write an
+  injection by accident. A transaction commits when the body returns and rolls back when
+  it throws — there is no `begin`/`commit` pair to forget between. Rows are `Map`s from
+  column label to value in the order selected; two columns sharing a label is refused
+  rather than silently losing one.
+
+  `DriverManager` only offers drivers its *caller* can see, so a driver pulled in through
+  `[dependencies]` — loaded by Onion's own classpath loader — would have come back as "No
+  suitable driver" in exactly the case this class exists to serve. `Db` falls back to
+  asking the context classloader directly.
+
+- **`onion.Archive`: zip and gzip.** Onion could read and write files but not archives,
+  which is most of what a release, a backup or a log rotation touches. **Extraction
+  refuses to write outside the target directory** — an entry named
+  `../../.ssh/authorized_keys` is the standard "zip slip" attack, and a naive extractor
+  writes exactly where it is told. Entries carry a fixed timestamp, so zipping the same
+  inputs twice produces the same bytes; an artefact that differs run to run cannot be
+  checksummed or cached. Tar is left out: it needs a dependency.
+
+- **`onion.Concurrent`: bounded parallelism, and the pieces needed to use it safely.**
+  `Future` could already run one thing off the current thread, but there was no way to
+  bound how many run at once, to share a counter, to hold a lock, or to hand work between
+  threads.
+
+  ```onion
+  val pool = Concurrent::pool(4)
+  val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+  pool.close()
+  ```
+
+  `mapAll` returns results in the *input's* order, not the order they finished — output
+  that depends on timing cannot be tested — and reports a failing element only once every
+  task has settled, so one bad input cannot leave workers running behind a caller that has
+  given up. `withLock` releases even when the body throws. Channels are bounded, because
+  an unbounded one hides a producer outrunning its consumer until memory runs out, and
+  refuse `null`, which would be indistinguishable from an empty receive. Pool threads are
+  daemons, so a forgotten `close()` cannot keep the JVM alive. Virtual threads are absent:
+  they need Java 21 and Onion targets 17.
+
+- **`onion.Net`: TCP sockets.** Onion could reach the network only as an HTTP client —
+  there was no way to speak any other protocol, and no way to accept a connection at all.
+
+  ```onion
+  val listener = Net::listen("localhost", 0, 4)   // 0 asks the OS for a free port
+  val peer = listener.accept()
+  peer.writeLine("echo: " + peer.readLine())
+  peer.close()
+  ```
+
+  Reads with `readLine`/`readAll`/`readBytes`, writes with `write`/`writeLine`/`writeBytes`
+  (every write flushes), plus `timeout`, `closeWrite` for protocols that signal EOF by
+  half-closing, and an idempotent `close`. Failures name the address that failed, so a
+  `catch` says which host rather than just "connection refused".
+
+- **`onion.Server`: an HTTP server**, on the JDK's own implementation, so it adds no
+  dependency. A language that can only make requests and never answer one is missing half
+  of what people write tools for.
+
+  ```onion
+  server.handleAll((req) -> select req.path() {
+    case re"/users/(\d+)" (id): Server::json("{\"id\": " + id + "}")
+    case "/health":             Server::text("ok")
+    else:                       Server::notFound()
+  })
+  ```
+
+  `handleAll` exists so routing can live in Onion — `select` over the path with `re"…"`
+  patterns, the captured group bound as a value — rather than in a table of registered
+  paths. Port 0 asks the OS for a free port and `port()` reports it, which is what makes a
+  server testable without picking a number and hoping. Responses are immutable values
+  built without touching a socket, so a handler is testable on its own, and a handler that
+  throws produces a 500 instead of taking the server down or leaving a client waiting on a
+  socket that never answers.
+
+  `run/MiniWebService.on` is a complete service that answers its own requests and exits.
+
+- **`ONION_JAVA_OPTS`, so JVM flags can be set at all.** Neither launcher passed anything
+  through, so setting a heap size or attaching a debug agent meant abandoning `onion` and
+  hand-writing a `java -cp` command:
+
+  ```bash
+  ONION_JAVA_OPTS="-Xmx4g" onion big-job.on
+  ```
+
+  `ONION_DEBUG_STARTUP=1` also stops the launcher silencing the JVM's class-sharing
+  messages, which is how to find out why an archive is being ignored.
+
+- **`[dependencies]` in `onion.toml`: a project can finally use a Java library.**
+  `ProjectBuilder` compiled every project with `classPath = Seq.empty` and the manifest
+  rejected any key outside `[package]`, so a project could not reference a single
+  third-party jar — while the README described Onion as a language that "runs on the JVM
+  and calls Java directly". Scripts could always take `-classpath`; projects could not.
+
+  ```toml
+  [dependencies]
+  "org.postgresql:postgresql" = "42.7.3"
+  ```
+
+  Resolution is coursier's, embedded through `io.get-coursier:interface` — its Java API,
+  with everything shaded, so it adds no transitive baggage beyond `slf4j-api` and cannot
+  collide with anything Onion already ships. (The Scala API has no Scala 3 build and would
+  have had to come in through `for3Use2_13` with its own dependency graph.) Transitives are
+  resolved, and the jars reach the compile classpath, the run classpath and the test
+  classpath alike — a library you compile against is there when the program runs.
+
+- **`[[repositories]]`, searched before Maven Central and in the order written.**
+
+  ```toml
+  [[repositories]]
+  url = "https://nexus.example.com/repository/maven-public"
+  ```
+
+  Central is kept rather than replaced. An array of tables rather than a plain
+  `repositories = [...]`, because a bare key-value pair belongs to whatever table header
+  precedes it: written after `[package]` the array form silently becomes
+  `package.repositories`, and the table form can go anywhere in the file. Only absolute
+  `http`/`https`/`file` URLs are accepted, so a typo is rejected at the repository line
+  instead of resurfacing later as a resolution failure blamed on a dependency.
+
+- **The editor now validates against the project's classpath** (`LspProjectClasspath`).
+  Validation used a fixed classpath of `.`, so a symbol defined in a sibling file read as
+  undefined, and — once dependencies existed — every type coming from a jar would have been
+  underlined while `onion build` succeeded. Diagnostics that disagree with the build are
+  worse than no diagnostics. Resolution is cached per project root and invalidated by the
+  manifest's size and modification time, since resolving on every keystroke would be
+  unusable. A malformed manifest or an unresolvable dependency degrades to validating
+  without them and says so on the server's stderr, rather than refusing to validate the
+  file the author is looking at.
+
+- **`onion new` scaffolds a commented `[dependencies]` block.** Otherwise a new project
+  gives no hint that Maven coordinates are accepted at all.
+
+- **Syntax highlighting on the documentation site.** The site is built with MkDocs,
+  which highlights through Pygments, and Pygments had no `onion` lexer — so all
+  1213 ` ```onion ` fences across 71 pages rendered as unstyled plain text, with no
+  warning from the build. `tools/pygments-onion/` is a Pygments lexer registered
+  through the `pygments.lexers` entry point; `.github/workflows/docs.yml` installs
+  it next to `mkdocs-material`, and because `mkdocs.yml` already sets
+  `pygments_lang_class`, not a single markdown file had to change. The TextMate
+  grammar could not be reused here: Pygments cannot read one, and the paths that
+  would let it (a browser-side highlighter) give up static generation.
+
+- **A drift guard over every highlighting grammar Onion ships**
+  (`SyntaxHighlightingDriftSpec`). It derives the keyword set mechanically from
+  `grammar/JJOnionParser.jj` — hard keywords from the `TOKEN` block, soft keywords
+  from both spellings of semantic lookahead the grammar uses (`getToken(n).image
+  .equals(...)` and the `la(...)` helpers, since `in` only ever appears as the
+  latter) — and holds both the TextMate grammar and the Pygments lexer to it, in
+  both directions. Forward catches a keyword added to the parser and forgotten in a
+  highlighter; reverse catches a stale entry left behind after a keyword is removed.
+  Keeping two extra grammars is only defensible with this in place.
+
+- **Contributor documentation for highlighting**
+  (`docs/contributing/syntax-highlighting.md` and its Japanese counterpart, both
+  linked from the nav): why there are two highlighters, how to add a keyword, why
+  soft-keyword rules are pinned with lookaheads, and why ` ```onion ` fences cannot
+  be highlighted on github.com.
+
+- **`.gitattributes` mapping `*.on` to Scala for display**
+  (`linguist-language=Scala linguist-detectable=false`), so the ~170 sample programs
+  under `run/` are no longer rendered as colourless text on github.com. Shared
+  constructs come out right; Onion-only keywords such as `conforms` and `tool` do
+  not, which is the honest cost of borrowing another grammar. The statistics
+  override keeps the repository language bar from claiming these files are Scala.
+  Fenced blocks are unaffected — GitHub resolves a fence's info string against
+  Linguist's language list, which requires roughly 2000 indexed files per extension,
+  and no per-repository override exists for it.
+
+- **`tools/pygments-onion/check_docs.py`, run in CI before deploy and on pull
+  requests.** A missing rule for a non-keyword form does not show up as a keyword
+  gap — it shows up as a Pygments `Error` token, which renders as unstyled text and
+  fails nothing. This lexes the fences directly and fails on any such token. The
+  docs workflow now also builds (without deploying) on pull requests, so a broken
+  site is caught before it reaches `main` rather than after.
+
+- **`RunSamplesSpec` coverage for 34 more `run/` examples that were added
+  without a corresponding test** (`Automaton`, `EmployeeManager`,
+  `ExpenseAuditor`, `GameStore`, `MatrixCalc`, `MazeSolver`, `MiniRpg`,
+  `MovieRecommender`, `MuseumCollection`, `MusicLibrary`,
+  `NationalParkTracker`, `NutritionTracker`, `ParkingGarage`,
+  `PayrollReport`, `PlaylistManager`, `PokerHands`, `RankedChoice`,
+  `RecipeManager`, `RestaurantOrders`, `ShipmentTracker`, `ShoppingCart`,
+  `SnippetLibrary`, `SortingShowcase`, `SpaceMission`, `StockPortfolio`,
+  `StudentGradeBook`, `Sudoku`, `SudokuSolver`, `TaskPlanner`,
+  `TimesheetTracker`, `TournamentStandings`, `TournamentTracker`,
+  `VirtualMachine`, `VirtualShell`). Each already ran and compiled cleanly;
+  `sbt test` simply never exercised them, so a regression in any of them
+  would have gone unnoticed. `ExpenseAuditor` is a `tool`-declared script, so
+  its test drives the auto-CLI with a temp input/output file pair rather
+  than calling it with no arguments. `Calculator.on` (a Swing GUI program
+  requiring a display) is intentionally left uncovered, matching how the
+  repository already treats headless-incompatible samples.
+
+- **`RunSamplesSpec` coverage for 20 `run/` examples that were added without a
+  corresponding test** (`ChemCalculator`, `CodeContest`, `CryptoPortfolio`,
+  `DependencyResolver`, `DnaAnalyzer`, `ElevatorDispatcher`,
+  `GenericLeaderboard`, `GeneticSequencer`, `HospitalWard`, `InsuranceClaims`,
+  `KaraokeNight`, `MarkdownConverter`, `MiniTypeChecker`, `NetworkMonitor`,
+  `PlantCare`, `RecipeVault`, `RuleEngine`, `SortAlgorithms`, `SupplyChain`,
+  `TransitPlanner`). Each already ran and compiled cleanly; `sbt test` simply
+  never exercised them, so a future regression in any of them would have gone
+  unnoticed. This closes the coverage gap.
+
+- **`RecordJsonSpec`/`RecordYamlSpec`, regression coverage for `derive!(Json, Yaml)`
+  rejecting a nullable scalar record component** (`nickname: String?`). Docs describe
+  `derive!` as supporting "scalar components only"; `ScalarConversions.isDerivable`
+  only matches the exact non-null scalar types, so a nullable wrapper around an
+  otherwise-supported type is already rejected with E0062 the same way a wholly
+  unsupported component type (a nested record) is -- but only the JSON side had a
+  regression for the nested-record case, and neither side tested the nullable case.
+  Both already behaved correctly; this closes a coverage gap rather than a live bug.
+
+- **`TryInArrayIndexAssignmentSpec`, regression coverage for `try`/`catch` used
+  as *both* the index and the assigned value of the same array write**
+  (`arr[try {...} catch {...}] = try {...} catch {...}`). The existing index-side
+  fix (#758 write-side sibling of #745/#669) and the pre-existing value-side
+  handling were each tested individually, but never combined in the same
+  write; the combination already passed, so this closes a coverage gap rather
+  than a live bug.
+- **`TryInEnumCaseArgSpec`, regression coverage for `try`/`catch` used as an
+  argument to an `enum case` constructor invocation**
+  (`new Circle(try {...} catch {...})`). The generated constructor already
+  flows through the same `visitNewObject` path ordinary records use (already
+  hardened by the #669/#745/#752 fixes), so this already passed; this closes
+  a coverage gap rather than a live bug.
+
+### Fixed
+
+- **`onion fmt` collapsed a whitespace-only file to empty.** A source with no real token
+  and no comment produced no lexeme at all, so the formatter's main loop was a no-op and
+  the trailing-newline logic never ran either — a file of nothing but blank lines was
+  silently rewritten down to an empty string and reported as changed. No rule anchors to
+  whitespace with no token around it, so it is now left exactly as written, the same
+  guarantee already held for whitespace next to a token.
+
+- **Diagnostics underlined one token instead of the construct they were about.** Every
+  leaf already spanned its own token, but a compound expression was anchored at its
+  operator and a call at its name, so:
+
+  ```
+    5 |     val n: Int = 3 * "x"
+      |                    ^
+    4 |     val total: Int = "hello" + someUndefinedThing(1, 2)
+      |                                ~~~~~~~~~~~~~~~~~~
+  ```
+
+  became:
+
+  ```
+    5 |     val n: Int = 3 * "x"
+      |                  ~~~~~~~
+    4 |     val total: Int = "hello" + someUndefinedThing(1, 2)
+      |                                ~~~~~~~~~~~~~~~~~~~~~~~~
+  ```
+
+  Binary expressions get their extent by merging their operands' locations
+  (`Location.spanningTo`) rather than by capturing tokens, which is why it composes: the
+  left operand of `1 + 2 + "x"` is itself a binary expression and the outer span covers
+  all of it. Calls run from the method name through the closing paren. A call
+  deliberately does **not** include its receiver: in a chain like `a.b().c()` every link
+  would otherwise underline everything before it.
+
+  The reported column moves with the underline — from the operator to the start of the
+  expression, and from `::` to the method name. `onion run` reporting a project's entry
+  point now points at `println` rather than at the `::` before it.
+
+- **Rename in the editor rewrote comments and string literals.** It replaced every
+  whole-word occurrence of the identifier in the file, so renaming `count` also rewrote
+  `"count of items"` and `// count starts at zero`. An edit that changes a program's output
+  while calling itself a rename is the worst kind: the file still compiles, so nothing
+  downstream catches it.
+
+  A new `SourceRegions` scanner classifies each offset as code or not, handling `//` and
+  `/* */`, string escapes, character literals, and scheme-prefixed raw literals (`re"…"`).
+  `#{ … }` interpolation counts as **code** — the `count` in `"n=#{count}"` is a real
+  reference, and skipping everything between quotes would have broken the file the other
+  way. Renaming from a position inside a comment or a literal is now refused, since the
+  word there is not a reference to anything.
+
+  Rename remains file-local and not scope-aware, and the language-server documentation now
+  says so plainly rather than leaving it to be discovered. Fixing that needs the typed AST
+  with real source ranges, and the parser currently produces spans only a token wide.
+
+- **Onion started in half the time depending on how you got it, and nothing noticed.**
+  There are two launcher implementations — the `bin/` scripts, which the distribution zip
+  ships and a source checkout runs, and the ones `install.sh` writes for a `curl | sh`
+  install — and they had drifted apart. The installed launchers had a class-data-sharing
+  archive and the `--sun-misc-unsafe-memory-access=allow` workaround; the `bin/` ones had
+  neither. So the same program took 0.73s from the zip and 0.38s from the installer
+  (JDK 25, `onion run/Hello.on`), and printed four lines of JVM deprecation warnings on
+  every single run in the first case and none in the second.
+
+  The `bin/` launchers now share one `bin/onion-jvm.sh` (and `onion-jvm.bat`) that does
+  both. `LauncherParitySpec` fails the build if either implementation gains a capability
+  the other lacks — it caught the archive filename disagreeing between the POSIX and
+  Windows halves while it was being written.
+
+  The Unsafe workaround needs a JDK version check, and the option does not exist before
+  JDK 23 — an unknown `--` option makes the JVM refuse to start. The version is read from
+  the JDK's own `release` file rather than probed by running `java`, which would add a
+  process launch to every invocation. The Windows scripts do not do this check yet, so
+  they still show the warnings.
+
+- **A stale class-data-sharing archive narrated itself on every run.** After a JDK
+  upgrade or a moved install the JVM refuses the archive and carries on correctly — but
+  says so on stderr each time, which lands in anything capturing a tool's output. Both
+  launchers now pass `-Xshare:auto` with the CDS log tags off, so a stale archive costs
+  the speedup and nothing else. `ONION_DEBUG_STARTUP=1` shows the messages again.
+
+- **The build cache could serve classes compiled against an old classpath.** The build
+  fingerprint hashed the manifest bytes, which pin only *direct* dependencies; a transitive
+  version can move without `onion.toml` changing a byte. The whole resolved set now feeds
+  the fingerprint, and `BuildFingerprint.SchemaVersion` is bumped to 2 so build state
+  written before this is rejected rather than read back with the wrong meaning.
+
+- **The TextMate grammar was missing the most distinctive parts of the language.**
+  It had drifted to roughly 70% keyword coverage: `trait`, `instance` and the
+  lowercase `void` were absent, as was every soft keyword (`tool`, `requires`,
+  `shape`, `law`, `example`, `from`, `derive`), along with scheme-prefixed raw
+  literals (`re"…"`, `file"…"`, `http"…"` — 225 occurrences in the docs alone), the
+  `|>` pipeline operator, and backtick-quoted identifiers. Soft-keyword rules are
+  pinned with lookaheads so that a variable named `shape` or `tool` stays
+  uncoloured, and keyword rules deliberately precede the scheme-literal rules so
+  that `return"x"` highlights as a keyword followed by a string, matching the
+  push-back the lexer in `JJOnionParser.jj` performs. Verified against
+  `vscode-textmate` and `vscode-oniguruma` — the engine VS Code itself uses.
+  (`vscode-onion` 1.1.0 → 1.2.0.)
+
+- **A `#!` shebang was unlexable.** `Parsing.scala` strips a shebang from the first
+  line of a script, but neither highlighter knew about it, so seven code blocks
+  across five documentation pages were emitting an error token for the `#`. Pinned
+  to line one with `\A`, matching what the compiler accepts.
+
+- **An ASCII-art inheritance diagram in `docs/guide/inheritance.md` was tagged
+  ` ```onion `.** It is a tree drawing, not code. It survived because
+  `DocExamplesCompileSpec` only scans `docs/examples/`, so nothing under
+  `docs/guide/` was ever checked; the new fence lexing is what surfaced it.
+
+- **Three tests failed under `-Duser.language=ja`, which nobody could see.** Once the
+  locale flag actually took effect, `ErrorCountMessageSpec` and
+  `ErrorMessageJapaneseTranslationSpec` went red — and both for the same reason.
+  `ResourceBundle.getBundle("errorMessage", Locale.ENGLISH)` does not return English
+  here: there is no `errorMessage_en.properties` (the base file *is* the English one),
+  and when the requested locale has no bundle of its own the JDK falls back to the
+  **default locale** before it falls back to the base file. On a `ja_JP` machine the
+  "English" bundle was therefore the Japanese one, so a test asserting the Japanese text
+  differs from the English text compared Japanese with Japanese. The two specs now take
+  their bundles from a new `MessageBundles` test helper, which pins each language with
+  `ResourceBundle.Control.getNoFallbackControl`. Production behaviour is unchanged and
+  deliberately different: `onion.compiler.toolbox.Message` follows the ambient locale,
+  because a user's diagnostics should follow their machine.
+
+- **`QualityBarSpec`'s test-count check used fixed bounds, and the recorded figure had
+  drifted inside them.** The bar said 3410 against an actual 3595 while sitting
+  comfortably within a hardcoded 2700–4000 window — and that window rots in both
+  directions as the suite grows, eventually failing spuriously at the ceiling while the
+  floor stops catching anything. The band is now derived from the number of tests
+  declared by hand across `src/test/scala`, so it moves with the suite.
+
+- **The documented way to verify a release stopped working after the move to sbt 2, and
+  failed silently.** `CLAUDE.md`, `docs/quality-bar.md` and `docs/RELEASING.md` all told
+  you to run `sbt -Duser.language=en test`. Under sbt 2.0.6 that command can test nothing
+  and still exit 0, for two independent reasons: `test` now delegates to `testQuick`, so a
+  second run over an unchanged tree prints `No tests to run`; and `-D` flags only reach a
+  *freshly started* sbt server, so passing `-Duser.language=ja` to a server already running
+  under `en` leaves `java.util.Locale.getDefault()` reporting `en_JP`. Running the two
+  locales back to back therefore reported two green runs having tested one locale once.
+  All three documents (and their Japanese copies) now say
+  `sbt shutdown && sbt -Duser.language=<xx> testFull`. CI was never affected — the
+  incremental state lives in `target/`, which `setup-java`'s `cache: 'sbt'` does not
+  cache, so every CI run starts cold.
+
+- **A change to the highlighting lexer did not redeploy the documentation site.**
+  The docs workflow triggered only on `docs/**`, `mkdocs.yml` and itself, so a fix
+  to how every code block renders would have sat unpublished. `tools/pygments-onion/**`
+  is now a trigger path.
+
+## [0.10.37] - 2026-08-16
+
+### Added
+
+- **`ThreeLevelNestedClosureCapturedVariableSpec`, regression coverage for a
+  `var` relayed through *three* levels of closure nesting.**
+  `NestedClosureCapturedVariableSpec` (#756) locked in the two-levels-deep
+  case for a variable captured from an outer scope, relayed through one
+  intermediate closure, and mutated only by the innermost one. Both
+  `CapturedVariableScanner` (typing) and `ClosureCodegen.emitNewClosure`'s
+  `adjustedFrame`-based boxed-ness lookup (codegen) were written to recurse
+  to arbitrary depth rather than special-cased for exactly two levels, but
+  nothing exercised a third level of relay -- including the case where the
+  innermost closure's assigned value runs its own `try`/`catch` (the
+  #745/#669 stack-corruption family, reached via the relay path). Both new
+  cases already passed, so this closes a coverage gap rather than a live bug.
+- **`TryInCompoundFieldArrayAssignmentSpec`, regression coverage for `try`/`catch`
+  as the right-hand side of a compound assignment (`+=`) on a field or array
+  element** (`obj.field += try {...} catch {...}`, `arr[i] += try {...} catch
+  {...}`). Compound assignment desugars `target op= value` to `target = target
+  op value`, so the `try` ends up nested inside a `BinaryTerm` rather than
+  directly as the assigned value -- unlike the plain-assignment cases already
+  covered by `TryInFieldAssignmentSpec`/`TryInArrayIndexAssignmentSpec`. This
+  locks in that `TermContainsTry.contains`'s generic recursion still finds the
+  nested `try` and `visitSetField`/`visitSetArray` still spill the
+  receiver/array-and-index correctly (the #745/#752 stack-corruption family);
+  all three new cases already passed, so this closes a coverage gap rather
+  than a live bug.
+- **`run/TryCatchEdgeCases.on`, a regression sample combining `try`/`catch`
+  with expression positions not covered by any single existing
+  `TryInXxxSpec`.** A `select` scrutinee, a `select` case guard, a `while`
+  condition, a `foreach` iterable, a record constructor argument, an
+  `is`/`as` target, a compound-assignment (`+=`) right-hand side, a string
+  interpolation segment, and a closure reassigning a per-iteration
+  captured `var` -- all via `try`/`catch` -- exercised together as one
+  combined integration check (`Shell.Success(138)`), on top of the
+  existing narrowly-scoped unit coverage for the array-index,
+  binary-operand, and field/local-assignment positions (#669, #745, #752
+  and friends).
+
+### Fixed
+
+- **`try`/`catch` as the index of an array *write* (`arr[try {...} catch
+  {...}] = value`) no longer crashes the compiler.** `visitSetArray` only
+  spilled the array reference into a local when the assigned *value* could
+  run its own `try`, never when the *index* could -- so an array reference
+  already pushed before evaluating such an index was silently discarded by
+  the JVM clearing the operand stack on the exceptional path, desyncing the
+  merged stack shape from the normal path with an `[I0000]` internal error.
+  This is the write-side sibling of the array-read fix for the same
+  underlying issue (#745, #752, and friends) -- the read path (`visitRefArray`)
+  already checked its index; the write path was missing the same check.
+- **A `var` declared inside a closure's own body and mutated only by a
+  closure nested inside it now correctly shares storage with the declaring
+  closure.** `ClosureCodegen.generateClosureMethod` built each closure's own
+  local-variable context with only parameter registration, never consulting
+  the boxed-variable information typing already computes for the closure's
+  frame -- unlike the top-level-method codegen path, which always does
+  both. So a `var` declared inside a closure and mutated by a closure
+  nested inside it got a disconnected unboxed copy per closure level
+  instead of sharing one heap-boxed cell, silently dropping the inner
+  closure's write. When the assigned value ran its own `try`/`catch`, the
+  same gap crashed the compiler with `[I0000] Inconsistent stackmap
+  frames` (the same family as #745/#669). This is the same-closure sibling
+  of the cross-closure-relay fix for issue #756.
+
+- **A `var` mutated only by a closure nested two (or more) levels deep now
+  correctly shares storage with the declaring scope.** `CapturedVariableScanner`
+  (used during typing to decide which variables need heap-boxed storage)
+  only ever examined the closure immediately enclosing a variable's use; a
+  variable referenced solely inside a closure nested *inside* that one was
+  never marked as boxed, so each closure level silently got its own
+  disconnected copy instead of sharing one cell — a write from the innermost
+  closure was invisible to the declaring scope. This is the transitive-capture
+  sibling of the single-level fix in #214. A related codegen bug compounded
+  it: even once boxing was correctly inferred, `ClosureCodegen.emitNewClosure`
+  determined a captured variable's boxed-ness via a lookup that only
+  understood a closure's own frame-0 locals, so a variable merely *relayed*
+  through an intermediate closure was still treated as unboxed. Combined with
+  a `try`/`catch` as the assigned value, the unboxed path also crashed the
+  compiler with an `[I0000]` internal error (inconsistent stackmap frames):
+  the JVM clears the operand stack when dispatching to the `catch` handler,
+  discarding the pending `this` reference the unboxed-assignment path had
+  already pushed, desyncing the merged stack shape from the normal path (the
+  same family of issue as #745/#669, reached via a different unguarded path).
+- **`try`/`catch` as the right-hand operand of a binary operator no longer
+  crashes the compiler.** `1 + (try { ... } catch { ... })`, and the same for
+  other arithmetic, bitwise, and comparison operators, previously crashed
+  with an `[I0000]` internal error during bytecode verification: the JVM
+  clears the operand stack when dispatching to an exception handler, so a
+  left operand already pushed before the `try`'d right operand ran was
+  silently discarded on the exceptional path. This is the binary-operator
+  sibling of the constructor-argument, list/map-literal, and field/array-
+  assignment fixes for the same underlying issue (#669 and friends).
+- **`try`/`catch` as an array-index expression no longer crashes the
+  compiler.** `arr[try { ... } catch { ... }]` previously crashed with an
+  `[I0000]` internal error during bytecode verification: the array reference
+  was pushed onto the operand stack before evaluating the index, and the JVM
+  clears the stack when dispatching to an exception handler, silently
+  discarding that reference on the exceptional path. This is the array-read
+  sibling of the array-write fix for the same underlying issue (#745 and
+  friends).
+- **`try`/`catch` as a later dimension of a multi-dimensional array creation
+  no longer crashes the compiler.** `new Int[3][try { ... } catch { ... }]`
+  previously crashed with an `[I0000]` internal error during bytecode
+  verification: every dimension was pushed onto the operand stack
+  unconditionally before the `multianewarray` instruction, and the JVM
+  clears the stack when dispatching to an exception handler, silently
+  discarding earlier dimensions on the exceptional path. This is the
+  array-creation sibling of the array-index and array-assignment fixes for
+  the same underlying issue (#745, #752, and friends).
+- **`try`/`catch` as the index of a safe array-read (`arr?[...]`) no longer
+  crashes the compiler.** `arr?[try { ... } catch { ... }]` previously
+  crashed with an `[I0000]` internal error during bytecode verification:
+  the array reference (plus a duplicate for the null check) was pushed onto
+  the operand stack before evaluating the index, and the JVM clears the
+  stack when dispatching to an exception handler, silently discarding the
+  pending reference on the exceptional path. This is the safe-indexing
+  sibling of the plain array-index fix for the same underlying issue
+  (#745, #752, and friends).
+- **`try`/`catch` assigned to a closure-captured (boxed) `var` no longer
+  crashes the compiler.** `x = try { ... } catch { ... }`, where `x` is a
+  `var` that some closure captures and mutates (so it is stored in a heap
+  box rather than a plain local slot), previously crashed with an `[I0000]`
+  internal error during bytecode verification whether the assignment ran
+  inside the capturing closure or in the variable's declaring scope: the
+  box reference was pushed onto the operand stack before evaluating the
+  right-hand side, and the JVM clears the stack when dispatching to an
+  exception handler, silently discarding the pending box reference on the
+  exceptional path. This is the boxed-local-variable sibling of the
+  field/array-assignment fixes for the same underlying issue (#745 and
+  friends).
+
+## [0.10.36] - 2026-08-15
+
+### Added
+
+- **`run/AccessLogAnalyzer.on`, a 325-line HTTP access-log analyzer.**
+  Parses Common-Log-Format lines via `record LogEntry from re"..."`
+  (`parseAll`), an ADT case-enum (`HttpStatus`: `Info`/`Success`/
+  `Redirect`/`ClientError`/`ServerError`), a class with mutable state
+  (`LogAnalyzer`, `PathSummary`), extension methods on `Int`/`Double`/
+  `String`, `do[Option]` monadic chaining, `|>` pipeline, collection
+  pipelines (`groupBy`/`sortedBy`/`filter`/`map`/`fold`/`count`/
+  `partition`/`distinct`), `foreach (k, v) in map`, and recursion.
+- **`run/DnaAnalyzer.on`, a 469-line DNA sequence analysis toolkit.**
+  Exercises an ADT enum with shared methods (`Nucleotide`), a
+  data-carrying ADT enum (`GCCategory`), records with `from re"..."`
+  and `example` clauses (`FastaHeader`, `SequenceRegion`, `MotifMatch`),
+  extension methods on `Int`/`String`, `do[Option]` composition,
+  collection pipelines (`map`/`filter`/`fold`/`partition`/`flatMap`/
+  `sortedBy`/`groupBy`), regex `select` patterns, and nullable types.
+- **`run/ChemCalculator.on`, a 274-line chemical formula analyser.**
+  Exercises a plain enum (`ElementGroup`) alongside a data-carrying enum
+  (`BondType`), records with body methods (`Element`, `FormulaComponent`),
+  an interface (`Describable`) implemented by a class (`Compound`), `select`
+  pattern matching on enum values, closures stored in `val` and passed as
+  arguments, and a wide sweep of collection pipelines (`filter`/`map`/
+  `fold`/`sortedBy`/`groupBy`/`find`/`partition`/`zip`/`distinct`/
+  `Colls::concat`), plus `try`/`catch`, tail recursion, and
+  `foreach (k, v) in map`.
+- **`run/NetworkMonitor.on`, a 270-line network traffic analysis and
+  alerting sample.** Parses Apache-style access log lines via
+  `record ... from re"..."` (`LogEntry`), and exercises an ADT case-enum
+  (`Alert`: `HighErrorRate`/`SlowEndpoint`/`SuspiciousIp`/`QuotaExceeded`),
+  a data-carrying enum (`Method`), a plain enum (`AlertLevel`), a record
+  with body methods (`PathStats`), extension methods on `Int`/`String`,
+  regex `select` patterns, `do[List]` comprehension, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`map`/`count`/`any`/`partition`),
+  `foreach (k, v) in map`, and tail recursion.
+- **`run/MarkdownConverter.on`, a 371-line Markdown-to-HTML converter.**
+  Exercises an ADT case-enum with shared methods (`Block`: `Heading`/
+  `Paragraph`/`BulletItem`/`OrderedItem`/`CodeBlock`/`Blockquote`/`HRule`),
+  `select` + type-pattern binding, a `record` (`DocStats`), `extension
+  String` helpers, a cursor-style parser class with mutable state,
+  collection pipelines (`filter`/`map`/`groupBy`/`partition`/`find`/
+  `sortedBy`), nullable types with null-guards, string interpolation,
+  `while`/`foreach`, and `Regex::replace`/`Regex::groups` for inline
+  transforms.
+- **`run/ElevatorDispatcher.on`, a 352-line multi-car elevator dispatch
+  simulator.** A `record ... from re"..."` dispatcher-log parser
+  (`CallLogEntry`) with `example` clauses, a plain enum (`Direction`), a
+  data-carrying enum (`DoorState`), an ADT case-enum (`DispatchEvent`:
+  `Arrived`/`DoorsOpened`/`Overloaded`/`WentIdle`), a `record` with body
+  methods (`RiderRequest`), an interface (`Dispatchable`) implemented by a
+  class with mutable state (`ElevatorCar`), extension methods on `Int`/
+  `String`, `do[Option]` chaining, regex `select` patterns, collection
+  pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`/
+  `zip`/`distinct`), `foreach (k, v) in map`, nullable types, `try`/`catch`,
+  and tail recursion.
+
+### Fixed
+
+- **Calling `.method()` (not `?.method()`) on a nullable class-typed value
+  (e.g. `x: Box?`) reported the generic, unhelpful `E0041`
+  ("type Box? is not a valid method call target.") instead of the dedicated
+  null-safety diagnostic `E0070`, which points at `?.` / `?:` / `!!` / a null
+  check.** Field access on the same nullable value already reported `E0070`;
+  `MethodTargetTypingSupport`'s method-call path just never had a
+  `NullableType` case to route through it.
+- **Assigning a `try { ... } catch e: T { ... }` expression directly to a
+  field or array element crashed the compiler with `[I0000] Internal
+  compiler error in LawCheck: Inconsistent stackmap frames`** (issue #745),
+  most visibly inside a constructor. The JVM clears the operand stack when
+  it dispatches to an exception handler, so a receiver (or array ref/index)
+  already pushed before the `try` silently vanished on the exceptional path,
+  desyncing the merged stack shape from the normal path — the field/array
+  sibling of issue #669's call-argument bug. `visitSetField`/`visitSetArray`
+  now spill an already-pushed target (and index) into locals before
+  evaluating a value that may run its own `try`, mirroring the existing
+  `emitArgumentsWithAdaptation` fix for call arguments.
+- **A `try { ... } catch e: T { ... }` expression used as an array-literal
+  element (`new Int[]{1, try { ... } catch _: Exception { -1 }, 3}`) crashed
+  the compiler with the same `[I0000] Inconsistent stackmap frames` error**,
+  the array-literal sibling of the fix above. `visitNewArrayWithValues` left
+  the array reference and element index on the operand stack (via `dup()`
+  and a pushed constant) while evaluating each element, which the JVM
+  silently discards on the exceptional path; it now evaluates any element
+  that may run its own `try` first with an empty operand stack, stashes the
+  result in a local, and only then reloads the array reference, index, and
+  value for the `arrayStore`, mirroring `visitSetField`/`visitSetArray`.
+- **A `try { ... } catch e: T { ... }` expression used as a constructor
+  argument, a super-constructor argument, a safe-call (`?.`) argument, a
+  `List`-literal element, or a `Map`-literal key/value crashed the compiler
+  with the same `[I0000] Inconsistent stackmap frames` error** — four more
+  siblings of the fixes above. For the safe-call case, the already-pushed,
+  already-initialized target just needed the same "spill to a local, reload
+  after" treatment as `visitSetField`/`visitNewArrayWithValues` (now applied
+  in `visitSafeCall`), and the `List`/`Map`-literal fix follows the same
+  pattern. The constructor and super-constructor cases needed a different
+  fix: the value `new` pushes (or `this`, before `super(...)`/`this(...)`
+  runs) is not an ordinary reference but a JVM-tracked "uninitialized"
+  value, which cannot survive being spilled into a local across a `try`'s
+  merge the way an already-initialized receiver can — attempting that
+  produced a *different* verifier rejection. `visitNewObject` and
+  `codeConstructor`'s super/self-delegation call now evaluate every
+  argument into a plain local *before* emitting `new`/loading `this` at
+  all, so no uninitialized value is ever in flight while an argument's own
+  `try` runs.
+
+## [0.10.35] - 2026-08-14
+
+### Added
+
+- **`run/GenericLeaderboard.on`, a 273-line polymorphic leaderboard sample.**
+  The first `run/` sample to exercise Onion's type-class machinery
+  (`trait`/`instance`) as a first-class feature of a realistic program:
+  two independent type classes (`Scoreable[T]`, `Formattable[T]`), a
+  multi-constraint generic function (`[T: Scoreable + Formattable]`), and
+  `Trait[T]::method()` dictionary dispatch, shared across two domains
+  (chess ratings and F1 standings).
+- **`run/GeneticSequencer.on`, a 482-line DNA sequence analysis toolkit.**
+  Covers a bioinformatics domain not yet in the corpus: records with
+  methods (`Sequence`, `ORF`, `RestrictionSite`), a 21-variant
+  data-carrying enum (`AminoAcid`), a plain enum with `select` dispatch
+  (`Nucleotide`), an interface/class validator hierarchy, collection
+  pipelines (`map`/`filter`/`fold`/`groupBy`/`flatMap`/`sortedBy`/`find`),
+  and tail-recursive k-mer frequency building.
+- **`run/KaraokeNight.on`, a 529-line karaoke night management simulator.**
+  Records with methods (`Song`, `Singer`, `Performance`); a data-carrying
+  enum (`Difficulty` with a multiplier); an ADT case-enum (`ScoreGrade`:
+  `Perfect`/`Good`/`Okay`/`NeedsWork`); interfaces (`Reportable`,
+  `Rankable`); classes with mutable state; extension methods on `Int`,
+  `Double`, `String`; collection pipelines including `zip` and
+  `partition`; and `select`/type-pattern dispatch.
+- **`run/CodeContest.on`, a 543-line ICPC-style competitive programming
+  contest simulator.** Data-carrying enum (`Language`), plain enum
+  (`Verdict`), ADT case-enum (`ContestPhase`); records with `example`
+  clauses (`Problem`, `Submission`) and a generic record (`Ranked[T]`);
+  a class/interface pair (`Contest`, `Contestant conforms Scorable`);
+  `do[Option]` and `do[List]` monadic notation; collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`); and
+  the `|>` pipeline operator.
+- **`run/InsuranceClaims.on`, a 349-line insurance claims processing
+  system.** Data-carrying enum (`CoverageType`), ADT case-enum
+  (`AdjustmentDecision`: `FullApproval`/`PartialApproval`/`Denial`);
+  records with methods (`Claimant`, `Policy`, `Claim`, `AdjustmentRecord`);
+  an interface/class pair (`Auditable`, `ClaimsProcessor`); extension
+  methods on `Int`, `Double`, `String`; collection pipelines
+  (`filter`/`groupBy`/`partition`/`find`); `select`/type-pattern dispatch;
+  nullable types; closures; and `try`/`catch`.
+- **`run/PlantCare.on`, a 299-line plant care and growth tracker.** ADT
+  sealed enums with embedded methods (`PlantFamily`, `CareAction`);
+  records with instance methods (`Plant`, `CareEvent`); typed generic
+  collections (`List[Plant]`, `Map[String, List[Plant]]`); `groupBy`/
+  `sortedBy` collection pipelines; `foreach` map destructuring; `while`
+  loops; string interpolation; and `select`/`is` pattern matching.
+
+### Fixed
+
+- **`docs/ja/GENERICS_DESIGN.md` linked to two anchors that MkDocs could
+  never generate.** Its cross-references to `reference/specification.md#ジェネリクス`
+  and `guide/classes-and-objects.md#ジェネリッククラス` relied on MkDocs
+  slugifying Japanese heading text, but the slugifier can't build a stable
+  slug from it and falls back to positional ids (`#_6`, `#_9`) instead —
+  confirmed broken via `mkdocs build --strict`. The two target headings now
+  carry explicit `attr_list` ids (`#generics`, `#generic-classes`, mirroring
+  the English page's slugs) and the links point at those.
+
+## [0.10.34] - 2026-08-14
+
+### Fixed
+
+- **`extension List[Int]` and `extension List[String]` (or any two primitive-extension
+  blocks differing only in type argument) in the same file collided as duplicate class
+  definitions (E0008).** `TypingHeaderPass.extractTypeName` / `extractTypeDescName`
+  discarded the type-argument list from `ParameterizedType` when generating the
+  extension container class name, so both produced `Extension$List`. Now the
+  type-argument names are folded into the generated name (`Extension$List_Int` vs
+  `Extension$List_String`).
+- **`select` with an empty `else:` body silently re-executed the preceding
+  `case` branch's body instead of doing nothing.** In the JavaCC
+  `select_expression()` production the shared accumulator `ss` was
+  initialized to `null` and reassigned per `case`; an empty `else:` skipped
+  the optional `[ss=block_elements()]` assignment, so `ss` still held the
+  last `case` branch's statement list and the generated `elseBlock` was a
+  copy of it. Reset `ss` to an empty list immediately before the optional
+  assignment (mirroring the existing pattern in `block()`), so an empty
+  `else:` now correctly executes nothing.
+
+### Added
+
+- **`run/HospitalWard.on`, a 261-line hospital patient-ward management sample.**
+  Exercises case-enum ADTs, a data-carrying homogeneous enum, records with body
+  methods, extension methods on `Int`/`Double`, collection pipelines
+  (`groupBy`/`sortedBy`/`filter`/`fold`/`partition`/`find`), foreach
+  map-destructuring, nullable find with a null guard, closures, and recursion.
+- **`run/RecipeVault.on`, a recipe-management sample.** Exercises ADT enums,
+  records, collection pipelines, closures, do-notation, and nullable fields.
+- **`run/MiniTypeChecker.on`, a 489-line bidirectional type checker for a small
+  lambda calculus.** Exercises self-referential ADT enums (`Ty`, `Expr`),
+  records, a `HashMap`-backed functional-update environment, extension
+  methods on `Int`/`String`, `select` + type-pattern dispatch, and a
+  39-case self-checking test runner.
+- **`run/SupplyChain.on`, a 338-line purchase-order monitoring sample.**
+  Exercises data-carrying and ADT case-enums, records with body methods,
+  extension methods on `Int`/`String`/`Double`, and a broad collection
+  pipeline (`groupBy`/`sortedBy`/`distinct`/`partition`/`zip`/`flatMap`).
+
 ## [0.10.33] - 2026-08-13
 
 ### Documentation

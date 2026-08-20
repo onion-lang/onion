@@ -1,0 +1,79 @@
+// Regression coverage for `try`/`catch` used in less-common expression
+// positions: a `select` scrutinee, a `select` case guard, a `while`
+// condition, a `foreach` iterable, a record constructor argument, an
+// `is`/`as` target, a compound-assignment right-hand side, a string
+// interpolation segment, and a closure that reassigns a loop-scoped
+// captured `var` from a `try`/`catch`. None of these individually push a
+// prior operand across the try's protected region the way the array-index,
+// binary-operand, or field/local-assignment positions do (see #669, #745,
+// #752 and friends), so they are not expected to trip the historical
+// `[I0000] Inconsistent stackmap frames` crash -- this sample locks that in
+// as one combined integration check rather than leaving it implicit.
+record Pair(a: Int, b: Int)
+
+class TryCatchEdgeCases {
+public:
+  static def main(args: String[]): Int {
+    var total: Int = 0
+
+    // try/catch as a select expression's scrutinee
+    val sel: Int = select try { 1 } catch e: Exception { 2 } {
+      case 1: 10
+      else: 20
+    }
+    total = total + sel
+
+    // try/catch inside a select case guard
+    val n: Int = 1
+    select n {
+      case x when (try { x } catch e: Exception { 0 }) > 0: total = total + 100
+      else: total = total - 1
+    }
+
+    // try/catch as the foreach iterable expression
+    val lst: List[Int] = try { [1, 2, 3] } catch e: Exception { [] }
+    foreach i: Int in lst {
+      total = total + i
+    }
+
+    // try/catch as a while condition
+    var i2: Int = 0
+    while (try { i2 < 2 } catch e: Exception { false }) {
+      i2 = i2 + 1
+    }
+    total = total + i2
+
+    // try/catch as a record constructor argument
+    val p: Pair = new Pair(1, try { 5 } catch e: Exception { 6 })
+    total = total + p.a() + p.b()
+
+    // try/catch as an is/as target
+    val obj: Object = try { "str" as Object } catch e: Exception { null }
+    if obj is String {
+      total = total + (obj as String).length
+    }
+
+    // try/catch as a compound-assignment right-hand side
+    var acc: Int = 1
+    acc += try { 4 } catch e: Exception { 0 }
+    total = total + acc
+
+    // try/catch inside string interpolation
+    val s: String = "v=#{try { 7 } catch e: Exception { 8 }}"
+    total = total + s.length
+
+    // a closure that reassigns a per-iteration captured var via try/catch
+    val results = new java.util.ArrayList[Int]()
+    for var k: Int = 0; k < 3; k++ {
+      var localSum: Int = k
+      val bump: () -> Int = () -> {
+        localSum = try { localSum + 1 } catch e: Exception { localSum }
+        return localSum
+      }
+      results.add(bump())
+    }
+    total = total + results.size
+
+    return total
+  }
+}

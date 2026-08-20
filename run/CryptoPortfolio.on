@@ -1,0 +1,331 @@
+// CryptoPortfolio.on — cryptocurrency portfolio tracker
+// Exercises records, data-carrying enums, classes, generics,
+// collection pipelines, select, nullable, closures,
+// string interpolation, try/catch, recursion, foreach/while.
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum TxType(label: String) {
+  BUY("buy"), SELL("sell"), RECEIVE("receive"), SEND("send")
+}
+
+enum RiskLevel(score: Int) {
+  LOW(1), MEDIUM(5), HIGH(9)
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record Coin(symbol: String, name: String, price: Double, change24h: Double, riskLevel: RiskLevel)
+
+record Transaction(coin: Coin, txType: TxType, amount: Double, priceAtTx: Double, note: String)
+
+record Holding(coin: Coin, totalAmount: Double, avgCost: Double) {
+public:
+  def currentValue(): Double = coin().price() * totalAmount()
+  def totalCostBasis(): Double = avgCost() * totalAmount()
+  def pnl(): Double = currentValue() - totalCostBasis()
+  def pnlPct(): Double {
+    if avgCost() == 0.0 { return 0.0 }
+    return (pnl() / totalCostBasis()) * 100.0
+  }
+}
+
+// ── Market data ────────────────────────────────────────────────────────────
+
+val btc  = new Coin("BTC",  "Bitcoin",   45000.0,  2.4,  RiskLevel::MEDIUM)
+val eth  = new Coin("ETH",  "Ethereum",   2800.0,  1.8,  RiskLevel::MEDIUM)
+val sol  = new Coin("SOL",  "Solana",      120.0,  5.3,  RiskLevel::HIGH)
+val ada  = new Coin("ADA",  "Cardano",       0.45, -1.2,  RiskLevel::HIGH)
+val dot  = new Coin("DOT",  "Polkadot",      7.2,  3.1,  RiskLevel::HIGH)
+val link = new Coin("LINK", "Chainlink",    14.8,  0.7,  RiskLevel::MEDIUM)
+
+val allCoins = [btc, eth, sol, ada, dot, link]
+
+// ── Transaction log ────────────────────────────────────────────────────────
+
+val txLog = [
+  new Transaction(btc,  TxType::BUY,     0.5,  38000.0, "initial BTC"),
+  new Transaction(btc,  TxType::BUY,     0.3,  42000.0, "dip buy"),
+  new Transaction(eth,  TxType::BUY,     2.0,   2400.0, "ETH entry"),
+  new Transaction(eth,  TxType::SELL,    0.5,   3100.0, "partial exit"),
+  new Transaction(sol,  TxType::BUY,    10.0,     95.0, "SOL entry"),
+  new Transaction(sol,  TxType::RECEIVE, 5.0,    100.0, "staking reward"),
+  new Transaction(ada,  TxType::BUY,   500.0,      0.35, "ADA bag"),
+  new Transaction(dot,  TxType::BUY,    20.0,      6.0, "DOT stake"),
+  new Transaction(dot,  TxType::SELL,    5.0,      8.5, "profit take"),
+  new Transaction(link, TxType::BUY,    15.0,     12.0, "LINK entry")
+]
+
+println("=== Crypto Portfolio Tracker ===")
+println("Transactions: #{(txLog as List).size}")
+
+// ── Aggregate holdings ─────────────────────────────────────────────────────
+
+val bySymbol = (txLog as List).groupBy { tx -> (tx as Transaction).coin().symbol() }
+
+val holdings: List[Object] = []
+foreach (sym, txsObj) in bySymbol {
+  val txs = txsObj as List
+  val firstCoin = ((txs as List)[0] as Transaction).coin()
+  var totalAmt: Double  = 0.0
+  var totalCost: Double = 0.0
+  var buyQty: Double    = 0.0
+  foreach txObj: Object in txs {
+    val tx = txObj as Transaction
+    select tx.txType() {
+      case TxType::BUY, TxType::RECEIVE:
+        totalAmt  = totalAmt + tx.amount()
+        totalCost = totalCost + tx.amount() * tx.priceAtTx()
+        buyQty    = buyQty + tx.amount()
+      case TxType::SELL, TxType::SEND:
+        totalAmt  = totalAmt - tx.amount()
+    }
+  }
+  val avgCost = if buyQty > 0.0 { totalCost / buyQty } else { 0.0 }
+  holdings.add(new Holding(firstCoin, totalAmt, avgCost))
+}
+
+println("Holdings: #{holdings.size} coins")
+
+// ── Format helpers ─────────────────────────────────────────────────────────
+
+def fmt2(d: Double): String {
+  val scaled = (d * 100.0).intValue()
+  val whole  = scaled / 100
+  val frac   = if scaled % 100 < 0 { 0 - scaled % 100 } else { scaled % 100 }
+  val fracStr = if frac < 10 { "0" + frac } else { "" + frac }
+  return whole + "." + fracStr
+}
+
+def fmtPct(d: Double): String {
+  val sign = if d >= 0.0 { "+" } else { "" }
+  return sign + fmt2(d) + "%"
+}
+
+def fmtUsd(d: Double): String = "$" + fmt2(d)
+
+// ── Holdings report ────────────────────────────────────────────────────────
+
+println("")
+println("╔══════════════════════════════════════════════════════════════╗")
+println("║  Holdings Summary                                            ║")
+println("╠══════════════════════════════════════════════════════════════╣")
+
+val sorted = holdings.sortedBy { h -> 0.0 - (h as Holding).currentValue() }
+foreach hObj: Object in sorted {
+  val h = hObj as Holding
+  val sym  = h.coin().symbol()
+  val name = h.coin().name()
+  val val_ = h.currentValue()
+  val pnl  = h.pnl()
+  val pct  = h.pnlPct()
+  println("║  #{sym} (#{name})")
+  println("║    Amount: #{fmt2(h.totalAmount())}   Avg Cost: #{fmtUsd(h.avgCost())}")
+  println("║    Value:  #{fmtUsd(val_)}   PnL: #{fmtUsd(pnl)} (#{fmtPct(pct)})")
+  println("║    Risk: #{h.coin().riskLevel().name()}  24h: #{fmtPct(h.coin().change24h())}")
+  println("╠══════════════════════════════════════════════════════════════╣")
+}
+
+// ── Portfolio totals ───────────────────────────────────────────────────────
+
+var totalValue: Double = 0.0
+var totalCost: Double  = 0.0
+foreach hObj: Object in holdings {
+  val h = hObj as Holding
+  totalValue = totalValue + h.currentValue()
+  totalCost  = totalCost  + h.totalCostBasis()
+}
+val totalPnl    = totalValue - totalCost
+val totalPnlPct = if totalCost > 0.0 { (totalPnl / totalCost) * 100.0 } else { 0.0 }
+
+println("║  TOTAL  Value: #{fmtUsd(totalValue)}  Cost: #{fmtUsd(totalCost)}  PnL: #{fmtUsd(totalPnl)} (#{fmtPct(totalPnlPct)})")
+println("╚══════════════════════════════════════════════════════════════╝")
+
+// ── Best / worst performer ─────────────────────────────────────────────────
+
+val bestH = sorted.find { h -> (h as Holding).pnlPct() == sorted.map { x -> (x as Holding).pnlPct() }.fold(0.0) { acc, v -> if (v as Double) > (acc as Double) { v } else { acc } } }
+val worstH = holdings.sortedBy { h -> (h as Holding).pnlPct() }.find { h -> true }
+
+println("")
+if bestH != null {
+  val b = bestH as Holding
+  println("Best performer:  #{b.coin().symbol()} at #{fmtPct(b.pnlPct())}")
+}
+if worstH != null {
+  val w = worstH as Holding
+  println("Worst performer: #{w.coin().symbol()} at #{fmtPct(w.pnlPct())}")
+}
+
+// ── Risk exposure by level ─────────────────────────────────────────────────
+
+println("")
+println("--- Risk Exposure ---")
+val byRisk = holdings.groupBy { h -> (h as Holding).coin().riskLevel().name() }
+foreach (riskName, riskHoldings) in byRisk {
+  var riskValue: Double = 0.0
+  foreach rh: Object in riskHoldings as List {
+    riskValue = riskValue + (rh as Holding).currentValue()
+  }
+  val pct = if totalValue > 0.0 { (riskValue / totalValue) * 100.0 } else { 0.0 }
+  println("  #{riskName}: #{fmtUsd(riskValue)} (#{fmtPct(pct)} of portfolio)")
+}
+
+// ── Transaction summary ────────────────────────────────────────────────────
+
+println("")
+println("--- Transaction Summary ---")
+val buys    = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::BUY }
+val sells   = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::SELL }
+val rewards = (txLog as List).filter { tx -> (tx as Transaction).txType() == TxType::RECEIVE }
+
+val totalBuyValue  = buys.fold(0.0) { acc, tx -> (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
+val totalSellValue = sells.fold(0.0) { acc, tx -> (acc as Double) + (tx as Transaction).amount() * (tx as Transaction).priceAtTx() }
+
+println("  Buys:    #{buys.size} transactions, #{fmtUsd(totalBuyValue as Double)}")
+println("  Sells:   #{sells.size} transactions, #{fmtUsd(totalSellValue as Double)}")
+println("  Rewards: #{rewards.size} transactions")
+
+// ── Distinct coins in transaction history ──────────────────────────────────
+
+val distinctSymbols = (txLog as List).map { tx -> (tx as Transaction).coin().symbol() }.distinct()
+println("  Coins traded: #{distinctSymbols.toString()}")
+
+// ── Coins with 24h gain (closure stored in val) ────────────────────────────
+
+val isGainer = (c: Coin) -> c.change24h() > 0.0
+val gainers  = (allCoins as List).filter { c -> isGainer(c as Coin) }.map { c -> (c as Coin).symbol() }
+val losers   = (allCoins as List).filter { c -> !(isGainer(c as Coin)) }.map { c -> (c as Coin).symbol() }
+println("")
+println("24h Gainers: #{gainers.toString()}")
+println("24h Losers:  #{losers.toString()}")
+
+// ── Compound-growth projection (recursion) ─────────────────────────────────
+
+def project(value: Double, annualRate: Double, years: Int): Double {
+  if years <= 0 { return value }
+  return project(value * (1.0 + annualRate), annualRate, years - 1)
+}
+
+println("")
+println("--- 5-Year Projection (12% annual) ---")
+val proj = project(totalValue, 0.12, 5)
+println("  Current:    #{fmtUsd(totalValue)}")
+println("  Projected:  #{fmtUsd(proj)}")
+println("  Growth:     #{fmtUsd(proj - totalValue)}")
+
+// ── Safe division helper (try/catch) ──────────────────────────────────────
+
+def safeRatio(a: Double, b: Double): Double {
+  try {
+    if b == 0.0 { throw new Exception("division by zero") }
+    return a / b
+  } catch e: Exception {
+    return 0.0
+  }
+}
+
+val costCoverage = safeRatio(totalValue, totalCost)
+println("")
+println("Portfolio coverage ratio: #{fmt2(costCoverage)}x")
+
+// ── While loop: simulate monthly DCA top-up ───────────────────────────────
+
+println("")
+println("--- DCA Simulation (6 months, $200/month into BTC) ---")
+var dcaValue: Double = totalValue
+var month = 0
+val dcaAmount = 200.0
+while month < 6 {
+  dcaValue = dcaValue + dcaAmount
+  month = month + 1
+  if month == 3 || month == 6 {
+    println("  Month #{month}: portfolio #{fmtUsd(dcaValue)}")
+  }
+}
+println("  DCA added: #{fmtUsd(dcaAmount * 6.0)}")
+
+// ── Interface + class hierarchy ────────────────────────────────────────────
+
+interface Analyzer {
+  def analyze(h: Holding): String
+}
+
+class TrendAnalyzer conforms Analyzer {
+public:
+  def analyze(h: Holding): String {
+    val pct = h.pnlPct()
+    return select pct {
+      case p when (p as Double) > 20.0: "STRONG BUY - excellent gain"
+      case p when (p as Double) > 5.0:  "BUY - positive momentum"
+      case p when (p as Double) > 0.0:  "HOLD - slight gain"
+      else:                              "WATCH - underperforming"
+    }
+  }
+}
+
+class RiskAnalyzer conforms Analyzer {
+  val threshold: Double
+public:
+  def this(t: Double) { this.threshold = t }
+  def analyze(h: Holding): String {
+    val risk = h.coin().riskLevel().score()
+    val val_ = h.currentValue()
+    val pct  = if totalValue > 0.0 { (val_ / totalValue) * 100.0 } else { 0.0 }
+    if risk >= 9 && pct > threshold {
+      return "OVERWEIGHT high-risk asset (#{fmtPct(pct)} of portfolio)"
+    }
+    return "OK (#{fmtPct(pct)} of portfolio)"
+  }
+}
+
+println("")
+println("--- Analyst Recommendations ---")
+val trend = new TrendAnalyzer()
+val risk  = new RiskAnalyzer(25.0)
+val analyzers: List[Object] = [trend, risk]
+
+foreach hObj: Object in sorted {
+  val h   = hObj as Holding
+  val sym = h.coin().symbol()
+  println("  #{sym}:")
+  foreach aObj: Object in analyzers {
+    val a = aObj as Analyzer
+    println("    #{a.analyze(h)}")
+  }
+}
+
+// ── Extension methods on String ────────────────────────────────────────────
+
+extension String {
+  def pad(width: Int): String {
+    var s = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def center(width: Int): String {
+    val spaces = width - self.length()
+    val left   = spaces / 2
+    var r      = ""
+    var i      = 0
+    while i < left { r = r + " "; i = i + 1 }
+    r = r + self
+    while r.length() < width { r = r + " " }
+    return r
+  }
+}
+
+// ── Allocation table (uses pad extension) ─────────────────────────────────
+
+println("")
+println("--- Allocation Table ---")
+println("  " + "Symbol".pad(8) + "Value".pad(12) + "Weight")
+foreach hObj: Object in sorted {
+  val h   = hObj as Holding
+  val sym = h.coin().symbol().pad(8)
+  val v   = fmtUsd(h.currentValue()).pad(12)
+  val w   = fmtPct(if totalValue > 0.0 { (h.currentValue() / totalValue) * 100.0 } else { 0.0 })
+  println("  " + sym + v + w)
+}
+
+println("")
+println("=== Report complete ===")

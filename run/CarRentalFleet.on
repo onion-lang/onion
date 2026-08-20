@@ -103,7 +103,7 @@ IO::println("Total rentals: " + rentals.size)
 IO::println("")
 
 // ── Total revenue (fold) ──────────────────────────────────────────────────────
-val totalRevenue = rentals.fold(0) { acc, r =>
+val totalRevenue = rentals.fold(0) { acc, r ->
   (acc as Int) + rentalRevenue(r as Rental)
 } as Int
 IO::println("Total revenue: " + fmtYen(totalRevenue))
@@ -115,9 +115,9 @@ IO::println(padRight("Category", 12) + padLeft("Count", 7) + padLeft("Revenue", 
 IO::println("-".repeat(34))
 val categoryNames = ["Economy", "SUV", "Luxury"]
 foreach catName: String in categoryNames {
-  val catR = rentals.filter { r => categoryName((r as Rental).category()) == catName }
+  val catR = rentals.filter { r -> categoryName((r as Rental).category()) == catName }
   val cnt = catR.size
-  val rev = catR.fold(0) { acc, r => (acc as Int) + rentalRevenue(r as Rental) } as Int
+  val rev = catR.fold(0) { acc, r -> (acc as Int) + rentalRevenue(r as Rental) } as Int
   IO::println(padRight(catName, 12) + padLeft("" + cnt, 7) + padLeft(fmtYen(rev), 14))
 }
 IO::println("")
@@ -128,14 +128,14 @@ IO::println(padRight("Vehicle", 14) + padRight("Category", 10) + padLeft("Count"
 IO::println("-".repeat(46))
 val fleet = [corolla, civic, rav4, cx5, es]
 val fleetCats = ["Economy", "Economy", "SUV", "SUV", "Luxury"]
-val vehicleStats = fleet.map { v =>
+val vehicleStats = fleet.map { v ->
   val vh = v as Vehicle
-  val vr = rentals.filter { r => (r as Rental).vehicle().plate() == vh.plate() }
-  val rev = vr.fold(0) { acc, r => (acc as Int) + rentalRevenue(r as Rental) } as Int
+  val vr = rentals.filter { r -> (r as Rental).vehicle().plate() == vh.plate() }
+  val rev = vr.fold(0) { acc, r -> (acc as Int) + rentalRevenue(r as Rental) } as Int
   val cat = categoryName((vr[0] as Rental).category())
   new VehicleStat(vh.model(), cat, vr.size, rev)
 }
-val sortedByRev = vehicleStats.sortedBy { vs => 0 - (vs as VehicleStat).revenue() }
+val sortedByRev = vehicleStats.sortedBy { vs -> 0 - (vs as VehicleStat).revenue() }
 foreach i: Int in 1..5 {
   val vs = sortedByRev[i - 1] as VehicleStat
   IO::println(
@@ -149,7 +149,7 @@ IO::println("")
 
 // ── Rentals by make (groupBy + foreach on map entries) ────────────────────────
 IO::println("── Rentals by Make ─────────────────────────────────")
-val byMake = rentals.groupBy { r => (r as Rental).vehicle().make() }
+val byMake = rentals.groupBy { r -> (r as Rental).vehicle().make() }
 foreach (make, grp) in byMake {
   val cnt = (grp as List).size
   var bar = ""
@@ -160,7 +160,7 @@ IO::println("")
 
 // ── Long-term rentals (filter by ADT pattern + foreach) ────────────────────────
 IO::println("── Long-Term Rentals (5+ days) ─────────────────────")
-val longTermRentals = rentals.filter { r => (r as Rental).days() >= 5 }
+val longTermRentals = rentals.filter { r -> (r as Rental).days() >= 5 }
 foreach lr: Rental in longTermRentals {
   val rev = rentalRevenue(lr)
   IO::println("  " + lr.customer() + " — " + lr.vehicle().model() + " (" + lr.days() + " days, " + fmtYen(rev) + ")")
@@ -168,7 +168,7 @@ foreach lr: Rental in longTermRentals {
 IO::println("")
 
 // ── Partition: high-value vs budget rentals ────────────────────────────────────
-val parts     = rentals.partition { r => rentalRevenue(r as Rental) >= 15000 }
+val parts     = rentals.partition { r -> rentalRevenue(r as Rental) >= 15000 }
 val highValue = parts[0] as List[Object]
 val budget    = parts[1] as List[Object]
 IO::println("Rentals >= 15000 yen: " + highValue.size)
@@ -176,13 +176,13 @@ IO::println("Rentals <  15000 yen: " + budget.size)
 IO::println("")
 
 // ── Distinct customers seen (distinct) ─────────────────────────────────────────
-val seenCustomers = rentals.map { r => (r as Rental).customer() }.distinct()
+val seenCustomers = rentals.map { r -> (r as Rental).customer() }.distinct()
 IO::println("Distinct customers: " + seenCustomers.size)
 IO::println("")
 
 // ── Vehicles ranked by daily rate (sortedBy + indexed foreach) ────────────────
 IO::println("── Vehicles by Daily Rate ──────────────────────────")
-val sortedByRate = fleet.sortedBy { v => 0 - (v as Vehicle).dailyRate() }
+val sortedByRate = fleet.sortedBy { v -> 0 - (v as Vehicle).dailyRate() }
 foreach i: Int in 1..5 {
   val v = sortedByRate[i - 1] as Vehicle
   IO::println("  #{i}. #{v.model()} — #{fmtYen(v.dailyRate())}/day")

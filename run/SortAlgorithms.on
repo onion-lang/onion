@@ -278,7 +278,7 @@ foreach tc: Object in testCases {
   IO::println("\n── Test: #{t.label()} ──")
   IO::println("  Input: #{arrToStr(t.data())}")
 
-  val allStats = sorters.map { s =>
+  val allStats = sorters.map { s ->
     val sorter = s as Sorter
     val copy = copyArr(t.data())
     val st = sorter.sort(copy)
@@ -288,12 +288,12 @@ foreach tc: Object in testCases {
     st
   }
 
-  val ranked = allStats.sortedBy { x => (x as SortStats).comparisons() }
+  val ranked = allStats.sortedBy { x -> (x as SortStats).comparisons() }
   foreach r: Object in ranked {
     IO::println((r as SortStats).summary())
   }
 
-  val winner: SortStats? = ranked.find { x => true } as SortStats?
+  val winner: SortStats? = ranked.find { x -> true } as SortStats?
   if winner != null {
     IO::println("  Winner: #{winner.algorithm()} (#{winner.comparisons()} cmps)")
   }
@@ -307,8 +307,8 @@ foreach s: Object in sorters {
   IO::println("  #{sorter.family().display()}")
 }
 
-val efficientCount = sorters.filter { s => (s as Sorter).family().efficient() }.size
-val quadraticCount = sorters.filter { s => !(s as Sorter).family().efficient() }.size
+val efficientCount = sorters.filter { s -> (s as Sorter).family().efficient() }.size
+val quadraticCount = sorters.filter { s -> !(s as Sorter).family().efficient() }.size
 IO::println("\nEfficient (sub-quadratic): #{efficientCount}")
 IO::println("Quadratic: #{quadraticCount}")
 
@@ -339,7 +339,7 @@ foreach sz: Int in [10, 20, 30, 40, 50] {
 // ── Fold: total merge-sort comparisons across all test cases ──────────────────
 
 IO::println("\n── Total merge-sort comparisons across test cases ──")
-val totalCmps = testCases.fold(0) { acc, tc =>
+val totalCmps = testCases.fold(0) { acc, tc ->
   val t = tc as TestCase
   val copy = copyArr(t.data())
   val st = new MergeSorter().sort(copy)
@@ -352,10 +352,10 @@ IO::println("  Total: #{totalCmps}")
 def sizeBucket(n: Int): String =
   if n <= 5 { "tiny" } else if n <= 15 { "small" } else { "medium" }
 
-val byBucket = testCases.groupBy { tc => sizeBucket((tc as TestCase).data().length) }
+val byBucket = testCases.groupBy { tc -> sizeBucket((tc as TestCase).data().length) }
 IO::println("\n── Test cases by size bucket ──")
 foreach (bucket, group) in byBucket {
-  val names = (group as List).map { tc => (tc as TestCase).label() }
+  val names = (group as List).map { tc -> (tc as TestCase).label() }
   IO::println("  #{bucket}: #{names.toString()}")
 }
 

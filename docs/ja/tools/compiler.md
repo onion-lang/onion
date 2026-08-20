@@ -141,6 +141,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0013` | `suspicious-interpolation` | 疑わしい文字列補間構文 |
 | `W0014` | `discarded-toplevel` | main が定義されているためトップレベル文が無視された |
 | `W0015` | `platform-unboxing` | ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた |
+| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` が付与されているが、その相互再帰グループを最適化できなかった |
 
 ### `--no-check-laws`
 
@@ -171,6 +172,22 @@ onionc --law-seed 7 MyProgram.on
 ```bash
 onionc --effects MyProgram.on
 ```
+
+### `-g:none`
+
+生成するクラスファイルから LocalVariableTable を省きます。
+
+これが無くても JVM デバッガは `.on` のソースをステップ実行できます（行番号は常に出力されます）が、
+**変数の値が一切表示されません**。値を見られないステップ実行はほとんど用をなしません。テーブルは
+既定で出力され、メソッドあたり数バイトのコストです。クラスファイルを小さくしたい場合の逃げ道が
+このオプションです。
+
+```bash
+onionc -g:none MyProgram.on
+```
+
+`onion` でスクリプトを実行する場合は常にテーブルを出力します。スクリプトはメモリ上で
+コンパイルされ、小さく保つべき成果物が存在しないためです。
 
 ## 例
 

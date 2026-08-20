@@ -28,3 +28,9 @@ target/
 
 # MkDocs
 site/
+
+# Python build artifacts (tools/pygments-onion)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/

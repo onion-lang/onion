@@ -161,6 +161,11 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Http` - HTTP client
 - `Regex` - Regular expressions
 - `Option`, `Result`, `Future` - Functional types
+- `Db` - JDBC access (connect, query, update, transactions)
+- `Archive` - Zip/gzip creation and extraction
+- `Concurrent` - Thread pools, counters, locks, channels
+- `Net` - TCP sockets (connect, listen)
+- `Server` - Minimal HTTP server (routing, request/response)
 
 ## Testing
 
@@ -170,7 +175,22 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 
 **Base Class:** Tests extend `AbstractShellSpec` for integration testing
 
-**Locale-independence (IMPORTANT):** error messages are bilingual (`errorMessage.properties` / `errorMessage_ja.properties`), resolved from the JVM default locale. The release CI runs in an **English** locale while local dev is often `ja_JP`. Assert on error **codes** (`E0002`, `E0069`), `Shell.Failure(-1)`, or locale-agnostic substrings — never on localized message text like `"重複"` alone, or the test passes locally but fails only in CI. Run `sbt -Duser.language=en test` before release to catch this.
+**Locale-independence (IMPORTANT):** error messages are bilingual (`errorMessage.properties` / `errorMessage_ja.properties`), resolved from the JVM default locale. The release CI runs in an **English** locale while local dev is often `ja_JP`. Assert on error **codes** (`E0002`, `E0069`), `Shell.Failure(-1)`, or locale-agnostic substrings — never on localized message text like `"重複"` alone, or the test passes locally but fails only in CI.
+
+**Running the suite (sbt 2.0.6 — two traps):**
+
+```bash
+sbt shutdown && sbt -Duser.language=en testFull    # then repeat with =ja
+```
+
+1. **`test` is incremental.** In sbt 2 it delegates to `testQuick`, so a second run with no
+   source change reports `No tests to run` and exits 0. Use `testFull` to actually run everything.
+2. **`-D` only reaches a *fresh* server.** The sbt server persists between invocations, so
+   passing `-Duser.language=ja` to a server already started under `en` silently does nothing
+   (`java.util.Locale.getDefault()` still reports the old one). `sbt shutdown` first.
+
+CI is unaffected by both: the incremental state lives in `target/`, which `setup-java`'s
+`cache: 'sbt'` does not cache, so every CI run starts cold and runs the full suite.
 
 **Test Suites:**
 - `HelloWorldSpec.scala` - Basic output
@@ -280,8 +300,8 @@ val f: Function1[Int, Int] = (x: Int) -> x * 2
 val g = (x, y) -> x + y
 
 // Trailing lambda syntax
-list.map { x => x * 2 }
-list.filter { x => x > 0 }
+list.map { x -> x * 2 }
+list.filter { x -> x > 0 }
 
 // Method reference (static)
 Type::methodName
@@ -326,7 +346,7 @@ val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED; null on
 val rows: List = Access::parseAll(logText)                  // per-line parse, nulls dropped
 
 // |> pipeline: e |> f is f(e); e |> f(a) is f(e, a); newline before |> continues
-xs.map { x => x * 2 } |> println
+xs.map { x -> x * 2 } |> println
 
 // auto-CLI: argument parsing derived from the top-level main signature
 def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
@@ -471,7 +491,7 @@ These are frequently confused with other languages. **Always check these:**
 | lambda as `Runnable`/`Comparator` | ✓ correct - SAM conversion to Java functional interfaces |
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
-| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - paren-less trailing lambda with `=>` |
+| `list.map { x => x * 2 }` | `list.map { x -> x * 2 }` - the trailing-lambda arrow is `->` too; `=>` is not part of the language (one arrow everywhere: function types, `(x) -> e`, `{ x -> e }`) |
 | `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable/arrays have builtin extension pipelines |
 
 ### Method Calls
@@ -498,7 +518,7 @@ These are frequently confused with other languages. **Always check these:**
 | bare `readText(p)` / `get(url)` / `now()` / `exit(1)` | **No longer resolve** — default static imports were narrowed to pure classes. Qualify (`Files::readText`) or import explicitly: `import { onion.Files::*; java.lang.System::exit }`. Bare `println` still works (`onion.IO` is the one exception) |
 | a CLI function with hand-rolled arg parsing | `tool name(args) [: T] [requires { caps }] { body }` — a top-level tool; a script whose top level declares tools (and has no `main`) IS a CLI: `--help`, `--contract` (machine-readable JSON), `--plan` (dry run showing bound effects, executing nothing) all derive from the declaration |
 | undeclared side effects in a tool | E0077 at the call site — the body's effects are inferred transitively and checked against `requires { read(src), write(dst), console, unknown }`. Overclaiming is E0078; a bad capability is E0079. An unlisted Java call is `unknown` and must be admitted explicitly |
-| `shape doc = json` when you need comments preserved | `shape doc = config` — a LOSSLESS shape over commented `key = value` files: `parseLossless` keeps a `Residue` (comments, spacing, key order, unknown keys, value spellings), `r.edit { v => v.copy(port = 9090) }.render()` rewrites exactly one value slot |
+| `shape doc = json` when you need comments preserved | `shape doc = config` — a LOSSLESS shape over commented `key = value` files: `parseLossless` keeps a `Residue` (comments, spacing, key order, unknown keys, value spellings), `r.edit { v -> v.copy(port = 9090) }.render()` rewrites exactly one value slot |
 | implementing a custom format ad hoc | `class MyShape conforms Shape[T]` — user-written shapes get the combinators and Outcome/Defect for free, but the file MUST assert a law (`example l1 { s.parse(s.print(v)).get() == v }`) or the class is E0080 |
 | a law only checkable inside a record | top-level `example [name] { boolExpr }` — runs at build time like a record example; false claim is E0065 |
 | `--effects` unknown | `onionc --effects` / `onion --effects file.on` prints every method's inferred effect set (`read write net exec env clock rand console unknown`; empty = `pure`) |

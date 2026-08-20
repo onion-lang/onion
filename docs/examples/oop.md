@@ -53,13 +53,8 @@ protected:
     def speak: String = this.name + " makes a sound"
 }
 
-class Dog extends Animal {
-  val breed: String
-
+class Dog(n: String, val breed: String) extends Animal(n) {
   public:
-    def this(n: String, b: String): (n) {
-      this.breed = b
-    }
 
     def speak: String = this.name + " barks: Woof!"
 

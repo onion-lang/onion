@@ -1,13 +1,22 @@
 # Onion Language for VS Code
 
-Language support for the [Onion programming language](https://github.com/kmizu/onion).
+Language support for the [Onion programming language](https://github.com/onion-lang/onion).
 
 ## Features
 
-- **Syntax Highlighting** — Full TextMate-based highlighting for Onion source
-  files (`.on`): keywords, types, strings with `#{}` interpolation, numbers,
-  operators (including `as`, `?.`, `?:`, `!!`, ranges), `select`/`case
-  is`/`when`, `do`/`ret` notation, records, enums, and more.
+- **Syntax Highlighting** — TextMate-based highlighting for Onion source files
+  (`.on`): keywords, types, strings with `#{}` interpolation, numbers,
+  operators (including `as`, `?.`, `?:`, `!!`, `|>`, ranges), `select`/`case
+  is`/`when`, `do`/`ret` notation, records, enums, traits and instances,
+  backtick-quoted identifiers, and scheme-prefixed raw literals (`re"…"`,
+  `file"…"`, `http"…"`, and any prefix you define) — with `re"…"` bodies
+  highlighted as regular expressions.
+
+  Soft keywords (`tool`, `requires`, `shape`, `law`, `example`, `from`,
+  `derive`) are recognised only where the compiler treats them as keywords, so
+  a variable named `shape` stays a variable. The keyword set is checked against
+  the compiler's own grammar on every build, so this list cannot silently fall
+  behind the language.
 - **Editor Configuration** — Comment toggling, bracket matching, auto-closing
   pairs, and indentation rules.
 

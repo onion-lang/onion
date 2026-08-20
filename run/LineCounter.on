@@ -21,7 +21,7 @@ public:
       if myFile.isDirectory {
         process(myFile, callback);
       } else {
-        callback.call(myFile);
+        callback(myFile);
       }
     }
   }

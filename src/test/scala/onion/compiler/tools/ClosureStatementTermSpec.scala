@@ -17,7 +17,7 @@ class ClosureStatementTermSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val list: List[String] = ["hello", "world", "hi", "there"]
-          |    val grouped: Map[String, List[String]] = list.groupBy { s =>
+          |    val grouped: Map[String, List[String]] = list.groupBy { s ->
           |      val x = s
           |      if x != null { x } else { "??" }
           |    }

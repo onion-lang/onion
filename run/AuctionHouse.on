@@ -191,15 +191,15 @@ public:
   }
 
   def openLots(): List[Lot] {
-    return lots.filter { l => (l as Lot).isOpen() }
+    return lots.filter { l -> (l as Lot).isOpen() }
   }
 
   def soldLots(): List[Lot] {
-    return lots.filter { l => (l as Lot).isSold() }
+    return lots.filter { l -> (l as Lot).isSold() }
   }
 
   def lotsByCategory(cat: Category): List[Lot] {
-    return lots.filter { l => (l as Lot).getCategory() == cat }
+    return lots.filter { l -> (l as Lot).getCategory() == cat }
   }
 
   def totalRevenue(): Int {
@@ -306,13 +306,13 @@ val revenue = house.totalRevenue()
 IO::println("Total revenue: " + revenue.currency())
 
 IO::println("\n=== Lots by Category ===")
-val byCategory = house.lots.groupBy { l => "" + (l as Lot).getCategory() }
+val byCategory = house.lots.groupBy { l -> "" + (l as Lot).getCategory() }
 foreach (cat, catLots) in byCategory {
   IO::println("  " + cat + ": " + (catLots as List).size + " lot(s)")
 }
 
 IO::println("\n=== Top Bids (sorted descending) ===")
-val allBids = house.allBids().sortedBy { b => 0 - (b as Bid).amount() }
+val allBids = house.allBids().sortedBy { b -> 0 - (b as Bid).amount() }
 var shown: Int = 0
 foreach b: Object in allBids {
   if shown >= 5 { break }
@@ -341,7 +341,7 @@ IO::println("\nTotal bids placed across all lots: " + totalBids)
 
 // Closures stored in vals.
 val isPricey: (Object) -> Boolean = (x: Object) -> (x as Lot).getReserve() >= 2000
-val priceyLots = house.lots.filter { l => isPricey.call(l) }
+val priceyLots = house.lots.filter { l -> isPricey(l) }
 IO::println("Lots with reserve >= $2000: " + priceyLots.size)
 
 // Pipeline: get winning prices and sum them.
@@ -356,7 +356,7 @@ foreach l: Object in house.soldLots() {
   }
 }
 IO::println("Sold prices: " + soldPrices.toString())
-val soldTotal = soldPrices.fold(0) { acc, x => (acc as Int) + (x as Int) }
+val soldTotal = soldPrices.fold(0) { acc, x -> (acc as Int) + (x as Int) }
 IO::println("Confirmed sold total: " + soldTotal.currency())
 
 // String interpolation summary.

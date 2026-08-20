@@ -23,7 +23,7 @@ extension String {
     if self.length() <= n { self } else { self.substring(0, n - 3) + "..." }
   def wordCount(): Int {
     val parts: List[String] = Strings::split(self, " ")
-    return parts.filter { p => (p as String).length() > 0 }.size
+    return parts.filter { p -> (p as String).length() > 0 }.size
   }
 }
 
@@ -164,14 +164,14 @@ public:
     foreach b: Book in books { if b.id() == id { return b } }
     return null
   }
-  def byGenre(g: Genre): List[Book] = books.filter { b => (b as Book).genre() == g }
-  def byAuthor(author: String): List[Book] = books.filter { b => (b as Book).author() == author }
-  def byTitle(): List[Book] = books.sortedBy { b => (b as Book).title() }
-  def byYear(): List[Book] = books.sortedBy { b => (b as Book).year() }
-  def totalCopies(): Int = books.fold(0) { acc, b => (acc as Int) + (b as Book).copies() }
-  def genreMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).genre().label() }
-  def eraMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).era() }
-  def sectionMap(): Map[String, List[Book]] = books.groupBy { b => (b as Book).genre().section() }
+  def byGenre(g: Genre): List[Book] = books.filter { b -> (b as Book).genre() == g }
+  def byAuthor(author: String): List[Book] = books.filter { b -> (b as Book).author() == author }
+  def byTitle(): List[Book] = books.sortedBy { b -> (b as Book).title() }
+  def byYear(): List[Book] = books.sortedBy { b -> (b as Book).year() }
+  def totalCopies(): Int = books.fold(0) { acc, b -> (acc as Int) + (b as Book).copies() }
+  def genreMap(): Map[String, List[Book]] = books.groupBy { b -> (b as Book).genre().label() }
+  def eraMap(): Map[String, List[Book]] = books.groupBy { b -> (b as Book).era() }
+  def sectionMap(): Map[String, List[Book]] = books.groupBy { b -> (b as Book).genre().section() }
 }
 
 // ─── MemberRegistry ──────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ public:
     foreach m: Member in members { if m.id() == id { return m } }
     return null
   }
-  def activeCount(): Int = members.count { m => (m as Member).status().canBorrow() }
+  def activeCount(): Int = members.count { m -> (m as Member).status().canBorrow() }
 }
 
 // ─── LoanDesk ────────────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ public:
     if !mem.canBorrow() {
       return "ERROR: #{mem.name()} cannot borrow (#{mem.status().label()})"
     }
-    val activeCount: Int = loans.count { l =>
+    val activeCount: Int = loans.count { l ->
       val loan = l as Loan
       loan.bookId() == bookId && loan.isActive()
     }
@@ -266,19 +266,19 @@ public:
     }
     return "OK: \"#{title}\" returned on day #{today}"
   }
-  def active(): List[Loan] = loans.filter { l => (l as Loan).isActive() }
-  def overdue(today: Int): List[Loan] = loans.filter { l =>
+  def active(): List[Loan] = loans.filter { l -> (l as Loan).isActive() }
+  def overdue(today: Int): List[Loan] = loans.filter { l ->
     val loan = l as Loan
     loan.isActive() && today > loan.dueDay()
   }
-  def forMember(memberId: Int): List[Loan] = loans.filter { l => (l as Loan).memberId() == memberId }
+  def forMember(memberId: Int): List[Loan] = loans.filter { l -> (l as Loan).memberId() == memberId }
   def memberSummary(memberId: Int, today: Int): LoanSummary? {
     val mem = registry.byId(memberId)
     if mem == null { return null }
     val mLoans = forMember(memberId)
-    val returned: Int  = mLoans.count { l => (l as Loan).status() == LoanStatus::RETURNED }
-    val activeM: Int   = mLoans.count { l => (l as Loan).isActive() }
-    val overdueM: Int  = mLoans.count { l => (l as Loan).daysOverdue(today) > 0 }
+    val returned: Int  = mLoans.count { l -> (l as Loan).status() == LoanStatus::RETURNED }
+    val activeM: Int   = mLoans.count { l -> (l as Loan).isActive() }
+    val overdueM: Int  = mLoans.count { l -> (l as Loan).daysOverdue(today) > 0 }
     return new LoanSummary((mem as Member).name(), mLoans.size, returned, activeM, overdueM)
   }
 }
@@ -306,7 +306,7 @@ public:
     sb << "Active members:    #{registry.activeCount()}"
     sb << "Active loans:      #{desk.active().size}"
     sb << "Overdue loans:     #{desk.overdue(today).size}"
-    return sb.fold("") { acc, s => (acc as String) + (s as String) + "\n" }
+    return sb.fold("") { acc, s -> (acc as String) + (s as String) + "\n" }
   }
 }
 
@@ -465,24 +465,24 @@ IO::println("")
 IO::println("--- Pipeline Demos " + sep(54))
 
 // Partition books by section
-val parts = catalog.all().partition { b => (b as Book).genre().section() == "A" }
+val parts = catalog.all().partition { b -> (b as Book).genre().section() == "A" }
 val fiction  = parts[0] as List[Object]
 val nonFictn = parts[1] as List[Object]
 IO::println("Section A (fiction/mystery/poetry): #{fiction.size} titles")
 IO::println("Section B (all others):             #{nonFictn.size} titles")
 
 // Closure stored in val
-val recent = (cutoff: Int) -> catalog.all().filter { b => (b as Book).year() >= cutoff }
+val recent = (cutoff: Int) -> catalog.all().filter { b -> (b as Book).year() >= cutoff }
 IO::println("Post-2000 titles:   #{recent(2000).size}")
 IO::println("Post-2010 titles:   #{recent(2010).size}")
 
 // any: any science book before 1990?
-val hasClassicSci: Boolean = catalog.byGenre(Genre::SCIENCE).any { b => (b as Book).year() < 1990 }
+val hasClassicSci: Boolean = catalog.byGenre(Genre::SCIENCE).any { b -> (b as Book).year() < 1990 }
 IO::println("Classic science book exists: #{hasClassicSci}")
 
 // fold: total character count of all book titles
-val allTitles = catalog.all().map { b => (b as Book).title() }
-val totalLen: Int = allTitles.fold(0) { acc, s => (acc as Int) + (s as String).length() }
+val allTitles = catalog.all().map { b -> (b as Book).title() }
+val totalLen: Int = allTitles.fold(0) { acc, s -> (acc as Int) + (s as String).length() }
 IO::println("Total chars in all titles: #{totalLen}")
 
 // Recursive helper: count via recursion
@@ -490,13 +490,13 @@ val wordTotal: Int = totalChars(allTitles, 0)
 IO::println("Total chars (recursive):   #{wordTotal}")
 
 // Word count per title via extension
-val multiWordTitles = allTitles.filter { t => (t as String).wordCount() >= 3 }
+val multiWordTitles = allTitles.filter { t -> (t as String).wordCount() >= 3 }
 IO::println("Titles with 3+ words: #{multiWordTitles.size}")
 
 // Zip: pair sorted titles with their years
 val sortedBooks = catalog.byTitle()
-val titleList   = sortedBooks.map { b => (b as Book).title() }
-val yearList    = sortedBooks.map { b => "" + (b as Book).year() }
+val titleList   = sortedBooks.map { b -> (b as Book).title() }
+val yearList    = sortedBooks.map { b -> "" + (b as Book).year() }
 val titleYears  = titleList.zip(yearList)
 IO::println("")
 IO::println("--- Alphabetical Title → Year " + sep(43))
@@ -507,13 +507,13 @@ foreach pair: Object in titleYears {
 IO::println("")
 
 // Double.fmt2 demo
-val avgYear: Double = catalog.all().fold(0) { acc, b => (acc as Int) + (b as Book).year() }.doubleValue() / catalog.all().size.doubleValue()
+val avgYear: Double = catalog.all().fold(0) { acc, b -> (acc as Int) + (b as Book).year() }.doubleValue() / catalog.all().size.doubleValue()
 IO::println("Average publication year: #{avgYear.fmt2()}")
 
 // Technology books sorted by year
 IO::println("")
 IO::println("--- Technology Books (by year) " + sep(42))
-val techBooks = catalog.byGenre(Genre::TECHNOLOGY).sortedBy { b => (b as Book).year() }
+val techBooks = catalog.byGenre(Genre::TECHNOLOGY).sortedBy { b -> (b as Book).year() }
 foreach b: Object in techBooks {
   val bk = b as Book
   IO::println("  #{bk.year()}  #{bk.title()} by #{bk.author()}")

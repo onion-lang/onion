@@ -558,7 +558,10 @@ final class ConstructionTyping(
       }
       unknownNamed match {
         case Some(named) =>
-          bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+          val paramNames = typeRef.constructors.collect {
+            case cd: ConstructorDefinition => cd.argumentsWithDefaults.map(_.name)
+          }.flatten.distinct.toArray
+          bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
         case None =>
           // Type the arguments anyway to provide better error messages
           val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
@@ -667,7 +670,7 @@ final class ConstructionTyping(
           // Find parameter by name
           val paramIndex = paramNames.indexOf(named.name)
           if (paramIndex < 0) {
-            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
             hasError = true
           } else if (filled(paramIndex)) {
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)

@@ -196,18 +196,37 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
 
     if ctor.superInitializer != null then
-      gen.loadThis()
-      var i = 0
-      while i < ctor.superInitializer.terms.length do
-        val arg = ctor.superInitializer.terms(i)
-        emitExpressionWithContext(gen, arg, className, localVars)
-        adaptValueOnStack(gen, arg.`type`, asmType(ctor.superInitializer.arguments(i)))
-        i += 1
+      val superArgTypes = ctor.superInitializer.arguments.map(asmType)
+      if ctor.superInitializer.terms.exists(TermContainsTry.contains) then
+        // `this` is `uninitializedThis` until this super/self-delegation call
+        // completes, and (like visitNewObject's freshly-`new`'d instance) that
+        // special verifier type cannot survive being spilled into a local
+        // across a try/catch merge. So `this` is not loaded until every
+        // argument has been evaluated into a plain local first.
+        val slots = new Array[Int](ctor.superInitializer.terms.length)
+        var i = 0
+        while i < ctor.superInitializer.terms.length do
+          val arg = ctor.superInitializer.terms(i)
+          emitExpressionWithContext(gen, arg, className, localVars)
+          adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
+          val slot = gen.newLocal(superArgTypes(i))
+          gen.storeLocal(slot)
+          slots(i) = slot
+          i += 1
+        gen.loadThis()
+        for slot <- slots do gen.loadLocal(slot)
+      else
+        gen.loadThis()
+        var i = 0
+        while i < ctor.superInitializer.terms.length do
+          val arg = ctor.superInitializer.terms(i)
+          emitExpressionWithContext(gen, arg, className, localVars)
+          adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
+          i += 1
       val targetClass =
         if ctor.superInitializer.selfDelegation then AsmUtil.internalName(ctor.classType.name)
         else if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name)
         else "java/lang/Object"
-      val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
         AsmUtil.objectType(targetClass),
         AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, superArgTypes*))
@@ -288,6 +307,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
     mv.visitEnd()
 
+  /**
+   * Writes the LocalVariableTable, unless `-g:none` asked for a smaller class file.
+   *
+   * Must run before `endMethod`, which is what calls `visitMaxs`; after that the method is
+   * closed and the entries would be dropped on the floor without complaint.
+   */
+  private def emitLocalVariableTable(
+    gen: DebugGeneratorAdapter,
+    localVars: LocalVarContext,
+    methodStart: org.objectweb.asm.Label
+  ): Unit =
+    if config.emitDebugInfo then
+      val methodEnd = gen.mark()
+      for entry <- localVars.declaredLocals do
+        gen.emitLocalVariableEntry(entry.name, entry.descriptor, methodStart, methodEnd, entry.slot)
+
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     var access = toAsmModifier(node.modifier)
     if (node.isVararg) access |= Opcodes.ACC_VARARGS
@@ -299,6 +334,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
 
+    // Bounds for every LocalVariableTable entry. Marked before anything else is emitted,
+    // so the range covers the whole body. Each slot is allocated fresh (newLocal never
+    // reuses one), so whole-method scope cannot describe two variables at once.
+    val methodStart = gen.mark()
+
     // Emit line number for method declaration
     if node.location != null then
       val label = gen.mark()
@@ -306,8 +346,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen)
+      // Names first: withParameters records debug entries as it goes, and would have
+      // nothing to name them with if the frame arrived afterwards.
+      .withNames(node.getFrame)
       .withParameters(isStatic, argTypes)
       .withBoxedVariables(node.getFrame)
+    if !isStatic then localVars.withThis(AsmUtil.objectType(className).getDescriptor)
 
     // TCO: Pre-allocate JVM slots for loop variables before emitting method body
     node.getTcoLoopVars match {
@@ -378,6 +422,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
       gen.returnValue()
+    emitLocalVariableTable(gen, localVars, methodStart)
     try gen.endMethod()
     catch
       case e: Throwable =>
@@ -724,6 +769,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // For frame=0 (current closure's own variables/parameters)
             if ref.frame == 0 && closureCtx.isParameter(ref.index) then
               gen.loadArg(ref.index)
+            else if ref.frame == 0 && closureCtx.isBoxed(ref.index) then
+              // Boxed own local (captured and mutated by a closure nested inside
+              // this one): load box, then get value field, mirroring the
+              // top-level-method boxed-local path below.
+              val boxType = boxAsmType(ref.`type`)
+              val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, boxType))
+              gen.loadLocal(slot)
+              gen.getField(boxType, "value", boxedValueType(ref.`type`))
+              if !ref.`type`.isBasicType then gen.checkCast(asmType(ref.`type`))
             else if ref.frame == 0 then
               val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
               gen.loadLocal(slot)
@@ -750,21 +804,40 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         // Use frameIndex to handle nested closures correctly
         closureCtx.capturedBinding(set.frame, set.index) match
           case Some(binding) if binding.isBoxed =>
-            // Boxed captured variable: load box, compute value, put value into box
-            gen.loadThis()
+            // Boxed captured variable: load box, compute value, put value into box.
+            // If the value may run its own try/catch, the box reference can't stay
+            // on the operand stack across it -- the JVM clears the stack when
+            // dispatching to an exception handler, silently discarding the pending
+            // box reference on the exceptional path (the boxed-local sibling of the
+            // field/array-assignment fix for issue #745/#669).
             val boxType = boxAsmType(binding.tp)
-            gen.getField(
-              AsmUtil.objectType(closureCtx.closureClassName),
-              closureCtx.capturedFieldName(binding),
-              boxType
-            )
-            emitExpressionWithContext(gen, set.value, className, localVars)
             val valueType = boxedValueType(set.`type`)
-            if valueType.getSize() == 2 then
-              gen.dup2X1()
+            if TermContainsTry.contains(set.value) then
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueSlot = gen.newLocal(valueType)
+              gen.storeLocal(valueSlot)
+              gen.loadThis()
+              gen.getField(
+                AsmUtil.objectType(closureCtx.closureClassName),
+                closureCtx.capturedFieldName(binding),
+                boxType
+              )
+              gen.loadLocal(valueSlot)
+              gen.putField(boxType, "value", valueType)
+              gen.loadLocal(valueSlot)
             else
-              gen.dupX1()
-            gen.putField(boxType, "value", valueType)
+              gen.loadThis()
+              gen.getField(
+                AsmUtil.objectType(closureCtx.closureClassName),
+                closureCtx.capturedFieldName(binding),
+                boxType
+              )
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              if valueType.getSize() == 2 then
+                gen.dup2X1()
+              else
+                gen.dupX1()
+              gen.putField(boxType, "value", valueType)
           case Some(binding) =>
             gen.loadThis()
             emitExpressionWithContext(gen, set.value, className, localVars)
@@ -782,12 +855,63 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // For frame=0 (current closure's own variables/parameters)
             if set.frame != 0 then
               throw new IllegalStateException(s"Non-captured variable with frame=${set.frame}, index=${set.index} in closure context")
-            emitExpressionWithContext(gen, set.value, className, localVars)
-            val valueType = asmType(set.`type`)
-            if valueType.getSize() == 2 then gen.dup2() else gen.dup()
+            // Parameters take precedence over the boxed-own-local path below,
+            // mirroring the top-level-method precedence a few lines down
+            // (isParameter is checked before isBoxed there too): a closure's
+            // own parameter slot already holds the raw argument value (from
+            // withParameters), not a box, even when CapturedVariableScanner
+            // marks that index boxed -- e.g. a synthetic type-cast-adaptation
+            // self-assignment the closure-typing prologue inserts for a
+            // generic parameter. Treating that pre-existing slot as an
+            // already-allocated box would read/write through a JVM slot that
+            // actually holds a plain (unboxed) value.
             if closureCtx.isParameter(set.index) then
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueType = asmType(set.`type`)
+              if valueType.getSize() == 2 then gen.dup2() else gen.dup()
               gen.storeArg(set.index)
+            else if closureCtx.isBoxed(set.index) then
+              // Boxed own local (captured and mutated by a closure nested inside
+              // this one): mirror the top-level-method boxed-local path below --
+              // box-reference-then-value ordering, with the try/catch guard for
+              // the same operand-stack-clearing reason as issue #745/#669.
+              val boxType = boxAsmType(set.`type`)
+              val valueType = boxedValueType(set.`type`)
+              closureCtx.slotOf(set.index) match
+                case Some(slot) =>
+                  if TermContainsTry.contains(set.value) then
+                    emitExpressionWithContext(gen, set.value, className, localVars)
+                    val valueSlot = gen.newLocal(valueType)
+                    gen.storeLocal(valueSlot)
+                    gen.loadLocal(slot)
+                    gen.loadLocal(valueSlot)
+                    gen.putField(boxType, "value", valueType)
+                    gen.loadLocal(valueSlot)
+                  else
+                    gen.loadLocal(slot)
+                    emitExpressionWithContext(gen, set.value, className, localVars)
+                    if valueType.getSize() == 2 then
+                      gen.dup2X1()
+                    else
+                      gen.dupX1()
+                    gen.putField(boxType, "value", valueType)
+                case None =>
+                  // Initialize: compute value, create box, store box, return value
+                  emitExpressionWithContext(gen, set.value, className, localVars)
+                  val tempSlot = gen.newLocal(valueType)
+                  gen.storeLocal(tempSlot)
+                  gen.newInstance(boxType)
+                  gen.dup()
+                  gen.loadLocal(tempSlot)
+                  val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
+                  gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
+                  val slot = closureCtx.allocateSlot(set.index, boxType)
+                  gen.storeLocal(slot)
+                  gen.loadLocal(tempSlot) // Return the value
             else
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val valueType = asmType(set.`type`)
+              if valueType.getSize() == 2 then gen.dup2() else gen.dup()
               val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
               gen.storeLocal(slot)
       case _ =>
@@ -801,14 +925,26 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           val valueType = boxedValueType(set.`type`)
           localVars.slotOf(set.index) match
             case Some(slot) =>
-              // Update: load box, compute value, put into box.value
-              gen.loadLocal(slot)
-              emitExpressionWithContext(gen, set.value, className, localVars)
-              if valueType.getSize() == 2 then
-                gen.dup2X1()
+              // Update: load box, compute value, put into box.value.
+              // If the value may run its own try/catch, the box reference can't
+              // stay on the operand stack across it -- see the boxed-captured-
+              // variable branch above for why (issue #745/#669 sibling).
+              if TermContainsTry.contains(set.value) then
+                emitExpressionWithContext(gen, set.value, className, localVars)
+                val valueSlot = gen.newLocal(valueType)
+                gen.storeLocal(valueSlot)
+                gen.loadLocal(slot)
+                gen.loadLocal(valueSlot)
+                gen.putField(boxType, "value", valueType)
+                gen.loadLocal(valueSlot)
               else
-                gen.dupX1()
-              gen.putField(boxType, "value", valueType)
+                gen.loadLocal(slot)
+                emitExpressionWithContext(gen, set.value, className, localVars)
+                if valueType.getSize() == 2 then
+                  gen.dup2X1()
+                else
+                  gen.dupX1()
+                gen.putField(boxType, "value", valueType)
             case None =>
               // Initialize: compute value, create box, store box, return value
               emitExpressionWithContext(gen, set.value, className, localVars)

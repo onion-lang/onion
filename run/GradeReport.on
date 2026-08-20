@@ -164,7 +164,7 @@ val students: List[Student] = [
   ])
 ]
 
-val reports: List[StudentReport] = students.map { s => new StudentReport(s as Student) }
+val reports: List[StudentReport] = students.map { s -> new StudentReport(s as Student) }
 
 // --- Main report ---
 IO::println("=== Student Grade Report ===")
@@ -174,7 +174,7 @@ foreach r: StudentReport in reports {
 
 // --- Honor roll: filter + type-pattern check via isHonors ---
 IO::println("\n--- Honor Roll ---")
-val honorRoll = reports.filter { r => (r as StudentReport).standing.isHonors() }
+val honorRoll = reports.filter { r -> (r as StudentReport).standing.isHonors() }
 if honorRoll.size == 0 {
   IO::println("  (none)")
 } else {
@@ -185,7 +185,7 @@ if honorRoll.size == 0 {
 
 // --- Rankings: sortedBy on a negated key ---
 IO::println("\n--- Ranked by GPA ---")
-val ranked = reports.sortedBy { r => 0.0 - (r as StudentReport).gpa }
+val ranked = reports.sortedBy { r -> 0.0 - (r as StudentReport).gpa }
 var rank = 1
 foreach r: StudentReport in ranked {
   val sr = r as StudentReport
@@ -208,7 +208,7 @@ while gi < gradeLetters.size {
 
 // --- Top student: reduce ---
 IO::println("\n--- Top Student ---")
-val top = reports.reduce { a, b =>
+val top = reports.reduce { a, b ->
   if (a as StudentReport).gpa >= (b as StudentReport).gpa { a } else { b }
 }
 if top != null {
@@ -217,23 +217,23 @@ if top != null {
 }
 
 // --- Class average: fold ---
-val sumGpa = reports.fold(0.0) { acc, r => (acc as Double) + (r as StudentReport).gpa }
+val sumGpa = reports.fold(0.0) { acc, r -> (acc as Double) + (r as StudentReport).gpa }
 val avgGpa = (sumGpa / reports.size).round2()
 IO::println("\nClass average GPA: " + avgGpa)
 
 // --- Summary by major: groupBy + nested fold ---
 IO::println("\n--- Summary by Major ---")
-val byMajor = reports.groupBy { r => (r as StudentReport).majorName() }
+val byMajor = reports.groupBy { r -> (r as StudentReport).majorName() }
 foreach (major, group) in byMajor {
   val grp = group as List
-  val majorSum = grp.fold(0.0) { acc, r => (acc as Double) + (r as StudentReport).gpa }
+  val majorSum = grp.fold(0.0) { acc, r -> (acc as Double) + (r as StudentReport).gpa }
   val majorAvg = (majorSum / grp.size).round2()
   IO::println("  #{major} (#{grp.size} student(s), avg GPA #{majorAvg})")
 }
 
 // --- Enrollment summary: string interpolation ---
 val n = students.size
-val activeCount = reports.filter { r => (r as StudentReport).standing.isEnrolled() }.size
+val activeCount = reports.filter { r -> (r as StudentReport).standing.isEnrolled() }.size
 IO::println("\n#{activeCount}/#{n} students currently enrolled")
 
 // --- try/catch: safe parse of an external GPA value ---

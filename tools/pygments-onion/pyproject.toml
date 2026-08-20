@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onion-pygments"
+version = "0.1.0"
+description = "Pygments lexer for the Onion programming language"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+dependencies = ["Pygments>=2.14"]
+
+[project.urls]
+Homepage = "https://onion-lang.org"
+Source = "https://github.com/onion-lang/onion"
+
+# Pygments discovers third-party lexers through this entry point, so installing the
+# package next to mkdocs-material is enough to make ```onion fences highlight. No
+# markdown changes are needed: mkdocs.yml already sets pygments_lang_class.
+[project.entry-points."pygments.lexers"]
+onion = "onion_pygments.lexer:OnionLexer"
+
+[tool.setuptools]
+packages = ["onion_pygments"]

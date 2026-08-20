@@ -202,7 +202,7 @@ public:
       val p = entry.getValue() as Post
       if fids.contains(p.authorId() as Object) { buf.add(p) }
     }
-    val sorted = buf.sortedBy { x => 0 - (x as Post).timestamp() }
+    val sorted = buf.sortedBy { x -> 0 - (x as Post).timestamp() }
     val result: ArrayList[Post] = new ArrayList[Post]()
     var i: Int = 0
     foreach p: Object in sorted {
@@ -220,7 +220,7 @@ public:
       val entry = e as java.util.Map.Entry
       buf.add(entry.getValue() as Post)
     }
-    val sorted = buf.sortedBy { x => 0 - engagement((x as Post).id()) }
+    val sorted = buf.sortedBy { x -> 0 - engagement((x as Post).id()) }
     val result: ArrayList[Post] = new ArrayList[Post]()
     var i: Int = 0
     foreach p: Object in sorted {
@@ -251,7 +251,7 @@ public:
       val entry = e as java.util.Map.Entry
       candidates.add(JInteger::parseInt(entry.getKey() as String))
     }
-    val sorted = candidates.sortedBy { x =>
+    val sorted = candidates.sortedBy { x ->
       val cand = x as Int
       val cnt: JInteger = mutuals.get(key(cand)) as JInteger
       0 - (if cnt == null { 0 } else { cnt.intValue() })
@@ -441,7 +441,7 @@ println("  " + sep(54))
 println("  " + rpad("Name", 9) + " | " + rpad("City", 10) + " | Posts | Friends | Rxns | Notifs")
 println("  " + sep(54))
 
-val sortedUsers = allUsers.sortedBy { u => (u as User).id() as Object }
+val sortedUsers = allUsers.sortedBy { u -> (u as User).id() as Object }
 foreach u: Object in sortedUsers {
   val user  = u as User
   val uid   = user.id()
@@ -481,7 +481,7 @@ foreach p: Post in allPosts {
   foreach r: Reaction in net.reactionsOn(p.id()) { allRxns.add(r) }
 }
 
-val byKind = allRxns.groupBy { x => (x as Reaction).kind().label() }
+val byKind = allRxns.groupBy { x -> (x as Reaction).kind().label() }
 foreach (label, group) in byKind {
   println("  " + rpad(label as String, 8) + " : " + (group as List).size)
 }
@@ -517,7 +517,7 @@ println("")
 println("  -- Post Kind Distribution --")
 println("")
 
-val byKindPost = allPosts.groupBy { x => (x as Post).content().kind() }
+val byKindPost = allPosts.groupBy { x -> (x as Post).content().kind() }
 foreach (kind, group) in byKindPost {
   val pct = (group as List).size * 100 / allPosts.size
   println("  " + rpad(kind as String, 8) + ": " + (group as List).size + " posts (" + pct + "%)")
@@ -552,7 +552,7 @@ foreach ua: Object in users2 {
 println("  Total friendships: " + totalEdges.size)
 
 // Most connected user
-val mostConnected = users2.sortedBy { u => 0 - net.friendsOf((u as User).id()).size() }
+val mostConnected = users2.sortedBy { u -> 0 - net.friendsOf((u as User).id()).size() }
 val top = (mostConnected.get(0) as User)
 println("  Most connected: " + top.name() + " (" + net.friendsOf(top.id()).size() + " friends)")
 
@@ -561,7 +561,7 @@ val totalF: ArrayList[Int] = new ArrayList[Int]()
 foreach u: Object in users2 {
   totalF.add(net.friendsOf((u as User).id()).size())
 }
-val sumF = totalF.fold(0) { acc, x => acc + (x as Int) }
+val sumF = totalF.fold(0) { acc, x -> acc + (x as Int) }
 println("  Average friends: " + (sumF / users2.size))
 
 println("")

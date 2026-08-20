@@ -12,6 +12,11 @@ if [ -z "$ONION_HOME" ]; then
     ONION_HOME=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 fi
 
+# Shared JVM setup: class-data sharing and ONION_JAVA_OPTS.
+if [ -r "$ONION_HOME/bin/onion-jvm.sh" ]; then
+    . "$ONION_HOME/bin/onion-jvm.sh"
+fi
+
 # Check if java is available
 if ! command -v "$JAVA_CMD" > /dev/null 2>&1; then
     echo "Error: Java not found. Please install Java or set JAVA_HOME environment variable."
@@ -34,4 +39,4 @@ if [ -n "$USER_CLASSPATH" ]; then
 fi
 
 # Run the Onion compiler
-exec "$JAVA_CMD" -classpath "$CLASSPATH" onion.tools.CompilerFrontend "$@"
+exec "$JAVA_CMD" $ONION_JVM_ARGS $ONION_JAVA_OPTS -classpath "$CLASSPATH" onion.tools.CompilerFrontend "$@"

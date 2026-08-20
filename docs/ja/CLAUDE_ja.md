@@ -155,6 +155,11 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Http` - HTTPクライアント
 - `Regex` - 正規表現
 - `Option`, `Result`, `Future` - 関数型
+- `Db` - JDBCアクセス (connect, query, update, トランザクション)
+- `Archive` - Zip/gzipの作成と展開
+- `Concurrent` - スレッドプール、カウンタ、ロック、チャネル
+- `Net` - TCPソケット (connect, listen)
+- `Server` - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)
 
 ## テスト
 
@@ -164,7 +169,22 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 
 **基底クラス:** テストは統合テスト用に `AbstractShellSpec` を継承
 
-**ロケール非依存性（重要）:** エラーメッセージは日英バイリンガル（`errorMessage.properties` / `errorMessage_ja.properties`）で、JVM のデフォルトロケールから解決されます。リリース CI は**英語**ロケールで実行されますが、ローカル開発環境はしばしば `ja_JP` です。エラー**コード**（`E0002`、`E0069` など）、`Shell.Failure(-1)`、またはロケールに依存しない部分文字列でアサートしてください — `"重複"` のようなローカライズされたメッセージ本文だけでアサートしないこと。さもないとローカルでは通ってもCIでのみ失敗します。リリース前に `sbt -Duser.language=en test` を実行してこれを検出してください。
+**ロケール非依存性（重要）:** エラーメッセージは日英バイリンガル（`errorMessage.properties` / `errorMessage_ja.properties`）で、JVM のデフォルトロケールから解決されます。リリース CI は**英語**ロケールで実行されますが、ローカル開発環境はしばしば `ja_JP` です。エラー**コード**（`E0002`、`E0069` など）、`Shell.Failure(-1)`、またはロケールに依存しない部分文字列でアサートしてください — `"重複"` のようなローカライズされたメッセージ本文だけでアサートしないこと。さもないとローカルでは通ってもCIでのみ失敗します。
+
+**スイートの実行方法（sbt 2.0.6 — 罠が2つ）:**
+
+```bash
+sbt shutdown && sbt -Duser.language=en testFull    # 続けて =ja でも実行する
+```
+
+1. **`test` は差分実行です。** sbt 2 では `testQuick` に委譲されるため、ソース無変更での
+   2 回目は `No tests to run` と表示して終了コード 0 を返します。全件実行には `testFull` を使います。
+2. **`-D` は新規サーバにしか届きません。** sbt サーバは実行間で常駐するため、`en` で起動済みの
+   サーバに `-Duser.language=ja` を渡しても何も起きません（`java.util.Locale.getDefault()` は
+   古い方を返し続けます）。先に `sbt shutdown` してください。
+
+CI はどちらの影響も受けません。差分実行の状態は `target/` にあり、`setup-java` の
+`cache: 'sbt'` はそこをキャッシュしないため、CI は毎回コールドスタートで全件実行します。
 
 **テストスイート:**
 - `HelloWorldSpec.scala` - 基本出力
@@ -278,8 +298,8 @@ val f: Function1[Int, Int] = (x: Int) -> x * 2
 val g = (x, y) -> x + y
 
 // 末尾ラムダ構文
-list.map { x => x * 2 }
-list.filter { x => x > 0 }
+list.map { x -> x * 2 }
+list.filter { x -> x > 0 }
 
 // メソッド参照（静的）
 Type::methodName
@@ -404,10 +424,10 @@ try {
 |-----|----------------|
 | `x -> x * 2` | `(x: Int) -> x * 2` - 型注釈が必要なことが多い |
 | `(x) -> expr`（単一引数） | `(x: Type) -> expr` - 型が通常必要 |
-| `func(arg)` でラムダ呼び出し | `func.call(arg)` または `func(arg)` - 両方OK |
+| `func(arg)` でラムダ呼び出し | `func(arg)` または `func(arg)` - 両方OK |
 | `Int -> Int` | ✓ 正しい - 単一引数の関数型 |
 | `(Int, Int) -> Int` | ✓ 正しい - 複数引数の関数型 |
-| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - トレイリングラムダは`=>`を使用 |
+| `list.map(x => x * 2)` | `list.map { x -> x * 2 }` - トレイリングラムダも `->`。矢印は言語全体で `->` の一種類だけ |
 
 ### メソッド呼び出し
 
@@ -433,7 +453,7 @@ try {
 | 裸の`readText(p)` / `get(url)` / `now()` / `exit(1)` | **もう解決しない** — デフォルトの静的インポートが純粋なクラスに限定された。`Files::readText`のように修飾するか、明示的にインポートする: `import { onion.Files::*; java.lang.System::exit }`。裸の`println`だけは引き続き使用可能（`onion.IO`が唯一の例外） |
 | 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される |
 | tool内の未宣言の副作用 | 呼び出し箇所でE0077 — 本体の効果は推移的に推論され、`requires { read(src), write(dst), console, unknown }`と照合される。過剰申告はE0078、不正なcapabilityはE0079。リストにないJava呼び出しは`unknown`として明示的に許可する必要がある |
-| コメントを保持したい場合の`shape doc = json` | `shape doc = config` — コメント付きの`key = value`形式ファイル向けのLOSSLESSなshape。`parseLossless`は`Residue`（コメント、空白、キー順序、未知キー、値の表記）を保持し、`r.edit { v => v.copy(port = 9090) }.render()`は該当する値のスロットだけを書き換える |
+| コメントを保持したい場合の`shape doc = json` | `shape doc = config` — コメント付きの`key = value`形式ファイル向けのLOSSLESSなshape。`parseLossless`は`Residue`（コメント、空白、キー順序、未知キー、値の表記）を保持し、`r.edit { v -> v.copy(port = 9090) }.render()`は該当する値のスロットだけを書き換える |
 | その場しのぎのカスタムフォーマット実装 | `class MyShape conforms Shape[T]` — ユーザー定義のshapeはコンビネータとOutcome/Defectを無償で得られるが、そのファイルは法則を主張しなければならない（`example l1 { s.parse(s.print(v)).get() == v }`）。さもなければそのクラスはE0080になる |
 | recordの中でしかチェックできない法則 | トップレベルの`example [name] { boolExpr }` — recordのexampleと同様にビルド時に実行される。偽の主張はE0065 |
 | 未知の`--effects` | `onionc --effects` / `onion --effects file.on`は各メソッドの推論された効果集合を表示する（`read write net exec env clock rand console unknown`。空なら`pure`） |

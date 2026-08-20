@@ -13,7 +13,7 @@ class CollsSortedByDescendingSpec extends AbstractShellSpec {
       """
         | static def main(args: String[]): String {
         |   val xs: List[Int] = [3, 1, 4, 1, 5, 9, 2, 6]
-        |   return "" + xs.sortedByDescending { x => x }
+        |   return "" + xs.sortedByDescending { x -> x }
         | }
       """.stripMargin, "None", Array())
     assert(Shell.Success("[9, 6, 5, 4, 3, 2, 1, 1]") == result)

@@ -65,8 +65,8 @@ trailing lambdas:
 val lines = ["alpha beta", "gamma", "alpha delta"]
 
 val lengths = lines
-  .filter { s => s.contains("alpha") }
-  .map { s => s.length() }       // [10, 11]
+  .filter { s -> s.contains("alpha") }
+  .map { s -> s.length() }       // [10, 11]
 ```
 
 The same helpers are available as plain static calls:

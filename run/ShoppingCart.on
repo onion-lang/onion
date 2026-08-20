@@ -154,7 +154,7 @@ val catalog: List[Product] = [
 ]
 
 def findProduct(sku: String): Product? {
-  val found = catalog.find { p => (p as Product).sku() == sku }
+  val found = catalog.find { p -> (p as Product).sku() == sku }
   return if found != null { found as Product } else { null }
 }
 
@@ -270,7 +270,7 @@ IO::println("")
 // ── Category breakdown ────────────────────────────────────────────────────────
 
 IO::println("── Spending by Category ───────────────────────────────────────────")
-val byCategory = cartItems.groupBy { i => (i as CartItem).product().category().label() }
+val byCategory = cartItems.groupBy { i -> (i as CartItem).product().category().label() }
 foreach (catLabel, catItems) in byCategory {
   val ps = catItems as List[CartItem]
   var catTotal: Int = 0
@@ -286,20 +286,20 @@ IO::println("")
 IO::println("── Cart Statistics ────────────────────────────────────────────────")
 var totalQty: Int = 0
 foreach item: CartItem in cartItems { totalQty = totalQty + item.qty() }
-val sortedByPrice = cartItems.sortedBy { i => 0 - (i as CartItem).product().priceCents() }
+val sortedByPrice = cartItems.sortedBy { i -> 0 - (i as CartItem).product().priceCents() }
 val mostExpensive: CartItem = sortedByPrice[0] as CartItem
-val cheapest: CartItem = cartItems.sortedBy { i => (i as CartItem).product().priceCents() }[0] as CartItem
+val cheapest: CartItem = cartItems.sortedBy { i -> (i as CartItem).product().priceCents() }[0] as CartItem
 
 IO::println("  Total quantity:       #{totalQty} items")
 IO::println("  Most expensive unit:  #{mostExpensive.product().name()} (#{mostExpensive.product().priceStr()})")
 IO::println("  Cheapest unit:        #{cheapest.product().name()} (#{cheapest.product().priceStr()})")
 
-val stockParts = catalog.partition { p => (p as Product).isAvailable() }
+val stockParts = catalog.partition { p -> (p as Product).isAvailable() }
 val inStock: List[Product] = stockParts[0] as List[Product]
 val outOfStock: List[Product] = stockParts[1] as List[Product]
 IO::println("  Catalog in-stock:     #{(inStock as List[Product]).size()} / #{catalog.size()} products")
 
-val lowStock = catalog.filter { p => (p as Product).isLowStock() }
+val lowStock = catalog.filter { p -> (p as Product).isLowStock() }
 IO::println("  Low-stock items:      #{(lowStock as List[Product]).size()}")
 foreach p: Product in lowStock {
   IO::println("    #{p.sku()} #{p.name()} — only #{p.stock()} left!")

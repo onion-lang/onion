@@ -4,10 +4,16 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 
 ## リリースチェックリスト
 
-1. **`develop` が正常であることを確認する。**
+1. **`develop` が両ロケールで green であることを確認する。**
    ```bash
-   sbt test
+   sbt shutdown && sbt -Duser.language=en testFull
+   sbt shutdown && sbt -Duser.language=ja testFull
    ```
+   どちらも必要です。診断は二言語で、リリース CI は英語ロケール、ローカル開発は多くの場合
+   `ja_JP` なので、メッセージ文字列を検査するテストは片方でだけ通ることがあります。
+   sbt 2 では `test` が `testQuick` に委譲され、変更のないツリーでは `No tests to run` を
+   返します。また `-D` は**新規起動した**サーバにしか反映されません。そのため `shutdown` と
+   `testFull` なしでは、何も実行していないのに green に見えることがあります。
 
 2. **次のバージョンを決める。**
    Onion は [Semantic Versioning](https://semver.org/) に従い、必要に応じてマイルストーンやRCプレリリースを行います。
@@ -48,12 +54,12 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 リリースを作成せずに同じ成果物をローカルでビルドするには:
 
 ```bash
-sbt assembly dist
+sbt "assembly; dist"
 ```
 
-出力:
-- `target/scala-3.3.7/onion-<version>.jar` (fat jar)
-- `target/onion-dist-<version>.zip` (配布用アーカイブ)
+出力 (sbt 2 の既定レイアウトではビルド成果物が `target/out/<platform>/<scalaVersion>/<project>/` 以下に配置される):
+- `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar` (fat jar)
+- `target/out/jvm/scala-3.3.7/onion/onion-dist-<version>.zip` (配布用アーカイブ)
 
 ## ホットフィックスリリース
 

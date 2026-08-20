@@ -303,7 +303,9 @@ private[compiler] final class StaticMethodCallSupport(
     overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
-          case Some(named) => typing.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+          case Some(named) =>
+            typing.report(UNKNOWN_PARAMETER_NAME, named, named.name,
+              ArgumentHelpers.parameterNameCandidates(candidates.asScala))
           case None => calls.reportMethodNotFound(node, typeRef, node.name, Array[Type]())
         }
         None

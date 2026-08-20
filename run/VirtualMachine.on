@@ -318,14 +318,14 @@ IO::println("═══ Execution Summary ═══")
 IO::println("  Program".ljustS(22) + "Steps".rjustS(7) + " Peak")
 IO::println("  " + "-".repeat(32))
 
-val sortedStats: List[ExecStats] = allStats.sortedBy { s => 0 - s.steps() }
+val sortedStats: List[ExecStats] = allStats.sortedBy { s -> 0 - s.steps() }
 foreach s: ExecStats in sortedStats {
   IO::println("  " + s.name().ljustS(20) + s.steps().rjust(7) + "  " + s.peakStack())
 }
 IO::println("")
 
-val totalSteps: Int = allStats.fold(0) { acc, s => (acc as Int) + (s as ExecStats).steps() } as Int
-val maxPeak: Int    = allStats.fold(0) { acc, s =>
+val totalSteps: Int = allStats.fold(0) { acc, s -> (acc as Int) + (s as ExecStats).steps() } as Int
+val maxPeak: Int    = allStats.fold(0) { acc, s ->
   val p = (s as ExecStats).peakStack()
   if (acc as Int) < p { p } else { acc }
 } as Int

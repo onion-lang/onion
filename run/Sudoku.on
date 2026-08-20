@@ -249,11 +249,11 @@ def main(): void {
     IO::println("  " + r.summary())
   }
 
-  val solvedCount = results.count { r => (r as SolveResult).solved() }
+  val solvedCount = results.count { r -> (r as SolveResult).solved() }
   IO::println("")
   IO::println("Solved #{solvedCount}/#{results.size} puzzles.")
 
-  val sorted: List[SolveResult] = results.sortedBy { r => (r as SolveResult).steps() }
+  val sorted: List[SolveResult] = results.sortedBy { r -> (r as SolveResult).steps() }
   IO::println("Easiest to hardest (by search steps):")
   foreach r: SolveResult in sorted {
     IO::println("  #{r.puzzle().name()}: #{r.steps()} steps")

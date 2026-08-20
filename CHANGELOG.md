@@ -79,6 +79,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `groupBy`, `sortedBy`, `fold`), closures stored in a `val` and invoked via
   `.call`, recursive helpers, string interpolation, and nullable-safe lookups.
 
+- **`run/SpreadsheetCalc.on`, a ~400-line mini spreadsheet evaluator with a
+  recursive-descent formula parser.** Covers ADT enums (`CellVal`, `FExpr`),
+  records, classes, user-defined generics, `HashMap`/`HashSet`, nullable
+  fields, `select`/pattern matching, and `try`/`catch`. The formula engine
+  supports literals, cell references, binary operators (`+ - * /`), range
+  notation (`A1:A3`), and aggregate functions (`SUM`, `MAX`, `MIN`, `AVG`),
+  plus cycle detection over circular formula references and a formatted
+  table report.
+
 ## [0.12.1] - 2026-08-19
 
 ### Fixed

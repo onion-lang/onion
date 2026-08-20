@@ -4466,7 +4466,7 @@
 <th>#</th>
 <th>次元</th>
 <th>測定方法</th>
-<th>現在値（2026-08-18）</th>
+<th>現在値（2026-08-20）</th>
 <th>合格閾値</th>
 </tr>
 </thead>
@@ -4474,22 +4474,22 @@
 <tr>
 <td>1</td>
 <td>テストスイート</td>
-<td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code>（下記の注記を参照）</td>
-<td>3818 pass / 0 fail / 1 cancelled</td>
+<td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code>(下記の注記を参照)</td>
+<td>3863 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
-<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
-<td>173 / 173 compile</td>
+<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>(どちらも <code>run/*.on</code> 全件をコンパイル)</td>
+<td>183 / 183 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>112（AccessLogAnalyzer、AirlineReservation、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ConferenceSchedule、ConwayLife、CourseRegistration、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FitnessTracker、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HospitalWard、HotelReservation、HRSystem、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、MarkdownConverter、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport）</td>
+<td>122(AccessLogAnalyzer、AirlineReservation、AstronomyCatalog、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrainFuck、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ConferenceSchedule、ConnectFour、ConwayLife、CourseRegistration、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FileSystemSim、FitnessTracker、FlashcardDeck、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HRSystem、HospitalWard、HotelReservation、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、Mandelbrot、MarkdownConverter、MarkovText、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、PackageDelivery、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PolynomialAlgebra、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SpreadsheetCalc、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport)</td>
 <td>≥ 5</td>
 </tr>
 <tr>

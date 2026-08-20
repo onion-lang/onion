@@ -20,9 +20,10 @@ class BuildFingerprintSpec extends AnyFunSuite with Matchers:
     manifestBytes: Array[Byte] = manifest,
     sourceBytes: Vector[(String, Array[Byte])] = sources,
     compilerVersion: String = "test-compiler",
-    javaFeature: Int = 21
+    javaFeature: Int = 21,
+    dependencies: Seq[String] = Seq.empty
   ): String =
-    BuildFingerprint.compute(manifestBytes, sourceBytes, compilerVersion, javaFeature)
+    BuildFingerprint.compute(manifestBytes, sourceBytes, compilerVersion, javaFeature, dependencies)
 
   test("returns a lowercase SHA-256 fingerprint"):
     fingerprint() should fullyMatch regex "[0-9a-f]{64}"
@@ -57,10 +58,22 @@ class BuildFingerprintSpec extends AnyFunSuite with Matchers:
       fingerprint(sourceBytes = sources :+ ("src/extra.on" -> bytes("class Extra {}\n"))),
       fingerprint(sourceBytes = sources.take(1)),
       fingerprint(sourceBytes = sources.updated(0, "src/renamed.on" -> sources(0)._2)),
-      fingerprint(sourceBytes = sources.updated(0, sources(0)._1 -> bytes("class Changed {}\n")))
+      fingerprint(sourceBytes = sources.updated(0, sources(0)._1 -> bytes("class Changed {}\n"))),
+      fingerprint(dependencies = Seq("org.postgresql:postgresql:42.7.3"))
     )
 
     variants.foreach(_ should not be baseline)
+
+  test("changes when a transitive dependency version changes without the manifest changing"):
+    // The manifest pins direct dependencies only. A transitive can move underneath it, and
+    // if that did not reach the fingerprint the cache would serve classes compiled against
+    // the old classpath as current.
+    fingerprint(dependencies = Seq("a:b:1.0.0", "c:d:2.0.0")) should not be
+      fingerprint(dependencies = Seq("a:b:1.0.0", "c:d:2.0.1"))
+
+  test("does not depend on the order dependencies are listed in"):
+    fingerprint(dependencies = Seq("c:d:2.0.0", "a:b:1.0.0")) shouldBe
+      fingerprint(dependencies = Seq("a:b:1.0.0", "c:d:2.0.0"))
 
   test("length-delimits source paths and contents to avoid concatenation ambiguity"):
     fingerprint(sourceBytes = Vector("ab" -> bytes("c"))) should not be

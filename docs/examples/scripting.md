@@ -211,7 +211,7 @@ tool setport(path: String, port: Int): Int
 {
   val read = file(path).readLossless(Server::cfg())
   if read.isBad() { return 1 }
-  val out = read.get().edit { v => v.copy(port = port) }.render()
+  val out = read.get().edit { v -> v.copy(port = port) }.render()
   Files::writeText(path, out)
   IO::println("port -> " + port)
   return 0

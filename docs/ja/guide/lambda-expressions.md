@@ -36,13 +36,17 @@ val upper = (s: String) -> { return s.toUpperCase(); }
 
 ## ラムダの呼び出し
 
-関数値は直接関数呼び出し構文で呼べます。`.call()` も使えます：
+関数値は直接、関数呼び出し構文で呼べます：
 
 ```onion
 val double = (x: Int) -> x * 2
 println(double(21))       // 42
-println(double.call(21))  // 42
 ```
+
+内部的には、関数値は `onion.Function0` 〜 `onion.Function10` を実装したオブジェクトで、
+唯一のメソッドが `call` です。`double(21)` は `double(21)` にコンパイルされます。
+自分で `.call` と書く必要があるのは、その名前で呼び出すことを期待する Java コードに
+関数値を渡すときだけです。
 
 ## 関数型
 
@@ -61,7 +65,7 @@ val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 ```onion
 def repeat(n: Int, block: () -> Unit): void {
   for var i: Int = 0; i < n; i = i + 1 {
-    block.call()
+    block()
   }
 }
 
@@ -117,7 +121,7 @@ val s: Supplier[Int] = () -> 42
 val multiplier: Int = 10
 val multiply: (Int) -> Int = (x: Int) -> { return x * multiplier; }
 
-println(multiply.call(5))  // 50
+println(multiply(5))  // 50
 ```
 
 可変変数もキャプチャして変更できます：
@@ -129,8 +133,8 @@ val increment: () -> Int = () -> {
   return count;
 }
 
-println(increment.call())  // 1
-println(increment.call())  // 2
+println(increment())  // 1
+println(increment())  // 2
 ```
 
 ## 高階関数
@@ -147,7 +151,7 @@ def filter(items: List[String], predicate: (String) -> Boolean): List[String] {
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
-    if predicate.call(item) {
+    if predicate(item) {
       result << item
     }
   }
@@ -167,12 +171,12 @@ val errors: List[String] = filter(lines, isError)
 
 ## リストのパイプライン
 
-`List` と `Iterable` にはトレイリングラムダ（`{ x => ... }` 構文）でチェインできるヘルパーメソッドがあります：
+`List` と `Iterable` にはトレイリングラムダ（`{ x -> ... }` 構文）でチェインできるヘルパーメソッドがあります：
 
 ```onion
 val lengths = lines
-  .filter { s => s.contains("ERROR") }
-  .map { s => s.length() }
+  .filter { s -> s.contains("ERROR") }
+  .map { s -> s.length() }
 ```
 
 ## 次のステップ

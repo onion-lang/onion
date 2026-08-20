@@ -131,7 +131,7 @@ def buildSourceReports(entries: List[LogEntry]): List[SourceReport] {
       if w  == null { 0 } else { w  as Int },
       if er == null { 0 } else { er as Int }))
   }
-  return result.sortedBy { r: SourceReport => 0 - r.errorCount() }
+  return result.sortedBy { r: SourceReport -> 0 - r.errorCount() }
 }
 
 def buildLevelSummaries(entries: List[LogEntry]): List[LevelSummary] {
@@ -172,7 +172,7 @@ def buildMinuteBuckets(entries: List[LogEntry]): List[MinuteBucket] {
     result.add(new MinuteBucket(min as String, cnt as Int,
       if er == null { 0 } else { er as Int }))
   }
-  return result.sortedBy { b: MinuteBucket => b.minute() }
+  return result.sortedBy { b: MinuteBucket -> b.minute() }
 }
 
 def detectAlerts(entries: List[LogEntry]): List[Alert] {
@@ -209,7 +209,7 @@ def detectAlerts(entries: List[LogEntry]): List[Alert] {
     }
   }
 
-  return alerts.sortedBy { a: Alert => 0 - a.severity() }
+  return alerts.sortedBy { a: Alert -> 0 - a.severity() }
 }
 
 def printSection(title: String, lines: List[String]): void {
@@ -243,7 +243,7 @@ def main(): void {
     "2024-01-15T10:06:40 INFO  [auth] Password changed for user alice"
   ]
 
-  val text = logLines.fold("") { acc: String, line: String =>
+  val text = logLines.fold("") { acc: String, line: String ->
     if acc.length() == 0 { line } else { acc + "\n" + line }
   }
 
@@ -254,21 +254,21 @@ def main(): void {
 
   // Level distribution
   printSection("Level Distribution",
-    buildLevelSummaries(entries).map { s: LevelSummary => s.describe() })
+    buildLevelSummaries(entries).map { s: LevelSummary -> s.describe() })
 
   // Source health
   printSection("Source Health",
-    buildSourceReports(entries).map { r: SourceReport => r.describe() })
+    buildSourceReports(entries).map { r: SourceReport -> r.describe() })
 
   // Timeline
   printSection("Timeline (per minute)",
-    buildMinuteBuckets(entries).map { b: MinuteBucket => b.describe() })
+    buildMinuteBuckets(entries).map { b: MinuteBucket -> b.describe() })
 
   // High-severity entries
   val highSev = entries
-    .filter { e: LogEntry => LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
-    .sortedBy { e: LogEntry => e.timestamp() }
-    .map { e: LogEntry => "  #{e.timestamp()} [#{e.level()}] #{e.source()}: #{e.message()}" }
+    .filter { e: LogEntry -> LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
+    .sortedBy { e: LogEntry -> e.timestamp() }
+    .map { e: LogEntry -> "  #{e.timestamp()} [#{e.level()}] #{e.source()}: #{e.message()}" }
   printSection("High-Severity Entries", highSev)
 
   // Alerts
@@ -276,19 +276,19 @@ def main(): void {
   val alertLines = if alerts.size == 0 {
     ["  (none)"]
   } else {
-    alerts.map { a: Alert => "  [sev=#{a.severity()}] #{a.description()}" }
+    alerts.map { a: Alert -> "  [sev=#{a.severity()}] #{a.description()}" }
   }
   printSection("Active Alerts (by severity)", alertLines)
 
   // Summary via fold/reduce and |>
-  val errorCount = entries.fold(0) { acc: Int, e: LogEntry =>
+  val errorCount = entries.fold(0) { acc: Int, e: LogEntry ->
     if e.level() == "ERROR" || e.level() == "FATAL" { acc + 1 } else { acc }
   }
   val criticalSources = entries
-    .filter { e: LogEntry => LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
-    .map { e: LogEntry => e.source() }
+    .filter { e: LogEntry -> LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
+    .map { e: LogEntry -> e.source() }
     .distinct()
-    .sortedBy { s: String => s }
+    .sortedBy { s: String -> s }
 
   IO::println("--- Summary ---")
   IO::println("  Errors+Fatals : #{errorCount}")

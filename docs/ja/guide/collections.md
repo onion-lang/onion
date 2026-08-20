@@ -56,8 +56,8 @@ def orEmpty(o: List[Int]?): List[Int] = o ?: []              // [] は List[Int]
 val lines = ["alpha beta", "gamma", "alpha delta"]
 
 val lengths = lines
-  .filter { s => s.contains("alpha") }
-  .map { s => s.length() }       // [10, 11]
+  .filter { s -> s.contains("alpha") }
+  .map { s -> s.length() }       // [10, 11]
 ```
 
 静的呼び出し形式でも使えます：

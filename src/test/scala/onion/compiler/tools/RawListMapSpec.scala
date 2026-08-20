@@ -20,7 +20,7 @@ class RawListMapSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val raw = [1, 2, 3] as List
-          |    return raw.map { e => (e as Int) + 1 }.toString()
+          |    return raw.map { e -> (e as Int) + 1 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -36,7 +36,7 @@ class RawListMapSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    return ([1, 2, 3] as List[Int]).map { e => (e as Int) + 1 }.toString()
+          |    return ([1, 2, 3] as List[Int]).map { e -> (e as Int) + 1 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -53,7 +53,7 @@ class RawListMapSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs: List[Int] = [1, 2, 3]
-          |    return xs.map { x => x + 1 }.toString()
+          |    return xs.map { x -> x + 1 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -70,7 +70,7 @@ class RawListMapSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val raw = [1, 2, 3] as List
-          |    return raw.filter { e => (e as Int) > 1 }.toString()
+          |    return raw.filter { e -> (e as Int) > 1 }.toString()
           |  }
           |}
           |""".stripMargin,

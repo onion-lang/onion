@@ -74,11 +74,8 @@ class Animal {
     }
 }
 
-class Dog extends Animal {
+class Dog(n: String) extends Animal(n) {
   public:
-    def this(n: String): (n) {
-    }
-
     def speak: String {
       return "Woof!"
     }
@@ -110,8 +107,8 @@ def makeCounter(): () -> Int {
 }
 
 val counter: () -> Int = makeCounter()
-println(counter.call())  // 1
-println(counter.call())  // 2
+println(counter())  // 1
+println(counter())  // 2
 ```
 
 Features:

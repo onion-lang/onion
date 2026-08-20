@@ -47,6 +47,114 @@ val p = new Point(3, 4)        // p.x、p.y が使える
 val c = new Conf(port = 9090)  // host はデフォルト値 "localhost"
 ```
 
+プライマリコンストラクタを持つクラスにも `def this` でコンストラクタを追加できます。
+その場合、各 `def this` は `: this(...)` で**プライマリコンストラクタに委譲**します。
+詳しくは次節を参照してください。
+
+## コンストラクタ
+
+Onion のコンストラクタは Scala / Kotlin と同じ primary / secondary モデルです。
+
+- **プライマリコンストラクタ**は、クラス名の後ろのパラメータリストと `extends` 節の
+  引数を合わせたものです。親クラスのコンストラクタを呼ぶのはここだけで、`val`/`var`
+  パラメータをフィールドに格納するのもここです。
+- **セカンダリコンストラクタ**はクラス本体の `def this(...)` です。プライマリ
+  コンストラクタを持つクラスでは、すべてのセカンダリは `: this(...)` で（直接、または
+  別のセカンダリ経由で）プライマリに委譲します。この規則があるおかげで、プライマリの
+  `val` フィールドが未初期化のまま観測されることはなく、親クラスは常に `extends` 節に
+  書いた通りに構築されます。
+
+```onion
+class Point(val x: Int, val y: Int) {
+public:
+  def this(x: Int) : this(x, 0) { }      // セカンダリ: プライマリに委譲
+  def this : this(0) { }                 // セカンダリ同士でチェインしてもよい
+  def dist(): Int { return x * x + y * y }
+}
+
+val a = new Point(3, 4)
+val b = new Point(3)                     // y == 0
+val c = new Point()                      // x == 0, y == 0
+```
+
+プライマリコンストラクタを持つクラスで、委譲しない `def this` はエラーです（`E0087`）。
+この規則ができる前は `class P(val x: Int) { def this { } }` がコンパイルでき、
+`new P().x` は `0` でした。
+
+### 親クラスへの引数
+
+親クラスのコンストラクタ引数は `extends` 節に書き、書けるのはそこだけです。
+セカンダリコンストラクタはプライマリに委譲することで親に到達します。
+
+```onion
+class Animal(val name: String)
+
+class Dog(name: String, val breed: String) extends Animal(name) {
+public:
+  def this(name: String) : this(name, "mixed") { }
+}
+```
+
+パラメータリストが無くても `extends` に引数があれば、それを親に渡す引数なしの
+プライマリコンストラクタになります（Kotlin / Scala と同じ読み方です）。
+
+```onion
+class Rex extends Animal("Rex") { }      // new Rex().name == "Rex"
+```
+
+### プライマリコンストラクタを持たないクラス
+
+パラメータリストも `extends` の引数も無いクラスにはプライマリコンストラクタがありません。
+その `def this` は暗黙に親クラスの引数なしコンストラクタを呼び、互いに委譲できます。
+
+```onion
+class Rectangle {
+  val width: Int
+  val height: Int
+public:
+  def this(w: Int, h: Int) {
+    this.width = w
+    this.height = h
+  }
+  def this(size: Int) : this(size, size) { }
+  def this : this(0) { }
+}
+```
+
+このようなクラスから親クラスに引数を渡すことはできません。必要ならプライマリ
+コンストラクタを書いてください。（以前は `def this(x) : (x) { }` という形でそれが
+できましたが、この形はもうありません。コンパイラは `extends` 節を書くよう案内します。）
+
+### フィールド初期化子
+
+フィールド初期化子は、プライマリコンストラクタがパラメータを格納した**後**に実行される
+ので、`val`/`var` パラメータのフィールドを読めます。
+
+```onion
+class Account(val opening: Int) {
+public:
+  var balance: Int = opening        // プライマリが格納したばかりのフィールドを読む
+  var history: List[Int] = [opening]
+}
+```
+
+初期化子は `new` がどのコンストラクタを通ったかに関係なく、プライマリの中で 1 回だけ
+実行されます。`val`/`var` の付かないプライマリパラメータはフィールドではないので、
+初期化子からは見えません。
+
+### コンストラクタ引数の中でできないこと
+
+委譲引数を評価している時点ではオブジェクトがまだ存在しないので、`: this(...)` や
+`extends B(...)` の引数の中で `this` やフィールドを読むことはできません（`E0090`）。
+パラメータか定数を渡してください。クロージャは `this` を捕捉して後で実行されるので
+問題ありません。互いに委譲し合って循環するコンストラクタは、`new` でスタックオーバー
+フローする代わりに拒否されます（`E0088`）。record と enum は正準コンストラクタを持つため
+`def this` を宣言できません（`E0089`）。
+
+プライマリコンストラクタは常に public です。private なコンストラクタ（ファクトリメソッド
+パターン）が欲しいクラスは、プライマリを宣言せず、デフォルト（private）セクションに
+`def this` を書きます。
+
 ## フィールドとアクセス修飾子
 
 フィールドは**デフォルトでprivate**です。`public:` セクションで公開します：
@@ -221,7 +329,7 @@ def describe(o: Opt[String]): String = select o {
 なります。定数形式の enum は型パラメータを取れません（`java.lang.Enum` になり、
 JVM がジェネリックな enum を許さないためです）。
 
-## ジェネリッククラス
+## ジェネリッククラス {: #generic-classes }
 
 クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：
 

@@ -105,31 +105,31 @@ public:
   }
 
   def sessionsInTrack(track: Track): List[Session] {
-    return this.sessions.filter { s => s.track() == track }
+    return this.sessions.filter { s -> s.track() == track }
   }
 
   def sessionsInRoom(room: String): List[Session] {
-    return this.sessions.filter { s => s.room() == room }
+    return this.sessions.filter { s -> s.room() == room }
   }
 
   def hasConflict(room: String, start: Int, end: Int): Boolean {
     val roomSessions = this.sessionsInRoom(room)
-    val conflict = roomSessions.find { s =>
+    val conflict = roomSessions.find { s ->
       s.startHour() < end && s.endHour() > start
     }
     return conflict != null
   }
 
   def totalCapacity(): Int {
-    return this.sessions.fold(0) { acc, s => (acc as Int) + s.capacity() }
+    return this.sessions.fold(0) { acc, s -> (acc as Int) + s.capacity() }
   }
 
   def printSchedule(): void {
     IO::println("=== Schedule: " + this.dayLabel + " ===")
-    val byRoom: Map[String, List[Session]] = this.sessions.groupBy { s => s.room() }
+    val byRoom: Map[String, List[Session]] = this.sessions.groupBy { s -> s.room() }
     foreach (room, roomSessions) in byRoom {
       IO::println("  Room: " + room)
-      val sorted: List[Session] = roomSessions.sortedBy { s => s.startHour() }
+      val sorted: List[Session] = roomSessions.sortedBy { s -> s.startHour() }
       foreach s: Session in sorted {
         val start: String = s.startHour().hourStr()
         val end: String = s.endHour().hourStr()
@@ -165,15 +165,15 @@ def trackFullName(t: Track): String {
 def durationHours(sess: Session): Int = sess.endHour() - sess.startHour()
 
 def sessionsByDuration(sessions: List[Session]): List[Session] {
-  return sessions.sortedBy { s => 0 - durationHours(s) }
+  return sessions.sortedBy { s -> 0 - durationHours(s) }
 }
 
 def countByTrack(sessions: List[Session]): Map[String, List[Session]] {
-  return sessions.groupBy { s => trackFullName(s.track()) }
+  return sessions.groupBy { s -> trackFullName(s.track()) }
 }
 
 def topCapacitySessions(sessions: List[Session], n: Int): List[Session] {
-  val sorted: List[Session] = sessions.sortedBy { s => 0 - s.capacity() }
+  val sorted: List[Session] = sessions.sortedBy { s -> 0 - s.capacity() }
   val result: List[Session] = []
   var count: Int = 0
   foreach s: Session in sorted {
@@ -257,7 +257,7 @@ def printConflictReport(sessions: List[Session]): void {
 def printRoomUtilisation(sessions: List[Session], rooms: List[String]): void {
   IO::println("\n=== Room Utilisation ===")
   foreach room: String in rooms {
-    val roomSessions: List[Session] = sessions.filter { s => s.room() == room }
+    val roomSessions: List[Session] = sessions.filter { s -> s.room() == room }
     var hours: Int = 0
     foreach s: Session in roomSessions {
       hours = hours + durationHours(s)
@@ -268,7 +268,7 @@ def printRoomUtilisation(sessions: List[Session], rooms: List[String]): void {
 
 def printSpeakerSessions(day: ConferenceDay): void {
   IO::println("\n=== Speaker Load ===")
-  val bySpkId: Map[Int, List[Session]] = day.getSessions().groupBy { s => s.speakerId() }
+  val bySpkId: Map[Int, List[Session]] = day.getSessions().groupBy { s -> s.speakerId() }
   foreach (spkId, spkSessions) in bySpkId {
     val spk: Speaker? = day.speakerById(spkId as Int)
     val spkName: String = if spk != null { (spk as Speaker).name() } else { "Unknown ##{spkId}" }
@@ -360,7 +360,7 @@ def main(): void {
   IO::println("\n" + msg.get)
 
   // Partition sessions by duration (partition returns List[List])
-  val parts = sessions.partition { s => durationHours(s) >= 2 }
+  val parts = sessions.partition { s -> durationHours(s) >= 2 }
   val longSessions: List[Session] = parts[0] as List[Session]
   val shortSessions: List[Session] = parts[1] as List[Session]
   IO::println("Long sessions (>=2h): #{longSessions.size}, Short (<2h): #{shortSessions.size}")
@@ -386,15 +386,15 @@ def main(): void {
   ]
 
   // any / count pipeline operations
-  val hasApproved: Boolean = proposals.any { p => p.verdict().isApproved() }
-  val approvedCount: Int = proposals.count { p => p.verdict().isApproved() }
-  val pendingCount: Int = proposals.count { p => p.verdict() == new Pending() }
+  val hasApproved: Boolean = proposals.any { p -> p.verdict().isApproved() }
+  val approvedCount: Int = proposals.count { p -> p.verdict().isApproved() }
+  val pendingCount: Int = proposals.count { p -> p.verdict() == new Pending() }
   IO::println("Has approved: #{hasApproved}, approved=#{approvedCount}, pending=#{pendingCount}")
 
   // filter + map pipeline for accepted proposals
   val accepted: List[String] = proposals
-    .filter { p => p.verdict().isApproved() }
-    .map { p => "#{p.title()} — #{p.verdict().label()}" }
+    .filter { p -> p.verdict().isApproved() }
+    .map { p -> "#{p.title()} — #{p.verdict().label()}" }
   IO::println("Accepted proposals:")
   foreach line: String in accepted {
     IO::println("  " + line)
@@ -402,8 +402,8 @@ def main(): void {
 
   // zip sessions with their speaker names (speakers list, padded)
   IO::println("\n=== Session–Speaker Pairs (zip) ===")
-  val sessionTitles: List[String] = sessions.map { s => s.title().truncate(30) }
-  val speakerNames: List[String] = sessions.map { s =>
+  val sessionTitles: List[String] = sessions.map { s -> s.title().truncate(30) }
+  val speakerNames: List[String] = sessions.map { s ->
     val spk: Speaker? = day.speakerById(s.speakerId())
     if spk != null { (spk as Speaker).name() } else { "Unknown" }
   }
@@ -424,7 +424,7 @@ def main(): void {
   IO::println("\nFlatten check: #{flattened.size} == #{sessions.size} sessions")
 
   // distinct session rooms
-  val allRooms: List[String] = sessions.map { s => s.room() }
+  val allRooms: List[String] = sessions.map { s -> s.room() }
   val distinctRooms: List[String] = allRooms.distinct()
   IO::println("Distinct rooms used: #{distinctRooms.size} of #{rooms.size}")
 

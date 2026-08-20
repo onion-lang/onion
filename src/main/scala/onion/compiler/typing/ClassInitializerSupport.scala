@@ -39,7 +39,21 @@ private[compiler] final class ClassInitializerSupport(
       case ctor: ConstructorDefinition if ctor.superInitializer != null && ctor.superInitializer.selfDelegation => ()
       case ctor: ConstructorDefinition =>
         val existing = Option(ctor.block).map(_.statements.toIndexedSeq).getOrElse(Seq.empty)
-        val combined = (initializers ++ existing).toArray
+        // The primary constructor's own `this.x = x` assignments come first, then the
+        // declared field initializers, then anything else. A field initializer such as
+        // `var total: Int = x * 2` names the *field* `x` (it is typed without the
+        // constructor's parameters in scope), so it has to run after that field was
+        // stored -- put the initializers first and `total` is always 0. This is the
+        // order Kotlin and Scala use, and it is what a reader of the class expects.
+        //
+        // The typed primary body has the shape StatementBlock(StatementBlock(assign*),
+        // Return): translate() lowers the parser's assignment-only block to the inner
+        // StatementBlock and addReturnNode() wraps it. So the assignments are the whole
+        // first statement, and the initializers slot in right after it.
+        val combined =
+          if ctor.primaryAssignments > 0 && existing.nonEmpty then
+            (existing.take(1) ++ initializers ++ existing.drop(1)).toArray
+          else (initializers ++ existing).toArray
         ctor.block = new StatementBlock(combined: _*)
       case _ => ()
     }

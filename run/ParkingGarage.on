@@ -150,7 +150,7 @@ public:
     foreach (lvl, total) in totalByLevel {
       usages.add(new LevelUsage(lvl, occByLevel.getOrDefault(lvl, 0), total))
     }
-    return usages.sortedBy { u => (u as LevelUsage).level() }
+    return usages.sortedBy { u -> (u as LevelUsage).level() }
   }
 
   def revenue(): Double {
@@ -162,7 +162,7 @@ public:
   def closedTicketCount(): Int = closedFees.size
 
   def freeSpotsOfKind(kind: VehicleType): Int {
-    return spots.filter { s => (s as Spot).kind() == kind && !occupied.containsKey((s as Spot).id()) }.size
+    return spots.filter { s -> (s as Spot).kind() == kind && !occupied.containsKey((s as Spot).id()) }.size
   }
 }
 

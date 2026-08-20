@@ -142,7 +142,7 @@ record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
 `e |> f` は `f(e)`、`e |> f(a)` は `f(e, a)` です。
 
 ```onion
-xs.map { x => x * 2 } |> println
+xs.map { x -> x * 2 } |> println
 ```
 
 ## auto-CLI
@@ -166,9 +166,9 @@ record Hit(ip: String, method: String, path: String, status: Int)
 
 def main(log: String, minStatus: Int = 500): void {
   Hit::parseAll(file(log).text())
-    .filter { h => h.status() >= minStatus }
-    .groupBy { h => h.path() }
-    .mapValues { xs => xs.size }
+    .filter { h -> h.status() >= minStatus }
+    .groupBy { h -> h.path() }
+    .mapValues { xs -> xs.size }
     |> println
 }
 ```

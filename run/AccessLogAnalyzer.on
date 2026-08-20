@@ -1,0 +1,325 @@
+// AccessLogAnalyzer.on — HTTP access-log analyzer (~270 lines)
+//
+// Exercises: record...from re"..." (anchored regex parser + parseAll),
+// do[Option] monadic chaining, |> pipeline, ADT case-enum with methods,
+// extension methods on Int/String/Double, class with mutable state,
+// collection pipelines (groupBy/map/filter/fold/sortedBy/find/partition/
+// distinct/any/count), foreach (k,v) in map, nullable types and null checks,
+// while/foreach loops, string interpolation, try/catch, recursion.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): String = {
+    if total == 0 { return "  0.0%" }
+    val p: Double = (self * 1000 / total) as Double / 10.0
+    return "#{p}%"
+  }
+}
+
+extension Double {
+  def fmt1(): String = {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+}
+
+extension String {
+  def repeated(n: Int): String {
+    var acc: String = ""
+    var i: Int = 0
+    while i < n { acc = acc + self; i++ }
+    return acc
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "~"
+  }
+}
+
+// ─── LogEntry record with regex parser ───────────────────────────────────────
+// Common Log Format: ip - - [timestamp] "METHOD path HTTP/ver" status bytes
+
+record LogEntry(ip: String, method: String, path: String, status: Int, bytes: Int)
+  from re"(\S+) \S+ \S+ \[[^\]]+\] \"(\w+) (\S+) HTTP/[\d.]+\" (\d+) (\d+)"
+
+// ─── HTTP status category (ADT enum) ─────────────────────────────────────────
+
+enum HttpStatus {
+  case Info(code: Int)
+  case Success(code: Int)
+  case Redirect(code: Int)
+  case ClientError(code: Int)
+  case ServerError(code: Int)
+
+public:
+  def label(): String = select this {
+    case i is Info:        "1xx"
+    case s is Success:     "2xx"
+    case r is Redirect:    "3xx"
+    case c is ClientError: "4xx"
+    case e is ServerError: "5xx"
+  }
+  def isError(): Boolean = select this {
+    case c is ClientError: true
+    case e is ServerError: true
+    else:                  false
+  }
+  def isSuccess(): Boolean = select this {
+    case s is Success: true
+    else:              false
+  }
+  static def of(code: Int): HttpStatus = {
+    if code >= 500 { return new ServerError(code) }
+    if code >= 400 { return new ClientError(code) }
+    if code >= 300 { return new Redirect(code) }
+    if code >= 200 { return new Success(code) }
+    return new Info(code)
+  }
+}
+
+// ─── PathSummary: aggregated stats per URL path ───────────────────────────────
+
+class PathSummary {
+  var _path:     String
+  var _hits:     Int
+  var _errCount: Int
+  var _totBytes: Int
+public:
+  def this(p: String) {
+    _path     = p
+    _hits     = 0
+    _errCount = 0
+    _totBytes = 0
+  }
+  def path():     String = _path
+  def hits():     Int    = _hits
+  def errCount(): Int    = _errCount
+  def accumulate(e: LogEntry): void {
+    _hits++
+    _totBytes = _totBytes + e.bytes()
+    if HttpStatus::of(e.status()).isError() { _errCount++ }
+  }
+  def avgBytes():  Double = if _hits == 0 { 0.0 } else { (_totBytes / _hits) as Double }
+  def errorRate(): Double = if _hits == 0 { 0.0 } else { (_errCount * 100 / _hits) as Double }
+}
+
+// ─── LogAnalyzer: orchestrates parsing and reporting ─────────────────────────
+
+class LogAnalyzer {
+  var _entries: List[LogEntry]
+public:
+  def this(parsed: List[LogEntry]) {
+    _entries = parsed
+  }
+  def size():         Int = _entries.size
+  def allEntries(): List[LogEntry] = _entries
+
+  def successCount(): Int = _entries.count { e -> HttpStatus::of(e.status()).isSuccess() }
+  def errorCount():   Int = _entries.count { e -> HttpStatus::of(e.status()).isError() }
+  def totalBytes():   Int = _entries.fold(0) { acc, e -> acc + e.bytes() }
+
+  def byIp():        Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
+  def byMethod():    Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.method() }
+  def byStatusCat(): Map[Object, List[LogEntry]] = _entries.groupBy { e -> HttpStatus::of(e.status()).label() }
+
+  def buildPathSummaries(): List[PathSummary] {
+    val byPath: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.path() }
+    val summaries: List[PathSummary] = []
+    foreach (p, pathEntries) in byPath {
+      val ps: PathSummary = new PathSummary(p as String)
+      foreach e: LogEntry in pathEntries { ps.accumulate(e) }
+      summaries.add(ps)
+    }
+    return summaries.sortedBy { ps -> -(ps as PathSummary).hits() }
+  }
+
+  def mostActiveIp(): String? {
+    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
+    var bestIp: String? = null
+    var bestCount: Int = 0
+    foreach (ip, ipEntries) in grouped {
+      if ipEntries.size > bestCount {
+        bestIp = ip as String
+        bestCount = ipEntries.size
+      }
+    }
+    return bestIp
+  }
+
+  def lastErrorFor(ip: String): LogEntry? {
+    var i: Int = 0
+    while i < _entries.size {
+      val e: LogEntry = _entries[i] as LogEntry
+      if e.ip() == ip && HttpStatus::of(e.status()).isError() { return e }
+      i++
+    }
+    return null
+  }
+
+  def suspiciousIps(): List[String] {
+    val grouped: Map[Object, List[LogEntry]] = _entries.groupBy { e -> e.ip() }
+    val suspect: List[String] = []
+    foreach (ip, ipEntries) in grouped {
+      val errs: List[LogEntry] = ipEntries.filter { e -> HttpStatus::of(e.status()).isError() }
+      if errs.size >= 2 { suspect.add(ip as String) }
+    }
+    return suspect
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def printSep(): void { IO::println("─".repeated(57)) }
+
+def headerLine(title: String): void {
+  printSep()
+  IO::println("  " + title)
+  printSep()
+}
+
+def toOptionEntry(e: LogEntry?): Option[LogEntry] =
+  if e == null { Option::none() } else { Option::some(e as LogEntry) }
+
+def toOptionStr(s: String?): Option[String] =
+  if s == null { Option::none() } else { Option::some(s as String) }
+
+// ─── Sample log data ─────────────────────────────────────────────────────────
+
+val RAW: String =
+  "192.168.1.10 - - [15/Aug/2026:10:00:00 +0000] \"GET /index.html HTTP/1.1\" 200 1234\n" +
+  "10.0.0.5 - - [15/Aug/2026:10:01:00 +0000] \"POST /api/login HTTP/1.1\" 200 88\n" +
+  "192.168.1.10 - - [15/Aug/2026:10:02:00 +0000] \"GET /images/logo.png HTTP/1.1\" 304 0\n" +
+  "172.16.0.3 - - [15/Aug/2026:10:03:00 +0000] \"GET /about HTTP/1.1\" 200 512\n" +
+  "10.0.0.99 - - [15/Aug/2026:10:04:00 +0000] \"DELETE /api/user/5 HTTP/1.1\" 404 42\n" +
+  "192.168.1.10 - - [15/Aug/2026:10:05:00 +0000] \"GET /api/data HTTP/1.1\" 500 0\n" +
+  "10.0.0.5 - - [15/Aug/2026:10:06:00 +0000] \"GET /api/data HTTP/1.1\" 200 9901\n" +
+  "172.16.0.3 - - [15/Aug/2026:10:07:00 +0000] \"POST /api/user HTTP/1.1\" 201 77\n" +
+  "10.0.0.99 - - [15/Aug/2026:10:08:00 +0000] \"GET /api/admin HTTP/1.1\" 403 0\n" +
+  "192.168.1.10 - - [15/Aug/2026:10:09:00 +0000] \"GET /shop HTTP/1.1\" 200 4321\n" +
+  "10.0.0.5 - - [15/Aug/2026:10:10:00 +0000] \"PUT /api/user/5 HTTP/1.1\" 200 156\n" +
+  "172.16.0.99 - - [15/Aug/2026:10:11:00 +0000] \"GET /missing HTTP/1.1\" 404 0\n" +
+  "192.168.1.10 - - [15/Aug/2026:10:12:00 +0000] \"GET /shop/checkout HTTP/1.1\" 500 0\n" +
+  "10.0.0.5 - - [15/Aug/2026:10:13:00 +0000] \"GET /index.html HTTP/1.1\" 200 1234\n" +
+  "172.16.0.3 - - [15/Aug/2026:10:14:00 +0000] \"GET /api/data HTTP/1.1\" 200 7788"
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val parsedEntries: List[LogEntry] = try {
+  LogEntry::parseAll(RAW)
+} catch e: Exception {
+  IO::println("Parse warning: #{e.message()}")
+  []
+}
+val analyzer: LogAnalyzer = new LogAnalyzer(parsedEntries)
+
+"=== HTTP Access Log Analyzer ===" |> IO::println
+IO::println("Parsed #{analyzer.size()} entries\n")
+
+// 1. Summary statistics
+headerLine("Summary")
+val total: Int = analyzer.size()
+IO::println("  Total requests : #{total}")
+IO::println("  Successful     : #{analyzer.successCount()} (#{analyzer.successCount().pct(total)})")
+IO::println("  Errors         : #{analyzer.errorCount()} (#{analyzer.errorCount().pct(total)})")
+IO::println("  Total bytes    : #{analyzer.totalBytes()}")
+
+// 2. Requests by HTTP method
+headerLine("Requests by Method")
+val byMethod: Map[Object, List[LogEntry]] = analyzer.byMethod()
+foreach (method, reqs) in byMethod {
+  val bar: String = "*".repeated(reqs.size)
+  IO::println("  #{(method as String).padRight(8)} #{reqs.size.pct(total).padRight(8)} #{bar}")
+}
+
+// 3. Requests by status category
+headerLine("Requests by Status Category")
+val byCat: Map[Object, List[LogEntry]] = analyzer.byStatusCat()
+foreach (cat, reqs) in byCat {
+  IO::println("  #{(cat as String).padRight(6)} #{reqs.size.pct(total).padRight(8)} (#{reqs.size} requests)")
+}
+
+// 4. Path summaries (top 5 by hits)
+headerLine("Top Paths")
+val summaries: List[PathSummary] = analyzer.buildPathSummaries()
+var shown: Int = 0
+foreach ps: PathSummary in summaries {
+  if shown >= 5 { break }
+  val pathStr: String = ps.path().truncate(35)
+  IO::println("  #{pathStr.padRight(36)} #{ps.hits()} hits  #{ps.errorRate().fmt1()}% err  avg #{ps.avgBytes().fmt1()} B")
+  shown++
+}
+
+// 5. Requests per client IP — sorted descending by request count
+headerLine("Requests by IP")
+val byIp: Map[Object, List[LogEntry]] = analyzer.byIp()
+// Prefix each line with a zero-padded count for lexicographic sort, then strip it.
+val ipLinesKeyed: List[String] = []
+foreach (ip, ipReqs) in byIp {
+  val errReqs: List[LogEntry] = ipReqs.filter { e -> HttpStatus::of(e.status()).isError() }
+  val cnt: Int = ipReqs.size
+  val prefix: String = if cnt >= 10 { "#{cnt}" } else { "0#{cnt}" }
+  ipLinesKeyed.add("#{prefix}|#{(ip as String).padRight(18)} #{cnt} req  #{errReqs.size} err")
+}
+val ipLinesSorted: List[String] = ipLinesKeyed.sortedBy { l -> l as String }
+// Iterate in reverse for descending order
+var ipIdx: Int = ipLinesSorted.size - 1
+while ipIdx >= 0 {
+  val line: String = ipLinesSorted[ipIdx] as String
+  IO::println("  #{line.substring(3)}")
+  ipIdx--
+}
+
+// 6. Suspicious IP detection (2+ errors)
+headerLine("Suspicious Clients (2+ errors)")
+val suspects: List[String] = analyzer.suspiciousIps()
+if suspects.size == 0 {
+  IO::println("  No suspicious clients detected.")
+} else {
+  foreach ip: String in suspects {
+    IO::println("  [ALERT] #{ip} -- multiple errors detected")
+  }
+}
+
+// 7. do[Option]: last error from the most active IP
+headerLine("Most Active Client -- Last Error")
+val lastErrOpt: Option[String] = do[Option] {
+  activeIp <- toOptionStr(analyzer.mostActiveIp())
+  lastErr  <- toOptionEntry(analyzer.lastErrorFor(activeIp))
+  ret "Last error from #{activeIp}: #{lastErr.status()} #{lastErr.method()} #{lastErr.path()}"
+}
+val lastErrMsg: String = if lastErrOpt == null { "No errors from most active client" } else { lastErrOpt.get() }
+IO::println("  #{lastErrMsg}")
+
+// 8. Partition successes vs failures and distinct error paths
+headerLine("Partition: Successes vs Failures")
+val allEntries: List[LogEntry] = analyzer.allEntries()
+val parts = allEntries.partition { e -> HttpStatus::of(e.status()).isSuccess() }
+val successes: List[Object] = parts[0] as List[Object]
+val failures:  List[Object] = parts[1] as List[Object]
+IO::println("  Successes: #{successes.size}   Failures: #{failures.size}")
+val errorPaths: List[String] = failures.map { e -> (e as LogEntry).path() }
+val allErrorPathObjs: List[Object] = errorPaths.map { p -> p as Object }
+val uniqueErrorPaths: List[Object] = allErrorPathObjs.distinct()
+val joinSep: String = ", "
+IO::println("  Distinct error paths (#{uniqueErrorPaths.size}): #{uniqueErrorPaths.join(joinSep)}")
+
+// 9. Recursive byte count (exercises recursion)
+def sumBytes(lst: List[LogEntry], idx: Int): Int = {
+  if idx >= lst.size { return 0 }
+  return (lst[idx] as LogEntry).bytes() + sumBytes(lst, idx + 1)
+}
+val recursiveTotal: Int = sumBytes(analyzer.allEntries(), 0)
+IO::println("  Recursive total bytes: #{recursiveTotal}")
+
+printSep()
+"Analysis complete." |> IO::println

@@ -105,6 +105,51 @@ if back != null {
 }
 ```
 
+## Serving HTTP
+
+**`MiniService.on`** answers requests instead of making them. Routing lives in `select`
+over the path, so a regex pattern binds its captured group as a value.
+
+```onion
+val server = Server::start("localhost", 8080)
+
+server.handleAll((req) -> select req.path() {
+  case re"/users/(\d+)" (id): Server::json("{\"id\": " + id + "}")
+  case "/health":             Server::text("ok")
+  else:                       Server::notFound()
+})
+
+IO::println("listening on " + server.port())
+server.await()
+```
+
+Port `0` asks the OS for a free port and `port()` reports the one it chose, which is how to
+start a server in a test without picking a number and hoping. `run/MiniWebService.on` is a
+complete version that answers its own requests and exits.
+
+## Raw TCP
+
+**`TcpClient.on`** speaks a protocol `Http` does not.
+
+```onion
+val conn = Net::connect("example.com", 80, 5000)
+conn.writeLine("GET / HTTP/1.0")
+conn.writeLine("Host: example.com")
+conn.writeLine("")
+IO::println(conn.readAll())
+conn.close()
+```
+
+Accepting is the mirror image:
+
+```onion
+val listener = Net::listen("localhost", 0, 4)
+val peer = listener.accept()
+peer.writeLine("echo: " + peer.readLine())
+peer.close()
+listener.close()
+```
+
 ## URL Utilities
 
 Build query strings and encode values:

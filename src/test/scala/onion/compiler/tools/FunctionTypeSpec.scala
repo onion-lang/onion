@@ -165,7 +165,7 @@ class FunctionTypeSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): Int {
           |    val picker = new Picker()
-          |    return picker.choose("a") { x => x.toString().length() }
+          |    return picker.choose("a") { x -> x.toString().length() }
           |  }
           |}
           |""".stripMargin,

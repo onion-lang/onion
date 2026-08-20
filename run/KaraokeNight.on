@@ -1,0 +1,529 @@
+// KaraokeNight.on — Karaoke night management: songs, singers, performances,
+// scores, playlists, and statistics.
+// Exercises: records with methods; data-carrying enum; ADT case-enum;
+// classes with mutable state; interfaces; collection pipelines
+// (map/filter/fold/reduce/groupBy/sortedBy/distinct/find/partition/zip);
+// select / pattern matching; nullable; closures; string interpolation;
+// try/catch; recursion; while/foreach (ranges and map (k,v)).
+
+import {
+  java.util.*
+}
+
+// ── Genre (homogeneous enum) ──────────────────────────────────────────────────
+
+enum Genre {
+  Pop, Rock, RnB, Country, Jazz, Anime, Classic
+public:
+  def label(): String = select this {
+    case Genre::Pop:     "Pop"
+    case Genre::Rock:    "Rock"
+    case Genre::RnB:     "R&B"
+    case Genre::Country: "Country"
+    case Genre::Jazz:    "Jazz"
+    case Genre::Anime:   "Anime"
+    case Genre::Classic: "Classic"
+    else: "Other"
+  }
+}
+
+// ── Difficulty (data-carrying enum) ──────────────────────────────────────────
+
+enum Difficulty(label: String, multiplier: Double) {
+  Easy("Easy", 1.0),
+  Medium("Medium", 1.5),
+  Hard("Hard", 2.0),
+  Nightmare("Nightmare", 3.0)
+}
+
+// ── ScoreGrade (ADT case-enum) ───────────────────────────────────────────────
+
+enum ScoreGrade {
+  case Perfect(score: Int)
+  case Good(score: Int)
+  case Okay(score: Int)
+  case NeedsWork(score: Int)
+public:
+  def label(): String = select this {
+    case g is Perfect:   "S (#{g.score()})"
+    case g is Good:      "A (#{g.score()})"
+    case g is Okay:      "B (#{g.score()})"
+    case g is NeedsWork: "C (#{g.score()})"
+  }
+  def stars(): Int = select this {
+    case g is Perfect:   5
+    case g is Good:      4
+    case g is Okay:      3
+    case g is NeedsWork: 2
+  }
+  def baseScore(): Int = select this {
+    case g is Perfect:   g.score()
+    case g is Good:      g.score()
+    case g is Okay:      g.score()
+    case g is NeedsWork: g.score()
+  }
+}
+
+def gradeOf(raw: Int): ScoreGrade {
+  if raw >= 95 { return new Perfect(raw) }
+  if raw >= 80 { return new Good(raw) }
+  if raw >= 60 { return new Okay(raw) }
+  return new NeedsWork(raw)
+}
+
+// ── Song record ───────────────────────────────────────────────────────────────
+
+record Song(
+  id: String,
+  title: String,
+  artist: String,
+  genre: Genre,
+  bpm: Int,
+  durationSec: Int,
+  difficulty: Difficulty
+) {
+public:
+  def durationMin(): String {
+    val m: Int = durationSec() / 60
+    val s: Int = durationSec() % 60
+    val pad: String = if s < 10 { "0" + s } else { "" + s }
+    return "#{m}:#{pad}"
+  }
+  def isUpbeat(): Boolean = bpm() >= 120
+  def shortTitle(): String {
+    val t: String = title()
+    if t.length() <= 25 { return t }
+    return t.substring(0, 22) + "..."
+  }
+}
+
+// ── Singer record ─────────────────────────────────────────────────────────────
+
+record Singer(name: String, age: Int, favoriteGenre: Genre)
+
+// ── Performance record ────────────────────────────────────────────────────────
+
+record Performance(
+  singer: Singer,
+  song: Song,
+  rawScore: Int,
+  bonusPoints: Int
+) {
+public:
+  def finalScore(): Int = rawScore() + bonusPoints()
+  def grade(): ScoreGrade = gradeOf(finalScore())
+  def effectiveScore(): Double =
+    finalScore() * song().difficulty().multiplier()
+  def summary(): String =
+    "#{singer().name()} sang \"#{song().shortTitle()}\" — #{grade().label()} " +
+    "(eff: #{effectiveScore()})"
+}
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+interface Rankable {
+  def rank(): Int
+  def displayName(): String
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self {
+      s = s + "*"
+      i++
+    }
+    return s
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val i: Int = self as Int
+    val frac: Int = ((self - (i as Double)) * 100.0) as Int
+    val pad: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "#{i}.#{pad}"
+  }
+}
+
+extension String {
+  def padEnd(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padStart(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── SingerStats (computed) ────────────────────────────────────────────────────
+
+class SingerStats conforms Reportable, Rankable {
+  val singer: Singer
+  val performances: List[Performance]
+  var position: Int
+public:
+  def this(s: Singer, ps: List[Performance]) {
+    singer = s
+    performances = ps
+    position = 0
+  }
+
+  def totalScore(): Int =
+    performances.fold(0) { acc, p -> acc + p.finalScore() }
+
+  def avgEffective(): Double =
+    if performances.size == 0 { 0.0 } else {
+      val sum: Double = performances.fold(0.0) { acc, p -> acc + p.effectiveScore() }
+      sum / (performances.size as Double)
+    }
+
+  def bestPerf(): Performance? {
+    val found: List[Performance] = performances.filter { p -> p.finalScore() >= 90 }
+    if found.size == 0 { return null }
+    return found[0]
+  }
+
+  def favGenreSongs(): Int =
+    performances.filter { p -> p.song().genre() == singer.favoriteGenre() }.size
+
+  def rank(): Int = position
+  def displayName(): String = singer.name()
+
+  def report(): String {
+    val g: String = singer.favoriteGenre().label()
+    return "#{singer.name().padEnd(14)} | songs: #{performances.size} | " +
+           "total: #{("" + totalScore()).padStart(5)} | " +
+           "avg-eff: #{avgEffective().fmt2().padStart(6)} | fav-genre(#{g}): #{favGenreSongs()}"
+  }
+}
+
+// ── Playlist ──────────────────────────────────────────────────────────────────
+
+class Playlist conforms Reportable {
+  val name: String
+  val songs: List[Song]
+public:
+  def this(n: String) { name = n; songs = [] }
+
+  def add(s: Song): void { songs << s }
+
+  def totalDurationSec(): Int = songs.fold(0) { acc, s -> acc + s.durationSec() }
+
+  def avgBpm(): Int =
+    if songs.size == 0 { 0 } else { songs.fold(0) { acc, s -> acc + s.bpm() } / songs.size }
+
+  def genreBreakdown(): Map[String, Int] {
+    val result: Map[String, Int] = [:]
+    foreach s: Song in songs {
+      val label: String = s.genre().label()
+      val current: Int? = result.get(label)
+      if current == null {
+        result.put(label, 1)
+      } else {
+        result.put(label, current + 1)
+      }
+    }
+    return result
+  }
+
+  def report(): String {
+    val mins: Int = totalDurationSec() / 60
+    val secs: Int = totalDurationSec() % 60
+    val pad: String = if secs < 10 { "0" + secs } else { "" + secs }
+    return "Playlist \"#{name}\": #{songs.size} songs, #{mins}:#{pad} total, avg BPM #{avgBpm()}"
+  }
+}
+
+// ── KaraokeEvent ─────────────────────────────────────────────────────────────
+
+class KaraokeEvent conforms Reportable {
+  val venue: String
+  val performances: List[Performance]
+public:
+  def this(v: String) { venue = v; performances = [] }
+  def allPerformances(): List[Performance] = performances
+
+  def addPerformance(p: Performance): void { performances << p }
+
+  def topN(n: Int): List[Performance] =
+    performances.sortedBy { p -> 0 - p.finalScore() }.take(n)
+
+  def singerStats(): List[SingerStats] {
+    val grouped: Map[String, List[Performance]] =
+      performances.groupBy { p -> p.singer().name() }
+    val result: List[SingerStats] = []
+    foreach (singerName, ps) in grouped {
+      val anyP: Performance = ps[0]
+      val stats: SingerStats = new SingerStats(anyP.singer(), ps)
+      if anyP.singer().name() != singerName { println("  [warn] name mismatch") }
+      result << stats
+    }
+    return result.sortedBy { s -> 0 - s.totalScore() }
+  }
+
+  def genreCounts(): Map[String, Int] {
+    val counts: Map[String, Int] = [:]
+    foreach p: Performance in performances {
+      val g: String = p.song().genre().label()
+      val c: Int? = counts.get(g)
+      if c == null { counts.put(g, 1) } else { counts.put(g, c + 1) }
+    }
+    return counts
+  }
+
+  def highScorers(): List[Performance] =
+    performances.filter { p -> p.finalScore() >= 90 }
+
+  def avgScoreByDifficulty(): Map[String, Double] {
+    val grouped: Map[String, List[Performance]] =
+      performances.groupBy { p -> p.song().difficulty().label() }
+    val result: Map[String, Double] = [:]
+    foreach (diff, ps) in grouped {
+      val sum2: Double = ps.fold(0.0) { acc, p -> acc + (p.finalScore() as Double) }
+      val avg: Double = sum2 / (ps.size as Double)
+      result.put(diff, avg)
+    }
+    return result
+  }
+
+  def report(): String = "KaraokeEvent @ #{venue}: #{performances.size} performances"
+}
+
+// ── Scoring helper ────────────────────────────────────────────────────────────
+
+def computeBonus(p: Performance): Int {
+  var bonus: Int = 0
+  if p.rawScore() == 100 { bonus = bonus + 5 }
+  if p.song().difficulty() == Difficulty::Hard || p.song().difficulty() == Difficulty::Nightmare {
+    bonus = bonus + 3
+  }
+  if p.song().isUpbeat() { bonus = bonus + 2 }
+  return bonus
+}
+
+// ── Recursive helpers ─────────────────────────────────────────────────────────
+
+def sumScores(ps: List[Performance], idx: Int): Int {
+  if idx >= ps.size { return 0 }
+  return ps[idx].finalScore() + sumScores(ps, idx + 1)
+}
+
+def maxScore(ps: List[Performance], idx: Int, best: Int): Int {
+  if idx >= ps.size { return best }
+  val s: Int = ps[idx].finalScore()
+  return maxScore(ps, idx + 1, if s > best { s } else { best })
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Songs
+  val songs: List[Song] = [
+    new Song("S01", "Bohemian Rhapsody",       "Queen",          Genre::Rock,    70,  355, Difficulty::Nightmare),
+    new Song("S02", "Shape of You",             "Ed Sheeran",     Genre::Pop,    96,  234, Difficulty::Easy),
+    new Song("S03", "All of Me",                "John Legend",    Genre::RnB,    63,  270, Difficulty::Medium),
+    new Song("S04", "Sweet Home Alabama",       "Lynyrd Skynyrd", Genre::Country,97,  213, Difficulty::Medium),
+    new Song("S05", "Take Five",                "Dave Brubeck",   Genre::Jazz,   86,  325, Difficulty::Hard),
+    new Song("S06", "A Cruel Angel's Thesis",   "Takahashi Yoko", Genre::Anime, 152,  226, Difficulty::Hard),
+    new Song("S07", "Can't Stop the Feeling",   "Justin Timberlake", Genre::Pop,113, 233, Difficulty::Easy),
+    new Song("S08", "Stairway to Heaven",       "Led Zeppelin",   Genre::Rock,   82,  482, Difficulty::Nightmare),
+    new Song("S09", "Fly Me to the Moon",       "Sinatra",        Genre::Jazz,   90,  147, Difficulty::Medium),
+    new Song("S10", "Before He Cheats",         "Carrie Underwood",Genre::Country,118,222,Difficulty::Medium)
+  ]
+
+  // Singers
+  val alice: Singer   = new Singer("Alice",   25, Genre::Pop)
+  val bob: Singer     = new Singer("Bob",     32, Genre::Rock)
+  val carol: Singer   = new Singer("Carol",   28, Genre::Jazz)
+  val david: Singer   = new Singer("David",   21, Genre::Anime)
+  val eve: Singer     = new Singer("Eve",     35, Genre::Country)
+  val frank: Singer   = new Singer("Frank",   30, Genre::RnB)
+
+  // Build event
+  val event: KaraokeEvent = new KaraokeEvent("Neon Star Karaoke")
+
+  // Raw score pairs [singer, song-index, rawScore]
+  val rawData: List[List[Int]] = [
+    [0, 1, 88], [0, 6, 92], [0, 2, 75],
+    [1, 0, 82], [1, 7, 78], [1, 3, 90],
+    [2, 4, 95], [2, 8, 89], [2, 5, 71],
+    [3, 5, 97], [3, 1, 83], [3, 6, 88],
+    [4, 3, 91], [4, 9, 85], [4, 1, 79],
+    [5, 2, 86], [5, 9, 93], [5, 4, 77]
+  ]
+
+  val singers: List[Singer] = [alice, bob, carol, david, eve, frank]
+
+  foreach row: List[Int] in rawData {
+    val singer: Singer = singers[row[0]]
+    val song: Song     = songs[row[1]]
+    val rawScore: Int  = row[2]
+    val tempP: Performance = new Performance(singer, song, rawScore, 0)
+    val bonus: Int = computeBonus(tempP)
+    val p: Performance = new Performance(singer, song, rawScore, bonus)
+    event.addPerformance(p)
+  }
+
+  // ── Report header ─────────────────────────────────────────────────────────
+  println("=================================================")
+  println("   NEON STAR KARAOKE NIGHT — RESULTS REPORT")
+  println("=================================================")
+  println("")
+
+  // ── Top 5 performances ────────────────────────────────────────────────────
+  println("--- Top 5 Performances ---")
+  val top5: List[Performance] = event.topN(5)
+  var rank: Int = 1
+  foreach p: Performance in top5 {
+    println("  #{rank}. #{p.summary()}")
+    rank++
+  }
+  println("")
+
+  // ── Singer leaderboard ────────────────────────────────────────────────────
+  println("--- Singer Leaderboard ---")
+  val stats: List[SingerStats] = event.singerStats()
+  var pos: Int = 1
+  foreach ss: SingerStats in stats {
+    println("  #{("" + pos).padStart(2)}. #{ss.report()}")
+    pos++
+  }
+  println("")
+
+  // ── Genre breakdown ───────────────────────────────────────────────────────
+  println("--- Genre Breakdown ---")
+  val genres: Map[String, Int] = event.genreCounts()
+  foreach (g, cnt) in genres {
+    println("  #{g.padEnd(10)}: #{("" + cnt).padStart(2)} perf(s) #{cnt.stars()}")
+  }
+  println("")
+
+  // ── Average score by difficulty ──────────────────────────────────────────
+  println("--- Avg Score by Difficulty ---")
+  val byDiff: Map[String, Double] = event.avgScoreByDifficulty()
+  foreach (diff, avg) in byDiff {
+    println("  #{diff.padEnd(10)}: #{avg.fmt2()}")
+  }
+  println("")
+
+  // ── High scorers (>= 90) ─────────────────────────────────────────────────
+  println("--- High Scorers (final >= 90) ---")
+  val hs: List[Performance] = event.highScorers()
+  val parts = hs.partition { p -> p.finalScore() >= 95 }
+  val topTier  = parts[0] as List[Object]
+  val restTier = parts[1] as List[Object]
+  println("  S-tier (95+): #{topTier.size} performance(s)")
+  foreach rawP: Object in topTier {
+    val p: Performance = rawP as Performance
+    println("    - #{p.singer().name()} — #{p.song().shortTitle()} #{p.grade().label()}")
+  }
+  println("  A-tier (90-94): #{restTier.size} performance(s)")
+  foreach rawP: Object in restTier {
+    val p: Performance = rawP as Performance
+    println("    - #{p.singer().name()} — #{p.song().shortTitle()} #{p.grade().label()}")
+  }
+  println("")
+
+  // ── Playlist analysis ─────────────────────────────────────────────────────
+  println("--- Sample Playlist Analysis ---")
+  val pl1: Playlist = new Playlist("Upbeat Hits")
+  val pl2: Playlist = new Playlist("Chill Vibes")
+  foreach s: Song in songs {
+    if s.isUpbeat() { pl1.add(s) } else { pl2.add(s) }
+  }
+  println("  #{pl1.report()}")
+  val bd1: Map[String, Int] = pl1.genreBreakdown()
+  foreach (genre, cnt) in bd1 {
+    println("    #{genre}: #{cnt}")
+  }
+  println("  #{pl2.report()}")
+  val bd2: Map[String, Int] = pl2.genreBreakdown()
+  foreach (genre, cnt) in bd2 {
+    println("    #{genre}: #{cnt}")
+  }
+  println("")
+
+  // ── Zip: pair songs with their difficulty multiplier ─────────────────────
+  println("--- Song Difficulty Multipliers ---")
+  val multipliers: List[Double] = songs.map { s -> s.difficulty().multiplier() }
+  val paired = songs.zip(multipliers)
+  foreach pair: Object in paired {
+    val row = pair as List
+    val s: Song   = row[0] as Song
+    val m: Double = row[1] as Double
+    println("  #{s.shortTitle().padEnd(27)}: x#{m.fmt2()} (#{s.difficulty().label()})")
+  }
+  println("")
+
+  // ── Recursive stats ───────────────────────────────────────────────────────
+  val allPs: List[Performance] = event.allPerformances()
+  val total: Int  = sumScores(allPs, 0)
+  val best: Int   = maxScore(allPs, 0, 0)
+  val avg: Double = (total as Double) / (allPs.size as Double)
+  println("--- Overall Statistics (recursive) ---")
+  println("  Total performances : #{allPs.size}")
+  println("  Sum of final scores: #{total}")
+  println("  Best final score   : #{best}")
+  println("  Average score      : #{avg.fmt2()}")
+  println("")
+
+  // ── Try/catch demo ────────────────────────────────────────────────────────
+  println("--- Nullable / Try-Catch Demo ---")
+  val impossibles: List[Performance] = allPs.filter { p -> p.finalScore() > 110 }
+  if impossibles.size == 0 {
+    println("  No score above 110 found (max bonus is 10, so this is correct).")
+  } else {
+    val maybeP: Performance = impossibles[0]
+    println("  Unexpected score > 110: #{maybeP.singer().name()}")
+  }
+  try {
+    val idx: Int = 999
+    println("" + allPs[idx])
+    println("  OOB did not throw!?")
+  } catch e: Exception {
+    println("  Caught expected exception: #{e.getClass().getSimpleName()}")
+  }
+  println("")
+
+  // ── Distinct artists ──────────────────────────────────────────────────────
+  val artists: List[String] = songs.map { s -> s.artist() }.distinct()
+  println("--- Distinct Artists (#{artists.size}) ---")
+  foreach a: String in artists {
+    println("  - #{a}")
+  }
+  println("")
+
+  // ── For-range bonus report ────────────────────────────────────────────────
+  println("--- Score Buckets ---")
+  val buckets: List[String] = ["<60", "60-79", "80-89", "90-94", "95+"]
+  val counts: List[Int] = [
+    allPs.filter { p -> p.finalScore() < 60 }.size,
+    allPs.filter { p -> p.finalScore() >= 60 && p.finalScore() < 80 }.size,
+    allPs.filter { p -> p.finalScore() >= 80 && p.finalScore() < 90 }.size,
+    allPs.filter { p -> p.finalScore() >= 90 && p.finalScore() < 95 }.size,
+    allPs.filter { p -> p.finalScore() >= 95 }.size
+  ]
+  val bpairs = buckets.zip(counts)
+  foreach bpair: Object in bpairs {
+    val brow = bpair as List
+    val blabel: String = brow[0] as String
+    val bc: Int = brow[1] as Int
+    println("  #{blabel.padEnd(8)}: #{bc}")
+  }
+
+  println("")
+  println("=================================================")
+  println("         END OF REPORT")
+  println("=================================================")
+}

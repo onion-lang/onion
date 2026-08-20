@@ -146,10 +146,10 @@ def hr(): void {
 }
 
 def totalDuration(songs: List[Song]): Int =
-  songs.fold(0) { acc, s => (acc as Int) + (s as Song).durationSecs() }
+  songs.fold(0) { acc, s -> (acc as Int) + (s as Song).durationSecs() }
 
 def topRatedEntries(entries: List[Entry], min: Int): List[Entry] =
-  entries.filter { e =>
+  entries.filter { e ->
     val r: Rating? = (e as Entry).rating()
     r != null && r.stars() >= min
   }
@@ -169,24 +169,24 @@ def main(): void {
   val totalSecs: Int = totalDuration(songs)
   IO::println("Total songs : #{catalog.size}")
   IO::println("Total time  : #{totalSecs.toMMSS()}")
-  val uniqueArtists = songs.map { s => (s as Song).artist() }.distinct()
+  val uniqueArtists = songs.map { s -> (s as Song).artist() }.distinct()
   IO::println("Artists     : #{uniqueArtists.size}")
   IO::println("")
 
   // ── Songs grouped by genre ─────────────────────────────────────────
   IO::println("By genre:")
-  val byGenre = songs.groupBy { s => genreLabel((s as Song).genre()) }
+  val byGenre = songs.groupBy { s -> genreLabel((s as Song).genre()) }
   foreach (genreName, genreSongs) in byGenre {
     val gn: String = genreName as String
     val gs: List[Song] = genreSongs as List[Song]
-    val secs: Int = gs.fold(0) { acc, s => (acc as Int) + s.durationSecs() }
+    val secs: Int = gs.fold(0) { acc, s -> (acc as Int) + s.durationSecs() }
     IO::println("  #{gn.padRight(12)}: #{gs.size} song(s), #{secs.toMMSS()}")
   }
   IO::println("")
 
   // ── Longest songs (top 5) ──────────────────────────────────────────
   IO::println("Longest songs (top 5):")
-  val byDuration: List[Song] = songs.sortedByDescending { s => (s as Song).durationSecs() }
+  val byDuration: List[Song] = songs.sortedByDescending { s -> (s as Song).durationSecs() }
   var rank: Int = 1
   foreach s: Object in byDuration {
     if rank > 5 { break }
@@ -198,7 +198,7 @@ def main(): void {
 
   // ── Chronological listing ──────────────────────────────────────────
   IO::println("Chronological (oldest first):")
-  val byYear: List[Song] = songs.sortedBy { s => (s as Song).year() }
+  val byYear: List[Song] = songs.sortedBy { s -> (s as Song).year() }
   foreach s: Object in byYear {
     val song: Song = s as Song
     IO::println("  #{song.year()} #{song.title().truncate(25)} [#{genreLabel(song.genre())}]")
@@ -216,7 +216,7 @@ def main(): void {
   IO::println("")
 
   // ── Unrated songs ──────────────────────────────────────────────────
-  val unrated: List[Entry] = entries.filter { e => (e as Entry).rating() == null }
+  val unrated: List[Entry] = entries.filter { e -> (e as Entry).rating() == null }
   IO::println("Unrated songs: #{unrated.size}")
   foreach e: Object in unrated {
     IO::println("  - #{(e as Entry).song().title()}")
@@ -225,13 +225,13 @@ def main(): void {
 
   // ── Catalog search ─────────────────────────────────────────────────
   IO::println("Catalog search:")
-  val found: Song? = catalog.findFirst { s => s.artist() == "Queen" }
+  val found: Song? = catalog.findFirst { s -> s.artist() == "Queen" }
   if found != null {
     IO::println("  Queen: #{found.title()} (#{found.year()}, #{genreLabel(found.genre())})")
   } else {
     IO::println("  Queen: not found")
   }
-  val jazzCount: Int = catalog.countWhere { s => s.genre() == Genre::valueOf("JAZZ") }
+  val jazzCount: Int = catalog.countWhere { s -> s.genre() == Genre::valueOf("JAZZ") }
   IO::println("  Jazz: #{jazzCount} song(s) in catalog")
   IO::println("")
 
@@ -240,7 +240,7 @@ def main(): void {
   foreach (gl, gs) in byGenre {
     val label: String = gl as String
     val glist: List[Song] = gs as List[Song]
-    val tot: Int = glist.fold(0) { acc, s => (acc as Int) + s.durationSecs() }
+    val tot: Int = glist.fold(0) { acc, s -> (acc as Int) + s.durationSecs() }
     val avg: Int = tot / glist.size
     IO::println("  #{label.padRight(12)}: #{avg.toMMSS()} avg")
   }
@@ -248,7 +248,7 @@ def main(): void {
 
   // ── Songs from the 1970s ───────────────────────────────────────────
   IO::println("1970s songs:")
-  val seventies: List[Song] = songs.filter { s =>
+  val seventies: List[Song] = songs.filter { s ->
     val y: Int = (s as Song).year()
     y >= 1970 && y < 1980
   }
@@ -262,7 +262,7 @@ def main(): void {
   IO::println("Rating distribution:")
   var star: Int = 5
   while star >= 1 {
-    val ratedCount: Int = entries.filter { e =>
+    val ratedCount: Int = entries.filter { e ->
       val r: Rating? = (e as Entry).rating()
       r != null && r.stars() == star
     }.size

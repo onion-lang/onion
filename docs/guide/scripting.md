@@ -163,9 +163,9 @@ newline before `|>` continues the pipeline:
 
 ```onion
 file"access.log".lines()
-  .map { l => classify(l) }
-  .groupBy { c => c }
-  .mapValues { xs => xs.size }
+  .map { l -> classify(l) }
+  .groupBy { c -> c }
+  .mapValues { xs -> xs.size }
   |> println
 ```
 
@@ -208,9 +208,9 @@ record Hit(ip: String, method: String, path: String, status: Int)
 
 def main(log: String, minStatus: Int = 500): void {
   Hit::parseAll(file(log).text())
-    .filter { h => h.status() >= minStatus }
-    .groupBy { h => h.path() }
-    .mapValues { xs => xs.size }
+    .filter { h -> h.status() >= minStatus }
+    .groupBy { h -> h.path() }
+    .mapValues { xs -> xs.size }
     |> println
 }
 ```

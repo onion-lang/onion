@@ -44,6 +44,23 @@ class QualityBarSpec extends AnyFunSpec {
     out.toSeq
   }
 
+  /**
+   * Tests written out by hand across `src/test/scala`, counted from the source. This
+   * undercounts -- suites that generate a case per sample under `run/`, or per documented
+   * example, contribute one declaration for many tests -- which is why row 1's band is
+   * one-sided in spirit: the point is that the recorded figure moves when the suite does.
+   */
+  private lazy val declaredTests: Int = {
+    val declaration = """\b(?:it|they|test)\s*\(""".r
+    var total = 0
+    java.nio.file.Files.walk(java.nio.file.Path.of("src/test/scala")).forEach { p =>
+      if (p.getFileName.toString.endsWith(".scala"))
+        total += declaration.findAllIn(java.nio.file.Files.readString(p)).size
+    }
+    assert(total > 0, "counted no test declarations under src/test/scala — the scan has rotted")
+    total
+  }
+
   private def firstInt(s: String): Int =
     """\d+""".r.findFirstIn(s).map(_.toInt)
       .getOrElse(fail(s"no number in quality-bar cell: $s"))
@@ -83,12 +100,26 @@ class QualityBarSpec extends AnyFunSpec {
         s"quality-bar says ${en(7)} diagnostic codes, SemanticError declares $declared")
     }
 
-    it("row 1: the recorded test count is in the right ballpark for this suite") {
-      // A suite cannot count itself while running, so this only catches the failure
-      // mode that actually happened: a figure left behind across many releases.
+    it("row 1: the recorded test count tracks the number of declared tests") {
+      // A suite cannot count itself while running, so this checks the recorded figure
+      // against a proxy that moves with the suite: the tests written out by hand.
+      //
+      // Fixed bounds were the earlier approach and they rot in both directions -- the
+      // floor stops catching a stale figure as the suite grows past it, and the ceiling
+      // starts failing spuriously for the same reason. (It had drifted to 3410 against
+      // an actual 3594 while sitting comfortably inside a 2700-4000 window.) Tying the
+      // band to the declaration count makes it self-adjusting.
+      //
+      // The band is wide on purpose: several suites generate cases in a loop -- one per
+      // `run/*.on` sample, one per documented example -- so the real total runs well
+      // above what is declared. The goal is to catch a figure left behind across many
+      // releases, not to compute the true count.
+      val declared = declaredTests
       val recorded = firstInt(en(1))
-      assert(recorded >= 2700 && recorded <= 4000,
-        s"quality-bar records $recorded tests, which is far from this suite's size — re-measure")
+      assert(recorded >= declared * 9 / 10 && recorded <= declared * 2,
+        s"quality-bar records $recorded tests; the suite declares $declared by hand, so the " +
+        s"recorded figure should sit between ${declared * 9 / 10} and ${declared * 2} — re-measure " +
+        "with `sbt shutdown && sbt -Duser.language=en testFull`")
     }
 
     it("the Japanese copy carries the same measured figures") {

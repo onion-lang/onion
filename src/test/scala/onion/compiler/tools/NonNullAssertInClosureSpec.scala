@@ -19,6 +19,6 @@ class NonNullAssertInClosureSpec extends AbstractShellSpec {
   }
   it("compiles a trait method (dict!!) used inside a lambda in a constrained fn") {
     assert(Shell.Success(6) == shell.run(
-      "trait Num[T] { def add(a: T, b: T): T }\ninstance Num[Integer] { def add(a: Integer, b: Integer): Integer = a + b }\ndef sumL[T: Num](xs: List[T], z: T): T = xs.fold(z) { acc, x => Num[T]::add(acc, x) }\ndef main(args: String[]): Int { return sumL([1,2,3], 0) }", "None", Array()))
+      "trait Num[T] { def add(a: T, b: T): T }\ninstance Num[Integer] { def add(a: Integer, b: Integer): Integer = a + b }\ndef sumL[T: Num](xs: List[T], z: T): T = xs.fold(z) { acc, x -> Num[T]::add(acc, x) }\ndef main(args: String[]): Int { return sumL([1,2,3], 0) }", "None", Array()))
   }
 }

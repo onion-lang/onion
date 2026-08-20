@@ -61,5 +61,37 @@ class LabelNotFoundSpec extends AbstractShellSpec {
           |""".stripMargin
       ).contains("E0058"))
     }
+
+    it("suggests the enclosing label's name for a near-miss typo") {
+      // Assert on the error code and the suggested identifier only (both
+      // locale-independent) rather than the localized "did you mean" wording.
+      val buf = new java.io.ByteArrayOutputStream()
+      val ps = new java.io.PrintStream(buf, true, "UTF-8")
+      val (o, e) = (System.out, System.err)
+      val r =
+        try {
+          System.setOut(ps); System.setErr(ps)
+          Console.withOut(ps) { Console.withErr(ps) {
+            shell.run(
+              """
+                |class Test {
+                |public:
+                |  static def main(args: String[]): void {
+                |    outer: foreach i: Int in 0..3 {
+                |      break outr
+                |    }
+                |  }
+                |}
+                |""".stripMargin,
+              "None",
+              Array()
+            )
+          } }
+        } finally { System.setOut(o); System.setErr(e) }
+      val out = new String(buf.toByteArray, "UTF-8")
+      assert(r.isInstanceOf[onion.tools.Shell.Failure], s"expected a compile failure, got $r\n$out")
+      assert(out.contains("E0058"), s"expected E0058 in diagnostics, got:\n$out")
+      assert(out.contains("outer"), s"expected suggestion 'outer' in diagnostics, got:\n$out")
+    }
   }
 }

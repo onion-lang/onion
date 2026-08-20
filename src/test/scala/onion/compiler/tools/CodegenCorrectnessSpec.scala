@@ -17,9 +17,9 @@ class CodegenCorrectnessSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): Int {
           |    val xs: List[Int] = [1, 2, 3, 4, 5]
-          |    val doubled = xs.map { x => (x as Int) * 2 }
-          |    val evens = doubled.filter { x => (x as Int) % 4 == 0 }
-          |    return evens.fold(0) { a, b => (a as Int) + (b as Int) }
+          |    val doubled = xs.map { x -> (x as Int) * 2 }
+          |    val evens = doubled.filter { x -> (x as Int) % 4 == 0 }
+          |    return evens.fold(0) { a, b -> (a as Int) + (b as Int) }
           |  }
           |}
           |""".stripMargin, "None", Array())
@@ -35,7 +35,7 @@ class CodegenCorrectnessSpec extends AbstractShellSpec {
           |  static def lineTotal(i: Item): Int = i.price() * i.qty()
           |  static def main(args: String[]): Int {
           |    val items: List[Item] = [new Item("a", 100, 3), new Item("b", 50, 2)]
-          |    return items.fold(0) { acc, i => (acc as Int) + Test::lineTotal(i as Item) }
+          |    return items.fold(0) { acc, i -> (acc as Int) + Test::lineTotal(i as Item) }
           |  }
           |}
           |""".stripMargin, "None", Array())

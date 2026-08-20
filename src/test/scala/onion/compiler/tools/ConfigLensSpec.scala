@@ -54,7 +54,7 @@ class ConfigLensSpec extends AbstractShellSpec {
           |    var ok = 0
           |    foreach t: String in corpus {
           |      val lens = Server::cfg().parseLossless(t).get()
-          |      val out = lens.edit { v => v.copy(debug = !v.debug()) }.render()
+          |      val out = lens.edit { v -> v.copy(debug = !v.debug()) }.render()
           |      if oneLineDiff(t, out) { ok = ok + 1 }
           |    }
           |    return ok
@@ -71,8 +71,8 @@ class ConfigLensSpec extends AbstractShellSpec {
           |  static def main(args: String[]): String {
           |    val t = "host = a\nport = 1\ndebug = false\n"
           |    val lens = Server::cfg().parseLossless(t).get()
-          |    return lens.edit { v => v.copy(port = 2) }
-          |               .edit { v => v.copy(host = "b") }
+          |    return lens.edit { v -> v.copy(port = 2) }
+          |               .edit { v -> v.copy(host = "b") }
           |               .render()
           |  }
           |}
@@ -94,7 +94,7 @@ class ConfigLensSpec extends AbstractShellSpec {
           |    // Unedited render reproduces the CRLF file exactly.
           |    if lens.render() != "host = a\r\nport = 1\r\ndebug = false\r\n" { return 1 }
           |    // An edited line keeps its terminator style.
-          |    val out = lens.edit { v => v.copy(port = 2) }.render()
+          |    val out = lens.edit { v -> v.copy(port = 2) }.render()
           |    if out != "host = a\r\nport = 2\r\ndebug = false\r\n" { return 2 }
           |    return 0
           |  }

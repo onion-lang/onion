@@ -98,21 +98,21 @@ public:
 
   // Highest priority first; ties broken by lower id (earlier submission wins).
   def byPriority(): List[Job] {
-    return all().sortedBy { j => 0 - j.priority() }
+    return all().sortedBy { j -> 0 - j.priority() }
   }
 
   def findById(id: Int): Job? {
-    val found = all().find { j => j.id() == id }
+    val found = all().find { j -> j.id() == id }
     if found == null { return null }
     return found as Job
   }
 
   def criticalJobs(): List[Job] {
-    return all().filter { j => j.priority().isCritical() }
+    return all().filter { j -> j.priority().isCritical() }
   }
 
   def totalEstimatedMs(): Int {
-    return all().fold(0) { acc, j => (acc as Int) + j.estimatedMs() } as Int
+    return all().fold(0) { acc, j -> (acc as Int) + j.estimatedMs() } as Int
   }
 }
 
@@ -128,14 +128,14 @@ def run(j: Job): RunResult {
 }
 
 def runAll(queue: JobQueue): List[RunResult] {
-  return queue.byPriority().map { j => run(j) }
+  return queue.byPriority().map { j -> run(j) }
 }
 
 def summarize(results: List[RunResult]): QueueSummary {
   val total  = results.size
-  val ok     = results.filter { r => !(r as RunResult).state().isFailure() }.size
-  val bad    = results.filter { r => (r as RunResult).state().isFailure() }.size
-  val ms     = results.fold(0) { acc, r => (acc as Int) + (r as RunResult).job().estimatedMs() } as Int
+  val ok     = results.filter { r -> !(r as RunResult).state().isFailure() }.size
+  val bad    = results.filter { r -> (r as RunResult).state().isFailure() }.size
+  val ms     = results.fold(0) { acc, r -> (acc as Int) + (r as RunResult).job().estimatedMs() } as Int
   return new QueueSummary(total, ok, bad, 0, ms)
 }
 
@@ -228,7 +228,7 @@ IO::println("  Total time: #{summary.totalMs()}ms")
 IO::println("")
 
 printHeader("Failures — root cause")
-val failures = results.filter { r => (r as RunResult).state().isFailure() }
+val failures = results.filter { r -> (r as RunResult).state().isFailure() }
 foreach r: RunResult in failures {
   select r.state() {
     case f is Failed: IO::println("  ##{r.job().id()} #{r.job().name()}: #{f.reason()}")
@@ -239,14 +239,14 @@ IO::println("")
 
 // Grouping and pipeline demo
 printHeader("Jobs grouped by outcome")
-val grouped = results.groupBy { r => (r as RunResult).state().label().trim() }
+val grouped = results.groupBy { r -> (r as RunResult).state().label().trim() }
 foreach (label, rlist) in grouped {
   val grp = rlist as List[Object]
   IO::println("  #{label}: #{grp.size.plural("job")}")
 }
 IO::println("")
 
-val distinctPriorities = queue.all().map { j => j.priority() }.distinct()
+val distinctPriorities = queue.all().map { j -> j.priority() }.distinct()
 IO::println("  Distinct priority levels in use: #{distinctPriorities.size}")
 
 val topTwo = queue.byPriority().take(2)
@@ -254,7 +254,7 @@ IO::println("  Top #{topTwo.size.plural("job")} by priority:")
 foreach j: Job in topTwo { IO::println("    ##{j.id()} #{j.name()}") }
 IO::println("")
 
-queue.all().map { j => j.name() } |> IO::println
+queue.all().map { j -> j.name() } |> IO::println
 
 IO::println(line("=", 60))
 IO::println("  Report complete.")

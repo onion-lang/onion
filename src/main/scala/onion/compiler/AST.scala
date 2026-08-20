@@ -309,7 +309,24 @@ object AST {
   }
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration
-  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression, selfDelegation: Boolean = false) extends MemberDeclaration {val name = "new" }
+  /**
+   * A constructor, in one of three shapes the parser produces:
+   *
+   *   - the '''primary''' constructor, synthesized from `class C(params) extends B(args)`:
+   *     `primary = true`, `superInits = args`, and `block` holds exactly
+   *     `primaryAssignments` field assignments (`this.x = x` for each `val`/`var` param)
+   *     and nothing else — the typer relies on that count to place declared field
+   *     initializers ''after'' those assignments;
+   *   - a '''secondary''' constructor delegating to a sibling, `def this(..) : this(args) { .. }`:
+   *     `selfDelegation = true`, `superInits = args`;
+   *   - a secondary constructor with no delegation clause, `def this(..) { .. }`: neither flag,
+   *     `superInits` empty, and it calls the superclass's no-arg constructor.
+   *
+   * There is no shape for a secondary constructor that passes arguments to the superclass:
+   * arguments to a super constructor are written once, on the `extends` clause, and belong
+   * to the primary. A `def this` in a class that ''has'' a primary must delegate to it.
+   */
+  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression, selfDelegation: Boolean = false, primary: Boolean = false, primaryAssignments: Int = 0) extends MemberDeclaration {val name = "new" }
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
@@ -343,9 +360,16 @@ object AST {
   case class ExampleClause(location: Location, name: Option[String], body: BlockExpression) extends Node
   /** A top-level `example { boolean-expr }`, desugared to a static boolean method in <File>Main. */
   case class TopLevelExample(location: Location, name: Option[String], body: BlockExpression) extends Toplevel
-  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
+  /**
+   * @param hasPrimary whether the class declared a primary constructor — a parameter list
+   *                   after the name, or arguments on the `extends` clause, or both. When it
+   *                   did, every `def this` in the body must delegate to it with `: this(..)`.
+   *                   A class with neither has no primary; its `def this` constructors call
+   *                   the superclass's no-arg constructor directly, as they always have.
+   */
+  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
-      this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)
+      this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil, false)
   }
   case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) =

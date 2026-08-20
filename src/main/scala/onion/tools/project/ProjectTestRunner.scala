@@ -106,7 +106,9 @@ private object SystemProjectTestBackend extends ProjectTestBackend:
   ): Either[ProjectTestFailure, PreparedProjectTest] =
     val bytes = Files.readAllBytes(source.path)
     val config = CompilerConfig(
-      classPath = Seq(build.paths.classes.toString),
+      // A test compiles against the project's own classes *and* its dependencies;
+      // without the latter a test cannot mention any type it depends on.
+      classPath = build.paths.classes.toString +: build.dependencies.classpath.map(_.toString),
       superClass = "",
       encoding = UTF_8.name(),
       outputDirectory = workspace.classes.toString,
@@ -160,7 +162,7 @@ private object SystemProjectTestBackend extends ProjectTestBackend:
     prepared: PreparedProjectTest
   ): ProgramResult =
     ProjectClassRunner.run(
-      Vector(workspace.classes, build.paths.classes),
+      Vector(workspace.classes, build.paths.classes) ++ build.dependencies.classpath,
       prepared.className,
       Array.empty
     )

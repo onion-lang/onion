@@ -8,6 +8,17 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
+      # The Pygments lexer decides how every ```onion fence renders, so a change to it
+      # has to redeploy the site just as a docs change does.
+      - 'tools/pygments-onion/**'
+  # Build (but do not deploy) on pull requests, so a broken site or an unlexable code
+  # fence is caught before it reaches main rather than after.
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
+      - 'tools/pygments-onion/**'
   workflow_dispatch:
 
 permissions:
@@ -31,9 +42,20 @@ jobs:
         run: |
           pip install mkdocs-material
           pip install mkdocs-glightbox
+          # Registers the `onion` Pygments lexer through an entry point, which is what
+          # makes the ~1200 ```onion fences highlight. Without it they render as plain
+          # text and mkdocs does not complain, so verify the alias resolved.
+          pip install ./tools/pygments-onion
+          python -c "from pygments.lexers import get_lexer_by_name; get_lexer_by_name('onion')"
+
+      - name: Check every ```onion fence lexes
+        # mkdocs does not complain about an unhighlightable fence -- it just renders it as
+        # plain text -- so this has to be an explicit gate.
+        run: python tools/pygments-onion/check_docs.py docs README.md
 
       - name: Build documentation
         run: mkdocs build --strict
 
       - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
         run: mkdocs gh-deploy --force

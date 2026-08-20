@@ -223,17 +223,17 @@ def statsReport(name: String, pattern: List[String], gridW: Int, gridH: Int,
   loadPattern(g, pattern, rowOff, colOff)
   val snaps: List[Snapshot] = collectSnapshots(g, steps)
 
-  val maxLive: Int = snaps.fold(0) { acc, s =>
+  val maxLive: Int = snaps.fold(0) { acc, s ->
     val snap: Snapshot = s as Snapshot
     val v: Int = acc as Int
     if snap.liveCount() > v { snap.liveCount() } else { v }
   }
-  val minLive: Int = snaps.fold(999999) { acc, s =>
+  val minLive: Int = snaps.fold(999999) { acc, s ->
     val snap: Snapshot = s as Snapshot
     val v: Int = acc as Int
     if snap.liveCount() < v { snap.liveCount() } else { v }
   }
-  val totalLive: Int = snaps.fold(0) { acc, s =>
+  val totalLive: Int = snaps.fold(0) { acc, s ->
     (acc as Int) + (s as Snapshot).liveCount()
   }
   val avgLive: Int = totalLive / snaps.size

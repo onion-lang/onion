@@ -103,7 +103,7 @@ IO::println("Total bookings: " + bookings.size)
 IO::println("")
 
 // ── Total revenue (fold) ──────────────────────────────────────────────────────
-val totalRevenue = bookings.fold(0) { acc, b =>
+val totalRevenue = bookings.fold(0) { acc, b ->
   (acc as Int) + bookingRevenue(b as Booking)
 } as Int
 IO::println("Total revenue: " + fmtYen(totalRevenue))
@@ -115,9 +115,9 @@ IO::println(padRight("Seat", 12) + padLeft("Count", 7) + padLeft("Revenue", 14))
 IO::println("-".repeat(34))
 val seatNames = ["Standard", "Premium", "VIP"]
 foreach stName: String in seatNames {
-  val stB = bookings.filter { b => seatName((b as Booking).seat()) == stName }
+  val stB = bookings.filter { b -> seatName((b as Booking).seat()) == stName }
   val cnt = stB.size
-  val rev = stB.fold(0) { acc, b => (acc as Int) + bookingRevenue(b as Booking) } as Int
+  val rev = stB.fold(0) { acc, b -> (acc as Int) + bookingRevenue(b as Booking) } as Int
   IO::println(padRight(stName, 12) + padLeft("" + cnt, 7) + padLeft(fmtYen(rev), 14))
 }
 IO::println("")
@@ -127,13 +127,13 @@ IO::println("── Revenue by Movie ──────────────�
 IO::println(padRight("Movie", 22) + padRight("Genre", 10) + padLeft("Count", 7) + padLeft("Revenue", 14))
 IO::println("-".repeat(55))
 val allMovies = [actionMovie, comedyMovie, dramaMovie, scifiMovie, horrorMovie]
-val movieStats = allMovies.map { m =>
+val movieStats = allMovies.map { m ->
   val mv = m as Movie
-  val mb = bookings.filter { b => (b as Booking).movie().title() == mv.title() }
-  val rev = mb.fold(0) { acc, b => (acc as Int) + bookingRevenue(b as Booking) } as Int
+  val mb = bookings.filter { b -> (b as Booking).movie().title() == mv.title() }
+  val rev = mb.fold(0) { acc, b -> (acc as Int) + bookingRevenue(b as Booking) } as Int
   new MovieStat(mv.title(), mv.genre(), mb.size, rev)
 }
-val sortedByRev = movieStats.sortedBy { ms => 0 - (ms as MovieStat).revenue() }
+val sortedByRev = movieStats.sortedBy { ms -> 0 - (ms as MovieStat).revenue() }
 foreach i: Int in 1..5 {
   val ms = sortedByRev[i - 1] as MovieStat
   IO::println(
@@ -147,7 +147,7 @@ IO::println("")
 
 // ── Genre breakdown (groupBy + foreach on map entries) ───────────────────────
 IO::println("── Bookings by Genre ───────────────────────────────")
-val byGenre = bookings.groupBy { b => (b as Booking).movie().genre() }
+val byGenre = bookings.groupBy { b -> (b as Booking).movie().genre() }
 foreach (genre, grp) in byGenre {
   val cnt = (grp as List).size
   var bar = ""
@@ -158,7 +158,7 @@ IO::println("")
 
 // ── VIP customers (filter by ADT pattern + foreach) ───────────────────────────
 IO::println("── VIP Customers ───────────────────────────────────")
-val vipBookings = bookings.filter { b =>
+val vipBookings = bookings.filter { b ->
   select (b as Booking).seat() {
     case s is VIP: true
     else:          false
@@ -171,7 +171,7 @@ foreach vb: Booking in vipBookings {
 IO::println("")
 
 // ── Partition: high-value vs budget bookings ──────────────────────────────────
-val parts     = bookings.partition { b => bookingRevenue(b as Booking) >= 2000 }
+val parts     = bookings.partition { b -> bookingRevenue(b as Booking) >= 2000 }
 val highValue = parts[0] as List[Object]
 val budget    = parts[1] as List[Object]
 IO::println("Bookings >= 2000 yen: " + highValue.size)
@@ -179,13 +179,13 @@ IO::println("Bookings <  2000 yen: " + budget.size)
 IO::println("")
 
 // ── Distinct movie titles seen (distinct) ─────────────────────────────────────
-val seenTitles = bookings.map { b => (b as Booking).movie().title() }.distinct()
+val seenTitles = bookings.map { b -> (b as Booking).movie().title() }.distinct()
 IO::println("Distinct movies with bookings: " + seenTitles.size)
 IO::println("")
 
 // ── Movies ranked by duration (sortedBy + indexed foreach) ───────────────────
 IO::println("── Movies by Duration ──────────────────────────────")
-val sortedByDur = allMovies.sortedBy { m => 0 - (m as Movie).durationMin() }
+val sortedByDur = allMovies.sortedBy { m -> 0 - (m as Movie).durationMin() }
 foreach i: Int in 1..5 {
   val mv = sortedByDur[i - 1] as Movie
   IO::println("  #{i}. #{mv.title()} — #{mv.durationMin()} min")

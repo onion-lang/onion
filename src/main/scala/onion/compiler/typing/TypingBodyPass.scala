@@ -41,6 +41,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val declarationBodySupport = new DeclarationBodySupport(
     typing,
     unitContext,
+    bodyContext,
     classInitializerSupport,
     methodBodySupport,
     processMethodDeclaration,
@@ -132,7 +133,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
           for (section <- node.sections; member <- section.members) {
             member match {
               case m: AST.MethodDeclaration => processMethodDeclaration(m)
-              case _ => // record bodies currently support methods only
+              // A record's constructor is its component list. A `def this` here parsed
+              // and was registered by the outline pass but never typed, and codegen then
+              // took the record's synthetic parameter-to-field path against a
+              // constructor of the wrong arity -- a crash (I0000), not a diagnostic.
+              case c: AST.ConstructorDeclaration =>
+                bodyContext.report(SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM, c, "record", definition)
+              case _ => // record bodies otherwise support methods only
             }
           }
         }
@@ -191,7 +198,11 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         for (section <- node.sections; member <- section.members) {
           member match {
             case m: AST.MethodDeclaration => processMethodDeclaration(m)
-            case _ => // enum bodies currently support methods only
+            // Same hazard as the record case: an enum's constructor is generated from its
+            // parameter list, and a user `def this` was silently left untyped.
+            case c: AST.ConstructorDeclaration =>
+              bodyContext.report(SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM, c, "enum", definition)
+            case _ => // enum bodies otherwise support methods only
           }
         }
       }

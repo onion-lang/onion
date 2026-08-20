@@ -24,7 +24,14 @@ final case class ProjectBuild(
   manifest: ProjectManifest,
   layout: ProjectLayout,
   state: BuildState,
-  cached: Boolean
+  cached: Boolean,
+  /**
+   * The jars this project compiled against; whatever runs its classes needs them too.
+   * Deliberately not defaulted — a default let the fresh-build path construct a
+   * `ProjectBuild` with no dependencies and still compile, which would have shipped a
+   * runner classpath silently missing every jar.
+   */
+  dependencies: ResolvedDependencies
 )
 
 object ProjectBuilder:
@@ -57,22 +64,72 @@ final class ProjectBuilder(
       for
         _ <- validatePaths(paths)
         sources <- readSources(layout.productionSources)
+        // Resolution happens before the fingerprint because its result is part of it.
+        resolved <- resolveDependencies(paths, manifest, err)
         fingerprint = BuildFingerprint.compute(
           manifest.bytes,
           sources.map(snapshot => snapshot.source.relative -> snapshot.bytes),
           compilerVersion,
-          javaFeature
+          javaFeature,
+          resolved.coordinates
         )
-        result <- cachedBuild(paths, manifest, layout, fingerprint) match
+        result <- cachedBuild(paths, manifest, layout, fingerprint, resolved) match
           case Some(hit) => Right(hit)
-          case None => compile(paths, manifest, layout, sources, fingerprint, err)
+          case None => compile(paths, manifest, layout, sources, fingerprint, resolved, err)
       yield result
+
+  /**
+   * Resolves through `onion.lock` when there is one that answers this manifest's question.
+   *
+   * A usable lock is resolved from its own pinned coordinate set rather than from
+   * `[dependencies]`, which is what fixes the transitive versions — the ones nobody wrote
+   * down and which otherwise change under the project without `onion.toml` changing a byte.
+   * The artifacts are then checked against the recorded hashes before anything compiles.
+   *
+   * With no usable lock, resolution proceeds from the manifest and the result is written out.
+   * A lock that cannot be written is reported but does not fail the build: the resolution
+   * itself succeeded, and refusing to compile over a file that is only there to help the
+   * *next* build would be a strange way to help.
+   */
+  private def resolveDependencies(
+    paths: ProjectPaths,
+    manifest: ProjectManifest,
+    err: PrintStream
+  ): Either[ProjectError, ResolvedDependencies] =
+    DependencyLock.read(paths).filter(_.matches(manifest)) match
+      case Some(locked) =>
+        for
+          resolved <- DependencyResolver.resolve(
+            pinned(locked.coordinates), manifest.repositories, Some(err))
+          _ <- DependencyLock.verify(locked, resolved)
+        yield resolved
+      case None =>
+        DependencyResolver
+          .resolve(manifest.dependencies, manifest.repositories, Some(err))
+          .map { resolved =>
+            if manifest.dependencies.nonEmpty then
+              DependencyLock.write(paths, manifest, resolved).left.foreach { error =>
+                err.println(s"warning: ${error.message}")
+              }
+            resolved
+          }
+
+  /** `group:artifact:version` back into a dependency; anything malformed is skipped. */
+  private def pinned(coordinates: Seq[String]): Seq[Dependency] =
+    coordinates.flatMap { coordinate =>
+      coordinate.split(":") match
+        case Array(group, artifact, version)
+          if group.nonEmpty && artifact.nonEmpty && version.nonEmpty =>
+          Some(Dependency(group, artifact, version))
+        case _ => None
+    }
 
   private def cachedBuild(
     paths: ProjectPaths,
     manifest: ProjectManifest,
     layout: ProjectLayout,
-    fingerprint: String
+    fingerprint: String,
+    resolved: ResolvedDependencies
   ): Option[ProjectBuild] =
     if Files.isSymbolicLink(paths.buildState) ||
       !Files.isRegularFile(paths.buildState, NOFOLLOW_LINKS)
@@ -81,7 +138,7 @@ final class ProjectBuilder(
       BuildState.load(paths.buildState).toOption
         .filter(_.fingerprint == fingerprint)
         .filter(BuildState.validatesOutputs(_, paths.classes))
-        .map(state => ProjectBuild(paths, manifest, layout, state, cached = true))
+        .map(state => ProjectBuild(paths, manifest, layout, state, cached = true, resolved))
 
   private def compile(
     paths: ProjectPaths,
@@ -89,11 +146,12 @@ final class ProjectBuilder(
     layout: ProjectLayout,
     sources: Vector[SourceSnapshot],
     fingerprint: String,
+    resolved: ResolvedDependencies,
     err: PrintStream
   ): Either[ProjectError, ProjectBuild] =
     createStaging(paths).flatMap { staging =>
       val result =
-        try compileStaged(paths, manifest, layout, sources, fingerprint, staging, err)
+        try compileStaged(paths, manifest, layout, sources, fingerprint, resolved, staging, err)
         catch
           case NonFatal(error) =>
             Left(ProjectError(
@@ -109,12 +167,13 @@ final class ProjectBuilder(
     layout: ProjectLayout,
     sources: Vector[SourceSnapshot],
     fingerprint: String,
+    resolved: ResolvedDependencies,
     staging: Path,
     err: PrintStream
   ): Either[ProjectError, ProjectBuild] =
     val stagedClasses = staging.resolve("classes")
     val config = CompilerConfig(
-      classPath = Seq.empty,
+      classPath = resolved.classpath.map(_.toString),
       superClass = "",
       encoding = UTF_8.name(),
       outputDirectory = stagedClasses.toString,
@@ -154,7 +213,7 @@ final class ProjectBuilder(
         )
         _ <- BuildState.write(staging.resolve("build-state.json"), state)
         _ <- BuildOutputTransaction.promote(paths, staging, mover)
-      yield ProjectBuild(paths, manifest, layout, state, cached = false)
+      yield ProjectBuild(paths, manifest, layout, state, cached = false, resolved)
 
   private def writeClasses(
     classes: Seq[onion.compiler.CompiledClass]

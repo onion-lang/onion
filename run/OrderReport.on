@@ -15,14 +15,14 @@ val products = [
 ]
 
 val cheapNames = products
-  .filter { p => p.price() < 1000 }
-  .map { p => p.name() }
+  .filter { p -> p.price() < 1000 }
+  .map { p -> p.name() }
 IO::println("cheap: " + cheapNames.toString())
 
-val grandTotal = products.fold(0) { acc, p => (acc as Int) + lineTotal(p) }
+val grandTotal = products.fold(0) { acc, p -> (acc as Int) + lineTotal(p) }
 IO::println("grandTotal: " + grandTotal)
 
-val byPrice = products.sortedBy { p => 0 - p.price() }.map { p => p.name() }
+val byPrice = products.sortedBy { p -> 0 - p.price() }.map { p -> p.name() }
 IO::println("byPriceDesc: " + byPrice.toString())
 
 class Cart {
@@ -32,7 +32,7 @@ public:
     this.items = ps
   }
   def total(): Int {
-    return items.fold(0) { acc, p => (acc as Int) + (p as Product).price() * (p as Product).qty() }
+    return items.fold(0) { acc, p -> (acc as Int) + (p as Product).price() * (p as Product).qty() }
   }
   def size(): Int = items.size
 }
@@ -58,13 +58,13 @@ IO::println("tier4800: " + tier(4800))
 IO::println("tier80: " + tier(80))
 
 // --- group products by price tier into a Map, then iterate entries ---
-val byTier = products.groupBy { p => tier(p.price()) }
+val byTier = products.groupBy { p -> tier(p.price()) }
 foreach (k, v) in byTier {
   IO::println("tier " + k + ": " + (v as List).size + " item(s)")
 }
 
 // --- nullable: find a pricey product (or null) ---
-val pricey = products.find { p => p.price() > 4000 }
+val pricey = products.find { p -> p.price() > 4000 }
 if pricey != null {
   IO::println("pricey: " + (pricey as Product).name())
 } else {

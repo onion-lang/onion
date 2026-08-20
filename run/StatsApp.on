@@ -103,7 +103,7 @@ def summarize(values: List[Double]): String {
 def countMatches(items: List[Double], predicate: (Object) -> Boolean): Int {
   var count: Int = 0
   foreach item: Object in items {
-    if predicate.call(item) {
+    if predicate(item) {
       count = count + 1
     }
   }

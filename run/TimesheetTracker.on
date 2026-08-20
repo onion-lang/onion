@@ -100,10 +100,10 @@ public:
   }
 
   def entriesFor(empId: String): List[TimeEntry] =
-    entries.filter { e => (e as TimeEntry).employeeId() == empId }
+    entries.filter { e -> (e as TimeEntry).employeeId() == empId }
 
   def totalHoursFor(empId: String): Double =
-    entriesFor(empId).fold(0.0d) { acc, e => (acc as Double) + (e as TimeEntry).hours() }
+    entriesFor(empId).fold(0.0d) { acc, e -> (acc as Double) + (e as TimeEntry).hours() }
 
   def regularHours(empId: String): Double {
     val total: Double = totalHoursFor(empId)

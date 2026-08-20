@@ -93,7 +93,7 @@ public:
         if !rest.contains("/") { children.add(node) }
       }
     }
-    return children.sortedBy { n => (n.isDir() as Object).toString() + n.name() }
+    return children.sortedBy { n -> (n.isDir() as Object).toString() + n.name() }
   }
 
   def findByName(name: String): List[FsNode] {
@@ -102,7 +102,7 @@ public:
       val node: FsNode = v as FsNode
       if node.name() == name { results.add(node) }
     }
-    return results.sortedBy { n => n.path() }
+    return results.sortedBy { n -> n.path() }
   }
 
   def treeLines(dir: String, indent: String): List[String] {
@@ -151,8 +151,8 @@ public:
         if !raw.isDir() { return "ls: #{dir}: not a directory" }
         val items = listDir(dir)
         if items.size == 0 { return "(empty)" }
-        return items.map { n => "  #{n.icon()} #{n.name()}" }
-                    .fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+        return items.map { n -> "  #{n.icon()} #{n.name()}" }
+                    .fold("") { acc, s -> if acc == "" { s } else { acc + "\n" + s } }
       }
       case c is Pwd:   return cwd
       case c is Cd: {
@@ -222,15 +222,15 @@ public:
         val node: FsNode = fs.get(p) as FsNode
         if node.isDir() { return "grep: #{p}: is a directory" }
         val lines: List[String] = Strings::split(node.content(), "\n")
-        val matches: List[String] = lines.filter { l => l.contains(c.pattern()) }
+        val matches: List[String] = lines.filter { l -> l.contains(c.pattern()) }
         if matches.size == 0 { return "no matches for '#{c.pattern()}' in #{p}" }
-        return matches.fold("") { acc, l => if acc == "" { l } else { acc + "\n" + l } }
+        return matches.fold("") { acc, l -> if acc == "" { l } else { acc + "\n" + l } }
       }
       case c is Find: {
         val results = findByName(c.name())
         if results.size == 0 { return "no entry named '#{c.name()}'" }
-        return results.map { n => "  #{n.icon()} #{n.path()}" }
-                      .fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+        return results.map { n -> "  #{n.icon()} #{n.path()}" }
+                      .fold("") { acc, s -> if acc == "" { s } else { acc + "\n" + s } }
       }
       case c is Tree: {
         val root: String = resolve(c.root())
@@ -239,7 +239,7 @@ public:
         val lines: List[String] = [header]
         val sub: List[String] = treeLines(root, "  ")
         foreach l: Object in sub { lines.add(l as String) }
-        return lines.fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+        return lines.fold("") { acc, s -> if acc == "" { s } else { acc + "\n" + s } }
       }
       case c is Stats: {
         var dirs: Int = 0

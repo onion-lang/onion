@@ -174,32 +174,32 @@ public:
   def allConditions(): List[Object]  = conditions
 
   def findArtistByName(name: String): Artist? {
-    val match = artists.find { a => (a as Artist).name() == name }
+    val match = artists.find { a -> (a as Artist).name() == name }
     return if match != null { match as Artist } else { null }
   }
 
   def artworksByArtist(name: String): List[Object] =
-    artworks.filter { a => (a as Artwork).artistName() == name }
+    artworks.filter { a -> (a as Artwork).artistName() == name }
 
   def artworksByMedium(m: Medium): List[Object] =
-    artworks.filter { a => (a as Artwork).medium() == m }
+    artworks.filter { a -> (a as Artwork).medium() == m }
 
   def artworksByEra(era: String): List[Object] =
-    artworks.filter { a => (a as Artwork).era() == era }
+    artworks.filter { a -> (a as Artwork).era() == era }
 
   def onDisplay(): List[Object] =
-    artworks.filter { a => (a as Artwork).onDisplay() }
+    artworks.filter { a -> (a as Artwork).onDisplay() }
 
   def totalCollectionValue(): Int =
-    artworks.fold(0) { acc, a => (acc as Int) + (a as Artwork).valueUSD() }
+    artworks.fold(0) { acc, a -> (acc as Int) + (a as Artwork).valueUSD() }
 
   def valueStats(): ValStats {
-    val values: List[Object] = artworks.map { a => (a as Artwork).valueUSD() }
+    val values: List[Object] = artworks.map { a -> (a as Artwork).valueUSD() }
     return ValStats::of(values)
   }
 
   def topByValue(n: Int): List[Object] =
-    artworks.sortedBy { a => -(a as Artwork).valueUSD() }.take(n)
+    artworks.sortedBy { a -> -(a as Artwork).valueUSD() }.take(n)
 
   def artworksByEraMap(): Map[String, List[Object]] {
     val result: Map[String, List[Object]] = [:]
@@ -228,13 +228,13 @@ public:
   }
 
   def needsRestoration(): List[Object] =
-    conditions.filter { c =>
+    conditions.filter { c ->
       val cond = (c as ConditionRecord).condition()
       select cond {
         case r is RequiresRestoration: true
         else: false
       }
-    }.sortedBy { c =>
+    }.sortedBy { c ->
       val cond = (c as ConditionRecord).condition()
       select cond {
         case r is RequiresRestoration: r.priority()
@@ -244,7 +244,7 @@ public:
 
   def averageConditionScore(): Double {
     if conditions.size == 0 { return 0.0 }
-    val total = conditions.fold(0) { acc, c =>
+    val total = conditions.fold(0) { acc, c ->
       (acc as Int) + (c as ConditionRecord).condition().score()
     }
     return (total as Int).doubleValue() / conditions.size.doubleValue()
@@ -256,14 +256,14 @@ public:
       val nat = (a as Artist).nationality()
       if !result.contains(nat) { result.add(nat) }
     }
-    return result.sortedBy { n => n as String }
+    return result.sortedBy { n -> n as String }
   }
 
   def artworksByNationality(nat: String): List[Object] {
     val artistNames: List[Object] = artists
-      .filter { a => (a as Artist).nationality() == nat }
-      .map    { a => (a as Artist).name() }
-    return artworks.filter { a => artistNames.contains((a as Artwork).artistName()) }
+      .filter { a -> (a as Artist).nationality() == nat }
+      .map    { a -> (a as Artist).name() }
+    return artworks.filter { a -> artistNames.contains((a as Artwork).artistName()) }
   }
 }
 
@@ -372,7 +372,7 @@ foreach e: Object in eraOrder {
   val era = e as String
   val list: List[Object]? = eraMap.get(era) as List[Object]?
   if list != null && list.size > 0 {
-    val vals: List[Object] = list.map { a => (a as Artwork).valueUSD() }
+    val vals: List[Object] = list.map { a -> (a as Artwork).valueUSD() }
     val st = ValStats::of(vals)
     println("  #{era}: #{list.size} work(s), total=$#{st.total().thousands()}")
   }
@@ -398,8 +398,8 @@ foreach nat: Object in museum.artistNationalities() {
   val n = nat as String
   val works = museum.artworksByNationality(n)
   val artNames: List[Object] = museum.allArtists()
-    .filter { a => (a as Artist).nationality() == n }
-    .map    { a => (a as Artist).name() }
+    .filter { a -> (a as Artist).nationality() == n }
+    .map    { a -> (a as Artist).name() }
   println("  #{n}: #{artNames.size} artist(s), #{works.size} work(s)")
 }
 
@@ -431,7 +431,7 @@ val crossRows = do[List] {
   era <- eras
   ret "  #{nat as String} × #{era as String}: " +
       museum.artworksByNationality(nat as String)
-            .filter { a => (a as Artwork).era() == era as String }.size + " work(s)"
+            .filter { a -> (a as Artwork).era() == era as String }.size + " work(s)"
 }
 foreach row: Object in crossRows {
   println(row as String)
@@ -439,8 +439,8 @@ foreach row: Object in crossRows {
 
 printSection("|> Pipeline: on-display works sorted by value")
 museum.onDisplay()
-  .sortedBy { a => -(a as Artwork).valueUSD() }
-  .map { a => "  $#{(a as Artwork).valueUSD().thousands()} — #{(a as Artwork).title()} (#{(a as Artwork).year()})" }
+  .sortedBy { a -> -(a as Artwork).valueUSD() }
+  .map { a -> "  $#{(a as Artwork).valueUSD().thousands()} — #{(a as Artwork).title()} (#{(a as Artwork).year()})" }
   |> println
 
 printSection("Van Gogh Collection")
@@ -450,8 +450,8 @@ foreach a: Object in museum.artworksByArtist("Vincent van Gogh") {
 
 printSection("Age of Each Work")
 val ageList: List[Object] = museum.allArtworks()
-  .sortedBy { a => (a as Artwork).year() }
-  .map { a => "  #{(a as Artwork).title()} — #{(a as Artwork).age()} years old" }
+  .sortedBy { a -> (a as Artwork).year() }
+  .map { a -> "  #{(a as Artwork).title()} — #{(a as Artwork).age()} years old" }
 foreach line: Object in ageList { println(line as String) }
 
 println("")

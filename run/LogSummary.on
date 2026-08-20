@@ -10,13 +10,13 @@ def main(args: String[]): void {
     "200 GET /index\n404 GET /gone\n200 GET /about"
 
   val entries = LogLine::parseAll(text)
-  val byStatus = Maps::countBy(entries) { e => "" + (e as LogLine).status() }
+  val byStatus = Maps::countBy(entries) { e -> "" + (e as LogLine).status() }
   IO::println("parsed=" + entries.size +
     " ok=" + byStatus.get("200") + " notfound=" + byStatus.get("404") + " error=" + byStatus.get("500"))
 
   // error requests (status >= 400), ranked by status descending
-  val errors = entries.filter { e => (e as LogLine).status() >= 400 }
-                      .sortedByDescending { e => (e as LogLine).status() }
+  val errors = entries.filter { e -> (e as LogLine).status() >= 400 }
+                      .sortedByDescending { e -> (e as LogLine).status() }
   foreach e: LogLine in errors {
     IO::println("  " + e.status() + " " + e.method() + " " + e.path())
   }

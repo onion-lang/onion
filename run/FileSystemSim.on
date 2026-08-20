@@ -1,0 +1,442 @@
+// FileSystemSim.on — virtual in-memory filesystem simulator (~280 lines).
+// Exercises: ADT enum (FsNode), records (FileEntry, DirEntry, Stat),
+// data-carrying enum (Permission), plain enum (SortOrder), generic record,
+// class implementing interface, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/distinct/partition/reduce), select + type-pattern
+// matching, nullable types, closures, string interpolation, recursion,
+// foreach over ranges and map (k,v) entries, while loop, try/catch.
+
+import {
+  java.util.*
+}
+
+// ── Permissions: data-carrying enum ─────────────────────────────────────────
+
+enum Permission(bits: Int) {
+  READ_ONLY(4), READ_WRITE(6), EXECUTABLE(7), NO_ACCESS(0)
+public:
+  def symbol(): String = select this {
+    case Permission::READ_ONLY:   "r--"
+    case Permission::READ_WRITE:  "rw-"
+    case Permission::EXECUTABLE:  "rwx"
+    else:                         "---"
+  }
+}
+
+// ── Sort order for directory listings ────────────────────────────────────────
+
+enum SortOrder {
+  BY_NAME, BY_SIZE, BY_TYPE
+}
+
+// ── FsNode: ADT enum (File | Directory | Symlink) ────────────────────────────
+
+enum FsNode {
+  case FileNode(name: String, content: String, perm: Permission)
+  case DirNode(name: String, children: List[FsNode], perm: Permission)
+  case SymlinkNode(name: String, target: String)
+public:
+  def name(): String = select this {
+    case f is FileNode:    f.name()
+    case d is DirNode:     d.name()
+    case s is SymlinkNode: s.name()
+  }
+  def isDir(): Boolean = select this {
+    case d is DirNode: true
+    else:              false
+  }
+  def isFile(): Boolean = select this {
+    case f is FileNode: true
+    else:               false
+  }
+  def size(): Int = select this {
+    case f is FileNode: f.content().length()
+    case d is DirNode: {
+      var sum: Int = 0
+      foreach c: FsNode in d.children() { sum = sum + c.size() }
+      sum
+    }
+    case s is SymlinkNode: s.target().length()
+  }
+  def perm(): Permission = select this {
+    case f is FileNode:    f.perm()
+    case d is DirNode:     d.perm()
+    case s is SymlinkNode: Permission::READ_ONLY
+  }
+  def typeChar(): String = select this {
+    case d is DirNode:     "d"
+    case s is SymlinkNode: "l"
+    else:                  "-"
+  }
+}
+
+// ── Stat record ──────────────────────────────────────────────────────────────
+
+record Stat(totalFiles: Int, totalDirs: Int, totalBytes: Int, maxDepth: Int) {
+public:
+  def toString(): String =
+    "files=#{totalFiles} dirs=#{totalDirs} bytes=#{totalBytes} maxDepth=#{maxDepth}"
+  def plus(other: Stat): Stat =
+    new Stat(totalFiles + other.totalFiles(), totalDirs + other.totalDirs(),
+             totalBytes + other.totalBytes(), if maxDepth > other.maxDepth() { maxDepth } else { other.maxDepth() })
+}
+
+// ── Generic pair for extension-count map ─────────────────────────────────────
+
+record Pair[A, B](first: A, second: B) {
+public:
+  def toString(): String = "(#{first}, #{second})"
+}
+
+// ── Filesystem interface ──────────────────────────────────────────────────────
+
+interface Filesystem {
+  def root(): DirNode
+  def find(path: String): FsNode?
+  def stat(): Stat
+}
+
+// ── VirtualFs: the in-memory filesystem class ────────────────────────────────
+
+class VirtualFs conforms Filesystem {
+  var rootNode: DirNode
+
+public:
+  def this {
+    rootNode = new DirNode("/", new ArrayList[FsNode](), Permission::READ_WRITE)
+  }
+
+  def root(): DirNode = rootNode
+
+  def find(path: String): FsNode? {
+    if path == "/" || path == "" { return rootNode }
+    val parts: List[String] = splitPath(path)
+    return findIn(rootNode, parts, 0)
+  }
+
+  def mkdir(path: String): Boolean {
+    val parts: List[String] = splitPath(path)
+    if parts.size == 0 { return false }
+    val newName: String = parts.get(parts.size - 1)
+    val parentPath: String = joinPath(parts, parts.size - 1)
+    val parent: FsNode? = if parentPath == "" { rootNode } else { find(parentPath) }
+    if parent == null { return false }
+    select parent {
+      case d is DirNode: {
+        if findChild(d, newName) != null { return false }
+        d.children().add(new DirNode(newName, new ArrayList[FsNode](), Permission::READ_WRITE))
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def touch(path: String, content: String): Boolean {
+    val parts: List[String] = splitPath(path)
+    if parts.size == 0 { return false }
+    val fileName: String = parts.get(parts.size - 1)
+    val parentPath: String = joinPath(parts, parts.size - 1)
+    val parent: FsNode? = if parentPath == "" { rootNode } else { find(parentPath) }
+    if parent == null { return false }
+    select parent {
+      case d is DirNode: {
+        val existing: FsNode? = findChild(d, fileName)
+        if existing != null {
+          d.children().remove(existing)
+        }
+        d.children().add(new FileNode(fileName, content, Permission::READ_WRITE))
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def symlink(name: String, parentPath: String, target: String): Boolean {
+    val parent: FsNode? = find(parentPath)
+    if parent == null { return false }
+    select parent {
+      case d is DirNode: {
+        d.children().add(new SymlinkNode(name, target))
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def rm(path: String): Boolean {
+    val parts: List[String] = splitPath(path)
+    if parts.size == 0 { return false }
+    val targetName: String = parts.get(parts.size - 1)
+    val parentPath: String = joinPath(parts, parts.size - 1)
+    val parent: FsNode? = if parentPath == "" { rootNode } else { find(parentPath) }
+    if parent == null { return false }
+    select parent {
+      case d is DirNode: {
+        val node: FsNode? = findChild(d, targetName)
+        if node == null { return false }
+        d.children().remove(node)
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def ls(path: String, order: SortOrder): List[FsNode] {
+    val node: FsNode? = find(path)
+    if node == null { return new ArrayList[FsNode]() }
+    select node {
+      case d is DirNode: {
+        val kids: List[FsNode] = d.children()
+        select order {
+          case SortOrder::BY_NAME: return kids.sortedBy((c: FsNode) -> c.name())
+          case SortOrder::BY_SIZE: return kids.sortedBy((c: FsNode) -> c.size())
+          else: {
+            val dirs: List[FsNode] = kids.filter((c: FsNode) -> c.isDir())
+            val files: List[FsNode] = kids.filter((c: FsNode) -> !c.isDir())
+            val result: List[FsNode] = new ArrayList[FsNode]()
+            result.addAll(dirs.sortedBy((c: FsNode) -> c.name()))
+            result.addAll(files.sortedBy((c: FsNode) -> c.name()))
+            return result
+          }
+        }
+      }
+      else: {
+        val result: List[FsNode] = new ArrayList[FsNode]()
+        result.add(node)
+        return result
+      }
+    }
+  }
+
+  def stat(): Stat = statNode(rootNode, 0)
+
+  def extensionCounts(path: String): List[Pair[String, Int]] {
+    val all: List[FsNode] = collectFiles(find(path))
+    val byExt: Map[String, List[FsNode]] =
+      all.groupBy((f: FsNode) -> fileExt(f.name()))
+    val result: List[Pair[String, Int]] = new ArrayList[Pair[String, Int]]()
+    foreach (ext, files) in byExt {
+      result.add(new Pair[String, Int](ext, files.size))
+    }
+    return result.sortedBy((p: Pair[String, Int]) -> p.first())
+  }
+
+  def treeStr(path: String): String {
+    val node: FsNode? = find(path)
+    if node == null { return "(not found)" }
+    return treeNode(node, "", true)
+  }
+
+  def findChild(dir: DirNode, name: String): FsNode? {
+    var result: FsNode? = null
+    foreach c: FsNode in dir.children() {
+      if c.name() == name { result = c }
+    }
+    return result
+  }
+
+  def splitPath(path: String): List[String] {
+    val p: String = if path.startsWith("/") { path.substring(1) } else { path }
+    val parts: List[String] = Strings::split(p, "/") as List[String]
+    val result: List[String] = new ArrayList[String]()
+    foreach s: String in parts {
+      if s.length() > 0 { result.add(s) }
+    }
+    return result
+  }
+
+  def joinPath(parts: List[String], count: Int): String {
+    if count == 0 { return "" }
+    var result: String = ""
+    foreach i: Int in 0..<count {
+      if i > 0 { result = result + "/" }
+      result = result + parts.get(i)
+    }
+    return result
+  }
+
+  def findIn(dir: DirNode, parts: List[String], idx: Int): FsNode? {
+    if idx >= parts.size { return dir }
+    val name: String = parts.get(idx)
+    val child: FsNode? = findChild(dir, name)
+    if child == null { return null }
+    if idx == parts.size - 1 { return child }
+    select child {
+      case d is DirNode: return findIn(d, parts, idx + 1)
+      else:              return null
+    }
+  }
+
+  def statNode(node: FsNode, depth: Int): Stat = select node {
+    case f is FileNode: new Stat(1, 0, f.content().length(), depth)
+    case d is DirNode: {
+      val childStats: Stat = d.children().fold(
+        new Stat(0, 1, 0, depth),
+        (acc: Stat, c: FsNode) -> acc.plus(statNode(c, depth + 1))
+      )
+      childStats
+    }
+    case s is SymlinkNode: new Stat(1, 0, 0, depth)
+  }
+
+  def collectFiles(node: FsNode?): List[FsNode] {
+    val result: List[FsNode] = new ArrayList[FsNode]()
+    if node == null { return result }
+    select node {
+      case f is FileNode: result.add(f)
+      case d is DirNode: {
+        foreach child: FsNode in d.children() {
+          result.addAll(collectFiles(child))
+        }
+      }
+      case s is SymlinkNode: result.add(s)
+    }
+    return result
+  }
+
+  def fileExt(name: String): String {
+    val idx: Int = name.lastIndexOf(".")
+    if idx < 0 || idx == name.length() - 1 { return "(no ext)" }
+    return name.substring(idx + 1)
+  }
+
+  def treeNode(node: FsNode, prefix: String, isLast: Boolean): String {
+    val connector: String = if isLast { "└── " } else { "├── " }
+    val label: String = node.typeChar() + node.perm().symbol() + " " + node.name()
+    var out: String = prefix + connector + label + "\n"
+    select node {
+      case d is DirNode: {
+        val kids: List[FsNode] = d.children().sortedBy((c: FsNode) -> c.name())
+        val indent: String = if isLast { "    " } else { "│   " }
+        val newPrefix: String = prefix + indent
+        foreach i: Int in 0..<kids.size {
+          out = out + treeNode(kids.get(i), newPrefix, i == kids.size - 1)
+        }
+      }
+      else: {}
+    }
+    return out
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def fmtEntry(node: FsNode, sizeWidth: Int): String {
+  val sizeStr: String = node.size().toString()
+  var pad: String = ""
+  foreach i: Int in 0..<(sizeWidth - sizeStr.length()) { pad = pad + " " }
+  return "#{node.typeChar()}#{node.perm().symbol()} #{pad}#{sizeStr}  #{node.name()}"
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val fs: VirtualFs = new VirtualFs()
+
+  // Build a realistic directory tree
+  fs.mkdir("home")
+  fs.mkdir("home/alice")
+  fs.mkdir("home/alice/projects")
+  fs.mkdir("home/alice/projects/onion")
+  fs.mkdir("home/alice/projects/onion/src")
+  fs.mkdir("home/alice/documents")
+  fs.mkdir("home/bob")
+  fs.mkdir("home/bob/music")
+  fs.mkdir("etc")
+  fs.mkdir("var")
+  fs.mkdir("var/log")
+  fs.mkdir("tmp")
+
+  // Populate files
+  fs.touch("home/alice/projects/onion/src/Main.on",
+    "def main(): void { println(\"Hello from Onion!\") }")
+  fs.touch("home/alice/projects/onion/src/Parser.on",
+    "// Parser source file with 500 lines of grammar")
+  fs.touch("home/alice/projects/onion/build.sbt",
+    "scalaVersion := \"3.3.7\"\nlibraryDependencies += ...")
+  fs.touch("home/alice/projects/onion/README.md",
+    "# Onion Language\nA statically-typed JVM language.")
+  fs.touch("home/alice/documents/notes.txt", "Meeting notes from 2026-08-01")
+  fs.touch("home/alice/documents/budget.csv", "month,income,expense\nJan,5000,3200\nFeb,5000,2900")
+  fs.touch("home/alice/.bashrc", "export PATH=~/.local/bin:/usr/bin\nalias ll='ls -la'")
+  fs.touch("home/bob/music/playlist.m3u", "#EXTM3U\n# Bob's favourite playlist")
+  fs.touch("home/bob/music/track1.mp3", "BINARY_AUDIO_DATA_PLACEHOLDER_1")
+  fs.touch("home/bob/music/track2.mp3", "BINARY_AUDIO_DATA_PLACEHOLDER_2")
+  fs.touch("etc/hosts", "127.0.0.1 localhost\n::1 localhost")
+  fs.touch("etc/passwd", "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000::/home/alice:/bin/bash")
+  fs.touch("var/log/syslog", "Aug 20 05:00:01 kernel: system started\nAug 20 05:00:05 sshd: listening")
+  fs.touch("var/log/auth.log", "Aug 20 05:01:00 alice logged in from 192.168.1.10")
+  fs.touch("tmp/scratch.tmp", "temporary data")
+  fs.symlink("latest.log", "var/log", "../var/log/syslog")
+
+  // ── ls /home/alice (sorted by type) ─────────────────────────────────────────
+  println("=== ls /home/alice (type order) ===")
+  val aliceEntries: List[FsNode] = fs.ls("home/alice", SortOrder::BY_TYPE)
+  foreach entry: FsNode in aliceEntries {
+    println(fmtEntry(entry, 6))
+  }
+
+  // ── ls /home/alice/projects/onion/src (by name) ──────────────────────────────
+  println("\n=== ls /home/alice/projects/onion/src ===")
+  val srcEntries: List[FsNode] = fs.ls("home/alice/projects/onion/src", SortOrder::BY_NAME)
+  foreach entry: FsNode in srcEntries {
+    println(fmtEntry(entry, 6))
+  }
+
+  // ── ls /home (by size, descending) ──────────────────────────────────────────
+  println("\n=== ls /home (by size) ===")
+  val homeEntries: List[FsNode] = fs.ls("home", SortOrder::BY_SIZE)
+  foreach entry: FsNode in homeEntries {
+    println(fmtEntry(entry, 6))
+  }
+
+  // ── tree /home/alice/projects ────────────────────────────────────────────────
+  println("\n=== tree /home/alice/projects ===")
+  print(fs.treeStr("home/alice/projects"))
+
+  // ── filesystem stat ──────────────────────────────────────────────────────────
+  val s: Stat = fs.stat()
+  println("=== Filesystem stat ===")
+  println(s.toString())
+
+  // ── extension breakdown under /home ──────────────────────────────────────────
+  println("\n=== File extensions under /home ===")
+  val counts: List[Pair[String, Int]] = fs.extensionCounts("home")
+  foreach p: Pair[String, Int] in counts {
+    println("  .#{p.first()}  #{p.second()}")
+  }
+
+  // ── find a specific node ─────────────────────────────────────────────────────
+  println("\n=== find /etc/passwd ===")
+  val passwdNode: FsNode? = fs.find("etc/passwd")
+  if passwdNode != null {
+    select passwdNode {
+      case f is FileNode: println("Found: #{f.name()} (#{f.content().length()} bytes, #{f.perm().symbol()})")
+      else:               println("Found: #{passwdNode.name()}")
+    }
+  } else {
+    println("Not found")
+  }
+
+  // ── remove and verify ────────────────────────────────────────────────────────
+  println("\n=== rm tmp/scratch.tmp ===")
+  val removed: Boolean = fs.rm("tmp/scratch.tmp")
+  println("Removed: #{removed}")
+  val afterRm: List[FsNode] = fs.ls("tmp", SortOrder::BY_NAME)
+  println("tmp/ contents after rm: #{afterRm.size} entries")
+
+  // ── total bytes by user ──────────────────────────────────────────────────────
+  println("\n=== Disk usage by user ===")
+  val homeDir: FsNode? = fs.find("home")
+  select homeDir {
+    case d is DirNode: {
+      val userUsage: List[FsNode] = d.children().sortedBy((u: FsNode) -> u.name())
+      foreach user: FsNode in userUsage {
+        println("  #{user.name()}: #{user.size()} bytes")
+      }
+    }
+    else: println("(home not found)")
+  }
+
+  println("\nDone.")
+}

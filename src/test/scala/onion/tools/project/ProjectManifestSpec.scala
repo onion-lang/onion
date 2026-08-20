@@ -95,3 +95,87 @@ class ProjectManifestSpec extends AnyFunSuite with Matchers:
     val contents = s"[package]\nname = \"hello\"\nversion = \"1.2.3\"\nx = $nesting\n"
 
     error(contents) shouldBe "Could not parse project manifest: too deeply nested"
+
+  // --------------------------------------------------------------- [dependencies]
+
+  test("a manifest without a dependencies table declares no dependencies"):
+    load("[package]\nname = \"hello\"\nversion = \"1.2.3\"\n").toOption.value.dependencies shouldBe empty
+
+  test("reads dependencies as group:artifact = version"):
+    val manifest = load(
+      "[package]\nname = \"hello\"\nversion = \"1.2.3\"\n" +
+      "\n[dependencies]\n" +
+      "\"org.postgresql:postgresql\" = \"42.7.3\"\n" +
+      "\"com.fasterxml.jackson.core:jackson-databind\" = \"2.17.0\"\n"
+    ).toOption.value
+    manifest.dependencies.map(_.render) shouldBe Seq(
+      "com.fasterxml.jackson.core:jackson-databind:2.17.0",
+      "org.postgresql:postgresql:42.7.3"
+    )
+
+  test("keeps dependencies in a stable order regardless of how they are written"):
+    // The resolved set feeds the build fingerprint, so reordering the file must not
+    // invalidate the cache.
+    val one = load(
+      "[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n" +
+      "\"b:b\" = \"1\"\n\"a:a\" = \"2\"\n").toOption.value
+    val two = load(
+      "[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n" +
+      "\"a:a\" = \"2\"\n\"b:b\" = \"1\"\n").toOption.value
+    one.dependencies shouldBe two.dependencies
+
+  test("rejects a coordinate that is not group:artifact, with a position"):
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"postgresql\" = \"42.7.3\"\n") shouldBe
+      "onion.toml:5:1: Invalid dependency coordinate: postgresql (expected \"group:artifact\")"
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b:c\" = \"1\"\n") shouldBe
+      "onion.toml:5:1: Invalid dependency coordinate: a:b:c (expected \"group:artifact\")"
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\":b\" = \"1\"\n") shouldBe
+      "onion.toml:5:1: Invalid dependency coordinate: :b (expected \"group:artifact\")"
+
+  test("rejects a non-string or empty dependency version, with a position"):
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b\" = 1\n") shouldBe
+      "onion.toml:5:1: dependencies.\"a:b\" must be a version string"
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b\" = \"\"\n") shouldBe
+      "onion.toml:5:1: dependencies.\"a:b\" must be a version string"
+
+  test("still rejects root tables other than package and dependencies"):
+    error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[profile]\nx = 1\n") shouldBe
+      "onion.toml:4:1: Unknown root table: profile"
+
+  // -------------------------------------------------------------- [[repositories]]
+
+  private val pkg = "[package]\nname = \"h\"\nversion = \"1.0.0\"\n"
+
+  test("a manifest without repositories declares none"):
+    load(pkg).toOption.value.repositories shouldBe empty
+
+  test("reads repositories in declaration order, which is resolution precedence"):
+    load(pkg +
+      "[[repositories]]\nurl = \"https://one.example.com/maven\"\n" +
+      "[[repositories]]\nurl = \"https://two.example.com/maven\"\n"
+    ).toOption.value.repositories shouldBe Seq(
+      "https://one.example.com/maven",
+      "https://two.example.com/maven"
+    )
+
+  test("accepts a file URL, which is what a local repository looks like"):
+    load(pkg + "[[repositories]]\nurl = \"file:///tmp/repo\"\n").toOption.value.repositories shouldBe
+      Seq("file:///tmp/repo")
+
+  test("rejects a repository URL that is relative or uses an unsupported scheme"):
+    error(pkg + "[[repositories]]\nurl = \"repo/maven\"\n") shouldBe
+      "onion.toml:5:1: Invalid repository URL: repo/maven"
+    error(pkg + "[[repositories]]\nurl = \"ftp://example.com/maven\"\n") shouldBe
+      "onion.toml:5:1: Invalid repository URL: ftp://example.com/maven"
+
+  test("rejects a repository entry that is not a table with a url"):
+    error(pkg + "[[repositories]]\nname = \"internal\"\n") shouldBe
+      "onion.toml:5:1: Unknown repository key: name"
+    error(pkg + "[[repositories]]\nurl = 1\n") should endWith
+      "repositories must be declared as [[repositories]] tables with a url string"
+
+  test("rejects a plain repositories array, which TOML would scope into [package]"):
+    // Written after [package] a bare `repositories = [...]` becomes `package.repositories`;
+    // the [[repositories]] form is immune to where in the file it appears.
+    error(pkg + "repositories = [\"https://example.com\"]\n") shouldBe
+      "onion.toml:4:1: Unknown package key: repositories"

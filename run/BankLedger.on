@@ -172,7 +172,7 @@ public:
 
   def printSummary(): void {
     IO::println("\n═══ Bank Summary ═══════════════════════════════════")
-    val sorted: List[Account] = allAccounts().sortedBy { a => 0 - (a as Account).getBalance() }
+    val sorted: List[Account] = allAccounts().sortedBy { a -> 0 - (a as Account).getBalance() }
     foreach acc: Account in sorted {
       val a: Account = acc as Account
       IO::println("  #{a.getId()}  #{a.getBalance().currency()}")
@@ -271,7 +271,7 @@ dave.printStatement()
 // Analytics with collection pipelines
 IO::println("")
 val allAccs: List[Account] = bank.allAccounts()
-  .sortedBy { a => 0 - (a as Account).getBalance() }
+  .sortedBy { a -> 0 - (a as Account).getBalance() }
 
 IO::println("── Per-account analytics ────────────────────────────")
 foreach acc: Account in allAccs {
@@ -282,13 +282,13 @@ foreach acc: Account in allAccs {
 }
 
 // Partition: solvent vs zero-balance
-val parts             = allAccs.partition { a => (a as Account).getBalance() > 0 }
+val parts             = allAccs.partition { a -> (a as Account).getBalance() > 0 }
 val solvent: List[Object] = parts[0] as List[Object]
 val empty: List[Object]   = parts[1] as List[Object]
 IO::println("solvent accounts: #{solvent.size}  zero-balance: #{empty.size}")
 
 // Find richest with fold
-val foldRichest: Account = allAccs.fold(alice) { best, a =>
+val foldRichest: Account = allAccs.fold(alice) { best, a ->
   val bestA: Account = best as Account
   val candA: Account = a as Account
   if candA.getBalance() > bestA.getBalance() { a } else { best }

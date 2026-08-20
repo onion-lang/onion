@@ -50,7 +50,7 @@ public:
 record SearchResult(query: String, found: Boolean, suggestions: List[Object]) {
 public:
   def hasClose(): Boolean {
-    return suggestions.find { s => (s as Suggestion).distance() <= 1 } != null
+    return suggestions.find { s -> (s as Suggestion).distance() <= 1 } != null
   }
   def bestMatch(): String? {
     if suggestions.size == 0 { return null }
@@ -106,7 +106,7 @@ public:
   }
 
   def contains(word: String): Boolean {
-    return words.find { w => (w as String).lower() == word.lower() } != null
+    return words.find { w -> (w as String).lower() == word.lower() } != null
   }
 
   def closest(query: String, maxDist: Int): List[Object] {
@@ -116,7 +116,7 @@ public:
       val d = editDistance(q, w.lower())
       if d <= maxDist { result << new Suggestion(w.lower(), d) }
     }
-    return result.sortedBy { s => (s as Suggestion).distance() }
+    return result.sortedBy { s -> (s as Suggestion).distance() }
   }
 
   def wordCount(): Int = words.size
@@ -141,7 +141,7 @@ def printResult(result: SearchResult): void {
     if sug.size == 0 {
       println("  #{q}✗  (no suggestions within distance 2)")
     } else {
-      val labels: List[Object] = sug.map { s => (s as Suggestion).display() }
+      val labels: List[Object] = sug.map { s -> (s as Suggestion).display() }
       val joined = labels.join(", ")
       println("  #{q}✗  → #{joined}")
     }
@@ -163,9 +163,9 @@ def countWithinDistance(words: List[String], query: String, threshold: Int, idx:
 
 def generateReport(results: List[Object], dictSize: Int): void {
   val total     = results.size
-  val correct   = results.filter { r => (r as SearchResult).found() }.size
+  val correct   = results.filter { r -> (r as SearchResult).found() }.size
   val incorrect = total - correct
-  val fixable   = results.filter { r =>
+  val fixable   = results.filter { r ->
     val sr = r as SearchResult
     !sr.found() && sr.hasClose()
   }.size
@@ -183,8 +183,8 @@ def generateReport(results: List[Object], dictSize: Int): void {
 
   if incorrect > 0 {
     println("\nMisspelled words by distance band:")
-    val misspelled = results.filter { r => !(r as SearchResult).found() }
-    val byBand = misspelled.groupBy { r =>
+    val misspelled = results.filter { r -> !(r as SearchResult).found() }
+    val byBand = misspelled.groupBy { r ->
       val sr = r as SearchResult
       val sug = sr.suggestions()
       if sug.size == 0 { "no match" }
@@ -210,8 +210,8 @@ def generateReport(results: List[Object], dictSize: Int): void {
 // ── Fold demo: total edit distance across all incorrect results ───────────────
 def totalEditDistance(results: List[Object]): Int {
   return results
-    .filter { r => !(r as SearchResult).found() }
-    .fold(0) { acc, r =>
+    .filter { r -> !(r as SearchResult).found() }
+    .fold(0) { acc, r ->
       val sug = (r as SearchResult).suggestions()
       if sug.size == 0 { (acc as Int) }
       else              { (acc as Int) + (sug[0] as Suggestion).distance() }
@@ -270,7 +270,7 @@ def main(): void {
   println("  #{"Word".padRight(14)}Status")
   printSeparator()
 
-  val results: List[Object] = testWords.map { w => checkWord(dict, w as String) }
+  val results: List[Object] = testWords.map { w -> checkWord(dict, w as String) }
   foreach result: SearchResult in results {
     printResult(result)
   }

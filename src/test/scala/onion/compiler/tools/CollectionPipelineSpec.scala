@@ -18,7 +18,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "b"]
-          |    return xs.map { s => s.toUpperCase() }.toString()
+          |    return xs.map { s -> s.toUpperCase() }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -35,7 +35,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["alpha beta", "gamma", "alpha delta"]
-          |    return xs.filter { s => s.contains("alpha") }.map { s => s.length() }.toString()
+          |    return xs.filter { s -> s.contains("alpha") }.map { s -> s.length() }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -86,7 +86,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = [1, 2, 3, 8, 1]
-          |    return xs.takeWhile { x => x < 5 }.toString() + xs.dropWhile { x => x < 5 }.toString()
+          |    return xs.takeWhile { x -> x < 5 }.toString() + xs.dropWhile { x -> x < 5 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -153,7 +153,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val parts = "a,bb,ccc".split(",")
-          |    return parts.map { s => s.length() }.toString()
+          |    return parts.map { s -> s.length() }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -190,7 +190,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "bb", "ccc"]
-          |    return xs.partition { s => s.length() > 1 }.toString()
+          |    return xs.partition { s -> s.length() > 1 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -207,7 +207,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "b"]
-          |    return xs.partition { s => s.length() > 5 }.toString()
+          |    return xs.partition { s -> s.length() > 5 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -241,7 +241,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["ccc", "a", "bb"]
-          |    return xs.sortedBy { s => s.length() }.toString()
+          |    return xs.sortedBy { s -> s.length() }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -258,7 +258,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = [1, 2, 3, 4]
-          |    val total = xs.reduce { a, b => (a as Int) + (b as Int) }
+          |    val total = xs.reduce { a, b -> (a as Int) + (b as Int) }
           |    return "" + (total as Int)
           |  }
           |}
@@ -276,7 +276,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = [42]
-          |    val only = xs.reduce { a, b => (a as Int) + (b as Int) }
+          |    val only = xs.reduce { a, b -> (a as Int) + (b as Int) }
           |    return "" + (only as Int)
           |  }
           |}
@@ -294,7 +294,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val m = ["a": 1, "b": 2]
-          |    return m.mapValues { v => (v as Int) * 10 }.toString()
+          |    return m.mapValues { v -> (v as Int) * 10 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -311,7 +311,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val m = ["a": 1, "b": 2, "c": 3]
-          |    return m.filterMap { k, v => (v as Int) > 1 }.toString()
+          |    return m.filterMap { k, v -> (v as Int) > 1 }.toString()
           |  }
           |}
           |""".stripMargin,
@@ -328,9 +328,9 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "bb", "ccc"]
-          |    val a = xs.any { s => s.length() > 2 }
-          |    val b = xs.all { s => s.length() > 0 }
-          |    val c = xs.none { s => s.length() > 5 }
+          |    val a = xs.any { s -> s.length() > 2 }
+          |    val b = xs.all { s -> s.length() > 0 }
+          |    val c = xs.none { s -> s.length() > 5 }
           |    return "" + a + "," + b + "," + c
           |  }
           |}
@@ -348,9 +348,9 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "bb"]
-          |    val a = xs.any { s => s.length() > 5 }
-          |    val b = xs.all { s => s.length() > 1 }
-          |    val c = xs.none { s => s.length() > 0 }
+          |    val a = xs.any { s -> s.length() > 5 }
+          |    val b = xs.all { s -> s.length() > 1 }
+          |    val c = xs.none { s -> s.length() > 0 }
           |    return "" + a + "," + b + "," + c
           |  }
           |}
@@ -455,7 +455,7 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = [1, 2, 3, 4]
-          |    val total = xs.foldl(0) { acc, x => (acc as Int) + (x as Int) }
+          |    val total = xs.foldl(0) { acc, x -> (acc as Int) + (x as Int) }
           |    return "" + (total as Int)
           |  }
           |}
@@ -473,8 +473,8 @@ class CollectionPipelineSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val xs = ["a", "bb", "ccc"]
-          |    val a = xs.forAll { s => s.length() > 0 }
-          |    val b = xs.forAll { s => s.length() > 1 }
+          |    val a = xs.forAll { s -> s.length() > 0 }
+          |    val b = xs.forAll { s -> s.length() > 1 }
           |    return "" + a + "," + b
           |  }
           |}

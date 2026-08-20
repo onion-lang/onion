@@ -115,6 +115,7 @@ java Hello
 | `ConfigEditDemo.on` | Lossless config editing | Lens, `Residue`, comment/order preservation |
 | `BrokenLogDemo.on` | Partial-failure log parsing | `onion.Shape`, `Outcome::values`/`defects` |
 | `ToolDemo.on` | CLI derived from a `tool` declaration | `tool`, capabilities, `--help`/`--contract`/`--plan` |
+| `ArchiveDemo.on` | Zipping, unzipping and gzip round-trips | `onion.Archive` |
 
 ## Learning Path
 

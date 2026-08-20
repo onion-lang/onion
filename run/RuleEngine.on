@@ -1,0 +1,254 @@
+// RuleEngine — a business-rule evaluator exercising:
+// plain & data-carrying enums, records with methods, sealed ADT select,
+// collection pipelines (filter/map/sortedBy/fold/find), closures,
+// string interpolation, nullable types, try/catch, classes with fields.
+
+// ── Fact type enum ─────────────────────────────────────────────────────────
+
+enum FactType {
+  INTEGER, DECIMAL, TEXT, FLAG
+public:
+  def label(): String = select this {
+    case FactType::INTEGER: "int"
+    case FactType::DECIMAL: "float"
+    case FactType::TEXT:    "text"
+    case FactType::FLAG:    "bool"
+  }
+}
+
+// ── Fact ──────────────────────────────────────────────────────────────────
+
+record Fact(name: String, kind: FactType, raw: String) {
+public:
+  def tryInt(): String {
+    try {
+      JInteger::parseInt(raw)
+      return "ok"
+    } catch e: Exception { return "err" }
+  }
+  def rawInt(): Int = JInteger::parseInt(raw)
+  def show(): String = "#{name}(#{kind.label()})=#{raw}"
+}
+
+// ── Operator enum ──────────────────────────────────────────────────────────
+
+enum Operator {
+  EQ, NEQ, LT, GT, LEQ, GEQ, CONTAINS, STARTS_WITH
+public:
+  def symbol(): String = select this {
+    case Operator::EQ:          "=="
+    case Operator::NEQ:         "!="
+    case Operator::LT:          "<"
+    case Operator::GT:          ">"
+    case Operator::LEQ:         "<="
+    case Operator::GEQ:         ">="
+    case Operator::CONTAINS:    "contains"
+    case Operator::STARTS_WITH: "startsWith"
+  }
+}
+
+// ── Condition ─────────────────────────────────────────────────────────────
+
+record Condition(factName: String, op: Operator, value: String) {
+public:
+  def evaluate(facts: List[Fact]): Boolean {
+    val found: Fact? = facts.find { f -> (f as Fact).name() == factName } as Fact?
+    if found == null { return false }
+    val f: Fact = found!!
+    val textOk: Boolean = select op {
+      case Operator::EQ:          f.raw() == value
+      case Operator::NEQ:         f.raw() != value
+      case Operator::CONTAINS:    f.raw().contains(value)
+      case Operator::STARTS_WITH: f.raw().startsWith(value)
+      else: false
+    }
+    if op == Operator::EQ || op == Operator::NEQ ||
+       op == Operator::CONTAINS || op == Operator::STARTS_WITH {
+      return textOk
+    }
+    if f.tryInt() != "ok" { return false }
+    val a: Int = f.rawInt()
+    val b: Int = JInteger::parseInt(value)
+    select op {
+      case Operator::LT:  return a < b
+      case Operator::GT:  return a > b
+      case Operator::LEQ: return a <= b
+      case Operator::GEQ: return a >= b
+      else: return false
+    }
+  }
+  def show(): String = "#{factName} #{op.symbol()} #{value}"
+}
+
+// ── Action (sealed ADT) ────────────────────────────────────────────────────
+
+enum Action {
+  case SetFact(target: String, newValue: String)
+  case LogMsg(message: String)
+  case AddScore(points: Int)
+  case FailWith(reason: String)
+}
+
+// ── Rule ──────────────────────────────────────────────────────────────────
+
+record Rule(name: String, priority: Int, conditions: List[Condition], actions: List[Action]) {
+public:
+  def matches(facts: List[Fact]): Boolean {
+    foreach c: Condition in conditions {
+      if !c.evaluate(facts) { return false }
+    }
+    return true
+  }
+  def show(): String = "Rule[#{name} p=#{priority} conds=#{conditions.size}]"
+}
+
+// ── Evaluation result ──────────────────────────────────────────────────────
+
+record RuleResult(
+  ruleName:   String,
+  matched:    Boolean,
+  score:      Int,
+  logs:       List[String],
+  failed:     Boolean,
+  failReason: String?
+)
+
+// ── RuleEngine class ───────────────────────────────────────────────────────
+
+class RuleEngine {
+  var rules: List[Rule]
+  var facts: List[Fact]
+public:
+  def this {
+    rules = []
+    facts = []
+  }
+  def addRule(r: Rule): void   { rules.add(r) }
+  def addFact(f: Fact): void   { facts.add(f) }
+  def allFacts(): List[Fact]   { return facts  }
+
+  def setFact(name: String, kind: FactType, value: String): void {
+    val newFact: Fact = new Fact(name, kind, value)
+    val existing: Fact? = facts.find { f -> (f as Fact).name() == name } as Fact?
+    if existing == null {
+      facts.add(newFact)
+    } else {
+      facts = facts.map { f -> if (f as Fact).name() == name { newFact } else { f as Fact } }
+    }
+  }
+
+  def evaluate(): List[RuleResult] {
+    val sorted: List[Rule] = rules.sortedBy { r -> (r as Rule).priority() }
+    return sorted.map { r -> evaluateRule(r as Rule) }
+  }
+
+  def evaluateRule(r: Rule): RuleResult {
+    if !r.matches(facts) {
+      return new RuleResult(r.name(), false, 0, [], false, null)
+    }
+    var score: Int = 0
+    val logs: List[String] = []
+    var failed: Boolean = false
+    var failReason: String? = null
+    foreach a: Action in r.actions() {
+      select a {
+        case s is SetFact:
+          setFact(s.target(), FactType::TEXT, s.newValue())
+          logs.add("set #{s.target()}=#{s.newValue()}")
+        case l is LogMsg:
+          logs.add(l.message())
+        case sc is AddScore:
+          score = score + sc.points()
+          logs.add("+#{sc.points()} pts")
+        case f is FailWith:
+          failed = true
+          failReason = f.reason()
+          logs.add("FAIL: #{f.reason()}")
+      }
+    }
+    return new RuleResult(r.name(), true, score, logs, failed, failReason)
+  }
+}
+
+// ── Report helper ──────────────────────────────────────────────────────────
+
+def printResults(results: List[RuleResult]): void {
+  val matched:    List[RuleResult] = results.filter { r -> (r as RuleResult).matched()  }
+  val unmatched:  List[RuleResult] = results.filter { r -> !(r as RuleResult).matched() }
+  val totalScore: Int = matched.fold(0) { acc: Int, r -> acc + (r as RuleResult).score() }
+  val failCount:  Int = matched.filter { r -> (r as RuleResult).failed() }.size
+
+  IO::println("=== Rule Engine Report ===")
+  IO::println("Rules fired : #{matched.size}/#{results.size}")
+  IO::println("Total score : #{totalScore}")
+  IO::println("Failures    : #{failCount}")
+  IO::println("")
+  IO::println("--- Matched rules ---")
+  foreach r: RuleResult in matched {
+    val status: String = if r.failed() { "FAIL" } else { "OK" }
+    IO::println("  [#{status}] #{r.ruleName()} score=#{r.score()}")
+    foreach log: String in r.logs() {
+      IO::println("    > #{log}")
+    }
+    if r.failReason() != null {
+      IO::println("    reason: #{r.failReason()}")
+    }
+  }
+  if unmatched.size > 0 {
+    IO::println("")
+    IO::println("--- Unmatched rules ---")
+    foreach r: RuleResult in unmatched {
+      IO::println("  [ -- ] #{r.ruleName()}")
+    }
+  }
+}
+
+// ── Demo: loan-application rule set ───────────────────────────────────────
+
+val engine: RuleEngine = new RuleEngine()
+
+engine.addFact(new Fact("age",      FactType::INTEGER, "34"))
+engine.addFact(new Fact("income",   FactType::INTEGER, "72000"))
+engine.addFact(new Fact("credit",   FactType::INTEGER, "710"))
+engine.addFact(new Fact("employed", FactType::FLAG,    "true"))
+engine.addFact(new Fact("region",   FactType::TEXT,    "NorthEast"))
+engine.addFact(new Fact("debt",     FactType::INTEGER, "15000"))
+
+// Rule 1: basic eligibility (age >= 18 && employed == true)
+val conds1: List[Condition] = [new Condition("age", Operator::GEQ, "18"), new Condition("employed", Operator::EQ, "true")]
+val acts1:  List[Action]    = [new LogMsg("applicant is employed adult"), new AddScore(10)]
+engine.addRule(new Rule("BasicEligibility", 1, conds1, acts1))
+
+// Rule 2: good credit score bonus (>= 700)
+val conds2: List[Condition] = [new Condition("credit", Operator::GEQ, "700")]
+val acts2:  List[Action]    = [new AddScore(20), new LogMsg("good credit score")]
+engine.addRule(new Rule("GoodCredit", 2, conds2, acts2))
+
+// Rule 3: high income bonus (>= 60 000)
+val conds3: List[Condition] = [new Condition("income", Operator::GEQ, "60000")]
+val acts3:  List[Action]    = [new AddScore(15), new LogMsg("high income bracket")]
+engine.addRule(new Rule("HighIncome", 3, conds3, acts3))
+
+// Rule 4: excessive debt guard (debt > 50 000 → fail)
+val conds4: List[Condition] = [new Condition("debt", Operator::GT, "50000")]
+val acts4:  List[Action]    = [new FailWith("excessive debt")]
+engine.addRule(new Rule("DebtCheck", 4, conds4, acts4))
+
+// Rule 5: regional preferred-rate tier for North* applicants
+val conds5: List[Condition] = [new Condition("region", Operator::STARTS_WITH, "North")]
+val acts5:  List[Action]    = [new AddScore(5), new SetFact("rate_tier", "preferred")]
+engine.addRule(new Rule("NorthRegion", 5, conds5, acts5))
+
+// Rule 6: young low-income risk (should NOT match this applicant)
+val conds6: List[Condition] = [new Condition("age", Operator::LT, "25"), new Condition("income", Operator::LT, "30000")]
+val acts6:  List[Action]    = [new AddScore(-5), new LogMsg("young + low income risk")]
+engine.addRule(new Rule("YoungLowIncome", 6, conds6, acts6))
+
+val results: List[RuleResult] = engine.evaluate()
+printResults(results)
+
+IO::println("")
+IO::println("--- Final fact state ---")
+foreach f: Fact in engine.allFacts() {
+  IO::println("  #{f.show()}")
+}

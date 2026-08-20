@@ -170,6 +170,9 @@ class LocalContext {
 
   def hasLabel(name: String): Boolean = labelStack.contains(name)
 
+  /** Labels of enclosing labeled loops, for "did you mean" suggestions on an unbound label. */
+  def labels: Array[String] = labelStack.toArray
+
   def openLoop[A](body: => A): A = {
     loopDepth += 1
     try body

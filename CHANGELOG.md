@@ -68,6 +68,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OVERRIDE_TARGET_NOT_FOUND` (E0068) has a dedicated handler that suggests
   the closest matching base method name.
 
+### Added
+
+- **`run/PackageDelivery.on`, a 413-line package delivery tracking simulation.**
+  Covers an ADT case-enum (`PackageStatus`, 5 cases) matched exhaustively via
+  `select`/`is`, a plain enum (`Priority`), records with `example` laws
+  (`Address`, `Customer`, `RouteStop`), an `extension Int` block (`asTime`,
+  `asCurrency`, `asWeight`), a mutable class with an event log (`Package`),
+  a class built on collection pipelines (`DeliveryCompany`: `filter`,
+  `groupBy`, `sortedBy`, `fold`), closures stored in a `val` and invoked via
+  `.call`, recursive helpers, string interpolation, and nullable-safe lookups.
+
 ## [0.12.1] - 2026-08-19
 
 ### Fixed

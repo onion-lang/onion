@@ -1,0 +1,286 @@
+// ConnectFour.on — AI-vs-AI Connect Four exercising ADT enums, records,
+// interfaces, classes, pattern matching, string interpolation, closures,
+// nullable types, extension methods, and collection pipelines.
+
+// ─── Cell: state of each board position ──────────────────────────────────────
+enum Cell {
+  case Empty
+  case Red
+  case Yellow
+}
+
+// ─── GameResult: outcome of a finished game ──────────────────────────────────
+enum GameResult {
+  case RedWins
+  case YellowWins
+  case Draw
+}
+
+// ─── Position: a row/col coordinate ─────────────────────────────────────────
+record Position(row: Int, col: Int)
+
+// ─── Extension: repeat a string n times ──────────────────────────────────────
+extension String {
+  def rep(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ─── Board: 6×7 grid with gravity ────────────────────────────────────────────
+class Board {
+  var rows: Int
+  var cols: Int
+  var grid: Int[]
+  var moveCount: Int
+
+public:
+  def this(r: Int, c: Int) {
+    rows = r
+    cols = c
+    grid = new Int[r * c]
+    moveCount = 0
+  }
+
+  def numRows(): Int = rows
+  def numCols(): Int = cols
+  def moves(): Int = moveCount
+
+  def get(r: Int, c: Int): Int = grid[r * cols + c]
+
+  def set(r: Int, c: Int, v: Int): void {
+    grid[r * cols + c] = v
+  }
+
+  def canDrop(col: Int): Boolean =
+    col >= 0 && col < cols && get(0, col) == 0
+
+  def dropPiece(col: Int, player: Int): Boolean {
+    if !canDrop(col) { return false }
+    for var r = rows - 1; r >= 0; r-- {
+      if get(r, col) == 0 {
+        set(r, col, player)
+        moveCount = moveCount + 1
+        return true
+      }
+    }
+    return false
+  }
+
+  def isFull(): Boolean = moveCount >= rows * cols
+
+  def runLength(startRow: Int, startCol: Int, dr: Int, dc: Int, player: Int): Int {
+    var count = 0
+    var r = startRow
+    var c = startCol
+    while r >= 0 && r < rows && c >= 0 && c < cols && get(r, c) == player {
+      count = count + 1
+      r = r + dr
+      c = c + dc
+    }
+    return count
+  }
+
+  def checkWin(player: Int): Boolean {
+    for var r = 0; r < rows; r++ {
+      for var c = 0; c < cols; c++ {
+        if get(r, c) == player {
+          if runLength(r, c, 0, 1, player) >= 4 { return true }
+          if runLength(r, c, 1, 0, player) >= 4 { return true }
+          if runLength(r, c, 1, 1, player) >= 4 { return true }
+          if runLength(r, c, 1, -1, player) >= 4 { return true }
+        }
+      }
+    }
+    return false
+  }
+
+  def copy(): Board {
+    val b = new Board(rows, cols)
+    for var i = 0; i < grid.length; i++ { b.grid[i] = grid[i] }
+    b.moveCount = moveCount
+    return b
+  }
+
+  def cellChar(r: Int, c: Int): String {
+    val v = get(r, c)
+    if v == 1 { return "R" }
+    if v == 2 { return "Y" }
+    return "."
+  }
+
+  def display(): void {
+    IO::println("+" + "-".rep(cols) + "+")
+    for var r = 0; r < rows; r++ {
+      var line = "|"
+      for var c = 0; c < cols; c++ { line = line + cellChar(r, c) }
+      IO::println(line + "|")
+    }
+    IO::println("+" + "-".rep(cols) + "+")
+    var header = " "
+    for var c = 0; c < cols; c++ { header = header + (c + 1) }
+    IO::println(header)
+  }
+}
+
+// ─── AI interface ─────────────────────────────────────────────────────────────
+interface AI {
+  def chooseColumn(board: Board): Int
+  def label(): String
+}
+
+// ─── GreedyAI: win → block → prefer center ───────────────────────────────────
+class GreedyAI conforms AI {
+  val player: Int
+  val opp: Int
+
+public:
+  def this(p: Int) {
+    player = p
+    opp = if p == 1 { 2 } else { 1 }
+  }
+
+  def label(): String = if player == 1 { "GreedyRed" } else { "GreedyYellow" }
+
+  def firstWinCol(board: Board, who: Int): Int {
+    for var c = 0; c < board.numCols(); c++ {
+      if board.canDrop(c) {
+        val t = board.copy()
+        t.dropPiece(c, who)
+        if t.checkWin(who) { return c }
+      }
+    }
+    return -1
+  }
+
+  def chooseColumn(board: Board): Int {
+    val win = firstWinCol(board, player)
+    if win >= 0 { return win }
+    val block = firstWinCol(board, opp)
+    if block >= 0 { return block }
+    // Center-biased column preference
+    val order = [3, 2, 4, 1, 5, 0, 6]
+    for var i = 0; i < order.size; i++ {
+      val c = (order[i] as Int)
+      if board.canDrop(c) { return c }
+    }
+    return 0
+  }
+}
+
+// ─── LineAI: leftmost win, else leftmost available ───────────────────────────
+class LineAI conforms AI {
+  val player: Int
+
+public:
+  def this(p: Int) { player = p }
+
+  def label(): String = if player == 1 { "LineRed" } else { "LineYellow" }
+
+  def firstWinCol(board: Board, who: Int): Int {
+    for var c = 0; c < board.numCols(); c++ {
+      if board.canDrop(c) {
+        val t = board.copy()
+        t.dropPiece(c, who)
+        if t.checkWin(who) { return c }
+      }
+    }
+    return -1
+  }
+
+  def chooseColumn(board: Board): Int {
+    val win = firstWinCol(board, player)
+    if win >= 0 { return win }
+    for var c = 0; c < board.numCols(); c++ {
+      if board.canDrop(c) { return c }
+    }
+    return 0
+  }
+}
+
+// ─── Game runner ──────────────────────────────────────────────────────────────
+def playGame(redAI: AI, yellowAI: AI, verbose: Boolean): GameResult {
+  val board = new Board(6, 7)
+  var turn = 1
+
+  while true {
+    val ai: AI = if turn == 1 { redAI } else { yellowAI }
+    val col = ai.chooseColumn(board)
+    board.dropPiece(col, turn)
+
+    if board.checkWin(turn) {
+      if verbose {
+        board.display()
+        val w = if turn == 1 { "Red" } else { "Yellow" }
+        IO::println("#{w} (#{ai.label()}) wins in #{board.moves()} moves!")
+      }
+      if turn == 1 { return new RedWins() }
+      return new YellowWins()
+    }
+
+    if board.isFull() {
+      if verbose {
+        board.display()
+        IO::println("Draw after #{board.moves()} moves!")
+      }
+      return new Draw()
+    }
+
+    turn = if turn == 1 { 2 } else { 1 }
+  }
+  return new Draw()  // unreachable
+}
+
+// ─── Statistics record ───────────────────────────────────────────────────────
+record MatchStats(redWins: Int, yellowWins: Int, draws: Int, total: Int)
+
+def runMatch(redAI: AI, yellowAI: AI, games: Int): MatchStats {
+  var rw = 0
+  var yw = 0
+  var dr = 0
+  for var i = 0; i < games; i++ {
+    val result = playGame(redAI, yellowAI, false)
+    select result {
+      case r is RedWins:    rw = rw + 1
+      case y is YellowWins: yw = yw + 1
+      else:                 dr = dr + 1
+    }
+  }
+  return new MatchStats(rw, yw, dr, games)
+}
+
+def printStats(stats: MatchStats): void {
+  IO::println("  Red wins:    #{stats.redWins()}")
+  IO::println("  Yellow wins: #{stats.yellowWins()}")
+  IO::println("  Draws:       #{stats.draws()}")
+  if stats.total() > 0 {
+    IO::println("  Red win %:   #{stats.redWins() * 100 / stats.total()}%")
+  }
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("=== Connect Four: AI vs AI ===\n")
+
+  val greedy1 = new GreedyAI(1)
+  val line2   = new LineAI(2)
+
+  IO::println("--- Single game: GreedyAI(Red) vs LineAI(Yellow) ---")
+  playGame(greedy1, line2, true)
+
+  IO::println("\n--- 5-game match: GreedyAI(Red) vs LineAI(Yellow) ---")
+  val stats1 = runMatch(greedy1, line2, 5)
+  printStats(stats1)
+
+  IO::println("\n--- 5-game match: LineAI(Red) vs GreedyAI(Yellow) ---")
+  val line1   = new LineAI(1)
+  val greedy2 = new GreedyAI(2)
+  val stats2  = runMatch(line1, greedy2, 5)
+  printStats(stats2)
+
+  // Summary: combine stats
+  val totalRedWins = stats1.redWins() + stats2.redWins()
+  IO::println("\nCombined Red wins across both match series: #{totalRedWins}")
+}

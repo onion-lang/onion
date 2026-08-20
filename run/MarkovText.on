@@ -11,7 +11,7 @@ extension String {
   // Count whitespace-separated non-empty tokens.
   def wordCount(): Int {
     val parts: List[String] = Strings::splitRegex(self, "\\s+")
-    val nonEmpty: List[String] = parts.filter { w => (w as String).length() > 0 } as List[String]
+    val nonEmpty: List[String] = parts.filter { w -> (w as String).length() > 0 } as List[String]
     return nonEmpty.size
   }
 
@@ -151,7 +151,7 @@ public:
     foreach (k, v) in transitions {
       pairs.add(new WordFreq(k as String, (v as List[Object]).size))
     }
-    val sorted: List[Object] = pairs.sortedBy { p => 0 - (p as WordFreq).freq() }
+    val sorted: List[Object] = pairs.sortedBy { p -> 0 - (p as WordFreq).freq() }
     val limit: Int = n.clamp(0, sorted.size)
     var top: List[Object] = []
     for var i: Int = 0; i < limit; i++ { top.add(sorted[i]) }
@@ -163,7 +163,7 @@ public:
 
 def tokenize(text: String): List[String] {
   val raw: List[String] = Strings::splitRegex(text, "\\s+")
-  return raw.filter { w => (w as String).length() > 0 } as List[String]
+  return raw.filter { w -> (w as String).length() > 0 } as List[String]
 }
 
 def countSentenceEnds(words: List[Object]): Int {
@@ -292,8 +292,8 @@ IO::println("Lexical diversity: #{ratioStr}%")
 
 // Group unique words by first letter and print letter histogram.
 val byLetter: Map[String, List[Object]] = uniqueWords
-  .filter { w => (w as String).length() > 0 }
-  .groupBy { w => (w as String).substring(0, 1).toUpperCase() }
+  .filter { w -> (w as String).length() > 0 }
+  .groupBy { w -> (w as String).substring(0, 1).toUpperCase() }
 
 IO::println("")
 IO::println("Initial-letter distribution (top 8 letters):")
@@ -302,7 +302,7 @@ foreach (letter, grp) in byLetter {
   letterPairs.add(new WordFreq(letter as String, (grp as List[Object]).size))
 }
 val topLetters: List[Object] = letterPairs
-  .sortedBy { p => 0 - (p as WordFreq).freq() }
+  .sortedBy { p -> 0 - (p as WordFreq).freq() }
 for var i: Int = 0; i < 8.clamp(0, topLetters.size); i++ {
   val lf: WordFreq = topLetters[i] as WordFreq
   val bar: String = Strings::repeat("█", lf.freq())

@@ -101,6 +101,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plus cycle detection over circular formula references and a formatted
   table report.
 
+- **`run/BrainFuck.on`, a 357-line Brainfuck interpreter** with five verified
+  demo programs and analytical reporting sections. Covers a data-carrying
+  ADT case-enum (`BfInstr`, 8 cases, `JumpFwd`/`JumpBck` each carrying an
+  `Int` target) matched exhaustively via `select`, an `Int[]` data tape,
+  extension methods on `Int` (`clamp`, `mod256`, `toHex`) and `String`
+  (`repeat`, `padRight`), a mutable class with public getters (`BfMachine`),
+  `Map[String,Int]` with `foreach (k,v)`, collection pipelines, string
+  interpolation, nullable types, and runtime Brainfuck code generation (a
+  3×3 multiplication table computed via generated BF programs).
+
 ## [0.12.1] - 2026-08-19
 
 ### Fixed

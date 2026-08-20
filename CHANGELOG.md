@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PolynomialAlgebra.on`, a 295-line polynomial arithmetic demo.**
+  Exercises record operator overloading (`plus`/`minus`/`times` mapped to
+  `+`/`-`/`*`), static factory methods, `List[Double]` generics, `foreach` over
+  ranges, `while` loops, nullable return types (`Double?`), string
+  interpolation, and batch computation. Demonstrates Horner evaluation,
+  Newton-Raphson root finding, Chebyshev polynomials, product-rule
+  differentiation cross-check, indefinite integration, iterated derivatives,
+  and polynomial composition — all results verified analytically.
+
 - **`run/FileSystemSim.on`, a 442-line virtual in-memory filesystem simulator.**
   Covers an ADT enum (`FsNode = FileNode | DirNode | SymlinkNode`) matched via
   `select`/`is`, a data-carrying enum (`Permission`), a plain enum

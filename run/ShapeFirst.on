@@ -17,9 +17,9 @@ def main(top: Int = 3): void {
   file"/tmp/onion-shapefirst.log".write("GET /index HTTP/1.1\nPOST /api/users HTTP/1.1\nGET /index HTTP/1.1\nDELETE /x HTTP/1.1\n")
 
   file"/tmp/onion-shapefirst.log".lines()
-    .map { l => classify(l) }
-    .groupBy { c => c }
-    .mapValues { xs => xs.size }
+    .map { l -> classify(l) }
+    .groupBy { c -> c }
+    .mapValues { xs -> xs.size }
     |> println
 
   // do[List] is a list comprehension

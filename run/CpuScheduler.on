@@ -187,10 +187,8 @@ def startBound(states: List[ProcState]): Int {
 }
 
 // ── FCFS: earliest arrival wins; ties broken by pid ──────────────────────────
-class FcfsSimulator extends Simulator {
+class FcfsSimulator extends Simulator(new Fcfs()) {
 public:
-  def this: (new Fcfs()) { }
-
   override def pick(ready: List[ProcState], now: Int): ProcState? {
     var best: ProcState? = null
     foreach s: ProcState in ready {
@@ -211,10 +209,8 @@ public:
 }
 
 // ── SJF: shortest total burst wins; non-preemptive ───────────────────────────
-class SjfSimulator extends Simulator {
+class SjfSimulator extends Simulator(new Sjf()) {
 public:
-  def this: (new Sjf()) { }
-
   override def pick(ready: List[ProcState], now: Int): ProcState? {
     var best: ProcState? = null
     foreach s: ProcState in ready {
@@ -244,15 +240,9 @@ public:
 // We keep the queue implicit in ready order: sort by (lastRun asc, arrival asc,
 // pid asc) so a process that just yielded goes to the back. lastRun is tracked
 // via a side table keyed by pid.
-class RoundRobinSimulator extends Simulator {
-  val quantum: Int
-  val lastRun: List[Object]   // list of (pid, tick) tuples as GanttEntry(pid, 0, tick)
+class RoundRobinSimulator(val quantum: Int) extends Simulator(new RoundRobin(quantum)) {
+  val lastRun: List[Object] = []   // list of (pid, tick) tuples as GanttEntry(pid, 0, tick)
 public:
-  def this(q: Int): (new RoundRobin(q)) {
-    this.quantum = q
-    this.lastRun = []
-  }
-
   def lastRunOf(pid: String): Int {
     foreach e: GanttEntry in this.lastRun {
       if e.pid() == pid { return e.end() }
@@ -303,10 +293,8 @@ public:
 // ── Priority: preemptive, smallest priority number wins ──────────────────────
 // The base driver already reconsiders the ready set every tick because slice()
 // defaults to 1; leaving slice() at the default gives us preemption for free.
-class PrioritySimulator extends Simulator {
+class PrioritySimulator extends Simulator(new Priority()) {
 public:
-  def this: (new Priority()) { }
-
   override def pick(ready: List[ProcState], now: Int): ProcState? {
     var best: ProcState? = null
     foreach s: ProcState in ready {

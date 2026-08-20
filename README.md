@@ -208,11 +208,11 @@ Methods accepting a function as the last parameter can use trailing lambda synta
 list.map((x: Int) -> { return x * 2; })
 
 // With trailing lambda
-list.map { x => x * 2 }
+list.map { x -> x * 2 }
 
 // Multiple arguments + trailing lambda
-future.onComplete(onSuccess, onFailure) { result =>
-  println("Done: " + result)
+list.fold(0) { acc, x ->
+  acc + x
 }
 ```
 
@@ -252,8 +252,8 @@ record Hit(ip: String, method: String, path: String, status: Int)
   from re"(\S+) (\w+) (\S+) (\d+)"
 
 Hit::parseAll(file"access.log".text())          // List[Hit], bad lines skipped
-  .filter { h => h.status() >= 500 }
-  .groupBy { h => h.path() }
+  .filter { h -> h.status() >= 500 }
+  .groupBy { h -> h.path() }
   |> println
 ```
 

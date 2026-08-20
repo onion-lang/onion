@@ -9,15 +9,15 @@ Onionの関数型プログラミング機能を示す例です。
 ```onion
 // シンプルなラムダ
 val double: (Int) -> Int = (x: Int) -> { return x * 2; }
-println(double.call(5))  // 10
+println(double(5))  // 10
 
 // 複数パラメータのラムダ
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
-println(add.call(3, 7))  // 10
+println(add(3, 7))  // 10
 
 // パラメータなしのラムダ
 val greet: () -> String = () -> { println("Hello!"); return "done"; }
-greet.call()
+greet()
 ```
 
 ## クロージャ
@@ -44,7 +44,7 @@ val reader: BufferedReader = new BufferedReader(
 
 var line: String = null
 while (line = reader.readLine()) != null {
-  println(filter.call(line))
+  println(filter(line))
 }
 ```
 
@@ -76,11 +76,11 @@ def makeCounter(): () -> Int {
 val counter1: () -> Int = makeCounter()
 val counter2: () -> Int = makeCounter()
 
-println(counter1.call())  // 1
-println(counter1.call())  // 2
-println(counter2.call())  // 1
-println(counter1.call())  // 3
-println(counter2.call())  // 2
+println(counter1())  // 1
+println(counter1())  // 2
+println(counter2())  // 1
+println(counter1())  // 3
+println(counter2())  // 2
 ```
 
 各カウンターは独自の `count` 変数を保持します。
@@ -191,7 +191,7 @@ def filter(items: List[String], predicate: (String) -> Boolean): ArrayList[Strin
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
-    if predicate.call(item) {
+    if predicate(item) {
       result << item
     }
   }
@@ -234,7 +234,7 @@ def map(items: java.util.List[String], transform: (String) -> String): ArrayList
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
-    result << transform.call(item)
+    result << transform(item)
   }
 
   return result
@@ -269,7 +269,7 @@ def reduce(items: List[Int], operation: (Int, Int) -> Int, initial: Int): Int {
   var accumulator: Int = initial
 
   foreach item: Int in items {
-    accumulator = operation.call(accumulator, item)
+    accumulator = operation(accumulator, item)
   }
 
   return accumulator
@@ -293,7 +293,7 @@ println("Product: " + result)  // 120
 
 ```onion
 def compose(f: (Int) -> Int, g: (Int) -> Int): (Int) -> Int {
-  return (x: Int) -> { return f.call(g.call(x)); }
+  return (x: Int) -> { return f(g(x)); }
 }
 
 // 関数の定義
@@ -303,7 +303,7 @@ val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 // 合成: 2倍してから10を加える
 val composed: (Int) -> Int = compose(addTen, double)
 
-println(composed.call(5))  // (5 * 2) + 10 = 20
+println(composed(5))  // (5 * 2) + 10 = 20
 ```
 
 ## カリー化
@@ -316,8 +316,8 @@ def add(x: Int): (Int) -> Int = (y: Int) -> { return x + y; }
 val add5: (Int) -> Int = add(5)
 val add10: (Int) -> Int = add(10)
 
-println(add5.call(3))   // 8
-println(add10.call(3))  // 13
+println(add5(3))   // 8
+println(add10(3))  // 13
 ```
 
 ## 実践: ログアナライザ
@@ -346,11 +346,11 @@ def analyzeLog(filename :String) {
 
   var line: String = null
   while (line = reader.readLine()) != null {
-    if isError.call(line) {
+    if isError(line) {
       errorCount = errorCount + 1
-    } else if isWarning.call(line) {
+    } else if isWarning(line) {
       warningCount = warningCount + 1
-    } else if isInfo.call(line) {
+    } else if isInfo(line) {
       infoCount = infoCount + 1
     }
   }
@@ -604,15 +604,15 @@ Kotlin風の末尾ラムダで、メソッド呼び出しをすっきりと書�
 list.map((x: Int) -> { return x * 2; })
 
 // 末尾ラムダ - より簡潔
-list.map { x => x * 2 }
+list.map { x -> x * 2 }
 
 // 関数を最後に取る任意のメソッドで利用可能
-future.onSuccess { result =>
+future.onSuccess { result ->
   println("Got: " + result)
 }
 
 // 末尾ラムダの前に他の引数がある場合
-api.request("GET", "/users") { response =>
+api.request("GET", "/users") { response ->
   println(response.body())
 }
 ```

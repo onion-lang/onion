@@ -122,7 +122,7 @@ public:
     if newStock < 0 { return false }
     val updated: Item = new Item(
       item.sku(), item.name(), item.category(), item.price(), newStock)
-    items        = items.map { i => if i.sku() == tx.sku() { updated } else { i } }
+    items        = items.map { i -> if i.sku() == tx.sku() { updated } else { i } }
     transactions.add(tx)
     return true
   }
@@ -131,13 +131,13 @@ public:
 
   def lowStock(threshold: Int): List[StockAlert] {
     return items
-      .filter  { i => i.stock() <= threshold }
-      .map     { i => new StockAlert(i.sku(), i.name(), i.stock(), threshold) }
-      .sortedBy { a => a.stock() }
+      .filter  { i -> i.stock() <= threshold }
+      .map     { i -> new StockAlert(i.sku(), i.name(), i.stock(), threshold) }
+      .sortedBy { a -> a.stock() }
   }
 
   def byCategory(): Map[String, List[Item]] {
-    return items.groupBy { i => categoryLabel(i.category()) }
+    return items.groupBy { i -> categoryLabel(i.category()) }
   }
 
   def totalValue(): Double {
@@ -260,8 +260,8 @@ printTransactionLog(inv.getTransactions())
 
 // Collection pipeline showcase
 val expensive: List[Item] = inv.getItems()
-  .filter  { i => i.price() >= 20.0 }
-  .sortedBy { i => -i.price().intValue() }
+  .filter  { i -> i.price() >= 20.0 }
+  .sortedBy { i -> -i.price().intValue() }
 
 IO::println("\n#{hline(65)}")
 IO::println("  Premium Items (price ≥ $20.00)")
@@ -270,8 +270,8 @@ foreach item: Item in expensive {
   IO::println("  #{item.name().padRight(22)} $#{item.price().fmt()}  qty=#{item.stock()}")
 }
 
-val inStockCount:  Int = inv.getItems().filter { i => i.stock() > 0  }.size
-val outStockCount: Int = inv.getItems().filter { i => i.stock() == 0 }.size
+val inStockCount:  Int = inv.getItems().filter { i -> i.stock() > 0  }.size
+val outStockCount: Int = inv.getItems().filter { i -> i.stock() == 0 }.size
 IO::println("\n  In stock: #{inStockCount}  /  Out of stock: #{outStockCount}")
 
 IO::println("\n#{hline(65)}")

@@ -34,7 +34,11 @@ object PipelineRunner {
       },
       mutualRecursionOptimization = new optimization.MutualRecursionOptimization(config) with CompilerPhase[Seq[TypedAST.ClassDefinition], Seq[TypedAST.ClassDefinition]] {
         override def name: String = "MutualRecursionOptimization"
-        override def run(input: Seq[TypedAST.ClassDefinition], ctx: PhaseContext): Seq[TypedAST.ClassDefinition] = process(input)
+        override def run(input: Seq[TypedAST.ClassDefinition], ctx: PhaseContext): Seq[TypedAST.ClassDefinition] = {
+          val result = process(input)
+          ctx.addWarnings(collectedWarnings)
+          result
+        }
       },
       bytecodeGeneration = new BytecodeGenerationPhase(config),
       lawCheck = new onion.compiler.verification.LawCheckPhase(config)
@@ -107,6 +111,9 @@ final class PipelineRunner(phases: CompilationPhases) {
   ): CompilationResult =
     runPhase(phases.mutualRecursionOptimization, optimizedTail, ctx)(_ => ()) match {
       case None => result(Seq.empty, ctx, request)
+      case Some(optimizedMutual) if request.config.warningLevel == WarningLevel.Error && ctx.diagnostics.warnings.nonEmpty =>
+        ctx.addErrors(promoteWarnings(ctx.diagnostics.warnings))
+        result(Seq.empty, ctx, request)
       case Some(optimizedMutual) =>
         runPhase(phases.bytecodeGeneration, optimizedMutual, ctx)(_ => ()) match {
           case None => result(Seq.empty, ctx, request)

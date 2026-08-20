@@ -251,7 +251,7 @@ foreach kind: SortKind in allKinds {
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
-val allPassed: Boolean = results.fold(true) { acc, r =>
+val allPassed: Boolean = results.fold(true) { acc, r ->
   (acc as Boolean) && (r as SortResult).sorted()
 }
 IO::println("All sorts correct: #{allPassed}")
@@ -270,10 +270,10 @@ foreach tc: TestCase in testCases {
 
 IO::println("")
 IO::println("=== Pipeline analysis ===")
-val byAlg = results.groupBy { r => (r as SortResult).algorithm() }
+val byAlg = results.groupBy { r -> (r as SortResult).algorithm() }
 foreach (name, rlist) in byAlg {
   val l = rlist as List[Object]
-  val passing = l.filter { r => (r as SortResult).sorted() }.size
+  val passing = l.filter { r -> (r as SortResult).sorted() }.size
   IO::println("  #{name}: #{passing}/#{l.size} passed")
 }
 
@@ -281,7 +281,7 @@ foreach (name, rlist) in byAlg {
 
 IO::println("")
 IO::println("=== Partition by dataset size ===")
-val parts = results.partition { r => (r as SortResult).size <= 5 }
+val parts = results.partition { r -> (r as SortResult).size <= 5 }
 val smallPart  = parts[0] as List[Object]
 val largerPart = parts[1] as List[Object]
 IO::println("  Small (<=5 elements): #{smallPart.size} results")
@@ -304,11 +304,11 @@ IO::println("")
 IO::println("=== Collection pipeline on [1..20] ===")
 val nums: List[Int] = []
 foreach i: Int in 1..20 { nums.add(i) }
-val evens = nums.filter { n => (n as Int).isEven() }
-val odds  = nums.filter { n => (n as Int).isOdd() }
-val doubled = nums.filter { n => (n as Int).isEven() }.map { n => (n as Int) * 2 }
-val sumEvens = evens.fold(0) { acc, n => (acc as Int) + (n as Int) }
-val sumOdds  = odds.fold(0) { acc, n => (acc as Int) + (n as Int) }
+val evens = nums.filter { n -> (n as Int).isEven() }
+val odds  = nums.filter { n -> (n as Int).isOdd() }
+val doubled = nums.filter { n -> (n as Int).isEven() }.map { n -> (n as Int) * 2 }
+val sumEvens = evens.fold(0) { acc, n -> (acc as Int) + (n as Int) }
+val sumOdds  = odds.fold(0) { acc, n -> (acc as Int) + (n as Int) }
 IO::println("  evens count=#{evens.size}, sum=#{sumEvens}")
 IO::println("  odds  count=#{odds.size}, sum=#{sumOdds}")
 IO::println("  doubled evens: #{listStr(doubled)}")
@@ -318,8 +318,8 @@ IO::println("  doubled evens: #{listStr(doubled)}")
 IO::println("")
 IO::println("=== Sorted by closures ===")
 val raw: List[Int] = [5, 3, 8, 1, 9, 2, 7, 4, 6]
-val ascSorted  = raw.sortedBy { x => x as Int }
-val descSorted = raw.sortedBy { x => 0 - (x as Int) }
+val ascSorted  = raw.sortedBy { x -> x as Int }
+val descSorted = raw.sortedBy { x -> 0 - (x as Int) }
 IO::println("  asc:  #{listStr(ascSorted)}")
 IO::println("  desc: #{listStr(descSorted)}")
 
@@ -350,8 +350,8 @@ IO::println("  10 / 0 = #{safeDiv(10, 0)}")
 IO::println("")
 IO::println("=== Nullable find ===")
 val mixed: List[Int] = [5, 1, 9, 3, 7, 2, 8, 4, 6]
-val found9  = mixed.find { n => (n as Int) == 9 }
-val found99 = mixed.find { n => (n as Int) == 99 }
+val found9  = mixed.find { n -> (n as Int) == 9 }
+val found99 = mixed.find { n -> (n as Int) == 99 }
 val found9Str  = if found9  != null { "" + (found9  as Int) } else { "none" }
 val found99Str = if found99 != null { "" + (found99 as Int) } else { "none" }
 IO::println("  found 9:  #{found9Str}")
@@ -383,10 +383,10 @@ IO::println("  fib(0..10): #{listStr(fibs)}")
 IO::println("")
 IO::println("=== GroupBy parity ===")
 val tenNums: List[Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-val byParity = tenNums.groupBy { n => if (n as Int).isEven() { "even" } else { "odd" } }
+val byParity = tenNums.groupBy { n -> if (n as Int).isEven() { "even" } else { "odd" } }
 foreach (parity, grp) in byParity {
   val g = grp as List[Object]
-  val sum = g.fold(0) { acc, v => (acc as Int) + (v as Int) }
+  val sum = g.fold(0) { acc, v -> (acc as Int) + (v as Int) }
   IO::println("  #{parity}: count=#{g.size}, sum=#{sum}")
 }
 

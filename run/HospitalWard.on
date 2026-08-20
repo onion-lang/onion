@@ -1,0 +1,261 @@
+// HospitalWard.on — Hospital patient management system (~220 lines).
+// Exercises: case-enum (ADT), records with body methods, class with mutable
+// state, generics, collection pipelines (filter/map/sortedBy/groupBy/find/
+// partition/fold), foreach map-destructuring, select pattern matching,
+// nullable, closures, string interpolation, try/catch, recursion.
+
+// ── Enums ────────────────────────────────────────────────────────────────
+
+enum Severity {
+  case Low
+  case Moderate
+  case High
+  case Critical
+
+  public:
+  def label(): String = select this {
+    case s is Low:      "LOW"
+    case s is Moderate: "MOD"
+    case s is High:     "HIGH"
+    case s is Critical: "CRIT"
+  }
+
+  def priority(): Int = select this {
+    case s is Low:      1
+    case s is Moderate: 2
+    case s is High:     3
+    case s is Critical: 4
+  }
+}
+
+enum BloodType {
+  A_POS, A_NEG, B_POS, B_NEG, O_POS, O_NEG, AB_POS, AB_NEG
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record Diagnosis(code: String, description: String, severity: Severity)
+
+record Patient(
+  id: Int,
+  name: String,
+  age: Int,
+  bloodType: BloodType,
+  ward: String,
+  daysSinceAdmission: Int,
+  diagnosis: Diagnosis
+) {
+public:
+  def fullLabel(): String =
+    "[#{id()}] #{name()} (#{age()}yr, #{bloodType()}) — #{diagnosis().description()}"
+  def isUrgent(): Boolean = diagnosis().severity().priority() >= 3
+}
+
+// ── Extension methods ────────────────────────────────────────────────────
+
+extension Int {
+  def dayLabel(): String = if self == 1 { "1 day" } else { "#{self} days" }
+}
+
+extension Double {
+  def pct(): String {
+    val i: Int = (self * 10.0).intValue()
+    val whole: Int = i / 10
+    val frac: Int = i % 10
+    return "#{whole}.#{frac}%"
+  }
+}
+
+// ── Top-level helpers ─────────────────────────────────────────────────────
+
+def severityBar(sev: Severity): String {
+  val filled: Int = sev.priority()
+  var bar: String = ""
+  var i: Int = 0
+  while i < 4 {
+    bar = bar + (if i < filled { "█" } else { "░" })
+    i = i + 1
+  }
+  return "[#{bar}] #{sev.label()}"
+}
+
+def riskScore(p: Patient): Int {
+  val sevPts: Int = p.diagnosis().severity().priority() * 25
+  val agePts: Int = if p.age() >= 70 { 20 } else if p.age() >= 50 { 10 } else { 0 }
+  val stayPts: Int = if p.daysSinceAdmission() > 14 { 15 } else { 0 }
+  return sevPts + agePts + stayPts
+}
+
+// Recursive helper: compute Fibonacci-based "complexity index" for a diagnosis code
+def complexityIndex(code: String, depth: Int): Int {
+  if depth <= 1 { return code.length() }
+  return complexityIndex(code, depth - 1) + complexityIndex(code, depth - 2)
+}
+
+// ── Ward class ───────────────────────────────────────────────────────────
+
+class Ward {
+  var patients: List[Patient]
+
+public:
+  val name: String
+
+  def this(n: String) {
+    self.name = n
+    self.patients = []
+  }
+
+  def admit(p: Patient): void {
+    patients.add(p)
+  }
+
+  def discharge(id: Int): void {
+    patients.removeIf((p: Patient) -> p.id() == id)
+  }
+
+  def count(): Int = patients.size
+
+  def urgentCount(): Int = patients.filter { p -> (p as Patient).isUrgent() }.size
+
+  def averageAge(): Double {
+    if patients.size == 0 { return 0.0 }
+    val total: Int = patients.fold(0) { acc, p -> (acc as Int) + (p as Patient).age() } as Int
+    return (total as Double) / (patients.size as Double)
+  }
+
+  def highestRisk(): Patient? {
+    val sorted: List[Patient] = patients.sortedBy { p -> -riskScore(p as Patient) }
+    if sorted.size == 0 { return null }
+    return sorted.get(0) as Patient
+  }
+}
+
+// ── Patient data ────────────────────────────────────────────────────────
+
+val icuWard = new Ward("ICU")
+val cardioWard = new Ward("Cardiology")
+val orthoWard = new Ward("Orthopaedics")
+
+val patients: List[Patient] = [
+  new Patient(1, "Alice Nguyen",  72, BloodType::O_POS, "ICU",          18,
+    new Diagnosis("S100", "Sepsis",             new Critical())),
+  new Patient(2, "Bob Martinez",  55, BloodType::A_NEG, "ICU",           5,
+    new Diagnosis("I200", "Unstable Angina",    new High())),
+  new Patient(3, "Carol Kim",     41, BloodType::B_POS, "Cardiology",    3,
+    new Diagnosis("I489", "Atrial Fibrillation",new Moderate())),
+  new Patient(4, "David Osei",    29, BloodType::AB_NEG,"Cardiology",    1,
+    new Diagnosis("R000", "Tachycardia",        new Low())),
+  new Patient(5, "Eva Kowalski",  68, BloodType::A_POS, "Orthopaedics",  7,
+    new Diagnosis("S720", "Hip Fracture",       new High())),
+  new Patient(6, "Fatima Al-Sayed",80,BloodType::O_NEG, "ICU",          22,
+    new Diagnosis("I639", "Stroke",             new Critical())),
+  new Patient(7, "George Tanaka", 45, BloodType::B_NEG, "Orthopaedics",  2,
+    new Diagnosis("M545", "Lumbar Radiculopathy",new Low())),
+  new Patient(8, "Hana Yoshida",  63, BloodType::O_POS, "Cardiology",   10,
+    new Diagnosis("I500", "Heart Failure",      new High())),
+  new Patient(9, "Ivan Petrov",   52, BloodType::A_POS, "Orthopaedics", 14,
+    new Diagnosis("S820", "Tibial Fracture",    new Moderate())),
+  new Patient(10,"Jamal Williams",35, BloodType::AB_POS,"Cardiology",    4,
+    new Diagnosis("I059", "Mitral Valve Disease",new High()))
+]
+
+// Admit patients to their wards
+foreach p: Patient in patients {
+  select p.ward() {
+    case "ICU":          icuWard.admit(p)
+    case "Cardiology":   cardioWard.admit(p)
+    case "Orthopaedics": orthoWard.admit(p)
+    else: IO::println("Unknown ward: #{p.ward()}")
+  }
+}
+
+// ── Ward summary ─────────────────────────────────────────────────────────
+
+def printWardSummary(w: Ward): void {
+  IO::println("┌─ #{w.name} ─ #{w.count()} patient(s)")
+  val avgAge: Double = w.averageAge()
+  val ageWhole: Int = avgAge.intValue()
+  IO::println("│  avg age: #{ageWhole}  urgent: #{w.urgentCount()}")
+  val top: Patient? = w.highestRisk()
+  if top != null {
+    IO::println("│  highest risk: #{(top as Patient).name()} (score #{riskScore(top as Patient)})")
+  }
+  IO::println("└──")
+}
+
+IO::println("═══ HOSPITAL DAILY REPORT ════════════════════════")
+printWardSummary(icuWard)
+printWardSummary(cardioWard)
+printWardSummary(orthoWard)
+
+// ── Hospital-wide analysis ───────────────────────────────────────────────
+
+IO::println("")
+IO::println("── By severity ──")
+val bySeverity = patients.groupBy { p -> (p as Patient).diagnosis().severity().label() }
+foreach (label, group) in bySeverity {
+  IO::println("  #{label}: #{(group as List[Patient]).size} patient(s)")
+}
+
+IO::println("")
+IO::println("── Priority ranking (all patients) ──")
+val ranked: List[Patient] = patients.sortedBy { p -> -(riskScore(p as Patient)) }
+foreach rp: Patient in ranked {
+  val score: Int = riskScore(rp)
+  IO::println("  #{rp.name()} — #{severityBar(rp.diagnosis().severity())} score=#{score} (#{rp.daysSinceAdmission().dayLabel()})")
+}
+
+// ── Partition into urgent / stable ───────────────────────────────────────
+
+IO::println("")
+val parts: List[List[Patient]] = patients.partition { p -> p.isUrgent() }
+val urgent: List[Patient] = parts.get(0)
+val stable: List[Patient] = parts.get(1)
+IO::println("Urgent: #{urgent.size}  Stable: #{stable.size}")
+val urgentPct: Double = (urgent.size as Double) / (patients.size as Double) * 100.0
+val pctWhole: Int = urgentPct.intValue()
+IO::println("Urgency rate: #{pctWhole}%")
+
+// ── Nullable find ─────────────────────────────────────────────────────────
+
+val found: Patient? = patients.find { p -> (p as Patient).age() > 75 } as Patient?
+if found != null {
+  IO::println("")
+  IO::println("Oldest critical-eligible: #{(found as Patient).fullLabel()}")
+} else {
+  IO::println("No patient over 75 found.")
+}
+
+// ── Closure + fold aggregation ────────────────────────────────────────────
+
+val totalRisk: Int = patients.fold(0) { acc, p -> (acc as Int) + riskScore(p as Patient) } as Int
+IO::println("")
+IO::println("Total risk load: #{totalRisk}")
+
+// ── Try/catch ─────────────────────────────────────────────────────────────
+
+def safeDivide(a: Int, b: Int): String {
+  try {
+    return "#{a / b}"
+  } catch e: Exception {
+    return "div-err"
+  }
+}
+IO::println("avg risk: " + safeDivide(totalRisk, patients.size))
+IO::println("div/0 guard: " + safeDivide(totalRisk, 0))
+
+// ── Recursion demo ────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("── Complexity indices ──")
+foreach p: Patient in patients.filter { p -> (p as Patient).isUrgent() } {
+  val ci: Int = complexityIndex((p as Patient).diagnosis().code(), 4)
+  IO::println("  #{(p as Patient).name()}: code=#{(p as Patient).diagnosis().code()} ci=#{ci}")
+}
+
+// ── discharge and recount ─────────────────────────────────────────────────
+
+icuWard.discharge(2)
+IO::println("")
+IO::println("After discharging patient #2: ICU now has #{icuWard.count()} patient(s)")
+

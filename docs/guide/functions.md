@@ -116,7 +116,7 @@ def square(x: Int): Int = x * x
 
 ### Lambda Syntax
 
-Anonymous functions use the `(params) -> { body }` syntax. Function values can be invoked with `f(args)`, which is shorthand for `f.call(args)`:
+Anonymous functions use the `(params) -> { body }` syntax. Function values can be invoked with `f(args)`, which is shorthand for `f(args)`:
 
 ```onion
 val double: (Int) -> Int = (x: Int) -> { return x * 2; }
@@ -180,8 +180,8 @@ val filter: (String) -> String = (line: String) -> {
   return line + " (line " + i + ")";
 }
 
-println(filter.call("First"))   // "First (line 1)"
-println(filter.call("Second"))  // "Second (line 2)"
+println(filter("First"))   // "First (line 1)"
+println(filter("Second"))  // "Second (line 2)"
 ```
 
 ## Function Types
@@ -211,8 +211,8 @@ Functions that accept or return other functions:
 
 ```onion
 def applyTwice(f: (Int) -> Int, value: Int): Int {
-  val temp: Int = f.call(value)
-  return f.call(temp)
+  val temp: Int = f(value)
+  return f(temp)
 }
 
 val increment: (Int) -> Int = (x: Int) -> { return x + 1; }
@@ -321,7 +321,7 @@ def filterLines(lines: List[String], predicate: (String) -> Boolean): List[Strin
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach line: String in lines {
-    if predicate.call(line) {
+    if predicate(line) {
       result << line
     }
   }
@@ -347,7 +347,7 @@ def mapLines(lines: List[String], transform: (String) -> String): List[String] {
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach line: String in lines {
-    result << transform.call(line)
+    result << transform(line)
   }
 
   return result

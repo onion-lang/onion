@@ -1,0 +1,20 @@
+# Onion source files.
+#
+# `.on` is not a language github.com knows: adding one to github-linguist requires the
+# extension to have at least 2000 files indexed across many repositories, which Onion is
+# nowhere near. So `.on` files render with no highlighting at all, which is a poor look for
+# the ~170 sample programs under run/ that are the first real code a visitor reads.
+#
+# `linguist-language` overrides how a file is classified and highlighted, so pointing `.on`
+# at Scala buys colour for the parts the two languages share -- def/val/var/class/extends/
+# case/enum, strings, comments, numbers, and (because Scala has interpolated strings) even
+# re"..." literals. Onion-only keywords such as conforms, foreach, select and tool stay
+# uncoloured, which is the honest cost of borrowing someone else's grammar.
+#
+# `linguist-detectable=false` keeps that borrowing out of the repository language
+# statistics, so the language bar does not claim these files are Scala.
+#
+# This affects FILE views only. Fenced ```onion blocks in Markdown resolve through
+# Linguist's language list and cannot be overridden per repository, so they stay plain on
+# github.com. The documentation site highlights them properly via tools/pygments-onion.
+*.on linguist-language=Scala linguist-detectable=false

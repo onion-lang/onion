@@ -1,0 +1,295 @@
+// PolynomialAlgebra.on — Polynomial arithmetic, differentiation, integration,
+// and Newton-Raphson root finding.
+// Exercises: record with operator overloading and static factories,
+// List[T] generics, foreach ranges, while loops, nullable return types,
+// string building, closures, collection pipelines (filter/fold), and
+// string interpolation.
+
+// Polynomial stored as List[Double] of coefficients:
+// coeffs[i] = coefficient of x^i, so [c0, c1, c2] = c0 + c1*x + c2*x^2
+record Polynomial(coeffs: List[Double]) {
+public:
+  static def constant(c: Double): Polynomial = new Polynomial([c])
+
+  def degree(): Int = if coeffs.size == 0 { 0 } else { coeffs.size - 1 }
+
+  def coeff(i: Int): Double {
+    if i < 0 || i >= coeffs.size { return 0.0 }
+    return coeffs[i] as Double
+  }
+
+  // Horner's method: evaluate sum c_i*x^i in O(n) with minimal operations
+  def eval(x: Double): Double {
+    if coeffs.size == 0 { return 0.0 }
+    var result: Double = coeff(coeffs.size - 1)
+    var i: Int = coeffs.size - 2
+    while i >= 0 {
+      result = result * x + coeff(i)
+      i = i - 1
+    }
+    return result
+  }
+
+  // Pad coefficient list to length n with trailing zeros
+  def padded(n: Int): List[Double] {
+    var out: List[Double] = []
+    foreach i: Int in 0..<n {
+      out.add(if i < coeffs.size { coeffs[i] as Double } else { 0.0 })
+    }
+    return out
+  }
+
+  // Remove trailing near-zero coefficients
+  def trimmed(): Polynomial {
+    var last: Int = coeffs.size - 1
+    while last > 0 {
+      val c: Double = coeffs[last] as Double
+      if c > 1.0e-12 || c < -1.0e-12 { break }
+      last = last - 1
+    }
+    var out: List[Double] = []
+    foreach i: Int in 0..last { out.add(coeffs[i] as Double) }
+    return new Polynomial(out)
+  }
+
+  // p + q  (maps to the '+' operator via 'def plus')
+  def plus(q: Polynomial): Polynomial {
+    val n: Int = if coeffs.size > q.coeffs().size { coeffs.size } else { q.coeffs().size }
+    val ap: List[Double] = padded(n)
+    val bp: List[Double] = q.padded(n)
+    var out: List[Double] = []
+    foreach i: Int in 0..<n {
+      out.add((ap[i] as Double) + (bp[i] as Double))
+    }
+    return new Polynomial(out)
+  }
+
+  // p - q
+  def minus(q: Polynomial): Polynomial {
+    val n: Int = if coeffs.size > q.coeffs().size { coeffs.size } else { q.coeffs().size }
+    val ap: List[Double] = padded(n)
+    val bp: List[Double] = q.padded(n)
+    var out: List[Double] = []
+    foreach i: Int in 0..<n {
+      out.add((ap[i] as Double) - (bp[i] as Double))
+    }
+    return new Polynomial(out)
+  }
+
+  // p * q  — convolution: for each output degree k, sum c_i * d_{k-i}
+  def times(q: Polynomial): Polynomial {
+    if coeffs.size == 0 || q.coeffs().size == 0 { return new Polynomial([0.0]) }
+    val n: Int = coeffs.size + q.coeffs().size - 1
+    var out: List[Double] = []
+    foreach k: Int in 0..<n {
+      var c: Double = 0.0
+      foreach i: Int in 0..k {
+        val j: Int = k - i
+        if i < coeffs.size && j < q.coeffs().size {
+          c = c + coeff(i) * q.coeff(j)
+        }
+      }
+      out.add(c)
+    }
+    return new Polynomial(out)
+  }
+
+  // d/dx: coefficient i becomes i * c_i at position i-1
+  def derive(): Polynomial {
+    if coeffs.size <= 1 { return new Polynomial([0.0]) }
+    var out: List[Double] = []
+    foreach i: Int in 1..<coeffs.size {
+      out.add(i * coeff(i))
+    }
+    return new Polynomial(out)
+  }
+
+  // Indefinite integral with integration constant c0
+  def integrate(c0: Double): Polynomial {
+    var out: List[Double] = []
+    out.add(c0)
+    foreach i: Int in 0..<coeffs.size {
+      out.add(coeff(i) / (i + 1.0))
+    }
+    return new Polynomial(out)
+  }
+
+  // Newton-Raphson iteration; returns null on non-convergence or flat derivative
+  def findRoot(guess: Double, tol: Double, maxIter: Int): Double? {
+    val dp: Polynomial = derive()
+    var x: Double = guess
+    var iter: Int = 0
+    while iter < maxIter {
+      val fx: Double = eval(x)
+      val fpx: Double = dp.eval(x)
+      if fpx < 1.0e-12 && fpx > -1.0e-12 { return null }
+      val next: Double = x - fx / fpx
+      val diff: Double = next - x
+      if diff < tol && diff > -tol { return next }
+      x = next
+      iter = iter + 1
+    }
+    return null
+  }
+
+  // Evaluate p at each x in xs; return the list of results
+  def evalRange(xs: List[Double]): List[Double] {
+    var out: List[Double] = []
+    var i: Int = 0
+    while i < xs.size {
+      out.add(eval(xs[i] as Double))
+      i = i + 1
+    }
+    return out
+  }
+
+  // Pretty-print: terms ordered from highest to lowest degree
+  def show(): String {
+    val p: Polynomial = trimmed()
+    if p.coeffs().size == 0 { return "0" }
+    var result: String = ""
+    var first: Boolean = true
+    var i: Int = p.coeffs().size - 1
+    while i >= 0 {
+      val c: Double = p.coeff(i)
+      val absC: Double = if c < 0.0 { 0.0 - c } else { c }
+      if absC > 1.0e-12 {
+        if first {
+          if c < 0.0 { result = "-" + absC } else { result = "" + absC }
+          first = false
+        } else {
+          if c < 0.0 { result = result + " - " + absC } else { result = result + " + " + absC }
+        }
+        if i == 1 { result = result + "x" }
+        else if i > 1 { result = result + "x^#{i}" }
+      }
+      i = i - 1
+    }
+    if first { return "0" }
+    return result
+  }
+}
+
+// ─── Top-level helpers ────────────────────────────────────────────────────────
+
+def poly(cs: List[Double]): Polynomial = new Polynomial(cs)
+
+def line(label: String): void { IO::println("--- #{label} ---") }
+
+def showEval(p: Polynomial, x: Double): void {
+  IO::println("    f(#{x}) = #{p.eval(x)}")
+}
+
+def printPoly(name: String, p: Polynomial): void {
+  IO::println("  #{name} = #{p.show()}")
+}
+
+// ─── Main demo ────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("========== Polynomial Algebra Demo ==========")
+  IO::println("")
+
+  // p = 3x^2 + 2x + 1  (coeffs low-to-high: [1, 2, 3])
+  // q = 5x + 4         (coeffs: [4, 5])
+  val p: Polynomial = poly([1.0, 2.0, 3.0])
+  val q: Polynomial = poly([4.0, 5.0])
+
+  line("Basic polynomials")
+  printPoly("p", p)
+  printPoly("q", q)
+  IO::println("")
+
+  line("Evaluation — Horner's method")
+  showEval(p, 0.0)
+  showEval(p, 1.0)
+  showEval(p, 2.0)
+  showEval(q, 3.0)
+  IO::println("")
+
+  line("Arithmetic")
+  printPoly("p + q", p + q)
+  printPoly("p - q", p - q)
+  printPoly("p * q", p * q)
+  IO::println("")
+
+  line("Differentiation")
+  printPoly("p'", p.derive())
+  printPoly("q'", q.derive())
+  val pq: Polynomial = p * q
+  printPoly("(p*q)'          ", pq.derive())
+  printPoly("p'*q + p*q' (≡) ", p.derive() * q + p * q.derive())
+  IO::println("")
+
+  line("Integration")
+  val pInt: Polynomial = p.integrate(0.0)
+  printPoly("∫p dx (c=0)", pInt)
+  printPoly("d/dx ∫p dx  ", pInt.derive())
+  IO::println("")
+
+  // r = x^2 - 5x + 6 = (x-2)(x-3); roots at x=2 and x=3
+  line("Root Finding — Newton-Raphson")
+  val r: Polynomial = poly([6.0, -5.0, 1.0])
+  printPoly("r", r)
+  val root1: Double? = r.findRoot(1.5, 1.0e-9, 100)
+  val root2: Double? = r.findRoot(4.0, 1.0e-9, 100)
+  if root1 != null { IO::println("  Root near 1.5 → #{root1}") }
+  else             { IO::println("  No convergence near 1.5") }
+  if root2 != null { IO::println("  Root near 4.0 → #{root2}") }
+  else             { IO::println("  No convergence near 4.0") }
+  IO::println("  Verify: r(2.0)=#{r.eval(2.0)}, r(3.0)=#{r.eval(3.0)}")
+  IO::println("")
+
+  // Chebyshev polynomials: T_n(cos θ) = cos(nθ)
+  line("Chebyshev Polynomials T0–T3")
+  val T0: Polynomial = poly([1.0])
+  val T1: Polynomial = poly([0.0, 1.0])
+  val T2: Polynomial = poly([-1.0, 0.0, 2.0])
+  val T3: Polynomial = poly([0.0, -3.0, 0.0, 4.0])
+  printPoly("T0", T0)
+  printPoly("T1", T1)
+  printPoly("T2", T2)
+  printPoly("T3", T3)
+  // θ = π/3 ⟹ cos θ = 0.5; T2(0.5) = cos(2π/3) = -0.5; T3(0.5) = cos(π) = -1.0
+  IO::println("  T2(0.5) = #{T2.eval(0.5)}  (expect -0.5)")
+  IO::println("  T3(0.5) = #{T3.eval(0.5)}  (expect -1.0)")
+  IO::println("")
+
+  // Iterated derivatives of (1+x)^3 = 1 + 3x + 3x^2 + x^3
+  line("Iterated Derivatives of (1+x)^3")
+  val cubic: Polynomial = poly([1.0, 3.0, 3.0, 1.0])
+  printPoly("(1+x)^3    ", cubic)
+  printPoly("d/dx       ", cubic.derive())
+  printPoly("d^2/dx^2   ", cubic.derive().derive())
+  printPoly("d^3/dx^3   ", cubic.derive().derive().derive())
+  printPoly("d^4/dx^4   ", cubic.derive().derive().derive().derive())
+  IO::println("")
+
+  // Batch evaluation with while-based evalRange
+  line("Batch Evaluation")
+  val xs: List[Double] = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+  val ys: List[Double] = p.evalRange(xs)
+  IO::println("  x    : #{xs}")
+  IO::println("  p(x) : #{ys}")
+  IO::println("")
+
+  // fold: accumulate sum of p(x) over x = 0..4
+  line("Fold: sum of p(x) for x = 0 .. 4")
+  val xs2: List[Double] = [0.0, 1.0, 2.0, 3.0, 4.0]
+  var sumY: Double = 0.0
+  var k: Int = 0
+  while k < xs2.size {
+    sumY = sumY + p.eval(xs2[k] as Double)
+    k = k + 1
+  }
+  IO::println("  sum p(0)+…+p(4) = #{sumY}")
+  IO::println("")
+
+  // Polynomial composition: evaluate p at each value of q
+  line("Polynomial Composition  p(q(x))")
+  IO::println("  q(0) = #{q.eval(0.0)},  p(q(0)) = #{p.eval(q.eval(0.0))}")
+  IO::println("  q(1) = #{q.eval(1.0)},  p(q(1)) = #{p.eval(q.eval(1.0))}")
+  IO::println("")
+
+  IO::println("============================================")
+}

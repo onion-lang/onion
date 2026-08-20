@@ -125,7 +125,7 @@ val found: Option[Shipment] = do[Option] {
   s1 <- wh.findById("SH003")
   ret s1
 }
-IO::println("SH003: #{found.map { s => (s as Shipment).id() + " " + (s as Shipment).carrier() + " -> " + (s as Shipment).dest() }.getOrElse("(not found)")}")
+IO::println("SH003: #{found.map { s -> (s as Shipment).id() + " " + (s as Shipment).carrier() + " -> " + (s as Shipment).dest() }.getOrElse("(not found)")}")
 
 val chained: Option[String] = do[Option] {
   s1 <- wh.findById("SH001")
@@ -157,7 +157,7 @@ IO::println("")
 IO::println("=== All Shipments ===")
 IO::println("ID      Carrier     Origin        Destination   Weight   St")
 IO::println("------  ----------  ------------  ------------  -------  --")
-val sorted: List[Shipment] = wh.all().sortedBy { s => (s as Shipment).id() } as List[Shipment]
+val sorted: List[Shipment] = wh.all().sortedBy { s -> (s as Shipment).id() } as List[Shipment]
 foreach s: Shipment in sorted {
   val st: ShipmentStatus? = wh.statusOf(s.id())
   val code: String = if st != null { statusCode(st) } else { "?" }
@@ -167,10 +167,10 @@ foreach s: Shipment in sorted {
 // ── Carrier breakdown ─────────────────────────────────────────────────────────
 IO::println("")
 IO::println("=== By Carrier ===")
-val byCarrier: Map[String, List[Shipment]] = wh.all().groupBy { s => (s as Shipment).carrier() } as Map[String, List[Shipment]]
+val byCarrier: Map[String, List[Shipment]] = wh.all().groupBy { s -> (s as Shipment).carrier() } as Map[String, List[Shipment]]
 foreach (carrier, items) in byCarrier {
   val sl: List[Shipment] = items as List[Shipment]
-  val tw: Double = sl.fold(0.0) { acc, s => (acc as Double) + (s as Shipment).weightKg() } as Double
+  val tw: Double = sl.fold(0.0) { acc, s -> (acc as Double) + (s as Shipment).weightKg() } as Double
   IO::println("  #{carrier.padRight(12)} #{sl.size()} shipments  #{tw.kgLabel()} total")
 }
 
@@ -206,12 +206,12 @@ IO::println("  Total:      #{totalN}")
 // ── Weight statistics ─────────────────────────────────────────────────────────
 IO::println("")
 IO::println("=== Weight Statistics ===")
-val allWeights: List[Double] = wh.all().map { s => (s as Shipment).weightKg() } as List[Double]
-val totalW: Double = allWeights.fold(0.0) { acc, w => (acc as Double) + (w as Double) } as Double
+val allWeights: List[Double] = wh.all().map { s -> (s as Shipment).weightKg() } as List[Double]
+val totalW: Double = allWeights.fold(0.0) { acc, w -> (acc as Double) + (w as Double) } as Double
 val avgW: Double   = totalW / (wh.all().size() as Double)
 
-val heaviestS: Shipment = wh.all().sortedBy { s => 0.0 - (s as Shipment).weightKg() }[0] as Shipment
-val lightestS: Shipment = wh.all().sortedBy { s => (s as Shipment).weightKg() }[0] as Shipment
+val heaviestS: Shipment = wh.all().sortedBy { s -> 0.0 - (s as Shipment).weightKg() }[0] as Shipment
+val lightestS: Shipment = wh.all().sortedBy { s -> (s as Shipment).weightKg() }[0] as Shipment
 
 IO::println("  Total:    #{totalW.kgLabel()}")
 IO::println("  Average:  #{avgW.kgLabel()}")
@@ -221,12 +221,12 @@ IO::println("  Lightest: #{lightestS.id()} #{lightestS.weightKg().kgLabel()} (#{
 // ── Destination hot-spots ─────────────────────────────────────────────────────
 IO::println("")
 IO::println("=== Top Destinations ===")
-val byDest: Map[String, List[Shipment]] = wh.all().groupBy { s => (s as Shipment).dest() } as Map[String, List[Shipment]]
+val byDest: Map[String, List[Shipment]] = wh.all().groupBy { s -> (s as Shipment).dest() } as Map[String, List[Shipment]]
 // Build (dest, count) pairs for sorting by inbound volume
 val destPairs: List[String] = wh.all()
-  .map { s => (s as Shipment).dest() } as List[String]
+  .map { s -> (s as Shipment).dest() } as List[String]
 val uniqueDests: List[String] = destPairs.distinct() as List[String]
-val sortedDests: List[String] = uniqueDests.sortedBy { d =>
+val sortedDests: List[String] = uniqueDests.sortedBy { d ->
   val sl2: List[Shipment] = byDest[d as String] as List[Shipment]
   0 - sl2.size()
 } as List[String]
@@ -238,7 +238,7 @@ foreach dest: String in sortedDests {
 // ── In-flight shipment detail ─────────────────────────────────────────────────
 IO::println("")
 IO::println("=== In-Flight Shipments (Pending + InTransit) ===")
-val inFlight: List[Shipment] = wh.all().filter { s =>
+val inFlight: List[Shipment] = wh.all().filter { s ->
   val sid: String = (s as Shipment).id()
   val st: ShipmentStatus? = wh.statusOf(sid)
   if st == null { return true }
@@ -248,7 +248,7 @@ val inFlight: List[Shipment] = wh.all().filter { s =>
     else: return false
   }
 } as List[Shipment]
-val heavyFirst: List[Shipment] = inFlight.sortedBy { s => 0.0 - (s as Shipment).weightKg() } as List[Shipment]
+val heavyFirst: List[Shipment] = inFlight.sortedBy { s -> 0.0 - (s as Shipment).weightKg() } as List[Shipment]
 foreach s: Shipment in heavyFirst {
   val st: ShipmentStatus? = wh.statusOf(s.id())
   val stl: String = if st != null { statusLabel(st) } else { "UNKNOWN" }
@@ -258,13 +258,13 @@ foreach s: Shipment in heavyFirst {
 // ── Delivery performance ──────────────────────────────────────────────────────
 IO::println("")
 IO::println("=== Delivery Performance ===")
-val deliveredList: List[Shipment] = wh.all().filter { s =>
+val deliveredList: List[Shipment] = wh.all().filter { s ->
   val st: ShipmentStatus? = wh.statusOf((s as Shipment).id())
   if st == null { return false }
   select st { case x is Delivered: return true; else: return false }
 } as List[Shipment]
 
-val failedList: List[Shipment] = wh.all().filter { s =>
+val failedList: List[Shipment] = wh.all().filter { s ->
   val st: ShipmentStatus? = wh.statusOf((s as Shipment).id())
   if st == null { return false }
   select st {

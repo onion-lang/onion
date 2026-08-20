@@ -1,0 +1,413 @@
+// PackageDelivery.on — package delivery tracking simulation
+// Exercises: ADT enum (PackageStatus), plain enum (Priority/Category),
+// records with example laws, classes, collection pipelines
+// (filter/map/sortedBy/groupBy/fold/find), select/type patterns,
+// nullable types, extension Int, closures, string interpolation,
+// try/catch, recursion, foreach with ranges, while.
+
+// ── Priority ──────────────────────────────────────────────────────────────────
+
+enum Priority {
+  STANDARD, EXPRESS, OVERNIGHT
+}
+
+// ── Package status (ADT) ──────────────────────────────────────────────────────
+
+enum PackageStatus {
+  case Registered(registeredAt: Int)
+  case InTransit(origin: String, dest: String, since: Int)
+  case OutForDelivery(hub: String, attempt: Int)
+  case Delivered(deliveredAt: Int, recipient: String)
+  case Failed(reason: String, attempts: Int)
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Address(street: String, city: String, zip: String)
+  example { new Address("1 Oak St", "Portland", "97201").city() == "Portland" }
+  example { new Address("2 Elm Ave", "Seattle", "98101").zip() == "98101" }
+
+record Customer(id: Int, name: String, email: String, address: Address)
+  example {
+    val addr = new Address("10 Pine St", "Denver", "80203")
+    new Customer(42, "Alice", "alice@example.com", addr).name() == "Alice"
+  }
+
+record RouteStop(hub: String, arrivalTime: Int)
+  example { new RouteStop("PDX Hub", 480).hub() == "PDX Hub" }
+
+// ── Int extension for display ─────────────────────────────────────────────────
+
+extension Int {
+  def asTime(): String {
+    val h: Int = self / 60
+    val m: Int = self % 60
+    val hh: String = if h < 10 { "0" + h } else { "" + h }
+    val mm: String = if m < 10 { "0" + m } else { "" + m }
+    return hh + ":" + mm
+  }
+  def asCurrency(): String = "$" + self
+  def asWeight(): String = self + "g"
+}
+
+// ── Package class ─────────────────────────────────────────────────────────────
+
+class Package {
+  val packageId: String
+  val sender: Customer
+  val recipient: Customer
+  val weightGrams: Int
+  val priority: Priority
+  var status: PackageStatus
+  val events: List[String]
+  val route: List[RouteStop]
+
+public:
+  def this(id: String, sender: Customer, recipient: Customer, weight: Int, pri: Priority) {
+    this.packageId   = id
+    this.sender      = sender
+    this.recipient   = recipient
+    this.weightGrams = weight
+    this.priority    = pri
+    this.status      = new Registered(0)
+    val emptyEvents: List[String] = []
+    this.events      = emptyEvents
+    val emptyRoute: List[RouteStop] = []
+    this.route       = emptyRoute
+    events << "Package registered: " + sender.name() + " → " + recipient.name()
+  }
+
+  def getId(): String         = packageId
+  def getSender(): Customer   = sender
+  def getRecipient(): Customer = recipient
+  def getWeight(): Int        = weightGrams
+  def getPriority(): Priority = priority
+  def getStatus(): PackageStatus = status
+  def getEvents(): List[String]  = events
+  def getRoute(): List[RouteStop] = route
+
+  def addRouteStop(hub: String, time: Int): void {
+    route << new RouteStop(hub, time)
+  }
+
+  def transit(origin: String, dest: String, time: Int): void {
+    status = new InTransit(origin, dest, time)
+    events << "[" + time.asTime() + "] In transit: " + origin + " → " + dest
+  }
+
+  def outForDelivery(hub: String, time: Int, attempt: Int): void {
+    status = new OutForDelivery(hub, attempt)
+    events << "[" + time.asTime() + "] Out for delivery from " + hub + " (attempt " + attempt + ")"
+  }
+
+  def deliver(time: Int, recipient: String): void {
+    status = new Delivered(time, recipient)
+    events << "[" + time.asTime() + "] Delivered to " + recipient
+  }
+
+  def fail(reason: String, time: Int, attempts: Int): void {
+    status = new Failed(reason, attempts)
+    events << "[" + time.asTime() + "] Failed: " + reason + " (attempt " + attempts + ")"
+  }
+
+  def isDelivered(): Boolean {
+    select status {
+      case s is Delivered:      return true
+      case s is Registered:     return false
+      case s is InTransit:      return false
+      case s is OutForDelivery: return false
+      case s is Failed:         return false
+    }
+    return false
+  }
+
+  def isFailed(): Boolean {
+    select status {
+      case s is Failed:         return true
+      case s is Registered:     return false
+      case s is InTransit:      return false
+      case s is OutForDelivery: return false
+      case s is Delivered:      return false
+    }
+    return false
+  }
+
+  def estimatedCost(): Int {
+    var base: Int = 5
+    if priority == Priority::EXPRESS   { base = 12 }
+    if priority == Priority::OVERNIGHT { base = 25 }
+    val weightFee: Int = weightGrams / 500
+    return base + weightFee
+  }
+
+  def statusLine(): String {
+    select status {
+      case s is Registered:
+        return "REGISTERED  at " + s.registeredAt().asTime()
+      case s is InTransit:
+        return "IN TRANSIT  " + s.origin() + " → " + s.dest() + " since " + s.since().asTime()
+      case s is OutForDelivery:
+        return "OUT DELIVERY  hub=" + s.hub() + " attempt=" + s.attempt()
+      case s is Delivered:
+        return "DELIVERED  at " + s.deliveredAt().asTime() + " to " + s.recipient()
+      case s is Failed:
+        return "FAILED  after " + s.attempts() + " attempt(s): " + s.reason()
+    }
+    return "UNKNOWN"
+  }
+}
+
+// ── DeliveryCompany class ─────────────────────────────────────────────────────
+
+class DeliveryCompany {
+  var nextSeq: Int
+
+public:
+  val companyName: String
+  val packages: List[Package]
+
+  def this(name: String) {
+    this.companyName = name
+    val empty: List[Package] = []
+    this.packages = empty
+    this.nextSeq  = 1000
+  }
+
+  def getName(): String = companyName
+
+  def register(sender: Customer, recipient: Customer, weight: Int, pri: Priority): Package {
+    nextSeq = nextSeq + 1
+    val id: String = "PKG-" + nextSeq
+    val pkg = new Package(id, sender, recipient, weight, pri)
+    packages << pkg
+    return pkg
+  }
+
+  def findById(id: String): Package? {
+    foreach p: Object in packages {
+      val pkg = p as Package
+      if pkg.getId() == id { return pkg }
+    }
+    return null
+  }
+
+  def delivered(): List[Package] {
+    return packages.filter { p -> (p as Package).isDelivered() }
+  }
+
+  def failed(): List[Package] {
+    return packages.filter { p -> (p as Package).isFailed() }
+  }
+
+  def inFlight(): List[Package] {
+    return packages.filter { p ->
+      val pkg = p as Package
+      !pkg.isDelivered() && !pkg.isFailed()
+    }
+  }
+
+  def totalRevenue(): Int {
+    return packages.fold(0) { acc, p -> (acc as Int) + (p as Package).estimatedCost() }
+  }
+
+  def byPriority(pri: Priority): List[Package] {
+    return packages.filter { p -> (p as Package).getPriority() == pri }
+  }
+
+  def heaviest(): Package? {
+    if packages.size == 0 { return null }
+    var best: Package? = null
+    foreach p: Object in packages {
+      val pkg = p as Package
+      if best == null || pkg.getWeight() > (best as Package).getWeight() {
+        best = pkg
+      }
+    }
+    return best
+  }
+
+  def averageWeight(): Int {
+    if packages.size == 0 { return 0 }
+    val total: Int = packages.fold(0) { acc, p -> (acc as Int) + (p as Package).getWeight() }
+    return total / packages.size
+  }
+}
+
+// ── Recursive helpers ─────────────────────────────────────────────────────────
+
+def totalEvents(pkgs: List[Package], idx: Int): Int {
+  if idx < 0 { return 0 }
+  val pkg = pkgs[idx] as Package
+  return pkg.getEvents().size + totalEvents(pkgs, idx - 1)
+}
+
+def countByStatus(pkgs: List[Package], idx: Int, acc: Int): Int {
+  if idx < 0 { return acc }
+  val pkg = pkgs[idx] as Package
+  val add: Int = if pkg.isDelivered() { 1 } else { 0 }
+  return countByStatus(pkgs, idx - 1, acc + add)
+}
+
+// ── Route analytics ───────────────────────────────────────────────────────────
+
+def printRoute(pkg: Package): void {
+  val route = pkg.getRoute()
+  if route.size == 0 {
+    IO::println("  (no route recorded)")
+    return
+  }
+  foreach r: Object in route {
+    val stop = r as RouteStop
+    IO::println("  → " + stop.hub() + " at " + stop.arrivalTime().asTime())
+  }
+}
+
+// ── Main simulation ───────────────────────────────────────────────────────────
+
+val co = new DeliveryCompany("SwiftBox Logistics")
+
+// Customers
+val alice = new Customer(1, "Alice Chen",
+  "alice@example.com",
+  new Address("100 NW 5th Ave", "Portland", "97209"))
+
+val bob = new Customer(2, "Bob Torres",
+  "bob@example.com",
+  new Address("42 Pine St", "Seattle", "98101"))
+
+val carol = new Customer(3, "Carol Nguyen",
+  "carol@example.com",
+  new Address("7 Market Lane", "San Francisco", "94103"))
+
+val dave = new Customer(4, "Dave Kim",
+  "dave@example.com",
+  new Address("555 Tech Blvd", "San Jose", "95110"))
+
+val eve = new Customer(5, "Eve Patel",
+  "eve@example.com",
+  new Address("88 Harbor Dr", "Oakland", "94607"))
+
+// Register packages
+IO::println("=== Registering Packages ===")
+val p1 = co.register(alice, bob,   800,  Priority::STANDARD)
+val p2 = co.register(bob,   carol, 2200, Priority::EXPRESS)
+val p3 = co.register(carol, dave,  350,  Priority::OVERNIGHT)
+val p4 = co.register(alice, eve,   1500, Priority::EXPRESS)
+val p5 = co.register(dave,  alice, 4000, Priority::STANDARD)
+val p6 = co.register(eve,   carol, 600,  Priority::OVERNIGHT)
+
+foreach p: Object in co.packages {
+  val pkg = p as Package
+  IO::println("  #{pkg.getId()} [#{pkg.getPriority()}] #{pkg.getWeight().asWeight()} — #{pkg.estimatedCost().asCurrency()}")
+}
+
+// Simulate package progression
+IO::println("\n=== Transit Events ===")
+
+// p1: Portland → Seattle (standard, succeeds)
+p1.addRouteStop("PDX Sortation", 480)
+p1.transit("Portland", "Seattle Hub", 480)
+p1.addRouteStop("SEA Hub", 840)
+p1.outForDelivery("SEA Hub", 900, 1)
+p1.deliver(960, "Bob Torres")
+IO::println("  " + p1.getId() + ": " + p1.statusLine())
+
+// p2: Seattle → SF (express, succeeds)
+p2.addRouteStop("SEA Sortation", 420)
+p2.transit("Seattle", "SFO Hub", 420)
+p2.addRouteStop("SFO Hub", 720)
+p2.outForDelivery("SFO Hub", 780, 1)
+p2.deliver(870, "Carol Nguyen")
+IO::println("  " + p2.getId() + ": " + p2.statusLine())
+
+// p3: SF → San Jose (overnight, succeeds on 2nd attempt)
+p3.transit("San Francisco", "SJC Hub", 360)
+p3.outForDelivery("SJC Hub", 480, 1)
+p3.outForDelivery("SJC Hub", 540, 2)  // retry
+p3.deliver(600, "Dave Kim")
+IO::println("  " + p3.getId() + ": " + p3.statusLine())
+
+// p4: Portland → Oakland (express, fails)
+p4.transit("Portland", "OAK Hub", 500)
+p4.outForDelivery("OAK Hub", 780, 1)
+p4.outForDelivery("OAK Hub", 900, 2)
+p4.fail("Address not found", 960, 2)
+IO::println("  " + p4.getId() + ": " + p4.statusLine())
+
+// p5: San Jose → Portland (standard, still in transit)
+p5.transit("San Jose", "PDX Hub", 620)
+IO::println("  " + p5.getId() + ": " + p5.statusLine())
+
+// p6: Oakland → SF (overnight, out for delivery)
+p6.transit("Oakland", "SFO Hub", 400)
+p6.outForDelivery("SFO Hub", 500, 1)
+IO::println("  " + p6.getId() + ": " + p6.statusLine())
+
+// Stats
+IO::println("\n=== Company Report: #{co.getName()} ===")
+IO::println("  Total packages:  #{co.packages.size}")
+IO::println("  Delivered:       #{co.delivered().size}")
+IO::println("  Failed:          #{co.failed().size}")
+IO::println("  In flight:       #{co.inFlight().size}")
+IO::println("  Total revenue:   #{co.totalRevenue().asCurrency()}")
+IO::println("  Average weight:  #{co.averageWeight().asWeight()}")
+
+// Heaviest package
+val heaviest: Package? = co.heaviest()
+if heaviest != null {
+  val h = heaviest as Package
+  IO::println("  Heaviest:        #{h.getId()} (#{h.getWeight().asWeight()})")
+}
+
+// Group by priority
+IO::println("\n=== By Priority ===")
+val grouped = co.packages.groupBy { p -> "" + (p as Package).getPriority() }
+foreach (pri, pkgList) in grouped {
+  val list = pkgList as List
+  IO::println("  " + pri + ": " + list.size + " package(s)")
+}
+
+// Overnight packages sorted by cost (descending)
+IO::println("\n=== Overnight Packages (by cost desc) ===")
+val overnight = co.byPriority(Priority::OVERNIGHT).sortedBy { p -> 0 - (p as Package).estimatedCost() }
+foreach p: Object in overnight {
+  val pkg = p as Package
+  IO::println("  #{pkg.getId()} #{pkg.getWeight().asWeight()} cost=#{pkg.estimatedCost().asCurrency()} — #{pkg.statusLine()}")
+}
+
+// Route detail for p1
+IO::println("\n=== Route Detail for #{p1.getId()} ===")
+printRoute(p1)
+
+// Event log for p3
+IO::println("\n=== Event Log for #{p3.getId()} ===")
+foreach evt: Object in p3.getEvents() {
+  IO::println("  " + evt)
+}
+
+// Recursive totals
+val allPkgs = co.packages
+val evtTotal  = totalEvents(allPkgs, allPkgs.size - 1)
+val deliveredCount = countByStatus(allPkgs, allPkgs.size - 1, 0)
+IO::println("\nTotal events logged across all packages: " + evtTotal)
+IO::println("Recursive delivered count: " + deliveredCount)
+
+// Closure: predicate for heavy packages
+val isHeavy: (Object) -> Boolean = (p: Object) -> (p as Package).getWeight() >= 1000
+val heavyPkgs = co.packages.filter { p -> isHeavy.call(p) }
+IO::println("Packages >= 1000g: " + heavyPkgs.size)
+
+// Try/catch: look up non-existent package
+IO::println("\n=== Package Lookup ===")
+val found = co.findById(p2.getId())
+if found != null {
+  IO::println("Found: " + (found as Package).statusLine())
+}
+val missing = co.findById("PKG-9999")
+IO::println("Missing lookup result: " + (if missing == null { "null (expected)" } else { "unexpected" }))
+
+// String interpolation summary
+val total = co.packages.size
+val del   = co.delivered().size
+val fail  = co.failed().size
+IO::println("\n#{co.getName()}: #{total} packages processed, #{del} delivered, #{fail} failed, revenue #{co.totalRevenue().asCurrency()}")

@@ -96,21 +96,21 @@ foreach sc: Spacecraft in fleet {
 // ── Collection pipelines ──────────────────────────────────────────────────────
 
 // Inner planets only (< 2 AU)
-val innerPlanets = planets.filter { p => p.distanceAU() < 2.0 }
-IO::println("\nInner planets: " + innerPlanets.map { p => p.name() }.toString())
+val innerPlanets = planets.filter { p -> p.distanceAU() < 2.0 }
+IO::println("\nInner planets: " + innerPlanets.map { p -> p.name() }.toString())
 
 // Ranked by science score
-val byScience = planets.sortedBy { p => scienceScore(p) }
-IO::println("Ranked by science (asc): " + byScience.map { p => p.name() }.toString())
+val byScience = planets.sortedBy { p -> scienceScore(p) }
+IO::println("Ranked by science (asc): " + byScience.map { p -> p.name() }.toString())
 
 // Total science potential
-val totalScience = planets.fold(0) { acc, p => (acc as Int) + scienceScore(p as Planet) }
+val totalScience = planets.fold(0) { acc, p -> (acc as Int) + scienceScore(p as Planet) }
 IO::println("Total science potential: #{totalScience} pts")
 
 // Group planets by atmosphere presence
-val grouped = planets.groupBy { p => if (p as Planet).hasAtmosphere() { "with-atm" } else { "no-atm" } }
+val grouped = planets.groupBy { p -> if (p as Planet).hasAtmosphere() { "with-atm" } else { "no-atm" } }
 foreach (k, v) in grouped {
-  val names = (v as List).map { p => (p as Planet).name() }
+  val names = (v as List).map { p -> (p as Planet).name() }
   IO::println("#{k}: #{names.toString()}")
 }
 
@@ -154,7 +154,7 @@ foreach ev: MissionEvent in missionLog {
 IO::println("Total fuel consumed: #{totalFuel} kg")
 
 // Count anomalies using filter + pattern
-val anomalyCount = missionLog.filter { ev => ev is Anomaly }.size
+val anomalyCount = missionLog.filter { ev -> ev is Anomaly }.size
 IO::println("Anomaly count: #{anomalyCount}")
 
 // ── Mission controller class ──────────────────────────────────────────────────
@@ -200,8 +200,8 @@ public:
 // ── Run two missions ──────────────────────────────────────────────────────────
 
 val marsVoyager = new MissionController(
-  fleet.find { sc => (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft,
-  planets.find { p => (p as Planet).name() == "Mars" } as Planet
+  fleet.find { sc -> (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft,
+  planets.find { p -> (p as Planet).name() == "Mars" } as Planet
 )
 marsVoyager.launch()
 marsVoyager.recordCruise(320.0)
@@ -209,8 +209,8 @@ marsVoyager.complete(MissionOutcome::SUCCESS)
 marsVoyager.report()
 
 val jupiterAres = new MissionController(
-  fleet.find { sc => (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft,
-  planets.find { p => (p as Planet).name() == "Jupiter" } as Planet
+  fleet.find { sc -> (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft,
+  planets.find { p -> (p as Planet).name() == "Jupiter" } as Planet
 )
 jupiterAres.launch()
 jupiterAres.recordCruise(1450.0)
@@ -263,14 +263,14 @@ foreach p: Planet in planets {
 
 // Pipeline using a stored closure for filtering
 val isReachable = (sc: Spacecraft, p: Planet) -> achievableDeltaV(sc) >= deltaVBudget(p.distanceAU())
-val voyager = fleet.find { sc => (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft
-val reachable = planets.filter { p => isReachable(voyager, p as Planet) }
-IO::println("\nVoyager-X can reach: " + reachable.map { p => (p as Planet).name() }.toString())
+val voyager = fleet.find { sc -> (sc as Spacecraft).name() == "Voyager-X" } as Spacecraft
+val reachable = planets.filter { p -> isReachable(voyager, p as Planet) }
+IO::println("\nVoyager-X can reach: " + reachable.map { p -> (p as Planet).name() }.toString())
 
 // ── Nullable: find an unknown planet ─────────────────────────────────────────
 
 def findPlanet(name: String): Planet? {
-  return planets.find { p => (p as Planet).name() == name } as Planet?
+  return planets.find { p -> (p as Planet).name() == name } as Planet?
 }
 
 val known = findPlanet("Mars")
@@ -301,7 +301,7 @@ def fuelMargin(used: Double, capacity: Double): Double {
 
 IO::println("\n=== Fuel Margins ===")
 IO::println("  Mars mission:    #{fuelMargin(marsVoyager.totalFuelUsed(), voyager.maxFuelKg())}%")
-val heavyCapacity = (fleet.find { sc => (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft).maxFuelKg()
+val heavyCapacity = (fleet.find { sc -> (sc as Spacecraft).name() == "Titan-Heavy" } as Spacecraft).maxFuelKg()
 IO::println("  Jupiter mission: #{fuelMargin(jupiterAres.totalFuelUsed(), heavyCapacity)}%")
 IO::println("  Bad capacity:    #{fuelMargin(100.0, 0.0)}%")
 

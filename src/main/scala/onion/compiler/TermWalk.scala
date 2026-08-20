@@ -1,0 +1,62 @@
+package onion.compiler
+
+import onion.compiler.TypedAST.*
+
+/**
+ * A structural walk over typed terms and statements.
+ *
+ * TypedAST nodes are plain classes rather than case classes, so there is no
+ * `productIterator` to lean on; the children are found through each node's public
+ * zero-argument accessors that return a `Term`, an `ActionStatement`, an array, or a
+ * Java list. That is the same trick `CapturedVariableCollector` and the ASM backend's
+ * try-detector use, gathered in one place so a new predicate over the tree does not
+ * bring a third copy of the reflection with it.
+ *
+ * Closure bodies are not entered: a closure compiles to its own method, so anything a
+ * caller wants to know about *this* method's evaluation -- what is on its operand
+ * stack, whether `this` is touched before it is initialized -- stops at the closure
+ * boundary. Callers that do want to look inside pass `intoClosures = true`.
+ */
+object TermWalk:
+
+  /** Whether `predicate` holds for `term` or any term or statement beneath it. */
+  def exists(term: Term, intoClosures: Boolean = false)(predicate: AnyRef => Boolean): Boolean =
+    walk(term, intoClosures, predicate)
+
+  /** Whether `predicate` holds for `statement` or any term or statement beneath it. */
+  def existsIn(statement: ActionStatement, intoClosures: Boolean = false)(predicate: AnyRef => Boolean): Boolean =
+    walk(statement, intoClosures, predicate)
+
+  private def walk(node: AnyRef, intoClosures: Boolean, predicate: AnyRef => Boolean): Boolean =
+    if predicate(node) then true
+    else
+      node match
+        case _: NewClosure if !intoClosures => false
+        case stmt: StatementTerm => walk(stmt.statement, intoClosures, predicate)
+        case other =>
+          children(other).exists {
+            case t: Term => walk(t, intoClosures, predicate)
+            case s: ActionStatement => walk(s, intoClosures, predicate)
+            case _ => false
+          }
+
+  private def children(node: AnyRef): Seq[AnyRef] = node match
+    case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
+    case _ => reflectiveChildren(node)
+
+  private def reflectiveChildren(node: AnyRef): Seq[AnyRef] =
+    node.getClass.getMethods.iterator
+      .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
+        (classOf[Term].isAssignableFrom(m.getReturnType) ||
+         classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
+         m.getReturnType.isArray ||
+         classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
+      .flatMap { m =>
+        try
+          m.invoke(node) match
+            case null => Nil
+            case arr: Array[?] => arr.toSeq.collect { case r: AnyRef => r }
+            case list: java.util.List[?] => scala.jdk.CollectionConverters.ListHasAsScala(list).asScala.toSeq.collect { case r: AnyRef => r }
+            case other: AnyRef => Seq(other)
+        catch case _: Throwable => Nil
+      }.toSeq

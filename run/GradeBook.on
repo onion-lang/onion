@@ -126,12 +126,12 @@ IO::println("── Per-Subject Summary ─────────────�
 
 def computeSubjectSummary(subject: String, grp: List[Object]): SubjectSummary {
   val count = grp.size
-  val scoreSum = grp.fold(0) { acc, s => (acc as Int) + (s as Student).score() } as Int
-  val highest  = grp.fold(0) { acc, s =>
+  val scoreSum = grp.fold(0) { acc, s -> (acc as Int) + (s as Student).score() } as Int
+  val highest  = grp.fold(0) { acc, s ->
     val sc = (s as Student).score()
     if (acc as Int) < sc { sc } else { acc }
   } as Int
-  val lowest = grp.fold(999) { acc, s =>
+  val lowest = grp.fold(999) { acc, s ->
     val sc = (s as Student).score()
     if (acc as Int) > sc { sc } else { acc }
   } as Int
@@ -140,7 +140,7 @@ def computeSubjectSummary(subject: String, grp: List[Object]): SubjectSummary {
   return new SubjectSummary(subject, count, highest, lowest, average, letter)
 }
 
-val bySubject = students.groupBy { s => s.subject() }
+val bySubject = students.groupBy { s -> s.subject() }
 
 IO::println(padRight("Subject", 10) + padLeft("N", 4) + padLeft("High", 6) +
             padLeft("Low", 6) + padLeft("Avg", 8) + "  Letter")
@@ -161,7 +161,7 @@ IO::println("")
 
 // ── Grade-letter distribution across all students ─────────────────────────────
 IO::println("── Grade Distribution ──────────────────────────────")
-val byLetter = students.groupBy { s => s.score().toLetter() }
+val byLetter = students.groupBy { s -> s.score().toLetter() }
 foreach (letter, grp) in byLetter {
   val ltr = letter as String
   val cnt = (grp as List[Object]).size
@@ -173,7 +173,7 @@ IO::println("")
 
 // ── Top 3 and bottom 3 performers overall ────────────────────────────────────
 IO::println("── Top 3 Performers ────────────────────────────────")
-val sorted = students.sortedBy { s => 0 - s.score() }
+val sorted = students.sortedBy { s -> 0 - s.score() }
 val topN: Int = if sorted.size >= 3 { 3 } else { sorted.size }
 foreach i: Int in 1..topN {
   val s = sorted[i - 1] as Student
@@ -182,7 +182,7 @@ foreach i: Int in 1..topN {
 IO::println("")
 
 IO::println("── Bottom 3 Performers ─────────────────────────────")
-val sortedAsc = students.sortedBy { s => s.score() }
+val sortedAsc = students.sortedBy { s -> s.score() }
 foreach i: Int in 1..topN {
   val s = sortedAsc[i - 1] as Student
   IO::println("  #{i}. #{s.name()} (#{s.subject()}) — #{s.score()} #{s.score().toLetter()}")
@@ -191,7 +191,7 @@ IO::println("")
 
 // ── Passing vs failing (partition) ───────────────────────────────────────────
 // partition returns [matching, non-matching] as a List of two sublists
-val parts    = students.partition { s => s.score() >= 60 }
+val parts    = students.partition { s -> s.score() >= 60 }
 val passing  = parts[0] as List[Object]
 val failing  = parts[1] as List[Object]
 IO::println("Passing: #{passing.size}  Failing: #{failing.size}")
@@ -200,7 +200,7 @@ IO::println("Pass rate: #{passRate.round2()}%")
 IO::println("")
 
 // ── Overall class average ─────────────────────────────────────────────────────
-val totalScore = students.fold(0) { acc, s => (acc as Int) + s.score() } as Int
+val totalScore = students.fold(0) { acc, s -> (acc as Int) + s.score() } as Int
 val classAvg: Double = (totalScore as Double) / (students.size as Double)
 val overallLetter = (totalScore / students.size).toLetter()
 IO::println("Overall class average: #{classAvg.fmt()}  (#{overallLetter})")
@@ -208,7 +208,7 @@ IO::println("")
 
 // ── do[Option]: safely look up a student by name ─────────────────────────────
 def findStudent(name: String): Option[Student] {
-  val found = students.find { s => s.name() == name }
+  val found = students.find { s -> s.name() == name }
   if found != null {
     return Option::some(found as Student)
   }
@@ -236,8 +236,8 @@ IO::println("")
 // ── GPA honours roll ──────────────────────────────────────────────────────────
 IO::println("── Honour Roll (GPA 3.0+) ──────────────────────────")
 val honours = students
-  .filter { s => s.score().toGPA() >= 3.0 }
-  .sortedBy { s => 0 - s.score() }
+  .filter { s -> s.score().toGPA() >= 3.0 }
+  .sortedBy { s -> 0 - s.score() }
 foreach h: Student in honours {
   IO::println("  #{h.name()} (#{h.subject()}) #{h.score()} → GPA #{h.score().toGPA()}")
 }

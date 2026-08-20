@@ -173,7 +173,7 @@ public:
             if canPlace(row, col, n) { cands.add(n) }
             n++
           }
-          val cs = (cands.map { x => (x as Int).toString() }) as List[Object]
+          val cs = (cands.map { x -> (x as Int).toString() }) as List[Object]
           lines.add("  (#{row},#{col}): [#{cs.join(",")}]")
         }
         col++
@@ -242,10 +242,10 @@ def solvePuzzle(name: String, difficulty: String,
   if difficulty == "Hard" {
     IO::println("Initial candidates (first few empty cells):")
     val hints = board.hintSummary()
-    val hintLines = (Strings::split(hints, "\n") as List[Object]).filter { l =>
+    val hintLines = (Strings::split(hints, "\n") as List[Object]).filter { l ->
       (l as String).length > 0
     }
-    val preview = hintLines.filter { l => true }
+    val preview = hintLines.filter { l -> true }
     var shown: Int = 0
     foreach h: Object in preview {
       if shown < 3 {
@@ -280,11 +280,11 @@ val results: List[Object] = [
 
 // ── Aggregate statistics ──────────────────────────────────────────────────────
 
-val solvedList = results.filter { r => (r as SolveResult).solved() }
-val totalBt    = results.fold(0) { acc, r => acc + (r as SolveResult).backtracks() }
-val avgClues   = results.fold(0) { acc, r => acc + (r as SolveResult).clues() } / results.size
+val solvedList = results.filter { r -> (r as SolveResult).solved() }
+val totalBt    = results.fold(0) { acc, r -> acc + (r as SolveResult).backtracks() }
+val avgClues   = results.fold(0) { acc, r -> acc + (r as SolveResult).clues() } / results.size
 
-val sortedByBt: List[Object] = results.sortedBy { r => (r as SolveResult).backtracks() }
+val sortedByBt: List[Object] = results.sortedBy { r -> (r as SolveResult).backtracks() }
 val easiest = (sortedByBt[0]) as SolveResult
 val hardest = (sortedByBt[sortedByBt.size - 1]) as SolveResult
 

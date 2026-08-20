@@ -285,7 +285,8 @@ class ProjectTestRunnerSpec extends AnyFunSuite with Matchers:
       ProjectManifest("demo", "1.0.0", manifestPath, Files.readAllBytes(manifestPath)),
       ProjectLayout(Vector.empty, testSources),
       BuildState(BuildFingerprint.SchemaVersion, "fingerprint", Vector("mainMain"), Vector.empty),
-      cached = false
+      cached = false,
+      ResolvedDependencies.empty
     )
 
   private def invoke(

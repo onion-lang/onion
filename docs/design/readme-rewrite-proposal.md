@@ -60,8 +60,8 @@ record Access(time: String, method: String, path: String, status: Int)
 
 def main(path: String, min: Int = 400): void {
   file(path).lines()
-    .map { line => Access::parse(line) }
-    .filter { a => a != null && a.status() >= min }
+    .map { line -> Access::parse(line) }
+    .filter { a -> a != null && a.status() >= min }
     |> println
 }
 ```

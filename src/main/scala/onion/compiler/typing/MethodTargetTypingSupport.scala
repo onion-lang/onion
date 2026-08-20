@@ -24,6 +24,9 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
       case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
         bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, node, tv.displayName)
         None
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName)
+        None
       case targetType: ObjectType =>
         Some(ResolvedMethodTarget(target, targetType))
       case basicType: BasicType =>

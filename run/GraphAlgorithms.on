@@ -326,15 +326,15 @@ def main(): void {
 
   // Collection pipelines on edges
   IO::println("\n=== Edge pipelines (g2) ===")
-  val heavy = g2.edges().filter { e => (e as Edge).weight() > 2 }
+  val heavy = g2.edges().filter { e -> (e as Edge).weight() > 2 }
   IO::println("Heavy edges (weight > 2):")
   foreach e: Object in heavy { IO::println("  " + (e as Edge).display()) }
 
-  val byWeight = g2.edges().sortedBy { e => (e as Edge).weight() as Object }
+  val byWeight = g2.edges().sortedBy { e -> (e as Edge).weight() as Object }
   IO::println("Sorted by weight:")
   foreach e: Object in byWeight { IO::println("  " + (e as Edge).display()) }
 
-  val doubled = g2.edges().map { e =>
+  val doubled = g2.edges().map { e ->
     val edge = e as Edge
     new Edge(edge.from(), edge.to(), edge.weight() * 2) as Object
   }
@@ -346,7 +346,7 @@ def main(): void {
   IO::println("Total weight: " + totalW)
 
   // Find minimum spanning edge
-  val minEdge = g2.edges().sortedBy { e => (e as Edge).weight() as Object }.get(0) as Edge
+  val minEdge = g2.edges().sortedBy { e -> (e as Edge).weight() as Object }.get(0) as Edge
   IO::println("Lightest edge: " + minEdge.display())
 
   // String interpolation summary

@@ -146,7 +146,7 @@ public:
   }
 
   def topByStars(): List[Recipe] {
-    return this.recipes.sortedBy { r => 0 - (r as Recipe).stars().value() }
+    return this.recipes.sortedBy { r -> 0 - (r as Recipe).stars().value() }
   }
 
   def findByName(target: String): Recipe? {
@@ -162,7 +162,7 @@ public:
   def avgPrepMins(): Int {
     val total = this.recipes.size
     if total == 0 { return 0 }
-    val sum = this.recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).prepMins() }
+    val sum = this.recipes.fold(0) { acc, r -> (acc as Int) + (r as Recipe).prepMins() }
     return (sum as Int) / total
   }
 }
@@ -326,7 +326,7 @@ foreach r: Object in book.withTag(DietaryTag::GLUTEN_FREE) {
 }
 
 println("\n--- Recipes grouped by cuisine ---")
-val byCuisine = book.all().groupBy { r => (r as Recipe).cuisine().displayName() }
+val byCuisine = book.all().groupBy { r -> (r as Recipe).cuisine().displayName() }
 foreach (cuisine, items) in byCuisine {
   println("  " + cuisine + ": " + (items as List[Recipe]).size + " recipe(s)")
 }

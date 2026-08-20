@@ -1,0 +1,349 @@
+// InsuranceClaims.on — Insurance claims processing system (~310 lines).
+// Exercises: data-carrying enum, ADT case-enum, records with methods,
+// class with interface, extension methods (Int, Double, String), collection
+// pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/partition/zip),
+// select + type-pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while and foreach (ranges and map k/v entries).
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def usd(): String {
+    if self < 0 {
+      val abs: Int = -self
+      return "-$" + abs
+    }
+    return "$" + self
+  }
+  def pad(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def pct(): String {
+    val p: Int = (self * 100.0).intValue()
+    return p + "%"
+  }
+  def usd2(): String {
+    val neg: Boolean  = self < 0.0
+    val abs: Double   = if neg { -self } else { self }
+    val cents: Long   = (abs * 100.0).longValue()
+    val ip: Long      = cents / 100L
+    val fp: Long      = cents % 100L
+    val fpStr: String = if fp < 10L { "0" + fp } else { "" + fp }
+    val sign: String  = if neg { "-$" } else { "$" }
+    return sign + ip + "." + fpStr
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var r: String = self
+    while r.length() < n { r = r + " " }
+    return r
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 3) + "..."
+  }
+}
+
+// ─── CoverageType: data-carrying enum ────────────────────────────────────────
+
+enum CoverageType(label: String, deductible: Int, maxPayout: Int) {
+  MEDICAL  ("Medical",  500,  50000),
+  AUTO     ("Auto",    1000,  25000),
+  PROPERTY ("Property",2000, 100000),
+  LIFE     ("Life",       0, 500000)
+public:
+  def coverageRatio(): Double = 1.0 - ((deductible() as Double) / (maxPayout() as Double))
+}
+
+// ─── ClaimStatus: plain data-carrying enum ────────────────────────────────────
+
+enum ClaimStatus(label: String) {
+  PENDING       ("Pending"),
+  UNDER_REVIEW  ("Under Review"),
+  APPROVED      ("Approved"),
+  PARTIAL       ("Partially Approved"),
+  DENIED        ("Denied")
+}
+
+// ─── AdjustmentDecision: ADT case-enum ───────────────────────────────────────
+
+enum AdjustmentDecision {
+  case FullApproval(amount: Int)
+  case PartialApproval(amount: Int, reason: String)
+  case Denial(reason: String)
+public:
+  def isApproved(): Boolean = select this {
+    case f is FullApproval:    true
+    case p is PartialApproval: true
+    else:                      false
+  }
+  def payoutAmount(): Int = select this {
+    case f is FullApproval:    f.amount()
+    case p is PartialApproval: p.amount()
+    else:                      0
+  }
+  def describe(): String = select this {
+    case f is FullApproval:    "Full approval: " + f.amount().usd()
+    case p is PartialApproval: "Partial " + p.amount().usd() + " — " + p.reason()
+    case d is Denial:          "Denied: " + d.reason()
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Claimant(id: String, name: String, email: String, policyCount: Int)
+
+record Policy(
+  id: String, claimantId: String,
+  coverage: CoverageType, annualPremium: Int
+) {
+public:
+  def deductible(): Int = coverage().deductible()
+  def maxPayout(): Int  = coverage().maxPayout()
+}
+
+record Claim(
+  id: String, policyId: String,
+  requestedAmount: Int, description: String,
+  docsSubmitted: Boolean
+) {
+public:
+  def summary(): String =
+    id() + " | " + requestedAmount().usd().padRight(10) + " | " + description().truncate(40)
+}
+
+record AdjustmentRecord(
+  claimId: String, decision: AdjustmentDecision, note: String?
+) {
+public:
+  def line(): String =
+    claimId().padRight(8) + " | " + decision.describe().padRight(40) +
+    " | " + (if note() != null { note() } else { "—" })
+}
+
+// ─── Auditable interface ─────────────────────────────────────────────────────
+
+interface Auditable {
+  def auditEntry(): String
+}
+
+// ─── ClaimsProcessor class ────────────────────────────────────────────────────
+
+class ClaimsProcessor conforms Auditable {
+  val processorId: String
+  var claimants:   List[Claimant]
+  var policies:    List[Policy]
+  var claims:      List[Claim]
+  var adjustments: List[AdjustmentRecord]
+
+public:
+  def this(pid: String) {
+    self.processorId = pid
+    self.claimants   = []
+    self.policies    = []
+    self.claims      = []
+    self.adjustments = []
+  }
+
+  def addClaimant(c: Claimant): void { claimants.add(c) }
+  def addPolicy(p: Policy): void    { policies.add(p) }
+  def addClaim(c: Claim): void      { claims.add(c) }
+
+  def findPolicy(id: String): Policy? =
+    policies.find { p -> (p as Policy).id() == id } as Policy?
+
+  def findClaimant(id: String): Claimant? =
+    claimants.find { c -> (c as Claimant).id() == id } as Claimant?
+
+  // Recursive: count all claims for a claimant across their policies
+  def claimsForClaimant(claimantId: String, policyList: List[Policy], idx: Int, acc: List[Claim]): List[Claim] {
+    if idx >= policyList.size() { return acc }
+    val pol: Policy = policyList.get(idx) as Policy
+    if pol.claimantId() == claimantId {
+      val matching: List[Claim] = claims.filter { c -> (c as Claim).policyId() == pol.id() }
+      foreach mc: Object in matching { acc.add(mc as Claim) }
+    }
+    return claimsForClaimant(claimantId, policyList, idx + 1, acc)
+  }
+
+  def adjust(claim: Claim, policy: Policy): AdjustmentDecision {
+    try {
+      if !claim.docsSubmitted() {
+        return new Denial("Missing supporting documentation")
+      }
+      val requested: Int = claim.requestedAmount()
+      if requested <= 0 {
+        return new Denial("Invalid claim amount: " + requested.usd())
+      }
+      val deductible: Int = policy.deductible()
+      val maxPay: Int     = policy.maxPayout()
+      if requested <= deductible {
+        return new Denial("Amount below deductible (" + deductible.usd() + ")")
+      }
+      val eligible: Int = requested - deductible
+      if eligible >= maxPay {
+        return new PartialApproval(maxPay, "Capped at policy maximum")
+      }
+      return new FullApproval(eligible)
+    } catch e: Exception {
+      return new Denial("Processing error: " + e.getMessage())
+    }
+  }
+
+  def processAll(): void {
+    foreach c: Object in claims {
+      val claim: Claim = c as Claim
+      val policy: Policy? = findPolicy(claim.policyId())
+      if policy == null {
+        adjustments.add(new AdjustmentRecord(claim.id(), new Denial("Policy not found"), null))
+      } else {
+        val decision: AdjustmentDecision = adjust(claim, policy)
+        val note: String? = select decision {
+          case p is PartialApproval: "Coverage type: " + policy.coverage().label()
+          else:                      null
+        }
+        adjustments.add(new AdjustmentRecord(claim.id(), decision, note))
+      }
+    }
+  }
+
+  def totalPayout(): Int {
+    var total: Int = 0
+    foreach a: Object in adjustments {
+      total = total + (a as AdjustmentRecord).decision.payoutAmount()
+    }
+    return total
+  }
+
+  def approvalRate(): Double {
+    if adjustments.size() == 0 { return 0.0 }
+    val approved: Int = adjustments.filter { a -> (a as AdjustmentRecord).decision.isApproved() }.size()
+    return (approved as Double) / (adjustments.size() as Double)
+  }
+
+  override def auditEntry(): String =
+    "Processor " + processorId + " | claims=" + claims.size() +
+    " | payout=" + totalPayout().usd() + " | approval=" + approvalRate().pct()
+
+  def printSummaryReport(): void {
+    println("════════════════════════════════════════════════════════")
+    println("  Insurance Claims Report  [" + processorId + "]")
+    println("════════════════════════════════════════════════════════")
+    println("  Policies  : " + policies.size())
+    println("  Claimants : " + claimants.size())
+    println("  Claims    : " + claims.size())
+    println("  Total Payout: " + totalPayout().usd())
+    println("  Approval Rate: " + approvalRate().pct())
+    println("")
+
+    // Build claim-id → coverage-label lookup
+    val claimCovMap: Map[String, String] = [:]
+    foreach c: Object in claims {
+      val cl: Claim    = c as Claim
+      val pol: Policy? = findPolicy(cl.policyId())
+      claimCovMap[cl.id()] = if pol != null { pol.coverage().label() } else { "Unknown" }
+    }
+
+    // Breakdown by coverage type
+    println("  ── By Coverage Type ──")
+    val byCoverage: Map[String, List[AdjustmentRecord]] =
+      adjustments.groupBy { a ->
+        val ar: AdjustmentRecord = a as AdjustmentRecord
+        val label: String? = claimCovMap.get(ar.claimId()) as String?
+        if label == null { "Unknown" } else { label }
+      }
+    foreach (covLabel, arList) in byCoverage {
+      val lst: List[AdjustmentRecord] = arList as List[AdjustmentRecord]
+      var payout: Int = 0
+      foreach la: Object in lst { payout = payout + (la as AdjustmentRecord).decision.payoutAmount() }
+      val cnt: Int = lst.size()
+      println("    " + (covLabel as String).padRight(12) + cnt.pad(3) + " claim(s)  " + payout.usd())
+    }
+    println("")
+
+    // Top payouts
+    println("  ── Adjustment Log ──")
+    foreach a: Object in adjustments {
+      println("    " + (a as AdjustmentRecord).line())
+    }
+    println("")
+
+    // Claimant summary
+    println("  ── Claimant Summary ──")
+    foreach cl: Object in claimants {
+      val claimant: Claimant = cl as Claimant
+      val claimsForThis: List[Claim] = claimsForClaimant(claimant.id(), policies, 0, [])
+      var claimantPayout: Int = 0
+      foreach mc: Object in claimsForThis {
+        val mclaim: Claim = mc as Claim
+        val ar: AdjustmentRecord? = adjustments
+          .find { a -> (a as AdjustmentRecord).claimId() == mclaim.id() } as AdjustmentRecord?
+        if ar != null { claimantPayout = claimantPayout + ar.decision.payoutAmount() }
+      }
+      println("    " + claimant.name().padRight(18) + claimsForThis.size().pad(2) +
+              " claim(s)  payout: " + claimantPayout.usd())
+    }
+    println("")
+
+    // Stats: partition into approved vs denied
+    val parts: List[List[AdjustmentRecord]] =
+      adjustments.partition { a -> (a as AdjustmentRecord).decision.isApproved() }
+    val approved: List[AdjustmentRecord] = parts.get(0) as List[AdjustmentRecord]
+    val denied:   List[AdjustmentRecord] = parts.get(1) as List[AdjustmentRecord]
+    println("  Approved : " + approved.size() + "  |  Denied: " + denied.size())
+    if approved.size() > 0 {
+      var maxPayout: Int = 0
+      foreach ap: Object in approved {
+        val p: Int = (ap as AdjustmentRecord).decision.payoutAmount()
+        if p > maxPayout { maxPayout = p }
+      }
+      println("  Largest payout: " + maxPayout.usd())
+    }
+    println("  Audit: " + auditEntry())
+    println("")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val proc: ClaimsProcessor = new ClaimsProcessor("PROC-001")
+
+// Claimants
+proc.addClaimant(new Claimant("C01", "Sarah Mitchell",  "sarah@example.com",  2))
+proc.addClaimant(new Claimant("C02", "James O'Brien",   "james@example.com",  1))
+proc.addClaimant(new Claimant("C03", "Priya Sharma",    "priya@example.com",  3))
+proc.addClaimant(new Claimant("C04", "Tom Kowalski",    "tom@example.com",    1))
+proc.addClaimant(new Claimant("C05", "Amara Diallo",    "amara@example.com",  2))
+
+// Policies
+proc.addPolicy(new Policy("POL-101", "C01", CoverageType::MEDICAL,   1800))
+proc.addPolicy(new Policy("POL-102", "C01", CoverageType::AUTO,      1200))
+proc.addPolicy(new Policy("POL-103", "C02", CoverageType::PROPERTY,  2400))
+proc.addPolicy(new Policy("POL-104", "C03", CoverageType::MEDICAL,   1800))
+proc.addPolicy(new Policy("POL-105", "C03", CoverageType::LIFE,      3600))
+proc.addPolicy(new Policy("POL-106", "C03", CoverageType::AUTO,      1200))
+proc.addPolicy(new Policy("POL-107", "C04", CoverageType::PROPERTY,  2400))
+proc.addPolicy(new Policy("POL-108", "C05", CoverageType::MEDICAL,   1800))
+proc.addPolicy(new Policy("POL-109", "C05", CoverageType::AUTO,      1200))
+
+// Claims (id, policyId, requestedAmount, description, docsSubmitted)
+proc.addClaim(new Claim("CLM-001", "POL-101",  8500, "Emergency appendectomy",           true))
+proc.addClaim(new Claim("CLM-002", "POL-102",  3200, "Rear-end collision repair",         true))
+proc.addClaim(new Claim("CLM-003", "POL-103", 45000, "Kitchen fire — structural damage",  true))
+proc.addClaim(new Claim("CLM-004", "POL-104",   300, "Prescription medication refill",    true))
+proc.addClaim(new Claim("CLM-005", "POL-105", 12000, "Accidental death benefit",          false))
+proc.addClaim(new Claim("CLM-006", "POL-106",  1500, "Windshield replacement",            true))
+proc.addClaim(new Claim("CLM-007", "POL-107",  5500, "Burst pipe — floor damage",         true))
+proc.addClaim(new Claim("CLM-008", "POL-108", 22000, "Cardiac bypass surgery",            true))
+proc.addClaim(new Claim("CLM-009", "POL-109",  8000, "Total loss: stolen vehicle",        false))
+proc.addClaim(new Claim("CLM-010", "POL-999",  1000, "Unknown policy reference",          true))
+
+proc.processAll()
+proc.printSummaryReport()

@@ -1,0 +1,387 @@
+// AstronomyCatalog — a large end-to-end sample.
+// Models a night-sky observation catalog: celestial objects, telescopes,
+// nightly observation runs, and roll-up reports over the results.
+
+enum SkyClass {
+  STAR, PLANET, GALAXY, NEBULA, CLUSTER
+}
+
+enum StarType(mass: Double, luminosity: Double) {
+  DWARF(0.5, 0.1),
+  MAIN_SEQUENCE(1.0, 1.0),
+  GIANT(8.0, 200.0),
+  SUPERGIANT(20.0, 60000.0)
+}
+
+record Coord(ra: Double, dec: Double) {
+public:
+  def show(): String = "(RA " + ra() + ", DEC " + dec() + ")"
+}
+
+record Sky(name: String, cls: SkyClass, mag: Double, at: Coord) {
+public:
+  def brighterThan(m: Double): Boolean = mag() < m
+}
+
+def classifyMag(mag: Double): String =
+  if mag < 1.0 { "brilliant" } else if mag < 4.0 { "bright" } else if mag < 6.0 { "visible" } else { "dim" }
+
+val catalog = [
+  new Sky("Sirius",     SkyClass::STAR,   -1.46, new Coord(101.28,  -16.72)),
+  new Sky("Betelgeuse", SkyClass::STAR,    0.42, new Coord( 88.79,    7.41)),
+  new Sky("Vega",       SkyClass::STAR,    0.03, new Coord(279.24,   38.78)),
+  new Sky("Andromeda",  SkyClass::GALAXY,  3.44, new Coord( 10.68,   41.27)),
+  new Sky("Orion Neb.", SkyClass::NEBULA,  4.00, new Coord( 83.82,   -5.39)),
+  new Sky("Pleiades",   SkyClass::CLUSTER, 1.60, new Coord( 56.75,   24.12)),
+  new Sky("Mars",       SkyClass::PLANET, -1.20, new Coord(210.10,  -12.34)),
+  new Sky("Jupiter",    SkyClass::PLANET, -2.20, new Coord(160.40,    5.55)),
+  new Sky("Polaris",    SkyClass::STAR,    1.97, new Coord( 37.95,   89.26))
+]
+
+IO::println("catalog: #{catalog.size} objects")
+
+// filter + map pipeline
+val bright = catalog
+  .filter { s -> s.brighterThan(2.0) }
+  .map { s -> s.name() }
+IO::println("bright: " + bright.toString())
+
+// sortedBy + map — magnitude ascending
+val ordered = catalog.sortedBy { s -> s.mag() }.map { s -> s.name() }
+IO::println("brightestFirst: " + ordered.toString())
+
+// groupBy classification
+val byClass = catalog.groupBy { s -> s.cls().toString() }
+foreach (k, v) in byClass {
+  IO::println("class " + k + ": " + (v as List).size + " item(s)")
+}
+
+// distinct across generated buckets
+val magBuckets = catalog.map { s -> classifyMag(s.mag()) }.distinct()
+IO::println("magBuckets: " + magBuckets.toString())
+
+// find (nullable)
+val faint = catalog.find { s -> s.mag() > 4.5 }
+if faint != null {
+  IO::println("faint: " + (faint as Sky).name())
+} else {
+  IO::println("faint: none")
+}
+
+// select on enum values
+def isDeepSky(c: SkyClass): Boolean {
+  var r: Boolean = false
+  select c {
+    case SkyClass::GALAXY, SkyClass::NEBULA, SkyClass::CLUSTER: r = true
+    else: r = false
+  }
+  return r
+}
+
+val deep = catalog.filter { s -> isDeepSky(s.cls()) }.map { s -> s.name() }
+IO::println("deepSky: " + deep.toString())
+
+// fold — total absolute magnitude scores
+val magSum = catalog.fold(0.0) { acc, s -> (acc as Double) + (s as Sky).mag() }
+IO::println("magSum≈" + magSum)
+
+// --- Telescope hierarchy: base class + specialised subclasses ---
+class Telescope {
+public:
+  val label: String
+  val apertureMM: Int
+  def this(label: String, apertureMM: Int) {
+    this.label = label
+    this.apertureMM = apertureMM
+  }
+  def canResolve(s: Sky): Boolean = s.mag() < magLimit()
+  def magLimit(): Double = 7.0 + (apertureMM as Double) / 200.0
+  def kind(): String = "generic"
+  def describe(): String = kind() + " " + label + " (" + apertureMM + "mm)"
+}
+
+class Refractor(name_: String, aperture_: Int) extends Telescope(name_, aperture_) {
+public:
+  override def kind(): String = "refractor"
+  override def magLimit(): Double = 7.0 + (apertureMM as Double) / 180.0
+}
+
+class Reflector(name_: String, aperture_: Int) extends Telescope(name_, aperture_) {
+public:
+  override def kind(): String = "reflector"
+  override def magLimit(): Double = 7.5 + (apertureMM as Double) / 150.0
+}
+
+val scopes: List[Telescope] = [
+  new Refractor("Meade 90", 90),
+  new Reflector("Newton 150", 150),
+  new Reflector("Dobson 250", 250),
+  new Telescope("Binoculars", 50)
+]
+
+IO::println("--- scopes ---")
+foreach t: Telescope in scopes {
+  val visible = catalog.filter { s -> t.canResolve(s) }.size
+  IO::println(t.describe() + " → " + visible + " visible")
+}
+
+// --- ADT enum: weather conditions with different payloads ---
+enum Weather {
+  case Clear(seeing: Double)
+  case Cloudy(coverage: Int)
+  case Rain(mmPerHour: Double)
+  case Fog
+}
+
+def weatherLabel(w: Weather): String {
+  var s: String = ""
+  select w {
+    case c is Clear:   s = "clear seeing=" + c.seeing()
+    case c is Cloudy:  s = "cloudy " + c.coverage() + "%"
+    case r is Rain:    s = "rain " + r.mmPerHour() + "mm/h"
+    case f is Fog:     s = "fog"
+  }
+  return s
+}
+
+def usableNight(w: Weather): Boolean {
+  var ok: Boolean = false
+  select w {
+    case c is Clear:  ok = c.seeing() > 1.0
+    case c is Cloudy: ok = c.coverage() < 40
+    else: ok = false
+  }
+  return ok
+}
+
+// --- Observation records + a nightly log ---
+record Observation(night: Int, object_: String, scope: String, weather: Weather, note: String)
+
+val log = [
+  new Observation(1, "Sirius",     "Newton 150", new Clear(2.5),   "razor sharp"),
+  new Observation(1, "Vega",       "Newton 150", new Clear(2.5),   "steady"),
+  new Observation(2, "Andromeda",  "Dobson 250", new Cloudy(30),   "some structure"),
+  new Observation(2, "Orion Neb.", "Dobson 250", new Cloudy(30),   "green tint"),
+  new Observation(3, "Mars",       "Meade 90",   new Clear(1.4),   "polar cap visible"),
+  new Observation(4, "Jupiter",    "Meade 90",   new Rain(1.2),    "aborted"),
+  new Observation(5, "Pleiades",   "Binoculars", new Clear(3.0),   "brilliant field"),
+  new Observation(5, "Polaris",    "Binoculars", new Clear(3.0),   "guide star"),
+  new Observation(6, "Andromeda",  "Dobson 250", new Fog(),        "no visibility")
+]
+
+IO::println("log: #{log.size} observations")
+
+// Weather labels for every entry
+foreach o: Observation in log {
+  IO::println("N#{o.night()} " + o.object_() + " [" + weatherLabel(o.weather()) + "] " + o.note())
+}
+
+// --- partition: usable vs washed-out (returns [matching, nonMatching]) ---
+val split = log.partition { o -> usableNight(o.weather()) }
+val usable = split[0] as List
+val washed = split[1] as List
+IO::println("usableNights: " + usable.size + " / washedOut: " + washed.size)
+
+// --- groupBy night ---
+val nights = log.groupBy { o -> o.night() }
+IO::println("nightsCovered: " + nights.size)
+
+// --- reduce: pick the earliest night with usable weather ---
+val firstUsable = usable.sortedBy { o -> (o as Observation).night() }.find { o -> true }
+if firstUsable != null {
+  val f = firstUsable as Observation
+  IO::println("firstUsable: N#{f.night()} #{f.object_()}")
+} else {
+  IO::println("firstUsable: none")
+}
+
+// --- distinct objects observed ---
+val observedNames = log.map { o -> o.object_() }.distinct()
+IO::println("observed: " + observedNames.toString())
+
+// --- zip nights with sequential labels ---
+val nightPairs = usable.map { o -> (o as Observation).night() }.distinct()
+val labels = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"]
+val labeledNights = nightPairs.zip(labels)
+IO::println("labeledNights: " + labeledNights.toString())
+
+// --- Generic registry with type parameter ---
+class Registry[T extends Object] {
+public:
+  val items: ArrayList[T]
+  def this() {
+    this.items = new ArrayList[T]()
+  }
+  def register(x: T): void { items.add(x) }
+  def size(): Int = items.size()
+  def get(i: Int): T = items.get(i)
+  def toArray(): ArrayList[T] = {
+    val out: ArrayList[T] = new ArrayList[T]()
+    var i: Int = 0
+    while i < items.size() {
+      out.add(items.get(i))
+      i = i + 1
+    }
+    return out
+  }
+}
+
+val skyReg: Registry[Sky] = new Registry[Sky]()
+foreach s: Sky in catalog {
+  skyReg.register(s)
+}
+IO::println("registrySize: " + skyReg.size())
+
+// --- interface + conforms ---
+interface Report {
+  def title(): String
+  def summary(): String
+}
+
+class NightSummary(val night: Int, val entries: List[Observation]) conforms Report {
+public:
+  def title(): String = "Night #{night}"
+  def summary(): String {
+    var okCount: Int = 0
+    var abortedCount: Int = 0
+    var i: Int = 0
+    while i < entries.size {
+      val o = entries[i] as Observation
+      if usableNight(o.weather()) {
+        okCount = okCount + 1
+      } else {
+        abortedCount = abortedCount + 1
+      }
+      i = i + 1
+    }
+    return "ok=#{okCount} aborted=#{abortedCount}"
+  }
+}
+
+val summaries: ArrayList[Report] = new ArrayList[Report]()
+foreach (k, v) in nights {
+  summaries.add(new NightSummary(k as Int, v as List[Observation]))
+}
+
+IO::println("--- summaries ---")
+foreach r: Report in summaries {
+  IO::println(r.title() + ": " + r.summary())
+}
+
+// --- tail recursion: count nights meeting a predicate ---
+def countUsable(entries: List[Observation], i: Int, acc: Int): Int =
+  if i >= entries.size {
+    acc
+  } else if usableNight(entries[i].weather()) {
+    countUsable(entries, i + 1, acc + 1)
+  } else {
+    countUsable(entries, i + 1, acc)
+  }
+
+IO::println("countUsable(recursive): " + countUsable(log, 0, 0))
+
+// --- while loop with accumulator ---
+var totalSeeing: Double = 0.0
+var seeingSamples: Int = 0
+var i2: Int = 0
+while i2 < log.size {
+  val w = log[i2].weather()
+  select w {
+    case c is Clear:
+      totalSeeing = totalSeeing + c.seeing()
+      seeingSamples = seeingSamples + 1
+    else:
+  }
+  i2 = i2 + 1
+}
+val avgSeeing = if seeingSamples > 0 { totalSeeing / (seeingSamples as Double) } else { 0.0 }
+IO::println("avgSeeing≈" + avgSeeing + " (samples=" + seeingSamples + ")")
+
+// --- foreach over inclusive range with fold ---
+val squares = new ArrayList[Int]()
+foreach n: Int in 1..5 {
+  squares.add(n * n)
+}
+IO::println("squares: " + squares.toString())
+
+// --- closure stored, then applied ---
+val boost = (base: Double, factor: Double) -> base * factor
+IO::println("boost(1.5, 2.0)=" + boost(1.5, 2.0))
+
+// --- string interpolation with expressions ---
+val skyCount = catalog.size
+val obsCount = log.size
+IO::println("catalog #{skyCount} objects; #{obsCount} obs across #{nights.size} nights")
+
+// --- try / catch ---
+def safeDivD(a: Double, b: Double): Double {
+  try {
+    if b == 0.0 { throw new Exception("divide-by-zero") }
+    return a / b
+  } catch e: Exception {
+    IO::println("caught: " + e.getMessage())
+    return 0.0 - 1.0
+  }
+}
+IO::println("safeDiv(10,4)=" + safeDivD(10.0, 4.0))
+IO::println("safeDiv(1,0)=" + safeDivD(1.0, 0.0))
+
+// --- StarType (data-carrying enum) — pair with each stellar catalog entry ---
+val stellar: Map[String, StarType] = [
+  "Sirius":     StarType::MAIN_SEQUENCE,
+  "Betelgeuse": StarType::SUPERGIANT,
+  "Vega":       StarType::MAIN_SEQUENCE,
+  "Polaris":    StarType::GIANT
+]
+
+foreach (k, v) in stellar {
+  IO::println("#{k} → #{v} mass=#{v.mass()} luminosity=#{v.luminosity()}")
+}
+
+// --- Nullable safe call — look up a name that might be missing ---
+val query: String? = "Vega"
+val hit: Sky? = catalog.find { s -> s.name() == query } as Sky?
+IO::println("query=#{query} classifyMag=" + (if hit != null { classifyMag((hit as Sky).mag()) } else { "n/a" }))
+
+val missQuery: String? = "Kuiper"
+val miss: Sky? = catalog.find { s -> s.name() == missQuery } as Sky?
+IO::println("query=#{missQuery} classifyMag=" + (if miss != null { classifyMag((miss as Sky).mag()) } else { "n/a" }))
+
+// --- Roll-up final report ---
+def line(): String = "----------------------------------------"
+IO::println(line())
+IO::println("               NIGHT REPORT")
+IO::println(line())
+IO::println("Catalog objects        : " + catalog.size)
+IO::println("Total observations     : " + log.size)
+IO::println("Nights covered         : " + nights.size)
+IO::println("Usable observations    : " + usable.size)
+IO::println("Washed-out obs.        : " + washed.size)
+IO::println("Distinct objects seen  : " + observedNames.size)
+IO::println("Average seeing (clear) : " + avgSeeing)
+IO::println("Telescope roster       : " + scopes.size)
+IO::println(line())
+
+// --- Which telescope logged the most observations? (reduce with a comparator) ---
+val counts: Map[String, Int] = [:]
+foreach o: Observation in log {
+  val prev = counts[o.scope()]
+  if prev != null {
+    counts[o.scope()] = (prev as Int) + 1
+  } else {
+    counts[o.scope()] = 1
+  }
+}
+
+var bestScope: String? = null
+var bestCount: Int = 0
+foreach (k, v) in counts {
+  if (v as Int) > bestCount {
+    bestCount = v as Int
+    bestScope = k as String
+  }
+}
+IO::println("busiest scope: " + (if bestScope != null { bestScope as String } else { "none" }) + " (" + bestCount + " obs)")
+
+IO::println(line())
+IO::println("done")

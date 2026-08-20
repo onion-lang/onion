@@ -148,6 +148,25 @@ class RecordJsonSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Failure])
     }
 
+    it("rejects a nullable scalar component (String?) (E0062)") {
+      // ScalarConversions.isDerivable only matches the exact non-null scalar types, so a
+      // nullable wrapper around an otherwise-supported type (String? vs String) is rejected
+      // the same way a wholly-unsupported component type (a nested record) is above. Docs
+      // say "scalar components only"; this locks in that nullability is part of that bar.
+      val result = shell.run(
+        """
+          |record Person(name: String, nickname: String?) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "x" }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
     it("rejects an unknown derive! marker (E0063)") {
       val result = shell.run(
         """

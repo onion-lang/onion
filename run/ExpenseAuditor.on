@@ -74,19 +74,19 @@ class ExpenseAuditorSupport {
 public:
   static def flagged(rows: List[Expense]): List[Violation] {
     return rows
-      .filter { e => e.amount() > Category::of(e.category()).dailyLimit() }
-      .map { e => new Violation(e, e.category() + " over daily limit of " + Category::of(e.category()).dailyLimit().asCurrency()) }
+      .filter { e -> e.amount() > Category::of(e.category()).dailyLimit() }
+      .map { e -> new Violation(e, e.category() + " over daily limit of " + Category::of(e.category()).dailyLimit().asCurrency()) }
   }
 
   static def totalsByCategory(rows: List[Expense]): List[CategoryTotal] {
-    val groups = rows.groupBy { e => e.category() }
+    val groups = rows.groupBy { e -> e.category() }
     val out = new java.util.ArrayList[CategoryTotal]()
     foreach (k, v) in groups {
       val group = v as List
-      val sum = group.fold(0.0) { acc, x => acc + (x as Expense).amount() }
+      val sum = group.fold(0.0) { acc, x -> acc + (x as Expense).amount() }
       out.add(new CategoryTotal(k as String, group.size, sum))
     }
-    return out.sortedBy { t => -(t as CategoryTotal).total() }
+    return out.sortedBy { t -> -(t as CategoryTotal).total() }
   }
 
   static def buildReport(rows: List[Expense], bad: List[Violation], limit: Double): String {
@@ -94,7 +94,7 @@ public:
     sb.append("expense audit\n")
     sb.append("=============\n")
     sb.append("entries read: #{rows.size}\n")
-    val grand = rows.fold(0.0) { acc, e => acc + e.amount() }
+    val grand = rows.fold(0.0) { acc, e -> acc + e.amount() }
     sb.append("grand total:  #{grand.asCurrency()}\n\n")
 
     sb.append("by category:\n")
@@ -106,7 +106,7 @@ public:
     foreach v: Violation in bad {
       sb.append("  #{v.expense().date()} #{v.expense().memo()}: #{v.reason()}\n")
     }
-    val big = bad.partition { v => v.expense().amount() > limit }
+    val big = bad.partition { v -> v.expense().amount() > limit }
     val overCap = big[0] as List[Object]
     sb.append("\nover the hard cap of #{limit.asCurrency()}: #{overCap.size}\n")
     return sb.toString()

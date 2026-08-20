@@ -109,13 +109,13 @@ public:
   }
 
   def totalRevenue(): Double =
-    sales.fold(0.0) { acc, s => (acc as Double) + (s as Sale).revenue() }
+    sales.fold(0.0) { acc, s -> (acc as Double) + (s as Sale).revenue() }
 
   def totalUnitsSold(): Int =
-    sales.fold(0) { acc, s => (acc as Int) + (s as Sale).quantity() }
+    sales.fold(0) { acc, s -> (acc as Int) + (s as Sale).quantity() }
 
   def sortedByPriceDesc(): List[Game] =
-    inventory.sortedBy { g => 0 - (g as Game).price().intValue() }
+    inventory.sortedBy { g -> 0 - (g as Game).price().intValue() }
 
   def topSale(): Sale? {
     if sales.size == 0 { return null }
@@ -151,7 +151,7 @@ public:
 
   def averagePrice(): Double {
     if inventory.size == 0 { return 0.0 }
-    val total = inventory.fold(0.0) { acc, g => (acc as Double) + (g as Game).price() }
+    val total = inventory.fold(0.0) { acc, g -> (acc as Double) + (g as Game).price() }
     return (total as Double) / inventory.size
   }
 }
@@ -223,7 +223,7 @@ def main(): void {
   val revByGame: Map[String, Double] = store.revenueByGame()
   val revTitles: List[String] = []
   foreach t: Object in revByGame.keySet() { revTitles.add((t as String)) }
-  val sortedRevTitles = revTitles.sortedBy { t => 0 - (revByGame.get(t) as Double).intValue() }
+  val sortedRevTitles = revTitles.sortedBy { t -> 0 - (revByGame.get(t) as Double).intValue() }
   foreach t: Object in sortedRevTitles {
     val rev = (revByGame.get(t) as Double)
     IO::println("  #{(t as String).ljust(24)} #{rev.fmtUsd().rjust(10)}")
@@ -234,7 +234,7 @@ def main(): void {
   // ─────────────────────────────────────────────
   IO::println("")
   header("INVENTORY BY GENRE")
-  val byGenre = store.getInventory().groupBy { g => (g as Game).genre().name() }
+  val byGenre = store.getInventory().groupBy { g -> (g as Game).genre().name() }
   foreach (genre, games) in byGenre {
     val gList = (games as List[Game])
     IO::println("  #{genre} (#{gList.size.plural("title")}):")
@@ -249,10 +249,10 @@ def main(): void {
   // ─────────────────────────────────────────────
   IO::println("")
   header("INVENTORY BY PLATFORM")
-  val byPlat = store.getInventory().groupBy { g => (g as Game).platform().name() }
+  val byPlat = store.getInventory().groupBy { g -> (g as Game).platform().name() }
   foreach (plat, games) in byPlat {
     val gList = (games as List[Game])
-    val catVal = gList.fold(0.0) { acc, g => (acc as Double) + (g as Game).price() }
+    val catVal = gList.fold(0.0) { acc, g -> (acc as Double) + (g as Game).price() }
     IO::println("  #{(plat as String).ljust(14)} #{gList.size.plural("title")}  catalogue value: #{(catVal as Double).fmtUsd()}")
   }
 

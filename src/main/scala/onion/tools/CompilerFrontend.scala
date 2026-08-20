@@ -68,6 +68,8 @@ object CompilerFrontend {
   private final val LAW_SEED: String = "--law-seed"
   private final val LAW_SAMPLES: String = "--law-samples"
   private final val SHOW_EFFECTS: String = "--effects"
+  // Named after javac's -g:none, and meaning the same thing: no LocalVariableTable.
+  private final val NO_DEBUG_INFO: String = "-g:none"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -94,7 +96,8 @@ class CompilerFrontend {
     config(NO_CHECK_LAWS, false),
     config(LAW_SEED, true),
     config(LAW_SAMPLES, true),
-    config(SHOW_EFFECTS, false)
+    config(SHOW_EFFECTS, false),
+    config(NO_DEBUG_INFO, false)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -155,6 +158,8 @@ class CompilerFrontend {
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
          |  --effects                   Print each method's inferred effect set to stderr
+         |  -g:none                     Omit the LocalVariableTable (smaller class files,
+         |                              but a debugger can no longer show variable values)
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -192,6 +197,7 @@ class CompilerFrontend {
     )
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
     val noCheckLaws = option.get(NO_CHECK_LAWS).contains(NoValuedParam)
+    val noDebugInfo = option.get(NO_DEBUG_INFO).contains(NoValuedParam)
     val lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed)
     val lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
@@ -218,6 +224,7 @@ class CompilerFrontend {
         dumpTypedAst = dumpTypedAst,
         compileProfile = profile,
         checkLaws = !noCheckLaws,
+        emitDebugInfo = !noDebugInfo,
         lawSeed = lawSeed,
         lawSamples = lawSamples
       )

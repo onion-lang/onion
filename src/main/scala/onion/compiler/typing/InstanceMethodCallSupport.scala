@@ -227,7 +227,9 @@ private[compiler] final class InstanceMethodCallSupport(
     overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
-          case Some(named) => bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+          case Some(named) =>
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name,
+              ArgumentHelpers.parameterNameCandidates(candidates.asScala))
           case None => calls.reportMethodNotFound(node, targetType, node.name, Array[Type]())
         }
         None

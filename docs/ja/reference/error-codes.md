@@ -1145,6 +1145,81 @@ public:
 本当にあるなら `var` を使ってください。コンストラクタ内で初期化されるフィールドの
 `val` はこのエラーの対象外です。
 
+## コンストラクタエラー
+
+### `E0087` — セカンダリコンストラクタはプライマリに委譲する必要がある
+
+プライマリコンストラクタ（クラス名の後ろのパラメータリスト、または `extends` 節の引数、
+またはその両方）を持つクラスで、`: this(...)` で委譲しない `def this` を宣言しています。
+親クラスのコンストラクタを呼び、`val`/`var` パラメータをフィールドに格納するのは
+プライマリコンストラクタだけです。それを経由しないコンストラクタは、クラスが書いていない
+暗黙の `super()` で親に到達し、フィールドを既定値のまま残します。この検査ができる前は
+`class P(val x: Int) { def this { } }` がコンパイルでき、`new P().x` は `0` でした。
+
+```onion
+class Point(val x: Int, val y: Int) {
+public:
+  def this(x: Int) { }   // E0087: 委譲が必要 — `: this(x, 0)` と書く
+}
+```
+
+修正: `def this(x: Int) : this(x, 0) { }` のように委譲を追加してください。プライマリ
+コンストラクタを持たないクラスは影響を受けません。その `def this` は今まで通り親クラスの
+引数なしコンストラクタを呼びます。
+
+### `E0088` — コンストラクタ委譲の循環
+
+複数のコンストラクタが互いに委譲し合って循環しており、親クラスのコンストラクタを呼ぶ
+コンストラクタにどの経路からも到達しません。`new` すると `StackOverflowError` になります。
+
+```onion
+class C {
+public:
+  def this(a: Int) : this("s") { }   // E0088
+  def this(s: String) : this(1) { }
+}
+```
+
+修正: 循環の中の 1 つを委譲しないコンストラクタにする（プライマリを持つクラスでは
+プライマリに委譲する）。
+
+### `E0089` — record / enum 本体のコンストラクタ
+
+`record` または `enum` の本体に `def this` があります。どちらも成分リスト／パラメータ
+リストから正準コンストラクタが生成されるので、2 つ目のコンストラクタに意味を与えられません。
+以前はこれが診断ではなくコンパイラのクラッシュでした。本体は型付けされず、コード生成が
+record の「パラメータをフィールドに格納する」処理を引数の数が違うコンストラクタに対して
+行っていました。
+
+```onion
+record R(a: Int, b: Int) {
+public:
+  def this(a: Int) { }   // E0089
+}
+```
+
+修正: static なファクトリメソッドを使ってください（`static def of(a: Int): R = new R(a, 0)`）。
+
+### `E0090` — コンストラクタ委譲より前の `this`
+
+`: this(...)` の委譲や `extends B(...)` の親呼び出しの引数の中で、`this` が（明示的に、
+または裸のフィールド名を通して）使われています。この時点ではオブジェクトがまだ存在しません。
+JVM の検証器は `uninitializedThis` に対するフィールド読み出しを拒否するため、この検査が
+無いとプログラムはロードに失敗するクラスにコンパイルされ、内部エラーとして報告されて
+いました。Java の "cannot reference `x` before supertype constructor has been called" と
+同じ規則です。
+
+```onion
+class F(val x: Int) {
+public:
+  var seed: Int = 3
+  def this : this(seed) { }   // E0090: `seed` はまだ構築されていないオブジェクトのフィールド
+}
+```
+
+修正: パラメータか定数を渡してください。クロージャは `this` を捕捉して後で（オブジェクトが
+存在してから）実行されるので、この位置に書いても問題ありません。
+
 ## 制御フローエラー
 
 ### `E0048` — ループの外での break
@@ -1438,6 +1513,10 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0084` | duplicated extension method …(…) on … |
 | `E0085` | static method … must have a body |
 | `E0086` | duplicated record component … in … |
+| `E0087` | class … has a primary constructor, so every `def this` must delegate to it |
+| `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
+| `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
+| `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 
 ## 関連項目
 

@@ -157,28 +157,28 @@ public:
     issues << issue
   }
 
-  def openIssues(): List[Object] = issues.filter { i => (i as Issue).status().isActive() }
-  def closedIssues(): List[Object] = issues.filter { i => (i as Issue).status().isFinal() }
-  def doneIssues(): List[Object] = issues.filter { i => (i as Issue).status().isDone() }
+  def openIssues(): List[Object] = issues.filter { i -> (i as Issue).status().isActive() }
+  def closedIssues(): List[Object] = issues.filter { i -> (i as Issue).status().isFinal() }
+  def doneIssues(): List[Object] = issues.filter { i -> (i as Issue).status().isDone() }
 
-  def byPriority(p: Priority): List[Object] = issues.filter { i => (i as Issue).priority().order() == p.order() }
+  def byPriority(p: Priority): List[Object] = issues.filter { i -> (i as Issue).priority().order() == p.order() }
 
   def byAssignee(name: String): List[Object] =
-    issues.filter { i =>
+    issues.filter { i ->
       val iss = i as Issue
       iss.assignee() != null && iss.assignee() == name
     }
 
-  def unassigned(): List[Object] = issues.filter { i => (i as Issue).assignee() == null }
+  def unassigned(): List[Object] = issues.filter { i -> (i as Issue).assignee() == null }
 
-  def urgent(): List[Object] = issues.filter { i => (i as Issue).priority().isUrgent() }
+  def urgent(): List[Object] = issues.filter { i -> (i as Issue).priority().isUrgent() }
 
-  def totalPoints(): Int = issues.fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+  def totalPoints(): Int = issues.fold(0) { acc, i -> (acc as Int) + (i as Issue).storyPoints() }
 
-  def completedPoints(): Int = doneIssues().fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+  def completedPoints(): Int = doneIssues().fold(0) { acc, i -> (acc as Int) + (i as Issue).storyPoints() }
 
   def findById(targetId: Int): Issue? {
-    val found = issues.find { i => (i as Issue).id() == targetId }
+    val found = issues.find { i -> (i as Issue).id() == targetId }
     if found == null { return null }
     return found as Issue
   }
@@ -225,7 +225,7 @@ foreach item: Object in tracker.issues {
 // ── Open issues sorted by priority ───────────────────────────────────────────
 
 IO::println("\n── Open Issues (by priority) ────────────────────────────────────────────────")
-val openSorted = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }
+val openSorted = tracker.openIssues().sortedBy { i -> (i as Issue).priority().order() }
 foreach item: Object in openSorted {
   val iss = item as Issue
   val who = if iss.assignee() != null { iss.assignee() } else { "unassigned" }
@@ -243,7 +243,7 @@ foreach item: Object in tracker.doneIssues() {
 // ── Group by priority ─────────────────────────────────────────────────────────
 
 IO::println("\n── By Priority ──────────────────────────────────────────────────────────────")
-val byPri = tracker.issues.groupBy { i => (i as Issue).priority().label().trim() }
+val byPri = tracker.issues.groupBy { i -> (i as Issue).priority().label().trim() }
 foreach (priLabel, group) in byPri {
   IO::println("  #{priLabel}: #{(group as List).size} issue(s)")
 }
@@ -251,10 +251,10 @@ foreach (priLabel, group) in byPri {
 // ── Group by assignee ─────────────────────────────────────────────────────────
 
 IO::println("\n── By Assignee ──────────────────────────────────────────────────────────────")
-val assigned = tracker.issues.filter { i => (i as Issue).assignee() != null }
-val byDev = assigned.groupBy { i => (i as Issue).assignee() }
+val assigned = tracker.issues.filter { i -> (i as Issue).assignee() != null }
+val byDev = assigned.groupBy { i -> (i as Issue).assignee() }
 foreach (dev, devIssues) in byDev {
-  val pts = (devIssues as List).fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+  val pts = (devIssues as List).fold(0) { acc, i -> (acc as Int) + (i as Issue).storyPoints() }
   IO::println("  #{dev}: #{(devIssues as List).size} issue(s), #{pts} pts")
 }
 
@@ -269,7 +269,7 @@ foreach item: Object in tracker.unassigned() {
 // ── Partition: active vs final ────────────────────────────────────────────────
 
 IO::println("\n── Partition: Active vs Final ───────────────────────────────────────────────")
-val parts   = tracker.issues.partition { i => (i as Issue).status().isActive() }
+val parts   = tracker.issues.partition { i -> (i as Issue).status().isActive() }
 val active  = parts[0] as List[Object]
 val final_  = parts[1] as List[Object]
 IO::println("  Active: #{active.size}   Final: #{final_.size}")
@@ -278,10 +278,10 @@ IO::println("  Active: #{active.size}   Final: #{final_.size}")
 
 IO::println("\n── Contributors (distinct assignees) ────────────────────────────────────────")
 val assignees = tracker.issues
-  .filter { i => (i as Issue).assignee() != null }
-  .map    { i => (i as Issue).assignee() }
+  .filter { i -> (i as Issue).assignee() != null }
+  .map    { i -> (i as Issue).assignee() }
   .distinct()
-  .sortedBy { a => a as String }
+  .sortedBy { a -> a as String }
 IO::println("  " + assignees.size + " contributor(s): " + assignees)
 
 // ── Find by ID ────────────────────────────────────────────────────────────────
@@ -299,7 +299,7 @@ if missed == null {
 // ── Zip: rank open issues by priority ────────────────────────────────────────
 
 IO::println("\n── Open Issues Ranked by Priority (zip) ─────────────────────────────────────")
-val ranked = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }
+val ranked = tracker.openIssues().sortedBy { i -> (i as Issue).priority().order() }
 val ranks: List[Object] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 val zipped = ranks.zip(ranked)
 foreach pair: Object in zipped {
@@ -323,15 +323,15 @@ IO::println("  Completion:       #{pctDone.pctStr()}")
 
 // ── Count and any ─────────────────────────────────────────────────────────────
 
-val critCount  = tracker.issues.count { i => (i as Issue).priority().order() == 0 }
-val hasCritOpen = tracker.urgent().any { i => (i as Issue).status().isActive() }
+val critCount  = tracker.issues.count { i -> (i as Issue).priority().order() == 0 }
+val hasCritOpen = tracker.urgent().any { i -> (i as Issue).status().isActive() }
 IO::println("  Critical issues:  #{critCount}")
 IO::println("  Has urgent open:  #{hasCritOpen}")
 
 // ── Point histogram (bar chart) ───────────────────────────────────────────────
 
 IO::println("\n── Story Point Histogram ────────────────────────────────────────────────────")
-val pointGroups = tracker.issues.groupBy { i => (i as Issue).storyPoints().storyLabel().trim() }
+val pointGroups = tracker.issues.groupBy { i -> (i as Issue).storyPoints().storyLabel().trim() }
 val labels: List[Object] = ["XS", "S", "M", "L", "XL"]
 foreach lbl: Object in labels {
   val key = lbl as String
@@ -355,7 +355,7 @@ IO::println("  Open pts (recursive): #{openPts}")
 // ── Foreach over range: show top-5 open by priority ──────────────────────────
 
 IO::println("\n── Top-5 Open Issues ────────────────────────────────────────────────────────")
-val top5 = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }.take(5)
+val top5 = tracker.openIssues().sortedBy { i -> (i as Issue).priority().order() }.take(5)
 foreach k: Int in 0..<top5.size {
   val iss = top5[k] as Issue
   IO::println("  #{k + 1}. [#{iss.issueType().symbol()}] #{iss.title()} (#{iss.priority().label().trim()})")
@@ -386,7 +386,7 @@ IO::println("  parse('BOGUS'): #{if p2 != null { (p2 as Priority).label().trim()
 // ── Resolution display across all issues ─────────────────────────────────────
 
 IO::println("\n── Resolution Status ────────────────────────────────────────────────────────")
-val resolvedCount   = tracker.issues.count { i => (i as Issue).resolution().isResolved() }
+val resolvedCount   = tracker.issues.count { i -> (i as Issue).resolution().isResolved() }
 val unresolvedCount = tracker.issues.size - resolvedCount
 IO::println("  Resolved:   #{resolvedCount}")
 IO::println("  Unresolved: #{unresolvedCount}")

@@ -230,7 +230,7 @@ public:
   }
 
   def liveBookings(): List[Booking] =
-    allBookings().filter { bk => (bk as Booking).status().isLive() }
+    allBookings().filter { bk -> (bk as Booking).status().isLive() }
 
   def totalRevenue(): Int {
     var sum: Int = 0
@@ -277,25 +277,25 @@ def safeReserve(hotel: Hotel, guestId: Int, roomNum: Int, arrival: Int, nights: 
 }
 
 def loyaltyTierReport(guests: List[Object]): void {
-  val byTier = guests.groupBy { g => (g as Guest).tier() }
+  val byTier = guests.groupBy { g -> (g as Guest).tier() }
   println("Loyalty tiers:")
   foreach (tier, members) in byTier {
-    val names = (members as List).map { g => (g as Guest).name() }
+    val names = (members as List).map { g -> (g as Guest).name() }
     println("  #{tier}: #{names}")
   }
 }
 
 def revenueByType(hotel: Hotel): void {
-  val settled = hotel.allBookings().filter { bk =>
+  val settled = hotel.allBookings().filter { bk ->
     select (bk as Booking).status() {
       case s is Settled: true
       else: false
     }
   }
-  val byType = settled.groupBy { bk => (bk as Booking).room().roomType().label() }
+  val byType = settled.groupBy { bk -> (bk as Booking).room().roomType().label() }
   println("Revenue by room type:")
   foreach (t, bks) in byType {
-    val rev = (bks as List).fold(0) { acc, bk =>
+    val rev = (bks as List).fold(0) { acc, bk ->
       select (bk as Booking).status() {
         case s is Settled: (acc as Int) + s.finalBill()
         else: acc as Int
@@ -376,20 +376,20 @@ println("Live bookings count: " + liveList.size)
 
 // 2. Guests with discounts (Silver or Gold)
 val allGuests: List[Object] = [alice, bob, carol, dave]
-val vipGuests = allGuests.filter { g => (g as Guest).discountPct() > 0 }
-println("VIP guests: " + vipGuests.map { g => (g as Guest).name() })
+val vipGuests = allGuests.filter { g -> (g as Guest).discountPct() > 0 }
+println("VIP guests: " + vipGuests.map { g -> (g as Guest).name() })
 
 // 3. Loyalty tier distribution
 loyaltyTierReport(allGuests)
 
 // 4. Sorted settled bookings by net amount
-val settled = hotel.allBookings().filter { bk =>
+val settled = hotel.allBookings().filter { bk ->
   select (bk as Booking).status() {
     case s is Settled: true
     else: false
   }
 }
-val sortedSettled = settled.sortedBy { bk => 0 - (bk as Booking).netAmount() }
+val sortedSettled = settled.sortedBy { bk -> 0 - (bk as Booking).netAmount() }
 println("Settled bookings (by bill, highest first):")
 foreach b: Object in sortedSettled {
   println("  " + (b as Booking).display())
@@ -399,7 +399,7 @@ foreach b: Object in sortedSettled {
 revenueByType(hotel)
 
 // 6. Partition bookings into live vs. closed
-val parts = hotel.allBookings().partition { bk => (bk as Booking).status().isLive() }
+val parts = hotel.allBookings().partition { bk -> (bk as Booking).status().isLive() }
 val live   = parts[0] as List[Object]
 val closed = parts[1] as List[Object]
 println("Live: #{live.size}, Closed/Voided: #{closed.size}")

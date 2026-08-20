@@ -54,7 +54,7 @@ class StdlibMethodChainSpec extends AbstractShellSpec {
     it("chains filter and map on a set (returning a Set)") {
       runInt(
         "val s = onion.Sets::of(1, 2, 3, 4)\n" +
-        "return s.filter { x => (x as Int) > 1 }.map { x => (x as Int) * 2 }.size()",
+        "return s.filter { x -> (x as Int) > 1 }.map { x -> (x as Int) * 2 }.size()",
         Shell.Success(3))
     }
 

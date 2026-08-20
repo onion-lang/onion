@@ -38,7 +38,7 @@ def gradePoints(score: Int): Double {
 
 // Compute GPA for a student (weighted by course credits).
 def computeGpa(studentId: Int, enrollments: List[Enrollment]): Double {
-  val mine = enrollments.filter { e => (e as Enrollment).studentId() == studentId }
+  val mine = enrollments.filter { e -> (e as Enrollment).studentId() == studentId }
   if mine.size == 0 { return 0.0 }
   var totalPoints: Double = 0.0
   var totalCredits: Int = 0
@@ -61,7 +61,7 @@ def standing(gpa: Double): String {
 
 // Print a course summary: enrolment count, average score, highest score.
 def courseReport(course: Course, enrollments: List[Enrollment]): void {
-  val mine = enrollments.filter { e =>
+  val mine = enrollments.filter { e ->
     (e as Enrollment).course().code() == course.code()
   }
   val n = mine.size
@@ -74,7 +74,7 @@ def courseReport(course: Course, enrollments: List[Enrollment]): void {
     total = total + (e as Enrollment).score()
   }
   val avg = (total as Double) / (n as Double)
-  val sorted = mine.sortedByDescending { e => (e as Enrollment).score() }
+  val sorted = mine.sortedByDescending { e -> (e as Enrollment).score() }
   val hiScore = (sorted[0] as Enrollment).score()
   IO::println("  #{course.code()} #{course.name()}: #{n} student(s), avg #{avg}, top #{hiScore}")
 }
@@ -148,7 +148,7 @@ foreach c: Object in courses {
 
 // GPA per student, sorted descending.
 IO::println("\n=== Student GPA Rankings ===")
-val ranked = students.sortedByDescending { s =>
+val ranked = students.sortedByDescending { s ->
   computeGpa((s as Student).id(), enrollments)
 }
 foreach s: Object in ranked {
@@ -161,8 +161,8 @@ foreach s: Object in ranked {
 // Honor roll: GPA >= 3.5.
 IO::println("\n=== Honor Roll (GPA >= 3.5) ===")
 val honorRoll = students
-  .filter { s => computeGpa((s as Student).id(), enrollments) >= 3.5 }
-  .map    { s => (s as Student).name() }
+  .filter { s -> computeGpa((s as Student).id(), enrollments) >= 3.5 }
+  .map    { s -> (s as Student).name() }
 if honorRoll.size == 0 {
   IO::println("  (none)")
 } else {
@@ -173,7 +173,7 @@ if honorRoll.size == 0 {
 
 // Grade distribution across all enrollments.
 IO::println("\n=== Grade Distribution ===")
-val gradeDist = enrollments.groupBy { e => letterGrade((e as Enrollment).score()) }
+val gradeDist = enrollments.groupBy { e -> letterGrade((e as Enrollment).score()) }
 foreach (grade, group) in gradeDist {
   IO::println("  " + grade + ": " + (group as List).size + " enrollment(s)")
 }
@@ -187,9 +187,9 @@ foreach c: Object in courses {
 
 // Students grouped by major.
 IO::println("\n=== Students by Major ===")
-val byMajor = students.groupBy { s => (s as Student).major() }
+val byMajor = students.groupBy { s -> (s as Student).major() }
 foreach (major, group) in byMajor {
-  val names = (group as List).map { s => (s as Student).name() }
+  val names = (group as List).map { s -> (s as Student).name() }
   IO::println("  " + major + ": " + names.toString())
 }
 
@@ -225,10 +225,10 @@ val emptyAvg = safeAvg([])
 IO::println("safeAvg([]) = #{emptyAvg}")
 
 // Nullable: find top-scoring enrollment and identify the student.
-val topEnroll = enrollments.find { e => (e as Enrollment).score() == 96 }
+val topEnroll = enrollments.find { e -> (e as Enrollment).score() == 96 }
 if topEnroll != null {
   val te    = topEnroll as Enrollment
-  val owner = students.find { s => (s as Student).id() == te.studentId() }
+  val owner = students.find { s -> (s as Student).id() == te.studentId() }
   if owner != null {
     IO::println("\nTop score (96) belongs to #{(owner as Student).name()}")
   }
@@ -244,5 +244,5 @@ foreach sc: Object in testScores {
 
 // Fold demo: compute total enrolled credits.
 IO::println("\n=== Total enrolled credits ===")
-val totalCredits = enrollments.fold(0) { acc, e => (acc as Int) + (e as Enrollment).course().credits() }
+val totalCredits = enrollments.fold(0) { acc, e -> (acc as Int) + (e as Enrollment).course().credits() }
 IO::println("Total credit-hours: #{totalCredits}")

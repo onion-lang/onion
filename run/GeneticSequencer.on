@@ -1,0 +1,482 @@
+// GeneticSequencer.on — DNA sequence analysis toolkit (~400 lines).
+// Exercises: records with methods, data-carrying enums, classes + interface,
+// extension methods on String/Int, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/distinct/flatMap), select + regex patterns,
+// closures, string interpolation, recursion, foreach over list/range/map (k,v),
+// while, try/catch, nullable types, inheritance.
+
+// ─── String extensions ───────────────────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension Int {
+  def pct(of: Int): String {
+    if of == 0 { return "0.0%" }
+    val whole: Int = self * 100 / of
+    val frac: Int  = (self * 1000 / of) % 10
+    return "#{whole}.#{frac}%"
+  }
+}
+
+// ─── Nucleotide ─────────────────────────────────────────────────────────────
+
+enum Nucleotide {
+  A, T, G, C, N   // N = unknown
+}
+
+def charToNuc(c: String): Nucleotide {
+  return select c {
+    case "A": Nucleotide::A
+    case "T": Nucleotide::T
+    case "G": Nucleotide::G
+    case "C": Nucleotide::C
+    else:     Nucleotide::N
+  }
+}
+
+def complement(c: String): String {
+  return select c {
+    case "A": "T"
+    case "T": "A"
+    case "G": "C"
+    case "C": "G"
+    else:     "N"
+  }
+}
+
+// ─── Amino acids (data-carrying enum) ───────────────────────────────────────
+
+enum AminoAcid(abbrev: String, fullName: String) {
+  MET("M", "Methionine"),
+  PHE("F", "Phenylalanine"),
+  LEU("L", "Leucine"),
+  ILE("I", "Isoleucine"),
+  VAL("V", "Valine"),
+  SER("S", "Serine"),
+  PRO("P", "Proline"),
+  THR("T", "Threonine"),
+  ALA("A", "Alanine"),
+  TYR("Y", "Tyrosine"),
+  HIS("H", "Histidine"),
+  GLN("Q", "Glutamine"),
+  ASN("N", "Asparagine"),
+  LYS("K", "Lysine"),
+  ASP("D", "Aspartic acid"),
+  GLU("E", "Glutamic acid"),
+  CYS("C", "Cysteine"),
+  TRP("W", "Tryptophan"),
+  ARG("R", "Arginine"),
+  GLY("G", "Glycine"),
+  STP("*", "Stop")
+}
+
+// ─── Codon table (codon -> AminoAcid) ───────────────────────────────────────
+
+def codonTable(): Map[String, AminoAcid] {
+  val t: Map[String, AminoAcid] = [:]
+  t.put("ATG", AminoAcid::MET)
+  t.put("TTT", AminoAcid::PHE); t.put("TTC", AminoAcid::PHE)
+  t.put("TTA", AminoAcid::LEU); t.put("TTG", AminoAcid::LEU)
+  t.put("CTT", AminoAcid::LEU); t.put("CTC", AminoAcid::LEU)
+  t.put("CTA", AminoAcid::LEU); t.put("CTG", AminoAcid::LEU)
+  t.put("ATT", AminoAcid::ILE); t.put("ATC", AminoAcid::ILE); t.put("ATA", AminoAcid::ILE)
+  t.put("GTT", AminoAcid::VAL); t.put("GTC", AminoAcid::VAL)
+  t.put("GTA", AminoAcid::VAL); t.put("GTG", AminoAcid::VAL)
+  t.put("TCT", AminoAcid::SER); t.put("TCC", AminoAcid::SER)
+  t.put("TCA", AminoAcid::SER); t.put("TCG", AminoAcid::SER)
+  t.put("CCT", AminoAcid::PRO); t.put("CCC", AminoAcid::PRO)
+  t.put("CCA", AminoAcid::PRO); t.put("CCG", AminoAcid::PRO)
+  t.put("ACT", AminoAcid::THR); t.put("ACC", AminoAcid::THR)
+  t.put("ACA", AminoAcid::THR); t.put("ACG", AminoAcid::THR)
+  t.put("GCT", AminoAcid::ALA); t.put("GCC", AminoAcid::ALA)
+  t.put("GCA", AminoAcid::ALA); t.put("GCG", AminoAcid::ALA)
+  t.put("TAT", AminoAcid::TYR); t.put("TAC", AminoAcid::TYR)
+  t.put("CAT", AminoAcid::HIS); t.put("CAC", AminoAcid::HIS)
+  t.put("CAA", AminoAcid::GLN); t.put("CAG", AminoAcid::GLN)
+  t.put("AAT", AminoAcid::ASN); t.put("AAC", AminoAcid::ASN)
+  t.put("AAA", AminoAcid::LYS); t.put("AAG", AminoAcid::LYS)
+  t.put("GAT", AminoAcid::ASP); t.put("GAC", AminoAcid::ASP)
+  t.put("GAA", AminoAcid::GLU); t.put("GAG", AminoAcid::GLU)
+  t.put("TGT", AminoAcid::CYS); t.put("TGC", AminoAcid::CYS)
+  t.put("TGG", AminoAcid::TRP)
+  t.put("CGT", AminoAcid::ARG); t.put("CGC", AminoAcid::ARG)
+  t.put("CGA", AminoAcid::ARG); t.put("CGG", AminoAcid::ARG)
+  t.put("AGA", AminoAcid::ARG); t.put("AGG", AminoAcid::ARG)
+  t.put("AGT", AminoAcid::SER); t.put("AGC", AminoAcid::SER)
+  t.put("GGT", AminoAcid::GLY); t.put("GGC", AminoAcid::GLY)
+  t.put("GGA", AminoAcid::GLY); t.put("GGG", AminoAcid::GLY)
+  t.put("TAA", AminoAcid::STP); t.put("TAG", AminoAcid::STP); t.put("TGA", AminoAcid::STP)
+  return t
+}
+
+// ─── Sequence record ─────────────────────────────────────────────────────────
+
+record Sequence(id: String, organism: String, bases: String) {
+public:
+  def len(): Int = bases.length()
+  def gcCount(): Int {
+    var count: Int = 0
+    var i: Int = 0
+    while i < bases.length() {
+      val b: String = bases.substring(i, i + 1)
+      if b == "G" || b == "C" { count = count + 1 }
+      i = i + 1
+    }
+    return count
+  }
+  def revComp(): String {
+    var result: String = ""
+    var i: Int = bases.length() - 1
+    while i >= 0 {
+      result = result + complement(bases.substring(i, i + 1))
+      i = i - 1
+    }
+    return result
+  }
+  def toString(): String = "[#{id}|#{organism}] #{len()} bp"
+}
+
+// ─── Open Reading Frame ──────────────────────────────────────────────────────
+
+record ORF(start: Int, end: Int, protein: String) {
+public:
+  def len(): Int = end - start
+  def toString(): String = "ORF[#{start}..#{end}] #{len()} nt -> #{protein}"
+}
+
+// ─── Translation ─────────────────────────────────────────────────────────────
+
+def translateCodon(codon: String, table: Map[String, AminoAcid]): String {
+  val aa = table.get(codon)
+  if aa == null { return "?" }
+  return (aa as AminoAcid).abbrev()
+}
+
+def translateSeq(dna: String, table: Map[String, AminoAcid]): String {
+  var protein: String = ""
+  var i: Int = 0
+  while i + 3 <= dna.length() {
+    val codon: String = dna.substring(i, i + 3)
+    val aa: String = translateCodon(codon, table)
+    if aa == "*" { return protein }
+    protein = protein + aa
+    i = i + 3
+  }
+  return protein
+}
+
+// ─── ORF finder ─────────────────────────────────────────────────────────────
+
+def findORFs(seq: Sequence, table: Map[String, AminoAcid]): List[ORF] {
+  val orfs: List[ORF] = []
+  val bases: String = seq.bases()
+  foreach frame: Int in 0..2 {
+    var i: Int = frame
+    while i + 3 <= bases.length() {
+      val codon: String = bases.substring(i, i + 3)
+      if codon == "ATG" {
+        val start: Int = i
+        var j: Int = i + 3
+        var protein: String = "M"
+        var found: Boolean = false
+        while j + 3 <= bases.length() && !found {
+          val c: String = bases.substring(j, j + 3)
+          val aa: String = translateCodon(c, table)
+          if aa == "*" {
+            if protein.length() >= 5 {
+              orfs.add(new ORF(start, j + 3, protein))
+            }
+            found = true
+          } else {
+            protein = protein + aa
+          }
+          j = j + 3
+        }
+      }
+      i = i + 3
+    }
+  }
+  return orfs
+}
+
+// ─── Restriction site finder ─────────────────────────────────────────────────
+
+record RestrictionSite(enzyme: String, site: String, position: Int)
+
+def findRestriction(seq: Sequence, enzyme: String, site: String): List[RestrictionSite] {
+  val hits: List[RestrictionSite] = []
+  val bases: String = seq.bases()
+  val siteLen: Int = site.length()
+  var i: Int = 0
+  while i + siteLen <= bases.length() {
+    if bases.substring(i, i + siteLen) == site {
+      hits.add(new RestrictionSite(enzyme, site, i))
+    }
+    i = i + 1
+  }
+  return hits
+}
+
+// ─── Sample sequences ────────────────────────────────────────────────────────
+
+val CODON_TABLE: Map[String, AminoAcid] = codonTable()
+
+val sequences: List[Sequence] = [
+  new Sequence("SEQ001", "E.coli",
+    "ATGAAAGCAATTTTCGTACTGAAAGGTTTTGTTGGTTTTCTTGCCATGAGCGGTTCGGCTGGTCTGCGC" +
+    "TGGAACATCACCGGCATCGTTGAGCAACTGGCCGATAACGTTCCGGCAATCACCAGCCTGTGGGCTTAA"),
+  new Sequence("SEQ002", "H.sapiens",
+    "ATGGAGCAGCTGAAGCAGCAGCTGGAGCAGCTGAAACAGCAGTTGGAGCAGCTGAAACAGCAATTGGAG" +
+    "CAACTGAAACAGCAGCTTGAGCAGCTGAAACAGCAGTTGGAGCAGTTGAAGCAGCAGTTGGAGTAA"),
+  new Sequence("SEQ003", "S.cerevisiae",
+    "ATGCCTGTTTTAAGAGAAATCAAAGATGTTTTGAAAGATTCTGATAAAGCACCTTTTGATGTTTTGGCT" +
+    "GAAGAATTGAAAAAAGTTTTGGAATCTGAAGATGAAGAACAAGATGAAATCGATGATGAAATCGAATAA")
+]
+
+// ─── Analysis ────────────────────────────────────────────────────────────────
+
+IO::println("=".rep(60))
+IO::println("GENETIC SEQUENCE ANALYSIS REPORT")
+IO::println("=".rep(60))
+IO::println("")
+
+// Basic stats per sequence
+IO::println("── SEQUENCE OVERVIEW ".padRight(60).replace(" ", " ") + "")
+foreach seq: Sequence in sequences {
+  val gc: Int = seq.gcCount()
+  IO::println("  " + seq.id().padRight(8) + seq.organism().padRight(16) +
+    seq.len().toString().padLeft(5) + " bp  GC: " + gc.pct(seq.len()))
+}
+IO::println("")
+
+// GC content summary across all sequences
+val totalBp: Int = sequences.fold(0) { acc, s -> (acc as Int) + (s as Sequence).len() }
+val totalGC: Int = sequences.fold(0) { acc, s -> (acc as Int) + (s as Sequence).gcCount() }
+IO::println("  Total bases: #{totalBp}  Average GC: #{totalGC.pct(totalBp)}")
+IO::println("")
+
+// Reverse complement check
+IO::println("── REVERSE COMPLEMENTS ─────────────────────────────────────")
+foreach seq: Sequence in sequences {
+  val rc: String = seq.revComp()
+  IO::println("  #{seq.id()}: ...#{rc.substring(rc.length() - 12, rc.length())}")
+}
+IO::println("")
+
+// ORF finding
+IO::println("── OPEN READING FRAMES ─────────────────────────────────────")
+foreach seq: Sequence in sequences {
+  val orfs: List[ORF] = findORFs(seq, CODON_TABLE)
+  IO::println("  #{seq.id()} (#{seq.organism()}) — #{orfs.size} ORF(s) found:")
+  foreach orf: ORF in orfs {
+    IO::println("    " + orf.toString())
+  }
+}
+IO::println("")
+
+// Restriction sites (EcoRI: GAATTC, BamHI: GGATCC)
+IO::println("── RESTRICTION SITES ────────────────────────────────────────")
+val enzymes: List[String] = ["EcoRI", "BamHI", "HindIII", "SalI"]
+val sites: List[String]   = ["GAATTC", "GGATCC", "AAGCTT", "GTCGAC"]
+foreach seq: Sequence in sequences {
+  IO::println("  #{seq.id()}:")
+  var i: Int = 0
+  while i < enzymes.size {
+    val enzyme: String = enzymes.get(i) as String
+    val site: String = sites.get(i) as String
+    val hits: List[RestrictionSite] = findRestriction(seq, enzyme, site)
+    if hits.size > 0 {
+      val positions: List[String] = hits.map { h -> (h as RestrictionSite).position().toString() }
+      IO::println("    #{enzyme} (#{site}): #{hits.size} site(s) at #{positions.toString()}")
+    }
+    i = i + 1
+  }
+}
+IO::println("")
+
+// Most GC-rich sequence
+var richest: Sequence? = null
+foreach seq: Sequence in sequences {
+  if richest == null {
+    richest = seq
+  } else {
+    val prev: Sequence = richest as Sequence
+    if seq.gcCount() * prev.len() > prev.gcCount() * seq.len() {
+      richest = seq
+    }
+  }
+}
+if richest != null {
+  val r: Sequence = richest as Sequence
+  IO::println("── RICHEST GC SEQUENCE: #{r.id()} (#{r.gcCount().pct(r.len())})")
+}
+IO::println("")
+
+// Protein length distribution
+IO::println("── PROTEIN LENGTH DISTRIBUTION ─────────────────────────────")
+val allORFs: List[ORF] = sequences.flatMap { seq ->
+  findORFs(seq as Sequence, CODON_TABLE)
+}
+val byLen: Map[String, List[ORF]] = allORFs.groupBy { orf ->
+  val l: Int = (orf as ORF).len()
+  if l < 20 { "short (<20nt)" } else if l < 60 { "medium (20-59nt)" } else { "long (60+nt)" }
+}
+foreach (category, group) in byLen {
+  IO::println("  #{category}: #{(group as List[ORF]).size} ORF(s)")
+}
+IO::println("")
+
+// Longest ORF per sequence via sortedBy
+IO::println("── LONGEST ORF PER SEQUENCE ────────────────────────────────")
+foreach seq: Sequence in sequences {
+  val orfs: List[ORF] = findORFs(seq, CODON_TABLE)
+  if orfs.size == 0 {
+    IO::println("  #{seq.id()}: no ORF")
+  } else {
+    val sorted: List[ORF] = orfs.sortedBy { o -> 0 - (o as ORF).len() }
+    val o: ORF = sorted.get(0) as ORF
+    IO::println("  #{seq.id()}: #{o.protein().length()} aa (#{o.len()} nt)")
+  }
+}
+IO::println("")
+
+// ─── Sequence validation via interface + class hierarchy ─────────────────────
+
+interface Validator {
+  def validate(seq: Sequence): Boolean
+  def description(): String
+}
+
+class LengthValidator conforms Validator {
+  val minLen: Int
+  val maxLen: Int
+public:
+  def this(lo: Int, hi: Int) { minLen = lo; maxLen = hi }
+  def validate(seq: Sequence): Boolean = seq.len() >= minLen && seq.len() <= maxLen
+  def description(): String = "length in [#{minLen}, #{maxLen}]"
+}
+
+class GcValidator conforms Validator {
+  val minPct: Int   // integer percent, e.g. 30 means 30%
+  val maxPct: Int
+public:
+  def this(lo: Int, hi: Int) { minPct = lo; maxPct = hi }
+  def validate(seq: Sequence): Boolean {
+    val gc: Int = seq.gcCount() * 100 / seq.len()
+    return gc >= minPct && gc <= maxPct
+  }
+  def description(): String = "GC in [#{minPct}%, #{maxPct}%]"
+}
+
+class CompositeValidator conforms Validator {
+  val validators: List[Validator]
+public:
+  def this(vs: List[Validator]) { validators = vs }
+  def validate(seq: Sequence): Boolean {
+    return validators.fold(true) { acc, v ->
+      (acc as Boolean) && (v as Validator).validate(seq)
+    } as Boolean
+  }
+  def description(): String {
+    val descs: List[String] = validators.map { v -> (v as Validator).description() }
+    return descs.fold("") { acc, d ->
+      val s: String = acc as String
+      if s.length() == 0 { d as String } else { s + " AND " + (d as String) }
+    } as String
+  }
+}
+
+IO::println("── SEQUENCE VALIDATION ─────────────────────────────────────")
+val validatorList: List[Validator] = [new LengthValidator(50, 300), new GcValidator(25, 75)]
+val validator: Validator = new CompositeValidator(validatorList)
+IO::println("  Rules: #{validator.description()}")
+foreach seq: Sequence in sequences {
+  val ok: Boolean = validator.validate(seq)
+  val mark: String = if ok { "PASS" } else { "FAIL" }
+  IO::println("  #{seq.id().padRight(8)} #{mark}")
+}
+IO::println("")
+
+// ─── Recursive kmer frequency analysis ──────────────────────────────────────
+
+def collectKmers(bases: String, k: Int, i: Int, acc: Map[String, Int]): void {
+  if i + k > bases.length() { return }
+  val kmer: String = bases.substring(i, i + k)
+  val cur: Int? = acc.get(kmer) as Int?
+  if cur == null {
+    acc.put(kmer, 1)
+  } else {
+    acc.put(kmer, (cur as Int) + 1)
+  }
+  collectKmers(bases, k, i + 1, acc)
+}
+
+IO::println("── TOP 3-MER FREQUENCIES (SEQ001) ──────────────────────────")
+val kmerMap: Map[String, Int] = [:]
+collectKmers(sequences.get(0).bases(), 3, 0, kmerMap)
+// Collect kmer entries into a list of pairs for sorting
+val kmerEntries: List[String] = []
+foreach (km, freq) in kmerMap {
+  kmerEntries.add(km as String)
+}
+val topKmers: List[String] = kmerEntries.sortedBy { km ->
+  val freq: Int? = kmerMap.get(km as String) as Int?
+  if freq == null { 0 } else { 0 - (freq as Int) }
+}
+var shown: Int = 0
+foreach km: String in topKmers {
+  if shown >= 5 { break }
+  val freq: Int = kmerMap.get(km) as Int
+  IO::println("  #{km}: #{freq}")
+  shown = shown + 1
+}
+IO::println("")
+
+// ─── Error handling: validate codon input ────────────────────────────────────
+
+def lookupCodon(codon: String): String {
+  try {
+    if codon.length() != 3 { throw new Exception("Codon must be 3 bases, got: " + codon.length()) }
+    val aa: AminoAcid? = CODON_TABLE.get(codon) as AminoAcid?
+    if aa == null { return "Unknown" }
+    return (aa as AminoAcid).fullName()
+  } catch e: Exception {
+    return "Error: " + e.getMessage()
+  }
+}
+
+IO::println("── CODON LOOKUP EXAMPLES ───────────────────────────────────")
+val testCodons: List[String] = ["ATG", "TAA", "GCG", "TGG", "XXX", "AT"]
+foreach codon: String in testCodons {
+  IO::println("  #{codon}: #{lookupCodon(codon)}")
+}
+IO::println("")
+
+// ─── Summary statistics ───────────────────────────────────────────────────────
+
+IO::println("── SUMMARY ─────────────────────────────────────────────────")
+IO::println("  Sequences analyzed : #{sequences.size}")
+IO::println("  Total bases        : #{totalBp}")
+IO::println("  Total ORFs found   : #{allORFs.size}")
+val validSeqs: List[Sequence] = sequences.filter { seq -> validator.validate(seq as Sequence) }
+IO::println("  Sequences passing  : #{validSeqs.size} / #{sequences.size}")
+IO::println("")
+IO::println("=".rep(60))
+IO::println("Analysis complete.")

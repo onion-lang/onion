@@ -167,27 +167,27 @@ public:
   }
 
   def findById(id: Int): Employee? {
-    val found = all().find { e => e.id() == id }
+    val found = all().find { e -> e.id() == id }
     if found == null { return null }
     return found as Employee
   }
 
   def byDepartment(deptName: String): List[Employee] =
-    all().filter { e => e.deptName() == deptName }
+    all().filter { e -> e.deptName() == deptName }
 
   def fullTimeEmployees(): List[Employee] =
-    all().filter { e => e.empType().isFullTime() }
+    all().filter { e -> e.empType().isFullTime() }
 
   def contractors(): List[Employee] =
-    all().filter { e => e.empType().isContractor() }
+    all().filter { e -> e.empType().isContractor() }
 
   def topEarners(n: Int): List[Employee] {
-    val sorted = all().sortedBy { e => -e.annualSalary() }
+    val sorted = all().sortedBy { e -> -e.annualSalary() }
     return sorted.take(n) as List[Employee]
   }
 
   def computeRaises(): List[PayRaise] {
-    return all().map { e =>
+    return all().map { e ->
       val pct = e.rating().raisePercent()
       val raise = e.annualSalary() * pct
       new PayRaise(e.id(), e.name(), e.annualSalary(), pct, (e.annualSalary() + raise).round2())
@@ -195,7 +195,7 @@ public:
   }
 
   def totalPayroll(): Double =
-    all().fold(0.0) { acc, e => (acc as Double) + e.annualSalary() } as Double
+    all().fold(0.0) { acc, e -> (acc as Double) + e.annualSalary() } as Double
 
   def avgSalary(): Double {
     val emps = all()
@@ -206,7 +206,7 @@ public:
   def departmentNames(): List[String] {
     val names: List[String] = []
     foreach e: Employee in all() {
-      if !names.any { n => n == e.deptName() } { names << e.deptName() }
+      if !names.any { n -> n == e.deptName() } { names << e.deptName() }
     }
     return names
   }
@@ -214,24 +214,24 @@ public:
   def deptStats(deptName: String): DeptStats {
     val emps = byDepartment(deptName)
     val count = emps.size
-    val ftCount = emps.filter { e => e.empType().isFullTime() }.size
-    val totalSal = emps.fold(0.0) { acc, e => (acc as Double) + e.annualSalary() } as Double
-    val totalExp = emps.fold(0) { acc, e => (acc as Int) + e.yearsExp() } as Int
+    val ftCount = emps.filter { e -> e.empType().isFullTime() }.size
+    val totalSal = emps.fold(0.0) { acc, e -> (acc as Double) + e.annualSalary() } as Double
+    val totalExp = emps.fold(0) { acc, e -> (acc as Int) + e.yearsExp() } as Int
     val avgSal = if count == 0 { 0.0 } else { totalSal / (count as Double) }
     val avgExp = if count == 0 { 0.0 } else { (totalExp as Double) / (count as Double) }
-    val best = emps.sortedBy { e => e.rating().order() }
+    val best = emps.sortedBy { e -> e.rating().order() }
     val topRat = if best.size == 0 { "N/A" } else { (best.get(0) as Employee).rating().label() }
     return new DeptStats(deptName, count, ftCount, avgSal.round2(), totalSal.round2(), avgExp.round2(), topRat)
   }
 
   def highPerformers(): List[Employee] =
-    all().filter { e =>
+    all().filter { e ->
       select e.rating() {
         case Rating::Excellent: true
         case Rating::Good:      true
         else:                   false
       }
-    }.sortedBy { e => -e.annualSalary() }
+    }.sortedBy { e -> -e.annualSalary() }
 
   def tenureGroups(): Map[String, Int] {
     val counts: Map[String, Int] = [:]
@@ -290,7 +290,7 @@ db.hire(new Employee(15, "Omar Reza",     "Finance",     new Contractor(70.0), 0
 printHeader("EMPLOYEE DIRECTORY")
 IO::println("ID   Name               Dept         Type         Salary      Rating")
 IO::println(hLine("-", 72))
-foreach emp: Employee in db.all().sortedBy { e => e.id() } {
+foreach emp: Employee in db.all().sortedBy { e -> e.id() } {
   val idStr   = ("" + emp.id()).padLeft(2)
   val nameStr = emp.name().padRight(18)
   val deptStr = emp.deptName().padRight(12)

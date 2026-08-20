@@ -81,7 +81,7 @@ public:
 
   def meanTemp(): Double {
     if readings_.size == 0 { return 0.0 }
-    val total = readings_.fold(0.0) { acc, r =>
+    val total = readings_.fold(0.0) { acc, r ->
       (acc as Double) + (r as DailyReading).tempMid()
     }
     return (total as Double) / readings_.size
@@ -95,9 +95,9 @@ public:
 
 def buildWeek(week: Int, rs: List[DailyReading]): WeekSummary {
   if rs.size == 0 { return new WeekSummary(week, 0.0, 0.0, 0) }
-  val sumT = rs.fold(0.0) { acc, r => (acc as Double) + (r as DailyReading).tempMid() }
-  val sumP = rs.fold(0.0) { acc, r => (acc as Double) + (r as DailyReading).precipitation() }
-  val alerts = rs.filter { r => (r as DailyReading).alert().order() > 0 }.size
+  val sumT = rs.fold(0.0) { acc, r -> (acc as Double) + (r as DailyReading).tempMid() }
+  val sumP = rs.fold(0.0) { acc, r -> (acc as Double) + (r as DailyReading).precipitation() }
+  val alerts = rs.filter { r -> (r as DailyReading).alert().order() > 0 }.size
   return new WeekSummary(week, ((sumT as Double) / rs.size).r1(), (sumP as Double).r1(), alerts)
 }
 
@@ -154,16 +154,16 @@ IO::println("=".rep(42))
 IO::println("")
 
 // ── 1. Total precipitation (fold) ────────────────────────────────────────────
-val totalRain = readings.fold(0.0) { acc, r =>
+val totalRain = readings.fold(0.0) { acc, r ->
   (acc as Double) + (r as DailyReading).precipitation()
 }
 IO::println("total precipitation: #{(totalRain as Double).r1()}mm")
 
 // ── 2. Hottest and coldest days (reduce) ─────────────────────────────────────
-val hottest = readings.reduce { a, b =>
+val hottest = readings.reduce { a, b ->
   if (a as DailyReading).tempHigh() >= (b as DailyReading).tempHigh() { a } else { b }
 }
-val coldest = readings.reduce { a, b =>
+val coldest = readings.reduce { a, b ->
   if (a as DailyReading).tempLow() <= (b as DailyReading).tempLow() { a } else { b }
 }
 val hd = hottest as DailyReading
@@ -173,13 +173,13 @@ IO::println("coldest: day #{cd.day()} low  #{cd.tempLow().degStr()}")
 IO::println("")
 
 // ── 3. Partition: rainy vs dry ────────────────────────────────────────────────
-val parts = readings.partition { r => (r as DailyReading).isRainy() }
+val parts = readings.partition { r -> (r as DailyReading).isRainy() }
 val rainy = parts.get(0) as List
 val dry   = parts.get(1) as List
 IO::println("rainy days: #{rainy.size}  dry days: #{dry.size}")
 
 // ── 4. Alert-day summary ──────────────────────────────────────────────────────
-val alertDays = readings.filter { r => (r as DailyReading).alert().order() > 0 }
+val alertDays = readings.filter { r -> (r as DailyReading).alert().order() > 0 }
 IO::println("alert days: #{alertDays.size}")
 foreach r: Object in alertDays {
   val dr = r as DailyReading
@@ -189,7 +189,7 @@ IO::println("")
 
 // ── 5. Top-5 warmest (sortedBy + take) ───────────────────────────────────────
 IO::println("top 5 warmest days:")
-val top5warm = readings.sortedBy { r => 0.0 - (r as DailyReading).tempHigh() }.take(5)
+val top5warm = readings.sortedBy { r -> 0.0 - (r as DailyReading).tempHigh() }.take(5)
 foreach r: Object in top5warm {
   val dr = r as DailyReading
   IO::println("  day #{dr.day()}: #{dr.tempHigh().degStr()} (range #{dr.tempRange().r1()}°)")
@@ -198,7 +198,7 @@ IO::println("")
 
 // ── 6. Last 7 days (drop) ────────────────────────────────────────────────────
 val last7 = readings.drop(21)
-val last7total = last7.fold(0.0) { acc, r =>
+val last7total = last7.fold(0.0) { acc, r ->
   (acc as Double) + (r as DailyReading).tempMid()
 }
 IO::println("last-7-day mean: #{((last7total as Double) / last7.size).r1()}°C")
@@ -206,7 +206,7 @@ IO::println("last-7-day mean: #{((last7total as Double) / last7.size).r1()}°C")
 // ── 7. Zip: day-index with temp (first week) ─────────────────────────────────
 val dayNums: List[Int] = []
 foreach i: Int in 1..7 { dayNums << i }
-val week1Temps = readings.take(7).map { r => (r as DailyReading).tempMid().r1() }
+val week1Temps = readings.take(7).map { r -> (r as DailyReading).tempMid().r1() }
 val zipped = dayNums.zip(week1Temps)
 IO::println("week-1 midpoint temps:")
 foreach pair: Object in zipped {
@@ -233,7 +233,7 @@ val allAvgs = weekAvgs.flatten()
 IO::println("weekly avg temps: " + allAvgs.toString())
 
 // ── 10. Distinct alert labels seen ────────────────────────────────────────────
-val alertsSeen = readings.map { r => (r as DailyReading).alert().label() }.distinct()
+val alertsSeen = readings.map { r -> (r as DailyReading).alert().label() }.distinct()
 IO::println("alert levels: " + alertsSeen.toString())
 
 // ── 11. 3-day moving average (recursive function) ────────────────────────────

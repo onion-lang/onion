@@ -36,6 +36,7 @@ enum WarningCategory(val code: String, val description: String):
   case SuspiciousInterpolation extends WarningCategory("W0013", "Suspicious string interpolation syntax")
   case DiscardedTopLevelStmts extends WarningCategory("W0014", "Top-level statements ignored because a main is defined")
   case PlatformUnboxing     extends WarningCategory("W0015", "Boxed platform value implicitly unboxed to a non-null primitive")
+  case IneffectiveTailRecursive extends WarningCategory("W0016", "@TailRecursive annotation present but its mutual-recursion group could not be optimized")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -55,7 +56,8 @@ object WarningCategory:
     "null-to-non-nullable" -> WarningCategory.NullToNonNullable,
     "suspicious-interpolation" -> WarningCategory.SuspiciousInterpolation,
     "discarded-toplevel" -> WarningCategory.DiscardedTopLevelStmts,
-    "platform-unboxing" -> WarningCategory.PlatformUnboxing
+    "platform-unboxing" -> WarningCategory.PlatformUnboxing,
+    "ineffective-tail-recursive" -> WarningCategory.IneffectiveTailRecursive
   )
 
   def fromString(value: String): Option[WarningCategory] =

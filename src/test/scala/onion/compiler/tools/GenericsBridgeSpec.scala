@@ -41,9 +41,8 @@ class GenericsBridgeSpec extends AbstractShellSpec {
           |  def get(): T { return this.item }
           |}
           |
-          |class StringBox extends Box[String] {
+          |class StringBox(s: String) extends Box[String](s) {
           |public:
-          |  def this(s: String) : (s) {}
           |  def shout(): String { return this.get().toUpperCase() }
           |
           |  static def main(args: String[]): String {

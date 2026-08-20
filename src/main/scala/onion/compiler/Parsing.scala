@@ -248,6 +248,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val LeadingSwitchStatement = """^\s*switch\b""".r
 
+  /**
+   * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
+   * declaration. None of these are keywords in Onion (which uses `def`), so at
+   * statement position the keyword parses as a bare identifier reference and the
+   * parser trips on the declaration name that follows, while inside a
+   * class/interface body it trips on the keyword itself -- neither mentions
+   * `def`. Matching the source line for `<kw> name(` catches both. A real call
+   * to a method named `fun`/`func`/`fn` is `fun(...)` with no name between the
+   * keyword and the paren, so it never matches; `fun name(` is not a valid Onion
+   * expression anyway.
+   */
+  private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -264,6 +277,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_for_in")
     case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.switch_not_supported")
+    case _ if FunDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.fun_declaration")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

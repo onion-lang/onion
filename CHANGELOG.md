@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PolynomialAlgebra.on`, a 295-line polynomial arithmetic demo.**
+  Exercises record operator overloading (`plus`/`minus`/`times` mapped to
+  `+`/`-`/`*`), static factory methods, `List[Double]` generics, `foreach` over
+  ranges, `while` loops, nullable return types (`Double?`), string
+  interpolation, and batch computation. Demonstrates Horner evaluation,
+  Newton-Raphson root finding, Chebyshev polynomials, product-rule
+  differentiation cross-check, indefinite integration, iterated derivatives,
+  and polynomial composition — all results verified analytically.
+
 - **`run/FileSystemSim.on`, a 442-line virtual in-memory filesystem simulator.**
   Covers an ADT enum (`FsNode = FileNode | DirNode | SymlinkNode`) matched via
   `select`/`is`, a data-carrying enum (`Permission`), a plain enum
@@ -17,6 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Filesystem`), collection pipelines (`filter`, `sortedBy`, `fold`,
   `groupBy`), recursive tree traversal, nullable types, closures, string
   interpolation, and `foreach` over integer ranges and map entries.
+
+- **Three new `run/` samples: `ConnectFour.on`, `Mandelbrot.on`, and
+  `MarkovText.on`.** `ConnectFour.on` (286 lines) is a deterministic AI-vs-AI
+  Connect Four match over ADT enums (`Cell`, `GameResult`), an `interface AI`
+  with two implementing strategies, and a flat-array 2-D grid.
+  `Mandelbrot.on` (279 lines) renders the Mandelbrot set and several Julia
+  sets as ASCII art using a `record Complex` with operator methods
+  (`plus`/`times`), a homogeneous enum, extension methods on `Double`, and
+  top-level `example` clauses checked at compile time. `MarkovText.on`
+  (312 lines) is a bigram Markov chain text generator covering an ADT
+  case-enum, records with `example` clauses, extension methods on `String`
+  and `Int`, `foreach (k, v)` map destructuring, and collection pipelines.
 
 ### Fixed
 

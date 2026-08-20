@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CpuScheduler.on`, a 464-line CPU scheduling simulator.** Runs FCFS,
+  SJF (non-preemptive), Round-Robin (quantum-based), and preemptive Priority
+  scheduling against a shared 5-process workload, rendering a text Gantt
+  chart and a per-process metrics table (wait/turnaround/response) for each
+  algorithm, then compares them and picks the one minimizing average wait
+  time. Exercises a data-carrying ADT case-enum dispatched via `select`,
+  class inheritance with per-algorithm overrides, primary-constructor
+  superclass delegation (`class Sub(args) extends Base(args)`), extension
+  methods on `Int`/`String`, and nullable-typed pick results.
+
 ## [0.13.0] - 2026-08-20
 
 ### Added

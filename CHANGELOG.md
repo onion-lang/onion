@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/ExprEval.on`, a 292-line symbolic expression evaluator.** Replaces
+  the earlier 98-line interface-based sketch with an ADT `enum Expr` (Num,
+  Var, Add, Sub, Mul, Div, Pow, Neg) evaluated and symbolically
+  differentiated (`diff`, product/quotient/power rules) via nested
+  `select`/`case is` pattern matching, plus a single-step algebraic
+  simplifier, a hand-written recursive-descent parser
+  (`parseExpr → parseTerm → parsePower → parseFactor`), and a
+  `Map[String, Double]` variable environment for batch evaluation over
+  `List[String]`/`List[Double]`.
+
 - **`run/PaymentProcessor.on`, a 338-line payment-processor simulation.**
   Luhn credit-card validation and batch transaction analytics: card-network
   detection from BIN prefix (plain `enum CardType`), approve/decline

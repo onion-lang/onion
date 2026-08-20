@@ -1,0 +1,393 @@
+// FlashcardDeck.on — Spaced-repetition flashcard deck manager.
+// Exercises: ADT case-enum (ReviewResult), records with body methods and
+// examples (Card, ReviewEntry, DeckStats), classes with collection-pipeline
+// methods (CardDeck), extension methods on String and Int, do[Option],
+// Option[T], collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find/partition/flatMap), foreach on ranges and maps (k,v),
+// select/type-pattern matching, nullable types, string interpolation,
+// try/catch, recursion, closures, while loops.
+
+import { java.util.ArrayList; java.util.LinkedHashMap }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < n { r = r + self; i = i + 1 }
+    return r
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "…"
+  }
+}
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "0" }
+    return "" + (self * 100 / total)
+  }
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "★"; i = i + 1 }
+    var j: Int = self
+    while j < 5 { s = s + "☆"; j = j + 1 }
+    return s
+  }
+}
+
+// ─── ReviewResult ADT ─────────────────────────────────────────────────────────
+
+enum ReviewResult {
+  case Again(cardId: Int)
+  case Hard(cardId: Int)
+  case Good(cardId: Int)
+  case Easy(cardId: Int)
+public:
+  def cardId(): Int = select this {
+    case a is Again: a.cardId()
+    case h is Hard:  h.cardId()
+    case g is Good:  g.cardId()
+    case e is Easy:  e.cardId()
+  }
+  def score(): Int = select this {
+    case a is Again: 0
+    case h is Hard:  1
+    case g is Good:  3
+    case e is Easy:  5
+  }
+  def label(): String = select this {
+    case a is Again: "AGAIN"
+    case h is Hard:  "HARD "
+    case g is Good:  "GOOD "
+    case e is Easy:  "EASY "
+  }
+  def nextIntervalDays(prevInterval: Int): Int = select this {
+    case a is Again: 1
+    case h is Hard:  if prevInterval <= 1 { 1 } else { prevInterval * 12 / 10 }
+    case g is Good:  if prevInterval == 0 { 1 } else { prevInterval * 25 / 10 }
+    case e is Easy:  if prevInterval == 0 { 4 } else { prevInterval * 4 }
+  }
+}
+
+// ─── Card record ──────────────────────────────────────────────────────────────
+
+record Card(id: Int, front: String, back: String, tag: String) {
+public:
+  def display(): String = "[#{id()}] #{front().truncate(30)} / #{back().truncate(20)}"
+  def tagLabel(): String = "[#{tag()}]"
+}
+
+// ─── ReviewEntry record ───────────────────────────────────────────────────────
+
+record ReviewEntry(cardId: Int, result: ReviewResult, intervalAfter: Int)
+  example { new ReviewEntry(1, new Good(1), 3).intervalAfter() == 3 }
+  example { new ReviewEntry(2, new Easy(2), 12).result().score() == 5 }
+
+// ─── DeckStats record ─────────────────────────────────────────────────────────
+
+record DeckStats(total: Int, mastered: Int, learning: Int, newCards: Int, avgScore: Int) {
+public:
+  def masteredPct(): String = mastered().pct(total())
+  def summary(): String = "total=#{total()} mastered=#{mastered()} learning=#{learning()} new=#{newCards()} avgScore=#{avgScore()}"
+}
+
+// ─── CardDeck class ───────────────────────────────────────────────────────────
+
+class CardDeck {
+public:
+  val name: String
+  val cards: ArrayList[Card]
+  val history: ArrayList[ReviewEntry]
+  val intervals: ArrayList[Int]
+
+  def this(name: String) {
+    this.name = name
+    this.cards = new ArrayList[Card]()
+    this.history = new ArrayList[ReviewEntry]()
+    this.intervals = new ArrayList[Int]()
+  }
+
+  def addCard(front: String, back: String, tag: String): Card {
+    val id: Int = cards.size() + 1
+    val card: Card = new Card(id, front, back, tag)
+    cards.add(card)
+    intervals.add(0)
+    return card
+  }
+
+  def findCard(id: Int): Option[Card] {
+    val found: Card? = cards.find { c -> (c as Card).id() == id } as Card?
+    if found != null { return Option::some(found) }
+    return Option::none()
+  }
+
+  def review(result: ReviewResult): ReviewEntry {
+    val cid: Int = result.cardId()
+    val prevInterval: Int = if cid <= intervals.size() { intervals.get(cid - 1) } else { 0 }
+    val nextInterval: Int = result.nextIntervalDays(prevInterval)
+    if cid <= intervals.size() { intervals.set(cid - 1, nextInterval) }
+    val entry: ReviewEntry = new ReviewEntry(cid, result, nextInterval)
+    history.add(entry)
+    return entry
+  }
+
+  def cardsByTag(tag: String): List[Card] {
+    return cards.filter { c -> c.tag() == tag }
+  }
+
+  def masteredCards(): List[Card] {
+    return cards.filter { c ->
+      val cid: Int = c.id()
+      if cid > intervals.size() { false } else { intervals.get(cid - 1) >= 14 }
+    }
+  }
+
+  def historyFor(cardId: Int): List[ReviewEntry] {
+    return history.filter { e -> e.cardId() == cardId }
+  }
+
+  def computeStats(): DeckStats {
+    val total: Int = cards.size()
+    val mastered: Int = masteredCards().size()
+    val newCount: Int = cards.filter { c ->
+      val cid: Int = c.id()
+      if cid > intervals.size() { true } else { intervals.get(cid - 1) == 0 }
+    }.size()
+    val learning: Int = total - mastered - newCount
+    val totalScore: Int = history.fold(0) { acc, e ->
+      (acc as Int) + e.result().score()
+    } as Int
+    val avgScore: Int = if history.size() == 0 { 0 } else { totalScore / history.size() }
+    return new DeckStats(total, mastered, learning, newCount, avgScore)
+  }
+
+  def reviewSummary(): Map[String, List[ReviewEntry]] {
+    val r: Map[String, List[ReviewEntry]] = history.groupBy { e -> e.result().label() }
+    return r
+  }
+
+  def allTags(): List[String] {
+    val tags: List[String] = cards.map { c -> c.tag() }.distinct().sortedBy { t -> t }
+    return tags
+  }
+
+  def sortedByInterval(): List[Card] {
+    return cards.sortedBy { c ->
+      val cid: Int = c.id()
+      if cid > intervals.size() { 0 } else { 0 - intervals.get(cid - 1) }
+    }
+  }
+}
+
+// ─── Spaced-repetition quiz simulation ───────────────────────────────────────
+
+def simulateSession(deck: CardDeck, results: List[Object]): void {
+  IO::println("  Simulating review session (#{results.size} cards)…")
+  foreach r: Object in results {
+    val result: ReviewResult = r as ReviewResult
+    val entry: ReviewEntry = deck.review(result)
+    val cardOpt: Option[Card] = deck.findCard(result.cardId())
+    val front: String = if cardOpt.isEmpty() { "?" } else { cardOpt.get().front() }
+    IO::println("    #{result.label()} [#{front.truncate(20)}] → next review in #{entry.intervalAfter()}d")
+  }
+}
+
+// ─── Levenshtein distance (for fuzzy matching demo) ──────────────────────────
+
+def levenshtein(a: String, b: String): Int {
+  if a.length() == 0 { return b.length() }
+  if b.length() == 0 { return a.length() }
+  if a.substring(0, 1) == b.substring(0, 1) {
+    return levenshtein(a.substring(1), b.substring(1))
+  }
+  val del: Int = levenshtein(a.substring(1), b)
+  val ins: Int = levenshtein(a, b.substring(1))
+  val rep: Int = levenshtein(a.substring(1), b.substring(1))
+  val minDI: Int = if del < ins { del } else { ins }
+  return 1 + (if minDI < rep { minDI } else { rep })
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  IO::println("═".rep(60))
+  IO::println("  " + title)
+  IO::println("═".rep(60))
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("  ── " + title + " ──")
+  IO::println("─".rep(56))
+}
+
+// ─── Main script ─────────────────────────────────────────────────────────────
+
+val deck: CardDeck = new CardDeck("Japanese N5 Vocabulary")
+
+// Populate with vocabulary cards
+deck.addCard("犬", "dog", "animals")
+deck.addCard("猫", "cat", "animals")
+deck.addCard("魚", "fish", "animals")
+deck.addCard("食べる", "to eat", "verbs")
+deck.addCard("飲む", "to drink", "verbs")
+deck.addCard("見る", "to see", "verbs")
+deck.addCard("大きい", "big/large", "adjectives")
+deck.addCard("小さい", "small", "adjectives")
+deck.addCard("赤い", "red", "adjectives")
+deck.addCard("青い", "blue", "adjectives")
+deck.addCard("一", "one", "numbers")
+deck.addCard("二", "two", "numbers")
+deck.addCard("三", "three", "numbers")
+deck.addCard("四", "four", "numbers")
+deck.addCard("五", "five", "numbers")
+
+printHeader("FLASHCARD DECK: " + deck.name)
+
+// ── Card overview by tag ──
+printSection("Cards by Tag")
+foreach tag: String in deck.allTags() {
+  val tagCards: List[Card] = deck.cardsByTag(tag)
+  IO::println("  " + tag.padRight(14) + " #{tagCards.size} card(s)")
+  foreach c: Card in tagCards {
+    IO::println("    " + c.display())
+  }
+}
+
+// ── Simulate review session 1 (mix of results) ──
+printSection("Review Session 1")
+val session1: List[Object] = [
+  new Again(1), new Hard(2), new Good(3), new Easy(4),
+  new Good(5), new Good(6), new Easy(7), new Hard(8),
+  new Good(9), new Good(10), new Easy(11), new Easy(12),
+  new Good(13), new Hard(14), new Again(15)
+]
+simulateSession(deck, session1)
+
+// ── Simulate review session 2 (second pass) ──
+printSection("Review Session 2")
+val session2: List[Object] = [
+  new Good(1), new Good(2), new Easy(3), new Easy(7),
+  new Good(8), new Again(14), new Easy(15)
+]
+simulateSession(deck, session2)
+
+// ── Deck statistics ──
+printSection("Deck Statistics")
+val stats: DeckStats = deck.computeStats()
+IO::println("  " + stats.summary())
+IO::println("  Mastered:  #{stats.mastered()} / #{stats.total()} (#{stats.masteredPct()}%)")
+
+// ── Review breakdown by result label ──
+printSection("Review Breakdown")
+val breakdown: Map[String, List[ReviewEntry]] = deck.reviewSummary()
+foreach (label, entries) in breakdown {
+  val count: Int = entries.size
+  IO::println("  #{label}: #{count} review(s)")
+}
+
+// ── Cards sorted by interval (most-mastered first) ──
+printSection("Cards Ranked by Mastery (interval)")
+val ranked: List[Card] = deck.sortedByInterval()
+var rank: Int = 1
+foreach card: Card in ranked {
+  val cid: Int = card.id()
+  val interval: Int = deck.intervals.get(cid - 1)
+  val bar: String = if interval == 0 { "new" } else { "★".rep(if interval >= 14 { 5 } else { interval / 3 + 1 }) }
+  IO::println("  #{rank}. " + card.front().padRight(8) + " = " + card.back().padRight(12) + " [#{interval}d] #{bar}")
+  rank = rank + 1
+}
+
+// ── Mastered cards (interval ≥ 14 days) ──
+printSection("Mastered Cards")
+val mastered: List[Card] = deck.masteredCards()
+if mastered.size == 0 {
+  IO::println("  No mastered cards yet.")
+} else {
+  foreach c: Card in mastered {
+    IO::println("  " + c.display())
+  }
+}
+
+// ── History for a specific card ──
+printSection("Review History — Card 1 (犬)")
+val hist1: List[ReviewEntry] = deck.historyFor(1)
+foreach entry: ReviewEntry in hist1 {
+  IO::println("  #{entry.result().label()} → next #{entry.intervalAfter()}d")
+}
+
+// ── do[Option] lookup demo ──
+printSection("do[Option] Card Lookup")
+val lookups: List[Int] = [3, 7, 99]
+foreach id: Int in lookups {
+  val msg: String = do[Option] {
+    card <- deck.findCard(id)
+    ret "card #{id}: #{card.front()} = #{card.back()}"
+  }.getOrElse("card #{id}: not found")
+  IO::println("  #{msg}")
+}
+
+// ── try/catch: invalid card lookup ──
+printSection("Error Handling")
+try {
+  val badId: Int = 0 - 1
+  val badCard: Option[Card] = deck.findCard(badId)
+  IO::println("  findCard(#{badId}): #{if badCard.isEmpty() { "not found (correct)" } else { "found (unexpected)" }}")
+} catch e: Exception {
+  IO::println("  Error: #{e.message()}")
+}
+
+// ── Fuzzy match: closest front to a typo ──
+printSection("Fuzzy Match (Levenshtein)")
+val query: String = "飲む"
+val closest: Card? = deck.cards.sortedBy { c ->
+  levenshtein(query, c.front())
+}.find { c -> true } as Card?
+if closest != null {
+  IO::println("  Query '#{query}' → closest: #{closest.display()}")
+}
+
+// ── Tag-level score analysis via groupBy ──
+printSection("Average Score per Tag")
+val tagScores: Map[String, List[ReviewEntry]] = deck.history.groupBy { e ->
+  val cid: Int = e.cardId()
+  val cardOpt: Option[Card] = deck.findCard(cid)
+  if cardOpt.isEmpty() { "unknown" } else { cardOpt.get().tag() }
+}
+foreach (tag, entries) in tagScores {
+  val scoreSum: Int = entries.fold(0) { acc, e ->
+    (acc as Int) + e.result().score()
+  } as Int
+  val cnt: Int = entries.size
+  val avg: Int = if cnt == 0 { 0 } else { scoreSum / cnt }
+  IO::println("  #{tag.padRight(14)} avg score: #{avg} / 5  (#{cnt} reviews)  #{avg.stars()}")
+}
+
+// ── Aggregate summary ──
+printSection("Final Summary")
+val totalReviews: Int = deck.history.size()
+val totalCards: Int = deck.cards.size()
+val uniqueTags: Int = deck.allTags().size
+IO::println("  Deck name     : #{deck.name}")
+IO::println("  Total cards   : #{totalCards}")
+IO::println("  Total reviews : #{totalReviews}")
+IO::println("  Unique tags   : #{uniqueTags}")
+IO::println("  Mastered      : #{stats.mastered()} (#{stats.masteredPct()}%)")
+IO::println("  Avg score     : #{stats.avgScore()} / 5  #{stats.avgScore().stars()}")
+
+IO::println("")
+IO::println("  " + "═".rep(56))

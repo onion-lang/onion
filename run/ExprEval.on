@@ -1,98 +1,292 @@
-// ExprEval — a small expression-tree evaluator exercising interfaces,
-// implementing classes, polymorphic dispatch (eval + show), recursion over a
-// heterogeneous tree, and collection pipelines over the results.
-interface Expr {
-  def eval(): Int
-  def show(): String
+// ExprEval.on — symbolic expression evaluator with:
+//   - Recursive descent parser for arithmetic expressions
+//   - ADT-based AST using enum + sealed cases
+//   - Symbolic differentiation (calculus d/dx)
+//   - Pretty-printer with simplification
+//   - Variable environment
+//   - Collection pipelines for batch evaluation
+import {
+  java.lang.Double as JDouble
+  java.lang.Math
 }
 
-class Num conforms Expr {
-  val value: Int
+// ── AST ──────────────────────────────────────────────────────────────────────
+
+enum Expr {
+  case Num(value: Double)
+  case Var(name: String)
+  case Add(left: Expr, right: Expr)
+  case Sub(left: Expr, right: Expr)
+  case Mul(left: Expr, right: Expr)
+  case Div(left: Expr, right: Expr)
+  case Pow(base: Expr, exp: Expr)
+  case Neg(operand: Expr)
 public:
-  def this(v: Int) { this.value = v }
-  def eval(): Int { return value }
-  def show(): String { return "" + value }
-}
+  def eval(env: Map[String, Double]): Double = select this {
+    case n is Num: n.value()
+    case v is Var: {
+      val r: Double? = env[v.name()]
+      if r == null { 0.0 } else { r }
+    }
+    case a is Add: a.left().eval(env) + a.right().eval(env)
+    case s is Sub: s.left().eval(env) - s.right().eval(env)
+    case m is Mul: m.left().eval(env) * m.right().eval(env)
+    case d is Div: d.left().eval(env) / d.right().eval(env)
+    case p is Pow: Math::pow(p.base().eval(env), p.exp().eval(env))
+    case n is Neg: -(n.operand().eval(env))
+  }
 
-class Add conforms Expr {
-  val left: Expr
-  val right: Expr
-public:
-  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
-  def eval(): Int { return left.eval() + right.eval() }
-  def show(): String { return "(" + left.show() + " + " + right.show() + ")" }
-}
+  // Symbolic derivative with respect to variable `wrt`
+  def diff(wrt: String): Expr = select this {
+    case n is Num:  new Num(0.0)
+    case v is Var:  if v.name() == wrt { new Num(1.0) } else { new Num(0.0) }
+    case a is Add:  simplify(new Add(a.left().diff(wrt), a.right().diff(wrt)))
+    case s is Sub:  simplify(new Sub(s.left().diff(wrt), s.right().diff(wrt)))
+    case m is Mul:  simplify(new Add(
+                      new Mul(m.left().diff(wrt), m.right()),
+                      new Mul(m.left(), m.right().diff(wrt))
+                    ))
+    case d is Div:  simplify(new Div(
+                      new Sub(
+                        new Mul(d.left().diff(wrt), d.right()),
+                        new Mul(d.left(), d.right().diff(wrt))
+                      ),
+                      new Mul(d.right(), d.right())
+                    ))
+    case p is Pow:  {
+      // d/dx x^n = n * x^(n-1), for constant exponent
+      val expVal: Expr = p.exp()
+      simplify(new Mul(
+        expVal,
+        new Mul(new Pow(p.base(), new Sub(expVal, new Num(1.0))), p.base().diff(wrt))
+      ))
+    }
+    case n is Neg: simplify(new Neg(n.operand().diff(wrt)))
+  }
 
-class Sub conforms Expr {
-  val left: Expr
-  val right: Expr
-public:
-  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
-  def eval(): Int { return left.eval() - right.eval() }
-  def show(): String { return "(" + left.show() + " - " + right.show() + ")" }
-}
-
-class Mul conforms Expr {
-  val left: Expr
-  val right: Expr
-public:
-  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
-  def eval(): Int { return left.eval() * right.eval() }
-  def show(): String { return "(" + left.show() + " * " + right.show() + ")" }
-}
-
-class Neg conforms Expr {
-  val arg: Expr
-public:
-  def this(a: Expr) { this.arg = a }
-  def eval(): Int { return 0 - arg.eval() }
-  def show(): String { return "-" + arg.show() }
-}
-
-val exprs = [
-  new Mul(new Add(new Num(2), new Num(3)), new Num(4)),
-  new Sub(new Num(10), new Neg(new Num(5))),
-  new Neg(new Add(new Num(1), new Num(2)))
-]
-
-foreach ex: Expr in exprs {
-  IO::println(ex.show() + " = " + ex.eval())
-}
-
-val total = exprs.fold(0) { acc, ex -> (acc as Int) + (ex as Expr).eval() }
-IO::println("sumAll: " + total)
-
-val shownDesc = exprs
-  .sortedBy { ex -> 0 - (ex as Expr).eval() }
-  .map { ex -> (ex as Expr).show() }
-IO::println("byValueDesc: " + shownDesc.toString())
-
-class Div conforms Expr {
-  val left: Expr
-  val right: Expr
-public:
-  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
-  def eval(): Int { return left.eval() / right.eval() }
-  def show(): String { return "(" + left.show() + " / " + right.show() + ")" }
-}
-
-// safe evaluation: division by zero is caught and reported as a sentinel
-def safeEval(e: Expr): Int {
-  try {
-    return e.eval()
-  } catch ex: Exception {
-    return 0 - 999
+  def toStr(): String = select this {
+    case n is Num: {
+      val v = n.value()
+      if v == (v as Int as Double) { "#{v as Int}" } else { "#{v}" }
+    }
+    case v is Var:  v.name()
+    case a is Add:  "(#{a.left().toStr()} + #{a.right().toStr()})"
+    case s is Sub:  "(#{s.left().toStr()} - #{s.right().toStr()})"
+    case m is Mul:  "(#{m.left().toStr()} * #{m.right().toStr()})"
+    case d is Div:  "(#{d.left().toStr()} / #{d.right().toStr()})"
+    case p is Pow:  "#{p.base().toStr()}^#{p.exp().toStr()}"
+    case n is Neg:  "(-#{n.operand().toStr()})"
   }
 }
 
-val d1: Expr = new Div(new Num(20), new Num(4))
-val d2: Expr = new Div(new Num(7), new Num(0))
-IO::println(d1.show() + " = " + safeEval(d1))
-IO::println(d2.show() + " -> " + safeEval(d2))
-
-// pick the largest expression by value with reduce
-val pool = [d1, new Num(100), new Sub(new Num(3), new Num(9))]
-val biggest = pool.reduce { a, b ->
-  if (a as Expr).eval() > (b as Expr).eval() { a } else { b }
+// Algebraic simplification pass (single-step; repeated until stable for deeper reduction)
+def simplify(e: Expr): Expr = select e {
+  case a is Add: select a.left() {
+    case ln is Num: select a.right() {
+      case rn is Num: new Num(ln.value() + rn.value())
+      else: if ln.value() == 0.0 { a.right() } else { e }
+    }
+    else: select a.right() {
+      case rn is Num: if rn.value() == 0.0 { a.left() } else { e }
+      else: e
+    }
+  }
+  case s is Sub: select s.left() {
+    case ln is Num: select s.right() {
+      case rn is Num: new Num(ln.value() - rn.value())
+      else: e
+    }
+    else: select s.right() {
+      case rn is Num: if rn.value() == 0.0 { s.left() } else { e }
+      else: e
+    }
+  }
+  case m is Mul: select m.left() {
+    case ln is Num: select m.right() {
+      case rn is Num: new Num(ln.value() * rn.value())
+      else: if ln.value() == 0.0 { new Num(0.0) } else if ln.value() == 1.0 { m.right() } else { e }
+    }
+    else: select m.right() {
+      case rn is Num: if rn.value() == 0.0 { new Num(0.0) } else if rn.value() == 1.0 { m.left() } else { e }
+      else: e
+    }
+  }
+  case d is Div: select d.right() {
+    case rn is Num: if rn.value() == 1.0 { d.left() } else { e }
+    else: e
+  }
+  case p is Pow: select p.exp() {
+    case en is Num: if en.value() == 0.0 { new Num(1.0) } else if en.value() == 1.0 { p.base() } else { e }
+    else: e
+  }
+  else: e
 }
-IO::println("biggest: " + (biggest as Expr).show() + " = " + (biggest as Expr).eval())
+
+// ── Parser ────────────────────────────────────────────────────────────────────
+
+class Parser {
+  var src: String
+  var pos: Int
+
+public:
+  def this(input: String) {
+    src = input.trim()
+    pos = 0
+  }
+
+  def skipSpaces(): void {
+    while pos < src.length && src.charAt(pos) == ' ' { pos++ }
+  }
+
+  def peek(): Char {
+    skipSpaces()
+    return if pos < src.length { src.charAt(pos) } else { '\0' }
+  }
+
+  def consume(): Char {
+    skipSpaces()
+    val c = src.charAt(pos)
+    pos++
+    return c
+  }
+
+  // expr = term (('+' | '-') term)*
+  def parseExpr(): Expr {
+    var left: Expr = parseTerm()
+    skipSpaces()
+    while pos < src.length && (src.charAt(pos) == '+' || src.charAt(pos) == '-') {
+      val op = consume()
+      val right: Expr = parseTerm()
+      if op == '+' { left = new Add(left, right) }
+      else          { left = new Sub(left, right) }
+      skipSpaces()
+    }
+    return left
+  }
+
+  // term = power (('*' | '/') power)*
+  def parseTerm(): Expr {
+    var left: Expr = parsePower()
+    skipSpaces()
+    while pos < src.length && (src.charAt(pos) == '*' || src.charAt(pos) == '/') {
+      val op = consume()
+      val right: Expr = parsePower()
+      if op == '*' { left = new Mul(left, right) }
+      else          { left = new Div(left, right) }
+      skipSpaces()
+    }
+    return left
+  }
+
+  // power = factor ('^' factor)?
+  def parsePower(): Expr {
+    val base: Expr = parseFactor()
+    skipSpaces()
+    if pos < src.length && src.charAt(pos) == '^' {
+      consume()
+      return new Pow(base, parseFactor())
+    }
+    return base
+  }
+
+  // factor = '-' factor | '(' expr ')' | number | identifier
+  def parseFactor(): Expr {
+    skipSpaces()
+    val c = peek()
+    if c == '-' {
+      consume()
+      return new Neg(parseFactor())
+    } else if c == '(' {
+      consume()
+      val e: Expr = parseExpr()
+      skipSpaces()
+      if pos < src.length && src.charAt(pos) == ')' { consume() }
+      return e
+    } else if (c >= '0' && c <= '9') || c == '.' {
+      return parseNumber()
+    } else {
+      return parseIdent()
+    }
+  }
+
+  def parseNumber(): Expr {
+    val start = pos
+    while pos < src.length && ((src.charAt(pos) >= '0' && src.charAt(pos) <= '9') || src.charAt(pos) == '.') {
+      pos++
+    }
+    return new Num(JDouble::parseDouble(src.substring(start, pos)))
+  }
+
+  def parseIdent(): Expr {
+    val start = pos
+    while pos < src.length && ((src.charAt(pos) >= 'a' && src.charAt(pos) <= 'z') || (src.charAt(pos) >= 'A' && src.charAt(pos) <= 'Z') || src.charAt(pos) == '_') {
+      pos++
+    }
+    return new Var(src.substring(start, pos))
+  }
+}
+
+def parse(s: String): Expr {
+  return new Parser(s).parseExpr()
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("── #{title} ──")
+}
+
+section("Numeric evaluation")
+val env: Map[String, Double] = ["x": 2.0, "y": 3.0, "t": 0.5]
+IO::println("Environment: x=2, y=3, t=0.5")
+
+val numExprs: List[String] = [
+  "2 + 3 * 4",
+  "(2 + 3) * 4",
+  "x^2 + y^2",
+  "(x + y) * (x - y)",
+  "2 * x^3 - 3 * x + 1"
+]
+foreach expr: String in numExprs {
+  val ast = parse(expr)
+  IO::println("  #{expr} = #{ast.eval(env)}")
+}
+
+section("Symbolic differentiation d/dx")
+val diffExprs: List[String] = [
+  "x^3",
+  "2 * x^2 + 3 * x",
+  "x * x",
+  "x^2 + y"
+]
+foreach expr: String in diffExprs {
+  val ast = parse(expr)
+  val d = ast.diff("x")
+  IO::println("  d/dx (#{expr}) = #{d.toStr()} = #{d.eval(env)}")
+}
+
+section("AST pretty-printing")
+val prettyExprs: List[String] = ["(x + 0) * 1 + 0", "1 * x^1", "x - 0"]
+foreach expr: String in prettyExprs {
+  val raw = parse(expr)
+  val simplified = simplify(raw)
+  IO::println("  #{expr} => #{simplified.toStr()}")
+}
+
+section("Batch evaluation — polynomial sweep")
+val poly = parse("x^3 - 2 * x^2 + x")
+IO::println("f(x) = #{poly.toStr()}")
+val xs: List[Double] = [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]
+foreach xVal: Double in xs {
+  val e2: Map[String, Double] = ["x": xVal, "y": 0.0, "t": 0.0]
+  IO::println("  f(#{xVal as Int}) = #{poly.eval(e2)}")
+}
+
+section("Derivative spot-check at x=2")
+val f = parse("x^3 - 2 * x^2 + x")
+val df = f.diff("x")
+IO::println("f(x)  = #{f.toStr()}")
+IO::println("f'(x) = #{df.toStr()}")
+IO::println("f(2)  = #{f.eval(env)}")
+IO::println("f'(2) = #{df.eval(env)}")

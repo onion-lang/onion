@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`new T[null]` (a `null` literal used as an array-size expression) crashed the
+  compiler with an internal error (`I0000: Bad type on operand stack`)** instead
+  of being rejected during type checking. `ConstructionTyping.typeNewArray` typed
+  each dimension expression but never checked it was actually an `Int` (or an
+  integer type unboxable to one), so a `null` literal — or any other
+  non-integer size expression — reached code generation and produced bytecode
+  that pushed a null reference where the JVM's `newarray`/`multianewarray`
+  expects an `int` on the operand stack, which the verifier rejects at class
+  load time. It now runs the same `Boxing.tryUnboxToInteger` + integer-type
+  check `typeIndexing` already uses for array indices, and reports
+  `INCOMPATIBLE_TYPE` (E0000) on the offending dimension instead. Found by
+  `MutationFuzzSpec` (issue #812).
+
 - **A `CONSTRUCTOR_NOT_FOUND` (E0021) diagnostic's "Available constructors:" list header
   was always English**, even under a Japanese-locale JVM where the rest of the message
   (`constructor applicable for ... is not found`) was correctly translated —
@@ -78,6 +91,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checking the override target; it now passes that list along, and
   `OVERRIDE_TARGET_NOT_FOUND` (E0068) has a dedicated handler that suggests
   the closest matching base method name.
+
+### Added
+
+- **`run/PackageDelivery.on`, a 413-line package delivery tracking simulation.**
+  Covers an ADT case-enum (`PackageStatus`, 5 cases) matched exhaustively via
+  `select`/`is`, a plain enum (`Priority`), records with `example` laws
+  (`Address`, `Customer`, `RouteStop`), an `extension Int` block (`asTime`,
+  `asCurrency`, `asWeight`), a mutable class with an event log (`Package`),
+  a class built on collection pipelines (`DeliveryCompany`: `filter`,
+  `groupBy`, `sortedBy`, `fold`), closures stored in a `val` and invoked via
+  `.call`, recursive helpers, string interpolation, and nullable-safe lookups.
+
+- **`run/SpreadsheetCalc.on`, a ~400-line mini spreadsheet evaluator with a
+  recursive-descent formula parser.** Covers ADT enums (`CellVal`, `FExpr`),
+  records, classes, user-defined generics, `HashMap`/`HashSet`, nullable
+  fields, `select`/pattern matching, and `try`/`catch`. The formula engine
+  supports literals, cell references, binary operators (`+ - * /`), range
+  notation (`A1:A3`), and aggregate functions (`SUM`, `MAX`, `MIN`, `AVG`),
+  plus cycle detection over circular formula references and a formatted
+  table report.
 
 ## [0.12.1] - 2026-08-19
 

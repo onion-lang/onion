@@ -153,6 +153,40 @@ class DynamicArraySizeSpec extends AbstractShellSpec {
       assert(Shell.Success(7) == result)
     }
 
+    it("rejects a null size expression with a diagnostic instead of crashing (new Boolean[null])") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr: Boolean[] = new Boolean[null]
+          |    return arr.length
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("rejects a null size expression in one dimension of a multi-dimensional array") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val grid = new Int[2][null]
+          |    return grid.length
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
     it("allocates with an uppercase variable size (new Int[N], not a type arg)") {
       val result = shell.run(
         """

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`new T[null]` (a `null` literal used as an array-size expression) crashed the
+  compiler with an internal error (`I0000: Bad type on operand stack`)** instead
+  of being rejected during type checking. `ConstructionTyping.typeNewArray` typed
+  each dimension expression but never checked it was actually an `Int` (or an
+  integer type unboxable to one), so a `null` literal — or any other
+  non-integer size expression — reached code generation and produced bytecode
+  that pushed a null reference where the JVM's `newarray`/`multianewarray`
+  expects an `int` on the operand stack, which the verifier rejects at class
+  load time. It now runs the same `Boxing.tryUnboxToInteger` + integer-type
+  check `typeIndexing` already uses for array indices, and reports
+  `INCOMPATIBLE_TYPE` (E0000) on the offending dimension instead. Found by
+  `MutationFuzzSpec` (issue #812).
+
 - **A `CONSTRUCTOR_NOT_FOUND` (E0021) diagnostic's "Available constructors:" list header
   was always English**, even under a Japanese-locale JVM where the rest of the message
   (`constructor applicable for ... is not found`) was correctly translated —

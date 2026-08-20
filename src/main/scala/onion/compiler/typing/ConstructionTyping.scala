@@ -105,10 +105,17 @@ final class ConstructionTyping(
 
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
     val typeRefOpt = typing.mapFromDeclared(node.typeRef, bodyContext.mapper)
-    val parameters = typedTerms(node.args.toArray, context)
+    val untypedArgs = node.args.toArray
+    val parameters = typedTerms(untypedArgs, context)
     if (typeRefOpt.isEmpty || parameters == null) return None
-    val resultType = typing.loadArray(typeRefOpt.get, parameters.length)
-    Some(new NewArray(resultType, parameters))
+    val sizes = parameters.map(Boxing.tryUnboxToInteger(bodyContext.table, _))
+    val badIndex = sizes.indexWhere(size => !(size.isBasicType && size.`type`.asInstanceOf[BasicType].isInteger))
+    if (badIndex >= 0) {
+      bodyContext.report(INCOMPATIBLE_TYPE, untypedArgs(badIndex), BasicType.INT, sizes(badIndex).`type`)
+      return None
+    }
+    val resultType = typing.loadArray(typeRefOpt.get, sizes.length)
+    Some(new NewArray(resultType, sizes))
   }
 
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] = {

@@ -66,7 +66,8 @@ class DefaultStaticImportSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(4.0) == result)
     }
-  
+  }
+
   describe("the narrowed default set (#360): an effectful line looks effectful") {
     it("no longer resolves bare calls into Files, Http, DateTime or System") {
       for (call <- Seq(
@@ -138,5 +139,4 @@ class DefaultStaticImportSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == r, r.toString)
     }
   }
-}
 }

@@ -75,15 +75,15 @@ def isStopWord(w: String): Boolean {
 // ── Core analysis helpers ─────────────────────────────────────────────────────
 
 def tokenize(text: String): List[String] {
-  return text.toLowerCase().split("[^a-z]+").toList().filter { w => w.length() > 1 }
+  return text.toLowerCase().split("[^a-z]+").toList().filter { w -> w.length() > 1 }
 }
 
 def contentWords(tokens: List[String]): List[String] {
-  return tokens.filter { w => !isStopWord(w) }
+  return tokens.filter { w -> !isStopWord(w) }
 }
 
 def splitSentences(text: String): List[String] {
-  return Strings::splitRegex(text, "[.!?]+").filter { s => s.trim().length() > 0 }
+  return Strings::splitRegex(text, "[.!?]+").filter { s -> s.trim().length() > 0 }
 }
 
 def readabilityLevel(avgLen: Double, uniqueRatio: Double): ReadabilityLevel {
@@ -110,17 +110,17 @@ public:
     val sentCount  = if sentences.size == 0 { 1 } else { sentences.size }
     val avgSentLen = wordCount * 1.0 / sentCount
 
-    val freq        = Maps::countBy(words as List[Object]) { w => w }
+    val freq        = Maps::countBy(words as List[Object]) { w -> w }
     val uniqueWords = freq.size
 
     val uniqueRatio = if wordCount == 0 { 0.0 } else { uniqueWords * 1.0 / wordCount }
     val level       = readabilityLevel(avgSentLen, uniqueRatio)
 
-    val allFreqs = Maps::toList(freq) { k, v =>
+    val allFreqs = Maps::toList(freq) { k, v ->
       new WordFreq(k as String, v as Int)
     }
     val topWords: List[WordFreq] =
-      allFreqs.sortedByDescending { wf => (wf as WordFreq).count() }.take(topN) as List[WordFreq]
+      allFreqs.sortedByDescending { wf -> (wf as WordFreq).count() }.take(topN) as List[WordFreq]
 
     return new AnalysisResult(
       doc.title(), wordCount, sentCount, uniqueWords,
@@ -150,7 +150,7 @@ public:
 def jaccardSim(tokA: List[String], tokB: List[String]): Double {
   val setA = tokA.distinct()
   val setB = tokB.distinct()
-  val intersection = setA.filter { w => setB.contains(w) }
+  val intersection = setA.filter { w -> setB.contains(w) }
   val unionSize = setA.size + setB.size - intersection.size
   if unionSize == 0 { return 0.0 }
   return intersection.size * 1.0 / unionSize
@@ -229,7 +229,7 @@ def main(args: String[]): void {
   val docs: List[Document] = [DOC1, DOC2, DOC3]
 
   // Per-document profiles
-  val results: List[Object] = docs.map { d => analyzer.analyze(d as Document) }
+  val results: List[Object] = docs.map { d -> analyzer.analyze(d as Document) }
   foreach r: Object in results { printResult(r as AnalysisResult) }
 
   // Sentence-length breakdown
@@ -262,7 +262,7 @@ def main(args: String[]): void {
 
   // Complexity ranking
   banner("Complexity Ranking (avg sentence length)")
-  val ranked = results.sortedByDescending { r => (r as AnalysisResult).avgSentLen() }
+  val ranked = results.sortedByDescending { r -> (r as AnalysisResult).avgSentLen() }
   var rank: Int = 1
   foreach r: Object in ranked {
     val res = r as AnalysisResult

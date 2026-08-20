@@ -467,6 +467,16 @@ object TypedAST {
 
     var frame: LocalFrame = _
 
+    /**
+     * How many statements at the head of `block` are the primary constructor's own
+     * `this.x = x` field assignments — zero for anything but the primary. The class
+     * initializer pass splices declared field initializers in *after* them, so an
+     * initializer like `var total: Int = x * 2` reads the value the constructor was given
+     * rather than the field's default. Nothing else in the body is counted, and the
+     * parser guarantees the synthesized block holds only those assignments.
+     */
+    var primaryAssignments: Int = 0
+
     // Named arguments and default values support
     private var argsWithDefaults_ : Array[MethodArgument] = null
 

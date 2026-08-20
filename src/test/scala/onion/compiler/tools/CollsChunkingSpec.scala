@@ -47,7 +47,7 @@ class CollsChunkingSpec extends AbstractShellSpec {
     it("chunked chains into map") {
       runInt(
         "val xs = [1, 2, 3, 4, 5, 6, 7]\n" +
-        "return xs.chunked(2).map { b => (b as List).size() }.size()",
+        "return xs.chunked(2).map { b -> (b as List).size() }.size()",
         Shell.Success(4))
     }
   }

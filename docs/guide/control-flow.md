@@ -340,7 +340,7 @@ val email: Option[String] = do[Option] {
 }
 
 // Equivalent to:
-// findUser(42).flatMap(user => getEmail(user).map(email => email))
+// findUser(42).flatMap((user) -> getEmail(user).map((email) -> email))
 ```
 
 ### With Result

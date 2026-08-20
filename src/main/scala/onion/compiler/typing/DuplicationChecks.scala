@@ -165,12 +165,14 @@ private[compiler] object DuplicationChecks {
       }
     }
 
+    val baseNames = baseKeys.map(_._1).toArray.distinct
+
     for (impl <- overrideMethods) {
       val implKeys = allErasedParamDescriptors(impl.arguments, typing).map(desc => (impl.name, desc))
       if !implKeys.exists(baseKeys.contains) then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
-        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name)
+        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames)
     }
   }
 

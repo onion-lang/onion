@@ -105,5 +105,100 @@ class LspRenameSpec extends AnyFunSpec {
 
       assert(edit == null)
     }
+
+    // Rename is file-local and not scope-aware -- it rewrites every *code* occurrence in
+    // the document. What it must never do is rewrite text that is not code: an edit that
+    // changes a program's output while calling itself a rename still compiles, so nothing
+    // downstream catches it.
+
+    it("does not rewrite the identifier inside a comment") {
+      val client = new RecordingClient()
+      val server = newServer(client)
+      val service = server.getTextDocumentService.asInstanceOf[OnionTextDocumentService]
+
+      val source =
+        """class C {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val count = 1        // count starts at one
+          |    return count
+          |  }
+          |}
+          |""".stripMargin
+      openDocument(service, "file:///test.on", source)
+      val edits = rename(service, "file:///test.on", 3, 8, "total")
+        .getChanges.asScala("file:///test.on").asScala
+
+      // The declaration and the `return`, and nothing on the comment's half of line 3.
+      assert(edits.size == 2, edits.map(e => (e.getRange.getStart.getLine, e.getRange.getStart.getCharacter)).mkString(", "))
+      assert(edits.forall(e => !(e.getRange.getStart.getLine == 3 && e.getRange.getStart.getCharacter > 20)))
+    }
+
+    it("does not rewrite the identifier inside a string literal") {
+      val client = new RecordingClient()
+      val server = newServer(client)
+      val service = server.getTextDocumentService.asInstanceOf[OnionTextDocumentService]
+
+      val source =
+        """class C {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val count = 1
+          |    IO::println("count of items")
+          |    return count
+          |  }
+          |}
+          |""".stripMargin
+      openDocument(service, "file:///test.on", source)
+      val edits = rename(service, "file:///test.on", 3, 8, "total")
+        .getChanges.asScala("file:///test.on").asScala
+
+      assert(!edits.exists(_.getRange.getStart.getLine == 4),
+        "rewrote a string literal: " + edits.map(_.getRange.getStart.getLine).mkString(", "))
+      assert(edits.size == 2)
+    }
+
+    it("does rewrite the identifier inside #{} interpolation, which is a real reference") {
+      val client = new RecordingClient()
+      val server = newServer(client)
+      val service = server.getTextDocumentService.asInstanceOf[OnionTextDocumentService]
+
+      val source =
+        """class C {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val count = 1
+          |    IO::println("n=#{count}")
+          |    return count
+          |  }
+          |}
+          |""".stripMargin
+      openDocument(service, "file:///test.on", source)
+      val edits = rename(service, "file:///test.on", 3, 8, "total")
+        .getChanges.asScala("file:///test.on").asScala
+
+      // Skipping everything between quotes would leave `#{count}` behind and stop the
+      // file compiling -- the opposite mistake to rewriting a string's prose.
+      assert(edits.exists(_.getRange.getStart.getLine == 4),
+        "did not rewrite the interpolated reference")
+      assert(edits.size == 3)
+    }
+
+    it("refuses when the cursor itself is inside a comment") {
+      val client = new RecordingClient()
+      val server = newServer(client)
+      val service = server.getTextDocumentService.asInstanceOf[OnionTextDocumentService]
+
+      val source =
+        """class C {
+          |  // count of items
+          |}
+          |""".stripMargin
+      openDocument(service, "file:///test.on", source)
+
+      // Renaming a word that is not a reference to anything would rewrite every
+      // occurrence of it in the file on the strength of a comment.
+      assert(rename(service, "file:///test.on", 1, 6, "total") == null)
+    }
   }
 }

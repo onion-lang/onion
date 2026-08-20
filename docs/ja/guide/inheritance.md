@@ -18,10 +18,8 @@ class Animal {
     def speak: String = "Some sound"
 }
 
-class Dog extends Animal {
+class Dog(n: String) extends Animal(n) {   // 親コンストラクタの呼び出しは extends 節に書く
   public:
-    def this(n: String): (n) { }   // 親コンストラクタの呼び出し
-
     def speak: String = "Woof!"    // メソッドのオーバーライド
 }
 
@@ -29,7 +27,7 @@ val dog: Dog = new Dog("Buddy")
 println(dog.speak())  // "Woof!"
 ```
 
-親コンストラクタへの引数は `def this(args): (superArgs) { ... }` の形式で渡します：
+親コンストラクタへの引数は `extends` 節に書きます。`class Car(b: String, val model: String) extends Vehicle(b)` のように、プライマリコンストラクタのパラメータをそのまま渡せます：
 
 ```onion
 class Vehicle {
@@ -41,14 +39,7 @@ class Vehicle {
     }
 }
 
-class Car extends Vehicle {
-  val model: String
-
-  public:
-    def this(b: String, m: String): (b) {
-      this.model = m
-    }
-}
+class Car(b: String, val model: String) extends Vehicle(b) { }
 ```
 
 ## インターフェースの実装

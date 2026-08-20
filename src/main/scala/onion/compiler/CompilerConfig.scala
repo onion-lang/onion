@@ -29,5 +29,9 @@ case class CompilerConfig(
   // reported counterexample can be reproduced, and so a run can be widened to look for
   // others (issue #346).
   lawSamples: Int = onion.compiler.verification.ArgGenerator.DefaultSamples,
-  lawSeed: Long = onion.compiler.verification.ArgGenerator.DefaultSeed
+  lawSeed: Long = onion.compiler.verification.ArgGenerator.DefaultSeed,
+  // Whether to emit a LocalVariableTable. On by default, because a debugger that can step
+  // through `.on` source but shows nothing for any variable is most of the way to useless,
+  // and the cost is a few bytes per method. `-g:none` turns it off.
+  emitDebugInfo: Boolean = true
 )

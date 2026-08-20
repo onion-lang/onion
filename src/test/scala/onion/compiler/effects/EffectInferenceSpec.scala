@@ -120,6 +120,25 @@ class EffectInferenceSpec extends AnyFunSpec {
           |}""".stripMargin)
       assert(eff("Sub#<init>") == Set(Console))
     }
+
+    it("charges the primary's effects to a secondary that delegates to it") {
+      // Self-delegation resolves against the class's own constructors, which the
+      // inference over-approximates to "any constructor of this class"; that still has
+      // to converge and to carry the primary's console effect into the secondary. This
+      // path had no test while `: this(...)` was rare; the delegation rule makes it the
+      // ordinary way to write a secondary.
+      val eff = infer(
+        """class Loud(val n: Int) {
+          |public:
+          |  var seen: Int = { IO::println("built"); n }
+          |  def this : this(1) { }
+          |}
+          |class A {
+          |public:
+          |  static def build(): Loud = new Loud()
+          |}""".stripMargin)
+      assert(eff("A#build") == Set(Console))
+    }
   }
 
   describe("the Method-trait default") {

@@ -1,0 +1,273 @@
+// GenericLeaderboard.on — A polymorphic leaderboard system using type classes.
+// Exercises: trait/instance (type classes), constrained generics [T: TC1 + TC2],
+// Trait[T]::method() dictionary dispatch, records with methods, data-carrying
+// ADT enums, collection pipelines (map/filter/sortedBy/fold/partition/reduce),
+// extension methods (Int, String), string interpolation, foreach over map (k,v),
+// select + type patterns, while loops, nullable, groupBy.
+
+// ─── Type class: Scoreable ────────────────────────────────────────────────────
+// Extracts a comparable score (higher = better) and metadata from a value.
+trait Scoreable[T] {
+  def score(v: T): Int
+  def name(v: T): String
+  def category(v: T): String
+}
+
+// ─── Type class: Formattable ──────────────────────────────────────────────────
+// Renders a value as a formatted table row.
+trait Formattable[T] {
+  def format(v: T): String
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+extension Int {
+  def padLeft(w: Int): String {
+    val s: String = "" + self
+    if s.length() >= w { return s }
+    var pad: String = ""
+    for var i: Int = s.length(); i < w; i++ { pad = pad + " " }
+    return pad + s
+  }
+  def medal(): String = select self {
+    case 1: " GOLD"
+    case 2: "  SLV"
+    case 3: "  BRZ"
+    else:   "     "
+  }
+}
+
+extension String {
+  def pad(w: Int): String {
+    if self.length() >= w { return self.substring(0, w) }
+    var result: String = self
+    while result.length() < w { result = result + " " }
+    return result
+  }
+  def bar(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + "#" }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+}
+
+// ─── Domain 1: Chess player ───────────────────────────────────────────────────
+enum Title { GM, IM, FM, CM, NONE }
+
+record ChessPlayer(playerName: String, rating: Int, title: Title, wins: Int, losses: Int)
+  example { new ChessPlayer("Magnus", 2850, Title::GM, 312, 48).winRate() > 80 }
+{
+public:
+  def winRate(): Int {
+    val total: Int = wins() + losses()
+    if total == 0 { return 0 }
+    return wins() * 100 / total
+  }
+  def titleStr(): String = select title() {
+    case Title::GM: "GM"
+    case Title::IM: "IM"
+    case Title::FM: "FM"
+    case Title::CM: "CM"
+    else:           "--"
+  }
+}
+
+instance Scoreable[ChessPlayer] {
+  def score(v: ChessPlayer): Int = v.rating()
+  def name(v: ChessPlayer): String = v.playerName()
+  def category(v: ChessPlayer): String = select v.title() {
+    case Title::GM: "Grand Master"
+    case Title::IM: "Int'l Master"
+    case Title::FM: "FIDE Master"
+    else:           "Club Player"
+  }
+}
+
+instance Formattable[ChessPlayer] {
+  def format(v: ChessPlayer): String {
+    val n: String = (v.titleStr() + " " + v.playerName()).pad(16)
+    val r: String = v.rating().padLeft(4)
+    val wr: String = v.winRate().padLeft(3)
+    return "#{n} #{r}  #{wr}% (#{v.wins()}W/#{v.losses()}L)"
+  }
+}
+
+// ─── Domain 2: Racing driver ─────────────────────────────────────────────────
+record Driver(driverName: String, team: String, points: Int, fastestLaps: Int, dnfs: Int)
+  example { new Driver("Hamilton", "Mercedes", 287, 6, 1).reliability() > 80 }
+{
+public:
+  // reliability: penalise DNFs relative to total race events
+  def reliability(): Int {
+    val total: Int = fastestLaps() + dnfs() + 15
+    if total == 0 { return 100 }
+    return 100 - (dnfs() * 100 / total)
+  }
+}
+
+instance Scoreable[Driver] {
+  def score(v: Driver): Int = v.points()
+  def name(v: Driver): String = v.driverName()
+  def category(v: Driver): String = v.team()
+}
+
+instance Formattable[Driver] {
+  def format(v: Driver): String {
+    val n: String = v.driverName().pad(12)
+    val t: String = v.team().pad(10)
+    val p: String = v.points().padLeft(4)
+    val r: String = v.reliability().padLeft(3)
+    return "#{n} #{t} #{p} pts  #{r}% rel  FL:#{v.fastestLaps()}"
+  }
+}
+
+// ─── Generic print leaderboard ───────────────────────────────────────────────
+def printBoard[T: Scoreable + Formattable](label: String, entries: List[T]): void {
+  val sep: String = "-".rep(62)
+  println(sep)
+  println("  " + label)
+  println(sep)
+  val sorted: List[T] = entries.sortedBy { e -> 0 - Scoreable[T]::score(e) }
+  var rank: Int = 1
+  foreach e: T in sorted {
+    println("#{rank.padLeft(2)}.#{rank.medal()} #{Formattable[T]::format(e)}")
+    rank++
+  }
+  println(sep)
+}
+
+// ─── Generic statistics: iterate to avoid boxing/unboxing warnings ───────────
+def scoreStats[T: Scoreable](label: String, entries: List[T]): void {
+  if entries.isEmpty { return }
+  var total: Int = 0
+  var best: Int  = -999999
+  var worst: Int = 999999
+  foreach e: T in entries {
+    val s: Int = Scoreable[T]::score(e)
+    total = total + s
+    if s > best  { best  = s }
+    if s < worst { worst = s }
+  }
+  val avg: Double = total.doubleValue() / entries.size as Double
+  val avgStr: String = avg.toString()
+  val avgDisplay: String = if avgStr.length() > 5 { avgStr.substring(0, 5) } else { avgStr }
+  println("  #{label}: #{entries.size} entries  best=#{best}  worst=#{worst}  avg=#{avgDisplay}")
+}
+
+// ─── Score histogram ─────────────────────────────────────────────────────────
+def histogram[T: Scoreable](entries: List[T], buckets: Int, lo: Int, hi: Int): void {
+  val width: Int = (hi - lo) / buckets
+  println("  Score distribution (#{lo}-#{hi}):")
+  for var b: Int = 0; b < buckets; b++ {
+    val bucketLo: Int = lo + b * width
+    val bucketHi: Int = bucketLo + width - 1
+    var count: Int = 0
+    foreach e: T in entries {
+      val s: Int = Scoreable[T]::score(e)
+      if s >= bucketLo && s <= bucketHi { count++ }
+    }
+    println("    #{bucketLo.padLeft(4)}-#{bucketHi.padLeft(4)}: #{"#".bar(count).pad(12)} (#{count})")
+  }
+}
+
+// ─── Constructors/team standings: sum scores by category ─────────────────────
+def teamStandings[T: Scoreable](label: String, entries: List[T]): void {
+  val cats: List[String] = entries.map { e -> Scoreable[T]::category(e) }.distinct()
+  // Build (cat, sum) totals as parallel lists, then print sorted by sum descending
+  val catList: List[String] = cats
+  val sumList: List[Integer] = cats.map { cat ->
+    var s: Int = 0
+    foreach e: T in entries {
+      if Scoreable[T]::category(e) == cat { s = s + Scoreable[T]::score(e) }
+    }
+    s
+  }
+  // Sort by descending sum using index-based selection sort on a small list
+  val n: Int = catList.size
+  val idxList: List[Integer] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter { i -> (i as Int) < n }
+  val sorted: List[Integer] = idxList.sortedBy { i -> 0 - (sumList.get(i as Int) as Int) }
+  println("  " + label + " standings by category:")
+  var pos: Int = 1
+  foreach idx: Object in sorted {
+    val i: Int = idx as Int
+    val cat: String = catList.get(i)
+    val total: Int = sumList.get(i) as Int
+    println("    #{pos.padLeft(2)}. #{cat.pad(14)} #{total.padLeft(5)}")
+    pos++
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  val chess: List[ChessPlayer] = [
+    new ChessPlayer("Magnus",   2850, Title::GM, 312, 48),
+    new ChessPlayer("Fabiano",  2788, Title::GM, 287, 65),
+    new ChessPlayer("Hikaru",   2768, Title::GM, 298, 72),
+    new ChessPlayer("Ding",     2759, Title::GM, 241, 58),
+    new ChessPlayer("Gukesh",   2740, Title::GM, 203, 44),
+    new ChessPlayer("Pragg",    2728, Title::GM, 189, 51),
+    new ChessPlayer("Vidit",    2710, Title::IM, 178, 63),
+    new ChessPlayer("Aronian",  2705, Title::GM, 201, 79),
+    new ChessPlayer("Anish",    2696, Title::GM, 198, 77),
+    new ChessPlayer("Sergey",   2680, Title::FM, 156, 84)
+  ]
+
+  val drivers: List[Driver] = [
+    new Driver("Hamilton",   "Mercedes", 287, 6, 1),
+    new Driver("Verstappen", "Red Bull", 355, 9, 2),
+    new Driver("Alonso",     "Aston M.", 206, 3, 4),
+    new Driver("Leclerc",    "Ferrari",  249, 5, 3),
+    new Driver("Norris",     "McLaren",  218, 4, 2),
+    new Driver("Sainz",      "Williams", 175, 2, 5),
+    new Driver("Russell",    "Mercedes", 192, 2, 2),
+    new Driver("Piastri",    "McLaren",  181, 3, 1)
+  ]
+
+  // ── Chess section ─────────────────────────────────────────────────────────
+  printBoard("CHESS RATING LEADERBOARD", chess)
+  println("")
+  scoreStats("Chess", chess)
+  histogram(chess, 4, 2680, 2860)
+  teamStandings("Chess", chess)
+  println("")
+
+  // ── F1 section ────────────────────────────────────────────────────────────
+  printBoard("F1 POINTS LEADERBOARD", drivers)
+  println("")
+  scoreStats("F1", drivers)
+  histogram(drivers, 4, 160, 360)
+  teamStandings("F1 Constructors", drivers)
+  println("")
+
+  // ── Cross-analysis ────────────────────────────────────────────────────────
+  val partitioned = chess.partition { p -> p.rating() >= 2740 }
+  val topChess: List[ChessPlayer] = partitioned.get(0) as List[ChessPlayer]
+  val midChess: List[ChessPlayer] = partitioned.get(1) as List[ChessPlayer]
+  println("Top tier (>= 2740): #{topChess.size} players")
+  foreach p: ChessPlayer in topChess {
+    println("  #{p.titleStr()} #{p.playerName()} - #{p.rating()}")
+  }
+  println("Mid tier (< 2740):  #{midChess.size} players")
+  println("")
+
+  // Reliable drivers — sorted by points
+  val reliableDrivers: List[Driver] = drivers
+    .filter { d -> d.dnfs() <= 2 }
+    .sortedBy { d -> 0 - d.points() }
+  println("Reliable drivers (DNF <= 2):")
+  foreach d: Driver in reliableDrivers {
+    println("  #{d.driverName().pad(12)} #{d.points()} pts  rel #{d.reliability()}%")
+  }
+  println("")
+
+  // Leaders
+  val chessLeader: ChessPlayer = chess.sortedBy { p -> 0 - p.rating() }.get(0)
+  val f1Leader: Driver = drivers.sortedBy { d -> 0 - d.points() }.get(0)
+  println("Current leaders:")
+  println("  Chess: #{chessLeader.titleStr()} #{chessLeader.playerName()} (#{chessLeader.rating()})")
+  println("  F1:    #{f1Leader.driverName()} / #{f1Leader.team()} (#{f1Leader.points()} pts)")
+}

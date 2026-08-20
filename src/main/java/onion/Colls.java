@@ -9,9 +9,9 @@ import java.util.*;
  * Example usage:
  * <pre>
  * val list = Colls::listOf(1, 2, 3, 4, 5)
- * val doubled = Colls::map(list, (x) => x * 2)
- * val evens = Colls::filter(list, (x) => x % 2 == 0)
- * val sum = Colls::reduce(list, 0, (a, b) => a + b)
+ * val doubled = Colls::map(list, (x) -> x * 2)
+ * val evens = Colls::filter(list, (x) -> x % 2 == 0)
+ * val sum = Colls::reduce(list, 0, (a, b) -> a + b)
  *
  * val set = Colls::setOf("a", "b", "c")
  * val map = Colls::mapOf(Colls::entry("name", "Alice"), Colls::entry("age", "30"))
@@ -341,7 +341,7 @@ public final class Colls {
     }
 
     /**
-     * Combines elements left-to-right: reduce([1,2,3]) { a, b => a + b }.
+     * Combines elements left-to-right: reduce([1,2,3]) { a, b -> a + b }.
      * Returns null for an empty or null list.
      */
     public static <T> T reduce(List<T> list, Function2<T, T, T> f) {
@@ -544,7 +544,7 @@ public final class Colls {
      * @return a new sorted list
      */
     /**
-     * Returns a new list sorted by the given key: names.sortedBy { s => s.length() }
+     * Returns a new list sorted by the given key: names.sortedBy { s -> s.length() }
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> List<T> sortedBy(List<T> list, Function1<T, ?> key) {
@@ -555,7 +555,7 @@ public final class Colls {
 
     /**
      * Returns a new list sorted by the given key in DESCENDING order:
-     * people.sortedByDescending { p => p.age() }
+     * people.sortedByDescending { p -> p.age() }
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> List<T> sortedByDescending(List<T> list, Function1<T, ?> key) {

@@ -115,6 +115,7 @@ java Hello
 | `ConfigEditDemo.on` | ロスレスな設定編集 | Lens、`Residue`、コメント/順序の保持 |
 | `BrokenLogDemo.on` | 部分的な失敗を許容するログ解析 | `onion.Shape`、`Outcome::values`/`defects` |
 | `ToolDemo.on` | `tool` 宣言から生成されるCLI | `tool`、capability、`--help`/`--contract`/`--plan` |
+| `ArchiveDemo.on` | zip・unzip・gzipの往復 | `onion.Archive` |
 
 ## 学習の道のり
 

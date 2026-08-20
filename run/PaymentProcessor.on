@@ -246,13 +246,13 @@ IO::println("")
 IO::println("Transactions:")
 foreach r: Object in results { IO::println((r as ProcessedTx).describe()) }
 
-val approved = results.filter { r => (r as ProcessedTx).isApproved() }
-val declined = results.filter { r => !(r as ProcessedTx).isApproved() }
+val approved = results.filter { r -> (r as ProcessedTx).isApproved() }
+val declined = results.filter { r -> !(r as ProcessedTx).isApproved() }
 
-val grossAmt: Double = approved.fold(0.0) { acc, r =>
+val grossAmt: Double = approved.fold(0.0) { acc, r ->
   (acc as Double) + (r as ProcessedTx).tx().amount()
 } as Double
-val feeAmt: Double = approved.fold(0.0) { acc, r =>
+val feeAmt: Double = approved.fold(0.0) { acc, r ->
   (acc as Double) + (r as ProcessedTx).tx().fee()
 } as Double
 val netAmt: Double = (grossAmt - feeAmt).round2()
@@ -270,15 +270,15 @@ IO::println("  Net revenue        : #{netAmt.usd()}")
 
 IO::println("")
 IO::println("By Card Network:")
-val byType = results.groupBy { r => (r as ProcessedTx).tx().cardType().label() }
+val byType = results.groupBy { r -> (r as ProcessedTx).tx().cardType().label() }
 val networks = Colls::mutableListOf("Visa", "Mastercard", "Amex", "Discover", "Unknown")
 foreach lbl: Object in networks {
   val key = lbl as String
   val grp = byType.get(key)
   if grp != null {
     val g = grp as List
-    val app = g.filter { r => (r as ProcessedTx).isApproved() }
-    val vol = app.fold(0.0) { acc, r => (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    val app = g.filter { r -> (r as ProcessedTx).isApproved() }
+    val vol = app.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
     IO::println("  #{key.rpad(12)} #{app.size}/#{g.size} approved  #{vol.usd()}")
   }
 }
@@ -287,16 +287,16 @@ foreach lbl: Object in networks {
 
 IO::println("")
 IO::println("By Category:")
-val byCat = approved.groupBy { r => (r as ProcessedTx).tx().category() }
-val catKeys = approved.map { r => (r as ProcessedTx).tx().category() }.distinct()
-val sortedCats = catKeys.sortedBy { c => c as String }
+val byCat = approved.groupBy { r -> (r as ProcessedTx).tx().category() }
+val catKeys = approved.map { r -> (r as ProcessedTx).tx().category() }.distinct()
+val sortedCats = catKeys.sortedBy { c -> c as String }
 foreach cat: Object in sortedCats {
   val key = cat as String
   val grp = byCat.get(key)
   if grp != null {
     val g = grp as List
-    val vol = g.fold(0.0) { acc, r => (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
-    val fees = g.fold(0.0) { acc, r => (acc as Double) + (r as ProcessedTx).tx().fee() } as Double
+    val vol = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    val fees = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().fee() } as Double
     IO::println("  #{key.rpad(12)} #{g.size} txns  gross=#{vol.usd()}  fees=#{fees.usd()}  net=#{(vol - fees).round2().usd()}")
   }
 }
@@ -305,19 +305,19 @@ foreach cat: Object in sortedCats {
 
 IO::println("")
 IO::println("Top Merchants:")
-val byMerchant = approved.groupBy { r => (r as ProcessedTx).tx().merchant() }
-val merchantKeys = approved.map { r => (r as ProcessedTx).tx().merchant() }.distinct()
+val byMerchant = approved.groupBy { r -> (r as ProcessedTx).tx().merchant() }
+val merchantKeys = approved.map { r -> (r as ProcessedTx).tx().merchant() }.distinct()
 val merchantStats: List[Object] = Colls::mutableListOf()
 foreach m: Object in merchantKeys {
   val key = m as String
   val grp = byMerchant.get(key)
   if grp != null {
     val g = grp as List
-    val vol = g.fold(0.0) { acc, r => (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    val vol = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
     merchantStats.add(new MerchantSummary(key, g.size, vol))
   }
 }
-val topMerchants = merchantStats.sortedBy { m => 0.0 - (m as MerchantSummary).volume() }
+val topMerchants = merchantStats.sortedBy { m -> 0.0 - (m as MerchantSummary).volume() }
 val showTop = if topMerchants.size > 5 { 5 } else { topMerchants.size }
 var mi: Int = 0
 while mi < showTop {

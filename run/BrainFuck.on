@@ -1,0 +1,357 @@
+// BrainFuck.on — a complete Brainfuck interpreter with classic demo programs
+// Exercises: data-carrying ADT case-enum, select exhaustiveness, Int[] tape
+// array, while loops, for loops, extension methods on Int and String,
+// Int[] array access/mutation, collection pipelines, mutable class state,
+// string interpolation, nested loops, nullable types, foreach over ranges,
+// Map[String,Int] entry destructuring (k,v).
+
+import {
+  java.lang.Character as JChar;
+  java.lang.StringBuilder;
+  java.util.LinkedHashMap;
+  java.util.ArrayList;
+  java.util.List as JList;
+}
+
+// ─── ADT enum: Brainfuck instructions ─────────────────────────────────────────
+// Each source character compiles to one of these; [ and ] store their
+// matching jump target so the interpreter never needs to scan at runtime.
+enum BfInstr {
+  case MoveRight            // >  advance data pointer
+  case MoveLeft             // <  retreat data pointer
+  case Increment            // +  increment cell value mod 256
+  case Decrement            // -  decrement cell value mod 256
+  case OutputCell           // .  emit cell value as ASCII character
+  case InputCell            // ,  read one byte into cell (treated as 0 here)
+  case JumpFwd(target: Int) // [  jump to target+1 when cell == 0
+  case JumpBck(target: Int) // ]  jump back to target when cell != 0
+public:
+  def symbol(): String = select this {
+    case _mr is MoveRight:  ">"
+    case _ml is MoveLeft:   "<"
+    case _inc is Increment:  "+"
+    case _dec is Decrement:  "-"
+    case _oc is OutputCell: "."
+    case _ic is InputCell:  ","
+    case f is JumpFwd:    "[→" + f.target() + "]"
+    case b is JumpBck:    "[←" + b.target() + "]"
+  }
+  def isJump(): Boolean = select this {
+    case _f is JumpFwd: true
+    case _b is JumpBck: true
+    else:               false
+  }
+}
+
+// ─── Extension methods ─────────────────────────────────────────────────────────
+extension String {
+  def repeat(n: Int): String {
+    val sb = new StringBuilder()
+    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    return sb.toString()
+  }
+  def padRight(width: Int): String {
+    if self.length() >= width { return self }
+    return self + " ".repeat(width - self.length())
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def mod256(): Int { val r: Int = self % 256; return if r < 0 { r + 256 } else { r } }
+  def toHex(): String {
+    if self == 0 { return "0" }
+    val digits: String = "0123456789ABCDEF"
+    var n: Int = self
+    var result: String = ""
+    while n > 0 { result = "" + digits.charAt(n % 16) + result; n = n / 16 }
+    return result
+  }
+}
+
+// ─── Parser: source string → List of BfInstr ────────────────────────────────
+// Uses a growable list-as-stack for bracket matching so [ and ] carry their
+// partner index. Non-BF characters are silently skipped (they are comments).
+def parseBf(src: String): List[BfInstr] {
+  val result: List[BfInstr] = new ArrayList[BfInstr]()
+  val opens: List[Int]      = new ArrayList[Int]()   // stack of [ positions
+
+  for var i: Int = 0; i < src.length(); i++ {
+    val ch: Int = src.charAt(i)
+    select ch {
+      case 62: result.add(new MoveRight())    // >
+      case 60: result.add(new MoveLeft())     // <
+      case 43: result.add(new Increment())    // +
+      case 45: result.add(new Decrement())    // -
+      case 46: result.add(new OutputCell())   // .
+      case 44: result.add(new InputCell())    // ,
+      case 91:                                // [
+        opens.add(result.size)
+        result.add(new JumpFwd(-1))           // placeholder, patched on matching ]
+      case 93:                                // ]
+        if opens.size > 0 {
+          val openIdx: Int  = (opens.remove(opens.size - 1) as Int)
+          val closeIdx: Int = result.size
+          result.set(openIdx, new JumpFwd(closeIdx + 1))
+          result.add(new JumpBck(openIdx))
+        }
+      else: // ignore
+    }
+  }
+  return result
+}
+
+// ─── Interpreter: BfMachine ──────────────────────────────────────────────────
+class BfMachine {
+  var tape: Int[]
+  var dp: Int
+  var ip: Int
+  var steps: Int
+  val out: StringBuilder
+public:
+  def this(tapeSize: Int) {
+    self.tape  = new Int[tapeSize]
+    self.dp    = tapeSize / 2
+    self.ip    = 0
+    self.steps = 0
+    self.out   = new StringBuilder()
+  }
+
+  def run(instrs: List[BfInstr]): void {
+    val len: Int = instrs.size
+    while ip < len {
+      val instr: BfInstr = instrs.get(ip) as BfInstr
+      steps++
+      select instr {
+        case _mr is MoveRight:
+          dp = (dp + 1).clamp(0, tape.length - 1); ip++
+        case _ml is MoveLeft:
+          dp = (dp - 1).clamp(0, tape.length - 1); ip++
+        case _inc is Increment:
+          tape[dp] = (tape[dp] + 1).mod256(); ip++
+        case _dec is Decrement:
+          tape[dp] = (tape[dp] - 1).mod256(); ip++
+        case _oc is OutputCell:
+          out.append(JChar::toChars(tape[dp])); ip++
+        case _ic is InputCell:
+          tape[dp] = 0; ip++
+        case f is JumpFwd:
+          ip = if tape[dp] == 0 { f.target() } else { ip + 1 }
+        case b is JumpBck:
+          ip = if tape[dp] != 0 { b.target() } else { ip + 1 }
+      }
+    }
+  }
+
+  def result(): String    = out.toString()
+  def getSteps(): Int     = steps
+  def getTape(): Int[]    = tape
+  def getDp(): Int        = dp
+
+  def tapeSlice(radius: Int): String {
+    val sb = new StringBuilder()
+    val lo: Int = (dp - radius).clamp(0, tape.length - 1)
+    val hi: Int = (dp + radius).clamp(0, tape.length - 1)
+    for var i: Int = lo; i <= hi; i++ {
+      val marker: String = if i == dp { "▶" } else { " " }
+      sb.append(marker + tape[i])
+      if i < hi { sb.append(",") }
+    }
+    return "[" + sb.toString() + "]"
+  }
+}
+
+// ─── Instruction statistics ───────────────────────────────────────────────────
+record InstrStat(symbol: String, count: Int)
+
+def countInstrs(src: String): List[InstrStat] {
+  val raw: java.util.Map[String, Int] = new LinkedHashMap[String, Int]()
+  for var i: Int = 0; i < src.length(); i++ {
+    val ch: String = "" + src.charAt(i)
+    val prev: Int? = raw.get(ch) as Int?
+    raw.put(ch, if prev == null { 1 } else { prev + 1 })
+  }
+  val stats: List[InstrStat] = new ArrayList[InstrStat]()
+  foreach (sym, cnt) in raw {
+    stats.add(new InstrStat(sym as String, cnt as Int))
+  }
+  return stats
+}
+
+def formatStats(stats: List[InstrStat]): String {
+  val parts: List[String] = stats.map { s -> (s as InstrStat).symbol() + ":" + (s as InstrStat).count() }
+  return Strings::join(parts, "  ")
+}
+
+// ─── Program library ─────────────────────────────────────────────────────────
+record Demo(name: String, src: String)
+
+def demos(): List[Demo] {
+  val d: List[Demo] = new ArrayList[Demo]()
+
+  // Classic Hello World — Brian Kernighan's version
+  d.add(new Demo("Hello, World!",
+    "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."))
+
+  // Print ASCII '7' (= 55) by incrementing 55 times
+  d.add(new Demo("Print '7'",
+    "+++++++++++++++++++++++++++++++++++++++++++++++++++++++" + "."))
+
+  // Increment one cell to 65 (= 'A'), print, increment to 66 ('B') ... 'E'
+  d.add(new Demo("Print A-E",
+    "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.+.+.+.+."))
+
+  // 7 × 6 = 42 → ASCII '*'
+  d.add(new Demo("7×6='*'(42)", "+++++++[->++++++<]>."))
+
+  // Count up: print '0'..'9' then stop (48=0, 57=9)
+  // Set cell to 48, then print 10 times incrementing
+  d.add(new Demo("Digits 0-9",
+    "++++++++[->++++++<]>." +          // 8*6=48='0', print
+    "+.+.+.+.+.+.+.+.+."))             // print '1'..'9'
+
+  return d
+}
+
+// ─── Runner ───────────────────────────────────────────────────────────────────
+def runDemo(d: Demo): void {
+  val instrs = parseBf(d.src())
+  val vm     = new BfMachine(1024)
+  vm.run(instrs)
+  val out: String = vm.result()
+
+  IO::println("  ▶ " + d.name().padRight(18) +
+              " | src=" + d.src().length() + " chars" +
+              " | instrs=" + instrs.size +
+              " | steps=" + vm.getSteps())
+  IO::println("    Output: " + out.replace("\n", "↵"))
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("╔══════════════════════════════════════╗")
+  IO::println("║    Brainfuck Interpreter in Onion    ║")
+  IO::println("╚══════════════════════════════════════╝")
+  IO::println("")
+
+  // ── Section 1: Run demo programs ──────────────────────────────────────────
+  IO::println("── Demo Programs ──────────────────────────────────────────────")
+  val demoList = demos()
+  foreach demo: Object in demoList {
+    runDemo(demo as Demo)
+  }
+  IO::println("")
+
+  // ── Section 2: Hello World deep dive ──────────────────────────────────────
+  IO::println("── Hello World Deep Dive ──────────────────────────────────────")
+  val hwSrc: String = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+  val hwInstrs = parseBf(hwSrc)
+  val hwVm     = new BfMachine(512)
+  hwVm.run(hwInstrs)
+
+  IO::println("  Source length:    " + hwSrc.length() + " chars")
+  IO::println("  Compiled instrs:  " + hwInstrs.size)
+  IO::println("  Steps executed:   " + hwVm.getSteps())
+  IO::println("  Output:           " + hwVm.result())
+  IO::println("  Tape (±5 from dp):" + hwVm.tapeSlice(5))
+
+  val stats   = countInstrs(hwSrc)
+  val jumps   = stats.filter { s -> (s as InstrStat).symbol() == "[" || (s as InstrStat).symbol() == "]" }
+  val nonJump = stats.filter { s -> (s as InstrStat).symbol() != "[" && (s as InstrStat).symbol() != "]" }
+  IO::println("  Char frequency:   " + formatStats(stats))
+  IO::println("  Jump chars:       " + jumps.fold(0) { acc, s -> acc + (s as InstrStat).count() })
+  IO::println("  Non-jump chars:   " + nonJump.fold(0) { acc, s -> acc + (s as InstrStat).count() })
+  IO::println("")
+
+  // ── Section 3: Instruction type distribution ───────────────────────────────
+  IO::println("── Instruction Mix (Hello World) ──────────────────────────────")
+  var moves: Int = 0; var arith: Int = 0; var io2: Int = 0; var jmps: Int = 0
+  foreach instr: Object in hwInstrs {
+    val i: BfInstr = instr as BfInstr
+    select i {
+      case _mr is MoveRight: moves++
+      case _ml is MoveLeft:  moves++
+      case _inc is Increment: arith++
+      case _dec is Decrement: arith++
+      case _oc is OutputCell: io2++
+      case _ic is InputCell:  io2++
+      case _jf is JumpFwd:   jmps++
+      case _jb is JumpBck:   jmps++
+    }
+  }
+  val total: Int = hwInstrs.size
+  IO::println("  Move  (< >): " + moves + "  (" + (moves * 100 / total) + "%)")
+  IO::println("  Arith (+ -): " + arith + "  (" + (arith * 100 / total) + "%)")
+  IO::println("  I/O  (. ,): " + io2   + "  (" + (io2   * 100 / total) + "%)")
+  IO::println("  Jumps ([ ]): " + jmps + "  (" + (jmps  * 100 / total) + "%)")
+  IO::println("")
+
+  // ── Section 4: Multiplication table (3×3) ────────────────────────────────
+  IO::println("── Multiplication Table 1-3 × 1-3 ────────────────────────────")
+  IO::println("  (using Brainfuck programs generated at runtime)")
+  for var row: Int = 1; row <= 3; row++ {
+    val sb2 = new StringBuilder()
+    sb2.append("  ")
+    for var col: Int = 1; col <= 3; col++ {
+      // BF to compute row*col: "+row[->+col<]>." outputs ASCII char whose value is product
+      val inc1: String = "+".repeat(row)
+      val inc2: String = "+".repeat(col)
+      val mulSrc: String = inc1 + "[>" + inc2 + "<-]>."
+      val mulVm = new BfMachine(128)
+      mulVm.run(parseBf(mulSrc))
+      // After the program, dp moved right once; the product is the char we printed
+      val product: Int = mulVm.getTape()[mulVm.getDp()]
+      sb2.append(product + "\t")
+    }
+    IO::println(sb2.toString())
+  }
+  IO::println("")
+
+  // ── Section 5: Parse round-trip check ─────────────────────────────────────
+  IO::println("── Parse Integrity ────────────────────────────────────────────")
+  val sources: List[String] = [
+    "+++++.",
+    "+[->+<]>.",
+    "++++++++[>++++[>++<-]<-]>>."
+  ]
+  foreach src2: Object in sources {
+    val s: String = src2 as String
+    val prog = parseBf(s)
+    // All JumpFwd in a valid program should have target >= 0
+    val badJumps = prog.filter { instr2 ->
+      val bf: BfInstr = instr2 as BfInstr
+      select bf {
+        case f is JumpFwd: f.target() < 0
+        else: false
+      }
+    }
+    val ok: Boolean = badJumps.size == 0
+    IO::println("  \"" + s + "\" → " + prog.size + " instrs, brackets OK=" + ok)
+  }
+  IO::println("")
+
+  // ── Section 6: Summary statistics across all demos ───────────────────────
+  IO::println("── Summary ────────────────────────────────────────────────────")
+  var totalSrcChars:  Int = 0
+  var totalInstrs:    Int = 0
+  var totalStepsAll:  Int = 0
+  var totalOutChars:  Int = 0
+  foreach demo2: Object in demoList {
+    val dm: Demo = demo2 as Demo
+    val prog = parseBf(dm.src())
+    val vm3  = new BfMachine(512)
+    vm3.run(prog)
+    totalSrcChars  = totalSrcChars  + dm.src().length()
+    totalInstrs    = totalInstrs    + prog.size
+    totalStepsAll  = totalStepsAll  + vm3.getSteps()
+    totalOutChars  = totalOutChars  + vm3.result().length()
+  }
+  IO::println("  Programs run:    " + demoList.size)
+  IO::println("  Total src chars: " + totalSrcChars)
+  IO::println("  Total instrs:    " + totalInstrs)
+  IO::println("  Total steps:     " + totalStepsAll)
+  IO::println("  Total out chars: " + totalOutChars)
+  IO::println("  Avg steps/instr: " + (totalStepsAll / totalInstrs))
+  IO::println("")
+  IO::println("Done.")
+}

@@ -70,6 +70,34 @@ onion-repl
 java -jar onion.jar --help
 ```
 
+## 起動時間と JVM フラグ
+
+Onion は実行のたびに JVM を起動し、その大半はコンパイラのクラスロードに費やされます。
+[AppCDS](https://openjdk.org/jeps/350) のアーカイブでクラスを共有すると、これがおよそ半分に
+なります。JDK 25 での実測で、`onion run/Hello.on` が 0.73 秒から 0.38 秒になりました。
+
+`curl | sh` のインストーラはアーカイブを自動で作ります。配布 zip から入れた場合は、展開後に
+一度だけ次を実行してください。
+
+```bash
+ONION_GENERATE_CDS=1 onion run/Hello.on
+```
+
+`onion.jar` と同じ場所に `lib/onion.jsa`（約 15MB）が作られます。生成をランチャ経由にしている
+のは意図的で、アーカイブは作成時と同じ classpath でしか使えないためです。Onion を更新したときや
+JDK を切り替えたときは作り直してください。作り直すまでの間、JVM は古いアーカイブを黙って拒否し、
+高速化なしで通常どおり動作します。
+
+追加の JVM フラグは `ONION_JAVA_OPTS` で渡します。
+
+```bash
+ONION_JAVA_OPTS="-Xmx4g" onion big-job.on
+ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005" onion script.on
+```
+
+`ONION_DEBUG_STARTUP=1` を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
+表示されます。アーカイブが使われない理由はこれで分かります。
+
 ## IDEセットアップ
 
 ### Visual Studio Code

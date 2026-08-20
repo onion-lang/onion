@@ -582,22 +582,22 @@ println("truncate(20)       => " + longStr.truncate(20))
 
 // ─── Collection pipeline demos ────────────────────────────────────────────────
 println("\n── Collection pipeline demos ────────────────")
-val expensive: List[MenuItem] = shop.getMenu().filter { m => m.basePrice() >= 500 }
+val expensive: List[MenuItem] = shop.getMenu().filter { m -> m.basePrice() >= 500 }
 println("Items ≥ ¥500: #{expensive.size}")
 
-val names: List[String] = shop.getMenu().map { m => m.name() }
+val names: List[String] = shop.getMenu().map { m -> m.name() }
 println("All drinks: #{names}")
 
-val totalBasePrice: Int = shop.getMenu().fold(0) { acc, m => (acc as Int) + m.basePrice() }
+val totalBasePrice: Int = shop.getMenu().fold(0) { acc, m -> (acc as Int) + m.basePrice() }
 println("Menu total (base): ¥#{totalBasePrice}")
 
 val avgPrice: Int = totalBasePrice / shop.getMenu().size
 println("Avg base price:    ¥#{avgPrice}")
 
-val byCategory: Map[String, List[MenuItem]] = shop.getMenu().groupBy { m => m.category().label() }
+val byCategory: Map[String, List[MenuItem]] = shop.getMenu().groupBy { m -> m.category().label() }
 println("\n── Drinks by category ───────────────────────")
 foreach (cat, items) in byCategory {
-  val itemNames: List[String] = items.map { x => x.name() }
+  val itemNames: List[String] = items.map { x -> x.name() }
   println("  #{cat}: #{itemNames}")
 }
 
@@ -611,7 +611,7 @@ if cheapest != null {
 }
 
 // Drinks sorted by prep time
-val byPrep: List[MenuItem] = shop.getMenu().sortedBy { m => m.prepTimeSecs() }
+val byPrep: List[MenuItem] = shop.getMenu().sortedBy { m -> m.prepTimeSecs() }
 println("\n── Sorted by prep time (fast first) ─────────")
 foreach m: MenuItem in byPrep {
   println("  #{m.name().padRight(14)} #{m.prepTimeSecs()}s")

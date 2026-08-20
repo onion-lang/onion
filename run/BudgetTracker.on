@@ -131,34 +131,34 @@ def catName(t: Transaction): String {
 }
 
 def totalAmt(txs: List[Transaction]): Double {
-  return txs.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+  return txs.fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
 }
 
 def netAmt(txs: List[Transaction]): Double {
-  return txs.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).sign() } as Double
+  return txs.fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).sign() } as Double
 }
 
 def monthSummaries(txs: List[Transaction]): List[MonthSummary] {
-  val byMonth = txs.groupBy { t => (t as Transaction).month() }
+  val byMonth = txs.groupBy { t -> (t as Transaction).month() }
   val result: List[MonthSummary] = []
   foreach (m, grp) in byMonth {
     val group = grp as List[Object]
-    val inc = group.filter { t => (t as Transaction).kind().isIncome()  }
-                   .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
-    val exp = group.filter { t => (t as Transaction).kind().isExpense() }
-                   .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+    val inc = group.filter { t -> (t as Transaction).kind().isIncome()  }
+                   .fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
+    val exp = group.filter { t -> (t as Transaction).kind().isExpense() }
+                   .fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
     result << new MonthSummary(m as Month, inc, exp)
   }
   return result
 }
 
 def catSpend(txs: List[Transaction]): Map[Object, Object] {
-  val exps = txs.filter { t => (t as Transaction).kind().isExpense() }
-  val bycat = exps.groupBy { t => catName(t as Transaction) }
+  val exps = txs.filter { t -> (t as Transaction).kind().isExpense() }
+  val bycat = exps.groupBy { t -> catName(t as Transaction) }
   val out: Map[Object, Object] = [:]
   foreach (cat, grp) in bycat {
     val total = (grp as List[Object])
-                  .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+                  .fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
     out[cat] = total
   }
   return out
@@ -218,10 +218,10 @@ IO::println("")
 // ── Category breakdown ────────────────────────────────────────────────────
 IO::println("─── Spending by Category ───")
 val spend = catSpend(all)
-val cats = all.filter { t => t.kind().isExpense() }
-              .map    { t => catName(t) }
+val cats = all.filter { t -> t.kind().isExpense() }
+              .map    { t -> catName(t) }
               .distinct()
-              .sortedBy { c => c as String }
+              .sortedBy { c -> c as String }
 foreach cat: Object in cats {
   val spentObj = spend[cat]
   val spent: Double = if spentObj == null { 0.0 } else { spentObj as Double }
@@ -231,8 +231,8 @@ IO::println("")
 
 // ── Top 5 expenses ────────────────────────────────────────────────────────
 IO::println("─── Top 5 Expenses ───")
-val topExp = all.filter  { t => t.kind().isExpense() }
-                .sortedBy{ t => t.amount() }
+val topExp = all.filter  { t -> t.kind().isExpense() }
+                .sortedBy{ t -> t.amount() }
                 .reverse()
                 .take(5)
 foreach t: Transaction in topExp {
@@ -241,11 +241,11 @@ foreach t: Transaction in topExp {
 IO::println("")
 
 // ── Income vs expenses (partition) ────────────────────────────────────────
-val parts    = all.partition { t => t.kind().isIncome() }
+val parts    = all.partition { t -> t.kind().isIncome() }
 val incList  = parts[0] as List[Object]
 val expList  = parts[1] as List[Object]
-val totInc   = incList.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
-val totExp   = expList.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+val totInc   = incList.fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
+val totExp   = expList.fold(0.0) { acc, t -> (acc as Double) + (t as Transaction).amount() } as Double
 IO::println("─── Totals ───")
 IO::println("  Total income:   $#{String::format("%.2f", totInc)}")
 IO::println("  Total expenses: $#{String::format("%.2f", totExp)}")
@@ -272,7 +272,7 @@ IO::println("")
 
 // ── Freelance income ──────────────────────────────────────────────────────
 IO::println("─── Freelance Income ───")
-val freelance = all.filter { t =>
+val freelance = all.filter { t ->
   select t.kind() {
     case k is Income: k.source() == "Freelance"
     else: false
@@ -291,10 +291,10 @@ IO::println("")
 
 // ── Quarter distribution (groupBy on Int key) ─────────────────────────────
 IO::println("─── Quarter Distribution ───")
-val byQ = all.groupBy { t => t.month().quarter() }
+val byQ = all.groupBy { t -> t.month().quarter() }
 foreach (q, grp) in byQ {
   val group = grp as List[Object]
-  val nExp = group.filter { t => (t as Transaction).kind().isExpense() }.size
+  val nExp = group.filter { t -> (t as Transaction).kind().isExpense() }.size
   IO::println("  Q#{q}: #{group.size} transactions (#{nExp} expenses)")
 }
 IO::println("")

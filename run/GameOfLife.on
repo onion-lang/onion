@@ -142,7 +142,7 @@ public:
   def aliveCells(): List[String] {
     val result: List[String] = []
     foreach (k, alive) in cells { if alive { result << k } }
-    return result.sortedBy { s => s as Object }
+    return result.sortedBy { s -> s as Object }
   }
 
   def display(): String {
@@ -253,9 +253,9 @@ public:
     return (history.get(history.size - 1) as Generation).population()
   }
 
-  def stableGens(): List[Generation] = history.filter { g => g.isStable() }
+  def stableGens(): List[Generation] = history.filter { g -> g.isStable() }
 
-  def bandCounts(): Map[String, List[Generation]] = history.groupBy { g =>
+  def bandCounts(): Map[String, List[Generation]] = history.groupBy { g ->
     if g.population() == 0       { "extinct"  }
     else if g.population() < 5   { "tiny"     }
     else if g.population() < 15  { "small"    }
@@ -347,10 +347,10 @@ printBandTable(rStats)
 // Pipeline: generations with a population spike (> 1.5 × average)
 val rHistory: List[Generation] = rStats.getHistory()
 val threshold: Double = rStats.avgPopulation() * 1.5
-val spikes = rHistory.filter { g => g.population() * 1.0 > threshold }
+val spikes = rHistory.filter { g -> g.population() * 1.0 > threshold }
 println("  Spike generations (>#{threshold} alive): #{spikes.size}")
 if spikes.size > 0 {
-  val topSpike = spikes.sortedBy { g => g.population() as Object }.get(spikes.size - 1) as Generation
+  val topSpike = spikes.sortedBy { g -> g.population() as Object }.get(spikes.size - 1) as Generation
   println("  Highest spike: #{topSpike.summary()}")
 }
 
@@ -374,7 +374,7 @@ val patterns: List[PatternKind] = [
   PatternKind::Beacon,
   PatternKind::RPentomino
 ]
-val results: List[RunStats] = patterns.map { pk =>
+val results: List[RunStats] = patterns.map { pk ->
   val g = new GameOfLife(20, 15, true)
   g.seedPattern(pk, 5, 5)
   runSimulation(g, 20, false)
@@ -406,7 +406,7 @@ println("")
 printHeader("6. Cell record — distance calculations")
 val centre = new Cell(10, 10)
 val corners: List[Cell] = [new Cell(0,0), new Cell(20,0), new Cell(0,15), new Cell(20,15)]
-corners.map { c => c }.forEach { c =>
+corners.map { c -> c }.forEach { c ->
   val dist = centre.distanceTo(c as Cell)
   println("  #{centre.label()} -> #{(c as Cell).label()}  distance = #{dist}")
 }
@@ -414,7 +414,7 @@ corners.map { c => c }.forEach { c =>
 // ── 7. Distinct population values across R-Pentomino run ──────────────────
 println("")
 printHeader("7. Distinct population values in R-Pentomino run")
-val allPops = rHistory.map { g => g.population() }.distinct().sortedBy { p => p as Object }
+val allPops = rHistory.map { g -> g.population() }.distinct().sortedBy { p -> p as Object }
 println("  Unique populations seen: #{allPops.size}")
 println("  Values: #{allPops}")
 

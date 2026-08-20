@@ -105,10 +105,17 @@ final class ConstructionTyping(
 
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
     val typeRefOpt = typing.mapFromDeclared(node.typeRef, bodyContext.mapper)
-    val parameters = typedTerms(node.args.toArray, context)
+    val untypedArgs = node.args.toArray
+    val parameters = typedTerms(untypedArgs, context)
     if (typeRefOpt.isEmpty || parameters == null) return None
-    val resultType = typing.loadArray(typeRefOpt.get, parameters.length)
-    Some(new NewArray(resultType, parameters))
+    val sizes = parameters.map(Boxing.tryUnboxToInteger(bodyContext.table, _))
+    val badIndex = sizes.indexWhere(size => !(size.isBasicType && size.`type`.asInstanceOf[BasicType].isInteger))
+    if (badIndex >= 0) {
+      bodyContext.report(INCOMPATIBLE_TYPE, untypedArgs(badIndex), BasicType.INT, sizes(badIndex).`type`)
+      return None
+    }
+    val resultType = typing.loadArray(typeRefOpt.get, sizes.length)
+    Some(new NewArray(resultType, sizes))
   }
 
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] = {
@@ -558,7 +565,10 @@ final class ConstructionTyping(
       }
       unknownNamed match {
         case Some(named) =>
-          bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+          val paramNames = typeRef.constructors.collect {
+            case cd: ConstructorDefinition => cd.argumentsWithDefaults.map(_.name)
+          }.flatten.distinct.toArray
+          bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
         case None =>
           // Type the arguments anyway to provide better error messages
           val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
@@ -667,7 +677,7 @@ final class ConstructionTyping(
           // Find parameter by name
           val paramIndex = paramNames.indexOf(named.name)
           if (paramIndex < 0) {
-            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
             hasError = true
           } else if (filled(paramIndex)) {
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)

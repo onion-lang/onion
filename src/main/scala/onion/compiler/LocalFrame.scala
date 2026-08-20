@@ -33,6 +33,21 @@ class LocalFrame(val parent: LocalFrame) {
     }
   }
 
+  /**
+   * Variable names by frame index, for the LocalVariableTable.
+   *
+   * `LocalBinding` carries an index, a type and two flags but no name — the name lives
+   * only in the scope that registered it, and by codegen the scopes are all that remember
+   * what the author called anything. Every scope this frame ever opened is kept in
+   * `allScopes` precisely so this is answerable afterwards.
+   *
+   * Shadowing is not a collision: two scopes declaring the same name produce two indices.
+   */
+  def namesByIndex: Map[Int, String] =
+    allScopes.iterator.flatMap { scope =>
+      scope.names.iterator.flatMap(name => scope.get(name).map(binding => binding.index -> name))
+    }.toMap
+
   def entries: Seq[LocalBinding] = {
     val binds: Array[LocalBinding] = entrySet.toArray
     JArrays.sort(binds, (b1: LocalBinding, b2: LocalBinding) => {

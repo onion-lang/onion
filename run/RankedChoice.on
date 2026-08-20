@@ -47,7 +47,7 @@ public:
 
   def isActive(id: Int): Boolean = !eliminated.contains(id)
 
-  def active(): List[Candidate] = candidates.filter { c => isActive(c.id()) }
+  def active(): List[Candidate] = candidates.filter { c -> isActive(c.id()) }
 
   // Walk a ballot and return the first candidate ID still in the running.
   // Returns -1 when all choices on the ballot have been eliminated.
@@ -76,7 +76,7 @@ public:
   }
 
   def printTable(counts: Map[Int, Int], activeBallots: Int): void {
-    val ranked: List[Candidate] = active().sortedBy { c => -(counts[c.id()] as Int) }
+    val ranked: List[Candidate] = active().sortedBy { c -> -(counts[c.id()] as Int) }
     foreach c: Candidate in ranked {
       val n: Int = counts[c.id()] as Int
       val pct: Double = (n as Double) * 100.0 / (activeBallots as Double)
@@ -136,7 +136,7 @@ public:
 
     // Last candidate standing wins if no majority threshold was reached
     if winnerId < 0 && active().size() == 1 {
-      val last = active().find { c => true }
+      val last = active().find { c -> true }
       if last != null { winnerId = (last as Candidate).id() }
     }
 

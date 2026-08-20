@@ -72,7 +72,7 @@ public:
   }
 
   def find(name: String, minVer: Version): Package? {
-    val candidates: List[Package] = packages.filter { p =>
+    val candidates: List[Package] = packages.filter { p ->
       val pkg: Package = p as Package
       pkg.name() == name && pkg.version().isCompatibleWith(minVer)
     } as List[Package]
@@ -184,18 +184,18 @@ def printResolution(status: ResolutionStatus): void {
     }
     case cy is Cycle: {
       val path: List[String] = cy.path()
-      val joined: String = path.fold("") { acc, p => (if (acc as String) == "" { "" } else { acc as String + " -> " }) + (p as String) } as String
+      val joined: String = path.fold("") { acc, p -> (if (acc as String) == "" { "" } else { acc as String + " -> " }) + (p as String) } as String
       println("  [#{cy.label()}] #{joined}")
     }
   }
 }
 
 def countOk(statuses: List[ResolutionStatus]): Int {
-  return statuses.filter { s => (s as ResolutionStatus).isOk() }.size
+  return statuses.filter { s -> (s as ResolutionStatus).isOk() }.size
 }
 
 def countFailed(statuses: List[ResolutionStatus]): Int {
-  return statuses.filter { s => !(s as ResolutionStatus).isOk() }.size
+  return statuses.filter { s -> !(s as ResolutionStatus).isOk() }.size
 }
 
 // ── Package registry population ───────────────────────────────────────────────
@@ -295,9 +295,9 @@ IO::println("")
 printHeader("Registry overview")
 val all: List[Package] = reg.allPackages()
 println("  Total packages in registry: #{all.size}")
-val byName: Map[String, List[Package]] = all.groupBy { p => (p as Package).name() } as Map[String, List[Package]]
+val byName: Map[String, List[Package]] = all.groupBy { p -> (p as Package).name() } as Map[String, List[Package]]
 println("  Unique package names: #{byName.size}")
-val multiVersion: List[Package] = all.filter { p =>
+val multiVersion: List[Package] = all.filter { p ->
   val name: String = (p as Package).name()
   (byName.get(name) as List[Package]).size > 1
 } as List[Package]
@@ -306,7 +306,7 @@ println("  Packages with multiple versions: #{multiVersion.size}")
 // Show packages sorted by number of deps (most deps first)
 IO::println("")
 println("  Dependency count per package:")
-val sorted: List[Package] = all.sortedBy { p => -(p as Package).deps().size } as List[Package]
+val sorted: List[Package] = all.sortedBy { p -> -(p as Package).deps().size } as List[Package]
 foreach p: Object in sorted {
   val pkg: Package = p as Package
   println("    #{pkg.name()} #{pkg.version().toString()} — #{pkg.deps().size} dep(s)")

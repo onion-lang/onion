@@ -1,0 +1,443 @@
+// SpreadsheetCalc.on — A mini spreadsheet with formula evaluation.
+//
+// Cells hold numeric values, text, or formulas (=A1+B2*3, =SUM(A1:A3)).
+// Features: cell references, arithmetic, SUM/MAX/MIN/AVG aggregate functions,
+// cycle detection, and a formatted table display.
+//
+// Exercises: ADT enum (CellVal, FExpr), records, class with mutable state,
+// HashMap, HashSet, foreach (with Object cast for boxed primitives), select /
+// pattern matching, nullable, try/catch, string interpolation, recursion,
+// collection pipelines (map, filter), closures.
+
+import {
+  java.lang.Character
+  java.lang.StringBuilder
+  java.util.HashSet
+  java.util.HashMap
+}
+
+// ── Cell content type ─────────────────────────────────────────────────────
+enum CellVal {
+  case CNum(v: Double)
+  case CStr(s: String)
+  case CFormula(expr: String)
+  case CErr(msg: String)
+}
+
+// ── Formula AST ───────────────────────────────────────────────────────────
+enum FExpr {
+  case FLit(v: Double)
+  case FRef(label: String)
+  case FBinOp(op: String, left: FExpr, right: FExpr)
+  case FFunc(name: String, args: List[FExpr])
+  case FRange(from: String, to_: String)
+}
+
+// ── Character-by-character lexer for formula strings ──────────────────────
+class FLexer {
+  var src: String = ""
+  var pos: Int = 0
+  var len: Int = 0
+
+public:
+  def this(s: String) {
+    this.src = s
+    this.len = s.length()
+    this.pos = 0
+  }
+
+  def isAtEnd(): Boolean = pos >= len
+
+  def peek(): Char {
+    if isAtEnd() { return '\0' }
+    return src.charAt(pos)
+  }
+
+  def advance(): Char {
+    val c: Char = peek()
+    pos = pos + 1
+    return c
+  }
+
+  def skipWS(): void {
+    while !isAtEnd() && Character::isWhitespace(peek()) { advance() }
+  }
+
+  def nextTok(): String {
+    skipWS()
+    if isAtEnd() { return "" }
+    val c: Char = peek()
+    if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' || c == ',' {
+      advance()
+      return "" + c
+    }
+    if c == ':' { advance(); return ":" }
+    if Character::isDigit(c) || c == '.' {
+      val sb: StringBuilder = new StringBuilder()
+      while !isAtEnd() && (Character::isDigit(peek()) || peek() == '.') { sb.append(advance()) }
+      return sb.toString()
+    }
+    if Character::isLetter(c) {
+      val sb: StringBuilder = new StringBuilder()
+      while !isAtEnd() && (Character::isLetterOrDigit(peek()) || peek() == '_') { sb.append(advance()) }
+      return sb.toString()
+    }
+    advance()
+    return ""
+  }
+}
+
+// ── Recursive-descent formula parser ──────────────────────────────────────
+class FParser {
+  var lexer: FLexer? = null
+  var cur: String = ""
+
+public:
+  def this(s: String) {
+    this.lexer = new FLexer(s)
+    this.cur = (this.lexer as FLexer).nextTok()
+  }
+
+  def consume(): String {
+    val t: String = cur
+    cur = (lexer as FLexer).nextTok()
+    return t
+  }
+
+  def parse(): FExpr { return parseAddSub() }
+
+  def parseAddSub(): FExpr {
+    var left: FExpr = parseMulDiv()
+    while cur == "+" || cur == "-" {
+      val op: String = consume()
+      val right: FExpr = parseMulDiv()
+      left = new FBinOp(op, left, right)
+    }
+    return left
+  }
+
+  def parseMulDiv(): FExpr {
+    var left: FExpr = parseUnary()
+    while cur == "*" || cur == "/" {
+      val op: String = consume()
+      val right: FExpr = parseUnary()
+      left = new FBinOp(op, left, right)
+    }
+    return left
+  }
+
+  def parseUnary(): FExpr {
+    if cur == "-" {
+      consume()
+      return new FBinOp("-", new FLit(0.0), parsePrimary())
+    }
+    return parsePrimary()
+  }
+
+  def parsePrimary(): FExpr {
+    val t: String = cur
+    if t == "" { return new FLit(0.0) }
+    // Function call: uppercase name like SUM, MAX, MIN, AVG
+    if t.length() > 1 && Character::isLetter(t.charAt(0)) {
+      consume()
+      if cur == "(" {
+        consume()
+        val args: List[FExpr] = []
+        while cur != ")" && cur != "" {
+          args.add(parseRangeOrExpr())
+          if cur == "," { consume() }
+        }
+        if cur == ")" { consume() }
+        return new FFunc(t, args)
+      }
+      return new FRef(t)
+    }
+    // Cell reference: uppercase letter + digit(s), e.g. A1, B12
+    if t.length() >= 2 && Character::isUpperCase(t.charAt(0)) && Character::isDigit(t.charAt(1)) {
+      consume()
+      return new FRef(t)
+    }
+    // Numeric literal
+    consume()
+    try {
+      return new FLit(Double::parseDouble(t))
+    } catch e: Exception {
+      return new FLit(0.0)
+    }
+  }
+
+  def parseRangeOrExpr(): FExpr {
+    val e: FExpr = parseAddSub()
+    if cur == ":" {
+      consume()
+      val to: String = cur
+      consume()
+      if e is FRef { return new FRange((e as FRef).label(), to) }
+    }
+    return e
+  }
+}
+
+// ── Spreadsheet engine ────────────────────────────────────────────────────
+class Spreadsheet {
+  val cells: HashMap[String, CellVal] = new HashMap[String, CellVal]()
+
+public:
+  def setNum(label: String, v: Double): void { cells.put(label, new CNum(v)) }
+  def setStr(label: String, s: String): void { cells.put(label, new CStr(s)) }
+  def setFormula(label: String, expr: String): void { cells.put(label, new CFormula(expr)) }
+
+  def eval(label: String): Double = evalCell(label, new HashSet[String]())
+
+  def evalCell(label: String, visiting: HashSet[String]): Double {
+    if visiting.contains(label) { throw new Exception("Cycle at " + label) }
+    val raw: CellVal = cells.get(label)
+    if raw == null { return 0.0 }
+    select raw {
+      case n is CNum: return n.v()
+      case f is CFormula: {
+        visiting.add(label)
+        val result: Double = evalExpr(new FParser(f.expr()).parse(), visiting)
+        visiting.remove(label)
+        return result
+      }
+      else: return 0.0
+    }
+  }
+
+  def evalExpr(node: FExpr, visiting: HashSet[String]): Double = select node {
+    case l is FLit: l.v()
+    case r is FRef: evalCell(r.label(), visiting)
+    case b is FBinOp: {
+      val lv: Double = evalExpr(b.left(), visiting)
+      val rv: Double = evalExpr(b.right(), visiting)
+      select b.op() {
+        case "+": lv + rv
+        case "-": lv - rv
+        case "*": lv * rv
+        case "/": {
+          if rv == 0.0 { throw new Exception("Division by zero") }
+          lv / rv
+        }
+        else: 0.0
+      }
+    }
+    case f is FFunc: {
+      val vals: List[Double] = collectArgs(f.args(), visiting)
+      select f.name() {
+        case "SUM": listSum(vals)
+        case "MAX": listMax(vals)
+        case "MIN": listMin(vals)
+        case "AVG": { if vals.size == 0 { 0.0 } else { listSum(vals) / vals.size } }
+        else: 0.0
+      }
+    }
+    case rng is FRange: listSum(rangeVals(rng.from(), rng.to_(), visiting))
+    else: 0.0
+  }
+
+  def collectArgs(args: List[FExpr], visiting: HashSet[String]): List[Double] {
+    val result: List[Double] = []
+    foreach a: Object in args {
+      val fx: FExpr = a as FExpr
+      if fx is FRange {
+        val rng: FRange = fx as FRange
+        foreach v: Object in rangeVals(rng.from(), rng.to_(), visiting) { result.add(v as Double) }
+      } else {
+        result.add(evalExpr(fx, visiting))
+      }
+    }
+    return result
+  }
+
+  def rangeVals(from: String, to_: String, visiting: HashSet[String]): List[Double] {
+    val fc: Int = from.charAt(0) as Int
+    val fr: Int = Integer::parseInt(from.substring(1))
+    val tc: Int = to_.charAt(0) as Int
+    val tr: Int = Integer::parseInt(to_.substring(1))
+    val result: List[Double] = []
+    var col: Int = fc
+    while col <= tc {
+      var row: Int = fr
+      while row <= tr {
+        val lbl: String = ("" + (col as Char)) + row
+        result.add(evalCell(lbl, visiting))
+        row = row + 1
+      }
+      col = col + 1
+    }
+    return result
+  }
+
+  def listSum(vals: List[Double]): Double {
+    var s: Double = 0.0
+    foreach x: Object in vals { s = s + (x as Double) }
+    return s
+  }
+
+  def listMax(vals: List[Double]): Double {
+    if vals.size == 0 { return 0.0 }
+    var m: Double = vals[0] as Double
+    foreach x: Object in vals { val v = x as Double; if v > m { m = v } }
+    return m
+  }
+
+  def listMin(vals: List[Double]): Double {
+    if vals.size == 0 { return 0.0 }
+    var m: Double = vals[0] as Double
+    foreach x: Object in vals { val v = x as Double; if v < m { m = v } }
+    return m
+  }
+
+  def display(label: String): String {
+    val raw: CellVal = cells.get(label)
+    if raw == null { return "" }
+    select raw {
+      case n is CNum: return fmtNum(n.v())
+      case s is CStr: return s.s()
+      case f is CFormula: {
+        try { return fmtNum(eval(label)) } catch e: Exception { return "#ERR" }
+      }
+      case e is CErr: return "#" + e.msg()
+      else: return ""
+    }
+  }
+
+  // Format as integer if value is whole, otherwise 2 decimal places
+  def fmtNum(v: Double): String {
+    val whole: Long = v as Long
+    if v == (whole as Double) { return "" + whole }
+    val scaled: Long = (v * 100.0 + 0.5) as Long
+    val ip: Long = scaled / 100L
+    val fp: Long = scaled % 100L
+    val fs: String = if fp < 10L { "0" + fp } else { "" + fp }
+    return ip + "." + fs
+  }
+
+  def colW(s: String, w: Int): String = Strings::padLeft(s, w, ' ')
+  def colL(s: String, w: Int): String = Strings::padRight(s, w, ' ')
+}
+
+// ── Demo: quarterly sales data ────────────────────────────────────────────
+val sheet: Spreadsheet = new Spreadsheet()
+
+// Product rows: A=name, B=Q1, C=Q2, D=Q3, E=Q4, F=Annual total
+sheet.setStr("A1", "Gadget A")
+sheet.setNum("B1", 230.0)
+sheet.setNum("C1", 410.0)
+sheet.setNum("D1", 390.0)
+sheet.setNum("E1", 520.0)
+sheet.setFormula("F1", "SUM(B1:E1)")
+
+sheet.setStr("A2", "Widget B")
+sheet.setNum("B2", 185.0)
+sheet.setNum("C2", 175.0)
+sheet.setNum("D2", 310.0)
+sheet.setNum("E2", 290.0)
+sheet.setFormula("F2", "SUM(B2:E2)")
+
+sheet.setStr("A3", "Doohickey C")
+sheet.setNum("B3", 90.0)
+sheet.setNum("C3", 130.0)
+sheet.setNum("D3", 95.0)
+sheet.setNum("E3", 160.0)
+sheet.setFormula("F3", "SUM(B3:E3)")
+
+// Aggregation rows
+sheet.setStr("A4", "TOTAL")
+sheet.setFormula("B4", "SUM(B1:B3)")
+sheet.setFormula("C4", "SUM(C1:C3)")
+sheet.setFormula("D4", "SUM(D1:D3)")
+sheet.setFormula("E4", "SUM(E1:E3)")
+sheet.setFormula("F4", "SUM(F1:F3)")
+
+sheet.setStr("A5", "PEAK")
+sheet.setFormula("B5", "MAX(B1:B3)")
+sheet.setFormula("C5", "MAX(C1:C3)")
+sheet.setFormula("D5", "MAX(D1:D3)")
+sheet.setFormula("E5", "MAX(E1:E3)")
+sheet.setFormula("F5", "MAX(F1:F3)")
+
+sheet.setStr("A6", "AVG/QTR")
+sheet.setFormula("B6", "AVG(B1:B3)")
+sheet.setFormula("C6", "AVG(C1:C3)")
+sheet.setFormula("D6", "AVG(D1:D3)")
+sheet.setFormula("E6", "AVG(E1:E3)")
+sheet.setFormula("F6", "AVG(F1:F3)")
+
+// H1 vs H2 comparison
+sheet.setStr("A7", "H1 avg")
+sheet.setFormula("B7", "AVG(B4,C4)")
+sheet.setStr("A8", "H2 avg")
+sheet.setFormula("B8", "AVG(D4,E4)")
+
+// Print table
+val cols: List[String] = ["B", "C", "D", "E", "F"]
+
+IO::println("╔══════════════════════════════════════════════════════════╗")
+IO::println("║           Quarterly Sales Report (Units Sold)            ║")
+IO::println("╠══════════════════════════════════════════════════════════╣")
+
+// Header row
+val hdr: StringBuilder = new StringBuilder("║ " + sheet.colL("Product", 13) + "│")
+foreach h: Object in ["Q1", "Q2", "Q3", "Q4", "Annual"] {
+  hdr.append(sheet.colW(h as String, 8) + " │")
+}
+IO::println(hdr.toString() + "║")
+IO::println("╠══════════════════════════════════════════════════════════╣")
+
+// Data rows 1-3
+for var r: Int = 1; r <= 3; r++ {
+  val row: StringBuilder = new StringBuilder("║ " + sheet.colL(sheet.display("A" + r), 13) + "│")
+  foreach c: Object in cols { row.append(sheet.colW(sheet.display((c as String) + r), 8) + " │") }
+  IO::println(row.toString() + "║")
+}
+
+IO::println("╠══════════════════════════════════════════════════════════╣")
+
+// Summary rows 4-6
+foreach ri: Object in [4, 5, 6] {
+  val r: Int = ri as Int
+  val srow: StringBuilder = new StringBuilder("║ " + sheet.colL(sheet.display("A" + r), 13) + "│")
+  foreach c: Object in cols { srow.append(sheet.colW(sheet.display((c as String) + r), 8) + " │") }
+  IO::println(srow.toString() + "║")
+}
+
+IO::println("╚══════════════════════════════════════════════════════════╝")
+
+IO::println("")
+IO::println("── Formula verification ──────────────────────────────────────")
+IO::println("F1 = SUM(B1:E1) = " + sheet.display("F1") + "  (expect 1550)")
+IO::println("F4 = SUM(F1:F3) = " + sheet.display("F4") + "  (expect 2985)")
+IO::println("B5 = MAX(B1:B3) = " + sheet.display("B5") + "   (expect 230)")
+IO::println("B6 = AVG(B1:B3) = " + sheet.display("B6") + " (expect 168.33)")
+IO::println("H1 avg (B4+C4)/2 = " + sheet.display("B7") + "  (expect 610)")
+IO::println("H2 avg (D4+E4)/2 = " + sheet.display("B8") + " (expect 882.50)")
+
+IO::println("")
+IO::println("── Best performer by quarter ─────────────────────────────────")
+val prods: List[String] = ["Gadget A", "Widget B", "Doohickey C"]
+val qCols: List[String] = ["B", "C", "D", "E"]
+val qNames: List[String] = ["Q1", "Q2", "Q3", "Q4"]
+for var qi: Int = 0; qi < qCols.size; qi++ {
+  val qcol: String = qCols[qi] as String
+  val qname: String = qNames[qi] as String
+  var best: Int = 0
+  var bestV: Double = sheet.eval(qcol + 1)
+  for var i: Int = 2; i <= 3; i++ {
+    val v: Double = sheet.eval(qcol + i)
+    if v > bestV { bestV = v; best = i - 1 }
+  }
+  IO::println(qname + " winner: " + (prods[best] as String) + " (" + sheet.fmtNum(bestV) + ")")
+}
+
+IO::println("")
+IO::println("── Cycle detection ───────────────────────────────────────────")
+sheet.setFormula("Z1", "Z2+1")
+sheet.setFormula("Z2", "Z1+1")
+try {
+  sheet.eval("Z1")
+  IO::println("ERROR: expected cycle exception!")
+} catch e: Exception {
+  IO::println("Cycle correctly caught: " + e.getMessage())
+}

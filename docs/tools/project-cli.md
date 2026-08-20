@@ -57,11 +57,99 @@ Assert::equals(4, 2 + 2)
 onion new <name>
 onion build [--verbose]
 onion run [--verbose] [-- <arguments...>]
-onion test [--verbose]
+onion test [--verbose] [--report-xml <path>]
 onion clean
+onion doc [-d <dir>] [<source.on>...]
+onion fmt [--check] [<path>...]
 ```
 
-`build`, `run`, `test`, and `clean` start at the current directory and walk
+### `onion test --report-xml`
+
+Writes the run as JUnit XML, which is what CI reads to annotate a build with the tests that
+failed rather than only that something did:
+
+```bash
+onion test --report-xml target/test-reports/junit.xml
+```
+
+The summary line and the exit code are unchanged. A report that cannot be written is an
+error in its own right — it does not silently turn a failing run into a passing one, and it
+does not hide a genuine test failure behind an I/O problem.
+
+### `onion fmt`
+
+Normalises spacing. With no arguments inside a project it formats everything under `src/`
+and `tests/`:
+
+```bash
+onion fmt
+```
+
+A path may be a file or a directory, and a directory is walked for `.on` files, so it also
+works outside a project:
+
+```bash
+onion fmt scripts/
+```
+
+`--check` writes nothing, lists the files that would change, and exits `1` if there are
+any — the shape a CI step needs:
+
+```bash
+onion fmt --check
+```
+
+**What it changes is deliberately small**, and each boundary was measured rather than
+guessed. It tightens the punctuation that binds to what it touches — `f(a , b)` to
+`f(a, b)`, `"=" .rep(60)` to `"=".rep(60)`, `f(- 1)` to `f(-1)` — and adds a missing
+newline at the end of a file. Everything else is reproduced byte for byte, tabs included.
+
+It does **not** reindent. Onion's continuations are not bracketed: an expression body on
+the line after `=`, a method chain led by `.filter`, an expression carried on by a trailing
+`+`, a `from re"…"` clause under a record. Nothing lexical separates those from a
+misindented line, so a formatter that computes indentation from brace depth reindents
+correct code — measured against the sample programs, that design rewrote 36% of their
+lines, almost all of it wrongly.
+
+It does **not** move a line break. A line break can end a statement in Onion, so moving one
+would be a semantic change rather than a cosmetic one.
+
+It does **not** touch a bracket, in either direction, and the sample programs are why.
+Closing `f( a )` up to `f(a)` reads like an improvement until you meet `new Employee( 1, …)`
+sitting above `new Employee(10, …)`, where the space is a right-aligned ID column. Closing
+`f (1)` up reads like an improvement until you meet an enum whose cases are padded so their
+argument lists line up — with five spaces on one line and a single space on the next, so not
+even "collapse a lone space" separates the typo from the intent. Across the 182 sample
+programs those two rules fired dozens of times and every firing was damage.
+
+The result is a small tool. Run over the whole sample corpus it changes four lines. That is
+the honest size of the problem a formatter working from tokens alone can see here; the rest
+needs a parser.
+
+Before writing any file, the formatted text is re-lexed and compared token for token,
+comments included, against the original. If they differ the file is left untouched and the
+command reports it as a bug.
+
+### `onion doc`
+
+Generates API documentation as HTML. With no arguments inside a project it documents the
+production sources under `src/` into `target/doc`:
+
+```bash
+onion doc
+```
+
+`-d <dir>` writes somewhere else, and naming source files explicitly makes it work outside
+a project entirely:
+
+```bash
+onion doc -d api src/main.on src/util.on
+```
+
+Doc comments (`/** … */`) on classes, interfaces, records, enums and methods are carried
+across, not just the signatures.
+
+`build`, `run`, `test`, `doc`, `fmt`, and `clean` start at the current directory and walk
 upward until they find `onion.toml`, so any of them also work from `src/`,
 `tests/`, or another nested subdirectory of the project — there is no need to
 `cd` back to the project root first.
@@ -74,13 +162,100 @@ Exit codes are stable across every project command:
 
 ## Manifest
 
-The manifest accepts exactly one table, `[package]`, with exactly two
-required string keys: `name` (matching `[A-Za-z][A-Za-z0-9_-]*`) and
-`version` (a valid [SemVer 2.0](https://semver.org/spec/v2.0.0.html)
-version). Unknown keys or tables, duplicate keys, malformed TOML, and invalid
-names or versions are all reported as errors, with a line and column when the
-TOML parser can supply one. No dependencies, source-root overrides,
+The manifest requires `[package]`, with exactly two required string keys: `name`
+(matching `[A-Za-z][A-Za-z0-9_-]*`) and `version` (a valid
+[SemVer 2.0](https://semver.org/spec/v2.0.0.html) version). Unknown keys or tables,
+duplicate keys, malformed TOML, and invalid names or versions are all reported as errors,
+with a line and column when the TOML parser can supply one. No source-root overrides,
 entrypoint overrides, compiler flags, or scripts are accepted.
+
+### `[dependencies]`
+
+Maven coordinates, one per line, as `"group:artifact" = "version"`:
+
+```toml
+[package]
+name = "report"
+version = "0.1.0"
+
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+"com.fasterxml.jackson.core:jackson-databind" = "2.17.0"
+```
+
+The key has to be quoted, because a Maven coordinate contains a colon. Versions are
+exact — no ranges, no `latest`. Transitive dependencies are resolved and land on the
+classpath for `build`, `run` and `test` alike, so a library you compile against is also
+there when the program runs.
+
+The **resolved** set — transitives included — is part of the build fingerprint, not just
+the manifest text. A transitive moving underneath you invalidates the cache and forces a
+recompile, rather than serving classes compiled against the old classpath as current.
+
+A coordinate that cannot be resolved fails the build with coursier's message, which names
+the coordinate it could not find.
+
+### `[[repositories]]`
+
+Extra Maven repositories, searched **before** Maven Central and in the order written:
+
+```toml
+[[repositories]]
+url = "https://nexus.example.com/repository/maven-public"
+```
+
+Maven Central stays available; these are added to it rather than replacing it. Only
+absolute `http`, `https` and `file` URLs are accepted — a relative or misspelled entry is
+rejected here rather than surfacing later as a resolution failure blamed on a dependency.
+
+This is an array of tables rather than a plain `repositories = [...]` array on purpose. A
+bare key-value pair belongs to whatever table header precedes it, so written after
+`[package]` it would quietly become `package.repositories`; a table header can go anywhere
+in the file.
+
+### Not yet supported
+
+There is no offline mode. Resolution runs on every build, reading coursier's cache
+(`~/.cache/coursier`) for anything already fetched, so a warm build does not hit the
+network — but it is not *prevented* from doing so. Onion embeds coursier's Java API,
+which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
+left out rather than made to look like a guarantee it is not.
+
+### `onion.lock`
+
+A build writes `onion.lock` next to `onion.toml`, and later builds resolve from it.
+**Commit it.**
+
+`[dependencies]` names direct dependencies at a version each, which is not enough to
+reproduce a build: a transitive dependency's version is chosen at resolution time, so two
+builds of a byte-identical `onion.toml` can compile against different jars the moment a
+transitive publishes a release. That failure appears on one machine, cannot be reproduced on
+another, and nothing in the project changed.
+
+The lock records the whole transitive coordinate set, so a later build resolves *those*
+versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
+anything is compiled. Different bytes for a version that was already published stops the
+build:
+
+```text
+error: Resolved dependencies do not match onion.lock:
+different bytes for the same file:
+  postgresql-42.7.3.jar
+    locked 8f3a...
+    found  1c90...
+A published version's bytes should never change. Check the repository, or delete onion.lock
+to accept what it is serving now.
+```
+
+Change a version in `onion.toml`, or add a repository, and the lock no longer describes what
+you are asking for -- it is discarded and rewritten rather than enforced against a different
+question. Reordering `[dependencies]` is not a change and does not discard it. `onion clean`
+does not remove it: it is an input to the next build, not an output of this one.
+
+**It is not an offline mode.** coursier's embedding API exposes a cache location, a thread
+pool and a logger, and no cache policy at all, so there is no honest way to promise a build
+that never reaches the network. The lock gives the same answer every time, not the absence
+of the question.
 
 ## Source Layout
 
@@ -169,8 +344,8 @@ interactive shell.
 
 The following are intentionally out of scope for this first version, to keep
 `onion.toml` from becoming another large build language before real usage
-justifies it: dependency resolution or publishing, multiple modules or
-workspaces, configurable source/test/output/entrypoint paths, incremental
+justifies it: publishing, offline resolution, multiple modules
+or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
 a new test framework, package/archive commands, formatter or linter
 integration, lifecycle hooks or manifest scripts, terminal color, and an

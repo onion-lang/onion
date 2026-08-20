@@ -67,6 +67,13 @@ class MutualRecursionOptimization(config: CompilerConfig)
   private inline def trace(message: => String): Unit =
     if (config.verbose) System.err.println(message)
 
+  private val warnings = mutable.ArrayBuffer[CompileWarning]()
+
+  /** Warnings accumulated by the most recent `process` call (e.g. a `@TailRecursive`
+    * group that could not be optimized). Read after `process` returns.
+    */
+  def collectedWarnings: Seq[CompileWarning] = warnings.toSeq
+
   def newEnvironment(source: Seq[ClassDefinition]): Environment =
     new OptimizationEnvironment
 
@@ -74,6 +81,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     source: Seq[ClassDefinition],
     environment: OptimizationEnvironment
   ): Seq[ClassDefinition] = {
+    warnings.clear()
     source.map { classDef =>
       optimizeClass(classDef)
     }
@@ -114,6 +122,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
             if (config.verbose) {
               trace(s"[Mutual TCO] Cannot optimize: $error")
             }
+            reportIneffective(classDef, group, error)
           case None =>
             if (config.verbose) {
               trace(s"[Mutual TCO] Optimization will be applied")
@@ -169,7 +178,22 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Check 3: All methods must be in same class (already guaranteed by our collection)
 
-    // Check 4: All tail calls must be to methods in the group
+    // Check 4: All methods must share one parameter list (count and per-position types),
+    // since the state machine has a single set of loop variables shared by every member.
+    val paramCounts = group.map(_.arguments.length).toSet
+    if (paramCounts.size > 1) {
+      break(Some(s"Methods have different parameter counts: ${paramCounts.mkString(", ")}"))
+    }
+    val paramCount = group.head.arguments.length
+    val incompatibleParam = (0 until paramCount).find { paramIdx =>
+      group.map(_.arguments(paramIdx).name).toSet.size > 1
+    }
+    incompatibleParam.foreach { paramIdx =>
+      val paramTypes = group.map(_.arguments(paramIdx).name).toSet
+      break(Some(s"Methods have incompatible parameter lists: parameter $paramIdx has different types: ${paramTypes.mkString(", ")}"))
+    }
+
+    // Check 5: All tail calls must be to methods in the group
     val groupNames = group.map(_.name).toSet
     var validationError: Option[String] = None
     val iterator = group.iterator
@@ -183,6 +207,22 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     validationError
+  }
+
+  /**
+   * Warn that a detected `@TailRecursive` mutual-recursion group could not be
+   * optimized, so callers relying on the annotation for stack safety find out
+   * at compile time instead of via a runtime StackOverflowError.
+   */
+  private def reportIneffective(classDef: ClassDefinition, group: Seq[MethodDefinition], reason: String): Unit = {
+    val sourceFile = Option(classDef.getSourceFile).getOrElse("")
+    val groupNames = group.map(_.name).mkString(", ")
+    group.foreach { method =>
+      val message = s"method '${method.name}' is annotated @TailRecursive but its mutual-recursion " +
+        s"group ($groupNames) could not be optimized: $reason; without the state-machine rewrite, " +
+        s"deep recursion between these methods can still overflow the JVM stack"
+      warnings += CompileWarning(sourceFile, method.location, WarningCategory.IneffectiveTailRecursive, message)
+    }
   }
 
   /**
@@ -206,31 +246,8 @@ class MutualRecursionOptimization(config: CompilerConfig)
       }
     }
 
-    // Step 1: Check parameter compatibility
-    val paramCounts = group.map(_.arguments.length).toSet
-    if (paramCounts.size > 1) {
-      if (config.verbose) {
-        trace(s"[Mutual TCO] ERROR: Methods have different parameter counts: $paramCounts")
-      }
-      return
-    }
-
+    // Parameter compatibility is already guaranteed by validateGroup before this is called.
     val paramCount = group.head.arguments.length
-
-    // Check parameter types are compatible across all methods
-    val incompatibleParam = (0 until paramCount).find { paramIdx =>
-      val paramTypesSet = group.map(_.arguments(paramIdx).name).toSet
-      val incompatible = paramTypesSet.size > 1
-      if (incompatible) {
-        if (config.verbose) {
-          trace(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
-        }
-      }
-      incompatible
-    }
-    if (incompatibleParam.nonEmpty) {
-      return
-    }
 
     // Step 2: Create state machine method name and structure
     val stateMachineMethodName = group.map(_.name).mkString("_")

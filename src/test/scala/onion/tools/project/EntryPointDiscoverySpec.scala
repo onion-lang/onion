@@ -28,8 +28,12 @@ class EntryPointDiscoverySpec extends AnyFunSuite with Matchers:
     val root = Files.createTempDirectory("entry-point-discovery")
     val units = parse(root, "src/main.on" -> """IO::println("hello")""")
 
+    // Column 5 is `println`, not column 3 which was the `::`. A call is anchored at its
+    // name now that its location spans the whole call, and pointing at the method rather
+    // than at the scope-resolution operator is what a reader expects of "the entry point
+    // is here".
     EntryPointDiscovery.discover(root, units).toOption.value shouldBe
-      Vector(EntryPoint("mainMain", "src/main.on", 1, 3))
+      Vector(EntryPoint("mainMain", "src/main.on", 1, 5))
 
   test("does not treat declaration-only src/main.on as executable"):
     val root = Files.createTempDirectory("entry-point-discovery")

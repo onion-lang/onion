@@ -129,6 +129,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/AdtExpr.on"))
     }
 
+    it("runs ArchiveDemo.on") {
+      assert(Shell.Success(null) == runSample("run/ArchiveDemo.on"))
+    }
+
     it("runs SetOperations.on") {
       assert(Shell.Success("union=[apple, banana, cherry, date] intersection=[banana, cherry] diff=[apple]") ==
         runSample("run/SetOperations.on"))
@@ -532,6 +536,270 @@ class RunSamplesSpec extends AbstractShellSpec {
 
     it("runs LogAnalytics.on") {
       assert(Shell.Success(null) == runSample("run/LogAnalytics.on"))
+    }
+
+    it("runs AccessLogAnalyzer.on and reports deterministic aggregate stats") {
+      val (result, output) = runSampleWithStdinCapturingStdout("run/AccessLogAnalyzer.on", "")
+      assert(Shell.Success(null) == result)
+      assert(output.contains("Parsed 15 entries"))
+      assert(output.contains("Total requests : 15"))
+      assert(output.contains("Successful     : 9 (60.0%)"))
+      assert(output.contains("Errors         : 5 (33.3%)"))
+      assert(output.contains("Total bytes    : 25353"))
+      assert(output.contains("/api/data                            3 hits  33.0% err  avg 5896.0 B"))
+      assert(output.contains("192.168.1.10       5 req  2 err"))
+      assert(output.contains("[ALERT] 192.168.1.10 -- multiple errors detected"))
+      assert(output.contains("[ALERT] 10.0.0.99 -- multiple errors detected"))
+      assert(output.contains("Last error from 192.168.1.10: 500 GET /api/data"))
+      assert(output.contains("Successes: 9   Failures: 6"))
+      assert(output.contains("Recursive total bytes: 25353"))
+      assert(output.contains("Analysis complete."))
+    }
+
+    it("runs TryCatchEdgeCases.on") {
+      assert(Shell.Success(138) == runSample("run/TryCatchEdgeCases.on"))
+    }
+
+    it("runs ChemCalculator.on") {
+      assert(Shell.Success(null) == runSample("run/ChemCalculator.on"))
+    }
+
+    it("runs CodeContest.on") {
+      assert(Shell.Success(null) == runSample("run/CodeContest.on"))
+    }
+
+    it("runs CryptoPortfolio.on") {
+      assert(Shell.Success(null) == runSample("run/CryptoPortfolio.on"))
+    }
+
+    it("runs DependencyResolver.on") {
+      assert(Shell.Success(null) == runSample("run/DependencyResolver.on"))
+    }
+
+    it("runs DnaAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/DnaAnalyzer.on"))
+    }
+
+    it("runs ElevatorDispatcher.on") {
+      assert(Shell.Success(null) == runSample("run/ElevatorDispatcher.on"))
+    }
+
+    it("runs GenericLeaderboard.on") {
+      assert(Shell.Success(null) == runSample("run/GenericLeaderboard.on"))
+    }
+
+    it("runs GeneticSequencer.on") {
+      assert(Shell.Success(null) == runSample("run/GeneticSequencer.on"))
+    }
+
+    it("runs HospitalWard.on") {
+      assert(Shell.Success(null) == runSample("run/HospitalWard.on"))
+    }
+
+    it("runs InsuranceClaims.on") {
+      assert(Shell.Success(null) == runSample("run/InsuranceClaims.on"))
+    }
+
+    it("runs KaraokeNight.on") {
+      assert(Shell.Success(null) == runSample("run/KaraokeNight.on"))
+    }
+
+    it("runs MarkdownConverter.on") {
+      assert(Shell.Success(null) == runSample("run/MarkdownConverter.on"))
+    }
+
+    it("runs MiniTypeChecker.on") {
+      assert(Shell.Success(null) == runSample("run/MiniTypeChecker.on"))
+    }
+
+    it("runs NetworkMonitor.on") {
+      assert(Shell.Success(null) == runSample("run/NetworkMonitor.on"))
+    }
+
+    it("runs PlantCare.on") {
+      assert(Shell.Success(null) == runSample("run/PlantCare.on"))
+    }
+
+    it("runs RecipeVault.on") {
+      assert(Shell.Success(null) == runSample("run/RecipeVault.on"))
+    }
+
+    it("runs RuleEngine.on") {
+      assert(Shell.Success(null) == runSample("run/RuleEngine.on"))
+    }
+
+    it("runs SortAlgorithms.on") {
+      assert(Shell.Success(null) == runSample("run/SortAlgorithms.on"))
+    }
+
+    it("runs SupplyChain.on") {
+      assert(Shell.Success(null) == runSample("run/SupplyChain.on"))
+    }
+
+    it("runs TransitPlanner.on") {
+      assert(Shell.Success(null) == runSample("run/TransitPlanner.on"))
+    }
+
+    it("runs Automaton.on") {
+      assert(Shell.Success(null) == runSample("run/Automaton.on"))
+    }
+
+    it("runs EmployeeManager.on") {
+      assert(Shell.Success(null) == runSample("run/EmployeeManager.on"))
+    }
+
+    it("runs ExpenseAuditor.on: audits expenses and writes a report") {
+      val dir = java.nio.file.Files.createTempDirectory("expense-auditor-spec")
+      val src = dir.resolve("expenses.txt"); val out = dir.resolve("report.txt")
+      java.nio.file.Files.writeString(src,
+        "2026-01-05|Travel|120.50|taxi to airport\n2026-01-06|Meals|500.00|team dinner\n")
+      def run(args: String*): Shell.Result =
+        shell.run(load("run/ExpenseAuditor.on"), "run/ExpenseAuditor.on", args.toArray)
+
+      assert(Shell.Success(0) == run(src.toString, out.toString))
+      val report = java.nio.file.Files.readString(out)
+      assert(report.nonEmpty, report)
+    }
+
+    it("runs GameStore.on") {
+      assert(Shell.Success(null) == runSample("run/GameStore.on"))
+    }
+
+    it("runs MatrixCalc.on") {
+      assert(Shell.Success(null) == runSample("run/MatrixCalc.on"))
+    }
+
+    it("runs MazeSolver.on") {
+      assert(Shell.Success(null) == runSample("run/MazeSolver.on"))
+    }
+
+    it("runs MiniRpg.on") {
+      assert(Shell.Success(null) == runSample("run/MiniRpg.on"))
+    }
+
+    it("runs MovieRecommender.on") {
+      assert(Shell.Success(null) == runSample("run/MovieRecommender.on"))
+    }
+
+    it("runs MuseumCollection.on") {
+      assert(Shell.Success(null) == runSample("run/MuseumCollection.on"))
+    }
+
+    it("runs MusicLibrary.on") {
+      assert(Shell.Success(null) == runSample("run/MusicLibrary.on"))
+    }
+
+    it("runs NationalParkTracker.on") {
+      assert(Shell.Success(null) == runSample("run/NationalParkTracker.on"))
+    }
+
+    it("runs NutritionTracker.on") {
+      assert(Shell.Success(null) == runSample("run/NutritionTracker.on"))
+    }
+
+    it("runs ParkingGarage.on") {
+      assert(Shell.Success(null) == runSample("run/ParkingGarage.on"))
+    }
+
+    it("runs PayrollReport.on") {
+      assert(Shell.Success(null) == runSample("run/PayrollReport.on"))
+    }
+
+    it("runs PlaylistManager.on") {
+      assert(Shell.Success(null) == runSample("run/PlaylistManager.on"))
+    }
+
+    it("runs PokerHands.on") {
+      assert(Shell.Success(null) == runSample("run/PokerHands.on"))
+    }
+
+    it("runs RankedChoice.on") {
+      assert(Shell.Success(null) == runSample("run/RankedChoice.on"))
+    }
+
+    it("runs RecipeManager.on") {
+      assert(Shell.Success(null) == runSample("run/RecipeManager.on"))
+    }
+
+    it("runs RestaurantOrders.on") {
+      assert(Shell.Success(null) == runSample("run/RestaurantOrders.on"))
+    }
+
+    it("runs ShipmentTracker.on") {
+      assert(Shell.Success(null) == runSample("run/ShipmentTracker.on"))
+    }
+
+    it("runs ShoppingCart.on") {
+      assert(Shell.Success(null) == runSample("run/ShoppingCart.on"))
+    }
+
+    it("runs SnippetLibrary.on") {
+      assert(Shell.Success(null) == runSample("run/SnippetLibrary.on"))
+    }
+
+    it("runs SortingShowcase.on") {
+      assert(Shell.Success(null) == runSample("run/SortingShowcase.on"))
+    }
+
+    it("runs SpaceMission.on") {
+      assert(Shell.Success(null) == runSample("run/SpaceMission.on"))
+    }
+
+    it("runs StockPortfolio.on") {
+      assert(Shell.Success(null) == runSample("run/StockPortfolio.on"))
+    }
+
+    it("runs StudentGradeBook.on") {
+      assert(Shell.Success(null) == runSample("run/StudentGradeBook.on"))
+    }
+
+    it("runs Sudoku.on") {
+      assert(Shell.Success(null) == runSample("run/Sudoku.on"))
+    }
+
+    it("runs SudokuSolver.on") {
+      assert(Shell.Success(null) == runSample("run/SudokuSolver.on"))
+    }
+
+    it("runs TaskPlanner.on") {
+      assert(Shell.Success(null) == runSample("run/TaskPlanner.on"))
+    }
+
+    it("runs TimesheetTracker.on") {
+      assert(Shell.Success(null) == runSample("run/TimesheetTracker.on"))
+    }
+
+    it("runs TournamentStandings.on") {
+      assert(Shell.Success(null) == runSample("run/TournamentStandings.on"))
+    }
+
+    it("runs TournamentTracker.on") {
+      assert(Shell.Success(null) == runSample("run/TournamentTracker.on"))
+    }
+
+    it("runs LambdaArrows.on") {
+      assert(Shell.Success(null) == runSample("run/LambdaArrows.on"))
+    }
+
+    it("runs VirtualMachine.on") {
+      assert(Shell.Success(null) == runSample("run/VirtualMachine.on"))
+    }
+
+    it("runs VirtualShell.on") {
+      assert(Shell.Success(null) == runSample("run/VirtualShell.on"))
+    }
+
+    it("runs MiniWebService.on: it answers its own requests and stops") {
+      // Binds port 0 on localhost, so this needs no fixed port and is not reachable from
+      // the network. The assertions cover the regex route capturing its group, the
+      // catch-all falling through to 404, and -- because a non-daemon handler pool would
+      // keep the JVM alive after `main` returned -- that the program actually terminates.
+      val (result, output) = runSampleWithStdinCapturingStdout("run/MiniWebService.on", "")
+      assert(Shell.Success(null) == result)
+      assert(output.contains("/health -> HTTP/1.1 200 OK | ok"))
+      assert(output.contains("""/users/42 -> HTTP/1.1 200 OK | {"id": 42}"""))
+      assert(output.contains("/missing -> HTTP/1.1 404 Not Found | Not Found"))
+      assert(output.contains("stopped"))
     }
   }
 }

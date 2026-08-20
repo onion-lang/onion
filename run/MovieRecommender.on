@@ -88,30 +88,30 @@ public:
   def size: Int = catalog.size
 
   def findByTitle(title: String): Movie? {
-    return catalog.find { m => (m as Movie).title() == title } as Movie?
+    return catalog.find { m -> (m as Movie).title() == title } as Movie?
   }
 
   def byGenre(g: Genre): List[Movie] {
-    return catalog.filter { m: Movie => m.genre() == g }
+    return catalog.filter { m: Movie -> m.genre() == g }
   }
 
   def topRated(n: Int): List[Movie] {
-    val sorted: List[Movie] = catalog.sortedBy { m: Movie => -(m.rating()) }
+    val sorted: List[Movie] = catalog.sortedBy { m: Movie -> -(m.rating()) }
     return new TopN[Movie](sorted).take(n)
   }
 
   def avgRating(): Double {
     if catalog.size == 0 { return 0.0 }
-    val sum: Double = catalog.fold(0.0) { acc: Double, m: Movie => acc + m.rating() }
+    val sum: Double = catalog.fold(0.0) { acc: Double, m: Movie -> acc + m.rating() }
     return sum / (catalog.size as Double)
   }
 
   def printGenreStats(): void {
-    val byGenre: Map[String, List[Movie]] = catalog.groupBy { m: Movie => m.genre().name() }
+    val byGenre: Map[String, List[Movie]] = catalog.groupBy { m: Movie -> m.genre().name() }
     foreach (genre, movies) in byGenre {
       val movieList: List[Movie] = movies as List[Movie]
       val count: Int = movieList.size
-      val sum: Double = movieList.fold(0.0) { acc: Double, m: Movie => acc + m.rating() }
+      val sum: Double = movieList.fold(0.0) { acc: Double, m: Movie -> acc + m.rating() }
       val avg: Double = sum / (count as Double)
       val rounded: Double = (JMath::round(avg * 10.0) as Double) / 10.0
       IO::println("    #{genre}: #{count} films, avg ★#{rounded}")
@@ -146,18 +146,18 @@ public:
 
   def recommend(profile: UserProfile): List[ScoredMovie] {
     val eligible: List[Movie] = db.catalog
-      .filter { m: Movie => m.rating() >= profile.minRating() }
-    val scored: List[ScoredMovie] = eligible.map { m: Movie =>
+      .filter { m: Movie -> m.rating() >= profile.minRating() }
+    val scored: List[ScoredMovie] = eligible.map { m: Movie ->
       new ScoredMovie(m, scoreFor(m, profile))
     }
-    val sorted: List[ScoredMovie] = scored.sortedBy { s: ScoredMovie => -(s.score()) }
+    val sorted: List[ScoredMovie] = scored.sortedBy { s: ScoredMovie -> -(s.score()) }
     return new TopN[ScoredMovie](sorted).take(profile.maxResults())
   }
 
   def findBestInGenre(g: Genre): Movie? {
     val candidates: List[Movie] = db.byGenre(g)
     if candidates.size == 0 { return null }
-    return candidates.sortedBy { m: Movie => -(m.rating()) }.find { m => true } as Movie?
+    return candidates.sortedBy { m: Movie -> -(m.rating()) }.find { m -> true } as Movie?
   }
 }
 
@@ -205,7 +205,7 @@ def main(): void {
 
   // ─ Rating partition ─
   IO::println("\n── Rating split at ★8.5 ──")
-  val rateParts = db.catalog.partition { m: Movie => m.rating() >= 8.5 }
+  val rateParts = db.catalog.partition { m: Movie -> m.rating() >= 8.5 }
   val above = rateParts[0] as List[Object]
   val below = rateParts[1] as List[Object]
   IO::println("  Above ★8.5: #{above.size} films")
@@ -255,7 +255,7 @@ def main(): void {
 
   // ─ Recent vs classic breakdown ─
   IO::println("\n── Recent (2010+) vs Classic ──")
-  val eraParts = db.catalog.partition { m: Movie => m.era().isRecent() }
+  val eraParts = db.catalog.partition { m: Movie -> m.era().isRecent() }
   val recent = eraParts[0] as List[Object]
   val classic = eraParts[1] as List[Object]
   IO::println("  Recent: #{recent.size} films")
@@ -263,12 +263,12 @@ def main(): void {
 
   // ─ Highly-rated per genre (groupBy + filter) ─
   IO::println("\n── Highly rated (★8.0+) titles per genre ──")
-  val genreMap: Map[String, List[Movie]] = db.catalog.groupBy { m: Movie => m.genre().name() }
+  val genreMap: Map[String, List[Movie]] = db.catalog.groupBy { m: Movie -> m.genre().name() }
   foreach (genre, movies) in genreMap {
     val ms: List[Movie] = movies as List[Movie]
-    val highly: List[Movie] = ms.filter { m: Movie => m.isHighlyRated() }
+    val highly: List[Movie] = ms.filter { m: Movie -> m.isHighlyRated() }
     if highly.size > 0 {
-      val titles: List[String] = highly.map { m: Movie => m.title() }
+      val titles: List[String] = highly.map { m: Movie -> m.title() }
       IO::println("  #{genre}: #{titles}")
     }
   }

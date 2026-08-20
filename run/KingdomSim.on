@@ -294,36 +294,36 @@ public:
   }
 
   def richProvinces(): List[Object] {
-    return all().filter { p => (p as Province).isRich() }
+    return all().filter { p -> (p as Province).isRich() }
   }
 
   def poorProvinces(): List[Object] {
-    return all().filter { p => (p as Province).isPoor() }
+    return all().filter { p -> (p as Province).isPoor() }
   }
 
   def byWealth(): List[Object] {
-    return all().sortedBy { p => (p as Province).totalWealth() }
+    return all().sortedBy { p -> (p as Province).totalWealth() }
   }
 
   def byRegion(): Map[String, List[Object]] {
-    return all().groupBy { p => (p as Province).region() }
+    return all().groupBy { p -> (p as Province).region() }
   }
 
   def totalGold(): Int {
-    return all().map { p => (p as Province).gold() }
-                .fold(0) { acc, v => acc + (v as Int) }
+    return all().map { p -> (p as Province).gold() }
+                .fold(0) { acc, v -> acc + (v as Int) }
   }
 
   def totalPopulation(): Int {
-    return all().map { p => (p as Province).population() }
-                .fold(0) { acc, v => acc + (v as Int) }
+    return all().map { p -> (p as Province).population() }
+                .fold(0) { acc, v -> acc + (v as Int) }
   }
 
   def avgWealth(): Double {
     val cnt: Int = provinces.size()
     if cnt == 0 { return 0.0 }
-    val total: Int = all().map { p => (p as Province).totalWealth() }
-                         .fold(0) { acc, v => acc + (v as Int) }
+    val total: Int = all().map { p -> (p as Province).totalWealth() }
+                         .fold(0) { acc, v -> acc + (v as Int) }
     return (total as Double) / (cnt as Double)
   }
 }
@@ -372,8 +372,8 @@ public:
     val byReg: Map[String, List[Object]] = manager.byRegion()
     foreach (region, list) in byReg {
       val ps: List[Object] = list as List[Object]
-      val names: List[Object] = ps.map { p => (p as Province).name() }
-      val joined: String = names.fold("") { acc, n => if acc == "" { n as String } else { acc + ", " + (n as String) } } as String
+      val names: List[Object] = ps.map { p -> (p as Province).name() }
+      val joined: String = names.fold("") { acc, n -> if acc == "" { n as String } else { acc + ", " + (n as String) } } as String
       sb = sb + "  #{region}: #{joined}\n"
     }
     sb = sb + "\n"
@@ -392,11 +392,11 @@ public:
     sb = sb + "\n"
 
     // Rich vs poor partition
-    val parts = manager.all().partition { p => (p as Province).isRich() }
+    val parts = manager.all().partition { p -> (p as Province).isRich() }
     val rich: List[Object] = (parts as List)[0] as List[Object]
     val poor: List[Object] = (parts as List)[1] as List[Object]
-    val richNames: String = rich.map { p => (p as Province).name() }.fold("") { a, n => if a == "" { n as String } else { a + ", " + (n as String) } } as String
-    val poorNames: String = poor.map { p => (p as Province).name() }.fold("") { a, n => if a == "" { n as String } else { a + ", " + (n as String) } } as String
+    val richNames: String = rich.map { p -> (p as Province).name() }.fold("") { a, n -> if a == "" { n as String } else { a + ", " + (n as String) } } as String
+    val poorNames: String = poor.map { p -> (p as Province).name() }.fold("") { a, n -> if a == "" { n as String } else { a + ", " + (n as String) } } as String
     sb = sb + "  Rich provinces (#{rich.size}): #{richNames}\n"
     sb = sb + "  Poor provinces (#{poor.size}): #{poorNames}\n\n"
 
@@ -419,7 +419,7 @@ def tradePairs(provinces: List[Object]): List[Object] {
     b <- provinces
     ret new Trade((a as Province).id(), (b as Province).id(), ResourceType::Gold, 10)
   }
-  return all.filter { ev =>
+  return all.filter { ev ->
     val e: KingdomEvent = ev as KingdomEvent
     select e {
       case t is Trade: t.fromId() != t.toId()
@@ -485,8 +485,8 @@ def main(): void {
   // Pipeline showcase: top 3 wealthiest provinces
   IO::println("\n  Top 3 wealthiest provinces:")
   val top3: List[Object] = manager.byWealth()
-                                  .filter { p => (p as Province).totalWealth() > 100 }
-                                  .sortedBy { p => 0 - (p as Province).totalWealth() }
+                                  .filter { p -> (p as Province).totalWealth() > 100 }
+                                  .sortedBy { p -> 0 - (p as Province).totalWealth() }
                                   .take(3)
   foreach p: Object in top3 {
     val pr: Province = p as Province
@@ -501,10 +501,10 @@ def main(): void {
   }
 
   // find + any: poverty and grain shortage checks
-  val hasPovert: Boolean = manager.all().any { p => (p as Province).isPoor() }
+  val hasPovert: Boolean = manager.all().any { p -> (p as Province).isPoor() }
   val poorest: Object? = manager.all()
-    .sortedBy { p => (p as Province).totalWealth() }
-    .find { p => (p as Province).isPoor() }
+    .sortedBy { p -> (p as Province).totalWealth() }
+    .find { p -> (p as Province).isPoor() }
   IO::println("\n  Any province in poverty? #{hasPovert}")
   if poorest != null {
     val lgMsg: String = "  Poorest province: #{(poorest as Province).name()} wealth=#{(poorest as Province).totalWealth()}"
@@ -512,13 +512,13 @@ def main(): void {
   }
 
   // distinct: show unique regions represented
-  val regions = manager.all().map { p => (p as Province).region() }.distinct()
-  val regionList: String = regions.fold("") { a, r => if a == "" { r as String } else { a + ", " + (r as String) } } as String
+  val regions = manager.all().map { p -> (p as Province).region() }.distinct()
+  val regionList: String = regions.fold("") { a, r -> if a == "" { r as String } else { a + ", " + (r as String) } } as String
   IO::println("  Distinct regions: #{regionList}")
 
   // zip: pair province names with their wealth values
-  val names: List[Object] = manager.all().map { p => (p as Province).name() }
-  val wealths: List[Object] = manager.all().map { p => (p as Province).totalWealth() }
+  val names: List[Object] = manager.all().map { p -> (p as Province).name() }
+  val wealths: List[Object] = manager.all().map { p -> (p as Province).totalWealth() }
   val zipped = names.zip(wealths)
   IO::println("\n  Province name → wealth pairs:")
   foreach pair: Object in zipped {
@@ -528,8 +528,8 @@ def main(): void {
 
   // |> pipeline: find any province with low grain (use |> for the println call)
   val lowGrainList: List[Object] = manager.all()
-    .filter { p => (p as Province).grain() < 100 }
-    .sortedBy { p => (p as Province).grain() }
+    .filter { p -> (p as Province).grain() < 100 }
+    .sortedBy { p -> (p as Province).grain() }
   val lowGrain: Object? = if lowGrainList.size > 0 { lowGrainList.get(0) } else { null }
   if lowGrain != null {
     val lgMsg: String = "\n  Low-grain alert: #{((lowGrain as Province)).name()} (#{((lowGrain as Province)).grain()} grain)"

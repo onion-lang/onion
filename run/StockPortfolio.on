@@ -195,14 +195,14 @@ public:
   }
 
   def investedValue(): Double =
-    self.positions.fold(0.0) { acc, p =>
+    self.positions.fold(0.0) { acc, p ->
       (acc as Double) + (p as Position).marketValue()
     } as Double
 
   def totalValue(): Double = self.cash + self.investedValue()
 
   def totalCost(): Double =
-    self.positions.fold(0.0) { acc, p =>
+    self.positions.fold(0.0) { acc, p ->
       (acc as Double) + (p as Position).costBasis()
     } as Double
 
@@ -296,21 +296,21 @@ foreach s: Stock in stocks {
 }
 
 // Group trades by ticker, then compute net position per ticker
-val byTicker = trades.groupBy { t => (t as Trade).ticker() }
+val byTicker = trades.groupBy { t -> (t as Trade).ticker() }
 
 val allPositions: List[Object] = []
 foreach (ticker, tradeList) in byTicker {
   val ts: List[Object] = tradeList as List[Object]
-  val netShares: Int = ts.fold(0) { acc, t =>
+  val netShares: Int = ts.fold(0) { acc, t ->
     val tr: Trade = t as Trade
     val delta: Int = if tr.kind() == TradeKind::BUY { tr.shares() } else { 0 - tr.shares() }
     (acc as Int) + delta
   } as Int
-  val buyShares: Int = ts.fold(0) { acc, t =>
+  val buyShares: Int = ts.fold(0) { acc, t ->
     val tr: Trade = t as Trade
     (acc as Int) + (if tr.kind() == TradeKind::BUY { tr.shares() } else { 0 })
   } as Int
-  val buyCost: Double = ts.fold(0.0) { acc, t =>
+  val buyCost: Double = ts.fold(0.0) { acc, t ->
     val tr: Trade = t as Trade
     (acc as Double) + (if tr.kind() == TradeKind::BUY { tr.total() } else { 0.0 })
   } as Double
@@ -322,7 +322,7 @@ foreach (ticker, tradeList) in byTicker {
 }
 
 // Compute cash remaining after all BUY trades minus SELL proceeds
-val netCashSpent: Double = trades.fold(0.0) { acc, t =>
+val netCashSpent: Double = trades.fold(0.0) { acc, t ->
   val tr: Trade = t as Trade
   val flow: Double = if tr.kind() == TradeKind::BUY { tr.total() } else { 0.0 - tr.total() }
   (acc as Double) + flow
@@ -358,19 +358,19 @@ IO::println(
   " Return ".padLeft(8)
 )
 IO::println(HR75)
-val sortedByValue: List[Object] = allPositions.sortedBy { p => 0.0 - (p as Position).marketValue() }
+val sortedByValue: List[Object] = allPositions.sortedBy { p -> 0.0 - (p as Position).marketValue() }
 foreach p: Position in sortedByValue {
   IO::println(p.row())
 }
 IO::println(HR75)
 
 // ── Winners & Losers (partition) ──────────────────────────────────────────────
-val parts                  = allPositions.partition { p => (p as Position).isProfit() }
+val parts                  = allPositions.partition { p -> (p as Position).isProfit() }
 val winners: List[Object]  = parts[0] as List[Object]
 val losers: List[Object]   = parts[1] as List[Object]
 IO::println("")
 IO::println("Winners (" + winners.size + "):")
-foreach p: Position in winners.sortedBy { p => 0.0 - (p as Position).unrealizedPct() } {
+foreach p: Position in winners.sortedBy { p -> 0.0 - (p as Position).unrealizedPct() } {
   IO::println(
     "  ▲ " + p.ticker().padRight(6) +
     p.unrealizedPnL().usd().padLeft(10) +
@@ -378,7 +378,7 @@ foreach p: Position in winners.sortedBy { p => 0.0 - (p as Position).unrealizedP
   )
 }
 IO::println("Losers  (" + losers.size + "):")
-foreach p: Position in losers.sortedBy { p => (p as Position).unrealizedPct() } {
+foreach p: Position in losers.sortedBy { p -> (p as Position).unrealizedPct() } {
   IO::println(
     "  ▼ " + p.ticker().padRight(6) +
     p.unrealizedPnL().usd().padLeft(10) +
@@ -390,7 +390,7 @@ foreach p: Position in losers.sortedBy { p => (p as Position).unrealizedPct() } 
 IO::println("")
 IO::println("SECTOR BREAKDOWN:")
 IO::println(HR60)
-val bySector = allPositions.groupBy { p =>
+val bySector = allPositions.groupBy { p ->
   val sec: Sector = if sectorMap[(p as Position).ticker()] != null {
     sectorMap[(p as Position).ticker()] as Sector
   } else { Sector::Consumer }
@@ -398,14 +398,14 @@ val bySector = allPositions.groupBy { p =>
 }
 foreach (secLabel, posList) in bySector {
   val ps: List[Object]   = posList as List[Object]
-  val secVal: Double     = ps.fold(0.0) { a, p => (a as Double) + (p as Position).marketValue() } as Double
-  val secPnL: Double     = ps.fold(0.0) { a, p => (a as Double) + (p as Position).unrealizedPnL() } as Double
-  val secTickers: List[Object] = ps.map { p => (p as Position).ticker() }
+  val secVal: Double     = ps.fold(0.0) { a, p -> (a as Double) + (p as Position).marketValue() } as Double
+  val secPnL: Double     = ps.fold(0.0) { a, p -> (a as Double) + (p as Position).unrealizedPnL() } as Double
+  val secTickers: List[Object] = ps.map { p -> (p as Position).ticker() }
   IO::println(
     "  " + (secLabel as String).padRight(14) +
     secVal.usd().padLeft(11) +
     "   P&L " + secPnL.usd().padLeft(10) +
-    "   tickers: " + secTickers.fold("") { a, t => if (a as String) == "" { t as String } else { (a as String) + "," + (t as String) } }
+    "   tickers: " + secTickers.fold("") { a, t -> if (a as String) == "" { t as String } else { (a as String) + "," + (t as String) } }
   )
 }
 
@@ -422,7 +422,7 @@ IO::println(
   "  Chg%"
 )
 IO::println(HR75)
-val sortedStocks: List[Object] = stocks.sortedBy { s => 0.0 - (s as Stock).changePct() }
+val sortedStocks: List[Object] = stocks.sortedBy { s -> 0.0 - (s as Stock).changePct() }
 val nStocks: Int = sortedStocks.size
 IO::println("▲ TOP GAINERS")
 foreach i: Int in 0..<3 {
@@ -435,7 +435,7 @@ foreach i: Int in (nStocks - 3)..<nStocks {
 
 // ── Distinct sectors held (distinct) ─────────────────────────────────────────
 val distinctSectors: List[String] = allPositions
-  .map { p =>
+  .map { p ->
     val sec = sectorMap[(p as Position).ticker()]
     if sec != null { (sec as Sector).label() } else { "Unknown" }
   }
@@ -459,7 +459,7 @@ val events: List[Object] = [
 foreach e: CorpEvent in events {
   IO::println("  • " + e.describe())
   val evTicker: String   = e.affectedTicker()
-  val held: Position?    = allPositions.find { p => (p as Position).ticker() == evTicker } as Position?
+  val held: Position?    = allPositions.find { p -> (p as Position).ticker() == evTicker } as Position?
   if held != null {
     IO::println("    → You hold " + held.shares() + " " + held.shares().shareWord() +
                 " — event applies to this position.")
@@ -470,8 +470,8 @@ foreach e: CorpEvent in events {
 IO::println("")
 IO::println("PORTFOLIO STATISTICS:")
 IO::println(HR60)
-val totalCostAll: Double = allPositions.fold(0.0) { a, p => (a as Double) + (p as Position).costBasis() } as Double
-val totalValAll: Double  = allPositions.fold(0.0) { a, p => (a as Double) + (p as Position).marketValue() } as Double
+val totalCostAll: Double = allPositions.fold(0.0) { a, p -> (a as Double) + (p as Position).costBasis() } as Double
+val totalValAll: Double  = allPositions.fold(0.0) { a, p -> (a as Double) + (p as Position).marketValue() } as Double
 val totalPnLAll: Double  = totalValAll - totalCostAll
 val nPos: Int = allPositions.size
 IO::println("  Total invested:      " + totalCostAll.usd())
@@ -495,7 +495,7 @@ IO::println("")
 IO::println("TICKER LOOKUP (try/catch demo):")
 IO::println(HR60)
 def requirePosition(positions: List[Object], ticker: String): Position {
-  val p: Position? = positions.find { p => (p as Position).ticker() == ticker } as Position?
+  val p: Position? = positions.find { p -> (p as Position).ticker() == ticker } as Position?
   if p == null { throw new Exception("No position found for: " + ticker) }
   return p as Position
 }
@@ -528,7 +528,7 @@ while day < dailyChanges.size {
 // ── zip: pair each position with its rank by return ──────────────────────────
 IO::println("")
 IO::println("POSITIONS BY RETURN RANK:")
-val ranked: List[Object] = sortedByValue.sortedBy { p => 0.0 - (p as Position).unrealizedPct() }
+val ranked: List[Object] = sortedByValue.sortedBy { p -> 0.0 - (p as Position).unrealizedPct() }
 val ranks: List[Object]  = []
 foreach i: Int in 1..ranked.size { ranks << i }
 val zipped = ranks.zip(ranked)

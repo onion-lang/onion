@@ -6,7 +6,11 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI）, `Http`（HTTPクライアント） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **ネットワーク** | `Http`（HTTPクライアント）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
+| **データストア** | `Db`（JDBC経由のSQL） |
+| **アーカイブ** | `Archive`（zip・gzip） |
+| **並行処理** | `Future`, `Concurrent`（プール・カウンタ・ロック・チャネル） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
@@ -114,7 +118,7 @@ val l: Long? = IO::tryReadLong("L: ")
 
 ```onion
 val lines: List = IO::readLines()          // 入力の終端まで読み取り
-IO::eachLine { line => IO::println(line) } // 残りの各行にコールバックを適用
+IO::eachLine { line -> IO::println(line) } // 残りの各行にコールバックを適用
 IO::printLines(["a", "b", "c"])            // 1項目1行で出力
 IO::printAll("a", "b", "c")                // printLines の可変長引数版
 ```
@@ -397,7 +401,7 @@ Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- この型が存在する理由
 ```onion
 val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
 val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
-println(a.zip(b) { p, q => p + q }.defects().size)   // 1 ではなく 2
+println(a.zip(b) { p, q -> p + q }.defects().size)   // 1 ではなく 2
 ```
 
 `bind` は短絡したままです——後続の計算が前の値に依存しうる以上、そうでなければなりません。
@@ -472,12 +476,12 @@ L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそ�
 不透明な値で、生成した shape にだけ渡し戻してください。
 
 `Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
-`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v => ... }` は更新を
+`withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v -> ... }` は更新を
 値にフォーカスします。`render()` がテキストを再構成します:
 
 ```onion
 val r   = configShape.parseLossless(file"app.conf".text()).get()
-val out = r.edit { v => v.copy(port = 9090) }.render()
+val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  1行だけ変わる
 ```
 
@@ -500,7 +504,7 @@ val out = r.edit { v => v.copy(port = 9090) }.render()
 
 ## 関数インターフェース
 
-ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。
+ラムダとクロージャのための組み込み関数型。`f(args)`の代わりに`f(args)`として呼び出せます。
 
 ### Function0
 
@@ -508,7 +512,7 @@ val out = r.edit { v => v.copy(port = 9090) }.render()
 
 ```onion
 val func: Function0[Int] = () -> { return 42; }
-val result: Int = func.call()
+val result: Int = func()
 ```
 
 ### Function1
@@ -517,7 +521,7 @@ val result: Int = func.call()
 
 ```onion
 val double: Function1[Int, Int] = (x: Int) -> { return x * 2; }
-val result: Int = double.call(5)
+val result: Int = double(5)
 ```
 
 ### Function2
@@ -526,7 +530,7 @@ val result: Int = double.call(5)
 
 ```onion
 val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
-val result: Int = add.call(3, 7)
+val result: Int = add(3, 7)
 ```
 
 ### Function3 から Function10 まで
@@ -1494,9 +1498,9 @@ parsed.positional()                     // オプション以外の引数の Lis
 Colls::listOf("a", "b", "c")            // 不変の List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
-Colls::sortedBy(people) { p => p.age() }
+Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
-// xs.map { x => x * 2 }.filter { x => x > 0 }
+// xs.map { x -> x * 2 }.filter { x -> x > 0 }
 ```
 
 ### バッチ化・ウィンドウ化・セレクタ集計
@@ -1512,7 +1516,7 @@ ps.averageBy((p) -> p.age())      // Double - セレクタの平均、空なら0
 ps.maxBy((p) -> p.age())          // セレクタの値が最大の要素、空ならnull
 ps.minBy((p) -> p.age())          // セレクタの値が最小の要素、空ならnull
 
-xs.chunked(2).map { b => (b as List).size() }   // 他のパイプライン段と同様に連結できる
+xs.chunked(2).map { b -> (b as List).size() }   // 他のパイプライン段と同様に連結できる
 ```
 
 ## Http
@@ -1660,6 +1664,211 @@ IO::println("明日: " + DateTime::format(tomorrow));
 val birthday: Long = DateTime::of(1990, 5, 15);
 val age: Int = DateTime::diffDays(now, birthday) / 365;
 ```
+
+---
+
+## Net
+
+TCP ソケット。`Http` がリクエストを送る側なのに対し、こちらは任意のプロトコルを話し、接続を受けられます。
+
+### Net::connect
+
+```onion
+val conn = Net::connect("example.com", 80)
+conn.writeLine("GET / HTTP/1.0")
+conn.writeLine("Host: example.com")
+conn.writeLine("")
+IO::println(conn.readAll())
+conn.close()
+```
+
+`Net::connect(host, port, timeoutMillis)` はタイムアウトを指定できます。OS 既定のままだと、
+パケットが落ちた場合に 1 分以上待つことがあります。
+
+接続は `readLine()`（終端で null）、`readAll()`（UTF-8、相手が閉じるまで）、`readBytes()` で読み、
+`write(text)`、`writeLine(text)`（CRLF を付加。行指向プロトコルが期待する形）、`writeBytes(bytes)`
+で書きます。書き込みは毎回フラッシュするので、バッファに溜まったまま送られないことはありません。
+`timeout(millis)` はブロックする読み込みの上限、`closeWrite()` は読みを続けたまま書き側だけ閉じて
+EOF を通知します。`close()` は冪等です。
+
+### Net::listen
+
+```onion
+val listener = Net::listen("localhost", 0, 4)   // 0 で OS に空きポートを選ばせる
+IO::println("listening on " + listener.port())
+
+val peer = listener.accept()
+peer.writeLine("hello " + peer.remoteAddress())
+peer.close()
+listener.close()
+```
+
+ポート 0 は OS に空きポートを選ばせ、`port()` が実際のポートを返します。番号を決め打ちして祈らずに
+サーバをテストできるのはこのためです。`"localhost"` を指定するとネットワークからは到達できません。
+ホストに `null` を渡すとすべてのローカルアドレスにバインドします。`accept()` でブロックしている
+スレッドを解除するにはリスナーを閉じます。
+
+失敗時は失敗したアドレスがメッセージに入るので、Onion の `catch` で「connection refused」だけでなく
+どのホストかが分かります。
+
+---
+
+## Server
+
+HTTP サーバ。JDK 同梱の実装を使うので依存は増えません。
+
+### Server::start
+
+```onion
+val server = Server::start("localhost", 8080)
+server.handle("/hello", (req) -> Server::text("hi " + req.method()))
+server.await()
+```
+
+`Server::start(port)` はすべてのローカルアドレス、`Server::start(host, port)` は 1 つだけに
+バインドします。ポート 0 なら OS が空きポートを選び、`port()` が返します。`await()` はプロセスが
+終わるまでブロックし、`stop()` は受付を止めて処理中のリクエストを 1 秒待ちます。
+
+### ルーティング
+
+`handle(path, handler)` は完全一致、`handleAll(handler)` はそれ以外すべてを受けます。Onion 側で
+ルーティングを書くならこちらです。
+
+```onion
+server.handleAll((req) -> select req.path() {
+  case re"/users/(\d+)" (id): Server::json("{\"id\":" + id + "}")
+  case "/health":             Server::text("ok")
+  else:                       Server::notFound()
+})
+```
+
+ハンドラが例外を投げた場合は 500 を返します。サーバが落ちたり、クライアントが応答のないソケットで
+待ち続けたりすることはありません。
+
+### Request
+
+`method()`、`path()`（クエリ文字列を含まない）、`query()`（生のクエリ文字列。無ければ `""`）、
+`body()`（ハンドラ実行前に全部読み込み済み）、`header(name)`、`headers()`、`params()`。
+最後の 2 つは記述順を保った `Map` を返します。
+
+### Response
+
+`Server::text`・`Server::json`・`Server::html` は対応する Content-Type 付きの 200、
+`Server::notFound()` は 404、`Server::status(code, body)` はそれ以外です。レスポンスは不変なので、
+`withStatus` と `withHeader` は新しい値を返します。
+
+```onion
+val r = Server::json("{\"a\":1}").withStatus(201).withHeader("X-Test", "yes")
+```
+
+レスポンスの構築はソケットに一切触れません。ハンドラを単体でテストできるのはこのためです。
+
+---
+
+## Archive
+
+zip と gzip。tar は依存が必要になるため入れていません。この 2 つが JDK 単体でできる範囲です。
+
+```onion
+Archive::zip("out.zip", ["a.txt", "b.txt"])
+Archive::zipDir("site.zip", "site")          // "site" からの相対パスを保つ
+val names = Archive::entries("out.zip")      // 展開せずに一覧
+val written = Archive::unzip("out.zip", "extracted")
+
+Archive::gzipFile("big.log", "big.log.gz")   // 全部をメモリに読まずストリーミング
+Archive::gunzipFile("big.log.gz", "big.log") // その逆
+val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
+```
+
+**展開は、対象ディレクトリの外に書き出すことを拒否します。** `../../.ssh/authorized_keys` という
+名前のエントリは「zip slip」と呼ばれる古典的な攻撃で、エントリ名を素直に解決する展開処理は
+言われたとおりの場所に書き込んでしまいます。ここではエントリ名を示して例外を投げます。
+
+エントリのタイムスタンプは固定値で書き込むので、同じ入力を 2 回 zip すると同じバイト列になります。
+実行のたびに変わる成果物はチェックサムもキャッシュもできません。
+
+---
+
+## Concurrent
+
+スレッドと、それを安全に使うための部品。`Future` は既に「1 つの処理を別スレッドで走らせる」ことは
+できましたが、同時実行数を制限する手段、スレッド間でカウンタを共有する手段、ロックを取る手段、
+処理を受け渡す手段がありませんでした。
+
+仮想スレッドは意図的に入れていません。Java 21 が必要で、Onion のターゲットは 17 です。
+
+### Pool
+
+```onion
+val pool = Concurrent::pool(4)                     // Concurrent::pool() で CPU 数
+val bodies = pool.mapAll(urls, (u) -> Http::get(u))
+pool.close()
+```
+
+`mapAll` は結果を**入力の順序**で返します。完了順ではありません——タイミングに依存する出力は
+テストできない出力です。失敗した要素は全タスクが決着してから報告されるので、1 つの不正な入力の
+せいで、諦めた呼び出し元の裏でワーカーが走り続けることはありません。単発の処理には
+`submit(f)` が `Future` を返します。
+
+プールのスレッドはデーモンなので、閉じ忘れたプールが `main` の後も JVM を生かし続けることは
+ありません。とはいえ `close()` は呼ぶべきですし、処理中のものを待つなら `awaitClose(millis)` です。
+
+### Counter・Lock・Channel
+
+```onion
+val hits = Concurrent::counter()
+hits.increment()
+
+val lock = Concurrent::lock()
+lock.withLock(() -> { /* … */ })     // 本体が例外を投げても解放される
+
+val chan = Concurrent::channel(16)   // 意図的に上限つき
+chan.send("work")
+val item = chan.receiveTimeout(1000) // 永久にブロックせず null を返す
+```
+
+`acquire`/`release` の手動ペアより `withLock` を使ってください。ペアの間で例外が投げられると
+ロックが漏れ、他のスレッドが永久に待ちます。チャネルに上限があるのは、無制限だと生産者が
+消費者を追い越していることがメモリ枯渇まで見えないからです。`null` の送信は拒否します——
+受信側で「何も来なかった」と区別できなくなるためです。
+
+---
+
+## Db
+
+JDBC 経由の SQL。ドライバは同梱していません。プロジェクトが宣言したものを使います。
+
+```toml
+[dependencies]
+"org.postgresql:postgresql" = "42.7.3"
+```
+
+```onion
+val db = Db::connect("jdbc:postgresql://localhost/app", "user", "secret")
+
+val rows = db.query("SELECT id, name FROM users WHERE age > ?", 18)
+val one  = db.queryOne("SELECT * FROM users WHERE id = ?", 7)   // 該当なしなら null
+val n    = db.queryValue("SELECT COUNT(*) FROM users")          // 先頭行の先頭列
+db.update("INSERT INTO users VALUES (?, ?)", 8, "ada")
+
+db.transaction((conn) -> {
+  conn.update("UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
+  conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
+})
+
+db.close()
+```
+
+値は常に**バインド**され、SQL 文字列に埋め込まれることはありません。`WHERE name = ?` は
+どんな名前でも安全で、うっかり文字列連結してしまう余地がそもそもありません。
+
+トランザクションは本体が正常終了すればコミット、例外を投げればロールバックし、そのうえで
+再スローします。`begin`/`commit` のペアを忘れる余地はありません。手動のペアの間で例外が投げられると
+接続はトランザクションを開いたままになり、次の無関係な文がそれに巻き込まれます。
+
+行は「列ラベル → 値」の `Map` で、選択した順序を保ちます。列名ではなくラベルなので
+`SELECT x AS y` は `y` になります。同じラベルの列が 2 つある場合は、片方を黙って失う代わりに
+拒否します。`AS` で別名を付けてください。
 
 ---
 

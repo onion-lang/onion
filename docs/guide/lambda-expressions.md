@@ -46,14 +46,10 @@ val double = (x: Int) -> x * 2
 println(double(21))   // 42
 ```
 
-`.call()` also works:
-
-```onion
-val square: (Int) -> Int = (x: Int) -> { return x * x; }
-
-val result: Int = square.call(5)  // 25
-println(result)
-```
+Under the hood a function value is an object implementing `onion.Function0` ..
+`onion.Function10`, whose single method is `call`; `double(21)` compiles to
+`double(21)`. You only need to spell `.call` yourself when handing a function
+value to Java code that expects to invoke it by that name.
 
 ## Function Types
 
@@ -62,15 +58,15 @@ Lambdas can be typed using the arrow type syntax `(A, B) -> R`. For a single par
 ```onion
 // Function with 0 parameters
 val func0: () -> Int = () -> { return 42; }
-val value: Int = func0.call()
+val value: Int = func0()
 
 // Function with 1 parameter
 val func1: Int -> Int = (x: Int) -> { return x * 2; }
-val doubled: Int = func1.call(10)
+val doubled: Int = func1(10)
 
 // Function with 2 parameters
 val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
-val sum: Int = func2.call(3, 7)
+val sum: Int = func2(3, 7)
 ```
 
 ### Void-Returning Functions
@@ -80,7 +76,7 @@ For side-effect-only lambdas, the return type can be written as `void` or `Unit`
 ```onion
 def repeat(n: Int, block: () -> Unit): void {
   for var i: Int = 0; i < n; i = i + 1 {
-    block.call()
+    block()
   }
 }
 
@@ -138,7 +134,7 @@ Lambdas can capture variables from their enclosing scope:
 val multiplier: Int = 10
 val multiply: (Int) -> Int = (x: Int) -> { return x * multiplier; }
 
-println(multiply.call(5))  // 50
+println(multiply(5))  // 50
 ```
 
 ### Mutable Closures
@@ -152,9 +148,9 @@ val increment: () -> Int = () -> {
   return count;
 }
 
-println(increment.call())  // 1
-println(increment.call())  // 2
-println(increment.call())  // 3
+println(increment())  // 1
+println(increment())  // 2
+println(increment())  // 3
 ```
 
 ### Counter Factory
@@ -171,10 +167,10 @@ def makeCounter(): () -> Int {
 val counter1: () -> Int = makeCounter()
 val counter2: () -> Int = makeCounter()
 
-println(counter1.call())  // 1
-println(counter1.call())  // 2
-println(counter2.call())  // 1
-println(counter1.call())  // 3
+println(counter1())  // 1
+println(counter1())  // 2
+println(counter2())  // 1
+println(counter1())  // 3
 ```
 
 ## Higher-Order Functions
@@ -193,7 +189,7 @@ def filter(items: List[String], predicate: (String) -> Boolean): List[String] {
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
-    if predicate.call(item) {
+    if predicate(item) {
       result << item
     }
   }
@@ -231,7 +227,7 @@ def map(items: List[String], transform: (String) -> String): List[String] {
   val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
-    result << transform.call(item)
+    result << transform(item)
   }
 
   return result
@@ -259,7 +255,7 @@ def reduce(items: List[Int], operation: (Int, Int) -> Int, initial: Int): Int {
   var accumulator: Int = initial
 
   foreach item: Int in items {
-    accumulator = operation.call(accumulator, item)
+    accumulator = operation(accumulator, item)
   }
 
   return accumulator
@@ -289,7 +285,7 @@ def filterFile(filename: String, predicate: (String) -> Boolean) {
 
   var line: String = null
   while (line = reader.readLine()) != null {
-    if predicate.call(line) {
+    if predicate(line) {
       println(line)
     }
   }
@@ -320,7 +316,7 @@ class LambdaComparator conforms Comparator[Object] {
       this.compareFunc = func
     }
 
-    def compare(a: Object, b: Object): Int = this.compareFunc.call(a, b)
+    def compare(a: Object, b: Object): Int = compareFunc(a, b)
 }
 
 val list: ArrayList[String] = new ArrayList[String]()
@@ -363,8 +359,8 @@ class LambdaActionListener conforms ActionListener {
       this.handler = h
     }
 
-    def actionPerformed(event :ActionEvent) {
-      this.handler.call(event)
+    def actionPerformed(event: ActionEvent): void {
+      handler(event)
     }
 }
 

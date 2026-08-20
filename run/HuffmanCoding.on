@@ -186,7 +186,7 @@ def buildEntries(freqs: Map[String, Int], table: Map[String, String]): List[Code
 def printCodeTable(entries: List[CodeEntry]): void {
   IO::println("  Sym   Freq  Code               Bits  Contrib")
   IO::println("  " + "-".times(54))
-  val sorted = entries.sortedBy { e => e.bits() }
+  val sorted = entries.sortedBy { e -> e.bits() }
   foreach e: CodeEntry in sorted {
     val contrib = e.freq() * e.bits()
     val sym: String = if e.symbol() == " " { "SPC" } else if e.symbol() == "\n" { "LF" } else { e.symbol() }
@@ -290,9 +290,9 @@ for var i: Int = 0; i < allStats.size; i++ {
 }
 
 // ── Pipeline analysis on stats ────────────────────────────────────────────────
-val bestRatio   = allStats.sortedBy { s => (s.ratio() * -1.0) as Int }.get(0)
-val worstRatio  = allStats.sortedBy { s => (s.ratio() * 1.0) as Int }.get(0)
-val avgSaved    = allStats.fold(0) { acc, s => acc + (s.inputBits() - s.encodedBits()) } / allStats.size
+val bestRatio   = allStats.sortedBy { s -> (s.ratio() * -1.0) as Int }.get(0)
+val worstRatio  = allStats.sortedBy { s -> (s.ratio() * 1.0) as Int }.get(0)
+val avgSaved    = allStats.fold(0) { acc, s -> acc + (s.inputBits() - s.encodedBits()) } / allStats.size
 
 IO::println("\n  Best compression  : " + labels.get(allStats.indexOf(bestRatio)))
 IO::println("  Worst compression : " + labels.get(allStats.indexOf(worstRatio)))

@@ -226,8 +226,8 @@ val nothing: Map[String, Int] = [:]   // 空のマップ
 リストにはパイプラインが組み込まれているので、添字を使う場面はほとんどありません。
 
 ```onion
-val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
-val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+val odds = [1, 2, 3, 4, 5].filter { n -> n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n -> n * 10 }                     // [10, 30, 50]
 ```
 
 全体は [コレクション](collections.md) を参照してください。

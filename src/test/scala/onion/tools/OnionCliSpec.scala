@@ -5,6 +5,7 @@ import java.io.PrintStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -17,7 +18,7 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
     case Create(name: String, cwd: Path)
     case Build(cwd: Path, verbose: Boolean)
     case Run(cwd: Path, verbose: Boolean, args: Vector[String])
-    case Test(cwd: Path, verbose: Boolean)
+    case Test(cwd: Path, verbose: Boolean, reportXml: Option[Path])
     case Clean(cwd: Path)
 
   private final class FakeLegacy(
@@ -56,8 +57,14 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       calls += ProjectCall.Run(cwd, verbose, args.toVector)
       result
 
-    override def test(cwd: Path, verbose: Boolean, out: PrintStream, err: PrintStream): Int =
-      calls += ProjectCall.Test(cwd, verbose)
+    override def test(
+      cwd: Path,
+      verbose: Boolean,
+      out: PrintStream,
+      err: PrintStream,
+      reportXml: Option[Path]
+    ): Int =
+      calls += ProjectCall.Test(cwd, verbose, reportXml)
       result
 
     override def clean(cwd: Path, out: PrintStream, err: PrintStream): Int =
@@ -220,7 +227,7 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
     build.exitCode shouldBe 0
     build.projects.calls.toSeq shouldBe Seq(ProjectCall.Build(buildCwd, true))
     test.exitCode shouldBe 0
-    test.projects.calls.toSeq shouldBe Seq(ProjectCall.Test(testCwd, false))
+    test.projects.calls.toSeq shouldBe Seq(ProjectCall.Test(testCwd, false, None))
 
   test("run accepts verbose before the separator and passes later arguments verbatim"):
     val cwd = Files.createTempDirectory("onion-cli-run")
@@ -359,3 +366,22 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
         Array("--verbose", "--stacktrace", "--Wno", "unused-parameter", source.toString))
     }
     rethrown.getMessage shouldBe "boom"
+
+  test("test passes --report-xml through, in either order with --verbose"):
+    val cwd = Paths.get("/tmp/report").toAbsolutePath
+
+    invoke(Array("test", "--report-xml", "out/junit.xml"), cwd).projects.calls.toSeq shouldBe
+      Seq(ProjectCall.Test(cwd, false, Some(Paths.get("out/junit.xml"))))
+
+    invoke(Array("test", "--report-xml", "out/junit.xml", "--verbose"), cwd).projects.calls.toSeq shouldBe
+      Seq(ProjectCall.Test(cwd, true, Some(Paths.get("out/junit.xml"))))
+
+    invoke(Array("test", "--verbose", "--report-xml", "out/junit.xml"), cwd).projects.calls.toSeq shouldBe
+      Seq(ProjectCall.Test(cwd, true, Some(Paths.get("out/junit.xml"))))
+
+  test("test rejects --report-xml without a path rather than writing somewhere arbitrary"):
+    val result = invoke(Array("test", "--report-xml"))
+
+    result.exitCode shouldBe 2
+    result.projects.calls shouldBe empty
+    result.stderr should include("--report-xml")

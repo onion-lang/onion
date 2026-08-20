@@ -1,0 +1,279 @@
+// Mandelbrot.on — ASCII-art Mandelbrot and Julia set renderer.
+// Exercises: Double arithmetic, complex-number records with operator methods,
+// ADT enum for palette mapping, extension Double methods, nested for-loops,
+// collection pipelines (map/sortedBy/fold/groupBy), while loops,
+// string interpolation, records with law/example clauses, nullable types,
+// closures, and the |> pipeline operator.
+
+// ── Palette: maps iteration count to an ASCII character ────────────────────
+
+enum Density {
+  Empty, VeryLow, Low, Mid, High, VeryHigh, Solid
+public:
+  def glyph(): String = select this {
+    case Density::Empty:   " "
+    case Density::VeryLow: "."
+    case Density::Low:     ":"
+    case Density::Mid:     "-"
+    case Density::High:    "="
+    case Density::VeryHigh: "+"
+    case Density::Solid:   "@"
+  }
+  static def fromIter(iter: Int, maxIter: Int): Density {
+    if iter >= maxIter { return Density::Solid }
+    val ratio: Double = iter.doubleValue() / maxIter.doubleValue()
+    if ratio < 0.05 { return Density::Empty }
+    if ratio < 0.15 { return Density::VeryLow }
+    if ratio < 0.30 { return Density::Low }
+    if ratio < 0.50 { return Density::Mid }
+    if ratio < 0.70 { return Density::High }
+    return Density::VeryHigh
+  }
+}
+
+// ── Complex number record ───────────────────────────────────────────────────
+
+record Complex(re: Double, im: Double) {
+public:
+  def plus(o: Complex): Complex = new Complex(re() + o.re(), im() + o.im())
+  def times(o: Complex): Complex = new Complex(
+    re() * o.re() - im() * o.im(),
+    re() * o.im() + im() * o.re())
+  def abs2(): Double = re() * re() + im() * im()
+  def abs(): Double = abs2().sqrt2()
+  def show(): String = if im() >= 0.0 { "#{re()}+#{im()}i" } else { "#{re()}#{im()}i" }
+}
+
+example { new Complex(3.0, 4.0).abs2() == 25.0 }
+example { new Complex(1.0, 0.0).plus(new Complex(0.0, 1.0)).show() == "1.0+1.0i" }
+
+// ── Extension helpers ───────────────────────────────────────────────────────
+
+extension Double {
+  def sqrt2(): Double {
+    if self <= 0.0 { return 0.0 }
+    var x: Double = self
+    var guess: Double = x / 2.0
+    var i: Int = 0
+    while i < 40 {
+      val next: Double = (guess + x / guess) / 2.0
+      if (next - guess).abs2() < 1e-15 { return next }
+      guess = next
+      i++
+    }
+    return guess
+  }
+  def abs2(): Double = if self < 0.0 { 0.0 - self } else { self }
+}
+
+// ── Core iteration ──────────────────────────────────────────────────────────
+
+// Returns how many Mandelbrot iterations before |z| > 2 (or maxIter if in set)
+def mandelbrotIter(c: Complex, maxIter: Int): Int {
+  var z = new Complex(0.0, 0.0)
+  var i: Int = 0
+  while i < maxIter {
+    z = z.times(z).plus(c)
+    if z.abs2() > 4.0 { return i }
+    i++
+  }
+  return maxIter
+}
+
+// Returns how many Julia iterations before |z| > 2 for fixed c, varying z0
+def juliaIter(z0: Complex, c: Complex, maxIter: Int): Int {
+  var z = z0
+  var i: Int = 0
+  while i < maxIter {
+    z = z.times(z).plus(c)
+    if z.abs2() > 4.0 { return i }
+    i++
+  }
+  return maxIter
+}
+
+// ── Viewport record ─────────────────────────────────────────────────────────
+
+record Viewport(xMin: Double, xMax: Double, yMin: Double, yMax: Double,
+                cols: Int, rows: Int) {
+public:
+  def pixelToComplex(col: Int, row: Int): Complex {
+    val re: Double = xMin() + col.doubleValue() * (xMax() - xMin()) / cols().doubleValue()
+    val im: Double = yMax() - row.doubleValue() * (yMax() - yMin()) / rows().doubleValue()
+    return new Complex(re, im)
+  }
+  def width(): Double = xMax() - xMin()
+  def height(): Double = yMax() - yMin()
+  def describe(): String = "x=[#{xMin()},#{xMax()}] y=[#{yMin()},#{yMax()}] #{cols()}×#{rows()}"
+}
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+
+def renderMandelbrot(vp: Viewport, maxIter: Int): List[String] {
+  val lines: List[String] = []
+  foreach row: Int in 0..<vp.rows() {
+    var line: String = ""
+    foreach col: Int in 0..<vp.cols() {
+      val c: Complex = vp.pixelToComplex(col, row)
+      val iter: Int = mandelbrotIter(c, maxIter)
+      line = line + Density::fromIter(iter, maxIter).glyph()
+    }
+    lines.add(line)
+  }
+  return lines
+}
+
+def renderJulia(vp: Viewport, c: Complex, maxIter: Int): List[String] {
+  val lines: List[String] = []
+  foreach row: Int in 0..<vp.rows() {
+    var line: String = ""
+    foreach col: Int in 0..<vp.cols() {
+      val z0: Complex = vp.pixelToComplex(col, row)
+      val iter: Int = juliaIter(z0, c, maxIter)
+      line = line + Density::fromIter(iter, maxIter).glyph()
+    }
+    lines.add(line)
+  }
+  return lines
+}
+
+// ── Statistics record ───────────────────────────────────────────────────────
+
+record RenderStats(totalPixels: Int, inSet: Int, palette: Map[String, Int]) {
+public:
+  def setPercent(): Double = if totalPixels() == 0 { 0.0 } else { inSet().doubleValue() * 100.0 / totalPixels().doubleValue() }
+  def round1(d: Double): String {
+    val scaled: Long = (d * 10.0).longValue()
+    val i: Long = scaled / 10L
+    val f: Long = scaled % 10L
+    return "#{i}.#{f}"
+  }
+  def describe(): String =
+    "pixels=#{totalPixels()} in-set=#{inSet()} (#{round1(setPercent())}%)"
+}
+
+def collectStats(lines: List[String]): RenderStats {
+  var total: Int = 0
+  var inSet: Int = 0
+  val palette: Map[String, Int] = [:]
+  foreach line: String in lines {
+    val chars: String = line
+    foreach col: Int in 0..<chars.length() {
+      val ch: String = "" + chars.charAt(col)
+      total++
+      val cur: Int = if palette.get(ch) == null { 0 } else { palette.get(ch) as Int }
+      palette.put(ch, cur + 1)
+      if ch == "@" { inSet++ }
+    }
+  }
+  return new RenderStats(total, inSet, palette)
+}
+
+// ── Named fractal presets ───────────────────────────────────────────────────
+
+record FractalPreset(name: String, xMin: Double, xMax: Double,
+                     yMin: Double, yMax: Double, maxIter: Int) {
+public:
+  def viewport(cols: Int, rows: Int): Viewport =
+    new Viewport(xMin(), xMax(), yMin(), yMax(), cols, rows)
+}
+
+val presets: List[FractalPreset] = [
+  new FractalPreset("Full Mandelbrot",   -2.5,  1.0, -1.2,  1.2,  64),
+  new FractalPreset("Seahorse Valley",   -0.76,-0.72, 0.09,  0.13, 128),
+  new FractalPreset("Elephant Valley",    0.27,  0.31, 0.0,   0.04, 128),
+  new FractalPreset("Triple Spiral",    -0.09, -0.06, 0.63,  0.66, 192)
+]
+
+// ── Julia set presets ───────────────────────────────────────────────────────
+
+record JuliaPreset(name: String, cRe: Double, cIm: Double) {
+public:
+  def c(): Complex = new Complex(cRe(), cIm())
+  def describe(): String = c().show()
+}
+
+val juliaPresets: List[JuliaPreset] = [
+  new JuliaPreset("Dendrite",    0.0,       1.0),
+  new JuliaPreset("Douady Rabbit", -0.123,  0.745),
+  new JuliaPreset("San Marco",  -0.75,     0.0),
+  new JuliaPreset("Siegel Disk", -0.391,  -0.587),
+  new JuliaPreset("Spiral",      0.285,    0.01)
+]
+
+// ── Main rendering section ──────────────────────────────────────────────────
+
+// 1. Full Mandelbrot set
+val vpFull = new Viewport(-2.5, 1.0, -1.2, 1.2, 70, 24)
+IO::println("=== Mandelbrot Set (#{vpFull.describe()}) ===")
+val mbLines: List[String] = renderMandelbrot(vpFull, 64)
+foreach line: String in mbLines { IO::println(line) }
+val mbStats = collectStats(mbLines)
+IO::println("Stats: #{mbStats.describe()}")
+IO::println("")
+
+// 2. Zoomed region: Seahorse Valley
+val vpSeahorse = new Viewport(-0.76, -0.72, 0.09, 0.13, 70, 20)
+IO::println("=== Seahorse Valley (#{vpSeahorse.describe()}) ===")
+val shLines: List[String] = renderMandelbrot(vpSeahorse, 128)
+foreach line: String in shLines { IO::println(line) }
+val shStats = collectStats(shLines)
+IO::println("Stats: #{shStats.describe()}")
+IO::println("")
+
+// 3. Julia set — Douady Rabbit
+val cRabbit = new Complex(-0.123, 0.745)
+val vpJulia = new Viewport(-1.5, 1.5, -1.0, 1.0, 70, 22)
+IO::println("=== Julia Set — Douady Rabbit (c=#{cRabbit.show()}) ===")
+val jLines: List[String] = renderJulia(vpJulia, cRabbit, 96)
+foreach line: String in jLines { IO::println(line) }
+val jStats = collectStats(jLines)
+IO::println("Stats: #{jStats.describe()}")
+IO::println("")
+
+// 4. Julia set — Siegel Disk
+val cSiegel = new Complex(-0.391, -0.587)
+IO::println("=== Julia Set — Siegel Disk (c=#{cSiegel.show()}) ===")
+val sLines: List[String] = renderJulia(vpJulia, cSiegel, 96)
+foreach line: String in sLines { IO::println(line) }
+val sStats = collectStats(sLines)
+IO::println("Stats: #{sStats.describe()}")
+IO::println("")
+
+// 5. Summary: compare in-set percentages across presets using collection pipeline
+IO::println("=== Preset Summary ===")
+val summaryData: List[Object] = presets.map { p: FractalPreset ->
+  val vp = p.viewport(50, 14)
+  val lines: List[String] = renderMandelbrot(vp, p.maxIter())
+  val stats = collectStats(lines)
+  "#{p.name()}: #{stats.describe()}"
+}
+foreach s: Object in summaryData { IO::println(s as String) }
+IO::println("")
+
+// 6. Julia diversity: render name and in-set % for all Julia presets
+IO::println("=== Julia Preset Diversity ===")
+val vpMini = new Viewport(-1.5, 1.5, -1.0, 1.0, 50, 14)
+val juliaSummary: List[Object] = juliaPresets.map { jp: JuliaPreset ->
+  val lines: List[String] = renderJulia(vpMini, jp.c(), 80)
+  val stats = collectStats(lines)
+  "#{jp.name()} (#{jp.describe()}): #{stats.describe()}"
+}
+foreach s: Object in juliaSummary { IO::println(s as String) }
+IO::println("")
+
+// 7. Pixel density histogram for the full Mandelbrot
+IO::println("=== Glyph Histogram (full Mandelbrot) ===")
+val hist: Map[String, Int] = mbStats.palette()
+val glyphs: List[Object] = [" ", ".", ":", "-", "=", "+", "@"]
+foreach g: Object in glyphs {
+  val gStr: String = g as String
+  val count: Int = if hist.get(gStr) == null { 0 } else { hist.get(gStr) as Int }
+  var bar: String = ""
+  val barLen: Int = count / 10
+  foreach i: Int in 0..<barLen { bar = bar + "#" }
+  IO::println("'#{gStr}' #{count} |#{bar}")
+}
+
+IO::println("")
+IO::println("Done. Rendered #{presets.size + juliaPresets.size + 2} fractal views.")

@@ -11,31 +11,50 @@ final class TermEmitter(
   asmType: Type => AsmType,
   visitTerm: Term => Unit
 ) {
+  // Push lhs then rhs for an arithmetic/bitwise/comparison operator. If rhs
+  // may run its own try/catch, lhs can't stay on the operand stack across it:
+  // the JVM clears the stack when dispatching to an exception handler, so an
+  // already-pushed lhs would be silently discarded on the exceptional path,
+  // desyncing the merged stack shape from the normal path (the binary-operator
+  // sibling of issue #669/#745/#747/#750). Spill it into a local instead and
+  // reload it once rhs has settled -- mirroring
+  // AsmCodeGenerationVisitor.visitSetField/visitSetArray. LOGICAL_AND/OR and
+  // ELVIS don't need this: their short-circuit branching already consumes lhs
+  // off the stack before rhs runs.
+  private def pushOperands(node: BinaryTerm): Unit =
+    if TermContainsTry.contains(node.rhs) then
+      visitTerm(node.lhs)
+      val lhsSlot = gen.newLocal(asmType(node.lhs.`type`))
+      gen.storeLocal(lhsSlot)
+      visitTerm(node.rhs)
+      val rhsSlot = gen.newLocal(asmType(node.rhs.`type`))
+      gen.storeLocal(rhsSlot)
+      gen.loadLocal(lhsSlot)
+      gen.loadLocal(rhsSlot)
+    else
+      visitTerm(node.lhs)
+      visitTerm(node.rhs)
+
   def emitBinaryTerm(node: BinaryTerm): Unit =
     node.kind match
       case ADD =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.ADD, asmType(node.`type`))
 
       case SUBTRACT =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.SUB, asmType(node.`type`))
 
       case MULTIPLY =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.MUL, asmType(node.`type`))
 
       case DIVIDE =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.DIV, asmType(node.`type`))
 
       case MOD =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.REM, asmType(node.`type`))
 
       case LOGICAL_AND =>
@@ -61,33 +80,27 @@ final class TermEmitter(
         gen.visitLabel(endLabel)
 
       case BIT_AND =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.AND, asmType(node.`type`))
 
       case BIT_OR =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.OR, asmType(node.`type`))
 
       case XOR =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.XOR, asmType(node.`type`))
 
       case BIT_SHIFT_L2 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.SHL, asmType(node.lhs.`type`))
 
       case BIT_SHIFT_R2 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.SHR, asmType(node.lhs.`type`))
 
       case BIT_SHIFT_R3 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
+        pushOperands(node)
         gen.math(GeneratorAdapter.USHR, asmType(node.lhs.`type`))
 
       case LESS_THAN =>
@@ -149,8 +162,7 @@ final class TermEmitter(
             throw new UnsupportedOperationException(s"Bitwise NOT not supported for type: ${node.`type`}")
 
   private def emitComparison(node: BinaryTerm, opcode: Int): Unit =
-    visitTerm(node.lhs)
-    visitTerm(node.rhs)
+    pushOperands(node)
     val trueLabel = gen.newLabel()
     val endLabel = gen.newLabel()
     gen.ifCmp(asmType(node.lhs.`type`), opcode, trueLabel)

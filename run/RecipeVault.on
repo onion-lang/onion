@@ -1,0 +1,361 @@
+// RecipeVault.on — Recipe management and nutritional-analysis system (~260 lines)
+// Exercises: data-carrying enum, ADT enum, records (with methods + examples),
+// class implementing interface, extension methods (Int, String, Double),
+// collection pipelines (map/filter/fold/groupBy/sortedBy/find/partition/distinct),
+// select + type-pattern matching (ADT exhaustiveness), nullable fields + null checks,
+// closures, string interpolation, try/catch, recursion, foreach (ranges + map k,v),
+// while loop, do[List] list comprehension.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def kcal(): String = "#{self} kcal"
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+  def padLeft(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def rounded1(): String {
+    val tenth: Int = (self * 10.0 + 0.5) as Int
+    return "#{tenth / 10}.#{tenth % 10}"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trunc(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+}
+
+// ─── MealType: data-carrying enum with serving time window ───────────────────
+
+enum MealType(startH: Int, endH: Int) {
+  BREAKFAST(6, 10), LUNCH(11, 14), DINNER(17, 21), SNACK(0, 23), DESSERT(12, 23)
+public:
+  def label(): String = select this {
+    case MealType::BREAKFAST: "Breakfast"
+    case MealType::LUNCH:     "Lunch"
+    case MealType::DINNER:    "Dinner"
+    case MealType::SNACK:     "Snack"
+    else:                     "Dessert"
+  }
+  def window(): String = "#{self.startH()}:00-#{self.endH()}:00"
+}
+
+// ─── DietaryFlag: ADT enum for dietary tags ──────────────────────────────────
+
+enum DietaryFlag {
+  case Vegan
+  case GlutenFree(certified: Boolean)
+  case HighProtein(minGrams: Int)
+  case LowCarb(maxGrams: Int)
+public:
+  def badge(): String = select this {
+    case v is Vegan:       "VEGAN"
+    case g is GlutenFree:  if g.certified() { "GF✓" } else { "GF?" }
+    case h is HighProtein: "PROTEIN(#{h.minGrams()}g+)"
+    case l is LowCarb:     "LOW-CARB(<#{l.maxGrams()}g)"
+  }
+}
+
+// ─── Ingredient record ────────────────────────────────────────────────────────
+
+record Ingredient(name: String, grams: Int, kcalPer100g: Int) {
+public:
+  def kcalTotal(): Int = self.grams() * self.kcalPer100g() / 100
+  def line(): String =
+    "  • #{self.name().padRight(22)} #{self.grams().padLeft(4)}g   #{self.kcalTotal().kcal()}"
+}
+
+example { new Ingredient("Flour", 100, 364).kcalTotal() == 364 }
+example { new Ingredient("Sugar",  50, 387).kcalTotal() == 193 }
+
+// ─── Recipe record ────────────────────────────────────────────────────────────
+
+record Recipe(name: String, mealType: MealType, servings: Int,
+              prepMins: Int, cookMins: Int,
+              ingredients: List[Ingredient], flags: List[DietaryFlag]) {
+public:
+  def totalKcal(): Int = {
+    var total: Int = 0
+    foreach ing: Ingredient in self.ingredients() { total = total + ing.kcalTotal() }
+    return total
+  }
+  def kcalPerServing(): Int = self.totalKcal() / self.servings()
+  def totalMins(): Int = self.prepMins() + self.cookMins()
+  def hasFlag(target: DietaryFlag): Boolean = {
+    foreach f: DietaryFlag in self.flags() {
+      if f == target { return true }
+    }
+    return false
+  }
+  def badgeRow(): String = {
+    var row: String = ""
+    foreach f: DietaryFlag in self.flags() { row = row + "[" + f.badge() + "] " }
+    if row.length() == 0 { return "—" }
+    return row.trunc(32)
+  }
+}
+
+// ─── RecipeBook class ─────────────────────────────────────────────────────────
+
+interface Searchable {
+  def size(): Int
+  def findByName(q: String): Recipe?
+}
+
+class RecipeBook conforms Searchable {
+  val recipes: List[Recipe]
+
+public:
+  def this { recipes = [] }
+  def size(): Int = recipes.size
+  def add(r: Recipe): void { recipes.add(r) }
+
+  def findByName(q: String): Recipe? {
+    foreach r: Recipe in recipes {
+      if r.name() == q { return r }
+    }
+    return null
+  }
+
+  def byMealType(t: MealType): List[Recipe] =
+    recipes.filter { r -> r.mealType() == t }
+
+  def quickRecipes(maxMins: Int): List[Recipe] =
+    recipes.filter { r -> r.totalMins() <= maxMins }
+
+  def topByCalories(n: Int): List[Recipe] =
+    recipes.sortedBy { r -> -(r.kcalPerServing()) }.take(n)
+
+  def lowCarbRecipes(): List[Recipe] {
+    val result: List[Recipe] = []
+    foreach r: Recipe in recipes {
+      var found: Boolean = false
+      foreach f: DietaryFlag in r.flags() {
+        val isLc: Boolean = select f {
+          case l is LowCarb: true
+          else: false
+        }
+        if isLc { found = true }
+      }
+      if found { result.add(r) }
+    }
+    return result
+  }
+
+  def avgKcalPerServing(): Double = {
+    if recipes.size == 0 { return 0.0 }
+    var total: Int = 0
+    foreach r: Recipe in recipes { total = total + r.kcalPerServing() }
+    return (total as Double) / (recipes.size as Double)
+  }
+
+  def allRecipes(): List[Recipe] = recipes
+
+  def byMealTypeMap(): Map[String, List[Recipe]] =
+    recipes.groupBy { r -> r.mealType().label() }
+
+  def ingredientFrequency(): Map[String, Int] {
+    val freq: Map[String, Int] = [:]
+    foreach r: Recipe in recipes {
+      foreach ing: Ingredient in r.ingredients() {
+        val prev: Int? = freq.get(ing.name())
+        if prev == null {
+          freq.put(ing.name(), 1)
+        } else {
+          freq.put(ing.name(), prev + 1)
+        }
+      }
+    }
+    return freq
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def divider(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "─"; i++ }
+  return s
+}
+
+def printSection(title: String): void {
+  IO::println(divider(65))
+  IO::println(" " + title)
+  IO::println(divider(65))
+}
+
+def printRecipe(r: Recipe): void {
+  IO::println("  #{r.name().trunc(26).padRight(28)} #{r.mealType().label().padRight(10)} #{r.totalMins().plural("min").padRight(12)} #{r.kcalPerServing().kcal().padRight(10)} #{r.badgeRow()}")
+}
+
+def printIngredients(r: Recipe): void {
+  IO::println("  #{r.name()} (#{r.servings().plural("serving")}, #{r.totalKcal().kcal()} total):")
+  foreach ing: Ingredient in r.ingredients() {
+    IO::println(ing.line())
+  }
+}
+
+// ─── Ingredient shorthand ─────────────────────────────────────────────────────
+
+def ing(name: String, g: Int, kcal: Int): Ingredient = new Ingredient(name, g, kcal)
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+def buildVault(): RecipeBook {
+  val book: RecipeBook = new RecipeBook()
+
+  book.add(new Recipe("Avocado Toast", MealType::BREAKFAST, 2, 5, 3,
+    [ing("Sourdough bread", 80, 260), ing("Avocado", 100, 160), ing("Olive oil", 10, 884), ing("Salt", 3, 0)],
+    [new Vegan() as DietaryFlag]))
+
+  book.add(new Recipe("Greek Yogurt Bowl", MealType::BREAKFAST, 1, 3, 0,
+    [ing("Greek yogurt", 200, 59), ing("Honey", 20, 304), ing("Blueberries", 80, 57), ing("Granola", 30, 471)],
+    [new HighProtein(15) as DietaryFlag]))
+
+  book.add(new Recipe("Omelette", MealType::BREAKFAST, 1, 5, 10,
+    [ing("Eggs", 150, 143), ing("Butter", 10, 717), ing("Cheese", 30, 402), ing("Herbs", 5, 0)],
+    [new HighProtein(18) as DietaryFlag, new GlutenFree(true) as DietaryFlag]))
+
+  book.add(new Recipe("Caesar Salad", MealType::LUNCH, 2, 15, 0,
+    [ing("Romaine lettuce", 150, 17), ing("Chicken breast", 200, 165), ing("Caesar dressing", 40, 450), ing("Croutons", 30, 407), ing("Parmesan", 20, 431)],
+    [new HighProtein(30) as DietaryFlag]))
+
+  book.add(new Recipe("Lentil Soup", MealType::LUNCH, 4, 10, 40,
+    [ing("Red lentils", 200, 352), ing("Tomatoes", 200, 18), ing("Onion", 100, 40), ing("Olive oil", 15, 884), ing("Spices", 5, 0)],
+    [new Vegan() as DietaryFlag, new GlutenFree(true) as DietaryFlag, new HighProtein(18) as DietaryFlag]))
+
+  book.add(new Recipe("Keto Chicken Bowl", MealType::LUNCH, 2, 10, 25,
+    [ing("Chicken thigh", 250, 209), ing("Avocado", 100, 160), ing("Spinach", 80, 23), ing("Olive oil", 20, 884)],
+    [new LowCarb(5) as DietaryFlag, new HighProtein(35) as DietaryFlag, new GlutenFree(true) as DietaryFlag]))
+
+  book.add(new Recipe("Spaghetti Bolognese", MealType::DINNER, 4, 15, 45,
+    [ing("Spaghetti", 320, 371), ing("Ground beef", 400, 250), ing("Tomato sauce", 200, 35), ing("Onion", 80, 40), ing("Olive oil", 15, 884)],
+    []))
+
+  book.add(new Recipe("Salmon & Veggies", MealType::DINNER, 2, 10, 20,
+    [ing("Salmon fillet", 300, 208), ing("Broccoli", 200, 34), ing("Sweet potato", 150, 86), ing("Lemon", 30, 29), ing("Olive oil", 15, 884)],
+    [new GlutenFree(true) as DietaryFlag, new HighProtein(40) as DietaryFlag]))
+
+  book.add(new Recipe("Black Bean Tacos", MealType::DINNER, 3, 10, 15,
+    [ing("Corn tortillas", 120, 218), ing("Black beans", 240, 132), ing("Salsa", 80, 36), ing("Avocado", 100, 160), ing("Lime", 20, 30)],
+    [new Vegan() as DietaryFlag, new GlutenFree(false) as DietaryFlag]))
+
+  book.add(new Recipe("Trail Mix", MealType::SNACK, 4, 2, 0,
+    [ing("Almonds", 50, 579), ing("Cashews", 50, 553), ing("Raisins", 40, 299), ing("Dark chocolate", 20, 546)],
+    [new Vegan() as DietaryFlag, new GlutenFree(true) as DietaryFlag]))
+
+  book.add(new Recipe("Protein Shake", MealType::SNACK, 1, 2, 0,
+    [ing("Protein powder", 30, 400), ing("Almond milk", 250, 13), ing("Banana", 100, 89)],
+    [new HighProtein(24) as DietaryFlag, new GlutenFree(true) as DietaryFlag]))
+
+  book.add(new Recipe("Chocolate Mousse", MealType::DESSERT, 4, 20, 0,
+    [ing("Dark chocolate", 200, 546), ing("Eggs", 180, 143), ing("Cream", 100, 340), ing("Sugar", 30, 387)],
+    [new GlutenFree(true) as DietaryFlag]))
+
+  return book
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val vault: RecipeBook = buildVault()
+
+  printSection("RECIPE VAULT — #{vault.size().plural("recipe")}")
+  IO::println("  Name                         Meal       Time         Cal/srv    Flags")
+  IO::println("  " + divider(63))
+  foreach r: Recipe in vault.allRecipes() {
+    printRecipe(r)
+  }
+
+  printSection("TOP 5 HIGHEST CALORIES PER SERVING")
+  foreach r: Recipe in vault.topByCalories(5) {
+    IO::println("  #{r.name().padRight(28)} #{r.kcalPerServing().kcal()}")
+  }
+
+  printSection("QUICK RECIPES (≤ 20 min total)")
+  foreach r: Recipe in vault.quickRecipes(20).sortedBy { r -> r.totalMins() } {
+    IO::println("  [#{r.totalMins().padLeft(2)} min] #{r.name()} — #{r.mealType().label()}")
+  }
+
+  printSection("LOW-CARB RECIPES")
+  val lowCarb: List[Recipe] = vault.lowCarbRecipes()
+  if lowCarb.size == 0 {
+    IO::println("  None found.")
+  } else {
+    foreach r: Recipe in lowCarb { IO::println("  ▸ " + r.name()) }
+  }
+
+  printSection("INGREDIENT DETAILS: Lentil Soup")
+  val found: Recipe? = vault.findByName("Lentil Soup")
+  if found != null {
+    printIngredients(found)
+  } else {
+    IO::println("  Recipe not found.")
+  }
+
+  printSection("RECIPES BY MEAL TYPE")
+  val byType: Map[String, List[Recipe]] = vault.byMealTypeMap()
+  foreach (mealLabel, recipes) in byType {
+    IO::println("  #{mealLabel} (#{recipes.size.plural("recipe")}):")
+    foreach r: Recipe in recipes.sortedBy { r -> r.name() } {
+      IO::println("    ▸ #{r.name()} — #{r.kcalPerServing().kcal()}/srv")
+    }
+  }
+
+  printSection("TOP 8 MOST-USED INGREDIENTS")
+  val freq: Map[String, Int] = vault.ingredientFrequency()
+  val topIngs: List[String] = freq.keys().sortedBy { k -> -(freq.get(k)) }.take(8)
+  var rank: Int = 1
+  foreach ingName: String in topIngs {
+    val count: Int = freq.get(ingName)
+    IO::println("  #{rank.padLeft(2)}. #{ingName.padRight(22)} in #{count.plural("recipe")}")
+    rank++
+  }
+
+  printSection("VEGAN vs NON-VEGAN SPLIT")
+  val veganParts = vault.allRecipes().partition { r -> r.hasFlag(new Vegan() as DietaryFlag) }
+  val vegan    = veganParts[0] as List[Object]
+  val nonVegan = veganParts[1] as List[Object]
+  IO::println("  Vegan:     #{vegan.size.plural("recipe")}")
+  IO::println("  Non-vegan: #{nonVegan.size.plural("recipe")}")
+  IO::println("  Avg cal/serving (overall): #{vault.avgKcalPerServing().rounded1()} kcal")
+
+  printSection("DO-NOTATION: Breakfast + Snack combo plans")
+  val plans: List[String] = do[List] {
+    b <- vault.byMealType(MealType::BREAKFAST).take(3)
+    s <- vault.byMealType(MealType::SNACK)
+    ret "#{b.name()} + #{s.name()} = #{b.kcalPerServing() + s.kcalPerServing()} kcal"
+  }
+  foreach plan: String in plans {
+    IO::println("  " + plan)
+  }
+
+  printSection("DURATION ANALYSIS")
+  val allMins: List[Int] = vault.allRecipes().map { r -> r.totalMins() }
+  val minTime: Int = allMins.fold(9999) { acc, m -> if m < acc { m } else { acc } }
+  val maxTime: Int = allMins.fold(0)    { acc, m -> if m > acc { m } else { acc } }
+  val totalTime: Int = allMins.fold(0)  { acc, m -> acc + m }
+  IO::println("  Fastest: #{minTime.plural("min")}")
+  IO::println("  Slowest: #{maxTime.plural("min")}")
+  IO::println("  Average: #{(totalTime / vault.size()).plural("min")}")
+
+  val durParts = vault.allRecipes().partition { r -> r.totalMins() <= 20 }
+  val quick = durParts[0] as List[Object]
+  val slow  = durParts[1] as List[Object]
+  IO::println("  Quick (≤20min): #{quick.size.plural("recipe")}")
+  IO::println("  Long  (>20min): #{slow.size.plural("recipe")}")
+
+  IO::println(divider(65))
+}

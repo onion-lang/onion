@@ -47,7 +47,11 @@ object Suggestions {
     }
 
     scored
-      .filter { case (_, distance) => distance <= maxDistance && distance > 0 }
+      // distance == 0 means `name` and `candidate` differ only in case (an exact,
+      // same-case match would already have resolved, so this call would never have
+      // been reached) -- that's the single most common typo of all and the best
+      // possible suggestion, not a false positive to exclude.
+      .filter { case (_, distance) => distance <= maxDistance }
       .sortBy { case (candidate, distance) =>
         // Prefer shorter edit distances, then shorter names
         (distance, candidate.length)

@@ -240,7 +240,7 @@ def analyzeFrequency(text: String): List[FrequencyEntry] {
     val pct: Double = (count as Int) * 100.0 / total
     entries.add(new FrequencyEntry(letter as String, count as Int, pct))
   }
-  return entries.sortedBy { e => 0 - (e as FrequencyEntry).count() }
+  return entries.sortedBy { e -> 0 - (e as FrequencyEntry).count() }
 }
 
 // Safely parse an integer key, defaulting to `fallback` on error
@@ -279,13 +279,13 @@ public:
   def getResultCount(): Int = results.size
 
   def selfInverseResults(): List[CipherResult] =
-    results.filter { r => (r as CipherResult).kind().isSelfInverse() }
+    results.filter { r -> (r as CipherResult).kind().isSelfInverse() }
 
   def byFamily(): Map[String, List[CipherResult]] =
-    results.groupBy { r => "" + (r as CipherResult).kind().family() }
+    results.groupBy { r -> "" + (r as CipherResult).kind().family() }
 
   def allRoundTripOk(reg: CipherRegistry): Boolean =
-    results.filter { r =>
+    results.filter { r ->
       val cr: CipherResult = r as CipherResult
       !cr.roundTripOk(reg.decrypt(cr.kind(), cr.ciphertext(), cr.key()))
     }.size == 0
@@ -359,7 +359,7 @@ IO::println("Total cipher operations:  " + reg.getResultCount())
 
 val selfInv: List[CipherResult] = reg.selfInverseResults()
 IO::println("Self-inverse results:     " + selfInv.size)
-IO::println("Self-inverse ciphers:     " + selfInv.map { r => "" + (r as CipherResult).kind() }.distinct().toString())
+IO::println("Self-inverse ciphers:     " + selfInv.map { r -> "" + (r as CipherResult).kind() }.distinct().toString())
 
 IO::println("")
 IO::println("Results by cipher family:")

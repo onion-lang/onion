@@ -107,20 +107,20 @@ public:
   }
 
   def finishedBooks(): List[MemberBook] {
-    return shelf.filter { mb => (mb as MemberBook).status().isDone() }
+    return shelf.filter { mb -> (mb as MemberBook).status().isDone() }
   }
 
   def avgRating(): Int {
     val done = finishedBooks()
     if done.size == 0 { return 0 }
-    val total = done.fold(0) { acc, mb => (acc as Int) + (mb as MemberBook).status().rating() }
+    val total = done.fold(0) { acc, mb -> (acc as Int) + (mb as MemberBook).status().rating() }
     return (total as Int) / done.size
   }
 
   def favoriteGenre(): String {
     val done = finishedBooks()
     if done.size == 0 { return "none" }
-    val counts = done.groupBy { mb => (mb as MemberBook).book().genre().label() }
+    val counts = done.groupBy { mb -> (mb as MemberBook).book().genre().label() }
     var topGenre: String = "none"
     var topCount: Int = 0
     foreach (g, entries) in counts {
@@ -163,19 +163,19 @@ public:
   def addBook(b: Book): void       { catalog.add(b) }
 
   def totalFinished(): Int {
-    return members.fold(0) { acc, m => (acc as Int) + (m as Member).finishedBooks().size }
+    return members.fold(0) { acc, m -> (acc as Int) + (m as Member).finishedBooks().size }
   }
 
   def topReader(): Member? {
     if members.size == 0 { return null }
-    return members.reduce { a, b =>
+    return members.reduce { a, b ->
       if (a as Member).finishedBooks().size >= (b as Member).finishedBooks().size { a } else { b }
     } as Member
   }
 
   def mostDiscussedBook(): Book? {
     if meetings.size == 0 { return null }
-    val best = meetings.reduce { a, b =>
+    val best = meetings.reduce { a, b ->
       if (a as Meeting).attendeeCount() >= (b as Meeting).attendeeCount() { a } else { b }
     }
     return (best as Meeting).book()
@@ -185,7 +185,7 @@ public:
 // ──────────────────────── utility functions ──────────────────────────────────
 
 def pagesRead(m: Member): Int {
-  return m.shelf.fold(0) { acc, mb =>
+  return m.shelf.fold(0) { acc, mb ->
     val s = (mb as MemberBook).status()
     val extra = select s {
       case st is Finished:   (mb as MemberBook).book().pages()
@@ -276,7 +276,7 @@ foreach b: Book in club.catalog {
 }
 
 IO::println("\n── GENRE BREAKDOWN ────────────────────────────────")
-val breakdown = club.catalog.groupBy { b => (b as Book).genre().label() }
+val breakdown = club.catalog.groupBy { b -> (b as Book).genre().label() }
 foreach (genre, books) in breakdown {
   IO::println("  #{genre}: #{(books as List).size} book(s)")
 }
@@ -311,7 +311,7 @@ foreach m: Member in club.members {
 }
 
 IO::println("\n── ACTIVE vs INACTIVE READERS ─────────────────────")
-val parts = club.members.partition { m => (m as Member).finishedBooks().size >= 3 }
+val parts = club.members.partition { m -> (m as Member).finishedBooks().size >= 3 }
 val active = parts[0] as List
 val inactive = parts[1] as List
 IO::println("  Active (>=3 books done): #{active.size}")
@@ -321,19 +321,19 @@ foreach m: Member in active {
 }
 
 IO::println("\n── BOOKS SORTED BY YEAR ───────────────────────────")
-val byYear = club.catalog.sortedBy { b => (b as Book).year() }
+val byYear = club.catalog.sortedBy { b -> (b as Book).year() }
 foreach b: Book in byYear {
   IO::println("  #{(b as Book).year()} - #{(b as Book).title()}")
 }
 
 IO::println("\n── HIGHEST-RATED BOOKS (avg across members) ───────")
-val ratedBooks = club.catalog.map { b =>
+val ratedBooks = club.catalog.map { b ->
   val bk = b as Book
-  val ratings = club.members.map { m =>
-    val found = (m as Member).shelf.find { mb => (mb as MemberBook).book().title() == bk.title() }
+  val ratings = club.members.map { m ->
+    val found = (m as Member).shelf.find { mb -> (mb as MemberBook).book().title() == bk.title() }
     if found != null { (found as MemberBook).status().rating() } else { 0 }
-  }.filter { r => (r as Int) > 0 }
-  val total2 = ratings.fold(0) { acc, r => (acc as Int) + (r as Int) }
+  }.filter { r -> (r as Int) > 0 }
+  val total2 = ratings.fold(0) { acc, r -> (acc as Int) + (r as Int) }
   val cnt = ratings.size
   val avg2 = if cnt == 0 { 0 } else { (total2 as Int) / cnt }
   "#{avg2.stars()} #{bk.title()} (#{cnt} rating(s))"
@@ -344,9 +344,9 @@ foreach entry: String in ratedBooks {
 
 IO::println("\n── RATING RANGE SUMMARY ───────────────────────────")
 foreach star: Int in 1..5 {
-  val cnt = club.members.fold(0) { acc, m =>
+  val cnt = club.members.fold(0) { acc, m ->
     val mBooks = (m as Member).shelf
-    val n = mBooks.filter { mb => (mb as MemberBook).status().rating() == star }.size
+    val n = mBooks.filter { mb -> (mb as MemberBook).status().rating() == star }.size
     (acc as Int) + n
   }
   IO::println("  #{star}: #{cnt} book(s) rated #{star}/5")
@@ -356,14 +356,14 @@ IO::println("\n── TOP MEMBER PER GENRE ────────────�
 val allGenres = [Genre::SciFi, Genre::Mystery, Genre::Fantasy, Genre::NonFiction, Genre::Biography, Genre::History]
 foreach genre: Genre in allGenres {
   val gl = genre.label()
-  val best: Member? = club.members.reduce { a, b =>
-    val ac = (a as Member).finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
-    val bc = (b as Member).finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
+  val best: Member? = club.members.reduce { a, b ->
+    val ac = (a as Member).finishedBooks().filter { mb -> (mb as MemberBook).book().genre().label() == gl }.size
+    val bc = (b as Member).finishedBooks().filter { mb -> (mb as MemberBook).book().genre().label() == gl }.size
     if ac >= bc { a } else { b }
   } as Member?
   if best != null {
     val bm = best as Member
-    val cnt2 = bm.finishedBooks().filter { mb => (mb as MemberBook).book().genre().label() == gl }.size
+    val cnt2 = bm.finishedBooks().filter { mb -> (mb as MemberBook).book().genre().label() == gl }.size
     if cnt2 > 0 {
       IO::println("  #{gl}: #{bm.name} (#{cnt2} book(s))")
     }

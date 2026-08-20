@@ -1,0 +1,543 @@
+// CodeContest.on — A competitive programming contest platform (~240 lines).
+// Exercises: data-carrying enum, ADT enum (ContestPhase), plain enum (Verdict),
+// records (with examples), generic record (Ranked[T]), class + interface (Scorable),
+// extension methods (Int, String), collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/partition/zip/any/count/reduce/find), do[Option] / do[List],
+// select + type-pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, foreach (ranges + k,v on map), while loop, |> pipeline.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def pad(width: Int): String {
+    val s: String = "#{self}"
+    if s.length() >= width { return s }
+    var r: String = s
+    var i: Int = s.length()
+    while i < width { r = " " + r; i++ }
+    return r
+  }
+  def msToStr(): String {
+    if self < 1000 { return "#{self}ms" }
+    return "#{self / 1000}.#{(self % 1000) / 100}s"
+  }
+}
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 2) + ".."
+  }
+  def padRight(width: Int): String {
+    if self.length() >= width { return self }
+    var r: String = self
+    while r.length() < width { r = r + " " }
+    return r
+  }
+}
+
+// ─── Language: data-carrying enum ────────────────────────────────────────────
+
+enum Language(langName: String, timeLimit: Int) {
+  CPP("C++", 1000), JAVA("Java", 2000), PYTHON("Python", 3000), ONION("Onion", 2000)
+public:
+  def label(): String = self.langName()
+  def limit(): Int = self.timeLimit()
+}
+
+// ─── Verdict: plain enum ──────────────────────────────────────────────────────
+
+enum Verdict {
+  ACCEPTED, WRONG_ANSWER, TIME_LIMIT, RUNTIME_ERROR, COMPILE_ERROR
+public:
+  def symbol(): String = select this {
+    case Verdict::ACCEPTED:      "AC"
+    case Verdict::WRONG_ANSWER:  "WA"
+    case Verdict::TIME_LIMIT:    "TL"
+    case Verdict::RUNTIME_ERROR: "RE"
+    else:                        "CE"
+  }
+  def isAccepted(): Boolean = self == Verdict::ACCEPTED
+}
+
+// ─── ContestPhase: ADT enum ───────────────────────────────────────────────────
+
+enum ContestPhase {
+  case Registration
+  case Running(elapsedMin: Int)
+  case Frozen(elapsedMin: Int)
+  case Ended(durationMin: Int)
+public:
+  def label(): String = select this {
+    case p is Registration: "REGISTRATION"
+    case p is Running:      "RUNNING (#{p.elapsedMin()} min elapsed)"
+    case p is Frozen:       "FROZEN  (#{p.elapsedMin()} min elapsed)"
+    case p is Ended:        "ENDED   (#{p.durationMin()} min total)"
+  }
+  def isActive(): Boolean = select this {
+    case p is Running: true
+    case p is Frozen:  true
+    else:              false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Problem(id: String, title: String, points: Int, difficulty: Int)
+  example { new Problem("A", "Hello World", 100, 1).points() == 100 }
+  example { new Problem("A", "Test", 200, 3).difficulty() == 3 }
+
+record Submission(handle: String, problemId: String, lang: Language,
+                  verdict: Verdict, elapsedMin: Int, execMs: Int)
+  example { new Submission("alice", "A", Language::ONION, Verdict::ACCEPTED, 5, 400).verdict().isAccepted() }
+  example { new Submission("bob",   "B", Language::CPP,   Verdict::WRONG_ANSWER, 10, 900).verdict().symbol() == "WA" }
+
+record Ranked[T](item: T, rank: Int, penalty: Int)
+
+// ─── Scorable interface ───────────────────────────────────────────────────────
+
+interface Scorable {
+  def totalScore(): Int
+  def totalPenalty(): Int
+  def solvedCount(): Int
+}
+
+// ─── Contestant class ─────────────────────────────────────────────────────────
+
+class Contestant conforms Scorable {
+  val contestantName: String
+  var subs: List[Object]
+
+public:
+  def this(h: String) {
+    this.contestantName = h
+    this.subs = []
+  }
+
+  def name(): String = contestantName
+
+  def addSub(s: Submission): void { subs.add(s) }
+
+  def allSubs(): List[Object] = subs
+
+  def firstAcAt(pid: String): Option[Int] {
+    var acTime: Int = -1
+    foreach s: Object in subs {
+      val sub = s as Submission
+      if sub.problemId() == pid && sub.verdict().isAccepted() {
+        if acTime == -1 || sub.elapsedMin() < acTime {
+          acTime = sub.elapsedMin()
+        }
+      }
+    }
+    if acTime == -1 { return Option::none() }
+    return Option::some(acTime)
+  }
+
+  def wrongsBefore(pid: String, acTime: Int): Int {
+    var count: Int = 0
+    foreach s: Object in subs {
+      val sub = s as Submission
+      if sub.problemId() == pid && !sub.verdict().isAccepted() && sub.elapsedMin() < acTime {
+        count++
+      }
+    }
+    return count
+  }
+
+  def solvedPids(): List[Object] {
+    val result: List[Object] = []
+    foreach s: Object in subs {
+      val sub = s as Submission
+      if sub.verdict().isAccepted() {
+        val pid: String = sub.problemId()
+        if !result.contains(pid) { result.add(pid) }
+      }
+    }
+    return result
+  }
+
+  def solvedCount(): Int = solvedPids().size
+
+  def totalScore(): Int = solvedCount()
+
+  def totalPenalty(): Int {
+    var total: Int = 0
+    foreach pid: Object in solvedPids() {
+      val pidStr: String = pid as String
+      val acTOpt: Option[Int] = firstAcAt(pidStr)
+      if !acTOpt.isEmpty() {
+        val acT: Int = acTOpt.get() as Int
+        val wrongs: Int = wrongsBefore(pidStr, acT)
+        total = total + acT + wrongs * 20
+      }
+    }
+    return total
+  }
+
+  def langUsage(): Map[String, Int] {
+    val result: Map[String, Int] = [:]
+    foreach s: Object in subs {
+      val sub = s as Submission
+      val key: String = sub.lang().label()
+      val count: Int = if result.containsKey(key) { result[key] as Int } else { 0 }
+      result[key] = count + 1
+    }
+    return result
+  }
+}
+
+// ─── Contest class ────────────────────────────────────────────────────────────
+
+class Contest {
+  val contestTitle: String
+  var problems: List[Object]
+  var contestants: List[Object]
+  var allSubmissions: List[Object]
+  var phase: ContestPhase
+
+public:
+  def this(t: String, probs: List[Object]) {
+    this.contestTitle = t
+    this.problems = probs
+    this.contestants = []
+    this.allSubmissions = []
+    this.phase = new Registration()
+  }
+
+  def title(): String = contestTitle
+  def phase(): ContestPhase = phase
+  def problems(): List[Object] = problems
+  def contestants(): List[Object] = contestants
+  def submissionCount(): Int = allSubmissions.size
+
+  def start(): void { phase = new Running(0) }
+  def freeze(at: Int): void { phase = new Frozen(at) }
+  def end(dur: Int): void { phase = new Ended(dur) }
+
+  def register(c: Contestant): void { contestants.add(c) }
+
+  def submit(s: Submission): void {
+    allSubmissions.add(s)
+    val found = contestants.find { c -> (c as Contestant).name() == s.handle() }
+    if found != null { (found as Contestant).addSub(s) }
+  }
+
+  def findProblem(pid: String): Problem? {
+    val found = problems.find { p -> (p as Problem).id() == pid }
+    if found == null { return null }
+    return found as Problem
+  }
+
+  def standings(): List[Object] {
+    return contestants.sortedBy { c ->
+      val con = c as Contestant
+      (0 - con.solvedCount()) * 100000 + con.totalPenalty()
+    }
+  }
+
+  def verdictStats(): Map[String, Int] {
+    val m: Map[String, Int] = [:]
+    foreach s: Object in allSubmissions {
+      val sub = s as Submission
+      val key: String = sub.verdict().symbol()
+      val n: Int = if m.containsKey(key) { m[key] as Int } else { 0 }
+      m[key] = n + 1
+    }
+    return m
+  }
+
+  def langStats(): Map[String, Int] {
+    val m: Map[String, Int] = [:]
+    foreach s: Object in allSubmissions {
+      val sub = s as Submission
+      val key: String = sub.lang().label()
+      val n: Int = if m.containsKey(key) { m[key] as Int } else { 0 }
+      m[key] = n + 1
+    }
+    return m
+  }
+
+  def submissionsFor(pid: String): List[Object] {
+    return allSubmissions.filter { s -> (s as Submission).problemId() == pid }
+  }
+
+  def allSubs(): List[Object] = allSubmissions
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def sep(c: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + c; i++ }
+  return s
+}
+
+def banner(text: String): void {
+  IO::println(sep("─", 60))
+  IO::println("  " + text)
+  IO::println(sep("─", 60))
+}
+
+// ─── do[Option]: safe contestant lookup + problem solve info ──────────────────
+
+def findContestant(contest: Contest, handle: String): Option[Contestant] {
+  val found = contest.contestants().find { c -> (c as Contestant).name() == handle }
+  if found == null { return Option::none() }
+  return Option::some(found as Contestant)
+}
+
+def solveSummary(contest: Contest, handle: String, pid: String): Option[String] {
+  return do[Option] {
+    c    <- findContestant(contest, handle)
+    acT  <- c.firstAcAt(pid)
+    ret "#{handle} solved #{pid} at #{acT as Int} min (#{c.wrongsBefore(pid, acT as Int)} wrong before)"
+  }
+}
+
+// ─── Main simulation ──────────────────────────────────────────────────────────
+
+val probs: List[Object] = [
+  new Problem("A", "Hello World",          100, 1),
+  new Problem("B", "Two Sum",              200, 2),
+  new Problem("C", "Balanced Brackets",    300, 3),
+  new Problem("D", "Shortest Path",        400, 4),
+  new Problem("E", "Dynamic Programming",  500, 5)
+]
+
+val contest = new Contest("Onion Open 2026", probs)
+contest.start()
+
+val alice = new Contestant("alice")
+val bob   = new Contestant("bob")
+val carol = new Contestant("carol")
+val dave  = new Contestant("dave")
+val eve   = new Contestant("eve")
+
+foreach c: Contestant in [alice, bob, carol, dave, eve] {
+  contest.register(c)
+}
+
+// Simulate submissions
+contest.submit(new Submission("alice", "A", Language::ONION,  Verdict::ACCEPTED,      5,  380))
+contest.submit(new Submission("alice", "B", Language::ONION,  Verdict::WRONG_ANSWER, 15, 1850))
+contest.submit(new Submission("alice", "B", Language::ONION,  Verdict::ACCEPTED,     20, 1900))
+contest.submit(new Submission("alice", "C", Language::ONION,  Verdict::ACCEPTED,     45, 1700))
+contest.submit(new Submission("alice", "D", Language::JAVA,   Verdict::TIME_LIMIT,   80, 2001))
+contest.submit(new Submission("alice", "D", Language::JAVA,   Verdict::ACCEPTED,     95, 1980))
+
+contest.submit(new Submission("bob",   "A", Language::CPP,    Verdict::ACCEPTED,      3,  210))
+contest.submit(new Submission("bob",   "B", Language::CPP,    Verdict::ACCEPTED,     12,  980))
+contest.submit(new Submission("bob",   "C", Language::CPP,    Verdict::WRONG_ANSWER, 25, 1200))
+contest.submit(new Submission("bob",   "C", Language::CPP,    Verdict::WRONG_ANSWER, 30, 1100))
+contest.submit(new Submission("bob",   "C", Language::CPP,    Verdict::ACCEPTED,     40,  950))
+contest.submit(new Submission("bob",   "D", Language::CPP,    Verdict::ACCEPTED,     60,  780))
+contest.submit(new Submission("bob",   "E", Language::CPP,    Verdict::RUNTIME_ERROR, 90, 1500))
+contest.submit(new Submission("bob",   "E", Language::CPP,    Verdict::ACCEPTED,    110,  820))
+
+contest.submit(new Submission("carol", "A", Language::PYTHON, Verdict::ACCEPTED,      8,  510))
+contest.submit(new Submission("carol", "B", Language::PYTHON, Verdict::ACCEPTED,     22,  980))
+contest.submit(new Submission("carol", "C", Language::PYTHON, Verdict::TIME_LIMIT,   55, 3001))
+contest.submit(new Submission("carol", "C", Language::PYTHON, Verdict::ACCEPTED,     70, 2950))
+
+contest.submit(new Submission("dave",  "A", Language::JAVA,   Verdict::COMPILE_ERROR,  2, 0))
+contest.submit(new Submission("dave",  "A", Language::JAVA,   Verdict::ACCEPTED,       7,  820))
+contest.submit(new Submission("dave",  "B", Language::JAVA,   Verdict::WRONG_ANSWER,  18, 1600))
+contest.submit(new Submission("dave",  "B", Language::JAVA,   Verdict::ACCEPTED,      28, 1550))
+
+contest.submit(new Submission("eve",   "A", Language::ONION,  Verdict::ACCEPTED,       4,  400))
+contest.submit(new Submission("eve",   "B", Language::ONION,  Verdict::ACCEPTED,      14,  900))
+contest.submit(new Submission("eve",   "C", Language::ONION,  Verdict::WRONG_ANSWER,  35, 1400))
+contest.submit(new Submission("eve",   "C", Language::ONION,  Verdict::ACCEPTED,      50, 1350))
+contest.submit(new Submission("eve",   "D", Language::ONION,  Verdict::TIME_LIMIT,    75, 2001))
+contest.submit(new Submission("eve",   "D", Language::ONION,  Verdict::ACCEPTED,      85, 1950))
+
+contest.end(120)
+
+// ─── Contest header ───────────────────────────────────────────────────────────
+
+banner("#{contest.title()} — Final Results")
+IO::println("Phase: #{contest.phase().label()}")
+IO::println("Problems: #{contest.problems().size}   " +
+            "Contestants: #{contest.contestants().size}   " +
+            "Submissions: #{contest.submissionCount()}")
+IO::println("")
+
+// ─── Standings ────────────────────────────────────────────────────────────────
+
+banner("Standings")
+IO::println("  #   Handle        Solved  Penalty")
+IO::println("  " + sep("-", 38))
+val ranked = contest.standings()
+var rank: Int = 1
+foreach entry: Object in ranked {
+  val c = entry as Contestant
+  IO::println("  #{rank.pad(2)}  #{c.name().padRight(10)}   #{c.solvedCount().pad(5)}  #{c.totalPenalty().pad(7)}")
+  rank++
+}
+IO::println("")
+
+// ─── do[Option]: per-contestant problem solve summaries ──────────────────────
+
+banner("Solve Summaries (do[Option])")
+val queries: List[Object] = [
+  ["alice", "A"], ["alice", "D"], ["bob", "E"],
+  ["carol", "C"], ["dave", "B"], ["eve", "D"], ["alice", "E"]
+]
+foreach q: Object in queries {
+  val pair = q as List
+  val hdl: String = pair[0] as String
+  val pid: String = pair[1] as String
+  val msg = solveSummary(contest, hdl, pid)
+  if msg.isEmpty() {
+    IO::println("  #{hdl}/#{pid}: not solved")
+  } else {
+    IO::println("  " + msg.get())
+  }
+}
+IO::println("")
+
+// ─── do[List]: cross-join of handles × problems for summary lines ─────────────
+
+banner("Cross-table: Handle × Problem (AC minute or  —)")
+val allHandles: List[Object] = ["alice", "bob", "carol", "dave", "eve"]
+val allPids: List[Object]    = ["A", "B", "C", "D", "E"]
+IO::println("  Handle          A    B    C    D    E")
+IO::println("  " + sep("-", 38))
+foreach h: Object in allHandles {
+  val hdl: String = h as String
+  val cOpt = findContestant(contest, hdl)
+  var line: String = "  #{hdl.padRight(10)}   "
+  foreach pid: Object in allPids {
+    val pidStr: String = pid as String
+    val cell: String = if cOpt.isEmpty() { "  —" } else {
+      val acTOpt = cOpt.get().firstAcAt(pidStr)
+      if acTOpt.isEmpty() { "  —" } else { (acTOpt.get() as Int).pad(3) }
+    }
+    line = line + "  " + cell
+  }
+  IO::println(line)
+}
+IO::println("")
+
+// ─── do[List]: generate problem × difficulty pairs for report ─────────────────
+
+val diffPairs: List[Object] = do[List] {
+  p  <- contest.problems()
+  d  <- ["easy", "medium", "hard", "very hard", "extreme"]
+  ret "#{(p as Problem).id()}/#{d}"
+}
+val hardOnly = diffPairs.filter { pair ->
+  val s = pair as String
+  s.contains("hard") || s.contains("extreme")
+}
+IO::println("Hard-difficulty entries (do[List] cross × filter):")
+foreach pair: Object in hardOnly {
+  IO::print("  #{pair as String}")
+}
+IO::println("")
+IO::println("")
+
+// ─── Verdict statistics ───────────────────────────────────────────────────────
+
+banner("Verdict Statistics")
+val vs: Map[String, Int] = contest.verdictStats()
+foreach (sym, cnt) in vs {
+  IO::println("  #{sym as String}: #{cnt as Int}")
+}
+IO::println("")
+
+// ─── Language statistics ──────────────────────────────────────────────────────
+
+banner("Language Statistics")
+val ls: Map[String, Int] = contest.langStats()
+val total: Int = contest.submissionCount()
+foreach (lang, cnt) in ls {
+  val pct: Int = (cnt as Int) * 100 / total
+  IO::println("  #{lang as String}: #{cnt as Int} submission(s) (#{pct}%)")
+}
+IO::println("")
+
+// ─── Per-problem acceptance rate ─────────────────────────────────────────────
+
+banner("Problem Acceptance Rates")
+foreach prob: Object in contest.problems() {
+  val p = prob as Problem
+  val psubs: List[Object] = contest.submissionsFor(p.id())
+  val acs: Int = psubs.filter { s -> (s as Submission).verdict().isAccepted() }.size
+  val total2: Int = psubs.size
+  val rate: Int = if total2 == 0 { 0 } else { acs * 100 / total2 }
+  IO::println("  #{p.id()}  #{p.title().truncate(24).padRight(24)}: #{acs}/#{total2} accepted (#{rate}%)")
+}
+IO::println("")
+
+// ─── By-language solver count via groupBy + |> pipeline ──────────────────────
+
+banner("Unique Solvers by Language")
+val byLang = contest.allSubs()
+  .filter { s -> (s as Submission).verdict().isAccepted() }
+  .groupBy { s -> (s as Submission).lang().label() }
+foreach (lang, langSubs) in byLang {
+  val uniq = (langSubs as List).map { s -> (s as Submission).handle() }.distinct()
+  val label: String = lang as String
+  val names: String = uniq.fold("") { acc, h -> (acc as String) + (h as String) + " " }
+  IO::println("  #{label}: #{uniq.size} solver(s) — #{names.trim()}")
+}
+IO::println("")
+
+// ─── Ranked record + recursion: compute bonus score ──────────────────────────
+
+banner("Ranked Contestants with Bonus Score")
+
+def bonus(solved: Int, penalty: Int): Int {
+  if solved == 0 { return 0 }
+  val base: Int = solved * 100
+  val deduction: Int = if penalty > 200 { 50 } else { penalty / 10 }
+  return base - deduction + bonus(solved - 1, penalty / 2) / 10
+}
+
+var rankIdx: Int = 1
+foreach entry: Object in contest.standings() {
+  val c = entry as Contestant
+  val b: Int = bonus(c.solvedCount(), c.totalPenalty())
+  val r = new Ranked[Contestant](c, rankIdx, b)
+  IO::println("  #{r.rank().pad(2)}. #{r.item().name().padRight(8)} solved=#{r.item().solvedCount()} penalty=#{r.item().totalPenalty()} bonus=#{r.penalty()}")
+  rankIdx++
+}
+IO::println("")
+
+// ─── Winner announcement ──────────────────────────────────────────────────────
+
+banner("Winner")
+val winner = contest.standings()[0] as Contestant
+IO::println("  Champion:  #{winner.name()}")
+IO::println("  Solved:    #{winner.solvedCount()} / #{contest.problems().size}")
+IO::println("  Penalty:   #{winner.totalPenalty()} min")
+val topLangs = winner.langUsage()
+if topLangs.size > 0 {
+  IO::println("  Languages: #{topLangs.size} distinct")
+  foreach (lang, cnt) in topLangs {
+    IO::println("    #{lang as String}: #{cnt as Int} submission(s)")
+  }
+}
+IO::println("")
+
+// ─── Phase transition: try/catch on invalid state ────────────────────────────
+
+banner("Phase State Machine")
+IO::println("  Final phase: #{contest.phase().label()}")
+IO::println("  Is active:   #{contest.phase().isActive()}")
+try {
+  val remaining: Int = select contest.phase() {
+    case p is Ended: 0
+    case p is Frozen: 120 - p.elapsedMin()
+    case p is Running: 120 - p.elapsedMin()
+    case p is Registration: 120
+  }
+  IO::println("  Time left:   #{remaining} min")
+} catch e: Exception {
+  IO::println("  Phase error: #{e.message()}")
+}
+IO::println("")
+IO::println("=== Contest complete. ===")

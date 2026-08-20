@@ -369,7 +369,7 @@ public:
     section("APPOINTMENTS (" + appointments.size + ")")
     IO::println("  ID     Patient  Doctor   Date       Status")
     IO::println("  " + "-".rep(56))
-    val sorted: List[Appointment] = appointments.sortedBy { a => (a as Appointment).date() }
+    val sorted: List[Appointment] = appointments.sortedBy { a -> (a as Appointment).date() }
     foreach a: Object in sorted {
       IO::println("  " + (a as Appointment).row())
     }
@@ -407,7 +407,7 @@ public:
     IO::println("  Top prescribed drug: " + drugLabel)
 
     section("Appointments by status")
-    val byStatus = appointments.groupBy { a => (a as Appointment).status().label() }
+    val byStatus = appointments.groupBy { a -> (a as Appointment).status().label() }
     foreach (status, appts) in byStatus {
       IO::println("    " + status + ": " + (appts as List[Object]).size)
     }

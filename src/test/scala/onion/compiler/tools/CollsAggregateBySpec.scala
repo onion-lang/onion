@@ -43,7 +43,7 @@ class CollsAggregateBySpec extends AbstractShellSpec {
       runInt(
         person,
         "val ps = [new Person(\"A\", 30), new Person(\"B\", 45), new Person(\"C\", 15)]\n" +
-        "return ps.filter { p => (p as Person).age() > 20 }.sumBy((p) -> p.age()) as Int",
+        "return ps.filter { p -> (p as Person).age() > 20 }.sumBy((p) -> p.age()) as Int",
         Shell.Success(75)) // 30 + 45
     }
   }

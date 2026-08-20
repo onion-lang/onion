@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/FileSystemSim.on`, a 442-line virtual in-memory filesystem simulator.**
+  Covers an ADT enum (`FsNode = FileNode | DirNode | SymlinkNode`) matched via
+  `select`/`is`, a data-carrying enum (`Permission`), a plain enum
+  (`SortOrder`), a generic record (`Pair[A, B]`), a plain record (`Stat`) with
+  methods, a class implementing an interface (`VirtualFs conforms
+  Filesystem`), collection pipelines (`filter`, `sortedBy`, `fold`,
+  `groupBy`), recursive tree traversal, nullable types, closures, string
+  interpolation, and `foreach` over integer ranges and map entries.
+
 ### Fixed
 
 - **A `CONSTRUCTOR_NOT_FOUND` (E0021) diagnostic's "Available constructors:" list header

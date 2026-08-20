@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `CONSTRUCTOR_NOT_FOUND` (E0021) diagnostic's "Available constructors:" list header
+  was always English**, even under a Japanese-locale JVM where the rest of the message
+  (`constructor applicable for ... is not found`) was correctly translated —
+  `SemanticErrorReporter.reportConstructorNotFound` built that header from a hard-coded
+  string literal instead of going through the bilingual `errorMessage*.properties` bundle
+  every other suggestion (`error.suggestion.candidates`, `suggestion.didYouMean`, ...) uses.
+  It now resolves `error.suggestion.availableConstructors` from the bundle, so the header
+  is Japanese under `-Duser.language=ja` like the rest of the message.
+
 - **A Java/JS/C-style `switch` statement (`switch x { case 1: ... }` or
   `switch (x) { ... }`) got a bare expected-token dump with no mention of
   `select`.** `switch` isn't a keyword in Onion, so it parses as a bare

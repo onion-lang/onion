@@ -630,7 +630,7 @@ class SemanticErrorReporter(threshold: Int) {
         val ctorSignatures = constructors.map { ctor =>
           s"  ${typeRef.name}(${ctor.getArgs.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")})"
         }
-        Some(s"Available constructors:${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
+        Some(s"${message("error.suggestion.availableConstructors")}${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
     } else None
 

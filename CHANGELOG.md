@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PaymentProcessor.on`, a 338-line payment-processor simulation.**
+  Luhn credit-card validation and batch transaction analytics: card-network
+  detection from BIN prefix (plain `enum CardType`), approve/decline
+  dispatch via a data-carrying ADT case-enum (`TxResult`), records with
+  `example` clauses, `do[Option]` notation for safe amount parsing,
+  extension methods on `String`/`Int`/`Double`, and collection pipelines
+  (`filter`/`groupBy`/`sortedBy`/`fold`/`distinct`/`partition`) over
+  per-transaction, per-network, per-category, and top-merchant reports.
+
 - **`run/CpuScheduler.on`, a 464-line CPU scheduling simulator.** Runs FCFS,
   SJF (non-preemptive), Round-Robin (quantum-based), and preemptive Priority
   scheduling against a shared 5-process workload, rendering a text Gantt

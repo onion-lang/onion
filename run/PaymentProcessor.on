@@ -1,0 +1,338 @@
+// PaymentProcessor.on — Luhn credit-card validation and batch transaction analytics.
+// Exercises: extension methods (String/Int/Double), record with example clause,
+// ADT enum (TxResult) with case-pattern dispatch, plain enum (CardType) with
+// static detection, top-level functions, do[Option] notation, collection
+// pipelines (groupBy/sortedBy/fold/filter/map/partition/distinct/find),
+// nullable map lookup, foreach on range and map entries, while loop,
+// try/catch, string interpolation.
+
+import {
+  java.lang.Integer as JInt;
+  java.lang.Double  as JDouble;
+  java.util.ArrayList;
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def cleanCard(): String = self.replace(" ", "").replace("-", "")
+  def maskCard(): String {
+    val s = self.cleanCard()
+    if s.length() < 4 { return "****" }
+    return "****-****-****-" + s.substring(s.length() - 4)
+  }
+  def lpad(width: Int): String {
+    var s = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rpad(width: Int): String {
+    var s = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "N/A" }
+    return "#{self * 100 / total}%"
+  }
+}
+
+extension Double {
+  def usd(): String = "$" + String::format("%.2f", self)
+  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+}
+
+// ─── CardType: network detection from card number prefix ─────────────────────
+
+enum CardType {
+  Visa, Mastercard, Amex, Discover, Unknown
+
+public:
+  def label(): String = select this {
+    case CardType::Visa:       "Visa"
+    case CardType::Mastercard: "Mastercard"
+    case CardType::Amex:       "Amex"
+    case CardType::Discover:   "Discover"
+    case CardType::Unknown:    "Unknown"
+  }
+
+  def feeRate(): Double = select this {
+    case CardType::Visa:       0.019
+    case CardType::Mastercard: 0.020
+    case CardType::Amex:       0.030
+    case CardType::Discover:   0.021
+    case CardType::Unknown:    0.025
+  }
+
+  static def detect(num: String): CardType {
+    val s = num.cleanCard()
+    if s.length() < 2 { return CardType::Unknown }
+    // Amex before Visa: both can start with digit 3
+    if s.startsWith("34") || s.startsWith("37")   { return CardType::Amex }
+    if s.startsWith("4")                           { return CardType::Visa }
+    if s.startsWith("6011") || s.startsWith("65")  { return CardType::Discover }
+    try {
+      val p2 = JInt::parseInt(s.substring(0, 2))
+      if p2 >= 51 && p2 <= 55 { return CardType::Mastercard }
+    } catch e: NumberFormatException {}
+    if s.length() >= 4 {
+      try {
+        val p4 = JInt::parseInt(s.substring(0, 4))
+        if p4 >= 2221 && p4 <= 2720 { return CardType::Mastercard }
+      } catch e2: NumberFormatException {}
+    }
+    return CardType::Unknown
+  }
+}
+
+// ─── TxResult: approved with fee OR declined with reason ─────────────────────
+
+enum TxResult {
+  case Approved(fee: Double)
+  case Declined(reason: String)
+
+public:
+  def isApproved(): Boolean = select this {
+    case a is Approved: true
+    case d is Declined: false
+  }
+
+  def netAmount(gross: Double): Double = select this {
+    case a is Approved: (gross - a.fee()).round2()
+    case d is Declined: 0.0
+  }
+
+  def tag(): String = select this {
+    case a is Approved: "APPROVED"
+    case d is Declined: "DECLINED"
+  }
+
+  def detail(): String = select this {
+    case a is Approved: "fee=#{a.fee().usd()}"
+    case d is Declined: d.reason()
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Transaction(id: String, cardNum: String, amount: Double, merchant: String, category: String)
+  example { new Transaction("X1", "4111111111111111", 50.0, "Shop", "RETAIL").cardType() == CardType::Visa }
+  example { new Transaction("X2", "371449635398431",  50.0, "Hotel","TRAVEL").cardType() == CardType::Amex }
+{
+public:
+  def masked(): String = cardNum().maskCard()
+  def cardType(): CardType = CardType::detect(cardNum())
+  def fee(): Double = (amount() * cardType().feeRate()).round2()
+  def describe(): String {
+    return "  [#{id()}] #{merchant().rpad(14)} #{amount().usd().lpad(9)}  #{masked()}  #{cardType().label()}"
+  }
+}
+
+record ProcessedTx(tx: Transaction, result: TxResult) {
+public:
+  def isApproved(): Boolean = result().isApproved()
+  def net(): Double = result().netAmount(tx().amount())
+  def describe(): String {
+    val tag = result().tag().rpad(8)
+    return "  [#{tx().id()}] #{tx().merchant().rpad(14)} #{tx().amount().usd().lpad(9)}  #{tag}  #{result().detail()}"
+  }
+}
+
+record MerchantSummary(name: String, txCount: Int, volume: Double) {
+public:
+  def describe(): String = "  #{name().rpad(16)} #{txCount()} txns  #{volume().usd()}"
+}
+
+// ─── Luhn algorithm ───────────────────────────────────────────────────────────
+
+def luhnCheck(num: String): Boolean {
+  val s = num.cleanCard()
+  val len = s.length()
+  if len < 13 || len > 19 { return false }
+  var sum: Int = 0
+  var i: Int = 0
+  while i < len {
+    val pos = len - 1 - i
+    try {
+      var d: Int = JInt::parseInt(s.substring(pos, pos + 1))
+      if i % 2 == 1 {
+        d = d * 2
+        if d > 9 { d = d - 9 }
+      }
+      sum = sum + d
+    } catch e: NumberFormatException {
+      return false
+    }
+    i++
+  }
+  return sum % 10 == 0
+}
+
+// ─── do[Option]: safely parse a positive Double ───────────────────────────────
+
+def parseAmount(s: String): Option[Double] {
+  try {
+    val d = JDouble::parseDouble(s)
+    if d > 0.0 { return Option::some(d) } else { return Option::none() }
+  } catch e: NumberFormatException {
+    return Option::none()
+  }
+}
+
+// Build a Transaction from string fields, returning None on any parse failure.
+def buildTx(id: String, card: String, amountStr: String, merchant: String, cat: String): Option[Transaction] {
+  return do[Option] {
+    amount <- parseAmount(amountStr)
+    ret new Transaction(id, card, amount, merchant, cat)
+  }
+}
+
+// ─── Process one transaction against current day totals ───────────────────────
+
+val PER_TX_LIMIT: Double = 5000.0
+val DAY_LIMIT: Double    = 3000.0
+
+def processTx(tx: Transaction, dayTotal: Double): TxResult {
+  if !luhnCheck(tx.cardNum())              { return new Declined("invalid Luhn") }
+  if tx.amount() <= 0.0                   { return new Declined("non-positive amount") }
+  if tx.amount() > PER_TX_LIMIT           { return new Declined("exceeds per-tx limit #{PER_TX_LIMIT.usd()}") }
+  if dayTotal + tx.amount() > DAY_LIMIT   { return new Declined("daily limit #{DAY_LIMIT.usd()} reached") }
+  return new Approved(tx.fee())
+}
+
+// ─── Dataset ──────────────────────────────────────────────────────────────────
+
+val txns = Colls::mutableListOf(
+  new Transaction("T01", "4111111111111111",  129.99, "TechStore",     "ELECTRONICS"),
+  new Transaction("T02", "5500005555555559",   45.00, "CafeBloom",     "FOOD"),
+  new Transaction("T03", "371449635398431",   890.00, "LuxuryHotel",   "TRAVEL"),
+  new Transaction("T04", "6011111111111117",   22.50, "PetSupplies",   "RETAIL"),
+  new Transaction("T05", "4111111111111111",  310.00, "AirlineApp",    "TRAVEL"),
+  new Transaction("T06", "5500005555555559",   78.30, "BookShop",      "RETAIL"),
+  new Transaction("T07", "4111111111111112",   55.00, "GadgetHub",     "ELECTRONICS"),  // bad Luhn
+  new Transaction("T08", "371449635398431",   200.00, "SpaTreatment",  "WELLNESS"),
+  new Transaction("T09", "6011111111111117",    9.99, "StreamingApp",  "DIGITAL"),
+  new Transaction("T10", "5500005555555559", 5200.00, "JewelryStore",  "LUXURY"),       // over per-tx limit
+  new Transaction("T11", "4111111111111111",   44.00, "GroceryMart",   "FOOD"),
+  new Transaction("T12", "371449635398431",   150.00, "Pharmacy",      "HEALTH"),
+  new Transaction("T13", "6011111111111117",  670.00, "FurnitureHut",  "HOME"),
+  new Transaction("T14", "5500005555555559",   88.00, "CafeBloom",     "FOOD"),
+  new Transaction("T15", "4111111111111111", 1200.00, "AirlineApp",    "TRAVEL")         // will hit day limit
+)
+
+// demonstrate do[Option] with a parsed transaction
+val dynTx: Option[Transaction] = buildTx("D01", "4111111111111111", "75.00", "OnlineShop", "RETAIL")
+if dynTx != null && !dynTx.isEmpty() { txns.add(dynTx.get()) }
+
+// ─── Run the processor ────────────────────────────────────────────────────────
+
+var dayTotal: Double = 0.0
+val results: List[Object] = Colls::mutableListOf()
+
+foreach tx: Object in txns {
+  val t = tx as Transaction
+  val res = processTx(t, dayTotal)
+  if res.isApproved() { dayTotal = (dayTotal + t.amount()).round2() }
+  results.add(new ProcessedTx(t, res))
+}
+
+// ─── Print report ─────────────────────────────────────────────────────────────
+
+IO::println("══ Payment Processor Report ══════════════════════════════════")
+IO::println("")
+IO::println("Transactions:")
+foreach r: Object in results { IO::println((r as ProcessedTx).describe()) }
+
+val approved = results.filter { r -> (r as ProcessedTx).isApproved() }
+val declined = results.filter { r -> !(r as ProcessedTx).isApproved() }
+
+val grossAmt: Double = approved.fold(0.0) { acc, r ->
+  (acc as Double) + (r as ProcessedTx).tx().amount()
+} as Double
+val feeAmt: Double = approved.fold(0.0) { acc, r ->
+  (acc as Double) + (r as ProcessedTx).tx().fee()
+} as Double
+val netAmt: Double = (grossAmt - feeAmt).round2()
+
+IO::println("")
+IO::println("Summary:")
+IO::println("  Total transactions : #{results.size}")
+IO::println("  Approved           : #{approved.size}  (#{approved.size.pct(results.size)})")
+IO::println("  Declined           : #{declined.size}  (#{declined.size.pct(results.size)})")
+IO::println("  Gross volume       : #{grossAmt.usd()}")
+IO::println("  Interchange fees   : #{feeAmt.usd()}")
+IO::println("  Net revenue        : #{netAmt.usd()}")
+
+// ─── By card network ──────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("By Card Network:")
+val byType = results.groupBy { r -> (r as ProcessedTx).tx().cardType().label() }
+val networks = Colls::mutableListOf("Visa", "Mastercard", "Amex", "Discover", "Unknown")
+foreach lbl: Object in networks {
+  val key = lbl as String
+  val grp = byType.get(key)
+  if grp != null {
+    val g = grp as List
+    val app = g.filter { r -> (r as ProcessedTx).isApproved() }
+    val vol = app.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    IO::println("  #{key.rpad(12)} #{app.size}/#{g.size} approved  #{vol.usd()}")
+  }
+}
+
+// ─── By category ─────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("By Category:")
+val byCat = approved.groupBy { r -> (r as ProcessedTx).tx().category() }
+val catKeys = approved.map { r -> (r as ProcessedTx).tx().category() }.distinct()
+val sortedCats = catKeys.sortedBy { c -> c as String }
+foreach cat: Object in sortedCats {
+  val key = cat as String
+  val grp = byCat.get(key)
+  if grp != null {
+    val g = grp as List
+    val vol = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    val fees = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().fee() } as Double
+    IO::println("  #{key.rpad(12)} #{g.size} txns  gross=#{vol.usd()}  fees=#{fees.usd()}  net=#{(vol - fees).round2().usd()}")
+  }
+}
+
+// ─── Top merchants by volume ──────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Top Merchants:")
+val byMerchant = approved.groupBy { r -> (r as ProcessedTx).tx().merchant() }
+val merchantKeys = approved.map { r -> (r as ProcessedTx).tx().merchant() }.distinct()
+val merchantStats: List[Object] = Colls::mutableListOf()
+foreach m: Object in merchantKeys {
+  val key = m as String
+  val grp = byMerchant.get(key)
+  if grp != null {
+    val g = grp as List
+    val vol = g.fold(0.0) { acc, r -> (acc as Double) + (r as ProcessedTx).tx().amount() } as Double
+    merchantStats.add(new MerchantSummary(key, g.size, vol))
+  }
+}
+val topMerchants = merchantStats.sortedBy { m -> 0.0 - (m as MerchantSummary).volume() }
+val showTop = if topMerchants.size > 5 { 5 } else { topMerchants.size }
+var mi: Int = 0
+while mi < showTop {
+  IO::println((topMerchants[mi] as MerchantSummary).describe())
+  mi++
+}
+
+// ─── Decline analysis ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Decline Reasons:")
+foreach r: Object in declined {
+  val p = r as ProcessedTx
+  IO::println("  [#{p.tx().id()}] #{p.tx().merchant().rpad(14)}  #{p.result().detail()}")
+}
+
+IO::println("")
+IO::println("══════════════════════════════════════════════════════════════")

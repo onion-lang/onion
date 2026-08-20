@@ -1,0 +1,312 @@
+// MarkovText.on — Bigram Markov chain text generator.
+// Exercises: classes, records with examples, ADT case-enum, typed Map/List,
+// extension methods (String, Int), foreach (k,v) on Map, collection pipelines
+// (filter/map/fold/sortedBy/distinct/groupBy/count), nullable types, string
+// interpolation, Rand::nextInt, Strings::splitRegex/repeat, closures, and
+// select / type-pattern matching.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  // Count whitespace-separated non-empty tokens.
+  def wordCount(): Int {
+    val parts: List[String] = Strings::splitRegex(self, "\\s+")
+    val nonEmpty: List[String] = parts.filter { w => (w as String).length() > 0 } as List[String]
+    return nonEmpty.size
+  }
+
+  // Uppercase the first character, leaving the rest unchanged.
+  def capitalize(): String {
+    if self.length() == 0 { return self }
+    return self.substring(0, 1).toUpperCase() + self.substring(1)
+  }
+
+  // True when the string ends a sentence.
+  def isSentenceEnd(): Boolean =
+    self.endsWith(".") || self.endsWith("!") || self.endsWith("?")
+}
+
+extension Int {
+  // Clamp to [lo, hi].
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else { if self > hi { hi } else { self } }
+}
+
+// ─── Text category ADT ────────────────────────────────────────────────────────
+
+enum TextCategory {
+  case Scientific
+  case Literary
+  case Technical
+
+public:
+  def label(): String = select this {
+    case s is Scientific: "Scientific"
+    case l is Literary:   "Literary"
+    case t is Technical:  "Technical"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Corpus(name: String, text: String, category: TextCategory)
+  example { new Corpus("t", "a b", new Literary()).name() == "t" }
+
+record ChainStats(uniqueStates: Int, totalTransitions: Int) {
+public:
+  def avgBranching(): Double = if uniqueStates() == 0 { 0.0 } else { totalTransitions().doubleValue() / uniqueStates().doubleValue() }
+
+  def summary(): String {
+    val avg: String = String::format("%.2f", avgBranching())
+    return "states=#{uniqueStates()}, transitions=#{totalTransitions()}, avg-branch=#{avg}"
+  }
+}
+
+record WordFreq(word: String, freq: Int)
+  example { new WordFreq("the", 5).freq() == 5 }
+
+record GenerationResult(text: String, wordCount: Int, sentenceCount: Int)
+  example { new GenerationResult("Hello world.", 2, 1).wordCount() == 2 }
+{
+public:
+  def describe(): String = "#{wordCount()} words, #{sentenceCount()} sentence(s)"
+}
+
+// ─── Markov chain ─────────────────────────────────────────────────────────────
+
+class MarkovChain {
+  var transitions: Map[String, List[Object]]
+  var vocabulary:  List[Object]
+
+public:
+  def this() {
+    this.transitions = [:]
+    this.vocabulary  = []
+  }
+
+  def train(text: String): void {
+    val tokens: List[String] = tokenize(text)
+    for var i: Int = 0; i < tokens.size - 1; i++ {
+      val cur: String = tokens[i] as String
+      val nxt: String = tokens[i + 1] as String
+      vocabulary.add(cur)
+      val bucket: List[Object] = transitions.get(cur) as List[Object]
+      if bucket == null {
+        val fresh: List[Object] = []
+        fresh.add(nxt)
+        transitions.put(cur, fresh)
+      } else {
+        bucket.add(nxt)
+      }
+    }
+    if tokens.size > 0 { vocabulary.add(tokens[tokens.size - 1] as String) }
+  }
+
+  // Generate up to maxWords words, capitalizing after sentence boundaries.
+  def generate(maxWords: Int): GenerationResult {
+    if vocabulary.size == 0 { return new GenerationResult("", 0, 0) }
+
+    var current: String? = vocabulary[Rand::nextInt(vocabulary.size)] as String?
+    var words: List[Object] = []
+    var count: Int = 0
+
+    while current != null && count < maxWords {
+      words.add(current as String)
+      count++
+      val bucket: List[Object] = transitions.get(current as String) as List[Object]
+      if bucket == null || bucket.size == 0 {
+        current = null
+      } else {
+        current = bucket[Rand::nextInt(bucket.size)] as String?
+      }
+    }
+
+    // Assemble text, capitalizing the first word and words after sentence ends.
+    var out: String = ""
+    var shouldCap: Boolean = true
+    for var i: Int = 0; i < words.size; i++ {
+      var w: String = words[i] as String
+      if shouldCap { w = w.capitalize() }
+      out = if i == 0 { w } else { out + " " + w }
+      shouldCap = w.isSentenceEnd()
+    }
+    val sentCount: Int = countSentenceEnds(words)
+    return new GenerationResult(out, words.size, sentCount)
+  }
+
+  // Aggregate chain statistics.
+  def stats(): ChainStats {
+    var stateCount: Int = 0
+    var txCount: Int = 0
+    foreach (_, v) in transitions {
+      stateCount++
+      txCount = txCount + (v as List[Object]).size
+    }
+    return new ChainStats(stateCount, txCount)
+  }
+
+  // Return the top-n words by successor count.
+  def topWords(n: Int): List[Object] {
+    var pairs: List[Object] = []
+    foreach (k, v) in transitions {
+      pairs.add(new WordFreq(k as String, (v as List[Object]).size))
+    }
+    val sorted: List[Object] = pairs.sortedBy { p => 0 - (p as WordFreq).freq() }
+    val limit: Int = n.clamp(0, sorted.size)
+    var top: List[Object] = []
+    for var i: Int = 0; i < limit; i++ { top.add(sorted[i]) }
+    return top
+  }
+}
+
+// ─── Free functions ───────────────────────────────────────────────────────────
+
+def tokenize(text: String): List[String] {
+  val raw: List[String] = Strings::splitRegex(text, "\\s+")
+  return raw.filter { w => (w as String).length() > 0 } as List[String]
+}
+
+def countSentenceEnds(words: List[Object]): Int {
+  var c: Int = 0
+  foreach w: Object in words {
+    if (w as String).isSentenceEnd() { c++ }
+  }
+  return c
+}
+
+def hr(): String = Strings::repeat("─", 62)
+
+// ─── Corpora ──────────────────────────────────────────────────────────────────
+
+val scienceText: String =
+  "Science is the systematic study of the natural world. " +
+  "Science uses observation and experiment to build knowledge. " +
+  "The natural world obeys consistent laws that science uncovers. " +
+  "A hypothesis is a testable prediction about the natural world. " +
+  "Experiments provide evidence to support or falsify a hypothesis. " +
+  "Data collected in experiments must be reproducible and verifiable. " +
+  "Peer review ensures that scientific claims meet a high standard. " +
+  "Scientific knowledge builds on itself through accumulated study. " +
+  "Technology applies scientific knowledge to solve real problems. " +
+  "Without experiment and observation science cannot advance."
+
+val literaryText: String =
+  "The old man sat by the river watching the water flow slowly. " +
+  "Water reflects the light of the moon on quiet evenings. " +
+  "The moon rises over the hills and casts long shadows. " +
+  "Long shadows stretch across the fields as evening falls. " +
+  "Evening falls and the stars begin to appear one by one. " +
+  "Stars appear as the sky darkens and the old man waits. " +
+  "The old man remembers long evenings by the river of his youth. " +
+  "Youth passes like water and only memory remains. " +
+  "Memory holds the light of evenings long gone. " +
+  "Gone are the days when the river ran wild and free."
+
+val technicalText: String =
+  "A compiler translates source code into machine code. " +
+  "Source code is written in a high-level programming language. " +
+  "A programming language defines syntax and semantics for programs. " +
+  "Programs describe algorithms that a computer can execute. " +
+  "A computer executes instructions stored in memory. " +
+  "Memory holds the data and instructions that a program uses. " +
+  "Instructions are decoded by the processor at high speed. " +
+  "High-speed processors perform billions of operations per second. " +
+  "Operations include arithmetic logic and memory access. " +
+  "Access to memory is managed by the operating system."
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val corpora: List[Object] = [
+  new Corpus("Science",   scienceText,   new Scientific()),
+  new Corpus("Literary",  literaryText,  new Literary()),
+  new Corpus("Technical", technicalText, new Technical())
+]
+
+IO::println(hr())
+IO::println("  Markov Chain Text Generator")
+IO::println(hr())
+
+foreach corpusObj: Object in corpora {
+  val corpus: Corpus = corpusObj as Corpus
+  val chain: MarkovChain = new MarkovChain()
+  chain.train(corpus.text())
+
+  val st: ChainStats = chain.stats()
+  IO::println("")
+  IO::println("Corpus: #{corpus.name()} [#{corpus.category().label()}]")
+  IO::println("  Source: #{corpus.text().wordCount()} words")
+  IO::println("  Chain:  #{st.summary()}")
+
+  IO::println("  Top 5 words by out-degree:")
+  val top: List[Object] = chain.topWords(5)
+  foreach wfObj: Object in top {
+    val wf: WordFreq = wfObj as WordFreq
+    IO::println("    \"#{wf.word()}\" -> #{wf.freq()} successor(s)")
+  }
+
+  IO::println("  Generated samples:")
+  for var g: Int = 1; g <= 3; g++ {
+    val res: GenerationResult = chain.generate(20)
+    IO::println("    [#{g}] #{res.text()}")
+    IO::println("        (#{res.describe()})")
+  }
+}
+
+IO::println("")
+IO::println(hr())
+
+// ─── Combined model ───────────────────────────────────────────────────────────
+
+val combined: MarkovChain = new MarkovChain()
+foreach corpusObj: Object in corpora {
+  combined.train((corpusObj as Corpus).text())
+}
+
+val cs: ChainStats = combined.stats()
+IO::println("Combined model: #{cs.summary()}")
+
+IO::println("")
+IO::println("Generated from combined model:")
+for var g: Int = 1; g <= 3; g++ {
+  val res: GenerationResult = combined.generate(25)
+  IO::println("  [#{g}] #{res.text()}")
+}
+
+// ─── Vocabulary analysis ──────────────────────────────────────────────────────
+
+IO::println("")
+IO::println(hr())
+IO::println("Vocabulary Analysis")
+IO::println(hr())
+
+val allText: String = scienceText + " " + literaryText + " " + technicalText
+val allTokens: List[Object] = tokenize(allText) as List[Object]
+val uniqueWords: List[Object] = allTokens.distinct()
+
+IO::println("Total tokens : #{allTokens.size}")
+IO::println("Unique words : #{uniqueWords.size}")
+
+val ratio: Double = uniqueWords.size.doubleValue() / allTokens.size.doubleValue() * 100.0
+val ratioStr: String = String::format("%.1f", ratio)
+IO::println("Lexical diversity: #{ratioStr}%")
+
+// Group unique words by first letter and print letter histogram.
+val byLetter: Map[String, List[Object]] = uniqueWords
+  .filter { w => (w as String).length() > 0 }
+  .groupBy { w => (w as String).substring(0, 1).toUpperCase() }
+
+IO::println("")
+IO::println("Initial-letter distribution (top 8 letters):")
+var letterPairs: List[Object] = []
+foreach (letter, grp) in byLetter {
+  letterPairs.add(new WordFreq(letter as String, (grp as List[Object]).size))
+}
+val topLetters: List[Object] = letterPairs
+  .sortedBy { p => 0 - (p as WordFreq).freq() }
+for var i: Int = 0; i < 8.clamp(0, topLetters.size); i++ {
+  val lf: WordFreq = topLetters[i] as WordFreq
+  val bar: String = Strings::repeat("█", lf.freq())
+  IO::println("  #{lf.word()}: #{bar} (#{lf.freq()})")
+}
+
+IO::println(hr())

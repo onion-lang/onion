@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/CircuitSimulator.on`, a digital logic circuit simulator.**
+  Represents gates (`NOT`/`AND`/`OR`/`XOR`/`NAND`) as an ADT case-enum wired
+  together by wire name into a graph, evaluated on demand via memoized
+  recursion with a cycle guard. Builds a half adder, a full adder, a 4-bit
+  ripple-carry adder (chained full adders, run on real integer pairs) and a
+  2-to-1 multiplexer, printing full truth tables plus a broken
+  self-referential circuit to show the cycle guard. Exercises ADT case-enum
+  dispatch, a class wrapping a mutable `HashMap`-backed graph, recursive
+  evaluation with a memo cache and a `HashSet` "currently visiting" guard,
+  records with methods, extension methods on `Int`/`Boolean`, and nested
+  `while` loops for combinatorial enumeration.
+
 - **`run/NeuralNet.on`, a 291-line from-scratch multi-layer perceptron.**
   Trains a hand-written two-layer network (sigmoid activations, backprop
   computed manually, no library) via stochastic gradient descent on two

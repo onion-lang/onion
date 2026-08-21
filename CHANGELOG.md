@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/FamilyTree.on`, a 432-line genealogy tracker.** Models a
+  four-generation fictional family and produces a roster, statistics,
+  decade/gender breakdowns, a recursive tree print, ancestor/descendant
+  counts, sibling lookup, and birth-century grouping. Exercises `record`
+  types (`Person`, `Relation`), a homogeneous `enum Gender`, extension
+  methods on `Int`/`String`, recursive traversal via private helpers,
+  collection pipelines (`groupBy`/`sortedBy`/`filter`/`fold`/`map`/`find`),
+  `foreach (k, v) in map`, and nullable `Int` fields.
+
 - **`run/Mastermind.on`, a 309-line AI-vs-AI Mastermind code-breaking
   simulation.** Two `Guesser` strategies (`RandomGuesser`, `SmartGuesser`)
   compete across 50 random secrets; stats are compared and colour

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PackageInstaller.on`, a 285-line npm-style dependency resolver.**
+  Registers 12 packages with version strings and dependency lists, resolves
+  them via DFS topological sort with cycle detection, and groups them into
+  parallel install levels with a BFS wave algorithm. Exercises a `record`
+  with methods (`Package`), an ADT `enum` (`Outcome`: `Resolved`/`Cyclic`),
+  `select`/`case is` pattern matching, `HashMap[String, Object]` /
+  `HashSet[String]` / `ArrayList`, collection pipelines (`sortedBy`,
+  `countWhere`, `filter`), an `extension List[String]`, closures, method
+  chaining, string interpolation, and nullable (`Package?`) lookups.
+
 - **`run/LispInterp.on`, a 590-line minimal Scheme-like Lisp interpreter.**
   Compiles and runs end-to-end with correct output on 27 verified cases.
   Exercises ADT case enums (`TokenKind`, `LispVal`, 7 cases), records

@@ -1,0 +1,285 @@
+// PackageInstaller.on — package dependency resolver that:
+//   • registers packages with version and dependency lists
+//   • topologically sorts them (DFS post-order) with cycle detection
+//   • groups packages into parallel install levels (BFS waves)
+//   • reports install plans and statistics
+//
+// Features exercised: records, ADT enum, HashMap/HashSet/ArrayList,
+// collection pipelines (map/filter/groupBy/sortedBy/find),
+// extension methods on List[String], closures, string interpolation,
+// pattern matching (select/case is), nullable, recursion, foreach over sets.
+
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+  java.util.HashSet;
+}
+
+// ── Data model ────────────────────────────────────────────────────────────────
+
+record Package(name: String, version: String, deps: List[String]) {
+public:
+  def display(): String = "#{name}@#{version}"
+  def depCount(): Int = deps.size
+}
+
+// ── Resolution outcome ────────────────────────────────────────────────────────
+
+enum Outcome {
+  case Resolved(order: List[String])
+  case Cyclic(cycle: List[String])
+public:
+  def ok(): Boolean = select this {
+    case r is Resolved: true
+    case c is Cyclic:   false
+  }
+  def summary(): String = select this {
+    case r is Resolved: "OK  #{r.order().size()} packages resolved"
+    case c is Cyclic:   "ERR cycle: #{c.cycle().toString()}"
+  }
+}
+
+// ── DFS-based topological resolver ───────────────────────────────────────────
+
+class Resolver {
+  var registry: HashMap[String, Object]
+  var visited: HashSet[String]
+  var inStack: HashSet[String]
+  var order: ArrayList[String]
+  var cycleNodes: ArrayList[String]
+  var hasCycle: Boolean
+
+public:
+  def this {
+    registry  = new HashMap[String, Object]()
+    visited   = new HashSet[String]()
+    inStack   = new HashSet[String]()
+    order     = new ArrayList[String]()
+    cycleNodes = new ArrayList[String]()
+    hasCycle  = false
+  }
+
+  def add(p: Package): Resolver {
+    registry.put(p.name(), p)
+    return self
+  }
+
+  def get(name: String): Package? {
+    val v: Object = registry.get(name)
+    if v == null { return null }
+    return v as Package
+  }
+
+  def size(): Int = registry.size()
+
+  def resolve(): Outcome {
+    visited.clear()
+    inStack.clear()
+    order.clear()
+    cycleNodes.clear()
+    hasCycle = false
+    val keys: ArrayList[String] = new ArrayList[String](registry.keySet())
+    foreach name: String in keys {
+      if !visited.contains(name) {
+        if !visit(name) { break }
+      }
+    }
+    if hasCycle {
+      return new Cyclic(cycleNodes)
+    }
+    return new Resolved(order)
+  }
+
+  def visit(name: String): Boolean {
+    if inStack.contains(name) {
+      hasCycle = true
+      cycleNodes.clear()
+      cycleNodes.add(name)
+      return false
+    }
+    if visited.contains(name) { return true }
+    inStack.add(name)
+    val pkg: Package? = self.get(name)
+    if pkg != null {
+      foreach dep: String in pkg.deps() {
+        if !visit(dep) {
+          if hasCycle && !cycleNodes.contains(name) {
+            cycleNodes.add(name)
+          }
+          inStack.remove(name as Object)
+          return false
+        }
+      }
+    }
+    inStack.remove(name as Object)
+    visited.add(name)
+    order.add(name)
+    return true
+  }
+}
+
+// ── Install-level grouping ────────────────────────────────────────────────────
+// Group resolved packages into waves: level 0 = no deps, level 1 = deps all
+// in level 0, etc.  Packages within a level can be installed in parallel.
+
+def computeLevels(resolvedOrder: List[String], resolver: Resolver): ArrayList[List[String]] {
+  val levels: ArrayList[List[String]] = new ArrayList[List[String]]()
+  val installed: HashSet[String] = new HashSet[String]()
+  var remaining: ArrayList[String] = new ArrayList[String](resolvedOrder)
+
+  while remaining.size() > 0 {
+    val wave: ArrayList[String] = new ArrayList[String]()
+    val next: ArrayList[String] = new ArrayList[String]()
+    foreach name: String in remaining {
+      val pkg: Package? = resolver.get(name)
+      var ready: Boolean = true
+      if pkg != null {
+        foreach dep: String in pkg.deps() {
+          if !installed.contains(dep) { ready = false }
+        }
+      }
+      if ready { wave.add(name) } else { next.add(name) }
+    }
+    if wave.size() == 0 { break }
+    levels.add(wave)
+    foreach n: String in wave { installed.add(n) }
+    remaining = next
+  }
+  return levels
+}
+
+// ── Extension methods on List[String] ─────────────────────────────────────────
+
+extension List[String] {
+  def joinWith(sep: String): String {
+    val sb: StringBuffer = new StringBuffer()
+    var first: Boolean = true
+    foreach s: Object in self {
+      if !first { sb.append(sep) }
+      sb.append(s as String)
+      first = false
+    }
+    return sb.toString()
+  }
+
+  def countWhere(pred: String -> Boolean): Int {
+    var n: Int = 0
+    foreach s: Object in self { if pred(s as String) { n = n + 1 } }
+    return n
+  }
+}
+
+// ── Pretty-print helpers ──────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  val pad: Int = 50 - title.length()
+  val barLen: Int = if pad > 0 { pad } else { 2 }
+  val bar: String = "─".repeat(barLen)
+  IO::println("")
+  IO::println("── #{title} #{bar}")
+}
+
+// ── Build the registry ────────────────────────────────────────────────────────
+// A small realistic npm-style dependency graph.
+
+val resolver: Resolver = new Resolver()
+resolver
+  .add(new Package("js-tokens",        "4.0.0",   []))
+  .add(new Package("loose-envify",     "1.4.0",   ["js-tokens"]))
+  .add(new Package("object-assign",    "4.1.1",   []))
+  .add(new Package("scheduler",        "0.23.0",  ["loose-envify"]))
+  .add(new Package("react",            "18.2.0",  ["loose-envify", "object-assign"]))
+  .add(new Package("react-dom",        "18.2.0",  ["react", "loose-envify", "scheduler"]))
+  .add(new Package("follow-redirects", "1.15.4",  []))
+  .add(new Package("proxy-from-env",   "1.1.0",   []))
+  .add(new Package("axios",            "1.6.0",   ["follow-redirects", "proxy-from-env"]))
+  .add(new Package("lodash",           "4.17.21", []))
+  .add(new Package("moment",           "2.29.4",  []))
+  .add(new Package("classnames",       "2.3.2",   []))
+
+// ── Resolve and print plan ────────────────────────────────────────────────────
+
+printSection("Resolving #{resolver.size()} packages")
+val outcome: Outcome = resolver.resolve()
+IO::println(outcome.summary())
+
+select outcome {
+  case r is Resolved: {
+    printSection("Install order (topological post-order)")
+    var idx: Int = 1
+    foreach name: String in r.order() {
+      val pkg: Package? = resolver.get(name)
+      val depStr: String = if pkg != null && pkg.depCount() > 0 {
+        "  (needs: #{pkg.deps().joinWith(", ")})"
+      } else { "" }
+      val display: String = if pkg != null { pkg.display() } else { name }
+      IO::println("  #{idx}. #{display}#{depStr}")
+      idx = idx + 1
+    }
+
+    printSection("Parallel install levels")
+    val levels: ArrayList[List[String]] = computeLevels(r.order(), resolver)
+    var lvl: Int = 0
+    foreach wave: Object in levels {
+      val waveList: List[String] = wave as List[String]
+      IO::println("  Level #{lvl}: [#{waveList.joinWith(", ")}]")
+      lvl = lvl + 1
+    }
+
+    printSection("Statistics")
+    val total: Int = r.order().size()
+    val withDeps: Int = r.order().countWhere { n: String ->
+      val p: Package? = resolver.get(n)
+      p != null && p.depCount() > 0
+    }
+    val leafCount: Int = total - withDeps
+    IO::println("  Packages total : #{total}")
+    IO::println("  Leaf (no deps) : #{leafCount}")
+    IO::println("  With deps      : #{withDeps}")
+    IO::println("  Install levels : #{levels.size}")
+
+    var maxWidth: Int = 0
+    var maxLvl: Int = 0
+    var li: Int = 0
+    foreach wave: Object in levels {
+      val w: Int = (wave as List[String]).size()
+      if w > maxWidth { maxWidth = w; maxLvl = li }
+      li = li + 1
+    }
+    IO::println("  Widest level   : #{maxWidth} packages (level #{maxLvl})")
+
+    printSection("Packages sorted by dependency count")
+    val sortedPkgs: List[String] = r.order().sortedBy { n: String ->
+      val p: Package? = resolver.get(n)
+      if p != null { p.depCount() } else { 0 }
+    }
+    foreach name: String in sortedPkgs {
+      val p: Package? = resolver.get(name)
+      if p != null {
+        IO::println("  #{p.depCount()} dep(s)  #{p.display()}")
+      }
+    }
+  }
+  case c is Cyclic: {
+    IO::println("Cycle path: #{c.cycle().joinWith(" -> ")}")
+  }
+}
+
+// ── Cycle detection demo ──────────────────────────────────────────────────────
+
+printSection("Cycle detection test")
+val cycleTest: Resolver = new Resolver()
+cycleTest
+  .add(new Package("alpha", "1.0.0", ["beta"]))
+  .add(new Package("beta",  "1.0.0", ["gamma"]))
+  .add(new Package("gamma", "1.0.0", ["alpha"]))
+
+val outcome2: Outcome = cycleTest.resolve()
+IO::println(outcome2.summary())
+select outcome2 {
+  case r is Resolved: IO::println("  Unexpectedly resolved!")
+  case c is Cyclic:   IO::println("  Correctly detected cycle in: #{c.cycle().joinWith(" -> ")}")
+}
+
+IO::println("")
+IO::println("Done.")

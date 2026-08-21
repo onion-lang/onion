@@ -4366,21 +4366,21 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>1</td>
 <td>Test suite</td>
 <td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code> (see the note below)</td>
-<td>3863 pass / 0 fail / 1 cancelled</td>
+<td>3886 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Sample health</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
-<td>183 / 183 compile</td>
+<td>191 / 191 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>122 (AccessLogAnalyzer, AirlineReservation, AstronomyCatalog, AuctionHouse, Automaton, BankLedger, BankSystem, Blackjack, BookClub, BrainFuck, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CensusAnalyzer, ChemCalculator, CinemaBooking, CipherSuite, ClinicRecords, CodeContest, ConferenceSchedule, ConnectFour, ConwayLife, CourseRegistration, CryptoPortfolio, DependencyResolver, DnaAnalyzer, DoctorScheduler, ElevatorDispatcher, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, FileSystemSim, FitnessTracker, FlashcardDeck, FleetManager, GameOfLife, GameStore, GenericLeaderboard, GeneticSequencer, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HRSystem, HospitalWard, HotelReservation, HuffmanCoding, InsuranceClaims, Inventory, InventoryManager, InventoryReport, JobScheduler, KaraokeNight, KingdomSim, LibraryCatalog, LibrarySystem, LogAnalytics, Mandelbrot, MarkdownConverter, MarkovText, MathParser, MatrixCalc, MazeSolver, MiniRpg, MiniTypeChecker, MovieRecommender, MuseumCollection, MusicFestival, MusicLibrary, NationalParkTracker, NetworkMonitor, NutritionTracker, OrderReport, PackageDelivery, ParkingGarage, PayrollReport, PerfReview, PetShelter, PharmacySystem, PlantCare, PlaylistManager, PokerHands, PolynomialAlgebra, PropertyManager, RankedChoice, RecipeBook, RecipeManager, RecipeVault, RestaurantOrders, RuleEngine, ShapeProcessor, ShipmentTracker, ShoppingCart, SnippetLibrary, SocialNetwork, SortAlgorithms, SortingShowcase, SpaceMission, SpellCheck, SpreadsheetCalc, SprintPlanner, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, SupplyChain, TaskPlanner, TextAnalytics, TextAnalyzer, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, TransitPlanner, VirtualMachine, VirtualShell, WeatherReport)</td>
+<td>131 (AccessLogAnalyzer, AirlineReservation, AstronomyCatalog, AuctionHouse, Automaton, BankLedger, BankSystem, Blackjack, BookClub, BrainFuck, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CellularAutomata, CensusAnalyzer, ChemCalculator, CinemaBooking, CipherSuite, ClinicRecords, CodeContest, ColorPalette, ConferenceSchedule, ConnectFour, ConwayLife, CourseRegistration, CpuScheduler, CryptoPortfolio, DependencyResolver, DnaAnalyzer, DoctorScheduler, ElevatorDispatcher, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, ExprEval, FamilyTree, FileSystemSim, FitnessTracker, FlashcardDeck, FleetManager, GameOfLife, GameStore, GenericLeaderboard, GeneticSequencer, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HRSystem, HospitalWard, HotelReservation, HuffmanCoding, InsuranceClaims, Inventory, InventoryManager, InventoryReport, JobScheduler, KaraokeNight, KingdomSim, LibraryCatalog, LibrarySystem, LogAnalytics, Mandelbrot, MarkdownConverter, MarkovText, Mastermind, MathParser, MatrixCalc, MazeSolver, MiniRpg, MiniTypeChecker, MovieRecommender, MuseumCollection, MusicFestival, MusicLibrary, MusicTheory, NationalParkTracker, NetworkMonitor, NutritionTracker, OrderReport, PackageDelivery, ParkingGarage, PaymentProcessor, PayrollReport, PerfReview, PetShelter, PharmacySystem, PlantCare, PlaylistManager, PokerHands, PolynomialAlgebra, PropertyManager, RankedChoice, RecipeBook, RecipeManager, RecipeVault, RestaurantOrders, RuleEngine, ShapeProcessor, ShipmentTracker, ShoppingCart, SnippetLibrary, SocialNetwork, SortAlgorithms, SortingShowcase, SpaceMission, SpellCheck, SpreadsheetCalc, SprintPlanner, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, SupplyChain, TaskPlanner, TextAnalytics, TextAnalyzer, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, TransitPlanner, VirtualMachine, VirtualShell, WeatherReport, WordSearch)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4446,7 +4446,7 @@ goal "reach practical quality" into a checkable state.</p>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> records (plain) and data-carrying enums</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> plain enums</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> classes with constructors and methods</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> interfaces + polymorphic dispatch (ExprEval)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> interfaces + polymorphic dispatch (FleetManager)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> top-level <code>def</code> with block and expression bodies</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> recursion (incl. tail position)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> collection pipelines: map / filter / fold / reduce / sortedBy / groupBy / find / distinct / partition / zip / flatten</li>

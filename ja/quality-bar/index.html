@@ -4475,21 +4475,21 @@
 <td>1</td>
 <td>テストスイート</td>
 <td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code>(下記の注記を参照)</td>
-<td>3863 pass / 0 fail / 1 cancelled</td>
+<td>3886 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>(どちらも <code>run/*.on</code> 全件をコンパイル)</td>
-<td>183 / 183 compile</td>
+<td>191 / 191 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>122(AccessLogAnalyzer、AirlineReservation、AstronomyCatalog、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrainFuck、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ConferenceSchedule、ConnectFour、ConwayLife、CourseRegistration、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、FileSystemSim、FitnessTracker、FlashcardDeck、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HRSystem、HospitalWard、HotelReservation、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、Mandelbrot、MarkdownConverter、MarkovText、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、PackageDelivery、ParkingGarage、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PolynomialAlgebra、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SpreadsheetCalc、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport)</td>
+<td>131（AccessLogAnalyzer、AirlineReservation、AstronomyCatalog、AuctionHouse、Automaton、BankLedger、BankSystem、Blackjack、BookClub、BrainFuck、BrokenLogDemo、BudgetTracker、BugTracker、CarRentalFleet、CellularAutomata、CensusAnalyzer、ChemCalculator、CinemaBooking、CipherSuite、ClinicRecords、CodeContest、ColorPalette、ConferenceSchedule、ConnectFour、ConwayLife、CourseRegistration、CpuScheduler、CryptoPortfolio、DependencyResolver、DnaAnalyzer、DoctorScheduler、ElevatorDispatcher、EmployeeManager、EspressoShop、EventTicketing、ExpenseAuditor、ExprEval、FamilyTree、FileSystemSim、FitnessTracker、FlashcardDeck、FleetManager、GameOfLife、GameStore、GenericLeaderboard、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphSearch、HRSystem、HospitalWard、HotelReservation、HuffmanCoding、InsuranceClaims、Inventory、InventoryManager、InventoryReport、JobScheduler、KaraokeNight、KingdomSim、LibraryCatalog、LibrarySystem、LogAnalytics、Mandelbrot、MarkdownConverter、MarkovText、Mastermind、MathParser、MatrixCalc、MazeSolver、MiniRpg、MiniTypeChecker、MovieRecommender、MuseumCollection、MusicFestival、MusicLibrary、MusicTheory、NationalParkTracker、NetworkMonitor、NutritionTracker、OrderReport、PackageDelivery、ParkingGarage、PaymentProcessor、PayrollReport、PerfReview、PetShelter、PharmacySystem、PlantCare、PlaylistManager、PokerHands、PolynomialAlgebra、PropertyManager、RankedChoice、RecipeBook、RecipeManager、RecipeVault、RestaurantOrders、RuleEngine、ShapeProcessor、ShipmentTracker、ShoppingCart、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpellCheck、SpreadsheetCalc、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、TaskPlanner、TextAnalytics、TextAnalyzer、TicTacToe、TimesheetTracker、TodoManager、ToolDemo、TournamentStandings、TournamentTracker、TransitPlanner、VirtualMachine、VirtualShell、WeatherReport、WordSearch）</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4552,7 +4552,7 @@ CI は影響を受けません。差分実行の状態は <code>target/</code> �
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> records（単純）とデータを持つ enum</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 単純 enum</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> コンストラクタとメソッドを持つクラス</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> インターフェース + 多態ディスパッチ（ExprEval）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> インターフェース + 多態ディスパッチ（FleetManager）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> トップレベルの <code>def</code>（ブロック本体と式本体）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 再帰（末尾位置も含む）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> コレクションパイプライン: map / filter / fold / reduce / sortedBy / groupBy / find / distinct / partition / zip / flatten</li>

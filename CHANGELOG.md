@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/MiniGit.on`, a 384-line version-control system simulation.** Models a
+  repository with commits, branches, staging area, and merge operations.
+  Exercises extension methods on `String`/`Int` (`abbrev`, `padRight`, `repeat`,
+  `abs`, `clamp`), a homogeneous `enum ChangeType`/`Priority` with methods, an ADT
+  `enum MergeOutcome` with `FastForward`/`ThreeWay`/`UpToDate` cases, records with
+  methods (`FileChange`, `CommitInfo`, `BranchInfo`), a class with `ArrayList` and
+  `Map[Object, Object]` mutable state (`Repository`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`sortedByDescending`/`groupBy`/`find`/
+  `count`/`distinct`/`take`), `select` with type patterns, string interpolation,
+  closures, `foreach` on list and `foreach (k, v) in map`, nullable types and null
+  checks, and `while` loops for manual iteration.
+
 ## [0.14.0] - 2026-08-21
 
 ### Added

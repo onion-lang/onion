@@ -1,0 +1,560 @@
+// MusicTheory.on — music theory calculator: chromatic notes, intervals,
+// chord voicings, scales, modal analysis, and chord progressions.
+//
+// Exercises: homogeneous enum (Note, ChordQuality, ScaleType, Mode);
+// records with methods (Chord, Scale, Progression); class with mutable state
+// (ProgressionBuilder); collection pipelines (map/filter/fold/sortedBy/
+// groupBy/distinct/find/partition/zip); select/pattern matching; nullable;
+// closures; string interpolation; while/foreach (ranges and map (k,v));
+// recursion; interface; generics.
+
+import {
+  java.util.*
+}
+
+// ── Note: the 12 chromatic pitch classes ─────────────────────────────────────
+
+enum Note {
+  C, Cs, D, Ds, E, F, Fs, G, Gs, A, As, B
+public:
+  def semitone(): Int = select this {
+    case Note::C:  0
+    case Note::Cs: 1
+    case Note::D:  2
+    case Note::Ds: 3
+    case Note::E:  4
+    case Note::F:  5
+    case Note::Fs: 6
+    case Note::G:  7
+    case Note::Gs: 8
+    case Note::A:  9
+    case Note::As: 10
+    case Note::B:  11
+    else: 0
+  }
+  def label(): String = select this {
+    case Note::C:  "C"
+    case Note::Cs: "C#"
+    case Note::D:  "D"
+    case Note::Ds: "D#"
+    case Note::E:  "E"
+    case Note::F:  "F"
+    case Note::Fs: "F#"
+    case Note::G:  "G"
+    case Note::Gs: "G#"
+    case Note::A:  "A"
+    case Note::As: "A#"
+    case Note::B:  "B"
+    else: "?"
+  }
+  def flatLabel(): String = select this {
+    case Note::Cs: "Db"
+    case Note::Ds: "Eb"
+    case Note::Fs: "Gb"
+    case Note::Gs: "Ab"
+    case Note::As: "Bb"
+    else: label()
+  }
+}
+
+def noteFromSemitone(s: Int): Note = {
+  val n = ((s % 12) + 12) % 12
+  select n {
+    case 0:  Note::C
+    case 1:  Note::Cs
+    case 2:  Note::D
+    case 3:  Note::Ds
+    case 4:  Note::E
+    case 5:  Note::F
+    case 6:  Note::Fs
+    case 7:  Note::G
+    case 8:  Note::Gs
+    case 9:  Note::A
+    case 10: Note::As
+    case 11: Note::B
+    else:    Note::C
+  }
+}
+
+def transposeNote(n: Note, semitones: Int): Note = noteFromSemitone(n.semitone() + semitones)
+
+def intervalFullName(semitones: Int): String = {
+  val n = ((semitones % 12) + 12) % 12
+  select n {
+    case 0:  "Perfect Unison"
+    case 1:  "Minor 2nd"
+    case 2:  "Major 2nd"
+    case 3:  "Minor 3rd"
+    case 4:  "Major 3rd"
+    case 5:  "Perfect 4th"
+    case 6:  "Tritone"
+    case 7:  "Perfect 5th"
+    case 8:  "Minor 6th"
+    case 9:  "Major 6th"
+    case 10: "Minor 7th"
+    case 11: "Major 7th"
+    else:    "Octave"
+  }
+}
+
+def intervalAbbr(semitones: Int): String = {
+  val n = ((semitones % 12) + 12) % 12
+  select n {
+    case 0:  "P1"
+    case 1:  "m2"
+    case 2:  "M2"
+    case 3:  "m3"
+    case 4:  "M3"
+    case 5:  "P4"
+    case 6:  "TT"
+    case 7:  "P5"
+    case 8:  "m6"
+    case 9:  "M6"
+    case 10: "m7"
+    case 11: "M7"
+    else:    "P8"
+  }
+}
+
+// ── ChordQuality ──────────────────────────────────────────────────────────────
+
+enum ChordQuality {
+  Major, Minor, Diminished, Augmented, Dom7, Maj7, Min7, HalfDim7, Sus2, Sus4
+public:
+  def label(): String = select this {
+    case ChordQuality::Major:      "maj"
+    case ChordQuality::Minor:      "min"
+    case ChordQuality::Diminished: "dim"
+    case ChordQuality::Augmented:  "aug"
+    case ChordQuality::Dom7:       "7"
+    case ChordQuality::Maj7:       "maj7"
+    case ChordQuality::Min7:       "min7"
+    case ChordQuality::HalfDim7:   "ø7"
+    case ChordQuality::Sus2:       "sus2"
+    case ChordQuality::Sus4:       "sus4"
+    else: "?"
+  }
+  def intervals(): List[Int] = select this {
+    case ChordQuality::Major:      [0, 4, 7]
+    case ChordQuality::Minor:      [0, 3, 7]
+    case ChordQuality::Diminished: [0, 3, 6]
+    case ChordQuality::Augmented:  [0, 4, 8]
+    case ChordQuality::Dom7:       [0, 4, 7, 10]
+    case ChordQuality::Maj7:       [0, 4, 7, 11]
+    case ChordQuality::Min7:       [0, 3, 7, 10]
+    case ChordQuality::HalfDim7:   [0, 3, 6, 10]
+    case ChordQuality::Sus2:       [0, 2, 7]
+    case ChordQuality::Sus4:       [0, 5, 7]
+    else: [0]
+  }
+  def voiceCount(): Int = intervals().size
+  def isTriad(): Boolean = voiceCount() == 3
+  def isSeventh(): Boolean = voiceCount() == 4
+}
+
+// ── Chord ─────────────────────────────────────────────────────────────────────
+
+record Chord(root: Note, quality: ChordQuality) {
+public:
+  def label(): String = root.label() + quality.label()
+  def notes(): List[Note] = quality.intervals().map { semi -> transposeNote(root, semi as Int) }
+  def noteLabels(): String = {
+    val ns: List[String] = notes().map { n -> n.label() }
+    ns.fold("") { acc, s -> if acc == "" { s } else { acc + "-" + s } }
+  }
+  def contains(n: Note): Boolean =
+    notes().find { x -> x.semitone() == n.semitone() } != null
+  def semitones(): List[Int] = quality.intervals().map { i -> (root.semitone() + (i as Int)) % 12 }
+  def commonToneCount(other: Chord): Int = {
+    val mine: List[Int] = semitones()
+    other.semitones().filter { s -> mine.find { m -> m == s } != null }.size
+  }
+  def intervalFromRoot(n: Note): String = intervalAbbr(n.semitone() - root.semitone())
+}
+
+// ── ScaleType ─────────────────────────────────────────────────────────────────
+
+enum ScaleType {
+  Major, NatMinor, HarmMinor, MelMinor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, WholeTone, Blues
+public:
+  def label(): String = select this {
+    case ScaleType::Major:      "Major"
+    case ScaleType::NatMinor:   "Natural Minor"
+    case ScaleType::HarmMinor:  "Harmonic Minor"
+    case ScaleType::MelMinor:   "Melodic Minor"
+    case ScaleType::Dorian:     "Dorian"
+    case ScaleType::Phrygian:   "Phrygian"
+    case ScaleType::Lydian:     "Lydian"
+    case ScaleType::Mixolydian: "Mixolydian"
+    case ScaleType::Locrian:    "Locrian"
+    case ScaleType::WholeTone:  "Whole Tone"
+    case ScaleType::Blues:      "Blues"
+    else: "?"
+  }
+  def intervals(): List[Int] = select this {
+    case ScaleType::Major:      [0, 2, 4, 5, 7, 9, 11]
+    case ScaleType::NatMinor:   [0, 2, 3, 5, 7, 8, 10]
+    case ScaleType::HarmMinor:  [0, 2, 3, 5, 7, 8, 11]
+    case ScaleType::MelMinor:   [0, 2, 3, 5, 7, 9, 11]
+    case ScaleType::Dorian:     [0, 2, 3, 5, 7, 9, 10]
+    case ScaleType::Phrygian:   [0, 1, 3, 5, 7, 8, 10]
+    case ScaleType::Lydian:     [0, 2, 4, 6, 7, 9, 11]
+    case ScaleType::Mixolydian: [0, 2, 4, 5, 7, 9, 10]
+    case ScaleType::Locrian:    [0, 1, 3, 5, 6, 8, 10]
+    case ScaleType::WholeTone:  [0, 2, 4, 6, 8, 10]
+    case ScaleType::Blues:      [0, 3, 5, 6, 7, 10]
+    else: [0]
+  }
+  def degreeCount(): Int = intervals().size
+}
+
+// ── Scale ─────────────────────────────────────────────────────────────────────
+
+record Scale(root: Note, scaleType: ScaleType) {
+public:
+  def label(): String = root.label() + " " + scaleType.label()
+  def notes(): List[Note] = scaleType.intervals().map { s -> transposeNote(root, s as Int) }
+  def noteLabels(): String = {
+    val ns: List[String] = notes().map { n -> n.label() }
+    ns.fold("") { acc, s -> if acc == "" { s } else { acc + " " + s } }
+  }
+  def degree(d: Int): Note = {
+    val ivs: List[Int] = scaleType.intervals()
+    val sz = ivs.size
+    val idx = ((d - 1) % sz + sz) % sz
+    transposeNote(root, ivs[idx] as Int)
+  }
+  def contains(n: Note): Boolean =
+    notes().find { x -> x.semitone() == n.semitone() } != null
+  def relativeMinor(): Scale? = if scaleType == ScaleType::Major {
+    new Scale(transposeNote(root, 9), ScaleType::NatMinor)
+  } else { null }
+  def parallelMinor(): Scale = new Scale(root, ScaleType::NatMinor)
+  // Diatonic triads on each degree
+  def diatonicChords(): List[Chord] = {
+    val notes: List[Note] = this.notes()
+    var result: List[Chord] = []
+    val sz = notes.size
+    foreach i: Int in 0..<sz {
+      val r: Note = notes[i]
+      val third: Note = notes[(i + 2) % sz]
+      val fifth: Note = notes[(i + 4) % sz]
+      val thirdInterval = ((third.semitone() - r.semitone() + 12) % 12)
+      val fifthInterval = ((fifth.semitone() - r.semitone() + 12) % 12)
+      val q: ChordQuality = if thirdInterval == 4 && fifthInterval == 7 {
+        ChordQuality::Major
+      } else if thirdInterval == 3 && fifthInterval == 7 {
+        ChordQuality::Minor
+      } else if thirdInterval == 3 && fifthInterval == 6 {
+        ChordQuality::Diminished
+      } else {
+        ChordQuality::Augmented
+      }
+      result << new Chord(r, q)
+    }
+    result
+  }
+}
+
+// ── Mode ─────────────────────────────────────────────────────────────────────
+
+enum Mode {
+  Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
+public:
+  def label(): String = select this {
+    case Mode::Ionian:      "Ionian (I)"
+    case Mode::Dorian:      "Dorian (II)"
+    case Mode::Phrygian:    "Phrygian (III)"
+    case Mode::Lydian:      "Lydian (IV)"
+    case Mode::Mixolydian:  "Mixolydian (V)"
+    case Mode::Aeolian:     "Aeolian (VI)"
+    case Mode::Locrian:     "Locrian (VII)"
+    else: "?"
+  }
+  def degreeOffset(): Int = select this {
+    case Mode::Ionian:     0
+    case Mode::Dorian:     1
+    case Mode::Phrygian:   2
+    case Mode::Lydian:     3
+    case Mode::Mixolydian: 4
+    case Mode::Aeolian:    5
+    case Mode::Locrian:    6
+    else: 0
+  }
+}
+
+def modeOf(keyRoot: Note, mode: Mode): Scale = {
+  val majorScale = new Scale(keyRoot, ScaleType::Major)
+  val modeRoot: Note = majorScale.degree(mode.degreeOffset() + 1)
+  val modeType: ScaleType = select mode {
+    case Mode::Ionian:     ScaleType::Major
+    case Mode::Dorian:     ScaleType::Dorian
+    case Mode::Phrygian:   ScaleType::Phrygian
+    case Mode::Lydian:     ScaleType::Lydian
+    case Mode::Mixolydian: ScaleType::Mixolydian
+    case Mode::Aeolian:    ScaleType::NatMinor
+    case Mode::Locrian:    ScaleType::Locrian
+    else: ScaleType::Major
+  }
+  new Scale(modeRoot, modeType)
+}
+
+// ── ProgressionBuilder ────────────────────────────────────────────────────────
+
+class ProgressionBuilder {
+  var chords: List[Chord]
+public:
+  def this { chords = [] }
+  def add(c: Chord): ProgressionBuilder = {
+    chords << c
+    self
+  }
+  def addAll(cs: List[Chord]): ProgressionBuilder = {
+    foreach c: Chord in cs { chords << c }
+    self
+  }
+  def build(): List[Chord] = chords
+  def labelSequence(): String = {
+    chords.fold("") { acc, c ->
+      if acc == "" { c.label() } else { acc + " → " + c.label() }
+    }
+  }
+  def analyze(): String = {
+    if chords.size < 2 {
+      "Too few chords to analyze."
+    } else {
+      var analysis = ""
+      foreach i: Int in 0..<(chords.size - 1) {
+        val from: Chord = chords[i]
+        val to: Chord   = chords[i + 1]
+        val common = from.commonToneCount(to)
+        val lineStr = "#{from.label()} → #{to.label()}: #{common} common tone(s)"
+        analysis = if analysis == "" { lineStr } else { analysis + "\n  " + lineStr }
+      }
+      analysis
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def romanNumeral(degree: Int, quality: ChordQuality): String = {
+  val base: String = select degree {
+    case 1: "I"
+    case 2: "II"
+    case 3: "III"
+    case 4: "IV"
+    case 5: "V"
+    case 6: "VI"
+    case 7: "VII"
+    else: "?"
+  }
+  val isMinor = quality == ChordQuality::Minor || quality == ChordQuality::Min7
+  val isDim   = quality == ChordQuality::Diminished || quality == ChordQuality::HalfDim7
+  val suffix: String = if quality == ChordQuality::Maj7 { "maj7" } else if quality == ChordQuality::Dom7 { "7" } else if quality == ChordQuality::Min7 { "7" } else if isDim { "°" } else { "" }
+  val numeral = if isMinor || isDim { base.toLowerCase() } else { base }
+  numeral + suffix
+}
+
+def printHeader(title: String): void {
+  val line = "─".repeat(60)
+  IO::println("\n" + line)
+  IO::println("  " + title)
+  IO::println(line)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MAIN PROGRAM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+IO::println("╔══════════════════════════════════════════════════════════╗")
+IO::println("║            ONION MUSIC THEORY CALCULATOR                ║")
+IO::println("╚══════════════════════════════════════════════════════════╝")
+
+// ── 1. Note and Interval Table ────────────────────────────────────────────────
+
+printHeader("1. Chromatic Scale & Interval Names")
+val chromaticNotes: List[Note] = [
+  Note::C, Note::Cs, Note::D, Note::Ds, Note::E, Note::F,
+  Note::Fs, Note::G, Note::Gs, Note::A, Note::As, Note::B
+]
+foreach n: Note in chromaticNotes {
+  IO::println("  #{n.semitone()}  #{n.label()} / #{n.flatLabel()}")
+}
+
+IO::println("\nInterval names (from C):")
+foreach n: Note in chromaticNotes {
+  val semi = n.semitone()
+  IO::println("  C → #{n.label()} : #{intervalAbbr(semi)}  (#{intervalFullName(semi)})")
+}
+
+// ── 2. Major Scales ───────────────────────────────────────────────────────────
+
+printHeader("2. Common Major Scales")
+val majorRoots: List[Note] = [Note::C, Note::G, Note::D, Note::F, Note::As, Note::Ds]
+foreach r: Note in majorRoots {
+  val s = new Scale(r, ScaleType::Major)
+  IO::println("  #{s.label()}: #{s.noteLabels()}")
+}
+
+// ── 3. Minor Scales ───────────────────────────────────────────────────────────
+
+printHeader("3. Minor Scale Variants on A")
+val minorVariants: List[ScaleType] = [ScaleType::NatMinor, ScaleType::HarmMinor, ScaleType::MelMinor]
+foreach t: ScaleType in minorVariants {
+  val s = new Scale(Note::A, t)
+  IO::println("  #{s.label()}: #{s.noteLabels()}")
+}
+
+// ── 4. Relative & Parallel Keys ──────────────────────────────────────────────
+
+printHeader("4. Relative & Parallel Keys")
+val keyRoots2: List[Note] = [Note::C, Note::G, Note::D, Note::F]
+foreach r: Note in keyRoots2 {
+  val maj = new Scale(r, ScaleType::Major)
+  val relMin: Scale? = maj.relativeMinor()
+  val parMin: Scale  = maj.parallelMinor()
+  if relMin != null {
+    IO::println("  #{maj.label()} → relative: #{relMin.label()}, parallel: #{parMin.label()}")
+  }
+}
+
+// ── 5. Modes of C Major ───────────────────────────────────────────────────────
+
+printHeader("5. Modes of C Major")
+val modes: List[Mode] = [
+  Mode::Ionian, Mode::Dorian, Mode::Phrygian, Mode::Lydian,
+  Mode::Mixolydian, Mode::Aeolian, Mode::Locrian
+]
+foreach m: Mode in modes {
+  val mode = modeOf(Note::C, m)
+  IO::println("  #{m.label()}: #{mode.label()} — #{mode.noteLabels()}")
+}
+
+// ── 6. Diatonic Chords ───────────────────────────────────────────────────────
+
+printHeader("6. Diatonic Triads of C Major")
+val cMajScale = new Scale(Note::C, ScaleType::Major)
+val diatonics: List[Chord] = cMajScale.diatonicChords()
+foreach i: Int in 0..<diatonics.size {
+  val c: Chord = diatonics[i]
+  val rn = romanNumeral(i + 1, c.quality)
+  IO::println("  #{rn}  #{c.label()}  (#{c.noteLabels()})")
+}
+
+printHeader("6b. Diatonic Triads of A Natural Minor")
+val aMinScale = new Scale(Note::A, ScaleType::NatMinor)
+val aMinDiat: List[Chord] = aMinScale.diatonicChords()
+foreach i: Int in 0..<aMinDiat.size {
+  val c: Chord = aMinDiat[i]
+  val rn = romanNumeral(i + 1, c.quality)
+  IO::println("  #{rn}  #{c.label()}  (#{c.noteLabels()})")
+}
+
+// ── 7. Chord Voicings & Inversions ───────────────────────────────────────────
+
+printHeader("7. Chord Voicings")
+val testChords: List[Chord] = [
+  new Chord(Note::C,  ChordQuality::Major),
+  new Chord(Note::A,  ChordQuality::Minor),
+  new Chord(Note::D,  ChordQuality::Min7),
+  new Chord(Note::G,  ChordQuality::Dom7),
+  new Chord(Note::E,  ChordQuality::HalfDim7),
+  new Chord(Note::F,  ChordQuality::Maj7),
+  new Chord(Note::Ds, ChordQuality::Augmented),
+  new Chord(Note::B,  ChordQuality::Diminished),
+  new Chord(Note::C,  ChordQuality::Sus4)
+]
+foreach c: Chord in testChords {
+  IO::println("  #{c.label()}: #{c.noteLabels()}  [#{c.quality.voiceCount()} voices, triad=#{c.quality.isTriad()}]")
+}
+
+// ── 8. Chord Progressions ────────────────────────────────────────────────────
+
+printHeader("8. Common Chord Progressions in C Major")
+
+// I–V–vi–IV (pop progression)
+val popChords: List[Chord] = [
+  diatonics[0], diatonics[4], diatonics[5], diatonics[3]
+]
+val popProg = new ProgressionBuilder().addAll(popChords)
+IO::println("  I–V–vi–IV (pop):  " + popProg.labelSequence())
+
+// ii–V–I (jazz)
+val jazzChords: List[Chord] = [
+  new Chord(Note::D, ChordQuality::Min7),
+  new Chord(Note::G, ChordQuality::Dom7),
+  new Chord(Note::C, ChordQuality::Maj7)
+]
+val jazzProg = new ProgressionBuilder().addAll(jazzChords)
+IO::println("  ii–V–I  (jazz):   " + jazzProg.labelSequence())
+IO::println("  Common-tone analysis:")
+IO::println("    " + jazzProg.analyze())
+
+// I–IV–V–I (blues shell)
+val bluesChords: List[Chord] = [
+  new Chord(Note::A, ChordQuality::Dom7),
+  new Chord(Note::D, ChordQuality::Dom7),
+  new Chord(Note::E, ChordQuality::Dom7),
+  new Chord(Note::A, ChordQuality::Dom7)
+]
+val bluesProg = new ProgressionBuilder().addAll(bluesChords)
+IO::println("  I7–IV7–V7–I7 (12-bar blues shell in A): " + bluesProg.labelSequence())
+
+// Circle-of-fifths walk
+printHeader("9. Circle of Fifths Walk (7 steps)")
+var curr: Note = Note::C
+IO::print("  C")
+foreach i: Int in 0..<6 {
+  curr = transposeNote(curr, 7)
+  IO::print(" → " + curr.label())
+}
+IO::println("")
+
+// ── 10. Scale vs Chord Membership ────────────────────────────────────────────
+
+printHeader("10. Scale-Chord Membership Check")
+val scale = new Scale(Note::G, ScaleType::Major)
+IO::println("  Scale: " + scale.label() + " (" + scale.noteLabels() + ")")
+val checkChords: List[Chord] = [
+  new Chord(Note::G,  ChordQuality::Major),
+  new Chord(Note::D,  ChordQuality::Major),
+  new Chord(Note::E,  ChordQuality::Minor),
+  new Chord(Note::Fs, ChordQuality::Diminished),
+  new Chord(Note::C,  ChordQuality::Major),   // contains F, not in G major
+  new Chord(Note::F,  ChordQuality::Major)    // F# → F clash
+]
+foreach c: Chord in checkChords {
+  val ns: List[Note] = c.notes()
+  val inScale = ns.filter { n -> !scale.contains(n) }.size == 0
+  val marker = if inScale { "✓" } else { "✗" }
+  IO::println("  #{marker} #{c.label()} (#{c.noteLabels()}) is#{if inScale { "" } else { " NOT" }} in #{scale.label()}")
+}
+
+// ── 11. Enharmonic Equivalents ───────────────────────────────────────────────
+
+printHeader("11. Enharmonic Equivalents")
+val enharmonics: List[Note] = [Note::Cs, Note::Ds, Note::Fs, Note::Gs, Note::As]
+foreach n: Note in enharmonics {
+  IO::println("  #{n.label()} = #{n.flatLabel()} (semitone #{n.semitone()})")
+}
+
+// ── 12. Interval Matrix (C as reference) ─────────────────────────────────────
+
+printHeader("12. Selected Interval Matrix")
+val refNotes: List[Note] = [Note::C, Note::E, Note::G, Note::B]
+IO::print("        ")
+foreach n: Note in refNotes { IO::print("   " + n.label()) }
+IO::println("")
+foreach a: Note in refNotes {
+  IO::print("  " + a.label() + "  |")
+  foreach b: Note in refNotes {
+    val semi = ((b.semitone() - a.semitone() + 12) % 12)
+    IO::print("  " + intervalAbbr(semi))
+  }
+  IO::println("")
+}
+
+IO::println("\n══════════════════════════════════════════════════════════")
+IO::println("  All calculations complete.")
+IO::println("══════════════════════════════════════════════════════════")

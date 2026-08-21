@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-21
+
 ### Added
 
 - **`run/FamilyTree.on`, a 432-line genealogy tracker.** Models a
@@ -81,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class inheritance with per-algorithm overrides, primary-constructor
   superclass delegation (`class Sub(args) extends Base(args)`), extension
   methods on `Int`/`String`, and nullable-typed pick results.
+
+- **`run/CellularAutomata.on`, a 363-line cellular automaton demo.**
+  Implements 1D Elementary Cellular Automata (Wolfram rules 0-255, e.g.
+  Rule 110) and Langton's Ant (2D). Exercises sealed ADT enums, records,
+  classes wrapping `java.util.HashMap`, collection pipelines
+  (`map`/`filter`/`fold`/`reduce`/`distinct`/`sortedBy`/`find`/`partition`/
+  `zip`), `select` with type-pattern matching, nullable types, closures,
+  and extension methods on `Int`/`String`.
 
 ### Fixed
 

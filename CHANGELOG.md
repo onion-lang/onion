@@ -821,6 +821,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows through the same `visitNewObject` path ordinary records use (already
   hardened by the #669/#745/#752 fixes), so this already passed; this closes
   a coverage gap rather than a live bug.
+- **`TryInCompoundBoxedLocalAssignmentSpec`, regression coverage for `try`/`catch`
+  on the right-hand side of a compound assignment (`+=`) to a closure-captured
+  (boxed) local variable** (`x += try {...} catch {...}`), both from inside the
+  capturing closure and from the declaring scope. `TryInCompoundFieldArrayAssignmentSpec`
+  already locked in the same `BinaryTerm`-wrapped-`try` shape for field/array
+  compound-assignment targets, but the boxed-local path in `emitSetLocal`
+  (`AsmCodeGeneration.scala`) was untested. `TermContainsTry.contains` already
+  recurses generically through a term's children, so both cases already passed;
+  this closes a coverage gap rather than a live bug.
 
 ### Fixed
 

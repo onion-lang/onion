@@ -1,0 +1,337 @@
+import {
+  java.util.*
+}
+
+// Reversi (Othello) board game with a greedy AI opponent.
+// Demonstrates: 2D arrays, ADT enums (case enums), records, extension methods
+// on primitive types, collection pipelines, pattern matching, closures, and
+// string interpolation.
+
+// ── Cell states ──────────────────────────────────────────────────────────────
+
+enum Cell {
+  case Black
+  case White
+  case Empty
+public:
+  def symbol(): String = select this {
+    case b is Black: return "B"
+    case w is White: return "W"
+    case e is Empty: return "."
+  }
+  def opposite(): Cell = select this {
+    case b is Black: return new White()
+    case w is White: return new Black()
+    case e is Empty: return new Empty()
+  }
+  def isEmpty(): Boolean = select this {
+    case b is Black: return false
+    case w is White: return false
+    case e is Empty: return true
+  }
+  def intValue(): Int = select this {
+    case b is Black: return 1
+    case w is White: return 2
+    case e is Empty: return 0
+  }
+  def label(): String = select this {
+    case b is Black: return "Black"
+    case w is White: return "White"
+    case e is Empty: return "Empty"
+  }
+}
+
+// ── Position on the 8×8 board ────────────────────────────────────────────────
+
+record Position(row: Int, col: Int) {
+public:
+  def toString(): String = "(#{row()},#{col()})"
+}
+
+// ── Extension methods on Int ──────────────────────────────────────────────────
+
+extension Int {
+  def padLeft(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ── Board ────────────────────────────────────────────────────────────────────
+
+// Eight compass directions as parallel dr/dc lists.
+// Row deltas:
+val DR: List[Int] = [-1, -1, -1, 0, 0, 1, 1, 1]
+// Col deltas:
+val DC: List[Int] = [-1,  0,  1,-1, 1,-1, 0, 1]
+
+class Board {
+  val cells: Int[][]   // 1=Black, 2=White, 0=Empty
+public:
+  def this {
+    cells = new Int[8][8]
+    // Standard Othello opening
+    cells[3][3] = 2
+    cells[3][4] = 1
+    cells[4][3] = 1
+    cells[4][4] = 2
+  }
+
+  def intAt(row: Int, col: Int): Int = cells[row][col]
+
+  def cellAt(row: Int, col: Int): Cell {
+    val v: Int = cells[row][col]
+    if v == 1 { return new Black() }
+    if v == 2 { return new White() }
+    return new Empty()
+  }
+
+  def inBounds(row: Int, col: Int): Boolean =
+    row >= 0 && row < 8 && col >= 0 && col < 8
+
+  // Collect positions that would be flipped if 'who' plays at (row, col).
+  def flipsFor(row: Int, col: Int, who: Cell): List[Position] {
+    val result: List[Position] = []
+    if !cellAt(row, col).isEmpty() { return result }
+    val oppVal: Int = who.opposite().intValue()
+    val whoVal: Int = who.intValue()
+    var d: Int = 0
+    while d < 8 {
+      val dr: Int = (DR[d] as Int)
+      val dc: Int = (DC[d] as Int)
+      val line: List[Position] = []
+      var r: Int = row + dr
+      var c: Int = col + dc
+      while inBounds(r, c) && intAt(r, c) == oppVal {
+        line << new Position(r, c)
+        r = r + dr
+        c = c + dc
+      }
+      if line.size > 0 && inBounds(r, c) && intAt(r, c) == whoVal {
+        foreach p: Position in line { result << p }
+      }
+      d = d + 1
+    }
+    return result
+  }
+
+  def isValidMove(row: Int, col: Int, who: Cell): Boolean =
+    flipsFor(row, col, who).size > 0
+
+  // Place a stone for 'who' at (row,col). Returns false if illegal.
+  def place(row: Int, col: Int, who: Cell): Boolean {
+    val flips: List[Position] = flipsFor(row, col, who)
+    if flips.size == 0 { return false }
+    cells[row][col] = who.intValue()
+    foreach p: Position in flips {
+      cells[p.row()][p.col()] = who.intValue()
+    }
+    return true
+  }
+
+  // All legal moves for 'who'.
+  def validMoves(who: Cell): List[Position] {
+    val moves: List[Position] = []
+    var r: Int = 0
+    while r < 8 {
+      var c: Int = 0
+      while c < 8 {
+        if isValidMove(r, c, who) { moves << new Position(r, c) }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return moves
+  }
+
+  // Count stones of the given color.
+  def score(who: Cell): Int {
+    val whoVal: Int = who.intValue()
+    var count: Int = 0
+    var r: Int = 0
+    while r < 8 {
+      var c: Int = 0
+      while c < 8 {
+        if intAt(r, c) == whoVal { count = count + 1 }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return count
+  }
+
+  def display(): void {
+    IO::println("  0 1 2 3 4 5 6 7")
+    var r: Int = 0
+    while r < 8 {
+      var row: String = r + " "
+      var c: Int = 0
+      while c < 8 {
+        row = row + cellAt(r, c).symbol() + " "
+        c = c + 1
+      }
+      IO::println(row)
+      r = r + 1
+    }
+  }
+}
+
+// ── Greedy AI ────────────────────────────────────────────────────────────────
+
+// Picks the move that flips the maximum number of opponent stones.
+class GreedyAI {
+  val color: Cell
+public:
+  def this(c: Cell) { color = c }
+
+  def bestMove(board: Board): Position? {
+    val moves: List[Position] = board.validMoves(color)
+    if moves.size == 0 { return null }
+    var best: Position = moves[0]
+    var bestCount: Int = board.flipsFor(best.row(), best.col(), color).size
+    var i: Int = 1
+    while i < moves.size {
+      val m: Position = moves[i]
+      val count: Int = board.flipsFor(m.row(), m.col(), color).size
+      if count > bestCount {
+        bestCount = count
+        best = m
+      }
+      i = i + 1
+    }
+    return best
+  }
+}
+
+// ── Corner-aware AI ──────────────────────────────────────────────────────────
+
+// Extends the greedy strategy: corners (0,0) (0,7) (7,0) (7,7) are weighted
+// heavily because a corner can never be flipped.
+class CornerAI {
+  val color: Cell
+  static val WEIGHT: Int = 100
+public:
+  def this(c: Cell) { color = c }
+
+  def moveScore(board: Board, m: Position): Int {
+    val flips: Int = board.flipsFor(m.row(), m.col(), color).size
+    val isCorner: Boolean =
+      (m.row() == 0 || m.row() == 7) && (m.col() == 0 || m.col() == 7)
+    if isCorner { return flips + WEIGHT }
+    return flips
+  }
+
+  def bestMove(board: Board): Position? {
+    val moves: List[Position] = board.validMoves(color)
+    if moves.size == 0 { return null }
+    var best: Position = moves[0]
+    var bestScore: Int = moveScore(board, best)
+    var i: Int = 1
+    while i < moves.size {
+      val m: Position = moves[i]
+      val s: Int = moveScore(board, m)
+      if s > bestScore { bestScore = s; best = m }
+      i = i + 1
+    }
+    return best
+  }
+}
+
+// ── Game statistics ──────────────────────────────────────────────────────────
+
+record GameStats(rounds: Int, blackScore: Int, whiteScore: Int, winner: String) {
+public:
+  def describe(): String =
+    "Rounds: #{rounds()} | B=#{blackScore()} W=#{whiteScore()} | #{winner()}"
+}
+
+// ── Play a game between two AI variants ──────────────────────────────────────
+
+def playGame(blackGreedy: Boolean, whiteGreedy: Boolean, verbose: Boolean): GameStats {
+  val board: Board = new Board()
+  val blackAI: GreedyAI = new GreedyAI(new Black())
+  val whiteAI: GreedyAI = new GreedyAI(new White())
+  val blackCorner: CornerAI = new CornerAI(new Black())
+  val whiteCorner: CornerAI = new CornerAI(new White())
+
+  var turn: Cell = new Black()
+  var round: Int = 1
+  var passCount: Int = 0
+
+  while passCount < 2 {
+    val label: String = turn.label()
+    var movePos: Position? = null
+
+    if turn.intValue() == 1 {
+      // Black's turn
+      if blackGreedy {
+        movePos = blackAI.bestMove(board)
+      } else {
+        movePos = blackCorner.bestMove(board)
+      }
+    } else {
+      // White's turn
+      if whiteGreedy {
+        movePos = whiteAI.bestMove(board)
+      } else {
+        movePos = whiteCorner.bestMove(board)
+      }
+    }
+
+    if movePos == null {
+      if verbose { IO::println("Round #{round}: #{label} passes") }
+      passCount = passCount + 1
+    } else {
+      val p: Position = movePos!!
+      board.place(p.row(), p.col(), turn)
+      if verbose {
+        IO::println("Round #{round}: #{label} plays #{p.toString()} B=#{board.score(new Black())} W=#{board.score(new White())}")
+      }
+      passCount = 0
+    }
+    turn = turn.opposite()
+    round = round + 1
+  }
+
+  val bScore: Int = board.score(new Black())
+  val wScore: Int = board.score(new White())
+  var winner: String = "Draw"
+  if bScore > wScore { winner = "Black wins" }
+  else if wScore > bScore { winner = "White wins" }
+
+  if verbose {
+    IO::println("")
+    IO::println("=== Final Board ===")
+    board.display()
+  }
+
+  return new GameStats(round - 1, bScore, wScore, winner)
+}
+
+// ── Main: run and report ─────────────────────────────────────────────────────
+
+IO::println("=== Othello: Greedy vs Greedy (verbose) ===")
+val game1: GameStats = playGame(true, true, true)
+IO::println(game1.describe())
+
+IO::println("")
+IO::println("=== Othello: CornerAI (Black) vs Greedy (White) ===")
+val game2: GameStats = playGame(false, true, false)
+IO::println(game2.describe())
+
+IO::println("")
+IO::println("=== Othello: Greedy (Black) vs CornerAI (White) ===")
+val game3: GameStats = playGame(true, false, false)
+IO::println(game3.describe())
+
+IO::println("")
+IO::println("=== Summary ===")
+IO::println("Game 1 (Greedy vs Greedy): " + game1.winner())
+IO::println("Game 2 (Corner vs Greedy): " + game2.winner())
+IO::println("Game 3 (Greedy vs Corner): " + game3.winner())
+
+val cornerWins: Int =
+  (if game2.winner() == "Black wins" { 1 } else { 0 }) +
+  (if game3.winner() == "White wins" { 1 } else { 0 })
+IO::println("Corner AI won #{cornerWins}/2 games against pure Greedy")

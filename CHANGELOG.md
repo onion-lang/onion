@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/Othello.on`, a 223-line Othello/Reversi AI-vs-AI simulation.**
+  Two positional-weight greedy AIs play a full game to completion on an 8x8
+  board. Exercises records (`Position`, `MoveRecord`), `foreach` with ranges,
+  `select`/pattern-match dispatch, a mutable flat `Int[]` board, nested-loop
+  move validation across 8 directions, string interpolation, and game
+  statistics (total flips, best single move, piece percentages).
+
 - **`run/BattleshipSim.on`, a 381-line two-player Battleship auto-simulation.**
   Two seeded AI players play a full game of Battleship end to end. Exercises
   2D `Int[][]` arrays, a plain `enum ShipKind` with `select`-based dispatch, an

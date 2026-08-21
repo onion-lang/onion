@@ -186,6 +186,9 @@ object CapturedVariableScanner {
    */
   private def findReferencedVariables(node: AST.Node, excluded: Set[String] = Set.empty): Set[String] = {
     val result = mutable.Set[String]()
+    // Track names declared by local variable declarations inside this closure
+    // body so they are not mistaken for outer-scope captures.
+    val locallyDeclared = mutable.Set[String]()
 
     def visit(n: AST.Node): Unit = {
       n match {
@@ -206,12 +209,19 @@ object CapturedVariableScanner {
           result ++= findReferencedVariables(closure.body, nestedExcluded)
           return // Special handling done, don't use visitChildren
 
+        case localVar: AST.LocalVariableDeclaration =>
+          // Record that this name is declared in the current closure scope so
+          // uses of it are not treated as captures of an outer variable.
+          locallyDeclared += localVar.name
+          if (localVar.init != null) visit(localVar.init)
+          return
+
         case _ =>
       }
       visitChildren(n)(visit)
     }
 
     visit(node)
-    result.toSet
+    (result -- locallyDeclared).toSet
   }
 }

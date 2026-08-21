@@ -1,0 +1,19 @@
+// Regression: do[List] with >=2 bindings followed by a closure that declares
+// a local variable whose name shadows one of the do-binding variables caused an
+// ICE at BytecodeGeneration (Index -1 out of bounds for length 0 in
+// ClosureCodegen.emitNewClosure). Root cause: CapturedVariableScanner did not
+// track locally-declared names and wrongly treated them as method-level captures
+// that needed boxing. The boxed flag then made the codegen try to loadLocal using
+// a JVM-slot value as a newLocal index, which is invalid.
+def main(): void {
+  val data: List[Object] = do[List] {
+    x <- [1, 2]
+    y <- [3, 4]
+    ret [x, y]
+  }
+  val r = data.filter { pair ->
+    val x = (pair as List[Object])[0] as Int
+    x > 1
+  }
+  IO::println(r.toString())
+}

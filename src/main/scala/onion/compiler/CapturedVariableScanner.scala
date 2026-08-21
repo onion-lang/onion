@@ -186,6 +186,13 @@ object CapturedVariableScanner {
    */
   private def findReferencedVariables(node: AST.Node, excluded: Set[String] = Set.empty): Set[String] = {
     val result = mutable.Set[String]()
+    // Names declared by local variable declarations in this closure body.
+    val locallyDeclared = mutable.Set[String]()
+    // Names that appear in at least one nested closure's reference set.
+    // A locally-declared variable that is also captured by a nested closure
+    // must NOT be excluded: it still needs boxing so mutations in the nested
+    // closure are visible in the declaring closure.
+    val capturedByNested = mutable.Set[String]()
 
     def visit(n: AST.Node): Unit = {
       n match {
@@ -203,8 +210,17 @@ object CapturedVariableScanner {
 
         case closure: AST.ClosureExpression =>
           val nestedExcluded = excluded ++ closure.args.map(_.name)
-          result ++= findReferencedVariables(closure.body, nestedExcluded)
+          val nestedRefs = findReferencedVariables(closure.body, nestedExcluded)
+          result ++= nestedRefs
+          capturedByNested ++= nestedRefs
           return // Special handling done, don't use visitChildren
+
+        case localVar: AST.LocalVariableDeclaration =>
+          // Record this name as locally declared so direct uses of it within
+          // the same closure body are not mistaken for outer-scope captures.
+          locallyDeclared += localVar.name
+          if (localVar.init != null) visit(localVar.init)
+          return
 
         case _ =>
       }
@@ -212,6 +228,10 @@ object CapturedVariableScanner {
     }
 
     visit(node)
-    result.toSet
+    // Exclude variables that are both locally declared AND not captured by any
+    // nested closure. A locally-declared variable that IS captured by a nested
+    // closure must stay in the result so it gets marked as boxed (the nested
+    // closure needs to read/write through the same heap cell).
+    (result -- (locallyDeclared -- capturedByNested)).toSet
   }
 }

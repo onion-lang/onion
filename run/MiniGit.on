@@ -1,0 +1,384 @@
+// MiniGit.on — a simplified version-control system simulation.
+// Exercises: homogeneous enums with methods, ADT case-enum, records with methods,
+// classes with ArrayList/Map mutable state, extension methods on String/Int,
+// collection pipelines (filter/map/fold/sortedBy/groupBy/find/count/any/distinct),
+// select with type patterns, string interpolation, closures, foreach on list and
+// map (k,v), nullable types and null checks, recursion.
+
+import { java.util.ArrayList }
+
+// ─────────────────────────────── Extensions ───────────────────────────────────
+
+extension String {
+  def abbrev(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n) + "…" }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+// ─────────────────────────────── Enums ────────────────────────────────────────
+
+enum ChangeType {
+  ADDED, MODIFIED, DELETED
+public:
+  def symbol(): String = select this {
+    case ChangeType::ADDED:    "+"
+    case ChangeType::MODIFIED: "~"
+    case ChangeType::DELETED:  "-"
+    else: "?"
+  }
+  def label(): String = select this {
+    case ChangeType::ADDED:    "added"
+    case ChangeType::MODIFIED: "modified"
+    case ChangeType::DELETED:  "deleted"
+    else: "unknown"
+  }
+}
+
+enum Priority { LOW, NORMAL, HIGH, CRITICAL
+public:
+  def label(): String = select this {
+    case Priority::LOW:      "low"
+    case Priority::NORMAL:   "normal"
+    case Priority::HIGH:     "high"
+    case Priority::CRITICAL: "critical"
+    else: "?"
+  }
+  def weight(): Int = select this {
+    case Priority::LOW:      1
+    case Priority::NORMAL:   2
+    case Priority::HIGH:     3
+    case Priority::CRITICAL: 4
+    else: 0
+  }
+}
+
+// ADT: a merge outcome carries extra context.
+enum MergeOutcome {
+  case FastForward(targetBranch: String)
+  case ThreeWay(targetBranch: String, conflictCount: Int)
+  case UpToDate(targetBranch: String)
+public:
+  def summary(): String = select this {
+    case r is FastForward: "Fast-forward into #{r.targetBranch()}"
+    case r is ThreeWay:    "3-way merge into #{r.targetBranch()} (#{r.conflictCount()} conflicts)"
+    case r is UpToDate:    "Already up-to-date with #{r.targetBranch()}"
+  }
+  def isConflict(): Boolean = select this {
+    case r is ThreeWay: r.conflictCount() > 0
+    else: false
+  }
+}
+
+// ─────────────────────────────── Records ──────────────────────────────────────
+
+record FileChange(path: String, kind: ChangeType, linesAdded: Int, linesRemoved: Int) {
+public:
+  def summary(): String =
+    "[#{kind.symbol()}] #{path.padRight(30)} +#{linesAdded}/-#{linesRemoved}"
+  def netLines(): Int = linesAdded - linesRemoved
+  def isSizeChange(): Boolean = linesAdded != linesRemoved
+}
+
+record CommitInfo(id: Int, message: String, author: String, parentId: Int,
+                  fileCount: Int, linesAdded: Int, linesDeleted: Int, priority: Priority) {
+public:
+  def shortHash(): String = "c" + ("0000" + id).abbrev(5)
+  def hasParent(): Boolean = parentId > 0
+  def display(): String =
+    "#{shortHash()} #{author.padRight(12)} #{priority.label().padRight(8)} #{message.abbrev(40)}"
+  def churn(): Int = linesAdded + linesDeleted
+  def net(): Int = linesAdded - linesDeleted
+}
+
+record BranchInfo(name: String, headId: Int, created: Int) {
+public:
+  def isAhead(other: BranchInfo): Boolean = headId > other.headId()
+  def label(): String = "#{name} → commit ##{headId}"
+}
+
+// ─────────────────────────────── Repository ───────────────────────────────────
+
+class Repository {
+  val repoName: String
+  val commits: ArrayList[CommitInfo]
+  val branches: Map[Object, Object]
+  val stagingArea: ArrayList[FileChange]
+  var currentBranch: String
+  var headId: Int
+  var nextId: Int
+public:
+  def this(name: String) {
+    this.repoName = name
+    this.commits = new ArrayList[CommitInfo]()
+    this.branches = [:]
+    this.stagingArea = new ArrayList[FileChange]()
+    this.currentBranch = "main"
+    this.headId = 0
+    this.nextId = 1
+    branches.put("main", 0)
+  }
+
+  def name(): String = repoName
+
+  def stage(path: String, ct: ChangeType, added: Int, removed: Int): void {
+    stagingArea.add(new FileChange(path, ct, added, removed))
+  }
+
+  def stagedCount(): Int = stagingArea.size()
+
+  def clearStage(): void { stagingArea.clear() }
+
+  def commit(msg: String, author: String, p: Priority): CommitInfo? {
+    if stagingArea.size() == 0 { return null }
+    var totalAdded: Int = 0
+    var totalRemoved: Int = 0
+    var i: Int = 0
+    while i < stagingArea.size() {
+      val fc: FileChange = stagingArea.get(i) as FileChange
+      totalAdded = totalAdded + fc.linesAdded()
+      totalRemoved = totalRemoved + fc.linesRemoved()
+      i = i + 1
+    }
+    val c = new CommitInfo(nextId, msg, author, headId, stagingArea.size(), totalAdded, totalRemoved, p)
+    commits.add(c)
+    headId = nextId
+    nextId = nextId + 1
+    branches.put(currentBranch, headId)
+    clearStage()
+    return c
+  }
+
+  def createBranch(branchName: String): Boolean {
+    if branches.get(branchName) != null { return false }
+    branches.put(branchName, headId)
+    return true
+  }
+
+  def checkout(branchName: String): Boolean {
+    val h: Object? = branches.get(branchName)
+    if h == null { return false }
+    currentBranch = branchName
+    headId = h as Int
+    return true
+  }
+
+  def currentHead(): CommitInfo? {
+    if headId == 0 { return null }
+    return findById(headId)
+  }
+
+  def findById(id: Int): CommitInfo? {
+    var i: Int = 0
+    while i < commits.size() {
+      val c: CommitInfo = commits.get(i) as CommitInfo
+      if c.id() == id { return c }
+      i = i + 1
+    }
+    return null
+  }
+
+  def log(): List[CommitInfo] {
+    val result: List[CommitInfo] = []
+    var i: Int = 0
+    while i < commits.size() {
+      result << (commits.get(i) as CommitInfo)
+      i = i + 1
+    }
+    return result.sortedByDescending { c -> (c as CommitInfo).id() }
+  }
+
+  def branchList(): List[BranchInfo] {
+    val result: List[BranchInfo] = []
+    foreach (bname, bid) in branches {
+      result << new BranchInfo(bname as String, bid as Int, 0)
+    }
+    return result.sortedBy { b -> (b as BranchInfo).name() }
+  }
+
+  def currentBranchName(): String = currentBranch
+
+  def merge(fromBranch: String): MergeOutcome? {
+    val fromHead: Object? = branches.get(fromBranch)
+    if fromHead == null { return null }
+    val fromId: Int = fromHead as Int
+    if fromId == headId { return new UpToDate(currentBranch) }
+    if fromId > headId {
+      headId = fromId
+      branches.put(currentBranch, headId)
+      return new FastForward(currentBranch)
+    }
+    return new ThreeWay(currentBranch, 0)
+  }
+
+  def allCommits(): List[CommitInfo] = log()
+
+  def commitsByAuthor(author: String): List[CommitInfo] =
+    log().filter { c -> (c as CommitInfo).author() == author }
+
+  def highPriorityCommits(): List[CommitInfo] =
+    log().filter { c ->
+      val p: Int = (c as CommitInfo).priority().weight()
+      p >= Priority::HIGH.weight()
+    }
+
+  def totalChurn(): Int =
+    log().fold(0) { acc, c -> (acc as Int) + (c as CommitInfo).churn() } as Int
+
+  def topContributors(): List[Object] {
+    val byAuthor = log().groupBy { c -> (c as CommitInfo).author() }
+    val result: List[Object] = []
+    foreach (auth, cs) in byAuthor {
+      val count: Int = (cs as List[Object]).count { x -> true }
+      result << "#{auth}(#{count})"
+    }
+    return result.sortedByDescending { s -> (s as String).length() }
+  }
+}
+
+// ─────────────────────────────── helper functions ─────────────────────────────
+
+def separator(w: Int): void { IO::println("-".repeat(w)) }
+
+def printCommit(c: CommitInfo): void {
+  IO::println("  " + c.display())
+}
+
+def printLog(repo: Repository): void {
+  IO::println("=== Log: #{repo.name()} [#{repo.currentBranchName()}] ===")
+  val cs: List[CommitInfo] = repo.log()
+  foreach c: CommitInfo in cs { printCommit(c) }
+  IO::println("  (#{cs.size} commits total)")
+}
+
+def printBranches(repo: Repository): void {
+  IO::println("=== Branches ===")
+  foreach b: BranchInfo in repo.branchList() {
+    val marker: String = if b.name() == repo.currentBranchName() { "* " } else { "  " }
+    IO::println(marker + b.label())
+  }
+}
+
+// ─────────────────────────────── Main scenario ────────────────────────────────
+
+val repo = new Repository("onion-lang")
+
+// ── Initial commits on main ───────────────────────────────────────────────────
+repo.stage("README.md",          ChangeType::ADDED,    10, 0)
+repo.stage("build.sbt",          ChangeType::ADDED,    40, 0)
+repo.stage("src/Main.on",        ChangeType::ADDED,   120, 0)
+repo.commit("Initial commit",    "alice", Priority::NORMAL)
+
+repo.stage("src/Parser.on",      ChangeType::ADDED,   250, 0)
+repo.stage("grammar/lang.jj",    ChangeType::ADDED,   180, 0)
+repo.commit("Add parser",        "bob",   Priority::HIGH)
+
+repo.stage("src/Typing.on",      ChangeType::ADDED,   300, 0)
+repo.stage("src/TypedAST.on",    ChangeType::ADDED,   150, 0)
+repo.commit("Add type checker",  "alice", Priority::HIGH)
+
+repo.stage("src/CodeGen.on",     ChangeType::ADDED,   420, 0)
+repo.commit("Add code generator","bob",   Priority::CRITICAL)
+
+// ── Create feature branch ─────────────────────────────────────────────────────
+repo.createBranch("feature/closures")
+repo.checkout("feature/closures")
+
+repo.stage("src/Closure.on",     ChangeType::ADDED,    80, 0)
+repo.stage("src/Typing.on",      ChangeType::MODIFIED, 45, 12)
+repo.commit("Closure support (draft)", "carol", Priority::NORMAL)
+
+repo.stage("src/Closure.on",     ChangeType::MODIFIED, 30,  8)
+repo.stage("test/ClosureSpec.on",ChangeType::ADDED,    60,  0)
+repo.commit("Closure tests + fixes",   "carol", Priority::HIGH)
+
+// ── Back to main, hotfix ──────────────────────────────────────────────────────
+repo.checkout("main")
+repo.createBranch("hotfix/null-ptr")
+repo.checkout("hotfix/null-ptr")
+
+repo.stage("src/Typing.on",      ChangeType::MODIFIED,  5,  2)
+repo.commit("Fix null-ptr in Typing", "bob", Priority::CRITICAL)
+
+repo.checkout("main")
+val mergeResult: MergeOutcome? = repo.merge("hotfix/null-ptr")
+if mergeResult != null {
+  IO::println("merge: " + mergeResult.summary())
+}
+
+// ── More main commits ─────────────────────────────────────────────────────────
+repo.stage("CHANGELOG.md",       ChangeType::ADDED,   25,  0)
+repo.stage("docs/README.md",     ChangeType::MODIFIED, 18,  4)
+repo.commit("Release notes",     "alice", Priority::NORMAL)
+
+// ── Back to feature branch, more work ────────────────────────────────────────
+repo.checkout("feature/closures")
+repo.stage("src/Closure.on",     ChangeType::MODIFIED, 20,  5)
+repo.stage("src/Optimizer.on",   ChangeType::ADDED,    55,  0)
+repo.commit("Optimize closure capture", "carol", Priority::HIGH)
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+IO::println("")
+repo.checkout("main")
+printLog(repo)
+
+IO::println("")
+printBranches(repo)
+
+IO::println("")
+separator(50)
+IO::println("=== Author breakdown ===")
+foreach s: Object in repo.topContributors() {
+  IO::println("  " + s)
+}
+
+IO::println("")
+IO::println("=== High-priority commits ===")
+foreach c: CommitInfo in repo.highPriorityCommits() {
+  IO::println("  " + c.display())
+}
+
+IO::println("")
+IO::println("=== Statistics ===")
+val allC: List[CommitInfo] = repo.allCommits()
+val totalChurn: Int = repo.totalChurn()
+val avgChurn: Int = if allC.size > 0 { totalChurn / allC.size } else { 0 }
+IO::println("  Total commits : " + allC.size)
+IO::println("  Total churn   : +" + allC.fold(0) { a, c -> (a as Int) + (c as CommitInfo).linesAdded() } + "/-" + allC.fold(0) { a, c -> (a as Int) + (c as CommitInfo).linesDeleted() })
+IO::println("  Avg churn/commit: " + avgChurn)
+IO::println("  Authors       : " + allC.map { c -> (c as CommitInfo).author() }.distinct().size)
+IO::println("  High+ priority: " + repo.highPriorityCommits().size)
+
+IO::println("")
+IO::println("=== By-author lines added (groupBy) ===")
+val byAuthor = allC.groupBy { c -> (c as CommitInfo).author() }
+foreach (author, cs) in byAuthor {
+  val added: Int = (cs as List[Object]).fold(0) { a, c -> (a as Int) + (c as CommitInfo).linesAdded() } as Int
+  val cnt:   Int = (cs as List[Object]).count { _ -> true }
+  IO::println("  #{author.padRight(8)}: #{cnt} commits, +#{added} lines")
+}
+
+IO::println("")
+IO::println("=== Commit churn histogram (top 5) ===")
+val topChurn: List[CommitInfo] = allC.sortedByDescending { c -> (c as CommitInfo).churn() }.take(5)
+foreach c: CommitInfo in topChurn {
+  val bar: String = "|".repeat((c.churn() / 20).clamp(1, 40))
+  IO::println("  " + c.shortHash() + " " + bar + " " + c.churn())
+}
+
+separator(50)
+IO::println("Done.")

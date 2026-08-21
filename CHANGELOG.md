@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/MusicTheory.on`, a 560-line music theory calculator.** Covers the
+  full chromatic note system, interval naming, chord voicings, scale
+  construction, modal analysis, and chord progressions: homogeneous enums
+  (`Note`, `ChordQuality`, `ScaleType`, `Mode`), records with methods
+  (`Chord`, `Scale`) including a diatonic-triad builder, a mutable
+  `ProgressionBuilder` class, and collection pipelines (`map`/`filter`/
+  `fold`/`find`) over chord/scale membership and common-tone analysis.
+
 - **`run/ExprEval.on`, a 292-line symbolic expression evaluator.** Replaces
   the earlier 98-line interface-based sketch with an ADT `enum Expr` (Num,
   Var, Add, Sub, Mul, Div, Pow, Neg) evaluated and symbolically

@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closures, `foreach` on list and `foreach (k, v) in map`, nullable types and null
   checks, and `while` loops for manual iteration.
 
+- **`run/TerrainGenerator.on`, a 366-line procedural world-map generator.**
+  A seeded LCG PRNG deterministically generates a 50x22 height map, classifies
+  it into an ADT `enum Biome` (8 cases, each with exhaustive `select` methods),
+  and BFS-pathfinds between corners. Exercises extension methods on
+  `Double`/`String`/`Int`, 4-level nested C-style `for` loops, collection
+  pipelines (`groupBy`/`sortedBy`/`filter`/`find`/`partition`/`distinct`/`map`),
+  `foreach (k, v) in Map[Object, List[Object]]`, `Double[]`/`Boolean[]`/`Int[]`
+  arrays, records with compile-time examples, and nullable types.
+
 ## [0.14.0] - 2026-08-21
 
 ### Added

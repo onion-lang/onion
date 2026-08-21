@@ -1,0 +1,366 @@
+// TerrainGenerator.on — Procedural world-map generator and terrain analyser
+// Exercises: class with mutable state (LCG seeded PRNG), ADT case-enum (Biome)
+// with exhaustive select methods, records with examples, extension methods on
+// Double/String/Int, foreach over ranges and Map[Object,List[...]] entries,
+// collection pipelines (groupBy/sortedBy/filter/find/partition/distinct/map),
+// closures, string interpolation, nullable types (TerrainCell?), BFS pathfinding
+// via Int[] arrays and while loop, nested C-style for loops, Double[]/Boolean[]
+// arrays, Map.get() with nullable cast.
+
+import { java.lang.Double as JDouble; }
+
+// ─── Extension: String ────────────────────────────────────────────────────────
+extension String {
+  def repeatStr(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Extension: Int ───────────────────────────────────────────────────────────
+extension Int {
+  def lpad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── Extension: Double ────────────────────────────────────────────────────────
+extension Double {
+  // Format with 3 decimal places (e.g. 0.732)
+  def fmt3(): String {
+    val whole: Int = self.intValue()
+    val frac3: Int = ((self - (whole as Double)) * 1000.0 + 0.5).intValue()
+    var fs: String = "" + frac3
+    if frac3 < 10 { fs = "00" + frac3 }
+    else if frac3 < 100 { fs = "0" + frac3 }
+    return "" + whole + "." + fs
+  }
+}
+
+// ─── Seeded PRNG (Knuth LCG) ──────────────────────────────────────────────────
+class LCG {
+  var state: Long
+public:
+  def this(seed: Long) { this.state = seed }
+
+  def nextLong(): Long {
+    this.state = this.state * 6364136223846793005L + 1442695040888963407L
+    return this.state
+  }
+
+  def nextDouble(): Double {
+    val n: Long = nextLong()
+    val pos: Long = if n < 0L { -n } else { n }
+    return (pos % 1000000L) as Double / 1000000.0
+  }
+}
+
+// ─── Biome ADT ────────────────────────────────────────────────────────────────
+enum Biome {
+  case DeepOcean
+  case Ocean
+  case Beach
+  case Plains
+  case Forest
+  case Highland
+  case Mountain
+  case Snow
+public:
+  def symbol(): String = select this {
+    case x is DeepOcean: "~"
+    case x is Ocean:     "o"
+    case x is Beach:     "."
+    case x is Plains:    ","
+    case x is Forest:    "f"
+    case x is Highland:  "^"
+    case x is Mountain:  "M"
+    case x is Snow:      "*"
+  }
+  def label(): String = select this {
+    case x is DeepOcean: "Deep Ocean"
+    case x is Ocean:     "Ocean"
+    case x is Beach:     "Beach"
+    case x is Plains:    "Plains"
+    case x is Forest:    "Forest"
+    case x is Highland:  "Highland"
+    case x is Mountain:  "Mountain"
+    case x is Snow:      "Snow"
+  }
+  def traversable(): Boolean = select this {
+    case x is DeepOcean: false
+    case x is Ocean:     false
+    else:                true
+  }
+  def elevation(): Int = select this {
+    case x is DeepOcean: 0
+    case x is Ocean:     1
+    case x is Beach:     2
+    case x is Plains:    3
+    case x is Forest:    4
+    case x is Highland:  5
+    case x is Mountain:  6
+    case x is Snow:      7
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+record TerrainCell(x: Int, y: Int, height: Double, biome: Biome)
+  example { new TerrainCell(0, 0, 0.5, new Plains()).biome().elevation() == 3 }
+
+record BiomeStat(biomeLabel: String, count: Int, barLen: Int)
+  example { new BiomeStat("Ocean", 10, 5).count() == 10 }
+
+record PathResult(found: Boolean, steps: Int)
+  example { !new PathResult(false, -1).found() }
+
+// ─── Height-map helpers ───────────────────────────────────────────────────────
+def generateRaw(rng: LCG, size: Int): Double[] {
+  val map: Double[] = new Double[size]
+  for var i: Int = 0; i < size; i++ { map[i] = rng.nextDouble() }
+  return map
+}
+
+// One box-blur smoothing pass (3×3 neighbourhood average)
+def boxSmooth(src: Double[], w: Int, h: Int): Double[] {
+  val dst: Double[] = new Double[w * h]
+  for var y: Int = 0; y < h; y++ {
+    for var x: Int = 0; x < w; x++ {
+      var sum: Double = 0.0
+      var cnt: Int = 0
+      for var dy: Int = -1; dy <= 1; dy++ {
+        for var dx: Int = -1; dx <= 1; dx++ {
+          val nx: Int = x + dx
+          val ny: Int = y + dy
+          if nx >= 0 && nx < w && ny >= 0 && ny < h {
+            sum = sum + src[ny * w + nx]
+            cnt = cnt + 1
+          }
+        }
+      }
+      dst[y * w + x] = sum / (cnt as Double)
+    }
+  }
+  return dst
+}
+
+def classify(h: Double): Biome {
+  if h < 0.32 { return new DeepOcean() }
+  if h < 0.38 { return new Ocean() }
+  if h < 0.43 { return new Beach() }
+  if h < 0.52 { return new Plains() }
+  if h < 0.60 { return new Forest() }
+  if h < 0.63 { return new Highland() }
+  if h < 0.67 { return new Mountain() }
+  return new Snow()
+}
+
+// ─── World ────────────────────────────────────────────────────────────────────
+class World {
+  var _W: Int
+  var _H: Int
+  var _cells: List[Object]   // flat List[TerrainCell], row-major
+public:
+  def this(width: Int, height: Int, seed: Long) {
+    this._W = width
+    this._H = height
+    val rng: LCG = new LCG(seed)
+    var hmap: Double[] = generateRaw(rng, width * height)
+    hmap = boxSmooth(hmap, width, height)
+    hmap = boxSmooth(hmap, width, height)
+    this._cells = []
+    for var y: Int = 0; y < height; y++ {
+      for var x: Int = 0; x < width; x++ {
+        val ht: Double = hmap[y * width + x]
+        this._cells << new TerrainCell(x, y, ht, classify(ht))
+      }
+    }
+  }
+
+  def cells(): List[Object] = this._cells
+  def width(): Int = this._W
+  def height(): Int = this._H
+
+  def render(): void {
+    println("+" + "-".repeatStr(this._W) + "+")
+    for var y: Int = 0; y < this._H; y++ {
+      var row: String = "|"
+      for var x: Int = 0; x < this._W; x++ {
+        val tc: TerrainCell = this._cells[y * this._W + x] as TerrainCell
+        row = row + tc.biome().symbol()
+      }
+      println(row + "|")
+    }
+    println("+" + "-".repeatStr(this._W) + "+")
+  }
+
+  // Grouped biome statistics, sorted by cell count descending.
+  def biomeStats(): List[Object] {
+    val total: Int = this._cells.size
+    val grouped: Map[Object, List[Object]] =
+      this._cells.groupBy { c -> (c as TerrainCell).biome().label() }
+    var result: List[Object] = []
+    foreach (lbl, grp) in grouped {
+      val cnt: Int = grp.size
+      result << new BiomeStat(lbl as String, cnt, cnt * 38 / total)
+    }
+    return result.sortedBy { s -> -((s as BiomeStat).count()) }
+  }
+
+  // BFS: shortest traversable path between two cells (cardinal moves only).
+  def findPath(x1: Int, y1: Int, x2: Int, y2: Int): PathResult {
+    if x1 == x2 && y1 == y2 { return new PathResult(true, 0) }
+    val cap: Int = this._W * this._H
+    val visited: Boolean[] = new Boolean[cap]
+    val qx: Int[] = new Int[cap]
+    val qy: Int[] = new Int[cap]
+    val qs: Int[] = new Int[cap]   // step count
+    val ddx: Int[] = new Int[4]
+    val ddy: Int[] = new Int[4]
+    ddx[0] = 0; ddx[1] = 0; ddx[2] = -1; ddx[3] = 1
+    ddy[0] = -1; ddy[1] = 1; ddy[2] = 0; ddy[3] = 0
+    var front: Int = 0
+    var back: Int = 0
+    qx[back] = x1; qy[back] = y1; qs[back] = 0; back++
+    visited[y1 * this._W + x1] = true
+    while front < back {
+      val cx: Int = qx[front]
+      val cy: Int = qy[front]
+      val steps: Int = qs[front]
+      front++
+      for var d: Int = 0; d < 4; d++ {
+        val nx: Int = cx + ddx[d]
+        val ny: Int = cy + ddy[d]
+        if nx >= 0 && nx < this._W && ny >= 0 && ny < this._H {
+          val idx: Int = ny * this._W + nx
+          if !visited[idx] {
+            val tc: TerrainCell = this._cells[idx] as TerrainCell
+            if tc.biome().traversable() {
+              if nx == x2 && ny == y2 {
+                return new PathResult(true, steps + 1)
+              }
+              visited[idx] = true
+              qx[back] = nx; qy[back] = ny; qs[back] = steps + 1; back++
+            }
+          }
+        }
+      }
+    }
+    return new PathResult(false, -1)
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+val W: Int = 50
+val H: Int = 22
+val SEED: Long = 98765L
+
+println("=== Terrain Generator  (#{W}x#{H}, seed #{SEED}) ===")
+println("")
+
+val world: World = new World(W, H, SEED)
+world.render()
+println("")
+
+// ── Biome distribution ─────────────────────────────────────────────────────────
+val total: Int = W * H
+val stats: List[Object] = world.biomeStats()
+println("Biome Distribution:")
+foreach s: Object in stats {
+  val bs: BiomeStat = s as BiomeStat
+  val bar: String = "#".repeatStr(bs.barLen())
+  println("  #{bs.biomeLabel().rpad(11)} #{bs.count().lpad(4)}  [#{bar}]")
+}
+println("")
+
+// ── Land/water partition ───────────────────────────────────────────────────────
+val landWater = world.cells().partition { c ->
+  (c as TerrainCell).biome().traversable()
+}
+val landCells: List[Object] = landWater[0] as List[Object]
+val waterCells: List[Object] = landWater[1] as List[Object]
+val landPct: Int = landCells.size * 100 / total
+println("Land: #{landCells.size} cells (#{landPct}%)   Water: #{waterCells.size} cells (#{100 - landPct}%)")
+println("")
+
+// ── Spot checks ────────────────────────────────────────────────────────────────
+// Highest-elevation cell (Snow or Mountain)
+var highest: TerrainCell? = null
+foreach c: Object in world.cells() {
+  val tc: TerrainCell = c as TerrainCell
+  if highest == null || tc.height() > (highest as TerrainCell).height() {
+    highest = tc
+  }
+}
+if highest != null {
+  val hc: TerrainCell = highest as TerrainCell
+  println("Highest cell: (#{hc.x()},#{hc.y()}) h=#{hc.height().fmt3()} [#{hc.biome().label()}]")
+}
+
+// Lowest-elevation cell (Deep Ocean or Ocean)
+var lowest: TerrainCell? = null
+foreach c: Object in world.cells() {
+  val tc: TerrainCell = c as TerrainCell
+  if lowest == null || tc.height() < (lowest as TerrainCell).height() {
+    lowest = tc
+  }
+}
+if lowest != null {
+  val lc: TerrainCell = lowest as TerrainCell
+  println("Lowest cell:  (#{lc.x()},#{lc.y()}) h=#{lc.height().fmt3()} [#{lc.biome().label()}]")
+}
+
+// find() — first snow cell
+val snowObj: Object? = world.cells().find { c ->
+  (c as TerrainCell).biome().label() == "Snow"
+}
+if snowObj != null {
+  val sc: TerrainCell = snowObj as TerrainCell
+  println("First snow:   (#{sc.x()},#{sc.y()}) h=#{sc.height().fmt3()}")
+}
+
+// distinct biome labels (map returns List[String], distinct() returns List[String])
+val distinctLabels: List[String] =
+  world.cells().map { c -> (c as TerrainCell).biome().label() }.distinct()
+println("Distinct biomes: #{distinctLabels.size}")
+println("")
+
+// ── Elevation profile ──────────────────────────────────────────────────────────
+println("Elevation Profile:")
+val byElev: Map[Object, List[Object]] =
+  world.cells().groupBy { c -> "" + (c as TerrainCell).biome().elevation() }
+val elevKeys: List[Object] = ["0", "1", "2", "3", "4", "5", "6", "7"]
+val elevNames: List[Object] = ["Deep Ocean", "Ocean", "Beach", "Plains",
+                                "Forest", "Highland", "Mountain", "Snow"]
+foreach eKey: Object in elevKeys {
+  val key: String = eKey as String
+  val idx: Int = elevKeys.indexOf(eKey)
+  val name: String = elevNames[idx] as String
+  val grp: List[Object]? = byElev.get(key) as List[Object]?
+  val cnt: Int = if grp != null { (grp as List[Object]).size } else { 0 }
+  val bar: String = "#".repeatStr(cnt * 38 / total)
+  println("  #{name.rpad(11)} #{cnt.lpad(4)}  [#{bar}]")
+}
+println("")
+
+// ── Pathfinding ────────────────────────────────────────────────────────────────
+println("Pathfinding:")
+def showPath(world: World, x1: Int, y1: Int, x2: Int, y2: Int): void {
+  val r: PathResult = world.findPath(x1, y1, x2, y2)
+  val status: String = if r.found() { "#{r.steps()} steps" } else { "no land path" }
+  println("  (#{x1},#{y1}) -> (#{x2},#{y2}):  #{status}")
+}
+showPath(world, 0, 0, W - 1, H - 1)
+showPath(world, W / 4, H / 4, 3 * W / 4, 3 * H / 4)
+showPath(world, 0, H / 2, W - 1, H / 2)
+showPath(world, 1, 1, 1, 1)
+
+println("")
+println("Done: #{W}x#{H}=#{W * H} cells, seed #{SEED}.")

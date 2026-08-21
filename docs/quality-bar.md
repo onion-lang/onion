@@ -60,7 +60,7 @@ A feature counts as covered once it runs inside at least one large sample
 - [x] records (plain) and data-carrying enums
 - [x] plain enums
 - [x] classes with constructors and methods
-- [x] interfaces + polymorphic dispatch (ExprEval)
+- [x] interfaces + polymorphic dispatch (FleetManager)
 - [x] top-level `def` with block and expression bodies
 - [x] recursion (incl. tail position)
 - [x] collection pipelines: map / filter / fold / reduce / sortedBy / groupBy / find / distinct / partition / zip / flatten

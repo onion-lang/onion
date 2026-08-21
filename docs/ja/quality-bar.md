@@ -54,7 +54,7 @@ cancelled の1件は `-Donion.dist.path` で切られている配布物 smoke �
 - [x] records（単純）とデータを持つ enum
 - [x] 単純 enum
 - [x] コンストラクタとメソッドを持つクラス
-- [x] インターフェース + 多態ディスパッチ（ExprEval）
+- [x] インターフェース + 多態ディスパッチ（FleetManager）
 - [x] トップレベルの `def`（ブロック本体と式本体）
 - [x] 再帰（末尾位置も含む）
 - [x] コレクションパイプライン: map / filter / fold / reduce / sortedBy / groupBy / find / distinct / partition / zip / flatten

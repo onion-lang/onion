@@ -1,0 +1,290 @@
+// CircuitSimulator.on — digital logic circuit simulator that:
+//   • represents gates (NOT/AND/OR/XOR/NAND) as a sealed ADT, wired together
+//     by name into a directed acyclic graph
+//   • evaluates any wire on demand via memoized recursion, with cycle
+//     detection so a malformed circuit fails cleanly instead of looping
+//   • builds a half adder, a full adder, a 4-bit ripple-carry adder (chained
+//     full adders) and a 2-to-1 multiplexer purely out of those gates
+//   • prints full truth tables by enumerating every input combination
+//
+// Features exercised: ADT case-enum with a shared accessor, a class wrapping
+// a mutable HashMap-backed graph, recursive graph evaluation with a memo
+// cache and a "currently visiting" cycle guard (HashSet), records with
+// methods, extension methods on Int/Boolean, foreach over ranges, nested
+// while loops for combinatorial enumeration, string interpolation, nullable
+// handling, and select/case-is pattern matching.
+
+import {
+  java.util.HashMap;
+  java.util.HashSet;
+}
+
+// ── ADT: a single logic gate, addressed by its own output-wire name ─────────
+
+enum Gate {
+  case InputGate(name: String, value: Boolean)
+  case NotGate(name: String, in1: String)
+  case AndGate(name: String, in1: String, in2: String)
+  case OrGate(name: String, in1: String, in2: String)
+  case XorGate(name: String, in1: String, in2: String)
+  case NandGate(name: String, in1: String, in2: String)
+public:
+  def gateName(): String = select this {
+    case i is InputGate: i.name()
+    case n is NotGate:   n.name()
+    case a is AndGate:   a.name()
+    case o is OrGate:    o.name()
+    case x is XorGate:   x.name()
+    case d is NandGate:  d.name()
+  }
+  def kind(): String = select this {
+    case _i is InputGate: "IN"
+    case _n is NotGate:   "NOT"
+    case _a is AndGate:   "AND"
+    case _o is OrGate:    "OR"
+    case _x is XorGate:   "XOR"
+    case _d is NandGate:  "NAND"
+  }
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension Boolean {
+  def toBit(): String = if self { "1" } else { "0" }
+}
+
+extension Int {
+  // Bit `index` (0 = least significant) of this integer, as a Boolean.
+  def bitAt(index: Int): Boolean {
+    val shifted: Int = self / pow2(index)
+    return shifted % 2 == 1
+  }
+}
+
+def pow2(n: Int): Int {
+  var r: Int = 1
+  var i: Int = 0
+  while i < n { r = r * 2; i++ }
+  return r
+}
+
+// ── Circuit: a named-wire graph of gates, evaluated on demand ────────────────
+
+class Circuit {
+  val wires: Map[String, Gate]
+public:
+  def this { wires = new HashMap[String, Gate]() }
+
+  def set(name: String, value: Boolean): void {
+    wires.put(name, new InputGate(name, value))
+  }
+
+  def add(gate: Gate): void {
+    wires.put(gate.gateName(), gate)
+  }
+
+  // Public entry point: fresh memo cache and cycle guard per top-level call.
+  def eval(name: String): Boolean {
+    val cache: Map[String, Boolean] = new HashMap[String, Boolean]()
+    val visiting: HashSet[String] = new HashSet[String]()
+    return evalWire(name, cache, visiting)
+  }
+
+  def evalWire(name: String, cache: Map[String, Boolean], visiting: HashSet[String]): Boolean {
+    if cache.containsKey(name) { return cache.get(name) as Boolean }
+    if visiting.contains(name) {
+      IO::println("  !! cycle detected while evaluating wire \"#{name}\" — treating as false")
+      return false
+    }
+    val gate: Gate? = wires.get(name) as Gate?
+    if gate == null {
+      IO::println("  !! unknown wire \"#{name}\" — treating as false")
+      return false
+    }
+    visiting.add(name)
+    val result: Boolean = select gate {
+      case i is InputGate: i.value()
+      case n is NotGate:   !evalWire(n.in1(), cache, visiting)
+      case a is AndGate:   evalWire(a.in1(), cache, visiting) && evalWire(a.in2(), cache, visiting)
+      case o is OrGate:    evalWire(o.in1(), cache, visiting) || evalWire(o.in2(), cache, visiting)
+      case x is XorGate:   evalWire(x.in1(), cache, visiting) != evalWire(x.in2(), cache, visiting)
+      case d is NandGate:  !(evalWire(d.in1(), cache, visiting) && evalWire(d.in2(), cache, visiting))
+    }
+    visiting.remove(name)
+    cache.put(name, result)
+    return result
+  }
+}
+
+// ── Record: one row of a printed truth table ─────────────────────────────────
+
+record TruthRow(inputs: List[Boolean], outputs: List[Boolean]) {
+public:
+  def render(): String {
+    var line: String = "  "
+    foreach b: Boolean in inputs { line = line + b.toBit() + " " }
+    line = line + "|"
+    foreach b: Boolean in outputs { line = line + " " + b.toBit() }
+    return line
+  }
+}
+
+// Enumerate every combination of `inputNames`, driving them through `set`,
+// then read every wire in `outputNames` back out via `eval`.
+def truthTable(circuit: Circuit, inputNames: List[String], outputNames: List[String]): List[TruthRow] {
+  val rows: List[TruthRow] = []
+  val n: Int = inputNames.size()
+  val combos: Int = pow2(n)
+
+  var mask: Int = 0
+  while mask < combos {
+    val ins: List[Boolean] = []
+    var i: Int = 0
+    while i < n {
+      // Most-significant input first, so rows print in familiar order.
+      val bit: Boolean = mask.bitAt(n - 1 - i)
+      ins.add(bit)
+      circuit.set(inputNames[i] as String, bit)
+      i++
+    }
+    val outs: List[Boolean] = []
+    foreach name: String in outputNames { outs.add(circuit.eval(name)) }
+    rows.add(new TruthRow(ins, outs))
+    mask++
+  }
+  return rows
+}
+
+def printTable(title: String, inputNames: List[String], outputNames: List[String], rows: List[TruthRow]): void {
+  IO::println("")
+  IO::println("=== #{title} ===")
+  var header: String = "  "
+  foreach name: String in inputNames { header = header + name + " " }
+  header = header + "|"
+  foreach name: String in outputNames { header = header + " " + name }
+  IO::println(header)
+  foreach r: TruthRow in rows { IO::println(r.render()) }
+}
+
+// ── Circuit builders ──────────────────────────────────────────────────────────
+
+// sum = a XOR b, carry = a AND b
+def buildHalfAdder(): Circuit {
+  val c: Circuit = new Circuit()
+  c.set("a", false)
+  c.set("b", false)
+  c.add(new XorGate("sum", "a", "b"))
+  c.add(new AndGate("carry", "a", "b"))
+  return c
+}
+
+// sum = (a XOR b) XOR cin, cout = (a AND b) OR (cin AND (a XOR b))
+def buildFullAdder(): Circuit {
+  val c: Circuit = new Circuit()
+  c.set("a", false)
+  c.set("b", false)
+  c.set("cin", false)
+  c.add(new XorGate("axb", "a", "b"))
+  c.add(new XorGate("sum", "axb", "cin"))
+  c.add(new AndGate("axb_and_cin", "axb", "cin"))
+  c.add(new AndGate("a_and_b", "a", "b"))
+  c.add(new OrGate("cout", "a_and_b", "axb_and_cin"))
+  return c
+}
+
+// 4-bit ripple-carry adder: four full adders, each cout feeding the next cin.
+def buildRippleAdder4(): Circuit {
+  val c: Circuit = new Circuit()
+  var bit: Int = 0
+  while bit < 4 {
+    c.set("a#{bit}", false)
+    c.set("b#{bit}", false)
+    bit++
+  }
+  c.set("cin0", false)
+
+  bit = 0
+  while bit < 4 {
+    val a: String = "a#{bit}"
+    val b: String = "b#{bit}"
+    val cin: String = "cin#{bit}"
+    val axb: String = "axb#{bit}"
+    val sum: String = "sum#{bit}"
+    val aAndB: String = "aAndB#{bit}"
+    val axbAndCin: String = "axbAndCin#{bit}"
+    val cout: String = "cin#{bit + 1}"
+
+    c.add(new XorGate(axb, a, b))
+    c.add(new XorGate(sum, axb, cin))
+    c.add(new AndGate(aAndB, a, b))
+    c.add(new AndGate(axbAndCin, axb, cin))
+    c.add(new OrGate(cout, aAndB, axbAndCin))
+    bit++
+  }
+  return c
+}
+
+// out = (a AND NOT sel) OR (b AND sel) — classic 2-to-1 mux from gates.
+def buildMux2to1(): Circuit {
+  val c: Circuit = new Circuit()
+  c.set("a", false)
+  c.set("b", false)
+  c.set("sel", false)
+  c.add(new NotGate("notSel", "sel"))
+  c.add(new AndGate("aPath", "a", "notSel"))
+  c.add(new AndGate("bPath", "b", "sel"))
+  c.add(new OrGate("out", "aPath", "bPath"))
+  return c
+}
+
+// ── 4-bit ripple-carry adder: run it on real numbers, not just a truth table ──
+
+def runRippleAdderDemo(): void {
+  IO::println("")
+  IO::println("=== 4-bit ripple-carry adder: 5 + 3, 12 + 9, 15 + 15 ===")
+  val pairs: List[List[Int]] = [[5, 3], [12, 9], [15, 15], [0, 0], [7, 8]]
+  foreach pair: List[Int] in pairs {
+    val x: Int = pair[0] as Int
+    val y: Int = pair[1] as Int
+    val c: Circuit = buildRippleAdder4()
+
+    var bit: Int = 0
+    while bit < 4 {
+      c.set("a#{bit}", x.bitAt(bit))
+      c.set("b#{bit}", y.bitAt(bit))
+      bit++
+    }
+
+    var sum: Int = 0
+    bit = 0
+    while bit < 4 {
+      if c.eval("sum#{bit}") { sum = sum + pow2(bit) }
+      bit++
+    }
+    val carryOut: Boolean = c.eval("cin4")
+    val overflow: String = if carryOut { " (carry out — overflows 4 bits)" } else { "" }
+    IO::println("  #{x} + #{y} = #{sum}#{overflow}")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("=== Digital Logic Circuit Simulator ===")
+
+  printTable("Half adder (sum, carry)", ["a", "b"], ["sum", "carry"], truthTable(buildHalfAdder(), ["a", "b"], ["sum", "carry"]))
+  printTable("Full adder (sum, cout)", ["a", "b", "cin"], ["sum", "cout"], truthTable(buildFullAdder(), ["a", "b", "cin"], ["sum", "cout"]))
+  printTable("2-to-1 multiplexer", ["a", "b", "sel"], ["out"], truthTable(buildMux2to1(), ["a", "b", "sel"], ["out"]))
+
+  runRippleAdderDemo()
+
+  IO::println("")
+  IO::println("=== Cycle guard: a wire wired to depend on itself ===")
+  val broken: Circuit = new Circuit()
+  broken.add(new AndGate("x", "x", "x"))
+  val guardedResult: Boolean = broken.eval("x")
+  IO::println("  eval(x) = #{guardedResult}  (guarded, no infinite recursion)")
+
+  IO::println("")
+  IO::println("Done.")
+}

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/Mastermind.on`, a 309-line AI-vs-AI Mastermind code-breaking
+  simulation.** Two `Guesser` strategies (`RandomGuesser`, `SmartGuesser`)
+  compete across 50 random secrets; stats are compared and colour
+  frequency is checked for uniformity. Exercises records with value
+  equality (`Feedback`, `Code`), a homogeneous `enum Strategy` dispatched
+  via `select` in a factory function, an extension method on `Int`
+  (`.colorName()`), `List.filter` with closures over `List[Code]`,
+  `Map[String, Int]` with `?:` null coalescing, `foreach (k, v)` over a
+  typed map, `List.zip` with nested generics, and `try`/`catch` with
+  nullable types.
+
 - **`run/ColorPalette.on`, a 399-line color science toolkit.** Covers
   RGB↔HSL/HSV/CMYK conversion, named color lookup, five harmony palette
   types, WCAG accessibility contrast checking, and palette

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/ColorPalette.on`, a 399-line color science toolkit.** Covers
+  RGB↔HSL/HSV/CMYK conversion, named color lookup, five harmony palette
+  types, WCAG accessibility contrast checking, and palette
+  temperature/brightness analysis. Exercises `record` types with method
+  bodies, a data-carrying `enum` with `case`, sealed-hierarchy `select`
+  matching, `foreach (k, v) in map` destructuring, and collection
+  pipelines.
+
 - **`run/WordSearch.on`, a 300-line word-search puzzle generator and
   solver.** Hides a word list in a 16×16 grid across 8 directions, fills
   the remaining cells with random letters, then solves the puzzle to

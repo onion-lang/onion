@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/NeuralNet.on`, a 291-line from-scratch multi-layer perceptron.**
+  Trains a hand-written two-layer network (sigmoid activations, backprop
+  computed manually, no library) via stochastic gradient descent on two
+  tasks run back-to-back: XOR (2→4→1, 5000 epochs, 4/4 accuracy) and
+  parity-3 (3→6→1, 8000 epochs, ≥7/8 accuracy). Exercises classes with
+  mutable `var` fields and static helpers, extension methods on `Double`,
+  mutable `List` APIs, `foreach` over record collections, closures, and
+  records.
+
 - **`run/HuffmanCode.on`, a 334-line Huffman encoding/decoding demo.**
   Builds a Huffman tree from symbol frequencies and round-trips five sample
   strings through encode/decode, plus a batch compression-ratio comparison.

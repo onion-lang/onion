@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/LispInterp.on`, a 590-line minimal Scheme-like Lisp interpreter.**
+  Compiles and runs end-to-end with correct output on 27 verified cases.
+  Exercises ADT case enums (`TokenKind`, `LispVal`, 7 cases), records
+  (`Token`), classes with `public:` sections (`LispEnv`, `Lexer`, `Parser`,
+  `Interpreter`), nullable fields, typed generics (`ArrayList[Object]`,
+  `LinkedHashMap[String, Object]`), `select`/`case … is` pattern matching,
+  string interpolation, direct and mutual recursion, closures with lexical
+  capture, `try`/`catch`, `foreach`/`while` loops with mutable state, and
+  method calls on boxed primitives.
+
 - **`run/Othello.on`, a 223-line Othello/Reversi AI-vs-AI simulation.**
   Two positional-weight greedy AIs play a full game to completion on an 8x8
   board. Exercises records (`Position`, `MoveRecord`), `foreach` with ranges,

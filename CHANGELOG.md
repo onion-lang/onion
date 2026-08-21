@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/GeneticAlgorithm.on`, a 333-line genetic algorithm solving N-Queens.**
+  Runs two scenarios end to end (8-Queens with tournament selection and
+  single-point crossover; 6-Queens with roulette selection and uniform
+  crossover), plus a mutation-rate sweep. Exercises records with methods,
+  sealed ADT case-enums (`SelectionStrategy`, `CrossoverType`), extension
+  methods on `Int`/`String`, collection pipelines (`map`/`fold`), nullable
+  return types, and `select`/`is` pattern matching.
+
 - **`run/PackageInstaller.on`, a 285-line npm-style dependency resolver.**
   Registers 12 packages with version strings and dependency lists, resolves
   them via DFS topological sort with cycle detection, and groups them into

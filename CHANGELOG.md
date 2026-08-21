@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/WordSearch.on`, a 300-line word-search puzzle generator and
+  solver.** Hides a word list in a 16×16 grid across 8 directions, fills
+  the remaining cells with random letters, then solves the puzzle to
+  verify placement accuracy. Exercises an ADT case-enum (`Direction`,
+  8 singleton cases) dispatched via `select`, records with methods
+  (`Placement`, `Found`), 2D arrays, extension methods on `Int`/`String`,
+  and collection pipelines (`map`/`filter`/`fold`/`groupBy`/`sortedBy`).
+
 - **`run/MusicTheory.on`, a 560-line music theory calculator.** Covers the
   full chromatic note system, interval naming, chord voicings, scale
   construction, modal analysis, and chord progressions: homogeneous enums
@@ -45,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class inheritance with per-algorithm overrides, primary-constructor
   superclass delegation (`class Sub(args) extends Base(args)`), extension
   methods on `Int`/`String`, and nullable-typed pick results.
+
+### Fixed
+
+- **Internal compiler error (I0000) on a `do[List]` comprehension whose
+  downstream closure locally re-declares a binding name.** A closure that
+  declares a local variable shadowing an outer `do`-binding name (e.g.
+  `x <- [1, 2]` followed by a nested closure with `val x = ...`) crashed
+  bytecode generation with `Index -1 out of bounds for length 0` in
+  `ClosureCodegen.emitNewClosure`. `CapturedVariableScanner` now tracks
+  locally-declared names per closure body and excludes them from the
+  captured-variable set (unless a nested closure still captures the same
+  name, in which case it correctly stays boxed).
 
 ## [0.13.0] - 2026-08-20
 

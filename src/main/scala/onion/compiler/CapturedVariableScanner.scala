@@ -232,6 +232,6 @@ object CapturedVariableScanner {
     // nested closure. A locally-declared variable that IS captured by a nested
     // closure must stay in the result so it gets marked as boxed (the nested
     // closure needs to read/write through the same heap cell).
-    (result -- (locallyDeclared -- capturedByNested)).toSet
+    (result.toSet -- (locallyDeclared.toSet -- capturedByNested.toSet))
   }
 }

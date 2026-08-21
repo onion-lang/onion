@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/BattleshipSim.on`, a 381-line two-player Battleship auto-simulation.**
+  Two seeded AI players play a full game of Battleship end to end. Exercises
+  2D `Int[][]` arrays, a plain `enum ShipKind` with `select`-based dispatch, an
+  ADT `enum ShotResult` (`Miss`/`Hit`/`Sunk`) with `select this` methods, a
+  record with methods (`Ship`), classes with public/private sections (`Board`,
+  `Player`), `ArrayList[Object]` with a foreach-cast pattern, extension methods
+  on `Int`/`String`, nullable `String?`, `if`-as-expression, and `select`/`case`
+  with `else:`.
+
 - **`run/MiniGit.on`, a 384-line version-control system simulation.** Models a
   repository with commits, branches, staging area, and merge operations.
   Exercises extension methods on `String`/`Int` (`abbrev`, `padRight`, `repeat`,

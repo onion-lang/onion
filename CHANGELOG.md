@@ -127,6 +127,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `foreach (k, v) in Map[Object, List[Object]]`, `Double[]`/`Boolean[]`/`Int[]`
   arrays, records with compile-time examples, and nullable types.
 
+### Fixed
+
+- A Java-style parenthesized `catch (e: Exception) { }` clause now gets a
+  bilingual diagnostic hint pointing at the correct `catch e: Exception { }`
+  form, instead of an unhelpful expected-token dump.
+
 ## [0.14.0] - 2026-08-21
 
 ### Added

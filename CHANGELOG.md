@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a C-style `for (init; cond; step)` loop.** Onion's `for` loop
+  never parenthesizes its clauses; writing the C/Java/JS form used to trip the
+  parser several tokens past the actual mistake with an unhelpful expected-token
+  dump. The diagnostic now recognizes a leading `for (` and points at the correct
+  `for var i: Int = 0; i < 10; i++ { ... }` form.
+
 ## [0.15.0] - 2026-08-22
 
 ### Added

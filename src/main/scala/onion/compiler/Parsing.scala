@@ -270,6 +270,16 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val ParenthesizedCatchClause = """\bcatch\s*\(""".r
 
+  /**
+   * A C/Java/JS-style parenthesized `for (init; cond; step)` loop. Onion's `for` is
+   * a real keyword but its three clauses are never parenthesized, so the parser treats
+   * the `(` as the start of a parenthesized initializer expression and trips several
+   * tokens later -- on whatever follows the type name -- never mentioning that `for`
+   * itself takes no parens. `for` cannot appear as an identifier (it is reserved), so
+   * a leading `for\s*\(` on the line can only be this mistake.
+   */
+  private val CStyleForLoop = """^\s*for\s*\(""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -290,6 +300,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.switch_not_supported")
     case _ if FunDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.fun_declaration")
+    case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.c_style_for")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

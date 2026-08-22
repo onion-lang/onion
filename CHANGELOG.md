@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/Chess.on`, a 395-line legal-move chess engine core.**
+  An 8x8 board of nullable `Piece` records, pseudo-legal move generation for
+  every piece kind (pawns with double push and automatic queen promotion,
+  knights, sliding bishops/rooks/queens, kings), and square-attack detection
+  used both to filter a king's own moves and to reject any move that leaves
+  the mover's own king in check. Verifies White has exactly 20 legal moves
+  from the starting position, replays a scripted Scholar's Mate ply-by-ply
+  down to confirmed checkmate, and confirms a composed minimal stalemate
+  position. Exercises records with methods, a class wrapping a mutable
+  nullable-element array (`Piece?[]`), a hand-rolled clone-and-simulate
+  check filter, nested `while`/`foreach` loops, closures, `List` pipelines,
+  and string interpolation.
+
 - **`run/PropLogic.on`, a 402-line propositional logic evaluator with truth tables.**
   Represents formulas as an 8-case ADT `enum Formula` (`Var`/`Top`/`Bot`/`Not`/
   `And`/`Or`/`Impl`/`Equiv`) with four recursive `select this` methods
@@ -113,6 +126,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pipelines (`groupBy`/`sortedBy`/`filter`/`find`/`partition`/`distinct`/`map`),
   `foreach (k, v) in Map[Object, List[Object]]`, `Double[]`/`Boolean[]`/`Int[]`
   arrays, records with compile-time examples, and nullable types.
+
+### Fixed
+
+- A Java-style parenthesized `catch (e: Exception) { }` clause now gets a
+  bilingual diagnostic hint pointing at the correct `catch e: Exception { }`
+  form, instead of an unhelpful expected-token dump.
 
 ## [0.14.0] - 2026-08-21
 

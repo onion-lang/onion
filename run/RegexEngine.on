@@ -1,0 +1,194 @@
+// RegexEngine.on — a small backtracking regex engine built from scratch.
+//   - recursive-descent parser: literal chars, `.` any-char, postfix `*`/`+`/`?`
+//     repetition, `(...)` grouping, `|` alternation
+//   - continuation-passing backtracking matcher over a regex AST (ADT case-enum)
+//   - `fullMatch` (whole-string match) and `find` (substring search) entry points
+//   - a self-checking demo: a table of (pattern, input, expected) cases, run and
+//     tallied against their expected results
+// Exercises: recursive-descent parsing with a mutable-field class, ADT case-enum
+// with a recursive select-based method, function-typed parameters used as
+// backtracking continuations (`Int -> Boolean`), closures capturing outer
+// locals, records, collection pipelines, string interpolation, nested control
+// flow, and a self-checking pass/fail summary.
+// Entry: sbt 'runScript run/RegexEngine.on'
+
+// ─── AST ────────────────────────────────────────────────────────────────────
+
+enum Node {
+  case Lit(c: Char)
+  case AnyChar
+  case Concat(a: Node, b: Node)
+  case Alt(a: Node, b: Node)
+  case Star(a: Node)
+  case Plus(a: Node)
+  case Opt(a: Node)
+  case Eps
+
+public:
+  // Try to match this node against `s` starting at index `i`. On success, hand
+  // the position just past the match to the continuation `k`; `go` returns
+  // whatever `k` returns for the first position that makes it succeed.
+  // Backtracking falls out naturally: alternatives and repetitions retry with
+  // a different split point whenever the continuation rejects one.
+  def go(s: String, i: Int, k: Int -> Boolean): Boolean = select this {
+    case _e is Eps: k(i)
+    case l is Lit: if i < s.length && s.charAt(i) == l.c() { k(i + 1) } else { false }
+    case _a is AnyChar: if i < s.length { k(i + 1) } else { false }
+    case c is Concat: c.a().go(s, i, (j) -> c.b().go(s, j, k))
+    case a is Alt: a.a().go(s, i, k) || a.b().go(s, i, k)
+    case st is Star: st.a().go(s, i, (j) -> j > i && st.go(s, j, k)) || k(i)
+    case p is Plus: p.a().go(s, i, (j) -> new Star(p.a()).go(s, j, k))
+    case o is Opt: o.a().go(s, i, k) || k(i)
+  }
+}
+
+// Whole-string match: the continuation only accepts landing exactly on `s.length`.
+def fullMatch(re: Node, s: String): Boolean = re.go(s, 0, (j) -> j == s.length)
+
+// Substring search: try every start position; the continuation accepts any landing spot.
+def find(re: Node, s: String): Boolean {
+  var i: Int = 0
+  while i <= s.length {
+    if re.go(s, i, (j) -> true) { return true }
+    i++
+  }
+  return false
+}
+
+// ─── Parser ─────────────────────────────────────────────────────────────────
+//
+// expr   = term ('|' term)*
+// term   = factor*                (concatenation; an empty term is Eps)
+// factor = atom ('*' | '+' | '?')*
+// atom   = '(' expr ')' | '.' | <any other char, taken literally>
+
+class RegexParser {
+  var pat: String
+  var pos: Int
+
+public:
+  def this(pattern: String) {
+    pat = pattern
+    pos = 0
+  }
+
+  def peek(): Char = if pos < pat.length { pat.charAt(pos) } else { '\0' }
+
+  def parseExpr(): Node {
+    var left: Node = parseTerm()
+    while peek() == '|' {
+      pos++
+      val right: Node = parseTerm()
+      left = new Alt(left, right)
+    }
+    return left
+  }
+
+  def parseTerm(): Node {
+    var result: Node = new Eps()
+    var first: Boolean = true
+    while pos < pat.length && peek() != '|' && peek() != ')' {
+      val f: Node = parseFactor()
+      if first { result = f; first = false } else { result = new Concat(result, f) }
+    }
+    return result
+  }
+
+  def parseFactor(): Node {
+    var atom: Node = parseAtom()
+    while pos < pat.length && (peek() == '*' || peek() == '+' || peek() == '?') {
+      val op: Char = pat.charAt(pos)
+      pos++
+      if op == '*' { atom = new Star(atom) }
+      else if op == '+' { atom = new Plus(atom) }
+      else { atom = new Opt(atom) }
+    }
+    return atom
+  }
+
+  def parseAtom(): Node {
+    val c: Char = pat.charAt(pos)
+    if c == '(' {
+      pos++
+      val inner: Node = parseExpr()
+      pos++ // consume ')'
+      return inner
+    } else if c == '.' {
+      pos++
+      return new AnyChar()
+    } else {
+      pos++
+      return new Lit(c)
+    }
+  }
+}
+
+def compile(pattern: String): Node {
+  val p: RegexParser = new RegexParser(pattern)
+  return p.parseExpr()
+}
+
+// ─── Self-checking demo ─────────────────────────────────────────────────────
+
+record Case(pattern: String, input: String, expectFull: Boolean, expectFind: Boolean)
+
+def runCase(c: Case): Boolean {
+  val re: Node = compile(c.pattern())
+  val fm: Boolean = fullMatch(re, c.input())
+  val fd: Boolean = find(re, c.input())
+  val ok: Boolean = fm == c.expectFull() && fd == c.expectFind()
+  val mark: String = if ok { "[PASS]" } else { "[FAIL]" }
+  IO::println("#{mark} /#{c.pattern()}/ vs \"#{c.input()}\"  full=#{fm} find=#{fd}")
+  return ok
+}
+
+def main(): void {
+  IO::println("=== RegexEngine — backtracking regex matcher from scratch ===")
+  IO::println("")
+
+  val cases: List[Case] = [
+    new Case("abc", "abc", true, true),
+    new Case("abc", "xabcy", false, true),
+    new Case("abc", "abx", false, false),
+    new Case("a*b", "aaab", true, true),
+    new Case("a*b", "b", true, true),
+    new Case("a*b", "aaa", false, false),
+    new Case("a+b", "b", false, false),
+    new Case("a+b", "aab", true, true),
+    new Case("a?b", "b", true, true),
+    new Case("a?b", "ab", true, true),
+    new Case("a?b", "aab", false, true),
+    new Case("a.c", "abc", true, true),
+    new Case("a.c", "ac", false, false),
+    new Case("a.c", "azc", true, true),
+    new Case("(ab)+", "ababab", true, true),
+    new Case("(ab)+", "aba", false, true),
+    new Case("(ab)+", "ba", false, false),
+    new Case("cat|dog", "cat", true, true),
+    new Case("cat|dog", "dog", true, true),
+    new Case("cat|dog", "cow", false, false),
+    new Case("(a|b)*c", "aabbac", true, true),
+    new Case("(a|b)*c", "aabba", false, false),
+    new Case("x*y*z", "xxyyz", true, true),
+    new Case("x*y*z", "z", true, true),
+    new Case("(fo)*bar", "fofofobar", true, true),
+    new Case("(fo)*bar", "fofoba", false, false)
+  ]
+
+  var passCount: Int = 0
+  foreach c: Case in cases {
+    if runCase(c) { passCount++ }
+  }
+
+  val total: Int = cases.size
+  IO::println("")
+  IO::println("Results: #{passCount}/#{total} passed")
+  if passCount == total { IO::println("All checks passed!") }
+  else { IO::println("Some checks FAILED — see above.") }
+
+  IO::println("")
+  IO::println("=== ad-hoc search demo ===")
+  val logLine: String = "GET /api/v2/users/42 HTTP/1.1"
+  val hasApiPath: Boolean = find(compile("/api/v.*/users/.*"), logLine)
+  IO::println("\"#{logLine}\" matches /api\\/v.*\\/users\\/.*/ -> #{hasApiPath}")
+}

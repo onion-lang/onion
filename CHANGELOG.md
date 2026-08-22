@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/RegexEngine.on`, a 194-line backtracking regex engine built from scratch.**
+  A recursive-descent parser turns a pattern string (literals, `.` any-char,
+  postfix `*`/`+`/`?`, `(...)` grouping, `|` alternation) into an 8-case ADT
+  AST, matched by a continuation-passing backtracking `go(s, i, k)` method
+  (`k: Int -> Boolean`) that provides both a whole-string `fullMatch` and a
+  substring `find`. A 26-case self-checking table (each asserting both the
+  full-match and find outcome) plus an ad-hoc log-line search demo exercise
+  ADT case-enum with a recursive `select`-based method, function-typed
+  parameters used as backtracking continuations, closures, a mutable-field
+  parser class, records, collection pipelines, and string interpolation.
+
 ### Fixed
 
 - **Parser hint for a C-style `for (init; cond; step)` loop.** Onion's `for` loop

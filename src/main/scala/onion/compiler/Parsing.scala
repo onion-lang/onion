@@ -262,6 +262,17 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
+   * A Kotlin-style extension-function declaration, `fun String.twice(): String { ... }`.
+   * This is a more specific form of the `fun`/`func`/`fn` mistake above: the receiver-dot
+   * syntax means [[FunDeclaration]]'s `<kw> name(` pattern never matches -- the identifier
+   * directly after the keyword is the *receiver type*, followed by `.`, not `(` -- so without
+   * its own case this would fall through to the generic parse error instead of naming Onion's
+   * `extension` block. Capturing the receiver type and method name lets the hint show the
+   * exact rewrite instead of just pointing at `def`.
+   */
+  private val FunExtensionDeclaration = """\b(?:fun|func|fn)\s+([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(""".r
+
+  /**
    * A Java-style parenthesized catch clause, `catch (e: Exception) { }`. `catch`
    * is a real keyword in Onion, but its variable is never parenthesized -- the
    * parser expects the binding name directly after `catch` and trips on the `(`.
@@ -347,6 +358,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_for_in")
     case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.switch_not_supported")
+    case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      val m = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.fun_extension_declaration", m.group(1), m.group(2))
     case _ if FunDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.fun_declaration")
     case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>

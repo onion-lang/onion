@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overloading, raw regex/resource literals, pipeline `|>`, regex `select`
   patterns, auto-CLI). Brought fully in sync, row-for-row, with `CLAUDE.md`.
 
+- **Parser hint for a Java/C#-style unbraced `import java.util.List;`.** Onion's
+  `import` decl always wraps its targets in braces (`import { java.util.List }`);
+  writing the unbraced Java/C# form used to fall through to the generic
+  "a block `{ ... }` is expected here" hint, which reads as if a code block were
+  missing rather than braces around the import. The diagnostic now recognizes a
+  leading `import` followed directly by a non-`{` token and points at the correct
+  braced form.
+
 ## [0.15.0] - 2026-08-22
 
 ### Added

@@ -1,0 +1,309 @@
+// Mastermind.on — AI-vs-AI Mastermind simulation (self-contained, no input)
+// Rules: crack a hidden 4-peg code; each peg is one of 6 colours (digits 0–5).
+// Feedback per guess: B = right colour+position, W = right colour wrong position.
+// Two AI strategies race across 50 random secrets and their stats are compared.
+//
+// Language features exercised:
+//   records (Feedback, Code), ADT enum (Strategy), interface + two implementing
+//   classes, top-level def, extension Int, closures, List.filter/sortedBy/fold,
+//   foreach-range, foreach(k,v) on Map, select/pattern match, string interpolation,
+//   try/catch, static methods, nullable, while loops, nested for loops, break.
+
+// ─── Colour names: extension on Int ──────────────────────────────────────────
+extension Int {
+  def colorName(): String = select this {
+    case 0: "Red"
+    case 1: "Grn"
+    case 2: "Blu"
+    case 3: "Yel"
+    case 4: "Wht"
+    else:   "Blk"
+  }
+}
+
+// ─── Feedback: result of one guess ───────────────────────────────────────────
+record Feedback(blacks: Int, whites: Int) {
+public:
+  def isSolved(): Boolean = blacks == 4
+  def display(): String = "#{blacks}B#{whites}W"
+}
+
+// ─── Code: a 4-digit guess or secret (digits 0–5) ────────────────────────────
+record Code(d0: Int, d1: Int, d2: Int, d3: Int) {
+public:
+  def at(i: Int): Int = select i {
+    case 0: d0
+    case 1: d1
+    case 2: d2
+    else:   d3
+  }
+  def display(): String =
+    "#{d0().colorName()}-#{d1().colorName()}-#{d2().colorName()}-#{d3().colorName()}"
+}
+
+// ─── evaluate: compute Feedback for (secret, guess) ──────────────────────────
+def evaluate(secret: Code, guess: Code): Feedback {
+  var blacks = 0
+  val sUsed = new Boolean[4]
+  val gUsed = new Boolean[4]
+  // Pass 1: exact matches (blacks)
+  for var i = 0; i < 4; i++ {
+    if secret.at(i) == guess.at(i) {
+      blacks = blacks + 1
+      sUsed[i] = true
+      gUsed[i] = true
+    }
+  }
+  // Pass 2: colour-only matches (whites)
+  var whites = 0
+  for var i = 0; i < 4; i++ {
+    if !gUsed[i] {
+      for var j = 0; j < 4; j++ {
+        if !sUsed[j] && guess.at(i) == secret.at(j) {
+          whites = whites + 1
+          sUsed[j] = true
+          break
+        }
+      }
+    }
+  }
+  return new Feedback(blacks, whites)
+}
+
+// ─── allCodes: all 6^4 = 1 296 possible codes ────────────────────────────────
+def allCodes(): List[Code] {
+  val result: List[Code] = []
+  for var a = 0; a < 6; a++ {
+    for var b = 0; b < 6; b++ {
+      for var c = 0; c < 6; c++ {
+        for var d = 0; d < 6; d++ {
+          result.add(new Code(a, b, c, d))
+        }
+      }
+    }
+  }
+  return result
+}
+
+// ─── Strategy: which AI algorithm to use ─────────────────────────────────────
+enum Strategy { Random, Median }
+
+// ─── Guesser interface ────────────────────────────────────────────────────────
+interface Guesser {
+  def strategyName(): String
+  def reset(): void
+  def nextGuess(): Code
+  def inform(guess: Code, fb: Feedback): void
+  def remaining(): Int
+}
+
+// ─── RandomGuesser: picks uniformly at random from the remaining pool ─────────
+class RandomGuesser conforms Guesser {
+  val label: String
+  var pool: List[Code]
+
+public:
+  def this(n: String) {
+    label = n
+    pool = allCodes()
+  }
+  def strategyName(): String = label
+  def reset(): void {
+    pool = allCodes()
+  }
+  def nextGuess(): Code {
+    val idx = Rand::nextInt(pool.size)
+    return (pool[idx] as Code)
+  }
+  def inform(guess: Code, fb: Feedback): void {
+    pool = pool.filter { c -> evaluate(c, guess) == fb }
+  }
+  def remaining(): Int = pool.size
+}
+
+// ─── SmartGuesser: constraint elimination + median pivot ─────────────────────
+// After each guess, eliminates all codes inconsistent with the feedback.
+// Opens with a fixed heuristic (0-0-1-1) that partitions the space well.
+class SmartGuesser conforms Guesser {
+  val label: String
+  var pool: List[Code]
+  var firstMove: Boolean
+
+public:
+  def this(n: String) {
+    label = n
+    pool = allCodes()
+    firstMove = true
+  }
+  def strategyName(): String = label
+  def reset(): void {
+    pool = allCodes()
+    firstMove = true
+  }
+  def nextGuess(): Code {
+    if firstMove {
+      firstMove = false
+      return new Code(0, 0, 1, 1)   // opens well for 6-colour Mastermind
+    }
+    if pool.size == 0 { return new Code(0, 0, 0, 0) }
+    val idx = pool.size / 2          // median pivot
+    return (pool[idx] as Code)
+  }
+  def inform(guess: Code, fb: Feedback): void {
+    pool = pool.filter { c -> evaluate(c, guess) == fb }
+  }
+  def remaining(): Int = pool.size
+}
+
+// ─── playGame: run one game, return guess-count (-1 on timeout) ───────────────
+def playGame(secret: Code, guesser: Guesser, maxRounds: Int, verbose: Boolean): Int {
+  guesser.reset()
+  var round = 0
+  while round < maxRounds {
+    round = round + 1
+    val guess  = guesser.nextGuess()
+    val fb     = evaluate(secret, guess)
+    if verbose {
+      IO::println("  Round #{round}: #{guess.display()} → #{fb.display()} (#{guesser.remaining()} left)")
+    }
+    guesser.inform(guess, fb)
+    if fb.isSolved() { return round }
+  }
+  return -1
+}
+
+// ─── Statistics: histogram + summary over many random secrets ─────────────────
+def runStats(guesser: Guesser, trials: Int, allCodesList: List[Code]): void {
+  IO::println("\n=== #{guesser.strategyName()} — #{trials} random games ===")
+  var totalGuesses = 0
+  var maxGuesses   = 0
+  var failures     = 0
+  val hist         = new Int[15]   // hist[k] = games solved in exactly k guesses
+
+  for var t = 0; t < trials; t++ {
+    val idx    = Rand::nextInt(allCodesList.size)
+    val secret = (allCodesList[idx] as Code)
+    val n      = playGame(secret, guesser, 12, false)
+    if n > 0 {
+      totalGuesses = totalGuesses + n
+      if n > maxGuesses { maxGuesses = n }
+      hist[n] = hist[n] + 1
+    } else {
+      failures = failures + 1
+    }
+  }
+
+  val solved = trials - failures
+  val avg10  = if solved > 0 { totalGuesses * 10 / solved } else { 0 }
+  IO::println("Solved: #{solved}/#{trials}   Total guesses: #{totalGuesses}   Avg: #{avg10/10}.#{avg10%10}   Max: #{maxGuesses}")
+  if failures > 0 { IO::println("Failed (timeout): #{failures}") }
+  IO::println("Distribution:")
+  for var r = 1; r <= maxGuesses && r < 15; r++ {
+    if hist[r] > 0 {
+      val pct = hist[r] * 100 / trials
+      IO::println("  #{r} guess(es): #{hist[r]} games (#{pct}%)")
+    }
+  }
+}
+
+// ─── colourProfile: aggregate colour frequency across positions ───────────────
+// Exercises foreach(k,v) on a Map[String,Int] and string interpolation.
+def colourProfile(codes: List[Code]): void {
+  IO::println("\n=== Colour frequency across all #{codes.size} codes ===")
+  val freq: Map[String, Int] = [:]
+  foreach c: Code in codes {
+    for var pos = 0; pos < 4; pos++ {
+      val key = c.at(pos).colorName()
+      freq.put(key, (freq.get(key) ?: 0) + 1)
+    }
+  }
+  foreach (k, v) in freq {
+    IO::println("  #{k}: #{v} occurrences")
+  }
+}
+
+// ─── makeGuesser: factory driven by the Strategy enum ─────────────────────────
+def makeGuesser(s: Strategy, label: String): Guesser = select s {
+  case r is Strategy: if s == Strategy::Random { new RandomGuesser(label) } else { new SmartGuesser(label) }
+}
+
+// ─── bestOf: return the Code with the fewest average guesses from a sample ────
+// Uses List.fold to aggregate per-code solve counts; exercises fold + closures.
+def bestOf(secrets: List[Code], guesser: Guesser): Code? {
+  if secrets.size == 0 { return null }
+  var best: Code? = null
+  var bestCount = 999
+  foreach s: Code in secrets {
+    val n = playGame(s, guesser, 12, false)
+    if n > 0 && n < bestCount {
+      bestCount = n
+      best = s
+    }
+  }
+  return best
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("╔══════════════════════════════════════╗")
+  IO::println("║   Mastermind AI Simulation (6-col)   ║")
+  IO::println("╚══════════════════════════════════════╝")
+  IO::println("B = right colour+position, W = right colour wrong position\n")
+
+  val allC = allCodes()
+
+  // ── Show one verbose example game ────────────────────────────────────────
+  val exSecret = new Code(2, 4, 1, 3)   // Blu-Wht-Grn-Yel
+  IO::println("--- Example game, secret = #{exSecret.display()} ---")
+  val exGuesser = new SmartGuesser("Smart (example)")
+  val exRounds  = playGame(exSecret, exGuesser, 12, true)
+  IO::println("Solved in #{exRounds} round(s)!\n")
+
+  // ── Validate evaluate() for known inputs ─────────────────────────────────
+  IO::println("--- evaluate() sanity checks ---")
+  val s = new Code(0, 1, 2, 3)
+  IO::println("(0,1,2,3) vs (0,1,2,3) → #{evaluate(s, s).display()}")   // 4B0W
+  IO::println("(0,1,2,3) vs (3,2,1,0) → #{evaluate(s, new Code(3,2,1,0)).display()}")  // 0B4W
+  IO::println("(0,1,2,3) vs (4,4,4,4) → #{evaluate(s, new Code(4,4,4,4)).display()}")  // 0B0W
+
+  try {
+    val bad: Code? = null
+    if bad == null { IO::println("(null check OK)") }
+  } catch e: Exception {
+    IO::println("Unexpected: #{e.getMessage()}")
+  }
+
+  // ── Colour profile ────────────────────────────────────────────────────────
+  colourProfile(allC)
+
+  // ── Head-to-head stats over 50 random secrets ────────────────────────────
+  val random = makeGuesser(Strategy::Random, "Random")
+  val smart  = makeGuesser(Strategy::Median, "Smart")
+  runStats(random, 50, allC)
+  runStats(smart,  50, allC)
+
+  // ── "Easiest" secrets: which codes are solved fastest? ────────────────────
+  IO::println("\n--- Easiest secrets (lowest-indexed first 12 codes) ---")
+  val sample: List[Code] = []
+  for var i = 0; i < 12; i++ { sample.add(allC[i] as Code) }
+  val probe = new SmartGuesser("probe")
+  val easy  = bestOf(sample, probe)
+  if easy != null {
+    IO::println("Easiest in sample: #{(easy as Code).display()}")
+  }
+
+  // ── Demonstrate List.zip via parallel code comparison ────────────────────
+  IO::println("\n--- Pairwise evaluate on first few codes ---")
+  val firstFew: List[Code] = []
+  for var i = 0; i < 4; i++ { firstFew.add(allC[i] as Code) }
+  val shifted: List[Code] = []
+  for var i = 1; i < 5; i++ { shifted.add(allC[i] as Code) }
+  val pairs: List[List[Object]] = firstFew.zip(shifted)
+  foreach p: List[Object] in pairs {
+    val left  = p[0] as Code
+    val right = p[1] as Code
+    IO::println("  #{left.display()} vs #{right.display()} → #{evaluate(left, right).display()}")
+  }
+
+  IO::println("\nDone.")
+}

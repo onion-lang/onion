@@ -1,0 +1,223 @@
+// Othello (Reversi) — two AIs compete using a positional-weight heuristic
+// Features: records, foreach/range, select/pattern-match, string interpolation,
+//           mutable arrays, nested loops, collection methods
+
+record Position(row: Int, col: Int)
+record MoveRecord(turn: Int, player: Int, row: Int, col: Int, flips: Int)
+
+val EMPTY: Int = 0
+val BLACK: Int = 1
+val WHITE: Int = 2
+
+def opponent(p: Int): Int = if p == BLACK { WHITE } else { BLACK }
+def playerName(p: Int): String = if p == BLACK { "Black" } else { "White" }
+
+// 8 directions: NW N NE W E SW S SE
+def dr(d: Int): Int = select d {
+  case 0, 1, 2: -1
+  case 3, 4: 0
+  else: 1
+}
+
+def dc(d: Int): Int = select d {
+  case 0, 3, 5: -1
+  case 1, 6: 0
+  else: 1
+}
+
+def initBoard(): Int[] {
+  val b: Int[] = new Int[64]
+  b[3 * 8 + 3] = WHITE
+  b[3 * 8 + 4] = BLACK
+  b[4 * 8 + 3] = BLACK
+  b[4 * 8 + 4] = WHITE
+  return b
+}
+
+def inBounds(r: Int, c: Int): Boolean = r >= 0 && r < 8 && c >= 0 && c < 8
+
+def countFlips(board: Int[], row: Int, col: Int, piece: Int, opp: Int, dir: Int): Int {
+  var r: Int = row + dr(dir)
+  var c: Int = col + dc(dir)
+  var n: Int = 0
+  while inBounds(r, c) && board[r * 8 + c] == opp {
+    n = n + 1
+    r = r + dr(dir)
+    c = c + dc(dir)
+  }
+  if inBounds(r, c) && board[r * 8 + c] == piece { return n } else { return 0 }
+}
+
+def totalFlips(board: Int[], row: Int, col: Int, player: Int): Int {
+  val opp: Int = opponent(player)
+  var total: Int = 0
+  foreach d: Int in 0..<8 {
+    total = total + countFlips(board, row, col, player, opp, d)
+  }
+  return total
+}
+
+def isValidMove(board: Int[], row: Int, col: Int, player: Int): Boolean {
+  if board[row * 8 + col] != EMPTY { return false }
+  return totalFlips(board, row, col, player) > 0
+}
+
+def getValidMoves(board: Int[], player: Int): List[Position] {
+  val moves: List[Position] = []
+  foreach r: Int in 0..<8 {
+    foreach c: Int in 0..<8 {
+      if isValidMove(board, r, c, player) {
+        moves.add(new Position(r, c))
+      }
+    }
+  }
+  return moves
+}
+
+// Positional weights: corners are prime, squares beside corners are traps
+def posWeight(r: Int, c: Int): Int {
+  val isCorner: Boolean = (r == 0 || r == 7) && (c == 0 || c == 7)
+  val isEdge: Boolean = (r == 0 || r == 7 || c == 0 || c == 7) && !isCorner
+  val isBadCornerAdj: Boolean = (r == 1 || r == 6) && (c == 1 || c == 6)
+  if isCorner { return 120 }
+  if isBadCornerAdj { return -20 }
+  if isEdge { return 10 }
+  return 5
+}
+
+def heuristicScore(board: Int[], row: Int, col: Int, player: Int): Int {
+  return totalFlips(board, row, col, player) * 3 + posWeight(row, col)
+}
+
+def applyMove(board: Int[], row: Int, col: Int, player: Int): void {
+  val opp: Int = opponent(player)
+  board[row * 8 + col] = player
+  foreach d: Int in 0..<8 {
+    val n: Int = countFlips(board, row, col, player, opp, d)
+    if n > 0 {
+      var r: Int = row + dr(d)
+      var c: Int = col + dc(d)
+      var i: Int = 0
+      while i < n {
+        board[r * 8 + c] = player
+        r = r + dr(d)
+        c = c + dc(d)
+        i = i + 1
+      }
+    }
+  }
+}
+
+def countPieces(board: Int[], player: Int): Int {
+  var count: Int = 0
+  foreach i: Int in 0..<64 {
+    if board[i] == player { count = count + 1 }
+  }
+  return count
+}
+
+def colLetter(c: Int): String = select c {
+  case 0: "a"; case 1: "b"; case 2: "c"; case 3: "d"
+  case 4: "e"; case 5: "f"; case 6: "g"; else: "h"
+}
+
+def printBoard(board: Int[], label: String): void {
+  IO::println(label)
+  IO::println("  a b c d e f g h")
+  val bCount: Int = countPieces(board, BLACK)
+  val wCount: Int = countPieces(board, WHITE)
+  foreach r: Int in 0..<8 {
+    var line: String = "#{r + 1} "
+    foreach c: Int in 0..<8 {
+      val sym: String = select board[r * 8 + c] {
+        case 1: "B"; case 2: "W"; else: "."
+      }
+      line = line + sym + " "
+    }
+    if r == 3 {
+      IO::println(line + "  B=#{bCount} W=#{wCount}")
+    } else {
+      IO::println(line)
+    }
+  }
+}
+
+def printMoveHistory(history: List[MoveRecord]): void {
+  IO::println("=== Move History ===")
+  var maxFlips: Int = 0
+  var maxTurn: Int = 0
+  var maxPlayer: String = ""
+  var totalFlipCount: Int = 0
+  foreach rec: MoveRecord in history {
+    totalFlipCount = totalFlipCount + rec.flips()
+    if rec.flips() > maxFlips {
+      maxFlips = rec.flips()
+      maxTurn = rec.turn()
+      maxPlayer = playerName(rec.player())
+    }
+  }
+  IO::println("Total moves played:  #{history.size}")
+  IO::println("Total pieces flipped: #{totalFlipCount}")
+  IO::println("Best single move:    #{maxPlayer} turn #{maxTurn} (#{maxFlips} flips)")
+}
+
+def main(): void {
+  val board: Int[] = initBoard()
+  val history: List[MoveRecord] = []
+  var current: Int = BLACK
+  var turn: Int = 1
+  var passes: Int = 0
+
+  IO::println("=== Othello: Positional-Weight AI vs AI ===")
+  printBoard(board, "Starting position:")
+  IO::println("")
+
+  while passes < 2 {
+    val moves: List[Position] = getValidMoves(board, current)
+    if moves.size == 0 {
+      IO::println("#{playerName(current)} passes (no valid moves).")
+      passes = passes + 1
+    } else {
+      passes = 0
+      var bestRow: Int = 0
+      var bestCol: Int = 0
+      var bestScore: Int = -1000
+      var bestFlips: Int = 0
+      foreach move: Position in moves {
+        val s: Int = heuristicScore(board, move.row(), move.col(), current)
+        if s > bestScore {
+          bestScore = s
+          bestRow = move.row()
+          bestCol = move.col()
+          bestFlips = totalFlips(board, move.row(), move.col(), current)
+        }
+      }
+      IO::println("Turn #{turn}: #{playerName(current)} -> #{colLetter(bestCol)}#{bestRow + 1}  (flips=#{bestFlips} w=#{posWeight(bestRow, bestCol)})")
+      applyMove(board, bestRow, bestCol, current)
+      history.add(new MoveRecord(turn, current, bestRow, bestCol, bestFlips))
+      if turn == 30 {
+        IO::println("")
+        printBoard(board, "--- Midgame snapshot (after turn 30) ---")
+        IO::println("")
+      }
+      turn = turn + 1
+    }
+    current = opponent(current)
+  }
+
+  IO::println("")
+  printBoard(board, "=== Final Board ===")
+  IO::println("")
+
+  val b: Int = countPieces(board, BLACK)
+  val w: Int = countPieces(board, WHITE)
+  val total: Int = b + w
+  val bPct: Int = b * 100 / total
+  val wPct: Int = w * 100 / total
+  IO::println("Score — Black: #{b} (#{bPct}%)  White: #{w} (#{wPct}%)")
+  if b > w { IO::println("Winner: Black!") }
+  else if w > b { IO::println("Winner: White!") }
+  else { IO::println("Draw!") }
+  IO::println("")
+  printMoveHistory(history)
+}

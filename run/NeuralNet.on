@@ -1,0 +1,291 @@
+// NeuralNet.on — A simple multi-layer perceptron with stochastic gradient descent.
+// Demonstrates: records with methods; classes; extension Double/Int; List pipelines
+// (map/filter/fold/zip/reduce); .add() mutable lists; foreach ranges; while loops;
+// string interpolation; nullable types; select/pattern matching; closures.
+//
+// Trains a 2-layer network (2->4->1) to learn XOR, then a 3-input parity function.
+
+import {
+  java.lang.Math;
+  java.lang.Integer as JInt;
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+extension Double {
+  def sigmoid(): Double {
+    val e: Double = Math::exp(0.0 - self)
+    return 1.0 / (1.0 + e)
+  }
+  def sigmoidPrime(): Double {
+    val s: Double = self.sigmoid()
+    return s * (1.0 - s)
+  }
+  def sq(): Double = self * self
+  def fmt(decimals: Int): String {
+    val scale: Double = Math::pow(10.0, decimals as Double)
+    val rounded: Long = Math::round(self * scale)
+    val intPart: Long = rounded / (scale as Long)
+    val fracPart: Long = Math::abs(rounded % (scale as Long))
+    val fracStr: String = "" + fracPart
+    var pad: String = ""
+    var p: Int = fracStr.length()
+    while p < decimals { pad = pad + "0"; p++ }
+    return "" + intPart + "." + pad + fracStr
+  }
+}
+
+// ── Training sample ──────────────────────────────────────────────────────────
+
+record Sample(inputs: List[Double], target: Double)
+
+// ── Dense layer: flat weight matrix + bias vector ────────────────────────────
+// weights[j * inSize + i] = weight from input i to output j.
+
+class DenseLayer {
+  var weights: List[Double]
+  var biases:  List[Double]
+  val inSize:  Int
+  val outSize: Int
+public:
+  def this(inSize: Int, outSize: Int) {
+    this.inSize  = inSize
+    this.outSize = outSize
+    this.weights = DenseLayer::randList(inSize * outSize, 0.5)
+    this.biases  = DenseLayer::zeroList(outSize)
+  }
+
+  static def randList(n: Int, scale: Double): List[Double] {
+    val out: List[Double] = []
+    var i: Int = 0
+    while i < n {
+      val raw: Double = (Rand::nextDouble() * 2.0 - 1.0) * scale
+      out.add(raw)
+      i++
+    }
+    return out
+  }
+
+  static def zeroList(n: Int): List[Double] {
+    val out: List[Double] = []
+    var i: Int = 0
+    while i < n { out.add(0.0); i++ }
+    return out
+  }
+
+  // Compute pre-activations (z-vector) for input x
+  def feedFwd(x: List[Double]): List[Double] {
+    val out: List[Double] = []
+    var j: Int = 0
+    while j < outSize {
+      var sum: Double = biases[j] as Double
+      var i: Int = 0
+      while i < inSize {
+        val w: Double  = weights[j * inSize + i] as Double
+        val xi: Double = x[i] as Double
+        sum = sum + w * xi
+        i++
+      }
+      out.add(sum)
+      j++
+    }
+    return out
+  }
+
+  // Apply sigmoid activation element-wise
+  def activate(z: List[Double]): List[Double] {
+    return z.map { v -> (v as Double).sigmoid() }
+  }
+
+  // Compute delta_z from upstream delta_a, given stored z
+  def backprop(deltaA: List[Double], z: List[Double]): List[Double] {
+    val deltaZ: List[Double] = []
+    var j: Int = 0
+    while j < outSize {
+      val zj: Double  = z[j] as Double
+      val daj: Double = deltaA[j] as Double
+      deltaZ.add(daj * zj.sigmoidPrime())
+      j++
+    }
+    return deltaZ
+  }
+
+  // Update weights and biases via SGD; mutates in place
+  def sgdUpdate(deltaZ: List[Double], x: List[Double], lr: Double): void {
+    var j: Int = 0
+    while j < outSize {
+      val dz: Double = deltaZ[j] as Double
+      biases  = DenseLayer::setAt(biases, j, (biases[j] as Double) - lr * dz)
+      var i: Int = 0
+      while i < inSize {
+        val idx: Int   = j * inSize + i
+        val xi: Double = x[i] as Double
+        weights = DenseLayer::setAt(weights, idx, (weights[idx] as Double) - lr * dz * xi)
+        i++
+      }
+      j++
+    }
+  }
+
+  // Compute gradient w.r.t. input x (for passing back to previous layer)
+  def gradInput(deltaZ: List[Double]): List[Double] {
+    val grad: List[Double] = []
+    var i: Int = 0
+    while i < inSize {
+      var s: Double = 0.0
+      var j: Int = 0
+      while j < outSize {
+        s = s + (weights[j * inSize + i] as Double) * (deltaZ[j] as Double)
+        j++
+      }
+      grad.add(s)
+      i++
+    }
+    return grad
+  }
+
+  // Return a new list with one element replaced
+  static def setAt(lst: List[Double], idx: Int, newVal: Double): List[Double] {
+    val out: List[Double] = []
+    var i: Int = 0
+    while i < lst.size {
+      out.add(if i == idx { newVal } else { lst[i] as Double })
+      i++
+    }
+    return out
+  }
+}
+
+// ── Two-layer network: hidden (sigmoid) -> output (sigmoid) ──────────────────
+
+class Network {
+  val hidden: DenseLayer
+  val output: DenseLayer
+public:
+  def this(inSize: Int, hidSize: Int, outSize: Int) {
+    hidden = new DenseLayer(inSize, hidSize)
+    output = new DenseLayer(hidSize, outSize)
+  }
+
+  // Returns predicted value in [0,1]
+  def predict(x: List[Double]): Double {
+    val zh: List[Double] = hidden.feedFwd(x)
+    val ah: List[Double] = hidden.activate(zh)
+    val zo: List[Double] = output.feedFwd(ah)
+    val ao: List[Double] = output.activate(zo)
+    return ao[0] as Double
+  }
+
+  // Single-sample SGD step; returns loss (0.5 * MSE)
+  def trainStep(s: Sample, lr: Double): Double {
+    val x: List[Double] = s.inputs()
+    val t: Double       = s.target()
+    // forward pass
+    val zh: List[Double] = hidden.feedFwd(x)
+    val ah: List[Double] = hidden.activate(zh)
+    val zo: List[Double] = output.feedFwd(ah)
+    val ao: List[Double] = output.activate(zo)
+    val pred: Double = ao[0] as Double
+    // loss = 0.5*(pred-t)^2; dL/dpred = pred-t
+    val loss: Double = 0.5 * (pred - t).sq()
+    val dlOut: List[Double] = [pred - t]
+    // backprop output layer
+    val deltaZo: List[Double] = output.backprop(dlOut, zo)
+    val dlAh:    List[Double] = output.gradInput(deltaZo)
+    output.sgdUpdate(deltaZo, ah, lr)
+    // backprop hidden layer
+    val deltaZh: List[Double] = hidden.backprop(dlAh, zh)
+    hidden.sgdUpdate(deltaZh, x, lr)
+    return loss
+  }
+}
+
+// ── Training loop ─────────────────────────────────────────────────────────────
+
+def trainEpochs(net: Network, dataset: List[Sample], epochs: Int, lr: Double): List[Double] {
+  val lossHistory: List[Double] = []
+  var epoch: Int = 0
+  while epoch < epochs {
+    var totalLoss: Double = 0.0
+    var i: Int = 0
+    while i < dataset.size {
+      totalLoss = totalLoss + net.trainStep(dataset[i] as Sample, lr)
+      i++
+    }
+    lossHistory.add(totalLoss / (dataset.size as Double))
+    epoch++
+  }
+  return lossHistory
+}
+
+def evaluate(net: Network, dataset: List[Sample]): Int {
+  var correct: Int = 0
+  var i: Int = 0
+  while i < dataset.size {
+    val s:        Sample = dataset[i] as Sample
+    val pred:     Double = net.predict(s.inputs())
+    val rounded:  Int    = if pred >= 0.5 { 1 } else { 0 }
+    val expected: Int    = if s.target() >= 0.5 { 1 } else { 0 }
+    if rounded == expected { correct++ }
+    i++
+  }
+  return correct
+}
+
+// ── XOR dataset ───────────────────────────────────────────────────────────────
+
+val xorData: List[Sample] = [
+  new Sample([0.0, 0.0], 0.0),
+  new Sample([0.0, 1.0], 1.0),
+  new Sample([1.0, 0.0], 1.0),
+  new Sample([1.0, 1.0], 0.0)
+]
+
+// ── Parity-3 dataset (all 8 three-bit patterns) ───────────────────────────────
+
+val parityData: List[Sample] = [
+  new Sample([0.0, 0.0, 0.0], 0.0),
+  new Sample([0.0, 0.0, 1.0], 1.0),
+  new Sample([0.0, 1.0, 0.0], 1.0),
+  new Sample([0.0, 1.0, 1.0], 0.0),
+  new Sample([1.0, 0.0, 0.0], 1.0),
+  new Sample([1.0, 0.0, 1.0], 0.0),
+  new Sample([1.0, 1.0, 0.0], 0.0),
+  new Sample([1.0, 1.0, 1.0], 1.0)
+]
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+
+IO::println("=== XOR  (2->4->1) ===")
+val xorNet: Network = new Network(2, 4, 1)
+val xorHistory: List[Double] = trainEpochs(xorNet, xorData, 5000, 0.5)
+
+IO::println("Loss at epoch  500: " + (xorHistory[499] as Double).fmt(6))
+IO::println("Loss at epoch 1000: " + (xorHistory[999] as Double).fmt(6))
+IO::println("Loss at epoch 2000: " + (xorHistory[1999] as Double).fmt(6))
+IO::println("Loss at epoch 5000: " + (xorHistory[4999] as Double).fmt(6))
+
+val xorCorrect: Int = evaluate(xorNet, xorData)
+IO::println("Accuracy: " + xorCorrect + "/4")
+
+IO::println("")
+IO::println("Predictions:")
+foreach s: Sample in xorData {
+  val pred:    Double = xorNet.predict(s.inputs())
+  val a:       Int    = (s.inputs()[0] as Double) as Int
+  val b:       Int    = (s.inputs()[1] as Double) as Int
+  val rounded: Int    = if pred >= 0.5 { 1 } else { 0 }
+  IO::println("  " + a + " XOR " + b + " -> " + pred.fmt(4) + "  (rounded=" + rounded + ")")
+}
+
+IO::println("")
+IO::println("=== Parity-3 (3->6->1) ===")
+val parNet: Network = new Network(3, 6, 1)
+val parHistory: List[Double] = trainEpochs(parNet, parityData, 8000, 0.3)
+
+IO::println("Loss at epoch 1000: " + (parHistory[999] as Double).fmt(6))
+IO::println("Loss at epoch 4000: " + (parHistory[3999] as Double).fmt(6))
+IO::println("Loss at epoch 8000: " + (parHistory[7999] as Double).fmt(6))
+
+val parCorrect: Int = evaluate(parNet, parityData)
+IO::println("Accuracy: " + parCorrect + "/8")

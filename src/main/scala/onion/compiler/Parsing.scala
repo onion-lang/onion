@@ -261,6 +261,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
 
+  /**
+   * A Java-style parenthesized catch clause, `catch (e: Exception) { }`. `catch`
+   * is a real keyword in Onion, but its variable is never parenthesized -- the
+   * parser expects the binding name directly after `catch` and trips on the `(`.
+   * `catch` cannot appear as an identifier (it is reserved), so `catch\s*\(`
+   * anywhere on the line can only be this mistake.
+   */
+  private val ParenthesizedCatchClause = """\bcatch\s*\(""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -273,6 +282,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
     // for `super` or `(` alone would fire at every expression position.
     case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
       Message("error.parsing.hint.old_super_init")
+    case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.catch_parens")
     case "in" =>
       Message("error.parsing.hint.old_for_in")
     case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>

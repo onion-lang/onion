@@ -1,0 +1,432 @@
+// FamilyTree.on — Genealogy tracker demonstrating:
+//   Records, homogeneous enum, ADT-style enum for Relation kind,
+//   extension Int/String methods, recursive ancestor/descendant search,
+//   collection pipelines (groupBy/sortedBy/filter/fold/map/distinct/find),
+//   foreach over ranges and map (k,v), nullable Int (death year),
+//   select pattern matching, closures, string interpolation, try/catch.
+
+import {
+  java.lang.Math
+}
+
+// ── Domain types ──────────────────────────────────────────────────────────────
+
+enum Gender {
+  Male, Female, Unknown
+}
+
+record Person(
+  id: Int,
+  firstName: String,
+  lastName: String,
+  birthYear: Int,
+  deathYear: Int?,
+  gender: Gender
+)
+
+record Relation(fromId: Int, toId: Int, kind: String)  // "parent" | "spouse"
+
+// ── Int and String extensions ──────────────────────────────────────────────────
+
+extension Int {
+  def century(): Int = (self - 1) / 100 + 1
+  def ageIn(refYear: Int): Int = refYear - self
+  def decadeLabel(): String = "#{(self / 10) * 10}s"
+  def abs(): Int = if self < 0 { -self } else { self }
+}
+
+extension String {
+  def padEnd(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padStart(n: Int): String {
+    var s = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── FamilyTree class ──────────────────────────────────────────────────────────
+
+class FamilyTree {
+  var people:    List[Object]   // Person objects
+  var relations: List[Object]   // Relation objects
+  val year:      Int            // current reference year
+
+public:
+  def this(currentYear: Int) {
+    people    = []
+    relations = []
+    year      = currentYear
+  }
+
+  def addPerson(p: Person): void { people.add(p) }
+
+  def allPeople(): List[Object] { return people }
+
+  def link(fromId: Int, toId: Int, kind: String): void {
+    relations.add(new Relation(fromId, toId, kind))
+  }
+
+  // ── Lookups ───────────────────────────────────────────────────────────────
+
+  def findById(id: Int): Person? {
+    val found = people.find { p -> (p as Person).id() == id }
+    if found == null { return null }
+    return found as Person
+  }
+
+  def parentsOf(id: Int): List[Object] {
+    val result: List[Object] = []
+    foreach r: Object in relations {
+      val rel = r as Relation
+      if rel.toId() == id && rel.kind() == "parent" {
+        val p = findById(rel.fromId())
+        if p != null { result.add(p) }
+      }
+    }
+    return result
+  }
+
+  def childrenOf(id: Int): List[Object] {
+    val result: List[Object] = []
+    foreach r: Object in relations {
+      val rel = r as Relation
+      if rel.fromId() == id && rel.kind() == "parent" {
+        val p = findById(rel.toId())
+        if p != null { result.add(p) }
+      }
+    }
+    return result
+  }
+
+  def spouseOf(id: Int): Person? {
+    val rel = relations.find { r ->
+      val rv = r as Relation
+      rv.kind() == "spouse" && (rv.fromId() == id || rv.toId() == id)
+    }
+    if rel == null { return null }
+    val rv = rel as Relation
+    val otherId = if rv.fromId() == id { rv.toId() } else { rv.fromId() }
+    return findById(otherId)
+  }
+
+  def siblingsOf(id: Int): List[Object] {
+    val pars = parentsOf(id)
+    if pars.size == 0 { return [] }
+    val pid = (pars.get(0) as Person).id()
+    return childrenOf(pid).filter { p -> (p as Person).id() != id }
+  }
+
+  // ── Recursive traversal ────────────────────────────────────────────────────
+
+  def ancestorsOf(id: Int): List[Object] {
+    val acc: List[Object] = []
+    collectAncestors(id, acc)
+    return acc
+  }
+
+  def descendantsOf(id: Int): List[Object] {
+    val acc: List[Object] = []
+    collectDescendants(id, acc)
+    return acc
+  }
+
+  def generationOf(id: Int): Int {
+    val pars = parentsOf(id)
+    if pars.size == 0 { return 0 }
+    return 1 + generationOf((pars.get(0) as Person).id())
+  }
+
+  // ── Statistics ─────────────────────────────────────────────────────────────
+
+  def living(): List[Object]   = people.filter { p -> (p as Person).deathYear() == null }
+  def deceased(): List[Object] = people.filter { p -> (p as Person).deathYear() != null }
+
+  def avgLifespan(): Double {
+    val dead = deceased()
+    if dead.size == 0 { return 0.0 }
+    val total = dead.fold(0) { acc, p ->
+      val person = p as Person
+      val dy = person.deathYear() as Int
+      (acc as Int) + (dy - person.birthYear())
+    }
+    return (total as Int as Double) / (dead.size as Double)
+  }
+
+  def oldestLiving(): Person? {
+    val live = living()
+    if live.size == 0 { return null }
+    return live.sortedBy { p -> (p as Person).birthYear() }.get(0) as Person
+  }
+
+  def longestLived(): Person? {
+    val dead = deceased()
+    if dead.size == 0 { return null }
+    return dead.sortedBy { p ->
+      val person = p as Person
+      val dy = person.deathYear() as Int
+      -(dy - person.birthYear())
+    }.get(0) as Person
+  }
+
+  def byBirthDecade(): Map[Object, List[Object]] {
+    return people.groupBy { p -> (p as Person).birthYear().decadeLabel() }
+  }
+
+  def byGender(): Map[Object, List[Object]] {
+    return people.groupBy { p -> (p as Person).gender().toString() }
+  }
+
+  def largestGeneration(): String {
+    val byGen: Map[Object, List[Object]] = people.groupBy { p ->
+      generationOf((p as Person).id())
+    }
+    var bestGen: String = "none"
+    var bestCount: Int = 0
+    foreach (k, v) in byGen {
+      val cnt = (v as List[Object]).size
+      if cnt > bestCount {
+        bestCount = cnt
+        bestGen = "Generation #{k}"
+      }
+    }
+    return bestGen
+  }
+
+  def countAncestors(id: Int):    Int = ancestorsOf(id).size
+  def countDescendants(id: Int):  Int = descendantsOf(id).size
+
+  // ── Reporting ──────────────────────────────────────────────────────────────
+
+  def describe(p: Person): String {
+    val dy = p.deathYear()
+    val ageDesc = if dy != null {
+      val age = (dy as Int) - p.birthYear()
+      "died at #{age}"
+    } else {
+      "age #{p.birthYear().ageIn(year)}"
+    }
+    val span = if dy != null { "#{p.birthYear()}–#{dy as Int}" } else { "#{p.birthYear()}–present" }
+    val g = select p.gender() {
+      case Gender::Male:    "M"
+      case Gender::Female:  "F"
+      case Gender::Unknown: "?"
+    }
+    return "[#{"#{p.id()}".padStart(2)}] #{(p.firstName() + " " + p.lastName()).padEnd(22)} #{g}  #{span}  #{ageDesc}"
+  }
+
+  def printRoster(): void {
+    IO::println("┌─ Members (#{people.size}) ────────────────────────────────────────────────────┐")
+    val sorted = people.sortedBy { p -> (p as Person).birthYear() }
+    foreach p: Object in sorted {
+      IO::println("│  #{describe(p as Person)}")
+    }
+    IO::println("└───────────────────────────────────────────────────────────────────────────┘")
+  }
+
+  def printFamily(id: Int, depth: Int): void {
+    val p = findById(id)
+    if p == null { return }
+    var indent: String = ""
+    foreach i: Int in 0..<depth { indent = indent + "  " }
+    IO::println("#{indent}#{describe(p)}")
+    val kids = childrenOf(id).sortedBy { c -> (c as Person).birthYear() }
+    foreach c: Object in kids {
+      printFamily((c as Person).id(), depth + 1)
+    }
+  }
+
+  def printStatistics(): void {
+    IO::println("")
+    IO::println("── Statistics ───────────────────────────────────────────────────────────────")
+    IO::println("  Total members : #{people.size}")
+    IO::println("  Living        : #{living().size}")
+    IO::println("  Deceased      : #{deceased().size}")
+    val avg = avgLifespan()
+    if avg > 0.0 {
+      val avgRounded: Int = avg as Int
+      IO::println("  Avg lifespan  : #{avgRounded} years")
+    }
+    val ol = oldestLiving()
+    if ol != null {
+      IO::println("  Oldest living : #{ol.firstName()} #{ol.lastName()} (b.#{ol.birthYear()})")
+    }
+    val ll = longestLived()
+    if ll != null {
+      val dy = ll.deathYear() as Int
+      val lifespan = dy - ll.birthYear()
+      IO::println("  Longest lived : #{ll.firstName()} #{ll.lastName()} (#{lifespan} years)")
+    }
+    IO::println("  Largest gen.  : #{largestGeneration()}")
+  }
+
+  def printDecadeBreakdown(): void {
+    IO::println("")
+    IO::println("── Birth-decade breakdown ───────────────────────────────────────────────────")
+    val byDecade: Map[Object, List[Object]] = byBirthDecade()
+    foreach (decade, members) in byDecade {
+      val cnt = (members as List[Object]).size
+      var bar: String = ""
+      foreach i: Int in 0..<cnt { bar = bar + "█" }
+      IO::println("  #{(decade as String).padEnd(6)}  #{bar.padEnd(15)} #{cnt}")
+    }
+  }
+
+  def printGenderBreakdown(): void {
+    IO::println("")
+    IO::println("── Gender breakdown ─────────────────────────────────────────────────────────")
+    val byG: Map[Object, List[Object]] = byGender()
+    foreach (g, members) in byG {
+      IO::println("  #{(g as String).padEnd(10)} #{(members as List[Object]).size}")
+    }
+  }
+
+private:
+  def collectAncestors(id: Int, acc: List[Object]): void {
+    foreach p: Object in parentsOf(id) {
+      val person = p as Person
+      if !acc.contains(person) {
+        acc.add(person)
+        collectAncestors(person.id(), acc)
+      }
+    }
+  }
+
+  def collectDescendants(id: Int, acc: List[Object]): void {
+    foreach p: Object in childrenOf(id) {
+      val person = p as Person
+      if !acc.contains(person) {
+        acc.add(person)
+        collectDescendants(person.id(), acc)
+      }
+    }
+  }
+}
+
+// ── Build the family tree ─────────────────────────────────────────────────────
+//
+// We model a fictional four-generation family tree:
+//
+//   (gen 0) Heinrich Müller × Gertrud Bauer
+//       |
+//   ┌───┼───────────────────┐
+//   |                       |
+//  (gen 1) Karl Müller × Anna Schneider     Helga Müller
+//       |
+//   ┌───┼───────────────────┐
+//   |                       |
+//  (gen 2) Peter Müller × Sara Weber      Lena Müller
+//       |
+//   (gen 3) Emma Müller
+//
+//  Plus a separate branch: Johann Weber × Maria Braun → Sara Weber
+
+val tree = new FamilyTree(2025)
+
+// Generation 0: founding couple
+tree.addPerson(new Person(1,  "Heinrich",  "Müller",   1890, 1960, Gender::Male))
+tree.addPerson(new Person(2,  "Gertrud",   "Bauer",    1893, 1968, Gender::Female))
+
+// Generation 1: children of Heinrich × Gertrud
+tree.addPerson(new Person(3,  "Karl",      "Müller",   1920, 1995, Gender::Male))
+tree.addPerson(new Person(4,  "Helga",     "Müller",   1923, 2001, Gender::Female))
+tree.addPerson(new Person(5,  "Anna",      "Schneider",1922, 2010, Gender::Female))  // Karl's spouse
+
+// Generation 2: children of Karl × Anna
+tree.addPerson(new Person(6,  "Peter",     "Müller",   1950, null, Gender::Male))
+tree.addPerson(new Person(7,  "Lena",      "Müller",   1953, null, Gender::Female))
+tree.addPerson(new Person(8,  "Sara",      "Weber",    1952, null, Gender::Female))  // Peter's spouse
+
+// Sara's parents (separate branch)
+tree.addPerson(new Person(9,  "Johann",    "Weber",    1920, 1988, Gender::Male))
+tree.addPerson(new Person(10, "Maria",     "Braun",    1924, 2000, Gender::Female))
+
+// Generation 3: children of Peter × Sara
+tree.addPerson(new Person(11, "Emma",      "Müller",   1978, null, Gender::Female))
+tree.addPerson(new Person(12, "Felix",     "Müller",   1981, null, Gender::Male))
+tree.addPerson(new Person(13, "Sophie",    "Müller",   1985, null, Gender::Female))
+
+// ── Relations ─────────────────────────────────────────────────────────────────
+
+// Spousal links
+tree.link(1, 2, "spouse")    // Heinrich ↔ Gertrud
+tree.link(3, 5, "spouse")    // Karl     ↔ Anna
+tree.link(6, 8, "spouse")    // Peter    ↔ Sara
+tree.link(9, 10, "spouse")   // Johann   ↔ Maria
+
+// Parent-child links (fromId=parent, toId=child)
+tree.link(1, 3, "parent")    // Heinrich → Karl
+tree.link(1, 4, "parent")    // Heinrich → Helga
+tree.link(2, 3, "parent")    // Gertrud  → Karl
+tree.link(2, 4, "parent")    // Gertrud  → Helga
+tree.link(3, 6, "parent")    // Karl     → Peter
+tree.link(3, 7, "parent")    // Karl     → Lena
+tree.link(5, 6, "parent")    // Anna     → Peter
+tree.link(5, 7, "parent")    // Anna     → Lena
+tree.link(9, 8, "parent")    // Johann   → Sara
+tree.link(10, 8, "parent")   // Maria    → Sara
+tree.link(6, 11, "parent")   // Peter    → Emma
+tree.link(6, 12, "parent")   // Peter    → Felix
+tree.link(6, 13, "parent")   // Peter    → Sophie
+tree.link(8, 11, "parent")   // Sara     → Emma
+tree.link(8, 12, "parent")   // Sara     → Felix
+tree.link(8, 13, "parent")   // Sara     → Sophie
+
+// ── Run reports ───────────────────────────────────────────────────────────────
+
+tree.printRoster()
+tree.printStatistics()
+tree.printDecadeBreakdown()
+tree.printGenderBreakdown()
+
+IO::println("")
+IO::println("── Family tree (rooted at generation 0) ─────────────────────────────────────")
+val roots = tree.allPeople().filter { p ->
+  tree.parentsOf((p as Person).id()).size == 0
+}.sortedBy { p -> (p as Person).birthYear() }
+foreach r: Object in roots {
+  tree.printFamily((r as Person).id(), 0)
+}
+
+IO::println("")
+IO::println("── Ancestor / Descendant counts ─────────────────────────────────────────────")
+val focus = tree.allPeople().sortedBy { p -> (p as Person).id() }
+foreach p: Object in focus {
+  val person = p as Person
+  val anc = tree.countAncestors(person.id())
+  val desc = tree.countDescendants(person.id())
+  IO::println("  #{(person.firstName() + " " + person.lastName()).padEnd(20)}  ancestors=#{anc}  descendants=#{desc}")
+}
+
+IO::println("")
+IO::println("── Siblings check ───────────────────────────────────────────────────────────")
+val sibs = tree.siblingsOf(6)  // Peter's siblings
+if sibs.size > 0 {
+  IO::println("  Peter's siblings:")
+  foreach s: Object in sibs {
+    val sib = s as Person
+    IO::println("    #{sib.firstName()} #{sib.lastName()}")
+  }
+} else {
+  IO::println("  Peter has no siblings on record")
+}
+
+IO::println("")
+IO::println("── Birth-century distribution ───────────────────────────────────────────────")
+val byCentury: Map[Object, List[Object]] = tree.allPeople().groupBy { p ->
+  "#{(p as Person).birthYear().century()}th century"
+}
+foreach (century, members) in byCentury {
+  IO::println("  #{century as String}: #{(members as List[Object]).size} member(s)")
+}
+
+IO::println("")
+IO::println("── Extension Int spot-checks ────────────────────────────────────────────────")
+IO::println("  1950.decadeLabel() = #{1950.decadeLabel()}")
+IO::println("  1890.ageIn(2025)   = #{1890.ageIn(2025)}")
+IO::println("  1920.century()     = #{1920.century()}")
+IO::println("  (-7).abs()         = #{(-7).abs()}")
+IO::println("  2024 decade        = #{2024.decadeLabel()}")

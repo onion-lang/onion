@@ -1,0 +1,334 @@
+// HuffmanCode.on — Huffman encoding and decoding (~240 lines)
+//
+// Exercises: ADT enum (sealed hierarchy with multi-case select bodies),
+// records with example/law, extension String and Int, generics (Map[K,V] /
+// List[T]), while/foreach loops, select / type patterns, nullable handling,
+// string interpolation, recursion (tree build, code-gen, decode),
+// collection pipelines (sortedBy/map/filter/fold).
+
+import { java.util.* }
+
+// ── ADT: Huffman tree node ────────────────────────────────────────────────────
+// A HuffNode is either a Leaf (one symbol + its frequency) or an Internal
+// node (combined frequency + two children).  Methods on the enum body
+// dispatch uniformly over both cases via select.
+
+enum HuffNode {
+  case Leaf(symbol: String, freq: Int)
+  case Internal(freq: Int, left: HuffNode, right: HuffNode)
+public:
+  def nodeFreq(): Int = select this {
+    case l is Leaf:     l.freq()
+    case i is Internal: i.freq()
+  }
+  def isLeaf(): Boolean = select this {
+    case _l is Leaf: true
+    else:            false
+  }
+  def leafSymbol(): String = select this {
+    case l is Leaf: l.symbol()
+    else:           "?"
+  }
+  def treeDepth(): Int = select this {
+    case _l is Leaf:    0
+    case i is Internal: 1 + intMax(i.left().treeDepth(), i.right().treeDepth())
+  }
+  // Navigate to the correct child by bit ("0" = left, "1" = right).
+  // Returns self if already at a Leaf (shouldn't happen during valid decode).
+  def navigate(bit: String): HuffNode = select this {
+    case i is Internal: if bit == "0" { i.left() } else { i.right() }
+    case _l is Leaf:    this
+  }
+}
+
+// ── Record: one entry in the code table ──────────────────────────────────────
+
+record CodeEntry(symbol: String, code: String, freq: Int) {
+public:
+  def describe(): String {
+    val padded: String = symbol().padRight(4)
+    return "  " + padded + " -> " + code() + "  (freq=" + freq() + ", len=" + code().length() + ")"
+  }
+  def weightedBits(): Int = code().length() * freq()
+}
+
+example { new CodeEntry("a", "10", 5).weightedBits() == 10 }
+example { new CodeEntry("b", "01", 3).weightedBits() == 6 }
+
+// ── Extension String ──────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def repeated(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ── Extension Int ─────────────────────────────────────────────────────────────
+
+extension Int {
+  def toPercent(total: Int): String {
+    if total == 0 { return "0%" }
+    return "" + (self * 100 / total) + "%"
+  }
+}
+
+// ── Helper ────────────────────────────────────────────────────────────────────
+
+def intMax(a: Int, b: Int): Int = if a > b { a } else { b }
+
+// ── Phase 1 · Build the Huffman tree ─────────────────────────────────────────
+
+// Build a character-frequency map from the input text.
+def frequencyOf(text: String): Map[String, Int] {
+  val freq: Map[String, Int] = [:]
+  var i: Int = 0
+  while i < text.length() {
+    val ch: String = text.substring(i, i + 1)
+    if freq.containsKey(ch) {
+      freq.put(ch, (freq.get(ch) as Int) + 1)
+    } else {
+      freq.put(ch, 1)
+    }
+    i++
+  }
+  return freq
+}
+
+// Return the index of the node with the lowest frequency in the list.
+def minFreqIndex(nodes: List[HuffNode]): Int {
+  var best: Int = 0
+  var i: Int = 1
+  while i < nodes.size() {
+    if nodes.get(i).nodeFreq() < nodes.get(best).nodeFreq() { best = i }
+    i++
+  }
+  return best
+}
+
+// Greedy Huffman tree construction: repeatedly merge the two least-frequent nodes.
+def buildHuffTree(text: String): HuffNode? {
+  val freq = frequencyOf(text)
+  if freq.isEmpty() { return null }
+
+  var pq: List[HuffNode] = []
+  foreach (ch, count) in freq {
+    pq.add(new Leaf(ch as String, count as Int))
+  }
+
+  while pq.size() > 1 {
+    val i1: Int = minFreqIndex(pq)
+    val left: HuffNode  = pq.get(i1)
+    pq.remove(i1)
+    val i2: Int = minFreqIndex(pq)
+    val right: HuffNode = pq.get(i2)
+    pq.remove(i2)
+    pq.add(new Internal(left.nodeFreq() + right.nodeFreq(), left, right))
+  }
+
+  return pq.get(0)
+}
+
+// ── Phase 2 · Generate codes, encode, decode ──────────────────────────────────
+
+// Walk the tree recursively, storing bit-string codes in the `codes` map.
+def collectCodes(node: HuffNode, prefix: String, codes: Map[String, String]): void {
+  if node.isLeaf() {
+    val code: String = if prefix.isEmpty() { "0" } else { prefix }
+    codes.put(node.leafSymbol(), code)
+  } else {
+    select node {
+      case i is Internal:
+        collectCodes(i.left(),  prefix + "0", codes)
+        collectCodes(i.right(), prefix + "1", codes)
+      else:
+    }
+  }
+}
+
+def buildCodeTable(root: HuffNode): Map[String, String] {
+  val codes: Map[String, String] = [:]
+  collectCodes(root, "", codes)
+  return codes
+}
+
+// Encode the text by concatenating the bit-string for each character.
+def huffEncode(text: String, codes: Map[String, String]): String {
+  var out: String = ""
+  var i: Int = 0
+  while i < text.length() {
+    val ch: String = text.substring(i, i + 1)
+    val code: String? = codes.get(ch) as String?
+    if code != null { out = out + code }
+    i++
+  }
+  return out
+}
+
+// Decode a bit-string by navigating the tree.
+def huffDecode(bits: String, root: HuffNode): String {
+  if bits.isEmpty() { return "" }
+  // Single-symbol alphabet: every "bit" maps to that one symbol.
+  if root.isLeaf() {
+    var r: String = ""
+    var i: Int = 0
+    while i < bits.length() { r = r + root.leafSymbol(); i++ }
+    return r
+  }
+  var result: String = ""
+  var current: HuffNode = root
+  var i: Int = 0
+  while i < bits.length() {
+    val bit: String = bits.substring(i, i + 1)
+    current = current.navigate(bit)
+    if current.isLeaf() {
+      result = result + current.leafSymbol()
+      current = root
+    }
+    i++
+  }
+  return result
+}
+
+// ── Phase 3 · Code-table display and statistics ────────────────────────────────
+
+def sortedCodeEntries(codes: Map[String, String], freq: Map[String, Int]): List[CodeEntry] {
+  val entries: List[CodeEntry] = []
+  foreach (sym, code) in codes {
+    val f: Int = if freq.containsKey(sym) { freq.get(sym) as Int } else { 0 }
+    entries.add(new CodeEntry(sym as String, code as String, f))
+  }
+  return entries.sortedBy { e -> e.code().length() }
+}
+
+def printRule(): void { IO::println("-".repeated(50)) }
+
+// ── Phase 4 · Run a single sample and print a full report ─────────────────────
+
+record RunStats(text: String, encoded: String, decoded: String) {
+public:
+  def origBits():  Int = text().length() * 8
+  def huffBits():  Int = encoded().length()
+  def saved():     Int = origBits() - huffBits()
+  def okRoundTrip(): Boolean = text() == decoded()
+}
+
+def runSample(text: String): void {
+  IO::println("")
+  printRule()
+  IO::println("Input  : \"#{text}\"")
+  IO::println("Length : #{text.length()} chars  (#{text.length() * 8} bits at 8 bpc)")
+
+  val root: HuffNode? = buildHuffTree(text)
+  if root == null {
+    IO::println("  (empty — nothing to encode)")
+    return
+  }
+
+  val codes     = buildCodeTable(root)
+  val freq      = frequencyOf(text)
+  val entries   = sortedCodeEntries(codes, freq)
+  val encoded   = huffEncode(text, codes)
+  val decoded   = huffDecode(encoded, root)
+  val stats     = new RunStats(text, encoded, decoded)
+
+  IO::println("")
+  IO::println("Code table (sorted by code length):")
+  foreach e: CodeEntry in entries { IO::println(e.describe()) }
+
+  val tableWeight: Int = entries.map { e -> e.weightedBits() }.fold(0) { acc, n -> acc + n }
+
+  IO::println("")
+  IO::println("Tree depth     : " + root.treeDepth())
+  IO::println("Unique symbols : " + codes.size())
+  IO::println("Original bits  : " + stats.origBits())
+  IO::println("Huffman bits   : " + stats.huffBits() + "  (" + stats.huffBits().toPercent(stats.origBits()) + " of original)")
+  IO::println("Table weight   : " + tableWeight + " bits (sum freq*codeLen)")
+  IO::println("Bits saved     : " + stats.saved())
+  IO::println("Round-trip OK  : " + stats.okRoundTrip())
+  IO::println("Encoded        : " + encoded)
+}
+
+// ── Phase 5 · Batch comparison across multiple strings ────────────────────────
+
+record BatchRow(label: String, origBits: Int, huffBits: Int, symbols: Int) {
+public:
+  def ratio():   Int = if origBits() == 0 { 0 } else { huffBits() * 100 / origBits() }
+  def saved():   Int = origBits() - huffBits()
+  def describe(): String {
+    val labPad: String = label().padRight(22)
+    return "  " + labPad + origBits() + "\t->\t" + huffBits() + " bits\t(" + ratio() + "%)\t" + symbols() + " syms"
+  }
+}
+
+def batchAnalysis(samples: List[String]): void {
+  IO::println("")
+  IO::println("=== Batch Comparison ===")
+  IO::println("  " + "Label".padRight(22) + "Orig\t->\tHuff\t(ratio)\tSymbols")
+  printRule()
+
+  val rows: List[BatchRow] = []
+  foreach text: String in samples {
+    val root: HuffNode? = buildHuffTree(text)
+    if root != null {
+      val codes = buildCodeTable(root)
+      val encoded = huffEncode(text, codes)
+      val label: String = if text.length() > 18 { text.substring(0, 18) + "..." } else { text }
+      rows.add(new BatchRow(label, text.length() * 8, encoded.length(), codes.size()))
+    }
+  }
+
+  foreach r: BatchRow in rows { IO::println(r.describe()) }
+  printRule()
+
+  val totalOrig: Int = rows.map { r: BatchRow -> r.origBits() }.fold(0) { acc, n -> acc + n }
+  val totalHuff: Int = rows.map { r: BatchRow -> r.huffBits() }.fold(0) { acc, n -> acc + n }
+  IO::println("  Total original bits : " + totalOrig)
+  IO::println("  Total Huffman bits  : " + totalHuff)
+  IO::println("  Overall ratio       : " + totalHuff.toPercent(totalOrig))
+  if rows.size() > 0 {
+    var bestIdx: Int = 0
+    var i: Int = 1
+    while i < rows.size() {
+      val r: BatchRow = rows.get(i) as BatchRow
+      val b: BatchRow = rows.get(bestIdx) as BatchRow
+      if r.ratio() < b.ratio() { bestIdx = i }
+      i++
+    }
+    val best: BatchRow = rows.get(bestIdx) as BatchRow
+    IO::println("  Best compression    : \"" + best.label() + "\" (" + best.ratio() + "%)")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("=== Huffman Encoding Demo ===")
+  runSample("abracadabra")
+  runSample("aaabbbccd")
+  runSample("mississippi")
+  runSample("aaa")
+  runSample("the quick brown fox")
+
+  val allSamples: List[String] = [
+    "abracadabra",
+    "aaabbbccd",
+    "mississippi",
+    "aaa",
+    "the quick brown fox",
+    "aaaaaaaaaabbbbbbcde",
+    "banana split sunday"
+  ]
+  batchAnalysis(allSamples)
+
+  IO::println("")
+  printRule()
+  IO::println("Done.")
+}

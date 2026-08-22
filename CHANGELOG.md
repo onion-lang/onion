@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PropLogic.on`, a 402-line propositional logic evaluator with truth tables.**
+  Represents formulas as an 8-case ADT `enum Formula` (`Var`/`Top`/`Bot`/`Not`/
+  `And`/`Or`/`Impl`/`Equiv`) with four recursive `select this` methods
+  (`vars`/`eval`/`nnf`/`simplify`). Prints truth tables for classic formulas
+  (excluded middle, contradiction, De Morgan, modus ponens, transitivity),
+  converts formulas to negation normal form, and constant-folds tautologies.
+  Exercises `extension Boolean`/`Int`, collection pipelines (`sortedBy`/`any`/
+  `filter`/`map`/`groupBy`), closures, string interpolation, and nullable
+  types.
+
 - **`run/CircuitSimulator.on`, a digital logic circuit simulator.**
   Represents gates (`NOT`/`AND`/`OR`/`XOR`/`NAND`) as an ADT case-enum wired
   together by wire name into a graph, evaluated on demand via memoized

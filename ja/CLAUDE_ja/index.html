@@ -5489,8 +5489,24 @@
 <td><code>new Box[String]()</code> - 角括弧</td>
 </tr>
 <tr>
+<td><code>new Box("hi")</code> は型引数なしだと拒否される？</td>
+<td>✓ 正しい - 型引数はコンストラクタ引数（または期待される型）から推論される。何にも束縛されない裸のジェネリック（<code>new Empty()</code>）だけがE0066になる</td>
+</tr>
+<tr>
 <td><code>String \| null</code></td>
 <td><code>String?</code> - nullable型の構文</td>
+</tr>
+<tr>
+<td><code>Box[String?]</code> は拒否される？</td>
+<td>✓ 正しい - 裸の<code>[T]</code>はnullableな型引数を受け付ける（Kotlin方式）</td>
+</tr>
+<tr>
+<td>裸の<code>T</code>値に対する<code>t.method()</code></td>
+<td>E0057 - <code>t?.method()</code>、<code>t ?: default</code>、<code>if t != null</code>、または<code>[T extends B]</code>を使う</td>
+</tr>
+<tr>
+<td><code>[T extends Object]</code>は<code>[T]</code>と同じ？</td>
+<td>いいえ - <code>extends</code>はTを非nullにする。<code>[T extends B?]</code>でnullableに戻せる</td>
 </tr>
 <tr>
 <td><code>==</code> で参照等価</td>
@@ -5517,19 +5533,35 @@
 </tr>
 <tr>
 <td><code>else if condition { }</code></td>
-<td><code>else { if condition { } }</code> - <code>else if</code>キーワードなし</td>
+<td>✓ 正しい - <code>else if</code>チェーンはサポートされている（式としても使える）</td>
 </tr>
 <tr>
 <td><code>switch value { case 1: }</code></td>
 <td><code>select value { case 1: }</code> - <code>switch</code>ではなく<code>select</code></td>
 </tr>
 <tr>
+<td><code>case s: String:</code>（Java/Scala流パターン）</td>
+<td><code>case s is String:</code> - 型パターンは<code>is</code>を使う。sealedの網羅性チェック（E0042）が適用される</td>
+</tr>
+<tr>
+<td><code>case Add(l, n is Num):</code> のようなネストした型パターン？</td>
+<td>✓ 正しい - 型パターンはデストラクチャリングの中にネストでき、束縛された値は絞り込まれた型として使える。レコードでない要素にも使える（<code>case Wrap(s is String)</code>）</td>
+</tr>
+<tr>
+<td><code>case Circle(r):</code> は非サポート？</td>
+<td>✓ 正しい - レコードのデストラクチャリングパターンは動作する。<code>case x when guard:</code> も使える</td>
+</tr>
+<tr>
 <td><code>for (int i = 0; ...)</code></td>
 <td><code>for var i: Int = 0; ...</code> - 括弧なし</td>
 </tr>
 <tr>
-<td><code>i += 1</code> や <code>i++</code></td>
-<td><code>i = i + 1</code> - 複合演算子は限定的（<code>++</code>はforループ内のみ）</td>
+<td><code>for i in 0..10</code>（他言語）</td>
+<td><code>foreach i: Int in 0..10</code> - 範囲: <code>a..b</code>は両端含む、<code>a..&lt;b</code>は上端を含まない</td>
+</tr>
+<tr>
+<td><code>i += 1</code>, <code>i -= 1</code>, <code>i++</code></td>
+<td>✓ 正しい - 複合代入と<code>++</code>/<code>--</code>は文として使える</td>
 </tr>
 <tr>
 <td><code>while (x = read()) != null</code></td>
@@ -5549,6 +5581,10 @@
 <tr>
 <td><code>public ClassName() { }</code></td>
 <td><code>def this { }</code> - コンストラクタは<code>def this</code></td>
+</tr>
+<tr>
+<td><code>class Point(val x: Int, val y: Int)</code></td>
+<td>✓ 正しい - プライマリコンストラクタ。<code>val</code>/<code>var</code>引数は公開フィールドになり、素の引数は<code>: Super(args)</code>に渡される</td>
 </tr>
 <tr>
 <td><code>public ClassName(x: Int) { }</code></td>
@@ -5576,7 +5612,7 @@
 </tr>
 <tr>
 <td><code>this.field = value</code> コンストラクタ内</td>
-<td>✓ 正しい - フィールドは<code>this.</code>が必要</td>
+<td>✓ 正しい - <code>this.</code>/<code>self.</code>は使える。今は省略も可能（裸の<code>field</code>は暗黙アクセスでフィールドに解決される）</td>
 </tr>
 <tr>
 <td><code>Long.toString(0)</code></td>
@@ -5585,6 +5621,10 @@
 <tr>
 <td><code>System.out</code></td>
 <td><code>System::out</code> - 静的フィールドも<code>::</code></td>
+</tr>
+<tr>
+<td><code>C::field = v</code> は非サポート？</td>
+<td>✓ 正しい - 静的フィールドへの代入は動作する（公開フィールド）</td>
 </tr>
 </tbody>
 </table>
@@ -5629,6 +5669,10 @@
 <td><code>["a", "b"]</code>は<code>List</code>を作成、配列は<code>new String[n]</code></td>
 </tr>
 <tr>
+<td><code>Map.of("a", 1)</code></td>
+<td><code>["a": 1, "b": 2]</code>は<code>Map</code>（LinkedHashMap）を作成。空マップは<code>[:]</code></td>
+</tr>
+<tr>
 <td><code>list.get(i)</code></td>
 <td><code>list[i]</code> - 配列もリストも<code>[]</code>でアクセス</td>
 </tr>
@@ -5645,8 +5689,20 @@
 <td><code>list.size</code> - これもプロパティ</td>
 </tr>
 <tr>
+<td>標準ライブラリが配列を返す？</td>
+<td>いいえ - 標準ライブラリは常に<code>List</code>を受け取り、返す。配列は返さない（<code>Strings::split</code>、<code>Regex::findAll</code>、<code>Files::readLines</code>、<code>Rand::shuffle</code>、<code>Http</code>のヘッダー/パラメータ、<code>Future::all</code>）。配列が現れるのはJavaとの境界だけ：<code>main(args: String[])</code>、<code>byte[]</code>によるバイナリI/O、varargs。境界を越えるには<code>Colls::toList(args)</code>を使う</td>
+</tr>
+<tr>
 <td><code>foreach (x : list)</code></td>
 <td><code>foreach x: Type in list { }</code> - 構文が異なる</td>
+</tr>
+<tr>
+<td><code>for (k, v) in map</code></td>
+<td><code>foreach (k, v) in map { }</code> - マップのエントリをデストラクチャリング</td>
+</tr>
+<tr>
+<td><code>val (a, b) = pair</code> は非サポート？</td>
+<td>✓ 正しい - レコード（と<code>Map.Entry</code>）を位置ベースでデストラクチャリングする。可変にするには<code>var (x, y) = ...</code></td>
 </tr>
 </tbody>
 </table>
@@ -5665,7 +5721,11 @@
 </tr>
 <tr>
 <td><code>0.0</code> でfloat</td>
-<td><code>0.0f</code> - Float型には明示的な<code>f</code>サフィックス</td>
+<td><code>0.0f</code> / <code>0.0F</code> - Float型には<code>f</code>/<code>F</code>サフィックス、Double型には<code>d</code>/<code>D</code>サフィックス（大文字小文字どちらも可）</td>
+</tr>
+<tr>
+<td><code>new Double(1.5)</code> / <code>new Integer(3)</code></td>
+<td><code>Double</code>/<code>Int</code>はプリミティブ型 - そのまま<code>1.5</code>と書けばよい。Object/Numberスロットへのボクシングは自動。ラッパークラスは<code>JDouble</code>/<code>JInteger</code>/...</td>
 </tr>
 <tr>
 <td><code>"str" + 123</code></td>
@@ -5725,6 +5785,42 @@
 <td><code>point.x</code> でレコードフィールド</td>
 <td><code>point.x()</code> - レコードフィールドはメソッド（括弧必要）</td>
 </tr>
+<tr>
+<td><code>point.copy(y=9)</code> は未サポート？</td>
+<td>✓ 正しい - 名前付き部分コピー、<code>copy()</code>によるクローン、位置引数のコピーいずれも動作する</td>
+</tr>
+<tr>
+<td>メソッドを持つレコード？</td>
+<td><code>record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }</code> - レコードは <code>{ access-section* }</code> 本体（インスタンス/静的/演算子メソッド、privateヘルパー）を持てる。メソッドからは生成されたアクセサが見える。ジェネリックなインターフェースを実装するジェネリックレコードでも動作する（<code>record Foo[T](v: T) conforms Bar[T]</code>）</td>
+</tr>
+<tr>
+<td><code>enum Planet(mass: Double) { MERCURY(3.3) }</code></td>
+<td>✓ 正しい - データを持つenum。<code>mass()</code> アクセサ、<code>values()</code>/<code>valueOf()</code> が使える</td>
+</tr>
+<tr>
+<td>ADT（直和型）のenum？</td>
+<td><code>enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }</code> - <code>case</code> キーワードで宣言する各ケースがそれぞれのフィールドを持つ。sealedインターフェース＋ケースごとのrecordに脱糖され、<code>select</code> の網羅性チェック（E0042）が適用される。フィールドが無いケース（シングルトン）は <code>new Origin()</code> で作るゼロフィールドrecordになる。<code>case</code>-enumは <code>java.lang.Enum</code> ではなくsealed階層（<code>values()</code>/<code>ordinal()</code> は無い）。共有パラメータと <code>case</code> ケースの混在はエラー</td>
+</tr>
+<tr>
+<td>ジェネリックなADT enum？</td>
+<td><code>enum Opt[T] { case Some(value: T); case Nothing }</code> - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、<code>Opt[String]</code> から <code>Some</code> をマッチさせると <code>Some[String]</code> が束縛され、<code>s.value()</code> は <code>String</code> になる。<em>homogeneous</em>（データを持たない）enumは型パラメータを取れない（<code>java.lang.Enum</code>になるため）</td>
+</tr>
+<tr>
+<td>レコードから手でパーサーを書く</td>
+<td><code>record R(...) from re"..."</code> - <code>R::parse(s): R?</code>（アンカー一致、非マッチ/変換失敗はnull）と <code>R::parseAll(text): List</code> を合成する。<code>from</code> は <code>conforms</code> より前に書く</td>
+</tr>
+<tr>
+<td><code>null</code> ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？</td>
+<td><code>record R(...) shape name = re"..."</code> - <code>R::name(): onion.Shape[R]</code> を合成する。<code>.parse(s)</code> は <code>Outcome[R]</code>（値、またはそれが得られなかった全理由を <code>Defect</code> として保持する）を返し、可逆な場合は <code>.print(v)</code> で書き戻せる。<code>shape</code> 節はレコード1つに複数付けられる（正規表現以外に <code>shape name = json</code>/<code>config</code> という書式指定も可）。<code>from re"..."</code> と共存できる</td>
+</tr>
+<tr>
+<td>レコードを手でシリアライズ（JSON/YAML）</td>
+<td><code>record R(...) derive!(Json, Yaml)</code> - 共通の <code>toMap</code>/<code>fromMap</code> を介して <code>R::fromJson</code>/<code>toJson</code>/<code>fromYaml</code>/<code>toYaml</code> をマクロ生成する。スカラー型のコンポーネントのみ（それ以外はE0062）、未知のマーカーはE0063。<code>from re"..."</code> と共存できる</td>
+</tr>
+<tr>
+<td>別スイートでレコードをテストする</td>
+<td><code>record R(...) law name(p: T) { boolExpr } example { boolExpr }</code> - コンパイラがビルド時に実行する。偽の <code>example</code> はE0065、反証された <code>law</code> はE0064（反例付き）になる。<code>parse∘format==id</code> のような性質を機械的に検証できる</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_25">ラムダと関数<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
@@ -5738,15 +5834,19 @@
 <tbody>
 <tr>
 <td><code>x -&gt; x * 2</code></td>
-<td><code>(x: Int) -&gt; x * 2</code> - 型注釈が必要なことが多い</td>
+<td>✓ 正しい - 裸の単一引数はそのまま使える。式本体も使える</td>
 </tr>
 <tr>
-<td><code>(x) -&gt; expr</code>（単一引数）</td>
-<td><code>(x: Type) -&gt; expr</code> - 型が通常必要</td>
+<td><code>(x) -&gt; expr</code></td>
+<td>✓ 正しい - 引数の型は期待される関数型から推論される</td>
 </tr>
 <tr>
 <td><code>func(arg)</code> でラムダ呼び出し</td>
-<td><code>func(arg)</code> または <code>func(arg)</code> - 両方OK</td>
+<td>✓ 正しい - 関数値は直接呼び出せる</td>
+</tr>
+<tr>
+<td><code>Runnable</code>/<code>Comparator</code>としてのラムダ</td>
+<td>✓ 正しい - JavaのSAM（関数型インターフェース）への変換が効く</td>
 </tr>
 <tr>
 <td><code>Int -&gt; Int</code></td>
@@ -5757,8 +5857,12 @@
 <td>✓ 正しい - 複数引数の関数型</td>
 </tr>
 <tr>
-<td><code>list.map(x =&gt; x * 2)</code></td>
-<td><code>list.map { x -&gt; x * 2 }</code> - トレイリングラムダも <code>-&gt;</code>。矢印は言語全体で <code>-&gt;</code> の一種類だけ</td>
+<td><code>list.map { x =&gt; x * 2 }</code></td>
+<td><code>list.map { x -&gt; x * 2 }</code> - トレイリングラムダの矢印も<code>-&gt;</code>。<code>=&gt;</code>は言語には存在しない（関数型、<code>(x) -&gt; e</code>、<code>{ x -&gt; e }</code>のすべてで矢印は<code>-&gt;</code>の一種類だけ）</td>
+</tr>
+<tr>
+<td><code>stream().map().collect()</code></td>
+<td><code>list.map { ... }.filter { ... }</code> - List/Iterable/配列に組み込みのextensionパイプラインがある</td>
 </tr>
 </tbody>
 </table>
@@ -5865,6 +5969,10 @@
 <td>✓ 正しい - 期待通りに動作</td>
 </tr>
 <tr>
+<td>nullable（<code>T?</code>）な<code>a</code>に対する<code>a == b</code></td>
+<td>✓ 正しい - null安全な値等価（<code>java.util.Objects.equals</code>）：両方nullなら等しい、片方だけnullなら等しくない、それ以外は<code>equals()</code>。事前のnullチェックは不要</td>
+</tr>
+<tr>
 <td><code>&amp;&amp;</code>, <code>\|\|</code> 演算子</td>
 <td>✓ 正しい - Javaと同じ</td>
 </tr>
@@ -5875,6 +5983,10 @@
 <tr>
 <td><code>a ? b : c</code> 三項演算子</td>
 <td>非サポート - <code>if/else</code>式を使用</td>
+</tr>
+<tr>
+<td><code>operator fun plus</code>（Kotlin風）</td>
+<td><code>def plus(o: T): T</code> - 左オペランドの<code>+ - * / %</code>はそれぞれplus/minus/times/div/remにマップされる</td>
 </tr>
 <tr>
 <td>文字列テンプレート <code>$var</code> や <code>${expr}</code></td>
@@ -5891,6 +6003,26 @@
 <tr>
 <td><code>println("Hi")</code></td>
 <td>✓ 正しい - トップレベル関数、または<code>IO::println</code></td>
+</tr>
+<tr>
+<td><code>Pattern.compile("\\d+")</code></td>
+<td><code>re"\d+"</code> - 生の正規表現リテラル（二重エスケープ不要）</td>
+</tr>
+<tr>
+<td><code>new File(p).read...</code></td>
+<td><code>file"path".text()</code> / <code>.lines()</code> / <code>.csv()</code> / <code>.json()</code> - リソースリテラル（動的には<code>file(p)</code>）</td>
+</tr>
+<tr>
+<td><code>x.let { f(it) }</code>（Kotlin風）</td>
+<td><code>x \|&gt; f</code> - パイプラインが<code>x</code>を<code>f</code>の第一引数として渡す</td>
+</tr>
+<tr>
+<td><code>when (s) { matches(...) }</code></td>
+<td><code>case re"(\d+)" (n):</code> - 正規表現のselectパターン。コンパイル時にチェックされる</td>
+</tr>
+<tr>
+<td>main内での手動<code>args</code>解析</td>
+<td><code>def main(name: String, n: Int = 1)</code> - シグネチャからauto-CLIがフラグ/usageを導出する</td>
 </tr>
 </tbody>
 </table>

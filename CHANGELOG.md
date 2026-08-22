@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Kotlin-style extension-function declaration, `fun String.twice() { }`.**
+  The existing `fun`/`func`/`fn` hint only matched `<kw> name(`, so a receiver-dot
+  declaration (the identifier after the keyword is the receiver *type*, followed by
+  `.`, not `(`) never matched and fell through to a generic parse error instead of
+  naming Onion's `def`-based equivalent. The diagnostic now recognizes `fun
+  Type.method(` (and the `func`/`fn` spellings) and points at the correct `extension
+  Type { def method(...) { ... } }` form, naming the captured receiver type and
+  method.
+
 - **Parser hint for a Java/Scala-style type-pattern `select` case, `case s: String:`.**
   Onion's `select` type patterns use `is` (`case s is String:`), never a colon after the
   binding name. The parser used to read `s` alone as an ordinary value pattern and only

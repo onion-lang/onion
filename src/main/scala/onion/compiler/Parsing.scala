@@ -314,11 +314,26 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val JavaStyleMethodDeclaration = """^\s*(?:public|private|protected)\s+[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
 
+  /**
+   * A Java/Scala-style type-pattern `select` case, `case s: String:` (or with extra
+   * spacing, `case s : String :`). Onion's `case` patterns use `is` for a type test
+   * (`case s is String:`) -- a colon straight after the binding name is never valid
+   * there, so the parser reads `s` alone as an ordinary value pattern (an
+   * ExpressionPattern) and only trips on the *second* colon that was meant to
+   * introduce the type, several characters later on the same line -- never
+   * mentioning `is`. Requiring a lower-case binding name (Onion's variable-naming
+   * convention) before the first colon and a capitalized type name before the
+   * second keeps this from firing on an ordinary multi-value case like `case 1, 2:`.
+   */
+  private val JavaStyleTypeCase = """^\s*case\s+[a-z_]\w*\s*:\s*[A-Z][\w.\[\]]*\??\s*:""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
     case "<:" =>
       Message("error.parsing.hint.old_conforms")
+    case ":" if JavaStyleTypeCase.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.case_type_colon")
     case ":" if expected.contains("extends") =>
       Message("error.parsing.hint.old_extends")
     // The removed anonymous super-call form: `def this(x) : (x) { }`. After the colon the

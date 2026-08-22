@@ -417,6 +417,15 @@ try {
 |---------------|----------------|
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - コンストラクタ形式 |
 | `point.x` でレコードフィールド | `point.x()` - レコードフィールドはメソッド（括弧必要） |
+| `point.copy(y=9)` は未サポート？ | ✓ 正しい - 名前付き部分コピー、`copy()`によるクローン、位置引数のコピーいずれも動作する |
+| メソッドを持つレコード？ | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - レコードは `{ access-section* }` 本体（インスタンス/静的/演算子メソッド、privateヘルパー）を持てる。メソッドからは生成されたアクセサが見える。ジェネリックなインターフェースを実装するジェネリックレコードでも動作する（`record Foo[T](v: T) conforms Bar[T]`） |
+| `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ 正しい - データを持つenum。`mass()` アクセサ、`values()`/`valueOf()` が使える |
+| ADT（直和型）のenum？ | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case` キーワードで宣言する各ケースがそれぞれのフィールドを持つ。sealedインターフェース＋ケースごとのrecordに脱糖され、`select` の網羅性チェック（E0042）が適用される。フィールドが無いケース（シングルトン）は `new Origin()` で作るゼロフィールドrecordになる。`case`-enumは `java.lang.Enum` ではなくsealed階層（`values()`/`ordinal()` は無い）。共有パラメータと `case` ケースの混在はエラー |
+| ジェネリックなADT enum？ | `enum Opt[T] { case Some(value: T); case Nothing }` - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、`Opt[String]` から `Some` をマッチさせると `Some[String]` が束縛され、`s.value()` は `String` になる。*homogeneous*（データを持たない）enumは型パラメータを取れない（`java.lang.Enum`になるため） |
+| レコードから手でパーサーを書く | `record R(...) from re"..."` - `R::parse(s): R?`（アンカー一致、非マッチ/変換失敗はnull）と `R::parseAll(text): List` を合成する。`from` は `conforms` より前に書く |
+| `null` ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？ | `record R(...) shape name = re"..."` - `R::name(): onion.Shape[R]` を合成する。`.parse(s)` は `Outcome[R]`（値、またはそれが得られなかった全理由を `Defect` として保持する）を返し、可逆な場合は `.print(v)` で書き戻せる。`shape` 節はレコード1つに複数付けられる（正規表現以外に `shape name = json`/`config` という書式指定も可）。`from re"..."` と共存できる |
+| レコードを手でシリアライズ（JSON/YAML） | `record R(...) derive!(Json, Yaml)` - 共通の `toMap`/`fromMap` を介して `R::fromJson`/`toJson`/`fromYaml`/`toYaml` をマクロ生成する。スカラー型のコンポーネントのみ（それ以外はE0062）、未知のマーカーはE0063。`from re"..."` と共存できる |
+| 別スイートでレコードをテストする | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - コンパイラがビルド時に実行する。偽の `example` はE0065、反証された `law` はE0064（反例付き）になる。`parse∘format==id` のような性質を機械的に検証できる |
 
 ### ラムダと関数
 

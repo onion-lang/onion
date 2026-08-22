@@ -302,6 +302,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val JavaStyleConstructor = """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
 
+  /**
+   * A Java-style method declaration, `public void method() { }` (or `private`/`protected`,
+   * with any return-type spelling before the name). `public`/`private`/`protected` are
+   * access-*section* markers that only ever appear as `public:`, immediately followed by a
+   * colon -- every member's own return type instead comes after its name via `def`. The
+   * parser consumes the modifier and then trips on the return-type identifier that follows,
+   * expecting `:` -- never mentioning `def`. Requiring two identifiers (return type, then
+   * name) before the `(` keeps this from firing on the single-identifier
+   * `public ClassName(...)` constructor mistake, which gets its own hint.
+   */
+  private val JavaStyleMethodDeclaration = """^\s*(?:public|private|protected)\s+[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -326,6 +338,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.c_style_for")
     case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_import")
+    case _ if expected == "\":\"" && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.java_style_method")
     case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_constructor")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same

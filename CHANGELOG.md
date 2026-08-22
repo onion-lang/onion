@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a C-style `for (init; cond; step)` loop.** Onion's `for` loop
+  never parenthesizes its clauses; writing the C/Java/JS form used to trip the
+  parser several tokens past the actual mistake with an unhelpful expected-token
+  dump. The diagnostic now recognizes a leading `for (` and points at the correct
+  `for var i: Int = 0; i < 10; i++ { ... }` form.
+
 - **`docs/ja/CLAUDE_ja.md`'s "よくある構文ミス" tables were stale against `CLAUDE.md`.**
   Several Japanese rows had fallen behind the English "Common Syntax Mistakes"
   tables — some flagged now-supported syntax as unsupported (`else if` chains,

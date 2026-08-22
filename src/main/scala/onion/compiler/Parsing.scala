@@ -289,6 +289,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val JavaStyleImport = """^\s*import\s+(?!\{)\S""".r
 
+  /**
+   * A Java-style constructor, named after the class instead of using `def this`:
+   * `public ClassName(...) { }`, or the same with no access modifier. `public`/
+   * `private`/`protected` are real keywords (access-section markers), so with a
+   * modifier the parser consumes it and trips on the class name, expecting `:` --
+   * without one, a bare capitalized identifier at member position trips on itself,
+   * expecting a member declarator (`def`, `val`, `var`, ...). Neither mentions
+   * `def this`. Requiring a capitalized identifier (Java/Onion class-naming
+   * convention) directly followed by `(` keeps this from firing on an ordinary
+   * lowercase-named call or declaration.
+   */
+  private val JavaStyleConstructor = """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -313,6 +326,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.c_style_for")
     case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_import")
+    case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.java_style_constructor")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

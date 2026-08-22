@@ -47,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leading `import` followed directly by a non-`{` token and points at the correct
   braced form.
 
+- **Parser hint for a Java-style constructor named after its class.** Onion
+  constructors are declared with `def this`, never a method sharing the
+  class's name (`public ClassName(...) { ... }`, as in Java/C#). With an
+  access modifier the parser trips on the class name expecting `:` (the
+  modifier is read as an access-section marker); without one it trips on the
+  class name itself expecting a member declarator -- neither previously
+  mentioned `def this`. The diagnostic now recognizes a capitalized
+  identifier directly followed by `(` at member position (with or without a
+  leading `public`/`private`/`protected`) and points at the correct
+  `def this(...) { ... }` form.
+
 ## [0.15.0] - 2026-08-22
 
 ### Added

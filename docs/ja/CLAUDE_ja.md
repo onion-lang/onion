@@ -342,7 +342,11 @@ try {
 | `(expr as Type).method()` はメソッドチェインに括弧が必要 | ✓ 正しい |
 | `Box<T>` | `Box[T]` - ジェネリクスは角括弧 |
 | `new Box<String>()` | `new Box[String]()` - 角括弧 |
+| `new Box("hi")` は型引数なしだと拒否される？ | ✓ 正しい - 型引数はコンストラクタ引数（または期待される型）から推論される。何にも束縛されない裸のジェネリック（`new Empty()`）だけがE0066になる |
 | `String \| null` | `String?` - nullable型の構文 |
+| `Box[String?]` は拒否される？ | ✓ 正しい - 裸の`[T]`はnullableな型引数を受け付ける（Kotlin方式） |
+| 裸の`T`値に対する`t.method()` | E0057 - `t?.method()`、`t ?: default`、`if t != null`、または`[T extends B]`を使う |
+| `[T extends Object]`は`[T]`と同じ？ | いいえ - `extends`はTを非nullにする。`[T extends B?]`でnullableに戻せる |
 | `==` で参照等価 | `===` が参照等価、`==` は値等価 |
 
 ### 制御フロー
@@ -351,10 +355,14 @@ try {
 |---------------------|----------------|
 | `if (condition) { }` | `if condition { }` - 条件を括弧で囲まない |
 | `while (condition) { }` | `while condition { }` - 括弧なし |
-| `else if condition { }` | `else { if condition { } }` - `else if`キーワードなし |
+| `else if condition { }` | ✓ 正しい - `else if`チェーンはサポートされている（式としても使える） |
 | `switch value { case 1: }` | `select value { case 1: }` - `switch`ではなく`select` |
+| `case s: String:`（Java/Scala流パターン） | `case s is String:` - 型パターンは`is`を使う。sealedの網羅性チェック（E0042）が適用される |
+| `case Add(l, n is Num):` のようなネストした型パターン？ | ✓ 正しい - 型パターンはデストラクチャリングの中にネストでき、束縛された値は絞り込まれた型として使える。レコードでない要素にも使える（`case Wrap(s is String)`） |
+| `case Circle(r):` は非サポート？ | ✓ 正しい - レコードのデストラクチャリングパターンは動作する。`case x when guard:` も使える |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
-| `i += 1` や `i++` | `i = i + 1` - 複合演算子は限定的（`++`はforループ内のみ） |
+| `for i in 0..10`（他言語） | `foreach i: Int in 0..10` - 範囲: `a..b`は両端含む、`a..<b`は上端を含まない |
+| `i += 1`, `i -= 1`, `i++` | ✓ 正しい - 複合代入と`++`/`--`は文として使える |
 | `while (x = read()) != null` | ✓ 正しい - 括弧付きで代入を条件に使用可 |
 
 ### メソッドとクラス
@@ -362,15 +370,17 @@ try {
 | 誤り（Java/Scala風） | 正しい（Onion） |
 |---------------------|----------------|
 | `public ClassName() { }` | `def this { }` - コンストラクタは`def this` |
+| `class Point(val x: Int, val y: Int)` | ✓ 正しい - プライマリコンストラクタ。`val`/`var`引数は公開フィールドになり、素の引数は`: Super(args)`に渡される |
 | `public ClassName(x: Int) { }` | `def this(x: Int) { }` - 引数付き |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - 括弧なし |
 | `public void method()` | `public: def method(): void` - セクションベースのアクセス |
 | `def method(): T { }` | `def method: T { }` - 引数なしなら括弧省略可 |
 | `@Override void method()` | `override def method(): void` - アノテーションではなくキーワード |
 | `fun String.twice()` (Kotlin風) | `extension String { def twice() { } }` - extensionブロック |
-| `this.field = value` コンストラクタ内 | ✓ 正しい - フィールドは`this.`が必要 |
+| `this.field = value` コンストラクタ内 | ✓ 正しい - `this.`/`self.`は使える。今は省略も可能（裸の`field`は暗黙アクセスでフィールドに解決される） |
 | `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longは`L`サフィックス |
 | `System.out` | `System::out` - 静的フィールドも`::` |
+| `C::field = v` は非サポート？ | ✓ 正しい - 静的フィールドへの代入は動作する（公開フィールド） |
 
 ### インポートと型
 
@@ -386,18 +396,23 @@ try {
 | 誤り（Java/Scala風） | 正しい（Onion） |
 |---------------------|----------------|
 | `new String[] {"a", "b"}` | `["a", "b"]`は`List`を作成、配列は`new String[n]` |
+| `Map.of("a", 1)` | `["a": 1, "b": 2]`は`Map`（LinkedHashMap）を作成。空マップは`[:]` |
 | `list.get(i)` | `list[i]` - 配列もリストも`[]`でアクセス |
 | `list.set(i, v)` | `list[i] = v` - 代入も`[]`を使用 |
 | `arr.length()` | `arr.length` - 配列の長さはプロパティ、メソッドではない |
 | `list.size()` | `list.size` - これもプロパティ |
+| 標準ライブラリが配列を返す？ | いいえ - 標準ライブラリは常に`List`を受け取り、返す。配列は返さない（`Strings::split`、`Regex::findAll`、`Files::readLines`、`Rand::shuffle`、`Http`のヘッダー/パラメータ、`Future::all`）。配列が現れるのはJavaとの境界だけ：`main(args: String[])`、`byte[]`によるバイナリI/O、varargs。境界を越えるには`Colls::toList(args)`を使う |
 | `foreach (x : list)` | `foreach x: Type in list { }` - 構文が異なる |
+| `for (k, v) in map` | `foreach (k, v) in map { }` - マップのエントリをデストラクチャリング |
+| `val (a, b) = pair` は非サポート？ | ✓ 正しい - レコード（と`Map.Entry`）を位置ベースでデストラクチャリングする。可変にするには`var (x, y) = ...` |
 
 ### リテラル
 
 | 誤り | 正しい（Onion） |
 |-----|----------------|
 | `0` でlong | `0L` - Long型には明示的な`L`サフィックスが必要 |
-| `0.0` でfloat | `0.0f` - Float型には明示的な`f`サフィックス |
+| `0.0` でfloat | `0.0f` / `0.0F` - Float型には`f`/`F`サフィックス、Double型には`d`/`D`サフィックス（大文字小文字どちらも可） |
+| `new Double(1.5)` / `new Integer(3)` | `Double`/`Int`はプリミティブ型 - そのまま`1.5`と書けばよい。Object/Numberスロットへのボクシングは自動。ラッパークラスは`JDouble`/`JInteger`/... |
 | `"str" + 123` | ✓ 正しい - 自動文字列変換 |
 
 ### 継承とインターフェース
@@ -431,12 +446,14 @@ try {
 
 | 誤り | 正しい（Onion） |
 |-----|----------------|
-| `x -> x * 2` | `(x: Int) -> x * 2` - 型注釈が必要なことが多い |
-| `(x) -> expr`（単一引数） | `(x: Type) -> expr` - 型が通常必要 |
-| `func(arg)` でラムダ呼び出し | `func(arg)` または `func(arg)` - 両方OK |
+| `x -> x * 2` | ✓ 正しい - 裸の単一引数はそのまま使える。式本体も使える |
+| `(x) -> expr` | ✓ 正しい - 引数の型は期待される関数型から推論される |
+| `func(arg)` でラムダ呼び出し | ✓ 正しい - 関数値は直接呼び出せる |
+| `Runnable`/`Comparator`としてのラムダ | ✓ 正しい - JavaのSAM（関数型インターフェース）への変換が効く |
 | `Int -> Int` | ✓ 正しい - 単一引数の関数型 |
 | `(Int, Int) -> Int` | ✓ 正しい - 複数引数の関数型 |
-| `list.map(x => x * 2)` | `list.map { x -> x * 2 }` - トレイリングラムダも `->`。矢印は言語全体で `->` の一種類だけ |
+| `list.map { x => x * 2 }` | `list.map { x -> x * 2 }` - トレイリングラムダの矢印も`->`。`=>`は言語には存在しない（関数型、`(x) -> e`、`{ x -> e }`のすべてで矢印は`->`の一種類だけ） |
+| `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable/配列に組み込みのextensionパイプラインがある |
 
 ### メソッド呼び出し
 
@@ -472,13 +489,20 @@ try {
 | 誤り | 正しい（Onion） |
 |-----|----------------|
 | `null`チェックに`== null` | ✓ 正しい - 期待通りに動作 |
+| nullable（`T?`）な`a`に対する`a == b` | ✓ 正しい - null安全な値等価（`java.util.Objects.equals`）：両方nullなら等しい、片方だけnullなら等しくない、それ以外は`equals()`。事前のnullチェックは不要 |
 | `&&`, `\|\|` 演算子 | ✓ 正しい - Javaと同じ |
 | `!condition` | ✓ 正しい - Javaと同じ |
 | `a ? b : c` 三項演算子 | 非サポート - `if/else`式を使用 |
+| `operator fun plus`（Kotlin風） | `def plus(o: T): T` - 左オペランドの`+ - * / %`はそれぞれplus/minus/times/div/remにマップされる |
 | 文字列テンプレート `$var` や `${expr}` | `"text #{expr}"` - `#{}` 構文を使用 |
 | `this`のみ | `self`も使用可 - 両方とも現在のインスタンスを参照 |
 | 予約語を識別子に | `` `class` `` - バッククォートでキーワードをエスケープ |
 | `println("Hi")` | ✓ 正しい - トップレベル関数、または`IO::println` |
+| `Pattern.compile("\\d+")` | `re"\d+"` - 生の正規表現リテラル（二重エスケープ不要） |
+| `new File(p).read...` | `file"path".text()` / `.lines()` / `.csv()` / `.json()` - リソースリテラル（動的には`file(p)`） |
+| `x.let { f(it) }`（Kotlin風） | `x \|> f` - パイプラインが`x`を`f`の第一引数として渡す |
+| `when (s) { matches(...) }` | `case re"(\d+)" (n):` - 正規表現のselectパターン。コンパイル時にチェックされる |
+| main内での手動`args`解析 | `def main(name: String, n: Int = 1)` - シグネチャからauto-CLIがフラグ/usageを導出する |
 
 ## 既知の制限
 

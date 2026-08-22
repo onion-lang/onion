@@ -9,6 +9,159 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PropLogic.on`, a 402-line propositional logic evaluator with truth tables.**
+  Represents formulas as an 8-case ADT `enum Formula` (`Var`/`Top`/`Bot`/`Not`/
+  `And`/`Or`/`Impl`/`Equiv`) with four recursive `select this` methods
+  (`vars`/`eval`/`nnf`/`simplify`). Prints truth tables for classic formulas
+  (excluded middle, contradiction, De Morgan, modus ponens, transitivity),
+  converts formulas to negation normal form, and constant-folds tautologies.
+  Exercises `extension Boolean`/`Int`, collection pipelines (`sortedBy`/`any`/
+  `filter`/`map`/`groupBy`), closures, string interpolation, and nullable
+  types.
+
+- **`run/CircuitSimulator.on`, a digital logic circuit simulator.**
+  Represents gates (`NOT`/`AND`/`OR`/`XOR`/`NAND`) as an ADT case-enum wired
+  together by wire name into a graph, evaluated on demand via memoized
+  recursion with a cycle guard. Builds a half adder, a full adder, a 4-bit
+  ripple-carry adder (chained full adders, run on real integer pairs) and a
+  2-to-1 multiplexer, printing full truth tables plus a broken
+  self-referential circuit to show the cycle guard. Exercises ADT case-enum
+  dispatch, a class wrapping a mutable `HashMap`-backed graph, recursive
+  evaluation with a memo cache and a `HashSet` "currently visiting" guard,
+  records with methods, extension methods on `Int`/`Boolean`, and nested
+  `while` loops for combinatorial enumeration.
+
+- **`run/NeuralNet.on`, a 291-line from-scratch multi-layer perceptron.**
+  Trains a hand-written two-layer network (sigmoid activations, backprop
+  computed manually, no library) via stochastic gradient descent on two
+  tasks run back-to-back: XOR (2→4→1, 5000 epochs, 4/4 accuracy) and
+  parity-3 (3→6→1, 8000 epochs, ≥7/8 accuracy). Exercises classes with
+  mutable `var` fields and static helpers, extension methods on `Double`,
+  mutable `List` APIs, `foreach` over record collections, closures, and
+  records.
+
+- **`run/HuffmanCode.on`, a 334-line Huffman encoding/decoding demo.**
+  Builds a Huffman tree from symbol frequencies and round-trips five sample
+  strings through encode/decode, plus a batch compression-ratio comparison.
+  Exercises an ADT case-enum (`HuffNode`: `Leaf`/`Internal`) with `select`/`is`
+  dispatch, a `record` with an `example` clause, `extension String`/`extension
+  Int`, generic `Map[K,V]`/`List[T]`, `foreach` map-entry destructuring,
+  collection pipelines (`sortedBy`/`map`/`fold`), nullable return types,
+  string interpolation, and recursion.
+
+- **`run/GeneticAlgorithm.on`, a 333-line genetic algorithm solving N-Queens.**
+  Runs two scenarios end to end (8-Queens with tournament selection and
+  single-point crossover; 6-Queens with roulette selection and uniform
+  crossover), plus a mutation-rate sweep. Exercises records with methods,
+  sealed ADT case-enums (`SelectionStrategy`, `CrossoverType`), extension
+  methods on `Int`/`String`, collection pipelines (`map`/`fold`), nullable
+  return types, and `select`/`is` pattern matching.
+
+- **`run/PackageInstaller.on`, a 285-line npm-style dependency resolver.**
+  Registers 12 packages with version strings and dependency lists, resolves
+  them via DFS topological sort with cycle detection, and groups them into
+  parallel install levels with a BFS wave algorithm. Exercises a `record`
+  with methods (`Package`), an ADT `enum` (`Outcome`: `Resolved`/`Cyclic`),
+  `select`/`case is` pattern matching, `HashMap[String, Object]` /
+  `HashSet[String]` / `ArrayList`, collection pipelines (`sortedBy`,
+  `countWhere`, `filter`), an `extension List[String]`, closures, method
+  chaining, string interpolation, and nullable (`Package?`) lookups.
+
+- **`run/LispInterp.on`, a 590-line minimal Scheme-like Lisp interpreter.**
+  Compiles and runs end-to-end with correct output on 27 verified cases.
+  Exercises ADT case enums (`TokenKind`, `LispVal`, 7 cases), records
+  (`Token`), classes with `public:` sections (`LispEnv`, `Lexer`, `Parser`,
+  `Interpreter`), nullable fields, typed generics (`ArrayList[Object]`,
+  `LinkedHashMap[String, Object]`), `select`/`case … is` pattern matching,
+  string interpolation, direct and mutual recursion, closures with lexical
+  capture, `try`/`catch`, `foreach`/`while` loops with mutable state, and
+  method calls on boxed primitives.
+
+- **`run/Othello.on`, a 223-line Othello/Reversi AI-vs-AI simulation.**
+  Two positional-weight greedy AIs play a full game to completion on an 8x8
+  board. Exercises records (`Position`, `MoveRecord`), `foreach` with ranges,
+  `select`/pattern-match dispatch, a mutable flat `Int[]` board, nested-loop
+  move validation across 8 directions, string interpolation, and game
+  statistics (total flips, best single move, piece percentages).
+
+- **`run/BattleshipSim.on`, a 381-line two-player Battleship auto-simulation.**
+  Two seeded AI players play a full game of Battleship end to end. Exercises
+  2D `Int[][]` arrays, a plain `enum ShipKind` with `select`-based dispatch, an
+  ADT `enum ShotResult` (`Miss`/`Hit`/`Sunk`) with `select this` methods, a
+  record with methods (`Ship`), classes with public/private sections (`Board`,
+  `Player`), `ArrayList[Object]` with a foreach-cast pattern, extension methods
+  on `Int`/`String`, nullable `String?`, `if`-as-expression, and `select`/`case`
+  with `else:`.
+
+- **`run/MiniGit.on`, a 384-line version-control system simulation.** Models a
+  repository with commits, branches, staging area, and merge operations.
+  Exercises extension methods on `String`/`Int` (`abbrev`, `padRight`, `repeat`,
+  `abs`, `clamp`), a homogeneous `enum ChangeType`/`Priority` with methods, an ADT
+  `enum MergeOutcome` with `FastForward`/`ThreeWay`/`UpToDate` cases, records with
+  methods (`FileChange`, `CommitInfo`, `BranchInfo`), a class with `ArrayList` and
+  `Map[Object, Object]` mutable state (`Repository`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`sortedByDescending`/`groupBy`/`find`/
+  `count`/`distinct`/`take`), `select` with type patterns, string interpolation,
+  closures, `foreach` on list and `foreach (k, v) in map`, nullable types and null
+  checks, and `while` loops for manual iteration.
+
+- **`run/TerrainGenerator.on`, a 366-line procedural world-map generator.**
+  A seeded LCG PRNG deterministically generates a 50x22 height map, classifies
+  it into an ADT `enum Biome` (8 cases, each with exhaustive `select` methods),
+  and BFS-pathfinds between corners. Exercises extension methods on
+  `Double`/`String`/`Int`, 4-level nested C-style `for` loops, collection
+  pipelines (`groupBy`/`sortedBy`/`filter`/`find`/`partition`/`distinct`/`map`),
+  `foreach (k, v) in Map[Object, List[Object]]`, `Double[]`/`Boolean[]`/`Int[]`
+  arrays, records with compile-time examples, and nullable types.
+
+## [0.14.0] - 2026-08-21
+
+### Added
+
+- **`run/FamilyTree.on`, a 432-line genealogy tracker.** Models a
+  four-generation fictional family and produces a roster, statistics,
+  decade/gender breakdowns, a recursive tree print, ancestor/descendant
+  counts, sibling lookup, and birth-century grouping. Exercises `record`
+  types (`Person`, `Relation`), a homogeneous `enum Gender`, extension
+  methods on `Int`/`String`, recursive traversal via private helpers,
+  collection pipelines (`groupBy`/`sortedBy`/`filter`/`fold`/`map`/`find`),
+  `foreach (k, v) in map`, and nullable `Int` fields.
+
+- **`run/Mastermind.on`, a 309-line AI-vs-AI Mastermind code-breaking
+  simulation.** Two `Guesser` strategies (`RandomGuesser`, `SmartGuesser`)
+  compete across 50 random secrets; stats are compared and colour
+  frequency is checked for uniformity. Exercises records with value
+  equality (`Feedback`, `Code`), a homogeneous `enum Strategy` dispatched
+  via `select` in a factory function, an extension method on `Int`
+  (`.colorName()`), `List.filter` with closures over `List[Code]`,
+  `Map[String, Int]` with `?:` null coalescing, `foreach (k, v)` over a
+  typed map, `List.zip` with nested generics, and `try`/`catch` with
+  nullable types.
+
+- **`run/ColorPalette.on`, a 399-line color science toolkit.** Covers
+  RGB↔HSL/HSV/CMYK conversion, named color lookup, five harmony palette
+  types, WCAG accessibility contrast checking, and palette
+  temperature/brightness analysis. Exercises `record` types with method
+  bodies, a data-carrying `enum` with `case`, sealed-hierarchy `select`
+  matching, `foreach (k, v) in map` destructuring, and collection
+  pipelines.
+
+- **`run/WordSearch.on`, a 300-line word-search puzzle generator and
+  solver.** Hides a word list in a 16×16 grid across 8 directions, fills
+  the remaining cells with random letters, then solves the puzzle to
+  verify placement accuracy. Exercises an ADT case-enum (`Direction`,
+  8 singleton cases) dispatched via `select`, records with methods
+  (`Placement`, `Found`), 2D arrays, extension methods on `Int`/`String`,
+  and collection pipelines (`map`/`filter`/`fold`/`groupBy`/`sortedBy`).
+
+- **`run/MusicTheory.on`, a 560-line music theory calculator.** Covers the
+  full chromatic note system, interval naming, chord voicings, scale
+  construction, modal analysis, and chord progressions: homogeneous enums
+  (`Note`, `ChordQuality`, `ScaleType`, `Mode`), records with methods
+  (`Chord`, `Scale`) including a diatonic-triad builder, a mutable
+  `ProgressionBuilder` class, and collection pipelines (`map`/`filter`/
+  `fold`/`find`) over chord/scale membership and common-tone analysis.
+
 - **`run/ExprEval.on`, a 292-line symbolic expression evaluator.** Replaces
   the earlier 98-line interface-based sketch with an ADT `enum Expr` (Num,
   Var, Add, Sub, Mul, Div, Pow, Neg) evaluated and symbolically
@@ -37,6 +190,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class inheritance with per-algorithm overrides, primary-constructor
   superclass delegation (`class Sub(args) extends Base(args)`), extension
   methods on `Int`/`String`, and nullable-typed pick results.
+
+- **`run/CellularAutomata.on`, a 363-line cellular automaton demo.**
+  Implements 1D Elementary Cellular Automata (Wolfram rules 0-255, e.g.
+  Rule 110) and Langton's Ant (2D). Exercises sealed ADT enums, records,
+  classes wrapping `java.util.HashMap`, collection pipelines
+  (`map`/`filter`/`fold`/`reduce`/`distinct`/`sortedBy`/`find`/`partition`/
+  `zip`), `select` with type-pattern matching, nullable types, closures,
+  and extension methods on `Int`/`String`.
+
+### Fixed
+
+- **Internal compiler error (I0000) on a `do[List]` comprehension whose
+  downstream closure locally re-declares a binding name.** A closure that
+  declares a local variable shadowing an outer `do`-binding name (e.g.
+  `x <- [1, 2]` followed by a nested closure with `val x = ...`) crashed
+  bytecode generation with `Index -1 out of bounds for length 0` in
+  `ClosureCodegen.emitNewClosure`. `CapturedVariableScanner` now tracks
+  locally-declared names per closure body and excludes them from the
+  captured-variable set (unless a nested closure still captures the same
+  name, in which case it correctly stays boxed).
 
 ## [0.13.0] - 2026-08-20
 
@@ -793,6 +966,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows through the same `visitNewObject` path ordinary records use (already
   hardened by the #669/#745/#752 fixes), so this already passed; this closes
   a coverage gap rather than a live bug.
+- **`TryInCompoundBoxedLocalAssignmentSpec`, regression coverage for `try`/`catch`
+  on the right-hand side of a compound assignment (`+=`) to a closure-captured
+  (boxed) local variable** (`x += try {...} catch {...}`), both from inside the
+  capturing closure and from the declaring scope. `TryInCompoundFieldArrayAssignmentSpec`
+  already locked in the same `BinaryTerm`-wrapped-`try` shape for field/array
+  compound-assignment targets, but the boxed-local path in `emitSetLocal`
+  (`AsmCodeGeneration.scala`) was untested. `TermContainsTry.contains` already
+  recurses generically through a term's children, so both cases already passed;
+  this closes a coverage gap rather than a live bug.
 
 ### Fixed
 

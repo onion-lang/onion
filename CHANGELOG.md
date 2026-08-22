@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/CLAUDE_ja.md`'s "よくある構文ミス" tables were stale against `CLAUDE.md`.**
+  Several Japanese rows had fallen behind the English "Common Syntax Mistakes"
+  tables — some flagged now-supported syntax as unsupported (`else if` chains,
+  compound assignment/`++`/`--` as statements, unannotated lambda params), and
+  6 subsections (Type System & Operators, Control Flow, Methods & Classes,
+  Collections, Literals, Lambdas & Functions, Miscellaneous) were missing rows
+  present in English (nullable generics, `E0057`, primary constructors, static
+  field assignment, `Map` literals, map/record destructuring, operator
+  overloading, raw regex/resource literals, pipeline `|>`, regex `select`
+  patterns, auto-CLI). Brought fully in sync, row-for-row, with `CLAUDE.md`.
+
 ## [0.15.0] - 2026-08-22
 
 ### Added

@@ -58,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leading `public`/`private`/`protected`) and points at the correct
   `def this(...) { ... }` form.
 
+- **Parser hint for a Java-style method with the return type before the name.**
+  Onion methods put their return type after the name via `def` (`def method():
+  void { ... }`); writing the Java form (`public void method() { ... }`) used
+  to trip the parser on the return-type identifier, expecting `:` (`public`/
+  `private`/`protected` are read as access-section markers, which only ever
+  appear as `public:`), without ever mentioning `def`. The diagnostic now
+  recognizes a leading access modifier followed by two identifiers before `(`
+  and points at the correct `public:` / `def method(): void { ... }` form.
+
 ## [0.15.0] - 2026-08-22
 
 ### Added

@@ -280,6 +280,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val CStyleForLoop = """^\s*for\s*\(""".r
 
+  /**
+   * A Java/C#-style unbraced `import java.util.List;` (or wildcard/no-semicolon variant).
+   * Onion's `import` decl always wraps its targets in braces -- `import { java.util.List }`
+   * -- so the parser consumes the `import` keyword and then trips on the identifier that
+   * follows, expecting `{`. `import` cannot appear as an identifier (it is reserved), so a
+   * leading `import\s+` followed directly by a non-`{` on the line can only be this mistake.
+   */
+  private val JavaStyleImport = """^\s*import\s+(?!\{)\S""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -302,6 +311,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.fun_declaration")
     case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.c_style_for")
+    case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.java_style_import")
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

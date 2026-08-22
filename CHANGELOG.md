@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java/Scala-style type-pattern `select` case, `case s: String:`.**
+  Onion's `select` type patterns use `is` (`case s is String:`), never a colon after the
+  binding name. The parser used to read `s` alone as an ordinary value pattern and only
+  trip on the *second* colon meant to introduce the type, several characters later on the
+  same line, without ever mentioning `is`. The diagnostic now recognizes a `case <name>:
+  <Type>:` line and points at the correct `case s is String:` form.
+
 - **Parser hint for a C-style `for (init; cond; step)` loop.** Onion's `for` loop
   never parenthesizes its clauses; writing the C/Java/JS form used to trip the
   parser several tokens past the actual mistake with an unhelpful expected-token

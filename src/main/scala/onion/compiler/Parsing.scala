@@ -301,6 +301,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val JavaStyleImport = """^\s*import\s+(?!\{)\S""".r
 
   /**
+   * A Java/C#-style import alias written before the target, `Foo = java.lang.Long`,
+   * instead of Onion's `java.lang.Long as Foo`. Import entries are parsed as a bare
+   * qualified name (`import_id() "."` repeated) with an optional trailing `as alias`
+   * -- so the parser reads the leading identifier as the start of that qualified name
+   * and trips on the `=`, expecting `.` to continue it, never mentioning `as`. That
+   * "expecting only a bare `.`" shape is unique to this production (an ordinary
+   * assignment statement never fails to parse this way), so no import-keyword context
+   * is needed to scope it.
+   */
+  private val JavaStyleImportAlias =
+    """^\s*([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\.\*)?)\s*;?\s*$""".r
+
+  /**
    * A Java-style constructor, named after the class instead of using `def this`:
    * `public ClassName(...) { }`, or the same with no access modifier. `public`/
    * `private`/`protected` are real keywords (access-section markers), so with a
@@ -418,6 +431,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.c_style_for")
     case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_import")
+    case "=" if expected == "\".\"" && JavaStyleImportAlias.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleImportAlias.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_import_alias", m.group(2), m.group(1))
     case _ if expected == "\":\"" && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_method")
     case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>

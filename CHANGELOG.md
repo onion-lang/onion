@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java-style record body, `record Point { int x; int y; }`.**
+  Onion records declare their components in parentheses right after the name --
+  `record Point(x: Int, y: Int)` -- never in a brace body. `record`'s grammar
+  requires `(` (or `[` to start type parameters) directly after the name, so the
+  parser accepts `record Point` and then trips on the `{`, with a generic
+  expected-token dump that never mentions the parenthesized form. The diagnostic
+  now recognizes `record Name { ... }` (with or without a generic `[T]`) and
+  points at the correct `record Name(x: Int, y: Int)` form, naming the captured
+  record name. The correct form -- a parenthesized component list optionally
+  followed by its own `{ ... }` method body -- is unaffected.
+
 - **New diagnostic `E0091` for a class used as a value, `System.currentTimeMillis()` instead of `System::currentTimeMillis()`.**
   A bare capitalized name that resolves to a real class -- not a local variable or field -- used
   where a value is expected (typically as the target of `.member`) is the Java/Kotlin habit of

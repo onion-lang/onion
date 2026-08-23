@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java/C#-style import alias written before the target, `Foo = java.lang.Long;`.**
+  Onion's import aliases follow the target (`java.lang.Long as Foo`), never precede it with
+  `=`. An import entry parses as a bare qualified name with an optional trailing `as alias`,
+  so the parser reads the leading identifier as the start of that name and trips on the `=`,
+  expecting only `.` to continue it — never mentioning `as`. The diagnostic now recognizes
+  this shape and points at the correct `Target as Alias` form, naming the captured target
+  and alias.
+
 - **Parser hint for a Java-style field or local declaration, `String name;` / `String name = "x";`.**
   Onion fields and locals are declared with `val`/`var` before the name (`var name: String`),
   never with the type before it. As a class member the parser trips on the type identifier

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java-style field or local declaration, `String name;` / `String name = "x";`.**
+  Onion fields and locals are declared with `val`/`var` before the name (`var name: String`),
+  never with the type before it. As a class member the parser trips on the type identifier
+  itself, expecting a member declarator (`def`, `val`, `var`, ...); as a local statement the
+  type is read as a bare expression and the parser trips on the name that follows, expecting
+  a statement terminator. Neither mentions `val`/`var`. The diagnostic now recognizes a
+  capitalized type name (optionally bracketed or nullable) directly followed by a second
+  identifier and `=`/`;`/end-of-line, and points at the correct `var name: Type` form, naming
+  the captured type and name.
+
 - **Parser hint for a Java-style dot static call on a primitive type name, `Long.toString(3L)`.**
   `Int`/`Long`/`Double`/`Float`/`Boolean`/`Byte`/`Short`/`Char` are reserved keyword
   tokens, valid only in a type position or directly before `::` for static member

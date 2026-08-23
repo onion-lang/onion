@@ -374,6 +374,7 @@ try {
 | `public ClassName(x: Int) { }` | `def this(x: Int) { }` - 引数付き |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - 括弧なし |
 | `public void method()` | `public: def method(): void` - セクションベースのアクセス |
+| `String name;`（フィールド/ローカル） | `var name: String`（または`val`）- 型は名前の後、`val`/`var`を介して書く |
 | `def method(): T { }` | `def method: T { }` - 引数なしなら括弧省略可 |
 | `@Override void method()` | `override def method(): void` - アノテーションではなくキーワード |
 | `fun String.twice()` (Kotlin風) | `extension String { def twice() { } }` - extensionブロック |

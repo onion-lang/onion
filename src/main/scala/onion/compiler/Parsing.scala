@@ -398,6 +398,21 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val PrimitiveTypeNames = Set("Int", "Long", "Double", "Float", "Boolean", "Byte", "Short", "Char")
   private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
 
+  /**
+   * A Java-style record body, `record Point { int x; int y; }`, that puts the
+   * components inside a brace body instead of Onion's parenthesized component
+   * list. `record`'s grammar is `"record" id() [type_params()] "(" args() ")"
+   * [brace-body]` -- after the name (and optional `[T]`), the parser requires
+   * `(` (or `[` to start the type parameters) and trips on the `{`, with an
+   * expected-token dump that never mentions the parenthesized form. Requiring
+   * the `record` keyword itself (reserved, so it never appears as an
+   * identifier) directly followed by a name and optional `[...]` keeps this
+   * from firing on the correct `record Point(x: Int, y: Int) { ... }` form,
+   * whose brace body comes after a already-closed parenthesized list.
+   */
+  private val JavaStyleRecordBody =
+    """^\s*record\s+([A-Za-z_]\w*)(?:\[[^\]]*\])?\s*\{""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -450,6 +465,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case _ if JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_field", m.group(1), m.group(2))
+    case "{" if expected.contains("\"(\"") && JavaStyleRecordBody.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleRecordBody.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_record_body", m.group(1))
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

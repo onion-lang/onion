@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Java/C++-style generic with angle brackets, `List<String>`.**
+  Onion's generics use square brackets (`List[String]`) — `<`/`>` are only comparison
+  operators, never valid inside a type — so in a type-annotation position (a `val`/`var`
+  declaration, a parameter type, ...) the parser accepted the bare type name and then
+  tripped several tokens later on the `<`, expecting the declaration to end (`=`, `;`, a
+  newline, ...), never mentioning `[`. The diagnostic now recognizes `Type<Args>` in a
+  type position and points at the correct `Type[Args]` form, naming the captured type
+  and its arguments.
+
 ## [0.16.0] - 2026-08-22
 
 ### Added

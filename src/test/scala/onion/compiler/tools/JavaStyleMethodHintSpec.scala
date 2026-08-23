@@ -62,6 +62,30 @@ class JavaStyleMethodHintSpec extends AbstractShellSpec {
       assert(msgs.isEmpty, s"expected no errors for the correct `def` form, got: $msgs")
     }
 
+    it("hints at `def` for `void greet(name: String) { }` with no access modifier at all") {
+      val msgs = messages(
+        """
+          |class Greeter {
+          |public:
+          |  def this { }
+          |  void greet(name: String) {
+          |    IO::println(name)
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      // "def" alone is too weak here: the raw member-declarator expected-token
+      // dump for this shape ("abstract", "def", "final", ...) already contains
+      // the literal word, so a hint-specific phrase is required to prove the
+      // hint actually fired rather than trivially matching that dump. The hint
+      // message is bilingual, but its `def method(): void { ... }` code example
+      // is a literal, locale-invariant substring in both bundles.
+      assert(
+        msgs.contains("def method(): void { ... }"),
+        s"expected the java-style-method hint, got: $msgs"
+      )
+    }
+
     it("does not fire for the single-identifier Java-style constructor mistake") {
       val msgs = messages(
         """

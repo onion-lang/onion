@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java-style method declaration with no access modifier, `void greet(name: String) { }`.**
+  The existing hint for `public void method() { }` only matched when an access modifier
+  (`public`/`private`/`protected`) preceded the return type, since the parser trips on a
+  different token in that shape (`:`, expecting the modifier's section colon) than in the
+  no-modifier shape (the return-type identifier itself, expecting a member declarator like
+  `def`). The pattern and its guard now also recognize the bare `Type name(...)` form —
+  Java's package-private default, with no modifier at all — and point at the correct
+  `def name(...): Type { ... }` form. A negative lookahead keeps the now-optional modifier
+  from being skipped and reread as the return type, which would otherwise misfire on the
+  unrelated single-identifier `public ClassName(...)` constructor mistake.
+
 - **Parser hint for a Java/C#-style import alias written before the target, `Foo = java.lang.Long;`.**
   Onion's import aliases follow the target (`java.lang.Long as Foo`), never precede it with
   `=`. An import entry parses as a bare qualified name with an optional trailing `as alias`,

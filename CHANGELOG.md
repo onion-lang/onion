@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **New diagnostic `E0091` for a class used as a value, `System.currentTimeMillis()` instead of `System::currentTimeMillis()`.**
+  A bare capitalized name that resolves to a real class -- not a local variable or field -- used
+  where a value is expected (typically as the target of `.member`) is the Java/Kotlin habit of
+  reaching for `.` on a type. Onion's static members go through `::`, so the name simply failed
+  ordinary variable/field lookup and was reported as the generic "local variable X is not found"
+  (E0002), never mentioning `::`. This is the mirror image of `E0071` (`::` used on an instance,
+  `s::m()` instead of `s.m()`); the new diagnostic points at the same fix in the other direction,
+  naming the class and the `::` rewrite. A real local variable or field with the same name as a
+  class still resolves correctly -- this only fires when the name resolves to neither.
+
 - **Parser hint for a Java-style method declaration with no access modifier, `void greet(name: String) { }`.**
   The existing hint for `public void method() { }` only matched when an access modifier
   (`public`/`private`/`protected`) preceded the return type, since the parser trips on a

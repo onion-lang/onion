@@ -415,6 +415,24 @@ public:
 `::` は型の静的メンバー専用です。ローカル変数と同名の実在する型に対しては
 正しく解決されます — このエラーは `::` が変数に対して使われた場合にのみ発生します。
 
+### `E0091` — 値として使われたクラス
+
+`E0071` の鏡像です。ローカル変数でもフィールドでもない、実在するクラスに
+解決される大文字始まりのベアな名前が、値が期待される位置（典型的には
+`.member` の対象）で使われました。汎用的な「ローカル変数が見つからない」
+エラーではなく、`::` を直接示します。
+
+```onion
+static def main(args: String[]): void {
+  IO::println(System.currentTimeMillis())   // E0091: System は変数ではなくクラス
+}
+```
+
+対処: 静的メンバーには `::` を使ってください（`System::currentTimeMillis()`）。
+`.` はインスタンスのメンバー専用です。クラスと同名の実在するローカル変数に
+対しては正しく解決されます — このエラーは名前が変数にもフィールドにも
+解決されない場合にのみ発生します。
+
 ### `E0020` — 値を返すことができない
 
 宣言された戻り値の型が `void` ではないメソッド内でベアな `return;` が使われて
@@ -1517,6 +1535,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
 | `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
+| `E0091` | … is a class, not a variable |
 
 ## 関連項目
 

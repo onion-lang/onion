@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Java-style try-with-resources declaration, `try (Res r = new Res()) { ... }`.**
+  Onion's resource clause always starts with `val` before the name (`try (val r = new Res())`) --
+  never with the type before it, and never `var`. The clause's grammar is only attempted with a
+  2-token lookahead (`"(" ("val"|"var")`); when the second token is a type name instead, the
+  lookahead fails, the whole optional resource clause is skipped, and the parser trips on the `(`
+  itself, expecting the `{` of a resourceless `try` block -- a generic expected-token dump that
+  never mentions `val`. The diagnostic now recognizes `try (Type name = ...)` and points at the
+  correct `try (val name: Type = ...)` form, naming the captured type and name.
+
 ## [0.17.0] - 2026-08-23
 
 ### Fixed

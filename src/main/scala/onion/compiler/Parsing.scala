@@ -413,6 +413,21 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val JavaStyleRecordBody =
     """^\s*record\s+([A-Za-z_]\w*)(?:\[[^\]]*\])?\s*\{""".r
 
+  /**
+   * A Java-style try-with-resources declaration, `try (Res r = new Res()) { ... }`,
+   * that puts the type before the name instead of using `val`/`var`. The resource
+   * clause's grammar (`"(" resource_list() ")"`, each resource starting with
+   * `val`/`var`) is only attempted with a 2-token lookahead (`"(" ("val"|"var")`) --
+   * when the second token is a type name instead, the lookahead fails, the whole
+   * optional clause is skipped, and the parser trips on the `(` itself, expecting
+   * the `{` of a resourceless `try` block. Neither mentions `val`/`var`. Requiring
+   * a capitalized leading identifier (Java/Onion type-naming convention), optionally
+   * bracketed or nullable, directly followed by a second identifier and `=` keeps
+   * this from firing on the correct `try (val r = ...)`/`try (var r = ...)` form.
+   */
+  private val JavaStyleTryResource =
+    """\btry\s*\(\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*=""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -468,6 +483,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case "{" if expected.contains("\"(\"") && JavaStyleRecordBody.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleRecordBody.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_record_body", m.group(1))
+    case "(" if expected.contains("{") && JavaStyleTryResource.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleTryResource.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_try_resource", m.group(1), m.group(2))
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

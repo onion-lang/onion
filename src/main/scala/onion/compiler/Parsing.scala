@@ -338,6 +338,17 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val JavaStyleTypeCase = """^\s*case\s+[a-z_]\w*\s*:\s*[A-Z][\w.\[\]]*\??\s*:""".r
 
+  /**
+   * A Java/C++-style generic type with angle brackets, `List<String>`, in a type
+   * position (a `val`/`var` declaration's type, a parameter type, ...). Onion's
+   * generics use square brackets (`List[String]`) -- `<`/`>` are only comparison
+   * operators, never valid inside a type -- so the parser accepts the bare type
+   * name and then trips on the `<`, expecting the declaration to end (`=`, `;`,
+   * a newline, ...), never mentioning `[`. Capturing the base type name and the
+   * (non-nested) argument list lets the hint show the exact rewrite.
+   */
+  private val JavaStyleGenericAngleBrackets = """\b([A-Z][A-Za-z0-9_]*)<([A-Za-z_][\w\s,\[\]?]*)>""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -345,6 +356,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_conforms")
     case ":" if JavaStyleTypeCase.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.case_type_colon")
+    case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_generics", m.group(1), m.group(2).trim)
     case ":" if expected.contains("extends") =>
       Message("error.parsing.hint.old_extends")
     // The removed anonymous super-call form: `def this(x) : (x) { }`. After the colon the

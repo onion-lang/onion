@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java-style dot static call on a primitive type name, `Long.toString(3L)`.**
+  `Int`/`Long`/`Double`/`Float`/`Boolean`/`Byte`/`Short`/`Char` are reserved keyword
+  tokens, valid only in a type position or directly before `::` for static member
+  access (`Long::toString(3L)`) — they can never start a value expression. So writing
+  the Java-style dot form doesn't fail on the `.`; the parser trips on the type name
+  itself, since no expression can start with that token, producing a generic
+  expected-token dump that never mentions `::`. The diagnostic now recognizes a
+  primitive type name directly followed by `.member` and points at the correct
+  `Type::member` form, naming the captured type and member.
+
 - **Parser hint for a Java/C++-style generic with angle brackets, `List<String>`.**
   Onion's generics use square brackets (`List[String]`) — `<`/`>` are only comparison
   operators, never valid inside a type — so in a type-annotation position (a `val`/`var`

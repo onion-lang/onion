@@ -349,6 +349,20 @@ class Parsing(config: CompilerConfig) extends AnyRef
    */
   private val JavaStyleGenericAngleBrackets = """\b([A-Z][A-Za-z0-9_]*)<([A-Za-z_][\w\s,\[\]?]*)>""".r
 
+  /**
+   * `Int`/`Long`/`Double`/`Float`/`Boolean`/`Byte`/`Short`/`Char` are reserved keyword
+   * tokens, valid only in a type position or directly before `::` for static member
+   * access (`Long::toString(3L)`) -- they can never start a value expression. So a
+   * Java-style `Long.toString(3L)` (dot instead of `::`) doesn't fail on the `.`; the
+   * parser trips on `Long` itself, since no expression can start with that token, and
+   * the generic expected-token dump never mentions `::`. Matching the *found* token
+   * against this set and the text right after it against this pattern (starting at the
+   * found token, like the other context-based hints above) recovers the member name for
+   * the rewrite.
+   */
+  private val PrimitiveTypeNames = Set("Int", "Long", "Double", "Float", "Boolean", "Byte", "Short", "Char")
+  private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -377,6 +391,13 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.fun_extension_declaration", m.group(1), m.group(2))
     case _ if FunDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.fun_declaration")
+    // Checked after the `fun`/`func`/`fn` declaration hints above: `func Int.doubled()`
+    // is an extension-method mistake first (wrong keyword, no `extension` block) and a
+    // dot-vs-`::` mistake only incidentally, so the more specific extension-block hint
+    // must win when both match the same line.
+    case name if PrimitiveTypeNames.contains(name) && DotAfterPrimitiveTypeName.findFirstMatchIn(context).isDefined =>
+      val member = DotAfterPrimitiveTypeName.findFirstMatchIn(context).get.group(1)
+      Message("error.parsing.hint.primitive_dot_static", name, member)
     case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.c_style_for")
     case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>

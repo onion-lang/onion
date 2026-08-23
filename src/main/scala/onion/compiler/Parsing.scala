@@ -326,6 +326,22 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val JavaStyleMethodDeclaration = """^\s*(?:public|private|protected)\s+[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
+   * A Java-style field or local-variable declaration, `String name;` or
+   * `String name = "x";`, that puts the type before the name instead of using
+   * `val`/`var`. As a class member this trips the parser on the type identifier
+   * itself, expecting a member declarator (`def`, `val`, `var`, ...); as a local
+   * statement the type is read as a bare expression and the parser trips on the
+   * name that follows, expecting a statement terminator. Neither mentions
+   * `val`/`var`. Requiring a capitalized leading identifier (Java/Onion type-naming
+   * convention), optionally bracketed (`List[String]`) or nullable (`String?`),
+   * directly followed by a second identifier and then `=`/`;`/end-of-line keeps
+   * this from firing on an ordinary call or expression -- a call's next
+   * non-whitespace character after the name is always `(`, never a second name.
+   */
+  private val JavaStyleFieldDeclaration =
+    """^\s*(?:public|private|protected)?\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
+
+  /**
    * A Java/Scala-style type-pattern `select` case, `case s: String:` (or with extra
    * spacing, `case s : String :`). Onion's `case` patterns use `is` for a type test
    * (`case s is String:`) -- a colon straight after the binding name is never valid
@@ -406,6 +422,12 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.java_style_method")
     case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_constructor")
+    // Checked after the constructor/method hints above, whose own patterns (a lone
+    // capitalized identifier, or two identifiers before `(`) would otherwise shadow it:
+    // this one has no `(` at all -- `Type name` ends in `=`, `;`, or end-of-line.
+    case _ if JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_field", m.group(1), m.group(2))
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

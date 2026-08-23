@@ -414,6 +414,7 @@ These are frequently confused with other languages. **Always check these:**
 | `public ClassName(x: Int) { }` | `def this(x: Int) { }` - with params |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
 | `public void method()` | `public: def method(): void` - section-based access |
+| `String name;` (field/local) | `var name: String` (or `val`) - type comes after the name, via `val`/`var` |
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |

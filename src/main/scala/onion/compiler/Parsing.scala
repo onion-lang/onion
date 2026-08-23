@@ -328,15 +328,21 @@ class Parsing(config: CompilerConfig) extends AnyRef
 
   /**
    * A Java-style method declaration, `public void method() { }` (or `private`/`protected`,
-   * with any return-type spelling before the name). `public`/`private`/`protected` are
-   * access-*section* markers that only ever appear as `public:`, immediately followed by a
-   * colon -- every member's own return type instead comes after its name via `def`. The
-   * parser consumes the modifier and then trips on the return-type identifier that follows,
-   * expecting `:` -- never mentioning `def`. Requiring two identifiers (return type, then
-   * name) before the `(` keeps this from firing on the single-identifier
-   * `public ClassName(...)` constructor mistake, which gets its own hint.
+   * or no modifier at all -- Java's package-private default -- with any return-type spelling
+   * before the name). `public`/`private`/`protected` are access-*section* markers that only
+   * ever appear as `public:`, immediately followed by a colon -- every member's own return
+   * type instead comes after its name via `def`. With a modifier, the parser consumes it and
+   * trips on the return-type identifier that follows, expecting `:`; with no modifier, a bare
+   * member declaration trips on the return-type identifier itself, expecting a member
+   * declarator (`def`, `val`, `var`, ...). Neither mentions `def`. Requiring two identifiers
+   * (return type, then name) before the `(` keeps this from firing on the single-identifier
+   * `public ClassName(...)` constructor mistake, which gets its own hint -- the negative
+   * lookahead stops the now-optional modifier group from being skipped and the modifier
+   * keyword itself reread as the return-type identifier, which would otherwise turn
+   * `public Point(x: Int)` (one identifier) into a false two-identifier match.
    */
-  private val JavaStyleMethodDeclaration = """^\s*(?:public|private|protected)\s+[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+  private val JavaStyleMethodDeclaration =
+    """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
    * A Java-style field or local-variable declaration, `String name;` or
@@ -434,7 +440,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case "=" if expected == "\".\"" && JavaStyleImportAlias.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleImportAlias.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_import_alias", m.group(2), m.group(1))
-    case _ if expected == "\":\"" && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+    case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_method")
     case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.java_style_constructor")

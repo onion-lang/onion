@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `fun`/`func`/`fn` hint now also recognizes `function`, including the
   `function Type.method(...)` extension-method mistake.
 
+- **`onion script.on` no longer fails silently when the script has no entry point.**
+  A compiled script with no public static `main(String[])` method (e.g. a file
+  containing only class/def declarations, with no top-level statements and no
+  explicit `main`) exited non-zero with completely empty stderr, giving no clue
+  why nothing ran. It now prints a message naming the compiled class(es) and
+  pointing at `def main(args: String[]): void { ... }` or adding executable
+  top-level statements.
+
 ## [0.18.0] - 2026-08-24
 
 ### Fixed

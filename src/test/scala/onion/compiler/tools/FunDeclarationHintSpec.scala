@@ -5,11 +5,11 @@ import java.io.StringReader
 
 /**
  * Onion declares functions and methods with `def`, not the `fun` (Kotlin),
- * `func` (Swift/Go), or `fn` (Rust) keyword. None of those are keywords in
- * Onion, so the parser trips either on the declaration name that follows (at
- * statement position) or on the keyword itself (inside a class/interface body),
- * never mentioning `def`. The hint keys off the source line so both spellings
- * are covered.
+ * `func` (Swift/Go), `fn` (Rust), or `function` (JavaScript/TypeScript) keyword.
+ * None of those are keywords in Onion, so the parser trips either on the
+ * declaration name that follows (at statement position) or on the keyword
+ * itself (inside a class/interface body), never mentioning `def`. The hint
+ * keys off the source line so all spellings are covered.
  */
 class FunDeclarationHintSpec extends AbstractShellSpec {
   private def messages(src: String): String = {
@@ -43,14 +43,25 @@ class FunDeclarationHintSpec extends AbstractShellSpec {
       assert(msgs.contains("def"), s"expected a hint mentioning def, got: $msgs")
     }
 
+    it("hints at def for a JavaScript-style function declaration") {
+      val msgs = messages("function greet(): void { IO::println(\"hi\") }\n")
+      assert(msgs.contains("def"), s"expected a hint mentioning def, got: $msgs")
+      assert(msgs.contains("function"), s"expected the hint to name function, got: $msgs")
+    }
+
     it("does not fire for an unrelated bare-identifier-statement typo") {
       val msgs = messages("foo bar\n")
-      assert(!msgs.contains("declared with"), s"hint should not fire without a leading fun/func/fn, got: $msgs")
+      assert(!msgs.contains("declared with"), s"hint should not fire without a leading fun/func/fn/function, got: $msgs")
     }
 
     it("does not fire for a call to a method literally named fun") {
       val msgs = messages("val x = fun(1, 2)\n")
       assert(!msgs.contains("declared with"), s"hint should not fire for a fun(...) call, got: $msgs")
+    }
+
+    it("does not fire for a call to a method literally named function") {
+      val msgs = messages("val x = function(1, 2)\n")
+      assert(!msgs.contains("declared with"), s"hint should not fire for a function(...) call, got: $msgs")
     }
   }
 }

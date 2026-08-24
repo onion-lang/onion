@@ -261,17 +261,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val LeadingWhenStatement = """^\s*when\b""".r
 
   /**
-   * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
-   * declaration. None of these are keywords in Onion (which uses `def`), so at
-   * statement position the keyword parses as a bare identifier reference and the
-   * parser trips on the declaration name that follows, while inside a
-   * class/interface body it trips on the keyword itself -- neither mentions
-   * `def`. Matching the source line for `<kw> name(` catches both. A real call
-   * to a method named `fun`/`func`/`fn` is `fun(...)` with no name between the
-   * keyword and the paren, so it never matches; `fun name(` is not a valid Onion
-   * expression anyway.
+   * A Kotlin (`fun`), Swift/Go (`func`), Rust (`fn`), or JavaScript/TypeScript
+   * (`function`) function/method declaration. None of these are keywords in
+   * Onion (which uses `def`), so at statement position the keyword parses as a
+   * bare identifier reference and the parser trips on the declaration name
+   * that follows, while inside a class/interface body it trips on the keyword
+   * itself -- neither mentions `def`. Matching the source line for `<kw>
+   * name(` catches all of them. A real call to a method named
+   * `fun`/`func`/`fn`/`function` is `fun(...)` with no name between the
+   * keyword and the paren, so it never matches; `fun name(` is not a valid
+   * Onion expression anyway.
    */
-  private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
+  private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
    * A Kotlin-style extension-function declaration, `fun String.twice(): String { ... }`.

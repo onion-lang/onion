@@ -284,6 +284,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val ElifStatement = """\belif\b""".r
 
   /**
+   * A Ruby-style `elsif` clause chaining an `if`. `elsif` isn't a keyword in
+   * Onion (which chains with `else if`), so it parses as a bare
+   * identifier-reference statement and the parser trips on whatever follows
+   * it (the condition), never on `elsif` itself. Mirrors the `elif` hint
+   * above, matching anywhere on the line for the same reason.
+   */
+  private val ElsifStatement = """\belsif\b""".r
+
+  /**
    * A JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration. Unlike
    * `const`, `let` is not a keyword at all in Onion -- it lexes as a plain
    * identifier -- so `let x = 1` at statement position is read as a bare
@@ -569,6 +578,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.match_not_supported")
     case _ if ElifStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.elif_not_supported")
+    case _ if ElsifStatement.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.elsif_not_supported")
     case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.js_style_let")
     case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>

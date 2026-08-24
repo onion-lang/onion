@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Ruby-style `elsif` clause chaining an `if`.**
+  `elsif` is not a keyword in Onion (which chains with `else if`), so it parses
+  as a bare identifier reference and the parser trips on whatever follows it
+  (the condition), with a generic expected-token dump that never mentions
+  `else if`. Mirrors the existing Python-style `elif` hint.
+
 - **Parser hint for a Rust/Scala/OCaml-style `match value { ... }` expression.**
   `match` is not a keyword in Onion (which uses `select`), so it parses as a bare
   identifier reference and the parser trips on whatever follows it, with a generic

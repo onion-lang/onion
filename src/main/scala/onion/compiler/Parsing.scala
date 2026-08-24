@@ -275,28 +275,28 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
 
   /**
-   * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
-   * declaration. None of these are keywords in Onion (which uses `def`), so at
-   * statement position the keyword parses as a bare identifier reference and the
-   * parser trips on the declaration name that follows, while inside a
-   * class/interface body it trips on the keyword itself -- neither mentions
-   * `def`. Matching the source line for `<kw> name(` catches both. A real call
-   * to a method named `fun`/`func`/`fn` is `fun(...)` with no name between the
-   * keyword and the paren, so it never matches; `fun name(` is not a valid Onion
-   * expression anyway.
+   * A Kotlin (`fun`), Swift/Go (`func`), Rust (`fn`), or JS/TS/PHP (`function`)
+   * function/method declaration. None of these are keywords in Onion (which uses
+   * `def`), so at statement position the keyword parses as a bare identifier
+   * reference and the parser trips on the declaration name that follows, while
+   * inside a class/interface body it trips on the keyword itself -- neither
+   * mentions `def`. Matching the source line for `<kw> name(` catches all four
+   * spellings. A real call to a method named `fun`/`func`/`fn`/`function` is
+   * `fun(...)` with no name between the keyword and the paren, so it never
+   * matches; `fun name(` is not a valid Onion expression anyway.
    */
-  private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
+  private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
    * A Kotlin-style extension-function declaration, `fun String.twice(): String { ... }`.
-   * This is a more specific form of the `fun`/`func`/`fn` mistake above: the receiver-dot
-   * syntax means [[FunDeclaration]]'s `<kw> name(` pattern never matches -- the identifier
-   * directly after the keyword is the *receiver type*, followed by `.`, not `(` -- so without
-   * its own case this would fall through to the generic parse error instead of naming Onion's
-   * `extension` block. Capturing the receiver type and method name lets the hint show the
-   * exact rewrite instead of just pointing at `def`.
+   * This is a more specific form of the `fun`/`func`/`fn`/`function` mistake above: the
+   * receiver-dot syntax means [[FunDeclaration]]'s `<kw> name(` pattern never matches -- the
+   * identifier directly after the keyword is the *receiver type*, followed by `.`, not `(` --
+   * so without its own case this would fall through to the generic parse error instead of
+   * naming Onion's `extension` block. Capturing the receiver type and method name lets the
+   * hint show the exact rewrite instead of just pointing at `def`.
    */
-  private val FunExtensionDeclaration = """\b(?:fun|func|fn)\s+([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(""".r
+  private val FunExtensionDeclaration = """\b(?:fun|func|fn|function)\s+([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(""".r
 
   /**
    * A Java-style parenthesized catch clause, `catch (e: Exception) { }`. `catch`

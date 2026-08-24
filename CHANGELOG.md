@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a JS/TS/PHP-style `function name(...) { ... }` declaration.**
+  `function` is not a keyword in Onion (which uses `def`), so it parses as a bare
+  identifier reference and the parser trips on the declaration name that follows,
+  with a generic expected-token dump that never mentions `def`. The existing
+  `fun`/`func`/`fn` hint now also recognizes `function`, including the
+  `function Type.method(...)` extension-method mistake.
+
 ## [0.18.0] - 2026-08-24
 
 ### Fixed

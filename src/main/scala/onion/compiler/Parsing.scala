@@ -382,6 +382,21 @@ class Parsing(config: CompilerConfig) extends AnyRef
     """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
 
   /**
+   * The same Java-style method mistake as above, but preceded by a Java annotation --
+   * most commonly `@Override void method() { }`. `@Name` is real Onion syntax
+   * (`anns=annotations() "def" ...`), valid only directly before `def`, so the parser
+   * accepts the annotation token itself and only trips on the return-type identifier
+   * that follows, at member-declarator position -- with a raw modifier-keyword dump
+   * that mentions neither `def` nor that `@Override` isn't how Onion spells "this
+   * overrides a superclass method" in the first place (that's the `override` modifier
+   * keyword). Capturing the annotation name lets the message single out `@Override`
+   * for its own more specific rewrite, while any other annotation name still gets the
+   * general "add `def`" hint.
+   */
+  private val JavaStyleAnnotatedMethodDeclaration =
+    """^\s*(@[A-Za-z_]\w*)\s+[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+
+  /**
    * A Java-style field or local-variable declaration, `String name;` or
    * `String name = "x";`, that puts the type before the name instead of using
    * `val`/`var`. As a class member this trips the parser on the type identifier
@@ -530,6 +545,12 @@ class Parsing(config: CompilerConfig) extends AnyRef
     // expected-token dump that never mentions `val`/`var`.
     case "const" =>
       Message("error.parsing.hint.js_style_const")
+    case ann if ann.startsWith("@") && JavaStyleAnnotatedMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      val annotationName = JavaStyleAnnotatedMethodDeclaration.findFirstMatchIn(sourceLine).get.group(1)
+      if (annotationName == "@Override")
+        Message("error.parsing.hint.java_style_override_annotation")
+      else
+        Message("error.parsing.hint.java_style_annotated_method", annotationName)
     case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleImplements.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_implements", m.group(1), m.group(2).trim)

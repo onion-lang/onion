@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointing at `def main(args: String[]): void { ... }` or adding executable
   top-level statements.
 
+- **Parser hint for a Java-style `@Override void method() { }` declaration.**
+  `@Name` is real Onion syntax, but only directly before `def` -- so the parser
+  accepted the annotation and only tripped on the return-type identifier after it,
+  at member-declarator position, with a raw modifier-keyword dump that never
+  mentioned `def`, let alone that `@Override` isn't how Onion spells "this
+  overrides a superclass method" (that's the `override` modifier keyword). The
+  diagnostic now recognizes this shape and points at `override def method(): void
+  { ... }`; any other annotation name (e.g. `@Deprecated void method() { }`) still
+  gets the existing "add `def`" hint.
+
 ## [0.18.0] - 2026-08-24
 
 ### Fixed

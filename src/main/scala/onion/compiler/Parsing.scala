@@ -458,6 +458,28 @@ class Parsing(config: CompilerConfig) extends AnyRef
     """^\s*class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*(?:extends\s+[A-Za-z_][\w.\[\]]*(?:\([^)]*\))?\s*)?implements\s+([A-Za-z_][\w.\[\], ]*?)\s*\{?\s*$""".r
 
   /**
+   * Every hard keyword token in the grammar (the `K_*` productions in the lexer
+   * section) -- as opposed to a *soft* keyword like `conforms`/`from`/`shape`, which
+   * lexes as a plain `<ID>` and is only special-cased by a lookahead on its image, so
+   * it's always free to use as an identifier. A hard keyword can never appear where
+   * `id()` (`<ID> | <QUOTED_ID>`) is expected -- e.g. `val class = 5` or a `for`-loop
+   * naming a variable `type` -- so the parser trips on the keyword itself, with an
+   * expected-token dump of `<ID>, <QUOTED_ID>` that never mentions that a reserved
+   * word can still be used as an identifier by escaping it with backticks. `void` has
+   * two spellings, both reserved.
+   */
+  private val ReservedWords = Set(
+    "abstract", "and", "as", "Boolean", "break", "Byte", "case", "catch", "Char", "class",
+    "const", "continue", "def", "do", "Double", "else", "enum", "extends", "extension",
+    "false", "final", "finally", "Float", "for", "foreach", "forward", "goto", "if",
+    "import", "instance", "interface", "internal", "Int", "is", "Long", "module", "new",
+    "null", "or", "override", "private", "protected", "public", "record", "ret", "return",
+    "select", "self", "Short", "static", "super", "sealed", "synchronized", "this", "throw",
+    "throws", "trait", "true", "try", "type", "Unit", "val", "var", "void", "volatile",
+    "when", "while"
+  )
+
+  /**
    * A TypeScript/Kotlin-style union nullable type, `String | null`, in a type
    * position (a `val`/`var` declaration, a parameter, a return type). Onion
    * writes a nullable type with a trailing `?` (`String?`) -- `|` is never
@@ -558,6 +580,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
       val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
       Message("error.parsing.hint.trailing_lambda_parens", params)
+    case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
+      Message("error.parsing.hint.reserved_word_identifier", word)
     case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
       Message("error.parsing.hint.block_expected")
     case _ =>

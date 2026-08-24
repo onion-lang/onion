@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a reserved word used as an identifier, `val class = 5`.**
+  A hard keyword token (`class`, `type`, `case`, ...) can never appear where `id()`
+  (`<ID> | <QUOTED_ID>`) is expected, so the parser trips on the keyword itself with a
+  generic `expecting <ID>, <QUOTED_ID>` dump that never mentions that Onion lets a
+  reserved word be used as an identifier by escaping it with backticks (`` `class` ``).
+  The diagnostic now recognizes any of the grammar's hard keyword tokens in that
+  position and points at the backtick-escaped form, naming the captured word. A *soft*
+  keyword like `conforms`/`from`/`shape` -- which lexes as a plain `<ID>` and is
+  already a legal identifier on its own -- is unaffected.
+
 - **Parser hint for a JS/TS-style `const x = 1` variable declaration.**
   `const` is a reserved keyword token (`K_CONST`) that no grammar production ever
   references -- Onion declares variables with `val` (immutable) or `var` (mutable) --

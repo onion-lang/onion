@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a TypeScript/Kotlin-style union nullable type, `String | null`.**
+  Onion writes a nullable type with a trailing `?` (`String?`) -- `|` is never valid inside
+  a type, so the parser accepts the base type and then trips right on the `|`, with an
+  expected-token dump that never mentions `?`. The diagnostic now recognizes `Type | null`
+  in any type position (a `val`/`var` declaration, a parameter, a return type) and points
+  at the correct `Type?` form, naming the captured type.
+
 - **Parser hint for a JS/TS-style `const x = 1` variable declaration.**
   `const` is a reserved keyword token (`K_CONST`) that no grammar production ever
   references -- Onion declares variables with `val` (immutable) or `var` (mutable) --

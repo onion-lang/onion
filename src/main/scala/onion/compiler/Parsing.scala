@@ -479,6 +479,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
     "when", "while"
   )
 
+  /**
+   * A TypeScript/Kotlin-style union nullable type, `String | null`, in a type
+   * position (a `val`/`var` declaration, a parameter, a return type). Onion
+   * writes a nullable type with a trailing `?` (`String?`) -- `|` is never
+   * valid inside a type, so the parser accepts the base type and then trips
+   * right on the `|`, with an expected-token dump that never mentions `?`.
+   * Requiring a preceding `:` (the start of any type position) directly
+   * followed by a type name, `|`, and `null` keeps this from firing on an
+   * ordinary bitwise-or expression, whose right-hand side is essentially
+   * never the literal `null`.
+   */
+  private val NullableUnionType = """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
@@ -550,6 +563,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case "(" if expected.contains("{") && JavaStyleTryResource.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleTryResource.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_try_resource", m.group(1), m.group(2))
+    case "|" if NullableUnionType.findFirstMatchIn(sourceLine).isDefined =>
+      val m = NullableUnionType.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.nullable_union_type", m.group(1))
     // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
     // ground as an expression, so unlike the hints above this isn't a token swap;
     // name the rewrite so the reader isn't left guessing what "unsupported" means here.

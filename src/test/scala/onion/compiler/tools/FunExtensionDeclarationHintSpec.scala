@@ -34,6 +34,12 @@ class FunExtensionDeclarationHintSpec extends AbstractShellSpec {
       assert(msgs.contains("doubled"), s"expected the hint to name the method, got: $msgs")
     }
 
+    it("hints at an extension block for a function-spelled receiver method") {
+      val msgs = messages("function Int.doubled(): Int { return this * 2 }\n")
+      assert(msgs.contains("extension"), s"expected a hint mentioning extension, got: $msgs")
+      assert(msgs.contains("doubled"), s"expected the hint to name the method, got: $msgs")
+    }
+
     it("still hints at def (not extension) for a receiver-less fun declaration") {
       val msgs = messages("fun greet(): void { IO::println(\"hi\") }\n")
       assert(msgs.contains("def"), s"expected a hint mentioning def, got: $msgs")

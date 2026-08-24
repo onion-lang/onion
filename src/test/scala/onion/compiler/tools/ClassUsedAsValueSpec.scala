@@ -44,7 +44,7 @@ class ClassUsedAsValueSpec extends AbstractShellSpec {
         |""".stripMargin
     )
     assert(!codes.contains("E0002"), s"expected the dedicated hint, not the generic not-found error, got: $codes")
-    assert(codes.exists(c => c != "E0002"), s"expected some error to be reported, got: $codes")
+    assert(codes.contains("E0091"), s"expected the dedicated CLASS_USED_AS_VALUE code E0091, got: $codes")
   }
 
   it("names the :: fix in the message") {

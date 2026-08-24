@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recognizes a leading `when` and points at the correct `select value { case 1: ...; else: ... }`
   form, the same way the existing `switch` hint does.
 
+- **Parser hint for a Java-style `implements` clause, `class A implements I { ... }`.**
+  Onion names interfaces with `conforms`, not `implements` -- and `implements` is not a
+  keyword at all, so it lexes as a plain identifier. A class header with no
+  `extends`/`conforms`/`{` after the name is already a complete, body-less class
+  declaration, so `implements Interface` is read as the start of a brand new top-level
+  statement: a bare reference to the identifier `implements`, immediately followed by the
+  interface name, where only a statement terminator is valid. The parser trips on the
+  interface name several tokens past the actual mistake, with an expected-token dump that
+  never mentions `conforms`. The diagnostic now recognizes `class A implements I` (with or
+  without a preceding `extends`, and with multiple comma-separated interfaces) and points at
+  the correct `class A conforms I` form, naming the captured class and interface list.
+
 ## [0.17.0] - 2026-08-23
 
 ### Fixed

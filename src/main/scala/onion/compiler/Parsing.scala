@@ -440,11 +440,31 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val JavaStyleTryResource =
     """\btry\s*\(\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*=""".r
 
+  /**
+   * A Java-style `class A implements I { ... }` declaration. `implements` is not a
+   * keyword in Onion -- interfaces are named with `conforms` -- so it lexes as a
+   * plain identifier. A class header with no `extends`/`conforms`/`{` after the name
+   * (optionally with a primary-constructor parameter list) is already a complete,
+   * body-less class declaration, so `implements Interface` is read as the start of a
+   * brand new top-level statement: a bare reference to the identifier `implements`,
+   * immediately followed by the interface name, where only a statement terminator
+   * is valid. The parser trips on the interface name several tokens past the actual
+   * mistake, with an expected-token dump (`<EOF>`, `<EOL>`, `;`) that never mentions
+   * `conforms`. Anchoring on `class` (reserved, never an identifier) at the start of
+   * the line keeps this from firing on an unrelated use of `implements` as an
+   * ordinary identifier elsewhere.
+   */
+  private val JavaStyleImplements =
+    """^\s*class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*(?:extends\s+[A-Za-z_][\w.\[\]]*(?:\([^)]*\))?\s*)?implements\s+([A-Za-z_][\w.\[\], ]*?)\s*\{?\s*$""".r
+
   private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
     case "<:" =>
       Message("error.parsing.hint.old_conforms")
+    case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
+      val m = JavaStyleImplements.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.java_style_implements", m.group(1), m.group(2).trim)
     case ":" if JavaStyleTypeCase.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.case_type_colon")
     case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>

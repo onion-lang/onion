@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointing at `def main(args: String[]): void { ... }` or adding executable
   top-level statements.
 
+- **Parser hint for a Python-style `elif` clause.**
+  `elif` is not a keyword in Onion (which chains with `else if`), so it parses
+  as a bare identifier reference and the parser trips on whatever follows it
+  (the condition), with a generic expected-token dump that never mentions
+  `else if`. Unlike the `switch`/`when`/`match` hints, `elif` almost never
+  starts a source line -- it typically follows the closing `}` of the
+  preceding branch on the same line (`} elif b { ... }`) -- so the diagnostic
+  matches the keyword anywhere on the line instead of anchoring at the start.
+
 ## [0.18.0] - 2026-08-24
 
 ### Fixed

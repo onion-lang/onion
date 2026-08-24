@@ -396,6 +396,7 @@ These are frequently confused with other languages. **Always check these:**
 | `if (condition) { }` | `if condition { }` - no parentheses around condition |
 | `while (condition) { }` | `while condition { }` - no parentheses |
 | `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
+| `elif condition { }` (Python) | `else if condition { }` - no `elif` keyword, chain with `else if` |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |

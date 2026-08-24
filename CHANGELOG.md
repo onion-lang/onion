@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a JS/TS-style `const x = 1` variable declaration.**
+  `const` is a reserved keyword token (`K_CONST`) that no grammar production ever
+  references -- Onion declares variables with `val` (immutable) or `var` (mutable) --
+  so meeting it can only mean this mistake. It trips the parser immediately, at
+  either top level or inside a block, with a generic expected-token dump that
+  never mentions `val`/`var`. The diagnostic now recognizes a leading `const` and
+  points at the correct `val name: Type = value` (or `var`, if it changes) form.
+
 - **Parser hint for a Java-style try-with-resources declaration, `try (Res r = new Res()) { ... }`.**
   Onion's resource clause always starts with `val` before the name (`try (val r = new Res())`) --
   never with the type before it, and never `var`. The clause's grammar is only attempted with a

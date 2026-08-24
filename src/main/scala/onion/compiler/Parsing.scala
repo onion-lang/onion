@@ -261,6 +261,20 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val LeadingWhenStatement = """^\s*when\b""".r
 
   /**
+   * A JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration. Unlike
+   * `const`, `let` is not a keyword at all in Onion -- it lexes as a plain
+   * identifier -- so `let x = 1` at statement position is read as a bare
+   * identifier-reference statement (`let`) immediately followed by another
+   * identifier (`x`), where only a statement terminator is valid. The parser
+   * trips on the name one token past the actual mistake, with an
+   * expected-token dump that never mentions `val`/`var`. Requiring a space
+   * before the following identifier (rather than `(` or `=`) keeps this from
+   * firing on a call to a function literally named `let` (`let(x)`) or a
+   * reassignment of a variable literally named `let` (`let = 1`).
+   */
+  private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+
+  /**
    * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
    * declaration. None of these are keywords in Onion (which uses `def`), so at
    * statement position the keyword parses as a bare identifier reference and the
@@ -528,6 +542,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.switch_not_supported")
     case "when" if LeadingWhenStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.when_not_supported")
+    case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.js_style_let")
     case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       val m = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.fun_extension_declaration", m.group(1), m.group(2))

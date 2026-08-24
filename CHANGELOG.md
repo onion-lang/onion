@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never mentions `val`. The diagnostic now recognizes `try (Type name = ...)` and points at the
   correct `try (val name: Type = ...)` form, naming the captured type and name.
 
+- **Parser hint for a Kotlin-style `when` expression, `when (x) { ... }`.**
+  Onion has no standalone `when` control-flow keyword -- `select` covers the same ground.
+  Unlike `switch`, `when` IS reserved in Onion, but only as the case-guard keyword
+  (`case p when guard:`), so opening a block with it at statement position trips the parser
+  right on the `when` token itself, with an expected-token dump that names whatever would
+  legally close the enclosing block instead -- never mentioning `select`. The diagnostic now
+  recognizes a leading `when` and points at the correct `select value { case 1: ...; else: ... }`
+  form, the same way the existing `switch` hint does.
+
 ## [0.17.0] - 2026-08-23
 
 ### Fixed

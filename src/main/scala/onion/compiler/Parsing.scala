@@ -249,6 +249,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val LeadingSwitchStatement = """^\s*switch\b""".r
 
   /**
+   * A Kotlin-style `when` expression used as a statement, `when (x) { ... }` or
+   * `when x { ... }`. Unlike `switch`, `when` IS reserved in Onion -- but only
+   * as the case-guard keyword (`case p when guard:`) -- so opening a block with
+   * it at statement position trips the parser right on the `when` token itself,
+   * with an expected-token dump that names whatever would legally close the
+   * enclosing block instead, never mentioning `select`. Matching for `when` at
+   * the start of the line (mirroring the `switch` hint) keeps this from firing
+   * on a guard clause elsewhere on the line.
+   */
+  private val LeadingWhenStatement = """^\s*when\b""".r
+
+  /**
    * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
    * declaration. None of these are keywords in Onion (which uses `def`), so at
    * statement position the keyword parses as a bare identifier reference and the
@@ -451,6 +463,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_for_in")
     case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.switch_not_supported")
+    case "when" if LeadingWhenStatement.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.when_not_supported")
     case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       val m = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.fun_extension_declaration", m.group(1), m.group(2))

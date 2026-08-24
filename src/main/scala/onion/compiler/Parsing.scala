@@ -462,6 +462,14 @@ class Parsing(config: CompilerConfig) extends AnyRef
     // `<:` no longer appears in any production, so meeting one can only be old source.
     case "<:" =>
       Message("error.parsing.hint.old_conforms")
+    // `const` is a reserved keyword token (K_CONST) that no production ever
+    // references, so it can only reach the parser as a JS/TS-style `const x = 1`
+    // variable declaration. It trips the parser immediately -- at statement
+    // position `const` fits no production (a generic top-level or member dump),
+    // and inside a block it isn't a valid statement start either -- with an
+    // expected-token dump that never mentions `val`/`var`.
+    case "const" =>
+      Message("error.parsing.hint.js_style_const")
     case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleImplements.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_implements", m.group(1), m.group(2).trim)

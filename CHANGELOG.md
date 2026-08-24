@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration.**
+  `let` is not a keyword at all in Onion -- it lexes as a plain identifier -- so
+  `let x = 1` at statement position is read as a bare identifier-reference statement
+  (`let`) immediately followed by another identifier (`x`), where only a statement
+  terminator is valid. The parser trips on the name one token past the actual mistake,
+  with an expected-token dump that never mentions `val`/`var`. The diagnostic now
+  recognizes a leading `let name` and points at the correct `val name: Type = value`
+  (or `var`, if it changes) form, the same way the existing `const` hint does.
+
 - **Parser hint for a reserved word used as an identifier, `val class = 5`.**
   A hard keyword token (`class`, `type`, `case`, ...) can never appear where `id()`
   (`<ID> | <QUOTED_ID>`) is expected, so the parser trips on the keyword itself with a

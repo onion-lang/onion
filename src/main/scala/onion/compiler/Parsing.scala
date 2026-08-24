@@ -261,6 +261,17 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val LeadingWhenStatement = """^\s*when\b""".r
 
   /**
+   * A Rust/Scala/OCaml-style `match` expression at the start of a source line.
+   * `match` isn't a keyword in Onion -- it parses as a bare identifier-reference
+   * statement -- so the parser actually trips on whatever follows it (the
+   * scrutinee, or the `{` of a parenthesized scrutinee), never on `match`
+   * itself. Matching the *line*, not the token that triggered the error,
+   * catches `match x { ... }` and `match (x) { ... }` alike (mirroring the
+   * `switch` hint).
+   */
+  private val LeadingMatchStatement = """^\s*match\b""".r
+
+  /**
    * A JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration. Unlike
    * `const`, `let` is not a keyword at all in Onion -- it lexes as a plain
    * identifier -- so `let x = 1` at statement position is read as a bare
@@ -542,6 +553,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.switch_not_supported")
     case "when" if LeadingWhenStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.when_not_supported")
+    case _ if LeadingMatchStatement.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.match_not_supported")
     case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.js_style_let")
     case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>

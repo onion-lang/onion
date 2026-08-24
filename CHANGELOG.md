@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Rust/Scala/OCaml-style `match value { ... }` expression.**
+  `match` is not a keyword in Onion (which uses `select`), so it parses as a bare
+  identifier reference and the parser trips on whatever follows it, with a generic
+  expected-token dump that never mentions `select`. The diagnostic now recognizes
+  a leading `match` at the start of a statement, unparenthesized or parenthesized,
+  the same way the existing `switch`/`when` hints do.
+
 - **Parser hint for a JS/TS/PHP-style `function name(...) { ... }` declaration.**
   `function` is not a keyword in Onion (which uses `def`), so it parses as a bare
   identifier reference and the parser trips on the declaration name that follows,

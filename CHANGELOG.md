@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java-style annotated method, `@Override void method() { ... }`.**
+  Onion annotations are real syntax -- `@Override def method(): void { ... }` parses
+  fine -- but a Java override almost always brings its other mistake along too: no
+  `def`, and the return type before the name. `annotations()` consumes `@Override`
+  without complaint, and the grammar right after it requires the literal `def`
+  token, so when a Java-style declaration follows instead, the parser doesn't trip
+  on `void` or the method name a few tokens later -- it trips right back on the
+  `@Override` token itself, with an expected-token dump listing `modifiers()`'s
+  keywords (`abstract`, `final`, `internal`, `override`, ...) that never mentions
+  `def`, even though the annotation was never the problem. The diagnostic now
+  recognizes an annotation directly followed by a Java-style method declaration
+  (on the same line or the next) and points at the correct `@Override def
+  method(): void { ... }` form, naming the captured annotation.
+
 - **Parser hint for a Python-style `except` clause on a `try` block.**
   `except` is not a keyword in Onion (which catches with `catch`), so it parses
   as a bare identifier-reference statement and the parser trips on whatever

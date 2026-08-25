@@ -533,6 +533,24 @@ class Parsing(config: CompilerConfig) extends AnyRef
     """^\s*class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*(?:extends\s+[A-Za-z_][\w.\[\]]*(?:\([^)]*\))?\s*)?implements\s+([A-Za-z_][\w.\[\], ]*?)\s*\{?\s*$""".r
 
   /**
+   * A Java-style annotated method, `@Override void method() { ... }`, that keeps
+   * Java's `@Override` but drops `def` and puts the return type before the name --
+   * the two mistakes an actual Java override almost always brings together. Onion's
+   * annotations are real syntax (`annotations()` in the grammar) and `@Override def
+   * method(): void { ... }` is valid -- the grammar right after an annotation just
+   * requires the literal `def` token. When a Java-style declaration follows instead,
+   * the parser trips right back on the `@Override` token itself (not on `void` or the
+   * method name, several tokens later), with an expected-token dump listing
+   * `modifiers()`'s keywords (`abstract`, `final`, `internal`, `override`, ...) that
+   * never mentions `def` -- even though the annotation itself was never the problem.
+   * Matched against `context` (the text starting at the found token, like
+   * [[DotAfterPrimitiveTypeName]] above) rather than `sourceLine`, since the
+   * mistaken method can follow the annotation either on the same line or the next.
+   */
+  private val JavaStyleAnnotatedMethod =
+    """\A@([A-Za-z_]\w*)\s+(?:public|private|protected)?\s*(?!public\b|private\b|protected\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+
+  /**
    * Every hard keyword token in the grammar (the `K_*` productions in the lexer
    * section) -- as opposed to a *soft* keyword like `conforms`/`from`/`shape`, which
    * lexes as a plain `<ID>` and is only special-cased by a lookahead on its image, so
@@ -583,6 +601,13 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
       val m = JavaStyleImplements.findFirstMatchIn(sourceLine).get
       Message("error.parsing.hint.java_style_implements", m.group(1), m.group(2).trim)
+    // Checked early, on `found` rather than `sourceLine`/`context` alone: an annotation
+    // token can only reach the parser at all through this failure mode (a valid
+    // `@Override def ...` never errors), so this is safe to try before the other
+    // `java_style_*` cases below, which never match starting with `@`.
+    case _ if found.startsWith("@") && JavaStyleAnnotatedMethod.findFirstMatchIn(context).isDefined =>
+      val m = JavaStyleAnnotatedMethod.findFirstMatchIn(context).get
+      Message("error.parsing.hint.java_style_annotated_method", m.group(1))
     case ":" if JavaStyleTypeCase.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.case_type_colon")
     case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>

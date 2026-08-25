@@ -341,6 +341,16 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val CStyleForLoop = """^\s*for\s*\(""".r
 
   /**
+   * A `foreach` with a parenthesized loop head, `foreach (x in xs) { }`. `foreach`
+   * itself only takes parentheses for the two-variable map-destructuring form
+   * (`foreach (k, v) in map { }`); a single variable is never parenthesized. `foreach`
+   * cannot appear as an identifier (it is reserved), so a `foreach\s*\(` earlier on the
+   * line -- checked once the parser has already tripped on `in` expecting a `,` -- can
+   * only be the single-variable form written with stray parens.
+   */
+  private val ForeachParenMistake = """\bforeach\s*\(""".r
+
+  /**
    * A Java/C#-style unbraced `import java.util.List;` (or wildcard/no-semicolon variant).
    * Onion's `import` decl always wraps its targets in braces -- `import { java.util.List }`
    * -- so the parser consumes the `import` keyword and then trips on the identifier that
@@ -559,6 +569,16 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.old_super_init")
     case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.catch_parens")
+    // `foreach` only takes parentheses for the two-variable map-destructuring form,
+    // `foreach (k, v) in map { ... }` -- a single loop variable is never parenthesized
+    // (`foreach x: Type in xs { ... }`). Writing the Java/Kotlin/JS-style
+    // `foreach (x in xs) { ... }` makes the parser take the map-destructuring branch,
+    // consume `x` as the key, and then trip on `in` expecting a `,`. Without this case
+    // that falls through to the generic `old_for_in` hint below, which tells the writer
+    // to abandon `foreach` for a C-style loop -- the wrong advice when they already
+    // reached for the right construct and just added stray parentheses.
+    case "in" if ForeachParenMistake.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.foreach_parens")
     case "in" =>
       Message("error.parsing.hint.old_for_in")
     case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>

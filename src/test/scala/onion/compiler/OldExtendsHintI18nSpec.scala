@@ -7,7 +7,7 @@ import java.io.StringReader
 
 /**
  * The symbolic `:` spelling of superclass inheritance, replaced by `extends`.
- * `commonSyntaxHint`'s `case ":" if expected.contains("extends")` fires when the
+ * `SyntaxHintClassifier`'s `case ":" if expected.contains("extends")` fires when the
  * parser trips on `:` right where a superclass name would follow `extends` --
  * like every other hint in that match, the message must resolve through the
  * bilingual `error.parsing.hint.*` bundle in both locales; see

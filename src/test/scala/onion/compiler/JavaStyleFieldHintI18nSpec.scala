@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The Java-style-field hint (`commonSyntaxHint`'s `JavaStyleFieldDeclaration` case) must
+ * The Java-style-field hint (`SyntaxHintClassifier`'s `JavaStyleFieldDeclaration` case) must
  * resolve through the bilingual `error.parsing.hint.*` bundle in both locales, like every
  * other hint in that match -- see OldForInHintI18nSpec for the motivating regression.
  */

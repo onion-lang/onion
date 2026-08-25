@@ -4,7 +4,7 @@ import org.scalatest.diagrams.Diagrams
 import org.scalatest.funspec.AnyFunSpec
 
 /**
- * The `catch (e: Exception) { }` hint (`commonSyntaxHint`'s parenthesized-catch
+ * The `catch (e: Exception) { }` hint (`SyntaxHintClassifier`'s parenthesized-catch
  * case in Parsing.scala) must resolve in both locale bundles, with the Japanese
  * entry actually written in Japanese rather than falling back to English.
  */

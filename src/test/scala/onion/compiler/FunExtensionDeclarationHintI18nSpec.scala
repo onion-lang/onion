@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The Kotlin-style extension-function hint (`commonSyntaxHint`'s `FunExtensionDeclaration`
+ * The Kotlin-style extension-function hint (`SyntaxHintClassifier`'s `FunExtensionDeclaration`
  * case) must resolve through the bilingual `error.parsing.hint.*` bundle in both locales,
  * like every other hint in that match -- see OldForInHintI18nSpec for the motivating
  * regression.

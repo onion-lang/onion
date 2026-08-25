@@ -9,7 +9,7 @@ import java.io.StringReader
  * The removed anonymous super-call constructor form, `def this(x) : (x) { }`.
  * After the colon the parser now expects only `this` (delegating with
  * `: this(...)`), so tripping on a `(` there is a strong signal of the old
- * form -- `commonSyntaxHint`'s `case "(" if expected.contains("\"this\"") ...`
+ * form -- `SyntaxHintClassifier`'s `case "(" if expected.contains("\"this\"") ...`
  * -- like every other hint in that match, the message must resolve through the
  * bilingual `error.parsing.hint.*` bundle in both locales; see
  * OldForInHintI18nSpec for the motivating regression.

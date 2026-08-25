@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The foreach-parens hint (`commonSyntaxHint`'s `ForeachParenMistake` case) must
+ * The foreach-parens hint (`SyntaxHintClassifier`'s `ForeachParenMistake` case) must
  * resolve through the bilingual `error.parsing.hint.*` bundle in both locales,
  * like every other hint in that match -- see OldForInHintI18nSpec for the
  * motivating regression.

@@ -7,7 +7,7 @@ import java.io.StringReader
 
 /**
  * The trailing-lambda arrow used to be `=>`; it is `->` now, the same as every
- * other arrow in the language (`commonSyntaxHint`'s `OldArrowTrailingLambdaHead`
+ * other arrow in the language (`SyntaxHintClassifier`'s `OldArrowTrailingLambdaHead`
  * case). The functional behavior is covered by TrailingLambdaParenHintSpec, but
  * like every other hint in that match, the message must also resolve through
  * the bilingual `error.parsing.hint.*` bundle in both locales; see

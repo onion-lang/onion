@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The JS-style-`let` hint (`commonSyntaxHint`'s `LeadingLetDeclaration`
+ * The JS-style-`let` hint (`SyntaxHintClassifier`'s `LeadingLetDeclaration`
  * case) must resolve through the bilingual `error.parsing.hint.*` bundle in
  * both locales, like every other hint in that match -- see
  * JsStyleConstHintI18nSpec for the same pattern.

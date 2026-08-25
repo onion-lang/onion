@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The reserved-word-as-identifier hint (`commonSyntaxHint`'s `ReservedWords`
+ * The reserved-word-as-identifier hint (`SyntaxHintClassifier`'s `ReservedWords`
  * case) must resolve through the bilingual `error.parsing.hint.*` bundle in
  * both locales, like every other hint in that match -- see
  * JavaStyleImplementsHintI18nSpec for the same pattern.

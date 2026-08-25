@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Java/JavaScript-style `default:` case inside a `select` block.**
+  Onion's `select` has no `default` label -- the catch-all arm is `else` -- so
+  `default:` parses as a bare identifier-reference statement and the parser
+  trips on the colon that follows it, with a generic expected-token dump that
+  never mentions `else`. The diagnostic now recognizes a leading `default:`
+  case label and points at the correct `select value { case 1: ...; else: ... }`
+  form.
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

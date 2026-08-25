@@ -105,3 +105,20 @@ direct test seam without widening a compiler API.
 Invariant: coordinates stay 1-based, context remains capped at 200 characters
 and may cross line boundaries, the complete source line is not truncated, and
 a line beyond the source produces empty values.
+
+## D010: keep terminal and recovery expected-token formatters separate
+
+Decision: `parser.ExpectedTokenFormatter` renders JavaCC expected-token
+metadata for terminal `ParseException` diagnostics. The generated grammar's
+`expectedSummary` method continues to render recovery-collected diagnostics.
+
+Reason: terminal rendering is deterministic and directly testable without
+parser or localization state. The recovery formatter runs inside generated
+JavaCC code and has different existing punctuation and truncation behavior;
+unifying the two would cross the generation boundary and change diagnostics,
+which is outside this refactoring slice.
+
+Invariant: terminal formatting keeps the null/empty fallback, considers only
+the first token of each sequence, deduplicates in encounter order, joins one to
+three tokens with the existing separators, and preserves the four-token
+truncation boundary exactly, including the existing `... (0 more)` result.

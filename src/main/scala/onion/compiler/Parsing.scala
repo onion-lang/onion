@@ -341,6 +341,22 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val CStyleForLoop = """^\s*for\s*\(""".r
 
   /**
+   * A Java/Python/JS-style `for (a, b) in xs { ... }` (or unparenthesized
+   * `for a, b in xs { ... }`) loop, meant to destructure map entries or walk
+   * a collection with `for` instead of `foreach`. The comma right after `for`
+   * (optionally inside parens) is what the parser trips on -- either as an
+   * unexpected token inside a would-be C-style init clause (parenthesized
+   * form) or as an unexpected token where only a statement terminator is
+   * valid (unparenthesized form) -- so without a dedicated check this falls
+   * through to the generic C-style-`for` hint above, which recommends a
+   * numeric-index rewrite that has nothing to do with the actual mistake.
+   * Checked *before* [[CStyleForLoop]], whose broader `for\s*\(` pattern
+   * would otherwise shadow the parenthesized form of this one.
+   */
+  private val ForEachDestructureMistake =
+    """^\s*for\s*\(?\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*\)?\s*in\s+([^{]+?)\s*\{?\s*$""".r
+
+  /**
    * A Java/C#-style unbraced `import java.util.List;` (or wildcard/no-semicolon variant).
    * Onion's `import` decl always wraps its targets in braces -- `import { java.util.List }`
    * -- so the parser consumes the `import` keyword and then trips on the identifier that
@@ -583,6 +599,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
     case name if PrimitiveTypeNames.contains(name) && DotAfterPrimitiveTypeName.findFirstMatchIn(context).isDefined =>
       val member = DotAfterPrimitiveTypeName.findFirstMatchIn(context).get.group(1)
       Message("error.parsing.hint.primitive_dot_static", name, member)
+    case _ if ForEachDestructureMistake.findFirstMatchIn(sourceLine).isDefined =>
+      val m = ForEachDestructureMistake.findFirstMatchIn(sourceLine).get
+      Message("error.parsing.hint.for_each_destructure", m.group(1), m.group(2).trim)
     case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.c_style_for")
     case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>

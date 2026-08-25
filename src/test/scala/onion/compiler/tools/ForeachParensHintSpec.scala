@@ -38,7 +38,7 @@ class ForeachParensHintSpec extends AbstractShellSpec {
           |""".stripMargin
       ).mkString("\n")
       assert(msgs.contains("foreach"), s"expected the hint to mention foreach, got: $msgs")
-      assert(!msgs.contains("C-style loop"), s"hint should not fall back to the for-in advice, got: $msgs")
+      assert(!msgs.contains("for var i"), s"hint should not fall back to the for-in advice, got: $msgs")
     }
 
     it("does not fire for the valid two-variable map-destructuring form") {
@@ -74,7 +74,7 @@ class ForeachParensHintSpec extends AbstractShellSpec {
           |}
           |""".stripMargin
       ).mkString("\n")
-      assert(msgs.contains("C-style loop"), s"expected the old for-in hint to still fire, got: $msgs")
+      assert(msgs.contains("for var i"), s"expected the old for-in hint to still fire, got: $msgs")
     }
   }
 }

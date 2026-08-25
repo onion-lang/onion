@@ -49,9 +49,13 @@ under `target/`. `Parsing.scala` owns:
 - source reading and shebang removal;
 - JavaCC construction and recovery configuration;
 - conversion of collected and terminal parse errors;
-- source offset, line, and context extraction;
 - expected-token rendering;
 - localization and final parse-error assembly.
+
+`parser.SourceContext` owns the pure conversion from a 1-based parser position
+to the bounded lookahead context and complete source line consumed by syntax
+hints. Collected and terminal parse errors use the same helper and calculate
+both values once per error.
 
 `parser.SyntaxHintClassifier` owns the ordered regular-expression policy for
 more than thirty friendly syntax hints. It returns a message key and literal
@@ -113,11 +117,11 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
 
 ## Tests and CI
 
-- `testFull` currently executes 4,140 tests across 568 suites.
+- `testFull` currently executes 4,151 tests across 571 suites.
 - The default phase order and failure short-circuit are covered by
   `PipelineRunnerSpec`.
-- Parser hint behavior is covered by a direct pure classifier suite plus
-  focused end-to-end and localization suites.
+- Parser hint behavior is covered by direct pure source-context and classifier
+  suites plus focused end-to-end and localization suites.
 - `Test / parallelExecution := false` protects global output-capture behavior.
 - `.github/workflows/scala.yml` runs `sbt -v +test`, not the documented English
   and Japanese `testFull` quality gate.
@@ -131,8 +135,8 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
   tools, effects, Shapes, and typed boundaries shipped.
 - `docs/parser-refactoring.md` describes a desired parser/AST-builder split as
   if it were the complete current architecture; `Parsing.scala` still owns
-  source context, expected-token rendering, recovery, localization, and final
-  parse-error assembly.
+  expected-token rendering, recovery, localization, and final parse-error
+  assembly.
 - compiler architecture docs mention `StatementTyping.scala`, which no longer
   exists after expression-oriented block lowering.
 - contributor docs recommend `sbt test`, while the quality bar defines fresh

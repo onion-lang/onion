@@ -89,3 +89,19 @@ Reason: these files record maintainer-facing measurements, sequencing, and
 temporary implementation status. The existing architecture and contributor
 documentation remains the stable public entry point, while the MkDocs coverage
 gate still verifies that the exclusion is intentional.
+
+## D009: represent parser hint source input as one pure value
+
+Decision: `parser.SourceContext.at` converts a 1-based parser position into the
+bounded context starting at the reported column and the complete reported
+source line. `Parsing` calculates this value once for each collected or
+terminal parse error.
+
+Reason: both parse-error paths previously repeated the same private offset and
+substring work. The calculation has no dependency on JavaCC state,
+localization, or diagnostic rendering, so a parser-local pure helper gives it a
+direct test seam without widening a compiler API.
+
+Invariant: coordinates stay 1-based, context remains capped at 200 characters
+and may cross line boundaries, the complete source line is not truncated, and
+a line beyond the source produces empty values.

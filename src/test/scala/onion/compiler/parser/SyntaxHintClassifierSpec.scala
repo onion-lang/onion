@@ -86,6 +86,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       block.arguments shouldBe empty
     }
 
+    it("recognizes a C-style cast") {
+      val hint = classify(
+        found = "o",
+        expected = "<EOL>",
+        sourceLine = "    val s: String = (String) o"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.c_style_cast"
+      hint.arguments shouldBe Seq("String")
+    }
+
+    it("recognizes a C-style cast of a generic type") {
+      val hint = classify(
+        found = "coll",
+        expected = "<EOL>",
+        sourceLine = "val xs = (List[String]) coll"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.c_style_cast"
+      hint.arguments shouldBe Seq("List[String]")
+    }
+
+    it("does not confuse the real `(expr as Type)` cast with a C-style cast") {
+      SyntaxHintClassifier.classify(
+        found = "as",
+        expected = "\")\"",
+        context = "",
+        sourceLine = "val s: String = (o as String)"
+      ) shouldBe None
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

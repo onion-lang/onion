@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case label and points at the correct `select value { case 1: ...; else: ... }`
   form.
 
+- **Parser hint for a C/Java/C#-style prefix type cast, `(Type) expr`.**
+  Onion casts are written postfix with `as` (`expr as Type`); the C-style
+  prefix form parses as a parenthesized expression followed by a stray
+  second expression, and the raw expected-token dump never mentions `as`.
+  The diagnostic now recognizes `(Type) expr` (including generic and
+  array/nullable type spellings) and points at the correct
+  `(expr as Type)` form.
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

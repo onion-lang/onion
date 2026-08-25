@@ -66,6 +66,8 @@ private[compiler] object SyntaxHintClassifier {
   )
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
+  private val CStyleCast =
+    """\(\s*([A-Z][\w.\[\]]*\??)\s*\)\s*[A-Za-z_$(]""".r
 
   def classify(
     found: String,
@@ -150,6 +152,9 @@ private[compiler] object SyntaxHintClassifier {
       case "|" if NullableUnionType.findFirstMatchIn(sourceLine).isDefined =>
         val matched = NullableUnionType.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.nullable_union_type", matched.group(1))
+      case _ if CStyleCast.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = CStyleCast.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.c_style_cast", matched.group(1))
       case "?" =>
         hint("error.parsing.hint.ternary")
       case "else" =>

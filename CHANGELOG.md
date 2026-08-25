@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wording was also updated to mention `foreach x: Type in xs { ... }` -- the actual
   idiomatic form -- instead of only suggesting a C-style loop.
 
+- **Parser hint for a Java/Kotlin/JS-style parenthesized `foreach (x in xs) { ... }` loop.**
+  `foreach` only takes parentheses for the two-variable map-destructuring form,
+  `foreach (k, v) in map { ... }` -- a single loop variable is never parenthesized
+  (`foreach x: Type in xs { ... }`). Writing `foreach (x in xs)` made the parser take
+  the map-destructuring branch, consume `x` as the key, and trip on `in` expecting a
+  `,`, which surfaced the unrelated "Onion does not support `for x in xs`, use a
+  C-style loop" hint -- confusing advice, since `foreach` is already the right
+  construct and the only mistake is the stray parentheses. The diagnostic now
+  recognizes a parenthesized `foreach` head and points at both correct forms.
+
 - **Parser hint for a Rust/Scala/OCaml-style `match value { ... }` expression.**
   `match` is not a keyword in Onion (which uses `select`), so it parses as a bare
   identifier reference and the parser trips on whatever follows it, with a generic

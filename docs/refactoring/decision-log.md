@@ -79,3 +79,13 @@ Decision: delete `project/.build.properties.un~` and ignore `*.un~`.
 Reason: it is editor debris containing obsolete build-property edit history and
 is not referenced by the build. This is a hygiene-only commit before compiler
 changes.
+
+## D008: keep refactoring work records outside the public manual
+
+Decision: list `docs/refactoring/` under MkDocs `exclude_docs` instead of adding
+the six planning and evidence files to the public navigation.
+
+Reason: these files record maintainer-facing measurements, sequencing, and
+temporary implementation status. The existing architecture and contributor
+documentation remains the stable public entry point, while the MkDocs coverage
+gate still verifies that the exclusion is intentional.

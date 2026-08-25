@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python-style `except` clause on a `try` block.**
+  `except` is not a keyword in Onion (which catches with `catch`), so it parses
+  as a bare identifier-reference statement and the parser trips on whatever
+  follows it (the exception type or bound name), with a generic expected-token
+  dump that never mentions `catch`. The diagnostic now recognizes both
+  `except Type as name { ... }` and `except name: Type { ... }` spellings and
+  points at the correct `catch name: Type { ... }` form.
+
 - **Parser hint for the `for (a, b) in xs` / `for a, b in xs` destructuring mistake
   no longer recommends the wrong rewrite.** `for` never destructures or iterates a
   collection in Onion (that's `foreach`'s job), but the comma right after `for` made

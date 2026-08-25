@@ -284,6 +284,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private val ElifStatement = """\belif\b""".r
 
   /**
+   * A Python-style `except` clause on a `try` block, `except Type as name { }`
+   * or `except name: Type { }`. `except` isn't a keyword in Onion (which
+   * catches with `catch`), so it parses as a bare identifier-reference
+   * statement and the parser trips on whatever follows it (the type or bound
+   * name), never on `except` itself. Like `elif`, `except` almost never starts
+   * a source line -- it typically follows the closing `}` of the `try` block
+   * on the same line (`} except Exception as e { ... }`) -- so this matches
+   * the keyword anywhere on the line rather than anchoring at the start.
+   */
+  private val ExceptClause = """\bexcept\b""".r
+
+  /**
    * A JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration. Unlike
    * `const`, `let` is not a keyword at all in Onion -- it lexes as a plain
    * identifier -- so `let x = 1` at statement position is read as a bare
@@ -605,6 +617,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       Message("error.parsing.hint.match_not_supported")
     case _ if ElifStatement.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.elif_not_supported")
+    case _ if ExceptClause.findFirstMatchIn(sourceLine).isDefined =>
+      Message("error.parsing.hint.except_not_supported")
     case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
       Message("error.parsing.hint.js_style_let")
     case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>

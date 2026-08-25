@@ -161,10 +161,11 @@ are not repository artifacts.
 Only start if the Phase 2 audit still ranks parser diagnostics as active debt.
 
 1. [x] Split source-context calculation into a pure `SourceContext` helper.
-2. [ ] Split expected-token rendering into a pure helper.
+2. [x] Split terminal expected-token rendering into a pure
+   `ExpectedTokenFormatter` helper.
 3. [ ] Group syntax hints by language-family mistake only if classifier tests keep
    priority visible across groups.
-4. [x] Update parser architecture docs for the source-context boundary.
+4. [x] Update parser architecture docs for each extracted diagnostic boundary.
 
 Each item uses RED/GREEN/refactor and is a separate commit.
 

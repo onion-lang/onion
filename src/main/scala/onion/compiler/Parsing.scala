@@ -6,7 +6,14 @@ import java.io.{IOException, Reader, StringReader}
 
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.parser.{JJOnionParser, ParseException, SourceContext, SyntaxHint, SyntaxHintClassifier}
+import _root_.onion.compiler.parser.{
+  ExpectedTokenFormatter,
+  JJOnionParser,
+  ParseException,
+  SourceContext,
+  SyntaxHint,
+  SyntaxHintClassifier
+}
 
 /**
  * Parsing phase of the Onion compiler.
@@ -147,7 +154,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(fileName, new Location(1, 1), e.getMessage)
     } else {
       val error = e.currentToken.next
-      val expected = formatExpectedTokens(e)
+      val expected = ExpectedTokenFormatter.format(e.expectedTokenSequences, e.tokenImage)
       val sourceContext = SourceContext.at(sourceText, error.beginLine, error.beginColumn)
       problems += CompileError(
         fileName,
@@ -194,37 +201,4 @@ class Parsing(config: CompilerConfig) extends AnyRef
     if (image == null || image.isEmpty) "<EOF>"
     else image.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
-  /**
-   * Format expected tokens from a ParseException for better error messages.
-   *
-   * When multiple tokens are expected, this creates a more readable message
-   * like "';' or 'newline'" instead of just showing the first one.
-   */
-  private def formatExpectedTokens(e: ParseException): String = {
-    val sequences = e.expectedTokenSequences
-    if (sequences == null || sequences.isEmpty) {
-      return "valid token"
-    }
-
-    // Collect unique expected tokens
-    val expectedSet = scala.collection.mutable.LinkedHashSet[String]()
-    for (seq <- sequences) {
-      if (seq != null && seq.nonEmpty) {
-        expectedSet += e.tokenImage(seq(0))
-      }
-    }
-
-    val expected = expectedSet.toSeq
-    if (expected.isEmpty) {
-      "valid token"
-    } else if (expected.size == 1) {
-      expected.head
-    } else if (expected.size <= 3) {
-      // Show all expected tokens if 3 or fewer
-      expected.init.mkString(", ") + " or " + expected.last
-    } else {
-      val shown = expected.take(4)
-      shown.mkString(", ") + s", ... (${expected.size - shown.size} more)"
-    }
-  }
 }

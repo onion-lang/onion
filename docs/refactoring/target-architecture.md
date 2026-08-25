@@ -42,15 +42,18 @@ Each phase should converge on this shape:
 ParsingPhase
   -> Parsing (reader lifecycle and JavaCC recovery)
      -> ParseDiagnosticBuilder
+        -> SourceContext (pure source slicing)
+        -> ExpectedTokenFormatter (pure terminal-token rendering)
         -> SyntaxHintClassifier (pure classification)
         -> localized Message rendering
 ```
 
-The first slice extracts `SyntaxHintClassifier` as a package-local pure service.
-It returns a message key and literal arguments rather than localized text.
-`Parsing` remains responsible for localization and exact final message
-assembly. Later slices may separate source context and expected-token rendering,
-but only if measurements still justify them.
+The landed parser slices extract `SyntaxHintClassifier`, `SourceContext`, and
+`ExpectedTokenFormatter` as package-local pure services. The classifier returns
+a message key and literal arguments rather than localized text. `Parsing`
+remains responsible for localization and exact final message assembly. The
+JavaCC grammar retains its recovery-specific expected-token summary because its
+existing output contract differs from terminal parse errors.
 
 ## Rewriting target
 

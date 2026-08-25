@@ -49,13 +49,19 @@ under `target/`. `Parsing.scala` owns:
 - source reading and shebang removal;
 - JavaCC construction and recovery configuration;
 - conversion of collected and terminal parse errors;
-- expected-token rendering;
 - localization and final parse-error assembly.
 
 `parser.SourceContext` owns the pure conversion from a 1-based parser position
 to the bounded lookahead context and complete source line consumed by syntax
 hints. Collected and terminal parse errors use the same helper and calculate
 both values once per error.
+
+`parser.ExpectedTokenFormatter` owns the pure rendering of JavaCC
+`expectedTokenSequences` for terminal `ParseException` diagnostics. It keeps
+the first token from each sequence, deduplicates in encounter order, and
+preserves the existing separator and truncation behavior. The generated
+parser's `expectedSummary` method remains a separate recovery-path formatter;
+its punctuation and truncation contract are observably different.
 
 `parser.SyntaxHintClassifier` owns the ordered regular-expression policy for
 more than thirty friendly syntax hints. It returns a message key and literal
@@ -117,7 +123,7 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
 
 ## Tests and CI
 
-- `testFull` currently executes 4,151 tests across 571 suites.
+- `testFull` currently executes 4,155 tests across 572 suites.
 - The default phase order and failure short-circuit are covered by
   `PipelineRunnerSpec`.
 - Parser hint behavior is covered by direct pure source-context and classifier
@@ -135,8 +141,8 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
   tools, effects, Shapes, and typed boundaries shipped.
 - `docs/parser-refactoring.md` describes a desired parser/AST-builder split as
   if it were the complete current architecture; `Parsing.scala` still owns
-  expected-token rendering, recovery, localization, and final parse-error
-  assembly.
+  recovery orchestration, localization, and final parse-error assembly, while
+  the generated grammar retains recovery-specific expected-token summaries.
 - compiler architecture docs mention `StatementTyping.scala`, which no longer
   exists after expression-oriented block lowering.
 - contributor docs recommend `sbt test`, while the quality bar defines fresh

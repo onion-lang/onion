@@ -91,4 +91,26 @@ class HintMessageFormatSpec extends AbstractShellSpec {
       assert(msgs.contains("`}`"), s"expected a literal closing brace in the hint, got: $msgs")
     }
   }
+
+  describe("hints resolved via the args-taking Message lookup") {
+    it("renders the python-style-return-arrow hint without crashing on the apostrophe in the pattern text") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  def bar(x: Int) -> Int {
+          |    ret x
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      // Locale-independent only: the hint text itself is translated (ja), but the
+      // MessageFormat pattern escaping (and the apostrophe bug it must not regress to)
+      // is shared by both bundles, and the quoted code snippet is never translated.
+      assert(!msgs.contains("I0000"), s"hint crashed MessageFormat: $msgs")
+      assert(!msgs.contains("'{'") && !msgs.contains("'}'"), s"hint leaked MessageFormat quoting: $msgs")
+      assert(!msgs.contains("''"), s"hint leaked an unresolved doubled-quote escape: $msgs")
+      assert(msgs.contains("def bar(...): Int { ... }"), s"expected substituted literal braces in the hint, got: $msgs")
+    }
+  }
 }

@@ -68,6 +68,8 @@ private[compiler] object SyntaxHintClassifier {
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =
     """\(\s*([A-Z][\w.\[\]]*\??)\s*\)\s*[A-Za-z_$(]""".r
+  private val PythonStyleReturnArrow =
+    """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*->\s*([A-Za-z_][\w.\[\]?]*)""".r
 
   def classify(
     found: String,
@@ -155,6 +157,9 @@ private[compiler] object SyntaxHintClassifier {
       case _ if CStyleCast.findFirstMatchIn(sourceLine).isDefined =>
         val matched = CStyleCast.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.c_style_cast", matched.group(1))
+      case "->" if PythonStyleReturnArrow.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleReturnArrow.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_return_arrow", matched.group(1), matched.group(2))
       case "?" =>
         hint("error.parsing.hint.ternary")
       case "else" =>

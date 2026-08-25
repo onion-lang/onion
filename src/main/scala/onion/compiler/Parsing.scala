@@ -6,7 +6,7 @@ import java.io.{IOException, Reader, StringReader}
 
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.parser.{JJOnionParser, ParseException, SyntaxHint, SyntaxHintClassifier}
+import _root_.onion.compiler.parser.{JJOnionParser, ParseException, SourceContext, SyntaxHint, SyntaxHintClassifier}
 
 /**
  * Parsing phase of the Onion compiler.
@@ -118,14 +118,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
     val errors = parser.getCollectedErrors()
     for (i <- 0 until errors.size()) {
       val error = errors.get(i)
+      val sourceContext = SourceContext.at(sourceText, error.line, error.column)
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
         syntaxErrorMessage(
           error.found,
           error.expected,
-          contextAt(sourceText, error.line, error.column),
-          sourceLineAt(sourceText, error.line)
+          sourceContext.context,
+          sourceContext.sourceLine
         )
       )
     }
@@ -147,52 +148,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
     } else {
       val error = e.currentToken.next
       val expected = formatExpectedTokens(e)
+      val sourceContext = SourceContext.at(sourceText, error.beginLine, error.beginColumn)
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
         syntaxErrorMessage(
           error.image,
           expected,
-          contextAt(sourceText, error.beginLine, error.beginColumn),
-          sourceLineAt(sourceText, error.beginLine)
+          sourceContext.context,
+          sourceContext.sourceLine
         )
       )
     }
-  }
-
-  /**
-   * The source text starting at a 1-based (line, column), for hints that need
-   * to look past the offending token (bounded so a pathological file can't
-   * make the regex match slow).
-   */
-  private def lineStartOffset(sourceText: String, line: Int): Int = {
-    var offset = 0
-    var currentLine = 1
-    while (currentLine < line && offset >= 0 && offset < sourceText.length) {
-      val nl = sourceText.indexOf('\n', offset)
-      if (nl < 0) offset = sourceText.length else { offset = nl + 1; currentLine += 1 }
-    }
-    offset
-  }
-
-  private def contextAt(sourceText: String, line: Int, column: Int): String = {
-    val start = math.min(sourceText.length, lineStartOffset(sourceText, line) + column - 1)
-    sourceText.substring(start, math.min(sourceText.length, start + 200))
-  }
-
-  /**
-   * The full text of the 1-based source line containing (line, column), for
-   * hints that need to recognize a whole malformed statement (e.g. a leading
-   * `switch`) rather than just the token at the error position -- the error
-   * itself is often reported several tokens past the actual mistake.
-   */
-  private def sourceLineAt(sourceText: String, line: Int): String = {
-    val start = lineStartOffset(sourceText, line)
-    val end = sourceText.indexOf('\n', start) match {
-      case -1 => sourceText.length
-      case i => i
-    }
-    sourceText.substring(start, end)
   }
 
   /**

@@ -5,6 +5,9 @@ Every phase ends in a green, independently revertible state.
 
 ## Phase 0: baseline, audit, and hygiene
 
+Status: complete. The baseline, audit, six handoff documents, and hygiene-only
+change landed before production compiler edits.
+
 ### Task 0.1: record the baseline
 
 Files:
@@ -60,6 +63,11 @@ Commit this phase without production compiler changes.
 
 ## Phase 1: focused safety rails
 
+Status: complete for the parser-hint slice. The direct classifier suite was
+observed failing on the missing API before implementation. Disabling the
+extension-declaration priority branch then failed its focused collision case,
+which demonstrates mutation sensitivity.
+
 ### Task 1.1: characterize syntax-hint classification
 
 Files:
@@ -87,6 +95,10 @@ exact focused suite list in the phase commit message. No golden output is
 rewritten during a pure move.
 
 ## Phase 2: first production extraction
+
+Status: complete on this branch. `Parsing` now delegates locale-independent
+hint selection to `parser.SyntaxHintClassifier` and retains source context,
+expected-token rendering, localization, recovery, and final error assembly.
 
 ### Task 2.1: extract the pure classifier
 
@@ -119,6 +131,30 @@ git diff --check
 
 Rollback: revert the extraction commit; no grammar, resource bundle, or public
 API changes are involved.
+
+### Landed evidence
+
+- The audit moved `Parsing.scala` from 744 LOC / 158 branch proxies to 263 / 39.
+  The cohesive classifier is 170 LOC / 78 branch proxies.
+- The old and new pattern-name sets and message-key multisets match exactly;
+  no resource, grammar production, or generated parser file changed. The
+  grammar file has only a comment updated to name the extracted classifier.
+- The direct suite covers eight cases, including the documented priority
+  collisions, captured arguments, method/constructor distinction, fallbacks,
+  and no-match behavior. Existing hint and i18n suites add 196 end-to-end
+  cases.
+- Fresh English and Japanese full runs each completed with 4,140 passed,
+  0 failed, and the same single opt-in distribution cancellation as baseline.
+- Two default 25-iteration readiness pairs and one 25-warmup/25-measurement
+  pair showed no systematic material regression. A reverse-order warm pair
+  put the 20-file corpus at +4.15%, process-cold Hello at +1.63%, and the
+  initially noisy Todo workload at +9.08%. Small in-process scenarios moved in
+  both directions as JIT state changed; generated-class counts stayed equal.
+- Base and extracted compilers emitted byte-identical `TodoManager.on` output:
+  seven class files and 10,953 bytes in both trees.
+
+Raw benchmark and full-suite reports remain under ignored `target/` paths and
+are not repository artifacts.
 
 ## Phase 3: parser diagnostics follow-ups
 

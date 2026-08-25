@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The elif hint (`commonSyntaxHint`'s `ElifStatement` case) must resolve
+ * The elif hint (`SyntaxHintClassifier`'s `ElifStatement` case) must resolve
  * through the bilingual `error.parsing.hint.*` bundle in both locales, like
  * every other hint in that match -- see OldForInHintI18nSpec for the
  * motivating regression.

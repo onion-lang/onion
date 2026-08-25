@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The Java-style-import hint (`commonSyntaxHint`'s `JavaStyleImport` case) must resolve
+ * The Java-style-import hint (`SyntaxHintClassifier`'s `JavaStyleImport` case) must resolve
  * through the bilingual `error.parsing.hint.*` bundle in both locales, like every other
  * hint in that match -- see OldForInHintI18nSpec for the motivating regression.
  */

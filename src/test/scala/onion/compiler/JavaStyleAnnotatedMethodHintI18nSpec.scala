@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The Java-style-annotated-method hint (`commonSyntaxHint`'s
+ * The Java-style-annotated-method hint (`SyntaxHintClassifier`'s
  * `JavaStyleAnnotatedMethod` case) must resolve through the bilingual
  * `error.parsing.hint.*` bundle in both locales, like every other hint in that
  * match -- see JavaStyleImplementsHintI18nSpec for the same pattern.

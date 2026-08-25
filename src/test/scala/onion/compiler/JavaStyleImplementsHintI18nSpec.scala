@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The Java-style-`implements` hint (`commonSyntaxHint`'s `JavaStyleImplements`
+ * The Java-style-`implements` hint (`SyntaxHintClassifier`'s `JavaStyleImplements`
  * case) must resolve through the bilingual `error.parsing.hint.*` bundle in
  * both locales, like every other hint in that match -- see
  * JavaStyleRecordBodyHintI18nSpec for the same pattern.

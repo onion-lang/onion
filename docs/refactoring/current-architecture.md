@@ -1,7 +1,8 @@
 # Current compiler architecture
 
-This document describes the implementation at
-`78973f25228d7f3009e210fb27e5b96054f7b4ac`. Source code and executable tests
+The measured baseline is
+`78973f25228d7f3009e210fb27e5b96054f7b4ac`; this document is updated as the
+maintainability branch lands bounded phases. Source code and executable tests
 take precedence when older design documents disagree.
 
 ## End-to-end flow
@@ -43,19 +44,20 @@ large.
 ## Parsing
 
 `grammar/JJOnionParser.jj` is the syntax authority and generates parser sources
-under `target/`. `Parsing.scala` currently owns all of these concerns:
+under `target/`. `Parsing.scala` owns:
 
 - source reading and shebang removal;
 - JavaCC construction and recovery configuration;
 - conversion of collected and terminal parse errors;
 - source offset, line, and context extraction;
 - expected-token rendering;
-- more than thirty regular-expression-based friendly syntax hints;
-- localization lookups for those hints.
+- localization and final parse-error assembly.
 
-The friendly hints dominate recent edits to the file. They are deterministic
-classification policy and do not need parser lifecycle access, which makes them
-a clean extraction boundary.
+`parser.SyntaxHintClassifier` owns the ordered regular-expression policy for
+more than thirty friendly syntax hints. It returns a message key and literal
+arguments without consulting parser or locale state. `Parsing` renders that
+result through `Message`. Direct priority tests and the existing end-to-end
+English/Japanese suites protect this boundary.
 
 ## Rewriting
 
@@ -111,11 +113,11 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
 
 ## Tests and CI
 
-- `testFull` currently executes 4,132 tests across 567 suites.
+- `testFull` currently executes 4,140 tests across 568 suites.
 - The default phase order and failure short-circuit are covered by
   `PipelineRunnerSpec`.
-- Parser hint behavior is covered by focused end-to-end and localization
-  suites, but the classifier has no direct pure unit-test seam yet.
+- Parser hint behavior is covered by a direct pure classifier suite plus
+  focused end-to-end and localization suites.
 - `Test / parallelExecution := false` protects global output-capture behavior.
 - `.github/workflows/scala.yml` runs `sbt -v +test`, not the documented English
   and Japanese `testFull` quality gate.
@@ -129,7 +131,8 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
   tools, effects, Shapes, and typed boundaries shipped.
 - `docs/parser-refactoring.md` describes a desired parser/AST-builder split as
   if it were the complete current architecture; `Parsing.scala` still owns
-  error policy and hint classification directly.
+  source context, expected-token rendering, recovery, localization, and final
+  parse-error assembly.
 - compiler architecture docs mention `StatementTyping.scala`, which no longer
   exists after expression-oriented block lowering.
 - contributor docs recommend `sbt test`, while the quality bar defines fresh

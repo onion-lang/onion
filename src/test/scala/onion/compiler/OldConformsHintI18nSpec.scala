@@ -8,7 +8,7 @@ import java.io.StringReader
 /**
  * The symbolic `<:` spelling of interface conformance, replaced by `conforms`.
  * `<:` no longer appears in any production, so meeting one can only be old
- * source (`commonSyntaxHint`'s `case "<:"`) -- like every other hint in that
+ * source (`SyntaxHintClassifier`'s `case "<:"`) -- like every other hint in that
  * match, the message must resolve through the bilingual `error.parsing.hint.*`
  * bundle in both locales; see OldForInHintI18nSpec for the motivating regression.
  */

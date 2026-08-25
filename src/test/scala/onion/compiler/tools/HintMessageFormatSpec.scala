@@ -4,7 +4,7 @@ import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, Compila
 import java.io.StringReader
 
 /**
- * `commonSyntaxHint` in `Parsing.scala` looks up some hints via the zero-argument
+ * `SyntaxHintClassifier` looks up some hints via the zero-argument
  * `Message(property)`, which returns the resource bundle string as-is — it never runs
  * `MessageFormat`. A property text written with MessageFormat's quoting convention
  * (`'{'`/`'}'` to escape a literal brace) is therefore never unescaped, so the single

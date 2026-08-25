@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The C-style-for-loop hint (`commonSyntaxHint`'s `CStyleForLoop` case) must resolve
+ * The C-style-for-loop hint (`SyntaxHintClassifier`'s `CStyleForLoop` case) must resolve
  * through the bilingual `error.parsing.hint.*` bundle in both locales, like every other
  * hint in that match -- see OldForInHintI18nSpec for the motivating regression.
  */

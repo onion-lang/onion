@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The nullable-union-type hint (`commonSyntaxHint`'s `NullableUnionType` case)
+ * The nullable-union-type hint (`SyntaxHintClassifier`'s `NullableUnionType` case)
  * must resolve through the bilingual `error.parsing.hint.*` bundle in both
  * locales, like every other hint in that match -- see
  * JavaStyleImplementsHintI18nSpec for the same pattern.

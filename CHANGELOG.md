@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for the `for (a, b) in xs` / `for a, b in xs` destructuring mistake
+  no longer recommends the wrong rewrite.** `for` never destructures or iterates a
+  collection in Onion (that's `foreach`'s job), but the comma right after `for` made
+  this fall through to the generic C-style-`for` hint, which told the reader to
+  rewrite it as a numeric-index loop -- an unhelpful, unrelated suggestion. It now
+  recognizes both the parenthesized and unparenthesized forms and points at the
+  correct `foreach (a, b) in xs { ... }` instead. The related `for x in xs` hint's
+  wording was also updated to mention `foreach x: Type in xs { ... }` -- the actual
+  idiomatic form -- instead of only suggesting a C-style loop.
+
 - **Parser hint for a Java/Kotlin/JS-style parenthesized `foreach (x in xs) { ... }` loop.**
   `foreach` only takes parentheses for the two-variable map-destructuring form,
   `foreach (k, v) in map { ... }` -- a single loop variable is never parenthesized

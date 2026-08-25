@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   array/nullable type spellings) and points at the correct
   `(expr as Type)` form.
 
+- **Parser hint for a Python/Rust/TypeScript-style return-type arrow, `def name(...) -> Type { ... }`.**
+  Onion writes a method's return type after a colon, not `->`; the arrow form
+  parses as a complete parameterless-return-type declaration followed by a
+  stray `->` token, with a generic expected-token dump that never mentions the
+  colon. The diagnostic now recognizes `def name(...) -> Type` and points at
+  the correct `def name(...): Type { ... }` form.
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

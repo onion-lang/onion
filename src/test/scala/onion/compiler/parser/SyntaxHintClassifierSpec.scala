@@ -108,6 +108,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("List[String]")
     }
 
+    it("recognizes a Python/Rust/TypeScript-style `-> Type` return type arrow") {
+      val hint = classify(
+        found = "->",
+        expected = "\"=\"",
+        sourceLine = "  def bar(x: Int) -> Int {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_return_arrow"
+      hint.arguments shouldBe Seq("bar", "Int")
+    }
+
     it("does not confuse the real `(expr as Type)` cast with a C-style cast") {
       SyntaxHintClassifier.classify(
         found = "as",

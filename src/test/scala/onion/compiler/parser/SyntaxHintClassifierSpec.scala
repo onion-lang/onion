@@ -128,6 +128,26 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ) shouldBe None
     }
 
+    it("recognizes a parameter missing its type annotation, not a Java-style method") {
+      val hint = classify(
+        found = ")",
+        expected = "\":\"",
+        sourceLine = "def foo(x): Int {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.missing_parameter_type"
+      hint.arguments shouldBe Seq("x")
+    }
+
+    it("does not confuse a fully-typed parameter list with a missing-type parameter") {
+      SyntaxHintClassifier.classify(
+        found = ":",
+        expected = "\"def\"",
+        context = "",
+        sourceLine = "  void foo(x: Int) {"
+      ).map(_.messageKey) shouldBe Some("error.parsing.hint.java_style_method")
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

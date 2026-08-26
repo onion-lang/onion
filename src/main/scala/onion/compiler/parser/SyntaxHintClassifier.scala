@@ -98,6 +98,8 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.old_conforms")
       case "const" =>
         hint("error.parsing.hint.js_style_const")
+      case "$" =>
+        hint("error.parsing.hint.dollar_sigil")
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)

@@ -316,6 +316,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a C#-style `$\"...\"` interpolated string prefix") {
+      val hint = classify(
+        found = "$",
+        expected = "<EOL>, \"Boolean\", \"break\", ... (44 more)",
+        sourceLine = "IO::println($\"Hello, {name}!\")"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.dollar_sigil"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a PHP/Bash-style `$name` variable sigil") {
+      val hint = classify(
+        found = "$",
+        expected = "<EOL>, \"Boolean\", \"break\", ... (44 more)",
+        sourceLine = "val greeting = \"Hi \" + $name"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.dollar_sigil"
+      hint.arguments shouldBe empty
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

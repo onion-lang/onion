@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a `$` variable/interpolation sigil.**
+  Onion has no `$` sigil; string interpolation is `#{expr}` inside a string
+  literal, so a C#-style `$"Hello, {name}!"` interpolated string or a
+  PHP/Bash-style `$name` variable reference trips the parser right at `$`,
+  with a generic expected-token dump listing over 40 alternatives that never
+  mentions `#{}`. The diagnostic now recognizes a leading `$` token and
+  points at the correct `"Hello, #{name}!"` interpolation form.
+
 - **Parser hint for a Python/Ruby-style `not` boolean negation.**
   Onion has no `not` operator; boolean negation is `!`, so `if not done { ... }`
   or `while not empty { ... }` parses `not` as a bare identifier-reference

@@ -210,6 +210,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("r", "new Res()")
     }
 
+    it("recognizes a Go-style `:=` short variable declaration") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOL>, \";\", <EOF>",
+        sourceLine = "x := 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.go_style_short_var_decl"
+      hint.arguments shouldBe Seq("x", "5")
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

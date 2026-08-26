@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Go-style `:=` short variable declaration.**
+  Onion has no `:=` operator; assignment is `=` and a type annotation is a
+  separate `:`, so `x := 5` parses as a bare identifier-reference statement
+  followed by a stray `:`, with a generic expected-token dump that never
+  mentions `val`/`var`. The diagnostic now recognizes a leading
+  `name := expr` line and points at the correct `val name = expr` (or
+  `var name = expr` for a mutable binding) form.
+
 - **Parser hint for a C#/Python-style `using` resource statement.**
   Onion has no `using` keyword; `using r = new Res() { ... }` parses as a bare
   identifier-reference statement followed by a stray `r`, with a generic

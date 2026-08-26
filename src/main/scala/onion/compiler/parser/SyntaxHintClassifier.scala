@@ -22,6 +22,8 @@ private[compiler] object SyntaxHintClassifier {
   private val ElifStatement = """\belif\b""".r
   private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val GoStyleShortVarDecl =
+    """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
@@ -124,6 +126,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.except_not_supported")
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if GoStyleShortVarDecl.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = GoStyleShortVarDecl.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.go_style_short_var_decl", matched.group(1), matched.group(2).trim)
       case _ if UsingResourceStatement.findFirstMatchIn(sourceLine).isDefined =>
         val matched = UsingResourceStatement.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.using_resource_statement", matched.group(1), matched.group(2).trim)

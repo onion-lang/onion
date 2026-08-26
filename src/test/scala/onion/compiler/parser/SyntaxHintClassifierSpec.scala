@@ -37,6 +37,26 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("key, value", "entries")
     }
 
+    it("prefers enhanced-for advice over generic C-style-for advice") {
+      val hint = classify(
+        found = "s",
+        sourceLine = "for (String s : list) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_enhanced_for"
+      hint.arguments shouldBe Seq("s", "String", "list")
+    }
+
+    it("recognizes an enhanced-for loop over a qualified/generic element type") {
+      val hint = classify(
+        found = "entry",
+        sourceLine = "for (Map.Entry[String, Int] entry : map.entrySet()) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_enhanced_for"
+      hint.arguments shouldBe Seq("entry", "Map.Entry[String, Int]", "map.entrySet()")
+    }
+
     it("captures Java-style import alias arguments in Onion order") {
       val hint = classify(
         found = "=",

@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The classifier now excludes `def` from that pattern and reports a dedicated
   hint naming the untyped parameter instead.
 
+- **Parser hint for a Java-style enhanced for-loop, `for (Type name : expr) { ... }`.**
+  Onion's collection loop is `foreach`, not `for`; the enhanced-for form parses
+  as a parenthesized `for` clause and previously fell through to the generic
+  C-style-for advice (`for var i: Int = 0; i < 10; i++ { ... }`), which is the
+  wrong fix for a collection loop. The diagnostic now recognizes
+  `for (Type name : expr)` ahead of that fallback and points at the correct
+  `foreach name: Type in expr { ... }` form. Fixing this also uncovered and
+  fixed an internal-compiler-error crash (arity-3+ syntax hints were
+  unsupported by the renderer).
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

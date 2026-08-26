@@ -23,6 +23,7 @@ private[compiler] object SyntaxHintClassifier {
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val Python2StylePrintStatement = """^\s*print\s+(?!\()(.+?)\s*$""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
@@ -135,6 +136,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.except_not_supported")
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if Python2StylePrintStatement.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = Python2StylePrintStatement.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python2_style_print_statement", matched.group(1))
       case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DataClassDeclaration.findFirstMatchIn(sourceLine).get
         val params = matched.group(2).split(",").map { p =>

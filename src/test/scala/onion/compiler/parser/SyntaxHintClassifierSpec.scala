@@ -252,6 +252,35 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a Python 2-style bare `print` statement") {
+      val hint = classify(
+        found = "\"hello\"",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "print \"hello\""
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python2_style_print_statement"
+      hint.arguments shouldBe Seq("\"hello\"")
+    }
+
+    it("does not flag a parenthesized `print(...)` call") {
+      SyntaxHintClassifier.classify(
+        found = ")",
+        expected = "<EOF>",
+        context = "",
+        sourceLine = "print(\"hello\")"
+      ) shouldBe None
+    }
+
+    it("does not flag `print` used merely as an identifier") {
+      SyntaxHintClassifier.classify(
+        found = "=",
+        expected = "\":\"",
+        context = "",
+        sourceLine = "val print = 5"
+      ) shouldBe None
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python 2-style bare `print` statement.**
+  Onion has no bare `print` statement; `print` is an ordinary identifier, so
+  `print "hello"` parses as a bare identifier-reference statement followed by
+  a stray string literal, with a generic expected-token dump that never
+  mentions `println`. The diagnostic now recognizes a leading `print expr`
+  statement and points at the correct `println(expr)` (or `IO::println(expr)`)
+  call form.
+
 - **Parser hint for a Ruby-style `unless` statement.**
   Onion has no `unless` statement; `unless condition { ... }` parses as a bare
   identifier-reference statement followed by a stray condition expression,

@@ -28,6 +28,8 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
+  private val JsStyleConstructorDeclaration =
+    """^\s*constructor\s*\(([^)]*)\)""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
@@ -93,6 +95,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.old_conforms")
       case "const" =>
         hint("error.parsing.hint.js_style_const")
+      case "constructor" if JsStyleConstructorDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JsStyleConstructorDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.js_style_constructor", matched.group(1).trim)
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)

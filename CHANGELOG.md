@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a JavaScript/TypeScript-style `constructor(...)` method.**
+  Onion has no `constructor` keyword; a class member named `constructor` is
+  just an identifier, so `constructor(n: String) { ... }` parses as a bare
+  identifier-reference statement and the parser trips on the token that
+  follows, with a generic expected-token dump that never mentions `def this`.
+  The diagnostic now recognizes a leading `constructor(...)` declaration and
+  points at the correct `def this(...)` form.
+
 ## [0.20.0] - 2026-08-26
 
 ### Fixed

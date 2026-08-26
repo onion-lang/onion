@@ -221,6 +221,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("x", "5")
     }
 
+    it("recognizes a JavaScript/TypeScript-style `constructor(...)` method") {
+      val hint = classify(
+        found = "constructor",
+        expected = "\"abstract\", \"def\", \"final\", \"forward\"",
+        sourceLine = "  constructor(n: String) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_constructor"
+      hint.arguments shouldBe Seq("n: String")
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

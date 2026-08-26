@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now recognizes a leading `unless condition { ... }` statement and points at
   the correct negated-condition form, `if !condition { ... }`.
 
+- **Parser hint for a JS/TS-style `constructor(...)` method.**
+  Onion has no special `constructor` method name; `constructor` is an ordinary
+  identifier (not a reserved word), so `constructor(x: Int) { ... }` trips the
+  parser right at `constructor`, with a generic expected-token dump that never
+  mentions `def this`. The diagnostic now recognizes a leading
+  `constructor(...) { ... }` method and points at the correct
+  `def this(...) { ... }` form.
+
 ## [0.20.0] - 2026-08-26
 
 ### Fixed

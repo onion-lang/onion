@@ -45,6 +45,7 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\.\*)?)\s*;?\s*$""".r
   private val JavaStyleConstructor =
     """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
+  private val JsStyleConstructorDeclaration = """^\s*constructor\s*\(""".r
   private val JavaStyleMethodDeclaration =
     """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b|def\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
   private val MissingParameterType =
@@ -170,6 +171,8 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.java_style_import_alias", matched.group(2), matched.group(1))
       case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.java_style_method")
+      case "constructor" if expected.contains("\"def\"") && JsStyleConstructorDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.js_style_constructor")
       case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.java_style_constructor")
       case (")" | ",") if expected == "\":\"" && MissingParameterType.findFirstMatchIn(sourceLine).isDefined =>

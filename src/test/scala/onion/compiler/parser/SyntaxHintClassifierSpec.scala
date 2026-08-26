@@ -252,6 +252,48 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a Python-style `not` boolean negation in an `if` condition") {
+      val hint = classify(
+        found = "done",
+        expected = "\"{\"",
+        sourceLine = "if not done {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.not_operator"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a Python-style `not` boolean negation in a `while` condition") {
+      val hint = classify(
+        found = "empty",
+        expected = "\"{\"",
+        sourceLine = "while not empty {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.not_operator"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a Python-style `not` boolean negation in an `else if` condition") {
+      val hint = classify(
+        found = "ready",
+        expected = "\"{\"",
+        sourceLine = "else if not ready {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.not_operator"
+      hint.arguments shouldBe empty
+    }
+
+    it("does not flag `not` when no block is expected next") {
+      SyntaxHintClassifier.classify(
+        found = "x",
+        expected = "\";\"",
+        context = "",
+        sourceLine = "if not x"
+      ) shouldBe None
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

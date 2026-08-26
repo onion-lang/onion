@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python/Ruby-style `not` boolean negation.**
+  Onion has no `not` operator; boolean negation is `!`, so `if not done { ... }`
+  or `while not empty { ... }` parses `not` as a bare identifier-reference
+  expression followed by a stray token, with a generic "a block is expected
+  here" hint that never mentions `!`. The diagnostic now recognizes a leading
+  `if`/`while`/`else if not ...` condition and points at the correct
+  `if !condition { ... }` form.
+
 - **Parser hint for a Ruby-style `unless` statement.**
   Onion has no `unless` statement; `unless condition { ... }` parses as a bare
   identifier-reference statement followed by a stray condition expression,

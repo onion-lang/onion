@@ -21,6 +21,7 @@ private[compiler] object SyntaxHintClassifier {
   private val DefaultCaseLabel = """^\s*default\s*:""".r
   private val ElifStatement = """\belif\b""".r
   private val LeadingUnlessStatement = """^\s*unless\b""".r
+  private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val GoStyleShortVarDecl =
@@ -219,6 +220,8 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.trailing_lambda_parens", params)
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
+      case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.not_operator")
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
       case _ =>

@@ -473,6 +473,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong (Java style) | Correct (Onion) |
 |--------------------|-----------------|
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
+| `data class Point(val x: Int, val y: Int)` (Kotlin) | `record Point(x: Int, y: Int)` - no `val`/`var` in the component list |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
 | record with methods? | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - a record may carry a `{ access-section* }` body (instance/static/operator methods, private helpers); methods see the generated accessors. Also works on a generic record implementing a generic interface (`record Foo[T](v: T) conforms Bar[T]`) |

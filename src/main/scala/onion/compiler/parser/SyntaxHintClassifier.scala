@@ -26,6 +26,9 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
+  private val DataClassDeclaration =
+    """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
+  private val ValVarParamPrefix = """^(?:val|var)\s+""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
     """\b(?:fun|func|fn|function)\s+([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(""".r
@@ -126,6 +129,12 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.except_not_supported")
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = DataClassDeclaration.findFirstMatchIn(sourceLine).get
+        val params = matched.group(2).split(",").map { p =>
+          ValVarParamPrefix.replaceFirstIn(p.trim, "")
+        }.mkString(", ")
+        hint("error.parsing.hint.data_class_declaration", matched.group(1), params)
       case _ if GoStyleShortVarDecl.findFirstMatchIn(sourceLine).isDefined =>
         val matched = GoStyleShortVarDecl.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.go_style_short_var_decl", matched.group(1), matched.group(2).trim)

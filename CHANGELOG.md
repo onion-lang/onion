@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `constructor(...) { ... }` method and points at the correct
   `def this(...) { ... }` form.
 
+- **Parser hint for a Python-style `def name():` with no return type.**
+  A method's `:` must be followed by its return type on the same line;
+  `def foo():` with nothing after the colon (the Python habit of ending a
+  `def` line with a bare `:` before an indented body) trips the parser at
+  the following newline, with a generic expected-token dump listing every
+  type keyword. The diagnostic now recognizes a dangling `def name(...):`
+  and suggests either adding the return type (`def name(...): Void { ... }`)
+  or dropping the `:` entirely (`def name(...) { ... }`).
+
 ## [0.20.0] - 2026-08-26
 
 ### Fixed

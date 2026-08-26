@@ -171,6 +171,26 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("bar", "Int")
     }
 
+    it("recognizes a Python-style `def name():` with no return type before the block") {
+      val hint = classify(
+        found = "\n",
+        expected = "\"Boolean\", \"Byte\", \"Char\", \"Double\", ... (11 more)",
+        sourceLine = "  def foo():"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.dangling_return_type_colon"
+      hint.arguments shouldBe Seq("foo")
+    }
+
+    it("does not flag a method colon that already has a same-line return type") {
+      SyntaxHintClassifier.classify(
+        found = "\n",
+        expected = "\"Boolean\", \"Byte\", \"Char\", \"Double\", ... (11 more)",
+        context = "",
+        sourceLine = "  def foo(): Int {"
+      ) shouldBe None
+    }
+
     it("does not confuse the real `(expr as Type)` cast with a C-style cast") {
       SyntaxHintClassifier.classify(
         found = "as",

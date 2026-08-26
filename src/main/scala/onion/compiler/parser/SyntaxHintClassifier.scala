@@ -83,6 +83,8 @@ private[compiler] object SyntaxHintClassifier {
     """\(\s*([A-Z][\w.\[\]]*\??)\s*\)\s*[A-Za-z_$(]""".r
   private val PythonStyleReturnArrow =
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*->\s*([A-Za-z_][\w.\[\]?]*)""".r
+  private val DanglingReturnTypeColon =
+    """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*:\s*$""".r
 
   def classify(
     found: String,
@@ -196,6 +198,9 @@ private[compiler] object SyntaxHintClassifier {
       case "->" if PythonStyleReturnArrow.findFirstMatchIn(sourceLine).isDefined =>
         val matched = PythonStyleReturnArrow.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.python_style_return_arrow", matched.group(1), matched.group(2))
+      case ("\n" | "\r\n" | "\r") if DanglingReturnTypeColon.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = DanglingReturnTypeColon.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.dangling_return_type_colon", matched.group(1))
       case "?" =>
         hint("error.parsing.hint.ternary")
       case "else" =>

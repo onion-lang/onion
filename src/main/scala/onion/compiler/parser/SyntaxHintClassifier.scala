@@ -36,7 +36,9 @@ private[compiler] object SyntaxHintClassifier {
   private val JavaStyleConstructor =
     """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
   private val JavaStyleMethodDeclaration =
-    """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+    """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b|def\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+  private val MissingParameterType =
+    """\bdef\s+[A-Za-z_]\w*(?:\[[^\]]*\])?\s*\(\s*(?:(?:val|var)\s+)?([A-Za-z_]\w*)\s*[,)]""".r
   private val JavaStyleFieldDeclaration =
     """^\s*(?:public|private|protected)?\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
   private val JavaStyleTypeCase =
@@ -142,6 +144,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.java_style_method")
       case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleConstructor.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.java_style_constructor")
+      case (")" | ",") if expected == "\":\"" && MissingParameterType.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = MissingParameterType.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.missing_parameter_type", matched.group(1))
       case _ if JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_field", matched.group(1), matched.group(2))

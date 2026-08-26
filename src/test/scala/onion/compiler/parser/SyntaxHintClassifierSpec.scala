@@ -200,6 +200,16 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) shouldBe Some("error.parsing.hint.java_style_method")
     }
 
+    it("recognizes a C#/Python-style `using` resource statement") {
+      val hint = classify(
+        found = "r",
+        sourceLine = "using r = new Res() {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.using_resource_statement"
+      hint.arguments shouldBe Seq("r", "new Res()")
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

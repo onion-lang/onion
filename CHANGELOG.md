@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a C#/Python-style `using` resource statement.**
+  Onion has no `using` keyword; `using r = new Res() { ... }` parses as a bare
+  identifier-reference statement followed by a stray `r`, with a generic
+  expected-token dump that never mentions `try`. The diagnostic now recognizes
+  a leading `using name = expr` line and points at the correct
+  `try (val name = expr) { ... }` form.
+
 - **Parser hint for a Java/JavaScript-style `default:` case inside a `select` block.**
   Onion's `select` has no `default` label -- the catch-all arm is `else` -- so
   `default:` parses as a bare identifier-reference statement and the parser

@@ -29,6 +29,8 @@ private[compiler] object SyntaxHintClassifier {
   private val CStyleForLoop = """^\s*for\s*\(""".r
   private val ForEachDestructureMistake =
     """^\s*for\s*\(?\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*\)?\s*in\s+([^{]+?)\s*\{?\s*$""".r
+  private val JavaStyleEnhancedForLoop =
+    """^\s*for\s*\(\s*(?:final\s+)?([A-Za-z_][\w.\[\],\s]*\??)\s+([A-Za-z_]\w*)\s*:\s*(.+?)\s*\)\s*\{?\s*$""".r
   private val ForeachParenMistake = """\bforeach\s*\(""".r
   private val JavaStyleImport = """^\s*import\s+(?!\{)\S""".r
   private val JavaStyleImportAlias =
@@ -133,6 +135,10 @@ private[compiler] object SyntaxHintClassifier {
       case _ if ForEachDestructureMistake.findFirstMatchIn(sourceLine).isDefined =>
         val matched = ForEachDestructureMistake.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.for_each_destructure", matched.group(1), matched.group(2).trim)
+      // A Java enhanced-for (`for (Type name : expr)`) also matches CStyleForLoop, so keep this first.
+      case _ if JavaStyleEnhancedForLoop.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JavaStyleEnhancedForLoop.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.java_style_enhanced_for", matched.group(2), matched.group(1).trim, matched.group(3).trim)
       case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.c_style_for")
       case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>

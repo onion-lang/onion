@@ -193,7 +193,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       case Seq() => Message(hint.messageKey)
       case Seq(argument) => Message(hint.messageKey, argument)
       case Seq(first, second) => Message(hint.messageKey, first, second)
-      case _ => throw new IllegalArgumentException(s"Unsupported syntax-hint arity: ${hint.arguments.size}")
+      case more => Message(hint.messageKey, more.toArray[Any])
     }
 
   /** Make control characters and EOF visible in error messages. */

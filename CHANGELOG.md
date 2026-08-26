@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic hint for calling an array's `length`/`size` as a method.**
+  Array length is exposed as a parenthesis-less property (`arr.length`), the
+  same way a record's generated accessors are exposed as methods; writing
+  the Java/JS-habit `arr.length()` or `arr.size()` previously fell through
+  to a plain "method not found" with no candidates, since arrays don't
+  carry a real `length` field or method in the class table. The
+  `METHOD_NOT_FOUND` reporter now recognizes this case the same way it
+  already recognizes a record field called with parentheses, and suggests
+  dropping the parentheses.
+
 ## [0.20.0] - 2026-08-26
 
 ### Fixed

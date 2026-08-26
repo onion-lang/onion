@@ -535,6 +535,11 @@ class SemanticErrorReporter(threshold: Int) {
 
   private def fieldNamed(targetType: TypedAST.Type, name: String): Boolean =
     targetType match
+      // An array's length isn't a real field in the class table (it's
+      // synthesized by codegen), but it is reached with the same
+      // parenthesis-less syntax as a field (`arr.length`), so `arr.length()`
+      // is the same mix-up the record-accessor case below already covers.
+      case _ if targetType.isArrayType => name == "length" || name == "size"
       case obj: TypedAST.ObjectType => obj.fields.exists(_.name == name)
       case _ => false
 

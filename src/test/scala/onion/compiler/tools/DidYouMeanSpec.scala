@@ -82,6 +82,42 @@ class DidYouMeanSpec extends AbstractShellSpec {
       }
     }
 
+    describe("for array length called as a method") {
+      // The hint template is "... ({0})", inserting the bare member name in
+      // parens (untranslated in both locales); the base "not found" message
+      // never parenthesizes the name that way, so "(length)"/"(size)" is a
+      // locale-independent signal that the field-not-method hint fired.
+      it("hints at the parenthesis-less form for arr.length()") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val arr: Int[] = new Int[5];
+            |    return arr.length();
+            |  }
+            |}
+            |""".stripMargin,
+          "E0005", "(length)"
+        )
+      }
+
+      it("hints at the parenthesis-less form for arr.size()") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val arr: Int[] = new Int[5];
+            |    return arr.size();
+            |  }
+            |}
+            |""".stripMargin,
+          "E0005", "(size)"
+        )
+      }
+    }
+
     describe("for variable names") {
       it("reports error for typo in variable name") {
         val result = shell.run(

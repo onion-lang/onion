@@ -221,6 +221,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("x", "5")
     }
 
+    it("recognizes a Ruby-style `unless` statement") {
+      val hint = classify(
+        found = "unless",
+        expected = "<ID>",
+        sourceLine = "unless done {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.unless_not_supported"
+      hint.arguments shouldBe empty
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

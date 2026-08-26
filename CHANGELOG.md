@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colon. The diagnostic now recognizes `def name(...) -> Type` and points at
   the correct `def name(...): Type { ... }` form.
 
+- **Missing-parameter-type diagnostic misclassified as a Java-style method hint.**
+  `def foo(x): Int { ... }` -- a parameter without a type annotation -- was
+  matched by `SyntaxHintClassifier`'s Java-style-method pattern (it excluded
+  a leading `public`/`private`/`protected` but not `def`), producing a hint
+  telling the user to write `def` on a line that already starts with `def`.
+  The classifier now excludes `def` from that pattern and reports a dedicated
+  hint naming the untyped parameter instead.
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

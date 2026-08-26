@@ -221,6 +221,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("x", "5")
     }
 
+    it("recognizes a Kotlin-style `data class` declaration") {
+      val hint = classify(
+        found = "class",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "data class Point(val x: Int, val y: Int)"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.data_class_declaration"
+      hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

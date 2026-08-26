@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Kotlin-style `data class` declaration.**
+  Onion has no `data class`; a data-carrying type is a `record`, and a
+  `data class Name(val x: Int, val y: Int)` line parses as a bare
+  identifier-reference statement followed by a stray `class`, with a generic
+  expected-token dump that never mentions `record`. The diagnostic now
+  recognizes a leading `data class Name(...)` declaration and points at the
+  correct `record Name(...)` form, stripping the `val`/`var` prefixes that
+  Onion's record component list does not use.
+
 - **Parser hint for a Go-style `:=` short variable declaration.**
   Onion has no `:=` operator; assignment is `=` and a type annotation is a
   separate `:`, so `x := 5` parses as a bare identifier-reference statement

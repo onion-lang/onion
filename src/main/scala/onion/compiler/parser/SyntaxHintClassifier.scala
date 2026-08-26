@@ -22,6 +22,8 @@ private[compiler] object SyntaxHintClassifier {
   private val ElifStatement = """\belif\b""".r
   private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val UsingResourceStatement =
+    """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
     """\b(?:fun|func|fn|function)\s+([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(""".r
@@ -122,6 +124,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.except_not_supported")
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if UsingResourceStatement.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = UsingResourceStatement.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.using_resource_statement", matched.group(1), matched.group(2).trim)
       // Also resembles `Int.member`; extension-declaration advice is more useful.
       case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get

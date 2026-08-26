@@ -178,6 +178,12 @@ private[compiler] object SyntaxHintClassifier {
       // The parentheses rule below recognizes only the current `->` arrow.
       case "{" if OldArrowTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
         hint("error.parsing.hint.old_trailing_arrow")
+      // A standalone (non-trailing) lambda with the old `=>` arrow: `found` lands on
+      // the `=` and `context` (which starts exactly there) sees the rest, `=> ...`.
+      // A map/array literal's Ruby-style `key => value` mistake hits the same token,
+      // but the parser still wants `:` there, so let that reading win instead.
+      case "=" if context.startsWith("=>") && !expected.contains("\":\"") =>
+        hint("error.parsing.hint.old_lambda_arrow")
       case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
         val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
         hint("error.parsing.hint.trailing_lambda_parens", params)

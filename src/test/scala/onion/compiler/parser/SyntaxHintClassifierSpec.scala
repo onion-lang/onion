@@ -96,6 +96,38 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes an old arrow in a standalone (non-trailing) lambda") {
+      val hint = classify(
+        found = "=",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "=> x * 2",
+        sourceLine = "val f = (x) => x * 2"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.old_lambda_arrow"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes an old arrow in a bare-parameter standalone lambda") {
+      val hint = classify(
+        found = "=",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "=> x * 2",
+        sourceLine = "val f = x => x * 2"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.old_lambda_arrow"
+    }
+
+    it("prefers the Ruby-style map-arrow reading when a `:` is expected next") {
+      SyntaxHintClassifier.classify(
+        found = "=",
+        expected = "<EOL>, \":\", \",\", \"]\"",
+        context = "=> 1]",
+        sourceLine = "val m = [\"a\" => 1]"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.old_lambda_arrow")
+    }
+
     it("keeps the reserved-word and missing-block fallbacks") {
       val reserved = classify(found = "class", expected = "<ID>")
       val block = classify(found = ")", expected = "\"{\"")

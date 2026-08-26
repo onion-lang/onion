@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixed an internal-compiler-error crash (arity-3+ syntax hints were
   unsupported by the renderer).
 
+- **Parser hint for a standalone lambda still using the old `=>` arrow,
+  `(x) => expr` or `x => expr`.** `OldTrailingArrowHintI18nSpec`'s
+  `{ x => ... }` case was already covered, but that rule only fires when the
+  parser trips on the lambda's opening `{`; a non-trailing lambda (assigned
+  to a `val`, or passed as a plain call argument) trips on the `=` of `=>`
+  instead, with a generic expected-token dump that never mentions `->`. The
+  diagnostic now recognizes this case and points at the correct `(x) -> ...`
+  form, while still deferring to the existing `:`-expecting reading for a
+  Ruby-style `key => value` map-literal mistake on the same token.
+
 ## [0.19.0] - 2026-08-25
 
 ### Fixed

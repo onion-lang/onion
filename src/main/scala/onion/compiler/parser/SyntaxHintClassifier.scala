@@ -20,6 +20,7 @@ private[compiler] object SyntaxHintClassifier {
   private val LeadingMatchStatement = """^\s*match\b""".r
   private val DefaultCaseLabel = """^\s*default\s*:""".r
   private val ElifStatement = """\belif\b""".r
+  private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val GoStyleShortVarDecl =
@@ -125,6 +126,8 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.default_case_not_supported")
       case _ if ElifStatement.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.elif_not_supported")
+      case _ if LeadingUnlessStatement.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.unless_not_supported")
       case _ if ExceptClause.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.except_not_supported")
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>

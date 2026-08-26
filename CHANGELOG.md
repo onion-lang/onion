@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Ruby-style `unless` statement.**
+  Onion has no `unless` statement; `unless condition { ... }` parses as a bare
+  identifier-reference statement followed by a stray condition expression,
+  with a generic expected-token dump that never mentions `if`. The diagnostic
+  now recognizes a leading `unless condition { ... }` statement and points at
+  the correct negated-condition form, `if !condition { ... }`.
+
 ## [0.20.0] - 2026-08-26
 
 ### Fixed

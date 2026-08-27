@@ -15,15 +15,7 @@ private[compiler] final case class SyntaxHint(
 private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
-  private val LeadingSwitchStatement = """^\s*switch\b""".r
-  private val LeadingWhenStatement = """^\s*when\b""".r
-  private val LeadingMatchStatement = """^\s*match\b""".r
-  private val DefaultCaseLabel = """^\s*default\s*:""".r
-  private val ElifStatement = """\belif\b""".r
-  private val LeadingUnlessStatement = """^\s*unless\b""".r
-  private val LeadingUntilStatement = """^\s*until\b""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
-  private val ExceptClause = """\bexcept\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
@@ -95,7 +87,9 @@ private[compiler] object SyntaxHintClassifier {
     expected: String,
     context: String,
     sourceLine: String
-  ): Option[SyntaxHint] =
+  ): Option[SyntaxHint] = {
+    lazy val controlFlowHint = ControlFlowSyntaxHints.classify(found, sourceLine)
+
     found match {
       case "<:" =>
         hint("error.parsing.hint.old_conforms")
@@ -125,22 +119,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.foreach_parens")
       case "in" =>
         hint("error.parsing.hint.old_for_in")
-      case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.switch_not_supported")
-      case "when" if LeadingWhenStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.when_not_supported")
-      case _ if LeadingMatchStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.match_not_supported")
-      case _ if DefaultCaseLabel.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.default_case_not_supported")
-      case _ if ElifStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.elif_not_supported")
-      case _ if LeadingUnlessStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.unless_not_supported")
-      case _ if LeadingUntilStatement.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.until_not_supported")
-      case _ if ExceptClause.findFirstMatchIn(sourceLine).isDefined =>
-        hint("error.parsing.hint.except_not_supported")
+      // Keep this family before declarations and the generic missing-block fallback.
+      case _ if controlFlowHint.isDefined =>
+        controlFlowHint
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
       case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
@@ -237,6 +218,7 @@ private[compiler] object SyntaxHintClassifier {
       case _ =>
         None
     }
+  }
 
   private def hint(messageKey: String, arguments: String*): Option[SyntaxHint] =
     Some(SyntaxHint(messageKey, arguments))

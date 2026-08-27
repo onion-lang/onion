@@ -45,15 +45,19 @@ ParsingPhase
         -> SourceContext (pure source slicing)
         -> ExpectedTokenFormatter (pure terminal-token rendering)
         -> SyntaxHintClassifier (pure classification)
+           -> ControlFlowSyntaxHints (pure family rules)
         -> localized Message rendering
 ```
 
 The landed parser slices extract `SyntaxHintClassifier`, `SourceContext`, and
 `ExpectedTokenFormatter` as package-local pure services. The classifier returns
-a message key and literal arguments rather than localized text. `Parsing`
-remains responsible for localization and exact final message assembly. The
-JavaCC grammar retains its recovery-specific expected-token summary because its
-existing output contract differs from terminal parse errors.
+a message key and literal arguments rather than localized text and delegates
+only cohesive, evidence-backed rule families; `ControlFlowSyntaxHints` is the
+first such family. Global family priority remains visible in the classifier.
+`Parsing` remains responsible for localization and exact final message
+assembly. The JavaCC grammar retains its recovery-specific expected-token
+summary because its existing output contract differs from terminal parse
+errors.
 
 ## Rewriting target
 

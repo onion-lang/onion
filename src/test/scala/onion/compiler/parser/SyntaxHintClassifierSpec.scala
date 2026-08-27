@@ -27,6 +27,15 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("keeps generic old-for-in advice ahead of the control-flow family") {
+      val hint = classify(
+        found = "in",
+        sourceLine = "switch item in items {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.old_for_in"
+    }
+
     it("prefers destructuring-foreach advice over generic C-style-for advice") {
       val hint = classify(
         found = ",",
@@ -279,6 +288,16 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.until_not_supported"
       hint.arguments shouldBe empty
+    }
+
+    it("keeps unsupported control-flow advice ahead of the generic block fallback") {
+      val hint = classify(
+        found = ")",
+        expected = "\"{\"",
+        sourceLine = "switch (value) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.switch_not_supported"
     }
 
     it("recognizes a Python-style `not` boolean negation in an `if` condition") {

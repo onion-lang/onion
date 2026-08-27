@@ -6,15 +6,19 @@ unavailable; ordinary environments may use `sbt` directly.
 
 ## Add a friendly parser hint
 
-1. Add a failing literal case to
-   `onion.compiler.parser.SyntaxHintClassifierSpec`.
-2. State which broader rule the new case must precede.
-3. Add the message key to both `errorMessage.properties` bundles.
-4. Add or update one end-to-end `*HintSpec` for the real malformed source.
-5. Add an i18n test when the hint has new text or arguments.
-6. Implement the smallest classifier pattern and ordered branch.
-7. Mutate its key or priority locally and confirm the focused test fails.
-8. Run focused tests and both locale `testFull` suites.
+1. Identify the owning family. Unsupported `switch` / `when` / `match` /
+   `default` / `elif` / `unless` / `until` / `except` forms belong to
+   `ControlFlowSyntaxHints`; other rules remain in `SyntaxHintClassifier` until
+   a cohesive family boundary is justified.
+2. Add a failing literal case to the owning direct spec. Add a
+   `SyntaxHintClassifierSpec` case when the rule can collide across families.
+3. State which broader rule or family the new case must precede.
+4. Add the message key to both `errorMessage.properties` bundles.
+5. Add or update one end-to-end `*HintSpec` for the real malformed source.
+6. Add an i18n test when the hint has new text or arguments.
+7. Implement the smallest pattern and ordered branch in the owning family.
+8. Mutate its key or priority locally and confirm the focused test fails.
+9. Run focused tests and both locale `testFull` suites.
 
 Do not edit generated JavaCC sources. Change
 `grammar/JJOnionParser.jj` only when accepted syntax changes; a hint for rejected

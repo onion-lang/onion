@@ -63,11 +63,17 @@ preserves the existing separator and truncation behavior. The generated
 parser's `expectedSummary` method remains a separate recovery-path formatter;
 its punctuation and truncation contract are observably different.
 
-`parser.SyntaxHintClassifier` owns the ordered regular-expression policy for
-more than thirty friendly syntax hints. It returns a message key and literal
-arguments without consulting parser or locale state. `Parsing` renders that
-result through `Message`. Direct priority tests and the existing end-to-end
-English/Japanese suites protect this boundary.
+`parser.SyntaxHintClassifier` owns the global priority policy for 51 friendly
+syntax hints and the rules that have not yet earned a cohesive family boundary.
+`parser.ControlFlowSyntaxHints` owns the eight unsupported control-flow forms
+for `switch`, `when`, `match`, `default`, `elif`, `unless`, `until`, and
+`except`.
+The classifier evaluates that family at the same position as the former inline
+branches, before declarations and the generic missing-block fallback. Both
+components return message keys and literal arguments without consulting parser
+or locale state; `Parsing` renders the result through `Message`. Direct family
+and cross-family priority tests plus the existing end-to-end English/Japanese
+suites protect this boundary.
 
 ## Rewriting
 
@@ -123,7 +129,7 @@ Japanese parser hints. That coverage is a valuable refactoring oracle.
 
 ## Tests and CI
 
-- `testFull` currently executes 4,155 tests across 572 suites.
+- `testFull` currently executes 4,225 tests across 585 suites.
 - The default phase order and failure short-circuit are covered by
   `PipelineRunnerSpec`.
 - Parser hint behavior is covered by direct pure source-context and classifier

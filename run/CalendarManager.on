@@ -1,0 +1,266 @@
+// CalendarManager.on - A personal calendar event manager
+// Exercises: ADT case-enum, homogeneous enum, records, classes,
+// collection pipelines (filter/sortedBy/fold), pattern matching,
+// closures, foreach on map (k,v), string interpolation, nullable.
+
+enum Priority {
+  URGENT, NORMAL, LOW
+}
+
+enum EventKind {
+  case Meeting(location: String)
+  case Appointment(doctor: String)
+  case Task(done: Boolean)
+  case Reminder(note: String)
+}
+
+record CalEvent(
+  id: Int,
+  title: String,
+  date: String,
+  startHour: Int,
+  endHour: Int,
+  priority: Priority,
+  kind: EventKind
+) {
+public:
+  def duration(): Int = endHour - startHour
+
+  def overlaps(other: CalEvent): Boolean {
+    if date != other.date { return false }
+    return startHour < other.endHour && other.startHour < endHour
+  }
+
+  def kindLabel(): String = select kind {
+    case m is Meeting:     "Meeting @ " + m.location()
+    case a is Appointment: "Appt with Dr. " + a.doctor()
+    case t is Task:        if t.done() { "Task [done]" } else { "Task [pending]" }
+    case r is Reminder:    "Reminder: " + r.note()
+  }
+
+  def priorityLabel(): String = select priority {
+    case Priority::URGENT: "!!"
+    case Priority::NORMAL: " ."
+    case Priority::LOW:    "  "
+  }
+
+  def summary(): String =
+    "#{priorityLabel()} [#{date} #{startHour}:00-#{endHour}:00] #{title} (#{kindLabel()})"
+}
+
+class Calendar {
+  var events: Map[String, List[CalEvent]]
+  var nextId: Int
+
+private:
+  def this {
+    events = [:]
+    nextId = 1
+  }
+
+public:
+  static def create(): Calendar = new Calendar()
+
+  def add(title: String, date: String, start: Int, end: Int, priority: Priority, kind: EventKind): CalEvent {
+    val ev = new CalEvent(nextId, title, date, start, end, priority, kind)
+    nextId = nextId + 1
+    var dayList: List[CalEvent] = events[date]
+    if dayList == null {
+      dayList = []
+      events[date] = dayList
+    }
+    dayList.add(ev)
+    return ev
+  }
+
+  def eventsOn(date: String): List[CalEvent] {
+    val raw: List[CalEvent] = events[date]
+    if raw == null { return [] }
+    return raw
+  }
+
+  def allEvents(): List[CalEvent] {
+    var result: List[CalEvent] = []
+    foreach (date, list) in events {
+      result.addAll(list as List[CalEvent])
+    }
+    return result
+  }
+
+  def findById(id: Int): CalEvent? {
+    val found = allEvents().find { e -> (e as CalEvent).id() == id }
+    if found == null { return null }
+    return found as CalEvent
+  }
+
+  def conflicts(): List[String] {
+    val all: List[CalEvent] = allEvents()
+    var found: List[String] = []
+    for var i: Int = 0; i < all.size; i++ {
+      for var j: Int = i + 1; j < all.size; j++ {
+        val a: CalEvent = all[i] as CalEvent
+        val b: CalEvent = all[j] as CalEvent
+        if a.overlaps(b) {
+          found.add("CONFLICT: \"#{a.title()}\" vs \"#{b.title()}\" on #{a.date()}")
+        }
+      }
+    }
+    return found
+  }
+
+  def urgentCount(): Int =
+    allEvents().filter { e -> (e as CalEvent).priority() == Priority::URGENT }.size
+
+  def totalHours(): Int =
+    allEvents().fold(0) { acc, e -> acc + (e as CalEvent).duration() }
+
+  def byDate(): Map[String, List[CalEvent]] = events
+
+  def printDay(date: String): void {
+    val list: List[CalEvent] = eventsOn(date)
+    if list.size == 0 {
+      IO::println("  (no events)")
+      return
+    }
+    val sorted = list.sortedBy { e -> (e as CalEvent).startHour() }
+    foreach ev: Object in sorted {
+      IO::println("  " + (ev as CalEvent).summary())
+    }
+  }
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("=== " + title + " ===")
+}
+
+// ─── build calendar ───────────────────────────────────────────────────────────
+
+val cal = Calendar::create()
+
+cal.add("Team standup",         "2025-09-01",  9, 10, Priority::NORMAL, new Meeting("Zoom"))
+cal.add("Dentist checkup",      "2025-09-01", 11, 12, Priority::URGENT, new Appointment("Smith"))
+cal.add("Finish report",        "2025-09-01",  9, 11, Priority::URGENT, new Task(false))
+cal.add("Buy groceries",        "2025-09-02", 14, 15, Priority::LOW,    new Reminder("milk, eggs, bread"))
+cal.add("Quarterly review",     "2025-09-02",  9, 11, Priority::URGENT, new Meeting("Board Room A"))
+cal.add("Call insurance",       "2025-09-02", 10, 11, Priority::NORMAL, new Task(false))
+cal.add("Lunch with Alice",     "2025-09-02", 12, 13, Priority::NORMAL, new Meeting("Cafe Central"))
+cal.add("Submit tax forms",     "2025-09-03",  8, 10, Priority::URGENT, new Task(false))
+cal.add("Doctor follow-up",     "2025-09-03", 14, 15, Priority::URGENT, new Appointment("Lee"))
+cal.add("Read book",            "2025-09-03", 19, 20, Priority::LOW,    new Reminder("chapter 7"))
+cal.add("Code review session",  "2025-09-04", 10, 12, Priority::NORMAL, new Meeting("Room 2B"))
+cal.add("Fix bug #412",         "2025-09-04", 10, 11, Priority::URGENT, new Task(false))
+cal.add("Gym",                  "2025-09-04", 17, 18, Priority::LOW,    new Reminder("leg day"))
+cal.add("Write unit tests",     "2025-09-05",  9, 10, Priority::NORMAL, new Task(false))
+cal.add("Design review",        "2025-09-05",  9, 11, Priority::NORMAL, new Meeting("Online"))
+cal.add("Sprint retrospective", "2025-09-05", 15, 17, Priority::NORMAL, new Meeting("Zoom"))
+cal.add("Grocery run",          "2025-09-05", 18, 19, Priority::LOW,    new Reminder("veggies"))
+
+// ─── weekly view ──────────────────────────────────────────────────────────────
+
+printSection("Week of 2025-09-01 — Calendar View")
+foreach (date, list) in cal.byDate() {
+  IO::println("")
+  IO::println("  " + date + ":")
+  cal.printDay(date)
+}
+
+// ─── conflict report ──────────────────────────────────────────────────────────
+
+printSection("Scheduling Conflicts")
+val cfls: List[String] = cal.conflicts()
+if cfls.size == 0 {
+  IO::println("  No conflicts found.")
+} else {
+  foreach c: String in cfls { IO::println("  " + c) }
+}
+
+// ─── lookup by id ─────────────────────────────────────────────────────────────
+
+printSection("Event Lookup (id=5)")
+val maybeEv: CalEvent? = cal.findById(5)
+if maybeEv != null {
+  IO::println("  Found: " + maybeEv.summary())
+} else {
+  IO::println("  Not found")
+}
+
+// ─── statistics ───────────────────────────────────────────────────────────────
+
+printSection("Statistics")
+val all: List[CalEvent] = cal.allEvents()
+val total       = all.size
+val urgent      = cal.urgentCount()
+val meetings    = all.filter { e -> (e as CalEvent).kind() is Meeting }.size
+val tasks       = all.filter { e -> (e as CalEvent).kind() is Task }.size
+val reminders   = all.filter { e -> (e as CalEvent).kind() is Reminder }.size
+val appts       = all.filter { e -> (e as CalEvent).kind() is Appointment }.size
+
+IO::println("  Total events : " + total)
+IO::println("  Urgent       : " + urgent)
+IO::println("  Meetings     : " + meetings)
+IO::println("  Tasks        : " + tasks)
+IO::println("  Appointments : " + appts)
+IO::println("  Reminders    : " + reminders)
+IO::println("  Scheduled h  : " + cal.totalHours() + "h")
+
+// ─── busiest day ──────────────────────────────────────────────────────────────
+
+printSection("Busiest Day")
+var busiestDate: String = ""
+var busiestCount: Int = 0
+foreach (date, list) in cal.byDate() {
+  val count = (list as List[CalEvent]).size
+  if count > busiestCount {
+    busiestCount = count
+    busiestDate = date
+  }
+}
+IO::println("  " + busiestDate + " with " + busiestCount + " events")
+
+// ─── meetings by date ─────────────────────────────────────────────────────────
+
+printSection("All Meetings (sorted by date/time)")
+def zeroPad(n: Int): String = if n < 10 { "0" + n } else { "" + n }
+
+val meetingList = all
+  .filter  { e -> (e as CalEvent).kind() is Meeting }
+  .sortedBy { e ->
+    val ev = e as CalEvent
+    ev.date() + "-" + zeroPad(ev.startHour())
+  }
+foreach m: Object in meetingList {
+  val ev = m as CalEvent
+  val k = ev.kind() as Meeting
+  IO::println("  #{ev.date()} #{ev.startHour()}:00  #{ev.title()}  [#{k.location()}]")
+}
+
+// ─── pending tasks ────────────────────────────────────────────────────────────
+
+printSection("Pending Tasks")
+val pending = all
+  .filter { e ->
+    val ev = e as CalEvent
+    (ev.kind() is Task) && !((ev.kind() as Task).done())
+  }
+  .sortedBy { e -> (e as CalEvent).priority().ordinal() }
+
+foreach t: Object in pending {
+  IO::println("  " + (t as CalEvent).summary())
+}
+
+// ─── priority breakdown ───────────────────────────────────────────────────────
+
+printSection("Events by Priority")
+val priorities: List[Priority] = [Priority::URGENT, Priority::NORMAL, Priority::LOW]
+foreach p: Priority in priorities {
+  val label = select p {
+    case Priority::URGENT: "URGENT"
+    case Priority::NORMAL: "NORMAL"
+    case Priority::LOW:    "LOW   "
+  }
+  val pvs = all.filter { e -> (e as CalEvent).priority() == p }
+  IO::println("  #{label}: #{pvs.size} events")
+}

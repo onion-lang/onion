@@ -1797,7 +1797,7 @@ AST.EnumConstant enum_constant() : {
 // removed -- a parenthesized list after a colon named nothing, and it let a class with a
 // primary constructor bypass its own field initialization.) A `def this` with no clause
 // calls the superclass no-arg constructor, which is only legal in a class with no primary;
-// Parsing.commonSyntaxHint explains the removed form to anyone who still writes it.
+// SyntaxHintClassifier explains the removed form to anyone who still writes it.
 AST.ConstructorDeclaration constructor_decl(int mset) : {
   Token t;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();

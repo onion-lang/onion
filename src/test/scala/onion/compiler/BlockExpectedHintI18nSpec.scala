@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * `commonSyntaxHint`'s final fallback case (fired when `{` is expected but none of the
+ * `SyntaxHintClassifier`'s final fallback case (fired when `{` is expected but none of the
  * more specific hints match, e.g. a `while`/`if` head missing its block) returned a
  * hard-coded English string instead of going through the bilingual `error.parsing.hint.*`
  * bundle lookup every other hint in that match uses — so a Japanese-locale diagnostic came

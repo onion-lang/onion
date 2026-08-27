@@ -1,0 +1,438 @@
+// MusicTheory — a music theory engine: notes, intervals, chords, scales, progressions.
+// Exercises: homogeneous enums, records, collection pipelines (map/filter/fold/zip/
+// sortedBy/distinct/partition/find), pattern matching (select), string interpolation,
+// closures, nullable types, while/foreach, extension methods, top-level functions.
+
+// ─── Enumerations ─────────────────────────────────────────────────────────
+enum NoteName {
+  C, Cs, D, Eb, E, F, Fs, G, Ab, A, Bb, B
+}
+
+enum ChordQuality {
+  MAJOR, MINOR, DIM, AUG, DOM7, MAJ7, MIN7, DIM7
+}
+
+enum ScaleMode {
+  MAJOR, NAT_MINOR, DORIAN, PHRYGIAN, LYDIAN, MIXOLYDIAN, LOCRIAN,
+  PENT_MAJOR, PENT_MINOR, BLUES
+}
+
+// ─── Records ───────────────────────────────────────────────────────────────
+record Progression(name: String, numerals: List[Int])
+
+record NoteFreq(note: NoteName, octave: Int, hz: Double) {
+public:
+  def display(): String = "#{noteName(note)}#{octave}: #{hz}Hz"
+}
+
+record KeyMatch(root: NoteName, mode: ScaleMode, missingCount: Int) {
+public:
+  def label(): String = noteName(root) + " " + scaleModeName(mode)
+}
+
+// ─── Note utilities ────────────────────────────────────────────────────────
+def noteIndex(n: NoteName): Int = select n {
+  case C:  0
+  case Cs: 1
+  case D:  2
+  case Eb: 3
+  case E:  4
+  case F:  5
+  case Fs: 6
+  case G:  7
+  case Ab: 8
+  case A:  9
+  case Bb: 10
+  case B:  11
+}
+
+def noteName(n: NoteName): String = select n {
+  case C:  "C"
+  case Cs: "C#"
+  case D:  "D"
+  case Eb: "Eb"
+  case E:  "E"
+  case F:  "F"
+  case Fs: "F#"
+  case G:  "G"
+  case Ab: "Ab"
+  case A:  "A"
+  case Bb: "Bb"
+  case B:  "B"
+}
+
+val CHROMATIC: List[NoteName] = [
+  NoteName::C, NoteName::Cs, NoteName::D, NoteName::Eb,
+  NoteName::E, NoteName::F, NoteName::Fs, NoteName::G,
+  NoteName::Ab, NoteName::A, NoteName::Bb, NoteName::B
+]
+
+def transpose(root: NoteName, semitones: Int): NoteName {
+  val idx: Int = (noteIndex(root) + semitones + 120) % 12
+  return CHROMATIC.get(idx)
+}
+
+def intervalBetween(from: NoteName, to: NoteName): Int {
+  return (noteIndex(to) - noteIndex(from) + 12) % 12
+}
+
+def intervalName(s: Int): String = select s % 12 {
+  case 0:  "Unison"
+  case 1:  "min 2nd"
+  case 2:  "Maj 2nd"
+  case 3:  "min 3rd"
+  case 4:  "Maj 3rd"
+  case 5:  "Perf 4th"
+  case 6:  "Tritone"
+  case 7:  "Perf 5th"
+  case 8:  "min 6th"
+  case 9:  "Maj 6th"
+  case 10: "min 7th"
+  case 11: "Maj 7th"
+  else:    "?"
+}
+
+// ─── Chord utilities ───────────────────────────────────────────────────────
+def chordIntervals(q: ChordQuality): List[Int] = select q {
+  case MAJOR: [0, 4, 7]
+  case MINOR: [0, 3, 7]
+  case DIM:   [0, 3, 6]
+  case AUG:   [0, 4, 8]
+  case DOM7:  [0, 4, 7, 10]
+  case MAJ7:  [0, 4, 7, 11]
+  case MIN7:  [0, 3, 7, 10]
+  case DIM7:  [0, 3, 6, 9]
+}
+
+def chordQualityLabel(q: ChordQuality): String = select q {
+  case MAJOR: ""
+  case MINOR: "m"
+  case DIM:   "°"
+  case AUG:   "+"
+  case DOM7:  "7"
+  case MAJ7:  "Δ7"
+  case MIN7:  "m7"
+  case DIM7:  "°7"
+}
+
+def buildChordNotes(root: NoteName, q: ChordQuality): List[NoteName] {
+  return chordIntervals(q).map { iv -> transpose(root, iv as Int) }
+}
+
+def chordDisplay(root: NoteName, q: ChordQuality): String {
+  val label: String = noteName(root) + chordQualityLabel(q)
+  val notes: List[NoteName] = buildChordNotes(root, q)
+  val noteStr: String = notes.map { n -> noteName(n as NoteName) }.join("-")
+  return "#{label,-8} [#{noteStr}]"
+}
+
+// ─── Scale utilities ───────────────────────────────────────────────────────
+def scaleIntervals(m: ScaleMode): List[Int] = select m {
+  case MAJOR:      [0, 2, 4, 5, 7, 9, 11]
+  case NAT_MINOR:  [0, 2, 3, 5, 7, 8, 10]
+  case DORIAN:     [0, 2, 3, 5, 7, 9, 10]
+  case PHRYGIAN:   [0, 1, 3, 5, 7, 8, 10]
+  case LYDIAN:     [0, 2, 4, 6, 7, 9, 11]
+  case MIXOLYDIAN: [0, 2, 4, 5, 7, 9, 10]
+  case LOCRIAN:    [0, 1, 3, 5, 6, 8, 10]
+  case PENT_MAJOR: [0, 2, 4, 7, 9]
+  case PENT_MINOR: [0, 3, 5, 7, 10]
+  case BLUES:      [0, 3, 5, 6, 7, 10]
+}
+
+def scaleModeName(m: ScaleMode): String = select m {
+  case MAJOR:      "Major"
+  case NAT_MINOR:  "Natural Minor"
+  case DORIAN:     "Dorian"
+  case PHRYGIAN:   "Phrygian"
+  case LYDIAN:     "Lydian"
+  case MIXOLYDIAN: "Mixolydian"
+  case LOCRIAN:    "Locrian"
+  case PENT_MAJOR: "Pentatonic Major"
+  case PENT_MINOR: "Pentatonic Minor"
+  case BLUES:      "Blues"
+}
+
+def buildScale(root: NoteName, m: ScaleMode): List[NoteName] {
+  return scaleIntervals(m).map { iv -> transpose(root, iv as Int) }
+}
+
+def scaleDisplay(root: NoteName, m: ScaleMode): String {
+  val notes: List[NoteName] = buildScale(root, m)
+  val noteStr: String = notes.map { n -> noteName(n as NoteName) }.join("  ")
+  val header: String = noteName(root) + " " + scaleModeName(m)
+  return "#{header,-24} #{noteStr}"
+}
+
+// ─── Diatonic triad builder (7-note scales only) ──────────────────────────
+def diatonicTriads(root: NoteName, m: ScaleMode): List[String] {
+  val ivs: List[Int] = scaleIntervals(m)
+  if ivs.size < 7 { return ["(scale has fewer than 7 notes)"] }
+  val result: List[String] = []
+  var i: Int = 0
+  while i < 7 {
+    val degRoot: NoteName = transpose(root, ivs.get(i) as Int)
+    val third: Int  = (ivs.get((i + 2) % 7) as Int) - (ivs.get(i) as Int)
+    val fifth:  Int = (ivs.get((i + 4) % 7) as Int) - (ivs.get(i) as Int)
+    val third12: Int = (third + 12) % 12
+    val fifth12: Int = (fifth  + 12) % 12
+    val quality: ChordQuality = if third12 == 4 && fifth12 == 7 {
+      ChordQuality::MAJOR
+    } else if third12 == 3 && fifth12 == 7 {
+      ChordQuality::MINOR
+    } else if third12 == 3 && fifth12 == 6 {
+      ChordQuality::DIM
+    } else {
+      ChordQuality::AUG
+    }
+    val roman: String = select i {
+      case 0: "I"
+      case 1: "II"
+      case 2: "III"
+      case 3: "IV"
+      case 4: "V"
+      case 5: "VI"
+      case 6: "VII"
+      else:   "?"
+    }
+    val label: String = noteName(degRoot) + chordQualityLabel(quality)
+    result.add("#{roman,-4} = #{label}")
+    i = i + 1
+  }
+  return result
+}
+
+// ─── Progression resolver ─────────────────────────────────────────────────
+val COMMON_PROGRESSIONS: List[Progression] = [
+  new Progression("I-IV-V-I",  [0, 3, 4, 0]),
+  new Progression("ii-V-I",    [1, 4, 0]),
+  new Progression("I-V-vi-IV", [0, 4, 5, 3]),
+  new Progression("I-vi-IV-V", [0, 5, 3, 4])
+]
+
+def resolveProgression(root: NoteName, m: ScaleMode, prog: Progression): String {
+  val ivs: List[Int] = scaleIntervals(m)
+  if ivs.size < 7 { return prog.name() + ": (need 7-note scale)" }
+  val chords: List[String] = prog.numerals().map { deg ->
+    val d: Int = deg as Int
+    val degRoot: NoteName = transpose(root, ivs.get(d % 7) as Int)
+    val third12: Int = ((ivs.get((d + 2) % 7) as Int) - (ivs.get(d) as Int) + 12) % 12
+    val q: ChordQuality = if third12 == 4 { ChordQuality::MAJOR } else { ChordQuality::MINOR }
+    noteName(degRoot) + chordQualityLabel(q)
+  }
+  return "#{prog.name(),-14} #{chords.join(" - ")}"
+}
+
+// ─── Key detection from a note set ────────────────────────────────────────
+// Returns keys that contain ALL supplied notes (missing = 0 means perfect match)
+def detectKeys(noteSet: List[NoteName]): List[KeyMatch] {
+  val sevenModeModes: List[ScaleMode] = [
+    ScaleMode::MAJOR, ScaleMode::NAT_MINOR, ScaleMode::DORIAN,
+    ScaleMode::PHRYGIAN, ScaleMode::LYDIAN, ScaleMode::MIXOLYDIAN,
+    ScaleMode::LOCRIAN
+  ]
+  val matches: List[KeyMatch] = []
+  foreach root: NoteName in CHROMATIC {
+    foreach m: ScaleMode in sevenModeModes {
+      val scaleNotes: List[NoteName] = buildScale(root, m)
+      val scaleIndices: List[Int] = scaleNotes.map { n -> noteIndex(n as NoteName) }
+      var missing: Int = 0
+      foreach query: NoteName in noteSet {
+        val qi: Int = noteIndex(query)
+        val found: Boolean = scaleIndices.filter { si -> (si as Int) == qi }.size > 0
+        if !found { missing = missing + 1 }
+      }
+      if missing == 0 {
+        matches.add(new KeyMatch(root, m, missing))
+      }
+    }
+  }
+  return matches
+}
+
+// ─── Note frequency calculator (A4 = 440 Hz) ─────────────────────────────
+// formula: freq = 440 * 2^((semitones_from_A4) / 12)
+// A4 is at MIDI note 69; C4 = MIDI 60
+def noteFreqHz(n: NoteName, octave: Int): Double {
+  val midiNum: Int = noteIndex(n) + (octave + 1) * 12
+  val semiFromA4: Int = midiNum - 69
+  var freq: Double = 440.0
+  var steps: Int = semiFromA4
+  if steps >= 0 {
+    var k: Int = 0
+    while k < steps {
+      freq = freq * 1.0594630943592953
+      k = k + 1
+    }
+  } else {
+    var k: Int = 0
+    while k < -steps {
+      freq = freq / 1.0594630943592953
+      k = k + 1
+    }
+  }
+  return freq
+}
+
+def roundHz(hz: Double): String {
+  val rounded: Int = (hz + 0.5) as Int
+  return "" + rounded
+}
+
+// ─── Circle of fifths ─────────────────────────────────────────────────────
+def circleOfFifths(): List[NoteName] {
+  val circle: List[NoteName] = []
+  var n: NoteName = NoteName::C
+  var i: Int = 0
+  while i < 12 {
+    circle.add(n)
+    n = transpose(n, 7)
+    i = i + 1
+  }
+  return circle
+}
+
+// ─── Extension: note with accidentals description ─────────────────────────
+extension NoteName {
+  def isNatural(): Boolean {
+    val idx: Int = noteIndex(self)
+    return idx == 0 || idx == 2 || idx == 4 || idx == 5 ||
+           idx == 7 || idx == 9 || idx == 11
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────
+def main(): void {
+  println("╔══════════════════════════════════════════════════════╗")
+  println("║         M U S I C   T H E O R Y   E N G I N E      ║")
+  println("╚══════════════════════════════════════════════════════╝")
+
+  // 1. Chromatic scale with natural/accidental flag
+  println("\n── Chromatic Scale ─────────────────────────────────────")
+  val naturalNotes: List[NoteName] = CHROMATIC.filter { n -> (n as NoteName).isNatural() }
+  val sharpNotes:   List[NoteName] = CHROMATIC.filter { n -> !(n as NoteName).isNatural() }
+  println("Natural:    " + naturalNotes.map { n -> noteName(n as NoteName) }.join("  "))
+  println("Accidental: " + sharpNotes.map   { n -> noteName(n as NoteName) }.join("  "))
+
+  // 2. Intervals from C
+  println("\n── Intervals from C ────────────────────────────────────")
+  foreach n: NoteName in CHROMATIC {
+    val iv: Int = intervalBetween(NoteName::C, n)
+    if iv > 0 {
+      println("  C -> #{noteName(n),-4} #{iv,2} semitones  (#{intervalName(iv)})")
+    }
+  }
+
+  // 3. Common chords from C
+  println("\n── Common Chords (C root) ──────────────────────────────")
+  val qualities: List[ChordQuality] = [
+    ChordQuality::MAJOR, ChordQuality::MINOR, ChordQuality::DIM,
+    ChordQuality::AUG, ChordQuality::DOM7, ChordQuality::MAJ7,
+    ChordQuality::MIN7, ChordQuality::DIM7
+  ]
+  foreach q: ChordQuality in qualities {
+    println("  " + chordDisplay(NoteName::C, q))
+  }
+
+  // 4. Scales from C
+  println("\n── Scales from C ───────────────────────────────────────")
+  val modes: List[ScaleMode] = [
+    ScaleMode::MAJOR, ScaleMode::NAT_MINOR, ScaleMode::DORIAN,
+    ScaleMode::PHRYGIAN, ScaleMode::LYDIAN, ScaleMode::MIXOLYDIAN,
+    ScaleMode::LOCRIAN, ScaleMode::PENT_MAJOR, ScaleMode::PENT_MINOR,
+    ScaleMode::BLUES
+  ]
+  foreach m: ScaleMode in modes {
+    println("  " + scaleDisplay(NoteName::C, m))
+  }
+
+  // 5. Diatonic triads
+  println("\n── Diatonic Triads: C Major ────────────────────────────")
+  foreach t: String in diatonicTriads(NoteName::C, ScaleMode::MAJOR) {
+    println("  " + t)
+  }
+  println("\n── Diatonic Triads: A Natural Minor ────────────────────")
+  foreach t: String in diatonicTriads(NoteName::A, ScaleMode::NAT_MINOR) {
+    println("  " + t)
+  }
+
+  // 6. Chord progressions in C major and G major
+  println("\n── Common Progressions: C Major ────────────────────────")
+  foreach p: Progression in COMMON_PROGRESSIONS {
+    println("  " + resolveProgression(NoteName::C, ScaleMode::MAJOR, p))
+  }
+  println("\n── Common Progressions: G Major ────────────────────────")
+  foreach p: Progression in COMMON_PROGRESSIONS {
+    println("  " + resolveProgression(NoteName::G, ScaleMode::MAJOR, p))
+  }
+
+  // 7. Key detection
+  println("\n── Key Detection ───────────────────────────────────────")
+  val sample1: List[NoteName] = [NoteName::C, NoteName::D, NoteName::E, NoteName::G, NoteName::A]
+  println("  Notes: " + sample1.map { n -> noteName(n as NoteName) }.join(" "))
+  val hits1: List[KeyMatch] = detectKeys(sample1)
+  val majorHits1: List[KeyMatch] = hits1.filter { k -> (k as KeyMatch).mode() == ScaleMode::MAJOR }
+  println("  Matching major keys: " +
+    majorHits1.map { k -> (k as KeyMatch).label() }.join(", "))
+
+  val sample2: List[NoteName] = [NoteName::A, NoteName::B, NoteName::D, NoteName::E, NoteName::Fs]
+  println("  Notes: " + sample2.map { n -> noteName(n as NoteName) }.join(" "))
+  val hits2: List[KeyMatch] = detectKeys(sample2)
+  val majorHits2: List[KeyMatch] = hits2.filter { k -> (k as KeyMatch).mode() == ScaleMode::MAJOR }
+  println("  Matching major keys: " +
+    majorHits2.map { k -> (k as KeyMatch).label() }.join(", "))
+
+  // 8. Note frequencies for octave 4 (middle octave)
+  println("\n── Note Frequencies (Octave 4, A4=440Hz) ──────────────")
+  foreach n: NoteName in CHROMATIC {
+    val hz: Double = noteFreqHz(n, 4)
+    println("  #{noteName(n),-4} = #{roundHz(hz)} Hz")
+  }
+
+  // 9. Circle of fifths
+  println("\n── Circle of Fifths ────────────────────────────────────")
+  val cof: List[NoteName] = circleOfFifths()
+  println("  " + cof.map { n -> noteName(n as NoteName) }.join(" → "))
+
+  // 10. Relative minors
+  println("\n── Relative Minors ─────────────────────────────────────")
+  val majorKeys: List[NoteName] = [
+    NoteName::C, NoteName::G, NoteName::D, NoteName::A,
+    NoteName::E, NoteName::F, NoteName::Bb, NoteName::Eb
+  ]
+  foreach k: NoteName in majorKeys {
+    val relMinor: NoteName = transpose(k, 9)
+    println("  #{noteName(k),-4} major  →  #{noteName(relMinor)} minor")
+  }
+
+  // 11. Partition: separate diatonic chords by quality
+  println("\n── Chord Quality Summary (C Major) ─────────────────────")
+  val allTriads: List[String] = diatonicTriads(NoteName::C, ScaleMode::MAJOR)
+  val triadParts = allTriads.partition { t: String ->
+    !t.contains("m") && !t.contains("°")
+  }
+  val majorTriads = triadParts[0] as List[Object]
+  val otherTriads = triadParts[1] as List[Object]
+  println("  Major chords: #{majorTriads.size}")
+  println("  Other chords: #{otherTriads.size} (minor + diminished)")
+  foreach t: Object in majorTriads { println("    " + t) }
+  println("  Other:")
+  foreach t: Object in otherTriads { println("    " + t) }
+
+  // 12. Zip: pair each note with its degree label
+  println("\n── Interval Table: G Major ─────────────────────────────")
+  val gMajNotes: List[NoteName] = buildScale(NoteName::G, ScaleMode::MAJOR)
+  val degreeLabels: List[String] = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"]
+  val zipped = gMajNotes.zip(degreeLabels)
+  foreach pair: Object in zipped {
+    val p = pair as List[Object]
+    val n: NoteName = p[0] as NoteName
+    val deg: String = p[1] as String
+    val iv: Int = intervalBetween(NoteName::G, n)
+    println("  #{deg} (#{intervalName(iv)}) = #{noteName(n)}")
+  }
+
+  println("\n══════════════════════════════════════════════════════")
+  println("  #{CHROMATIC.size} notes · #{qualities.size} chord types · #{modes.size} modes")
+  println("══════════════════════════════════════════════════════")
+}

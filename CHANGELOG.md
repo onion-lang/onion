@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tail call optimization silently skipped statements after a self-call assignment.**
+  `transformStatement` treated any `ExpressionActionStatement` wrapping a
+  `SetLocal` self-call (e.g. `val lr = self(args)`) as a tail call, because
+  `isSelfCall` recurses into `SetLocal.value`. Once TCO activated for a
+  method (any branch had a genuine tail call), such an assignment was
+  rewritten into loop-variable updates plus `continue`, jumping back to the
+  top of the `while(true)` loop before any later statement depending on the
+  assigned variable ran — a silent miscompilation with no error or
+  exception. An assignment result is never in tail position by definition,
+  so `ExpressionActionStatement` is now always left unchanged. Added
+  `run/HMTypeInference.on`, a Hindley-Milner type inference engine for a
+  small λ-calculus, as the regression corpus program that exposed the bug.
+
 - **Parser hint for a Ruby-style `until` loop.**
   Onion has no `until` loop; the negated-condition idiom is `while !condition`,
   so `until done { ... }` parses as a bare identifier-reference statement

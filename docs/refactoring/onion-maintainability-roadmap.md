@@ -165,6 +165,10 @@ Only start if the Phase 2 audit still ranks parser diagnostics as active debt.
    `ExpectedTokenFormatter` helper.
 3. [ ] Group syntax hints by language-family mistake only if classifier tests keep
    priority visible across groups.
+   - [x] Re-audit after active hint development and extract the contiguous
+     unsupported control-flow family into `ControlFlowSyntaxHints`.
+   - [ ] Extract another family only when churn and a closed priority interval
+     justify it; do not create one-rule files or reorder the global chain.
 4. [x] Update parser architecture docs for each extracted diagnostic boundary.
 
 Each item uses RED/GREEN/refactor and is a separate commit.

@@ -122,3 +122,23 @@ Invariant: terminal formatting keeps the null/empty fallback, considers only
 the first token of each sequence, deduplicates in encounter order, joins one to
 three tokens with the existing separators, and preserves the four-token
 truncation boundary exactly, including the existing `... (0 more)` result.
+
+## D011: begin hint grouping with one contiguous control-flow family
+
+Decision: move the seven contiguous unsupported control-flow rules for
+`switch`, `when`, `match`, `default`, `elif`, `unless`, and `except` into the
+package-private pure `parser.ControlFlowSyntaxHints` object. Keep its single
+delegation point in the exact former position of the global classifier chain.
+
+Reason: after the original classifier extraction, the file reached 240 LOC,
+113 branch proxies, 16 commits, and 242 lines of churn in the audit window;
+most of that activity was new hint work. These seven rules form a closed,
+contiguous priority interval and share the same unsupported-control-flow
+responsibility. Extracting them localizes future changes without introducing a
+registry, one-rule files, or a speculative rule interface.
+
+Invariant: the seven internal rules retain their order, the family remains
+after the removed `for ... in` cases and before declaration rules, and it stays
+ahead of the generic missing-block fallback. Message keys, arguments, regular
+expressions, localization, source locations, and no-match behavior do not
+change.

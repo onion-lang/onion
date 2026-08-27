@@ -1,0 +1,274 @@
+// SmartHome.on — smart home controller simulation
+// Exercises: ADT enum, records with methods, extension methods,
+// collection pipelines, select pattern matching, maps, string interpolation.
+
+import {
+  java.util.*
+  java.lang.System as Sys
+}
+
+// === Device types (ADT enum) ===
+
+enum DeviceKind {
+  case Light(brightness: Int, colorTemp: Int)
+  case Thermostat(targetTemp: Double, mode: String)
+  case SecurityCamera(recording: Boolean, sensitivity: Int)
+  case SmartLock(locked: Boolean, code: String)
+}
+
+record Device(id: String, name: String, room: String, kind: DeviceKind, powerWatts: Double) {
+public:
+  def isOn(): Boolean = select kind() {
+    case l is Light: l.brightness() > 0
+    case t is Thermostat: true
+    case c is SecurityCamera: true
+    case lk is SmartLock: true
+    else: false
+  }
+  def statusLine(): String = select kind() {
+    case l is Light:
+      "#{name()} [#{room()}] brightness=#{l.brightness()} colorTemp=#{l.colorTemp()}K"
+    case t is Thermostat:
+      "#{name()} [#{room()}] target=#{t.targetTemp()}C mode=#{t.mode()}"
+    case c is SecurityCamera:
+      "#{name()} [#{room()}] recording=#{c.recording()} sens=#{c.sensitivity()}"
+    case lk is SmartLock:
+      "#{name()} [#{room()}] locked=#{lk.locked()}"
+    else: "#{name()} [#{room()}] unknown"
+  }
+}
+
+record Scene(name: String, description: String, commands: List[SceneCommand])
+record SceneCommand(deviceId: String, action: String, value: String)
+record EventLog(timestamp: Long, deviceId: String, action: String, result: String)
+
+// === Extension methods on Device (use self.accessor()) ===
+
+extension Device {
+  def label(): String = "[#{self.room()}/#{self.name()}]"
+  def isLight(): Boolean = self.kind() is Light
+  def isThermostat(): Boolean = self.kind() is Thermostat
+  def isCamera(): Boolean = self.kind() is SecurityCamera
+  def isLock(): Boolean = self.kind() is SmartLock
+}
+
+// === Controller ===
+
+class SmartHomeController {
+  var devices: ArrayList[Device]
+  var scenes: ArrayList[Scene]
+  var eventLog: ArrayList[EventLog]
+
+public:
+  def this {
+    devices = new ArrayList[Device]()
+    scenes = new ArrayList[Scene]()
+    eventLog = new ArrayList[EventLog]()
+  }
+
+  def addDevice(d: Device): void {
+    devices.add(d)
+  }
+
+  def addScene(s: Scene): void {
+    scenes.add(s)
+  }
+
+  def findDevice(id: String): Device? {
+    var result: Device? = null
+    foreach d: Device in devices {
+      if d.id() == id { result = d }
+    }
+    return result
+  }
+
+  def logEvent(deviceId: String, action: String, result: String): void {
+    eventLog.add(new EventLog(Sys::currentTimeMillis(), deviceId, action, result))
+  }
+
+  def report(): void {
+    IO::println("=== Smart Home Report ===")
+    IO::println("Devices: #{devices.size()}")
+
+    // Collect distinct rooms
+    val rooms = new ArrayList[String]()
+    foreach d: Device in devices {
+      if !rooms.contains(d.room()) { rooms.add(d.room()) }
+    }
+    IO::println("Rooms: #{rooms.size()}")
+
+    foreach room: String in rooms {
+      var cnt = 0
+      foreach d: Device in devices {
+        if d.room() == room { cnt++ }
+      }
+      IO::println("  #{room}: #{cnt} device(s)")
+    }
+
+    IO::println("")
+    IO::println("--- Device Status ---")
+    foreach d: Device in devices {
+      IO::println("  " + d.statusLine())
+    }
+
+    var nLights = 0
+    var nCameras = 0
+    var nLocks = 0
+    var totalPower: Double = 0.0
+    foreach d: Device in devices {
+      if d.isLight()  { nLights++ }
+      if d.isCamera() { nCameras++ }
+      if d.isLock()   { nLocks++ }
+      totalPower = totalPower + d.powerWatts()
+    }
+
+    IO::println("")
+    IO::println("--- Summary ---")
+    IO::println("Lights:        #{nLights}")
+    IO::println("Cameras:       #{nCameras}")
+    IO::println("Locks:         #{nLocks}")
+    IO::println("Total power:   #{totalPower}W")
+
+    IO::println("")
+    IO::println("--- Recent Events ---")
+    val total = eventLog.size()
+    val start = if total > 5 { total - 5 } else { 0 }
+    for var i = start; i < total; i++ {
+      val ev = eventLog.get(i)
+      IO::println("  #{ev.deviceId()} -> #{ev.action()}: #{ev.result()}")
+    }
+  }
+
+  def applyScene(sceneName: String): void {
+    var found: Scene? = null
+    foreach s: Scene in scenes {
+      if s.name() == sceneName { found = s }
+    }
+    if found == null {
+      IO::println("Scene not found: #{sceneName}")
+    } else {
+      val scene = found
+      IO::println("Applying scene: #{scene.name()} - #{scene.description()}")
+      foreach cmd: SceneCommand in scene.commands() {
+        logEvent(cmd.deviceId(), cmd.action(), "scene=#{sceneName} value=#{cmd.value()}")
+      }
+    }
+  }
+
+  def powerByRoom(): void {
+    IO::println("=== Power by Room ===")
+    val rooms = new ArrayList[String]()
+    foreach d: Device in devices {
+      if !rooms.contains(d.room()) { rooms.add(d.room()) }
+    }
+    foreach room: String in rooms {
+      var watts: Double = 0.0
+      foreach d: Device in devices {
+        if d.room() == room { watts = watts + d.powerWatts() }
+      }
+      IO::println("  #{room}: #{watts}W")
+    }
+  }
+
+  def lightsByBrightness(): ArrayList[Device] {
+    val lights = new ArrayList[Device]()
+    foreach d: Device in devices {
+      if d.isLight() { lights.add(d) }
+    }
+    // Insertion sort by brightness
+    val n = lights.size()
+    for var i = 1; i < n; i++ {
+      val key = lights.get(i)
+      val keyBright = (key.kind() as Light).brightness()
+      var j = i - 1
+      while j >= 0 && (lights.get(j).kind() as Light).brightness() > keyBright {
+        lights.set(j + 1, lights.get(j))
+        j--
+      }
+      lights.set(j + 1, key)
+    }
+    return lights
+  }
+}
+
+// === Factory helpers ===
+
+def makeLight(id: String, name: String, room: String, brightness: Int, ct: Int, watts: Double): Device =
+  new Device(id, name, room, new Light(brightness, ct), watts)
+
+def makeThermostat(id: String, name: String, room: String, temp: Double, mode: String): Device =
+  new Device(id, name, room, new Thermostat(temp, mode), 15.0)
+
+def makeCamera(id: String, name: String, room: String, rec: Boolean, sens: Int): Device =
+  new Device(id, name, room, new SecurityCamera(rec, sens), 5.0)
+
+def makeLock(id: String, name: String, room: String, locked: Boolean, code: String): Device =
+  new Device(id, name, room, new SmartLock(locked, code), 2.0)
+
+// === Main ===
+
+def main(): void {
+  val ctrl = new SmartHomeController()
+
+  ctrl.addDevice(makeLight("L1", "Ceiling Light",   "Living Room", 80,  4000, 10.0))
+  ctrl.addDevice(makeLight("L2", "Floor Lamp",      "Living Room", 50,  2700, 8.0))
+  ctrl.addDevice(makeLight("L3", "Overhead",        "Kitchen",     100, 5000, 12.0))
+  ctrl.addDevice(makeLight("L4", "Bedside",         "Bedroom",     20,  2200, 6.0))
+  ctrl.addDevice(makeThermostat("T1", "Main Thermostat", "Living Room", 21.5, "heat"))
+  ctrl.addDevice(makeThermostat("T2", "Bedroom AC",      "Bedroom",     20.0, "cool"))
+  ctrl.addDevice(makeCamera("C1", "Front Door Cam", "Entryway", true,  7))
+  ctrl.addDevice(makeCamera("C2", "Backyard Cam",   "Garden",   false, 5))
+  ctrl.addDevice(makeLock("K1", "Front Door Lock",  "Entryway", true,  "1234"))
+  ctrl.addDevice(makeLock("K2", "Back Door Lock",   "Garden",   true,  "5678"))
+
+  ctrl.addScene(new Scene("Movie Night", "Dim lights for movie watching", [
+    new SceneCommand("L1", "setBrightness", "20"),
+    new SceneCommand("L2", "setBrightness", "10"),
+    new SceneCommand("T1", "setTemp", "22.0")
+  ]))
+  ctrl.addScene(new Scene("Away Mode", "Secure everything when leaving", [
+    new SceneCommand("L1", "setBrightness", "0"),
+    new SceneCommand("L2", "setBrightness", "0"),
+    new SceneCommand("L3", "setBrightness", "0"),
+    new SceneCommand("K1", "lock", "true"),
+    new SceneCommand("K2", "lock", "true"),
+    new SceneCommand("C1", "setRecording", "true"),
+    new SceneCommand("C2", "setRecording", "true")
+  ]))
+  ctrl.addScene(new Scene("Good Morning", "Ease into the day", [
+    new SceneCommand("L4", "setBrightness", "60"),
+    new SceneCommand("T1", "setTemp", "20.0"),
+    new SceneCommand("L3", "setBrightness", "100")
+  ]))
+
+  // Simulate events
+  ctrl.logEvent("L1", "setBrightness", "80")
+  ctrl.logEvent("T1", "setTemp", "21.5")
+  ctrl.logEvent("K1", "lock", "true")
+  ctrl.applyScene("Movie Night")
+  ctrl.applyScene("Away Mode")
+  ctrl.logEvent("C1", "motionAlert", "detected at 23:14")
+
+  ctrl.report()
+  IO::println("")
+  ctrl.powerByRoom()
+
+  // Extension method demo
+  IO::println("")
+  IO::println("=== Extension Method Demo ===")
+  val d1 = ctrl.findDevice("L1")
+  if d1 != null {
+    IO::println("Found: " + d1.label())
+    IO::println("  isLight: #{d1.isLight()}")
+    IO::println("  isOn:    #{d1.isOn()}")
+  }
+
+  // Sort lights by brightness
+  val sorted = ctrl.lightsByBrightness()
+  IO::println("")
+  IO::println("=== Lights by Brightness ===")
+  foreach l: Device in sorted {
+    val kind = l.kind() as Light
+    IO::println("  #{l.name()}: #{kind.brightness()}% @ #{kind.colorTemp()}K")
+  }
+}

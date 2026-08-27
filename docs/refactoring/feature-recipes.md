@@ -7,7 +7,7 @@ unavailable; ordinary environments may use `sbt` directly.
 ## Add a friendly parser hint
 
 1. Identify the owning family. Unsupported `switch` / `when` / `match` /
-   `default` / `elif` / `unless` / `except` forms belong to
+   `default` / `elif` / `unless` / `until` / `except` forms belong to
    `ControlFlowSyntaxHints`; other rules remain in `SyntaxHintClassifier` until
    a cohesive family boundary is justified.
 2. Add a failing literal case to the owning direct spec. Add a

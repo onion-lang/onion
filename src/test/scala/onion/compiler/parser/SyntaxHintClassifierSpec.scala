@@ -279,6 +279,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a Ruby-style `until` loop") {
+      val hint = classify(
+        found = "until",
+        expected = "<ID>",
+        sourceLine = "until done {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.until_not_supported"
+      hint.arguments shouldBe empty
+    }
+
     it("keeps unsupported control-flow advice ahead of the generic block fallback") {
       val hint = classify(
         found = ")",

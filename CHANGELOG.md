@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Ruby-style `until` loop.**
+  Onion has no `until` loop; the negated-condition idiom is `while !condition`,
+  so `until done { ... }` parses as a bare identifier-reference statement
+  followed by a stray condition expression, with a generic expected-token
+  dump that never mentions `while`. The diagnostic now recognizes a leading
+  `until condition { ... }` statement and points at the correct
+  `while !condition { ... }` form, mirroring the existing `unless` → `if !`
+  hint.
+
 - **Parser hint for a C#-style `using` namespace-import directive.**
   Onion has no `using Namespace;` import directive; imports are wrapped in
   braces, so `using System.Collections.Generic;` at the top of a file parses

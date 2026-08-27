@@ -65,8 +65,9 @@ its punctuation and truncation contract are observably different.
 
 `parser.SyntaxHintClassifier` owns the global priority policy for 51 friendly
 syntax hints and the rules that have not yet earned a cohesive family boundary.
-`parser.ControlFlowSyntaxHints` owns the seven unsupported control-flow forms
-for `switch`, `when`, `match`, `default`, `elif`, `unless`, and `except`.
+`parser.ControlFlowSyntaxHints` owns the eight unsupported control-flow forms
+for `switch`, `when`, `match`, `default`, `elif`, `unless`, `until`, and
+`except`.
 The classifier evaluates that family at the same position as the former inline
 branches, before declarations and the generic missing-block fallback. Both
 components return message keys and literal arguments without consulting parser

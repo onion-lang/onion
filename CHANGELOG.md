@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for calling an array's `length`/`size` as a method.**
+  An array only exposes `length`/`size` as the paren-less property form
+  (`arr.length`); calling it with parentheses (`arr.length()`, a Java/JS
+  habit) previously reported a bare "method ... is not found" with no
+  guidance, since arrays have no user-visible fields or same-name methods
+  for the existing hint machinery to key off of. The diagnostic now adds
+  the same "is a field/property, not a method; access it without
+  parentheses" hint already used for record component accessor mix-ups.
+
 - **Parser hint for a Ruby-style `until` loop.**
   Onion has no `until` loop; the negated-condition idiom is `while !condition`,
   so `until done { ... }` parses as a bare identifier-reference statement

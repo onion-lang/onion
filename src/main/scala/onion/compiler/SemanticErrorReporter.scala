@@ -504,7 +504,8 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportMethodNotFound(position: Location, items: Array[AnyRef]): Unit = {
     val targetType = items(0).asInstanceOf[TypedAST.Type]
     val name = asString(items(1))
-    val args = typeNames(asTypeArray(items(2)))
+    val argTypes = asTypeArray(items(2))
+    val args = typeNames(argTypes)
     val baseMessage = format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
     // A method with that exact name exists: show its signatures instead of
     // a (possibly misleading) name-similarity suggestion
@@ -517,6 +518,13 @@ class SemanticErrorReporter(threshold: Int) {
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else if (targetType.isArrayType && argTypes.isEmpty && (name == "length" || name == "size")) {
+        // Arrays expose `length`/`size` only as the paren-less pseudo-property
+        // handled in member-selection typing (`arr.length`), never as a real
+        // method, so an array has no same-name method and no user-visible
+        // field either -- without this case `arr.length()` falls through to
+        // an unhelpful bare "not found".
+        Some(format(message("suggestion.fieldNotMethod"), Seq(name)))
       } else if (fieldNamed(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

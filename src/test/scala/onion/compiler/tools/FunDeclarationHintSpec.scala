@@ -43,6 +43,17 @@ class FunDeclarationHintSpec extends AbstractShellSpec {
       assert(msgs.contains("def"), s"expected a hint mentioning def, got: $msgs")
     }
 
+    it("hints at def for a JS/TS/PHP-style function declaration") {
+      val msgs = messages("function greet(): void { IO::println(\"hi\") }\n")
+      assert(msgs.contains("def"), s"expected a hint mentioning def, got: $msgs")
+      assert(msgs.contains("function"), s"expected the hint to name function, got: $msgs")
+    }
+
+    it("does not fire for a call to a method literally named function") {
+      val msgs = messages("val x = function(1, 2)\n")
+      assert(!msgs.contains("declared with"), s"hint should not fire for a function(...) call, got: $msgs")
+    }
+
     it("does not fire for an unrelated bare-identifier-statement typo") {
       val msgs = messages("foo bar\n")
       assert(!msgs.contains("declared with"), s"hint should not fire without a leading fun/func/fn, got: $msgs")

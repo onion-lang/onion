@@ -1,0 +1,277 @@
+// Trie.on — prefix-tree (trie) data structure with autocomplete
+// Exercises: mutable classes, recursive data structures, LinkedHashMap for
+// children, nullable fields, foreach over ranges, collection pipelines
+// (map/filter/sortedBy/groupBy/distinct/take), string interpolation, extension
+// methods, ADT enum for search results, recursive insert/search/collect.
+
+import {
+  java.lang.Character as JChar;
+  java.lang.Integer  as JInteger;
+  java.lang.StringBuilder;
+  java.util.LinkedHashMap;
+  java.util.ArrayList;
+}
+
+// ─── Trie node ────────────────────────────────────────────────────────────────
+// Keys in the children map are the string form of the char code ("97" for 'a')
+// so we can iterate without dealing with Map.Entry inner-class casts.
+class TrieNode {
+  var _map:   LinkedHashMap[String, Object]
+  var _isEnd: Boolean
+  var _count: Int
+public:
+  def this() {
+    self._map   = new LinkedHashMap[String, Object]()
+    self._isEnd = false
+    self._count = 0
+  }
+  def child(c: Int): TrieNode?         = self._map.get("" + c) as TrieNode?
+  def setChild(c: Int, n: TrieNode): void { self._map.put("" + c, n) }
+  def hasChild(c: Int): Boolean        = self._map.containsKey("" + c)
+  def isEnd(): Boolean                 = self._isEnd
+  def setIsEnd(v: Boolean): void       { self._isEnd = v }
+  def prefixCount(): Int               = self._count
+  def incPrefixCount(): void           { self._count++ }
+
+  // Recursively collect all complete words rooted at this node into `result`.
+  def collectInto(buf: String, result: List[Object]): void {
+    if self._isEnd { result.add(buf) }
+    val iter = self._map.keySet().iterator()
+    while iter.hasNext() {
+      val keyStr: String = iter.next() as String
+      val c: Int = JInteger::parseInt(keyStr)
+      val ch: TrieNode = self._map.get(keyStr) as TrieNode
+      val sb = new StringBuilder()
+      sb.append(buf)
+      sb.append(JChar::toChars(c))
+      ch.collectInto(sb.toString(), result)
+    }
+  }
+}
+
+// ─── Trie ─────────────────────────────────────────────────────────────────────
+class Trie {
+  var root:      TrieNode
+  var wordCount: Int
+public:
+  def this() {
+    self.root      = new TrieNode()
+    self.wordCount = 0
+  }
+
+  def insert(word: String): void {
+    var node = root
+    for var i: Int = 0; i < word.length(); i++ {
+      val c = word.charAt(i)
+      if !node.hasChild(c) { node.setChild(c, new TrieNode()) }
+      val next: TrieNode = node.child(c)!!
+      next.incPrefixCount()
+      node = next
+    }
+    if !node.isEnd() { node.setIsEnd(true); wordCount++ }
+  }
+
+  def contains(word: String): Boolean {
+    var node: TrieNode? = root
+    for var i: Int = 0; i < word.length(); i++ {
+      if node == null { return false }
+      node = node?.child(word.charAt(i))
+    }
+    return if node == null { false } else { node.isEnd() }
+  }
+
+  def startsWith(prefix: String): Boolean {
+    var node: TrieNode? = root
+    for var i: Int = 0; i < prefix.length(); i++ {
+      if node == null { return false }
+      node = node?.child(prefix.charAt(i))
+    }
+    return node != null
+  }
+
+  def countWithPrefix(prefix: String): Int {
+    var node: TrieNode? = root
+    for var i: Int = 0; i < prefix.length(); i++ {
+      if node == null { return 0 }
+      node = node?.child(prefix.charAt(i))
+    }
+    return if node == null { 0 } else { node.prefixCount() }
+  }
+
+  // All words with the given prefix, sorted lexicographically
+  def autocomplete(prefix: String): List[Object] {
+    var node: TrieNode? = root
+    for var i: Int = 0; i < prefix.length(); i++ {
+      if node == null { return new ArrayList[Object]() }
+      node = node?.child(prefix.charAt(i))
+    }
+    val result: List[Object] = new ArrayList[Object]()
+    if node != null { node.collectInto(prefix, result) }
+    return result.sortedBy { w -> w as String }
+  }
+
+  def size(): Int = wordCount
+
+  def allWords(): List[Object] = autocomplete("")
+}
+
+// ─── Lookup result ADT ────────────────────────────────────────────────────────
+enum LookupResult {
+  case Found(word: String)
+  case NotFound(query: String)
+  case Ambiguous(query: String, cnt: Int, sample: List[Object])
+public:
+  def describe(): String = select this {
+    case f is Found:
+      "exact match  -> \"#{f.word()}\""
+    case n is NotFound:
+      "not found    -> \"#{n.query()}\""
+    case a is Ambiguous:
+      "#{a.cnt()} matches   -> #{a.sample()}#{if a.cnt() > 3 { " ..." } else { "" }}"
+  }
+}
+
+def lookup(trie: Trie, query: String): LookupResult {
+  val completions = trie.autocomplete(query)
+  val n = completions.size()
+  return if n == 0 {
+    new NotFound(query)
+  } else if (completions[0] as String) == query {
+    new Found(query)
+  } else {
+    new Ambiguous(query, n, completions.take(3))
+  }
+}
+
+// ─── Extension methods on String ─────────────────────────────────────────────
+extension String {
+  def repeat(n: Int): String {
+    val sb = new StringBuilder()
+    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    return sb.toString()
+  }
+  def padRight(n: Int): String {
+    if self.length() >= n { return self }
+    val sb = new StringBuilder()
+    sb.append(self)
+    for var i: Int = self.length(); i < n; i++ { sb.append(' ') }
+    return sb.toString()
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+def banner(title: String): void {
+  IO::println("\n" + "-".repeat(52))
+  IO::println("  " + title)
+  IO::println("-".repeat(52))
+}
+
+def checkWord(trie: Trie, word: String): void {
+  val exact  = trie.contains(word)
+  val pfx    = trie.startsWith(word)
+  val status = if exact { "exact-match " } else if pfx { "prefix-only " } else { "not-found   " }
+  IO::println("  " + word.padRight(18) + status)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+val dictionary: List[Object] = [
+  "apple", "application", "apply", "apt",
+  "bear", "beard", "beat", "bee", "been", "beer", "bees",
+  "can", "candy", "cane", "cannot", "canyon",
+  "dog", "dodge", "doe", "done", "door", "dorm",
+  "echo", "edge", "egg", "eight",
+  "fear", "feat", "feed", "feel", "feet", "fell", "felt",
+  "gear", "gene", "get",
+  "hang", "happy", "hard", "hare", "harm", "have",
+  "idea", "idle",
+  "jar", "jazz",
+  "keen", "keep", "keel",
+  "lamp", "land", "lane", "last", "late", "lawn",
+  "make", "male", "map", "mars", "mast",
+  "name", "nap", "near", "need", "nest", "net",
+  "oak", "old", "one",
+  "pace", "pack", "page", "pair", "pale", "palm", "park",
+  "queen", "quest", "queue",
+  "race", "rack", "rain", "rank", "rare",
+  "safe", "sage", "sail", "same", "sand", "sane",
+  "tale", "talk", "tall", "tame", "tank", "tape", "task",
+  "ugly", "unit",
+  "vale", "vane", "vase", "vast",
+  "wade", "wage", "wake", "walk", "wall", "wane", "ward",
+  "yarn", "year", "yell",
+  "zeal", "zero", "zinc"
+]
+
+val trie = new Trie()
+foreach word: String in dictionary { trie.insert(word) }
+
+banner("Dictionary statistics")
+IO::println("  Total words inserted : " + trie.size())
+IO::println("  Words with prefix 'a': " + trie.countWithPrefix("a"))
+IO::println("  Words with prefix 'be': " + trie.countWithPrefix("be"))
+IO::println("  Words with prefix 'ca': " + trie.countWithPrefix("ca"))
+IO::println("  Words with prefix 'z':  " + trie.countWithPrefix("z"))
+IO::println("  Words with prefix 'qu': " + trie.countWithPrefix("qu"))
+
+banner("Exact and prefix search")
+checkWord(trie, "apple")
+checkWord(trie, "app")
+checkWord(trie, "apply")
+checkWord(trie, "application")
+checkWord(trie, "apricot")
+checkWord(trie, "bear")
+checkWord(trie, "bee")
+checkWord(trie, "bees")
+checkWord(trie, "quiz")
+checkWord(trie, "queen")
+checkWord(trie, "zeal")
+checkWord(trie, "xyz")
+
+banner("Autocomplete suggestions")
+val prefixes: List[Object] = ["ap", "be", "ca", "qu", "z", "ta"]
+foreach pfx: String in prefixes {
+  val completions = trie.autocomplete(pfx)
+  IO::println("  \"#{pfx}\" (#{completions.size()}) -> #{completions}")
+}
+
+banner("Lookup: exact / ambiguous / not-found")
+val queries: List[Object] = ["apple", "app", "jazz", "bee", "xylophone", "zero", "qu", "abc"]
+foreach q: String in queries {
+  val r = lookup(trie, q)
+  IO::println("  query \"#{(q as String).padRight(12)}\"  " + r.describe())
+}
+
+banner("Words grouped by first letter")
+val allWords = trie.allWords()
+val byLetter = allWords.groupBy { w -> (w as String).substring(0, 1) }
+val letters  = new ArrayList[Object](byLetter.keySet()).sortedBy { k -> k as String }
+foreach letter: String in letters {
+  val group: List[Object] = byLetter[letter] as List[Object]
+  IO::println("  #{letter}: #{group.size()} words -> #{group}")
+}
+
+banner("Count by word length")
+val countByLen = dictionary.groupBy { w -> "" + (w as String).length() }
+val lenKeys    = new ArrayList[Object](countByLen.keySet()).sortedBy { k -> JInteger::parseInt(k as String) }
+foreach k: String in lenKeys {
+  val grp: List[Object] = countByLen[k] as List[Object]
+  IO::println("  length #{k}: #{grp.size()} word(s)")
+}
+
+banner("Collection pipeline demo")
+val longWords = dictionary.filter  { w -> (w as String).length() >= 5 }
+val upperLong = longWords.map      { w -> (w as String).toUpperCase() }
+val topTen    = upperLong.distinct().sortedBy { w -> w as String }.take(10)
+IO::println("  Words with 5+ chars  : " + longWords.size())
+IO::println("  Top 10 (upper,sorted): " + topTen)
+
+val shortest: String = dictionary.fold(dictionary[0] as String) { acc, w ->
+  val a = acc as String; val b = w as String
+  if b.length() < a.length() { b } else { a }
+}
+val longest: String = dictionary.fold(dictionary[0] as String) { acc, w ->
+  val a = acc as String; val b = w as String
+  if b.length() > a.length() { b } else { a }
+}
+IO::println("  Shortest word        : \"#{shortest}\"")
+IO::println("  Longest word         : \"#{longest}\"")

@@ -103,3 +103,19 @@ class ScriptRunnerExitCodeSpec extends AnyFunSuite with Matchers:
 
     exitCode shouldBe 0
     out should include("hello world")
+
+  test("a script with no entry point exits non-zero and reports why, instead of failing silently"):
+    val path = writeScript(
+      """class Foo {
+        |public:
+        |  def bar(): String = "bar"
+        |}
+        |""".stripMargin)
+
+    val (exitCode, out) = captureOut(new ScriptRunner().run(Array(path)))
+
+    // Same exit code as any other Shell.Failure(-1) (e.g. a compile error).
+    exitCode shouldBe -1
+    // Locale-independent: the class name is never translated, unlike the rest
+    // of the message (bilingual, see errorMessage.properties/errorMessage_ja.properties).
+    out should include("Foo")

@@ -1,0 +1,260 @@
+import {
+  java.util.*
+  java.lang.Math
+}
+
+// === Data-carrying enum for payment frequency ===
+enum PaymentFrequency {
+  case Monthly(periods: Int, label: String)
+  case BiWeekly(periods: Int, label: String)
+  case Weekly(periods: Int, label: String)
+}
+
+// === Records ===
+record AmortizationEntry(
+  period: Int,
+  payment: Double,
+  interest: Double,
+  principal: Double,
+  balance: Double
+)
+
+record YearlySummary(
+  year: Int,
+  totalPayment: Double,
+  totalInterest: Double,
+  totalPrincipal: Double,
+  closingBalance: Double
+)
+
+record MortgagePlan(
+  name: String,
+  principal: Double,
+  annualRate: Double,
+  termYears: Int,
+  frequency: PaymentFrequency
+)
+
+// === Extension methods ===
+extension Int {
+  def toDouble(): Double = self * 1.0
+}
+
+extension Double {
+  def fmt2(): String = {
+    val rounded: Long = Math::round(self * 100.0)
+    val whole: Long = rounded / 100L
+    val frac: Long = rounded % 100L
+    val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
+    whole + "." + fracStr
+  }
+  def fmtPct(): String = {
+    val rounded: Long = Math::round(self * 100.0)
+    val whole: Long = rounded / 100L
+    val frac: Long = rounded % 100L
+    val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
+    whole + "." + fracStr + "%"
+  }
+}
+
+// === Mortgage Calculator class ===
+class MortgageCalculator {
+  val plan: MortgagePlan
+
+public:
+  def this(p: MortgagePlan) {
+    self.plan = p
+  }
+
+  def periodsPerYear(): Int = select plan.frequency {
+    case m is Monthly:  m.periods()
+    case b is BiWeekly: b.periods()
+    case w is Weekly:   w.periods()
+  }
+
+  def frequencyLabel(): String = select plan.frequency {
+    case m is Monthly:  m.label()
+    case b is BiWeekly: b.label()
+    case w is Weekly:   w.label()
+  }
+
+  def periodicRate(): Double = plan.annualRate / 100.0 / periodsPerYear().toDouble()
+
+  def totalPeriods(): Int = plan.termYears * periodsPerYear()
+
+  def periodicPayment(): Double = {
+    val r: Double = periodicRate()
+    val n: Double = totalPeriods().toDouble()
+    val p: Double = plan.principal
+    if r == 0.0 {
+      p / n
+    } else {
+      val factor: Double = Math::pow(1.0 + r, n)
+      p * r * factor / (factor - 1.0)
+    }
+  }
+
+  def amortize(): List[Object] = {
+    val payment: Double = periodicPayment()
+    val rate: Double = periodicRate()
+    val entries: List[Object] = []
+    var balance: Double = plan.principal
+    foreach period: Int in 1..totalPeriods() {
+      val interestPart: Double = balance * rate
+      var principalPart: Double = payment - interestPart
+      if principalPart > balance { principalPart = balance }
+      balance = balance - principalPart
+      if balance < 0.0 { balance = 0.0 }
+      entries.add(new AmortizationEntry(period, payment, interestPart, principalPart, balance))
+    }
+    entries
+  }
+
+  def yearlySummaries(entries: List[Object]): List[Object] = {
+    val ppy: Int = periodsPerYear()
+    var year: Int = 1
+    var totalPay: Double = 0.0
+    var totalInt: Double = 0.0
+    var totalPrin: Double = 0.0
+    var closing: Double = plan.principal
+    val summaries: List[Object] = []
+    foreach entry: AmortizationEntry in entries {
+      totalPay = totalPay + entry.payment()
+      totalInt = totalInt + entry.interest()
+      totalPrin = totalPrin + entry.principal()
+      closing = entry.balance()
+      if entry.period() % ppy == 0 {
+        summaries.add(new YearlySummary(year, totalPay, totalInt, totalPrin, closing))
+        year = year + 1
+        totalPay = 0.0
+        totalInt = 0.0
+        totalPrin = 0.0
+      }
+    }
+    summaries
+  }
+}
+
+def padRight(s: String, width: Int): String = {
+  var result: String = s
+  while result.length() < width { result = result + " " }
+  result
+}
+
+def padLeft(s: String, width: Int): String = {
+  var result: String = s
+  while result.length() < width { result = " " + result }
+  result
+}
+
+def printPlan(plan: MortgagePlan): void {
+  val calc: MortgageCalculator = new MortgageCalculator(plan)
+  val payment: Double = calc.periodicPayment()
+  val entries: List[Object] = calc.amortize()
+  val summaries: List[Object] = calc.yearlySummaries(entries)
+
+  println("=== " + plan.name + " ===")
+  println("Principal:  $" + plan.principal.fmt2())
+  println("Rate:       " + plan.annualRate.fmt2() + "% per annum")
+  println("Term:       " + plan.termYears + " years")
+  println("Frequency:  " + calc.frequencyLabel())
+  println("Payment:    $" + payment.fmt2() + " per period")
+  println("")
+
+  val totalPaid: Double = entries.fold(0.0) { acc, e ->
+    (acc as Double) + (e as AmortizationEntry).payment()
+  } as Double
+  val totalInterest: Double = entries.fold(0.0) { acc, e ->
+    (acc as Double) + (e as AmortizationEntry).interest()
+  } as Double
+
+  println("Total paid:     $" + totalPaid.fmt2())
+  println("Total interest: $" + totalInterest.fmt2())
+  println("Interest ratio: " + (totalInterest / plan.principal * 100.0).fmtPct())
+  println("")
+
+  val parts = entries.partition { e -> (e as AmortizationEntry).interest() > payment / 2.0 }
+  val highInt: List[Object] = parts[0] as List[Object]
+  val lowInt: List[Object] = parts[1] as List[Object]
+  println("Periods where interest > half payment: " + highInt.size)
+  println("Periods where principal >= half payment: " + lowInt.size)
+  println("")
+
+  println("Year-by-Year Summary:")
+  println(padRight("Year", 6) + "| " + padRight("Total Paid", 13) + "| " + padRight("Interest", 13) + "| " + padRight("Principal", 13) + "| Closing Balance")
+  println("------|-------------|-------------|-------------|----------------")
+  foreach s: YearlySummary in summaries {
+    val yr: String = padLeft("" + s.year(), 4)
+    val pay: String = padLeft("$" + s.totalPayment().fmt2(), 12)
+    val int_: String = padLeft("$" + s.totalInterest().fmt2(), 12)
+    val prin: String = padLeft("$" + s.totalPrincipal().fmt2(), 12)
+    val bal: String = padLeft("$" + s.closingBalance().fmt2(), 15)
+    println(yr + "  | " + pay + " | " + int_ + " | " + prin + " | " + bal)
+  }
+  println("")
+}
+
+def compareRates(principal: Double, term: Int): void {
+  println("=== Rate Comparison ($#{principal.fmt2()} over #{term} years, Monthly) ===")
+  val rates: List[Object] = [3.0, 4.5, 6.0, 7.5]
+  println(padRight("Rate", 7) + "| " + padRight("Monthly Pmt", 13) + "| Total Interest")
+  println("-------|-------------|---------------")
+  foreach rate: Double in rates {
+    val plan: MortgagePlan = new MortgagePlan("", principal, rate, term, new Monthly(12, "Monthly"))
+    val calc: MortgageCalculator = new MortgageCalculator(plan)
+    val ents: List[Object] = calc.amortize()
+    val totalInt: Double = ents.fold(0.0) { acc, e ->
+      (acc as Double) + (e as AmortizationEntry).interest()
+    } as Double
+    val pmt: String = padLeft("$" + calc.periodicPayment().fmt2(), 12)
+    val ti: String = padLeft("$" + totalInt.fmt2(), 14)
+    println(padRight(rate.fmt2() + "%", 7) + "| " + pmt + " | " + ti)
+  }
+  println("")
+}
+
+def extraPaymentImpact(plan: MortgagePlan, extraMonthly: Double): void {
+  val calc: MortgageCalculator = new MortgageCalculator(plan)
+  val basePmt: Double = calc.periodicPayment()
+  val rate: Double = calc.periodicRate()
+  var balance: Double = plan.principal
+  var totalInt: Double = 0.0
+  var periods: Int = 0
+
+  while balance > 0.0 {
+    val interestPart: Double = balance * rate
+    var principalPart: Double = basePmt + extraMonthly - interestPart
+    if principalPart > balance { principalPart = balance }
+    totalInt = totalInt + interestPart
+    balance = balance - principalPart
+    if balance < 0.0 { balance = 0.0 }
+    periods = periods + 1
+  }
+
+  val yearsOff: Int = calc.totalPeriods() - periods
+  println("=== Extra Payment Impact ===")
+  println("Plan: " + plan.name)
+  println("Extra per period: $" + extraMonthly.fmt2())
+  println("Payoff in #{periods} periods (saves #{yearsOff} periods)")
+  println("Total interest with extra: $" + totalInt.fmt2())
+  val savedInt: Double = calc.amortize().fold(0.0) { acc, e ->
+    (acc as Double) + (e as AmortizationEntry).interest()
+  } as Double - totalInt
+  println("Interest saved:   $" + savedInt.fmt2())
+  println("")
+}
+
+def main(): void {
+  val monthly: PaymentFrequency = new Monthly(12, "Monthly")
+  val biweekly: PaymentFrequency = new BiWeekly(26, "Bi-Weekly")
+
+  val plan1: MortgagePlan = new MortgagePlan("30-Year Fixed Monthly", 350000.0, 6.5, 30, monthly)
+  printPlan(plan1)
+
+  val plan2: MortgagePlan = new MortgagePlan("15-Year Fixed Bi-Weekly", 350000.0, 5.75, 15, biweekly)
+  printPlan(plan2)
+
+  compareRates(250000.0, 25)
+
+  extraPaymentImpact(plan1, 200.0)
+}

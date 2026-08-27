@@ -1,0 +1,333 @@
+// GeneticAlgorithm.on — N-Queens solver using a Genetic Algorithm.
+// Exercises: records, ADT case-enums, extension methods on Int/String,
+//   collection pipelines (map/filter/fold/sortedBy), closures, nested for
+//   loops, while loops, foreach ranges, nullable types, string interpolation,
+//   try/catch, and pattern matching with `select`/`is`.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+extension Int {
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def padded(w: Int): String {
+    val s: String = "" + self
+    if s.length() >= w { return s }
+    var r: String = s
+    while r.length() < w { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def times(n: Int): String {
+    var result: String = ""
+    for var i: Int = 0; i < n; i++ { result = result + self }
+    return result
+  }
+}
+
+// ─── Chromosome ────────────────────────────────────────────────────────────────
+// queens[col] = row where the queen sits (0-indexed).
+// Perfect fitness = n*(n-1)/2 (no pair attacks).
+record Chromosome(boardN: Int, queens: List[Object]) {
+public:
+  def size(): Int = queens().size
+
+  def fitness(): Int {
+    val qs: List[Object] = queens()
+    val sz: Int = qs.size
+    var safe: Int = 0
+    for var i: Int = 0; i < sz; i++ {
+      for var j: Int = i + 1; j < sz; j++ {
+        val ri: Int = qs[i] as Int
+        val rj: Int = qs[j] as Int
+        if ri != rj && (ri - rj).abs() != (j - i).abs() { safe++ }
+      }
+    }
+    return safe
+  }
+
+  def perfectFitness(): Int = boardN() * (boardN() - 1) / 2
+
+  def isSolution(): Boolean = fitness() == perfectFitness()
+
+  def show(): String {
+    var s: String = "["
+    for var i: Int = 0; i < queens().size; i++ {
+      if i > 0 { s = s + " " }
+      s = s + (queens()[i] as Int)
+    }
+    return s + "]"
+  }
+}
+
+// ─── Selection strategy (sealed ADT) ─────────────────────────────────────────
+enum SelectionStrategy {
+  case Tournament
+  case Roulette
+public:
+  def label(): String = select this {
+    case x is Tournament: "Tournament(k=3)"
+    case x is Roulette:   "Roulette"
+  }
+}
+
+// ─── Crossover type (sealed ADT) ──────────────────────────────────────────────
+enum CrossoverType {
+  case SinglePoint
+  case Uniform
+public:
+  def label(): String = select this {
+    case x is SinglePoint: "Single-Point"
+    case x is Uniform:     "Uniform"
+  }
+}
+
+// ─── GA configuration ─────────────────────────────────────────────────────────
+record GAConfig(
+  boardN:    Int,
+  popSize:   Int,
+  mutRate:   Double,
+  maxGen:    Int,
+  selection: SelectionStrategy,
+  crossover: CrossoverType
+)
+
+// ─── Population helpers ───────────────────────────────────────────────────────
+def randomChromosome(n: Int): Chromosome {
+  val queens: List[Object] = []
+  for var i: Int = 0; i < n; i++ { queens.add(Rand::nextInt(n)) }
+  return new Chromosome(n, queens)
+}
+
+def bestOf(pop: List[Object]): Chromosome {
+  var best: Chromosome = pop[0] as Chromosome
+  for var i: Int = 1; i < pop.size; i++ {
+    val c: Chromosome = pop[i] as Chromosome
+    if c.fitness() > best.fitness() { best = c }
+  }
+  return best
+}
+
+def totalFitness(pop: List[Object]): Int {
+  var total: Int = 0
+  for var i: Int = 0; i < pop.size; i++ {
+    total = total + (pop[i] as Chromosome).fitness()
+  }
+  return total
+}
+
+// ─── Selection ────────────────────────────────────────────────────────────────
+def tournamentSelect(pop: List[Object]): Chromosome {
+  var best: Chromosome = pop[Rand::nextInt(pop.size)] as Chromosome
+  for var i: Int = 1; i < 3; i++ {
+    val c: Chromosome = pop[Rand::nextInt(pop.size)] as Chromosome
+    if c.fitness() > best.fitness() { best = c }
+  }
+  return best
+}
+
+def rouletteSelect(pop: List[Object]): Chromosome {
+  val total: Int = totalFitness(pop)
+  if total == 0 { return pop[Rand::nextInt(pop.size)] as Chromosome }
+  var spin: Int = Rand::nextInt(total)
+  for var i: Int = 0; i < pop.size; i++ {
+    val c: Chromosome = pop[i] as Chromosome
+    spin = spin - c.fitness()
+    if spin <= 0 { return c }
+  }
+  return pop[pop.size - 1] as Chromosome
+}
+
+def selectParent(pop: List[Object], strat: SelectionStrategy): Chromosome {
+  return select strat {
+    case x is Tournament: tournamentSelect(pop)
+    case x is Roulette:   rouletteSelect(pop)
+  }
+}
+
+// ─── Crossover ────────────────────────────────────────────────────────────────
+def singlePointCrossover(a: Chromosome, b: Chromosome): Chromosome {
+  val n: Int = a.boardN()
+  val point: Int = 1 + Rand::nextInt(n - 1)
+  val child: List[Object] = []
+  for var i: Int = 0; i < n; i++ {
+    if i < point { child.add(a.queens()[i]) } else { child.add(b.queens()[i]) }
+  }
+  return new Chromosome(n, child)
+}
+
+def uniformCrossover(a: Chromosome, b: Chromosome): Chromosome {
+  val n: Int = a.boardN()
+  val child: List[Object] = []
+  for var i: Int = 0; i < n; i++ {
+    if Rand::nextBoolean() { child.add(a.queens()[i]) } else { child.add(b.queens()[i]) }
+  }
+  return new Chromosome(n, child)
+}
+
+def doCrossover(a: Chromosome, b: Chromosome, ct: CrossoverType): Chromosome {
+  return select ct {
+    case x is SinglePoint: singlePointCrossover(a, b)
+    case x is Uniform:     uniformCrossover(a, b)
+  }
+}
+
+// ─── Mutation ─────────────────────────────────────────────────────────────────
+def mutate(c: Chromosome, rate: Double): Chromosome {
+  val n: Int = c.boardN()
+  val genes: List[Object] = []
+  for var i: Int = 0; i < n; i++ {
+    if Rand::nextDouble() < rate {
+      genes.add(Rand::nextInt(n))
+    } else {
+      genes.add(c.queens()[i])
+    }
+  }
+  return new Chromosome(n, genes)
+}
+
+// ─── Board display ────────────────────────────────────────────────────────────
+def printBoard(c: Chromosome): void {
+  val n: Int = c.boardN()
+  val bar: String = "+" + "-".times(n * 2 + 1) + "+"
+  IO::println(bar)
+  for var row: Int = 0; row < n; row++ {
+    var line: String = "| "
+    for var col: Int = 0; col < n; col++ {
+      val qrow: Int = c.queens()[col] as Int
+      line = line + (if qrow == row { "Q " } else { ". " })
+    }
+    IO::println(line + "|")
+  }
+  IO::println(bar)
+}
+
+// ─── Population statistics ────────────────────────────────────────────────────
+def popStats(pop: List[Object], perfect: Int): String {
+  val fitnesses: List[Object] = pop.map { x -> (x as Chromosome).fitness() }
+  val total: Int = fitnesses.fold(0) { acc, x -> acc + (x as Int) } as Int
+  val minF: Int = fitnesses.fold(perfect) { acc, x ->
+    val v: Int = x as Int
+    if v < acc { v } else { acc }
+  } as Int
+  val maxF: Int = fitnesses.fold(0) { acc, x ->
+    val v: Int = x as Int
+    if v > acc { v } else { acc }
+  } as Int
+  val avgF: Int = total / pop.size
+  return "min=#{minF} avg=#{avgF} max=#{maxF}/#{perfect}"
+}
+
+// ─── Main GA loop ─────────────────────────────────────────────────────────────
+def runGA(cfg: GAConfig): Chromosome? {
+  val n: Int = cfg.boardN()
+  val perfect: Int = n * (n - 1) / 2
+  IO::println("=".times(56))
+  IO::println("N-Queens GA: N=#{n}, pop=#{cfg.popSize()}, mut=#{cfg.mutRate()}")
+  IO::println("  Selection: #{cfg.selection().label()}")
+  IO::println("  Crossover: #{cfg.crossover().label()}")
+  IO::println("=".times(56))
+
+  // Initialise population
+  var pop: List[Object] = []
+  for var i: Int = 0; i < cfg.popSize(); i++ { pop.add(randomChromosome(n)) }
+
+  var gen: Int = 0
+  var best: Chromosome = bestOf(pop)
+  var found: Boolean = false
+
+  IO::println("  gen  0: #{popStats(pop, perfect)}")
+
+  while gen < cfg.maxGen() && !found {
+    // Build next generation (with elitism — keep the best)
+    val nextPop: List[Object] = []
+    nextPop.add(best)
+    while nextPop.size < cfg.popSize() {
+      val p1: Chromosome = selectParent(pop, cfg.selection())
+      val p2: Chromosome = selectParent(pop, cfg.selection())
+      val child: Chromosome = doCrossover(p1, p2, cfg.crossover())
+      nextPop.add(mutate(child, cfg.mutRate()))
+    }
+    pop = nextPop
+    gen++
+
+    val genBest: Chromosome = bestOf(pop)
+    if genBest.fitness() > best.fitness() { best = genBest }
+    if best.isSolution() { found = true }
+
+    if gen % 100 == 0 || found {
+      IO::println("  gen #{gen.padded(4)}: #{popStats(pop, perfect)}  best=#{best.show()}")
+    }
+  }
+
+  IO::println("")
+  if found {
+    IO::println("  Solution found at generation #{gen}!")
+    IO::println("  Queens: #{best.show()}")
+    IO::println("  Fitness: #{best.fitness()}/#{perfect}")
+    return best
+  } else {
+    IO::println("  No solution in #{gen} generations.")
+    IO::println("  Best: #{best.show()}  (#{best.fitness()}/#{perfect})")
+    return null
+  }
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+def main(args: String[]): void {
+  IO::println("*** N-Queens Genetic Algorithm Demo ***")
+  IO::println("")
+
+  // --- Scenario 1: 8-Queens, tournament selection, single-point crossover ---
+  val cfg1: GAConfig = new GAConfig(
+    8, 150, 0.04, 2000,
+    new Tournament(),
+    new SinglePoint()
+  )
+  val sol1: Chromosome? = runGA(cfg1)
+  if sol1 != null {
+    IO::println("")
+    IO::println("Board:")
+    printBoard(sol1 as Chromosome)
+  }
+
+  IO::println("")
+
+  // --- Scenario 2: 6-Queens, roulette selection, uniform crossover ---
+  val cfg2: GAConfig = new GAConfig(
+    6, 80, 0.08, 1000,
+    new Roulette(),
+    new Uniform()
+  )
+  val sol2: Chromosome? = runGA(cfg2)
+  if sol2 != null {
+    IO::println("")
+    IO::println("Board:")
+    printBoard(sol2 as Chromosome)
+  }
+
+  IO::println("")
+  IO::println("--- Batch sweep: fitness at gen 50 for different mutation rates ---")
+  val nBoard: Int = 8
+  val batchRates: List[Object] = [0.01, 0.05, 0.10, 0.20]
+  foreach rate: Object in batchRates {
+    val r: Double = rate as Double
+    var batchPop: List[Object] = []
+    for var i: Int = 0; i < 100; i++ { batchPop.add(randomChromosome(nBoard)) }
+    for var g: Int = 0; g < 50; g++ {
+      val nb: List[Object] = []
+      nb.add(bestOf(batchPop))
+      while nb.size < 100 {
+        val p1: Chromosome = tournamentSelect(batchPop)
+        val p2: Chromosome = tournamentSelect(batchPop)
+        nb.add(mutate(singlePointCrossover(p1, p2), r))
+      }
+      batchPop = nb
+    }
+    val b: Chromosome = bestOf(batchPop)
+    val perfect: Int = nBoard * (nBoard - 1) / 2
+    IO::println("  mutRate=#{r}: best fitness=#{b.fitness()}/#{perfect}")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

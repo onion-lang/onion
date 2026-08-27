@@ -1,0 +1,359 @@
+// TextDiff.on  –  Edit-distance + word-diff analysis demo
+// Exercises: records, ADT enum, plain enum, generics, collection pipelines,
+//            foreach, select/pattern-matching, string interpolation,
+//            nested classes, 2D arrays (Int[][]), extension methods on String.
+
+import {
+  java.lang.StringBuilder as JBuilder
+  java.util.ArrayList as JList
+}
+
+// ── Extension method on String ────────────────────────────────────────────────
+
+extension String {
+  def trimmed(): String = this.trim()
+}
+
+// ── Plain enum for segment kind ───────────────────────────────────────────────
+
+enum SegKind {
+  CONTEXT, ADDED, REMOVED
+}
+
+// ── ADT enum for word-level edit operations ───────────────────────────────────
+
+enum WordOp {
+  case Keep(w: String)
+  case Add(w: String)
+  case Del(w: String)
+public:
+  def symbol(): String = select this {
+    case k is Keep: "="
+    case a is Add:  "+"
+    case d is Del:  "-"
+  }
+  def text(): String = select this {
+    case k is Keep: k.w()
+    case a is Add:  a.w()
+    case d is Del:  d.w()
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record TextPair(label: String, a: String, b: String)
+
+record SimilarityResult(
+  editDist: Int,
+  lcsLen: Int,
+  normSim: Double,
+  jaccard: Double
+)
+
+// ── Character-level Levenshtein distance (2-row DP) ──────────────────────────
+
+class CharDiff {
+public:
+  static def distance(a: String, b: String): Int {
+    val n: Int = a.length
+    val m: Int = b.length
+    if n == 0 { return m }
+    if m == 0 { return n }
+
+    val prev: Int[] = new Int[m + 1]
+    val curr: Int[] = new Int[m + 1]
+
+    var j: Int = 0
+    while j <= m { prev[j] = j; j = j + 1 }
+
+    var i: Int = 1
+    while i <= n {
+      curr[0] = i
+      j = 1
+      while j <= m {
+        if a.charAt(i-1) == b.charAt(j-1) {
+          curr[j] = prev[j-1]
+        } else {
+          val sub: Int = prev[j-1] + 1
+          val ins: Int = curr[j-1] + 1
+          val del: Int = prev[j]   + 1
+          val minSI: Int = if sub <= ins { sub } else { ins }
+          curr[j] = if minSI <= del { minSI } else { del }
+        }
+        j = j + 1
+      }
+      var k: Int = 0
+      while k <= m { prev[k] = curr[k]; k = k + 1 }
+      i = i + 1
+    }
+    return prev[m]
+  }
+}
+
+// ── Longest Common Subsequence (character level) ──────────────────────────────
+
+class LCS {
+public:
+  static def charLen(a: String, b: String): Int {
+    val n: Int = a.length
+    val m: Int = b.length
+    if n == 0 || m == 0 { return 0 }
+
+    val prev: Int[] = new Int[m + 1]
+    val curr: Int[] = new Int[m + 1]
+
+    var i: Int = 1
+    while i <= n {
+      var j: Int = 1
+      while j <= m {
+        if a.charAt(i-1) == b.charAt(j-1) {
+          curr[j] = prev[j-1] + 1
+        } else {
+          curr[j] = if prev[j] >= curr[j-1] { prev[j] } else { curr[j-1] }
+        }
+        j = j + 1
+      }
+      var k: Int = 0
+      while k <= m { prev[k] = curr[k]; curr[k] = 0; k = k + 1 }
+      i = i + 1
+    }
+    return prev[m]
+  }
+
+  // Word-level diff via LCS back-trace (returns List[WordOp])
+  static def wordDiff(wa: List[String], wb: List[String]): List[WordOp] {
+    val n: Int = wa.size
+    val m: Int = wb.size
+
+    val dp: Int[][] = new Int[n + 1][m + 1]
+
+    var i: Int = 1
+    while i <= n {
+      var j: Int = 1
+      while j <= m {
+        if wa.get(i-1) == wb.get(j-1) {
+          dp[i][j] = dp[i-1][j-1] + 1
+        } else {
+          dp[i][j] = if dp[i-1][j] >= dp[i][j-1] { dp[i-1][j] } else { dp[i][j-1] }
+        }
+        j = j + 1
+      }
+      i = i + 1
+    }
+
+    val result: List[WordOp] = []
+    i = n
+    var j: Int = m
+    while i > 0 || j > 0 {
+      if i > 0 && j > 0 && wa.get(i-1) == wb.get(j-1) {
+        result.add(0, new Keep(wa.get(i-1)))
+        i = i - 1
+        j = j - 1
+      } else if j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j]) {
+        result.add(0, new Add(wb.get(j-1)))
+        j = j - 1
+      } else {
+        result.add(0, new Del(wa.get(i-1)))
+        i = i - 1
+      }
+    }
+    return result
+  }
+}
+
+// ── Bigram computation for Jaccard similarity ─────────────────────────────────
+
+class Bigrams {
+public:
+  static def of(s: String): List[String] {
+    val result: List[String] = []
+    var i: Int = 0
+    while i < s.length - 1 {
+      result.add("" + s.charAt(i) + s.charAt(i+1))
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ── Similarity metrics ────────────────────────────────────────────────────────
+
+class Similarity {
+public:
+  static def normalized(a: String, b: String): Double {
+    val dist: Int = CharDiff::distance(a, b)
+    val maxLen: Int = if a.length > b.length { a.length } else { b.length }
+    if maxLen == 0 { return 1.0 }
+    return 1.0 - (dist as Double) / (maxLen as Double)
+  }
+
+  static def jaccard(a: String, b: String): Double {
+    val bgA: List[String] = Bigrams::of(a)
+    val bgB: List[String] = Bigrams::of(b)
+    if bgA.isEmpty && bgB.isEmpty { return 1.0 }
+    var inter: Int = 0
+    foreach bg: String in bgA {
+      if bgB.contains(bg) { inter = inter + 1 }
+    }
+    val union: Int = bgA.size + bgB.size - inter
+    if union == 0 { return 0.0 }
+    return (inter as Double) / (union as Double)
+  }
+
+  static def analyze(a: String, b: String): SimilarityResult {
+    return new SimilarityResult(
+      CharDiff::distance(a, b),
+      LCS::charLen(a, b),
+      normalized(a, b),
+      jaccard(a, b)
+    )
+  }
+}
+
+// ── Text splitting into words ─────────────────────────────────────────────────
+
+class Splitter {
+public:
+  static def words(text: String): List[String] {
+    val parts: List[String] = []
+    val sb: JBuilder = new JBuilder()
+    var i: Int = 0
+    while i < text.length {
+      val c: Char = text.charAt(i)
+      if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+        if sb.length() > 0 {
+          parts.add(sb.toString())
+          sb.setLength(0)
+        }
+      } else {
+        sb.append(c)
+      }
+      i = i + 1
+    }
+    if sb.length() > 0 { parts.add(sb.toString()) }
+    return parts
+  }
+}
+
+// ── Formatting utilities ──────────────────────────────────────────────────────
+
+class Fmt {
+public:
+  static def pct(d: Double): String {
+    val scaled: Int = (d * 10000.0) as Int
+    val whole: Int  = scaled / 100
+    val frac: Int   = scaled - whole * 100
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr + "%"
+  }
+
+  static def bar(d: Double, width: Int): String {
+    val filled: Int = (d * (width as Double)) as Int
+    val sb: JBuilder = new JBuilder()
+    sb.append("[")
+    var i: Int = 0
+    while i < width {
+      if i < filled { sb.append("#") } else { sb.append(".") }
+      i = i + 1
+    }
+    sb.append("]")
+    return sb.toString()
+  }
+
+  static def wordDiffLine(ops: List[WordOp]): String {
+    val sb: JBuilder = new JBuilder()
+    foreach op: WordOp in ops {
+      val sym: String  = op.symbol()
+      val word: String = op.text()
+      if sym == "=" {
+        sb.append(word)
+      } else {
+        sb.append(sym).append("[").append(word).append("]")
+      }
+      sb.append(" ")
+    }
+    return sb.toString().trimmed()
+  }
+}
+
+// ── Test pairs ────────────────────────────────────────────────────────────────
+
+val pairs: List[TextPair] = [
+  new TextPair("identical",        "hello world", "hello world"),
+  new TextPair("one word changed", "the quick brown fox", "the slow brown fox"),
+  new TextPair("insertion",        "cat sat on mat", "the cat sat on the mat"),
+  new TextPair("deletion",         "to be or not to be that is the question",
+                                   "to be or not to be"),
+  new TextPair("heavy edit",       "abcdefgh", "xyzabc"),
+  new TextPair("empty vs text",    "", "hello"),
+  new TextPair("anagram",          "listen", "silent"),
+  new TextPair("code variant",
+    "def factorial(n): return 1 if n <= 1 else n * factorial(n-1)",
+    "def fact(n): if n <= 1: return 1; return n * fact(n - 1)")
+]
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+IO::println("=============================================")
+IO::println("  Text Similarity & Diff Analysis Report")
+IO::println("=============================================")
+IO::println("")
+
+var totalSim: Double = 0.0
+var totalDist: Int   = 0
+
+foreach pair: TextPair in pairs {
+  val a: String = pair.a()
+  val b: String = pair.b()
+  val r: SimilarityResult = Similarity::analyze(a, b)
+
+  totalSim  = totalSim  + r.normSim()
+  totalDist = totalDist + r.editDist()
+
+  IO::println("--- #{pair.label()} ---")
+  IO::println("  A : \"#{a}\"")
+  IO::println("  B : \"#{b}\"")
+  IO::println("  Edit distance : #{r.editDist()}")
+  IO::println("  LCS length    : #{r.lcsLen()}")
+  IO::println("  Similarity    : #{Fmt::pct(r.normSim())}  #{Fmt::bar(r.normSim(), 20)}")
+  IO::println("  Jaccard(2gram): #{Fmt::pct(r.jaccard())}  #{Fmt::bar(r.jaccard(), 20)}")
+
+  if a.length > 0 && b.length > 0 {
+    val wa: List[String] = Splitter::words(a)
+    val wb: List[String] = Splitter::words(b)
+    val ops: List[WordOp] = LCS::wordDiff(wa, wb)
+    IO::println("  Word diff     : #{Fmt::wordDiffLine(ops)}")
+  }
+  IO::println("")
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+
+val count: Int     = pairs.size
+val avgSim: Double = totalSim / (count as Double)
+
+IO::println("=============================================")
+IO::println("  Summary")
+IO::println("=============================================")
+IO::println("Pairs analyzed : #{count}")
+IO::println("Total edit dist: #{totalDist}")
+IO::println("Avg similarity : #{Fmt::pct(avgSim)}  #{Fmt::bar(avgSim, 20)}")
+IO::println("")
+IO::println("Similarity tiers:")
+
+var tierHigh: Int   = 0
+var tierMed: Int    = 0
+var tierLow: Int    = 0
+
+foreach pair: TextPair in pairs {
+  val s: Double = Similarity::normalized(pair.a(), pair.b())
+  if s >= 0.7 { tierHigh = tierHigh + 1 }
+  else if s >= 0.4 { tierMed = tierMed + 1 }
+  else { tierLow = tierLow + 1 }
+}
+
+IO::println("  High   (>=70%): #{tierHigh}")
+IO::println("  Medium (40-70%): #{tierMed}")
+IO::println("  Low    (<40%) : #{tierLow}")
+IO::println("")
+IO::println("Done.")

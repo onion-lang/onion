@@ -7,7 +7,7 @@ import java.io.StringReader
 import java.util.Locale
 
 /**
- * `commonSyntaxHint`'s `case "in"` (the `for x in xs` hint) was the one hint still
+ * `SyntaxHintClassifier`'s `case "in"` (the `for x in xs` hint) was the one hint still
  * returning a hard-coded English string instead of going through the bilingual
  * `error.parsing.hint.*` bundle lookup every other hint in that match uses — so a
  * Japanese-locale diagnostic for the base message came out in Japanese with the hint

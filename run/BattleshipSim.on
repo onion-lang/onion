@@ -1,0 +1,381 @@
+// BattleshipSim.on — Two-player Battleship auto-simulation (~280 lines)
+// Exercises: 2D Int arrays, plain enum (ShipKind), data-carrying ADT enum
+//   (ShotResult), records with methods, classes with public/private sections,
+//   collection pipelines (map/filter/fold/sortedBy), extension methods
+//   (Int/String), closures, foreach/while loops, select/case pattern matching,
+//   string interpolation, nullable (String?), if-as-expression, try/catch.
+
+import {
+  java.util.Random;
+  java.util.ArrayList;
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+
+extension Int {
+  def pad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def pct(total: Int): String {
+    if total == 0 { return " N/A" }
+    return "#{self * 100 / total}%"
+  }
+}
+
+extension String {
+  def lpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ── ShipKind: plain enum with label and size ───────────────────────────────────
+
+enum ShipKind {
+  Carrier, Battleship, Cruiser, Submarine, Destroyer
+
+public:
+  def label(): String = select this {
+    case ShipKind::Carrier:    "Carrier"
+    case ShipKind::Battleship: "Battleship"
+    case ShipKind::Cruiser:    "Cruiser"
+    case ShipKind::Submarine:  "Submarine"
+    case ShipKind::Destroyer:  "Destroyer"
+  }
+  def shipSize(): Int = select this {
+    case ShipKind::Carrier:    5
+    case ShipKind::Battleship: 4
+    case ShipKind::Cruiser:    3
+    case ShipKind::Submarine:  3
+    case ShipKind::Destroyer:  2
+  }
+  def shortName(): String = select this {
+    case ShipKind::Carrier:    "CA"
+    case ShipKind::Battleship: "BB"
+    case ShipKind::Cruiser:    "CR"
+    case ShipKind::Submarine:  "SS"
+    case ShipKind::Destroyer:  "DD"
+  }
+}
+
+// ── ShotResult: data-carrying ADT enum ────────────────────────────────────────
+
+enum ShotResult {
+  case Miss()
+  case Hit(shipName: String)
+  case Sunk(shipName: String)
+
+public:
+  def describe(): String = select this {
+    case m is Miss: "Miss"
+    case h is Hit:  "Hit  (#{h.shipName()})"
+    case s is Sunk: "SUNK (#{s.shipName()})"
+  }
+  def isHit(): Boolean = select this {
+    case m is Miss: false
+    else:           true
+  }
+  def isSunk(): Boolean = select this {
+    case s is Sunk: true
+    else:           false
+  }
+}
+
+// ── Ship record ────────────────────────────────────────────────────────────────
+
+record Ship(kind: ShipKind, row: Int, col: Int, horiz: Boolean) {
+public:
+  def size(): Int = kind().shipSize()
+  def label(): String = kind().label()
+  def shortName(): String = kind().shortName()
+  def contains(r: Int, c: Int): Boolean {
+    if horiz() {
+      if r != row() { return false }
+      return c >= col() && c < col() + size()
+    }
+    if c != col() { return false }
+    return r >= row() && r < row() + size()
+  }
+}
+
+// ── Board class ────────────────────────────────────────────────────────────────
+
+class Board {
+  var shipGrid: Int[][]           // 1 = occupied by ship, 0 = empty water
+  var shotGrid: Int[][]           // 0 = unshot, 1 = miss, 2 = hit
+  var shipList: List[Object]
+  var sunkNames: List[Object]     // names (String) of sunk ships
+
+public:
+  def this {
+    shipGrid  = new Int[10][10]
+    shotGrid  = new Int[10][10]
+    shipList  = new ArrayList[Object]()
+    sunkNames = new ArrayList[Object]()
+  }
+
+  def placeShip(ship: Ship): Boolean {
+    val sz: Int = ship.size()
+    if ship.horiz() {
+      if ship.col() + sz > 10 { return false }
+    } else {
+      if ship.row() + sz > 10 { return false }
+    }
+    var i: Int = 0
+    while i < sz {
+      val r: Int = if ship.horiz() { ship.row() } else { ship.row() + i }
+      val c: Int = if ship.horiz() { ship.col() + i } else { ship.col() }
+      if shipGrid[r][c] != 0 { return false }
+      i = i + 1
+    }
+    i = 0
+    while i < sz {
+      val r: Int = if ship.horiz() { ship.row() } else { ship.row() + i }
+      val c: Int = if ship.horiz() { ship.col() + i } else { ship.col() }
+      shipGrid[r][c] = 1
+      i = i + 1
+    }
+    shipList.add(ship)
+    return true
+  }
+
+  def shoot(r: Int, c: Int): ShotResult {
+    if shotGrid[r][c] != 0 { return new Miss() }
+    if shipGrid[r][c] == 0 {
+      shotGrid[r][c] = 1
+      return new Miss()
+    }
+    shotGrid[r][c] = 2
+    foreach s: Object in shipList {
+      val ship: Ship = s as Ship
+      if ship.contains(r, c) {
+        if isSunk(ship) {
+          sunkNames.add(ship.label())
+          return new Sunk(ship.label())
+        }
+        return new Hit(ship.label())
+      }
+    }
+    return new Hit("?")
+  }
+
+  def isSunk(ship: Ship): Boolean {
+    val sz: Int = ship.size()
+    var i: Int = 0
+    while i < sz {
+      val r: Int = if ship.horiz() { ship.row() } else { ship.row() + i }
+      val c: Int = if ship.horiz() { ship.col() + i } else { ship.col() }
+      if shotGrid[r][c] != 2 { return false }
+      i = i + 1
+    }
+    return true
+  }
+
+  def allSunk(): Boolean {
+    foreach s: Object in shipList {
+      if !isSunk(s as Ship) { return false }
+    }
+    return true
+  }
+
+  def hasBeenShot(r: Int, c: Int): Boolean = shotGrid[r][c] != 0
+
+  def hitCount(): Int {
+    var count: Int = 0
+    var r: Int = 0
+    while r < 10 {
+      var c: Int = 0
+      while c < 10 {
+        if shotGrid[r][c] == 2 { count = count + 1 }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return count
+  }
+
+  def missCount(): Int {
+    var count: Int = 0
+    var r: Int = 0
+    while r < 10 {
+      var c: Int = 0
+      while c < 10 {
+        if shotGrid[r][c] == 1 { count = count + 1 }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return count
+  }
+
+  def sunkCount(): Int = sunkNames.size
+
+  def renderTracking(): void {
+    IO::println("   A  B  C  D  E  F  G  H  I  J")
+    var r: Int = 0
+    while r < 10 {
+      var line: String = (r + 1).pad(2) + " "
+      var c: Int = 0
+      while c < 10 {
+        val ch: String = select shotGrid[r][c] {
+          case 0: " · "
+          case 1: " ○ "
+          case 2: " × "
+          else:   " ? "
+        }
+        line = line + ch
+        c = c + 1
+      }
+      IO::println(line)
+      r = r + 1
+    }
+  }
+}
+
+// ── Player class ───────────────────────────────────────────────────────────────
+
+class Player {
+  var playerName: String
+  var playerBoard: Board
+  var rng: Random
+  var totalShots: Int
+  var totalHits: Int
+
+public:
+  def this(n: String, seed: Long) {
+    playerName  = n
+    playerBoard = new Board()
+    rng         = new Random(seed)
+    totalShots  = 0
+    totalHits   = 0
+  }
+
+  def name(): String = playerName
+
+  def board(): Board = playerBoard
+
+  def placeShipsRandomly(): void {
+    val kinds: List[Object] = new ArrayList[Object]()
+    kinds.add(ShipKind::Carrier)
+    kinds.add(ShipKind::Battleship)
+    kinds.add(ShipKind::Cruiser)
+    kinds.add(ShipKind::Submarine)
+    kinds.add(ShipKind::Destroyer)
+    foreach k: Object in kinds {
+      val kind: ShipKind = k as ShipKind
+      var placed: Boolean = false
+      while !placed {
+        val r: Int = rng.nextInt(10)
+        val c: Int = rng.nextInt(10)
+        val h: Boolean = rng.nextBoolean()
+        val ship: Ship = new Ship(kind, r, c, h)
+        placed = playerBoard.placeShip(ship)
+      }
+    }
+  }
+
+  def shootAt(enemy: Board): ShotResult {
+    var r: Int = 0
+    var c: Int = 0
+    var found: Boolean = false
+    while !found {
+      r = rng.nextInt(10)
+      c = rng.nextInt(10)
+      if !enemy.hasBeenShot(r, c) { found = true }
+    }
+    val result: ShotResult = enemy.shoot(r, c)
+    totalShots = totalShots + 1
+    if result.isHit() { totalHits = totalHits + 1 }
+    return result
+  }
+
+  def shots(): Int = totalShots
+  def hits():  Int = totalHits
+  def accuracy(): String = totalHits.pct(totalShots)
+}
+
+// ── Separator helpers ──────────────────────────────────────────────────────────
+
+def sep(): void {
+  IO::println("-".rep(58))
+}
+
+def bar(): void {
+  IO::println("=".rep(58))
+}
+
+// ── Main: simulate one full game ───────────────────────────────────────────────
+
+val alice: Player = new Player("Alice", 42L)
+val bob:   Player = new Player("Bob",   137L)
+
+alice.placeShipsRandomly()
+bob.placeShipsRandomly()
+
+bar()
+IO::println("           BATTLESHIP AUTO-SIMULATION")
+IO::println("   Alice (seed 42)  vs  Bob (seed 137) — 5 ships each")
+bar()
+IO::println("Fleet: CA=Carrier(5) BB=Battleship(4) CR=Cruiser(3)")
+IO::println("       SS=Submarine(3) DD=Destroyer(2)  Total: 17 cells")
+sep()
+
+var turn: Int = 1
+var winner: String? = null
+
+while winner == null {
+  val ar: ShotResult = alice.shootAt(bob.board())
+  IO::println("Turn #{turn.pad(3)} | Alice → Bob  : #{ar.describe()}")
+  if bob.board().allSunk() {
+    winner = alice.name()
+  } else {
+    val br: ShotResult = bob.shootAt(alice.board())
+    IO::println("        | Bob   → Alice: #{br.describe()}")
+    if alice.board().allSunk() { winner = bob.name() }
+  }
+  turn = turn + 1
+}
+
+sep()
+IO::println("*** #{winner} WINS after #{turn - 1} turns! ***")
+sep()
+
+// ── Final statistics ───────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("FINAL STATISTICS")
+bar()
+IO::println("Player   | Shots | Hits | Accuracy | Ships sunk")
+sep()
+
+val players: List[Object] = new ArrayList[Object]()
+players.add(alice)
+players.add(bob)
+
+foreach p: Object in players {
+  val player: Player = p as Player
+  val enemyBoard: Board = if player.name() == alice.name() { bob.board() } else { alice.board() }
+  IO::println(
+    "#{player.name().rpad(8)} | #{player.shots().pad(5)} | #{player.hits().pad(4)} | #{player.accuracy().lpad(8)} | #{enemyBoard.sunkCount()}/5"
+  )
+}
+
+sep()
+IO::println("")
+IO::println("#{winner}'s tracking board (final):")
+val winnerBoard: Board = if winner == alice.name() { bob.board() } else { alice.board() }
+winnerBoard.renderTracking()

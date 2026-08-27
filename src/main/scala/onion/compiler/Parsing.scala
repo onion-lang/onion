@@ -3,12 +3,17 @@ package onion.compiler
 import collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 import java.io.{IOException, Reader, StringReader}
-import java.util.Arrays.ArrayList
-import java.util.Collections
 
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.parser.{JJOnionParser, ParseException}
+import _root_.onion.compiler.parser.{
+  ExpectedTokenFormatter,
+  JJOnionParser,
+  ParseException,
+  SourceContext,
+  SyntaxHint,
+  SyntaxHintClassifier
+}
 
 /**
  * Parsing phase of the Onion compiler.
@@ -120,14 +125,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
     val errors = parser.getCollectedErrors()
     for (i <- 0 until errors.size()) {
       val error = errors.get(i)
+      val sourceContext = SourceContext.at(sourceText, error.line, error.column)
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
         syntaxErrorMessage(
           error.found,
           error.expected,
-          contextAt(sourceText, error.line, error.column),
-          sourceLineAt(sourceText, error.line)
+          sourceContext.context,
+          sourceContext.sourceLine
         )
       )
     }
@@ -148,61 +154,21 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(fileName, new Location(1, 1), e.getMessage)
     } else {
       val error = e.currentToken.next
-      val expected = formatExpectedTokens(e)
+      val expected = ExpectedTokenFormatter.format(e.expectedTokenSequences, e.tokenImage)
+      val sourceContext = SourceContext.at(sourceText, error.beginLine, error.beginColumn)
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
         syntaxErrorMessage(
           error.image,
           expected,
-          contextAt(sourceText, error.beginLine, error.beginColumn),
-          sourceLineAt(sourceText, error.beginLine)
+          sourceContext.context,
+          sourceContext.sourceLine
         )
       )
     }
   }
 
-  /**
-   * The source text starting at a 1-based (line, column), for hints that need
-   * to look past the offending token (bounded so a pathological file can't
-   * make the regex match slow).
-   */
-  private def lineStartOffset(sourceText: String, line: Int): Int = {
-    var offset = 0
-    var currentLine = 1
-    while (currentLine < line && offset >= 0 && offset < sourceText.length) {
-      val nl = sourceText.indexOf('\n', offset)
-      if (nl < 0) offset = sourceText.length else { offset = nl + 1; currentLine += 1 }
-    }
-    offset
-  }
-
-  private def contextAt(sourceText: String, line: Int, column: Int): String = {
-    val start = math.min(sourceText.length, lineStartOffset(sourceText, line) + column - 1)
-    sourceText.substring(start, math.min(sourceText.length, start + 200))
-  }
-
-  /**
-   * The full text of the 1-based source line containing (line, column), for
-   * hints that need to recognize a whole malformed statement (e.g. a leading
-   * `switch`) rather than just the token at the error position -- the error
-   * itself is often reported several tokens past the actual mistake.
-   */
-  private def sourceLineAt(sourceText: String, line: Int): String = {
-    val start = lineStartOffset(sourceText, line)
-    val end = sourceText.indexOf('\n', start) match {
-      case -1 => sourceText.length
-      case i => i
-    }
-    sourceText.substring(start, end)
-  }
-
-  /**
-   * Format expected tokens from a ParseException for better error messages.
-   *
-   * When multiple tokens are expected, this creates a more readable message
-   * like "';' or 'newline'" instead of just showing the first one.
-   */
   /**
    * A lone double quote can only come from an unterminated string literal
    * (complete strings lex as a single STRING token); report it as such
@@ -215,120 +181,24 @@ class Parsing(config: CompilerConfig) extends AnyRef
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
-    val hint = commonSyntaxHint(found, expected, context, sourceLine)
+    val hint = SyntaxHintClassifier
+      .classify(found, expected, context, sourceLine)
+      .map(renderSyntaxHint)
+      .getOrElse("")
     if (hint.isEmpty) base else base + " " + hint
   }
 
-  /**
-   * A trailing lambda's parameter list is never parenthesized (`{ k, v -> ... }`,
-   * unlike the non-trailing `(k, v) -> ...` form), so `{ (k, v) -> ... }` fails
-   * right at the `{` with an unhelpful expected-token dump.
-   */
-  private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
-
-  /**
-   * The trailing-lambda arrow used to be `=>`, and nothing else in the language ever was.
-   * `=>` is no longer a token, so `{ x => ... }` fails at the `{` — the lookahead for a
-   * trailing lambda no longer matches and the brace is left where a statement cannot
-   * start. Without a hint the message is an expected-token dump that never mentions the
-   * arrow, which is the one thing that is wrong.
-   */
-  private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
-
-  /**
-   * Add friendly hints for common syntax mistakes.
-   */
-  /**
-   * A Java/JS/C-style `switch` statement at the start of a source line. `switch`
-   * isn't a keyword in Onion -- it parses as a bare identifier-reference
-   * statement -- so the parser actually trips on whatever follows it (the
-   * condition, or the `{` of a parenthesized condition), never on `switch`
-   * itself. Matching the *line*, not the token that triggered the error,
-   * catches `switch x { ... }` and `switch (x) { ... }` alike.
-   */
-  private val LeadingSwitchStatement = """^\s*switch\b""".r
-
-  /**
-   * A Kotlin (`fun`), Swift/Go (`func`), or Rust (`fn`) function/method
-   * declaration. None of these are keywords in Onion (which uses `def`), so at
-   * statement position the keyword parses as a bare identifier reference and the
-   * parser trips on the declaration name that follows, while inside a
-   * class/interface body it trips on the keyword itself -- neither mentions
-   * `def`. Matching the source line for `<kw> name(` catches both. A real call
-   * to a method named `fun`/`func`/`fn` is `fun(...)` with no name between the
-   * keyword and the paren, so it never matches; `fun name(` is not a valid Onion
-   * expression anyway.
-   */
-  private val FunDeclaration = """\b(?:fun|func|fn)\s+[A-Za-z_]\w*\s*\(""".r
-
-  private def commonSyntaxHint(found: String, expected: String, context: String, sourceLine: String): String = found match {
-    // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
-    // `<:` no longer appears in any production, so meeting one can only be old source.
-    case "<:" =>
-      Message("error.parsing.hint.old_conforms")
-    case ":" if expected.contains("extends") =>
-      Message("error.parsing.hint.old_extends")
-    // The removed anonymous super-call form: `def this(x) : (x) { }`. After the colon the
-    // parser now expects only `this`, so that expected-set is the discriminator -- checking
-    // for `super` or `(` alone would fire at every expression position.
-    case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
-      Message("error.parsing.hint.old_super_init")
-    case "in" =>
-      Message("error.parsing.hint.old_for_in")
-    case _ if LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined =>
-      Message("error.parsing.hint.switch_not_supported")
-    case _ if FunDeclaration.findFirstMatchIn(sourceLine).isDefined =>
-      Message("error.parsing.hint.fun_declaration")
-    // There is no `cond ? a : b` ternary operator -- `if`/`else` covers the same
-    // ground as an expression, so unlike the hints above this isn't a token swap;
-    // name the rewrite so the reader isn't left guessing what "unsupported" means here.
-    case "?" =>
-      Message("error.parsing.hint.ternary")
-    case "else" =>
-      Message("error.parsing.hint.dangling_else")
-    // Checked before the paren hint: `{ (k, v) => ... }` is wrong twice, and the arrow
-    // is the part the writer will not spot on their own.
-    case "{" if OldArrowTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
-      Message("error.parsing.hint.old_trailing_arrow")
-    case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
-      val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
-      Message("error.parsing.hint.trailing_lambda_parens", params)
-    case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
-      Message("error.parsing.hint.block_expected")
-    case _ =>
-      ""
-  }
+  private def renderSyntaxHint(hint: SyntaxHint): String =
+    hint.arguments match {
+      case Seq() => Message(hint.messageKey)
+      case Seq(argument) => Message(hint.messageKey, argument)
+      case Seq(first, second) => Message(hint.messageKey, first, second)
+      case more => Message(hint.messageKey, more.toArray[Any])
+    }
 
   /** Make control characters and EOF visible in error messages. */
   private def displayTokenImage(image: String): String =
     if (image == null || image.isEmpty) "<EOF>"
     else image.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
-  private def formatExpectedTokens(e: ParseException): String = {
-    val sequences = e.expectedTokenSequences
-    if (sequences == null || sequences.isEmpty) {
-      return "valid token"
-    }
-
-    // Collect unique expected tokens
-    val expectedSet = scala.collection.mutable.LinkedHashSet[String]()
-    for (seq <- sequences) {
-      if (seq != null && seq.nonEmpty) {
-        expectedSet += e.tokenImage(seq(0))
-      }
-    }
-
-    val expected = expectedSet.toSeq
-    if (expected.isEmpty) {
-      "valid token"
-    } else if (expected.size == 1) {
-      expected.head
-    } else if (expected.size <= 3) {
-      // Show all expected tokens if 3 or fewer
-      expected.init.mkString(", ") + " or " + expected.last
-    } else {
-      val shown = expected.take(4)
-      shown.mkString(", ") + s", ... (${expected.size - shown.size} more)"
-    }
-  }
 }

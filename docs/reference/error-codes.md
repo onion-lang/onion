@@ -417,6 +417,24 @@ Fix: use `.` for an instance call (`s.length()`); `::` is only for a type's
 static members. A real type with the same name as a local still resolves
 correctly — this only fires when `::` is applied to a variable.
 
+### `E0091` — Class used as a value
+
+The mirror image of `E0071`: a bare capitalized name that resolves to a real
+class — not a local variable or field — was used where a value is expected,
+typically as the target of `.member`. Instead of the generic "local variable
+not found", the compiler points at `::`.
+
+```onion
+static def main(args: String[]): void {
+  IO::println(System.currentTimeMillis())   // E0091: System is a class, not a variable
+}
+```
+
+Fix: use `::` for a static member (`System::currentTimeMillis()`); `.` is
+only for an instance's members. A real local variable with the same name as
+a class still resolves correctly — this only fires when the name resolves to
+neither a variable nor a field.
+
 ### `E0020` — Cannot return value
 
 A bare `return;` appears in a method whose declared return type isn't `void`,
@@ -1528,6 +1546,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
 | `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
+| `E0091` | … is a class, not a variable |
 
 ## See also
 

@@ -6,7 +6,7 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The until hint (`SyntaxHintClassifier`'s `LeadingUntilStatement` case) must
+ * The until hint (`ControlFlowSyntaxHints`'s `LeadingUntilStatement` case) must
  * resolve through the bilingual `error.parsing.hint.*` bundle in both locales,
  * like every other hint in that match -- see OldForInHintI18nSpec for the
  * motivating regression.

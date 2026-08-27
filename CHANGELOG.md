@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/TradeMatchingEngine.on`, a 454-line continuous limit-order-book
+  simulator.** Multi-symbol stock exchange matching engine: an ADT
+  `enum OrderType` (Market, Limit, StopLoss), plain enums for `Side`/`Status`,
+  a `record Trade` with methods, mutable `Order`/`OrderBook`/`MatchingEngine`
+  classes with `public:`/`private:` sections, an observer interface
+  (`TradeObserver`), and collection pipelines (`filter`, `map`, `fold`,
+  `sortedBy`, `groupBy`, `distinct`, `partition`) driving VWAP, market-depth,
+  and top-by-notional reporting.
+
 ## [0.22.0] - 2026-08-27
 
 ### Fixed

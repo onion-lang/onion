@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a C#-style `using` namespace-import directive.**
+  Onion has no `using Namespace;` import directive; imports are wrapped in
+  braces, so `using System.Collections.Generic;` at the top of a file parses
+  `using` as a bare identifier-reference statement followed by a stray
+  identifier, with a generic expected-token dump that never mentions
+  `import { ... }`. The diagnostic now recognizes a leading
+  `using Some.Dotted.Path;` statement and points at the correct
+  `import { Some.Dotted.Path }` form. This is distinct from the existing hint
+  for C#/Python-style `using r = expr { ... }` resource statements.
+
 - **Parser hint for a `$` variable/interpolation sigil.**
   Onion has no `$` sigil; string interpolation is `#{expr}` inside a string
   literal, so a C#-style `$"Hello, {name}!"` interpolated string or a

@@ -28,6 +28,8 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
+  private val CSharpStyleUsingImport =
+    """^\s*using\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
@@ -150,6 +152,9 @@ private[compiler] object SyntaxHintClassifier {
       case _ if UsingResourceStatement.findFirstMatchIn(sourceLine).isDefined =>
         val matched = UsingResourceStatement.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.using_resource_statement", matched.group(1), matched.group(2).trim)
+      case _ if CSharpStyleUsingImport.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = CSharpStyleUsingImport.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.csharp_style_using_import", matched.group(1))
       // Also resembles `Int.member`; extension-declaration advice is more useful.
       case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get

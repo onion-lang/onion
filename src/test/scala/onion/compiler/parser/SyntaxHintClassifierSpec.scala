@@ -230,6 +230,24 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("r", "new Res()")
     }
 
+    it("recognizes a C#-style `using` namespace-import directive") {
+      val hint = classify(
+        found = "System",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "using System.Collections.Generic;"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.csharp_style_using_import"
+      hint.arguments shouldBe Seq("System.Collections.Generic")
+    }
+
+    it("does not confuse a C#-style resource `using` statement with the import-directive form") {
+      classify(
+        found = "r",
+        sourceLine = "using r = new Res() {"
+      ).messageKey shouldBe "error.parsing.hint.using_resource_statement"
+    }
+
     it("recognizes a Go-style `:=` short variable declaration") {
       val hint = classify(
         found = ":",

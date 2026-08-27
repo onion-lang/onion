@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `name(arg)` form (or, if two separate statements were intended, that they
   need a newline or `;` between them).
 
+- **No hint for `arr.length()`/`arr.size()`, unlike the same mix-up on a
+  record field.** Array length is a property (`arr.length`, no
+  parentheses), not a method, so calling it with parentheses raised a bare
+  "method ... is not found" with no suggestion — the parallel
+  `p.name()`-on-a-record-field mix-up already got a "field, not a method"
+  hint, but arrays carry no real `length` field entry in the type table for
+  that check to match. `arr.length()`/`arr.size()` now gets the same hint.
+
 ## [0.21.0] - 2026-08-27
 
 ### Fixed

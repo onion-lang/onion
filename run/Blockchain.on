@@ -1,0 +1,326 @@
+// Blockchain.on — Minimal proof-of-work blockchain simulator.
+// Exercises: ADT case-enums, records with law/example, extension methods
+//   on Int/String, class with mutable List state (.add(), public: fields),
+//   collection pipelines (map/filter/fold/find/groupBy/sortedBy),
+//   foreach over ranges and (k,v) map entries, select/pattern-matching,
+//   nullable types, string interpolation, while loop, closures.
+//   ~250 lines.
+
+// ─── String helpers ────────────────────────────────────────────────────────────
+extension String {
+  def rep(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+  def hasPrefix(p: String): Boolean = self.startsWith(p)
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Int {
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Transaction types (ADT enum) ─────────────────────────────────────────────
+enum TxType {
+  case Coinbase(reward: Int)
+  case Transfer(from: String, to: String, amount: Int)
+  case Freeze(holder: String)
+}
+
+// ─── Transaction record ────────────────────────────────────────────────────────
+record Transaction(id: Int, kind: TxType, memo: String)
+  example { new Transaction(1, new Coinbase(50), "block reward").id() == 1 }
+  example { new Transaction(2, new Freeze("alice"), "penalize").memo() == "penalize" }
+
+// ─── Block record ─────────────────────────────────────────────────────────────
+record Block(index: Int, prevHash: String, txs: List[Object],
+             nonce: Int, hash: String)
+  example { new Block(0, "0", [], 0, "genesis").index() == 0 }
+
+// ─── Mining outcome enum ───────────────────────────────────────────────────────
+enum MineResult {
+  case Mined(block: Block)
+  case Rejected(reason: String)
+}
+
+// ─── Validation error enum ─────────────────────────────────────────────────────
+enum ChainError {
+  case BadPrevHash(at: Int)
+  case BadHash(at: Int)
+  case EmptyTxs(at: Int)
+}
+
+// ─── Deterministic hash using Java's hashCode ─────────────────────────────────
+// Returns an 8-hex-digit string. Not cryptographic but well-distributed.
+def blockHash(s: String): String {
+  // Mix two hashCode calls with different seeds to improve distribution.
+  var h1: Int = s.hashCode()
+  val rotated: String = (s.length() + "|" + s)
+  var h2: Int = rotated.hashCode()
+  // Combine and take absolute value.
+  val combined: Long = ((h1 as Long) * 2654435761L + (h2 as Long)) % 4294967296L
+  val absVal: Long = if combined < 0L { 0L - combined } else { combined }
+  val hex: String = Long::toHexString(absVal)
+  val padLen: Int = 8 - hex.length()
+  val pad: String = if padLen > 0 { "0".rep(padLen) } else { "" }
+  val full: String = pad + hex
+  return full.substring(full.length() - 8, full.length())
+}
+
+def txSummary(tx: Transaction): String {
+  val body: String = select tx.kind() {
+    case c is Coinbase:  "COINBASE+" + c.reward()
+    case t is Transfer:  t.from() + ">" + t.to() + ":" + t.amount()
+    case f is Freeze:    "FREEZE:" + f.holder()
+  }
+  return "#" + tx.id() + "[" + body + "]"
+}
+
+def blockData(b: Block): String {
+  val txStr: String = b.txs().map { t -> txSummary(t as Transaction) }
+                        .fold("") { acc, s -> acc + s }
+  return b.index() + "|" + b.prevHash() + "|" + txStr + "|" + b.nonce()
+}
+
+def computeHash(b: Block): String = blockHash(blockData(b))
+
+def mineBlock(idx: Int, prev: String, txs: List[Object], difficulty: Int): Block {
+  val prefix: String = "0".rep(difficulty)
+  var nonce: Int = 0
+  while true {
+    val candidate: Block = new Block(idx, prev, txs, nonce, "")
+    val h: String = computeHash(candidate)
+    if h.hasPrefix(prefix) {
+      return new Block(idx, prev, txs, nonce, h)
+    }
+    nonce++
+  }
+  return new Block(idx, prev, txs, 0, "never")  // unreachable
+}
+
+// ─── Blockchain class ─────────────────────────────────────────────────────────
+class Blockchain {
+  var chain: List[Object]
+  var pending: List[Object]
+  var difficulty: Int
+
+public:
+  def this(diff: Int) {
+    val genesis: Block = mineBlock(0, "0000000000000000",
+      [new Transaction(0, new Coinbase(0), "genesis")], diff)
+    chain = [genesis]
+    pending = []
+    difficulty = diff
+  }
+
+  def addTx(tx: Transaction): void { pending.add(tx) }
+
+  def tip(): Block = chain[chain.size - 1] as Block
+
+  def mine(): MineResult {
+    if pending.size == 0 { return new Rejected("no pending transactions") }
+    val txsCopy: List[Object] = pending.map { t -> t }
+    val prev: Block = tip()
+    val b: Block = mineBlock(prev.index() + 1, prev.hash(), txsCopy, difficulty)
+    chain.add(b)
+    pending = []
+    return new Mined(b)
+  }
+
+  def blockAt(idx: Int): Block? {
+    return chain.find { b -> (b as Block).index() == idx } as Block?
+  }
+
+  def validate(): List[Object] {
+    val errors: List[Object] = []
+    for var i: Int = 1; i < chain.size; i++ {
+      val b: Block = chain[i] as Block
+      val prev: Block = chain[i - 1] as Block
+      if b.prevHash() != prev.hash()        { errors.add(new BadPrevHash(i)) }
+      if computeHash(b) != b.hash()         { errors.add(new BadHash(i)) }
+      if b.txs().size == 0                  { errors.add(new EmptyTxs(i)) }
+    }
+    return errors
+  }
+
+  def length(): Int = chain.size
+
+  def allBlocks(): List[Object] = chain
+}
+
+// ─── Reporting helpers ─────────────────────────────────────────────────────────
+def printBlock(b: Block): void {
+  println("  Block #" + b.index())
+  println("    hash     : " + b.hash())
+  println("    prevHash : " + b.prevHash())
+  println("    nonce    : " + b.nonce())
+  println("    txs(" + b.txs().size + ")")
+  foreach t: Object in b.txs() {
+    val tx: Transaction = t as Transaction
+    println("      " + txSummary(tx) + " — " + tx.memo())
+  }
+}
+
+def analyzeChain(bc: Blockchain): void {
+  println("=== Chain Analysis ===")
+  val blocks: List[Object] = bc.allBlocks()
+
+  val totalTx: Int = blocks.map { b -> (b as Block).txs().size }
+                            .fold(0) { acc, n -> acc + (n as Int) }
+  println("  blocks       : " + bc.length())
+  println("  total txs    : " + totalTx)
+
+  val allTxs: List[Object] = []
+  foreach b: Object in blocks {
+    foreach t: Object in (b as Block).txs() { allTxs.add(t) }
+  }
+
+  // sum of transferred amounts by recipient
+  val byRecipient: Map[Object, Object] = [:]
+  foreach t: Object in allTxs {
+    val tx: Transaction = t as Transaction
+    select tx.kind() {
+      case tr is Transfer:
+        val prev: Int = if byRecipient.containsKey(tr.to()) {
+          byRecipient.get(tr.to()) as Int
+        } else { 0 }
+        byRecipient.put(tr.to(), prev + tr.amount())
+      else: {}
+    }
+  }
+  if byRecipient.size > 0 {
+    println("  balances (received) by address:")
+    foreach (k, v) in byRecipient {
+      println("    " + ("" + k).lpad(8) + " : " + v)
+    }
+  }
+
+  val coinbaseTotal: Int = allTxs
+    .filter { t -> select (t as Transaction).kind() { case c is Coinbase: true; else: false } }
+    .map    { t -> select (t as Transaction).kind() { case c is Coinbase: c.reward(); else: 0 } }
+    .fold(0) { acc, n -> acc + (n as Int) }
+  println("  total coinbase issued : " + coinbaseTotal)
+
+  // group tx IDs mod 3 (exercises groupBy)
+  val grouped: Map[Object, List[Object]] = allTxs.groupBy { t -> (t as Transaction).id() % 3 }
+  println("  tx-id mod-3 groups    : " + grouped.size)
+  foreach (k, v) in grouped {
+    println("    group " + k + ": " + v.size + " tx(s)")
+  }
+}
+
+// ─── Tamper demo ──────────────────────────────────────────────────────────────
+def tamperDemo(bc: Blockchain): void {
+  println("\n=== Tamper Detection Demo ===")
+  val b1: Block? = bc.blockAt(1)
+  if b1 != null {
+    val real: Block = b1 as Block
+    // Replace block 1 with a fake (same index/prev but wrong hash)
+    val fake: Block = new Block(real.index(), real.prevHash(), real.txs(),
+                                real.nonce() + 99, "deadbeef")
+    bc.allBlocks()[1] = fake
+    val errs: List[Object] = bc.validate()
+    if errs.size > 0 {
+      println("  Tamper detected! errors: " + errs.size)
+      foreach e: Object in errs {
+        select e {
+          case bp is BadPrevHash: println("    badPrevHash at " + bp.at())
+          case bh is BadHash:     println("    badHash at " + bh.at())
+          case et is EmptyTxs:    println("    emptyTxs at " + et.at())
+        }
+      }
+    } else {
+      println("  No errors (unexpected)")
+    }
+    // Restore
+    bc.allBlocks()[1] = real
+    val errs2: List[Object] = bc.validate()
+    println("  After restore: " + (if errs2.size == 0 { "valid ✓" } else { "still broken" }))
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  println("╔══════════════════════════════════════════╗")
+  println("║   Blockchain Simulator  (difficulty=2)  ║")
+  println("╚══════════════════════════════════════════╝")
+
+  val bc: Blockchain = new Blockchain(2)
+  println("\n[genesis] hash=" + bc.tip().hash())
+
+  // ── Block 1: two transfers + coinbase ────────────────────────────────────────
+  bc.addTx(new Transaction(1, new Coinbase(50), "miner reward"))
+  bc.addTx(new Transaction(2, new Transfer("alice", "bob", 10), "coffee"))
+  bc.addTx(new Transaction(3, new Transfer("alice", "carol", 25), "rent share"))
+  val r1: MineResult = bc.mine()
+  select r1 {
+    case m is Mined:      println("Block 1 mined  nonce=" + m.block().nonce() + "  hash=" + m.block().hash())
+    case rej is Rejected: println("ERROR: " + rej.reason())
+  }
+
+  // ── Block 2 ──────────────────────────────────────────────────────────────────
+  bc.addTx(new Transaction(4, new Coinbase(50), "miner reward"))
+  bc.addTx(new Transaction(5, new Transfer("bob", "dave", 5), "lunch"))
+  bc.addTx(new Transaction(6, new Freeze("eve"), "suspicious activity"))
+  bc.addTx(new Transaction(7, new Transfer("carol", "alice", 8), "payback"))
+  val r2: MineResult = bc.mine()
+  select r2 {
+    case m is Mined:      println("Block 2 mined  nonce=" + m.block().nonce() + "  hash=" + m.block().hash())
+    case rej is Rejected: println("ERROR: " + rej.reason())
+  }
+
+  // ── Block 3 ──────────────────────────────────────────────────────────────────
+  bc.addTx(new Transaction(8, new Coinbase(50), "miner reward"))
+  bc.addTx(new Transaction(9, new Transfer("dave", "alice", 2), "tip"))
+  val r3: MineResult = bc.mine()
+  select r3 {
+    case m is Mined:      println("Block 3 mined  nonce=" + m.block().nonce() + "  hash=" + m.block().hash())
+    case rej is Rejected: println("ERROR: " + rej.reason())
+  }
+
+  // ── Mine with empty pending ───────────────────────────────────────────────────
+  val rEmpty: MineResult = bc.mine()
+  select rEmpty {
+    case rej is Rejected: println("\nEmpty mine → rejected: " + rej.reason())
+    case m is Mined:      println("Unexpected mine success!")
+  }
+
+  // ── Print all blocks ─────────────────────────────────────────────────────────
+  println("\n=== Full Chain (" + bc.length() + " blocks) ===")
+  foreach b: Object in bc.allBlocks() { printBlock(b as Block) }
+
+  // ── Normal validation ─────────────────────────────────────────────────────────
+  println("\n=== Validation ===")
+  val errors: List[Object] = bc.validate()
+  println("  result: " + (if errors.size == 0 { "VALID ✓" } else { errors.size + " error(s)" }))
+
+  // ── Lookup ────────────────────────────────────────────────────────────────────
+  println("\n=== Block Lookup ===")
+  val found: Block? = bc.blockAt(2)
+  if found != null {
+    println("  blockAt(2) → hash=" + (found as Block).hash())
+  } else {
+    println("  blockAt(2) → not found")
+  }
+  val missing: Block? = bc.blockAt(99)
+  println("  blockAt(99) → " + (if missing != null { "found" } else { "not found" }))
+
+  // ── Tamper detection ─────────────────────────────────────────────────────────
+  tamperDemo(bc)
+
+  // ── Analytics ────────────────────────────────────────────────────────────────
+  println("")
+  analyzeChain(bc)
+
+  println("\nDone.")
+}

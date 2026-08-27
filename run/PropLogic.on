@@ -1,0 +1,402 @@
+// PropLogic.on — propositional-logic evaluator and truth-table generator.
+// Demonstrates: 8-case ADT enum with recursive methods; extension Boolean/Int;
+// collection pipelines (map/filter/fold/sortedBy/any/count); closures; string
+// interpolation; while/foreach/ranges; nullable types; recursion; |> pipeline.
+//
+// Formulas supported: Var, Top (⊤), Bot (⊥), Not, And, Or, Impl (→), Equiv (↔).
+// Entry: sbt 'runScript run/PropLogic.on'
+
+// ─── Utility functions ────────────────────────────────────────────────────────
+
+def emptyStrs(): List[String] {
+  val r: List[String] = []
+  return r
+}
+
+def strIndexOf(lst: List[String], needle: String): Int {
+  var i: Int = 0
+  foreach s: String in lst {
+    if s == needle { return i }
+    i++
+  }
+  return 0 - 1
+}
+
+// Merge two sorted-unique String lists, keeping uniqueness and sorting.
+def mergeVars(a: List[String], b: List[String]): List[String] {
+  val result: List[String] = []
+  foreach s: String in a {
+    val found: Boolean = result.any { x -> x == s }
+    if !found { result.add(s) }
+  }
+  foreach s: String in b {
+    val found: Boolean = result.any { x -> x == s }
+    if !found { result.add(s) }
+  }
+  return result.sortedBy { s -> s }
+}
+
+// 2^n (n < 30)
+def pow2(n: Int): Int {
+  var r: Int = 1
+  var i: Int = 0
+  while i < n { r = r * 2; i++ }
+  return r
+}
+
+// Fetch element i from a List[Boolean] via iteration (avoids untyped cast).
+def boolAt(vals: List[Boolean], idx: Int): Boolean {
+  var i: Int = 0
+  foreach b: Boolean in vals {
+    if i == idx { return b }
+    i++
+  }
+  return false
+}
+
+// Repeat a character string `n` times.
+def repeatStr(s: String, n: Int): String {
+  var r: String = ""
+  var i: Int = 0
+  while i < n { r = r + s; i++ }
+  return r
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Boolean {
+  def toBit(): String = if self { "1" } else { "0" }
+  def toLabel(): String = if self { "T" } else { "F" }
+}
+
+extension Int {
+  // Bit at position `pos` (0 = least significant) of this integer.
+  def bitAt(pos: Int): Boolean {
+    var n: Int = self
+    var i: Int = 0
+    while i < pos { n = n / 2; i++ }
+    return n % 2 == 1
+  }
+}
+
+// ─── Formula ADT ─────────────────────────────────────────────────────────────
+
+enum Formula {
+  case Var(name: String)
+  case Top
+  case Bot
+  case Not(f: Formula)
+  case And(l: Formula, r: Formula)
+  case Or(l: Formula, r: Formula)
+  case Impl(l: Formula, r: Formula)
+  case Equiv(l: Formula, r: Formula)
+
+public:
+  // Sorted list of distinct variable names appearing in this formula.
+  def vars(): List[String] = select this {
+    case v is Var:   mergeVars([v.name()], emptyStrs())
+    case _tp is Top: emptyStrs()
+    case _bp is Bot: emptyStrs()
+    case n is Not:   n.f().vars()
+    case a is And:   mergeVars(a.l().vars(), a.r().vars())
+    case o is Or:    mergeVars(o.l().vars(), o.r().vars())
+    case i is Impl:  mergeVars(i.l().vars(), i.r().vars())
+    case e is Equiv: mergeVars(e.l().vars(), e.r().vars())
+  }
+
+  // Evaluate this formula under the given variable assignment.
+  // `variables` lists variable names; `vals` gives their truth values (parallel).
+  def eval(variables: List[String], vals: List[Boolean]): Boolean = select this {
+    case v is Var:
+      val idx: Int = strIndexOf(variables, v.name())
+      if idx < 0 { false } else { boolAt(vals, idx) }
+    case _tp is Top: true
+    case _bp is Bot: false
+    case n is Not:   !n.f().eval(variables, vals)
+    case a is And:   a.l().eval(variables, vals) && a.r().eval(variables, vals)
+    case o is Or:    o.l().eval(variables, vals) || o.r().eval(variables, vals)
+    case i is Impl:  !i.l().eval(variables, vals) || i.r().eval(variables, vals)
+    case e is Equiv:
+      e.l().eval(variables, vals) == e.r().eval(variables, vals)
+  }
+
+  // Parenthesised infix string representation.
+  def show(): String = select this {
+    case v is Var:   v.name()
+    case _tp is Top: "T"
+    case _bp is Bot: "F"
+    case n is Not:   "(~" + n.f().show() + ")"
+    case a is And:   "(" + a.l().show() + " & " + a.r().show() + ")"
+    case o is Or:    "(" + o.l().show() + " | " + o.r().show() + ")"
+    case i is Impl:  "(" + i.l().show() + " -> " + i.r().show() + ")"
+    case e is Equiv: "(" + e.l().show() + " <-> " + e.r().show() + ")"
+  }
+
+  // Negation Normal Form: push all negations inward to literals.
+  def nnf(): Formula = select this {
+    case _v is Var:  self
+    case _t is Top:  self
+    case _b is Bot:  self
+    case n is Not: select n.f() {
+      case _it is Top:     new Bot()
+      case _ib is Bot:     new Top()
+      case inner is Not:   inner.f().nnf()
+      case a is And:       new Or(new Not(a.l()).nnf(), new Not(a.r()).nnf())
+      case o is Or:        new And(new Not(o.l()).nnf(), new Not(o.r()).nnf())
+      case i is Impl:      new And(i.l().nnf(), new Not(i.r()).nnf())
+      case e is Equiv:
+        new Or(
+          new And(e.l().nnf(), new Not(e.r()).nnf()),
+          new And(new Not(e.l()).nnf(), e.r().nnf())
+        )
+      else: new Not(n.f().nnf())
+    }
+    case a is And:   new And(a.l().nnf(), a.r().nnf())
+    case o is Or:    new Or(o.l().nnf(), o.r().nnf())
+    case i is Impl:  new Or(new Not(i.l()).nnf(), i.r().nnf())
+    case e is Equiv:
+      new Or(
+        new And(e.l().nnf(), e.r().nnf()),
+        new And(new Not(e.l()).nnf(), new Not(e.r()).nnf())
+      )
+  }
+
+  // Simple constant folding (Top/Bot propagation).
+  def simplify(): Formula = select this {
+    case _v is Var:  self
+    case _t is Top:  self
+    case _b is Bot:  self
+    case n is Not:
+      val sf: Formula = n.f().simplify()
+      select sf {
+        case _st is Top: new Bot()
+        case _sb is Bot: new Top()
+        else:            new Not(sf)
+      }
+    case a is And:
+      val sl: Formula = a.l().simplify()
+      val sr: Formula = a.r().simplify()
+      select sl {
+        case _slb is Bot: new Bot()
+        case _slt is Top: sr
+        else: select sr {
+          case _srb is Bot: new Bot()
+          case _srt is Top: sl
+          else:             new And(sl, sr)
+        }
+      }
+    case o is Or:
+      val sl: Formula = o.l().simplify()
+      val sr: Formula = o.r().simplify()
+      select sl {
+        case _slt is Top: new Top()
+        case _slb is Bot: sr
+        else: select sr {
+          case _srt is Top: new Top()
+          case _srb is Bot: sl
+          else:             new Or(sl, sr)
+        }
+      }
+    case i is Impl:
+      val sl: Formula = i.l().simplify()
+      val sr: Formula = i.r().simplify()
+      select sl {
+        case _slb is Bot: new Top()
+        case _slt is Top: sr
+        else: select sr {
+          case _srt is Top: new Top()
+          else:             new Impl(sl, sr)
+        }
+      }
+    case e is Equiv: new Equiv(e.l().simplify(), e.r().simplify())
+  }
+}
+
+// ─── Truth-table display ──────────────────────────────────────────────────────
+
+// Build the Boolean assignment for truth-table row `rowIdx` (0-indexed):
+// variable at position i gets bit i of rowIdx.
+def assignment(rowIdx: Int, n: Int): List[Boolean] {
+  val vals: List[Boolean] = []
+  var i: Int = 0
+  while i < n { vals.add(rowIdx.bitAt(i)); i++ }
+  return vals
+}
+
+// Print a truth table and classify the formula.
+def truthTable(title: String, f: Formula): void {
+  val variables: List[String] = f.vars()
+  val n: Int = variables.size
+  val rows: Int = pow2(n)
+
+  println("--- " + title + " ---")
+  println("Formula: " + f.show())
+
+  // Header row
+  var header: String = ""
+  foreach v: String in variables { header = header + v + "  " }
+  header = header + "| result"
+  println(header)
+  println(repeatStr("-", header.length()))
+
+  var trueCount: Int = 0
+  var rowIdx: Int = 0
+  while rowIdx < rows {
+    val vals: List[Boolean] = assignment(rowIdx, n)
+    val result: Boolean = f.eval(variables, vals)
+    var line: String = ""
+    foreach v: String in variables {
+      val idx: Int = strIndexOf(variables, v)
+      line = line + boolAt(vals, idx).toLabel() + "  "
+    }
+    line = line + "| " + result.toLabel()
+    println(line)
+    if result { trueCount++ }
+    rowIdx++
+  }
+
+  println(repeatStr("-", header.length()))
+  val label: String = if trueCount == rows { "TAUTOLOGY" } else if trueCount == 0 { "CONTRADICTION" } else { "SATISFIABLE (" + trueCount + "/" + rows + " rows true)" }
+  println("=> " + label)
+  println("")
+}
+
+// ─── NNF and simplify demos ───────────────────────────────────────────────────
+
+def showTransform(label: String, f: Formula, result: Formula): void {
+  println(label)
+  println("  Input:  " + f.show())
+  println("  Result: " + result.show())
+  println("")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val p: Formula = new Var("p")
+  val q: Formula = new Var("q")
+  val r: Formula = new Var("r")
+
+  println("=== Propositional Logic — truth tables, NNF, simplification ===")
+  println("")
+
+  // 1. Law of Excluded Middle: p | ~p  (tautology)
+  truthTable("Excluded Middle: p | ~p", new Or(p, new Not(p)))
+
+  // 2. Contradiction: p & ~p
+  truthTable("Contradiction: p & ~p", new And(p, new Not(p)))
+
+  // 3. De Morgan: ~(p | q) <-> (~p & ~q)  (tautology)
+  truthTable(
+    "De Morgan: ~(p|q) <-> (~p&~q)",
+    new Equiv(
+      new Not(new Or(p, q)),
+      new And(new Not(p), new Not(q))
+    )
+  )
+
+  // 4. Modus Ponens: ((p -> q) & p) -> q  (tautology)
+  truthTable(
+    "Modus Ponens: ((p->q)&p)->q",
+    new Impl(new And(new Impl(p, q), p), q)
+  )
+
+  // 5. Hypothetical Syllogism is satisfiable but not a tautology
+  truthTable(
+    "p -> q (satisfiable)",
+    new Impl(p, q)
+  )
+
+  // 6. Three-variable chain: (p->q) & (q->r) -> (p->r)  (tautology)
+  truthTable(
+    "Transitivity: (p->q)&(q->r)->(p->r)",
+    new Impl(
+      new And(new Impl(p, q), new Impl(q, r)),
+      new Impl(p, r)
+    )
+  )
+
+  // 7. NNF conversions
+  println("=== Negation Normal Form ===")
+  println("")
+
+  // ~(p -> q)  =>  p & ~q
+  showTransform(
+    "NNF of ~(p -> q):",
+    new Not(new Impl(p, q)),
+    new Not(new Impl(p, q)).nnf()
+  )
+
+  // ~(p <-> q)  =>  (p & ~q) | (~p & q)
+  showTransform(
+    "NNF of ~(p <-> q):",
+    new Not(new Equiv(p, q)),
+    new Not(new Equiv(p, q)).nnf()
+  )
+
+  // ~(p & (q | ~r))  =>  ~p | (~q & r)
+  showTransform(
+    "NNF of ~(p & (q | ~r)):",
+    new Not(new And(p, new Or(q, new Not(r)))),
+    new Not(new And(p, new Or(q, new Not(r)))).nnf()
+  )
+
+  // 8. Constant folding / simplification
+  println("=== Constant Folding ===")
+  println("")
+
+  // (T -> p) & (p | F)  =>  p & p  =>  (p & p)  (simplify each layer)
+  showTransform(
+    "Simplify (T->p) & (p|F):",
+    new And(new Impl(new Top(), p), new Or(p, new Bot())),
+    new And(new Impl(new Top(), p), new Or(p, new Bot())).simplify()
+  )
+
+  // ~T & (p | ~F)  =>  F & (p | T)  =>  F
+  showTransform(
+    "Simplify ~T & (p | ~F):",
+    new And(new Not(new Top()), new Or(p, new Not(new Bot()))),
+    new And(new Not(new Top()), new Or(p, new Not(new Bot()))).simplify()
+  )
+
+  // (p -> F) | (T -> q)  =>  ~p | q
+  showTransform(
+    "Simplify (p->F)|(T->q):",
+    new Or(new Impl(p, new Bot()), new Impl(new Top(), q)),
+    new Or(new Impl(p, new Bot()), new Impl(new Top(), q)).simplify()
+  )
+
+  // 9. Quick stats via collection pipelines
+  println("=== Variable-count distribution over demo formulas ===")
+  val formulas: List[Formula] = [
+    new Or(p, new Not(p)),
+    new And(p, new Not(p)),
+    new Equiv(new Not(new Or(p, q)), new And(new Not(p), new Not(q))),
+    new Impl(new And(new Impl(p, q), p), q),
+    new Impl(p, q),
+    new Impl(new And(new Impl(p, q), new Impl(q, r)), new Impl(p, r))
+  ]
+
+  val counts: List[Int] = formulas.map { f -> (f as Formula).vars().size }
+  val grouped: Map[Object, List[Int]] = counts.groupBy { c -> c as Object }
+  foreach (k, vs) in grouped {
+    println("  #{k} variable(s): #{vs.size} formula(s)")
+  }
+
+  var totalVarSlots: Int = 0
+  foreach c: Int in counts { totalVarSlots = totalVarSlots + c }
+  println("Total variable slots across all formulas: " + totalVarSlots)
+
+  val onlyTauts: List[Formula] = formulas.filter { f ->
+    val fv: List[String] = (f as Formula).vars()
+    val nr: Int = pow2(fv.size)
+    var tc: Int = 0
+    var ri: Int = 0
+    while ri < nr {
+      if (f as Formula).eval(fv, assignment(ri, fv.size)) { tc++ }
+      ri++
+    }
+    tc == nr
+  }
+  println("Tautologies in the set: " + onlyTauts.size)
+}

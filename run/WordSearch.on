@@ -1,0 +1,300 @@
+// WordSearch.on — word-search puzzle generator and solver (~240 lines)
+// Exercises: ADT enum (Direction), records with methods, classes,
+//   2D String arrays, collection pipelines (map/filter/fold/groupBy/sortedBy),
+//   select/pattern matching, extension methods, string interpolation,
+//   closures, foreach over List, nullable, Rand.
+
+// ── Direction ADT ─────────────────────────────────────────────────────────────
+
+enum Direction {
+  case Right; case Left; case Down; case Up
+  case DownRight; case DownLeft; case UpRight; case UpLeft
+public:
+  def dr(): Int = select this {
+    case x is Right: 0
+    case x is Left: 0
+    case x is Down: 1
+    case x is Up: -1
+    case x is DownRight: 1
+    case x is DownLeft: 1
+    case x is UpRight: -1
+    case x is UpLeft: -1
+  }
+  def dc(): Int = select this {
+    case x is Right: 1
+    case x is Left: -1
+    case x is Down: 0
+    case x is Up: 0
+    case x is DownRight: 1
+    case x is DownLeft: -1
+    case x is UpRight: 1
+    case x is UpLeft: -1
+  }
+  def label(): String = select this {
+    case x is Right: "→"
+    case x is Left: "←"
+    case x is Down: "↓"
+    case x is Up: "↑"
+    case x is DownRight: "↘"
+    case x is DownLeft: "↙"
+    case x is UpRight: "↗"
+    case x is UpLeft: "↖"
+  }
+  def dirName(): String = select this {
+    case x is Right: "Right"
+    case x is Left: "Left"
+    case x is Down: "Down"
+    case x is Up: "Up"
+    case x is DownRight: "DownRight"
+    case x is DownLeft: "DownLeft"
+    case x is UpRight: "UpRight"
+    case x is UpLeft: "UpLeft"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Placement(word: String, row: Int, col: Int, dir: Direction) {
+public:
+  def describe(): String =
+    "#{word()} at (#{row()},#{col()}) #{dir().label()}"
+}
+
+record Found(word: String, row: Int, col: Int, dir: Direction) {
+public:
+  def describe(): String =
+    "  #{word()} found at row=#{row()} col=#{col()} going #{dir().dirName()}"
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def pad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def truncate(max: Int): String {
+    if self.length() <= max { return self }
+    return self.substring(0, max - 2) + ".."
+  }
+}
+
+// ── Grid ──────────────────────────────────────────────────────────────────────
+
+class Grid {
+public:
+  val size: Int
+  var cells: String[][]
+
+  def this(n: Int) {
+    size = n
+    cells = new String[n][n]
+    var r: Int = 0
+    while r < n {
+      var c: Int = 0
+      while c < n { cells[r][c] = "."; c++ }
+      r++
+    }
+  }
+
+  def inBounds(r: Int, c: Int): Boolean =
+    r >= 0 && r < size && c >= 0 && c < size
+
+  def canPlace(word: String, row: Int, col: Int, dir: Direction): Boolean {
+    var r: Int = row; var c: Int = col; var i: Int = 0
+    while i < word.length() {
+      if !inBounds(r, c) { return false }
+      val here: String = cells[r][c]
+      val ch: String = word.substring(i, i + 1)
+      if here != "." && here != ch { return false }
+      r = r + dir.dr(); c = c + dir.dc(); i++
+    }
+    return true
+  }
+
+  def place(word: String, row: Int, col: Int, dir: Direction): void {
+    var r: Int = row; var c: Int = col; var i: Int = 0
+    while i < word.length() {
+      cells[r][c] = word.substring(i, i + 1)
+      r = r + dir.dr(); c = c + dir.dc(); i++
+    }
+  }
+
+  def fillRandom(): void {
+    val alpha: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var r: Int = 0
+    while r < size {
+      var c: Int = 0
+      while c < size {
+        if cells[r][c] == "." {
+          val idx: Int = Rand::nextInt(26)
+          cells[r][c] = alpha.substring(idx, idx + 1)
+        }
+        c++
+      }
+      r++
+    }
+  }
+
+  def matchesAt(word: String, row: Int, col: Int, dir: Direction): Boolean {
+    var r: Int = row; var c: Int = col; var i: Int = 0
+    while i < word.length() {
+      if !inBounds(r, c) { return false }
+      if cells[r][c] != word.substring(i, i + 1) { return false }
+      r = r + dir.dr(); c = c + dir.dc(); i++
+    }
+    return true
+  }
+
+  def findWord(word: String): Found? {
+    val dirs: List[Direction] = [
+      new Right(), new Left(), new Down(), new Up(),
+      new DownRight(), new DownLeft(), new UpRight(), new UpLeft()
+    ]
+    var r: Int = 0
+    while r < size {
+      var c: Int = 0
+      while c < size {
+        foreach dir: Direction in dirs {
+          if matchesAt(word, r, c, dir) { return new Found(word, r, c, dir) }
+        }
+        c++
+      }
+      r++
+    }
+    return null
+  }
+
+  def printGrid(): void {
+    var r: Int = 0
+    while r < size {
+      var line: String = ""
+      var c: Int = 0
+      while c < size { line = line + cells[r][c] + " "; c++ }
+      IO::println(line.trim())
+      r++
+    }
+  }
+}
+
+// ── Puzzle ────────────────────────────────────────────────────────────────────
+
+class WordSearchPuzzle {
+public:
+  val grid: Grid
+  val placements: List[Placement]
+
+  def this(n: Int) {
+    grid = new Grid(n)
+    placements = []
+  }
+
+  def addWords(words: List[String]): void {
+    val dirs: List[Direction] = [
+      new Right(), new Left(), new Down(), new Up(),
+      new DownRight(), new DownLeft(), new UpRight(), new UpLeft()
+    ]
+    val shuffled: List[String] = Rand::shuffle(words) as List[String]
+    foreach word: String in shuffled {
+      val upper: String = word.toUpperCase()
+      var placed: Boolean = false
+      var tries: Int = 0
+      while !placed && tries < 300 {
+        val row: Int = Rand::nextInt(grid.size)
+        val col: Int = Rand::nextInt(grid.size)
+        val dir: Direction = dirs.get(Rand::nextInt(dirs.size)) as Direction
+        if grid.canPlace(upper, row, col, dir) {
+          grid.place(upper, row, col, dir)
+          placements.add(new Placement(upper, row, col, dir))
+          placed = true
+        }
+        tries++
+      }
+      if !placed { IO::println("! could not place: #{upper}") }
+    }
+    grid.fillRandom()
+  }
+
+  def solve(): List[Found] {
+    val results: List[Found] = []
+    foreach p: Placement in placements {
+      val f: Found? = grid.findWord(p.word())
+      if f != null { results.add(f) }
+    }
+    return results
+  }
+
+  def printPuzzle(): void {
+    IO::println("=== Word Search Puzzle (#{grid.size}x#{grid.size}) ===")
+    IO::println("")
+    grid.printGrid()
+    IO::println("")
+    val wordList: List[String] = placements.map { p -> p.word() }
+    IO::println("Words to find: " + wordList.join(" | "))
+  }
+}
+
+// ── Stats & report ────────────────────────────────────────────────────────────
+
+def statsReport(puzzle: WordSearchPuzzle, solutions: List[Found]): void {
+  IO::println("")
+  IO::println("=== Solutions ===")
+  foreach s: Found in solutions { IO::println(s.describe()) }
+
+  IO::println("")
+  IO::println("=== Statistics ===")
+  IO::println("  Grid:          #{puzzle.grid.size}x#{puzzle.grid.size}")
+  IO::println("  Words hidden:  #{puzzle.placements.size}")
+  IO::println("  Words found:   #{solutions.size}")
+
+  val total: Int = if puzzle.placements.size > 0 { puzzle.placements.size } else { 1 }
+  val pct: Int = solutions.size * 100 / total
+  IO::println("  Coverage:      #{pct}%")
+
+  // Longest and shortest word by placement length
+  val sorted: List[Placement] = puzzle.placements.sortedBy { p -> p.word().length() }
+  if sorted.size > 0 {
+    val shortest: Placement = sorted.get(0) as Placement
+    val longest: Placement = sorted.get(sorted.size - 1) as Placement
+    IO::println("  Shortest word: #{shortest.word()} (#{shortest.word().length()} chars)")
+    IO::println("  Longest word:  #{longest.word()} (#{longest.word().length()} chars)")
+  }
+
+  // Distribution by direction name
+  val byDir = solutions.groupBy { s -> s.dir().dirName() }
+  IO::println("")
+  IO::println("  Direction breakdown:")
+  foreach (dir, group) in byDir {
+    IO::println("    #{dir}: #{(group as List).size}")
+  }
+
+  // Average word length via fold
+  val totalLen: Int = puzzle.placements.fold(0) { acc, p ->
+    (acc as Int) + p.word().length()
+  } as Int
+  val avgLen: Int = if puzzle.placements.size > 0 { totalLen / puzzle.placements.size } else { 0 }
+  IO::println("")
+  IO::println("  Avg word length: #{avgLen} chars")
+  IO::println("  Total chars:     #{totalLen}")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val words: List[String] = [
+    "ONION", "JAVA", "SCALA", "COMPILER", "PARSER",
+    "BYTECODE", "LAMBDA", "RECORD", "ENUM", "CLOSURE",
+    "GENERIC", "SYNTAX", "TYPING"
+  ]
+
+  val puzzle: WordSearchPuzzle = new WordSearchPuzzle(16)
+  puzzle.addWords(words)
+  puzzle.printPuzzle()
+
+  val solutions: List[Found] = puzzle.solve()
+  statsReport(puzzle, solutions)
+}

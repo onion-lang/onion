@@ -1,0 +1,395 @@
+// Chess.on — a legal-move chess engine core:
+//   • an 8x8 board of nullable Piece records, indexed by a flat 64-slot array
+//   • pseudo-legal move generation for every piece kind (pawns with double
+//     push/promotion, knights, sliding bishops/rooks/queens, kings)
+//   • square-attack detection (used both to filter a king's own moves and to
+//     reject any move that would leave the mover's own king in check)
+//   • check / checkmate / stalemate detection built purely from "does the
+//     side to move have zero legal moves"
+//   • a perft-style legal-move count from the standard starting position
+//     (must be exactly 20 for White), then a scripted Scholar's Mate replay
+//     printing the board after every ply and confirming checkmate at the end
+//
+// Features exercised: records with methods, a class wrapping a mutable
+// array, nullable fields (Piece?), nested while/foreach loops, closures over
+// captured locals, List pipelines (map/filter/size), string interpolation,
+// select/case-is-style branching via if/else chains on record accessors,
+// and a hand-rolled clone-and-simulate approach to "does this move leave my
+// king in check" (no framework, no shortcuts).
+
+import {
+  java.util.ArrayList;
+}
+
+// ── Piece ─────────────────────────────────────────────────────────────────
+
+// kind is one of "P" "N" "B" "R" "Q" "K"; white flags the color.
+record Piece(kind: String, white: Boolean) {
+public:
+  def symbol(): String {
+    if white { return kind }
+    return kind.toLowerCase()
+  }
+}
+
+record Pos(r: Int, c: Int)
+
+record Move(fromR: Int, fromC: Int, toR: Int, toC: Int, piece: Piece, captured: Piece?) {
+public:
+  def notation(): String {
+    val tag: String = if captured != null { "x" } else { "-" }
+    return squareName(fromR, fromC) + tag + squareName(toR, toC)
+  }
+}
+
+val FILES: List[String] = ["a", "b", "c", "d", "e", "f", "g", "h"]
+
+def squareName(r: Int, c: Int): String = (FILES[c] as String) + (8 - r)
+
+// ── Board ─────────────────────────────────────────────────────────────────
+
+class Board {
+  val squares: Piece?[]
+public:
+  def this { squares = new Piece?[64] }
+
+  def idx(r: Int, c: Int): Int = r * 8 + c
+  def inBounds(r: Int, c: Int): Boolean = r >= 0 && r < 8 && c >= 0 && c < 8
+  def get(r: Int, c: Int): Piece? = squares[idx(r, c)]
+  def put(r: Int, c: Int, p: Piece?): void { squares[idx(r, c)] = p }
+
+  def clone(): Board {
+    val b: Board = new Board()
+    var i: Int = 0
+    while i < 64 { b.squares[i] = squares[i]; i++ }
+    return b
+  }
+
+  def findKing(white: Boolean): Pos {
+    var r: Int = 0
+    while r < 8 {
+      var c: Int = 0
+      while c < 8 {
+        val p: Piece? = get(r, c)
+        if p != null && (p as Piece).kind() == "K" && (p as Piece).white() == white {
+          return new Pos(r, c)
+        }
+        c++
+      }
+      r++
+    }
+    return new Pos(-1, -1)
+  }
+}
+
+def setupStandardBoard(): Board {
+  val b: Board = new Board()
+  val backRank: List[String] = ["R", "N", "B", "Q", "K", "B", "N", "R"]
+  var c: Int = 0
+  while c < 8 {
+    b.put(0, c, new Piece(backRank[c] as String, false))
+    b.put(1, c, new Piece("P", false))
+    b.put(6, c, new Piece("P", true))
+    b.put(7, c, new Piece(backRank[c] as String, true))
+    c++
+  }
+  return b
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────
+
+def printBoard(b: Board): void {
+  var r: Int = 0
+  while r < 8 {
+    var line: String = "" + (8 - r) + " "
+    var c: Int = 0
+    while c < 8 {
+      val p: Piece? = b.get(r, c)
+      line = line + (if p != null { (p as Piece).symbol() } else { "." }) + " "
+      c++
+    }
+    IO::println(line)
+    r++
+  }
+  IO::println("  a b c d e f g h")
+}
+
+// ── Attack detection ─────────────────────────────────────────────────────
+
+def firstPieceInDirection(b: Board, r: Int, c: Int, dr: Int, dc: Int): Piece? {
+  var rr: Int = r + dr
+  var cc: Int = c + dc
+  while b.inBounds(rr, cc) {
+    val p: Piece? = b.get(rr, cc)
+    if p != null { return p }
+    rr = rr + dr
+    cc = cc + dc
+  }
+  return null
+}
+
+val ROOK_DIRS: List[List[Int]] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+val BISHOP_DIRS: List[List[Int]] = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
+val KNIGHT_OFFSETS: List[List[Int]] = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]]
+val KING_OFFSETS: List[List[Int]] = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
+
+def isSquareAttacked(b: Board, r: Int, c: Int, byWhite: Boolean): Boolean {
+  // Pawns: a byWhite pawn attacks "upward" (toward row 0), so an attacker on
+  // (r,c) sits one row further from row 0 than the square it attacks.
+  val pawnRow: Int = if byWhite { r + 1 } else { r - 1 }
+  var pc: Int = c - 1
+  while pc <= c + 1 {
+    if pc != c && b.inBounds(pawnRow, pc) {
+      val p: Piece? = b.get(pawnRow, pc)
+      if p != null && (p as Piece).kind() == "P" && (p as Piece).white() == byWhite { return true }
+    }
+    pc++
+  }
+
+  foreach off: List[Int] in KNIGHT_OFFSETS {
+    val rr: Int = r + (off[0] as Int)
+    val cc: Int = c + (off[1] as Int)
+    if b.inBounds(rr, cc) {
+      val p: Piece? = b.get(rr, cc)
+      if p != null && (p as Piece).kind() == "N" && (p as Piece).white() == byWhite { return true }
+    }
+  }
+
+  foreach off: List[Int] in KING_OFFSETS {
+    val rr: Int = r + (off[0] as Int)
+    val cc: Int = c + (off[1] as Int)
+    if b.inBounds(rr, cc) {
+      val p: Piece? = b.get(rr, cc)
+      if p != null && (p as Piece).kind() == "K" && (p as Piece).white() == byWhite { return true }
+    }
+  }
+
+  foreach dir: List[Int] in ROOK_DIRS {
+    val p: Piece? = firstPieceInDirection(b, r, c, dir[0] as Int, dir[1] as Int)
+    if p != null {
+      val kind: String = (p as Piece).kind()
+      if (p as Piece).white() == byWhite && (kind == "R" || kind == "Q") { return true }
+    }
+  }
+
+  foreach dir: List[Int] in BISHOP_DIRS {
+    val p: Piece? = firstPieceInDirection(b, r, c, dir[0] as Int, dir[1] as Int)
+    if p != null {
+      val kind: String = (p as Piece).kind()
+      if (p as Piece).white() == byWhite && (kind == "B" || kind == "Q") { return true }
+    }
+  }
+
+  return false
+}
+
+def inCheck(b: Board, white: Boolean): Boolean {
+  val kp: Pos = b.findKing(white)
+  return isSquareAttacked(b, kp.r(), kp.c(), !white)
+}
+
+// ── Pseudo-legal move generation ────────────────────────────────────────
+
+def slideMoves(b: Board, r: Int, c: Int, piece: Piece, dirs: List[List[Int]]): List[Move] {
+  val moves: List[Move] = []
+  foreach dir: List[Int] in dirs {
+    var rr: Int = r + (dir[0] as Int)
+    var cc: Int = c + (dir[1] as Int)
+    while b.inBounds(rr, cc) {
+      val target: Piece? = b.get(rr, cc)
+      if target == null {
+        moves.add(new Move(r, c, rr, cc, piece, null))
+      } else {
+        if (target as Piece).white() != piece.white() { moves.add(new Move(r, c, rr, cc, piece, target)) }
+        break
+      }
+      rr = rr + (dir[0] as Int)
+      cc = cc + (dir[1] as Int)
+    }
+  }
+  return moves
+}
+
+def stepMoves(b: Board, r: Int, c: Int, piece: Piece, offsets: List[List[Int]]): List[Move] {
+  val moves: List[Move] = []
+  foreach off: List[Int] in offsets {
+    val rr: Int = r + (off[0] as Int)
+    val cc: Int = c + (off[1] as Int)
+    if b.inBounds(rr, cc) {
+      val target: Piece? = b.get(rr, cc)
+      if target == null || (target as Piece).white() != piece.white() {
+        moves.add(new Move(r, c, rr, cc, piece, target))
+      }
+    }
+  }
+  return moves
+}
+
+def pawnMoves(b: Board, r: Int, c: Int, piece: Piece): List[Move] {
+  val moves: List[Move] = []
+  val dir: Int = if piece.white() { -1 } else { 1 }
+  val startRow: Int = if piece.white() { 6 } else { 1 }
+
+  if b.inBounds(r + dir, c) && b.get(r + dir, c) == null {
+    moves.add(new Move(r, c, r + dir, c, piece, null))
+    if r == startRow && b.get(r + dir + dir, c) == null {
+      moves.add(new Move(r, c, r + dir + dir, c, piece, null))
+    }
+  }
+
+  var dc: Int = -1
+  while dc <= 1 {
+    if dc != 0 && b.inBounds(r + dir, c + dc) {
+      val target: Piece? = b.get(r + dir, c + dc)
+      if target != null && (target as Piece).white() != piece.white() {
+        moves.add(new Move(r, c, r + dir, c + dc, piece, target))
+      }
+    }
+    dc++
+  }
+  return moves
+}
+
+def pseudoMovesFor(b: Board, r: Int, c: Int): List[Move] {
+  val piece: Piece? = b.get(r, c)
+  if piece == null { return [] }
+  val p: Piece = piece as Piece
+  if p.kind() == "P" { return pawnMoves(b, r, c, p) }
+  if p.kind() == "N" { return stepMoves(b, r, c, p, KNIGHT_OFFSETS) }
+  if p.kind() == "K" { return stepMoves(b, r, c, p, KING_OFFSETS) }
+  if p.kind() == "R" { return slideMoves(b, r, c, p, ROOK_DIRS) }
+  if p.kind() == "B" { return slideMoves(b, r, c, p, BISHOP_DIRS) }
+  val queenMoves: List[Move] = slideMoves(b, r, c, p, ROOK_DIRS)
+  queenMoves.addAll(slideMoves(b, r, c, p, BISHOP_DIRS))
+  return queenMoves
+}
+
+// ── Applying a move (with automatic queen promotion) ────────────────────
+
+def applyMove(b: Board, m: Move): void {
+  var moved: Piece = m.piece()
+  if moved.kind() == "P" && (m.toR() == 0 || m.toR() == 7) {
+    moved = new Piece("Q", moved.white())
+  }
+  b.put(m.toR(), m.toC(), moved)
+  b.put(m.fromR(), m.fromC(), null)
+}
+
+// ── Legal moves: pseudo-legal, minus anything that leaves your own king in check ──
+
+def legalMovesFor(b: Board, r: Int, c: Int): List[Move] {
+  val piece: Piece? = b.get(r, c)
+  if piece == null { return [] }
+  val white: Boolean = (piece as Piece).white()
+  val pseudo: List[Move] = pseudoMovesFor(b, r, c)
+  val legal: List[Move] = []
+  foreach m: Move in pseudo {
+    val sim: Board = b.clone()
+    applyMove(sim, m)
+    if !inCheck(sim, white) { legal.add(m) }
+  }
+  return legal
+}
+
+def allLegalMoves(b: Board, white: Boolean): List[Move] {
+  val result: List[Move] = []
+  var r: Int = 0
+  while r < 8 {
+    var c: Int = 0
+    while c < 8 {
+      val p: Piece? = b.get(r, c)
+      if p != null && (p as Piece).white() == white {
+        result.addAll(legalMovesFor(b, r, c))
+      }
+      c++
+    }
+    r++
+  }
+  return result
+}
+
+def isCheckmate(b: Board, white: Boolean): Boolean = inCheck(b, white) && allLegalMoves(b, white).size == 0
+def isStalemate(b: Board, white: Boolean): Boolean = !inCheck(b, white) && allLegalMoves(b, white).size == 0
+
+// Find the one legal move from (fr,fc) to (tr,tc); the scripted game below
+// only ever plays moves that are actually legal, so this always succeeds.
+def findMove(b: Board, fr: Int, fc: Int, tr: Int, tc: Int): Move {
+  foreach m: Move in legalMovesFor(b, fr, fc) {
+    if m.toR() == tr && m.toC() == tc { return m }
+  }
+  throw new Exception("illegal move requested: #{squareName(fr, fc)} -> #{squareName(tr, tc)}")
+}
+
+def playAndPrint(b: Board, whiteToMove: Boolean, fr: Int, fc: Int, tr: Int, tc: Int): void {
+  val m: Move = findMove(b, fr, fc, tr, tc)
+  applyMove(b, m)
+  val mover: String = if whiteToMove { "White" } else { "Black" }
+  IO::println("")
+  IO::println("#{mover} plays #{m.notation()}")
+  printBoard(b)
+  if inCheck(b, !whiteToMove) {
+    val checkedSide: String = if whiteToMove { "Black" } else { "White" }
+    IO::println("  #{checkedSide} is in check!")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("=== Chess move generator ===")
+  IO::println("")
+  IO::println("Starting position:")
+  val start: Board = setupStandardBoard()
+  printBoard(start)
+
+  val whiteOpeningMoves: Int = allLegalMoves(start, true).size
+  IO::println("")
+  IO::println("Legal moves for White from the starting position: #{whiteOpeningMoves}")
+  if whiteOpeningMoves == 20 {
+    IO::println("  matches the known value (16 pawn moves + 4 knight moves)")
+  } else {
+    IO::println("  !! expected 20, move generation has a bug")
+  }
+
+  IO::println("")
+  IO::println("=== Scripted game: Scholar's Mate ===")
+  val g: Board = setupStandardBoard()
+  // 1. e4 e5
+  playAndPrint(g, true, 6, 4, 4, 4)
+  playAndPrint(g, false, 1, 4, 3, 4)
+  // 2. Bc4 Nc6
+  playAndPrint(g, true, 7, 5, 4, 2)
+  playAndPrint(g, false, 0, 1, 2, 2)
+  // 3. Qh5 Nf6??
+  playAndPrint(g, true, 7, 3, 3, 7)
+  playAndPrint(g, false, 0, 6, 2, 5)
+  // 4. Qxf7#
+  playAndPrint(g, true, 3, 7, 1, 5)
+
+  IO::println("")
+  if isCheckmate(g, false) {
+    IO::println("Checkmate confirmed: Black has #{allLegalMoves(g, false).size} legal moves and is in check.")
+  } else {
+    IO::println("!! expected checkmate for Black, but Black still has legal moves")
+  }
+
+  IO::println("")
+  IO::println("=== A composed stalemate position ===")
+  // Classic minimal stalemate: White king a1 is not in check but has no
+  // legal moves once Black's king and queen box it in.
+  val sm: Board = new Board()
+  sm.put(7, 0, new Piece("K", true))     // White king a1
+  sm.put(5, 1, new Piece("K", false))    // Black king b3
+  sm.put(6, 2, new Piece("Q", false))    // Black queen c2
+  IO::println("")
+  printBoard(sm)
+  if isStalemate(sm, true) {
+    IO::println("Stalemate confirmed: White is not in check but has 0 legal moves.")
+  } else {
+    val whiteMoves: Int = allLegalMoves(sm, true).size
+    IO::println("!! expected stalemate, White has #{whiteMoves} legal moves and inCheck=#{inCheck(sm, true)}")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

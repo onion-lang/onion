@@ -7,7 +7,653 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a call written without parentheses.**
+  Onion always requires parentheses around a call's arguments; a Python
+  2-style `print "x"` or Ruby-style `puts x` habit (a bare name followed
+  directly by another token, with nothing between them) parsed as an
+  identifier-reference statement followed by a stray token, with a generic
+  expected-token dump that never mentioned the missing parentheses. The
+  diagnostic now recognizes a leading `name arg` statement at the exact
+  point a complete statement was expected and points at the correct
+  `name(arg)` form (or, if two separate statements were intended, that they
+  need a newline or `;` between them).
+
+- **No hint for `arr.length()`/`arr.size()`, unlike the same mix-up on a
+  record field.** Array length is a property (`arr.length`, no
+  parentheses), not a method, so calling it with parentheses raised a bare
+  "method ... is not found" with no suggestion — the parallel
+  `p.name()`-on-a-record-field mix-up already got a "field, not a method"
+  hint, but arrays carry no real `length` field entry in the type table for
+  that check to match. `arr.length()`/`arr.size()` now gets the same hint.
+
+## [0.21.0] - 2026-08-27
+
+### Fixed
+
+- **Tail call optimization silently skipped statements after a self-call assignment.**
+  `transformStatement` treated any `ExpressionActionStatement` wrapping a
+  `SetLocal` self-call (e.g. `val lr = self(args)`) as a tail call, because
+  `isSelfCall` recurses into `SetLocal.value`. Once TCO activated for a
+  method (any branch had a genuine tail call), such an assignment was
+  rewritten into loop-variable updates plus `continue`, jumping back to the
+  top of the `while(true)` loop before any later statement depending on the
+  assigned variable ran — a silent miscompilation with no error or
+  exception. An assignment result is never in tail position by definition,
+  so `ExpressionActionStatement` is now always left unchanged. Added
+  `run/HMTypeInference.on`, a Hindley-Milner type inference engine for a
+  small λ-calculus, as the regression corpus program that exposed the bug.
+
+- **Parser hint for a Ruby-style `until` loop.**
+  Onion has no `until` loop; the negated-condition idiom is `while !condition`,
+  so `until done { ... }` parses as a bare identifier-reference statement
+  followed by a stray condition expression, with a generic expected-token
+  dump that never mentions `while`. The diagnostic now recognizes a leading
+  `until condition { ... }` statement and points at the correct
+  `while !condition { ... }` form, mirroring the existing `unless` → `if !`
+  hint.
+
+- **Parser hint for a C#-style `using` namespace-import directive.**
+  Onion has no `using Namespace;` import directive; imports are wrapped in
+  braces, so `using System.Collections.Generic;` at the top of a file parses
+  `using` as a bare identifier-reference statement followed by a stray
+  identifier, with a generic expected-token dump that never mentions
+  `import { ... }`. The diagnostic now recognizes a leading
+  `using Some.Dotted.Path;` statement and points at the correct
+  `import { Some.Dotted.Path }` form. This is distinct from the existing hint
+  for C#/Python-style `using r = expr { ... }` resource statements.
+
+- **Parser hint for a `$` variable/interpolation sigil.**
+  Onion has no `$` sigil; string interpolation is `#{expr}` inside a string
+  literal, so a C#-style `$"Hello, {name}!"` interpolated string or a
+  PHP/Bash-style `$name` variable reference trips the parser right at `$`,
+  with a generic expected-token dump listing over 40 alternatives that never
+  mentions `#{}`. The diagnostic now recognizes a leading `$` token and
+  points at the correct `"Hello, #{name}!"` interpolation form.
+
+- **Parser hint for a Python/Ruby-style `not` boolean negation.**
+  Onion has no `not` operator; boolean negation is `!`, so `if not done { ... }`
+  or `while not empty { ... }` parses `not` as a bare identifier-reference
+  expression followed by a stray token, with a generic "a block is expected
+  here" hint that never mentions `!`. The diagnostic now recognizes a leading
+  `if`/`while`/`else if not ...` condition and points at the correct
+  `if !condition { ... }` form.
+
+- **Parser hint for a Ruby-style `unless` statement.**
+  Onion has no `unless` statement; `unless condition { ... }` parses as a bare
+  identifier-reference statement followed by a stray condition expression,
+  with a generic expected-token dump that never mentions `if`. The diagnostic
+  now recognizes a leading `unless condition { ... }` statement and points at
+  the correct negated-condition form, `if !condition { ... }`.
+
+- **Parser hint for a JS/TS-style `constructor(...)` method.**
+  Onion has no special `constructor` method name; `constructor` is an ordinary
+  identifier (not a reserved word), so `constructor(x: Int) { ... }` trips the
+  parser right at `constructor`, with a generic expected-token dump that never
+  mentions `def this`. The diagnostic now recognizes a leading
+  `constructor(...) { ... }` method and points at the correct
+  `def this(...) { ... }` form.
+
+- **Parser hint for a Python-style `def name():` with no return type.**
+  A method's `:` must be followed by its return type on the same line;
+  `def foo():` with nothing after the colon (the Python habit of ending a
+  `def` line with a bare `:` before an indented body) trips the parser at
+  the following newline, with a generic expected-token dump listing every
+  type keyword. The diagnostic now recognizes a dangling `def name(...):`
+  and suggests either adding the return type (`def name(...): Void { ... }`)
+  or dropping the `:` entirely (`def name(...) { ... }`).
+
+## [0.20.0] - 2026-08-26
+
+### Fixed
+
+- **Parser hint for a Kotlin-style `data class` declaration.**
+  Onion has no `data class`; a data-carrying type is a `record`, and a
+  `data class Name(val x: Int, val y: Int)` line parses as a bare
+  identifier-reference statement followed by a stray `class`, with a generic
+  expected-token dump that never mentions `record`. The diagnostic now
+  recognizes a leading `data class Name(...)` declaration and points at the
+  correct `record Name(...)` form, stripping the `val`/`var` prefixes that
+  Onion's record component list does not use.
+
+- **Parser hint for a Go-style `:=` short variable declaration.**
+  Onion has no `:=` operator; assignment is `=` and a type annotation is a
+  separate `:`, so `x := 5` parses as a bare identifier-reference statement
+  followed by a stray `:`, with a generic expected-token dump that never
+  mentions `val`/`var`. The diagnostic now recognizes a leading
+  `name := expr` line and points at the correct `val name = expr` (or
+  `var name = expr` for a mutable binding) form.
+
+- **Parser hint for a C#/Python-style `using` resource statement.**
+  Onion has no `using` keyword; `using r = new Res() { ... }` parses as a bare
+  identifier-reference statement followed by a stray `r`, with a generic
+  expected-token dump that never mentions `try`. The diagnostic now recognizes
+  a leading `using name = expr` line and points at the correct
+  `try (val name = expr) { ... }` form.
+
+- **Parser hint for a Java/JavaScript-style `default:` case inside a `select` block.**
+  Onion's `select` has no `default` label -- the catch-all arm is `else` -- so
+  `default:` parses as a bare identifier-reference statement and the parser
+  trips on the colon that follows it, with a generic expected-token dump that
+  never mentions `else`. The diagnostic now recognizes a leading `default:`
+  case label and points at the correct `select value { case 1: ...; else: ... }`
+  form.
+
+- **Parser hint for a C/Java/C#-style prefix type cast, `(Type) expr`.**
+  Onion casts are written postfix with `as` (`expr as Type`); the C-style
+  prefix form parses as a parenthesized expression followed by a stray
+  second expression, and the raw expected-token dump never mentions `as`.
+  The diagnostic now recognizes `(Type) expr` (including generic and
+  array/nullable type spellings) and points at the correct
+  `(expr as Type)` form.
+
+- **Parser hint for a Python/Rust/TypeScript-style return-type arrow, `def name(...) -> Type { ... }`.**
+  Onion writes a method's return type after a colon, not `->`; the arrow form
+  parses as a complete parameterless-return-type declaration followed by a
+  stray `->` token, with a generic expected-token dump that never mentions the
+  colon. The diagnostic now recognizes `def name(...) -> Type` and points at
+  the correct `def name(...): Type { ... }` form.
+
+- **Missing-parameter-type diagnostic misclassified as a Java-style method hint.**
+  `def foo(x): Int { ... }` -- a parameter without a type annotation -- was
+  matched by `SyntaxHintClassifier`'s Java-style-method pattern (it excluded
+  a leading `public`/`private`/`protected` but not `def`), producing a hint
+  telling the user to write `def` on a line that already starts with `def`.
+  The classifier now excludes `def` from that pattern and reports a dedicated
+  hint naming the untyped parameter instead.
+
+- **Parser hint for a Java-style enhanced for-loop, `for (Type name : expr) { ... }`.**
+  Onion's collection loop is `foreach`, not `for`; the enhanced-for form parses
+  as a parenthesized `for` clause and previously fell through to the generic
+  C-style-for advice (`for var i: Int = 0; i < 10; i++ { ... }`), which is the
+  wrong fix for a collection loop. The diagnostic now recognizes
+  `for (Type name : expr)` ahead of that fallback and points at the correct
+  `foreach name: Type in expr { ... }` form. Fixing this also uncovered and
+  fixed an internal-compiler-error crash (arity-3+ syntax hints were
+  unsupported by the renderer).
+
+- **Parser hint for a standalone lambda still using the old `=>` arrow,
+  `(x) => expr` or `x => expr`.** `OldTrailingArrowHintI18nSpec`'s
+  `{ x => ... }` case was already covered, but that rule only fires when the
+  parser trips on the lambda's opening `{`; a non-trailing lambda (assigned
+  to a `val`, or passed as a plain call argument) trips on the `=` of `=>`
+  instead, with a generic expected-token dump that never mentions `->`. The
+  diagnostic now recognizes this case and points at the correct `(x) -> ...`
+  form, while still deferring to the existing `:`-expecting reading for a
+  Ruby-style `key => value` map-literal mistake on the same token.
+
+## [0.19.0] - 2026-08-25
+
+### Fixed
+
+- **Parser hint for a Java-style annotated method, `@Override void method() { ... }`.**
+  Onion annotations are real syntax -- `@Override def method(): void { ... }` parses
+  fine -- but a Java override almost always brings its other mistake along too: no
+  `def`, and the return type before the name. `annotations()` consumes `@Override`
+  without complaint, and the grammar right after it requires the literal `def`
+  token, so when a Java-style declaration follows instead, the parser doesn't trip
+  on `void` or the method name a few tokens later -- it trips right back on the
+  `@Override` token itself, with an expected-token dump listing `modifiers()`'s
+  keywords (`abstract`, `final`, `internal`, `override`, ...) that never mentions
+  `def`, even though the annotation was never the problem. The diagnostic now
+  recognizes an annotation directly followed by a Java-style method declaration
+  (on the same line or the next) and points at the correct `@Override def
+  method(): void { ... }` form, naming the captured annotation.
+
+- **Parser hint for a Python-style `except` clause on a `try` block.**
+  `except` is not a keyword in Onion (which catches with `catch`), so it parses
+  as a bare identifier-reference statement and the parser trips on whatever
+  follows it (the exception type or bound name), with a generic expected-token
+  dump that never mentions `catch`. The diagnostic now recognizes both
+  `except Type as name { ... }` and `except name: Type { ... }` spellings and
+  points at the correct `catch name: Type { ... }` form.
+
+- **Parser hint for the `for (a, b) in xs` / `for a, b in xs` destructuring mistake
+  no longer recommends the wrong rewrite.** `for` never destructures or iterates a
+  collection in Onion (that's `foreach`'s job), but the comma right after `for` made
+  this fall through to the generic C-style-`for` hint, which told the reader to
+  rewrite it as a numeric-index loop -- an unhelpful, unrelated suggestion. It now
+  recognizes both the parenthesized and unparenthesized forms and points at the
+  correct `foreach (a, b) in xs { ... }` instead. The related `for x in xs` hint's
+  wording was also updated to mention `foreach x: Type in xs { ... }` -- the actual
+  idiomatic form -- instead of only suggesting a C-style loop.
+
+- **Parser hint for a Java/Kotlin/JS-style parenthesized `foreach (x in xs) { ... }` loop.**
+  `foreach` only takes parentheses for the two-variable map-destructuring form,
+  `foreach (k, v) in map { ... }` -- a single loop variable is never parenthesized
+  (`foreach x: Type in xs { ... }`). Writing `foreach (x in xs)` made the parser take
+  the map-destructuring branch, consume `x` as the key, and trip on `in` expecting a
+  `,`, which surfaced the unrelated "Onion does not support `for x in xs`, use a
+  C-style loop" hint -- confusing advice, since `foreach` is already the right
+  construct and the only mistake is the stray parentheses. The diagnostic now
+  recognizes a parenthesized `foreach` head and points at both correct forms.
+
+- **Parser hint for a Rust/Scala/OCaml-style `match value { ... }` expression.**
+  `match` is not a keyword in Onion (which uses `select`), so it parses as a bare
+  identifier reference and the parser trips on whatever follows it, with a generic
+  expected-token dump that never mentions `select`. The diagnostic now recognizes
+  a leading `match` at the start of a statement, unparenthesized or parenthesized,
+  the same way the existing `switch`/`when` hints do.
+
+- **Parser hint for a JS/TS/PHP-style `function name(...) { ... }` declaration.**
+  `function` is not a keyword in Onion (which uses `def`), so it parses as a bare
+  identifier reference and the parser trips on the declaration name that follows,
+  with a generic expected-token dump that never mentions `def`. The existing
+  `fun`/`func`/`fn` hint now also recognizes `function`, including the
+  `function Type.method(...)` extension-method mistake.
+
+- **`onion script.on` no longer fails silently when the script has no entry point.**
+  A compiled script with no public static `main(String[])` method (e.g. a file
+  containing only class/def declarations, with no top-level statements and no
+  explicit `main`) exited non-zero with completely empty stderr, giving no clue
+  why nothing ran. It now prints a message naming the compiled class(es) and
+  pointing at `def main(args: String[]): void { ... }` or adding executable
+  top-level statements.
+
+- **Parser hint for a Python-style `elif` clause.**
+  `elif` is not a keyword in Onion (which chains with `else if`), so it parses
+  as a bare identifier reference and the parser trips on whatever follows it
+  (the condition), with a generic expected-token dump that never mentions
+  `else if`. Unlike the `switch`/`when`/`match` hints, `elif` almost never
+  starts a source line -- it typically follows the closing `}` of the
+  preceding branch on the same line (`} elif b { ... }`) -- so the diagnostic
+  matches the keyword anywhere on the line instead of anchoring at the start.
+
+## [0.18.0] - 2026-08-24
+
+### Fixed
+
+- **Parser hint for a JS/TS/Swift/Rust/Kotlin-style `let x = 1` variable declaration.**
+  `let` is not a keyword at all in Onion -- it lexes as a plain identifier -- so
+  `let x = 1` at statement position is read as a bare identifier-reference statement
+  (`let`) immediately followed by another identifier (`x`), where only a statement
+  terminator is valid. The parser trips on the name one token past the actual mistake,
+  with an expected-token dump that never mentions `val`/`var`. The diagnostic now
+  recognizes a leading `let name` and points at the correct `val name: Type = value`
+  (or `var`, if it changes) form, the same way the existing `const` hint does.
+
+- **Parser hint for a reserved word used as an identifier, `val class = 5`.**
+  A hard keyword token (`class`, `type`, `case`, ...) can never appear where `id()`
+  (`<ID> | <QUOTED_ID>`) is expected, so the parser trips on the keyword itself with a
+  generic `expecting <ID>, <QUOTED_ID>` dump that never mentions that Onion lets a
+  reserved word be used as an identifier by escaping it with backticks (`` `class` ``).
+  The diagnostic now recognizes any of the grammar's hard keyword tokens in that
+  position and points at the backtick-escaped form, naming the captured word. A *soft*
+  keyword like `conforms`/`from`/`shape` -- which lexes as a plain `<ID>` and is
+  already a legal identifier on its own -- is unaffected.
+
+- **Parser hint for a TypeScript/Kotlin-style union nullable type, `String | null`.**
+  Onion writes a nullable type with a trailing `?` (`String?`) -- `|` is never valid inside
+  a type, so the parser accepts the base type and then trips right on the `|`, with an
+  expected-token dump that never mentions `?`. The diagnostic now recognizes `Type | null`
+  in any type position (a `val`/`var` declaration, a parameter, a return type) and points
+  at the correct `Type?` form, naming the captured type.
+
+- **Parser hint for a JS/TS-style `const x = 1` variable declaration.**
+  `const` is a reserved keyword token (`K_CONST`) that no grammar production ever
+  references -- Onion declares variables with `val` (immutable) or `var` (mutable) --
+  so meeting it can only mean this mistake. It trips the parser immediately, at
+  either top level or inside a block, with a generic expected-token dump that
+  never mentions `val`/`var`. The diagnostic now recognizes a leading `const` and
+  points at the correct `val name: Type = value` (or `var`, if it changes) form.
+
+- **Parser hint for a Java-style try-with-resources declaration, `try (Res r = new Res()) { ... }`.**
+  Onion's resource clause always starts with `val` before the name (`try (val r = new Res())`) --
+  never with the type before it, and never `var`. The clause's grammar is only attempted with a
+  2-token lookahead (`"(" ("val"|"var")`); when the second token is a type name instead, the
+  lookahead fails, the whole optional resource clause is skipped, and the parser trips on the `(`
+  itself, expecting the `{` of a resourceless `try` block -- a generic expected-token dump that
+  never mentions `val`. The diagnostic now recognizes `try (Type name = ...)` and points at the
+  correct `try (val name: Type = ...)` form, naming the captured type and name.
+
+- **Parser hint for a Kotlin-style `when` expression, `when (x) { ... }`.**
+  Onion has no standalone `when` control-flow keyword -- `select` covers the same ground.
+  Unlike `switch`, `when` IS reserved in Onion, but only as the case-guard keyword
+  (`case p when guard:`), so opening a block with it at statement position trips the parser
+  right on the `when` token itself, with an expected-token dump that names whatever would
+  legally close the enclosing block instead -- never mentioning `select`. The diagnostic now
+  recognizes a leading `when` and points at the correct `select value { case 1: ...; else: ... }`
+  form, the same way the existing `switch` hint does.
+
+- **Parser hint for a Java-style `implements` clause, `class A implements I { ... }`.**
+  Onion names interfaces with `conforms`, not `implements` -- and `implements` is not a
+  keyword at all, so it lexes as a plain identifier. A class header with no
+  `extends`/`conforms`/`{` after the name is already a complete, body-less class
+  declaration, so `implements Interface` is read as the start of a brand new top-level
+  statement: a bare reference to the identifier `implements`, immediately followed by the
+  interface name, where only a statement terminator is valid. The parser trips on the
+  interface name several tokens past the actual mistake, with an expected-token dump that
+  never mentions `conforms`. The diagnostic now recognizes `class A implements I` (with or
+  without a preceding `extends`, and with multiple comma-separated interfaces) and points at
+  the correct `class A conforms I` form, naming the captured class and interface list.
+
+## [0.17.0] - 2026-08-23
+
+### Fixed
+
+- **Parser hint for a Java-style record body, `record Point { int x; int y; }`.**
+  Onion records declare their components in parentheses right after the name --
+  `record Point(x: Int, y: Int)` -- never in a brace body. `record`'s grammar
+  requires `(` (or `[` to start type parameters) directly after the name, so the
+  parser accepts `record Point` and then trips on the `{`, with a generic
+  expected-token dump that never mentions the parenthesized form. The diagnostic
+  now recognizes `record Name { ... }` (with or without a generic `[T]`) and
+  points at the correct `record Name(x: Int, y: Int)` form, naming the captured
+  record name. The correct form -- a parenthesized component list optionally
+  followed by its own `{ ... }` method body -- is unaffected.
+
+- **New diagnostic `E0091` for a class used as a value, `System.currentTimeMillis()` instead of `System::currentTimeMillis()`.**
+  A bare capitalized name that resolves to a real class -- not a local variable or field -- used
+  where a value is expected (typically as the target of `.member`) is the Java/Kotlin habit of
+  reaching for `.` on a type. Onion's static members go through `::`, so the name simply failed
+  ordinary variable/field lookup and was reported as the generic "local variable X is not found"
+  (E0002), never mentioning `::`. This is the mirror image of `E0071` (`::` used on an instance,
+  `s::m()` instead of `s.m()`); the new diagnostic points at the same fix in the other direction,
+  naming the class and the `::` rewrite. A real local variable or field with the same name as a
+  class still resolves correctly -- this only fires when the name resolves to neither.
+
+- **Parser hint for a Java-style method declaration with no access modifier, `void greet(name: String) { }`.**
+  The existing hint for `public void method() { }` only matched when an access modifier
+  (`public`/`private`/`protected`) preceded the return type, since the parser trips on a
+  different token in that shape (`:`, expecting the modifier's section colon) than in the
+  no-modifier shape (the return-type identifier itself, expecting a member declarator like
+  `def`). The pattern and its guard now also recognize the bare `Type name(...)` form —
+  Java's package-private default, with no modifier at all — and point at the correct
+  `def name(...): Type { ... }` form. A negative lookahead keeps the now-optional modifier
+  from being skipped and reread as the return type, which would otherwise misfire on the
+  unrelated single-identifier `public ClassName(...)` constructor mistake.
+
+- **Parser hint for a Java/C#-style import alias written before the target, `Foo = java.lang.Long;`.**
+  Onion's import aliases follow the target (`java.lang.Long as Foo`), never precede it with
+  `=`. An import entry parses as a bare qualified name with an optional trailing `as alias`,
+  so the parser reads the leading identifier as the start of that name and trips on the `=`,
+  expecting only `.` to continue it — never mentioning `as`. The diagnostic now recognizes
+  this shape and points at the correct `Target as Alias` form, naming the captured target
+  and alias.
+
+- **Parser hint for a Java-style field or local declaration, `String name;` / `String name = "x";`.**
+  Onion fields and locals are declared with `val`/`var` before the name (`var name: String`),
+  never with the type before it. As a class member the parser trips on the type identifier
+  itself, expecting a member declarator (`def`, `val`, `var`, ...); as a local statement the
+  type is read as a bare expression and the parser trips on the name that follows, expecting
+  a statement terminator. Neither mentions `val`/`var`. The diagnostic now recognizes a
+  capitalized type name (optionally bracketed or nullable) directly followed by a second
+  identifier and `=`/`;`/end-of-line, and points at the correct `var name: Type` form, naming
+  the captured type and name.
+
+- **Parser hint for a Java-style dot static call on a primitive type name, `Long.toString(3L)`.**
+  `Int`/`Long`/`Double`/`Float`/`Boolean`/`Byte`/`Short`/`Char` are reserved keyword
+  tokens, valid only in a type position or directly before `::` for static member
+  access (`Long::toString(3L)`) — they can never start a value expression. So writing
+  the Java-style dot form doesn't fail on the `.`; the parser trips on the type name
+  itself, since no expression can start with that token, producing a generic
+  expected-token dump that never mentions `::`. The diagnostic now recognizes a
+  primitive type name directly followed by `.member` and points at the correct
+  `Type::member` form, naming the captured type and member.
+
+- **Parser hint for a Java/C++-style generic with angle brackets, `List<String>`.**
+  Onion's generics use square brackets (`List[String]`) — `<`/`>` are only comparison
+  operators, never valid inside a type — so in a type-annotation position (a `val`/`var`
+  declaration, a parameter type, ...) the parser accepted the bare type name and then
+  tripped several tokens later on the `<`, expecting the declaration to end (`=`, `;`, a
+  newline, ...), never mentioning `[`. The diagnostic now recognizes `Type<Args>` in a
+  type position and points at the correct `Type[Args]` form, naming the captured type
+  and its arguments.
+
+## [0.16.0] - 2026-08-22
+
 ### Added
+
+- **`run/RegexEngine.on`, a 194-line backtracking regex engine built from scratch.**
+  A recursive-descent parser turns a pattern string (literals, `.` any-char,
+  postfix `*`/`+`/`?`, `(...)` grouping, `|` alternation) into an 8-case ADT
+  AST, matched by a continuation-passing backtracking `go(s, i, k)` method
+  (`k: Int -> Boolean`) that provides both a whole-string `fullMatch` and a
+  substring `find`. A 26-case self-checking table (each asserting both the
+  full-match and find outcome) plus an ad-hoc log-line search demo exercise
+  ADT case-enum with a recursive `select`-based method, function-typed
+  parameters used as backtracking continuations, closures, a mutable-field
+  parser class, records, collection pipelines, and string interpolation.
+
+### Fixed
+
+- **Parser hint for a Kotlin-style extension-function declaration, `fun String.twice() { }`.**
+  The existing `fun`/`func`/`fn` hint only matched `<kw> name(`, so a receiver-dot
+  declaration (the identifier after the keyword is the receiver *type*, followed by
+  `.`, not `(`) never matched and fell through to a generic parse error instead of
+  naming Onion's `def`-based equivalent. The diagnostic now recognizes `fun
+  Type.method(` (and the `func`/`fn` spellings) and points at the correct `extension
+  Type { def method(...) { ... } }` form, naming the captured receiver type and
+  method.
+
+- **Parser hint for a Java/Scala-style type-pattern `select` case, `case s: String:`.**
+  Onion's `select` type patterns use `is` (`case s is String:`), never a colon after the
+  binding name. The parser used to read `s` alone as an ordinary value pattern and only
+  trip on the *second* colon meant to introduce the type, several characters later on the
+  same line, without ever mentioning `is`. The diagnostic now recognizes a `case <name>:
+  <Type>:` line and points at the correct `case s is String:` form.
+
+- **Parser hint for a C-style `for (init; cond; step)` loop.** Onion's `for` loop
+  never parenthesizes its clauses; writing the C/Java/JS form used to trip the
+  parser several tokens past the actual mistake with an unhelpful expected-token
+  dump. The diagnostic now recognizes a leading `for (` and points at the correct
+  `for var i: Int = 0; i < 10; i++ { ... }` form.
+
+- **`docs/ja/CLAUDE_ja.md`'s "よくある構文ミス" tables were stale against `CLAUDE.md`.**
+  Several Japanese rows had fallen behind the English "Common Syntax Mistakes"
+  tables — some flagged now-supported syntax as unsupported (`else if` chains,
+  compound assignment/`++`/`--` as statements, unannotated lambda params), and
+  6 subsections (Type System & Operators, Control Flow, Methods & Classes,
+  Collections, Literals, Lambdas & Functions, Miscellaneous) were missing rows
+  present in English (nullable generics, `E0057`, primary constructors, static
+  field assignment, `Map` literals, map/record destructuring, operator
+  overloading, raw regex/resource literals, pipeline `|>`, regex `select`
+  patterns, auto-CLI). Brought fully in sync, row-for-row, with `CLAUDE.md`.
+
+- **Parser hint for a Java/C#-style unbraced `import java.util.List;`.** Onion's
+  `import` decl always wraps its targets in braces (`import { java.util.List }`);
+  writing the unbraced Java/C# form used to fall through to the generic
+  "a block `{ ... }` is expected here" hint, which reads as if a code block were
+  missing rather than braces around the import. The diagnostic now recognizes a
+  leading `import` followed directly by a non-`{` token and points at the correct
+  braced form.
+
+- **Parser hint for a Java-style constructor named after its class.** Onion
+  constructors are declared with `def this`, never a method sharing the
+  class's name (`public ClassName(...) { ... }`, as in Java/C#). With an
+  access modifier the parser trips on the class name expecting `:` (the
+  modifier is read as an access-section marker); without one it trips on the
+  class name itself expecting a member declarator -- neither previously
+  mentioned `def this`. The diagnostic now recognizes a capitalized
+  identifier directly followed by `(` at member position (with or without a
+  leading `public`/`private`/`protected`) and points at the correct
+  `def this(...) { ... }` form.
+
+- **Parser hint for a Java-style method with the return type before the name.**
+  Onion methods put their return type after the name via `def` (`def method():
+  void { ... }`); writing the Java form (`public void method() { ... }`) used
+  to trip the parser on the return-type identifier, expecting `:` (`public`/
+  `private`/`protected` are read as access-section markers, which only ever
+  appear as `public:`), without ever mentioning `def`. The diagnostic now
+  recognizes a leading access modifier followed by two identifiers before `(`
+  and points at the correct `public:` / `def method(): void { ... }` form.
+
+## [0.15.0] - 2026-08-22
+
+### Added
+
+- **`run/Chess.on`, a 395-line legal-move chess engine core.**
+  An 8x8 board of nullable `Piece` records, pseudo-legal move generation for
+  every piece kind (pawns with double push and automatic queen promotion,
+  knights, sliding bishops/rooks/queens, kings), and square-attack detection
+  used both to filter a king's own moves and to reject any move that leaves
+  the mover's own king in check. Verifies White has exactly 20 legal moves
+  from the starting position, replays a scripted Scholar's Mate ply-by-ply
+  down to confirmed checkmate, and confirms a composed minimal stalemate
+  position. Exercises records with methods, a class wrapping a mutable
+  nullable-element array (`Piece?[]`), a hand-rolled clone-and-simulate
+  check filter, nested `while`/`foreach` loops, closures, `List` pipelines,
+  and string interpolation.
+
+- **`run/PropLogic.on`, a 402-line propositional logic evaluator with truth tables.**
+  Represents formulas as an 8-case ADT `enum Formula` (`Var`/`Top`/`Bot`/`Not`/
+  `And`/`Or`/`Impl`/`Equiv`) with four recursive `select this` methods
+  (`vars`/`eval`/`nnf`/`simplify`). Prints truth tables for classic formulas
+  (excluded middle, contradiction, De Morgan, modus ponens, transitivity),
+  converts formulas to negation normal form, and constant-folds tautologies.
+  Exercises `extension Boolean`/`Int`, collection pipelines (`sortedBy`/`any`/
+  `filter`/`map`/`groupBy`), closures, string interpolation, and nullable
+  types.
+
+- **`run/CircuitSimulator.on`, a digital logic circuit simulator.**
+  Represents gates (`NOT`/`AND`/`OR`/`XOR`/`NAND`) as an ADT case-enum wired
+  together by wire name into a graph, evaluated on demand via memoized
+  recursion with a cycle guard. Builds a half adder, a full adder, a 4-bit
+  ripple-carry adder (chained full adders, run on real integer pairs) and a
+  2-to-1 multiplexer, printing full truth tables plus a broken
+  self-referential circuit to show the cycle guard. Exercises ADT case-enum
+  dispatch, a class wrapping a mutable `HashMap`-backed graph, recursive
+  evaluation with a memo cache and a `HashSet` "currently visiting" guard,
+  records with methods, extension methods on `Int`/`Boolean`, and nested
+  `while` loops for combinatorial enumeration.
+
+- **`run/NeuralNet.on`, a 291-line from-scratch multi-layer perceptron.**
+  Trains a hand-written two-layer network (sigmoid activations, backprop
+  computed manually, no library) via stochastic gradient descent on two
+  tasks run back-to-back: XOR (2→4→1, 5000 epochs, 4/4 accuracy) and
+  parity-3 (3→6→1, 8000 epochs, ≥7/8 accuracy). Exercises classes with
+  mutable `var` fields and static helpers, extension methods on `Double`,
+  mutable `List` APIs, `foreach` over record collections, closures, and
+  records.
+
+- **`run/HuffmanCode.on`, a 334-line Huffman encoding/decoding demo.**
+  Builds a Huffman tree from symbol frequencies and round-trips five sample
+  strings through encode/decode, plus a batch compression-ratio comparison.
+  Exercises an ADT case-enum (`HuffNode`: `Leaf`/`Internal`) with `select`/`is`
+  dispatch, a `record` with an `example` clause, `extension String`/`extension
+  Int`, generic `Map[K,V]`/`List[T]`, `foreach` map-entry destructuring,
+  collection pipelines (`sortedBy`/`map`/`fold`), nullable return types,
+  string interpolation, and recursion.
+
+- **`run/GeneticAlgorithm.on`, a 333-line genetic algorithm solving N-Queens.**
+  Runs two scenarios end to end (8-Queens with tournament selection and
+  single-point crossover; 6-Queens with roulette selection and uniform
+  crossover), plus a mutation-rate sweep. Exercises records with methods,
+  sealed ADT case-enums (`SelectionStrategy`, `CrossoverType`), extension
+  methods on `Int`/`String`, collection pipelines (`map`/`fold`), nullable
+  return types, and `select`/`is` pattern matching.
+
+- **`run/PackageInstaller.on`, a 285-line npm-style dependency resolver.**
+  Registers 12 packages with version strings and dependency lists, resolves
+  them via DFS topological sort with cycle detection, and groups them into
+  parallel install levels with a BFS wave algorithm. Exercises a `record`
+  with methods (`Package`), an ADT `enum` (`Outcome`: `Resolved`/`Cyclic`),
+  `select`/`case is` pattern matching, `HashMap[String, Object]` /
+  `HashSet[String]` / `ArrayList`, collection pipelines (`sortedBy`,
+  `countWhere`, `filter`), an `extension List[String]`, closures, method
+  chaining, string interpolation, and nullable (`Package?`) lookups.
+
+- **`run/LispInterp.on`, a 590-line minimal Scheme-like Lisp interpreter.**
+  Compiles and runs end-to-end with correct output on 27 verified cases.
+  Exercises ADT case enums (`TokenKind`, `LispVal`, 7 cases), records
+  (`Token`), classes with `public:` sections (`LispEnv`, `Lexer`, `Parser`,
+  `Interpreter`), nullable fields, typed generics (`ArrayList[Object]`,
+  `LinkedHashMap[String, Object]`), `select`/`case … is` pattern matching,
+  string interpolation, direct and mutual recursion, closures with lexical
+  capture, `try`/`catch`, `foreach`/`while` loops with mutable state, and
+  method calls on boxed primitives.
+
+- **`run/Othello.on`, a 223-line Othello/Reversi AI-vs-AI simulation.**
+  Two positional-weight greedy AIs play a full game to completion on an 8x8
+  board. Exercises records (`Position`, `MoveRecord`), `foreach` with ranges,
+  `select`/pattern-match dispatch, a mutable flat `Int[]` board, nested-loop
+  move validation across 8 directions, string interpolation, and game
+  statistics (total flips, best single move, piece percentages).
+
+- **`run/BattleshipSim.on`, a 381-line two-player Battleship auto-simulation.**
+  Two seeded AI players play a full game of Battleship end to end. Exercises
+  2D `Int[][]` arrays, a plain `enum ShipKind` with `select`-based dispatch, an
+  ADT `enum ShotResult` (`Miss`/`Hit`/`Sunk`) with `select this` methods, a
+  record with methods (`Ship`), classes with public/private sections (`Board`,
+  `Player`), `ArrayList[Object]` with a foreach-cast pattern, extension methods
+  on `Int`/`String`, nullable `String?`, `if`-as-expression, and `select`/`case`
+  with `else:`.
+
+- **`run/MiniGit.on`, a 384-line version-control system simulation.** Models a
+  repository with commits, branches, staging area, and merge operations.
+  Exercises extension methods on `String`/`Int` (`abbrev`, `padRight`, `repeat`,
+  `abs`, `clamp`), a homogeneous `enum ChangeType`/`Priority` with methods, an ADT
+  `enum MergeOutcome` with `FastForward`/`ThreeWay`/`UpToDate` cases, records with
+  methods (`FileChange`, `CommitInfo`, `BranchInfo`), a class with `ArrayList` and
+  `Map[Object, Object]` mutable state (`Repository`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`sortedByDescending`/`groupBy`/`find`/
+  `count`/`distinct`/`take`), `select` with type patterns, string interpolation,
+  closures, `foreach` on list and `foreach (k, v) in map`, nullable types and null
+  checks, and `while` loops for manual iteration.
+
+- **`run/TerrainGenerator.on`, a 366-line procedural world-map generator.**
+  A seeded LCG PRNG deterministically generates a 50x22 height map, classifies
+  it into an ADT `enum Biome` (8 cases, each with exhaustive `select` methods),
+  and BFS-pathfinds between corners. Exercises extension methods on
+  `Double`/`String`/`Int`, 4-level nested C-style `for` loops, collection
+  pipelines (`groupBy`/`sortedBy`/`filter`/`find`/`partition`/`distinct`/`map`),
+  `foreach (k, v) in Map[Object, List[Object]]`, `Double[]`/`Boolean[]`/`Int[]`
+  arrays, records with compile-time examples, and nullable types.
+
+### Fixed
+
+- A Java-style parenthesized `catch (e: Exception) { }` clause now gets a
+  bilingual diagnostic hint pointing at the correct `catch e: Exception { }`
+  form, instead of an unhelpful expected-token dump.
+
+## [0.14.0] - 2026-08-21
+
+### Added
+
+- **`run/FamilyTree.on`, a 432-line genealogy tracker.** Models a
+  four-generation fictional family and produces a roster, statistics,
+  decade/gender breakdowns, a recursive tree print, ancestor/descendant
+  counts, sibling lookup, and birth-century grouping. Exercises `record`
+  types (`Person`, `Relation`), a homogeneous `enum Gender`, extension
+  methods on `Int`/`String`, recursive traversal via private helpers,
+  collection pipelines (`groupBy`/`sortedBy`/`filter`/`fold`/`map`/`find`),
+  `foreach (k, v) in map`, and nullable `Int` fields.
+
+- **`run/Mastermind.on`, a 309-line AI-vs-AI Mastermind code-breaking
+  simulation.** Two `Guesser` strategies (`RandomGuesser`, `SmartGuesser`)
+  compete across 50 random secrets; stats are compared and colour
+  frequency is checked for uniformity. Exercises records with value
+  equality (`Feedback`, `Code`), a homogeneous `enum Strategy` dispatched
+  via `select` in a factory function, an extension method on `Int`
+  (`.colorName()`), `List.filter` with closures over `List[Code]`,
+  `Map[String, Int]` with `?:` null coalescing, `foreach (k, v)` over a
+  typed map, `List.zip` with nested generics, and `try`/`catch` with
+  nullable types.
+
+- **`run/ColorPalette.on`, a 399-line color science toolkit.** Covers
+  RGB↔HSL/HSV/CMYK conversion, named color lookup, five harmony palette
+  types, WCAG accessibility contrast checking, and palette
+  temperature/brightness analysis. Exercises `record` types with method
+  bodies, a data-carrying `enum` with `case`, sealed-hierarchy `select`
+  matching, `foreach (k, v) in map` destructuring, and collection
+  pipelines.
+
+- **`run/WordSearch.on`, a 300-line word-search puzzle generator and
+  solver.** Hides a word list in a 16×16 grid across 8 directions, fills
+  the remaining cells with random letters, then solves the puzzle to
+  verify placement accuracy. Exercises an ADT case-enum (`Direction`,
+  8 singleton cases) dispatched via `select`, records with methods
+  (`Placement`, `Found`), 2D arrays, extension methods on `Int`/`String`,
+  and collection pipelines (`map`/`filter`/`fold`/`groupBy`/`sortedBy`).
+
+- **`run/MusicTheory.on`, a 560-line music theory calculator.** Covers the
+  full chromatic note system, interval naming, chord voicings, scale
+  construction, modal analysis, and chord progressions: homogeneous enums
+  (`Note`, `ChordQuality`, `ScaleType`, `Mode`), records with methods
+  (`Chord`, `Scale`) including a diatonic-triad builder, a mutable
+  `ProgressionBuilder` class, and collection pipelines (`map`/`filter`/
+  `fold`/`find`) over chord/scale membership and common-tone analysis.
 
 - **`run/ExprEval.on`, a 292-line symbolic expression evaluator.** Replaces
   the earlier 98-line interface-based sketch with an ADT `enum Expr` (Num,
@@ -37,6 +683,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class inheritance with per-algorithm overrides, primary-constructor
   superclass delegation (`class Sub(args) extends Base(args)`), extension
   methods on `Int`/`String`, and nullable-typed pick results.
+
+- **`run/CellularAutomata.on`, a 363-line cellular automaton demo.**
+  Implements 1D Elementary Cellular Automata (Wolfram rules 0-255, e.g.
+  Rule 110) and Langton's Ant (2D). Exercises sealed ADT enums, records,
+  classes wrapping `java.util.HashMap`, collection pipelines
+  (`map`/`filter`/`fold`/`reduce`/`distinct`/`sortedBy`/`find`/`partition`/
+  `zip`), `select` with type-pattern matching, nullable types, closures,
+  and extension methods on `Int`/`String`.
+
+### Fixed
+
+- **Internal compiler error (I0000) on a `do[List]` comprehension whose
+  downstream closure locally re-declares a binding name.** A closure that
+  declares a local variable shadowing an outer `do`-binding name (e.g.
+  `x <- [1, 2]` followed by a nested closure with `val x = ...`) crashed
+  bytecode generation with `Index -1 out of bounds for length 0` in
+  `ClosureCodegen.emitNewClosure`. `CapturedVariableScanner` now tracks
+  locally-declared names per closure body and excludes them from the
+  captured-variable set (unless a nested closure still captures the same
+  name, in which case it correctly stays boxed).
 
 ## [0.13.0] - 2026-08-20
 
@@ -793,6 +1459,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows through the same `visitNewObject` path ordinary records use (already
   hardened by the #669/#745/#752 fixes), so this already passed; this closes
   a coverage gap rather than a live bug.
+- **`TryInCompoundBoxedLocalAssignmentSpec`, regression coverage for `try`/`catch`
+  on the right-hand side of a compound assignment (`+=`) to a closure-captured
+  (boxed) local variable** (`x += try {...} catch {...}`), both from inside the
+  capturing closure and from the declaring scope. `TryInCompoundFieldArrayAssignmentSpec`
+  already locked in the same `BinaryTerm`-wrapped-`try` shape for field/array
+  compound-assignment targets, but the boxed-local path in `emitSetLocal`
+  (`AsmCodeGeneration.scala`) was untested. `TermContainsTry.contains` already
+  recurses generically through a term's children, so both cases already passed;
+  this closes a coverage gap rather than a live bug.
 
 ### Fixed
 

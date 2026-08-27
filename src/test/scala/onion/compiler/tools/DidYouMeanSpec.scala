@@ -189,6 +189,44 @@ class DidYouMeanSpec extends AbstractShellSpec {
       }
     }
 
+    describe("for array length") {
+      // `arr.length()` / `arr.size()` -- array length is a property (`arr.length`,
+      // no parentheses), not a method, so there is no real `length` field entry
+      // on ArrayType to match the record/getter fieldNotMethod hint on. The base
+      // message alone repeats "length" as part of the call signature
+      // ("Int[].length() is not found"), so assert on the hint's distinguishing
+      // "(length)" parenthetical rather than on "length" alone.
+      it("hints that length is a property, not a method") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val arr: Int[] = new Int[3];
+            |    return arr.length();
+            |  }
+            |}
+            |""".stripMargin,
+          "E0005", "(length)"
+        )
+      }
+
+      it("hints that size is a property, not a method") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val arr: Int[] = new Int[3];
+            |    return arr.size();
+            |  }
+            |}
+            |""".stripMargin,
+          "E0005", "(size)"
+        )
+      }
+    }
+
     describe("for named-argument names") {
       // The typo ("kount") shares no substring with the real name ("count"),
       // so matching on "count" in the output can only be the suggestion --

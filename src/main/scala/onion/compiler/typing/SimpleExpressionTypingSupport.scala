@@ -354,7 +354,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
               if (!context.isFailedDeclaration(node.name)) {
                 fieldQualificationHint(node.name, context) match {
                   case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
-                  case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+                  case None =>
+                    if (namesResolvableClass(node.name)) bodyContext.report(CLASS_USED_AS_VALUE, node, node.name)
+                    else bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
                 }
               }
               None
@@ -389,6 +391,24 @@ private[compiler] final class SimpleExpressionTypingSupport(
     else if (!context.isStatic) Some(s"this.$name")
     else None
   }
+
+  /**
+   * True when a bare name that failed ordinary variable/field lookup is actually a
+   * resolvable class -- the mirror image of the local-shadows-a-type probe in
+   * `typeStaticMethodCall` (`System.currentTimeMillis()` written with `.` instead of
+   * `::`, see #CLASS_USED_AS_VALUE). Resolves through the name resolver directly
+   * (imports, aliases, same-package classes) rather than `typing.mapFrom`, which
+   * would itself report CLASS_NOT_FOUND on a genuine miss -- this is only a probe,
+   * so a miss must stay silent and fall through to the plain "not found" message.
+   * A bare type parameter (`T`) resolves too but is never what this hint means, so
+   * it's excluded explicitly.
+   */
+  private def namesResolvableClass(name: String): Boolean =
+    name.nonEmpty && name.head.isUpper && (bodyContext.mapper.map(AST.ReferenceType(name, false)) match {
+      case _: TypedAST.TypeVariableType => false
+      case _: TypedAST.ClassType => true
+      case _ => false
+    })
 
   private def typeUnqualifiedFieldReference(node: AST.UnqualifiedFieldReference, context: LocalContext): Option[Term] =
     if (context.isStatic) {

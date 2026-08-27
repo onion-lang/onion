@@ -1,0 +1,364 @@
+// LogCorrelator.on — Multi-source log stream correlation and analytics.
+// Exercises: ADT enum (LogLevel/Source), records (LogEntry, TraceGroup,
+// SourceStats), collection pipelines (groupBy/filter/map/sortedBy/find/
+// partition), extension methods (String/Int/Double), string interpolation,
+// foreach on map (k,v) and ranges, nullable types, select/case dispatch,
+// while loops.
+
+import {
+  java.lang.Integer as JInt;
+  java.lang.Double  as JDouble;
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def padL(w: Int): String {
+    var s = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def padR(w: Int): String {
+    var s = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String = String::format("%.1f", self)
+}
+
+extension Int {
+  def bar(max: Int, width: Int): String {
+    if max == 0 { return "".padR(width) }
+    val filled = if self * width / max > width { width } else { self * width / max }
+    var s = ""
+    foreach i: Int in 0..<filled       { s = s + "#" }
+    foreach i: Int in filled..<width   { s = s + "." }
+    return s
+  }
+}
+
+// ─── LogLevel: ordered severity ───────────────────────────────────────────────
+
+enum LogLevel {
+  Debug, Info, Warn, Error, Fatal
+
+public:
+  def label(): String = select this {
+    case LogLevel::Debug: "DEBUG"
+    case LogLevel::Info:  "INFO "
+    case LogLevel::Warn:  "WARN "
+    case LogLevel::Error: "ERROR"
+    case LogLevel::Fatal: "FATAL"
+  }
+  def severity(): Int = select this {
+    case LogLevel::Debug: 0
+    case LogLevel::Info:  1
+    case LogLevel::Warn:  2
+    case LogLevel::Error: 3
+    case LogLevel::Fatal: 4
+  }
+  def isAlert(): Boolean = self.severity() >= 2
+}
+
+// ─── Source: log-origin enum ──────────────────────────────────────────────────
+
+enum Source {
+  Web, Auth, Database, Background, Gateway
+
+public:
+  def tag(): String = select this {
+    case Source::Web:        "WEB "
+    case Source::Auth:       "AUTH"
+    case Source::Database:   "DB  "
+    case Source::Background: "BKG "
+    case Source::Gateway:    "GW  "
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record LogEntry(
+  ts: Long,
+  level: LogLevel,
+  source: Source,
+  traceId: String,
+  message: String
+) {
+public:
+  def isAlert(): Boolean = level.isAlert()
+  def formatted(): String {
+    val t  = ("" + ts + "ms").padL(8)
+    val lv = level.label()
+    val sr = source.tag()
+    val tr = traceId.padR(10)
+    return "#{t} #{lv} [#{sr}] #{tr} #{message}"
+  }
+}
+
+record TraceGroup(
+  traceId: String,
+  entries: List[Object]
+) {
+public:
+  def count(): Int = entries.size
+  def duration(): Long {
+    if entries.size == 0 { return 0L }
+    var minT: Long = Long::MAX_VALUE
+    var maxT: Long = Long::MIN_VALUE
+    foreach e: Object in entries {
+      val t = (e as LogEntry).ts()
+      if t < minT { minT = t }
+      if t > maxT { maxT = t }
+    }
+    return maxT - minT
+  }
+  def hasError(): Boolean {
+    var found: Boolean = false
+    foreach e: Object in entries {
+      if (e as LogEntry).isAlert() { found = true }
+    }
+    return found
+  }
+  def errorCount(): Int {
+    var cnt: Int = 0
+    foreach e: Object in entries {
+      if (e as LogEntry).isAlert() { cnt = cnt + 1 }
+    }
+    return cnt
+  }
+  def maxSeverity(): Int {
+    var best: Int = 0
+    foreach e: Object in entries {
+      val sev = (e as LogEntry).level().severity()
+      if sev > best { best = sev }
+    }
+    return best
+  }
+}
+
+record SourceStats(
+  source: Source,
+  total: Int,
+  alerts: Int,
+  errors: Int
+) {
+public:
+  def alertPct(): Double {
+    if total == 0 { return 0.0 }
+    return (alerts as Double) * 100.0 / (total as Double)
+  }
+  def errorPct(): Double {
+    if total == 0 { return 0.0 }
+    return (errors as Double) * 100.0 / (total as Double)
+  }
+}
+
+// ─── Sample log dataset ───────────────────────────────────────────────────────
+
+def entry(ts: Long, lv: LogLevel, src: Source, tr: String, msg: String): LogEntry =
+  new LogEntry(ts, lv, src, tr, msg)
+
+def makeLog(): List[Object] {
+  val e: List[Object] = Colls::mutableListOf()
+
+  // Trace A: successful auth + DB query
+  e.add(entry(0L,   LogLevel::Info,  Source::Gateway,    "TRACE-A", "Request received: GET /api/users"))
+  e.add(entry(2L,   LogLevel::Info,  Source::Auth,       "TRACE-A", "Token validated: user=alice"))
+  e.add(entry(5L,   LogLevel::Debug, Source::Database,   "TRACE-A", "Query: SELECT * FROM users WHERE id=1"))
+  e.add(entry(12L,  LogLevel::Info,  Source::Database,   "TRACE-A", "Query returned 1 row in 7ms"))
+  e.add(entry(14L,  LogLevel::Info,  Source::Web,        "TRACE-A", "Response 200 sent (14ms)"))
+
+  // Trace B: auth failure
+  e.add(entry(10L,  LogLevel::Info,  Source::Gateway,    "TRACE-B", "Request received: POST /login"))
+  e.add(entry(11L,  LogLevel::Warn,  Source::Auth,       "TRACE-B", "Invalid credentials for user=bob"))
+  e.add(entry(13L,  LogLevel::Error, Source::Auth,       "TRACE-B", "Auth failed after 3 attempts — locked"))
+  e.add(entry(15L,  LogLevel::Info,  Source::Web,        "TRACE-B", "Response 401 sent"))
+
+  // Trace C: slow query + timeout
+  e.add(entry(20L,  LogLevel::Info,  Source::Gateway,    "TRACE-C", "Request received: GET /report"))
+  e.add(entry(21L,  LogLevel::Info,  Source::Auth,       "TRACE-C", "Token validated: user=carol"))
+  e.add(entry(22L,  LogLevel::Debug, Source::Database,   "TRACE-C", "Query: SELECT * FROM events JOIN logs"))
+  e.add(entry(80L,  LogLevel::Warn,  Source::Database,   "TRACE-C", "Query running long (58ms elapsed)"))
+  e.add(entry(150L, LogLevel::Error, Source::Database,   "TRACE-C", "Query timeout after 128ms"))
+  e.add(entry(151L, LogLevel::Error, Source::Web,        "TRACE-C", "Response 504 sent"))
+
+  // Trace D: background job crash
+  e.add(entry(30L,  LogLevel::Info,  Source::Background, "TRACE-D", "Job started: nightly-cleanup"))
+  e.add(entry(45L,  LogLevel::Debug, Source::Background, "TRACE-D", "Processed 1024 records"))
+  e.add(entry(90L,  LogLevel::Fatal, Source::Background, "TRACE-D", "OutOfMemoryError: heap space exhausted"))
+
+  // Trace E: normal web request
+  e.add(entry(50L,  LogLevel::Info,  Source::Gateway,    "TRACE-E", "Request received: GET /health"))
+  e.add(entry(51L,  LogLevel::Info,  Source::Web,        "TRACE-E", "Health check OK"))
+  e.add(entry(52L,  LogLevel::Info,  Source::Web,        "TRACE-E", "Response 200 sent (2ms)"))
+
+  // Trace F: cascading deadlocks
+  e.add(entry(60L,  LogLevel::Info,  Source::Gateway,    "TRACE-F", "Request received: POST /orders"))
+  e.add(entry(61L,  LogLevel::Debug, Source::Auth,       "TRACE-F", "Token validated: user=dave"))
+  e.add(entry(62L,  LogLevel::Debug, Source::Database,   "TRACE-F", "BEGIN TRANSACTION"))
+  e.add(entry(65L,  LogLevel::Error, Source::Database,   "TRACE-F", "Deadlock detected on table orders"))
+  e.add(entry(66L,  LogLevel::Error, Source::Database,   "TRACE-F", "ROLLBACK issued"))
+  e.add(entry(67L,  LogLevel::Warn,  Source::Web,        "TRACE-F", "Retrying (attempt 1/3)"))
+  e.add(entry(80L,  LogLevel::Error, Source::Database,   "TRACE-F", "Deadlock on retry — giving up"))
+  e.add(entry(82L,  LogLevel::Fatal, Source::Web,        "TRACE-F", "Request aborted after 3 deadlocks"))
+
+  // Trace G: background cache warmup (clean)
+  e.add(entry(100L, LogLevel::Debug, Source::Background, "TRACE-G", "Cache warmup started"))
+  e.add(entry(110L, LogLevel::Info,  Source::Background, "TRACE-G", "Cache warmed: 512 entries loaded"))
+  e.add(entry(120L, LogLevel::Info,  Source::Background, "TRACE-G", "Cache warmup done (20ms)"))
+
+  return e
+}
+
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+def buildTraceGroups(entries: List[Object]): List[Object] {
+  val byTrace = entries.groupBy { e -> (e as LogEntry).traceId() }
+  val groups: List[Object] = Colls::mutableListOf()
+  foreach (k, v) in byTrace {
+    groups.add(new TraceGroup(k as String, v as List[Object]))
+  }
+  return groups
+}
+
+def countByLevel(entries: List[Object], lv: LogLevel): Int {
+  return entries.filter { e -> (e as LogEntry).level() == lv }.size
+}
+
+def buildSourceStats(entries: List[Object], src: Source): SourceStats {
+  val mine = entries.filter { e -> (e as LogEntry).source() == src }
+  val total = mine.size
+  val alerts = mine.filter { e -> (e as LogEntry).isAlert() }.size
+  val errors = mine.filter { e ->
+    (e as LogEntry).level().severity() >= LogLevel::Error.severity()
+  }.size
+  return new SourceStats(src, total, alerts, errors)
+}
+
+// ─── Report sections ──────────────────────────────────────────────────────────
+
+def rule(ch: String, n: Int): String {
+  var s = ""
+  foreach i: Int in 0..<n { s = s + ch }
+  return s
+}
+
+def banner(title: String): void {
+  val line = rule("=", 62)
+  IO::println(line)
+  IO::println("  " + title)
+  IO::println(line)
+}
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("-- " + title + " " + rule("-", 55 - title.length()))
+}
+
+def printOverview(entries: List[Object]): void {
+  section("OVERVIEW")
+  val total  = entries.size
+  val alerts = entries.filter { e -> (e as LogEntry).isAlert() }.size
+  val errors = entries.filter { e ->
+    (e as LogEntry).level().severity() >= LogLevel::Error.severity()
+  }.size
+  IO::println("  Total entries : #{total}")
+  IO::println("  Alerts (>=WARN): #{alerts}  (#{((alerts as Double)*100.0/(total as Double)).fmt1()}%)")
+  IO::println("  Errors/Fatal  : #{errors}  (#{((errors as Double)*100.0/(total as Double)).fmt1()}%)")
+}
+
+def printLevelBreakdown(entries: List[Object]): void {
+  section("LEVEL BREAKDOWN")
+  val total = entries.size
+  val levels = [
+    LogLevel::Debug, LogLevel::Info, LogLevel::Warn,
+    LogLevel::Error, LogLevel::Fatal
+  ]
+  IO::println("  Level   Count  Distribution")
+  foreach lv: Object in levels {
+    val l   = lv as LogLevel
+    val cnt = countByLevel(entries, l)
+    val bar = cnt.bar(total, 24)
+    IO::println("  #{l.label()}  #{("" + cnt).padL(4)}   #{bar}  #{((cnt as Double)*100.0/(total as Double)).fmt1()}%")
+  }
+}
+
+def printSourceBreakdown(entries: List[Object]): void {
+  section("SOURCE BREAKDOWN")
+  val sources = [
+    Source::Web, Source::Auth, Source::Database,
+    Source::Background, Source::Gateway
+  ]
+  IO::println("  Source  Total  Alerts  Errors  Alert%  Error%")
+  foreach src: Object in sources {
+    val s = buildSourceStats(entries, src as Source)
+    val line = "  #{s.source().tag().padR(5)} #{("" + s.total()).padL(5)}" +
+               "  #{("" + s.alerts()).padL(6)}  #{("" + s.errors()).padL(6)}" +
+               "  #{s.alertPct().fmt1().padL(5)}%  #{s.errorPct().fmt1().padL(5)}%"
+    IO::println(line)
+  }
+}
+
+def printTraceGroups(groups: List[Object]): void {
+  section("TRACE GROUPS")
+  val sorted = groups.sortedBy { g -> (g as TraceGroup).traceId() }
+  IO::println("  TraceID    Cnt  Duration  Alerts  Status")
+  foreach g: Object in sorted {
+    val tg     = g as TraceGroup
+    val status = if tg.hasError() { "PROBLEM" } else { "OK" }
+    val dms    = "" + tg.duration() + "ms"
+    IO::println(
+      "  #{tg.traceId().padR(10)} #{("" + tg.count()).padL(3)}" +
+      "  #{dms.padL(8)}  #{("" + tg.errorCount()).padL(6)}  #{status}"
+    )
+  }
+}
+
+def printProblemTraces(groups: List[Object]): void {
+  section("PROBLEM TRACES -- FULL TIMELINE")
+  val problems = groups.filter { g -> (g as TraceGroup).hasError() }
+    .sortedBy { g -> -(g as TraceGroup).maxSeverity() }
+  foreach g: Object in problems {
+    val tg = g as TraceGroup
+    IO::println("")
+    IO::println("  >> #{tg.traceId()} (#{tg.count()} entries, #{tg.duration()}ms span, max-severity=#{tg.maxSeverity()})")
+    val sorted = tg.entries().sortedBy { e -> (e as LogEntry).ts() }
+    foreach e: Object in sorted {
+      val le  = e as LogEntry
+      val pfx = select le.level() {
+        case LogLevel::Fatal: "!!! "
+        case LogLevel::Error: "!!  "
+        case LogLevel::Warn:  "~   "
+        else:                 "    "
+      }
+      IO::println("    #{pfx}#{le.formatted()}")
+    }
+  }
+}
+
+def printAlertSummary(entries: List[Object]): void {
+  section("ALL ALERT MESSAGES (chronological)")
+  val alerts = entries.filter { e -> (e as LogEntry).isAlert() }
+    .sortedBy { e -> (e as LogEntry).ts() }
+  foreach e: Object in alerts {
+    IO::println("  " + (e as LogEntry).formatted())
+  }
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+val logs   = makeLog()
+val groups = buildTraceGroups(logs)
+
+banner("LOG CORRELATOR -- ANALYSIS REPORT")
+printOverview(logs)
+printLevelBreakdown(logs)
+printSourceBreakdown(logs)
+printTraceGroups(groups)
+printProblemTraces(groups)
+printAlertSummary(logs)
+IO::println("")
+banner("END OF REPORT")

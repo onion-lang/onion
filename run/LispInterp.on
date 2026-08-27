@@ -1,0 +1,590 @@
+// Minimal Lisp interpreter: numbers, strings, booleans, nil, symbols,
+// lists, lambdas, if/cond, define, let, begin, apply, quote.
+// Exercises: ADT enums, records, classes, pattern matching, generics,
+// collection pipelines, nullable, string interpolation, recursion.
+
+import {
+  java.util.*
+  java.lang.StringBuilder
+}
+
+// ── Tokens ────────────────────────────────────────────────────────────────────
+
+enum TokenKind {
+  case TLParen
+  case TRParen
+  case TNum
+  case TSym
+  case TStr
+  case TBool
+  case TEof
+}
+
+record Token(kind: TokenKind, text: String)
+
+// ── Lisp values (sealed ADT) ───────────────────────────────────────────────────
+
+// Forward reference: LFun references LispEnv, so LispEnv is declared first.
+
+class LispEnv {
+  var bindings: LinkedHashMap[String, Object]
+  var parent: LispEnv?
+
+public:
+  def this(parent: LispEnv?) {
+    bindings = new LinkedHashMap[String, Object]()
+    self.parent = parent
+  }
+
+  def get(name: String): Object? {
+    val v = bindings.get(name)
+    if v != null { return v }
+    return parent?.get(name)
+  }
+
+  def set(name: String, value: Object): void {
+    bindings.put(name, value)
+  }
+}
+
+enum LispVal {
+  case LNum(n: Double)
+  case LStr(s: String)
+  case LSym(name: String)
+  case LBool(b: Boolean)
+  case LList(items: ArrayList[Object])
+  case LFun(params: ArrayList[Object], body: LispVal, env: LispEnv)
+  case LNil
+
+  public:
+  def display(): String = select this {
+    case v is LNum:  LispVal::formatNum(v.n())
+    case v is LStr:  "\"#{v.s()}\""
+    case v is LSym:  v.name()
+    case v is LBool: if v.b() { "#t" } else { "#f" }
+    case v is LList: "(#{LispVal::listDisplay(v.items())})"
+    case v is LFun:  "#<lambda>"
+    case v is LNil:  "nil"
+  }
+
+  static def formatNum(n: Double): String {
+    val asLong = n.longValue()
+    if n == asLong.doubleValue() { return Long::toString(asLong) }
+    return Double::toString(n)
+  }
+
+  static def listDisplay(items: ArrayList[Object]): String {
+    val sb = new StringBuilder()
+    foreach item: Object in items {
+      if sb.length() > 0 { sb.append(" ") }
+      sb.append((item as LispVal).display())
+    }
+    return sb.toString()
+  }
+}
+
+// ── Lexer ─────────────────────────────────────────────────────────────────────
+
+class Lexer {
+  var src: String
+  var pos: Int
+
+public:
+  def this(src: String) { self.src = src; pos = 0 }
+
+  def peek(): Char {
+    if pos >= src.length() { return '\0' }
+    return src.charAt(pos)
+  }
+
+  def advance(): Char {
+    val c = peek()
+    pos++
+    return c
+  }
+
+  def skipWhitespace(): void {
+    while pos < src.length() {
+      val c = peek()
+      if c == ' ' || c == '\n' || c == '\r' || c == '\t' { pos++ }
+      else if c == ';' {
+        while pos < src.length() && peek() != '\n' { pos++ }
+      } else { break }
+    }
+  }
+
+  def readString(): Token {
+    val sb = new StringBuilder()
+    advance()  // consume opening "
+    while pos < src.length() && peek() != '"' {
+      val c = advance()
+      if c == '\\' && pos < src.length() {
+        val esc = advance()
+        if esc == 'n' { sb.append('\n') }
+        else if esc == 't' { sb.append('\t') }
+        else { sb.append(esc) }
+      } else { sb.append(c) }
+    }
+    advance()  // consume closing "
+    return new Token(new TStr(), sb.toString())
+  }
+
+  def readAtom(): Token {
+    val sb = new StringBuilder()
+    while pos < src.length() {
+      val c = peek()
+      if c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '(' || c == ')' || c == '"' || c == ';' { break }
+      sb.append(advance())
+    }
+    val text = sb.toString()
+    if text == "#t" || text == "#f" { return new Token(new TBool(), text) }
+    try {
+      Double::parseDouble(text)
+      return new Token(new TNum(), text)
+    } catch e: Exception {
+      return new Token(new TSym(), text)
+    }
+  }
+
+  def nextToken(): Token {
+    skipWhitespace()
+    if pos >= src.length() { return new Token(new TEof(), "") }
+    val c = peek()
+    if c == '(' { advance(); return new Token(new TLParen(), "(") }
+    if c == ')' { advance(); return new Token(new TRParen(), ")") }
+    if c == '"' { return readString() }
+    return readAtom()
+  }
+
+  def tokenize(): ArrayList[Object] {
+    val tokens = new ArrayList[Object]()
+    var tok = nextToken()
+    while !(tok.kind() is TEof) {
+      tokens.add(tok)
+      tok = nextToken()
+    }
+    tokens.add(tok)  // include EOF sentinel
+    return tokens
+  }
+}
+
+// ── Parser ────────────────────────────────────────────────────────────────────
+
+class Parser {
+  var tokens: ArrayList[Object]
+  var pos: Int
+
+public:
+  def this(tokens: ArrayList[Object]) { self.tokens = tokens; pos = 0 }
+
+  def peek(): Token = (tokens[pos] as Token)
+
+  def consume(): Token {
+    val t = peek()
+    pos++
+    return t
+  }
+
+  def parseVal(): LispVal {
+    val tok = consume()
+    select tok.kind() {
+      case k is TNum:
+        return new LNum(Double::parseDouble(tok.text()))
+      case k is TStr:
+        return new LStr(tok.text())
+      case k is TBool:
+        return new LBool(tok.text() == "#t")
+      case k is TSym:
+        return new LSym(tok.text())
+      case k is TLParen:
+        val items = new ArrayList[Object]()
+        while !(peek().kind() is TRParen) && !(peek().kind() is TEof) {
+          items.add(parseVal())
+        }
+        consume()  // consume ')'
+        return new LList(items)
+      else:
+        return new LNil()
+    }
+  }
+
+  def parseAll(): ArrayList[Object] {
+    val result = new ArrayList[Object]()
+    while !(peek().kind() is TEof) {
+      result.add(parseVal())
+    }
+    return result
+  }
+}
+
+// ── Evaluator ─────────────────────────────────────────────────────────────────
+
+class Interpreter {
+  var globalEnv: LispEnv
+
+public:
+  def this() {
+    globalEnv = new LispEnv(null)
+    setupBuiltins()
+  }
+
+  def setupBuiltins(): void {
+    globalEnv.set("+",    new LSym("__add"))
+    globalEnv.set("-",    new LSym("__sub"))
+    globalEnv.set("*",    new LSym("__mul"))
+    globalEnv.set("/",    new LSym("__div"))
+    globalEnv.set("=",    new LSym("__eq"))
+    globalEnv.set("<",    new LSym("__lt"))
+    globalEnv.set(">",    new LSym("__gt"))
+    globalEnv.set("not",  new LSym("__not"))
+    globalEnv.set("cons",   new LSym("__cons"))
+    globalEnv.set("car",    new LSym("__car"))
+    globalEnv.set("cdr",    new LSym("__cdr"))
+    globalEnv.set("list",   new LSym("__list"))
+    globalEnv.set("null?",  new LSym("__null_q"))
+    globalEnv.set("pair?",  new LSym("__pair_q"))
+    globalEnv.set("length", new LSym("__length"))
+    globalEnv.set("append", new LSym("__append"))
+    globalEnv.set("display",  new LSym("__display"))
+    globalEnv.set("newline",  new LSym("__newline"))
+    globalEnv.set("number?",  new LSym("__number_q"))
+    globalEnv.set("string?",  new LSym("__string_q"))
+    globalEnv.set("boolean?", new LSym("__bool_q"))
+    globalEnv.set("symbol?",  new LSym("__sym_q"))
+    globalEnv.set("number->string", new LSym("__num_str"))
+    globalEnv.set("string-append",  new LSym("__str_append"))
+  }
+
+  def numVal(v: LispVal): Double = select v {
+    case n is LNum: n.n()
+    else: throw new RuntimeException("Expected number, got: #{v.display()}")
+  }
+
+  def isTruthy(v: LispVal): Boolean = select v {
+    case b is LBool: b.b()
+    case n is LNil:  false
+    else:            true
+  }
+
+  def getList(v: LispVal, who: String): ArrayList[Object] = select v {
+    case lst is LList: lst.items()
+    else: throw new RuntimeException("#{who}: not a list: #{v.display()}")
+  }
+
+  def applyBuiltin(name: String, args: ArrayList[Object]): LispVal {
+    if name == "__add" {
+      var sum = 0.0
+      foreach a: Object in args { sum = sum + numVal(a as LispVal) }
+      return new LNum(sum)
+    }
+    if name == "__sub" {
+      if args.size == 1 { return new LNum(-numVal(args[0] as LispVal)) }
+      var r = numVal(args[0] as LispVal)
+      var i = 1
+      while i < args.size { r = r - numVal(args[i] as LispVal); i++ }
+      return new LNum(r)
+    }
+    if name == "__mul" {
+      var prod = 1.0
+      foreach a: Object in args { prod = prod * numVal(a as LispVal) }
+      return new LNum(prod)
+    }
+    if name == "__div" {
+      var r = numVal(args[0] as LispVal)
+      var i = 1
+      while i < args.size { r = r / numVal(args[i] as LispVal); i++ }
+      return new LNum(r)
+    }
+    if name == "__eq"  { return new LBool(numVal(args[0] as LispVal) == numVal(args[1] as LispVal)) }
+    if name == "__lt"  { return new LBool(numVal(args[0] as LispVal) < numVal(args[1] as LispVal)) }
+    if name == "__gt"  { return new LBool(numVal(args[0] as LispVal) > numVal(args[1] as LispVal)) }
+    if name == "__not" { return new LBool(!isTruthy(args[0] as LispVal)) }
+    if name == "__cons" {
+      val lst = new ArrayList[Object]()
+      lst.add(args[0] as LispVal)
+      val tail = args[1] as LispVal
+      if tail is LList { foreach item: Object in (tail as LList).items() { lst.add(item) } }
+      return new LList(lst)
+    }
+    if name == "__car" {
+      val items = getList(args[0] as LispVal, "car")
+      if items.size == 0 { throw new RuntimeException("car: empty list") }
+      return (items[0] as LispVal)
+    }
+    if name == "__cdr" {
+      val items = getList(args[0] as LispVal, "cdr")
+      if items.size == 0 { throw new RuntimeException("cdr: empty list") }
+      val rest = new ArrayList[Object]()
+      var i = 1
+      while i < items.size { rest.add(items[i]); i++ }
+      return new LList(rest)
+    }
+    if name == "__list" {
+      val lst = new ArrayList[Object]()
+      foreach a: Object in args { lst.add(a) }
+      return new LList(lst)
+    }
+    if name == "__null_q" {
+      val v = args[0] as LispVal
+      return new LBool(v is LNil || (v is LList && (v as LList).items().size == 0))
+    }
+    if name == "__pair_q" {
+      val v = args[0] as LispVal
+      return new LBool(v is LList && (v as LList).items().size > 0)
+    }
+    if name == "__length" {
+      val v = args[0] as LispVal
+      if v is LList { return new LNum((v as LList).items().size() + 0.0) }
+      return new LNum(0.0)
+    }
+    if name == "__append" {
+      val lst = new ArrayList[Object]()
+      foreach a: Object in args {
+        val v = a as LispVal
+        if v is LList { foreach item: Object in (v as LList).items() { lst.add(item) } }
+      }
+      return new LList(lst)
+    }
+    if name == "__display"   { IO::print((args[0] as LispVal).display()); return new LNil() }
+    if name == "__newline"   { IO::println(""); return new LNil() }
+    if name == "__number_q"  { return new LBool((args[0] as LispVal) is LNum) }
+    if name == "__string_q"  { return new LBool((args[0] as LispVal) is LStr) }
+    if name == "__bool_q"    { return new LBool((args[0] as LispVal) is LBool) }
+    if name == "__sym_q"     { return new LBool((args[0] as LispVal) is LSym) }
+    if name == "__num_str"   { return new LStr(LispVal::formatNum(numVal(args[0] as LispVal))) }
+    if name == "__str_append" {
+      val sb = new StringBuilder()
+      foreach a: Object in args {
+        val v = a as LispVal
+        if v is LStr { sb.append((v as LStr).s()) }
+      }
+      return new LStr(sb.toString())
+    }
+    throw new RuntimeException("Unknown builtin: #{name}")
+  }
+
+  def evalArgs(argForms: ArrayList[Object], env: LispEnv): ArrayList[Object] {
+    val result = new ArrayList[Object]()
+    foreach form: Object in argForms { result.add(eval(form as LispVal, env)) }
+    return result
+  }
+
+  def applyFn(fn: LispVal, args: ArrayList[Object]): LispVal {
+    select fn {
+      case sym is LSym:
+        val n = sym.name()
+        if n.startsWith("__") { return applyBuiltin(n, args) }
+        val resolved = globalEnv.get(n)
+        if resolved != null { return applyFn(resolved as LispVal, args) }
+        throw new RuntimeException("Undefined function: #{n}")
+      case f is LFun:
+        val callEnv = new LispEnv(f.env())
+        val params = f.params()
+        var i = 0
+        while i < params.size {
+          callEnv.set(((params[i] as LispVal) as LSym).name(), args[i] as LispVal)
+          i++
+        }
+        return eval(f.body(), callEnv)
+      else:
+        throw new RuntimeException("Not a function: #{fn.display()}")
+    }
+  }
+
+  def eval(form: LispVal, env: LispEnv): LispVal {
+    select form {
+      case n is LNum:  return n
+      case s is LStr:  return s
+      case b is LBool: return b
+      case n is LNil:  return n
+      case sym is LSym:
+        val name = sym.name()
+        val v = env.get(name)
+        if v != null { return (v as LispVal) }
+        throw new RuntimeException("Undefined symbol: #{name}")
+      case lst is LList:
+        val items = lst.items()
+        if items.size == 0 { return new LNil() }
+        val head = items[0] as LispVal
+        // special forms first
+        if head is LSym {
+          val op = (head as LSym).name()
+          if op == "quote" { return (items[1] as LispVal) }
+          if op == "if" {
+            val cond = eval(items[1] as LispVal, env)
+            if isTruthy(cond) { return eval(items[2] as LispVal, env) }
+            if items.size > 3 { return eval(items[3] as LispVal, env) }
+            return new LNil()
+          }
+          if op == "define" {
+            val target = items[1] as LispVal
+            if target is LSym {
+              val v = eval(items[2] as LispVal, env)
+              env.set((target as LSym).name(), v)
+              return new LNil()
+            }
+            // (define (f x y) body) shorthand
+            if target is LList {
+              val nameAndParams = (target as LList).items()
+              val fnName = ((nameAndParams[0] as LispVal) as LSym).name()
+              val params = new ArrayList[Object]()
+              var pi = 1
+              while pi < nameAndParams.size { params.add(nameAndParams[pi]); pi++ }
+              env.set(fnName, new LFun(params, items[2] as LispVal, env))
+              return new LNil()
+            }
+          }
+          if op == "lambda" {
+            val paramNode = items[1] as LispVal
+            val params = new ArrayList[Object]()
+            if paramNode is LList {
+              foreach p: Object in (paramNode as LList).items() { params.add(p) }
+            }
+            return new LFun(params, items[2] as LispVal, env)
+          }
+          if op == "let" {
+            val bindingList = items[1] as LispVal
+            val letEnv = new LispEnv(env)
+            if bindingList is LList {
+              foreach binding: Object in (bindingList as LList).items() {
+                val pair = ((binding as LispVal) as LList).items()
+                val bname = ((pair[0] as LispVal) as LSym).name()
+                val bval  = eval(pair[1] as LispVal, env)
+                letEnv.set(bname, bval)
+              }
+            }
+            return eval(items[2] as LispVal, letEnv)
+          }
+          if op == "begin" {
+            var result: LispVal = new LNil()
+            var i = 1
+            while i < items.size { result = eval(items[i] as LispVal, env); i++ }
+            return result
+          }
+          if op == "cond" {
+            var i = 1
+            while i < items.size {
+              val clause = ((items[i] as LispVal) as LList).items()
+              val test = clause[0] as LispVal
+              val isElse = test is LSym && (test as LSym).name() == "else"
+              if isElse || isTruthy(eval(test, env)) {
+                return eval(clause[1] as LispVal, env)
+              }
+              i++
+            }
+            return new LNil()
+          }
+        }
+        // function application
+        val fn = eval(head, env)
+        val restItems = new ArrayList[Object]()
+        var i2 = 1
+        while i2 < items.size { restItems.add(items[i2]); i2++ }
+        val args = evalArgs(restItems, env)
+        return applyFn(fn, args)
+      else: return form
+    }
+  }
+
+  def run(src: String): LispVal {
+    val tokens = new Lexer(src).tokenize()
+    val forms  = new Parser(tokens).parseAll()
+    var result: LispVal = new LNil()
+    foreach form: Object in forms { result = eval(form as LispVal, globalEnv) }
+    return result
+  }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+val interp = new Interpreter()
+
+def runDemo(label: String, src: String): void {
+  IO::print("#{label}: ")
+  try {
+    val result = interp.run(src)
+    IO::println(result.display())
+  } catch e: Exception {
+    IO::println("ERROR: #{e.getMessage()}")
+  }
+}
+
+// Arithmetic
+runDemo("1+2",       "(+ 1 2)")
+runDemo("(3+4)*5",   "(* (+ 3 4) 5)")
+runDemo("10/2-1",    "(- (/ 10 2) 1)")
+
+// Boolean / conditional
+runDemo("if #t",     "(if #t 42 0)")
+runDemo("if #f",     "(if #f 42 0)")
+runDemo("not",       "(not #t)")
+
+// Variables
+interp.run("(define x 10)")
+interp.run("(define y 20)")
+runDemo("x+y",       "(+ x y)")
+
+// Lambda and define sugar
+interp.run("(define square (lambda (n) (* n n)))")
+interp.run("(define (cube n) (* n n n))")
+runDemo("square(7)",  "(square 7)")
+runDemo("cube(3)",    "(cube 3)")
+
+// Factorial (recursion)
+interp.run("""
+  (define (fact n)
+    (if (= n 0) 1 (* n (fact (- n 1)))))
+""")
+runDemo("fact(0)",   "(fact 0)")
+runDemo("fact(5)",   "(fact 5)")
+runDemo("fact(10)",  "(fact 10)")
+
+// Fibonacci (recursion)
+interp.run("""
+  (define (fib n)
+    (cond
+      ((= n 0) 0)
+      ((= n 1) 1)
+      (else (+ (fib (- n 1)) (fib (- n 2))))))
+""")
+runDemo("fib(0)",    "(fib 0)")
+runDemo("fib(7)",    "(fib 7)")
+runDemo("fib(10)",   "(fib 10)")
+
+// List operations
+interp.run("(define mylist (list 1 2 3 4 5))")
+runDemo("mylist",    "mylist")
+runDemo("car",       "(car mylist)")
+runDemo("cdr",       "(cdr mylist)")
+runDemo("length",    "(length mylist)")
+runDemo("cons",      "(cons 0 mylist)")
+runDemo("append",    "(append (list 1 2) (list 3 4))")
+
+// Let binding
+runDemo("let",       "(let ((a 3) (b 4)) (+ (* a a) (* b b)))")
+
+// Closures / adder factory
+interp.run("(define (make-adder n) (lambda (x) (+ x n)))")
+interp.run("(define add5 (make-adder 5))")
+runDemo("add5(10)",  "(add5 10)")
+runDemo("add5(20)",  "(add5 20)")
+
+// Quote
+runDemo("quote",     "(quote (a b c))")
+
+// Accumulator using tail-style recursion
+interp.run("""
+  (define (sum-list lst acc)
+    (if (null? lst)
+        acc
+        (sum-list (cdr lst) (+ acc (car lst)))))
+""")
+runDemo("sum 1-5",   "(sum-list (list 1 2 3 4 5) 0)")
+
+// String operations
+interp.run("(define greeting \"Hello\")")
+runDemo("str?",      "(string? greeting)")
+runDemo("num?",      "(number? 42)")
+runDemo("sym?",      "(symbol? (quote foo))")
+
+IO::println("Lisp interpreter demo complete.")

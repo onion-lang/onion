@@ -1,0 +1,382 @@
+// HMTypeInference.on — Hindley-Milner type inference for a tiny lambda calculus
+//
+// Exercises: sealed ADT case-enum (Ty, Expr) with recursive types, Map[K,V]
+// for typed substitutions and environments, recursive algorithms (unification,
+// type inference), extension methods on Int/String, pattern matching, closures,
+// string interpolation, nullable types, try/catch, collection pipelines.
+
+// ── Extension helpers ──────────────────────────────────────────────────────────
+
+extension Int {
+  def toVar(): String = "a" + self
+  def pad(width: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length() < width { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def ljust(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ── Type expressions ───────────────────────────────────────────────────────────
+
+enum Ty {
+  case TInt
+  case TBool
+  case TFun(from: Ty, to: Ty)
+  case TVar(id: Int)
+public:
+  def show(): String = select this {
+    case i is TInt:  "Int"
+    case b is TBool: "Bool"
+    case f is TFun:
+      val fStr: String = select f.from() {
+        case ff is TFun: "(#{f.from().show()})"
+        case a is TInt:  f.from().show()
+        case b is TBool: f.from().show()
+        case v is TVar:  f.from().show()
+      }
+      fStr + " -> " + f.to().show()
+    case v is TVar:  "α#{v.id()}"
+  }
+
+  def occurs(id: Int): Boolean {
+    if self is TVar { return (self as TVar).id() == id }
+    if self is TFun {
+      val f: TFun = self as TFun
+      return f.from().occurs(id) || f.to().occurs(id)
+    }
+    return false
+  }
+
+  def applySubst(s: Map[String, Object]): Ty {
+    if self is TVar {
+      val v: TVar = self as TVar
+      val found: Object? = s.get(v.id().toVar())
+      if found != null { return (found as Ty).applySubst(s) }
+      return self
+    }
+    if self is TFun {
+      val f: TFun = self as TFun
+      return new TFun(f.from().applySubst(s), f.to().applySubst(s))
+    }
+    return self
+  }
+}
+
+// ── Expressions ────────────────────────────────────────────────────────────────
+
+enum Expr {
+  case EInt(n: Int)
+  case EBool(b: Boolean)
+  case EVar(name: String)
+  case ELam(param: String, body: Expr)
+  case EApp(fun: Expr, arg: Expr)
+  case EIf(cond: Expr, thn: Expr, els: Expr)
+  case ELet(name: String, value: Expr, body: Expr)
+  case EAdd(left: Expr, right: Expr)
+  case EEq(left: Expr, right: Expr)
+public:
+  def show(): String = select this {
+    case l is EInt:  "" + l.n()
+    case b is EBool: if b.b() { "true" } else { "false" }
+    case v is EVar:  v.name()
+    case l is ELam:  "λ#{l.param()}.#{l.body().show()}"
+    case a is EApp:  "(#{a.fun().show()} #{a.arg().show()})"
+    case i is EIf:   "if #{i.cond().show()} then #{i.thn().show()} else #{i.els().show()}"
+    case l is ELet:  "let #{l.name()} = #{l.value().show()} in #{l.body().show()}"
+    case a is EAdd:  "(#{a.left().show()} + #{a.right().show()})"
+    case e is EEq:   "(#{e.left().show()} == #{e.right().show()})"
+  }
+}
+
+// ── Fresh variable supply ──────────────────────────────────────────────────────
+
+var freshCounter: Int = 0
+
+def freshTy(): Ty {
+  val id: Int = freshCounter
+  freshCounter++
+  return new TVar(id)
+}
+
+// ── Substitution helpers ───────────────────────────────────────────────────────
+
+def emptySubst(): Map[String, Object] = [:]
+
+def substExtend(s: Map[String, Object], id: Int, ty: Ty): Map[String, Object] {
+  val ns: Map[String, Object] = [:]
+  foreach (k, v) in s { ns.put(k as String, v) }
+  ns.put(id.toVar(), ty)
+  return ns
+}
+
+def applySubstToEnv(env: Map[String, Object], s: Map[String, Object]): Map[String, Object] {
+  val result: Map[String, Object] = [:]
+  foreach (k, v) in env {
+    result.put(k as String, (v as Ty).applySubst(s))
+  }
+  return result
+}
+
+// ── Unification ────────────────────────────────────────────────────────────────
+
+def unify(t1: Ty, t2: Ty, s: Map[String, Object]): Map[String, Object]? {
+  val r1: Ty = t1.applySubst(s)
+  val r2: Ty = t2.applySubst(s)
+
+  if r1 is TVar {
+    val v1: TVar = r1 as TVar
+    if r2 is TVar && (r2 as TVar).id() == v1.id() { return s }
+    if r2.occurs(v1.id()) { return null }
+    return substExtend(s, v1.id(), r2)
+  }
+  if r2 is TVar { return unify(r2, r1, s) }
+
+  if r1 is TInt && r2 is TInt   { return s }
+  if r1 is TBool && r2 is TBool { return s }
+
+  if r1 is TFun && r2 is TFun {
+    val f1: TFun = r1 as TFun
+    val f2: TFun = r2 as TFun
+    val s1: Map[String, Object]? = unify(f1.from(), f2.from(), s)
+    if s1 == null { return null }
+    return unify(f1.to(), f2.to(), s1 as Map[String, Object])
+  }
+  return null
+}
+
+// ── Type inference ─────────────────────────────────────────────────────────────
+
+// Returns [Ty, Map[String,Object]] on success; null on failure.
+// env maps variable names to their types (as Object).
+def infer(
+  expr: Expr,
+  env: Map[String, Object],
+  s: Map[String, Object]
+): List[Object]? {
+  if expr is EInt  { return [new TInt(), s] }
+  if expr is EBool { return [new TBool(), s] }
+
+  if expr is EVar {
+    val v: EVar = expr as EVar
+    val ty: Object? = env.get(v.name())
+    if ty == null { return null }
+    return [(ty as Ty).applySubst(s), s]
+  }
+
+  if expr is EAdd {
+    val a: EAdd = expr as EAdd
+    val lr: List[Object]? = infer(a.left(), env, s)
+    if lr == null { return null }
+    val lTy: Ty = lr[0] as Ty
+    val s1: Map[String, Object] = lr[1] as Map[String, Object]
+    val s2: Map[String, Object]? = unify(lTy, new TInt(), s1)
+    if s2 == null { return null }
+    val rr: List[Object]? = infer(a.right(), env, s2 as Map[String, Object])
+    if rr == null { return null }
+    val rTy: Ty = rr[0] as Ty
+    val s3: Map[String, Object] = rr[1] as Map[String, Object]
+    val s4: Map[String, Object]? = unify(rTy, new TInt(), s3)
+    if s4 == null { return null }
+    return [new TInt(), s4]
+  }
+
+  if expr is EEq {
+    val e: EEq = expr as EEq
+    val lr: List[Object]? = infer(e.left(), env, s)
+    if lr == null { return null }
+    val lTy: Ty = lr[0] as Ty
+    val s1: Map[String, Object] = lr[1] as Map[String, Object]
+    val rr: List[Object]? = infer(e.right(), env, s1)
+    if rr == null { return null }
+    val rTy: Ty = rr[0] as Ty
+    val s2: Map[String, Object] = rr[1] as Map[String, Object]
+    val s3: Map[String, Object]? = unify(lTy, rTy, s2)
+    if s3 == null { return null }
+    return [new TBool(), s3]
+  }
+
+  if expr is ELam {
+    val lam: ELam = expr as ELam
+    val paramTy: Ty = freshTy()
+    val newEnv: Map[String, Object] = [:]
+    foreach (k, v) in env { newEnv.put(k as String, v) }
+    newEnv.put(lam.param(), paramTy)
+    val br: List[Object]? = infer(lam.body(), newEnv, s)
+    if br == null { return null }
+    val bodyTy: Ty = br[0] as Ty
+    val s1: Map[String, Object] = br[1] as Map[String, Object]
+    val result: Ty = new TFun(paramTy.applySubst(s1), bodyTy)
+    return [result, s1]
+  }
+
+  if expr is EApp {
+    val app: EApp = expr as EApp
+    val fr: List[Object]? = infer(app.fun(), env, s)
+    if fr == null { return null }
+    val funTy: Ty = fr[0] as Ty
+    val s1: Map[String, Object] = fr[1] as Map[String, Object]
+    val ar: List[Object]? = infer(app.arg(), env, s1)
+    if ar == null { return null }
+    val argTy: Ty = ar[0] as Ty
+    val s2: Map[String, Object] = ar[1] as Map[String, Object]
+    val retTy: Ty = freshTy()
+    val s3: Map[String, Object]? = unify(funTy, new TFun(argTy, retTy), s2)
+    if s3 == null { return null }
+    return [retTy.applySubst(s3 as Map[String, Object]), s3]
+  }
+
+  if expr is EIf {
+    val i: EIf = expr as EIf
+    val cr: List[Object]? = infer(i.cond(), env, s)
+    if cr == null { return null }
+    val condTy: Ty = cr[0] as Ty
+    val s1: Map[String, Object] = cr[1] as Map[String, Object]
+    val s2: Map[String, Object]? = unify(condTy, new TBool(), s1)
+    if s2 == null { return null }
+    val tr: List[Object]? = infer(i.thn(), env, s2 as Map[String, Object])
+    if tr == null { return null }
+    val thenTy: Ty = tr[0] as Ty
+    val s3: Map[String, Object] = tr[1] as Map[String, Object]
+    val er: List[Object]? = infer(i.els(), env, s3)
+    if er == null { return null }
+    val elsTy: Ty = er[0] as Ty
+    val s4: Map[String, Object] = er[1] as Map[String, Object]
+    val s5: Map[String, Object]? = unify(thenTy, elsTy, s4)
+    if s5 == null { return null }
+    return [thenTy.applySubst(s5 as Map[String, Object]), s5]
+  }
+
+  if expr is ELet {
+    val l: ELet = expr as ELet
+    val vr: List[Object]? = infer(l.value(), env, s)
+    if vr == null { return null }
+    val valTy: Ty = vr[0] as Ty
+    val s1: Map[String, Object] = vr[1] as Map[String, Object]
+    val newEnv: Map[String, Object] = [:]
+    foreach (k, v) in env { newEnv.put(k as String, v) }
+    newEnv.put(l.name(), valTy)
+    return infer(l.body(), newEnv, s1)
+  }
+
+  return null  // unreachable for well-formed Expr
+}
+
+def tryInfer(label: String, expr: Expr): void {
+  freshCounter = 0
+  val env: Map[String, Object] = [:]
+  val result: List[Object]? = infer(expr, env, emptySubst())
+  if result == null {
+    IO::println("#{label.ljust(40)} -> TYPE ERROR")
+  } else {
+    val ty: Ty = result[0] as Ty
+    IO::println("#{label.ljust(40)} :: #{ty.show()}")
+  }
+}
+
+def tryInferWithEnv(label: String, expr: Expr, env: Map[String, Object]): void {
+  freshCounter = 0
+  val result: List[Object]? = infer(expr, env, emptySubst())
+  if result == null {
+    IO::println("#{label.ljust(40)} -> TYPE ERROR")
+  } else {
+    val ty: Ty = result[0] as Ty
+    IO::println("#{label.ljust(40)} :: #{ty.show()}")
+  }
+}
+
+// ── Demo ───────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Hindley-Milner Type Inference Demo ===")
+  IO::println("")
+
+  // Literals
+  tryInfer("42",              new EInt(42))
+  tryInfer("true",            new EBool(true))
+  tryInfer("1 + 2",          new EAdd(new EInt(1), new EInt(2)))
+  tryInfer("1 == 2",         new EEq(new EInt(1), new EInt(2)))
+
+  // Lambda: λx.x  (identity)
+  tryInfer("λx.x",           new ELam("x", new EVar("x")))
+  // λx.(x + 1)  :: Int -> Int
+  tryInfer("λx.(x + 1)",    new ELam("x", new EAdd(new EVar("x"), new EInt(1))))
+  // λx.λy.(x + y)  :: Int -> Int -> Int
+  tryInfer("λx.λy.(x+y)",
+    new ELam("x", new ELam("y", new EAdd(new EVar("x"), new EVar("y")))))
+  // λf.λx.(f x)  :: (α0 -> α1) -> α0 -> α1
+  tryInfer("λf.λx.(f x)",
+    new ELam("f", new ELam("x", new EApp(new EVar("f"), new EVar("x")))))
+
+  // let id = λx.x in (id 5)  :: Int
+  tryInfer("let id=λx.x in (id 5)",
+    new ELet("id",
+      new ELam("x", new EVar("x")),
+      new EApp(new EVar("id"), new EInt(5))))
+
+  // let add1 = λx.(x+1) in (add1 (add1 3))  :: Int
+  tryInfer("let add1=λx.(x+1) in add1(add1(3))",
+    new ELet("add1",
+      new ELam("x", new EAdd(new EVar("x"), new EInt(1))),
+      new EApp(new EVar("add1"), new EApp(new EVar("add1"), new EInt(3)))))
+
+  // if true then 1 else 2  :: Int
+  tryInfer("if true then 1 else 2",
+    new EIf(new EBool(true), new EInt(1), new EInt(2)))
+
+  // if true then 1 else true  -> TYPE ERROR (branch mismatch)
+  tryInfer("if true then 1 else true [ERR]",
+    new EIf(new EBool(true), new EInt(1), new EBool(true)))
+
+  // λb.(if b then 0 else 1)  :: Bool -> Int
+  tryInfer("λb.(if b then 0 else 1)",
+    new ELam("b", new EIf(new EVar("b"), new EInt(0), new EInt(1))))
+
+  // With a preloaded environment: x :: Int
+  val env: Map[String, Object] = [:]
+  env.put("x", new TInt())
+  env.put("flag", new TBool())
+  tryInferWithEnv("x + 1  [env: x:Int]",
+    new EAdd(new EVar("x"), new EInt(1)), env)
+  tryInferWithEnv("if flag then x else 0  [env]",
+    new EIf(new EVar("flag"), new EVar("x"), new EInt(0)), env)
+
+  // Church numeral: λf.λx.(f x)  :: (α -> β) -> α -> β
+  tryInfer("λf.λx.(f x)",
+    new ELam("f", new ELam("x", new EApp(new EVar("f"), new EVar("x")))))
+
+  // Compose: λf.λg.λx.(f (g x))  :: (β->γ) -> (α->β) -> α -> γ
+  tryInfer("λf.λg.λx.(f(g x))",
+    new ELam("f", new ELam("g", new ELam("x",
+      new EApp(new EVar("f"), new EApp(new EVar("g"), new EVar("x")))))))
+
+  IO::println("")
+  IO::println("=== Summary ===")
+
+  // Count type errors (demonstrate collection pipelines)
+  val tests: List[Object] = [
+    [new EInt(0), "EInt"],
+    [new EBool(false), "EBool"],
+    [new EAdd(new EInt(1), new EBool(false)), "1+false"],
+    [new ELam("x", new EVar("x")), "id"],
+    [new EApp(new ELam("x", new EAdd(new EVar("x"), new EInt(1))), new EInt(5)), "app"]
+  ]
+  var pass: Int = 0
+  var fail: Int = 0
+  foreach item: Object in tests {
+    val pair: List[Object] = item as List[Object]
+    val e: Expr = pair[0] as Expr
+    freshCounter = 0
+    val r: List[Object]? = infer(e, emptySubst(), emptySubst())
+    if r != null { pass++ } else { fail++ }
+  }
+  IO::println("Tests: #{pass} inferred, #{fail} rejected (type errors)")
+}

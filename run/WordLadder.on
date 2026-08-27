@@ -1,0 +1,223 @@
+// WordLadder.on — Find shortest word-ladder path between two 4-letter words.
+// Each step changes exactly one letter; every intermediate word must be valid.
+// Demonstrates: records, nullable types, BFS with List/Map, collection pipelines,
+// while loops, foreach (List and Map), string manipulation, closures, pattern matching.
+
+import {
+  java.util.*
+}
+
+// ---- dictionary -----------------------------------------------------------
+
+def makeDict(): List[String] = [
+  "cold", "cord", "core", "bore", "bare", "hare", "hire", "fire", "fare", "care",
+  "card", "ward", "warm", "worm", "word", "wore", "more", "mare", "dare", "date",
+  "late", "fate", "gate", "mate", "mite", "bite", "site", "sire", "tire", "time",
+  "lime", "line", "fine", "mine", "wine", "vine", "vane", "cane", "lane", "lame",
+  "came", "game", "fame", "face", "lace", "race", "pace", "page", "cage", "cave",
+  "gave", "have", "hive", "live", "love", "cove", "code", "mode", "mole", "role",
+  "pole", "pile", "bile", "bike", "like", "life", "wife", "wide", "ride", "hide",
+  "head", "bead", "lead", "load", "road", "toad", "told", "gold", "bold", "bolt",
+  "melt", "felt", "belt", "bell", "ball", "tall", "tale", "pale", "male", "sale",
+  "sole", "hole", "home", "come", "some", "same", "sane", "sand", "band", "bond",
+  "fond", "find", "kind", "bind", "mind", "mild", "wild", "will", "fill", "film",
+  "firm", "hill", "mill", "milk", "silk", "sill", "bill", "bull", "full", "pull",
+  "poll", "pool", "fool", "cool", "coal", "coat", "cost", "lost", "last", "fast",
+  "past", "post", "most", "mast", "cast", "case", "base", "vase", "vast", "mask",
+  "task", "tack", "rack", "rock", "lock", "look", "book", "boot", "soot", "soon",
+  "moon", "moan", "loan", "lean", "mean", "bean", "beat", "heat", "heal", "deal",
+  "seal", "real", "reel", "feel", "feed", "seed", "weed", "need", "deed", "seem",
+  "seam", "team", "trim", "trip", "drop", "crop", "shop", "ship", "skip", "slip",
+  "clip", "chip", "chin", "chat", "flat", "flag", "slug", "plug", "plum", "blue",
+  "glue", "clue", "true", "tree", "free", "flee", "flea", "plea", "pear", "bear",
+  "beam", "ream", "read", "dead", "leap", "heap", "reap", "warp", "bars", "cars",
+  "star", "stir", "spar", "span", "plan", "clan", "clam", "slam", "slap", "snap",
+  "nap", "map", "cap", "cup", "cut", "but", "bun", "run", "rut", "gut", "gun",
+  "sun", "sum", "gum", "gym", "aim", "dim", "din", "bin", "bit", "sit", "set",
+  "net", "met", "men", "hen", "den", "ten", "tan", "tin", "win", "sin", "fin"
+]
+
+// ---- data types -----------------------------------------------------------
+
+record Step(word: String, prev: Step?)
+
+record Puzzle(from: String, to: String)
+
+// ---- helpers --------------------------------------------------------------
+
+def oneLetterApart(a: String, b: String): Boolean {
+  if a.length() != b.length() { return false }
+  var diffs: Int = 0
+  var i: Int = 0
+  while i < a.length() {
+    if a.charAt(i) != b.charAt(i) { diffs = diffs + 1 }
+    if diffs > 1 { return false }
+    i = i + 1
+  }
+  return diffs == 1
+}
+
+def reconstructPath(step: Step): List[String] {
+  var path: List[String] = []
+  var cur: Step? = step
+  while cur != null {
+    path.add(0, cur.word())
+    cur = cur.prev()
+  }
+  return path
+}
+
+// ---- BFS ------------------------------------------------------------------
+
+def findPath(start: String, goal: String, dict: List[String]): List[String] {
+  if start == goal { return [start] }
+
+  val visited: Map[String, Boolean] = [start: true]
+  var frontier: List[Step] = [new Step(start, null)]
+
+  while frontier.size > 0 {
+    val nextFrontier: List[Step] = []
+    foreach step: Step in frontier {
+      foreach candidate: String in dict {
+        if !visited.containsKey(candidate) && oneLetterApart(step.word(), candidate) {
+          visited.put(candidate, true)
+          val ns: Step = new Step(candidate, step)
+          if candidate == goal {
+            return reconstructPath(ns)
+          }
+          nextFrontier.add(ns)
+        }
+      }
+    }
+    frontier = nextFrontier
+  }
+  return []  // no path found
+}
+
+// ---- formatting -----------------------------------------------------------
+
+def formatPath(path: List[String]): String {
+  if path.size == 0 { return "(no path)" }
+  var sb: String = ""
+  var i: Int = 0
+  while i < path.size {
+    if i > 0 { sb = sb + " -> " }
+    sb = sb + (path[i] as String)
+    i = i + 1
+  }
+  return sb
+}
+
+def bar(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "#"; i = i + 1 }
+  return s
+}
+
+// ---- analytics ------------------------------------------------------------
+
+def neighborsOf(word: String, dict: List[String]): List[String] =
+  dict.filter { w -> oneLetterApart(word, w) }
+
+def printNeighborStats(words: List[String], dict: List[String]): void {
+  IO::println("Neighbor counts (higher = more connected):")
+  val sorted: List[String] = words.sortedBy { w -> -neighborsOf(w, dict).size }
+  foreach w: String in sorted {
+    val n: Int = neighborsOf(w, dict).size
+    IO::println("  " + w + " [" + n + "] " + bar(n))
+  }
+}
+
+def dedup(words: List[String]): List[String] {
+  val seen: Map[String, Boolean] = [:]
+  val result: List[String] = []
+  foreach w: String in words {
+    if !seen.containsKey(w) {
+      seen.put(w, true)
+      result.add(w)
+    }
+  }
+  return result
+}
+
+// ---- main -----------------------------------------------------------------
+
+def main(): void {
+  val dict: List[String] = dedup(makeDict())
+
+  IO::println("=== Word Ladder ===")
+  IO::println("Dictionary: " + dict.size + " unique words")
+  IO::println("")
+
+  // Length breakdown
+  val fourLetter: List[String] = dict.filter { w -> w.length() == 4 }
+  val threeLetter: List[String] = dict.filter { w -> w.length() == 3 }
+  IO::println("4-letter words: " + fourLetter.size)
+  IO::println("3-letter words: " + threeLetter.size)
+  IO::println("")
+
+  // ---- ladder puzzles ----
+  val puzzles: List[Puzzle] = [
+    new Puzzle("cold", "warm"),
+    new Puzzle("head", "heal"),
+    new Puzzle("fire", "wine"),
+    new Puzzle("love", "cove"),
+    new Puzzle("life", "wife"),
+    new Puzzle("lead", "gold"),
+    new Puzzle("slow", "fast"),
+    new Puzzle("dark", "bark")
+  ]
+
+  IO::println("=== Ladder Puzzles ===")
+  var solved: Int = 0
+  var unsolved: Int = 0
+  var totalSteps: Int = 0
+
+  foreach puzzle: Puzzle in puzzles {
+    val path: List[String] = findPath(puzzle.from(), puzzle.to(), dict)
+    if path.size > 0 {
+      val steps: Int = path.size - 1
+      totalSteps = totalSteps + steps
+      solved = solved + 1
+      IO::println(puzzle.from() + " → " + puzzle.to() + " (" + steps + " steps): " + formatPath(path))
+    } else {
+      unsolved = unsolved + 1
+      IO::println(puzzle.from() + " → " + puzzle.to() + ": no path found")
+    }
+  }
+
+  IO::println("")
+  IO::println("Results: " + solved + " solved, " + unsolved + " unsolved")
+  if solved > 0 {
+    IO::println("Average steps: " + (totalSteps / solved))
+  }
+
+  // ---- step distribution of paths ----
+  IO::println("")
+  IO::println("=== Path length distribution ===")
+  val buckets: Map[String, Int] = [:]
+  foreach puzzle: Puzzle in puzzles {
+    val path: List[String] = findPath(puzzle.from(), puzzle.to(), dict)
+    if path.size > 0 {
+      val key: String = "" + (path.size - 1) + " steps"
+      if buckets.containsKey(key) {
+        buckets.put(key, (buckets.get(key) as Int) + 1)
+      } else {
+        buckets.put(key, 1)
+      }
+    }
+  }
+  foreach (k, v) in buckets {
+    IO::println("  " + k + ": " + bar(v as Int) + " (" + v + ")")
+  }
+
+  // ---- neighbor stats for a sample set ----
+  IO::println("")
+  IO::println("=== Connectivity of sample words (4-letter) ===")
+  val sample: List[String] = ["cold", "word", "fire", "love", "life", "lead", "bare", "rock"]
+  printNeighborStats(sample, dict)
+
+  IO::println("")
+  IO::println("Done.")
+}

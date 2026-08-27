@@ -15,6 +15,7 @@ import java.net.MalformedURLException
 import onion.compiler._
 import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.exceptions.ScriptException
+import onion.compiler.toolbox.Message
 
 class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   private val encoding = Option(System.getenv("ONION_ENCODING"))
@@ -51,7 +52,10 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
         val main = findFirstMainMethod(loader, classes)
         main match {
           case Some(method) => Shell.Success(method.invoke(null, args))
-          case None => Shell.Failure(-1)
+          case None =>
+            val classNames = classes.map(_.className).mkString(", ")
+            System.err.println(Message("error.command.noEntryPoint", classNames))
+            Shell.Failure(-1)
         }
       } catch {
         case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => Shell.Failure(-1)

@@ -379,6 +379,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.staticCallOnInstance",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.CLASS_USED_AS_VALUE -> ErrorDef(
+      "error.semantic.classUsedAsValue",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.ABSTRACT_METHOD_WITH_BODY -> ErrorDef(
       "error.semantic.abstractMethodWithBody",
       Seq(items => asString(items(0)))
@@ -513,11 +517,14 @@ class SemanticErrorReporter(threshold: Int) {
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
-      } else if (fieldNamed(targetType, name)) {
+      } else if (fieldNamed(targetType, name) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A
         // name-similarity hint would uselessly suggest the same spelling, so
-        // point at the parentheses instead.
+        // point at the parentheses instead. `arr.length()`/`arr.size()` hits
+        // the same mix-up, but arrays carry no real `length` field entry for
+        // fieldNamed to match (their length is resolved specially, not as a
+        // TypedAST field), so it needs its own check.
         Some(format(message("suggestion.fieldNotMethod"), Seq(name)))
       } else {
         val candidates = targetType match
@@ -533,6 +540,9 @@ class SemanticErrorReporter(threshold: Int) {
     targetType match
       case obj: TypedAST.ObjectType => obj.fields.exists(_.name == name)
       case _ => false
+
+  private def isArrayLengthProperty(targetType: TypedAST.Type, name: String): Boolean =
+    targetType.isArrayType && (name == "length" || name == "size")
 
   private def reportFieldNotFound(position: Location, items: Array[AnyRef]): Unit = {
     val targetType = items(0).asInstanceOf[TypedAST.Type]

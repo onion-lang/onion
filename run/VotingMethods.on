@@ -1,0 +1,436 @@
+// VotingMethods.on — Compares four voting algorithms (FPTP, Borda Count,
+// Approval, Condorcet) on the same set of ranked ballots, demonstrating
+// the "voting paradox": different methods can elect different winners.
+//
+// Exercises: records, ADT enum for vote events, class with typed generics,
+// Map[String,Int] tallies, List[List[Int]] for ballot rankings, groupBy,
+// filter/map/fold/sortedBy, foreach (k,v) in map, select pattern matching,
+// string interpolation, try/catch, extension String/Int methods.
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Candidate(id: Int, name: String, party: String)
+
+// A ballot holds each voter's full ranking of candidate IDs (most preferred first)
+record Ballot(voterId: String, rankings: List[Int])
+
+// Summary of one method's result
+record ElectionResult(method: String, winner: String, scores: Map[String, Int])
+
+// ─── ADT: vote events ─────────────────────────────────────────────────────────
+
+enum VoteEvent {
+  case VotesCast(count: Int, method: String)
+  case RoundElimination(candidate: String, round: Int)
+  case TieDetected(candidates: String)
+  case WinnerDeclared(candidate: String, method: String)
+}
+
+// ─── Voting-method enum ───────────────────────────────────────────────────────
+
+enum VotingMethod {
+  FPTP, BORDA, APPROVAL, CONDORCET
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "…"
+  }
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def padLeft(n: Int): String {
+    var s = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Election class ───────────────────────────────────────────────────────────
+
+class Election {
+  val candidates: List[Candidate]
+  val ballots: List[Ballot]
+  val log: List[VoteEvent]
+
+public:
+  def this(candidates: List[Candidate], ballots: List[Ballot]) {
+    this.candidates = candidates
+    this.ballots = ballots
+    this.log = []
+  }
+
+  def candidateById(id: Int): Candidate {
+    val found = candidates.find { c -> c.id() == id }
+    return found as Candidate
+  }
+
+  def candidateName(id: Int): String = candidateById(id).name()
+
+  // ── First-Past-The-Post: highest first-place vote count wins ──────────────
+
+  def fptp(): ElectionResult {
+    val tally: Map[String, Int] = [:]
+    foreach c: Object in candidates {
+      tally[(c as Candidate).name()] = 0
+    }
+    foreach b: Object in ballots {
+      val ballot = b as Ballot
+      if ballot.rankings().size > 0 {
+        val first = ballot.rankings()[0] as Int
+        val name = candidateName(first)
+        tally[name] = (tally[name] as Int) + 1
+      }
+    }
+    log.add(new VotesCast(ballots.size, "FPTP"))
+    val winner = maxByScore(tally)
+    log.add(new WinnerDeclared(winner, "FPTP"))
+    return new ElectionResult("First-Past-The-Post", winner, tally)
+  }
+
+  // ── Borda Count: rank n candidates, assign n-1 points to 1st, … 0 to last ─
+
+  def borda(): ElectionResult {
+    val n = candidates.size
+    val tally: Map[String, Int] = [:]
+    foreach c: Object in candidates {
+      tally[(c as Candidate).name()] = 0
+    }
+    foreach b: Object in ballots {
+      val ballot = b as Ballot
+      val rankings = ballot.rankings()
+      var pos = 0
+      while pos < rankings.size {
+        val cid = rankings[pos] as Int
+        val points = n - 1 - pos
+        val name = candidateName(cid)
+        tally[name] = (tally[name] as Int) + points
+        pos = pos + 1
+      }
+    }
+    log.add(new VotesCast(ballots.size, "Borda"))
+    val winner = maxByScore(tally)
+    log.add(new WinnerDeclared(winner, "Borda"))
+    return new ElectionResult("Borda Count", winner, tally)
+  }
+
+  // ── Approval Voting: approve top-2 choices from each ballot ───────────────
+
+  def approval(): ElectionResult {
+    val tally: Map[String, Int] = [:]
+    foreach c: Object in candidates {
+      tally[(c as Candidate).name()] = 0
+    }
+    foreach b: Object in ballots {
+      val ballot = b as Ballot
+      val rankings = ballot.rankings()
+      val approveCount = if rankings.size >= 2 { 2 } else { rankings.size }
+      var i = 0
+      while i < approveCount {
+        val cid = rankings[i] as Int
+        val name = candidateName(cid)
+        tally[name] = (tally[name] as Int) + 1
+        i = i + 1
+      }
+    }
+    log.add(new VotesCast(ballots.size, "Approval"))
+    val winner = maxByScore(tally)
+    log.add(new WinnerDeclared(winner, "Approval"))
+    return new ElectionResult("Approval Voting", winner, tally)
+  }
+
+  // ── Condorcet: pairwise head-to-head; winner beats everyone else ──────────
+
+  def condorcet(): ElectionResult {
+    // wins[A][B] = number of ballots that rank A over B
+    val wins: Map[String, Int] = [:]
+    foreach a: Object in candidates {
+      foreach b2: Object in candidates {
+        val ca = (a as Candidate).name()
+        val cb = (b2 as Candidate).name()
+        if ca != cb {
+          wins[ca + "|" + cb] = 0
+        }
+      }
+    }
+    foreach ballot: Object in ballots {
+      val bl = ballot as Ballot
+      val rankings = bl.rankings()
+      var i = 0
+      while i < rankings.size {
+        var j = i + 1
+        while j < rankings.size {
+          val higher = candidateName(rankings[i] as Int)
+          val lower  = candidateName(rankings[j] as Int)
+          wins[higher + "|" + lower] = (wins[higher + "|" + lower] as Int) + 1
+          j = j + 1
+        }
+        i = i + 1
+      }
+    }
+    // Build win-count per candidate (how many opponents they beat pairwise)
+    val beatCount: Map[String, Int] = [:]
+    foreach c: Object in candidates {
+      beatCount[(c as Candidate).name()] = 0
+    }
+    foreach a: Object in candidates {
+      foreach b2: Object in candidates {
+        val ca = (a as Candidate).name()
+        val cb = (b2 as Candidate).name()
+        if ca != cb {
+          val aBeatsB = wins[ca + "|" + cb] as Int
+          val bBeatsA = wins[cb + "|" + ca] as Int
+          if aBeatsB > bBeatsA {
+            beatCount[ca] = (beatCount[ca] as Int) + 1
+          }
+        }
+      }
+    }
+    log.add(new VotesCast(ballots.size, "Condorcet"))
+    val numCandidates = candidates.size
+    val winner = maxByScore(beatCount)
+    val winnerBeats = beatCount[winner] as Int
+    if winnerBeats < numCandidates - 1 {
+      log.add(new TieDetected(winner + " (no Condorcet winner)"))
+      return new ElectionResult("Condorcet", winner + " (no Condorcet winner)", beatCount)
+    }
+    log.add(new WinnerDeclared(winner, "Condorcet"))
+    return new ElectionResult("Condorcet Method", winner, beatCount)
+  }
+
+  // ── Instant Runoff Voting: eliminate last-place each round ────────────────
+
+  def irv(): ElectionResult {
+    // Work with a mutable list of active candidate IDs
+    val active: List[Int] = []
+    foreach c: Object in candidates {
+      active.add((c as Candidate).id())
+    }
+    val finalScores: Map[String, Int] = [:]
+    var round = 1
+    while active.size > 1 {
+      val tally: Map[String, Int] = [:]
+      foreach cid: Object in active {
+        tally[candidateName(cid as Int)] = 0
+      }
+      foreach b: Object in ballots {
+        val ballot = b as Ballot
+        val rankings = ballot.rankings()
+        var found = false
+        var k = 0
+        while k < rankings.size && !found {
+          val cid = rankings[k] as Int
+          if active.find { a -> (a as Int) == cid } != null {
+            val nm = candidateName(cid)
+            tally[nm] = (tally[nm] as Int) + 1
+            found = true
+          }
+          k = k + 1
+        }
+      }
+      // Find the candidate with fewest votes
+      var loserName = ""
+      var lowestVotes = ballots.size + 1
+      foreach (k2, v2) in tally {
+        val score = v2 as Int
+        if score < lowestVotes {
+          lowestVotes = score
+          loserName = k2 as String
+        }
+      }
+      // Remove loser from active (rebuild list without them)
+      val loserCand = candidates.find { c -> (c as Candidate).name() == loserName }
+      if loserCand != null {
+        val lId = (loserCand as Candidate).id()
+        val keep = active.filter { a -> (a as Int) != lId }
+        active.clear()
+        foreach ka: Object in keep { active.add(ka as Int) }
+      }
+      log.add(new RoundElimination(loserName, round))
+      // Record scores for final report
+      foreach (k3, v3) in tally {
+        finalScores[k3 as String] = v3 as Int
+      }
+      round = round + 1
+    }
+    val winner = if active.size > 0 { candidateName(active[0] as Int) } else { "none" }
+    log.add(new WinnerDeclared(winner, "IRV"))
+    return new ElectionResult("Instant Runoff Voting", winner, finalScores)
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  def maxByScore(tally: Map[String, Int]): String {
+    var bestName = ""
+    var bestScore = -1
+    foreach (k, v) in tally {
+      val score = v as Int
+      if score > bestScore {
+        bestScore = score
+        bestName = k as String
+      }
+    }
+    return bestName
+  }
+
+  def getLog(): List[VoteEvent] = log
+}
+
+// ─── Event description ─────────────────────────────────────────────────────────
+
+def describeEvent(ev: VoteEvent): String {
+  select ev {
+    case vc is VotesCast:
+      return "[#{vc.method()}] #{vc.count()} ballots processed"
+    case re is RoundElimination:
+      return "[IRV Round #{re.round()}] Eliminated: #{re.candidate()}"
+    case td is TieDetected:
+      return "[WARNING] #{td.candidates()}"
+    case wd is WinnerDeclared:
+      return "[#{wd.method()}] Winner: #{wd.candidate()}"
+  }
+}
+
+// ─── Sample election setup ─────────────────────────────────────────────────────
+
+val candidates: List[Candidate] = [
+  new Candidate(1, "Alice", "Progressive"),
+  new Candidate(2, "Bob",   "Conservative"),
+  new Candidate(3, "Carol", "Centrist"),
+  new Candidate(4, "Dave",  "Green")
+]
+
+// 100 voters with different preference profiles
+// Profile A (35 voters): Alice > Carol > Bob > Dave
+val profileA: List[Int] = [1, 3, 2, 4]
+// Profile B (30 voters): Bob > Dave > Carol > Alice
+val profileB: List[Int] = [2, 4, 3, 1]
+// Profile C (25 voters): Carol > Alice > Dave > Bob
+val profileC: List[Int] = [3, 1, 4, 2]
+// Profile D (10 voters): Dave > Carol > Alice > Bob
+val profileD: List[Int] = [4, 3, 1, 2]
+
+val ballots: List[Ballot] = []
+var vid = 1
+foreach i: Int in 1..35 {
+  ballots.add(new Ballot("V#{vid}", profileA))
+  vid = vid + 1
+}
+foreach i: Int in 1..30 {
+  ballots.add(new Ballot("V#{vid}", profileB))
+  vid = vid + 1
+}
+foreach i: Int in 1..25 {
+  ballots.add(new Ballot("V#{vid}", profileC))
+  vid = vid + 1
+}
+foreach i: Int in 1..10 {
+  ballots.add(new Ballot("V#{vid}", profileD))
+  vid = vid + 1
+}
+
+val election = new Election(candidates, ballots)
+
+// ─── Run all four methods ───────────────────────────────────────────────────────
+
+val r1 = election.fptp()
+val r2 = election.borda()
+val r3 = election.approval()
+val r4 = election.condorcet()
+val r5 = election.irv()
+
+// ─── Print results ─────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════════╗")
+IO::println("║        VOTING METHODS COMPARISON — 100 voters        ║")
+IO::println("╚══════════════════════════════════════════════════════╝")
+
+IO::println("")
+IO::println("Ballot profiles:")
+IO::println("  35 voters: Alice > Carol > Bob > Dave")
+IO::println("  30 voters: Bob > Dave > Carol > Alice")
+IO::println("  25 voters: Carol > Alice > Dave > Bob")
+IO::println("  10 voters: Dave > Carol > Alice > Bob")
+
+IO::println("")
+IO::println("═══ Results by method ═══")
+
+val results: List[ElectionResult] = [r1, r2, r3, r4, r5]
+foreach item: Object in results {
+  val r = item as ElectionResult
+  IO::println("")
+  IO::println("▸ " + r.method())
+  IO::println("  Winner: " + r.winner())
+  IO::println("  Scores:")
+  val sortedNames = candidates.map { c -> c.name() }
+  foreach nm: Object in sortedNames {
+    val name = nm as String
+    val score = if r.scores()[name] != null { r.scores()[name] as Int } else { 0 }
+    IO::println("    " + name.padRight(10) + score.padLeft(4))
+  }
+}
+
+IO::println("")
+IO::println("═══ Winner comparison ═══")
+val methodNames: List[String] = [r1.method(), r2.method(), r3.method(), r4.method(), r5.method()]
+val winnerNames: List[String] = [r1.winner(), r2.winner(), r3.winner(), r4.winner(), r5.winner()]
+var mi = 0
+while mi < methodNames.size {
+  val mname = methodNames[mi] as String
+  val wname = winnerNames[mi] as String
+  IO::println("  " + mname.padRight(26) + "→ " + wname)
+  mi = mi + 1
+}
+
+IO::println("")
+IO::println("═══ Head-to-head pairings (from ballot data) ═══")
+// Compute pairwise wins for each pair
+foreach a: Object in candidates {
+  foreach b2: Object in candidates {
+    val ca = (a as Candidate)
+    val cb = (b2 as Candidate)
+    if ca.id() < cb.id() {
+      var aWins = 0
+      var bWins = 0
+      foreach bl: Object in ballots {
+        val ballot = bl as Ballot
+        val rankings = ballot.rankings()
+        val posA = rankings.find { r -> (r as Int) == ca.id() }
+        val posB = rankings.find { r -> (r as Int) == cb.id() }
+        if posA != null && posB != null {
+          val iA = rankings.indexOf(posA)
+          val iB = rankings.indexOf(posB)
+          if iA < iB { aWins = aWins + 1 } else { bWins = bWins + 1 }
+        }
+      }
+      IO::println("  #{ca.name()} vs #{cb.name()}: #{aWins}–#{bWins}")
+    }
+  }
+}
+
+IO::println("")
+IO::println("═══ Election audit log ═══")
+foreach ev: Object in election.getLog() {
+  IO::println("  " + describeEvent(ev as VoteEvent))
+}
+
+IO::println("")
+IO::println("Total ballots cast: " + ballots.size)
+IO::println("Candidates:         " + candidates.size)
+IO::println("Methods compared:   " + results.size)
+
+// Safety check: ensure no method returned an empty winner
+var allHaveWinner = true
+foreach item: Object in results {
+  val r = item as ElectionResult
+  if r.winner().length() == 0 { allHaveWinner = false }
+}
+IO::println("All methods returned a winner: " + allHaveWinner)

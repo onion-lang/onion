@@ -1,0 +1,454 @@
+// TradeMatchingEngine.on — continuous limit-order-book simulator for a stock exchange
+// Features: ADT enum (OrderType: Market/Limit/StopLoss), plain enums (Side/Status),
+//   records (Trade), mutable class state (Order, OrderBook, MatchingEngine),
+//   interface (TradeObserver), generics (List[T], Map[K,V]), collection pipelines
+//   (filter/map/fold/sortedBy/groupBy/distinct/partition/any/count/take/zip),
+//   select/pattern matching, nullable, closures, string interpolation, try/catch,
+//   foreach with ranges + map (k,v) entry destructuring, extension methods.
+
+// ── Plain enums ───────────────────────────────────────────────────────────────
+
+enum Side { BUY, SELL }
+
+enum Status { PENDING, PARTIAL, FILLED, CANCELLED }
+
+// ── Order-type ADT ────────────────────────────────────────────────────────────
+
+enum OrderType {
+  case Market
+  case Limit(price: Double)
+  case StopLoss(trigger: Double, limitPrice: Double)
+public:
+  def label(): String = select this {
+    case m is Market:   "MKT"
+    case l is Limit:    "LMT@$#{l.price().fmt2()}"
+    case s is StopLoss: "STP[trig=$#{s.trigger().fmt2()}/lmt=$#{s.limitPrice().fmt2()}]"
+  }
+  def limitPriceValue(): Double? = select this {
+    case l is Limit:    l.price()
+    case s is StopLoss: s.limitPrice()
+    else:               null
+  }
+}
+
+// ── Executed trade (immutable record) ─────────────────────────────────────────
+
+record Trade(buyId: Int, sellId: Int, symbol: String, qty: Int, price: Double, seqNo: Int) {
+public:
+  def value(): Double  = qty as Double * price
+  def toStr(): String  =
+    "T##{seqNo}: B##{buyId} vs S##{sellId}  #{symbol} #{qty}sh @ $#{price.fmt2()}"
+}
+
+// ── Observer interface ────────────────────────────────────────────────────────
+
+interface TradeObserver {
+  def onTrade(trade: Trade): void
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String = String::format("%.2f", self)
+}
+
+extension Int {
+  def padLeft(w: Int): String {
+    val s = "" + self
+    if s.length() >= w { return s }
+    return " ".repeat(w - s.length()) + s
+  }
+}
+
+extension String {
+  def rjust(w: Int): String =
+    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+  def ljust(w: Int): String =
+    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+}
+
+// ── Mutable order ─────────────────────────────────────────────────────────────
+
+class Order {
+public:
+  val id:        Int
+  val symbol:    String
+  val side:      Side
+  val qty:       Int
+  val orderType: OrderType
+  var filledQty: Int
+  var status:    Status
+
+  def this(id: Int, sym: String, s: Side, q: Int, ot: OrderType) {
+    this.id        = id
+    this.symbol    = sym
+    this.side      = s
+    this.qty       = q
+    this.orderType = ot
+    this.filledQty = 0
+    this.status    = Status::PENDING
+  }
+
+  def remaining(): Int    = qty - filledQty
+  def isActive(): Boolean = status == Status::PENDING || status == Status::PARTIAL
+
+  def fill(amount: Int): void {
+    filledQty = filledQty + amount
+    status = if filledQty >= qty { Status::FILLED } else { Status::PARTIAL }
+  }
+
+  def limitPrice(): Double? = orderType.limitPriceValue()
+
+  def toStr(): String =
+    "##{id} #{side} #{qty}sh #{orderType.label()} [#{status} filled=#{filledQty}]"
+}
+
+// ── Order book (one symbol) ───────────────────────────────────────────────────
+
+class OrderBook {
+public:
+  val symbol:    String
+  val bids:      List[Order]
+  val asks:      List[Order]
+  val observers: List[TradeObserver]
+
+  def this(sym: String) {
+    this.symbol    = sym
+    this.bids      = []
+    this.asks      = []
+    this.observers = []
+  }
+
+  def addObserver(obs: TradeObserver): void { observers.add(obs) }
+
+  def activeBids(): List[Order] = bids.filter { o -> (o as Order).isActive() } as List[Order]
+  def activeAsks(): List[Order] = asks.filter { o -> (o as Order).isActive() } as List[Order]
+  def openOrderCount(): Int     = activeBids().size + activeAsks().size
+
+  def bestBid(): Double? = highestPrice(activeBids())
+  def bestAsk(): Double? = lowestPrice(activeAsks())
+
+  def spread(): Double? {
+    val b: Double? = bestBid()
+    val a: Double? = bestAsk()
+    return if b == null || a == null { null } else { a - b }
+  }
+
+  def match(order: Order, startSeq: Int): List[Trade] {
+    val trades: List[Trade] = []
+    var seq: Int = startSeq
+    val opposite: List[Order] =
+      if order.side == Side::BUY { activeAsks() } else { activeBids() }
+
+    var cont: Boolean = true
+    while cont {
+      if !order.isActive() { cont = false; continue }
+
+      var best: Order? = null
+      foreach o: Order in opposite {
+        if !o.isActive() { continue }
+        if !canMatch(order, o) { continue }
+        if best == null { best = o }
+        else {
+          val bLp: Double? = (best as Order).limitPrice()
+          val oLp: Double? = o.limitPrice()
+          val prefer: Boolean = if order.side == Side::BUY {
+            oLp != null && (bLp == null || oLp < bLp!!)
+          } else {
+            oLp != null && (bLp == null || oLp > bLp!!)
+          }
+          if prefer { best = o }
+        }
+      }
+
+      if best == null { cont = false }
+      else {
+        val counter: Order = best as Order
+        val execQty: Int =
+          if order.remaining() <= counter.remaining() { order.remaining() } else { counter.remaining() }
+        val price: Double = execPrice(counter, order)
+        order.fill(execQty)
+        counter.fill(execQty)
+        val t: Trade = new Trade(
+          if order.side == Side::BUY { order.id } else { counter.id },
+          if order.side == Side::BUY { counter.id } else { order.id },
+          symbol, execQty, price, seq
+        )
+        seq = seq + 1
+        trades.add(t)
+        foreach obs: TradeObserver in observers { obs.onTrade(t) }
+      }
+    }
+    return trades
+  }
+
+  def submit(order: Order, startSeq: Int): List[Trade] {
+    val newTrades: List[Trade] = match(order, startSeq)
+    if order.isActive() {
+      if order.side == Side::BUY { bids.add(order) }
+      else { asks.add(order) }
+    }
+    return newTrades
+  }
+
+  def cancel(orderId: Int): Boolean {
+    var found: Order? = null
+    foreach o: Order in bids {
+      if o.id == orderId && o.isActive() { found = o }
+    }
+    if found == null {
+      foreach o: Order in asks {
+        if o.id == orderId && o.isActive() { found = o }
+      }
+    }
+    if found == null { return false }
+    (found as Order).status = Status::CANCELLED
+    return true
+  }
+
+  def printDepth(maxLevels: Int): void {
+    println("  ─ #{symbol} Market Depth ──────────────────────────")
+    val sortedAsks: List[Order] = activeAsks().sortedBy { o -> (o as Order).limitPrice() ?: 1.0e18 }
+    val sortedBids: List[Order] = activeBids().sortedBy { o -> -((o as Order).limitPrice() ?: 0.0) }
+    printDepthSide(sortedAsks, "ASK", maxLevels)
+    println("  ─────────────────────────────────────────────────────")
+    printDepthSide(sortedBids, "BID", maxLevels)
+  }
+
+private:
+  def highestPrice(orders: List[Order]): Double? {
+    var best: Double? = null
+    foreach o: Order in orders {
+      val p: Double? = o.limitPrice()
+      if p != null && (best == null || p > best!!) { best = p }
+    }
+    return best
+  }
+
+  def lowestPrice(orders: List[Order]): Double? {
+    var best: Double? = null
+    foreach o: Order in orders {
+      val p: Double? = o.limitPrice()
+      if p != null && (best == null || p < best!!) { best = p }
+    }
+    return best
+  }
+
+  def canMatch(incoming: Order, resting: Order): Boolean {
+    val ip: Double? = incoming.limitPrice()
+    val rp: Double? = resting.limitPrice()
+    return if ip == null { true } else if rp == null { true } else if incoming.side == Side::BUY { ip >= rp } else { ip <= rp }
+  }
+
+  def execPrice(resting: Order, incoming: Order): Double {
+    val rp: Double? = resting.limitPrice()
+    val ip: Double? = incoming.limitPrice()
+    return if rp != null { rp!! } else if ip != null { ip!! } else { 0.0 }
+  }
+
+  def printDepthSide(orders: List[Order], side: String, maxLevels: Int): void {
+    val seen: List[Double] = []
+    var count: Int = 0
+    foreach o: Order in orders {
+      if count >= maxLevels { break }
+      val p: Double? = o.limitPrice()
+      if p == null { continue }
+      val price: Double = p!!
+      if seen.contains(price) { continue }
+      seen.add(price)
+      count = count + 1
+      val atPrice: List[Order] = orders.filter { x -> ((x as Order).limitPrice() ?: -1.0) == price } as List[Order]
+      val totalQty: Int = atPrice.fold(0) { acc, x -> acc + (x as Order).remaining() } as Int
+      println("  #{side.rjust(4)} │ $#{price.fmt2().rjust(7)} │ #{totalQty.padLeft(6)} sh  (#{atPrice.size} orders)")
+    }
+  }
+}
+
+// ── Matching engine (multi-symbol) ────────────────────────────────────────────
+
+class MatchingEngine {
+public:
+  val books:     Map[String, OrderBook]
+  val allTrades: List[Trade]
+  var nextId:    Int
+  var tradeSeq:  Int
+
+  def this() {
+    this.books     = [:]
+    this.allTrades = []
+    this.nextId    = 1
+    this.tradeSeq  = 1
+  }
+
+  def book(symbol: String): OrderBook {
+    var b: OrderBook? = books[symbol] as OrderBook?
+    if b == null {
+      val nb: OrderBook = new OrderBook(symbol)
+      books[symbol] = nb
+      b = nb
+    }
+    return b!!
+  }
+
+  def submit(symbol: String, side: Side, qty: Int, ot: OrderType): void {
+    try {
+      if qty <= 0 { throw new Exception("qty must be positive") }
+      val id: Int = nextId
+      nextId = nextId + 1
+      val order: Order = new Order(id, symbol, side, qty, ot)
+      val bk: OrderBook = book(symbol)
+      val newTrades: List[Trade] = bk.submit(order, tradeSeq)
+      tradeSeq = tradeSeq + newTrades.size
+      foreach t: Trade in newTrades { allTrades.add(t) }
+      val statusStr: String = select order.status {
+        case Status::FILLED:    "FILLED"
+        case Status::PARTIAL:   "partial #{order.filledQty}/#{order.qty}sh"
+        case Status::PENDING:   "resting"
+        case Status::CANCELLED: "cancelled"
+      }
+      println("  Order ##{id} #{side} #{qty}sh #{symbol} #{ot.label()} → #{statusStr}")
+    } catch e: Exception {
+      println("  ERROR: " + e.message())
+    }
+  }
+
+  def cancel(symbol: String, orderId: Int): void {
+    val bk: OrderBook? = books[symbol] as OrderBook?
+    if bk == null { println("  No book for #{symbol}"); return }
+    val ok: Boolean = (bk!!).cancel(orderId)
+    println(if ok { "  ✓ Order ##{orderId} cancelled" } else { "  ✗ Cannot cancel ##{orderId}" })
+  }
+
+  def vwap(symbol: String): Double? {
+    val st: List[Trade] = allTrades.filter { t -> (t as Trade).symbol() == symbol } as List[Trade]
+    if st.size == 0 { return null }
+    val totalVal: Double = st.fold(0.0) { acc, t -> acc + (t as Trade).value()  } as Double
+    val totalQty: Int    = st.fold(0)   { acc, t -> acc + (t as Trade).qty()    } as Int
+    return if totalQty == 0 { null } else { totalVal / (totalQty as Double) }
+  }
+
+  def printReport(): void {
+    println("\n══════════════════════════════════════════════════════════")
+    println("  TRADING REPORT")
+    println("══════════════════════════════════════════════════════════")
+    println("  Trades executed : #{allTrades.size}")
+    val notional: Double = allTrades.fold(0.0) { acc, t -> acc + (t as Trade).value() } as Double
+    println("  Total notional  : $#{notional.fmt2()}")
+
+    // Distinct symbols traded
+    val syms: List[String] = allTrades.map { t -> (t as Trade).symbol() }.distinct() as List[String]
+    println("  Symbols traded  : #{syms.size}")
+    println("")
+
+    // Per-symbol breakdown via groupBy
+    val bySymbol: Map[Object, List[Trade]] = allTrades.groupBy { t -> (t as Trade).symbol() }
+    foreach (sym, bucket) in bySymbol {
+      val symStr: String       = sym as String
+      val symTrades: List[Trade] = bucket as List[Trade]
+      val vol: Int        = symTrades.fold(0)   { acc, t -> acc + (t as Trade).qty()   } as Int
+      val notl: Double    = symTrades.fold(0.0) { acc, t -> acc + (t as Trade).value() } as Double
+      val vwapStr: String = { val v: Double? = vwap(symStr); if v == null { "N/A" } else { "$#{v.fmt2()}" } }
+      val bk: OrderBook   = book(symStr)
+      val bidStr: String  = { val b: Double? = bk.bestBid(); if b == null { "—" } else { "$#{b.fmt2()}" } }
+      val askStr: String  = { val a: Double? = bk.bestAsk(); if a == null { "—" } else { "$#{a.fmt2()}" } }
+      val spStr:  String  = { val s: Double? = bk.spread();  if s == null { "—" } else { s.fmt2() } }
+      println("  #{symStr.ljust(6)} vol=#{vol.padLeft(5)}sh notional=$#{notl.fmt2()} " +
+              "vwap=#{vwapStr} bid=#{bidStr} ask=#{askStr} spread=#{spStr}")
+    }
+    println("")
+
+    // Partition: block trades (≥100 sh) vs small
+    val parts = allTrades.partition { t -> (t as Trade).qty() >= 100 }
+    val large: List[Object] = parts[0] as List[Object]
+    val small: List[Object] = parts[1] as List[Object]
+    println("  Block trades (≥100sh): #{large.size}    Small trades (<100sh): #{small.size}")
+
+    // any / count
+    val hasHuge: Boolean = allTrades.any { t -> (t as Trade).qty() >= 200 }
+    val highValCount: Int = allTrades.count { t -> (t as Trade).value() >= 25000.0 }
+    println("  Has trade ≥200sh    : #{hasHuge}")
+    println("  High-value (≥$25k)  : #{highValCount}")
+    println("")
+
+    // Top 3 trades by notional (take)
+    if allTrades.size > 0 {
+      val top3: List[Trade] = allTrades.sortedBy { t -> -((t as Trade).value()) }.take(3) as List[Trade]
+      println("  Top trades by value:")
+      foreach t: Trade in top3 {
+        println("    " + t.toStr() + "  notional=$#{t.value().fmt2()}")
+      }
+      println("")
+    }
+
+    // zip: pair symbol names with VWAP strings
+    val symNames: List[Object] = syms.map { s -> s as String }
+    val vwapStrs: List[Object] = symNames.map { sym ->
+      val s: String = sym as String
+      val v: Double? = vwap(s)
+      if v == null { s + ":N/A" } else { s + ":$" + v.fmt2() }
+    }
+    val zipped = symNames.zip(vwapStrs)
+    println("  Symbol → VWAP:")
+    foreach pair: Object in zipped {
+      val p: List[Object] = pair as List[Object]
+      println("    #{(p[0] as String).ljust(6)} → #{p[1] as String}")
+    }
+    println("")
+
+    println("  ─ Book Snapshots ───────────────────────────────────────")
+    foreach (sym, bk) in books {
+      (bk as OrderBook).printDepth(4)
+      println("")
+    }
+    println("══════════════════════════════════════════════════════════")
+  }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  println("TradeMatchingEngine.on — Continuous Limit Order Book Simulator")
+  println("══════════════════════════════════════════════════════════════\n")
+
+  val engine: MatchingEngine = new MatchingEngine()
+
+  println("── AAPL ─────────────────────────────────────────────────────")
+  engine.submit("AAPL", Side::BUY,  200, new Limit(148.50))
+  engine.submit("AAPL", Side::BUY,  100, new Limit(149.00))
+  engine.submit("AAPL", Side::BUY,   50, new Limit(148.75))
+  engine.submit("AAPL", Side::SELL, 150, new Limit(149.50))
+  engine.submit("AAPL", Side::SELL,  80, new Limit(149.25))
+  engine.submit("AAPL", Side::SELL, 200, new Limit(149.75))
+
+  println("\n[Crossing BUY limit 120sh @ $149.30 — should fill 80sh @ $149.25]")
+  engine.submit("AAPL", Side::BUY, 120, new Limit(149.30))
+
+  println("\n[Market SELL 100sh — fills against best bids]")
+  engine.submit("AAPL", Side::SELL, 100, new Market())
+
+  println("\n[Cancel order #1 (BUY 200sh @ $148.50)]")
+  engine.cancel("AAPL", 1)
+
+  println("\n[Error case: zero-qty order]")
+  engine.submit("AAPL", Side::BUY, 0, new Limit(149.00))
+
+  println("\n── TSLA ─────────────────────────────────────────────────────")
+  engine.submit("TSLA", Side::BUY,  300, new Limit(245.00))
+  engine.submit("TSLA", Side::SELL, 150, new Limit(245.00))  // crosses immediately
+  engine.submit("TSLA", Side::SELL, 200, new Limit(246.00))
+  engine.submit("TSLA", Side::BUY,   80, new StopLoss(243.00, 242.50))
+  engine.submit("TSLA", Side::BUY,  120, new Limit(244.75))
+  engine.submit("TSLA", Side::SELL,  50, new Market())
+
+  println("\n── MSFT ─────────────────────────────────────────────────────")
+  engine.submit("MSFT", Side::SELL, 100, new Limit(420.50))
+  engine.submit("MSFT", Side::BUY,   75, new Limit(420.00))
+  engine.submit("MSFT", Side::BUY,  125, new Market())   // fills 100sh at 420.50
+
+  println("\n── All Executed Trades ──────────────────────────────────────")
+  foreach t: Trade in engine.allTrades {
+    println("  " + t.toStr())
+  }
+
+  engine.printReport()
+}

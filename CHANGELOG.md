@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a call written without parentheses.**
+  Onion always requires parentheses around a call's arguments; a Python
+  2-style `print "x"` or Ruby-style `puts x` habit (a bare name followed
+  directly by another token, with nothing between them) parsed as an
+  identifier-reference statement followed by a stray token, with a generic
+  expected-token dump that never mentioned the missing parentheses. The
+  diagnostic now recognizes a leading `name arg` statement at the exact
+  point a complete statement was expected and points at the correct
+  `name(arg)` form (or, if two separate statements were intended, that they
+  need a newline or `;` between them).
+
 ## [0.21.0] - 2026-08-27
 
 ### Fixed

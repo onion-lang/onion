@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
+  A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
+  plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,
+  `Conflict`, `ScheduleStats`), an observer interface (`CalendarObserver` /
+  `LogObserver`), a mutable `Calendar` class with `public:`/`private:`
+  sections, extension methods on `Int`/`String`, and collection pipelines
+  (`filter`, `map`, `fold`, `sortedBy`, `groupBy`, `partition`, `count`,
+  `distinct`, `any`) driving conflict detection, free-slot finding, and an
+  auto-scheduler.
+
 ### Fixed
 
 - **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has

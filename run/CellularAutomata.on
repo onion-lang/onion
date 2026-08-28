@@ -1,0 +1,363 @@
+// CellularAutomata.on
+// Implements two classic cellular automaton systems:
+//   1. 1D Elementary Cellular Automata  (Wolfram rules 0-255, e.g. Rule 110)
+//   2. Langton's Ant (2D)
+//
+// Exercises: sealed ADT enums; records; classes with HashMap; collection
+// pipelines (map/filter/fold/reduce/distinct/sortedBy/find/partition/zip);
+// select + type-pattern matching; nullable types; closures; string
+// interpolation; try/catch; recursion; foreach over ranges and map (k,v);
+// extension methods on Int and String; while loops.
+
+import {
+  java.util.HashMap;
+  java.util.Collection;
+  java.lang.Integer as JInteger;
+  onion.Colls::zip;
+}
+
+// ─── Extensions ────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def repeat(s: String): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < self { r = r + s; i = i + 1 }
+    return r
+  }
+  def toBinary(width: Int): String {
+    var n: Int = self
+    var bits: String = ""
+    var i: Int = 0
+    while i < width {
+      bits = (if n % 2 == 1 { "1" } else { "0" }) + bits
+      n = n / 2
+      i = i + 1
+    }
+    return bits
+  }
+}
+
+extension String {
+  def padLeft(width: Int, ch: String): String {
+    var s: String = self
+    while s.length() < width { s = ch + s }
+    return s
+  }
+  def padRight(width: Int, ch: String): String {
+    var s: String = self
+    while s.length() < width { s = s + ch }
+    return s
+  }
+}
+
+// ─── Direction (for Langton's Ant) ─────────────────────────────────────────
+
+enum Direction {
+  case North
+  case East
+  case South
+  case West
+public:
+  def turnRight(): Direction = select this {
+    case d is North: new East()
+    case d is East:  new South()
+    case d is South: new West()
+    case d is West:  new North()
+  }
+  def turnLeft(): Direction = select this {
+    case d is North: new West()
+    case d is West:  new South()
+    case d is South: new East()
+    case d is East:  new North()
+  }
+  def dr(): Int = select this {
+    case d is North: -1
+    case d is South:  1
+    case d is East:   0
+    case d is West:   0
+  }
+  def dc(): Int = select this {
+    case d is East:   1
+    case d is West:  -1
+    case d is North:  0
+    case d is South:  0
+  }
+  def symbol(): String = select this {
+    case d is North: "^"
+    case d is East:  ">"
+    case d is South: "v"
+    case d is West:  "<"
+  }
+}
+
+// ─── 1-D Elementary Cellular Automaton ─────────────────────────────────────
+
+class ElemCA {
+  var cells: List[Boolean]
+  val width: Int
+  val rule: Int
+
+public:
+  def this(width: Int, rule: Int) {
+    self.width = width
+    self.rule = rule
+    self.cells = []
+    var i: Int = 0
+    while i < width {
+      cells.add(i == width / 2)
+      i = i + 1
+    }
+  }
+
+  def nextCell(left: Boolean, center: Boolean, right: Boolean): Boolean {
+    val index: Int = (if left { 4 } else { 0 }) + (if center { 2 } else { 0 }) + (if right { 1 } else { 0 })
+    return (rule >> index) % 2 == 1
+  }
+
+  def step(): void {
+    val next: List[Boolean] = []
+    var i: Int = 0
+    while i < width {
+      val left:   Boolean = if i == 0       { false } else { cells.get(i - 1) }
+      val center: Boolean = cells.get(i)
+      val right:  Boolean = if i == width-1 { false } else { cells.get(i + 1) }
+      next.add(nextCell(left, center, right))
+      i = i + 1
+    }
+    self.cells = next
+  }
+
+  def rowString(): String {
+    var s: String = ""
+    foreach b: Boolean in cells {
+      s = s + (if b { "█" } else { " " })
+    }
+    return s
+  }
+
+  def liveCellCount(): Int {
+    var n: Int = 0
+    foreach b: Boolean in cells { if b { n = n + 1 } }
+    return n
+  }
+
+  def run(generations: Int): void {
+    IO::println("Rule #{rule} — #{rule.toBinary(8)}")
+    IO::println("─".repeat(width))
+    var g: Int = 0
+    while g < generations {
+      IO::println(rowString())
+      step()
+      g = g + 1
+    }
+    IO::println("─".repeat(width))
+  }
+}
+
+// ─── Langton's Ant ─────────────────────────────────────────────────────────
+
+class LangtonAnt {
+  var grid: HashMap[String, Boolean]
+  var antRow: Int
+  var antCol: Int
+  var dir: Direction
+  var steps: Int
+
+public:
+  def this() {
+    self.grid    = new HashMap[String, Boolean]()
+    self.antRow  = 0
+    self.antCol  = 0
+    self.dir     = new North()
+    self.steps   = 0
+  }
+
+  def isWhite(row: Int, col: Int): Boolean {
+    val k: String = "#{row},#{col}"
+    val v: Boolean? = grid.get(k)
+    return v == null || v
+  }
+
+  def blackCount(): Int {
+    var n: Int = 0
+    val vals: Collection[Boolean] = grid.values()
+    foreach v: Boolean in vals { if !v { n = n + 1 } }
+    return n
+  }
+
+  def step(): void {
+    val k: String = "#{antRow},#{antCol}"
+    val white: Boolean = isWhite(antRow, antCol)
+    if white {
+      grid.put(k, false)
+      dir = dir.turnRight()
+    } else {
+      grid.put(k, true)
+      dir = dir.turnLeft()
+    }
+    antRow = antRow + dir.dr()
+    antCol = antCol + dir.dc()
+    steps = steps + 1
+  }
+
+  def run(n: Int): void {
+    var i: Int = 0
+    while i < n { step(); i = i + 1 }
+  }
+
+  def print(halfSize: Int): void {
+    val lo: Int = 0 - halfSize
+    val hi: Int = halfSize
+    IO::println("Langton's Ant after #{steps} steps (#{halfSize * 2 + 1}×#{halfSize * 2 + 1}):")
+    var row: Int = lo
+    while row <= hi {
+      var line: String = ""
+      var col: Int = lo
+      while col <= hi {
+        if row == antRow && col == antCol {
+          line = line + dir.symbol()
+        } else if !isWhite(row, col) {
+          line = line + "█"
+        } else {
+          line = line + "·"
+        }
+        col = col + 1
+      }
+      IO::println(line)
+      row = row + 1
+    }
+  }
+}
+
+// ─── Statistics helpers ─────────────────────────────────────────────────────
+
+// Returns live-cell count after 'generations' steps for the given rule/width
+def fingerprint(rule: Int, width: Int, generations: Int): Int {
+  val ca = new ElemCA(width, rule)
+  var g: Int = 0
+  while g < generations { ca.step(); g = g + 1 }
+  return ca.liveCellCount()
+}
+
+// Density profile: black-cell count in a bounding box at various step counts
+def densityProfile(stepCounts: List[Int], halfSize: Int): void {
+  IO::println("")
+  IO::println("Black-cell density at selected step counts:")
+  IO::println("  Steps │ Black cells │ Density")
+  IO::println("  ──────┼─────────────┼────────")
+  foreach n: Int in stepCounts {
+    val ant = new LangtonAnt()
+    ant.run(n)
+    val total: Int = (halfSize * 2 + 1) * (halfSize * 2 + 1)
+    val black: Int = ant.blackCount()
+    val pct: Int   = black * 100 / total
+    val slabel: String = "#{n}".padLeft(6, " ")
+    val blabel: String = "#{black}".padLeft(11, " ")
+    val plabel: String = "#{pct}%".padLeft(6, " ")
+    IO::println("  #{slabel} │ #{blabel} │ #{plabel}")
+  }
+}
+
+// ─── Main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // 1. 1-D Elementary Automata ───────────────────────────────────────────
+  IO::println("══════════════════════════════════════")
+  IO::println(" 1-D Elementary Cellular Automata")
+  IO::println("══════════════════════════════════════")
+  IO::println("")
+
+  val rules: List[Int] = [110, 30, 90, 18]
+  foreach r: Int in rules {
+    val ca = new ElemCA(61, r)
+    ca.run(14)
+    IO::println("")
+  }
+
+  // 2. Rule survey: live-cell fingerprints ───────────────────────────────
+  IO::println("Rule fingerprints (live cells after 20 gen, width=61):")
+  val interesting: List[Int] = [0, 18, 30, 90, 110, 150, 255]
+  foreach r: Int in interesting {
+    val fp: Int = fingerprint(r, 61, 20)
+    IO::println("  Rule #{r}: #{fp} live cells")
+  }
+  IO::println("")
+
+  // 3. Collection pipelines on all 256 rules ─────────────────────────────
+
+  // Build a List[Int] 0..255
+  val allRules: List[Int] = []
+  foreach i: Int in 0..<256 { allRules.add(i) }
+
+  // map: compute fingerprint for each rule (width=31, 10 gen)
+  val fps: List[Int] = allRules.map { r -> fingerprint(r as Int, 31, 10) }
+
+  // fold: sum of all fingerprints (trailing-lambda syntax)
+  val totalLive: Int = fps.fold(0) { acc, fp -> acc as Int + (fp as Int) } as Int
+  IO::println("Sum of all rule fingerprints (width=31, 10 gen): #{totalLive}")
+
+  // distinct fingerprint values
+  val distinctFps: List[Int] = fps.distinct()
+  IO::println("Distinct fingerprint values: #{distinctFps.size}")
+
+  // find: first rule with fingerprint > 15
+  val threshold: Int = 15
+  val firstAbove = allRules.find { r -> fingerprint(r as Int, 31, 10) > threshold }
+  if firstAbove != null {
+    IO::println("First rule with >#{threshold} live cells after 10 gen: #{firstAbove}")
+  }
+
+  // partition: rules with fingerprint in (10, 20) vs rest
+  val parts = allRules.partition { r ->
+    val c: Int = fingerprint(r as Int, 31, 10)
+    c > 10 && c < 20
+  }
+  val inRange:    List[Int] = parts.get(0)!!
+  val outOfRange: List[Int] = parts.get(1)!!
+  IO::println("Rules with fingerprint in (10,20): #{inRange.size}")
+  IO::println("All other rules: #{outOfRange.size}")
+
+  // sortedBy: top-5 rules by fingerprint (descending)
+  val sorted: List[Int] = allRules.sortedBy { r -> -(fingerprint(r as Int, 31, 10)) }
+  IO::println("")
+  IO::println("Top-5 rules by live-cell count (width=31, 10 gen):")
+  foreach i: Int in 0..<5 {
+    val r: Int = sorted.get(i)
+    val fp: Int = fingerprint(r, 31, 10)
+    IO::println("  Rule #{r}: #{fp} live cells")
+  }
+
+  // zip: pair rule number with fingerprint; compute sum of rule*fp products
+  val paired: List[List[Object]] = zip(allRules, fps)
+  var sumProduct: Long = 0L
+  foreach pair: List[Object] in paired {
+    val r:  Int = pair.get(0) as Int
+    val fp: Int = pair.get(1) as Int
+    sumProduct = sumProduct + (r as Long) * (fp as Long)
+  }
+  IO::println("Sum of rule*fingerprint over all rules: #{sumProduct}")
+
+  // 4. Langton's Ant ─────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("══════════════════════════════════════")
+  IO::println(" Langton's Ant")
+  IO::println("══════════════════════════════════════")
+  IO::println("")
+
+  val ant100 = new LangtonAnt()
+  ant100.run(100)
+  ant100.print(8)
+  IO::println("")
+
+  val ant400 = new LangtonAnt()
+  ant400.run(400)
+  ant400.print(12)
+
+  // 5. Density profile ───────────────────────────────────────────────────
+  densityProfile([50, 100, 200, 400], 12)
+
+  IO::println("")
+  IO::println("Done.")
+}

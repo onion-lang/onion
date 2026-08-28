@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0090) for identification
+ * type checking. Each error has a unique code (E0000-E0091) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -197,6 +197,15 @@ object SemanticError {
    * called" is the same rule.
    */
   case object THIS_BEFORE_CONSTRUCTOR_DELEGATION extends SemanticError(90)
+  /**
+   * A bare capitalized name that resolves to a real class, used where a value is
+   * expected (typically as the target of `.member`) -- the mirror image of
+   * STATIC_CALL_ON_INSTANCE (E0071): `System.currentTimeMillis()` instead of
+   * `System::currentTimeMillis()`. Without this, the name simply fails ordinary
+   * local-variable/field lookup and is reported as the generic VARIABLE_NOT_FOUND
+   * (E0002), never mentioning `::`.
+   */
+  case object CLASS_USED_AS_VALUE extends SemanticError(91)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

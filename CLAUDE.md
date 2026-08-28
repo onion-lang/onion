@@ -396,6 +396,7 @@ These are frequently confused with other languages. **Always check these:**
 | `if (condition) { }` | `if condition { }` - no parentheses around condition |
 | `while (condition) { }` | `while condition { }` - no parentheses |
 | `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
+| `elif condition { }` (Python) | `else if condition { }` - no `elif` keyword, chain with `else if` |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
@@ -414,6 +415,7 @@ These are frequently confused with other languages. **Always check these:**
 | `public ClassName(x: Int) { }` | `def this(x: Int) { }` - with params |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
 | `public void method()` | `public: def method(): void` - section-based access |
+| `String name;` (field/local) | `var name: String` (or `val`) - type comes after the name, via `val`/`var` |
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
@@ -471,6 +473,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong (Java style) | Correct (Onion) |
 |--------------------|-----------------|
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
+| `data class Point(val x: Int, val y: Int)` (Kotlin) | `record Point(x: Int, y: Int)` - no `val`/`var` in the component list |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
 | record with methods? | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - a record may carry a `{ access-section* }` body (instance/static/operator methods, private helpers); methods see the generated accessors. Also works on a generic record implementing a generic interface (`record Foo[T](v: T) conforms Bar[T]`) |
@@ -478,6 +481,7 @@ These are frequently confused with other languages. **Always check these:**
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
+| need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) shape name = re"..."` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
 | test a record in a separate suite | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 

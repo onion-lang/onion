@@ -1,0 +1,411 @@
+// MorseCode.on — International Morse code encoder, decoder, and signal visualizer
+// Exercises: ADT enum with instance methods (select this), records with examples,
+// extension methods on Int and String, Map[String,String]-backed codec class,
+// select/type patterns on zero-field enum cases, nullable from Map.get,
+// string interpolation, foreach over ranges and typed lists, while loops,
+// try/catch, and collection pipelines.
+
+import { java.util.* }
+
+// ── Signal ADT ───────────────────────────────────────────────────────────────
+// A transmitted Morse message is a sequence of five element kinds.
+
+enum Signal {
+  case Dot          // mark:  1 timing unit
+  case Dash         // mark:  3 timing units
+  case ElementGap   // pause between dots/dashes in one letter: 1 unit
+  case LetterGap    // pause between letters in one word:  3 units
+  case WordGap      // pause between words:  7 units
+
+public:
+  def units(): Int = select this {
+    case d is Dot:        1
+    case da is Dash:      3
+    case e is ElementGap: 1
+    case l is LetterGap:  3
+    case w is WordGap:    7
+  }
+
+  def isMark(): Boolean = select this {
+    case d is Dot:  true
+    case da is Dash: true
+    else:           false
+  }
+
+  // Visual symbol: marks are shown; inter-element gaps are empty; letter/word
+  // gaps use separator characters so the display stays readable.
+  def symbol(): String = select this {
+    case d is Dot:        "."
+    case da is Dash:      "-"
+    case e is ElementGap: ""
+    case l is LetterGap:  "|"
+    case w is WordGap:    "/"
+  }
+}
+
+// ── Statistics record ─────────────────────────────────────────────────────────
+
+record MorseStats(dots: Int, dashes: Int, duration: Int, words: Int)
+  example { new MorseStats(3, 2, 14, 1).dots()     == 3    }
+  example { new MorseStats(3, 2, 14, 1).duration() == 14   }
+  example { new MorseStats(0, 0,  0, 0).words()    == 0    }
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  // Repeat a string self times: 3.rep("#") => "###"
+  def rep(ch: String): String {
+    var s = ""
+    var i = 0
+    while i < self {
+      s = s + ch
+      i = i + 1
+    }
+    return s
+  }
+  // Right-align an integer in a field of width w
+  def padNum(w: Int): String {
+    var s = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ── Codec class ───────────────────────────────────────────────────────────────
+
+class MorseCodec {
+  val enc: Map[String, String]
+  val dec: Map[String, String]
+
+public:
+  def this {
+    this.enc = [:]
+    this.dec = [:]
+    this.initTable()
+  }
+
+  def add(letter: String, code: String): void {
+    enc.put(letter, code)
+    dec.put(code, letter)
+  }
+
+  def initTable(): void {
+    add("A", ".-");    add("B", "-...");  add("C", "-.-.")
+    add("D", "-..");   add("E", ".");     add("F", "..-.")
+    add("G", "--.");   add("H", "....");  add("I", "..")
+    add("J", ".---");  add("K", "-.-");   add("L", ".-..")
+    add("M", "--");    add("N", "-.");    add("O", "---")
+    add("P", ".--.");  add("Q", "--.-");  add("R", ".-.")
+    add("S", "...");   add("T", "-");     add("U", "..-")
+    add("V", "...-");  add("W", ".--");   add("X", "-..-")
+    add("Y", "-.--");  add("Z", "--..")
+    add("0", "-----"); add("1", ".----"); add("2", "..---")
+    add("3", "...--"); add("4", "....-"); add("5", ".....")
+    add("6", "-...."); add("7", "--..."); add("8", "---..")
+    add("9", "----.")
+    add(".", ".-.-.-"); add(",", "--..--"); add("?", "..--..")
+    add("!", "-.-.--"); add("/", "-..-.")
+  }
+
+  // Encode a single letter/digit, returning null if not in the table.
+  def encodeLetter(ch: String): String? {
+    val raw = enc.get(ch.toUpperCase())
+    if raw == null { return null }
+    return raw as String
+  }
+
+  // Encode plain text to Morse: letters separated by 1 space, words by 3 spaces.
+  def encode(text: String): String {
+    val ws = text.trim().toUpperCase().split("\\s+")
+    var result = ""
+    var fw = true
+    var wi = 0
+    while wi < ws.length {
+      val word = ws[wi]
+      var wcode = ""
+      var fl = true
+      var ci = 0
+      while ci < word.length() {
+        val code = this.encodeLetter(word.substring(ci, ci + 1))
+        if code != null {
+          if !fl { wcode = wcode + " " }
+          wcode = wcode + (code as String)
+          fl = false
+        }
+        ci = ci + 1
+      }
+      if wcode.length() > 0 {
+        if !fw { result = result + "   " }
+        result = result + wcode
+        fw = false
+      }
+      wi = wi + 1
+    }
+    return result
+  }
+
+  // Decode a letter code; "?" for unknown.
+  def decodeLetter(code: String): String {
+    val raw = dec.get(code)
+    if raw == null { return "?" }
+    return raw as String
+  }
+
+  // Decode Morse back to plain text.
+  def decode(morse: String): String {
+    val wps = morse.split("   ")
+    var result = ""
+    var fw = true
+    var wi = 0
+    while wi < wps.length {
+      val wp = wps[wi].trim()
+      if wp.length() > 0 {
+        val lps = wp.split(" ")
+        var word = ""
+        var li = 0
+        while li < lps.length {
+          val lp = lps[li].trim()
+          if lp.length() > 0 {
+            word = word + this.decodeLetter(lp)
+          }
+          li = li + 1
+        }
+        if !fw { result = result + " " }
+        result = result + word
+        fw = false
+      }
+      wi = wi + 1
+    }
+    return result
+  }
+
+  // Convert an encoded Morse string into an ordered list of Signal values.
+  def toSignals(morse: String): List[Signal] {
+    val sigs: List[Signal] = []
+    val wps = morse.split("   ")
+    var wi = 0
+    while wi < wps.length {
+      if wi > 0 { sigs << new WordGap() }
+      val lps = wps[wi].split(" ")
+      var li = 0
+      while li < lps.length {
+        if li > 0 { sigs << new LetterGap() }
+        val lp = lps[li]
+        var ci = 0
+        while ci < lp.length() {
+          if ci > 0 { sigs << new ElementGap() }
+          val ch = lp.substring(ci, ci + 1)
+          if ch == "." { sigs << new Dot() }
+          else if ch == "-" { sigs << new Dash() }
+          ci = ci + 1
+        }
+        li = li + 1
+      }
+      wi = wi + 1
+    }
+    return sigs
+  }
+
+  def countDots(sigs: List[Signal]): Int {
+    var n = 0
+    foreach s: Signal in sigs {
+      if s.symbol() == "." { n = n + 1 }
+    }
+    return n
+  }
+
+  def countDashes(sigs: List[Signal]): Int {
+    var n = 0
+    foreach s: Signal in sigs {
+      if s.symbol() == "-" { n = n + 1 }
+    }
+    return n
+  }
+
+  def totalDuration(sigs: List[Signal]): Int {
+    var total = 0
+    foreach s: Signal in sigs {
+      total = total + s.units()
+    }
+    return total
+  }
+
+  def stats(text: String): MorseStats {
+    val encoded = this.encode(text)
+    val sigs    = this.toSignals(encoded)
+    val ws      = text.trim().split("\\s+")
+    return new MorseStats(
+      this.countDots(sigs),
+      this.countDashes(sigs),
+      this.totalDuration(sigs),
+      ws.length
+    )
+  }
+}
+
+// ── Free functions ────────────────────────────────────────────────────────────
+
+def visualize(sigs: List[Signal]): String {
+  var s = ""
+  foreach sig: Signal in sigs {
+    s = s + sig.symbol()
+  }
+  return s
+}
+
+def printStats(st: MorseStats): void {
+  IO::println("  Words:    " + st.words())
+  IO::println("  Dots:     " + st.dots())
+  IO::println("  Dashes:   " + st.dashes())
+  IO::println("  Duration: " + st.duration() + " timing units")
+  val total = st.dots() + st.dashes()
+  var dotBar = ""
+  var daBar  = ""
+  if total > 0 {
+    dotBar = (st.dots()   * 20 / total).rep("#")
+    daBar  = (st.dashes() * 20 / total).rep("#")
+  }
+  IO::println("  .  [" + dotBar.padRight(20) + "] " + st.dots())
+  IO::println("  -  [" + daBar.padRight(20) + "] " + st.dashes())
+}
+
+def roundTrip(codec: MorseCodec, text: String): void {
+  val encoded = codec.encode(text)
+  val decoded = codec.decode(encoded)
+  val sigs    = codec.toSignals(encoded)
+  val vis     = visualize(sigs)
+  IO::println("Input:   '" + text + "'")
+  IO::println("Encoded: " + encoded)
+  IO::println("Visual:  " + vis)
+  IO::println("Decoded: '" + decoded + "'")
+  printStats(codec.stats(text))
+  IO::println("")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val codec = new MorseCodec()
+
+IO::println("=== Morse Code Analyzer ===")
+IO::println("")
+roundTrip(codec, "SOS")
+roundTrip(codec, "HELLO WORLD")
+roundTrip(codec, "ONION")
+
+// ── Letter round-trip verification ───────────────────────────────────────────
+
+IO::println("=== Letter round-trip check ===")
+val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+var okCount   = 0
+var failCount = 0
+var i = 0
+while i < alphabet.length() {
+  val ch  = alphabet.substring(i, i + 1)
+  val enc = codec.encode(ch)
+  val dec = codec.decode(enc)
+  if dec == ch { okCount = okCount + 1 }
+  else {
+    IO::println("  FAIL: '" + ch + "' -> '" + enc + "' -> '" + dec + "'")
+    failCount = failCount + 1
+  }
+  i = i + 1
+}
+IO::println("  Passed: " + okCount + "/" + (okCount + failCount))
+
+// ── Timing comparison ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Timing comparison (short letters first) ===")
+val shortLetters: List[String] = ["E", "T", "I", "A", "N", "M", "S", "O", "R"]
+foreach t: String in shortLetters {
+  val st = codec.stats(t)
+  val bar = st.duration().rep("=")
+  IO::println("  " + t.padRight(3) + " " + bar.padRight(15) + " " + st.duration() + " units")
+}
+
+// ── Digit encoding table ──────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Digit encoding table ===")
+foreach n: Int in 0..9 {
+  val ns  = "" + n
+  val enc = codec.encode(ns)
+  val st  = codec.stats(ns)
+  IO::println("  " + n + "  " + enc.padRight(8) + " (dots: " + st.dots() + ", dashes: " + st.dashes() + ")")
+}
+
+// ── Select on signal kinds ────────────────────────────────────────────────────
+// Demonstrate select with type patterns on the zero-field ADT cases directly.
+
+IO::println("")
+IO::println("=== Signal breakdown for 'SOS' ===")
+val sosSigs = codec.toSignals(codec.encode("SOS"))
+var markTotal = 0
+var gapTotal  = 0
+foreach s: Signal in sosSigs {
+  select s {
+    case d is Dot:        markTotal = markTotal + 1
+    case da is Dash:      markTotal = markTotal + 3
+    case e is ElementGap: gapTotal  = gapTotal  + 1
+    case l is LetterGap:  gapTotal  = gapTotal  + 3
+    case w is WordGap:    gapTotal  = gapTotal  + 7
+  }
+}
+IO::println("  Mark time: " + markTotal + " units")
+IO::println("  Gap time:  " + gapTotal  + " units")
+
+// ── Unknown character handling ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Handling unrecognized characters ===")
+val testStr = "HELLO 2 WORLD"
+IO::println("  Input:   '" + testStr + "'")
+val testEnc = codec.encode(testStr)
+IO::println("  Encoded: " + testEnc)
+IO::println("  Decoded: '" + codec.decode(testEnc) + "'")
+
+// ── Try/catch for invalid decode ──────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Try/catch for invalid Morse input ===")
+try {
+  val bad = codec.decode("... --- --- xyz-bad-code ...")
+  IO::println("  Decoded (with unknowns): '" + bad + "'")
+} catch e: Exception {
+  IO::println("  Caught exception: " + e.getMessage())
+}
+
+// ── Recursive dot/dash counter ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Cumulative letter stats ===")
+val cumText = "SOS"
+var cumDots   = 0
+var cumDashes = 0
+var ci2 = 0
+while ci2 < cumText.length() {
+  val ch = cumText.substring(ci2, ci2 + 1)
+  val st = codec.stats(ch)
+  cumDots   = cumDots   + st.dots()
+  cumDashes = cumDashes + st.dashes()
+  IO::println("  After '" + ch + "': " + cumDots + " dot(s), " + cumDashes + " dash(es)")
+  ci2 = ci2 + 1
+}
+IO::println("  Total: " + cumDots + " dots, " + cumDashes + " dashes")
+
+// ── Multi-word statistics ─────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Multi-word message stats ===")
+val msg = "CQ CQ DE W1AW"
+IO::println("  Message:  '" + msg + "'")
+IO::println("  Encoded:  " + codec.encode(msg))
+printStats(codec.stats(msg))

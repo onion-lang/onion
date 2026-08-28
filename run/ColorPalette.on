@@ -1,0 +1,399 @@
+// ColorPalette.on — Color science toolkit
+// Covers: RGB/HSL/HSV/CMYK conversion, named colors, color harmony,
+//         WCAG accessibility contrast, palette generation.
+// Features exercised: records, data-carrying enums, sealed-hierarchy
+//   matching, closures, collection pipelines, foreach (k,v) over maps,
+//   generics, string interpolation, try/catch, nullable types, recursion.
+
+import {
+  java.util.LinkedHashMap
+}
+
+// ── Colour model enums ────────────────────────────────────────────────────────
+
+enum ContrastLevel {
+  case AA
+  case AAA
+  case Fail
+}
+
+enum HarmonyType {
+  case Complementary
+  case Analogous
+  case Triadic
+  case SplitComplementary
+  case Tetradic
+}
+
+// ── Colour utility functions (top-level so records can call them) ─────────────
+
+def hexPad(n: Int): String {
+  val s = Integer::toHexString(n)
+  return if s.length() == 1 { "0" + s } else { s }
+}
+
+def linearize(c: Int): Double {
+  val v = (c as Double) / 255.0
+  return if v <= 0.04045 { v / 12.92 } else { Math::pow((v + 0.055) / 1.055, 2.4) }
+}
+
+def hue2rgb(p: Double, q: Double, t0: Double): Double {
+  var t = t0
+  if t < 0.0 { t = t + 1.0 }
+  if t > 1.0 { t = t - 1.0 }
+  if t < 1.0 / 6.0 { return p + (q - p) * 6.0 * t }
+  if t < 1.0 / 2.0 { return q }
+  if t < 2.0 / 3.0 { return p + (q - p) * (2.0 / 3.0 - t) * 6.0 }
+  return p
+}
+
+// ── Core colour records ───────────────────────────────────────────────────────
+
+record Rgb(r: Int, g: Int, b: Int) {
+public:
+  def hex(): String = "#" + hexPad(r) + hexPad(g) + hexPad(b)
+
+  def luminance(): Double {
+    val lr = linearize(r)
+    val lg = linearize(g)
+    val lb = linearize(b)
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb
+  }
+
+  def describe(): String = "Rgb(#{r}, #{g}, #{b}) → #{hex()}"
+}
+
+record Hsl(h: Double, s: Double, l: Double) {
+public:
+  def describe(): String = "Hsl(#{h}°, #{(s * 100.0)}%, #{(l * 100.0)}%)"
+}
+
+record Hsv(h: Double, s: Double, v: Double) {
+public:
+  def describe(): String = "Hsv(#{h}°, #{(s * 100.0)}%, #{(v * 100.0)}%)"
+}
+
+record Cmyk(c: Double, m: Double, y: Double, k: Double) {
+public:
+  def describe(): String =
+    "Cmyk(#{(c * 100.0)}%, #{(m * 100.0)}%, #{(y * 100.0)}%, #{(k * 100.0)}%)"
+}
+
+// ── Conversion helpers ────────────────────────────────────────────────────────
+
+class Conversions {
+public:
+  static def rgbToHsl(rgb: Rgb): Hsl {
+    val r1 = (rgb.r() as Double) / 255.0
+    val g1 = (rgb.g() as Double) / 255.0
+    val b1 = (rgb.b() as Double) / 255.0
+    val mx = Math::max(r1, Math::max(g1, b1))
+    val mn = Math::min(r1, Math::min(g1, b1))
+    val l  = (mx + mn) / 2.0
+    if mx == mn {
+      return new Hsl(0.0, 0.0, l)
+    }
+    val d = mx - mn
+    val s = if l > 0.5 { d / (2.0 - mx - mn) } else { d / (mx + mn) }
+    val h = if mx == r1 {
+      ((g1 - b1) / d + (if g1 < b1 { 6.0 } else { 0.0 })) / 6.0
+    } else if mx == g1 {
+      ((b1 - r1) / d + 2.0) / 6.0
+    } else {
+      ((r1 - g1) / d + 4.0) / 6.0
+    }
+    return new Hsl(h * 360.0, s, l)
+  }
+
+  static def hslToRgb(hsl: Hsl): Rgb {
+    val h = hsl.h() / 360.0
+    val s = hsl.s()
+    val l = hsl.l()
+    if s == 0.0 {
+      val v = (l * 255.0) as Int
+      return new Rgb(v, v, v)
+    }
+    val q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s }
+    val p = 2.0 * l - q
+    return new Rgb(
+      (hue2rgb(p, q, h + 1.0 / 3.0) * 255.0) as Int,
+      (hue2rgb(p, q, h)              * 255.0) as Int,
+      (hue2rgb(p, q, h - 1.0 / 3.0) * 255.0) as Int
+    )
+  }
+
+  static def rgbToHsv(rgb: Rgb): Hsv {
+    val r1 = (rgb.r() as Double) / 255.0
+    val g1 = (rgb.g() as Double) / 255.0
+    val b1 = (rgb.b() as Double) / 255.0
+    val mx = Math::max(r1, Math::max(g1, b1))
+    val mn = Math::min(r1, Math::min(g1, b1))
+    val d  = mx - mn
+    val v  = mx
+    val s  = if mx == 0.0 { 0.0 } else { d / mx }
+    val h  = if d == 0.0 { 0.0
+    } else if mx == r1 {
+      60.0 * (((g1 - b1) / d) % 6.0)
+    } else if mx == g1 {
+      60.0 * ((b1 - r1) / d + 2.0)
+    } else {
+      60.0 * ((r1 - g1) / d + 4.0)
+    }
+    return new Hsv(if h < 0.0 { h + 360.0 } else { h }, s, v)
+  }
+
+  static def rgbToCmyk(rgb: Rgb): Cmyk {
+    val r1 = (rgb.r() as Double) / 255.0
+    val g1 = (rgb.g() as Double) / 255.0
+    val b1 = (rgb.b() as Double) / 255.0
+    val k  = 1.0 - Math::max(r1, Math::max(g1, b1))
+    if k == 1.0 { return new Cmyk(0.0, 0.0, 0.0, 1.0) }
+    return new Cmyk(
+      (1.0 - r1 - k) / (1.0 - k),
+      (1.0 - g1 - k) / (1.0 - k),
+      (1.0 - b1 - k) / (1.0 - k),
+      k
+    )
+  }
+
+  static def round2(v: Double): Double =
+    ((v * 100.0) as Int as Double) / 100.0
+}
+
+// ── Contrast & accessibility ──────────────────────────────────────────────────
+
+class Accessibility {
+public:
+  static def contrastRatio(a: Rgb, b: Rgb): Double {
+    val la = a.luminance()
+    val lb = b.luminance()
+    val lighter = Math::max(la, lb)
+    val darker  = Math::min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+  }
+
+  static def level(ratio: Double, largeText: Boolean): ContrastLevel {
+    if largeText {
+      return if ratio >= 4.5 { new AAA() } else if ratio >= 3.0 { new AA() } else { new Fail() }
+    }
+    return if ratio >= 7.0 { new AAA() } else if ratio >= 4.5 { new AA() } else { new Fail() }
+  }
+
+  static def levelName(cl: ContrastLevel): String =
+    select cl {
+      case l is AAA: "AAA"
+      case l is AA:  "AA"
+      else: "Fail"
+    }
+}
+
+// ── Harmony palette generator ─────────────────────────────────────────────────
+
+class Harmony {
+public:
+  static def generate(base: Rgb, kind: HarmonyType): List[Object] {
+    val hsl = Conversions::rgbToHsl(base)
+    val h   = hsl.h()
+    val offsets: List[Object] = select kind {
+      case k is Complementary:      [180.0]
+      case k is Analogous:          [-30.0, 30.0]
+      case k is Triadic:            [120.0, 240.0]
+      case k is SplitComplementary: [150.0, 210.0]
+      case k is Tetradic:           [90.0, 180.0, 270.0]
+    }
+    val result: List[Object] = [base]
+    foreach off: Double in offsets {
+      val newH = ((h + off) % 360.0 + 360.0) % 360.0
+      result.add(Conversions::hslToRgb(new Hsl(newH, hsl.s(), hsl.l())))
+    }
+    return result
+  }
+
+  static def harmonyName(kind: HarmonyType): String =
+    select kind {
+      case k is Complementary:      "Complementary"
+      case k is Analogous:          "Analogous"
+      case k is Triadic:            "Triadic"
+      case k is SplitComplementary: "Split-Complementary"
+      case k is Tetradic:           "Tetradic"
+    }
+}
+
+// ── Named colour lookup ───────────────────────────────────────────────────────
+
+class NamedColors {
+  var table: LinkedHashMap[String, Object]
+
+public:
+  def this {
+    table = new LinkedHashMap[String, Object]()
+    table.put("red",     new Rgb(255,   0,   0))
+    table.put("green",   new Rgb(  0, 128,   0))
+    table.put("blue",    new Rgb(  0,   0, 255))
+    table.put("yellow",  new Rgb(255, 255,   0))
+    table.put("cyan",    new Rgb(  0, 255, 255))
+    table.put("magenta", new Rgb(255,   0, 255))
+    table.put("white",   new Rgb(255, 255, 255))
+    table.put("black",   new Rgb(  0,   0,   0))
+    table.put("orange",  new Rgb(255, 165,   0))
+    table.put("purple",  new Rgb(128,   0, 128))
+    table.put("pink",    new Rgb(255, 192, 203))
+    table.put("brown",   new Rgb(165,  42,  42))
+    table.put("coral",   new Rgb(255, 127,  80))
+    table.put("teal",    new Rgb(  0, 128, 128))
+    table.put("indigo",  new Rgb( 75,   0, 130))
+    table.put("violet",  new Rgb(238, 130, 238))
+    table.put("gold",    new Rgb(255, 215,   0))
+    table.put("silver",  new Rgb(192, 192, 192))
+    table.put("crimson", new Rgb(220,  20,  60))
+    table.put("navy",    new Rgb(  0,   0, 128))
+  }
+  def lookup(name: String): Rgb? = (table.get(name) as Rgb?)
+
+  def nearest(target: Rgb): String {
+    var bestName: String = "unknown"
+    var bestDist: Int    = 999999
+    foreach (name, entry) in table {
+      val c = (entry as Rgb)
+      val dr = target.r() - c.r()
+      val dg = target.g() - c.g()
+      val db = target.b() - c.b()
+      val dist = dr * dr + dg * dg + db * db
+      if dist < bestDist {
+        bestDist = dist
+        bestName = (name as String)
+      }
+    }
+    return bestName
+  }
+
+  def allNames(): List[Object] = table.keySet().stream().collect(java.util.stream.Collectors::toList())
+}
+
+// ── Palette analysis ──────────────────────────────────────────────────────────
+
+class PaletteAnalyzer {
+public:
+  static def averageColor(colors: List[Object]): Rgb {
+    var sumR: Int = 0
+    var sumG: Int = 0
+    var sumB: Int = 0
+    foreach c: Rgb in colors {
+      sumR = sumR + c.r()
+      sumG = sumG + c.g()
+      sumB = sumB + c.b()
+    }
+    val n = colors.size()
+    return new Rgb(sumR / n, sumG / n, sumB / n)
+  }
+
+  static def temperature(rgb: Rgb): String {
+    val r = rgb.r()
+    val b = rgb.b()
+    if r > b + 50 { return "warm" }
+    if b > r + 50 { return "cool" }
+    return "neutral"
+  }
+
+  static def brightness(rgb: Rgb): String {
+    val avg = (rgb.r() + rgb.g() + rgb.b()) / 3
+    if avg > 200 { return "light" }
+    if avg < 80  { return "dark" }
+    return "medium"
+  }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Color Palette Toolkit ===\n")
+
+  val nc = new NamedColors()
+
+  // 1. Conversion round-trip
+  IO::println("── Conversions ──")
+  val baseColors: List[Object] = [
+    new Rgb(255,  99,  71),   // tomato
+    new Rgb( 70, 130, 180),   // steel blue
+    new Rgb( 34, 139,  34),   // forest green
+    new Rgb(148,   0, 211)    // dark violet
+  ]
+
+  foreach rgb: Rgb in baseColors {
+    val hsl  = Conversions::rgbToHsl(rgb)
+    val back = Conversions::hslToRgb(hsl)
+    val hsv  = Conversions::rgbToHsv(rgb)
+    val cmyk = Conversions::rgbToCmyk(rgb)
+    IO::println("  #{rgb.describe()}")
+    IO::println("    HSL  : #{hsl.describe()}")
+    IO::println("    HSV  : #{hsv.describe()}")
+    IO::println("    CMYK : #{cmyk.describe()}")
+    IO::println("    Round-trip: #{back.hex()}")
+    IO::println("")
+  }
+
+  // 2. Named color lookup
+  IO::println("── Named Colors ──")
+  val lookups: List[Object] = ["coral", "teal", "crimson", "gold", "navy"]
+  foreach name: String in lookups {
+    val c = nc.lookup(name)
+    if c != null {
+      val nearest = nc.nearest(c)
+      IO::println("  #{name}: #{c.hex()} (nearest name back: #{nearest})")
+    }
+  }
+  IO::println("")
+
+  // 3. Harmony palettes
+  IO::println("── Harmony Palettes ──")
+  val seed = new Rgb(220, 20, 60)   // crimson seed
+  val harmonies: List[Object] = [
+    new Complementary(),
+    new Analogous(),
+    new Triadic(),
+    new SplitComplementary(),
+    new Tetradic()
+  ]
+  foreach ht: HarmonyType in harmonies {
+    val palette: List[Object] = Harmony::generate(seed, ht)
+    val hexList: List[Object] = palette.map { c: Rgb -> c.hex() }
+    val sep = ", "
+    IO::println("  #{Harmony::harmonyName(ht)}: #{hexList.join(sep)}")
+  }
+  IO::println("")
+
+  // 4. Accessibility contrast
+  IO::println("── Accessibility Contrast ──")
+  val pairs: List[Object] = [
+    [new Rgb(0, 0, 0),       new Rgb(255, 255, 255)],
+    [new Rgb(255, 255, 255), new Rgb(0, 0, 255)],
+    [new Rgb(255, 0, 0),     new Rgb(0, 255, 0)],
+    [new Rgb(30, 30, 30),    new Rgb(220, 220, 220)]
+  ]
+  foreach pair: List[Object] in pairs {
+    val fg = (pair.get(0) as Rgb)
+    val bg = (pair.get(1) as Rgb)
+    val ratio = Accessibility::contrastRatio(fg, bg)
+    val level = Accessibility::level(ratio, false)
+    val roundedRatio = Conversions::round2(ratio)
+    IO::println("  #{fg.hex()} on #{bg.hex()}: ratio=#{roundedRatio}:1  [#{Accessibility::levelName(level)}]")
+  }
+  IO::println("")
+
+  // 5. Palette analysis
+  IO::println("── Palette Analysis ──")
+  val swatch: List[Object] = Harmony::generate(new Rgb(255, 140, 0), new Tetradic())
+  val avg = PaletteAnalyzer::averageColor(swatch)
+  IO::println("  Palette (tetradic from orange):")
+  foreach c: Rgb in swatch {
+    IO::println("    #{c.hex()}  temp=#{PaletteAnalyzer::temperature(c)} brightness=#{PaletteAnalyzer::brightness(c)}")
+  }
+  IO::println("  Average colour: #{avg.hex()}")
+  IO::println("")
+
+  // 6. Nearest-name probe for generated colours
+  IO::println("── Nearest Named Color ──")
+  foreach c: Rgb in swatch {
+    IO::println("  #{c.hex()} → \"#{nc.nearest(c)}\"")
+  }
+}

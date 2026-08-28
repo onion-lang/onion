@@ -1,0 +1,390 @@
+// AntColony.on — Ant Colony Optimization for the Travelling Salesman Problem.
+// A swarm of artificial ants deposits pheromone on tour edges; shorter tours
+// get more pheromone; over many iterations the colony converges to a good route.
+//
+// Exercises: records (City, AntTour); plain enum (Phase); extension methods on
+// Int/Double; collection pipelines (map/filter/fold/sortedBy/find); foreach (k,v)
+// over map entries; select pattern matching; closures; Rand for probabilistic
+// choice; string interpolation; nested while/for loops; nullable handling.
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record City(id: Int, name: String, x: Double, y: Double)
+
+record AntTour(cities: List[Int], totalDist: Double) {
+public:
+  def isImprovement(other: AntTour): Boolean = totalDist() < other.totalDist()
+}
+
+// ─── Phase enum ──────────────────────────────────────────────────────────────
+
+enum Phase { INIT, RUNNING, CONVERGED }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def repeated(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self.toString(); i++ }
+    return s
+  }
+  def bar(max: Int, width: Int): String {
+    if max == 0 { return " ".times(width) }
+    val filled = (self * width) / max
+    var s = ""
+    var i = 0
+    while i < width { s = s + (if i < filled { "█" } else { "░" }); i++ }
+    return s
+  }
+}
+
+extension Double {
+  def fmt(dec: Int): String {
+    if dec == 0 { return "" + (self as Int) }
+    val scale = if dec == 1 { 10.0 } else if dec == 2 { 100.0 } else { 1000.0 }
+    val scaled = (self * scale) as Int
+    val intPart = scaled / (scale as Int)
+    val fracPart = scaled % (scale as Int)
+    val fracStr = "" + fracPart
+    var padded = fracStr
+    while padded.length() < dec { padded = "0" + padded }
+    return "" + intPart + "." + padded
+  }
+  def padFmt(dec: Int, width: Int): String {
+    val s = self.fmt(dec)
+    var r = s
+    while r.length() < width { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def times(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Distance helpers ─────────────────────────────────────────────────────────
+
+def dist(a: City, b: City): Double {
+  val dx = a.x() - b.x()
+  val dy = a.y() - b.y()
+  return Math::sqrt(dx * dx + dy * dy)
+}
+
+def tourLength(order: List[Int], cities: List[City]): Double {
+  var total = 0.0
+  var i = 0
+  while i < order.size - 1 {
+    total = total + dist(cities[order[i]], cities[order[i + 1]])
+    i++
+  }
+  // return to start
+  total = total + dist(cities[order[order.size - 1]], cities[order[0]])
+  return total
+}
+
+// ─── Pheromone matrix as a flat List ─────────────────────────────────────────
+
+class Pheromone {
+  var matrix: List[Double]
+  var n: Int
+public:
+  def this(size: Int) {
+    self.n = size
+    self.matrix = []
+    var i = 0
+    while i < size * size { self.matrix.add(1.0); i++ }
+  }
+  def get(i: Int, j: Int): Double = self.matrix[i * self.n + j]
+  def set(i: Int, j: Int, v: Double): void { self.matrix[i * self.n + j] = v }
+  def evaporate(rate: Double): void {
+    var k = 0
+    while k < self.matrix.size {
+      val cur = self.matrix[k]
+      self.matrix[k] = cur * (1.0 - rate)
+      k++
+    }
+  }
+  def deposit(tour: List[Int], amount: Double): void {
+    var i = 0
+    while i < tour.size - 1 {
+      val a = tour[i]; val b = tour[i + 1]
+      self.set(a, b, self.get(a, b) + amount)
+      self.set(b, a, self.get(b, a) + amount)
+      i++
+    }
+    val last = tour[tour.size - 1]; val first = tour[0]
+    self.set(last, first, self.get(last, first) + amount)
+    self.set(first, last, self.get(first, last) + amount)
+  }
+}
+
+// ─── Ant tour construction ────────────────────────────────────────────────────
+
+def buildAntTour(start: Int, cities: List[City], phero: Pheromone,
+                 alpha: Double, beta: Double): AntTour {
+  val n = cities.size
+  val visited: List[Boolean] = []
+  var i = 0
+  while i < n { visited.add(false); i++ }
+
+  val order: List[Int] = []
+  var cur = start
+  order.add(cur)
+  visited[cur] = true
+
+  var step = 0
+  while step < n - 1 {
+    // Compute probabilities for unvisited cities
+    var totalWeight = 0.0
+    val weights: List[Double] = []
+    var j = 0
+    while j < n {
+      if !visited[j] {
+        val d = dist(cities[cur], cities[j])
+        val eta = if d < 0.0001 { 10000.0 } else { 1.0 / d }
+        val tau = phero.get(cur, j)
+        // weight = tau^alpha * eta^beta  (simplified: tau * eta^beta)
+        var tauA = 1.0
+        var ia = 0
+        while ia < alpha as Int { tauA = tauA * tau; ia++ }
+        var etaB = 1.0
+        var ib = 0
+        while ib < beta as Int { etaB = etaB * eta; ib++ }
+        val w = tauA * etaB
+        weights.add(w)
+        totalWeight = totalWeight + w
+      } else {
+        weights.add(0.0)
+      }
+      j++
+    }
+
+    // Roulette-wheel selection
+    val roll = Rand::nextDouble() * totalWeight
+    var cumul = 0.0
+    var chosen = -1
+    var k = 0
+    while k < n {
+      if !visited[k] {
+        cumul = cumul + weights[k]
+        if cumul >= roll && chosen < 0 {
+          chosen = k
+        }
+      }
+      k++
+    }
+    if chosen < 0 {
+      // fallback: pick first unvisited
+      var fb = 0
+      while fb < n {
+        if !visited[fb] { chosen = fb; break }
+        fb++
+      }
+    }
+
+    order.add(chosen)
+    visited[chosen] = true
+    cur = chosen
+    step++
+  }
+
+  return new AntTour(order, tourLength(order, cities))
+}
+
+// ─── ACO runner ──────────────────────────────────────────────────────────────
+
+class AntColonyOptimizer {
+  val cities: List[City]
+  val ants: Int
+  val iterations: Int
+  val alpha: Double
+  val beta: Double
+  val evapRate: Double
+public:
+  def this(cs: List[City], ants: Int, iters: Int,
+           alpha: Double, beta: Double, evap: Double) {
+    self.cities    = cs
+    self.ants      = ants
+    self.iterations = iters
+    self.alpha     = alpha
+    self.beta      = beta
+    self.evapRate  = evap
+  }
+
+  def run(): AntTour {
+    val n = self.cities.size
+    val phero = new Pheromone(n)
+
+    // Nearest-neighbour greedy tour as initial best
+    var bestTour: AntTour? = null
+
+    var iter = 0
+    while iter < self.iterations {
+      // Each ant builds a tour
+      var iterBestTour: AntTour? = null
+      var ant = 0
+      while ant < self.ants {
+        val start = ant % n
+        val tour  = buildAntTour(start, self.cities, phero, self.alpha, self.beta)
+        if iterBestTour == null || tour.isImprovement(iterBestTour) {
+          iterBestTour = tour
+        }
+        ant++
+      }
+
+      if iterBestTour != null {
+        if bestTour == null || (iterBestTour as AntTour).isImprovement(bestTour) {
+          bestTour = iterBestTour
+        }
+      }
+
+      // Pheromone update: evaporate then deposit
+      phero.evaporate(self.evapRate)
+      if iterBestTour != null {
+        val t = (iterBestTour as AntTour)
+        val deposit = if t.totalDist() > 0.0001 { 100.0 / t.totalDist() } else { 1.0 }
+        phero.deposit(t.cities(), deposit)
+      }
+
+      iter++
+    }
+
+    if bestTour == null {
+      return new AntTour([], 0.0)
+    }
+    return bestTour as AntTour
+  }
+}
+
+// ─── Visualise a tour on a 40×18 ASCII grid ──────────────────────────────────
+
+def visualise(tour: AntTour, cities: List[City]): void {
+  val W = 44; val H = 18
+  val tourLen = tour.cities().size  // use tour to show sequence info
+  // Map city coordinates to grid
+  val gridRows: List[List[String]] = []
+  var ri = 0
+  while ri < H {
+    val rowList: List[String] = []
+    var ci = 0
+    while ci < W { rowList.add("."); ci++ }
+    gridRows.add(rowList)
+    ri++
+  }
+  // Find bounds
+  var minX = cities[0].x(); var maxX = cities[0].x()
+  var minY = cities[0].y(); var maxY = cities[0].y()
+  foreach c: City in cities {
+    if c.x() < minX { minX = c.x() }
+    if c.x() > maxX { maxX = c.x() }
+    if c.y() < minY { minY = c.y() }
+    if c.y() > maxY { maxY = c.y() }
+  }
+  val spanX = if maxX > minX { maxX - minX } else { 1.0 }
+  val spanY = if maxY > minY { maxY - minY } else { 1.0 }
+
+  // Plot city labels
+  foreach c: City in cities {
+    val gx = ((c.x() - minX) / spanX * (W - 3)) as Int + 1
+    val gy = (H - 2) - ((c.y() - minY) / spanY * (H - 3)) as Int
+    val row = gridRows[gy]
+    row[gx] = c.id().toString()
+    gridRows[gy] = row
+  }
+
+  // Print with border
+  IO::println("  +" + "-".times(W) + "+")
+  var row = 0
+  while row < H {
+    var line = "  |"
+    var col = 0
+    while col < W { line = line + gridRows[row][col]; col++ }
+    IO::println(line + "|")
+    row++
+  }
+  IO::println("  +" + "-".times(W) + "+")
+  IO::println("  (#{tourLen} cities; numbers show city IDs in their grid positions)")
+}
+
+// ─── Main demo ────────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════════╗")
+IO::println("║     Ant Colony Optimisation — TSP Demo               ║")
+IO::println("╚══════════════════════════════════════════════════════╝")
+
+// 10-city problem (scaled to [0,100] × [0,100])
+val cities: List[City] = [
+  new City(0, "Alpha",   15.0,  82.0),
+  new City(1, "Beta",    40.0,  65.0),
+  new City(2, "Gamma",   72.0,  88.0),
+  new City(3, "Delta",   91.0,  54.0),
+  new City(4, "Epsilon", 73.0,  20.0),
+  new City(5, "Zeta",    50.0,   5.0),
+  new City(6, "Eta",     20.0,  15.0),
+  new City(7, "Theta",    5.0,  40.0),
+  new City(8, "Iota",    30.0,  50.0),
+  new City(9, "Kappa",   60.0,  45.0)
+]
+
+IO::println("\n  Cities:")
+IO::println("  " + "-".times(40))
+IO::println("  ID  Name       X      Y")
+IO::println("  " + "-".times(40))
+foreach c: City in cities {
+  IO::println("  " + c.id().toString().padLeft(2) + "  " +
+    c.name().padRight(10) + c.x().padFmt(1, 5) + "  " + c.y().padFmt(1, 5))
+}
+
+// Distance matrix preview
+IO::println("\n  Distance matrix (selected pairs):")
+IO::println("  " + "-".times(40))
+var i = 0
+while i < cities.size - 1 {
+  val d = dist(cities[i], cities[i + 1])
+  IO::println("  #{cities[i].name()} → #{cities[i + 1].name()}: #{d.fmt(2)}")
+  i++
+}
+
+// Run ACO
+IO::println("\n  Running ACO  (ants=15, iterations=40, α=1, β=3, ρ=0.1)...")
+val aco = new AntColonyOptimizer(cities, 15, 40, 1.0, 3.0, 0.1)
+val best = aco.run()
+
+IO::println("\n  Best tour found:")
+IO::println("  " + "-".times(40))
+var step = 0
+while step < best.cities().size {
+  val cid = best.cities()[step]
+  val arrow = if step < best.cities().size - 1 { " → " } else { " → (start)" }
+  IO::println("  Step #{step + 1}: #{cities[cid].name()}#{arrow}")
+  step++
+}
+IO::println("\n  Total distance : " + best.totalDist().fmt(2))
+
+// Compare with naive order (0→1→2→...→9)
+val naiveOrder: List[Int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+val naiveDist = tourLength(naiveOrder, cities)
+IO::println("  Naive distance : " + naiveDist.fmt(2))
+val improvement = ((naiveDist - best.totalDist()) / naiveDist * 100.0) as Int
+IO::println("  Improvement    : #{improvement}% shorter than naive")
+
+IO::println("\n  Tour map (city IDs):")
+visualise(best, cities)
+
+IO::println("\n  Done.")

@@ -68,6 +68,7 @@ markdown_extensions:
 # nav-coverage check (mkdocs --strict otherwise warns on every orphaned file).
 exclude_docs: |
   superpowers/
+  refactoring/
 
 nav:
   - Home: index.md

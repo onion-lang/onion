@@ -1,0 +1,329 @@
+// DungeonCrawler.on — A scripted text-based dungeon-crawler RPG (~250 lines).
+//
+// Exercises: ADT enum (ItemKind, MonsterKind, CombatResult), plain enum
+// (RoomKind), records (Item, Room), interface (Entity), class with mutable
+// state (Player, Dungeon), static-method class (CombatEngine), collection
+// pipelines (filter/find/any), select/type-pattern matching, nullable,
+// string interpolation, while/foreach loops.
+//
+// The run is scripted (no stdin) so it always produces deterministic output.
+
+// ── Entity interface ───────────────────────────────────────────────────────
+
+interface Entity {
+  def name(): String
+  def hp(): Int
+  def maxHp(): Int
+  def alive(): Boolean
+}
+
+// ── Item type (ADT enum) ───────────────────────────────────────────────────
+
+enum ItemKind {
+  case Sword(damage: Int)
+  case Shield(defense: Int)
+  case Potion(heal: Int)
+  case Key
+public:
+  def describe(): String = select this {
+    case k is Sword:   "Sword (+#{k.damage()} dmg)"
+    case k is Shield:  "Shield (+#{k.defense()} def)"
+    case k is Potion:  "Potion (heals #{k.heal()} hp)"
+    case k is Key:     "Dungeon Key"
+  }
+}
+
+record Item(kind: ItemKind, label: String)
+
+// ── Monster type (ADT enum) ────────────────────────────────────────────────
+
+enum MonsterKind {
+  case Goblin(hp: Int, atk: Int)
+  case Orc(hp: Int, atk: Int)
+  case Dragon(hp: Int, atk: Int)
+public:
+  def displayName(): String = select this {
+    case m is Goblin: "Goblin"
+    case m is Orc:    "Orc"
+    case m is Dragon: "Dragon"
+  }
+  def baseHp(): Int = select this {
+    case m is Goblin: m.hp()
+    case m is Orc:    m.hp()
+    case m is Dragon: m.hp()
+  }
+  def baseAtk(): Int = select this {
+    case m is Goblin: m.atk()
+    case m is Orc:    m.atk()
+    case m is Dragon: m.atk()
+  }
+}
+
+// ── Monster class ──────────────────────────────────────────────────────────
+
+class Monster conforms Entity {
+  val kind: MonsterKind
+  var curHp: Int
+public:
+  def this(kind: MonsterKind) {
+    self.kind = kind
+    self.curHp = kind.baseHp()
+  }
+  def name(): String    = kind.displayName()
+  def hp(): Int         = curHp
+  def maxHp(): Int      = kind.baseHp()
+  def alive(): Boolean  = curHp > 0
+  def attack(): Int     = kind.baseAtk()
+
+  def takeDamage(dmg: Int): Int {
+    val actual = if dmg < 1 { 1 } else { dmg }
+    curHp -= actual
+    if curHp < 0 { curHp = 0 }
+    return actual
+  }
+}
+
+// ── Combat result (ADT enum) ───────────────────────────────────────────────
+
+enum CombatResult {
+  case Victory(xp: Int, loot: Item?)
+  case Defeat
+}
+
+// ── Room kind (plain enum) ─────────────────────────────────────────────────
+
+enum RoomKind {
+  ENTRANCE, CORRIDOR, CHAMBER, BOSS_LAIR, EXIT
+}
+
+// ── Room record ────────────────────────────────────────────────────────────
+
+record Room(id: Int, kind: RoomKind, description: String)
+
+// ── Player ─────────────────────────────────────────────────────────────────
+
+class Player conforms Entity {
+  val heroName: String
+  var curHp: Int
+  var maxHp_: Int
+  var atkStat: Int
+  var defStat: Int
+  var xpTotal: Int
+  var lvl: Int
+  var bag: List[Item]
+  var keys: Int
+public:
+  def this(name: String) {
+    heroName = name
+    curHp = 30
+    maxHp_ = 30
+    atkStat = 6
+    defStat = 2
+    xpTotal = 0
+    lvl = 1
+    val empty: List[Item] = []
+    bag = empty
+    keys = 0
+  }
+  def name(): String    = heroName
+  def hp(): Int         = curHp
+  def maxHp(): Int      = maxHp_
+  def alive(): Boolean  = curHp > 0
+  def atkPower(): Int   = atkStat
+  def defPower(): Int   = defStat
+
+  def takeDamage(dmg: Int): Int {
+    val actual = if dmg - defStat < 1 { 1 } else { dmg - defStat }
+    curHp -= actual
+    if curHp < 0 { curHp = 0 }
+    return actual
+  }
+
+  def heal(amount: Int): void {
+    curHp += amount
+    if curHp > maxHp_ { curHp = maxHp_ }
+  }
+
+  def gainXp(amount: Int): void {
+    xpTotal += amount
+    val needed = lvl * 20
+    if xpTotal >= needed {
+      xpTotal -= needed
+      lvl++
+      maxHp_ += 5
+      curHp += 5
+      atkStat++
+      IO::println("  *** Level up! Now level #{lvl}. HP #{curHp}/#{maxHp_}, ATK #{atkStat} ***")
+    }
+  }
+
+  def pickUp(item: Item): void {
+    select item.kind() {
+      case k is Sword:
+        atkStat += k.damage()
+        IO::println("  Equipped #{item.label()}: ATK now #{atkStat}")
+      case k is Shield:
+        defStat += k.defense()
+        IO::println("  Equipped #{item.label()}: DEF now #{defStat}")
+      case k is Potion:
+        bag << item
+        IO::println("  Picked up #{item.label()} (added to bag)")
+      case k is Key:
+        keys++
+        IO::println("  Picked up a key (have #{keys})")
+    }
+  }
+
+  def usePotion(): Boolean {
+    var found: Item? = null
+    foreach item: Item in bag {
+      select item.kind() {
+        case k is Potion:
+          found = item
+          break
+        else:
+      }
+    }
+    if found != null {
+      val p = (found as Item)
+      select p.kind() {
+        case k is Potion:
+          bag = bag.filter { i: Item -> !(i === p) }
+          heal(k.heal())
+          IO::println("  Used #{p.label()}: HP now #{curHp}/#{maxHp_}")
+          return true
+        else:
+      }
+    }
+    return false
+  }
+
+  def hasKey(): Boolean = keys > 0
+
+  def useKey(): void { keys-- }
+
+  def status(): String =
+    "#{heroName} | HP #{curHp}/#{maxHp_} | ATK #{atkStat} | DEF #{defStat} | LVL #{lvl} | XP #{xpTotal}"
+}
+
+// ── Combat engine ──────────────────────────────────────────────────────────
+
+class CombatEngine {
+public:
+  static def fight(player: Player, monster: Monster, loot: Item?): CombatResult {
+    IO::println("\n  [BATTLE] #{player.name()} vs #{monster.name()} (HP #{monster.hp()})")
+    var round = 1
+    while player.alive() && monster.alive() {
+      val pdmg = monster.takeDamage(player.atkPower())
+      IO::println("  Round #{round}: You deal #{pdmg}. #{monster.name()} HP: #{monster.hp()}")
+      if !monster.alive() { break }
+      val mdmg = player.takeDamage(monster.attack())
+      IO::println("           #{monster.name()} deals #{mdmg}. Your HP: #{player.hp()}")
+      if player.hp() < player.maxHp() / 3 {
+        player.usePotion()
+      }
+      round++
+    }
+    if player.alive() {
+      val earned = monster.maxHp() / 2 + 5
+      IO::println("  Victory! Earned #{earned} XP.")
+      return new Victory(earned, loot)
+    } else {
+      IO::println("  Defeat!")
+      return new Defeat()
+    }
+  }
+}
+
+// ── Dungeon ────────────────────────────────────────────────────────────────
+
+class Dungeon {
+  var rooms: List[Room]
+  var player: Player
+public:
+  def this(heroName: String) {
+    player = new Player(heroName)
+    rooms = [
+      new Room(1, RoomKind::ENTRANCE,  "The damp stone entrance. Torchlight flickers."),
+      new Room(2, RoomKind::CORRIDOR,  "A narrow corridor. Bones crunch underfoot."),
+      new Room(3, RoomKind::CHAMBER,   "A wide chamber. A goblin snarls at you."),
+      new Room(4, RoomKind::CORRIDOR,  "The passage bends. A locked door ahead."),
+      new Room(5, RoomKind::CHAMBER,   "A large chamber. An orc guard blocks the way."),
+      new Room(6, RoomKind::BOSS_LAIR, "The boss lair. A dragon roars!"),
+      new Room(7, RoomKind::EXIT,      "Sunlight! The exit is ahead!")
+    ]
+  }
+
+  def run(): void {
+    IO::println("=== DUNGEON CRAWLER ===")
+    IO::println(player.status())
+    IO::println("")
+
+    foreach room: Room in rooms {
+      IO::println("--- Room #{room.id()}: #{room.description()} ---")
+
+      select room.kind() {
+        case RoomKind::ENTRANCE:
+          val sword = new Item(new Sword(2), "Iron Sword")
+          player.pickUp(sword)
+
+        case RoomKind::CHAMBER:
+          if room.id() == 3 {
+            val goblin = new Monster(new Goblin(12, 4))
+            val loot: Item? = new Item(new Key(), "Rusty Key")
+            val result = CombatEngine::fight(player, goblin, loot)
+            select result {
+              case v is Victory:
+                player.gainXp(v.xp())
+                if v.loot() != null { player.pickUp((v.loot() as Item)) }
+              case d is Defeat: return
+            }
+          } else if room.id() == 5 {
+            val orc = new Monster(new Orc(22, 7))
+            val loot: Item? = new Item(new Potion(12), "Greater Potion")
+            val result = CombatEngine::fight(player, orc, loot)
+            select result {
+              case v is Victory:
+                player.gainXp(v.xp())
+                if v.loot() != null { player.pickUp((v.loot() as Item)) }
+              case d is Defeat: return
+            }
+          }
+
+        case RoomKind::CORRIDOR:
+          if room.id() == 4 {
+            if player.hasKey() {
+              player.useKey()
+              IO::println("  Used a key to unlock the door.")
+            } else {
+              IO::println("  The door is locked — no key. Dead end.")
+              return
+            }
+          }
+
+        case RoomKind::BOSS_LAIR:
+          val dragon = new Monster(new Dragon(40, 10))
+          val loot: Item? = new Item(new Shield(3), "Dragon Scale Shield")
+          val result = CombatEngine::fight(player, dragon, loot)
+          select result {
+            case v is Victory:
+              player.gainXp(v.xp())
+              if v.loot() != null { player.pickUp((v.loot() as Item)) }
+            case d is Defeat: return
+          }
+
+        case RoomKind::EXIT:
+          IO::println("")
+          IO::println("=== ESCAPED THE DUNGEON! ===")
+          IO::println(player.status())
+
+        else:
+      }
+    }
+  }
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────
+
+val dungeon = new Dungeon("Hero")
+dungeon.run()

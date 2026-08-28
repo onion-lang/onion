@@ -1,0 +1,352 @@
+// TextTransformPipeline.on — A composable text-transformation pipeline (~250 lines).
+// Features: ADT enum (Transform), data-carrying enum (Category), records with methods,
+//   interface (Reportable), extension methods (String/Int), collection pipelines
+//   (filter/map/fold/sortedBy/groupBy/distinct/find/partition/any/count/zip),
+//   select + ADT type-pattern matching, nullable, closures, string interpolation,
+//   try/catch, recursion, foreach over ranges and map (k,v) entries, while loop.
+
+import {
+  java.util.*
+}
+
+// ── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def wordCount(): Int {
+    val trimmed: String = self.trim()
+    if trimmed.isEmpty() { return 0 }
+    return Strings::splitRegex(trimmed, "\\s+").size
+  }
+  def rjust(w: Int): String =
+    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+  def ljust(w: Int): String =
+    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+  def truncateAt(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n) + "…" }
+}
+
+extension Int {
+  def pluralise(noun: String): String = if self == 1 { "1 " + noun } else { self + " " + noun + "s" }
+}
+
+// ── Category (data-carrying enum) ────────────────────────────────────────────
+
+enum Category(label: String, code: String) {
+  CASE_OPS("Case",        "CASE"),
+  STRUCTURAL("Structure", "STRC"),
+  CONTENT("Content",      "CONT")
+public:
+  def describe(): String = "#{code}: #{label}"
+}
+
+// ── Transform ADT ─────────────────────────────────────────────────────────────
+
+enum Transform {
+  case Upper
+  case Lower
+  case TrimSpaces
+  case Truncate(limit: Int)
+  case Repeat(n: Int)
+  case Reverse
+  case Replace(from: String, to: String)
+  case AddPrefix(prefix: String)
+  case AddSuffix(suffix: String)
+  case CollapseSpaces
+public:
+  def apply(s: String): String = select this {
+    case u is Upper:           s.toUpperCase()
+    case l is Lower:           s.toLowerCase()
+    case tr is TrimSpaces:     s.trim()
+    case t is Truncate:        if s.length() <= t.limit() { s } else { s.substring(0, t.limit()) + "…" }
+    case r is Repeat:          s.repeat(r.n())
+    case rv is Reverse:        new StringBuilder(s).reverse().toString()
+    case r is Replace:         s.replace(r.from(), r.to())
+    case p is AddPrefix:       p.prefix() + s
+    case sf is AddSuffix:      s + sf.suffix()
+    case cs is CollapseSpaces: Strings::splitRegex(s.trim(), "\\s+").fold("") { acc, w -> if (acc as String) == "" { w as String } else { (acc as String) + " " + (w as String) } } as String
+  }
+  def category(): Category = select this {
+    case u is Upper:           Category::CASE_OPS
+    case l is Lower:           Category::CASE_OPS
+    case tr is TrimSpaces:     Category::STRUCTURAL
+    case t is Truncate:        Category::STRUCTURAL
+    case cs is CollapseSpaces: Category::STRUCTURAL
+    else:                      Category::CONTENT
+  }
+  def label(): String = select this {
+    case u is Upper:           "Upper"
+    case l is Lower:           "Lower"
+    case tr is TrimSpaces:     "Trim"
+    case t is Truncate:        "Truncate(#{t.limit()})"
+    case r is Repeat:          "Repeat(#{r.n()})"
+    case rv is Reverse:        "Reverse"
+    case r is Replace:         "Replace('#{r.from()}','#{r.to()}')"
+    case p is AddPrefix:       "AddPrefix('#{p.prefix()}')"
+    case sf is AddSuffix:      "AddSuffix('#{sf.suffix()}')"
+    case cs is CollapseSpaces: "CollapseSpaces"
+  }
+}
+
+// ── Record: result of a single step ──────────────────────────────────────────
+
+record StepResult(step: Int, transformLabel: String, input: String, output: String) {
+public:
+  def changed(): Boolean = input() != output()
+  def delta(): Int       = output().length() - input().length()
+  def summary(): String  =
+    "  Step #{step()}: [#{transformLabel().ljust(22)}] #{input().length()} → #{output().length()} chars#{if changed() { "" } else { " (no-op)" }}"
+}
+
+// ── Record: full pipeline run result ─────────────────────────────────────────
+
+record RunResult(name: String, original: String, final_: String, steps: List[Object]) {
+public:
+  def wordsBefore(): Int  = original().wordCount()
+  def wordsAfter(): Int   = final_().wordCount()
+  def charDelta(): Int    = final_().length() - original().length()
+  def changedSteps(): Int = steps().count { s -> (s as StepResult).changed() }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ── Pipeline class ────────────────────────────────────────────────────────────
+
+class Pipeline conforms Reportable {
+public:
+  val name:       String
+  var transforms: List[Object]
+
+  def this(name: String) {
+    self.name       = name
+    self.transforms = []
+  }
+
+  def add(t: Transform): Pipeline {
+    transforms.add(t)
+    return self
+  }
+
+  def run(input: String): RunResult {
+    val steps: List[Object] = []
+    var current: String = input
+    var i: Int = 0
+    while i < transforms.size {
+      val t: Transform = transforms[i] as Transform
+      val next: String = try { t.apply(current) } catch e: Exception { current }
+      steps.add(new StepResult(i + 1, t.label(), current, next))
+      current = next
+      i++
+    }
+    return new RunResult(name, input, current, steps)
+  }
+
+  def report(): String = "Pipeline '#{name}' has #{transforms.size.pluralise("transform")}"
+
+  def categories(): List[Object] {
+    val result: List[Object] = []
+    foreach t: Transform in transforms {
+      val desc: Object = t.category().describe()
+      if !result.contains(desc) { result.add(desc) }
+    }
+    return result
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def applyN(s: String, transforms: List[Object], idx: Int): String {
+  if idx >= transforms.size { return s }
+  val t: Transform = transforms[idx] as Transform
+  return applyN(t.apply(s), transforms, idx + 1)
+}
+
+def joinList(list: List[Object], sep: String): String {
+  var result: String = ""
+  foreach item: Object in list {
+    result = if result == "" { item as String } else { result + sep + (item as String) }
+  }
+  return result
+}
+
+def printDivider(): void {
+  println("─".repeat(64))
+}
+
+def printRun(r: RunResult): void {
+  val sign: String = if r.charDelta() >= 0 { "+" } else { "" }
+  println("▶  Pipeline: #{r.name()}  |  input: \"#{r.original().truncateAt(30)}\"")
+  println("   Words: #{r.wordsBefore()} → #{r.wordsAfter()}  |  Chars: #{r.original().length()} → #{r.final_().length()}  (delta #{sign}#{r.charDelta()})")
+  println("   Changed steps: #{r.changedSteps()} / #{r.steps().size}")
+  foreach step: StepResult in r.steps() {
+    println(step.summary())
+  }
+  println("   Result: \"#{r.final_().truncateAt(55)}\"")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  println("TextTransformPipeline.on — Composable Text Transformation Engine")
+  printDivider()
+
+  // Build pipelines using fluent API
+  val normalise: Pipeline = new Pipeline("Normalise")
+    .add(new TrimSpaces())
+    .add(new CollapseSpaces())
+    .add(new Lower())
+
+  val encode: Pipeline = new Pipeline("Encode")
+    .add(new Upper())
+    .add(new Replace("A", "@"))
+    .add(new Replace("E", "3"))
+    .add(new Replace("I", "1"))
+    .add(new AddPrefix("["))
+    .add(new AddSuffix("]"))
+
+  val shorten: Pipeline = new Pipeline("Shorten")
+    .add(new TrimSpaces())
+    .add(new Truncate(20))
+    .add(new Lower())
+
+  val echo3: Pipeline = new Pipeline("Echo×3")
+    .add(new TrimSpaces())
+    .add(new Repeat(3))
+    .add(new Truncate(40))
+
+  val reversePipe: Pipeline = new Pipeline("Reverse")
+    .add(new TrimSpaces())
+    .add(new CollapseSpaces())
+    .add(new Reverse())
+    .add(new AddPrefix("← "))
+
+  // ── Pipeline inventory ───────────────────────────────────────────
+  println("\n── Pipeline Inventory ───────────────────────────────────────")
+  val pipelines: List[Object] = [normalise, encode, shorten, echo3, reversePipe]
+  foreach p: Pipeline in pipelines {
+    val cats: String = joinList(p.categories(), ", ")
+    println("  #{p.report()}  |  categories: #{cats}")
+  }
+
+  // ── Sample inputs ───────────────────────────────────────────────
+  val inputs: List[Object] = [
+    "  Hello   World  ",
+    "The Quick Brown Fox Jumps Over The Lazy Dog",
+    "OpenAI   GPT   Model   Release",
+    "  Onion Language Compiler  ",
+    "abcde"
+  ]
+
+  println("\n── Per-Pipeline Quick Runs ──────────────────────────────────")
+  foreach p: Pipeline in pipelines {
+    printDivider()
+    println("Pipeline: #{p.report()}")
+    foreach inp: Object in inputs {
+      val r: RunResult = p.run(inp as String)
+      println("  '#{(inp as String).truncateAt(25).ljust(26)}' → '#{r.final_().truncateAt(40)}'")
+    }
+  }
+
+  // ── Detailed step trace ────────────────────────────────────────
+  println("\n── Detailed Step Trace: Encode pipeline ─────────────────────")
+  printDivider()
+  val detail: RunResult = encode.run("  Hello Onion World  ")
+  printRun(detail)
+
+  // ── Aggregate analytics ────────────────────────────────────────
+  println("\n── Aggregate Analytics ──────────────────────────────────────")
+  printDivider()
+  val allResults: List[Object] = []
+  foreach p: Pipeline in pipelines {
+    foreach inp: Object in inputs {
+      allResults.add(p.run(inp as String))
+    }
+  }
+
+  val totalChanged: Int = allResults.fold(0) { acc, r -> (acc as Int) + (r as RunResult).changedSteps() } as Int
+  val totalSteps: Int   = allResults.fold(0) { acc, r -> (acc as Int) + (r as RunResult).steps().size } as Int
+  println("  Runs: #{allResults.size}  |  Total steps: #{totalSteps}  |  Changed: #{totalChanged}  |  No-op: #{totalSteps - totalChanged}")
+
+  // Pipelines where every run had at least one change
+  val alwaysChanging: List[Object] = pipelines.filter { p ->
+    val pp: Pipeline = p as Pipeline
+    inputs.all { inp -> pp.run(inp as String).changedSteps() > 0 }
+  }
+  println("  Always-changing: #{joinList(alwaysChanging.map { p -> (p as Pipeline).name as Object }, ", ")}")
+
+  // Find run with maximum output length
+  val maxLen: Int = allResults.fold(0) { acc, r ->
+    val l: Int = (r as RunResult).final_().length()
+    if l > (acc as Int) { l } else { (acc as Int) }
+  } as Int
+  val longest: RunResult? = allResults.find { r -> (r as RunResult).final_().length() == maxLen } as RunResult?
+  if longest != null {
+    println("  Longest output: '#{longest.final_().truncateAt(40)}' (#{longest.final_().length()} chars, via '#{longest.name()}')")
+  }
+
+  // ── Transform usage counts ────────────────────────────────────
+  val allSteps: List[Object] = []
+  foreach r: RunResult in allResults { allSteps.addAll(r.steps()) }
+  val byTransform = allSteps.groupBy { s -> (s as StepResult).transformLabel() }
+
+  val labelList: List[Object] = []
+  foreach p: Pipeline in pipelines {
+    foreach t: Transform in p.transforms { labelList.add(t.label()) }
+  }
+  val sortedLabels: List[Object] = labelList.distinct().sortedBy { s -> s as String }
+
+  println("\n── Transform Usage Counts ───────────────────────────────────")
+  printDivider()
+  foreach lbl: Object in sortedLabels {
+    val lblStr: String = lbl as String
+    val bucket: List[Object]? = if byTransform.containsKey(lblStr) { byTransform.get(lblStr) as List[Object] } else { null }
+    val count: Int   = if bucket == null { 0 } else { bucket.size }
+    val changed: Int = if bucket == null { 0 } else { bucket.count { s -> (s as StepResult).changed() } }
+    println("  #{lblStr.ljust(26)}  applications=#{("" + count).rjust(3)}  changed=#{("" + changed).rjust(3)}")
+  }
+
+  // Partition: runs that grew vs. shrank
+  val parts = allResults.partition { r -> (r as RunResult).charDelta() > 0 }
+  val grew: List[Object]   = parts[0] as List[Object]
+  val shrank: List[Object] = parts[1] as List[Object]
+  println("\n  Runs that grew: #{grew.size}  |  Shrank/same: #{shrank.size}")
+
+  // zip pipeline names with first-input changed-step counts
+  val pipelineNames: List[Object] = pipelines.map { p -> (p as Pipeline).name as Object }
+  val changeCounts: List[Object]  = pipelines.map { p -> (p as Pipeline).run(inputs[0] as String).changedSteps() as Object }
+  val zipped = pipelineNames.zip(changeCounts)
+  println("\n── Pipeline × First-Input Changed Steps ─────────────────────")
+  foreach pair: Object in zipped {
+    val pairList: List[Object] = pair as List[Object]
+    val pname: String = pairList[0] as String
+    val cnt: Int      = pairList[1] as Int
+    println("  #{pname.ljust(16)} → #{cnt.pluralise("changed step")}")
+  }
+
+  // ── Range + Recursion Demo ────────────────────────────────────
+  println("\n── Range + Recursion Demo ────────────────────────────────────")
+  printDivider()
+  val testStr: String = "Hello World"
+  val finalVal: String = applyN(testStr, normalise.transforms, 0)
+  println("  Recursive normalise '#{testStr}' → '#{finalVal}'")
+
+  println("  Normalise steps (foreach over range 0..<n):")
+  foreach i: Int in 0..<normalise.transforms.size {
+    val t: Transform = normalise.transforms[i] as Transform
+    println("    #{i + 1}. #{t.label()} [#{t.category().describe()}]")
+  }
+
+  // ── Category distribution via foreach (k,v) on groupBy result ──
+  println("\n  Category distribution across all pipelines:")
+  val allTransforms: List[Object] = []
+  foreach p: Pipeline in pipelines { allTransforms.addAll(p.transforms) }
+  val byCat = allTransforms.groupBy { t -> (t as Transform).category().describe() }
+  foreach (cat, ts) in byCat {
+    println("    #{cat as String}  : #{(ts as List[Object]).size} transforms")
+  }
+
+  println("\nDone.")
+}

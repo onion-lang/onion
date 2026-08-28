@@ -1,0 +1,278 @@
+// DNA Sequence Analysis — end-to-end demo (~240 lines)
+// Exercises: extension methods; records with methods; ADT enum with instance
+// methods; collection pipelines (map/filter/fold/groupBy/sortedByDescending/
+// find/partition/zip/distinct/take); foreach (ranges + (k,v) map
+// destructuring); select / pattern matching; closures; string interpolation;
+// nullable types; while loops.
+
+import {
+  java.lang.StringBuilder as JBuilder
+}
+
+// ── Extension methods on String ──────────────────────────────────────────────
+
+extension String {
+
+  def complementBases(): String {
+    val sb: JBuilder = new JBuilder()
+    foreach i: Int in 0..<this.length {
+      val b: String = this.substring(i, i + 1)
+      val c: String = select b {
+        case "A": "T"
+        case "T": "A"
+        case "G": "C"
+        case "C": "G"
+        else:      "N"
+      }
+      sb.append(c)
+    }
+    return sb.toString()
+  }
+
+  def revComp(): String {
+    val comp: String = this.complementBases()
+    val sb: JBuilder = new JBuilder()
+    var i: Int = comp.length - 1
+    while i >= 0 {
+      sb.append(comp.substring(i, i + 1))
+      i--
+    }
+    return sb.toString()
+  }
+
+  def gcCount(): Int {
+    var count: Int = 0
+    foreach i: Int in 0..<this.length {
+      val b: String = this.substring(i, i + 1)
+      if b == "G" || b == "C" { count++ }
+    }
+    return count
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Sequence(id: String, data: String) {
+public:
+  def seqLen(): Int = data.length
+  def gcContent(): Double = data.gcCount() as Double / data.length as Double
+  def gcPct(): Int = (gcContent() * 100.0 + 0.5) as Int
+  def description(): String = "#{id}(#{data.length}bp GC=#{gcPct()}%)"
+  def kmer(start: Int, k: Int): String = data.substring(start, start + k)
+}
+
+record ORF(seqId: String, frame: Int, start: Int, end: Int) {
+public:
+  def orfLen(): Int = end - start
+  def codonCount(): Int = orfLen() / 3
+  def description(): String = "#{seqId}@frame#{frame}:[#{start},#{end}) #{codonCount()}aa"
+}
+
+record KmerCount(seq: String, count: Int)
+
+// ── ADT enum for variant type ─────────────────────────────────────────────────
+
+enum VariantKind {
+  case SNP(ref: String, alt: String)
+  case Insertion(inserted: String)
+  case Deletion(deleted: String)
+public:
+  def label(): String = select this {
+    case s is SNP:       "SNP #{s.ref()}->#{s.alt()}"
+    case i is Insertion: "INS +#{i.inserted()}"
+    case d is Deletion:  "DEL -#{d.deleted()}"
+  }
+  def isSNP(): Boolean = select this {
+    case x is SNP: true
+    else: false
+  }
+  def isIndel(): Boolean = select this {
+    case x is Insertion: true
+    case x is Deletion:  true
+    else: false
+  }
+}
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def isStart(codon: String): Boolean = codon == "ATG"
+
+def isStop(codon: String): Boolean = codon == "TAA" || codon == "TAG" || codon == "TGA"
+
+def codonType(codon: String): String =
+  if isStart(codon) { "START" } else if isStop(codon) { "STOP" } else { "CODING" }
+
+def gcBracket(pct: Int): String =
+  if pct < 40 { "AT-rich (<40%)" } else if pct < 60 { "balanced (40-59%)" } else { "GC-rich (>=60%)" }
+
+def findORFs(seq: Sequence, frame: Int): List[Object] {
+  val data: String = seq.data()
+  val orfs: List[Object] = []
+  var i: Int = frame
+  while i + 2 < data.length {
+    val codon: String = data.substring(i, i + 3)
+    if isStart(codon) {
+      var j: Int = i + 3
+      var found: Boolean = false
+      while j + 2 < data.length && !found {
+        if isStop(data.substring(j, j + 3)) {
+          orfs.add(new ORF(seq.id(), frame, i, j + 3))
+          found = true
+        }
+        j += 3
+      }
+    }
+    i += 3
+  }
+  return orfs
+}
+
+def countKmers(data: String, k: Int): List[Object] {
+  val counts: Map[String, Int] = [:]
+  foreach i: Int in 0..data.length - k {
+    val km: String = data.substring(i, i + k)
+    val prev: Int = if counts.containsKey(km) { counts.get(km) as Int } else { 0 }
+    counts.put(km, prev + 1)
+  }
+  val result: List[Object] = []
+  foreach (km, cnt) in counts {
+    result.add(new KmerCount(km as String, cnt as Int))
+  }
+  return result.sortedByDescending { kc -> (kc as KmerCount).count() }
+}
+
+def main(): void {
+  // ── Dataset ───────────────────────────────────────────────────────────────
+  val sequences: List[Object] = [
+    new Sequence("BRCA2", "ATGCGATCGATCGAAATTTGCTAGATGATGATGTAA"),
+    new Sequence("TP53",  "ATGGCTAGCGATCGATCGATCGAATAAATGATGTAA"),
+    new Sequence("EGFR",  "GCATGCTAGCATGAAATGCGCGTAAGCGCGCGATG"),
+    new Sequence("MYC",   "ATGATGATGATGATGTAAGCGCGCGCGAT"),
+    new Sequence("RAS",   "CGCGCGCGATTATAGCATGATGCGCGTAA")
+  ]
+
+  val variants: List[Object] = [
+    new SNP("A", "G"),
+    new Insertion("ATG"),
+    new Deletion("TC"),
+    new SNP("C", "T")
+  ]
+
+  IO::println("=== DNA Sequence Analysis ===")
+  IO::println("")
+
+  // ── 1. GC content table ────────────────────────────────────────────────────
+  IO::println("--- GC Content ---")
+  foreach s: Object in sequences {
+    IO::println("  " + (s as Sequence).description())
+  }
+
+  // ── 2. Sorted by GC% descending ────────────────────────────────────────────
+  IO::println("")
+  IO::println("--- Sorted by GC% (high to low) ---")
+  val byGC: List[Object] = sequences.sortedByDescending { s -> (s as Sequence).gcContent() }
+  foreach s: Object in byGC {
+    val seq: Sequence = s as Sequence
+    IO::println("  #{seq.id()}: #{seq.gcPct()}%")
+  }
+
+  // ── 3. Group by AT-rich / balanced / GC-rich ───────────────────────────────
+  IO::println("")
+  IO::println("--- Grouped by GC bracket ---")
+  val grouped = sequences.groupBy { s -> gcBracket((s as Sequence).gcPct()) }
+  foreach (bracket, seqs) in grouped {
+    IO::println("  #{bracket}: #{(seqs as List[Object]).size} seq(s)")
+  }
+
+  // ── 4. Partition into long (>=30bp) and short ──────────────────────────────
+  IO::println("")
+  IO::println("--- Length partition (>=30bp / <30bp) ---")
+  val parts: List[List[Object]] = sequences.partition { s -> (s as Sequence).seqLen() >= 30 }
+  val longSeqs: List[Object] = parts[0]
+  val shortSeqs: List[Object] = parts[1]
+  IO::println("  long (>=30bp) : #{longSeqs.size}")
+  IO::println("  short (<30bp) : #{shortSeqs.size}")
+
+  // ── 5. ORF discovery in all 3 frames ────────────────────────────────────────
+  IO::println("")
+  IO::println("--- ORF discovery (all 3 frames) ---")
+  val allOrfs: List[Object] = []
+  foreach s: Object in sequences {
+    val seq: Sequence = s as Sequence
+    foreach frame: Int in 0..2 {
+      val frameOrfs: List[Object] = findORFs(seq, frame)
+      foreach o: Object in frameOrfs { allOrfs.add(o) }
+    }
+  }
+  val longOrfs: List[Object] = allOrfs.filter { o -> (o as ORF).codonCount() >= 4 }
+  IO::println("  total ORFs found : #{allOrfs.size}")
+  IO::println("  ORFs >= 4 codons : #{longOrfs.size}")
+  foreach o: Object in longOrfs.take(5) {
+    IO::println("    " + (o as ORF).description())
+  }
+
+  // ── 6. Reverse-complement of each sequence ────────────────────────────────
+  IO::println("")
+  IO::println("--- Reverse complements ---")
+  val rcPairs: List[Object] = sequences.map { s ->
+    val seq: Sequence = s as Sequence
+    seq.id() + " -> " + seq.data().revComp()
+  }
+  foreach pair: Object in rcPairs {
+    IO::println("  " + (pair as String))
+  }
+
+  // ── 7. Top-3 3-mers for first sequence ────────────────────────────────────
+  IO::println("")
+  val seq0: Sequence = sequences[0] as Sequence
+  IO::println("--- Top-3 trinucleotides in #{seq0.id()} ---")
+  val kmers: List[Object] = countKmers(seq0.data(), 3)
+  val top3: List[Object] = kmers.filter { kc -> (kc as KmerCount).count() > 1 }.take(3)
+  foreach kc: Object in top3 {
+    val k: KmerCount = kc as KmerCount
+    IO::println("  #{k.seq()}: #{k.count()}x  type=#{codonType(k.seq())}")
+  }
+
+  // ── 8. Variant kinds via ADT enum ─────────────────────────────────────────
+  IO::println("")
+  IO::println("--- Variant types ---")
+  val snpList: List[Object] = variants.filter { v -> (v as VariantKind).isSNP() }
+  val indelList: List[Object] = variants.filter { v -> (v as VariantKind).isIndel() }
+  IO::println("  total: #{variants.size}  SNPs: #{snpList.size}  indels: #{indelList.size}")
+  foreach v: Object in variants {
+    IO::println("  " + (v as VariantKind).label())
+  }
+
+  // ── 9. Find first GC-rich sequence (nullable) ─────────────────────────────
+  IO::println("")
+  IO::println("--- First high-GC sequence ---")
+  val gcRich: Object? = sequences.find { s -> (s as Sequence).gcPct() >= 50 }
+  if gcRich != null {
+    IO::println("  " + (gcRich as Sequence).description())
+  } else {
+    IO::println("  none found")
+  }
+
+  // ── 10. Zip sequence IDs with GC% ─────────────────────────────────────────
+  IO::println("")
+  IO::println("--- ID / GC% zip ---")
+  val ids: List[Object] = sequences.map { s -> (s as Sequence).id() }
+  val pcts: List[Object] = sequences.map { s -> (s as Sequence).gcPct() }
+  val zipped: List[List[Object]] = ids.zip(pcts)
+  foreach pair: Object in zipped {
+    val p: List[Object] = pair as List[Object]
+    IO::println("  #{p[0]}: #{p[1]}%")
+  }
+
+  // ── 11. Fold: total base-pair count ────────────────────────────────────────
+  IO::println("")
+  val totalBp: Int = sequences.fold(0) { acc, s -> (acc as Int) + (s as Sequence).seqLen() }
+  IO::println("Total bases across all sequences: #{totalBp}bp")
+
+  // ── 12. Distinct GC brackets ──────────────────────────────────────────────
+  val brackets: List[String] = sequences.map { s -> gcBracket((s as Sequence).gcPct()) }.distinct()
+  IO::println("Distinct GC brackets: #{brackets.size}")
+
+  IO::println("")
+  IO::println("Done.")
+}

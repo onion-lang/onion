@@ -299,6 +299,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("x", "5")
     }
 
+    it("recognizes a Rust-style `val mut` declaration") {
+      val hint = classify(
+        found = "x",
+        expected = "\"=\", \":\"",
+        sourceLine = "val mut x = 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("val", "x")
+    }
+
+    it("recognizes a Rust-style `var mut` declaration") {
+      val hint = classify(
+        found = "count",
+        expected = "\"=\", \":\"",
+        sourceLine = "var mut count = 0"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("var", "count")
+    }
+
     it("recognizes a Ruby-style `unless` statement") {
       val hint = classify(
         found = "unless",

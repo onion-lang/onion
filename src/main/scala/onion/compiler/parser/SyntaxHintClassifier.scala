@@ -17,6 +17,8 @@ private[compiler] object SyntaxHintClassifier {
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val RustStyleMutDeclaration =
+    """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
@@ -127,6 +129,9 @@ private[compiler] object SyntaxHintClassifier {
         controlFlowHint
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if RustStyleMutDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = RustStyleMutDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.rust_style_mut", matched.group(1), matched.group(2))
       case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DataClassDeclaration.findFirstMatchIn(sourceLine).get
         val params = matched.group(2).split(",").map { p =>

@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `distinct`, `any`) driving conflict detection, free-slot finding, and an
   auto-scheduler.
 
+- **`run/TextTransformPipeline.on`, a 352-line composable text-transformation
+  pipeline simulator.** An ADT `case` enum `Transform` (10 cases: Upper,
+  Lower, TrimSpaces, Truncate, Repeat, Reverse, Replace, AddPrefix,
+  AddSuffix, CollapseSpaces) with `apply`/`category`/`label` methods, a
+  data-carrying `Category` enum, records with methods (`StepResult`,
+  `RunResult`), a `Pipeline` class conforming to a `Reportable` interface,
+  extension methods on `String`/`Int`, and collection pipelines (`filter`,
+  `map`, `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`,
+  `any`, `count`, `zip`) run five named pipelines over five sample inputs
+  with aggregate analytics.
+
 ### Fixed
 
 - **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has

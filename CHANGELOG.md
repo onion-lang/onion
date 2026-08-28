@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
+  Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
+  graph model, residual-graph min-cut derivation via reachability from the
+  source, and bipartite maximum matching as a unit-capacity max-flow
+  reduction. Five worked examples (CLRS Figure 26.1, a supply-chain network,
+  a 5-router packet mesh, bipartite worker/job matching, and degenerate
+  disconnected/parallel/diamond cases) exercise ADT `case`-enums, `HashMap`
+  Java interop, generic `List[T]`, `extension Int`, closures, and collection
+  pipelines.
+
 - **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
   A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
   plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,

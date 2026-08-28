@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/SymbolicMath.on`, a 283-line symbolic expression rewriting and
+  calculus engine.** An ADT `enum Term` (Num, Var, Add, Sub, Mul, Div, Neg,
+  Pow) with nested `select`/destructuring, fixpoint simplification
+  (constant folding, identity/zero laws, double-negation elimination),
+  symbolic differentiation (product/quotient/power-chain rules),
+  substitution, variable collection, and a nullable-propagating evaluator
+  over `java.util.Map[String, JDouble]`. Cross-checks a symbolic derivative
+  against a finite-difference approximation.
+
 - **`run/TradeMatchingEngine.on`, a 454-line continuous limit-order-book
   simulator.** Multi-symbol stock exchange matching engine: an ADT
   `enum OrderType` (Market, Limit, StopLoss), plain enums for `Side`/`Status`,

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has
+  no `mut` keyword; mutability is chosen directly by `val` (immutable) or
+  `var` (mutable). Writing `let mut x = 5` translated naively as
+  `val mut x = 5` parsed `mut` as the declared identifier and then hit a
+  generic `expecting "=", ":"` error on the next token, with no mention of
+  `val`/`var`. The diagnostic now recognizes the `val mut name` / `var mut
+  name` pattern and points at the correct `var name = ...` form.
+
 ## [0.23.0] - 2026-08-28
 
 ### Fixed

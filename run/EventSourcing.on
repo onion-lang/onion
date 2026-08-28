@@ -1,0 +1,266 @@
+// EventSourcing.on — A simple event-sourced bank account system.
+// Demonstrates: ADT sum-type enums, records, generics, pattern matching,
+// collection pipelines (fold/map/filter), closures, nullable, string interpolation.
+
+// ── Events ────────────────────────────────────────────────────────────────────
+enum AccountEvent {
+  case Opened(id: String, owner: String, initial: Int)
+  case Credited(id: String, amount: Int, memo: String)
+  case Debited(id: String, amount: Int, memo: String)
+  case Closed(id: String, reason: String)
+}
+
+// ── Account state rebuilt by replaying events ─────────────────────────────────
+record Account(id: String, owner: String, balance: Int, open: Boolean)
+
+// A snapshot of the account for display
+record Snapshot(id: String, owner: String, balance: Int, status: String)
+
+// ── Command result ─────────────────────────────────────────────────────────────
+enum CommandResult {
+  case Accepted(event: AccountEvent)
+  case Rejected(reason: String)
+}
+
+// ── Event store (generic) ──────────────────────────────────────────────────────
+class EventStore {
+  var events: List
+  def this {
+    events = []
+  }
+public:
+  def append(event: AccountEvent): void {
+    events.add(event)
+  }
+  def all(): List {
+    return events
+  }
+  def forAccount(id: String): List {
+    return events.filter { e: AccountEvent ->
+      select e {
+        case o is Opened: o.id() == id
+        case c is Credited: c.id() == id
+        case d is Debited: d.id() == id
+        case cl is Closed: cl.id() == id
+      }
+    }
+  }
+}
+
+// ── Rebuild account state from events ─────────────────────────────────────────
+def rebuildAccount(events: List): Account? {
+  if events.size == 0 { return null }
+  var id: String = ""
+  var owner: String = ""
+  var balance: Int = 0
+  var open: Boolean = false
+  foreach e: AccountEvent in events {
+    select e {
+      case o is Opened:
+        id = o.id()
+        owner = o.owner()
+        balance = o.initial()
+        open = true
+      case c is Credited:
+        balance = balance + c.amount()
+      case d is Debited:
+        balance = balance - d.amount()
+      case cl is Closed:
+        open = false
+    }
+  }
+  return new Account(id, owner, balance, open)
+}
+
+// ── Command processor ─────────────────────────────────────────────────────────
+class AccountService {
+  var store: EventStore
+  var nextId: Int
+  def this {
+    store = new EventStore()
+    nextId = 1
+  }
+public:
+  def open(owner: String, initial: Int): CommandResult {
+    if initial < 0 {
+      return new Rejected("Initial balance cannot be negative")
+    }
+    val id: String = "ACC-#{nextId}"
+    nextId = nextId + 1
+    val event: AccountEvent = new Opened(id, owner, initial)
+    store.append(event)
+    return new Accepted(event)
+  }
+
+  def credit(id: String, amount: Int, memo: String): CommandResult {
+    if amount <= 0 {
+      return new Rejected("Credit amount must be positive")
+    }
+    val acc: Account? = rebuildAccount(store.forAccount(id))
+    if acc == null {
+      return new Rejected("Account #{id} not found")
+    }
+    if !acc.open() {
+      return new Rejected("Account #{id} is closed")
+    }
+    val event: AccountEvent = new Credited(id, amount, memo)
+    store.append(event)
+    return new Accepted(event)
+  }
+
+  def debit(id: String, amount: Int, memo: String): CommandResult {
+    if amount <= 0 {
+      return new Rejected("Debit amount must be positive")
+    }
+    val acc: Account? = rebuildAccount(store.forAccount(id))
+    if acc == null {
+      return new Rejected("Account #{id} not found")
+    }
+    if !acc.open() {
+      return new Rejected("Account #{id} is closed")
+    }
+    if acc.balance() < amount {
+      return new Rejected("Insufficient funds: balance #{acc.balance()}, requested #{amount}")
+    }
+    val event: AccountEvent = new Debited(id, amount, memo)
+    store.append(event)
+    return new Accepted(event)
+  }
+
+  def closeAccount(id: String, reason: String): CommandResult {
+    val acc: Account? = rebuildAccount(store.forAccount(id))
+    if acc == null {
+      return new Rejected("Account #{id} not found")
+    }
+    if !acc.open() {
+      return new Rejected("Account #{id} is already closed")
+    }
+    val event: AccountEvent = new Closed(id, reason)
+    store.append(event)
+    return new Accepted(event)
+  }
+
+  def snapshot(id: String): Snapshot? {
+    val acc: Account? = rebuildAccount(store.forAccount(id))
+    if acc == null { return null }
+    val status: String = if acc.open() { "OPEN" } else { "CLOSED" }
+    return new Snapshot(acc.id(), acc.owner(), acc.balance(), status)
+  }
+
+  def history(id: String): List {
+    return store.forAccount(id)
+  }
+
+  def allEvents(): List {
+    return store.all()
+  }
+}
+
+// ── Result printing ────────────────────────────────────────────────────────────
+def printResult(label: String, result: CommandResult): void {
+  select result {
+    case ok is Accepted:
+      val ev: AccountEvent = ok.event()
+      val desc: String = select ev {
+        case o is Opened: "Opened #{o.id()} for #{o.owner()} with $#{o.initial()}"
+        case c is Credited: "Credited #{c.id()} +$#{c.amount()} (#{c.memo()})"
+        case d is Debited: "Debited #{d.id()} -$#{d.amount()} (#{d.memo()})"
+        case cl is Closed: "Closed #{cl.id()} (#{cl.reason()})"
+      }
+      println("[OK]  #{label}: #{desc}")
+    case rej is Rejected:
+      println("[ERR] #{label}: #{rej.reason()}")
+  }
+}
+
+// ── Portfolio projection: total assets under management ────────────────────────
+def totalBalance(svc: AccountService, ids: List): Int {
+  var total: Int = 0
+  foreach id: String in ids {
+    val snap: Snapshot? = svc.snapshot(id)
+    if snap != null && snap.status() == "OPEN" {
+      total = total + snap.balance()
+    }
+  }
+  return total
+}
+
+// ── Activity report: event count per account ──────────────────────────────────
+def activityReport(svc: AccountService, ids: List): void {
+  println("\n--- Activity Report ---")
+  foreach id: String in ids {
+    val evts: List = svc.history(id)
+    val snap: Snapshot? = svc.snapshot(id)
+    val owner: String = if snap != null { snap.owner() } else { "unknown" }
+    println("  #{id} (#{owner}): #{evts.size} events")
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+val svc: AccountService = new AccountService()
+
+println("=== Opening accounts ===")
+var r: CommandResult = svc.open("Alice", 1000)
+printResult("open Alice", r)
+r = svc.open("Bob", 500)
+printResult("open Bob", r)
+r = svc.open("Carol", 0)
+printResult("open Carol", r)
+// Reject: negative initial balance
+r = svc.open("Dave", -100)
+printResult("open Dave (bad)", r)
+
+println("\n=== Deposits ===")
+r = svc.credit("ACC-1", 250, "salary")
+printResult("deposit Alice", r)
+r = svc.credit("ACC-2", 100, "gift")
+printResult("deposit Bob", r)
+// Reject: amount <= 0
+r = svc.credit("ACC-1", 0, "zero")
+printResult("deposit zero (bad)", r)
+
+println("\n=== Withdrawals ===")
+r = svc.debit("ACC-1", 300, "rent")
+printResult("withdraw Alice", r)
+r = svc.debit("ACC-2", 200, "groceries")
+printResult("withdraw Bob", r)
+// Reject: insufficient funds
+r = svc.debit("ACC-2", 1000, "holiday")
+printResult("withdraw Bob too much (bad)", r)
+
+println("\n=== Closing ===")
+r = svc.closeAccount("ACC-3", "empty account")
+printResult("close Carol", r)
+// Reject: already closed
+r = svc.closeAccount("ACC-3", "duplicate")
+printResult("close Carol again (bad)", r)
+// Reject: unknown account
+r = svc.credit("ACC-3", 50, "after close")
+printResult("credit closed account (bad)", r)
+
+println("\n=== Snapshots ===")
+val ids: List = ["ACC-1", "ACC-2", "ACC-3"]
+foreach id: String in ids {
+  val snap: Snapshot? = svc.snapshot(id)
+  if snap != null {
+    println("  #{snap.id()} [#{snap.status()}] #{snap.owner()}: $#{snap.balance()}")
+  }
+}
+
+println("\n=== Total Open Balance ===")
+println("  $#{totalBalance(svc, ids)}")
+
+activityReport(svc, ids)
+
+println("\n=== Full Event Log ===")
+var i: Int = 1
+foreach ev: AccountEvent in svc.allEvents() {
+  val line: String = select ev {
+    case o is Opened: "Opened(#{o.id()},#{o.owner()},#{o.initial()})"
+    case c is Credited: "Credited(#{c.id()},+#{c.amount()},\"#{c.memo()}\")"
+    case d is Debited: "Debited(#{d.id()},-#{d.amount()},\"#{d.memo()}\")"
+    case cl is Closed: "Closed(#{cl.id()},\"#{cl.reason()}\")"
+  }
+  println("  #{i}. #{line}")
+  i = i + 1
+}

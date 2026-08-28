@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python-style `from ... import ...` statement.**
+  Onion has no `from module import name` statement; imports are wrapped in
+  braces and dotted, so `from os import path` parses `from` as a bare
+  identifier-reference statement followed by a stray identifier, with a
+  generic expected-token dump that never mentions `import { ... }`. The
+  diagnostic now recognizes a leading `from module import name[, name...]`
+  statement (including a `*` wildcard and `name as alias`) and points at the
+  correct `import { module.name }` form.
+
 - **Parser hint for a Ruby-style `until` loop.**
   Onion has no `until` loop; the negated-condition idiom is `while !condition`,
   so `until done { ... }` parses as a bare identifier-reference statement

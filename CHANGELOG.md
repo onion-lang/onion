@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/ForthMachine.on`, a 474-line Forth-inspired stack-based interpreter.**
+  A tokenizer/executor over a mutable data stack and dictionary, exercising
+  an ADT `case`-enum (`ForthError` with `Underflow`/`Unknown`/`DivByZero`/
+  `Syntax`), `select`/type-pattern error dispatch, `extension String`
+  (`isInt`, `toInt`, `padLeft`, `repeatStr`), nullable types with safe calls,
+  recursive instance methods (word definitions calling themselves for
+  `DO`-bodies and user words), `try`/`catch`, `StringBuilder`, and collection
+  pipelines. Demos cover arithmetic, recursive factorial/Fibonacci,
+  `DO`/`LOOP` with nested `IF`/`ELSE`/`THEN`, FizzBuzz, and a prime sieve.
+
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
   Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
   graph model, residual-graph min-cut derivation via reachability from the

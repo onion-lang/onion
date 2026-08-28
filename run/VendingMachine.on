@@ -1,0 +1,290 @@
+// VendingMachine.on — Vending machine simulator (~230 lines)
+// Exercises: plain enums, data-carrying enum, records, class/inheritance,
+// interface, collection pipelines, select/pattern-matching, closures,
+// string interpolation, try/catch, recursion, foreach (range + map k,v), while.
+
+// ── Enums ─────────────────────────────────────────────────────────────────
+
+enum Coin { NICKEL, DIME, QUARTER, DOLLAR }
+
+enum Category { DRINK, SNACK, CANDY }
+
+// Data-carrying enum: machine event log entry
+enum MachineEvent {
+  case CoinAccepted(amount: Int)
+  case ItemDispensed(name: String, change: Int)
+  case Refunded(amount: Int)
+  case ErrorEvent(message: String)
+public:
+  def describe(): String = select this {
+    case e is CoinAccepted:  "Coin accepted: " + e.amount() + "¢"
+    case e is ItemDispensed: "Dispensed: " + e.name() + " | Change: " + e.change() + "¢"
+    case e is Refunded:      "Refunded: " + e.amount() + "¢"
+    case e is ErrorEvent:    "Error: " + e.message()
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record Product(id: Int, name: String, category: Category, priceCents: Int, stock: Int)
+
+record Sale(product: Product, paid: Int, change: Int)
+
+record DailySummary(totalSales: Int, totalRevenue: Int, topCategory: String)
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+def coinValue(c: Coin): Int = select c {
+  case Coin::NICKEL:  5
+  case Coin::DIME:    10
+  case Coin::QUARTER: 25
+  case Coin::DOLLAR:  100
+  else: 0
+}
+
+def coinName(c: Coin): String = select c {
+  case Coin::NICKEL:  "nickel"
+  case Coin::DIME:    "dime"
+  case Coin::QUARTER: "quarter"
+  case Coin::DOLLAR:  "dollar"
+  else: "unknown"
+}
+
+def categoryLabel(cat: Category): String = select cat {
+  case Category::DRINK: "Drink"
+  case Category::SNACK: "Snack"
+  case Category::CANDY: "Candy"
+  else: "Other"
+}
+
+def formatCents(cents: Int): String {
+  val dollars = cents / 100
+  val remainder = cents % 100
+  if remainder < 10 {
+    return "$" + dollars + ".0" + remainder
+  } else {
+    return "$" + dollars + "." + remainder
+  }
+}
+
+// Recursive: count minimum coins needed (quarters / dimes / nickels)
+def makeChange(remaining: Int, denoms: List[Int], idx: Int): Int {
+  if remaining == 0 { return 0 }
+  if idx >= denoms.size { return -1 }
+  val denom = (denoms[idx] as Int)
+  val count = remaining / denom
+  if count > 0 {
+    val rest = remaining - count * denom
+    val sub = makeChange(rest, denoms, idx + 1)
+    if sub >= 0 { return count + sub }
+  }
+  return makeChange(remaining, denoms, idx + 1)
+}
+
+// ── VendingMachine class ───────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class VendingMachine(val products: List[Product]) conforms Reportable {
+  var balance: Int = 0
+
+public:
+  val sales: List[Sale] = []
+  val events: List[MachineEvent] = []
+
+  def insert(coin: Coin): MachineEvent {
+    val v = coinValue(coin)
+    this.balance = this.balance + v
+    val ev = new CoinAccepted(v)
+    this.events.add(ev)
+    return ev
+  }
+
+  def pick(productId: Int): MachineEvent {
+    val found = this.products.find { p -> (p as Product).id() == productId }
+    if found == null {
+      val ev = new ErrorEvent("No such product: #" + productId)
+      this.events.add(ev)
+      return ev
+    }
+    val prod = (found as Product)
+    if prod.stock() <= 0 {
+      val ev = new ErrorEvent("Out of stock: " + prod.name())
+      this.events.add(ev)
+      return ev
+    }
+    if this.balance < prod.priceCents() {
+      val need = prod.priceCents() - this.balance
+      val ev = new ErrorEvent("Need " + need + "¢ more for " + prod.name())
+      this.events.add(ev)
+      return ev
+    }
+    val change = this.balance - prod.priceCents()
+    val sale = new Sale(prod, this.balance, change)
+    this.sales.add(sale)
+    this.balance = 0
+    val ev = new ItemDispensed(prod.name(), change)
+    this.events.add(ev)
+    return ev
+  }
+
+  def refund(): MachineEvent {
+    val amount = this.balance
+    this.balance = 0
+    val ev = new Refunded(amount)
+    this.events.add(ev)
+    return ev
+  }
+
+  def report(): String {
+    val totalSales = this.sales.size
+    val totalRevenue = this.sales.fold(0) { acc, s ->
+      (acc as Int) + (s as Sale).paid() - (s as Sale).change()
+    }
+    return "=== Vending Machine Report ===\n" +
+           "Sales:   " + totalSales + "\n" +
+           "Revenue: " + formatCents(totalRevenue)
+  }
+}
+
+// ── PremiumMachine: extends VendingMachine, adds loyalty points ────────────
+
+class PremiumMachine(products: List[Product]) extends VendingMachine(products) {
+  var loyaltyPoints: Int = 0
+
+public:
+  override def pick(productId: Int): MachineEvent {
+    val ev = super.pick(productId)
+    select ev {
+      case e is ItemDispensed: this.loyaltyPoints = this.loyaltyPoints + 1
+      else: {}
+    }
+    return ev
+  }
+
+  def pointsBalance(): Int = this.loyaltyPoints
+}
+
+// ── Collection pipeline analysis ───────────────────────────────────────────
+
+def analyzeInventory(products: List[Product]): String {
+  val byCategory = products.groupBy { p -> categoryLabel((p as Product).category()) }
+  var result: String = "── Inventory by category ──\n"
+  foreach (cat, items) in byCategory {
+    val names = (items as List).map { p -> (p as Product).name() }
+    result = result + "  " + cat + ": " + names.toString() + "\n"
+  }
+
+  val affordable = products.filter { p -> (p as Product).priceCents() <= 75 }
+  result = result + "Under 75¢: " + affordable.map { p -> (p as Product).name() }.toString() + "\n"
+
+  val parts = products.partition { p -> (p as Product).stock() > 0 }
+  val inStock = parts[0] as List[Object]
+  val oos = parts[1] as List[Object]
+  result = result + "In stock: " + inStock.size +
+           "  Out of stock: " + oos.size + "\n"
+
+  val sorted = products.sortedBy { p -> (p as Product).priceCents() }
+  val cheapest = (sorted[0] as Product)
+  result = result + "Cheapest: " + cheapest.name() + " @ " +
+           formatCents(cheapest.priceCents()) + "\n"
+
+  return result
+}
+
+def summarizeSales(sales: List[Sale]): DailySummary {
+  val totalSales = sales.size
+  val totalRevenue = sales.fold(0) { acc, s ->
+    (acc as Int) + (s as Sale).paid() - (s as Sale).change()
+  }
+  val byCategory = sales.groupBy { s -> categoryLabel((s as Sale).product().category()) }
+  var topCat: String = "None"
+  var topCount: Int = 0
+  foreach (cat, items) in byCategory {
+    val count = (items as List).size
+    if count > topCount {
+      topCount = count
+      topCat = (cat as String)
+    }
+  }
+  return new DailySummary(totalSales, totalRevenue, topCat)
+}
+
+// ── Main simulation ────────────────────────────────────────────────────────
+
+val products: List[Product] = [
+  new Product(1, "Cola",         Category::DRINK, 75,  10),
+  new Product(2, "OrangeJuice",  Category::DRINK, 90,   5),
+  new Product(3, "Water",        Category::DRINK, 50,  20),
+  new Product(4, "Chips",        Category::SNACK, 80,   8),
+  new Product(5, "PretzelStick", Category::SNACK, 60,  12),
+  new Product(6, "ChocolateBar", Category::CANDY, 100,  6),
+  new Product(7, "GummiBears",   Category::CANDY, 65,  15),
+  new Product(8, "Mints",        Category::CANDY, 25,   0)
+]
+
+IO::println(analyzeInventory(products))
+
+val machine = new PremiumMachine(products)
+
+// Session 1: buy Cola with exact change (3 quarters = 75¢)
+IO::println("── Session 1: buy Cola ──")
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.pick(1).describe())
+
+// Session 2: buy Chips with overpayment (1 dollar = 100¢, Chips = 80¢)
+IO::println("── Session 2: buy Chips with $1 ──")
+IO::println(machine.insert(Coin::DOLLAR).describe())
+IO::println(machine.pick(4).describe())
+
+// Session 3: try out-of-stock item, then refund
+IO::println("── Session 3: out-of-stock Mints ──")
+IO::println(machine.insert(Coin::DIME).describe())
+IO::println(machine.insert(Coin::DIME).describe())
+IO::println(machine.insert(Coin::NICKEL).describe())
+IO::println(machine.pick(8).describe())
+IO::println(machine.refund().describe())
+
+// Session 4: unknown product
+IO::println("── Session 4: unknown product ──")
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.pick(99).describe())
+IO::println(machine.refund().describe())
+
+// Session 5: buy two candies
+IO::println("── Session 5: two candies ──")
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.insert(Coin::QUARTER).describe())
+IO::println(machine.pick(7).describe())
+IO::println(machine.insert(Coin::DOLLAR).describe())
+IO::println(machine.pick(6).describe())
+
+IO::println("")
+IO::println(machine.report())
+IO::println("Loyalty points: " + machine.pointsBalance())
+
+// Analyze sales
+val summary = summarizeSales(machine.sales)
+IO::println("\n── Sales summary ──")
+IO::println("Total sales:   " + summary.totalSales())
+IO::println("Total revenue: " + formatCents(summary.totalRevenue()))
+IO::println("Top category:  " + summary.topCategory())
+
+// Recent event log (first 5)
+IO::println("\n── Event log (first 5) ──")
+val evCount = if machine.events.size > 5 { 5 } else { machine.events.size }
+foreach i: Int in 0..<evCount {
+  IO::println("  " + (machine.events[i] as MachineEvent).describe())
+}
+
+// Change calculation
+IO::println("\n── Change denominations ──")
+val denominations: List[Int] = [25, 10, 5]
+val testChange = 85
+val pieces = makeChange(testChange, denominations, 0)
+IO::println("Making change for " + testChange + "¢: " + pieces + " coins")

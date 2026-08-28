@@ -1,0 +1,283 @@
+// SymbolicMath.on — symbolic expression rewriting and calculus.
+// Exercises: ADT enums, nested select+destructuring, recursion, string interpolation,
+// nullable handling, collection operations.
+
+enum Term {
+  case Num(value: Int)
+  case Var(name: String)
+  case Add(left: Term, right: Term)
+  case Sub(left: Term, right: Term)
+  case Mul(left: Term, right: Term)
+  case Div(left: Term, right: Term)
+  case Neg(expr: Term)
+  case Pow(base: Term, exp: Int)
+}
+
+def isZero(t: Term): Boolean { select t { case Num(v): return v == 0; else: return false } }
+def isOne(t: Term): Boolean  { select t { case Num(v): return v == 1; else: return false } }
+def isConst(t: Term): Boolean { select t { case Num(v): return true; else: return false } }
+def numVal(t: Term): Int      { select t { case Num(v): return v; else: return 0 } }
+
+def pretty(t: Term): String {
+  select t {
+    case Num(v):    return "" + v
+    case Var(n):    return n
+    case Neg(e):    return "(-#{pretty(e)})"
+    case Add(l, r): return "(#{pretty(l)} + #{pretty(r)})"
+    case Sub(l, r): return "(#{pretty(l)} - #{pretty(r)})"
+    case Mul(l, r): return "(#{pretty(l)} * #{pretty(r)})"
+    case Div(l, r): return "(#{pretty(l)} / #{pretty(r)})"
+    case Pow(b, e): return "(#{pretty(b)}^#{e})"
+  }
+}
+
+def collectVarsHelper(node: Term, result: java.util.ArrayList[String]): void {
+  select node {
+    case Var(n):    result.add(n)
+    case Neg(e):    collectVarsHelper(e, result)
+    case Add(l, r): { collectVarsHelper(l, result); collectVarsHelper(r, result) }
+    case Sub(l, r): { collectVarsHelper(l, result); collectVarsHelper(r, result) }
+    case Mul(l, r): { collectVarsHelper(l, result); collectVarsHelper(r, result) }
+    case Div(l, r): { collectVarsHelper(l, result); collectVarsHelper(r, result) }
+    case Pow(b, e): collectVarsHelper(b, result)
+    else: {}
+  }
+}
+
+def collectVars(t: Term): java.util.List[String] {
+  val result: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+  collectVarsHelper(t, result)
+  val seen: java.util.LinkedHashSet[String] = new java.util.LinkedHashSet[String]()
+  seen.addAll(result)
+  return new java.util.ArrayList[String](seen)
+}
+
+def subst(t: Term, varName: String, replacement: Term): Term {
+  select t {
+    case Num(v):    return t
+    case Var(n):    return if n == varName { replacement } else { t }
+    case Neg(e):    return new Neg(subst(e, varName, replacement))
+    case Add(l, r): return new Add(subst(l, varName, replacement), subst(r, varName, replacement))
+    case Sub(l, r): return new Sub(subst(l, varName, replacement), subst(r, varName, replacement))
+    case Mul(l, r): return new Mul(subst(l, varName, replacement), subst(r, varName, replacement))
+    case Div(l, r): return new Div(subst(l, varName, replacement), subst(r, varName, replacement))
+    case Pow(b, e): return new Pow(subst(b, varName, replacement), e)
+  }
+}
+
+def intPow(base: Int, exp: Int): Int {
+  if exp == 0 { return 1 }
+  return base * intPow(base, exp - 1)
+}
+
+def simplifyOnce(t: Term): Term {
+  select t {
+    case Num(v): return t
+    case Var(n): return t
+    case Neg(e): {
+      val se: Term = simplifyOnce(e)
+      select se { case Neg(inner): return simplifyOnce(inner); else: {} }
+      return new Neg(se)
+    }
+    case Add(l, r): {
+      val sl: Term = simplifyOnce(l)
+      val sr: Term = simplifyOnce(r)
+      if isConst(sl) && isConst(sr) { return new Num(numVal(sl) + numVal(sr)) }
+      if isZero(sr) { return sl }
+      if isZero(sl) { return sr }
+      return new Add(sl, sr)
+    }
+    case Sub(l, r): {
+      val sl: Term = simplifyOnce(l)
+      val sr: Term = simplifyOnce(r)
+      if isConst(sl) && isConst(sr) { return new Num(numVal(sl) - numVal(sr)) }
+      if isZero(sr) { return sl }
+      return new Sub(sl, sr)
+    }
+    case Mul(l, r): {
+      val sl: Term = simplifyOnce(l)
+      val sr: Term = simplifyOnce(r)
+      if isConst(sl) && isConst(sr) { return new Num(numVal(sl) * numVal(sr)) }
+      if isZero(sl) || isZero(sr)   { return new Num(0) }
+      if isOne(sr) { return sl }
+      if isOne(sl) { return sr }
+      return new Mul(sl, sr)
+    }
+    case Div(l, r): {
+      val sl: Term = simplifyOnce(l)
+      val sr: Term = simplifyOnce(r)
+      if isZero(sl) { return new Num(0) }
+      if isOne(sr)  { return sl }
+      if isConst(sl) && isConst(sr) && numVal(sr) != 0 && numVal(sl) % numVal(sr) == 0 {
+        return new Num(numVal(sl) / numVal(sr))
+      }
+      return new Div(sl, sr)
+    }
+    case Pow(b, e): {
+      val sb: Term = simplifyOnce(b)
+      if e == 0 { return new Num(1) }
+      if e == 1 { return sb }
+      if isConst(sb) { return new Num(intPow(numVal(sb), e)) }
+      return new Pow(sb, e)
+    }
+  }
+}
+
+def simplify(t: Term): Term {
+  val before: String = pretty(t)
+  val s: Term = simplifyOnce(t)
+  if pretty(s) == before { return s }
+  return simplify(s)
+}
+
+def diff(t: Term, varName: String): Term {
+  select t {
+    case Num(v):    return new Num(0)
+    case Var(n):    return if n == varName { new Num(1) } else { new Num(0) }
+    case Neg(e):    return new Neg(diff(e, varName))
+    case Add(l, r): return new Add(diff(l, varName), diff(r, varName))
+    case Sub(l, r): return new Sub(diff(l, varName), diff(r, varName))
+    case Mul(l, r): {
+      return new Add(new Mul(diff(l, varName), r), new Mul(l, diff(r, varName)))
+    }
+    case Div(l, r): {
+      val numer: Term = new Sub(new Mul(diff(l, varName), r), new Mul(l, diff(r, varName)))
+      return new Div(numer, new Pow(r, 2))
+    }
+    case Pow(b, e): {
+      if e == 0 { return new Num(0) }
+      return new Mul(new Mul(new Num(e), new Pow(b, e - 1)), diff(b, varName))
+    }
+  }
+}
+
+def evalTerm(t: Term, env: java.util.Map[String, JDouble]): JDouble? {
+  select t {
+    case Num(v): return JDouble::valueOf(v + 0.0d)
+    case Var(n): return env.get(n)
+    case Neg(e): {
+      val inner: JDouble? = evalTerm(e, env)
+      if inner == null { return null }
+      return JDouble::valueOf(-inner.doubleValue())
+    }
+    case Add(l, r): {
+      val lv: JDouble? = evalTerm(l, env)
+      val rv: JDouble? = evalTerm(r, env)
+      if lv == null || rv == null { return null }
+      return JDouble::valueOf(lv.doubleValue() + rv.doubleValue())
+    }
+    case Sub(l, r): {
+      val lv: JDouble? = evalTerm(l, env)
+      val rv: JDouble? = evalTerm(r, env)
+      if lv == null || rv == null { return null }
+      return JDouble::valueOf(lv.doubleValue() - rv.doubleValue())
+    }
+    case Mul(l, r): {
+      val lv: JDouble? = evalTerm(l, env)
+      val rv: JDouble? = evalTerm(r, env)
+      if lv == null || rv == null { return null }
+      return JDouble::valueOf(lv.doubleValue() * rv.doubleValue())
+    }
+    case Div(l, r): {
+      val lv: JDouble? = evalTerm(l, env)
+      val rv: JDouble? = evalTerm(r, env)
+      if lv == null || rv == null { return null }
+      if rv.doubleValue() == 0.0d { return null }
+      return JDouble::valueOf(lv.doubleValue() / rv.doubleValue())
+    }
+    case Pow(b, e): {
+      val bv: JDouble? = evalTerm(b, env)
+      if bv == null { return null }
+      var acc: Double = 1.0d
+      var i: Int = 0
+      while i < e { acc = acc * bv.doubleValue(); i = i + 1 }
+      return JDouble::valueOf(acc)
+    }
+  }
+}
+
+def showRule(label: String, expr: Term): void {
+  val simp: Term = simplify(expr)
+  IO::println("  #{label}")
+  IO::println("    #{pretty(expr)}  ->  #{pretty(simp)}")
+}
+
+def showDiff(f: Term, varName: String): void {
+  val dfSimp: Term = simplify(diff(f, varName))
+  IO::println("  d/d#{varName}[#{pretty(f)}]  =  #{pretty(dfSimp)}")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+IO::println("=== Symbolic Math Engine ===")
+IO::println("")
+
+IO::println("── Simplification rules ──")
+showRule("a + 0 = a",        new Add(new Var("a"), new Num(0)))
+showRule("0 + a = a",        new Add(new Num(0), new Var("a")))
+showRule("a - 0 = a",        new Sub(new Var("a"), new Num(0)))
+showRule("a * 1 = a",        new Mul(new Var("a"), new Num(1)))
+showRule("1 * a = a",        new Mul(new Num(1), new Var("a")))
+showRule("a * 0 = 0",        new Mul(new Var("a"), new Num(0)))
+showRule("-(-a) = a",        new Neg(new Neg(new Var("a"))))
+showRule("(2+3)*(4-1) = 15", new Mul(new Add(new Num(2), new Num(3)), new Sub(new Num(4), new Num(1))))
+showRule("2^8 = 256",        new Pow(new Num(2), 8))
+showRule("12/4 = 3",         new Div(new Num(12), new Num(4)))
+showRule("(x*1+0)*1 = x",    new Mul(new Add(new Mul(new Var("x"), new Num(1)), new Num(0)), new Num(1)))
+IO::println("")
+
+IO::println("── Symbolic differentiation ──")
+showDiff(new Pow(new Var("x"), 2), "x")
+
+val fPoly: Term = new Add(
+  new Add(
+    new Add(new Pow(new Var("x"), 3), new Mul(new Num(2), new Pow(new Var("x"), 2))),
+    new Mul(new Num(3), new Var("x"))),
+  new Num(5))
+showDiff(fPoly, "x")
+showDiff(new Mul(new Var("x"), new Var("x")), "x")
+
+val fXY: Term = new Mul(new Pow(new Var("x"), 2), new Var("y"))
+showDiff(fXY, "x")
+showDiff(fXY, "y")
+IO::println("")
+
+IO::println("── Substitution and evaluation ──")
+val quad: Term = new Add(
+  new Sub(new Mul(new Num(3), new Pow(new Var("x"), 2)),
+          new Mul(new Num(2), new Var("x"))),
+  new Num(1))
+IO::println("  f(x) = #{pretty(quad)}")
+
+val env: java.util.Map[String, JDouble] = ["x": JDouble::valueOf(2.0d)]
+val evalResult: JDouble? = evalTerm(quad, env)
+IO::println("  f(2) via eval   = #{evalResult}")
+
+val substd: Term = simplify(subst(quad, "x", new Num(2)))
+IO::println("  f(2) via subst  = #{pretty(substd)}")
+
+val vars: java.util.List[String] = collectVars(fPoly)
+IO::println("  vars in f(x)    = #{vars}")
+IO::println("")
+
+IO::println("── Numerical derivative check ──")
+val h: Double = 0.0001d
+val dfPoly: Term = simplify(diff(fPoly, "x"))
+IO::println("  f(x)  = #{pretty(fPoly)}")
+IO::println("  f'(x) = #{pretty(dfPoly)}")
+val env0: java.util.Map[String, JDouble] = ["x": JDouble::valueOf(2.0d)]
+val envH: java.util.Map[String, JDouble] = ["x": JDouble::valueOf(2.0d + h)]
+val fAt0: JDouble? = evalTerm(fPoly, env0)
+val fAtH: JDouble? = evalTerm(fPoly, envH)
+val dfAt0: JDouble? = evalTerm(dfPoly, env0)
+if fAt0 != null && fAtH != null && dfAt0 != null {
+  val finite: Double = (fAtH.doubleValue() - fAt0.doubleValue()) / h
+  val sym: Double = dfAt0.doubleValue()
+  val err: Double = if finite - sym < 0.0d { -(finite - sym) } else { finite - sym }
+  IO::println("  symbolic f'(2) = #{sym}")
+  IO::println("  finite diff    = #{finite}")
+  IO::println("  |error|        = #{err} (should be < 0.01)")
+  IO::println("  consistent:    #{err < 0.01d}")
+}
+
+IO::println("")
+IO::println("=== Done ===")

@@ -1,0 +1,379 @@
+// PolyCalc.on — Polynomial calculator
+// Exercises: records, ADT enums, extension methods, collection pipelines
+// (map/filter/fold/zip/zipWithIndex/sortedBy/reduce), select/pattern matching,
+// nullable, closures, string interpolation, foreach/while loops, recursion,
+// integer/double arithmetic, sealed enums, generic records.
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt(places: Int): String = String::format("%.#{places}f", self)
+  def abs(): Double = if self < 0.0 { -self } else { self }
+  def approxEq(other: Double): Boolean = (self - other).abs() < 1e-9
+}
+
+extension Int {
+  def pow(exp: Int): Int {
+    if exp == 0 { return 1 }
+    var r: Int = 1
+    var i: Int = 0
+    while i < exp { r = r * self; i++ }
+    return r
+  }
+}
+
+// ── Polynomial ────────────────────────────────────────────────────────────────
+// Coefficients are stored lowest-degree first:
+//   coeffs[0] = constant term, coeffs[1] = x^1, ..., coeffs[n] = x^n
+
+class Poly {
+  var coeffs: List[Double]
+
+public:
+  def this(coeffs: List[Double]) {
+    this.coeffs = trim(coeffs)
+  }
+
+  static def zero(): Poly = new Poly([0.0])
+  static def one(): Poly  = new Poly([1.0])
+  static def x(): Poly    = new Poly([0.0, 1.0])
+
+  // Degree of the polynomial (0 for the zero poly)
+  def degree(): Int = coeffs.size - 1
+
+  // Evaluate at a real value using Horner's method
+  def eval(x: Double): Double {
+    val deg = degree()
+    var result: Double = (coeffs.get(deg) as Double)
+    var i: Int = deg - 1
+    while i >= 0 {
+      result = result * x + (coeffs.get(i) as Double)
+      i--
+    }
+    return result
+  }
+
+  // Addition
+  def plus(other: Poly): Poly {
+    val maxLen = if coeffs.size > other.coeffs.size { coeffs.size } else { other.coeffs.size }
+    val result: List[Double] = []
+    var i: Int = 0
+    while i < maxLen {
+      val a: Double = if i < coeffs.size { coeffs.get(i) as Double } else { 0.0 }
+      val b: Double = if i < other.coeffs.size { other.coeffs.get(i) as Double } else { 0.0 }
+      result.add(a + b)
+      i++
+    }
+    return new Poly(result)
+  }
+
+  // Subtraction
+  def minus(other: Poly): Poly {
+    val maxLen = if coeffs.size > other.coeffs.size { coeffs.size } else { other.coeffs.size }
+    val result: List[Double] = []
+    var i: Int = 0
+    while i < maxLen {
+      val a: Double = if i < coeffs.size { coeffs.get(i) as Double } else { 0.0 }
+      val b: Double = if i < other.coeffs.size { other.coeffs.get(i) as Double } else { 0.0 }
+      result.add(a - b)
+      i++
+    }
+    return new Poly(result)
+  }
+
+  // Scalar multiplication
+  def scale(k: Double): Poly {
+    val result: List[Double] = []
+    foreach c: Object in coeffs { result.add((c as Double) * k) }
+    return new Poly(result)
+  }
+
+  // Polynomial multiplication (convolution)
+  def times(other: Poly): Poly {
+    val resultLen = degree() + other.degree() + 1
+    val result: List[Double] = []
+    var i: Int = 0
+    while i < resultLen { result.add(0.0); i++ }
+    i = 0
+    while i <= degree() {
+      var j: Int = 0
+      while j <= other.degree() {
+        val old: Double = result.get(i + j) as Double
+        val ci: Double = coeffs.get(i) as Double
+        val cj: Double = other.coeffs.get(j) as Double
+        result.set(i + j, old + ci * cj)
+        j++
+      }
+      i++
+    }
+    return new Poly(result)
+  }
+
+  // Formal derivative
+  def derivative(): Poly {
+    if degree() == 0 { return Poly::zero() }
+    val result: List[Double] = []
+    var i: Int = 1
+    while i <= degree() {
+      result.add((coeffs.get(i) as Double) * (i as Double))
+      i++
+    }
+    return new Poly(result)
+  }
+
+  // Indefinite integral (constant of integration = 0)
+  def integral(): Poly {
+    val result: List[Double] = [0.0]
+    var i: Int = 0
+    while i <= degree() {
+      result.add((coeffs.get(i) as Double) / ((i + 1) as Double))
+      i++
+    }
+    return new Poly(result)
+  }
+
+  // Compose: this(other(x))
+  def compose(other: Poly): Poly {
+    var result: Poly = Poly::zero()
+    var powerOfOther: Poly = Poly::one()
+    var i: Int = 0
+    while i <= degree() {
+      val c: Double = coeffs.get(i) as Double
+      if c != 0.0 {
+        result = result.plus(powerOfOther.scale(c))
+      }
+      powerOfOther = powerOfOther.times(other)
+      i++
+    }
+    return result
+  }
+
+  // Newton's method: find a root near x0
+  def findRoot(x0: Double): Double? {
+    var x: Double = x0
+    var iter: Int = 0
+    while iter < 100 {
+      val fx: Double = eval(x)
+      val dfx: Double = derivative().eval(x)
+      if dfx.abs() < 1e-15 { return null }
+      val next: Double = x - fx / dfx
+      if (next - x).abs() < 1e-10 { return next }
+      x = next
+      iter++
+    }
+    return null
+  }
+
+  // Definite integral from a to b
+  def integrate(a: Double, b: Double): Double {
+    val antideriv: Poly = integral()
+    return antideriv.eval(b) - antideriv.eval(a)
+  }
+
+  // Display as a string "3x^2 - 2x + 1"
+  def display(): String {
+    if degree() == 0 { return (coeffs.get(0) as Double).fmt(3) }
+    val parts: List[String] = []
+    var i: Int = degree()
+    while i >= 0 {
+      val c: Double = coeffs.get(i) as Double
+      if c != 0.0 {
+        val term: String = if i == 0 {
+          c.fmt(3)
+        } else if i == 1 {
+          if c == 1.0 { "x" } else if c == -1.0 { "-x" } else { "#{c.fmt(3)}x" }
+        } else {
+          if c == 1.0 { "x^#{i}" } else if c == -1.0 { "-x^#{i}" } else { "#{c.fmt(3)}x^#{i}" }
+        }
+        parts.add(term)
+      }
+      i--
+    }
+    if parts.size == 0 { return "0.000" }
+    // Join with " + " but handle minus signs
+    var s: String = parts.get(0) as String
+    var k: Int = 1
+    while k < parts.size {
+      val p: String = parts.get(k) as String
+      if p.startsWith("-") { s = s + " - " + p.substring(1) } else { s = s + " + " + p }
+      k++
+    }
+    return s
+  }
+
+  // Remove trailing zero coefficients
+  static def trim(coeffs: List[Double]): List[Double] {
+    var i: Int = coeffs.size - 1
+    while i > 0 && (coeffs.get(i) as Double).abs() < 1e-12 { i-- }
+    val result: List[Double] = []
+    var j: Int = 0
+    while j <= i { result.add(coeffs.get(j) as Double); j++ }
+    return result
+  }
+
+  def equals(other: Poly): Boolean {
+    if degree() != other.degree() { return false }
+    var i: Int = 0
+    while i <= degree() {
+      if !(coeffs.get(i) as Double).approxEq(other.coeffs.get(i) as Double) { return false }
+      i++
+    }
+    return true
+  }
+}
+
+// ── Result ADT ────────────────────────────────────────────────────────────────
+
+enum CalcResult {
+  case Value(poly: Poly)
+  case RootFound(x: Double, fx: Double)
+  case IntegralValue(area: Double)
+  case NoRoot
+public:
+  def display(): String = select this {
+    case v is Value:    "p(x) = #{v.poly().display()}"
+    case r is RootFound: "root ≈ #{r.x().fmt(8)}, f(root) = #{r.fx().fmt(10)}"
+    case i is IntegralValue: "∫ = #{i.area().fmt(8)}"
+    case n is NoRoot:   "no root found"
+  }
+}
+
+// ── Table printer ─────────────────────────────────────────────────────────────
+
+class TablePrinter {
+public:
+  def printEvalTable(p: Poly, xs: List[Double]): void {
+    IO::println("x          | p(x)")
+    IO::println("-----------+------------------")
+    foreach xObj: Object in xs {
+      val xv: Double = xObj as Double
+      val fv: Double = p.eval(xv)
+      val xStr: String = xv.fmt(3)
+      val fStr: String = fv.fmt(6)
+      IO::println("#{xStr.padEnd(10)} | #{fStr}")
+    }
+  }
+}
+
+extension String {
+  def padEnd(w: Int): String =
+    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def runDemo(): void {
+  IO::println("═══ Polynomial Calculator Demo ═══")
+  IO::println("")
+
+  // Build p(x) = x^3 - 6x^2 + 11x - 6  (roots: 1, 2, 3)
+  val p: Poly = new Poly([-6.0, 11.0, -6.0, 1.0])
+  IO::println("p(x) = #{p.display()}")
+  IO::println("Degree: #{p.degree()}")
+  IO::println("")
+
+  // Evaluate at integer points
+  IO::println("── Evaluation table ──")
+  val printer: TablePrinter = new TablePrinter()
+  val xs: List[Double] = [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+  printer.printEvalTable(p, xs)
+  IO::println("")
+
+  // Build q(x) = x^2 - 4
+  val q: Poly = new Poly([-4.0, 0.0, 1.0])
+  IO::println("q(x) = #{q.display()}")
+  IO::println("")
+
+  // Arithmetic
+  IO::println("── Arithmetic ──")
+  IO::println("p + q = #{p.plus(q).display()}")
+  IO::println("p - q = #{p.minus(q).display()}")
+  IO::println("p * q = #{p.times(q).display()}")
+  IO::println("2·q   = #{q.scale(2.0).display()}")
+  IO::println("")
+
+  // Calculus
+  IO::println("── Calculus ──")
+  IO::println("p'(x) = #{p.derivative().display()}")
+  IO::println("p''(x) = #{p.derivative().derivative().display()}")
+  IO::println("∫p dx  = #{p.integral().display()}")
+  val area: Double = p.integrate(0.0, 3.0)
+  IO::println("∫p from 0 to 3 = #{area.fmt(6)}")
+  IO::println("")
+
+  // Composition: q(p(x)) — degree 6
+  IO::println("── Composition ──")
+  val qp: Poly = q.compose(p)
+  IO::println("q(p(x)) = #{qp.display()}")
+  IO::println("q(p(0)) = #{qp.eval(0.0).fmt(4)}, check: q(p(0))=q(-6)=#{q.eval(-6.0).fmt(4)}")
+  IO::println("")
+
+  // Root finding for p(x) — roots at 1, 2, 3
+  IO::println("── Root finding (Newton's method) ──")
+  val seeds: List[Double] = [0.5, 1.5, 2.5, 10.0]
+  foreach seedObj: Object in seeds {
+    val seed: Double = seedObj as Double
+    val root: Double? = p.findRoot(seed)
+    val result: CalcResult = if root == null { new NoRoot() } else { new RootFound(root, p.eval(root)) }
+    IO::println("  seed #{seed.fmt(1)} → #{result.display()}")
+  }
+  IO::println("")
+
+  // Polynomial families
+  IO::println("── Chebyshev-like polynomials (T_0..T_4 via recurrence) ──")
+  val T: List[Poly] = buildChebyshev(5)
+  var ti: Int = 0
+  foreach tObj: Object in T {
+    val tp: Poly = tObj as Poly
+    IO::println("  T_#{ti}(x) = #{tp.display()}")
+    ti++
+  }
+  IO::println("")
+
+  // Verify T_2(cos θ) ≈ cos(2θ) at a sample point (θ = π/6)
+  val theta: Double = 3.14159265358979 / 6.0
+  val cosTheta: Double = java.lang.Math::cos(theta)
+  val t2: Poly = T.get(2) as Poly
+  val t2val: Double = t2.eval(cosTheta)
+  val cos2theta: Double = java.lang.Math::cos(2.0 * theta)
+  IO::println("T_2(cos(π/6)) = #{t2val.fmt(8)}")
+  IO::println("cos(2·π/6)    = #{cos2theta.fmt(8)}")
+  IO::println("Match: #{if (t2val - cos2theta).abs() < 1e-9 { "✓" } else { "✗" }}")
+  IO::println("")
+
+  IO::println("── Collection pipeline on evaluation results ──")
+  val pts: List[Double] = [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0]
+  val qvals: List[Double] = []
+  foreach ptObj: Object in pts { qvals.add(q.eval(ptObj as Double)) }
+  val positiveCount: Int = qvals.filter { v -> (v as Double) > 0.0 }.size
+  val sumVals: Double = (qvals.fold(0.0) { acc, v -> (acc as Double) + (v as Double) }) as Double
+  IO::println("q evaluated at #{pts.size} points; #{positiveCount} positive; sum = #{sumVals.fmt(3)}")
+
+  // GroupBy sign
+  val positive: List[Double] = qvals.filter { v -> (v as Double) > 0.0 }
+  val negative: List[Double] = qvals.filter { v -> (v as Double) < 0.0 }
+  val zero: List[Double] = qvals.filter { v -> (v as Double).approxEq(0.0) }
+  IO::println("  > 0: #{positive.size} values, < 0: #{negative.size} values, = 0: #{zero.size} values")
+}
+
+// Build Chebyshev polynomials T_0..T_(n-1) via the recurrence
+//   T_0 = 1, T_1 = x, T_{n} = 2x·T_{n-1} - T_{n-2}
+def buildChebyshev(n: Int): List[Poly] {
+  val result: List[Poly] = []
+  if n == 0 { return result }
+  result.add(Poly::one())
+  if n == 1 { return result }
+  result.add(Poly::x())
+  var i: Int = 2
+  while i < n {
+    val prev2: Poly = result.get(i - 2) as Poly
+    val prev1: Poly = result.get(i - 1) as Poly
+    val twoX: Poly = new Poly([0.0, 2.0])
+    val ti: Poly = twoX.times(prev1).minus(prev2)
+    result.add(ti)
+    i++
+  }
+  return result
+}
+
+runDemo()

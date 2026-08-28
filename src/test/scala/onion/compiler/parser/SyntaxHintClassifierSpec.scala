@@ -257,6 +257,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).messageKey shouldBe "error.parsing.hint.using_resource_statement"
     }
 
+    it("recognizes a Python-style `from ... import ...` statement") {
+      val hint = classify(
+        found = "import",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "from os import path"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path", "os", "path")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with a wildcard") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import *"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.*", "os.path", "*")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with multiple names") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import join, exists"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.join; os.path.exists", "os.path", "join, exists")
+    }
+
     it("recognizes a Go-style `:=` short variable declaration") {
       val hint = classify(
         found = ":",
@@ -266,6 +297,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.go_style_short_var_decl"
       hint.arguments shouldBe Seq("x", "5")
+    }
+
+    it("recognizes a Rust-style `val mut` declaration") {
+      val hint = classify(
+        found = "x",
+        expected = "\"=\", \":\"",
+        sourceLine = "val mut x = 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("val", "x")
+    }
+
+    it("recognizes a Rust-style `var mut` declaration") {
+      val hint = classify(
+        found = "count",
+        expected = "\"=\", \":\"",
+        sourceLine = "var mut count = 0"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("var", "count")
     }
 
     it("recognizes a Ruby-style `unless` statement") {

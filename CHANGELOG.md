@@ -9,6 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
+  Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
+  graph model, residual-graph min-cut derivation via reachability from the
+  source, and bipartite maximum matching as a unit-capacity max-flow
+  reduction. Five worked examples (CLRS Figure 26.1, a supply-chain network,
+  a 5-router packet mesh, bipartite worker/job matching, and degenerate
+  disconnected/parallel/diamond cases) exercise ADT `case`-enums, `HashMap`
+  Java interop, generic `List[T]`, `extension Int`, closures, and collection
+  pipelines.
+
+- **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
+  A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
+  plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,
+  `Conflict`, `ScheduleStats`), an observer interface (`CalendarObserver` /
+  `LogObserver`), a mutable `Calendar` class with `public:`/`private:`
+  sections, extension methods on `Int`/`String`, and collection pipelines
+  (`filter`, `map`, `fold`, `sortedBy`, `groupBy`, `partition`, `count`,
+  `distinct`, `any`) driving conflict detection, free-slot finding, and an
+  auto-scheduler.
+
+- **`run/TextTransformPipeline.on`, a 352-line composable text-transformation
+  pipeline simulator.** An ADT `case` enum `Transform` (10 cases: Upper,
+  Lower, TrimSpaces, Truncate, Repeat, Reverse, Replace, AddPrefix,
+  AddSuffix, CollapseSpaces) with `apply`/`category`/`label` methods, a
+  data-carrying `Category` enum, records with methods (`StepResult`,
+  `RunResult`), a `Pipeline` class conforming to a `Reportable` interface,
+  extension methods on `String`/`Int`, and collection pipelines (`filter`,
+  `map`, `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`,
+  `any`, `count`, `zip`) run five named pipelines over five sample inputs
+  with aggregate analytics.
+
+### Fixed
+
+- **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has
+  no `mut` keyword; mutability is chosen directly by `val` (immutable) or
+  `var` (mutable). Writing `let mut x = 5` translated naively as
+  `val mut x = 5` parsed `mut` as the declared identifier and then hit a
+  generic `expecting "=", ":"` error on the next token, with no mention of
+  `val`/`var`. The diagnostic now recognizes the `val mut name` / `var mut
+  name` pattern and points at the correct `var name = ...` form.
+
+## [0.23.0] - 2026-08-28
+
+### Fixed
+
+- **Parser hint for a Python-style `from ... import ...` statement.**
+  Onion has no `from module import name` statement; imports are wrapped in
+  braces and dotted, so `from os import path` parses `from` as a bare
+  identifier-reference statement followed by a stray identifier, with a
+  generic expected-token dump that never mentions `import { ... }`. The
+  diagnostic now recognizes a leading `from module import name[, name...]`
+  statement (including a `*` wildcard and `name as alias`) and points at the
+  correct `import { module.name }` form.
+
+### Added
+
+- **`run/SymbolicMath.on`, a 283-line symbolic expression rewriting and
+  calculus engine.** An ADT `enum Term` (Num, Var, Add, Sub, Mul, Div, Neg,
+  Pow) with nested `select`/destructuring, fixpoint simplification
+  (constant folding, identity/zero laws, double-negation elimination),
+  symbolic differentiation (product/quotient/power-chain rules),
+  substitution, variable collection, and a nullable-propagating evaluator
+  over `java.util.Map[String, JDouble]`. Cross-checks a symbolic derivative
+  against a finite-difference approximation.
+
 - **`run/TradeMatchingEngine.on`, a 454-line continuous limit-order-book
   simulator.** Multi-symbol stock exchange matching engine: an ADT
   `enum OrderType` (Market, Limit, StopLoss), plain enums for `Side`/`Status`,

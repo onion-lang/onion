@@ -1,0 +1,389 @@
+// TrainDispatch.on — Railway dispatch simulation exercising records,
+// data-carrying enums, ADT enums, classes, interfaces, collection
+// pipelines, select/pattern-match, nullable, closures, string interpolation,
+// try/catch, recursion, while, and foreach.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Station(name: String, code: String, platforms: Int)
+
+record Route(from: Station, to: Station, distKm: Int, baseMin: Int)
+
+record Booking(id: Int, passenger: String, seat: Int, cls: String)
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum TicketClass {
+  ECONOMY, BUSINESS, FIRST
+}
+
+// Data-carrying ADT enum for train status
+enum TrainStatus {
+  case OnTime
+  case Delayed(minutes: Int)
+  case Cancelled(reason: String)
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def summary(): String
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def padLeft(width: Int): String {
+    var s = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── Train class ───────────────────────────────────────────────────────────────
+
+class Train conforms Reportable {
+public:
+  val id: String
+  val route: Route
+  var status: TrainStatus
+  var bookings: List[Booking]
+  var nextSeat: Int
+
+  def this(id: String, route: Route) {
+    this.id = id
+    this.route = route
+    this.status = new OnTime()
+    this.bookings = []
+    this.nextSeat = 1
+  }
+
+  def book(passenger: String, cls: TicketClass): Booking {
+    val seat = nextSeat
+    nextSeat = nextSeat + 1
+    val clsName = select cls {
+      case TicketClass::ECONOMY:  "ECO"
+      case TicketClass::BUSINESS: "BIZ"
+      case TicketClass::FIRST:    "FST"
+    }
+    val b = new Booking(bookings.size + 1, passenger, seat, clsName)
+    bookings.add(b)
+    return b
+  }
+
+  def delay(minutes: Int): void {
+    status = new Delayed(minutes)
+  }
+
+  def cancel(reason: String): void {
+    status = new Cancelled(reason)
+  }
+
+  def eta(): String {
+    val base = route.baseMin()
+    val total = select status {
+      case s is OnTime:    base
+      case s is Delayed:   base + s.minutes()
+      case s is Cancelled: 0 - 1
+    }
+    if total < 0 { return "N/A" }
+    val h = total / 60
+    val m = total % 60
+    return "#{h}h #{m}m"
+  }
+
+  def statusText(): String = select status {
+    case s is OnTime:    "ON TIME"
+    case s is Delayed:   "DELAYED +#{s.minutes()}min"
+    case s is Cancelled: "CANCELLED (#{s.reason()})"
+  }
+
+  def revenue(): Int {
+    return bookings.fold(0) { acc, b ->
+      val bk = b as Booking
+      val base = route.distKm() * 10
+      val mult = select bk.cls() {
+        case "ECO": 1
+        case "BIZ": 2
+        case "FST": 3
+        else: 1
+      }
+      (acc as Int) + base * mult
+    }
+  }
+
+  def passengerCount(): Int = bookings.size
+
+  def summary(): String {
+    val from = route.from().code()
+    val to   = route.to().code()
+    val pax  = bookings.size
+    return "[#{id}] #{from}->#{to} | #{statusText()} | #{pax} pax | ETA:#{eta()} | Y#{revenue()}"
+  }
+}
+
+// ── Dispatcher class ──────────────────────────────────────────────────────────
+
+class Dispatcher {
+  var trains: List[Object]
+
+public:
+  def this() {
+    this.trains = []
+  }
+
+  def add(t: Train): void {
+    trains.add(t)
+  }
+
+  def find(id: String): Train? {
+    val result = trains.find { t -> (t as Train).id == id }
+    if result == null { return null }
+    return result as Train
+  }
+
+  def delayedTrains(): List[Object] {
+    return trains.filter { t ->
+      val train = t as Train
+      select train.status {
+        case s is Delayed:   true
+        case s is OnTime:    false
+        case s is Cancelled: false
+      }
+    }
+  }
+
+  def cancelledTrains(): List[Object] {
+    return trains.filter { t ->
+      val train = t as Train
+      select train.status {
+        case s is Cancelled: true
+        else: false
+      }
+    }
+  }
+
+  def totalRevenue(): Int {
+    return trains.fold(0) { acc, t -> (acc as Int) + (t as Train).revenue() }
+  }
+
+  def onTimeCount(): Int {
+    return trains.filter { t ->
+      select (t as Train).status { case s is OnTime: true; else: false }
+    }.size
+  }
+
+  def reportByStatus(): void {
+    val groups = trains.groupBy { t ->
+      val train = t as Train
+      select train.status {
+        case s is OnTime:    "On Time"
+        case s is Delayed:   "Delayed"
+        case s is Cancelled: "Cancelled"
+      }
+    }
+    println("-- Status Groups ------------------------------------------")
+    foreach (k, v) in groups {
+      println("  #{k}: #{(v as List[Object]).size} train(s)")
+    }
+  }
+
+  def topRevenueTrains(): List[Object] {
+    return trains.sortedBy { t -> 0 - (t as Train).revenue() }
+  }
+
+  def printDashboard(): void {
+    println("==========================================================")
+    println("               RAILWAY DISPATCH BOARD                     ")
+    println("==========================================================")
+    foreach t: Object in trains {
+      val train = t as Train
+      println("  " + train.summary())
+    }
+    println("----------------------------------------------------------")
+    println("  Total trains  : " + trains.size)
+    println("  On time       : " + onTimeCount())
+    println("  Delayed       : " + delayedTrains().size)
+    println("  Cancelled     : " + cancelledTrains().size)
+    println("  Total revenue : Y" + totalRevenue())
+    println("==========================================================")
+  }
+}
+
+// ── Helper: recursive Fibonacci ──────────────────────────────────────────────
+
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+
+// ── Safe division ────────────────────────────────────────────────────────────
+
+def safeDiv(a: Int, b: Int): Int {
+  try {
+    return a / b
+  } catch e: Exception {
+    return 0
+  }
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+val tokyo     = new Station("Tokyo",     "TYO", 30)
+val osaka     = new Station("Osaka",     "OSA", 15)
+val nagoya    = new Station("Nagoya",    "NGO", 12)
+val kyoto     = new Station("Kyoto",     "KYT",  8)
+val hiroshima = new Station("Hiroshima", "HRS", 10)
+
+val rTokOsa = new Route(tokyo,   osaka,     553, 150)
+val rTokNgo = new Route(tokyo,   nagoya,    366,  97)
+val rOsaKyt = new Route(osaka,   kyoto,      75,  18)
+val rNgoOsa = new Route(nagoya,  osaka,     187,  50)
+val rOsaHrs = new Route(osaka,   hiroshima, 341,  90)
+
+val t1 = new Train("NOZOMI-1", rTokOsa)
+val t2 = new Train("HIKARI-2", rTokNgo)
+val t3 = new Train("SAKURA-3", rOsaKyt)
+val t4 = new Train("KODAMA-4", rNgoOsa)
+val t5 = new Train("NOZOMI-5", rOsaHrs)
+
+// Book passengers
+t1.book("Tanaka",   TicketClass::FIRST)
+t1.book("Suzuki",   TicketClass::BUSINESS)
+t1.book("Sato",     TicketClass::ECONOMY)
+t1.book("Yamada",   TicketClass::FIRST)
+
+t2.book("Ito",      TicketClass::ECONOMY)
+t2.book("Watanabe", TicketClass::BUSINESS)
+
+t3.book("Kobayashi",TicketClass::ECONOMY)
+t3.book("Kato",     TicketClass::ECONOMY)
+t3.book("Yoshida",  TicketClass::FIRST)
+
+t4.book("Yamamoto", TicketClass::BUSINESS)
+
+t5.book("Nakamura", TicketClass::ECONOMY)
+t5.book("Hayashi",  TicketClass::ECONOMY)
+t5.book("Kimura",   TicketClass::BUSINESS)
+
+// Apply delays and cancellations
+t2.delay(25)
+t4.delay(10)
+t5.cancel("Mechanical fault")
+
+val dispatcher = new Dispatcher()
+dispatcher.add(t1)
+dispatcher.add(t2)
+dispatcher.add(t3)
+dispatcher.add(t4)
+dispatcher.add(t5)
+
+dispatcher.printDashboard()
+
+// ── Nullable find ─────────────────────────────────────────────────────────────
+println("")
+println("-- Train Lookup -------------------------------------------")
+val found = dispatcher.find("SAKURA-3")
+if found != null {
+  println("Found: " + (found as Train).summary())
+} else {
+  println("Train not found.")
+}
+val missing = dispatcher.find("NOPE-99")
+if missing == null {
+  println("NOPE-99: not found (expected)")
+} else {
+  println("Unexpected: found NOPE-99")
+}
+
+// ── Group by status ───────────────────────────────────────────────────────────
+println("")
+dispatcher.reportByStatus()
+
+// ── Top revenue trains ────────────────────────────────────────────────────────
+println("")
+println("-- Top Revenue Trains -------------------------------------")
+val top = dispatcher.topRevenueTrains()
+var rank = 1
+foreach t: Object in top {
+  val train = t as Train
+  println("  ##{rank}: [#{train.id}] Y#{train.revenue()}")
+  rank = rank + 1
+}
+
+// ── Revenue statistics via closures ──────────────────────────────────────────
+println("")
+println("-- Revenue Stats ------------------------------------------")
+val trainList: List[Object] = [t1, t2, t3, t4, t5]
+val maxRev = trainList.fold(0) { acc, t ->
+  val r = (t as Train).revenue()
+  val a = acc as Int
+  if r > a { r } else { a }
+}
+val minRev = trainList.fold(999999999) { acc, t ->
+  val r = (t as Train).revenue()
+  val a = acc as Int
+  if r < a { r } else { a }
+}
+val sumRev = trainList.fold(0) { acc, t -> (acc as Int) + (t as Train).revenue() }
+val avgRev = safeDiv(sumRev, 5)
+println("  Sum:Y#{sumRev}  Max:Y#{maxRev}  Min:Y#{minRev}  Avg:Y#{avgRev}")
+
+// ── Distinct origin cities ────────────────────────────────────────────────────
+val allOrigins = trainList.map { t -> (t as Train).route.from().name() }.distinct()
+println("  Departure cities: #{allOrigins.toString()}")
+
+// ── Partition: on-time vs not ─────────────────────────────────────────────────
+val parts = trainList.partition { t ->
+  select (t as Train).status { case s is OnTime: true; else: false }
+}
+val onTimePart = parts[0] as List[Object]
+val othersPart = parts[1] as List[Object]
+println("  On-time: #{onTimePart.size}  Not on-time: #{othersPart.size}")
+
+// ── Zip ids with revenues ─────────────────────────────────────────────────────
+val ids: List[Object]    = trainList.map { t -> (t as Train).id }
+val revs: List[Object]   = trainList.map { t -> (t as Train).revenue() }
+val zipped = ids.zip(revs)
+println("")
+println("-- Train Revenue (id, revenue) ---------------------------")
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  println("  #{p[0]} -> Y#{p[1]}")
+}
+
+// ── Recursion (Fibonacci) ─────────────────────────────────────────────────────
+println("")
+println("-- Fibonacci Sequence (1..8) -----------------------------")
+foreach n: Int in 1..8 {
+  println("  fib(#{n}) = #{fib(n)}")
+}
+
+// ── While loop: platform queue simulation ────────────────────────────────────
+println("")
+println("-- Platform Queue -----------------------------------------")
+var queue = 12
+var served = 0
+while queue > 0 {
+  val batch = if queue >= 3 { 3 } else { queue }
+  served = served + batch
+  queue = queue - batch
+}
+println("  Served #{served} passengers in platform queue")
+
+// ── Extension method demo ─────────────────────────────────────────────────────
+println("")
+println("-- Extension Methods --------------------------------------")
+val label = "NOZOMI-1"
+println("  padRight(20): '#{label.padRight(20)}'")
+val num = 42
+println("  padLeft(8):   '#{num.padLeft(8)}'")
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+println("")
+println("Network: 5 stations, 5 trains, total Y#{dispatcher.totalRevenue()} revenue")

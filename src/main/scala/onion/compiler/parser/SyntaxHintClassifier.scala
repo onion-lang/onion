@@ -17,12 +17,16 @@ private[compiler] object SyntaxHintClassifier {
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val RustStyleMutDeclaration =
+    """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val CSharpStyleUsingImport =
     """^\s*using\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;\s*$""".r
+  private val PythonStyleFromImport =
+    """^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+?)\s*;?\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
@@ -125,6 +129,9 @@ private[compiler] object SyntaxHintClassifier {
         controlFlowHint
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if RustStyleMutDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = RustStyleMutDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.rust_style_mut", matched.group(1), matched.group(2))
       case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DataClassDeclaration.findFirstMatchIn(sourceLine).get
         val params = matched.group(2).split(",").map { p =>
@@ -140,6 +147,14 @@ private[compiler] object SyntaxHintClassifier {
       case _ if CSharpStyleUsingImport.findFirstMatchIn(sourceLine).isDefined =>
         val matched = CSharpStyleUsingImport.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.csharp_style_using_import", matched.group(1))
+      case _ if PythonStyleFromImport.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleFromImport.findFirstMatchIn(sourceLine).get
+        val module = matched.group(1)
+        val names = matched.group(2)
+        val imports = names.split(",").map(_.trim).filter(_.nonEmpty).map { n =>
+          if (n == "*") s"$module.*" else s"$module.$n"
+        }.mkString("; ")
+        hint("error.parsing.hint.python_style_from_import", imports, module, names)
       // Also resembles `Int.member`; extension-declaration advice is more useful.
       case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get

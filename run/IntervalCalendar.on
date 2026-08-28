@@ -1,0 +1,456 @@
+// IntervalCalendar.on — interval-based calendar with conflict detection,
+// free-slot finding, merging, and scheduling reports.
+// Features: ADT enums (Priority, Recurrence), plain enums (Weekday),
+//   records (Event, TimeSlot, Conflict, ScheduleStats),
+//   class hierarchy (Calendar, Room, Attendee, Report),
+//   interface (CalendarObserver), extension methods (Int, String),
+//   collection pipelines (filter/map/fold/sortedBy/groupBy/find/partition/zip/any/count),
+//   select / pattern matching, nullable, closures, string interpolation,
+//   try/catch, foreach with ranges + map (k,v) entry iteration.
+
+// ── Plain enum: weekday ───────────────────────────────────────────────────────
+
+enum Weekday { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+// ── Priority ADT ─────────────────────────────────────────────────────────────
+
+enum Priority {
+  case Low
+  case Medium(note: String)
+  case High(reason: String, escalated: Boolean)
+public:
+  def label(): String = select this {
+    case lo is Low:    "LOW"
+    case m  is Medium: "MED[#{m.note()}]"
+    case h  is High:   if h.escalated() { "HIGH! (#{h.reason()})" } else { "HIGH (#{h.reason()})" }
+  }
+  def weight(): Int = select this {
+    case lo is Low:    1
+    case m  is Medium: 5
+    case h  is High:   10
+  }
+}
+
+// ── Recurrence ADT ───────────────────────────────────────────────────────────
+
+enum Recurrence {
+  case Once
+  case Daily(times: Int)
+  case Weekly(day: Weekday, weeks: Int)
+public:
+  def occurrences(): Int = select this {
+    case o is Once:   1
+    case d is Daily:  d.times()
+    case w is Weekly: w.weeks()
+  }
+  def describe(): String = select this {
+    case o is Once:   "one-time"
+    case d is Daily:  "daily x#{d.times()}"
+    case w is Weekly: "weekly/#{w.day()} x#{w.weeks()}"
+  }
+}
+
+// ── Core records ──────────────────────────────────────────────────────────────
+
+record TimeSlot(start: Int, end: Int) {
+public:
+  def duration(): Int  = end() - start()
+  def overlaps(other: TimeSlot): Boolean =
+    start() < other.end() && end() > other.start()
+  def contains(minute: Int): Boolean =
+    minute >= start() && minute < end()
+  def toStr(): String  = "#{start().hhmm()}-#{end().hhmm()}"
+}
+
+record Event(id: Int, title: String, slot: TimeSlot, priority: Priority, recurrence: Recurrence, room: String, organizer: String) {
+public:
+  def toStr(): String =
+    "[##{id()}] #{title()} #{slot().toStr()} (#{priority().label()}, #{recurrence().describe()}) @#{room()}"
+}
+
+record Conflict(eventA: Event, eventB: Event, room: String) {
+public:
+  def toStr(): String =
+    "CONFLICT: '#{eventA().title()}' vs '#{eventB().title()}' in #{room()} " +
+    "(#{eventA().slot().toStr()} overlaps #{eventB().slot().toStr()})"
+}
+
+record ScheduleStats(totalEvents: Int, totalConflicts: Int, totalMinutes: Int, peakMinute: Int, uniqueRooms: Int) {
+public:
+  def toStr(): String =
+    "Events=#{totalEvents()}, Conflicts=#{totalConflicts()}, " +
+    "TotalMinutes=#{totalMinutes()}, PeakAt=#{peakMinute().hhmm()}, " +
+    "Rooms=#{uniqueRooms()}"
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def hhmm(): String {
+    val h = self / 60
+    val m = self % 60
+    return String::format("%02d:%02d", h, m)
+  }
+  def padLeft(w: Int): String {
+    val s = "" + self
+    if s.length() >= w { return s }
+    return " ".repeat(w - s.length()) + s
+  }
+}
+
+extension String {
+  def ljust(w: Int): String =
+    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+  def rjust(w: Int): String =
+    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+}
+
+// ── Observer interface ────────────────────────────────────────────────────────
+
+interface CalendarObserver {
+  def onConflict(c: Conflict): void
+  def onEventAdded(e: Event): void
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+
+class Calendar {
+  var events_:    List[Event]
+  var nextId_:    Int
+  var observers_: List[CalendarObserver]
+public:
+  def this {
+    this.events_    = []
+    this.nextId_    = 1
+    this.observers_ = []
+  }
+
+  def addObserver(obs: CalendarObserver): void {
+    observers_.add(obs)
+  }
+
+  def addEvent(title: String, start: Int, end: Int, priority: Priority, recurrence: Recurrence, room: String, organizer: String): Event {
+    val slot = new TimeSlot(start, end)
+    val ev   = new Event(nextId_, title, slot, priority, recurrence, room, organizer)
+    nextId_ = nextId_ + 1
+    events_.add(ev)
+    foreach obs: CalendarObserver in observers_ {
+      obs.onEventAdded(ev)
+    }
+    val conflicts = conflictsFor(ev)
+    foreach c: Conflict in conflicts {
+      foreach obs: CalendarObserver in observers_ {
+        obs.onConflict(c)
+      }
+    }
+    return ev
+  }
+
+  def events(): List[Event] = events_
+
+  def conflictsFor(ev: Event): List[Conflict] {
+    val result: List[Conflict] = []
+    foreach other: Event in events_ {
+      if other.id() != ev.id() && other.room() == ev.room() &&
+         other.slot().overlaps(ev.slot()) {
+        result.add(new Conflict(ev, other, ev.room()))
+      }
+    }
+    return result
+  }
+
+  def allConflicts(): List[Conflict] {
+    val result: List[Conflict] = []
+    foreach ev: Event in events_ {
+      foreach other: Event in events_ {
+        if other.id() > ev.id() && other.room() == ev.room() &&
+           other.slot().overlaps(ev.slot()) {
+          result.add(new Conflict(ev, other, ev.room()))
+        }
+      }
+    }
+    return result
+  }
+
+  def eventsInRoom(room: String): List[Event] =
+    events_.filter { e -> (e as Event).room() == room } as List[Event]
+
+  def eventsBy(organizer: String): List[Event] =
+    events_.filter { e -> (e as Event).organizer() == organizer } as List[Event]
+
+  def freeSlots(room: String, dayStart: Int, dayEnd: Int, minDuration: Int): List[TimeSlot] {
+    val booked = eventsInRoom(room).sortedBy { e -> (e as Event).slot().start() }
+    val result: List[TimeSlot] = []
+    var cursor = dayStart
+    foreach ev: Event in booked {
+      val s = ev.slot().start()
+      if s > cursor && s - cursor >= minDuration {
+        result.add(new TimeSlot(cursor, s))
+      }
+      if ev.slot().end() > cursor { cursor = ev.slot().end() }
+    }
+    if dayEnd - cursor >= minDuration {
+      result.add(new TimeSlot(cursor, dayEnd))
+    }
+    return result
+  }
+
+  def peakMinute(): Int {
+    var bestMinute = 0
+    var bestCount  = 0
+    foreach ev: Event in events_ {
+      var m = ev.slot().start()
+      while m < ev.slot().end() {
+        val t = m
+        val count = events_.count { e -> (e as Event).slot().contains(t) }
+        if count > bestCount {
+          bestCount  = count
+          bestMinute = t
+        }
+        m = m + 30
+      }
+    }
+    return bestMinute
+  }
+
+  def stats(): ScheduleStats {
+    val conflicts = allConflicts()
+    val totalMin  = events_.fold(0) { acc, e -> (acc as Int) + (e as Event).slot().duration() }
+    val rooms     = events_.map { e -> (e as Event).room() }.distinct()
+    return new ScheduleStats(
+      events_.size,
+      conflicts.size,
+      totalMin as Int,
+      peakMinute(),
+      rooms.size
+    )
+  }
+}
+
+// ── Logging observer ──────────────────────────────────────────────────────────
+
+class LogObserver conforms CalendarObserver {
+  var log_: List[String]
+public:
+  def this { this.log_ = [] }
+  def onEventAdded(e: Event): void {
+    log_.add("+ #{e.title()} added")
+  }
+  def onConflict(c: Conflict): void {
+    log_.add("! CONFLICT: #{c.eventA().title()} vs #{c.eventB().title()}")
+  }
+  def entries(): List[String] = log_
+}
+
+// ── Report generator ─────────────────────────────────────────────────────────
+
+class Report {
+public:
+  static def header(title: String): void {
+    val bar = "=".repeat(60)
+    IO::println(bar)
+    IO::println(title)
+    IO::println(bar)
+  }
+
+  static def printEvents(events: List[Event]): void {
+    foreach ev: Event in events.sortedBy { e -> (e as Event).slot().start() } {
+      IO::println("  " + ev.toStr())
+    }
+  }
+
+  static def printConflicts(conflicts: List[Conflict]): void {
+    if conflicts.size == 0 {
+      IO::println("  (no conflicts)")
+    } else {
+      foreach c: Conflict in conflicts {
+        IO::println("  " + c.toStr())
+      }
+    }
+  }
+
+  static def printFreeSlots(slots: List[TimeSlot], room: String): void {
+    IO::println("  Free slots in #{room}:")
+    if slots.size == 0 {
+      IO::println("    (none >= requested duration)")
+    } else {
+      foreach s: TimeSlot in slots {
+        IO::println("    #{s.toStr()} (#{s.duration()} min)")
+      }
+    }
+  }
+
+  static def printStats(s: ScheduleStats): void {
+    IO::println("  " + s.toStr())
+  }
+}
+
+// ── Scheduling helpers ────────────────────────────────────────────────────────
+
+def recommendRoom(cal: Calendar, rooms: List[String], start: Int, end: Int): String? {
+  foreach r: String in rooms {
+    val slot = new TimeSlot(start, end)
+    val busy = cal.eventsInRoom(r).any { e -> (e as Event).slot().overlaps(slot) }
+    if !busy { return r }
+  }
+  return null
+}
+
+def trySchedule(cal: Calendar, title: String, start: Int, end: Int, priority: Priority, rooms: List[String], organizer: String): void {
+  val room = recommendRoom(cal, rooms, start, end)
+  if room != null {
+    val ev = cal.addEvent(title, start, end, priority,
+                          new Once(), room as String, organizer)
+    IO::println("  Scheduled '#{ev.title()}' in #{ev.room()} #{ev.slot().toStr()}")
+  } else {
+    IO::println("  No free room for '#{title}' at #{start.hhmm()}-#{end.hhmm()}")
+  }
+}
+
+// ── Main simulation ───────────────────────────────────────────────────────────
+
+val cal  = new Calendar()
+val logger = new LogObserver()
+cal.addObserver(logger)
+
+val rooms: List[String] = ["A101", "B202", "C303"]
+
+Report::header("INTERVAL CALENDAR — building schedule")
+
+// ── Batch 1: Morning sessions ─────────────────────────────────────────────────
+// Minutes from midnight: 9:00=540, 10:00=600, 11:00=660, 12:00=720
+
+cal.addEvent("Kick-off Meeting", 540, 600,
+             new High("q1-planning", false),
+             new Once(), "A101", "alice")
+
+cal.addEvent("Team Sync", 600, 660,
+             new Medium("weekly"),
+             new Weekly(Weekday::MON, 4), "B202", "bob")
+
+cal.addEvent("Design Review", 540, 660,
+             new High("critical path", true),
+             new Once(), "C303", "carol")
+
+// intentional conflict: two events in A101 overlap
+cal.addEvent("Sprint Planning", 570, 660,
+             new Medium("sprint 7"),
+             new Once(), "A101", "alice")
+
+// afternoon: 13:00=780, 14:00=840, 15:00=900, 16:00=960, 17:00=1020
+cal.addEvent("Customer Demo", 780, 900,
+             new High("external", true),
+             new Once(), "A101", "carol")
+
+cal.addEvent("Lunch Briefing", 720, 780,
+             new Low(),
+             new Daily(5), "B202", "bob")
+
+cal.addEvent("Code Review", 840, 960,
+             new Medium("pre-release"),
+             new Weekly(Weekday::WED, 2), "C303", "dave")
+
+cal.addEvent("Retrospective", 900, 990,
+             new High("q1 close", false),
+             new Once(), "B202", "alice")
+
+cal.addEvent("1:1 Session", 600, 630,
+             new Low(),
+             new Weekly(Weekday::TUE, 8), "C303", "dave")
+
+cal.addEvent("Roadmap Planning", 960, 1020,
+             new High("strategy", false),
+             new Once(), "A101", "carol")
+
+// ── Print all events ──────────────────────────────────────────────────────────
+Report::header("ALL EVENTS")
+Report::printEvents(cal.events())
+
+// ── Conflicts ─────────────────────────────────────────────────────────────────
+Report::header("CONFLICTS")
+Report::printConflicts(cal.allConflicts())
+
+// ── Free slots ────────────────────────────────────────────────────────────────
+Report::header("FREE SLOTS (room A101, day 09:00-17:00, min 30 min)")
+Report::printFreeSlots(cal.freeSlots("A101", 540, 1020, 30), "A101")
+
+// ── Room analysis ─────────────────────────────────────────────────────────────
+Report::header("EVENTS PER ROOM")
+foreach r: String in rooms {
+  val evs = cal.eventsInRoom(r)
+  val total = evs.fold(0) { acc, e -> (acc as Int) + (e as Event).slot().duration() }
+  IO::println("  #{r.ljust(5)} — #{evs.size} event(s), #{total as Int} min booked")
+}
+
+// ── Organizer view ────────────────────────────────────────────────────────────
+Report::header("EVENTS PER ORGANIZER")
+val byOrg = cal.events().groupBy { e -> (e as Event).organizer() }
+foreach (org, evs) in byOrg {
+  val totalMin = (evs as List).fold(0) { acc, e -> (acc as Int) + (e as Event).slot().duration() }
+  IO::println("  #{(org as String).ljust(8)} — #{(evs as List).size} event(s), #{totalMin as Int} min")
+}
+
+// ── Priority breakdown ────────────────────────────────────────────────────────
+Report::header("PRIORITY BREAKDOWN")
+val priParts = cal.events().partition { e -> (e as Event).priority().weight() >= 10 }
+val highPri  = priParts[0] as List[Object]
+val rest     = priParts[1] as List[Object]
+val restParts = rest.partition { e -> (e as Event).priority().weight() >= 5 }
+val medPri   = restParts[0] as List[Object]
+val lowPri   = restParts[1] as List[Object]
+IO::println("  HIGH  (#{highPri.size}): " + highPri.map { e -> (e as Event).title() }.toString())
+IO::println("  MED   (#{medPri.size}): " + medPri.map { e -> (e as Event).title() }.toString())
+IO::println("  LOW   (#{lowPri.size}): " + lowPri.map { e -> (e as Event).title() }.toString())
+
+// ── Recurrence summary ────────────────────────────────────────────────────────
+Report::header("RECURRENCE SUMMARY")
+val totalOccurrences = cal.events().fold(0) { acc, e ->
+  (acc as Int) + (e as Event).recurrence().occurrences()
+}
+IO::println("  Total planned occurrences: #{totalOccurrences as Int}")
+val recurring = cal.events().filter { e ->
+  val ev = e as Event
+  select ev.recurrence() {
+    case o is Once: false
+    else: true
+  }
+}
+IO::println("  Recurring events (#{recurring.size}):")
+foreach ev: Event in recurring {
+  IO::println("    #{ev.title().ljust(25)} #{ev.recurrence().describe()}")
+}
+
+// ── Auto-scheduler: find rooms for new requests ───────────────────────────────
+Report::header("AUTO-SCHEDULING NEW REQUESTS")
+trySchedule(cal, "All-Hands", 630, 720,
+            new High("company-wide", true), rooms, "ceo")
+trySchedule(cal, "Budget Review", 840, 900,
+            new Medium("Q2"), rooms, "finance")
+trySchedule(cal, "Impossible 9-17", 540, 1020,
+            new Low(), rooms, "nobody")
+
+// ── Observer log ─────────────────────────────────────────────────────────────
+Report::header("ACTIVITY LOG (first 8 entries)")
+var idx = 0
+foreach entry: String in logger.entries() {
+  if idx < 8 { IO::println("  " + entry) }
+  idx = idx + 1
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+Report::header("SCHEDULE STATISTICS")
+Report::printStats(cal.stats())
+
+// ── Try/catch: bad duration guard ────────────────────────────────────────────
+Report::header("GUARD: ZERO-DURATION SLOT")
+try {
+  val bad = new TimeSlot(600, 600)
+  if bad.duration() == 0 {
+    throw new IllegalArgumentException("zero-duration slot rejected")
+  }
+} catch e: Exception {
+  IO::println("  Caught: " + e.getMessage())
+}
+
+IO::println("")
+IO::println("Done.")

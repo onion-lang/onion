@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.24.0] - 2026-08-28
-
 ### Added
 
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**

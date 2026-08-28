@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A plain
+  `enum Category` (10 spending categories), an ADT `enum TransactionType`
+  (Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), and
+  `Account`/`BudgetManager`/`FinanceEngine`/`ReportPrinter` classes with
+  `public:`/`private:` sections. Two months of checking/savings
+  transactions drive per-category budget tracking and over-budget
+  detection, monthly income/expense/net-savings/savings-rate reports, a
+  top-3 expense ranking (insertion sort), and a savings-goal projection,
+  via `filter`/`fold`/`map` pipelines and `select`/`case` matching on the
+  ADT enum.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
+
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
   Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
   graph model, residual-graph min-cut derivation via reachability from the

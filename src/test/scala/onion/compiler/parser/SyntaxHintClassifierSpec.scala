@@ -257,6 +257,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).messageKey shouldBe "error.parsing.hint.using_resource_statement"
     }
 
+    it("recognizes a Python-style `from ... import ...` statement") {
+      val hint = classify(
+        found = "import",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "from os import path"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path", "os", "path")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with a wildcard") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import *"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.*", "os.path", "*")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with multiple names") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import join, exists"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.join; os.path.exists", "os.path", "join, exists")
+    }
+
     it("recognizes a Go-style `:=` short variable declaration") {
       val hint = classify(
         found = ":",

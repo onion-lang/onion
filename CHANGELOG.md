@@ -18,6 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sortedBy`, `groupBy`, `distinct`, `partition`) driving VWAP, market-depth,
   and top-by-notional reporting.
 
+- **`run/TextDiff.on`, a 359-line edit-distance and word-diff demo.**
+  Exercises an extension method on `String`, a plain `enum SegKind`, an ADT
+  `enum WordOp` (Keep/Add/Del) with `select`/`is` pattern matching, 2D
+  `Int[][]` arrays for the Levenshtein DP table, and collection pipelines
+  over the resulting line- and word-level diff segments.
+
+- **`run/DungeonCrawler.on`, a 329-line scripted text-based dungeon-crawler
+  RPG.** An `Entity` interface, ADT enums (`ItemKind`, `MonsterKind`,
+  `CombatResult`), a plain `enum RoomKind`, `record Item`/`Room`, mutable
+  `Player`/`Dungeon` classes, a static-method `CombatEngine`, and
+  `filter`/`find`/`any` collection pipelines. The run is fully scripted
+  (no stdin), so output is deterministic.
+
+- **`run/VotingMethods.on`, a 436-line comparison of four voting
+  algorithms** (First-Past-The-Post, Borda Count, Approval, Condorcet) over
+  the same ranked ballots, demonstrating the voting paradox where different
+  methods elect different winners. Uses `record Candidate`/`Ballot`/
+  `ElectionResult`, an ADT `enum VoteEvent`, `Map[String, Int]` tallies,
+  `List[List[Int]]` ballot rankings, `groupBy`/`filter`/`map`/`fold`/
+  `sortedBy`, `foreach (k, v) in map`, and `try`/`catch`.
+
 ## [0.22.0] - 2026-08-27
 
 ### Fixed

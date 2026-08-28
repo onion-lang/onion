@@ -1,0 +1,366 @@
+// BinaryHeap.on — Binary min-heap (priority queue), heap sort, and
+// Dijkstra's single-source shortest-path algorithm.
+// Exercises: records, ADT enum, classes, private: sections, extension
+// methods, foreach/while/for, break/continue, string interpolation,
+// select/is patterns, collection pipelines (filter/map/fold/sortedBy/
+// groupBy/distinct/find/zip/partition), nullable types, Java interop
+// (LinkedHashMap, ArrayList).
+
+import {
+  java.lang.Integer as JInt;
+  java.util.ArrayList;
+  java.util.LinkedHashMap;
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+record HeapEntry(priority: Int, label: String)
+record Edge(to: String, weight: Int)
+
+// ─── ADT enum: Dijkstra path result ──────────────────────────────────────────
+enum PathResult {
+  case Reached(node: String, dist: Int, via: String)
+  case Unreachable(node: String)
+public:
+  def summary(): String = select this {
+    case r is Reached:     "#{r.node()} dist=#{r.dist()} via=#{r.via()}"
+    case u is Unreachable: "#{u.node()} [unreachable]"
+  }
+  def distance(): Int = select this {
+    case r is Reached:     r.dist()
+    case u is Unreachable: JInt::MAX_VALUE
+  }
+  def node(): String = select this {
+    case r is Reached:     r.node()
+    case u is Unreachable: u.node()
+  }
+  def via(): String = select this {
+    case r is Reached:     r.via()
+    case u is Unreachable: ""
+  }
+  def isReachable(): Boolean = select this {
+    case r is Reached:     true
+    case u is Unreachable: false
+  }
+}
+
+// ─── Binary min-heap ─────────────────────────────────────────────────────────
+// Parent of node at index i is (i-1)/2; children are 2i+1 and 2i+2.
+// The backing list is grown with add() and shrunk logically via sz.
+class MinHeap {
+  var data: List[HeapEntry]
+  var sz:   Int
+public:
+  def this() { self.data = []; self.sz = 0 }
+  def size():    Int     = self.sz
+  def isEmpty(): Boolean = self.sz == 0
+
+  def push(priority: Int, label: String): void {
+    val e = new HeapEntry(priority, label)
+    if self.sz == self.data.size { self.data.add(e) }
+    else { self.data[self.sz] = e }
+    self.siftUp(self.sz)
+    self.sz++
+  }
+
+  def pop(): HeapEntry? {
+    if self.sz == 0 { return null }
+    val top: HeapEntry = self.data[0]
+    self.sz--
+    if self.sz > 0 { self.data[0] = self.data[self.sz]; self.siftDown(0) }
+    return top
+  }
+
+private:
+  def swap(i: Int, j: Int): void {
+    val t: HeapEntry = self.data[i]
+    self.data[i] = self.data[j]
+    self.data[j] = t
+  }
+
+  def siftUp(start: Int): void {
+    var i: Int = start
+    while i > 0 {
+      val p: Int = (i - 1) / 2
+      if self.data[i].priority() < self.data[p].priority() { self.swap(i, p); i = p }
+      else { break }
+    }
+  }
+
+  def siftDown(start: Int): void {
+    var i: Int = start
+    while true {
+      val l: Int = 2 * i + 1; val r: Int = 2 * i + 2; var s: Int = i
+      if l < self.sz && self.data[l].priority() < self.data[s].priority() { s = l }
+      if r < self.sz && self.data[r].priority() < self.data[s].priority() { s = r }
+      if s != i { self.swap(i, s); i = s } else { break }
+    }
+  }
+}
+
+// ─── Heap sort ────────────────────────────────────────────────────────────────
+def heapSort(nums: List[Int]): List[Int] {
+  val h = new MinHeap()
+  foreach n: Int in nums { h.push(n, "") }
+  val sorted: List[Int] = []
+  while !h.isEmpty() { sorted.add(h.pop()!!.priority()) }
+  return sorted
+}
+
+// ─── Graph with Dijkstra ──────────────────────────────────────────────────────
+class Graph {
+  var adj:      LinkedHashMap[String, Object]
+  var nodeList: List[String]
+public:
+  def this() {
+    self.adj      = new LinkedHashMap[String, Object]()
+    self.nodeList = []
+  }
+
+  def addNode(name: String): void {
+    if !self.adj.containsKey(name) {
+      self.adj.put(name, new ArrayList[Object]())
+      self.nodeList.add(name)
+    }
+  }
+
+  def addEdge(from: String, to: String, w: Int): void {
+    self.addNode(from); self.addNode(to)
+    val edges: ArrayList[Object] = self.adj.get(from) as ArrayList[Object]
+    edges.add(new Edge(to, w))
+  }
+
+  // Dijkstra's single-source shortest-path via min-heap.
+  def dijkstra(source: String): List[Object] {
+    val INF: Int = JInt::MAX_VALUE / 2
+    val dist: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
+    val prev: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
+    foreach name: String in self.nodeList {
+      dist.put(name, JInt::valueOf(INF))
+      prev.put(name, "")
+    }
+    dist.put(source, JInt::valueOf(0))
+    val pq = new MinHeap()
+    pq.push(0, source)
+
+    while !pq.isEmpty() {
+      val entry: HeapEntry = pq.pop()!!
+      val u: String = entry.label()
+      val du: Int   = (dist.get(u) as JInt).intValue()
+      if entry.priority() > du { continue }
+      val nbs: ArrayList[Object] = self.neighbors(u)
+      for var i: Int = 0; i < nbs.size(); i++ {
+        val e: Edge   = nbs.get(i) as Edge
+        val v: String = e.to()
+        val nd: Int   = du + e.weight()
+        val dv: Int   = (dist.get(v) as JInt).intValue()
+        if nd < dv {
+          dist.put(v, JInt::valueOf(nd))
+          prev.put(v, u)
+          pq.push(nd, v)
+        }
+      }
+    }
+
+    val results: List[Object] = []
+    foreach name: String in self.nodeList {
+      val d:   Int    = (dist.get(name) as JInt).intValue()
+      val via: String = prev.get(name) as String
+      if d >= INF {
+        results.add(new Unreachable(name))
+      } else {
+        val p: String = if via == "" { source } else { via }
+        results.add(new Reached(name, d, p))
+      }
+    }
+    return results
+  }
+
+private:
+  def neighbors(node: String): ArrayList[Object] {
+    val v: Object? = self.adj.get(node)
+    return if v == null { new ArrayList[Object]() } else { v as ArrayList[Object] }
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+extension String {
+  def repeat(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Banner helper ────────────────────────────────────────────────────────────
+def banner(title: String): void {
+  IO::println("\n" + "-".repeat(54))
+  IO::println("  " + title)
+  IO::println("-".repeat(54))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Demo 1: Heap Sort
+// ════════════════════════════════════════════════════════════════════════════
+banner("Heap Sort")
+val unsorted: List[Int] = [42, 7, 19, 3, 55, 1, 28, 14, 33, 6]
+val sorted = heapSort(unsorted)
+IO::println("  Input : " + unsorted.toString())
+IO::println("  Sorted: " + sorted.toString())
+var sortOk: Boolean = true
+for var i: Int = 0; i < sorted.size - 1; i++ {
+  if sorted[i] > sorted[i + 1] { sortOk = false }
+}
+IO::println("  Ascending order verified: " + sortOk)
+
+// ════════════════════════════════════════════════════════════════════════════
+// Demo 2: Priority Queue (task scheduler)
+// ════════════════════════════════════════════════════════════════════════════
+banner("Task Scheduler (Priority Queue)")
+val taskHeap = new MinHeap()
+val taskNames: List[String] = ["Write docs", "Fix critical bug", "Refactor code",
+                               "Write tests", "Review PR", "Deploy hotfix"]
+val taskPrios: List[Int]    = [3, 1, 5, 2, 4, 1]
+for var i: Int = 0; i < taskNames.size; i++ {
+  taskHeap.push(taskPrios[i], taskNames[i])
+}
+IO::println("  Processed in priority order:")
+while !taskHeap.isEmpty() {
+  val t: HeapEntry = taskHeap.pop()!!
+  IO::println("    [#{t.priority()}] " + t.label())
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Demo 3: Dijkstra's shortest path
+// ════════════════════════════════════════════════════════════════════════════
+banner("Dijkstra's Shortest Path (source = A)")
+// Weighted directed graph:
+//   A --4--> B --2--> D --1--> F
+//   A --1--> C --2--> B
+//            C --3--> E --5--> F
+//            B --3--> E
+val g = new Graph()
+g.addEdge("A", "B", 4)
+g.addEdge("A", "C", 1)
+g.addEdge("C", "B", 2)
+g.addEdge("B", "D", 2)
+g.addEdge("B", "E", 3)
+g.addEdge("C", "E", 3)
+g.addEdge("E", "F", 5)
+g.addEdge("D", "F", 1)
+
+val paths = g.dijkstra("A")
+IO::println("  Results:")
+foreach r: Object in paths {
+  IO::println("    " + (r as PathResult).summary())
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Demo 4: Collection pipelines on path results
+// ════════════════════════════════════════════════════════════════════════════
+banner("Collection Pipelines on Path Results")
+
+// filter
+val reachable = paths.filter { r -> (r as PathResult).isReachable() }
+IO::println("  Reachable: #{reachable.size()} / #{paths.size()} nodes")
+
+// map
+val nodeLabels = reachable.map { r -> (r as PathResult).node() }
+IO::println("  Reachable node names: " + nodeLabels.toString())
+
+// fold: sum of shortest distances
+val totalDist = reachable.fold(0) { acc, r ->
+  (acc as Int) + (r as PathResult).distance()
+}
+IO::println("  Sum of shortest distances: " + totalDist)
+
+// find: first reachable node with distance > 2
+val found = reachable.find { r -> (r as PathResult).distance() > 2 }
+if found != null {
+  IO::println("  First node with dist > 2: " + (found as PathResult).summary())
+}
+
+// sortedBy: ascending distance
+val byDist = reachable.sortedBy { r -> (r as PathResult).distance() }
+IO::println("  Sorted by distance: " + byDist.map { r -> (r as PathResult).node() }.toString())
+
+// groupBy: via predecessor
+val byVia = reachable.groupBy { r -> (r as PathResult).via() }
+IO::println("  Grouped by predecessor node:")
+foreach (via, group) in byVia {
+  val names = (group as List).map { r -> (r as PathResult).node() }
+  IO::println("    via #{via}: #{names}")
+}
+
+// distinct: unique predecessor nodes
+val distinctVia = reachable.map { r -> (r as PathResult).via() }.distinct()
+IO::println("  Distinct predecessors: " + distinctVia.toString())
+
+// partition: near (dist <= 3) vs far (dist > 3)
+val parts = reachable.partition { r -> (r as PathResult).distance() <= 3 }
+val near = parts[0] as List[Object]
+val far  = parts[1] as List[Object]
+IO::println("  Near (dist <= 3): " + near.map { r -> (r as PathResult).node() }.toString())
+IO::println("  Far  (dist  > 3): " + far.map  { r -> (r as PathResult).node() }.toString())
+
+// zip: node names paired with distance strings
+val distStrs = reachable.map { r -> "" + (r as PathResult).distance() }
+val nameList = reachable.map { r -> (r as PathResult).node() }
+val zipped   = nameList.zip(distStrs)
+IO::println("  Zipped (node, dist):")
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  IO::println("    #{p[0]}: #{p[1]}")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Demo 5: Recursive Fibonacci + nullable + try/catch
+// ════════════════════════════════════════════════════════════════════════════
+banner("Recursion, Nullable, Try/Catch")
+
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+val fibs: List[Int] = []
+foreach i: Int in 0..10 { fibs.add(fib(i)) }
+IO::println("  Fibonacci(0..10): " + fibs.toString())
+
+def safeParse(s: String): Int? {
+  try { return JInt::parseInt(s) }
+  catch e: Exception { return null }
+}
+val tokens: List[String] = ["10", "bad", "25", "nope", "7", "0"]
+var validSum: Int = 0
+var nullCount: Int = 0
+foreach tok: String in tokens {
+  val v: Int? = safeParse(tok)
+  if v == null { nullCount++ }
+  else { validSum = validSum + v!! }
+}
+IO::println("  Parse results for #{tokens.toString()}:")
+IO::println("    Null (parse failures): #{nullCount}")
+IO::println("    Sum of valid ints    : #{validSum}")
+
+// while loop: count heap-sort inversions in a random-ish list
+banner("Inversion Count via Sort Comparison")
+val randomish: List[Int] = [9, 2, 7, 1, 5, 3, 8, 4, 6]
+val sortedRef: List[Int] = heapSort(randomish)
+var inversions: Int = 0
+for var i: Int = 0; i < randomish.size; i++ {
+  for var j: Int = i + 1; j < randomish.size; j++ {
+    if randomish[i] > randomish[j] { inversions++ }
+  }
+}
+IO::println("  Original:  " + randomish.toString())
+IO::println("  Sorted:    " + sortedRef.toString())
+IO::println("  Inversions: " + inversions)
+
+// Extension method showcase
+banner("String Extension Methods")
+val words: List[String] = ["apple", "banana", "cherry", "date"]
+val padded = words.map { w -> (w as String).padRight(10) + "|" }
+foreach p: Object in padded { IO::print("  " + p) }
+IO::println("")
+IO::println("  Header: " + "-".repeat(40))

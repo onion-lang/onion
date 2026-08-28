@@ -1,0 +1,431 @@
+// MiniVcs.on — an in-memory mini version control system (git-inspired).
+//
+// Models blobs, trees, commits, branches, and a staging area.  Supports add,
+// commit, log, branch, checkout, status, and diff operations.  All objects are
+// stored in a content-addressed Map keyed by a 7-char hex hash.
+//
+// Exercises: ADT case-enum with fields, records with methods and examples,
+// classes with mutable state and Map[K,V]/List[T] fields, select type-pattern
+// matching, closures, extension methods on String/Int, string interpolation,
+// collection pipelines (map/filter/sortedBy/fold), foreach (k,v) on maps,
+// nullable types, while loops, try/catch.
+
+// ── Object-type ADT ──────────────────────────────────────────────────────────
+
+enum VcsKind {
+  case BlobKind
+  case TreeKind
+  case CommitKind
+public:
+  def label(): String = select this {
+    case b is BlobKind:   "blob"
+    case t is TreeKind:   "tree"
+    case c is CommitKind: "commit"
+  }
+}
+
+// ── Low-level VCS objects ────────────────────────────────────────────────────
+
+record Blob(hash: String, content: String)
+  example { new Blob("abc1234", "hello\n").hash() == "abc1234" }
+
+record TreeEntry(name: String, blobHash: String)
+  example { new TreeEntry("README.md", "abc1234").name() == "README.md" }
+
+record Tree(hash: String, entries: List[TreeEntry])
+  example { new Tree("fffffff", []).entries().size == 0 }
+
+record CommitObj(
+  hash:    String,
+  message: String,
+  author:  String,
+  epoch:   Int,
+  tree:    String,   // tree hash
+  parent:  String?   // null for root commit
+)
+  example {
+    val c: CommitObj = new CommitObj("aabbcc1", "init", "alice", 1000, "tree123", null)
+    c.parent() == null && c.author() == "alice"
+  }
+
+// ── Branch ────────────────────────────────────────────────────────────────────
+
+class Branch {
+public:
+  val name: String
+  var tip:  String?   // commit hash; null on unborn branch
+
+  def this(n: String) {
+    this.name = n
+    this.tip  = null
+  }
+
+  def born(): Boolean = this.tip != null
+
+  def tipOrUnborn(): String = this.tip ?: "(unborn)"
+}
+
+// ── Diff status ───────────────────────────────────────────────────────────────
+
+enum DiffStatus {
+  case Added
+  case Removed
+  case Modified
+public:
+  def symbol(): String = select this {
+    case d is Added:    "+"
+    case d is Removed:  "-"
+    case d is Modified: "~"
+  }
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension String {
+  def shorten(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n)
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def splitLines(): List[String] = Strings::split(self, "\n")
+}
+
+extension Int {
+  def zeroPad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = "0" + s }
+    return s
+  }
+}
+
+// ── Simple hash: djb2-style over chars ───────────────────────────────────────
+
+def hashStr(s: String): String {
+  var h: Int = 5381
+  var i: Int = 0
+  while i < s.length() {
+    h = h * 33 + s.charAt(i) as Int
+    i = i + 1
+  }
+  val unsigned: Long = h as Long & 0xFFFFFFFFL
+  var hex: String = Long::toHexString(unsigned)
+  while hex.length() < 7 { hex = "0" + hex }
+  return hex.shorten(7)
+}
+
+// ── Repository ────────────────────────────────────────────────────────────────
+
+class Repo {
+  var store:    Map[String, Object]   // hash -> Blob | Tree | CommitObj
+  var index:    Map[String, String]   // path -> blob hash (staging area)
+  var branches: Map[String, Branch]
+  var head:     String                // current branch name
+
+public:
+  def this() {
+    this.store    = [:]
+    this.index    = [:]
+    this.branches = [:]
+    this.head     = "main"
+    this.branches.put("main", new Branch("main"))
+  }
+
+  // ── Current branch / commit ───────────────────────────────────────────────
+
+  def currentBranch(): Branch? = this.branches.get(this.head)
+
+  def headCommitHash(): String? {
+    val b: Branch? = this.currentBranch()
+    return b?.tip
+  }
+
+  // ── Staging area ──────────────────────────────────────────────────────────
+
+  def stageFile(path: String, content: String): void {
+    val hash: String = hashStr("blob:" + path + ":" + content)
+    this.store.put(hash, new Blob(hash, content))
+    this.index.put(path, hash)
+    IO::println("staged: " + path + "  (" + hash + ")")
+  }
+
+  def status(): void {
+    IO::println("On branch " + this.head)
+    if this.headCommitHash() == null {
+      IO::println("(no commits yet)")
+    }
+    val staged: List[String] = this.stagedPaths()
+    if staged.size == 0 {
+      IO::println("nothing to commit, working tree clean")
+    } else {
+      IO::println("Changes staged for commit:")
+      foreach p: String in staged { IO::println("  staged:   " + p) }
+    }
+  }
+
+  def stagedPaths(): List[String] {
+    val result: List[String] = []
+    foreach (path, blobHash) in this.index {
+      result.add(path + " (" + blobHash + ")")
+    }
+    return result
+  }
+
+  // ── Build tree from index ─────────────────────────────────────────────────
+
+  def buildTree(): String {
+    val entries: List[TreeEntry] = []
+    foreach (path, blobHash) in this.index {
+      entries.add(new TreeEntry(path, blobHash))
+    }
+    val content: String = entries
+      .map { e: TreeEntry -> e.name() + ":" + e.blobHash() }
+      .fold("") { a: String, s: String -> a + s + "," }
+    val treeHash: String = hashStr("tree:" + content)
+    this.store.put(treeHash, new Tree(treeHash, entries))
+    return treeHash
+  }
+
+  // ── Commit ────────────────────────────────────────────────────────────────
+
+  def commit(message: String, author: String, epoch: Int): String? {
+    if this.index.size() == 0 {
+      IO::println("nothing to commit")
+      return null
+    }
+    val treeHash:   String  = this.buildTree()
+    val parentHash: String? = this.headCommitHash()
+    val content:    String  = "tree:" + treeHash + "|parent:" + parentHash +
+                              "|msg:" + message + "|author:" + author + "|epoch:" + epoch
+    val hash: String = hashStr(content)
+    this.store.put(hash, new CommitObj(hash, message, author, epoch, treeHash, parentHash))
+    val cb: Branch? = this.currentBranch()
+    if cb != null { cb.tip = hash }
+    this.index = [:]
+    IO::println("[" + this.head + " " + hash + "] " + message)
+    return hash
+  }
+
+  // ── Log ───────────────────────────────────────────────────────────────────
+
+  def log(): void {
+    var hash: String? = this.headCommitHash()
+    if hash == null { IO::println("(no commits yet)"); return }
+    while hash != null {
+      val c: CommitObj = this.store.get(hash as String) as CommitObj
+      IO::println("commit " + c.hash())
+      IO::println("Author: " + c.author() + "  epoch=" + c.epoch())
+      IO::println("    " + c.message())
+      IO::println("")
+      hash = c.parent()
+    }
+  }
+
+  // ── Branch management ─────────────────────────────────────────────────────
+
+  def branch(name: String): void {
+    if this.branches.containsKey(name) {
+      IO::println("error: branch '" + name + "' already exists")
+      return
+    }
+    val b: Branch = new Branch(name)
+    b.tip = this.headCommitHash()
+    this.branches.put(name, b)
+    IO::println("created branch " + name + " -> " + b.tipOrUnborn())
+  }
+
+  def listBranches(): void {
+    foreach (name, branchObj) in this.branches {
+      val b: Branch  = branchObj as Branch
+      val star: String = if this.head == name { "* " } else { "  " }
+      IO::println(star + name + " -> " + b.tipOrUnborn())
+    }
+  }
+
+  def checkout(name: String): void {
+    if !this.branches.containsKey(name) {
+      IO::println("error: branch '" + name + "' not found")
+      return
+    }
+    if this.index.size() > 0 {
+      IO::println("error: staged changes present — commit first")
+      return
+    }
+    this.head = name
+    val b: Branch = this.branches.get(name) as Branch
+    IO::println("Switched to branch '" + name + "' (tip: " + b.tipOrUnborn() + ")")
+  }
+
+  // ── Diff two commits ──────────────────────────────────────────────────────
+
+  def diff(hashA: String?, hashB: String?): void {
+    val filesA: Map[String, String] = this.commitFiles(hashA)
+    val filesB: Map[String, String] = this.commitFiles(hashB)
+
+    // Collect all paths from both sides
+    val seen:  Map[String, Boolean] = [:]
+    val paths: List[String] = []
+    foreach (p, hA) in filesA { if !seen.containsKey(p) { seen.put(p, hA != null); paths.add(p) } }
+    foreach (p, hB) in filesB { if !seen.containsKey(p) { seen.put(p, hB != null); paths.add(p) } }
+
+    val sorted: List[String] = paths.sortedBy { p: String -> p }
+    foreach path: String in sorted {
+      val aHash: String? = filesA.get(path)
+      val bHash: String? = filesB.get(path)
+      if aHash == null && bHash != null {
+        IO::println("+ " + path + " (new file)")
+        this.showBlobLines(bHash as String, "+ ")
+      }
+      if aHash != null && bHash == null {
+        IO::println("- " + path + " (deleted)")
+        this.showBlobLines(aHash as String, "- ")
+      }
+      if aHash != null && bHash != null && aHash != bHash {
+        IO::println("~ " + path + " (changed)")
+        this.diffBlobs(aHash as String, bHash as String)
+      }
+    }
+  }
+
+  def commitFiles(commitHash: String?): Map[String, String] {
+    val result: Map[String, String] = [:]
+    if commitHash == null { return result }
+    val c: CommitObj? = this.store.get(commitHash) as CommitObj?
+    if c == null { return result }
+    val tree: Tree? = this.store.get(c.tree()) as Tree?
+    if tree == null { return result }
+    foreach e: TreeEntry in tree.entries() { result.put(e.name(), e.blobHash()) }
+    return result
+  }
+
+  def showBlobLines(hash: String, prefix: String): void {
+    val blob: Blob? = this.store.get(hash) as Blob?
+    if blob == null { return }
+    foreach line: String in blob.content().splitLines() {
+      IO::println("  " + prefix + line)
+    }
+  }
+
+  def diffBlobs(hashA: String, hashB: String): void {
+    val blobA: Blob? = this.store.get(hashA) as Blob?
+    val blobB: Blob? = this.store.get(hashB) as Blob?
+    if blobA == null || blobB == null { return }
+    val linesA: List[String] = blobA.content().splitLines()
+    val linesB: List[String] = blobB.content().splitLines()
+    val removed: List[String] = linesA.filter { l: String -> !linesB.contains(l) }
+    val added:   List[String] = linesB.filter { l: String -> !linesA.contains(l) }
+    foreach l: String in removed { IO::println("  - " + l) }
+    foreach l: String in added   { IO::println("  + " + l) }
+  }
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+
+  def summary(): void {
+    IO::println("=== Repository Summary ===")
+    IO::println("Object store : " + this.store.size() + " objects")
+    IO::println("Staging area : " + this.index.size() + " files")
+    IO::println("Branches     : " + this.branches.size())
+    IO::println("HEAD         : " + this.head + " -> " + (this.headCommitHash() ?: "(none)"))
+  }
+
+  def objectBreakdown(): void {
+    val counts: Map[String, Int] = [:]
+    foreach (hash, obj) in this.store {
+      val kind: String = select obj {
+        case b is Blob:      "blob"
+        case t is Tree:      "tree:" + hash.shorten(4)
+        case c is CommitObj: "commit"
+        else:                "unknown"
+      }
+      val baseKind: String = if kind.startsWith("tree") { "tree" } else { kind }
+      val prev: Int? = counts.get(baseKind)
+      counts.put(baseKind, (prev ?: 0) + 1)
+    }
+    foreach (kind, cnt) in counts {
+      IO::println("  " + (kind as String).padRight(8) + " : " + cnt)
+    }
+  }
+}
+
+
+// ── Clock (epoch substitute) ──────────────────────────────────────────────────
+
+class Clock {
+  var tick: Int
+public:
+  def this() { this.tick = 1000 }
+  def next(): Int { this.tick = this.tick + 60; return this.tick }
+}
+
+// ── Driver ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val repo:  Repo  = new Repo()
+  val clock: Clock = new Clock()
+
+  // ── First commit on main ──────────────────────────────────────────────────
+  IO::println("=== First commit ===")
+  repo.stageFile("README.md",    "# MiniVcs\nA tiny VCS demo.\n")
+  repo.stageFile("src/Main.on",  "def main(): void { IO::println(\"hello\") }\n")
+  val hash1: String? = repo.commit("initial commit", "alice", clock.next())
+  IO::println("")
+
+  // ── Second commit on main ─────────────────────────────────────────────────
+  IO::println("=== Second commit ===")
+  repo.stageFile("src/Util.on",  "def greet(name: String): void { IO::println(\"Hi, \" + name) }\n")
+  repo.stageFile("README.md",    "# MiniVcs\nA tiny VCS demo.\nSee src/.\n")
+  val hash2: String? = repo.commit("add Util, update README", "alice", clock.next())
+  IO::println("")
+
+  // ── Branch feature/login ──────────────────────────────────────────────────
+  IO::println("=== Create and switch to feature/login ===")
+  repo.branch("feature/login")
+  repo.checkout("feature/login")
+  repo.stageFile("src/Auth.on",
+    "def login(user: String, pass: String): Boolean {\n  return user == \"admin\"\n}\n")
+  val hash3: String? = repo.commit("add auth module", "bob", clock.next())
+  IO::println("")
+
+  // ── Log on feature/login ──────────────────────────────────────────────────
+  IO::println("=== Log (feature/login) ===")
+  repo.log()
+
+  // ── Back to main, add config ──────────────────────────────────────────────
+  IO::println("=== Back to main ===")
+  repo.checkout("main")
+  repo.stageFile("src/Config.on", "val VERSION: String = \"0.1.0\"\n")
+  repo.commit("add config", "alice", clock.next())
+  IO::println("")
+
+  // ── Branch listing ────────────────────────────────────────────────────────
+  IO::println("=== Branches ===")
+  repo.listBranches()
+  IO::println("")
+
+  // ── Diff: first commit -> second commit ───────────────────────────────────
+  IO::println("=== Diff: initial → second commit ===")
+  repo.diff(hash1, hash2)
+  IO::println("")
+
+  // ── Diff: second -> feature/login ─────────────────────────────────────────
+  IO::println("=== Diff: second commit → feature/login ===")
+  repo.diff(hash2, hash3)
+  IO::println("")
+
+  // ── Status ────────────────────────────────────────────────────────────────
+  IO::println("=== Status ===")
+  repo.status()
+  IO::println("")
+
+  // ── Object type counts ────────────────────────────────────────────────────
+  IO::println("=== Object type breakdown ===")
+  repo.objectBreakdown()
+  IO::println("")
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+  IO::println("=== Summary ===")
+  repo.summary()
+}

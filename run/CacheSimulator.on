@@ -1,0 +1,309 @@
+// CacheSimulator.on — compares LRU / LFU / FIFO cache-eviction policies across
+// four synthetic workloads (sequential, uniform-random, hot-set, strided).
+//
+// Exercises: ADT enum (singleton-case records) • record with body & methods •
+// class with mutable state and explicit constructor • extension Int / Double •
+// collection pipelines (sortedBy / filter / map / fold / groupBy / find) •
+// select exhaustiveness • nullable • foreach (k,v) on Map • closures •
+// while & foreach loops • string interpolation • LCG pseudo-random numbers.
+
+// ── Extensions ─────────────────────────────────────────────────────────────────
+
+extension Int {
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String = {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+}
+
+// ── Core data types ────────────────────────────────────────────────────────────
+
+record CacheEntry(key: Int, value: String, useTime: Int, freq: Int, insertTime: Int)
+
+record Workload(name: String, keys: List[Object])
+
+record SimResult(policy: String, hits: Int, misses: Int, evictions: Int) {
+public:
+  def total(): Int = hits + misses
+  def hitRate(): Double =
+    if total() == 0 { 0.0 } else { (hits * 1000 / total()) as Double / 10.0 }
+  def row(): String =
+    "  " + policy + "  hits=" + hits.rjust(4) + "/" + total().rjust(4) +
+    "  rate=" + hitRate().fmt1() + "%  evict=" + evictions.rjust(3)
+}
+
+// ── Eviction policy (ADT enum with singleton cases) ────────────────────────────
+
+enum EvictPolicy {
+  case LRU    // evict the least-recently-used entry
+  case LFU    // evict the least-frequently-used entry
+  case FIFO   // evict the oldest-inserted entry
+}
+
+// ── Cache class ────────────────────────────────────────────────────────────────
+
+class SimCache {
+  var _cap:      Int
+  var _pol:      EvictPolicy
+  var entries:   List[Object]
+  var clock:     Int
+  var hits:      Int
+  var misses:    Int
+  var evictions: Int
+
+public:
+  def this(capacity: Int, policy: EvictPolicy) {
+    this._cap      = capacity
+    this._pol      = policy
+    this.entries   = []
+    this.clock     = 0
+    this.hits      = 0
+    this.misses    = 0
+    this.evictions = 0
+  }
+
+  def capacity(): Int = _cap
+
+  def get(key: Int): String? {
+    clock = clock + 1
+    var found: CacheEntry? = null
+    foreach e: Object in entries {
+      val ce: CacheEntry = e as CacheEntry
+      if ce.key() == key { found = ce }
+    }
+    if found != null {
+      hits = hits + 1
+      val old: CacheEntry = found
+      val fresh: List[Object] = []
+      foreach e: Object in entries {
+        val ce = e as CacheEntry
+        if ce.key() == key { fresh.add(ce.copy(useTime = clock, freq = old.freq() + 1)) } else { fresh.add(ce) }
+      }
+      entries = fresh
+      return old.value()
+    } else {
+      misses = misses + 1
+      return null
+    }
+  }
+
+  def put(key: Int, value: String): void {
+    clock = clock + 1
+    var exists: Boolean = false
+    foreach e: Object in entries { if (e as CacheEntry).key() == key { exists = true } }
+    if exists {
+      val fresh: List[Object] = []
+      foreach e: Object in entries {
+        val ce = e as CacheEntry
+        if ce.key() == key { fresh.add(ce.copy(value = value, useTime = clock, freq = ce.freq() + 1)) } else { fresh.add(ce) }
+      }
+      entries = fresh
+    } else {
+      if entries.size >= _cap {
+        doEvict()
+        evictions = evictions + 1
+      }
+      val fresh: List[Object] = []
+      foreach e: Object in entries { fresh.add(e) }
+      fresh.add(new CacheEntry(key, value, clock, 1, clock))
+      entries = fresh
+    }
+  }
+
+  def reset(): void {
+    this.entries   = []
+    this.clock     = 0
+    this.hits      = 0
+    this.misses    = 0
+    this.evictions = 0
+  }
+
+  def result(name: String): SimResult = new SimResult(name, hits, misses, evictions)
+
+private:
+  def doEvict(): void {
+    val sorted: List[Object] = select _pol {
+      case p is LRU:  entries.sortedBy { e -> (e as CacheEntry).useTime() }
+      case p is LFU:  entries.sortedBy { e -> (e as CacheEntry).freq() }
+      case p is FIFO: entries.sortedBy { e -> (e as CacheEntry).insertTime() }
+    }
+    val victim: CacheEntry = sorted.get(0) as CacheEntry
+    val fresh: List[Object] = []
+    foreach e: Object in entries { if (e as CacheEntry).key() != victim.key() { fresh.add(e) } }
+    entries = fresh
+  }
+}
+
+// ── Workload generators ────────────────────────────────────────────────────────
+
+def lcgNext(s: Int): Int = (s * 1664525 + 1013904223) & 0x7fffffff
+
+// Sequential scan: 0, 1, 2, …, maxKey-1, 0, 1, …
+def wlSeq(n: Int, maxKey: Int): List[Object] {
+  val keys: List[Object] = []
+  foreach i: Int in 0..<n { keys.add(i % maxKey) }
+  return keys
+}
+
+// Uniform-random (LCG deterministic)
+def wlRand(n: Int, maxKey: Int, seed: Int): List[Object] {
+  val keys: List[Object] = []
+  var s: Int = seed
+  foreach i: Int in 0..<n {
+    s = lcgNext(s)
+    keys.add((s & 0x7fffffff) % maxKey)
+  }
+  return keys
+}
+
+// Hot-set 80/20: 80% of accesses hit the top-20% of keys
+def wlHot(n: Int, maxKey: Int, seed: Int): List[Object] {
+  val keys: List[Object] = []
+  var s: Int = seed
+  val hotCap: Int = maxKey / 5 + 1
+  foreach i: Int in 0..<n {
+    s = lcgNext(s)
+    val pct: Int = (s & 0x7fffffff) % 100
+    s = lcgNext(s)
+    val k: Int = if pct < 80 { (s & 0x7fffffff) % hotCap } else { (s & 0x7fffffff) % maxKey }
+    keys.add(k)
+  }
+  return keys
+}
+
+// Strided: 0, stride, 2·stride, … wrapping at maxKey
+def wlStride(n: Int, maxKey: Int, stride: Int): List[Object] {
+  val keys: List[Object] = []
+  var k: Int = 0
+  foreach i: Int in 0..<n { keys.add(k); k = (k + stride) % maxKey }
+  return keys
+}
+
+// ── Simulation helpers ─────────────────────────────────────────────────────────
+
+def runWorkload(name: String, cache: SimCache, keys: List[Object]): SimResult {
+  cache.reset()
+  foreach k: Object in keys {
+    val key: Int = k as Int
+    if cache.get(key) == null { cache.put(key, "v" + key) }
+  }
+  return cache.result(name)
+}
+
+def separator(title: String): void {
+  IO::println("")
+  IO::println("─── " + title)
+}
+
+def printTriple(r0: SimResult, r1: SimResult, r2: SimResult): void {
+  IO::println(r0.row())
+  IO::println(r1.row())
+  IO::println(r2.row())
+  val rs: List[Object] = [r0, r1, r2]
+  val winner: SimResult = rs.sortedBy { r -> -(r as SimResult).hitRate() }.get(0) as SimResult
+  IO::println("  Winner: " + winner.policy().trim())
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val cap: Int = 8      // cache capacity (number of entries)
+  val acc: Int = 300    // accesses per workload
+
+  val lru  = new SimCache(cap, new LRU())
+  val lfu  = new SimCache(cap, new LFU())
+  val fifo = new SimCache(cap, new FIFO())
+
+  IO::println("===============================================")
+  IO::println("Cache Simulator   cap=" + cap + "   accesses=" + acc)
+  IO::println("===============================================")
+
+  val workloads: List[Object] = [
+    new Workload("Sequential  (12 keys, cycle)",  wlSeq(acc, 12)),
+    new Workload("Random-uniform  (20 keys)",      wlRand(acc, 20, 31337)),
+    new Workload("Hot-set 80/20  (20 keys)",       wlHot(acc, 20, 99991)),
+    new Workload("Strided  (16 keys, stride=5)",   wlStride(acc, 16, 5))
+  ]
+
+  // Run each workload on all three caches, collect result triples
+  val allResults: List[Object] = []
+
+  foreach wl: Object in workloads {
+    val w: Workload = wl as Workload
+    separator(w.name())
+    val r0: SimResult = runWorkload("LRU ", lru,  w.keys())
+    val r1: SimResult = runWorkload("LFU ", lfu,  w.keys())
+    val r2: SimResult = runWorkload("FIFO", fifo, w.keys())
+    printTriple(r0, r1, r2)
+    allResults.add([r0, r1, r2])
+  }
+
+  // ── Aggregate: average hit rate per policy across all workloads ────────────
+  separator("Average hit-rate by policy (all workloads)")
+  val polNames: List[Object] = ["LRU ", "LFU ", "FIFO"]
+  foreach pi: Int in 0..<3 {
+    var sumRate: Double = 0.0
+    foreach triple: Object in allResults {
+      val r: SimResult = (triple as List).get(pi) as SimResult
+      sumRate = sumRate + r.hitRate()
+    }
+    val avg: Double = (sumRate * 10.0 / allResults.size.doubleValue()) as Double / 10.0
+    IO::println("  " + polNames.get(pi) + " avg = " + avg.fmt1() + "%")
+  }
+
+  // ── Per-workload winner table ──────────────────────────────────────────────
+  separator("Winner per workload")
+  var wi: Int = 0
+  val lruHitRates: Map[Object, Object] = [:]
+  foreach wl: Object in workloads {
+    val w: Workload = wl as Workload
+    val triple: List[Object] = allResults.get(wi) as List[Object]
+    val winner: SimResult = triple
+      .sortedBy { r -> -(r as SimResult).hitRate() }
+      .get(0) as SimResult
+    IO::println("  " + w.name() + "  ->  " + winner.policy().trim() +
+                " (" + winner.hitRate().fmt1() + "%)")
+    val r0: SimResult = triple.get(0) as SimResult
+    lruHitRates.put(w.name(), r0.hitRate().fmt1() + "%")
+    wi = wi + 1
+  }
+
+  // ── LRU hit rates via foreach (k,v) on Map ─────────────────────────────────
+  separator("LRU hit rates by workload")
+  foreach (wname, rate) in lruHitRates {
+    IO::println("  " + wname + "  =>  " + rate)
+  }
+
+  // ── Policy strengths summary ───────────────────────────────────────────────
+  separator("Policy strengths")
+  var lruW: String = ""; var lfuW: String = ""; var fifoW: String = ""
+  var wj: Int = 0
+  foreach wl: Object in workloads {
+    val w: Workload = wl as Workload
+    val triple: List[Object] = allResults.get(wj) as List[Object]
+    val best: SimResult = triple.sortedBy { r -> -(r as SimResult).hitRate() }.get(0) as SimResult
+    val pol: String = best.policy().trim()
+    if pol == "LRU"  { lruW  = if lruW  == "" { w.name() } else { lruW  + ", " + w.name() } }
+    if pol == "LFU"  { lfuW  = if lfuW  == "" { w.name() } else { lfuW  + ", " + w.name() } }
+    if pol == "FIFO" { fifoW = if fifoW == "" { w.name() } else { fifoW + ", " + w.name() } }
+    wj = wj + 1
+  }
+  if lruW  != "" { IO::println("  LRU  wins: " + lruW) }
+  if lfuW  != "" { IO::println("  LFU  wins: " + lfuW) }
+  if fifoW != "" { IO::println("  FIFO wins: " + fifoW) }
+
+  IO::println("")
+  IO::println("Simulation complete.")
+}

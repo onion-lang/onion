@@ -83,6 +83,7 @@ private[compiler] object SyntaxHintClassifier {
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*->\s*([A-Za-z_][\w.\[\]?]*)""".r
   private val DanglingReturnTypeColon =
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*:\s*$""".r
+  private val BareAdjacentTokens = """^\s*([A-Za-z_]\w*)\s+\S""".r
 
   def classify(
     found: String,
@@ -225,6 +226,14 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.not_operator")
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
+      // A complete statement was expected right where a second bare token follows its
+      // leading identifier with nothing in between -- most often a call whose arguments
+      // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            BareAdjacentTokens.findFirstMatchIn(sourceLine).exists(m => !ReservedWords.contains(m.group(1))) =>
+        val name = BareAdjacentTokens.findFirstMatchIn(sourceLine).get.group(1)
+        hint("error.parsing.hint.missing_call_parens", name)
       case _ =>
         None
     }

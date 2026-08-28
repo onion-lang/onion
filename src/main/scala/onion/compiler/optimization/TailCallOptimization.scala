@@ -773,50 +773,13 @@ class TailCallOptimization(config: CompilerConfig)
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
 
       case exprStmt: ExpressionActionStatement =>
-        trace(s"[TCO transformStatement] ExpressionActionStatement, term type=${exprStmt.term.getClass.getSimpleName}")
-        // Check if the expression contains a tail call
-        exprStmt.term match {
-          case setLocal: SetLocal if isSelfCall(setLocal.value, method) =>
-            trace(s"[TCO transformStatement] SetLocal with tail call, value type=${setLocal.value.getClass.getSimpleName}")
-            // Tail call is being assigned to a variable
-            // Check if it's wrapped in Begin with IfStatement
-            setLocal.value match {
-              case begin: Begin if begin.terms.nonEmpty =>
-                trace(s"[TCO transformStatement] Begin with ${begin.terms.length} terms")
-                // Look for IfStatement in Begin
-                val ifStmtOpt = begin.terms.collectFirst {
-                  case stmtTerm: StatementTerm =>
-                    stmtTerm.statement match {
-                      case ifStmt: IfStatement => Some(ifStmt)
-                      case _ => None
-                    }
-                }.flatten
-
-                trace(s"[TCO transformStatement] ifStmtOpt = ${ifStmtOpt.isDefined}")
-                ifStmtOpt match {
-                  case Some(ifStmt) =>
-                    trace(s"[TCO transformStatement] Transforming IfStatement branches")
-                    // Transform the IfStatement's branches
-                    val transformedThen = transformStatement(ifStmt.thenStatement, method, paramTemps)
-                    val transformedElse = if (ifStmt.elseStatement != null) {
-                      transformStatement(ifStmt.elseStatement, method, paramTemps)
-                    } else null
-                    new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
-                  case None =>
-                    trace(s"[TCO transformStatement] No IfStatement found, calling transformTailCall")
-                    // No IfStatement found, try to transform as direct call
-                    transformTailCall(setLocal.value, paramTemps).getOrElse(exprStmt)
-                }
-              case _ =>
-                trace(s"[TCO transformStatement] Not Begin, calling transformTailCall")
-                // Direct tail call (not in Begin)
-                transformTailCall(setLocal.value, paramTemps).getOrElse(exprStmt)
-            }
-          case _ =>
-            trace(s"[TCO transformStatement] No tail call in ExpressionActionStatement")
-            // No tail call, keep as-is
-            exprStmt
-        }
+        // An ExpressionActionStatement whose value is assigned to a local variable
+        // (SetLocal) is NEVER a tail call: the result of the call is stored in the
+        // variable and consumed by later code. Transforming it as a tail call would
+        // incorrectly replace `val lr = self(args)` with a loop-variable update and
+        // `continue`, skipping all subsequent statements in the block.
+        // Keep every ExpressionActionStatement as-is.
+        exprStmt
 
       case _ =>
         // Keep as-is

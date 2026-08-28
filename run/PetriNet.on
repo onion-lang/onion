@@ -1,0 +1,342 @@
+// PetriNet.on — Petri net simulator for modelling concurrent workflows
+// Exercises: records, ADT enums, class with Map/List state, foreach with casts,
+//            pattern matching, string interpolation, nullable params, while loops.
+
+// ── Core elements ──────────────────────────────────────────────────────────────
+
+record Place(id: String, label: String)
+
+record Transition(id: String, label: String)
+
+record Arc(fromId: String, toId: String, weight: Int)
+
+record FiredEvent(step: Int, transId: String, transLabel: String)
+
+// ── Simulation status (ADT enum) ───────────────────────────────────────────────
+
+enum SimStatus {
+  case Running
+  case Deadlock
+  case GoalReached(goalPlace: String)
+  case MaxStepsReached(steps: Int)
+}
+
+// ── PetriNet class ─────────────────────────────────────────────────────────────
+
+class PetriNet {
+  val places:    List[Place]
+  val trans:     List[Transition]
+  val inArcs:    List[Arc]
+  val outArcs:   List[Arc]
+  var marking:   Map[String, Object]
+  var history_:  List[FiredEvent]
+  var step_:     Int
+
+public:
+  def this(places: List[Place], trans: List[Transition],
+           inArcs: List[Arc], outArcs: List[Arc], initial: Map[String, Object]) {
+    self.places   = places
+    self.trans    = trans
+    self.inArcs   = inArcs
+    self.outArcs  = outArcs
+    self.marking  = initial
+    self.history_ = []
+    self.step_    = 0
+  }
+
+  def stepCount(): Int = step_
+  def history(): List[FiredEvent] = history_
+
+  // Token count for a place (0 if absent)
+  def tokens(placeId: String): Int {
+    val v = marking[placeId]
+    return if v == null { 0 } else { v as Int }
+  }
+
+  def isEnabled(tid: String): Boolean {
+    var ok: Boolean = true
+    foreach a: Object in inArcs {
+      val arc = a as Arc
+      if arc.toId() == tid {
+        if tokens(arc.fromId()) < arc.weight() { ok = false }
+      }
+    }
+    return ok
+  }
+
+  def enabledList(): List[Transition] {
+    val result: List[Transition] = []
+    foreach t: Object in trans {
+      val tr = t as Transition
+      if isEnabled(tr.id()) { result.add(tr) }
+    }
+    return result
+  }
+
+  def fire(tid: String): Boolean {
+    if !isEnabled(tid) { return false }
+    foreach a: Object in inArcs {
+      val arc = a as Arc
+      if arc.toId() == tid {
+        marking[arc.fromId()] = tokens(arc.fromId()) - arc.weight()
+      }
+    }
+    foreach a: Object in outArcs {
+      val arc = a as Arc
+      if arc.fromId() == tid {
+        marking[arc.toId()] = tokens(arc.toId()) + arc.weight()
+      }
+    }
+    val lbl = labelOf(tid)
+    step_++
+    history_.add(new FiredEvent(step_, tid, lbl))
+    return true
+  }
+
+  def labelOf(tid: String): String {
+    foreach t: Object in trans {
+      val tr = t as Transition
+      if tr.id() == tid { return tr.label() }
+    }
+    return tid
+  }
+
+  def placeLabel(pid: String): String {
+    foreach p: Object in places {
+      val pl = p as Place
+      if pl.id() == pid { return pl.label() }
+    }
+    return pid
+  }
+
+  def printMarking(): void {
+    var any: Boolean = false
+    foreach p: Object in places {
+      val pl = p as Place
+      val n  = tokens(pl.id())
+      if n > 0 { IO::println("    #{pl.label()} : #{n}"); any = true }
+    }
+    if !any { IO::println("    (empty)") }
+  }
+
+  def simulate(maxSteps: Int, goalPlaceId: String?): SimStatus {
+    IO::println("  Initial marking:")
+    printMarking()
+    IO::println("")
+    while step_ < maxSteps {
+      val enabled = enabledList()
+      if enabled.size == 0 { return new Deadlock() }
+      val chosen = enabled[0] as Transition
+      fire(chosen.id())
+      IO::println("  Step #{step_}: fired '#{chosen.label()}'")
+      printMarking()
+      IO::println("")
+      if goalPlaceId != null && tokens(goalPlaceId) > 0 {
+        return new GoalReached(placeLabel(goalPlaceId))
+      }
+    }
+    return new MaxStepsReached(step_)
+  }
+}
+
+// ── NetBuilder: fluent construction ───────────────────────────────────────────
+
+class NetBuilder {
+  var places_:  List[Place]
+  var trans_:   List[Transition]
+  var inArcs_:  List[Arc]
+  var outArcs_: List[Arc]
+  var marking_: Map[String, Object]
+
+public:
+  def this {
+    places_  = []
+    trans_   = []
+    inArcs_  = []
+    outArcs_ = []
+    marking_ = [:]
+  }
+
+  def place(id: String, label: String): NetBuilder {
+    places_.add(new Place(id, label)); return self
+  }
+
+  def transition(id: String, label: String): NetBuilder {
+    trans_.add(new Transition(id, label)); return self
+  }
+
+  def consumes(placeId: String, transId: String, weight: Int): NetBuilder {
+    inArcs_.add(new Arc(placeId, transId, weight)); return self
+  }
+
+  def consumes(placeId: String, transId: String): NetBuilder = consumes(placeId, transId, 1)
+
+  def produces(transId: String, placeId: String, weight: Int): NetBuilder {
+    outArcs_.add(new Arc(transId, placeId, weight)); return self
+  }
+
+  def produces(transId: String, placeId: String): NetBuilder = produces(transId, placeId, 1)
+
+  def tokens(placeId: String, count: Int): NetBuilder {
+    marking_[placeId] = count; return self
+  }
+
+  def build(): PetriNet = new PetriNet(places_, trans_, inArcs_, outArcs_, marking_)
+}
+
+// ── Example nets ───────────────────────────────────────────────────────────────
+
+// 1. Three tasks flow backlog → review → done
+def workflowNet(): PetriNet {
+  return new NetBuilder()
+    .place("backlog",  "Backlog")
+    .place("inreview", "In Review")
+    .place("done",     "Done")
+    .transition("t_start",   "Start Review")
+    .transition("t_approve", "Approve")
+    .consumes("backlog",  "t_start")
+    .produces("t_start",  "inreview")
+    .consumes("inreview", "t_approve")
+    .produces("t_approve","done")
+    .tokens("backlog", 3)
+    .build()
+}
+
+// 2. Producer-Consumer with bounded buffer (capacity=3)
+//    When buffer is full, producer blocks; when empty, consumer blocks.
+def producerConsumerNet(): PetriNet {
+  return new NetBuilder()
+    .place("idle_prod", "Producer Idle")
+    .place("buffer",    "Buffer")
+    .place("buf_cap",   "Buffer Capacity")  // capacity tokens
+    .place("idle_cons", "Consumer Idle")
+    .transition("t_consume", "Consume")     // listed first so consumer fires when possible
+    .transition("t_produce", "Produce")
+    .consumes("idle_cons", "t_consume")
+    .consumes("buffer",    "t_consume")
+    .produces("t_consume", "idle_cons")
+    .produces("t_consume", "buf_cap")
+    .consumes("idle_prod", "t_produce")
+    .consumes("buf_cap",   "t_produce")
+    .produces("t_produce", "buffer")
+    .produces("t_produce", "idle_prod")
+    .tokens("idle_prod", 1)
+    .tokens("idle_cons", 1)
+    .tokens("buf_cap",  3)   // buffer capacity = 3
+    .build()
+}
+
+// 3. Mutual exclusion: two processes competing for a critical section
+def mutexNet(): PetriNet {
+  return new NetBuilder()
+    .place("p1_ready",    "P1 Ready")
+    .place("p1_critical", "P1 Critical")
+    .place("p2_ready",    "P2 Ready")
+    .place("p2_critical", "P2 Critical")
+    .place("mutex",       "Mutex Token")
+    .transition("p1_enter", "P1 Enter CS")
+    .transition("p1_exit",  "P1 Exit CS")
+    .transition("p2_enter", "P2 Enter CS")
+    .transition("p2_exit",  "P2 Exit CS")
+    .consumes("p1_ready",    "p1_enter")
+    .consumes("mutex",       "p1_enter")
+    .produces("p1_enter",    "p1_critical")
+    .consumes("p1_critical", "p1_exit")
+    .produces("p1_exit",     "p1_ready")
+    .produces("p1_exit",     "mutex")
+    .consumes("p2_ready",    "p2_enter")
+    .consumes("mutex",       "p2_enter")
+    .produces("p2_enter",    "p2_critical")
+    .consumes("p2_critical", "p2_exit")
+    .produces("p2_exit",     "p2_ready")
+    .produces("p2_exit",     "mutex")
+    .tokens("p1_ready", 1)
+    .tokens("p2_ready", 1)
+    .tokens("mutex",    1)
+    .build()
+}
+
+// 4. Pipeline: three stages in series with capacity constraints
+def pipelineNet(): PetriNet {
+  return new NetBuilder()
+    .place("raw",      "Raw Input")
+    .place("stage1",   "Stage 1")
+    .place("stage2",   "Stage 2")
+    .place("finished", "Finished")
+    .place("cap1",     "Cap Stage1")   // capacity token
+    .place("cap2",     "Cap Stage2")   // capacity token
+    .transition("t1",  "Enter Stage 1")
+    .transition("t2",  "Enter Stage 2")
+    .transition("t3",  "Complete")
+    // t1: consume raw + capacity, produce stage1
+    .consumes("raw",    "t1")
+    .consumes("cap1",   "t1")
+    .produces("t1",     "stage1")
+    // t2: consume stage1 + capacity, produce stage2 + release cap1
+    .consumes("stage1", "t2")
+    .consumes("cap2",   "t2")
+    .produces("t2",     "stage2")
+    .produces("t2",     "cap1")
+    // t3: consume stage2, produce finished + release cap2
+    .consumes("stage2", "t3")
+    .produces("t3",     "finished")
+    .produces("t3",     "cap2")
+    .tokens("raw",  4)   // 4 work items
+    .tokens("cap1", 2)   // stage 1 capacity = 2
+    .tokens("cap2", 2)   // stage 2 capacity = 2
+    .build()
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  IO::println("────────────────────────────────────────────────────────────")
+  IO::println("  #{title}")
+  IO::println("────────────────────────────────────────────────────────────")
+}
+
+def reportStatus(status: SimStatus): void {
+  select status {
+    case d is Deadlock:
+      IO::println("► DEADLOCK — no transition is enabled.")
+    case g is GoalReached:
+      IO::println("► GOAL REACHED — '#{g.goalPlace()}' is now marked.")
+    case m is MaxStepsReached:
+      IO::println("► MAX STEPS (#{m.steps()}) reached.")
+    case r is Running:
+      IO::println("► Still running.")
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
+banner("Example 1: Simple Workflow  (3 tasks: backlog → review → done)")
+val wf = workflowNet()
+val s1 = wf.simulate(10, "done")
+reportStatus(s1)
+IO::println("")
+
+banner("Example 2: Producer-Consumer  (10 steps)")
+val pc = producerConsumerNet()
+val s2 = pc.simulate(10, null)
+reportStatus(s2)
+IO::println("")
+
+banner("Example 3: Mutual Exclusion  (6 steps)")
+val mx = mutexNet()
+val s3 = mx.simulate(6, null)
+reportStatus(s3)
+IO::println("")
+
+banner("Example 4: Three-Stage Pipeline  (goal: all items finished)")
+val pl = pipelineNet()
+val s4 = pl.simulate(30, "finished")
+reportStatus(s4)
+IO::println("")
+
+banner("Summary")
+IO::println("  Workflow steps  : #{wf.stepCount()}")
+IO::println("  Prod-Con steps  : #{pc.stepCount()}")
+IO::println("  Mutex steps     : #{mx.stepCount()}")
+IO::println("  Pipeline steps  : #{pl.stepCount()}")
+IO::println("  Total events    : #{wf.history().size + pc.history().size + mx.history().size + pl.history().size}")

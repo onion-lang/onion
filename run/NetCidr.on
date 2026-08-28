@@ -1,0 +1,232 @@
+// NetCidr.on — IP address / CIDR network calculator
+// Exercises: from re"...", record laws, ADT enums, closures,
+//            collection pipelines, nullable types, extension methods.
+
+record IpAddress(a: Int, b: Int, c: Int, d: Int)
+  from re"(\d+)\.(\d+)\.(\d+)\.(\d+)"
+  example { IpAddress::parse("192.168.1.1") != null }
+  example { IpAddress::parse("not-an-ip")   == null }
+
+extension IpAddress {
+  def toLong(): Long {
+    var v: Long = 0L
+    v = v * 256L + self.a()
+    v = v * 256L + self.b()
+    v = v * 256L + self.c()
+    v = v * 256L + self.d()
+    return v
+  }
+  def format(): String = "#{self.a()}.#{self.b()}.#{self.c()}.#{self.d()}"
+}
+
+def longToIp(v: Long): IpAddress {
+  val a: Int = ((v >> 24) & 255L) as Int
+  val b: Int = ((v >> 16) & 255L) as Int
+  val c: Int = ((v >>  8) & 255L) as Int
+  val d: Int = (v         & 255L) as Int
+  return new IpAddress(a, b, c, d)
+}
+
+def prefixToMask(prefix: Int): Long {
+  if prefix == 0 { return 0L }
+  return (0xFFFFFFFFL << (32 - prefix)) & 0xFFFFFFFFL
+}
+
+// --- CIDR block -------------------------------------------------------
+
+record CidrBlock(ip: IpAddress, prefix: Int)
+
+extension CidrBlock {
+  def mask(): Long = prefixToMask(self.prefix())
+
+  def networkLong(): Long = self.ip().toLong() & self.mask()
+
+  def broadcastLong(): Long = self.networkLong() | (~self.mask() & 0xFFFFFFFFL)
+
+  def networkAddr(): IpAddress = longToIp(self.networkLong())
+
+  def broadcastAddr(): IpAddress = longToIp(self.broadcastLong())
+
+  def contains(addr: IpAddress): Boolean =
+    (addr.toLong() & self.mask()) == self.networkLong()
+
+  def hostCount(): Long = self.broadcastLong() - self.networkLong() - 1L
+
+  def firstHost(): IpAddress = longToIp(self.networkLong() + 1L)
+
+  def lastHost(): IpAddress = longToIp(self.broadcastLong() - 1L)
+
+  def format(): String = "#{self.networkAddr().format()}/#{self.prefix()}"
+
+  def summary(): String {
+    return "Network #{self.format()}: hosts #{self.firstHost().format()} — #{self.lastHost().format()} (#{self.hostCount()} usable)"
+  }
+}
+
+def parseCidr(s: String): CidrBlock? {
+  val parts: List[String] = Strings::split(s, "/")
+  if parts.size != 2 { return null }
+  val ip = IpAddress::parse(parts[0] as String)
+  if ip == null { return null }
+  try {
+    val prefix: Int = Integer::parseInt(parts[1] as String)
+    if prefix < 0 || prefix > 32 { return null }
+    return new CidrBlock(ip!!, prefix)
+  } catch e: Exception {
+    return null
+  }
+}
+
+// --- Address classification (ADT enum) --------------------------------
+
+enum AddressClass {
+  case Loopback
+  case LinkLocal
+  case Private10
+  case Private172
+  case Private192
+  case Multicast
+  case Public
+  public:
+    def label(): String = select this {
+      case x is Loopback:   "Loopback"
+      case x is LinkLocal:  "Link-local"
+      case x is Private10:  "Private (10.x)"
+      case x is Private172: "Private (172.16-31.x)"
+      case x is Private192: "Private (192.168.x)"
+      case x is Multicast:  "Multicast"
+      case x is Public:     "Public"
+    }
+}
+
+def classifyIp(addr: IpAddress): AddressClass {
+  val v: Long = addr.toLong()
+  if v >= 2130706432L && v <= 2147483647L { return new Loopback() }       // 127.x
+  if v >= 2851995648L && v <= 2852061183L { return new LinkLocal() }      // 169.254.x
+  if v >= 167772160L  && v <= 184549375L  { return new Private10() }      // 10.x
+  if v >= 2886729728L && v <= 2887778303L { return new Private172() }     // 172.16-31.x
+  if v >= 3232235520L && v <= 3232301055L { return new Private192() }     // 192.168.x
+  if v >= 3758096384L && v <= 4026531839L { return new Multicast() }      // 224-239.x
+  return new Public()
+}
+
+// --- Routing table ----------------------------------------------------
+
+record Route(name: String, cidr: CidrBlock)
+
+class RoutingTable {
+  var routes: List[Route]
+public:
+  def this { routes = [] }
+  def addRoute(name: String, cidrStr: String): Boolean {
+    val block = parseCidr(cidrStr)
+    if block == null { return false }
+    routes.add(new Route(name, block!!))
+    return true
+  }
+  def lookup(addr: IpAddress): Route? {
+    var best: Route? = null
+    var bestPrefix: Int = -1
+    foreach route: Route in routes {
+      if route.cidr().contains(addr) && route.cidr().prefix() > bestPrefix {
+        best = route
+        bestPrefix = route.cidr().prefix()
+      }
+    }
+    return best
+  }
+  def listAll(): void {
+    foreach route: Route in routes {
+      IO::println("  #{route.name()} -> #{route.cidr().summary()}")
+    }
+  }
+}
+
+// ======================================================================
+// Main program
+// ======================================================================
+
+def printSep(): void { IO::println("------------------------------------------------------------") }
+
+// --- 1. Demonstrate CIDR block properties --------------------------------
+IO::println("=== CIDR Block Properties ===")
+printSep()
+val blocks: List[String] = ["10.0.0.0/8", "192.168.1.0/24", "172.16.0.0/12",
+                             "10.10.5.0/30", "203.0.113.0/24"]
+foreach s: String in blocks {
+  val blk = parseCidr(s)
+  if blk != null {
+    IO::println(blk!!.summary())
+    IO::println("  broadcast: #{blk!!.broadcastAddr().format()}")
+  }
+}
+IO::println("")
+
+// --- 2. Address classification -------------------------------------------
+IO::println("=== Address Classification ===")
+printSep()
+val samples: List[String] = ["127.0.0.1", "169.254.0.5", "10.1.2.3",
+                              "172.20.10.0", "192.168.100.200",
+                              "224.0.0.1", "8.8.8.8", "1.1.1.1"]
+foreach s: String in samples {
+  val addr = IpAddress::parse(s)
+  if addr != null {
+    val cls = classifyIp(addr!!)
+    IO::println("  #{addr!!.format()} -> #{cls.label()}")
+  }
+}
+IO::println("")
+
+// --- 3. Routing table lookup ---------------------------------------------
+IO::println("=== Routing Table Lookup ===")
+printSep()
+val table = new RoutingTable()
+table.addRoute("default",   "0.0.0.0/0")
+table.addRoute("loopback",  "127.0.0.0/8")
+table.addRoute("corp-main", "10.0.0.0/8")
+table.addRoute("corp-vpn",  "10.10.5.0/24")
+table.addRoute("lab",       "10.10.5.128/25")
+table.addRoute("mgmt",      "192.168.1.0/24")
+IO::println("Routes:")
+table.listAll()
+IO::println("")
+
+val probes: List[String] = ["10.10.5.200", "10.10.5.10", "10.1.1.1",
+                             "192.168.1.50", "8.8.8.8", "127.0.0.1"]
+IO::println("Lookups:")
+foreach s: String in probes {
+  val addr = IpAddress::parse(s)
+  if addr != null {
+    val route = table.lookup(addr!!)
+    val label = if route != null { route!!.name() } else { "(no match)" }
+    IO::println("  #{addr!!.format()} -> #{label}")
+  }
+}
+IO::println("")
+
+// --- 4. Subnet containment filter via collection pipeline ----------------
+IO::println("=== Subnet Containment Filter ===")
+printSep()
+val corpNet = parseCidr("10.0.0.0/8")!!
+val allIps: List[String] = ["10.1.2.3", "192.168.0.1", "10.255.255.254",
+                             "172.16.0.1", "10.0.0.0", "11.0.0.1"]
+val inside: List[String] = allIps.filter { s ->
+  val a = IpAddress::parse(s)
+  a != null && corpNet.contains(a!!)
+}
+IO::println("IPs inside 10.0.0.0/8: #{inside}")
+IO::println("")
+
+// --- 5. Prefix-length statistics via groupBy -----------------------------
+IO::println("=== Prefix Length Distribution ===")
+printSep()
+val cidrs: List[String] = ["10.0.0.0/8", "10.10.0.0/16", "10.10.5.0/24",
+                            "192.168.0.0/16", "192.168.1.0/24", "172.16.0.0/12",
+                            "8.8.0.0/24", "1.0.0.0/8"]
+val byPrefix = cidrs
+  .map { s -> parseCidr(s) }
+  .filter { b -> b != null }
+  .groupBy { b -> (b as CidrBlock).prefix() }
+foreach (prefix, grp) in byPrefix {
+  IO::println("  /#{prefix}: #{grp.size} block(s)")
+}

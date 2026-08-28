@@ -1,0 +1,429 @@
+// ProjectTracker.on — Software project milestone and task tracking system.
+// Exercises: homogeneous enum with methods, ADT enum with cases, records with
+// example clause, classes with mutable List[Object] fields, collection pipelines
+// (filter/map/fold/groupBy/sortedBy/find/distinct), select with type patterns,
+// nullable handling, string interpolation, extension methods (String/Int/Double),
+// foreach on ranges, list, and map entries, while loops, closures, try/catch.
+
+import { java.lang.Integer as JInt; }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def lpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def truncate(max: Int): String {
+    if self.length() <= max { return self }
+    return self.substring(0, max - 3) + "..."
+  }
+}
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return " N/A%" }
+    val p = self * 100 / total
+    return ("#{p}%").lpad(5)
+  }
+  def hrs(): String = if self == 1 { "1 hr" } else { "#{self} hrs" }
+  def bar(total: Int, width: Int): String {
+    val filled = if total == 0 { 0 } else { self * width / total }
+    var bar = "["
+    var i = 0
+    while i < width {
+      bar = bar + (if i < filled { "█" } else { "░" })
+      i = i + 1
+    }
+    return bar + "]"
+  }
+}
+
+extension Double {
+  def fmt1(): String = String::format("%.1f", self)
+}
+
+// ─── Priority ─────────────────────────────────────────────────────────────────
+
+enum Priority {
+  Critical, High, Medium, Low
+public:
+  def label(): String = select this {
+    case Priority::Critical: "CRIT"
+    case Priority::High:     "HIGH"
+    case Priority::Medium:   " MED"
+    case Priority::Low:      " LOW"
+  }
+  def weight(): Int = select this {
+    case Priority::Critical: 4
+    case Priority::High:     3
+    case Priority::Medium:   2
+    case Priority::Low:      1
+  }
+}
+
+// ─── Status ADT ──────────────────────────────────────────────────────────────
+
+enum Status {
+  case Todo
+  case InProgress(pct: Int)
+  case Done(actualHrs: Int)
+  case Blocked(reason: String)
+public:
+  def shortLabel(): String = select this {
+    case s is InProgress: "WIP"
+    case s is Done:       "DONE"
+    case s is Blocked:    "BLKD"
+    else:                 "TODO"
+  }
+  def longLabel(): String = select this {
+    case s is InProgress: "In Progress (#{s.pct()}%)"
+    case s is Done:       "Done (#{s.actualHrs()} hrs actual)"
+    case s is Blocked:    "Blocked — #{s.reason()}"
+    else:                 "To Do"
+  }
+  def isDone(): Boolean = select this { case s is Done: true; else: false }
+  def isBlocked(): Boolean = select this { case s is Blocked: true; else: false }
+  def isActive(): Boolean = select this { case s is InProgress: true; else: false }
+  def actualHrs(): Int = select this { case s is Done: s.actualHrs(); else: 0 }
+  def blockReason(): String = select this { case s is Blocked: s.reason(); else: "" }
+}
+
+// ─── Task record ──────────────────────────────────────────────────────────────
+
+record Task(id: Int, title: String, priority: Priority, status: Status, estHrs: Int, owner: String)
+  example {
+    val t = new Task(1, "Setup CI", Priority::High, new Todo(), 4, "alice")
+    t.id() == 1 && t.estHrs() == 4 && !t.status().isDone()
+  }
+
+// ─── Milestone class ──────────────────────────────────────────────────────────
+
+class Milestone {
+  val name: String
+  val tasks: List[Object]
+public:
+  def this(name: String) {
+    self.name = name
+    self.tasks = []
+  }
+  def getName(): String = name
+  def getTasks(): List[Object] = tasks
+
+  def addTask(t: Task): void { tasks << t }
+
+  def total(): Int = tasks.size
+
+  def doneCount(): Int {
+    var n = 0
+    foreach t: Object in tasks { if (t as Task).status().isDone() { n = n + 1 } }
+    return n
+  }
+
+  def blockedCount(): Int {
+    var n = 0
+    foreach t: Object in tasks { if (t as Task).status().isBlocked() { n = n + 1 } }
+    return n
+  }
+
+  def activeCount(): Int {
+    var n = 0
+    foreach t: Object in tasks { if (t as Task).status().isActive() { n = n + 1 } }
+    return n
+  }
+
+  def estHrsTotal(): Int {
+    var n = 0
+    foreach t: Object in tasks { n = n + (t as Task).estHrs() }
+    return n
+  }
+
+  def actualHrsTotal(): Int {
+    var n = 0
+    foreach t: Object in tasks { n = n + (t as Task).status().actualHrs() }
+    return n
+  }
+
+  def completionPct(): Int {
+    val total = total()
+    if total == 0 { return 0 }
+    return doneCount() * 100 / total
+  }
+}
+
+// ─── Project class ────────────────────────────────────────────────────────────
+
+class Project {
+  val title: String
+  val milestones: List[Object]
+public:
+  def this(title: String) {
+    self.title = title
+    self.milestones = []
+  }
+  def getTitle(): String = title
+  def getMilestones(): List[Object] = milestones
+  def addMilestone(m: Milestone): void { milestones << m }
+
+  def allTasks(): List[Object] {
+    val all: List[Object] = []
+    foreach m: Object in milestones {
+      foreach t: Object in (m as Milestone).getTasks() { all << t }
+    }
+    return all
+  }
+
+  def totalTasks(): Int {
+    var n = 0
+    foreach m: Object in milestones { n = n + (m as Milestone).total() }
+    return n
+  }
+
+  def doneTasks(): Int {
+    var n = 0
+    foreach m: Object in milestones { n = n + (m as Milestone).doneCount() }
+    return n
+  }
+
+  def blockedTasks(): List[Object] =
+    allTasks().filter { t -> (t as Task).status().isBlocked() }
+
+  def criticalOpen(): List[Object] =
+    allTasks().filter { t ->
+      val task = t as Task
+      task.priority() == Priority::Critical && !task.status().isDone()
+    }
+
+  def totalEstHrs(): Int {
+    var n = 0
+    foreach m: Object in milestones { n = n + (m as Milestone).estHrsTotal() }
+    return n
+  }
+
+  def totalActualHrs(): Int {
+    var n = 0
+    foreach m: Object in milestones { n = n + (m as Milestone).actualHrsTotal() }
+    return n
+  }
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+static def rule(w: Int): String {
+  var s = ""
+  var i = 0
+  while i < w { s = s + "─"; i = i + 1 }
+  return s
+}
+
+static def printTaskRow(t: Task): void {
+  val id   = ("[#{t.id()}]").lpad(4)
+  val pri  = t.priority().label()
+  val stat = t.status().shortLabel().rpad(4)
+  val hrs  = t.estHrs().hrs().lpad(6)
+  val own  = t.owner().rpad(8)
+  val titl = t.title().truncate(34).rpad(34)
+  IO::println("  #{id} #{pri} #{stat} #{hrs} #{own} #{titl}")
+}
+
+// ─── Build project: "Phoenix v2.0" ────────────────────────────────────────────
+
+val proj = new Project("Phoenix v2.0")
+
+val m1 = new Milestone("Infrastructure")
+m1.addTask(new Task( 1, "Provision cloud VMs",        Priority::Critical, new Done(6),  8,  "alice"))
+m1.addTask(new Task( 2, "Configure load balancer",    Priority::High,     new Done(3),  4,  "bob"))
+m1.addTask(new Task( 3, "Set up CI/CD pipeline",      Priority::High,     new InProgress(60), 12, "alice"))
+m1.addTask(new Task( 4, "Harden firewall rules",      Priority::Critical, new Blocked("Pending security audit"), 6, "bob"))
+m1.addTask(new Task( 5, "Enable monitoring alerts",   Priority::Medium,   new Todo(),   4,  "carol"))
+
+val m2 = new Milestone("Backend API")
+m2.addTask(new Task( 6, "Design REST schema",          Priority::High,     new Done(5),  6,  "carol"))
+m2.addTask(new Task( 7, "Auth service (JWT)",          Priority::Critical, new Done(14), 16, "alice"))
+m2.addTask(new Task( 8, "User CRUD endpoints",         Priority::High,     new InProgress(40), 10, "bob"))
+m2.addTask(new Task( 9, "Rate limiting middleware",    Priority::Medium,   new Todo(),   5,  "carol"))
+m2.addTask(new Task(10, "WebSocket notifications",     Priority::Low,      new Todo(),   8,  "dave"))
+m2.addTask(new Task(11, "OpenAPI documentation",       Priority::Low,      new InProgress(20), 4, "dave"))
+
+val m3 = new Milestone("Frontend")
+m3.addTask(new Task(12, "Component library setup",    Priority::High,     new Done(8),  8,  "eve"))
+m3.addTask(new Task(13, "Login / Auth screens",       Priority::Critical, new Done(10), 12, "eve"))
+m3.addTask(new Task(14, "Dashboard page",             Priority::High,     new InProgress(75), 14, "frank"))
+m3.addTask(new Task(15, "Settings & profile",         Priority::Medium,   new Todo(),   8,  "frank"))
+m3.addTask(new Task(16, "Mobile responsiveness",      Priority::Medium,   new Blocked("Waiting on design mockups"), 6, "eve"))
+m3.addTask(new Task(17, "Accessibility WCAG 2.1",     Priority::Low,      new Todo(),   10, "frank"))
+
+val m4 = new Milestone("QA & Launch")
+m4.addTask(new Task(18, "Integration test suite",     Priority::Critical, new InProgress(30), 20, "grace"))
+m4.addTask(new Task(19, "Load testing (k6)",          Priority::High,     new Todo(),   6,  "grace"))
+m4.addTask(new Task(20, "Security pen test",          Priority::Critical, new Blocked("Blocked by task 4"), 8, "grace"))
+m4.addTask(new Task(21, "Staging deployment",         Priority::High,     new Todo(),   4,  "alice"))
+m4.addTask(new Task(22, "Go-live runbook",            Priority::Medium,   new Todo(),   3,  "bob"))
+
+proj.addMilestone(m1)
+proj.addMilestone(m2)
+proj.addMilestone(m3)
+proj.addMilestone(m4)
+
+// ─── Overall header ───────────────────────────────────────────────────────────
+
+val W = 64
+val allTasks = proj.allTasks()
+val totalT   = proj.totalTasks()
+val doneT    = proj.doneTasks()
+val blockedT = proj.blockedTasks().size
+val estHrs   = proj.totalEstHrs()
+val actHrs   = proj.totalActualHrs()
+val pctDone  = doneT.pct(totalT)
+
+IO::println("╔══════════════════════════════════════════════════════════════╗")
+IO::println("║  PROJECT TRACKER — #{proj.getTitle().rpad(43)}║")
+IO::println("╚══════════════════════════════════════════════════════════════╝")
+IO::println("")
+IO::println("  Overall progress : #{doneT.bar(totalT, 26)} #{pctDone}")
+IO::println("  Tasks            : #{doneT}/#{totalT} done  •  #{blockedT} blocked")
+IO::println("  Estimated hours  : #{estHrs.hrs()}")
+IO::println("  Actual hrs logged: #{actHrs.hrs()} (#{actHrs.pct(estHrs)} of estimate)")
+
+// ─── Per-milestone details ────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("  ══ MILESTONE DETAILS ══════════════════════════════════════")
+foreach m: Object in proj.getMilestones() {
+  val ms   = m as Milestone
+  val mDone  = ms.doneCount()
+  val mTotal = ms.total()
+  IO::println("")
+  IO::println("  ┌─ #{ms.getName()}")
+  IO::println("  │  Progress : #{mDone.bar(mTotal, 20)} #{mDone.pct(mTotal)}")
+  IO::println("  │  Est #{ms.estHrsTotal().hrs()} • Actual #{ms.actualHrsTotal().hrs()} logged")
+  if ms.blockedCount() > 0 {
+    IO::println("  │  ⚠ #{ms.blockedCount()} blocked")
+  }
+  if ms.activeCount() > 0 {
+    IO::println("  │  ◌ #{ms.activeCount()} in progress")
+  }
+  IO::println("  │")
+  IO::println("  │  " + rule(60))
+  IO::println("  │   ID  PRI  STAT    HRS  OWNER    TITLE")
+  IO::println("  │  " + rule(60))
+  // Critical/High first (not done), then done/lower
+  foreach t: Object in ms.getTasks() {
+    val task = t as Task
+    if !task.status().isDone() && (task.priority() == Priority::Critical || task.priority() == Priority::High) {
+      IO::print("  │")
+      printTaskRow(task)
+    }
+  }
+  foreach t: Object in ms.getTasks() {
+    val task = t as Task
+    val isHighPri = task.priority() == Priority::Critical || task.priority() == Priority::High
+    if task.status().isDone() || !isHighPri {
+      IO::print("  │")
+      printTaskRow(task)
+    }
+  }
+  IO::println("  └" + rule(61))
+}
+
+// ─── Owner workload summary ───────────────────────────────────────────────────
+
+IO::println("")
+IO::println("  ══ OWNER WORKLOAD ══════════════════════════════════════════")
+IO::println("")
+IO::println("  OWNER      TASKS  EST HRS  DONE%")
+IO::println("  " + rule(36))
+val byOwner = allTasks.groupBy { t -> (t as Task).owner() }
+val ownerKeys = allTasks.map { t -> (t as Task).owner() }.distinct().sortedBy { o -> o as String }
+foreach owner: Object in ownerKeys {
+  val key = owner as String
+  val grp = byOwner.get(key)
+  if grp != null {
+    val tl   = grp as List
+    val cnt  = tl.size
+    val hrs  = tl.fold(0) { acc, t -> (acc as Int) + (t as Task).estHrs() } as Int
+    val dn   = tl.filter { t -> (t as Task).status().isDone() }.size
+    IO::println("  #{key.rpad(10)} #{("" + cnt).lpad(4)}   #{hrs.hrs().lpad(7)}  #{dn.pct(cnt)}")
+  }
+}
+
+// ─── Priority breakdown ───────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("  ══ PRIORITY BREAKDOWN ══════════════════════════════════════")
+IO::println("")
+IO::println("  PRI   TASKS  EST HRS  DONE%")
+IO::println("  " + rule(30))
+val priorities: List[Object] = [Priority::Critical, Priority::High, Priority::Medium, Priority::Low]
+foreach pri: Object in priorities {
+  val p       = pri as Priority
+  val pTasks  = allTasks.filter { t -> (t as Task).priority() == p }
+  val pCount  = pTasks.size
+  val pHrs    = pTasks.fold(0) { acc, t -> (acc as Int) + (t as Task).estHrs() } as Int
+  val pDone   = pTasks.filter { t -> (t as Task).status().isDone() }.size
+  IO::println("  #{p.label()}  #{("" + pCount).lpad(4)}   #{pHrs.hrs().lpad(7)}  #{pDone.pct(pCount)}")
+}
+
+// ─── Blocked tasks ────────────────────────────────────────────────────────────
+
+val blockedList = proj.blockedTasks()
+if blockedList.size > 0 {
+  IO::println("")
+  IO::println("  ══ BLOCKED TASKS ═══════════════════════════════════════════")
+  IO::println("")
+  foreach t: Object in blockedList {
+    val task = t as Task
+    IO::println("  [#{task.id()}] #{task.title().truncate(28).rpad(28)}  #{task.status().blockReason()}")
+  }
+}
+
+// ─── Critical open items ──────────────────────────────────────────────────────
+
+val critList = proj.criticalOpen()
+if critList.size > 0 {
+  IO::println("")
+  IO::println("  ══ CRITICAL OPEN ITEMS ═════════════════════════════════════")
+  IO::println("")
+  foreach t: Object in critList {
+    val task = t as Task
+    IO::println("  [#{task.id()}] #{task.title().truncate(34).rpad(34)}  owner: #{task.owner()}")
+    IO::println("         Status : #{task.status().longLabel()}")
+  }
+}
+
+// ─── Try/catch demo: parse a hypothetical effort string ──────────────────────
+
+static def parseEffort(raw: String): Int {
+  try {
+    return JInt::parseInt(raw.trim())
+  } catch e: Exception {
+    return -1
+  }
+}
+
+IO::println("")
+IO::println("  ══ EFFORT PARSE DEMO ═══════════════════════════════════════")
+val inputs: List[String] = ["8", " 16 ", "abc", ""]
+foreach s: Object in inputs {
+  val raw = s as String
+  val hrs2 = parseEffort(raw)
+  if hrs2 < 0 {
+    IO::println("  parse(\"#{raw}\") -> invalid input")
+  } else {
+    IO::println("  parse(\"#{raw}\") -> #{hrs2.hrs()}")
+  }
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("╔══════════════════════════════════════════════════════════════╗")
+IO::println("║  Report complete.                                            ║")
+IO::println("║  #{("" + totalT + " tasks across " + proj.getMilestones().size + " milestones  •  " + estHrs.hrs() + " estimated").rpad(60)}║")
+IO::println("╚══════════════════════════════════════════════════════════════╝")

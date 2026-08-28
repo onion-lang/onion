@@ -793,6 +793,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/VirtualMachine.on"))
     }
 
+    it("runs CacheSimulator.on") {
+      assert(Shell.Success(null) == runSample("run/CacheSimulator.on"))
+    }
+
     it("runs VirtualShell.on") {
       assert(Shell.Success(null) == runSample("run/VirtualShell.on"))
     }

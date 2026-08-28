@@ -417,6 +417,54 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a function call missing its parentheses") {
+      val hint = classify(
+        found = "bar",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "foo bar"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.missing_call_parens"
+      hint.arguments shouldBe Seq("foo")
+    }
+
+    it("recognizes a Python2-style `print` statement missing its parentheses") {
+      val hint = classify(
+        found = "\"Hello\"",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "println \"Hello\""
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.missing_call_parens"
+      hint.arguments shouldBe Seq("println")
+    }
+
+    it("does not flag a bare identifier when a block is expected next, not end-of-statement") {
+      SyntaxHintClassifier.classify(
+        found = "bar",
+        expected = "\"{\"",
+        context = "",
+        sourceLine = "foo bar {"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.missing_call_parens")
+    }
+
+    it("does not flag a leading reserved word as a missing-parens call") {
+      SyntaxHintClassifier.classify(
+        found = "5",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "",
+        sourceLine = "val x 5"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.missing_call_parens")
+    }
+
+    it("keeps the Ruby-style `unless` advice ahead of the missing-call-parens fallback") {
+      classify(
+        found = "unless",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "unless done {"
+      ).messageKey shouldBe "error.parsing.hint.unless_not_supported"
+    }
+
     it("returns no hint when no classification rule matches") {
       SyntaxHintClassifier.classify(
         found = ")",

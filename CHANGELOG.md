@@ -18,6 +18,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   statement (including a `*` wildcard and `name as alias`) and points at the
   correct `import { module.name }` form.
 
+### Added
+
+- **`run/TradeMatchingEngine.on`, a 454-line continuous limit-order-book
+  simulator.** Multi-symbol stock exchange matching engine: an ADT
+  `enum OrderType` (Market, Limit, StopLoss), plain enums for `Side`/`Status`,
+  a `record Trade` with methods, mutable `Order`/`OrderBook`/`MatchingEngine`
+  classes with `public:`/`private:` sections, an observer interface
+  (`TradeObserver`), and collection pipelines (`filter`, `map`, `fold`,
+  `sortedBy`, `groupBy`, `distinct`, `partition`) driving VWAP, market-depth,
+  and top-by-notional reporting.
+
+- **`run/TextDiff.on`, a 359-line edit-distance and word-diff demo.**
+  Exercises an extension method on `String`, a plain `enum SegKind`, an ADT
+  `enum WordOp` (Keep/Add/Del) with `select`/`is` pattern matching, 2D
+  `Int[][]` arrays for the Levenshtein DP table, and collection pipelines
+  over the resulting line- and word-level diff segments.
+
+- **`run/DungeonCrawler.on`, a 329-line scripted text-based dungeon-crawler
+  RPG.** An `Entity` interface, ADT enums (`ItemKind`, `MonsterKind`,
+  `CombatResult`), a plain `enum RoomKind`, `record Item`/`Room`, mutable
+  `Player`/`Dungeon` classes, a static-method `CombatEngine`, and
+  `filter`/`find`/`any` collection pipelines. The run is fully scripted
+  (no stdin), so output is deterministic.
+
+- **`run/VotingMethods.on`, a 436-line comparison of four voting
+  algorithms** (First-Past-The-Post, Borda Count, Approval, Condorcet) over
+  the same ranked ballots, demonstrating the voting paradox where different
+  methods elect different winners. Uses `record Candidate`/`Ballot`/
+  `ElectionResult`, an ADT `enum VoteEvent`, `Map[String, Int]` tallies,
+  `List[List[Int]]` ballot rankings, `groupBy`/`filter`/`map`/`fold`/
+  `sortedBy`, `foreach (k, v) in map`, and `try`/`catch`.
+
+## [0.22.0] - 2026-08-27
+
+### Fixed
+
+- **Parser hint for a call written without parentheses.**
+  Onion always requires parentheses around a call's arguments; a Python
+  2-style `print "x"` or Ruby-style `puts x` habit (a bare name followed
+  directly by another token, with nothing between them) parsed as an
+  identifier-reference statement followed by a stray token, with a generic
+  expected-token dump that never mentioned the missing parentheses. The
+  diagnostic now recognizes a leading `name arg` statement at the exact
+  point a complete statement was expected and points at the correct
+  `name(arg)` form (or, if two separate statements were intended, that they
+  need a newline or `;` between them).
+
+- **No hint for `arr.length()`/`arr.size()`, unlike the same mix-up on a
+  record field.** Array length is a property (`arr.length`, no
+  parentheses), not a method, so calling it with parentheses raised a bare
+  "method ... is not found" with no suggestion — the parallel
+  `p.name()`-on-a-record-field mix-up already got a "field, not a method"
+  hint, but arrays carry no real `length` field entry in the type table for
+  that check to match. `arr.length()`/`arr.size()` now gets the same hint.
+
+## [0.21.0] - 2026-08-27
+
+### Fixed
+
+- **Tail call optimization silently skipped statements after a self-call assignment.**
+  `transformStatement` treated any `ExpressionActionStatement` wrapping a
+  `SetLocal` self-call (e.g. `val lr = self(args)`) as a tail call, because
+  `isSelfCall` recurses into `SetLocal.value`. Once TCO activated for a
+  method (any branch had a genuine tail call), such an assignment was
+  rewritten into loop-variable updates plus `continue`, jumping back to the
+  top of the `while(true)` loop before any later statement depending on the
+  assigned variable ran — a silent miscompilation with no error or
+  exception. An assignment result is never in tail position by definition,
+  so `ExpressionActionStatement` is now always left unchanged. Added
+  `run/HMTypeInference.on`, a Hindley-Milner type inference engine for a
+  small λ-calculus, as the regression corpus program that exposed the bug.
+
 - **Parser hint for a Ruby-style `until` loop.**
   Onion has no `until` loop; the negated-condition idiom is `while !condition`,
   so `until done { ... }` parses as a bare identifier-reference statement

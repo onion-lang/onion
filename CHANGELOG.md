@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
+
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
   Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
   graph model, residual-graph min-cut derivation via reachability from the

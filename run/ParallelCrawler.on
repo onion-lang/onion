@@ -1,0 +1,250 @@
+// ParallelCrawler.on — parallel web-crawler simulation (~270 lines)
+// Exercises: Concurrent pool / counter / channel; Timing; ADT enum;
+// records with example clauses; extension String / Int; collection
+// pipelines (filter/count/sortedBy/sortedByDescending/groupBy/take);
+// foreach (k,v) on Map; select type-pattern; try/catch; while.
+
+import { java.lang.Thread; java.lang.Exception; }
+
+// ─── FetchStatus (data-carrying ADT enum) ────────────────────────────────────
+
+enum FetchStatus {
+  case Ok(bytes: Int, contentType: String)
+  case NotFound(url: String)
+  case Timeout(url: String, limitMs: Long)
+  case Error(url: String, reason: String)
+
+public:
+  def isSuccess(): Boolean = select this {
+    case s is Ok: true
+    else: false
+  }
+  def label(): String = select this {
+    case s is Ok:       "200 OK  (#{s.bytes()} bytes, #{s.contentType()})"
+    case s is NotFound: "404 Not Found"
+    case s is Timeout:  "TIMEOUT (limit #{s.limitMs()}ms)"
+    case s is Error:    "ERROR — #{s.reason()}"
+  }
+  def bytes(): Int = select this {
+    case s is Ok: s.bytes()
+    else:         0
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Resource(id: Int, url: String, category: String, timeoutMs: Long)
+  example { new Resource(1, "https://a.com/", "home", 500L).category() == "home" }
+  example { new Resource(2, "https://b.org/api", "api", 200L).timeoutMs() == 200L }
+
+record FetchResult(resource: Resource, status: FetchStatus, elapsedMs: Long)
+  example { new FetchResult(new Resource(1, "u", "c", 100L), new Error("u", "fail"), 5L).elapsedMs() == 5L }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "…"
+  }
+  def domain(): String {
+    val s = if self.startsWith("https://") { self.substring(8) } else if self.startsWith("http://") { self.substring(7) } else { self }
+    val slash = s.indexOf("/")
+    if slash < 0 { return s }
+    return s.substring(0, slash)
+  }
+}
+
+extension Int {
+  def maxOf(other: Int): Int = if self >= other { self } else { other }
+  def minOf(other: Int): Int = if self <= other { self } else { other }
+  def bar(cap: Int): String {
+    val n = self.minOf(cap)
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + "█"; i = i + 1 }
+    return s
+  }
+  def pct(total: Int): String {
+    if total == 0 { return "  0%" }
+    val v = (self * 100) / total
+    if v < 10  { return "  " + v + "%" }
+    if v < 100 { return " "  + v + "%" }
+    return v + "%"
+  }
+}
+
+// ─── Simulated fetch (deterministic, no real network) ────────────────────────
+
+def simulateFetch(res: Resource): FetchStatus {
+  val hash = res.id() * 17 + res.url().length() * 3
+  val roll = ((hash % 10) + 10) % 10
+
+  if roll == 0 { return new Timeout(res.url(), res.timeoutMs()) }
+  if roll == 1 { return new Error(res.url(), "connection refused") }
+  if roll == 2 { return new NotFound(res.url()) }
+
+  val bytes = 512 + (hash % 8192)
+  val ct = if res.category() == "api" { "application/json" } else if res.category() == "image" { "image/png" } else { "text/html" }
+  return new Ok(bytes, ct)
+}
+
+// ─── Worker: runs in thread-pool via pool.mapAll ──────────────────────────────
+
+def fetchResource(res: Resource, hits: Object, misses: Object, bytesTotal: Object): FetchResult {
+  val start = Timing::millis()
+  var status: FetchStatus = new Error(res.url(), "not yet run")
+  try {
+    status = simulateFetch(res)
+    Thread::sleep(2L + (res.id() % 5) as Long)
+  } catch e: Exception {
+    status = new Error(res.url(), e.getMessage())
+  }
+  val elapsed = Timing::elapsedMillis(start)
+
+  select status {
+    case s is Ok:
+      (hits as onion.Concurrent.Counter).increment()
+      (bytesTotal as onion.Concurrent.Counter).add(s.bytes() as Long)
+    else:
+      (misses as onion.Concurrent.Counter).increment()
+  }
+
+  return new FetchResult(res, status, elapsed)
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def printSummary(results: List[FetchResult], hits: Object, misses: Object, bytesTotal: Object, wallMs: Long): void {
+  val total  = results.size
+  val nOk    = (hits   as onion.Concurrent.Counter).get() as Int
+  val nFail  = (misses as onion.Concurrent.Counter).get() as Int
+  val nbytes = (bytesTotal as onion.Concurrent.Counter).get()
+
+  println("")
+  println("╔══ Crawl Summary ══════════════════════════════════════════╗")
+  println("  Resources:  #{total}   OK: #{nOk}   Failed: #{nFail}   Wall: #{wallMs}ms")
+  println("  Total data: #{nbytes} bytes  (avg #{if nOk > 0 { nbytes / nOk as Long } else { 0L }} bytes/page)")
+  println("╚═══════════════════════════════════════════════════════════╝")
+}
+
+def printResultTable(results: List[FetchResult]): void {
+  println("")
+  println("── Per-Resource Results ────────────────────────────────────")
+  val sorted = results.sortedBy { r -> (r as FetchResult).resource().id() }
+  foreach r: FetchResult in sorted {
+    val ok   = if r.status().isSuccess() { "✓" } else { "✗" }
+    val url  = r.resource().url().truncate(32).padEnd(34)
+    val cat  = r.resource().category().padEnd(8)
+    println("  #{ok} #{url} #{cat} #{r.elapsedMs()}ms  #{r.status().label()}")
+  }
+}
+
+def printCategoryBreakdown(results: List[FetchResult]): void {
+  println("")
+  println("── By Category ─────────────────────────────────────────────")
+  val byCategory = results.groupBy { r -> (r as FetchResult).resource().category() }
+  foreach (cat, items) in byCategory {
+    val lst     = items as List[Object]
+    val ok      = lst.count { r -> (r as FetchResult).status().isSuccess() }
+    val total   = lst.size
+    val totBytes = lst.fold(0) { acc, r -> (acc as Int) + (r as FetchResult).status().bytes() }
+    println("  #{cat.padEnd(10)} #{ok}/#{total} ok   #{totBytes} bytes   #{ok.bar(10)}")
+  }
+}
+
+def printDomainBreakdown(results: List[FetchResult]): void {
+  println("")
+  println("── By Domain (top 5) ───────────────────────────────────────")
+  val byDomain = results.groupBy { r -> (r as FetchResult).resource().url().domain() }
+  val domains: List[String] = []
+  foreach (dom, items) in byDomain {
+    val cnt = (items as List[Object]).size
+    domains.add("#{cnt}|#{dom}")
+  }
+  val top = domains.sortedByDescending { d -> (d as String) }.take(5)
+  foreach entry: String in top {
+    val parts = entry.split("\\|")
+    val cnt   = parts[0]
+    val dom   = parts[1]
+    println("  #{dom.padEnd(30)} #{cnt} request(s)")
+  }
+}
+
+def printSlowFetches(results: List[FetchResult], topN: Int): void {
+  println("")
+  println("── Slowest #{topN} Fetches ─────────────────────────────────")
+  val byTime = results.sortedByDescending { r -> (r as FetchResult).elapsedMs() }.take(topN)
+  foreach r: FetchResult in byTime {
+    val elapsed = r.elapsedMs()
+    println("  #{elapsed}ms  #{r.resource().url().truncate(40)}")
+  }
+}
+
+// ─── Main demo ────────────────────────────────────────────────────────────────
+
+def run(): void {
+  // Build a realistic URL set across several domains and categories
+  val resources: List[Resource] = [
+    new Resource( 1, "https://news.example.com/",          "home",  400L),
+    new Resource( 2, "https://news.example.com/world",     "home",  400L),
+    new Resource( 3, "https://news.example.com/tech",      "home",  400L),
+    new Resource( 4, "https://api.example.com/headlines",  "api",   200L),
+    new Resource( 5, "https://api.example.com/sports",     "api",   200L),
+    new Resource( 6, "https://cdn.example.com/logo.png",   "image", 300L),
+    new Resource( 7, "https://cdn.example.com/banner.png", "image", 300L),
+    new Resource( 8, "https://blog.example.com/post/1",    "blog",  500L),
+    new Resource( 9, "https://blog.example.com/post/2",    "blog",  500L),
+    new Resource(10, "https://blog.example.com/post/3",    "blog",  500L),
+    new Resource(11, "https://shop.example.org/items",     "api",   250L),
+    new Resource(12, "https://shop.example.org/cart",      "api",   250L),
+    new Resource(13, "https://shop.example.org/",          "home",  400L),
+    new Resource(14, "https://cdn.example.org/style.css",  "home",  300L),
+    new Resource(15, "https://api.example.org/search",     "api",   200L),
+    new Resource(16, "https://auth.service.io/token",      "api",   150L),
+    new Resource(17, "https://auth.service.io/refresh",    "api",   150L),
+    new Resource(18, "https://docs.service.io/guide",      "blog",  500L),
+    new Resource(19, "https://docs.service.io/api",        "blog",  500L),
+    new Resource(20, "https://metrics.service.io/health",  "api",   100L)
+  ]
+
+  val cpus    = Concurrent::cpus()
+  val threads = cpus.minOf(4).maxOf(2)
+  println("Springfield Parallel Crawler  (#{resources.size} resources, #{threads} worker threads)")
+  println("")
+
+  // Shared counters — safe to increment from multiple threads
+  val hits      = Concurrent::counter()
+  val misses    = Concurrent::counter()
+  val bytesAcc  = Concurrent::counter()
+
+  val pool = Concurrent::pool(threads)
+  val wallStart = Timing::millis()
+
+  // Run all fetches in parallel via mapAll
+  val worker: Function1[Object, Object] = (res: Object) -> fetchResource(res as Resource, hits, misses, bytesAcc)
+  val rawResults = pool.mapAll(resources, worker)
+
+  val wallMs = Timing::elapsedMillis(wallStart)
+  pool.awaitClose(5000L)
+  pool.close()
+
+  // Collect typed results
+  val results: List[FetchResult] = []
+  foreach r: Object in rawResults { results.add(r as FetchResult) }
+
+  // Print all report sections
+  printSummary(results, hits, misses, bytesAcc, wallMs)
+  printResultTable(results)
+  printCategoryBreakdown(results)
+  printDomainBreakdown(results)
+  printSlowFetches(results, 5)
+  println("")
+}
+
+run()

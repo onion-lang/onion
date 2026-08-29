@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python-style `if cond:` / `while cond:` colon body.**
+  Onion blocks use `{ ... }`, not a trailing `:`; writing `if cond:` or
+  `while cond:` (also `else if cond:`) hit only the generic "a block `{
+  ... }` is expected here" fallback with no mention of the actual mistake.
+  The diagnostic now recognizes the colon-terminated header and shows the
+  brace-based rewrite directly, e.g. `if args.length > 0 { ... }` instead
+  of `if args.length > 0:`.
 - **Parser hint for a Swift-style `guard let ... else` early exit.** Onion
   has no `guard`; `guard let x = expr else { ... }` parsed `guard` as a bare
   identifier-reference statement and then hit a generic `expecting <EOF>,

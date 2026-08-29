@@ -447,6 +447,58 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ) shouldBe None
     }
 
+    it("recognizes a Python-style `if cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "    if args.length > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("if", "args.length > 0")
+    }
+
+    it("recognizes a Python-style `while cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "while x > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("while", "x > 0")
+    }
+
+    it("recognizes a Python-style `else if cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "else if x > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("else if", "x > 0")
+    }
+
+    it("prefers the `not`-operator hint over the colon-block hint when both apply") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "if not done:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.not_operator"
+    }
+
+    it("keeps the colon-block hint out of a case type pattern") {
+      SyntaxHintClassifier.classify(
+        found = ":",
+        expected = "\"{\"",
+        context = "",
+        sourceLine = "case s: String:"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.python_style_colon_block")
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

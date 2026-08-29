@@ -16,6 +16,8 @@ private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
+  private val PythonStyleColonBlockHeader =
+    """^\s*(if|while|else\s+if)\s+(.+?):\s*$""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val RustStyleMutDeclaration =
     """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
@@ -253,6 +255,11 @@ private[compiler] object SyntaxHintClassifier {
         val matched = IfWhileLetBinding.findFirstMatchIn(sourceLine).get
         val name = Option(matched.group(2)).getOrElse(matched.group(3))
         hint("error.parsing.hint.if_let_binding", matched.group(1), name, matched.group(4).trim)
+      // A Python-style `if cond:` / `while cond:` header also matches the generic
+      // block-expected fallback below, so keep this ahead of it.
+      case ":" if expected.contains("{") && PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_colon_block", matched.group(1), matched.group(2).trim)
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
       // A Swift-style `guard let x = expr else { ... }` early exit reads as a bare

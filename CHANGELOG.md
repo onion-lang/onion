@@ -192,6 +192,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/LibraryCatalog.on`, a 361-line library catalog and loan tracking
+  sample.** A public-library book catalog and loan management system:
+  records with `example` clauses (`Book`, `Member`, `Loan`), a data-carrying
+  ADT `enum LoanStatus` (`Active(dueDay)`, `Returned(returnedDay, onTime)`,
+  `Overdue(dueDay, daysLate)`) matched exhaustively via `select`, a plain
+  `enum Genre`, extension methods on `Int` and `String`, a mutable `Library`
+  class, nullable `Int?` handling, collection pipelines (`any`/`count`/
+  `filter`/`groupBy`/`sortedBy`/`sortedByDescending`/`take`), `foreach (k, v)
+  in map` for genre/author breakdowns, and `try`/`catch` for validation
+  errors.
+
 - **`run/SymbolicMath.on`, a 283-line symbolic expression rewriting and
   calculus engine.** An ADT `enum Term` (Num, Var, Add, Sub, Mul, Div, Neg,
   Pow) with nested `select`/destructuring, fixpoint simplification

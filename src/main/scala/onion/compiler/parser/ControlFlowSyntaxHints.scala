@@ -12,6 +12,13 @@ private[compiler] object ControlFlowSyntaxHints {
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val LeadingUntilStatement = """^\s*until\b""".r
   private val ExceptClause = """\bexcept\b""".r
+  // A raised value shaped like a constructor call (`raise Exception("boom")`)
+  // gets a `throw new` suggestion; anything else (e.g. a bare re-raise like
+  // `raise e`) falls through to the plain `throw` case below it, so this must
+  // be tried first.
+  private val LeadingRaiseConstructorCall =
+    """^\s*raise\s+([A-Za-z_][\w.]*)\s*\(([^()]*)\)\s*$""".r
+  private val LeadingRaiseStatement = """^\s*raise\s+(.+?)\s*$""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -34,11 +41,17 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.until_not_supported")
     } else if (ExceptClause.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.except_not_supported")
+    } else if (LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.python_style_raise_construct", matched.group(1), matched.group(2).trim)
+    } else if (LeadingRaiseStatement.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingRaiseStatement.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.python_style_raise", matched.group(1))
     } else {
       None
     }
   }
 
-  private def hint(messageKey: String): Option[SyntaxHint] =
-    Some(SyntaxHint(messageKey))
+  private def hint(messageKey: String, arguments: String*): Option[SyntaxHint] =
+    Some(SyntaxHint(messageKey, arguments))
 }

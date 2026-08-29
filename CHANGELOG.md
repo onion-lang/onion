@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `List[List[Int]]` ballot rankings, `groupBy`/`filter`/`map`/`fold`/
   `sortedBy`, `foreach (k, v) in map`, and `try`/`catch`.
 
+- **`run/GraphAlgorithms.on` extended into a property-graph showcase**
+  (360 → 432 lines): labeled weighted edges (`record Edge`), BFS/DFS
+  traversal, Dijkstra's shortest path with full path+label reconstruction,
+  3-colour DFS cycle detection, and Kahn's algorithm for topological sort,
+  over a city-transit-network and task-dependency-DAG demo.
+
+- **`run/BinaryHeap.on`, a ~280-line binary min-heap corpus sample.**
+  A `MinHeap` class with a `private:` section (`siftUp`/`siftDown`/`swap`)
+  backing heap sort, a task scheduler, and Dijkstra's shortest path; an ADT
+  `enum PathResult` (`Reached`/`Unreachable`), `record HeapEntry`/`Edge`,
+  extension methods on `String` (`repeat`, `padRight`), nullable (`Int?`)
+  `safeParse` with `try`/`catch`, and collection pipelines
+  (`filter`/`map`/`fold`/`find`/`sortedBy`/`groupBy`/`distinct`/`partition`/`zip`).
+
 ## [0.22.0] - 2026-08-27
 
 ### Fixed

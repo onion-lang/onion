@@ -384,6 +384,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a PHP-style `elseif` clause") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "} elseif x == 2 {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.elseif_not_supported"
+      hint.arguments shouldBe empty
+    }
+
     it("keeps unsupported control-flow advice ahead of the generic block fallback") {
       val hint = classify(
         found = ")",

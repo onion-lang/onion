@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a PHP-style `elseif` clause.** Onion has no `elseif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elseif b {
+  ... }` parsed `elseif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elseif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` and Ruby-style `elsif` hints).
 - **Parser hint for a Ruby-style `elsif` clause.** Onion has no `elsif`;
   `if`/`else if` chains cover the same ground, so `if a { ... } elsif b {
   ... }` parsed `elsif` as a bare identifier-reference statement and then

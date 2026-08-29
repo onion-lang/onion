@@ -68,4 +68,19 @@ class PythonStyleColonBlockHintI18nSpec extends AnyFunSpec with Diagrams {
     }
     assert(msgs.contains("while args.length > 0"), s"expected the hint's rewritten header, got: $msgs")
   }
+
+  it("fires for a Python-style `class Foo:` header, not the old-extends hint") {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    val src =
+      """
+        |class Foo:
+        |  val x: Int = 1
+        |""".stripMargin
+    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+    assert(msgs.contains("class Foo"), s"expected the hint's rewritten header, got: $msgs")
+    assert(!msgs.contains("superclass") && !msgs.contains("親クラス"), s"expected the class-body hint, not the old-extends hint, got: $msgs")
+  }
 }

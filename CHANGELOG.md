@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python-style `class Foo:` header no longer says "superclass".**
+  A Python-style class header (`class Foo:` or `class Foo(x: Int):`, body indented
+  on the next line instead of `{ ... }`) hit the same generic colon-position error
+  as the *old* `class A : B` extends syntax and got that hint back verbatim — "a
+  superclass is named with `extends`, not `:`" — which makes no sense when there
+  is no superclass in sight. The diagnostic now tells the two mistakes apart by
+  whether anything follows the colon on the same line and, for the Python-style
+  case, points at the brace-based rewrite (`class Foo { ... }`) instead.
 - **Parser hint for a Java-style `final Type name = ...` local variable.**
   Onion has no grammar production for a `final`-qualified local declaration
   (`final` is only a class/method modifier), so writing one — e.g. `final

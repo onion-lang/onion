@@ -18,6 +18,11 @@ private[compiler] object SyntaxHintClassifier {
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val PythonStyleColonBlockHeader =
     """^\s*(if|while|else\s+if)\s+(.+?):\s*$""".r
+  // A Python-style `class Foo:` (or `class Foo(x: Int):`) header, where the colon
+  // terminates the whole line -- unlike the old `class Foo: Bar` extends-colon
+  // mistake below, where a superclass name follows the colon on the same line.
+  private val PythonStyleColonBlockClassHeader =
+    """^\s*class\s+(.+?):\s*$""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val RustStyleMutDeclaration =
     """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
@@ -133,6 +138,12 @@ private[compiler] object SyntaxHintClassifier {
       case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_generics", matched.group(1), matched.group(2).trim)
+      // A Python-style `class Foo:` header also lands here (the parser wants
+      // `extends`/`{` right where the trailing `:` sits), but it's a missing-brace
+      // mistake, not the old colon-extends syntax -- keep it ahead of that case.
+      case ":" if expected.contains("extends") && PythonStyleColonBlockClassHeader.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleColonBlockClassHeader.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_colon_block", "class", matched.group(1).trim)
       case ":" if expected.contains("extends") =>
         hint("error.parsing.hint.old_extends")
       case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>

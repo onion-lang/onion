@@ -499,6 +499,38 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) should not be Some("error.parsing.hint.python_style_colon_block")
     }
 
+    it("recognizes a Python-style `class Foo:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("class", "Foo")
+    }
+
+    it("recognizes a Python-style `class Foo(x: Int):` header with a primary constructor") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo(x: Int):"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("class", "Foo(x: Int)")
+    }
+
+    it("keeps the old-extends hint for a real `class Foo: Bar` superclass mistake") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo: Bar {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.old_extends"
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

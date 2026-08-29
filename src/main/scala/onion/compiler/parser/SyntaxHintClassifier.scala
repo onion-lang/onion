@@ -39,6 +39,13 @@ private[compiler] object SyntaxHintClassifier {
   private val CStyleForLoop = """^\s*for\s*\(""".r
   private val ForEachDestructureMistake =
     """^\s*for\s*\(?\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*\)?\s*in\s+([^{]+?)\s*\{?\s*$""".r
+  // The whole `for (vars in coll)` clause wrapped in one outer paren pair: unlike
+  // ForEachDestructureMistake's optional parens around the vars alone, the closing
+  // paren here belongs to the wrapper, not to the collection expression, so it must
+  // be matched explicitly -- otherwise it leaks into the captured collection text
+  // (e.g. "entries)" instead of "entries").
+  private val ForEachDestructureWrappedMistake =
+    """^\s*for\s*\(\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*in\s+([^{]+?)\)\s*\{?\s*$""".r
   private val JavaStyleEnhancedForLoop =
     """^\s*for\s*\(\s*(?:final\s+)?([A-Za-z_][\w.\[\],\s]*\??)\s+([A-Za-z_]\w*)\s*:\s*(.+?)\s*\)\s*\{?\s*$""".r
   private val ForeachParenMistake = """\bforeach\s*\(""".r
@@ -167,6 +174,12 @@ private[compiler] object SyntaxHintClassifier {
         val member = DotAfterPrimitiveTypeName.findFirstMatchIn(context).get.group(1)
         hint("error.parsing.hint.primitive_dot_static", name, member)
       // The parenthesized form also matches CStyleForLoop, so keep this first.
+      // Try the whole-clause-wrapped form first: ForEachDestructureMistake's optional
+      // parens around the vars alone would otherwise also match it, but leak the
+      // wrapper's closing paren into the collection capture (see its comment above).
+      case _ if ForEachDestructureWrappedMistake.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = ForEachDestructureWrappedMistake.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.for_each_destructure", matched.group(1), matched.group(2).trim)
       case _ if ForEachDestructureMistake.findFirstMatchIn(sourceLine).isDefined =>
         val matched = ForEachDestructureMistake.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.for_each_destructure", matched.group(1), matched.group(2).trim)

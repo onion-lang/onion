@@ -46,6 +46,36 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("key, value", "entries")
     }
 
+    it("strips the outer paren when the whole `for (vars in coll)` clause is wrapped") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value in entries) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "entries")
+    }
+
+    it("keeps a call's own parens when the collection is a function call") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value) in getEntries() {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "getEntries()")
+    }
+
+    it("keeps a call's own parens when the whole wrapped clause's collection is a call") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value in getEntries()) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "getEntries()")
+    }
+
     it("prefers enhanced-for advice over generic C-style-for advice") {
       val hint = classify(
         found = "s",

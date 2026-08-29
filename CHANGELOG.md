@@ -55,6 +55,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `for (vars in coll)` destructuring-mistake hint leaked a stray `)` into
+  its suggested fix.** Writing the whole `for (key, value in entries) { ... }`
+  clause wrapped in one outer paren pair (mimicking the also-supported
+  `for (key, value) in entries { ... }` mistake) produced a hint reading
+  `foreach (key, value) in entries) { ... }` -- the wrapper's own closing
+  paren was captured as part of the collection expression, because the
+  classifier's regex only accounted for an optional close paren right after
+  the variable list, not one belonging to an outer wrap. A dedicated pattern
+  now recognizes the whole-clause-wrapped form before falling back to the
+  general one, so the suggested fix has balanced parens again; collection
+  expressions that are themselves calls (`getEntries()`) are unaffected.
+
 - **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
   Writing a bare class name as a `select` case pattern (`case Nothing:`,
   meaning to match a singleton ADT enum case or any other type by name)

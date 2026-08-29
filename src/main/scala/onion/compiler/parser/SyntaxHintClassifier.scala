@@ -19,6 +19,8 @@ private[compiler] object SyntaxHintClassifier {
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
   private val RustStyleMutDeclaration =
     """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
+  private val IfWhileLetBinding =
+    """^\s*(if|while)\s+let\s+(?:[A-Za-z_]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))\s*=\s*(.+?)\s*\{?\s*$""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
@@ -229,6 +231,13 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.not_operator")
+      // A Rust-Option-style `if let Some(x) = ...` pattern also matches the
+      // plain-identifier alternative below it, so keep this ahead of the
+      // generic block-expected fallback.
+      case _ if expected.contains("{") && IfWhileLetBinding.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = IfWhileLetBinding.findFirstMatchIn(sourceLine).get
+        val name = Option(matched.group(2)).getOrElse(matched.group(3))
+        hint("error.parsing.hint.if_let_binding", matched.group(1), name, matched.group(4).trim)
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
       // A complete statement was expected right where a second bare token follows its

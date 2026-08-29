@@ -343,6 +343,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a Ruby-style `elsif` clause") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "} elsif x == 2 {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.elsif_not_supported"
+      hint.arguments shouldBe empty
+    }
+
     it("keeps unsupported control-flow advice ahead of the generic block fallback") {
       val hint = classify(
         found = ")",

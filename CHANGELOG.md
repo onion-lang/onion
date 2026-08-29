@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Ruby-style `elsif` clause.** Onion has no `elsif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elsif b {
+  ... }` parsed `elsif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elsif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` hint).
+
 - **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has
   no `mut` keyword; mutability is chosen directly by `val` (immutable) or
   `var` (mutable). Writing `let mut x = 5` translated naively as

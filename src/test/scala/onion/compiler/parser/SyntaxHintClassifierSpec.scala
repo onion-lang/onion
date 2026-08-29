@@ -597,6 +597,45 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
         sourceLine = "if x == y {"
       ).map(_.messageKey) should not be Some("error.parsing.hint.if_let_binding")
     }
+
+    it("recognizes a Swift-style `guard let x = ... else` early exit") {
+      val hint = classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let x = 5 else {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.guard_let_else"
+      hint.arguments shouldBe Seq("x", "5")
+    }
+
+    it("recognizes a Swift-style `guard let Some(x) = ... else` pattern binding") {
+      val hint = classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let Some(y) = opt else {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.guard_let_else"
+      hint.arguments shouldBe Seq("y", "opt")
+    }
+
+    it("keeps the guard-let advice ahead of the generic missing-call-parens fallback") {
+      classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let x = compute(1, 2) else {"
+      ).messageKey shouldBe "error.parsing.hint.guard_let_else"
+    }
+
+    it("does not flag an ordinary `guard(...)` call as a guard-let binding") {
+      SyntaxHintClassifier.classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "",
+        sourceLine = "guard(x)"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.guard_let_else")
+    }
   }
 
   private def classify(

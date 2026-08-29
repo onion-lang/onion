@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Java-style `final Type name = ...` local variable.**
+  Onion has no grammar production for a `final`-qualified local declaration
+  (`final` is only a class/method modifier), so writing one — e.g. `final
+  Int x = 5` inside a method body — previously fell straight through to the
+  generic "encountered `final`, but expecting `}`" fallback with no mention
+  of the actual mistake. The diagnostic now recognizes the Java-style
+  `final Type name` shape and points at `val` instead, which is already
+  immutable by default.
+
 ## [0.26.0] - 2026-08-29
 
 ### Added

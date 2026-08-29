@@ -4357,7 +4357,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <th>#</th>
 <th>Dimension</th>
 <th>How to measure</th>
-<th>Current (2026-08-28)</th>
+<th>Current (2026-08-29)</th>
 <th>Pass threshold</th>
 </tr>
 </thead>
@@ -4366,21 +4366,21 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>1</td>
 <td>Test suite</td>
 <td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code> (see the note below)</td>
-<td>4312 pass / 0 fail / 1 cancelled</td>
+<td>4382 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Sample health</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
-<td>239 / 239 compile</td>
+<td>244 / 244 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>179 (AccessLogAnalyzer, AirlineReservation, AntColony, AstronomyCatalog, AuctionHouse, Automaton, BankLedger, BankSystem, BattleshipSim, BinaryHeap, Blackjack, Blockchain, BookClub, BrainFuck, BrokenLogDemo, BudgetTracker, BugTracker, CacheSimulator, CalendarManager, CarRentalFleet, CellularAutomata, CensusAnalyzer, ChemCalculator, Chess, CinemaBooking, CipherSuite, CircuitSimulator, ClinicRecords, CodeContest, ColorPalette, ConferenceSchedule, ConnectFour, ConwayLife, CourseRegistration, CpuScheduler, CryptoPortfolio, DNAAnalysis, DependencyResolver, DnaAnalyzer, DoctorScheduler, DungeonCrawler, ElevatorDispatcher, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, ExprEval, FamilyTree, FileSystemSim, FitnessTracker, FlashcardDeck, FleetManager, ForthMachine, GameOfLife, GameStore, GenericLeaderboard, GeneticAlgorithm, GeneticSequencer, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HMTypeInference, HRSystem, HospitalWard, HotelReservation, HuffmanCode, HuffmanCoding, InsuranceClaims, IntervalCalendar, Inventory, InventoryManager, InventoryReport, JobScheduler, KaraokeNight, KingdomSim, LibraryCatalog, LibrarySystem, LispInterp, LogAnalytics, LogCorrelator, Mandelbrot, MarkdownConverter, MarkovText, Mastermind, MathParser, MatrixCalc, MaxFlow, MazeSolver, MiniGit, MiniRpg, MiniSQL, MiniTypeChecker, MiniVcs, MorseCode, MortgageCalc, MovieRecommender, MuseumCollection, MusicFestival, MusicLibrary, MusicTheory, NationalParkTracker, NetCidr, NetworkMonitor, NeuralNet, NutritionTracker, OrderReport, Othello, PackageDelivery, PackageInstaller, ParallelCrawler, ParkingGarage, PaymentProcessor, PayrollReport, PerfReview, PersonalFinance, PetShelter, PetriNet, PharmacySystem, PlantCare, PlaylistManager, PokerHands, PolyCalc, PolynomialAlgebra, ProjectTracker, PropCheck, PropLogic, PropertyManager, RankedChoice, RationalCalc, RecipeBook, RecipeManager, RecipeVault, RegexEngine, RestaurantOrders, RuleEngine, ScaleAnalyzer, ShapeProcessor, ShipmentTracker, ShoppingCart, SmartHome, SnippetLibrary, SocialNetwork, SortAlgorithms, SortingShowcase, SpaceMission, SpellCheck, SpreadsheetCalc, SprintPlanner, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, SupplyChain, SymbolicMath, TaskPlanner, TerrainGenerator, TextAnalytics, TextAnalyzer, TextDiff, TextTransformPipeline, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, TradeMatchingEngine, TrainDispatch, TransitPlanner, Trie, VendingMachine, VirtualMachine, VirtualShell, VotingMethods, WeatherReport, WordLadder, WordSearch)</td>
+<td>184 (AccessLogAnalyzer, AirlineReservation, AntColony, AstronomyCatalog, AuctionHouse, Automaton, BankLedger, BankSystem, BattleshipSim, BinaryHeap, Blackjack, Blockchain, BookClub, BowlingGame, BrainFuck, BrokenLogDemo, BudgetTracker, BugTracker, CacheSimulator, CalendarManager, CarRentalFleet, CellularAutomata, CensusAnalyzer, ChemCalculator, Chess, CinemaBooking, CipherSuite, CircuitBreakerSim, CircuitSimulator, ClinicRecords, CodeContest, ColorPalette, ConferenceSchedule, ConnectFour, ConwayLife, CourseRegistration, CpuScheduler, CryptoPortfolio, DNAAnalysis, DependencyResolver, DnaAnalyzer, DoctorScheduler, DungeonCrawler, ElevatorDispatcher, EmployeeManager, EspressoShop, EventTicketing, ExpenseAuditor, ExprEval, FamilyTree, FileSystemSim, FitnessTracker, FlashcardDeck, FleetManager, ForthMachine, GameOfLife, GameStore, GenericLeaderboard, GeneticAlgorithm, GeneticSequencer, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HMTypeInference, HRSystem, HospitalWard, HotelReservation, HuffmanCode, HuffmanCoding, InsuranceClaims, IntervalCalendar, Inventory, InventoryManager, InventoryReport, JobScheduler, KaraokeNight, KingdomSim, LambdaCalc, LibraryCatalog, LibrarySystem, LispInterp, LogAnalytics, LogCorrelator, Mandelbrot, MarkdownConverter, MarkovText, Mastermind, MathParser, MatrixCalc, MaxFlow, MazeSolver, MiniGit, MiniRpg, MiniSQL, MiniTypeChecker, MiniVcs, MorseCode, MortgageCalc, MovieRecommender, MuseumCollection, MusicEngine, MusicFestival, MusicLibrary, MusicTheory, NationalParkTracker, NetCidr, NetworkMonitor, NeuralNet, NumberTheory, NutritionTracker, OrderReport, Othello, PackageDelivery, PackageInstaller, ParallelCrawler, ParkingGarage, PaymentProcessor, PayrollReport, PerfReview, PersonalFinance, PetShelter, PetriNet, PharmacySystem, PlantCare, PlaylistManager, PokerHands, PolyCalc, PolynomialAlgebra, ProjectTracker, PropCheck, PropLogic, PropertyManager, RankedChoice, RationalCalc, RecipeBook, RecipeManager, RecipeVault, RegexEngine, RestaurantOrders, RuleEngine, ScaleAnalyzer, ShapeProcessor, ShipmentTracker, ShoppingCart, SmartHome, SnippetLibrary, SocialNetwork, SortAlgorithms, SortingShowcase, SpaceMission, SpellCheck, SpreadsheetCalc, SprintPlanner, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, SudokuSolver, SupplyChain, SymbolicMath, TaskPlanner, TerrainGenerator, TextAnalytics, TextAnalyzer, TextDiff, TextTransformPipeline, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, TradeMatchingEngine, TrainDispatch, TransitPlanner, Trie, VendingMachine, VirtualMachine, VirtualShell, VotingMethods, WeatherReport, WordLadder, WordSearch)</td>
 <td>≥ 5</td>
 </tr>
 <tr>

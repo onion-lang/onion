@@ -1,0 +1,303 @@
+// BowlingGame.on — standard ten-pin bowling score calculator for multiple
+// players.  Classic frame-index algorithm: strikes and spares carry bonus
+// rolls; the 10th frame allows up to three fill-ball rolls appended to the
+// same flat list.  Perfect game = 300.
+//
+// Features exercised: records, data-carrying enum, extension Int/String,
+// classes with interfaces, collection pipelines (map / sortedByDescending /
+// fold / filter / groupBy / partition / find / zip), select, foreach over
+// ranges and lists, while loops, string interpolation, closures, nullable
+// types and null checks, try/catch, recursion.
+
+// ─── Enum: how a frame ended ──────────────────────────────────────────────
+
+enum FrameKind { STRIKE, SPARE, OPEN }
+
+// ─── Records ──────────────────────────────────────────────────────────────
+
+record Player(name: String, rolls: List[Int])
+  example { new Player("X", []).name() == "X" }
+
+record ScoreCard(
+  name: String,
+  frameScores: List[Object],
+  total: Int,
+  classification: String
+)
+  example { new ScoreCard("Y", [], 0, "BEGINNER").total() == 0 }
+
+record LabeledInt(label: String, value: Int)
+
+// ─── Extension: pad an Int to a fixed-width field ─────────────────────────
+
+extension Int {
+  def pad(width: Int): String {
+    val s = "" + self
+    var r: String = s
+    var i: Int = s.length()
+    while i < width {
+      r = " " + r
+      i = i + 1
+    }
+    return r
+  }
+  def abs2(): Int {
+    if self < 0 { return 0 - self }
+    return self
+  }
+}
+
+// ─── Extension: right-pad a String ───────────────────────────────────────
+
+extension String {
+  def rpad(width: Int): String {
+    var r: String = self
+    var i: Int = self.length()
+    while i < width {
+      r = r + " "
+      i = i + 1
+    }
+    return r
+  }
+}
+
+// ─── Scoring helpers ──────────────────────────────────────────────────────
+
+def getR(rolls: List[Int], idx: Int): Int {
+  if idx < 0 || idx >= rolls.size { return 0 }
+  return rolls[idx] as Int
+}
+
+def isStrike(rolls: List[Int], idx: Int): Boolean {
+  return getR(rolls, idx) == 10
+}
+
+def isSpare(rolls: List[Int], idx: Int): Boolean {
+  if isStrike(rolls, idx) { return false }
+  return getR(rolls, idx) + getR(rolls, idx + 1) == 10
+}
+
+// Returns a list of 10 running totals (one per frame).
+def scoreGame(rolls: List[Int]): List[Object] {
+  val accumulated = []
+  var total: Int = 0
+  var idx: Int = 0
+  var frame: Int = 0
+  while frame < 10 {
+    if isStrike(rolls, idx) {
+      total = total + 10 + getR(rolls, idx + 1) + getR(rolls, idx + 2)
+      idx = idx + 1
+    } else if isSpare(rolls, idx) {
+      total = total + 10 + getR(rolls, idx + 2)
+      idx = idx + 2
+    } else {
+      total = total + getR(rolls, idx) + getR(rolls, idx + 1)
+      idx = idx + 2
+    }
+    accumulated.add(total)
+    frame = frame + 1
+  }
+  return accumulated
+}
+
+// Classify the final score.
+def classify(score: Int): String {
+  if score == 300 { return "PERFECT" }
+  if score >= 200 { return "GREAT" }
+  if score >= 150 { return "GOOD" }
+  if score >= 100 { return "AVERAGE" }
+  return "BEGINNER"
+}
+
+// ─── Frame-kind classifier (for display only) ─────────────────────────────
+
+def frameKind(rolls: List[Int], idx: Int): FrameKind {
+  if isStrike(rolls, idx) { return FrameKind::STRIKE }
+  if isSpare(rolls, idx)  { return FrameKind::SPARE  }
+  return FrameKind::OPEN
+}
+
+// Frame marker string used in the score-card header row.
+def frameMarker(rolls: List[Int], rollIdx: Int, frameNum: Int): String {
+  if frameNum == 9 {
+    // 10th frame: show proper symbols (strike = X, spare = /, else raw)
+    val r1 = getR(rolls, rollIdx)
+    val r2 = if rollIdx + 1 < rolls.size { getR(rolls, rollIdx + 1) } else { 0 }
+    val r1s = if r1 == 10 { " X" } else { "" + r1 }
+    val r2s = if r1 == 10 && r2 == 10 { "X" }
+              else if r1 != 10 && r1 + r2 == 10 { "/" }
+              else { "" + r2 }
+    return r1s + r2s
+  }
+  select frameKind(rolls, rollIdx) {
+    case FrameKind::STRIKE: return " X"
+    case FrameKind::SPARE:  return getR(rolls, rollIdx) + "/"
+    else:                   return getR(rolls, rollIdx) + " " + getR(rolls, rollIdx + 1)
+  }
+}
+
+// ─── ScoreCard builder ────────────────────────────────────────────────────
+
+def buildCard(player: Player): ScoreCard {
+  val scores = scoreGame(player.rolls())
+  val total = if scores.size > 0 { scores[scores.size - 1] as Int } else { 0 }
+  return new ScoreCard(player.name(), scores, total, classify(total))
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────
+
+def renderCard(card: ScoreCard, rolls: List[Int]): void {
+  IO::println("Player : " + card.name())
+
+  // Build header row of frame markers
+  var header: String = "Frames :"
+  var idx: Int = 0
+  var f: Int = 0
+  while f < 10 {
+    val marker = frameMarker(rolls, idx, f)
+    header = header + " " + marker.rpad(4)
+    if isStrike(rolls, idx) && f < 9 { idx = idx + 1 }
+    else if isSpare(rolls, idx)       { idx = idx + 2 }
+    else                               { idx = idx + 2 }
+    f = f + 1
+  }
+  IO::println(header)
+
+  // Cumulative scores row
+  var scoreRow: String = "Scores :"
+  foreach fs: Object in card.frameScores() {
+    scoreRow = scoreRow + " " + (fs as Int).pad(4)
+  }
+  IO::println(scoreRow)
+
+  IO::println("Total  : " + card.total() + "  [" + card.classification() + "]")
+  IO::println("─────────────────────────────────────────────")
+}
+
+// ─── Statistics helpers ───────────────────────────────────────────────────
+
+def sumList(xs: List[Int]): Int {
+  var total: Int = 0
+  foreach x: Object in xs { total = total + (x as Int) }
+  return total
+}
+
+def maxList(xs: List[Int]): Int {
+  var m: Int = 0
+  foreach x: Object in xs { val xi = x as Int; if xi > m { m = xi } }
+  return m
+}
+
+def minList(xs: List[Int]): Int {
+  var m: Int = 999999
+  foreach x: Object in xs { val xi = x as Int; if xi < m { m = xi } }
+  return m
+}
+
+// Recursive sum of a list (exercises recursion).
+def recSum(xs: List[Int], i: Int): Int {
+  if i >= xs.size { return 0 }
+  return (xs[i] as Int) + recSum(xs, i + 1)
+}
+
+// ─── Player data ──────────────────────────────────────────────────────────
+
+// Alice: perfect game (12 strikes → 300).
+val alice = new Player("Alice",
+  [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10])
+
+// Bob: all spares (5-5 each frame, bonus 5 → 150).
+val bob = new Player("Bob",
+  [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
+
+// Carol: mixed game with strikes and spares.
+val carol = new Player("Carol",
+  [10, 7, 3, 9, 0, 10, 0, 8, 8, 2, 0, 6, 10, 10, 10, 8, 1])
+
+// Dave: beginner — mostly low scores, two spares.
+val dave = new Player("Dave",
+  [1, 4, 4, 5, 6, 4, 5, 5, 10, 0, 1, 7, 3, 6, 4, 10, 2, 8, 6])
+
+// Eve: all gutter balls → 0.
+val eve = new Player("Eve",
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+val players: List[Object] = [alice, bob, carol, dave, eve]
+
+// ─── Build all score cards ────────────────────────────────────────────────
+
+val cards = players.map { p -> buildCard(p as Player) }
+
+// ─── Sort by total score (descending) ────────────────────────────────────
+
+val ranked = cards.sortedByDescending { c -> (c as ScoreCard).total() }
+
+// ─── Print leaderboard ───────────────────────────────────────────────────
+
+IO::println("═══════════════════════════════════════════════")
+IO::println("          BOWLING TOURNAMENT RESULTS           ")
+IO::println("═══════════════════════════════════════════════")
+IO::println("")
+
+var rank: Int = 1
+foreach c: Object in ranked {
+  val card = c as ScoreCard
+  val playerOpt = players.find { p -> (p as Player).name() == card.name() }
+  if playerOpt != null {
+    val player = playerOpt as Player
+    IO::println("  ##{rank}  " + card.name().rpad(10) + " " + card.total().pad(3) + "  [" + card.classification() + "]")
+    renderCard(card, player.rolls())
+  }
+  rank = rank + 1
+}
+
+// ─── Statistics ──────────────────────────────────────────────────────────
+
+val totals = cards.map { c -> (c as ScoreCard).total() }
+val totalSum = sumList(totals)
+val hi = maxList(totals)
+val lo = minList(totals)
+val avg = totalSum / cards.size
+val totalRec = recSum(totals, 0)
+
+IO::println("═══════════════════════════════════════════════")
+IO::println("TOURNAMENT STATISTICS")
+IO::println("Players  : " + players.size)
+IO::println("Average  : " + avg)
+IO::println("Highest  : " + hi)
+IO::println("Lowest   : " + lo)
+IO::println("Sum (rec): " + totalRec)
+
+// Distribution by classification (groupBy).
+val byClass = cards.groupBy { c -> (c as ScoreCard).classification() }
+IO::println("")
+IO::println("Score distribution:")
+foreach (cls, members) in byClass {
+  IO::println("  " + (cls as String).rpad(10) + " : " + (members as List[Object]).size + " player(s)")
+}
+
+// Partition: 200+ vs under 200.
+val parts = cards.partition { c -> (c as ScoreCard).total() >= 200 }
+val elite: List[Object] = parts[0] as List[Object]
+val rest:  List[Object] = parts[1] as List[Object]
+IO::println("")
+IO::println("200+ club : " + elite.size + " player(s)")
+IO::println("Under 200 : " + rest.size + " player(s)")
+
+// Find winner: ranked is sorted descending so first element is the champion.
+val winnerOpt: ScoreCard? = if ranked.size > 0 { ranked[0] as ScoreCard } else { null }
+if winnerOpt != null {
+  val winner = winnerOpt as ScoreCard
+  IO::println("")
+  IO::println("Champion  : #{winner.name()} — #{winner.total()} points!")
+}
+
+// Try/catch: guard against bad index access.
+try {
+  val phantom = ranked[999] as ScoreCard
+  IO::println("unexpected: " + phantom.name())
+} catch e: Exception {
+  IO::println("(index guard ok)")
+}
+
+IO::println("═══════════════════════════════════════════════")

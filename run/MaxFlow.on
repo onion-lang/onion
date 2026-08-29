@@ -1,0 +1,370 @@
+// MaxFlow.on — maximum flow and minimum s-t cut in directed flow networks.
+// Implements Edmonds-Karp (BFS-based Ford-Fulkerson) with O(VE²) guarantee.
+//
+// Exercises: classes, records, ADT case-enum, HashMap/ArrayList Java interop,
+// generic List, while/foreach/for, extension Int, closures, collection
+// pipelines (map/filter/fold/sortedBy), string interpolation, nullable types,
+// pattern matching (select / type patterns), try/catch.
+
+import {
+  java.lang.Integer as JInt;
+  java.util.HashMap;
+}
+
+// ── Result records ─────────────────────────────────────────────────────────────
+
+record FlowResult(maxFlow: Int, cutEdges: List[String], sideS: List[String])
+
+record NetEdge(from: String, to: String, capacity: Int)
+
+// ── Helper ─────────────────────────────────────────────────────────────────────
+
+def joinList(xs: List[String]): String =
+  xs.fold("") { acc, e -> if acc == "" { e as String } else { acc + ", " + (e as String) } }
+
+// ── ADT: solver outcome ────────────────────────────────────────────────────────
+
+enum FlowOutcome {
+  case Solved(result: FlowResult)
+  case NoPath(source: String, sink: String)
+public:
+  def describe(): String = select this {
+    case s is Solved:
+      val r = s.result()
+      val cuts = joinList(r.cutEdges())
+      val side = joinList(r.sideS())
+      "Max flow = #{r.maxFlow()}\nMin-cut edges: #{cuts}\nSource side: #{side}"
+    case np is NoPath:
+      "No path from #{np.source()} to #{np.sink()}"
+  }
+  def maxFlow(): Int = select this {
+    case s is Solved: s.result().maxFlow()
+    case np is NoPath: 0
+  }
+}
+
+// ── Flow graph (adjacency matrix via flattened array) ──────────────────────────
+
+class FlowGraph {
+  var n: Int
+  var cap: Int[]
+  var flow_: Int[]
+  var labels: List[String]
+  var index: HashMap[String, Int]
+
+public:
+  def this(nodeLabels: List[String]) {
+    self.n = nodeLabels.size
+    self.cap   = new Int[self.n * self.n]
+    self.flow_ = new Int[self.n * self.n]
+    self.labels = nodeLabels
+    self.index  = new HashMap[String, Int]()
+    for var i: Int = 0; i < self.n; i++ {
+      self.index.put(nodeLabels[i] as String, i)
+    }
+  }
+
+  def nodeId(name: String): Int {
+    val v = self.index.get(name)
+    return if v == null { -1 } else { v as Int }
+  }
+
+  def addEdge(from: String, to: String, capacity: Int): void {
+    val u: Int = self.nodeId(from)
+    val v: Int = self.nodeId(to)
+    if u < 0 || v < 0 { return }
+    self.cap[u * self.n + v] = self.cap[u * self.n + v] + capacity
+  }
+
+  def residual(u: Int, v: Int): Int =
+    self.cap[u * self.n + v] - self.flow_[u * self.n + v]
+
+  def augment(u: Int, v: Int, delta: Int): void {
+    self.flow_[u * self.n + v] = self.flow_[u * self.n + v] + delta
+    self.flow_[v * self.n + u] = self.flow_[v * self.n + u] - delta
+  }
+
+  // BFS: find augmenting path from s to t.
+  // Returns the parent HashMap (v -> u) if a path exists, null otherwise.
+  def bfsParent(s: Int, t: Int): HashMap[Int, Int]? {
+    val parent: HashMap[Int, Int] = new HashMap[Int, Int]()
+    parent.put(s, s)
+    val queue: List[Int] = [s]
+    var head: Int = 0
+    while head < queue.size {
+      val u: Int = queue[head] as Int
+      head = head + 1
+      for var v: Int = 0; v < self.n; v++ {
+        if parent.get(v) == null && self.residual(u, v) > 0 {
+          parent.put(v, u)
+          if v == t { return parent }
+          queue.add(v)
+        }
+      }
+    }
+    return null
+  }
+
+  // Edmonds-Karp: repeatedly find shortest augmenting path via BFS.
+  def computeMaxFlow(source: String, sink: String): FlowOutcome {
+    val s: Int = self.nodeId(source)
+    val t: Int = self.nodeId(sink)
+    if s < 0 || t < 0 { return new NoPath(source, sink) }
+
+    var totalFlow: Int = 0
+    var parent: HashMap[Int, Int]? = self.bfsParent(s, t)
+
+    while parent != null {
+      val p: HashMap[Int, Int] = parent as HashMap[Int, Int]
+      // Find bottleneck along path t <- ... <- s
+      var bottleneck: Int = JInt::MAX_VALUE
+      var v: Int = t
+      while v != s {
+        val u: Int = p.get(v) as Int
+        val r: Int = self.residual(u, v)
+        if r < bottleneck { bottleneck = r }
+        v = u
+      }
+      // Augment flow along path
+      v = t
+      while v != s {
+        val u: Int = p.get(v) as Int
+        self.augment(u, v, bottleneck)
+        v = u
+      }
+      totalFlow = totalFlow + bottleneck
+      parent = self.bfsParent(s, t)
+    }
+
+    val result = new FlowResult(totalFlow, self.cutEdgeNames(s), self.reachableNames(s))
+    return new Solved(result)
+  }
+
+  // Nodes reachable from s in residual graph (source side of min-cut).
+  def reachable(s: Int): List[Int] {
+    val visited: HashMap[Int, Boolean] = new HashMap[Int, Boolean]()
+    visited.put(s, true)
+    val queue: List[Int] = [s]
+    var head: Int = 0
+    while head < queue.size {
+      val u: Int = queue[head] as Int
+      head = head + 1
+      for var v: Int = 0; v < self.n; v++ {
+        if visited.get(v) == null && self.residual(u, v) > 0 {
+          visited.put(v, true)
+          queue.add(v)
+        }
+      }
+    }
+    val result: List[Int] = []
+    for var i: Int = 0; i < self.n; i++ {
+      if visited.get(i) != null { result.add(i) }
+    }
+    return result
+  }
+
+  def reachableNames(s: Int): List[String] {
+    val side: List[Int] = self.reachable(s)
+    return side.map { i -> self.labels[i as Int] as String }
+  }
+
+  def cutEdgeNames(s: Int): List[String] {
+    val side: List[Int] = self.reachable(s)
+    val inS: HashMap[Int, Boolean] = new HashMap[Int, Boolean]()
+    foreach u: Int in side { inS.put(u, true) }
+    val result: List[String] = []
+    foreach u: Int in side {
+      for var v: Int = 0; v < self.n; v++ {
+        if inS.get(v) == null && self.cap[u * self.n + v] > 0 {
+          val uName: String = self.labels[u] as String
+          val vName: String = self.labels[v] as String
+          val c: Int = self.cap[u * self.n + v]
+          val f: Int = self.flow_[u * self.n + v]
+          result.add("#{uName}->#{vName}(#{f}/#{c})")
+        }
+      }
+    }
+    return result
+  }
+
+  // Total flow leaving the source node.
+  def sourceFlow(source: String): Int {
+    val s: Int = self.nodeId(source)
+    if s < 0 { return 0 }
+    var total: Int = 0
+    for var v: Int = 0; v < self.n; v++ {
+      val f: Int = self.flow_[s * self.n + v]
+      if f > 0 { total = total + f }
+    }
+    return total
+  }
+}
+
+// ── Extension Int: right-pad to width ─────────────────────────────────────────
+
+extension Int {
+  def rpad(width: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length() < width { r = r + " " }
+    return r
+  }
+}
+
+// ── Demo helpers ───────────────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  println("")
+  val bar: String = "─".repeat(JInt::max(0, 52 - title.length()))
+  println("┌─ #{title} #{bar}")
+}
+
+def buildGraph(nodes: List[String], edges: List[NetEdge]): FlowGraph {
+  val g: FlowGraph = new FlowGraph(nodes)
+  foreach e: NetEdge in edges { g.addEdge(e.from(), e.to(), e.capacity()) }
+  return g
+}
+
+def runExample(title: String, nodes: List[String], edges: List[NetEdge],
+               source: String, sink: String): void {
+  printSection(title)
+  val g: FlowGraph = buildGraph(nodes, edges)
+  val outcome: FlowOutcome = g.computeMaxFlow(source, sink)
+  println(outcome.describe())
+}
+
+// ── Example 1: CLRS Figure 26.1 ───────────────────────────────────────────────
+// s->v1(16), s->v2(13), v1->v2(10), v1->v3(12), v2->v1(4), v2->v4(14),
+// v3->v2(9), v3->t(20), v4->v3(7), v4->t(4). Expected max flow = 23.
+
+def clrsExample(): void {
+  val nodes: List[String] = ["s", "v1", "v2", "v3", "v4", "t"]
+  val edges: List[NetEdge] = [
+    new NetEdge("s",  "v1", 16), new NetEdge("s",  "v2", 13),
+    new NetEdge("v1", "v2", 10), new NetEdge("v1", "v3", 12),
+    new NetEdge("v2", "v1",  4), new NetEdge("v2", "v4", 14),
+    new NetEdge("v3", "v2",  9), new NetEdge("v3", "t",  20),
+    new NetEdge("v4", "v3",  7), new NetEdge("v4", "t",   4)
+  ]
+  runExample("CLRS Figure 26.1  (expected max-flow = 23)", nodes, edges, "s", "t")
+}
+
+// ── Example 2: Supply chain ────────────────────────────────────────────────────
+// Factories A,B → DCs X,Y → Retailers P,Q,R.
+
+def supplyChainExample(): void {
+  val nodes: List[String] = ["src", "A", "B", "X", "Y", "P", "Q", "R", "snk"]
+  val edges: List[NetEdge] = [
+    new NetEdge("src", "A",  30), new NetEdge("src", "B",  40),
+    new NetEdge("A",   "X",  20), new NetEdge("A",   "Y",  15),
+    new NetEdge("B",   "X",  25), new NetEdge("B",   "Y",  30),
+    new NetEdge("X",   "P",  18), new NetEdge("X",   "Q",  22),
+    new NetEdge("Y",   "Q",  15), new NetEdge("Y",   "R",  24),
+    new NetEdge("P",   "snk", 18), new NetEdge("Q",   "snk", 30),
+    new NetEdge("R",   "snk", 24)
+  ]
+  runExample("Supply Chain  (factories → DCs → retailers)", nodes, edges, "src", "snk")
+}
+
+// ── Example 3: Network routing ────────────────────────────────────────────────
+
+def networkRoutingExample(): void {
+  val nodes: List[String] = ["in", "r1", "r2", "r3", "r4", "r5", "out"]
+  val edges: List[NetEdge] = [
+    new NetEdge("in",  "r1", 10), new NetEdge("in",  "r2",  8),
+    new NetEdge("r1",  "r3",  6), new NetEdge("r1",  "r4",  7),
+    new NetEdge("r2",  "r3",  5), new NetEdge("r2",  "r4",  6),
+    new NetEdge("r3",  "r5",  9), new NetEdge("r4",  "r5",  8),
+    new NetEdge("r3",  "out", 4), new NetEdge("r5",  "out", 12)
+  ]
+  runExample("Network Routing  (5-router mesh)", nodes, edges, "in", "out")
+}
+
+// ── Example 4: Bipartite matching via max flow ────────────────────────────────
+// Workers W1-W3 ↔ Jobs J1-J4; 1 if worker can do the job.
+// Matching size = max flow (super-source to super-sink).
+
+def bipartiteMatchingExample(): void {
+  printSection("Bipartite Matching  (workers W1-W3, jobs J1-J4)")
+  val nodes: List[String] = ["src", "W1", "W2", "W3", "J1", "J2", "J3", "J4", "snk"]
+  val edges: List[NetEdge] = [
+    new NetEdge("src", "W1", 1), new NetEdge("src", "W2", 1), new NetEdge("src", "W3", 1),
+    new NetEdge("W1", "J1", 1), new NetEdge("W1", "J2", 1),
+    new NetEdge("W2", "J2", 1), new NetEdge("W2", "J3", 1),
+    new NetEdge("W3", "J3", 1), new NetEdge("W3", "J4", 1),
+    new NetEdge("J1", "snk", 1), new NetEdge("J2", "snk", 1),
+    new NetEdge("J3", "snk", 1), new NetEdge("J4", "snk", 1)
+  ]
+  val g: FlowGraph = buildGraph(nodes, edges)
+  val outcome: FlowOutcome = g.computeMaxFlow("src", "snk")
+  select outcome {
+    case s is Solved:
+      println("Max matching size = #{s.result().maxFlow()}  (expected 3)")
+      println("Min-cut (unmatched job boundary):")
+      foreach edge: String in s.result().cutEdges() { println("  #{edge}") }
+    case np is NoPath:
+      println("No path from #{np.source()} to #{np.sink()}")
+  }
+}
+
+// ── Example 5: Degenerate cases ────────────────────────────────────────────────
+
+def degenerateCases(): void {
+  printSection("Degenerate cases")
+
+  // Disconnected source and sink → max flow 0
+  val g1: FlowGraph = new FlowGraph(["A", "B", "C"])
+  g1.addEdge("A", "B", 10)
+  val o1 = g1.computeMaxFlow("A", "C")
+  println("Disconnected (A->C with no path): max flow = #{o1.maxFlow()}  (expected 0)")
+
+  // Single edge
+  val g2: FlowGraph = new FlowGraph(["src", "snk"])
+  g2.addEdge("src", "snk", 42)
+  val o2 = g2.computeMaxFlow("src", "snk")
+  println("Single edge cap=42:              max flow = #{o2.maxFlow()}  (expected 42)")
+
+  // Parallel paths: s->m(5), s->t(8), m->t(3)  → max flow = 11
+  val g3: FlowGraph = new FlowGraph(["s", "m", "t"])
+  g3.addEdge("s", "m", 5)
+  g3.addEdge("s", "t", 8)
+  g3.addEdge("m", "t", 3)
+  val o3 = g3.computeMaxFlow("s", "t")
+  println("Parallel paths s->t:             max flow = #{o3.maxFlow()}  (expected 11)")
+
+  // Diamond with bottleneck: s->a(10), s->b(10), a->t(4), b->t(6) → 10
+  val g4: FlowGraph = new FlowGraph(["s", "a", "b", "t"])
+  g4.addEdge("s", "a", 10)
+  g4.addEdge("s", "b", 10)
+  g4.addEdge("a", "t",  4)
+  g4.addEdge("b", "t",  6)
+  val o4 = g4.computeMaxFlow("s", "t")
+  println("Diamond bottleneck:              max flow = #{o4.maxFlow()}  (expected 10)")
+}
+
+// ── Summary table ──────────────────────────────────────────────────────────────
+
+def summaryTable(): void {
+  printSection("Algorithm summary")
+  println("  Algorithm : Edmonds-Karp (BFS-augmenting Ford-Fulkerson)")
+  println("  Complexity: O(V · E²)  — V nodes, E edges")
+  println("  Key idea  : BFS finds shortest augmenting path → fewest iterations")
+  println("  Min-cut   : nodes reachable from source in residual graph after flow")
+  println("  Matching  : bipartite matching is max-flow on a unit-capacity network")
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
+println("═══════════════════════════════════════════════════════")
+println("  MaxFlow.on  —  Edmonds-Karp Maximum Flow Algorithm  ")
+println("═══════════════════════════════════════════════════════")
+
+clrsExample()
+supplyChainExample()
+networkRoutingExample()
+bipartiteMatchingExample()
+degenerateCases()
+summaryTable()
+
+println("")
+println("Done.")

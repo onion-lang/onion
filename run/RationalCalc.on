@@ -1,0 +1,247 @@
+// RationalCalc.on – Rational number arithmetic.
+// Features: record with method body + statics, plain enum, interface,
+// class conforms interface, collection pipelines (filter map sortedBy
+// groupBy fold reduce distinct zip partition), select on enum, closures,
+// string interpolation, try/catch, recursion (GCD/Egyptian fractions),
+// while, foreach over range and over map (k,v).
+
+// ─── Core rational-number type ────────────────────────────────────────────────
+
+record Rational(num: Int, den: Int) {
+public:
+  def plus(o: Rational): Rational =
+    Rational::of(num() * o.den() + o.num() * den(), den() * o.den())
+  def minus(o: Rational): Rational =
+    Rational::of(num() * o.den() - o.num() * den(), den() * o.den())
+  def times(o: Rational): Rational =
+    Rational::of(num() * o.num(), den() * o.den())
+  def div(o: Rational): Rational =
+    Rational::of(num() * o.den(), den() * o.num())
+  def negate(): Rational = Rational::of(0 - num(), den())
+  def abs(): Rational = if num() < 0 { negate() } else { self }
+  def isZero(): Boolean = num() == 0
+  def isWhole(): Boolean = den() == 1
+  def isPositive(): Boolean = num() > 0 && den() > 0
+  def cmp(o: Rational): Int {
+    val diff = num() * o.den() - o.num() * den()
+    return if diff < 0 { 0 - 1 } else if diff > 0 { 1 } else { 0 }
+  }
+  def show(): String =
+    if den() == 1 { "" + num() } else { "" + num() + "/" + den() }
+
+  static def of(n: Int, d: Int): Rational {
+    if d == 0 { throw new ArithmeticException("zero denominator") }
+    val sign = if d < 0 { 0 - 1 } else { 1 }
+    val absN = if n < 0 { 0 - n } else { n }
+    val absD = if d < 0 { 0 - d } else { d }
+    val g    = Rational::gcd(absN, absD)
+    return new Rational(sign * n / g, sign * d / g)
+  }
+  static def fromInt(n: Int): Rational = Rational::of(n, 1)
+  static def zero(): Rational = Rational::fromInt(0)
+  static def one():  Rational = Rational::fromInt(1)
+  static def gcd(a: Int, b: Int): Int =
+    if b == 0 { a } else { Rational::gcd(b, a % b) }
+  static def lcm(a: Int, b: Int): Int = a / Rational::gcd(a, b) * b
+}
+
+// ─── Arithmetic operation token ───────────────────────────────────────────────
+
+enum Op { ADD, SUB, MUL, DIV }
+
+// ─── One step in a calculation script ─────────────────────────────────────────
+
+record Calculation(left: Rational, op: Op, right: Rational) {
+public:
+  def result(): Rational = select op() {
+    case Op::ADD: left().plus(right())
+    case Op::SUB: left().minus(right())
+    case Op::MUL: left().times(right())
+    case Op::DIV: left().div(right())
+    else:         left()
+  }
+  def symbol(): String = select op() {
+    case Op::ADD: "+"
+    case Op::SUB: "-"
+    case Op::MUL: "*"
+    case Op::DIV: "/"
+    else:         "?"
+  }
+  def show(): String =
+    left().show() + " " + symbol() + " " + right().show() + " = " + result().show()
+}
+
+// ─── Session that records results ─────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+class CalcSession conforms Summarizable {
+  val log: List[Object]
+public:
+  def this {
+    this.log = []
+  }
+  def run(c: Calculation): Rational {
+    val r = c.result()
+    log.add(r)
+    return r
+  }
+  def history(): List[Object] = log
+  def summary(): String {
+    val total     = log.size
+    val positives = log.filter { r -> (r as Rational).isPositive() }.size
+    val wholes    = log.filter { r -> (r as Rational).isWhole() }.size
+    return "#{total} results, #{positives} positive, #{wholes} whole"
+  }
+}
+
+// ─── Calculation script ────────────────────────────────────────────────────────
+
+val calcs = [
+  new Calculation(Rational::of(1, 2), Op::ADD, Rational::of(1, 3)),
+  new Calculation(Rational::of(3, 4), Op::SUB, Rational::of(1, 4)),
+  new Calculation(Rational::of(2, 3), Op::MUL, Rational::of(3, 4)),
+  new Calculation(Rational::of(5, 6), Op::DIV, Rational::of(5, 3)),
+  new Calculation(Rational::of(7, 8), Op::ADD, Rational::of(1, 8)),
+  new Calculation(Rational::of(4, 5), Op::SUB, Rational::of(9, 5)),
+  new Calculation(Rational::of(3, 1), Op::MUL, Rational::of(4, 3)),
+  new Calculation(Rational::of(2, 5), Op::DIV, Rational::of(4, 5))
+]
+
+val session = new CalcSession()
+foreach c: Object in calcs {
+  val calc = c as Calculation
+  session.run(calc)
+  IO::println(calc.show())
+}
+
+IO::println("--- " + session.summary())
+
+// ─── Collection pipelines on history ─────────────────────────────────────────
+
+val results = session.history()
+
+// sortedBy: ascending numerator
+val byNum = results.sortedBy { r -> (r as Rational).num() }
+IO::println("sorted by num: " + byNum.map { r -> (r as Rational).show() }.toString())
+
+// groupBy: whole integers vs proper fractions
+val grouped = results.groupBy { r -> if (r as Rational).isWhole() { "whole" } else { "frac" } }
+IO::println("--- grouped ---")
+foreach (k, v) in grouped {
+  val labels = (v as List[Object]).map { r -> (r as Rational).show() }
+  IO::println("  #{k}: #{labels.toString()}")
+}
+
+// partition: positive vs non-positive
+val halves = results.partition { r -> (r as Rational).isPositive() }
+val posLabels = (halves[0] as List[Object]).map { r -> (r as Rational).show() }
+val negLabels = (halves[1] as List[Object]).map { r -> (r as Rational).show() }
+IO::println("positive:     " + posLabels.toString())
+IO::println("non-positive: " + negLabels.toString())
+
+// distinct results
+val unique = results.distinct()
+IO::println("distinct count: " + unique.size)
+
+// reduce: sum all positive results
+val posOnly = results.filter { r -> (r as Rational).isPositive() }
+val sumPos = posOnly.reduce { a, b -> (a as Rational).plus(b as Rational) }
+if sumPos != null {
+  IO::println("sum of positives: " + (sumPos as Rational).show())
+}
+
+// zip calcs with results and print paired
+IO::println("--- op→result pairs ---")
+val pairs = calcs.zip(results)
+foreach pair: Object in pairs {
+  val p    = pair as List[Object]
+  val calc = p[0] as Calculation
+  val res  = p[1] as Rational
+  IO::println("  " + calc.symbol() + " → " + res.show())
+}
+
+// find: first result with denominator > 3
+val bigDen = results.find { r -> (r as Rational).den() > 3 }
+if bigDen != null {
+  IO::println("first den>3: " + (bigDen as Rational).show())
+} else {
+  IO::println("no den>3 result")
+}
+
+// ─── Harmonic numbers (foreach over range) ────────────────────────────────────
+
+IO::println("--- harmonic ---")
+var harmonic = Rational::zero()
+foreach k: Int in 1..6 {
+  harmonic = harmonic.plus(Rational::of(1, k))
+  IO::println("  H#{k} = " + harmonic.show())
+}
+
+// ─── Stern-Brocot search via while loop ──────────────────────────────────────
+
+def sternBrocotSteps(p: Int, q: Int): Int {
+  var lo = Rational::zero()
+  var hi = Rational::one()
+  val target = Rational::of(p, q)
+  var steps = 0
+  while lo.cmp(target) != 0 && steps < 50 {
+    val mnum = lo.num() + hi.num()
+    val mden = lo.den() + hi.den()
+    val mid  = Rational::of(mnum, mden)
+    val cmp  = mid.cmp(target)
+    if cmp < 0 { lo = mid } else if cmp > 0 { hi = mid } else { lo = mid }
+    steps = steps + 1
+  }
+  return steps
+}
+IO::println("Stern-Brocot 1/3: " + sternBrocotSteps(1, 3) + " steps")
+IO::println("Stern-Brocot 3/7: " + sternBrocotSteps(3, 7) + " steps")
+
+// ─── Egyptian fraction decomposition (recursion) ─────────────────────────────
+
+def egyptianFractions(p: Int, q: Int): List[Object] {
+  val fracs: List[Object] = []
+  var rp = p
+  var rq = q
+  while rp != 0 {
+    val k   = (rq + rp - 1) / rp     // ceiling(rq/rp)
+    fracs.add(Rational::of(1, k))
+    val newp = rp * k - rq
+    val newq = rq * k
+    val g    = Rational::gcd(if newp < 0 { 0 - newp } else { newp }, newq)
+    rp = newp / g
+    rq = newq / g
+  }
+  return fracs
+}
+
+IO::println("--- Egyptian fractions ---")
+val targets = [Rational::of(3, 7), Rational::of(5, 8), Rational::of(11, 12)]
+foreach t: Object in targets {
+  val r     = t as Rational
+  val fracs = egyptianFractions(r.num(), r.den())
+  var eqStr = r.show() + " ="
+  foreach f: Object in fracs {
+    eqStr = eqStr + " " + (f as Rational).show()
+  }
+  IO::println(eqStr)
+}
+
+// ─── try/catch: catch division by zero ───────────────────────────────────────
+
+IO::println("--- error handling ---")
+try {
+  val bad = Rational::of(5, 0)
+  IO::println("unreachable")
+} catch e: ArithmeticException {
+  IO::println("caught: " + e.message())
+}
+
+// ─── GCD / LCM showcase ───────────────────────────────────────────────────────
+
+IO::println("gcd(48,18) = " + Rational::gcd(48, 18))
+IO::println("lcm(7,5)   = " + Rational::lcm(7, 5))
+IO::println("done")

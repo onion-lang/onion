@@ -28,6 +28,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `find`, closures, string interpolation, `try`/`catch`, recursion, and
   `foreach` over ranges, an object list, and map entries.
 
+- **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
+  An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
+  substitution and beta reduction to normal form, with Church numeral
+  encodings exercising `succ`, `+`, and `*` end-to-end. Uses nullable
+  types, `select`/`case` pattern matching (including an `else:`
+  catch-all), extension methods on `String`, and `filter`/`fold`/`find`
+  pipelines over `List[String]`.
+
+### Fixed
+
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
+
+## [0.24.0] - 2026-08-28
+
+### Added
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A plain
+  `enum Category` (10 spending categories), an ADT `enum TransactionType`
+  (Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), and
+  `Account`/`BudgetManager`/`FinanceEngine`/`ReportPrinter` classes with
+  `public:`/`private:` sections. Two months of checking/savings
+  transactions drive per-category budget tracking and over-budget
+  detection, monthly income/expense/net-savings/savings-rate reports, a
+  top-3 expense ranking (insertion sort), and a savings-goal projection,
+  via `filter`/`fold`/`map` pipelines and `select`/`case` matching on the
+  ADT enum.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
+
+- **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
+  Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
+  graph model, residual-graph min-cut derivation via reachability from the
+  source, and bipartite maximum matching as a unit-capacity max-flow
+  reduction. Five worked examples (CLRS Figure 26.1, a supply-chain network,
+  a 5-router packet mesh, bipartite worker/job matching, and degenerate
+  disconnected/parallel/diamond cases) exercise ADT `case`-enums, `HashMap`
+  Java interop, generic `List[T]`, `extension Int`, closures, and collection
+  pipelines.
+
+- **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
+  A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
+  plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,
+  `Conflict`, `ScheduleStats`), an observer interface (`CalendarObserver` /
+  `LogObserver`), a mutable `Calendar` class with `public:`/`private:`
+  sections, extension methods on `Int`/`String`, and collection pipelines
+  (`filter`, `map`, `fold`, `sortedBy`, `groupBy`, `partition`, `count`,
+  `distinct`, `any`) driving conflict detection, free-slot finding, and an
+  auto-scheduler.
+
+- **`run/TextTransformPipeline.on`, a 352-line composable text-transformation
+  pipeline simulator.** An ADT `case` enum `Transform` (10 cases: Upper,
+  Lower, TrimSpaces, Truncate, Repeat, Reverse, Replace, AddPrefix,
+  AddSuffix, CollapseSpaces) with `apply`/`category`/`label` methods, a
+  data-carrying `Category` enum, records with methods (`StepResult`,
+  `RunResult`), a `Pipeline` class conforming to a `Reportable` interface,
+  extension methods on `String`/`Int`, and collection pipelines (`filter`,
+  `map`, `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`,
+  `any`, `count`, `zip`) run five named pipelines over five sample inputs
+  with aggregate analytics.
+
+### Fixed
+
+- **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has
+  no `mut` keyword; mutability is chosen directly by `val` (immutable) or
+  `var` (mutable). Writing `let mut x = 5` translated naively as
+  `val mut x = 5` parsed `mut` as the declared identifier and then hit a
+  generic `expecting "=", ":"` error on the next token, with no mention of
+  `val`/`var`. The diagnostic now recognizes the `val mut name` / `var mut
+  name` pattern and points at the correct `var name = ...` form.
+
 ## [0.23.0] - 2026-08-28
 
 ### Fixed

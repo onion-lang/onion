@@ -211,6 +211,34 @@ public class JJOnionParser implements Parser {
   }
 
   /**
+   * Else-clause continuation: true when, skipping any EOLs after the current
+   * position, the next token is "else" AND it is followed by "{" or "if"
+   * (i.e. it is an if/else, not a select's "else:" clause). This is needed
+   * because when a block body fits on one line (e.g. `if cond { body }`), the
+   * IN_STATEMENT lexer mode activated by expression_element() can pre-tokenize
+   * the newline after `}` as an <EOL> before leaveSection() fires. That stale
+   * EOL persists in the token buffer even after the state reverts to DEFAULT,
+   * so a bare LOOKAHEAD(2) "else" would see <EOL> as token 1 and skip the else
+   * branch. By peeking past any EOLs we find the real next token regardless of
+   * how many newlines were buffered. We also exclude "else:" (select syntax) by
+   * requiring the token after "else" to be "{" or "if".
+   */
+  private boolean elseFollows() {
+    int i = 1;
+    while (getToken(i).kind == EOL) i++;
+    Token t = getToken(i);
+    if (t == null || !"else".equals(t.image)) return false;
+    // Skip any EOLs after "else" before checking what follows it
+    int j = i + 1;
+    while (getToken(j).kind == EOL) j++;
+    Token next = getToken(j);
+    if (next == null) return false;
+    // "else { ... }" or "else if ..." are valid if/else continuations.
+    // "else:" is the select-expression else clause — do NOT match that.
+    return "{".equals(next.image) || "if".equals(next.image);
+  }
+
+  /**
    * Desugars e |> rhs by injecting e as the first argument of the call on the
    * right-hand side: f -> f(e); f(a) -> f(e, a); obj.m -> obj.m(e);
    * obj.m(a) -> obj.m(e, a); C::m(a) -> C::m(e, a).
@@ -2277,7 +2305,7 @@ AST.Expression expression_element() :{AST.Expression e;}{
 
 AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null; AST.IfExpression elif = null; ArrayBuffer<AST.BlockElement> elifElems = new ArrayBuffer<AST.BlockElement>();}{
   t="if" e=term() b1=block()
-  [ LOOKAHEAD(2) "else"
+  [ LOOKAHEAD({elseFollows()}) eols() "else"
     ( b2=block()
     | elif=if_expression() {
         // else-if chain: wrap the nested if in a synthetic block

@@ -16,13 +16,28 @@ private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
+  private val PythonStyleColonBlockHeader =
+    """^\s*(if|while|else\s+if)\s+(.+?):\s*$""".r
+  // A Python-style `class Foo:` (or `class Foo(x: Int):`) header, where the colon
+  // terminates the whole line -- unlike the old `class Foo: Bar` extends-colon
+  // mistake below, where a superclass name follows the colon on the same line.
+  private val PythonStyleColonBlockClassHeader =
+    """^\s*class\s+(.+?):\s*$""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  private val RustStyleMutDeclaration =
+    """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
+  private val IfWhileLetBinding =
+    """^\s*(if|while)\s+let\s+(?:[A-Za-z_]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))\s*=\s*(.+?)\s*\{?\s*$""".r
+  private val GuardLetElseBinding =
+    """^\s*guard\s+let\s+(?:[A-Za-z_]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))\s*=\s*(.+?)\s*else\b.*$""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val CSharpStyleUsingImport =
     """^\s*using\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;\s*$""".r
+  private val PythonStyleFromImport =
+    """^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+?)\s*;?\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
@@ -33,6 +48,13 @@ private[compiler] object SyntaxHintClassifier {
   private val CStyleForLoop = """^\s*for\s*\(""".r
   private val ForEachDestructureMistake =
     """^\s*for\s*\(?\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*\)?\s*in\s+([^{]+?)\s*\{?\s*$""".r
+  // The whole `for (vars in coll)` clause wrapped in one outer paren pair: unlike
+  // ForEachDestructureMistake's optional parens around the vars alone, the closing
+  // paren here belongs to the wrapper, not to the collection expression, so it must
+  // be matched explicitly -- otherwise it leaks into the captured collection text
+  // (e.g. "entries)" instead of "entries").
+  private val ForEachDestructureWrappedMistake =
+    """^\s*for\s*\(\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*in\s+([^{]+?)\)\s*\{?\s*$""".r
   private val JavaStyleEnhancedForLoop =
     """^\s*for\s*\(\s*(?:final\s+)?([A-Za-z_][\w.\[\],\s]*\??)\s+([A-Za-z_]\w*)\s*:\s*(.+?)\s*\)\s*\{?\s*$""".r
   private val ForeachParenMistake = """\bforeach\s*\(""".r
@@ -48,6 +70,13 @@ private[compiler] object SyntaxHintClassifier {
     """\bdef\s+[A-Za-z_]\w*(?:\[[^\]]*\])?\s*\(\s*(?:(?:val|var)\s+)?([A-Za-z_]\w*)\s*[,)]""".r
   private val JavaStyleFieldDeclaration =
     """^\s*(?:public|private|protected)?\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
+  // `final` is itself a valid Onion modifier (for classes/methods, via `modifiers()`
+  // in the grammar), so this must require a capitalized type name right after it --
+  // that shape never appears for a legitimate `final class ...`/`final def ...`/
+  // `final override ...` (all lowercase keywords), only for the Java mistake of a
+  // `final`-qualified local variable, which Onion has no grammar production for at all.
+  private val JavaStyleFinalLocalDeclaration =
+    """^\s*final\s+([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
   private val JavaStyleTypeCase =
     """^\s*case\s+[a-z_]\w*\s*:\s*[A-Z][\w.\[\]]*\??\s*:""".r
   private val JavaStyleGenericAngleBrackets =
@@ -109,6 +138,12 @@ private[compiler] object SyntaxHintClassifier {
       case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_generics", matched.group(1), matched.group(2).trim)
+      // A Python-style `class Foo:` header also lands here (the parser wants
+      // `extends`/`{` right where the trailing `:` sits), but it's a missing-brace
+      // mistake, not the old colon-extends syntax -- keep it ahead of that case.
+      case ":" if expected.contains("extends") && PythonStyleColonBlockClassHeader.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleColonBlockClassHeader.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_colon_block", "class", matched.group(1).trim)
       case ":" if expected.contains("extends") =>
         hint("error.parsing.hint.old_extends")
       case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
@@ -125,6 +160,9 @@ private[compiler] object SyntaxHintClassifier {
         controlFlowHint
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if RustStyleMutDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = RustStyleMutDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.rust_style_mut", matched.group(1), matched.group(2))
       case _ if DataClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DataClassDeclaration.findFirstMatchIn(sourceLine).get
         val params = matched.group(2).split(",").map { p =>
@@ -140,6 +178,14 @@ private[compiler] object SyntaxHintClassifier {
       case _ if CSharpStyleUsingImport.findFirstMatchIn(sourceLine).isDefined =>
         val matched = CSharpStyleUsingImport.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.csharp_style_using_import", matched.group(1))
+      case _ if PythonStyleFromImport.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleFromImport.findFirstMatchIn(sourceLine).get
+        val module = matched.group(1)
+        val names = matched.group(2)
+        val imports = names.split(",").map(_.trim).filter(_.nonEmpty).map { n =>
+          if (n == "*") s"$module.*" else s"$module.$n"
+        }.mkString("; ")
+        hint("error.parsing.hint.python_style_from_import", imports, module, names)
       // Also resembles `Int.member`; extension-declaration advice is more useful.
       case _ if FunExtensionDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = FunExtensionDeclaration.findFirstMatchIn(sourceLine).get
@@ -150,6 +196,12 @@ private[compiler] object SyntaxHintClassifier {
         val member = DotAfterPrimitiveTypeName.findFirstMatchIn(context).get.group(1)
         hint("error.parsing.hint.primitive_dot_static", name, member)
       // The parenthesized form also matches CStyleForLoop, so keep this first.
+      // Try the whole-clause-wrapped form first: ForEachDestructureMistake's optional
+      // parens around the vars alone would otherwise also match it, but leak the
+      // wrapper's closing paren into the collection capture (see its comment above).
+      case _ if ForEachDestructureWrappedMistake.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = ForEachDestructureWrappedMistake.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.for_each_destructure", matched.group(1), matched.group(2).trim)
       case _ if ForEachDestructureMistake.findFirstMatchIn(sourceLine).isDefined =>
         val matched = ForEachDestructureMistake.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.for_each_destructure", matched.group(1), matched.group(2).trim)
@@ -173,6 +225,9 @@ private[compiler] object SyntaxHintClassifier {
       case (")" | ",") if expected == "\":\"" && MissingParameterType.findFirstMatchIn(sourceLine).isDefined =>
         val matched = MissingParameterType.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.missing_parameter_type", matched.group(1))
+      case _ if JavaStyleFinalLocalDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JavaStyleFinalLocalDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.java_style_final_local", matched.group(1), matched.group(2))
       case _ if JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_field", matched.group(1), matched.group(2))
@@ -214,8 +269,29 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.not_operator")
+      // A Rust-Option-style `if let Some(x) = ...` pattern also matches the
+      // plain-identifier alternative below it, so keep this ahead of the
+      // generic block-expected fallback.
+      case _ if expected.contains("{") && IfWhileLetBinding.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = IfWhileLetBinding.findFirstMatchIn(sourceLine).get
+        val name = Option(matched.group(2)).getOrElse(matched.group(3))
+        hint("error.parsing.hint.if_let_binding", matched.group(1), name, matched.group(4).trim)
+      // A Python-style `if cond:` / `while cond:` header also matches the generic
+      // block-expected fallback below, so keep this ahead of it.
+      case ":" if expected.contains("{") && PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_colon_block", matched.group(1), matched.group(2).trim)
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
+      // A Swift-style `guard let x = expr else { ... }` early exit reads as a bare
+      // `guard` statement followed by a stray `let`, which also matches the generic
+      // missing-call-parens fallback below -- keep this ahead of it.
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            GuardLetElseBinding.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = GuardLetElseBinding.findFirstMatchIn(sourceLine).get
+        val name = Option(matched.group(1)).getOrElse(matched.group(2))
+        hint("error.parsing.hint.guard_let_else", name, matched.group(3).trim)
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).

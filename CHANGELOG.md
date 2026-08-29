@@ -9,6 +9,288 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/GraphAlgorithms.on` extended into a property-graph showcase**
+  (360 → 432 lines): labeled weighted edges (`record Edge`), BFS/DFS
+  traversal, Dijkstra's shortest path with full path+label reconstruction,
+  3-colour DFS cycle detection, and Kahn's algorithm for topological sort,
+  over a city-transit-network and task-dependency-DAG demo.
+
+- **`run/BinaryHeap.on`, a ~280-line binary min-heap corpus sample.**
+  A `MinHeap` class with a `private:` section (`siftUp`/`siftDown`/`swap`)
+  backing heap sort, a task scheduler, and Dijkstra's shortest path; an ADT
+  `enum PathResult` (`Reached`/`Unreachable`), `record HeapEntry`/`Edge`,
+  extension methods on `String` (`repeat`, `padRight`), nullable (`Int?`)
+  `safeParse` with `try`/`catch`, and collection pipelines
+  (`filter`/`map`/`fold`/`find`/`sortedBy`/`groupBy`/`distinct`/`partition`/`zip`).
+
+### Fixed
+
+- **Parser hint for a Python-style `class Foo:` header no longer says "superclass".**
+  A Python-style class header (`class Foo:` or `class Foo(x: Int):`, body indented
+  on the next line instead of `{ ... }`) hit the same generic colon-position error
+  as the *old* `class A : B` extends syntax and got that hint back verbatim — "a
+  superclass is named with `extends`, not `:`" — which makes no sense when there
+  is no superclass in sight. The diagnostic now tells the two mistakes apart by
+  whether anything follows the colon on the same line and, for the Python-style
+  case, points at the brace-based rewrite (`class Foo { ... }`) instead.
+- **Parser hint for a Java-style `final Type name = ...` local variable.**
+  Onion has no grammar production for a `final`-qualified local declaration
+  (`final` is only a class/method modifier), so writing one — e.g. `final
+  Int x = 5` inside a method body — previously fell straight through to the
+  generic "encountered `final`, but expecting `}`" fallback with no mention
+  of the actual mistake. The diagnostic now recognizes the Java-style
+  `final Type name` shape and points at `val` instead, which is already
+  immutable by default.
+
+## [0.26.0] - 2026-08-29
+
+### Added
+
+- **`run/RideSharePool.on`, a 259-line ride-share carpool matching and
+  dispatch simulator.** Covers a plain `enum VehicleType`, a data-carrying
+  ADT `enum RideEvent` (`RequestCreated`, `DriverMatched`, `RideCompleted`,
+  `RideCancelled`) with exhaustive `select`, `extension Double`/`extension
+  Int`, records (`Location`, `RideRequest`, `Trip`), a class hierarchy
+  (`PremiumDriver extends Driver`, `override`/`super`) conforming to a
+  `Reportable` interface, nullable-return driver matching (`Driver?`),
+  collection pipelines (`filter`, `sortedBy`, `groupBy`, `partition`,
+  `fold`, `map`), `try`/`catch` for invalid ride requests, recursive
+  multi-stop route distance, `foreach` over ranges and `Map` (k, v)
+  destructuring, and a `while` loop modeling surge-price decay.
+
+- **`run/EpidemiologySim.on`, a 403-line SEIR epidemic compartment-model
+  simulator.** Covers 8 intervention scenarios across 2 pathogens (seasonal
+  flu, COVID-like, novel), exercising a data-carrying ADT `enum
+  InterventionType`, records with body methods, `extension Double`/`extension
+  Int`, collection pipelines (`map`, `filter`, `any`, `count`, `find`),
+  `foreach` over ranges and `Map` (k, v) destructuring, nullable lookups,
+  closures, string interpolation, and `while` loops.
+
+### Fixed
+
+- **Parser hint for a Python-style `if cond:` / `while cond:` colon body.**
+  Onion blocks use `{ ... }`, not a trailing `:`; writing `if cond:` or
+  `while cond:` (also `else if cond:`) hit only the generic "a block `{
+  ... }` is expected here" fallback with no mention of the actual mistake.
+  The diagnostic now recognizes the colon-terminated header and shows the
+  brace-based rewrite directly, e.g. `if args.length > 0 { ... }` instead
+  of `if args.length > 0:`.
+- **Parser hint for a Swift-style `guard let ... else` early exit.** Onion
+  has no `guard`; `guard let x = expr else { ... }` parsed `guard` as a bare
+  identifier-reference statement and then hit a generic `expecting <EOF>,
+  <EOL>, ";"` error on the following `let`, surfacing the unrelated
+  "call's arguments need parentheses" hint. The diagnostic now recognizes
+  the `guard let ... else` shape (including a pattern binding like `guard
+  let Some(x) = expr else { ... }`) and points at the idiomatic bind-then-
+  null-check form: `val x = expr; if x == null { ... }` (matching the
+  existing `if let`/`while let` optional-binding hint).
+- **Parser hint for a PHP-style `elseif` clause.** Onion has no `elseif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elseif b {
+  ... }` parsed `elseif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elseif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` and Ruby-style `elsif` hints).
+- **Parser hint for a Ruby-style `elsif` clause.** Onion has no `elsif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elsif b {
+  ... }` parsed `elsif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elsif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` hint).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` figures
+  synced** after the `EpidemiologySim.on` corpus addition (245 samples, 185
+  large programs, 4388 recorded tests).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` sample and
+  large-program counts re-synced** to 246 / 186 (`TimeSeries.on` was added to
+  `run/` without a matching doc update, so `QualityBarSpec` was red on
+  `develop`).
+
+## [0.25.0] - 2026-08-29
+
+### Added
+
+- **`run/PolyCalc.on`, a 379-line polynomial arithmetic system.** Exercises
+  an ADT enum (`CalcResult` with `Value`, `RootFound`, `IntegralValue`,
+  `NoRoot` cases, including a zero-field singleton), extension methods on
+  `Double`/`Int`/`String`, a mutable `Poly` class with static factories,
+  Horner-method evaluation, polynomial add/subtract/multiply/derivative/
+  integral/composition, Newton's-method root finding (nullable `Double?`
+  return), collection pipelines, and a Chebyshev-recurrence cross-check
+  against `java.lang.Math::cos`.
+
+- **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain
+  enums (`Coin`, `Category`) with value-pattern matching, a data-carrying
+  ADT `enum MachineEvent` (`CoinAccepted`, `ItemDispensed`, `Refunded`,
+  `ErrorEvent`) with exhaustive type-pattern dispatch, records (`Product`,
+  `Sale`, `DailySummary`), a class hierarchy with primary-constructor
+  inheritance (`PremiumMachine extends VendingMachine`, `override`/`super`),
+  an interface (`Reportable`), and collection pipelines (`groupBy`,
+  `filter`, `map`, `fold`, `sortedBy`, `partition`, `find`).
+
+- **`run/TrainDispatch.on`, a 389-line railway dispatch simulation.**
+  Records (`Station`, `Route`, `Booking`), a data-carrying ADT
+  `enum TrainStatus` (`OnTime`, `Delayed`, `Cancelled`), a plain
+  `enum TicketClass`, an interface/class pair (`Reportable`, `Train`,
+  `Dispatcher`) with public fields, extension methods on `String`/`Int`,
+  ADT `select`/pattern matching, collection pipelines (`map`, `filter`,
+  `fold`, `groupBy`, `sortedBy`, `distinct`, `partition`, `zip`), nullable
+  `find`, closures, string interpolation, `try`/`catch`, recursion, and
+  `foreach` over ranges, an object list, and map entries.
+
+- **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
+  An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
+  substitution and beta reduction to normal form, with Church numeral
+  encodings exercising `succ`, `+`, and `*` end-to-end. Uses nullable
+  types, `select`/`case` pattern matching (including an `else:`
+  catch-all), extension methods on `String`, and `filter`/`fold`/`find`
+  pipelines over `List[String]`.
+
+- **Diagnostic hint for Swift/Rust-style `if let`/`while let` optional
+  binding.** `if let x = opt { ... }`, `while let x = opt { ... }`, and the
+  Rust `Some(x)` pattern-binding form (`if let Some(x) = opt { ... }`) now
+  get a bilingual parser hint pointing at the Onion equivalent (bind with
+  `var`, then null-check: `var x = opt; if x != null { ... }`), instead of
+  falling through to the generic "a block `{ ... }` is expected here"
+  message.
+
+### Fixed
+
+- **The `for (vars in coll)` destructuring-mistake hint leaked a stray `)` into
+  its suggested fix.** Writing the whole `for (key, value in entries) { ... }`
+  clause wrapped in one outer paren pair (mimicking the also-supported
+  `for (key, value) in entries { ... }` mistake) produced a hint reading
+  `foreach (key, value) in entries) { ... }` -- the wrapper's own closing
+  paren was captured as part of the collection expression, because the
+  classifier's regex only accounted for an optional close paren right after
+  the variable list, not one belonging to an outer wrap. A dedicated pattern
+  now recognizes the whole-clause-wrapped form before falling back to the
+  general one, so the suggested fix has balanced parens again; collection
+  expressions that are themselves calls (`getEntries()`) are unaffected.
+
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
+
+## [0.24.0] - 2026-08-28
+
+### Added
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A plain
+  `enum Category` (10 spending categories), an ADT `enum TransactionType`
+  (Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), and
+  `Account`/`BudgetManager`/`FinanceEngine`/`ReportPrinter` classes with
+  `public:`/`private:` sections. Two months of checking/savings
+  transactions drive per-category budget tracking and over-budget
+  detection, monthly income/expense/net-savings/savings-rate reports, a
+  top-3 expense ranking (insertion sort), and a savings-goal projection,
+  via `filter`/`fold`/`map` pipelines and `select`/`case` matching on the
+  ADT enum.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
+
+- **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
+  Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
+  graph model, residual-graph min-cut derivation via reachability from the
+  source, and bipartite maximum matching as a unit-capacity max-flow
+  reduction. Five worked examples (CLRS Figure 26.1, a supply-chain network,
+  a 5-router packet mesh, bipartite worker/job matching, and degenerate
+  disconnected/parallel/diamond cases) exercise ADT `case`-enums, `HashMap`
+  Java interop, generic `List[T]`, `extension Int`, closures, and collection
+  pipelines.
+
+- **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
+  A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
+  plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,
+  `Conflict`, `ScheduleStats`), an observer interface (`CalendarObserver` /
+  `LogObserver`), a mutable `Calendar` class with `public:`/`private:`
+  sections, extension methods on `Int`/`String`, and collection pipelines
+  (`filter`, `map`, `fold`, `sortedBy`, `groupBy`, `partition`, `count`,
+  `distinct`, `any`) driving conflict detection, free-slot finding, and an
+  auto-scheduler.
+
+- **`run/TextTransformPipeline.on`, a 352-line composable text-transformation
+  pipeline simulator.** An ADT `case` enum `Transform` (10 cases: Upper,
+  Lower, TrimSpaces, Truncate, Repeat, Reverse, Replace, AddPrefix,
+  AddSuffix, CollapseSpaces) with `apply`/`category`/`label` methods, a
+  data-carrying `Category` enum, records with methods (`StepResult`,
+  `RunResult`), a `Pipeline` class conforming to a `Reportable` interface,
+  extension methods on `String`/`Int`, and collection pipelines (`filter`,
+  `map`, `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`,
+  `any`, `count`, `zip`) run five named pipelines over five sample inputs
+  with aggregate analytics.
+
+### Fixed
+
+- **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has
+  no `mut` keyword; mutability is chosen directly by `val` (immutable) or
+  `var` (mutable). Writing `let mut x = 5` translated naively as
+  `val mut x = 5` parsed `mut` as the declared identifier and then hit a
+  generic `expecting "=", ":"` error on the next token, with no mention of
+  `val`/`var`. The diagnostic now recognizes the `val mut name` / `var mut
+  name` pattern and points at the correct `var name = ...` form.
+
+## [0.23.0] - 2026-08-28
+
+### Fixed
+
+- **Parser hint for a Python-style `from ... import ...` statement.**
+  Onion has no `from module import name` statement; imports are wrapped in
+  braces and dotted, so `from os import path` parses `from` as a bare
+  identifier-reference statement followed by a stray identifier, with a
+  generic expected-token dump that never mentions `import { ... }`. The
+  diagnostic now recognizes a leading `from module import name[, name...]`
+  statement (including a `*` wildcard and `name as alias`) and points at the
+  correct `import { module.name }` form.
+
+### Added
+
+- **`run/LibraryCatalog.on`, a 361-line library catalog and loan tracking
+  sample.** A public-library book catalog and loan management system:
+  records with `example` clauses (`Book`, `Member`, `Loan`), a data-carrying
+  ADT `enum LoanStatus` (`Active(dueDay)`, `Returned(returnedDay, onTime)`,
+  `Overdue(dueDay, daysLate)`) matched exhaustively via `select`, a plain
+  `enum Genre`, extension methods on `Int` and `String`, a mutable `Library`
+  class, nullable `Int?` handling, collection pipelines (`any`/`count`/
+  `filter`/`groupBy`/`sortedBy`/`sortedByDescending`/`take`), `foreach (k, v)
+  in map` for genre/author breakdowns, and `try`/`catch` for validation
+  errors.
+
+- **`run/SymbolicMath.on`, a 283-line symbolic expression rewriting and
+  calculus engine.** An ADT `enum Term` (Num, Var, Add, Sub, Mul, Div, Neg,
+  Pow) with nested `select`/destructuring, fixpoint simplification
+  (constant folding, identity/zero laws, double-negation elimination),
+  symbolic differentiation (product/quotient/power-chain rules),
+  substitution, variable collection, and a nullable-propagating evaluator
+  over `java.util.Map[String, JDouble]`. Cross-checks a symbolic derivative
+  against a finite-difference approximation.
+
 - **`run/TradeMatchingEngine.on`, a 454-line continuous limit-order-book
   simulator.** Multi-symbol stock exchange matching engine: an ADT
   `enum OrderType` (Market, Limit, StopLoss), plain enums for `Side`/`Status`,
@@ -38,20 +320,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ElectionResult`, an ADT `enum VoteEvent`, `Map[String, Int]` tallies,
   `List[List[Int]]` ballot rankings, `groupBy`/`filter`/`map`/`fold`/
   `sortedBy`, `foreach (k, v) in map`, and `try`/`catch`.
-
-- **`run/GraphAlgorithms.on` extended into a property-graph showcase**
-  (360 → 432 lines): labeled weighted edges (`record Edge`), BFS/DFS
-  traversal, Dijkstra's shortest path with full path+label reconstruction,
-  3-colour DFS cycle detection, and Kahn's algorithm for topological sort,
-  over a city-transit-network and task-dependency-DAG demo.
-
-- **`run/BinaryHeap.on`, a ~280-line binary min-heap corpus sample.**
-  A `MinHeap` class with a `private:` section (`siftUp`/`siftDown`/`swap`)
-  backing heap sort, a task scheduler, and Dijkstra's shortest path; an ADT
-  `enum PathResult` (`Reached`/`Unreachable`), `record HeapEntry`/`Edge`,
-  extension methods on `String` (`repeat`, `padRight`), nullable (`Int?`)
-  `safeParse` with `try`/`catch`, and collection pipelines
-  (`filter`/`map`/`fold`/`find`/`sortedBy`/`groupBy`/`distinct`/`partition`/`zip`).
 
 ## [0.22.0] - 2026-08-27
 

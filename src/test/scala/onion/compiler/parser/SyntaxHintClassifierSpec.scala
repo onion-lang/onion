@@ -46,6 +46,36 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("key, value", "entries")
     }
 
+    it("strips the outer paren when the whole `for (vars in coll)` clause is wrapped") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value in entries) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "entries")
+    }
+
+    it("keeps a call's own parens when the collection is a function call") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value) in getEntries() {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "getEntries()")
+    }
+
+    it("keeps a call's own parens when the whole wrapped clause's collection is a call") {
+      val hint = classify(
+        found = ",",
+        sourceLine = "for (key, value in getEntries()) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.for_each_destructure"
+      hint.arguments shouldBe Seq("key, value", "getEntries()")
+    }
+
     it("prefers enhanced-for advice over generic C-style-for advice") {
       val hint = classify(
         found = "s",
@@ -257,6 +287,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).messageKey shouldBe "error.parsing.hint.using_resource_statement"
     }
 
+    it("recognizes a Python-style `from ... import ...` statement") {
+      val hint = classify(
+        found = "import",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "from os import path"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path", "os", "path")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with a wildcard") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import *"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.*", "os.path", "*")
+    }
+
+    it("recognizes a Python-style `from ... import ...` statement with multiple names") {
+      val hint = classify(
+        found = "import",
+        sourceLine = "from os.path import join, exists"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_from_import"
+      hint.arguments shouldBe Seq("os.path.join; os.path.exists", "os.path", "join, exists")
+    }
+
     it("recognizes a Go-style `:=` short variable declaration") {
       val hint = classify(
         found = ":",
@@ -266,6 +327,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.go_style_short_var_decl"
       hint.arguments shouldBe Seq("x", "5")
+    }
+
+    it("recognizes a Rust-style `val mut` declaration") {
+      val hint = classify(
+        found = "x",
+        expected = "\"=\", \":\"",
+        sourceLine = "val mut x = 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("val", "x")
+    }
+
+    it("recognizes a Rust-style `var mut` declaration") {
+      val hint = classify(
+        found = "count",
+        expected = "\"=\", \":\"",
+        sourceLine = "var mut count = 0"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_mut"
+      hint.arguments shouldBe Seq("var", "count")
     }
 
     it("recognizes a Ruby-style `unless` statement") {
@@ -287,6 +370,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       )
 
       hint.messageKey shouldBe "error.parsing.hint.until_not_supported"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a Ruby-style `elsif` clause") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "} elsif x == 2 {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.elsif_not_supported"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a PHP-style `elseif` clause") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "} elseif x == 2 {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.elseif_not_supported"
       hint.arguments shouldBe empty
     }
 
@@ -342,6 +447,90 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ) shouldBe None
     }
 
+    it("recognizes a Python-style `if cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "    if args.length > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("if", "args.length > 0")
+    }
+
+    it("recognizes a Python-style `while cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "while x > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("while", "x > 0")
+    }
+
+    it("recognizes a Python-style `else if cond:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "else if x > 0:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("else if", "x > 0")
+    }
+
+    it("prefers the `not`-operator hint over the colon-block hint when both apply") {
+      val hint = classify(
+        found = ":",
+        expected = "\"{\"",
+        sourceLine = "if not done:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.not_operator"
+    }
+
+    it("keeps the colon-block hint out of a case type pattern") {
+      SyntaxHintClassifier.classify(
+        found = ":",
+        expected = "\"{\"",
+        context = "",
+        sourceLine = "case s: String:"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.python_style_colon_block")
+    }
+
+    it("recognizes a Python-style `class Foo:` header with a trailing colon") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("class", "Foo")
+    }
+
+    it("recognizes a Python-style `class Foo(x: Int):` header with a primary constructor") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo(x: Int):"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_colon_block"
+      hint.arguments shouldBe Seq("class", "Foo(x: Int)")
+    }
+
+    it("keeps the old-extends hint for a real `class Foo: Bar` superclass mistake") {
+      val hint = classify(
+        found = ":",
+        expected = "<EOF>, \"extends\", \";\", \"{\"",
+        sourceLine = "class Foo: Bar {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.old_extends"
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",
@@ -351,6 +540,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.data_class_declaration"
       hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
+    }
+
+    it("recognizes a Java-style `final` local variable declaration") {
+      val hint = classify(
+        found = "final",
+        expected = "\"}\"",
+        sourceLine = "final Int x = 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_final_local"
+      hint.arguments shouldBe Seq("Int", "x")
+    }
+
+    it("recognizes a Java-style `final` local variable declaration with no initializer") {
+      val hint = classify(
+        found = "final",
+        expected = "\"}\"",
+        sourceLine = "final String name;"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_final_local"
+      hint.arguments shouldBe Seq("String", "name")
+    }
+
+    it("does not flag a `final class` declaration as a final-local mistake") {
+      SyntaxHintClassifier.classify(
+        found = "class",
+        expected = "<ID>",
+        context = "",
+        sourceLine = "final class Point {"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.java_style_final_local")
     }
 
     it("recognizes a JS/TS-style `constructor(...)` method") {
@@ -441,6 +661,95 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
         context = "",
         sourceLine = "value)"
       ) shouldBe None
+    }
+
+    it("recognizes a Swift-style `if let` optional binding") {
+      val hint = classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "if let x = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("if", "x", "opt")
+    }
+
+    it("recognizes a Rust-style `while let` optional binding") {
+      val hint = classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "while let x = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("while", "x", "opt")
+    }
+
+    it("recognizes a Rust-style `if let Some(x) = ...` pattern binding") {
+      val hint = classify(
+        found = "Some",
+        expected = "\"{\"",
+        sourceLine = "if let Some(x) = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("if", "x", "opt")
+    }
+
+    it("keeps the if-let-binding advice ahead of the generic block-expected fallback") {
+      classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "if let x = compute(1, 2) {"
+      ).messageKey shouldBe "error.parsing.hint.if_let_binding"
+    }
+
+    it("does not flag an ordinary `if` condition as an if-let binding") {
+      SyntaxHintClassifier.classify(
+        found = "y",
+        expected = "\"{\"",
+        context = "",
+        sourceLine = "if x == y {"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.if_let_binding")
+    }
+
+    it("recognizes a Swift-style `guard let x = ... else` early exit") {
+      val hint = classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let x = 5 else {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.guard_let_else"
+      hint.arguments shouldBe Seq("x", "5")
+    }
+
+    it("recognizes a Swift-style `guard let Some(x) = ... else` pattern binding") {
+      val hint = classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let Some(y) = opt else {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.guard_let_else"
+      hint.arguments shouldBe Seq("y", "opt")
+    }
+
+    it("keeps the guard-let advice ahead of the generic missing-call-parens fallback") {
+      classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "guard let x = compute(1, 2) else {"
+      ).messageKey shouldBe "error.parsing.hint.guard_let_else"
+    }
+
+    it("does not flag an ordinary `guard(...)` call as a guard-let binding") {
+      SyntaxHintClassifier.classify(
+        found = "let",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "",
+        sourceLine = "guard(x)"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.guard_let_else")
     }
   }
 

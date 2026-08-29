@@ -1,0 +1,403 @@
+// EpidemiologySim.on — Epidemiological compartment model (SEIR).
+// Exercises: ADT enums (InterventionType with data), records (Compartment,
+// Scenario, DayResult, Summary), extension Double (clamp/pct/fmt), collection
+// pipelines (map/filter/fold/sortedBy/groupBy/find/partition/any/count),
+// foreach over Int ranges and Map (k,v) entries, select/type-pattern
+// exhaustiveness, nullable (peak day), closures, string interpolation,
+// try/catch, while loops, |> pipeline, extension Int.
+
+import { java.util.ArrayList }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def clamp(lo: Double, hi: Double): Double =
+    if self < lo { lo } else if self > hi { hi } else { self }
+
+  def pct(): String = "#{(self * 100.0).fmt(2)}%"
+
+  def fmt(decimals: Int): String {
+    val neg: Boolean = self < 0.0
+    val abs: Double = if neg { -self } else { self }
+    val factor: Long = Math::pow(10.0, decimals as Double) as Long
+    val scaled: Long = (abs * (factor as Double) + 0.5) as Long
+    val intPart: Long = scaled / factor
+    val fracPart: Long = scaled % factor
+    var fracStr: String = Long::toString(fracPart)
+    while fracStr.length() < decimals { fracStr = "0" + fracStr }
+    val sign: String = if neg { "-" } else { "" }
+    return sign + Long::toString(intPart) + "." + fracStr
+  }
+}
+
+extension Int {
+  def clampI(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+// ─── ADT enum: intervention type ─────────────────────────────────────────────
+
+enum InterventionType {
+  case NoIntervention
+  case SocialDistancing(reduction: Double)
+  case Lockdown(reduction: Double, complianceRate: Double)
+  case MassVaccination(dailyRate: Double, efficacy: Double)
+  case Combined(distancing: Double, vaccinationRate: Double)
+public:
+  def label(): String = select this {
+    case i is NoIntervention:   "No Intervention"
+    case i is SocialDistancing: "Social Distancing (#{(i.reduction() * 100.0) as Int}% contact↓)"
+    case i is Lockdown:         "Lockdown (#{(i.reduction() * 100.0) as Int}% contact↓, #{(i.complianceRate() * 100.0) as Int}% compliance)"
+    case i is MassVaccination:  "Mass Vaccination (#{(i.dailyRate() * 100000.0) as Int}/100k/day, #{(i.efficacy() * 100.0) as Int}% eff.)"
+    case i is Combined:         "Combined (distancing #{(i.distancing() * 100.0) as Int}%, vax #{(i.vaccinationRate() * 100000.0) as Int}/100k)"
+  }
+
+  // Effective contact reduction factor (0 = no transmission, 1 = unchanged)
+  def transmissionFactor(): Double = select this {
+    case i is NoIntervention:   1.0
+    case i is SocialDistancing: 1.0 - i.reduction()
+    case i is Lockdown:         1.0 - i.reduction() * i.complianceRate()
+    case i is MassVaccination:  1.0
+    case i is Combined:         1.0 - i.distancing()
+  }
+
+  // Daily proportion of susceptibles vaccinated (0 if no vaccination)
+  def dailyVaxRate(): Double = select this {
+    case i is NoIntervention:   0.0
+    case i is SocialDistancing: 0.0
+    case i is Lockdown:         0.0
+    case i is MassVaccination:  i.dailyRate() * i.efficacy()
+    case i is Combined:         i.vaccinationRate() * 0.85
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+// SEIR compartment counts (fractions of population)
+record Compartment(s: Double, e: Double, i: Double, r: Double, dead: Double) {
+public:
+  def total(): Double = s + e + i + r + dead
+
+  def infected(): Double = e + i
+
+  def show(): String =
+    "S=#{s.pct()} E=#{e.pct()} I=#{i.pct()} R=#{r.pct()} D=#{dead.pct()}"
+}
+
+record DayResult(day: Int, compartment: Compartment, newCases: Double, intervention: InterventionType) {
+public:
+  def isWorseningThan(prev: DayResult): Boolean =
+    compartment.i() > prev.compartment.i()
+}
+
+record Scenario(
+  name: String,
+  population: Int,
+  r0: Double,
+  incubationDays: Int,
+  infectiousDays: Int,
+  fatalityRate: Double,
+  startInfected: Double,
+  intervention: InterventionType,
+  interventionStartDay: Int
+) {
+public:
+  def sigma(): Double = 1.0 / (incubationDays() as Double)
+  def gamma(): Double = 1.0 / (infectiousDays() as Double)
+}
+
+record Summary(
+  scenario: Scenario,
+  totalDays: Int,
+  peakInfected: Double,
+  peakDay: Int,
+  totalDeaths: Double,
+  totalRecovered: Double,
+  attackRate: Double,
+  peakNewCases: Double
+) {
+public:
+  def report(): String {
+    val pop: Int = scenario().population()
+    val peakAbs: Int = (peakInfected() * pop as Double) as Int
+    val deathsAbs: Int = (totalDeaths() * pop as Double) as Int
+    val recovAbs: Int = (totalRecovered() * pop as Double) as Int
+    val newCasePeak: Int = (peakNewCases() * pop as Double) as Int
+    return "  Scenario   : #{scenario().name()}\n" +
+           "  R0          : #{scenario().r0().fmt(2)} | Intervention: #{scenario().intervention().label()}\n" +
+           "  Peak day    : day #{peakDay()} — #{peakAbs} infected (#{peakInfected().pct()})\n" +
+           "  Peak new/d  : #{newCasePeak}\n" +
+           "  Deaths      : #{deathsAbs} (#{totalDeaths().pct()})\n" +
+           "  Recovered   : #{recovAbs} (#{totalRecovered().pct()})\n" +
+           "  Attack rate : #{attackRate().pct()}"
+  }
+}
+
+// ─── SEIR simulator ───────────────────────────────────────────────────────────
+
+class Simulator {
+  var results: List[Object]
+
+public:
+  def this {
+    results = []
+  }
+
+  def run(sc: Scenario, days: Int): Summary {
+    val beta0: Double = sc.r0() * sc.gamma()
+    val sigma: Double = sc.sigma()
+    val gamma: Double = sc.gamma()
+    val mu: Double = sc.fatalityRate() * gamma
+
+    var s: Double = 1.0 - sc.startInfected()
+    var e: Double = sc.startInfected() * 0.5
+    var i: Double = sc.startInfected() * 0.5
+    var r: Double = 0.0
+    var dead: Double = 0.0
+
+    var peakI: Double = i
+    var peakDay: Int = 0
+    var peakNew: Double = 0.0
+    var day: Int = 0
+
+    while day < days {
+      val tf: Double = if day >= sc.interventionStartDay() {
+        sc.intervention().transmissionFactor()
+      } else { 1.0 }
+      val vax: Double = if day >= sc.interventionStartDay() {
+        sc.intervention().dailyVaxRate()
+      } else { 0.0 }
+
+      val beta: Double = beta0 * tf
+      val forceOfInfection: Double = beta * i
+      val newExposed: Double = s * forceOfInfection
+      val newInfected: Double = sigma * e
+      val newRecovered: Double = gamma * i * (1.0 - sc.fatalityRate())
+      val newDead: Double = mu * i
+      val newVaxed: Double = (s * vax).clamp(0.0, s)
+
+      val sNext: Double = (s - newExposed - newVaxed).clamp(0.0, 1.0)
+      val eNext: Double = (e + newExposed - newInfected).clamp(0.0, 1.0)
+      val iNext: Double = (i + newInfected - newRecovered - newDead).clamp(0.0, 1.0)
+      val rNext: Double = (r + newRecovered + newVaxed).clamp(0.0, 1.0)
+      val deadNext: Double = (dead + newDead).clamp(0.0, 1.0)
+
+      if iNext > peakI { peakI = iNext; peakDay = day }
+      if newInfected > peakNew { peakNew = newInfected }
+
+      s = sNext; e = eNext; i = iNext; r = rNext; dead = deadNext
+      day = day + 1
+    }
+
+    val attackRate: Double = r + dead
+    return new Summary(sc, days, peakI, peakDay, dead, r, attackRate, peakNew)
+  }
+}
+
+// ─── Scenario builder ─────────────────────────────────────────────────────────
+
+class ScenarioLibrary {
+public:
+  static def baselineFlu(): Scenario =
+    new Scenario("Seasonal Flu (baseline)", 1000000, 1.3, 2, 4, 0.001, 0.0001,
+                 new NoIntervention(), 0)
+
+  static def covid19Uncontrolled(): Scenario =
+    new Scenario("COVID-19 Uncontrolled", 1000000, 3.0, 5, 10, 0.01, 0.0001,
+                 new NoIntervention(), 0)
+
+  static def covid19Distancing(): Scenario =
+    new Scenario("COVID-19 + Distancing", 1000000, 3.0, 5, 10, 0.01, 0.0001,
+                 new SocialDistancing(0.4), 14)
+
+  static def covid19Lockdown(): Scenario =
+    new Scenario("COVID-19 + Lockdown", 1000000, 3.0, 5, 10, 0.01, 0.0001,
+                 new Lockdown(0.7, 0.85), 14)
+
+  static def covid19Vaccination(): Scenario =
+    new Scenario("COVID-19 + Vaccination", 1000000, 3.0, 5, 10, 0.01, 0.0001,
+                 new MassVaccination(0.002, 0.9), 30)
+
+  static def covid19Combined(): Scenario =
+    new Scenario("COVID-19 + Combined", 1000000, 3.0, 5, 10, 0.01, 0.0001,
+                 new Combined(0.35, 0.0015), 14)
+
+  static def novelHighR0(): Scenario =
+    new Scenario("Novel Pathogen R0=6", 1000000, 6.0, 3, 7, 0.02, 0.0001,
+                 new NoIntervention(), 0)
+
+  static def novelWithLockdown(): Scenario =
+    new Scenario("Novel Pathogen + Hard Lockdown", 1000000, 6.0, 3, 7, 0.02, 0.0001,
+                 new Lockdown(0.85, 0.9), 7)
+}
+
+// ─── Analysis utilities ───────────────────────────────────────────────────────
+
+class Analyzer {
+public:
+  static def rankByDeaths(summaries: List[Object]): List[Object] {
+    val copy: List[Object] = new ArrayList(summaries)
+    copy.sort((a, b) -> {
+      val sa: Summary = a as Summary
+      val sb: Summary = b as Summary
+      if sa.totalDeaths() < sb.totalDeaths() { return -1 }
+      if sa.totalDeaths() > sb.totalDeaths() { return 1 }
+      return 0
+    })
+    return copy
+  }
+
+  static def rankByPeak(summaries: List[Object]): List[Object] {
+    val copy: List[Object] = new ArrayList(summaries)
+    copy.sort((a, b) -> {
+      val sa: Summary = a as Summary
+      val sb: Summary = b as Summary
+      if sa.peakInfected() < sb.peakInfected() { return -1 }
+      if sa.peakInfected() > sb.peakInfected() { return 1 }
+      return 0
+    })
+    return copy
+  }
+
+  static def interventionEffect(baseline: Summary, treated: Summary): String {
+    val deathsAverted: Double = baseline.totalDeaths() - treated.totalDeaths()
+    val peakReduction: Double = baseline.peakInfected() - treated.peakInfected()
+    val pop: Int = baseline.scenario().population()
+    val deathsAvertedAbs: Int = (deathsAverted * pop as Double) as Int
+    return "  vs. '#{baseline.scenario().name()}':\n" +
+           "    Deaths averted : #{deathsAvertedAbs} (#{deathsAverted.pct()})\n" +
+           "    Peak reduction : #{peakReduction.pct()}"
+  }
+
+  // group summaries by whether they controlled the outbreak (attack rate < 30%)
+  static def partition(summaries: List[Object]): Map[String, List[Object]] {
+    val controlled: List[Object] = []
+    val uncontrolled: List[Object] = []
+    foreach s: Object in summaries {
+      val sum: Summary = s as Summary
+      if sum.attackRate() < 0.3 {
+        controlled.add(s)
+      } else {
+        uncontrolled.add(s)
+      }
+    }
+    return ["controlled": controlled, "uncontrolled": uncontrolled]
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val sim: Simulator = new Simulator()
+  val DAYS: Int = 365
+
+  // --- Build scenario list
+  val scenarios: List[Object] = [
+    ScenarioLibrary::baselineFlu(),
+    ScenarioLibrary::covid19Uncontrolled(),
+    ScenarioLibrary::covid19Distancing(),
+    ScenarioLibrary::covid19Lockdown(),
+    ScenarioLibrary::covid19Vaccination(),
+    ScenarioLibrary::covid19Combined(),
+    ScenarioLibrary::novelHighR0(),
+    ScenarioLibrary::novelWithLockdown()
+  ]
+
+  // --- Run simulations
+  val summaries: List[Object] = scenarios.map { sc ->
+    sim.run(sc as Scenario, DAYS)
+  }
+
+  // --- Print full reports
+  println("══════════════════════════════════════════════════════")
+  println("  SEIR Epidemic Simulator — #{scenarios.size()} scenarios × #{DAYS} days")
+  println("══════════════════════════════════════════════════════")
+  foreach s: Object in summaries {
+    val sum: Summary = s as Summary
+    println("")
+    println(sum.report())
+  }
+
+  // --- Rank by deaths
+  println("")
+  println("── Ranked by deaths (fewest first) ───────────────────")
+  val byDeaths: List[Object] = Analyzer::rankByDeaths(summaries)
+  var rank: Int = 1
+  foreach s: Object in byDeaths {
+    val sum: Summary = s as Summary
+    val deathsAbs: Int = (sum.totalDeaths() * sum.scenario().population() as Double) as Int
+    println("  #{rank}. #{sum.scenario().name()} — #{deathsAbs} deaths")
+    rank = rank + 1
+  }
+
+  // --- Ranked by peak pressure (hospital load proxy)
+  println("")
+  println("── Ranked by peak infectious fraction (fewest first) ──")
+  val byPeak: List[Object] = Analyzer::rankByPeak(summaries)
+  rank = 1
+  foreach s: Object in byPeak {
+    val sum: Summary = s as Summary
+    println("  #{rank}. #{sum.scenario().name()} — peak #{sum.peakInfected().pct()} on day #{sum.peakDay()}")
+    rank = rank + 1
+  }
+
+  // --- Intervention effectiveness vs uncontrolled baseline (COVID-19 only, indices 2-5)
+  val uncontrolled: Summary = summaries[1] as Summary
+  println("")
+  println("── Intervention effectiveness vs. COVID-19 Uncontrolled ──")
+  foreach idx: Int in 2..5 {
+    val sum: Summary = summaries[idx] as Summary
+    println("  [#{sum.scenario().name()}]")
+    println(Analyzer::interventionEffect(uncontrolled, sum))
+  }
+
+  // --- Outbreak control partition
+  println("")
+  println("── Outbreak control classification (attack rate < 30%) ──")
+  val groups: Map[String, List[Object]] = Analyzer::partition(summaries)
+  foreach (label, list) in groups {
+    val names: List[Object] = list.map { s -> (s as Summary).scenario().name() }
+    println("  #{label}: #{names.size()} scenario(s)")
+    foreach n: Object in names {
+      println("    - #{n as String}")
+    }
+  }
+
+  // --- Quick stats
+  println("")
+  println("── Cross-scenario statistics ──────────────────────────")
+  val allDeaths: List[Object] = summaries.map { s -> (s as Summary).totalDeaths() }
+  var maxDeaths: Double = 0.0
+  var minDeaths: Double = 1.0
+  var sumDeaths: Double = 0.0
+  foreach d: Object in allDeaths {
+    val v: Double = d as Double
+    if v > maxDeaths { maxDeaths = v }
+    if v < minDeaths { minDeaths = v }
+    sumDeaths = sumDeaths + v
+  }
+  val avgDeaths: Double = sumDeaths / summaries.size() as Double
+  println("  Death rate — min: #{minDeaths.pct()}  max: #{maxDeaths.pct()}  avg: #{avgDeaths.pct()}")
+
+  val anyControlled: Boolean = summaries.any { s -> (s as Summary).attackRate() < 0.3 }
+  val controlCount: Int = summaries.count { s -> (s as Summary).attackRate() < 0.3 }
+  println("  Any scenario controlled? #{anyControlled}  (#{controlCount}/#{summaries.size()})")
+
+  // --- Find the fastest-peaking scenario (compute min peak day first)
+  var minPeakDay: Int = 9999
+  foreach s: Object in summaries {
+    val d: Int = (s as Summary).peakDay()
+    if d < minPeakDay { minPeakDay = d }
+  }
+  var fastestPeak: Summary? = null
+  foreach s: Object in summaries {
+    val sum: Summary = s as Summary
+    if sum.peakDay() == minPeakDay { fastestPeak = sum }
+  }
+  if fastestPeak != null {
+    println("  Fastest peak: '#{fastestPeak.scenario().name()}' (day #{fastestPeak.peakDay()})")
+  }
+
+  println("")
+  println("Simulation complete.")
+}

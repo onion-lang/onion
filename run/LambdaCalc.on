@@ -1,0 +1,304 @@
+// LambdaCalc.on — untyped lambda calculus interpreter with Church numerals
+// Demonstrates: ADT enum (Expr), records, recursion, nullable types,
+//               closures, select/pattern matching, extension methods,
+//               collection pipelines (map, filter, fold, find),
+//               foreach over lists, string interpolation, while loops.
+
+// ── Expression ADT ────────────────────────────────────────────────────────────
+
+enum Expr {
+  case Var(name: String)
+  case Abs(param: String, body: Expr)
+  case App(fn: Expr, arg: Expr)
+}
+
+// Pretty-print an expression
+def prettyExpr(e: Expr): String = select e {
+  case v is Var: v.name()
+  case a is Abs: "(λ#{a.param()}.#{prettyExpr(a.body())})"
+  case ap is App: {
+    val fn  = prettyExpr(ap.fn())
+    val arg = prettyExpr(ap.arg())
+    "(#{fn} #{arg})"
+  }
+}
+
+// ── Variable freshening ────────────────────────────────────────────────────────
+
+def freeVars(e: Expr): List[String] {
+  select e {
+    case v is Var: return [v.name()]
+    case a is Abs: {
+      val bodyFree = freeVars(a.body())
+      return bodyFree.filter { n -> n != a.param() }
+    }
+    case ap is App: {
+      val left  = freeVars(ap.fn())
+      val right = freeVars(ap.arg())
+      val combined: List[String] = []
+      foreach s: String in left  { combined.add(s) }
+      foreach s: String in right { combined.add(s) }
+      return combined
+    }
+  }
+}
+
+def freshVar(base: String, avoid: List[String]): String {
+  var candidate = base
+  var n = 0
+  while avoid.find { s -> s == candidate } != null {
+    n = n + 1
+    candidate = "#{base}#{n}"
+  }
+  return candidate
+}
+
+// ── Substitution: replace free occurrences of `name` with `replacement` ───────
+
+def substitute(e: Expr, name: String, replacement: Expr): Expr = select e {
+  case v is Var: {
+    if v.name() == name { replacement } else { e }
+  }
+  case a is Abs: {
+    if a.param() == name {
+      // Parameter shadows the substitution variable — stop here
+      e
+    } else {
+      // Avoid capture: if `param` is free in `replacement`, alpha-rename first
+      val free = freeVars(replacement)
+      if free.find { s -> s == a.param() } != null {
+        val allFree: List[String] = []
+        foreach s: String in free { allFree.add(s) }
+        allFree.add(name)
+        val fresh = freshVar(a.param(), allFree)
+        val renamedBody = substitute(a.body(), a.param(), new Var(fresh))
+        val newBody = substitute(renamedBody, name, replacement)
+        new Abs(fresh, newBody)
+      } else {
+        new Abs(a.param(), substitute(a.body(), name, replacement))
+      }
+    }
+  }
+  case ap is App: new App(substitute(ap.fn(), name, replacement),
+                          substitute(ap.arg(), name, replacement))
+}
+
+// ── Beta reduction (normal-order) ─────────────────────────────────────────────
+
+record StepResult(expr: Expr, reduced: Boolean)
+
+def step(e: Expr): StepResult = select e {
+  case v is Var: new StepResult(v, false)
+  case a is Abs: {
+    val inner = step(a.body())
+    new StepResult(new Abs(a.param(), inner.expr()), inner.reduced())
+  }
+  case ap is App: {
+    select ap.fn() {
+      case lam is Abs: {
+        // Redex: (λx.body) arg -> body[x := arg]
+        val result = substitute(lam.body(), lam.param(), ap.arg())
+        new StepResult(result, true)
+      }
+      else: {
+        // Try reducing the function first (normal order)
+        val fnStep = step(ap.fn())
+        if fnStep.reduced() {
+          new StepResult(new App(fnStep.expr(), ap.arg()), true)
+        } else {
+          // Then try reducing the argument
+          val argStep = step(ap.arg())
+          new StepResult(new App(ap.fn(), argStep.expr()), argStep.reduced())
+        }
+      }
+    }
+  }
+}
+
+def normalize(e: Expr, maxSteps: Int): Expr {
+  var current = e
+  var steps = 0
+  var going = true
+  while going && steps < maxSteps {
+    val r = step(current)
+    if r.reduced() {
+      current = r.expr()
+      steps = steps + 1
+    } else {
+      going = false
+    }
+  }
+  return current
+}
+
+// ── Church numerals ───────────────────────────────────────────────────────────
+
+// n = λf.λx.f^n(x)
+def churchNumeral(n: Int): Expr {
+  // body = f^n(x)
+  var body: Expr = new Var("x")
+  for var i: Int = 0; i < n; i++ {
+    body = new App(new Var("f"), body)
+  }
+  return new Abs("f", new Abs("x", body))
+}
+
+// Decode a Church numeral: reduce (e succ_ zero_) symbolically, count succ_ wraps
+def decodeChurch(e: Expr): Int? {
+  val applied = new App(new App(e, new Abs("n", new App(new Var("succ_"), new Var("n")))), new Var("zero_"))
+  val result  = normalize(applied, 200)
+  return countApps(result)
+}
+
+def countApps(e: Expr): Int? {
+  select e {
+    case v is Var: {
+      if v.name() == "zero_" { return 0 }
+      return null
+    }
+    case a is App: {
+      select a.fn() {
+        case f is Var: {
+          if f.name() == "succ_" {
+            val inner = countApps(a.arg())
+            if inner == null { return null }
+            return inner + 1
+          }
+          return null
+        }
+        else: return null
+      }
+    }
+    case a is Abs: return null
+    else: return null
+  }
+}
+
+// ── Church arithmetic combinators ─────────────────────────────────────────────
+
+// zero = λf.λx.x
+def churchZero(): Expr = new Abs("f", new Abs("x", new Var("x")))
+
+// succ = λn.λf.λx.f(n f x)
+def churchSucc(): Expr = new Abs("n", new Abs("f", new Abs("x",
+  new App(new Var("f"), new App(new App(new Var("n"), new Var("f")), new Var("x")))
+)))
+
+// add = λm.λn.λf.λx. m f (n f x)
+def churchAdd(): Expr = new Abs("m", new Abs("n", new Abs("f", new Abs("x",
+  new App(
+    new App(new Var("m"), new Var("f")),
+    new App(new App(new Var("n"), new Var("f")), new Var("x"))
+  )
+))))
+
+// mul = λm.λn.λf. m (n f)
+def churchMul(): Expr = new Abs("m", new Abs("n", new Abs("f",
+  new App(new Var("m"), new App(new Var("n"), new Var("f")))
+)))
+
+// true  = λa.λb.a
+def churchTrue():  Expr = new Abs("a", new Abs("b", new Var("a")))
+// false = λa.λb.b
+def churchFalse(): Expr = new Abs("a", new Abs("b", new Var("b")))
+// and   = λp.λq. p q p
+def churchAnd(): Expr = new Abs("p", new Abs("q",
+  new App(new App(new Var("p"), new Var("q")), new Var("p"))
+))
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+record TestCase(title: String, expr: Expr, expected: Int)
+
+def evalChurch(title: String, e: Expr): void {
+  val reduced = normalize(e, 500)
+  val decoded = decodeChurch(reduced)
+  if decoded == null {
+    IO::println("  #{title} = (non-numeral)")
+  } else {
+    IO::println("  #{title} = #{decoded}")
+  }
+}
+
+def runArithmetic(): void {
+  IO::println("── Church Arithmetic ─────────────────────────────────────")
+  val zero  = churchZero()
+  val one   = churchNumeral(1)
+  val two   = churchNumeral(2)
+  val three = churchNumeral(3)
+  val add   = churchAdd()
+  val mul   = churchMul()
+
+  evalChurch("succ(0)",    new App(churchSucc(), zero))
+  evalChurch("succ(2)",    new App(churchSucc(), two))
+  evalChurch("1 + 2",     new App(new App(add, one), two))
+  evalChurch("2 + 3",     new App(new App(add, two), three))
+  evalChurch("2 * 3",     new App(new App(mul, two), three))
+  evalChurch("3 * 3",     new App(new App(mul, three), three))
+  evalChurch("(1+2) * 3", new App(new App(mul, new App(new App(add, one), two)), three))
+  IO::println("")
+}
+
+def runPrettyPrint(): void {
+  IO::println("── Pretty-printing ──────────────────────────────────────")
+  val id   = new Abs("x", new Var("x"))
+  val konst = new Abs("x", new Abs("y", new Var("x")))
+  val flip  = new Abs("f", new Abs("x", new Abs("y",
+    new App(new App(new Var("f"), new Var("y")), new Var("x"))
+  )))
+  IO::println("  id    = #{prettyExpr(id)}")
+  IO::println("  const = #{prettyExpr(konst)}")
+  IO::println("  flip  = #{prettyExpr(flip)}")
+  IO::println("")
+}
+
+def runReduction(): void {
+  IO::println("── Reduction trace ──────────────────────────────────────")
+  // (λx.x) (λy.y)  →β  λy.y
+  val id   = new Abs("x", new Var("x"))
+  val e    = new App(id, new Abs("y", new Var("y")))
+  IO::println("  start : #{prettyExpr(e)}")
+  val norm = normalize(e, 10)
+  IO::println("  normal: #{prettyExpr(norm)}")
+  IO::println("")
+
+  // (λx.λy.x) a b → a
+  val konst  = new Abs("x", new Abs("y", new Var("x")))
+  val e2     = new App(new App(konst, new Var("a")), new Var("b"))
+  IO::println("  start : #{prettyExpr(e2)}")
+  val norm2  = normalize(e2, 10)
+  IO::println("  normal: #{prettyExpr(norm2)}")
+  IO::println("")
+}
+
+def runFreeVarCheck(): void {
+  IO::println("── Free variable analysis ───────────────────────────────")
+  val exprs: List[Expr] = [
+    new Var("x"),
+    new Abs("x", new Var("x")),
+    new Abs("x", new Var("y")),
+    new App(new Var("f"), new Var("x"))
+  ]
+  val names: List[String] = ["x", "λx.x", "λx.y", "f x"]
+  for var i: Int = 0; i < exprs.size; i++ {
+    val free = freeVars(exprs[i])
+    val freeStr = free.fold("") { acc, s -> if acc == "" { s } else { "#{acc},#{s}" } }
+    val display = if freeStr == "" { "(none)" } else { freeStr }
+    IO::println("  freeVars(#{names[i]}) = {#{display}}")
+  }
+  IO::println("")
+}
+
+def main(): void {
+  IO::println("╔═══════════════════════════════════════════╗")
+  IO::println("║  Untyped Lambda Calculus — Onion          ║")
+  IO::println("╚═══════════════════════════════════════════╝")
+  IO::println("")
+
+  runPrettyPrint()
+  runFreeVarCheck()
+  runReduction()
+  runArithmetic()
+
+  IO::println("Done.")
+}

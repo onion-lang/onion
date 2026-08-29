@@ -1,0 +1,473 @@
+// ForthMachine.on — a Forth-inspired stack-based interpreter
+// Exercises: ADT case-enum (ForthError), mutable class state (List-as-stack,
+// LinkedHashMap-as-dictionary), ArrayList ops (<<, .size, .remove), while/for
+// loops, try/catch (integer parsing), extension String (isInt/toInt/padLeft/
+// repeatStr), select/pattern-matching, nullable types, closures, collection
+// pipelines (foreach/reduce), generics (List[Object], List[String]),
+// StringBuilder, recursive method calls, deeply nested IF/ELSE/THEN.
+//
+// Supported built-in words:
+//   Literals : integer numbers
+//   Arithmetic: + - * / MOD NEGATE ABS 1+ 1- 2+ 2- 2* 2/
+//   Comparison: = < > <= >= <>   (Forth: -1 = true, 0 = false)
+//   Logic     : AND OR NOT
+//   Math      : MAX MIN
+//   Stack ops : DUP DROP SWAP OVER ROT 2DUP NIP .S DEPTH
+//   Output    : .  CR  SPACE  and  ." text" (space after ." is separator)
+//   Control   : IF [ELSE] THEN  (in word bodies; fully nestable)
+//   Loops     : limit DO ... LOOP  with  I  for 0-based loop index
+//   Defs      : : name ... ;    and    n CONSTANT name
+
+import {
+  java.lang.Integer as JInteger;
+  java.util.ArrayList;
+  java.util.LinkedHashMap;
+}
+
+// ── Error ─────────────────────────────────────────────────────────────────────
+
+enum ForthError {
+  case Underflow(word: String)
+  case Unknown(name: String)
+  case DivByZero
+  case Syntax(msg: String)
+public:
+  def text(): String = select this {
+    case e  is Underflow: "stack underflow in '" + e.word() + "'"
+    case e  is Unknown:   "unknown word '" + e.name() + "'"
+    case _d is DivByZero: "division by zero"
+    case e  is Syntax:    "syntax: " + e.msg()
+  }
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension String {
+  def isInt(): Boolean {
+    try { JInteger::parseInt(self); return true } catch e: Exception { return false }
+  }
+  def toInt(): Int = JInteger::parseInt(self)
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def repeatStr(n: Int): String {
+    val sb: StringBuilder = new StringBuilder()
+    var i: Int = 0
+    while i < n { sb.append(self); i++ }
+    return sb.toString()
+  }
+}
+
+// ── Tokeniser ─────────────────────────────────────────────────────────────────
+// Splits Forth source into words.  Handles:
+//   ( paren-comments )   — skipped entirely
+//   \ line-comments      — rest of line discarded
+//   ." text"             — one token prefixed with '"'; separator space skipped
+
+def tokenise(src: String): List[String] {
+  val toks: List[String] = new ArrayList[String]()
+  val cur:  StringBuilder = new StringBuilder()
+  var i: Int = 0
+  val n: Int = src.length()
+  while i < n {
+    val c: Int = src.charAt(i)
+    if c == 40 {                                               // ( paren comment
+      while i < n && src.charAt(i) != 41 { i++ }
+      if i < n { i++ }
+    } else if c == 92 {                                        // \ line comment
+      while i < n && src.charAt(i) != 10 { i++ }
+    } else if c == 46 && i + 1 < n && src.charAt(i + 1) == 34 {  // ." string
+      i += 2
+      if i < n && src.charAt(i) == 32 { i++ }   // skip obligatory separator space
+      val sb: StringBuilder = new StringBuilder()
+      while i < n && src.charAt(i) != 34 { sb.append(src.substring(i, i + 1)); i++ }
+      if i < n { i++ }
+      toks.add("\"" + sb.toString())
+    } else if c == 32 || c == 9 || c == 10 || c == 13 {      // whitespace
+      if cur.length() > 0 { toks.add(cur.toString()); cur.setLength(0) }
+      i++
+    } else {
+      cur.append(src.substring(i, i + 1)); i++
+    }
+  }
+  if cur.length() > 0 { toks.add(cur.toString()) }
+  return toks
+}
+
+// ── ForthMachine ──────────────────────────────────────────────────────────────
+
+class ForthMachine {
+  var stack:  List[Object]               // data stack (top at end; boxed Int)
+  var lstack: List[Object]               // loop-index stack (for I word)
+  var dict:   LinkedHashMap[String, Object]   // word name -> List[String] body
+
+public:
+  def this {
+    stack  = new ArrayList[Object]()
+    lstack = new ArrayList[Object]()
+    dict   = new LinkedHashMap[String, Object]()
+  }
+
+  // ── Stack primitives ───────────────────────────────────────────────────────
+
+  def push(v: Int): void { stack << v }
+
+  def pop(ctx: String): Int {
+    if stack.size == 0 { reportErr(new Underflow(ctx)); return 0 }
+    val last: Int = stack.size - 1
+    val v: Int    = (stack[last] as JInteger).intValue()
+    stack.remove(last)
+    return v
+  }
+
+  def peek(): Int? {
+    if stack.size == 0 { return null }
+    return (stack[stack.size - 1] as JInteger).intValue()
+  }
+
+  def depth(): Int = stack.size
+
+  def stackStr(): String {
+    if stack.size == 0 { return "<empty>" }
+    val parts: List[String] = new ArrayList[String]()
+    foreach item: Object in stack { parts.add("" + (item as JInteger).intValue()) }
+    return parts.reduce { a, b -> a + " " + b } + "  ← top"
+  }
+
+  // ── Loop-index stack ──────────────────────────────────────────────────────
+
+  def pushL(v: Int): void { lstack << v }
+  def popL():  void { if lstack.size > 0 { lstack.remove(lstack.size - 1) } }
+  def loopI(): Int  {
+    if lstack.size == 0 { return 0 }
+    return (lstack[lstack.size - 1] as JInteger).intValue()
+  }
+
+  // ── Error handling ─────────────────────────────────────────────────────────
+
+  var currentErr: ForthError? = null
+
+  def ok(): Boolean = currentErr == null
+
+  def reportErr(e: ForthError): void { currentErr = e }
+
+  def flushErr(): void {
+    if currentErr != null {
+      IO::println("ERROR: " + currentErr?.text())
+      currentErr = null
+    }
+  }
+
+  // ── Control-flow scanners ─────────────────────────────────────────────────
+  // Scan forward tracking IF/THEN nesting depth to find matching token.
+
+  def scanIfBranch(toks: List[String], start: Int): Int {
+    var depth: Int = 1; var j: Int = start
+    while j < toks.size {
+      val t: String = toks.get(j) as String
+      if t == "IF"   { depth++ }
+      else if t == "THEN" { depth--; if depth == 0 { return j } }
+      else if t == "ELSE" && depth == 1 { return j }
+      j++
+    }
+    return toks.size
+  }
+
+  def scanThen(toks: List[String], start: Int): Int {
+    var depth: Int = 1; var j: Int = start
+    while j < toks.size {
+      val t: String = toks.get(j) as String
+      if t == "IF"   { depth++ }
+      else if t == "THEN" { depth--; if depth == 0 { return j } }
+      j++
+    }
+    return toks.size
+  }
+
+  def scanLoop(toks: List[String], start: Int): Int {
+    var depth: Int = 1; var j: Int = start
+    while j < toks.size {
+      val t: String = toks.get(j) as String
+      if t == "DO"   { depth++ }
+      else if t == "LOOP" { depth--; if depth == 0 { return j } }
+      j++
+    }
+    return toks.size
+  }
+
+  // ── Core executor ─────────────────────────────────────────────────────────
+
+  def exec(toks: List[String]): void { execRange(toks, 0, toks.size) }
+
+  def execRange(toks: List[String], from: Int, to: Int): void {
+    var i: Int = from
+    while i < to && ok() {
+      val tok: String = toks.get(i) as String
+      i++
+
+      if tok.isInt() {
+        push(tok.toInt())
+      } else if tok.startsWith("\"") {
+        IO::print(tok.substring(1))
+
+      // ── arithmetic ──────────────────────────────────────────────────────
+      } else if tok == "+"      { val b = pop("+");    val a = pop("+");    push(a + b) }
+      else if tok == "-"        { val b = pop("-");    val a = pop("-");    push(a - b) }
+      else if tok == "*"        { val b = pop("*");    val a = pop("*");    push(a * b) }
+      else if tok == "/" {
+        val b = pop("/"); val a = pop("/")
+        if b == 0 { reportErr(new DivByZero()) } else { push(a / b) }
+      }
+      else if tok == "MOD"      { val b = pop("MOD"); val a = pop("MOD"); if b != 0 { push(a % b) } }
+      else if tok == "NEGATE"   { push(-pop("NEGATE")) }
+      else if tok == "ABS"      { val v = pop("ABS"); push(if v < 0 { -v } else { v }) }
+      else if tok == "1+"       { push(pop("1+") + 1) }
+      else if tok == "1-"       { push(pop("1-") - 1) }
+      else if tok == "2+"       { push(pop("2+") + 2) }
+      else if tok == "2-"       { push(pop("2-") - 2) }
+      else if tok == "2*"       { push(pop("2*") * 2) }
+      else if tok == "2/"       { push(pop("2/") / 2) }
+      else if tok == "MAX"      { val b = pop("MAX"); val a = pop("MAX"); push(if a > b { a } else { b }) }
+      else if tok == "MIN"      { val b = pop("MIN"); val a = pop("MIN"); push(if a < b { a } else { b }) }
+
+      // ── comparison / logic ───────────────────────────────────────────────
+      else if tok == "="        { val b = pop("=");   val a = pop("=");   push(if a == b { -1 } else { 0 }) }
+      else if tok == "<"        { val b = pop("<");   val a = pop("<");   push(if a  < b { -1 } else { 0 }) }
+      else if tok == ">"        { val b = pop(">");   val a = pop(">");   push(if a  > b { -1 } else { 0 }) }
+      else if tok == "<="       { val b = pop("<=");  val a = pop("<=");  push(if a <= b { -1 } else { 0 }) }
+      else if tok == ">="       { val b = pop(">=");  val a = pop(">=");  push(if a >= b { -1 } else { 0 }) }
+      else if tok == "<>"       { val b = pop("<>");  val a = pop("<>");  push(if a != b { -1 } else { 0 }) }
+      else if tok == "AND"      { val b = pop("AND"); val a = pop("AND"); push(a & b) }
+      else if tok == "OR"       { val b = pop("OR");  val a = pop("OR");  push(a | b) }
+      else if tok == "NOT"      { val v = pop("NOT"); push(if v == 0 { -1 } else { 0 }) }
+
+      // ── stack manipulation ───────────────────────────────────────────────
+      else if tok == "DUP"  { val v: Int? = peek(); if v != null { push(v) } else { reportErr(new Underflow("DUP")) } }
+      else if tok == "DROP" { pop("DROP") }
+      else if tok == "SWAP" { val b = pop("SWAP"); val a = pop("SWAP"); push(b); push(a) }
+      else if tok == "OVER" {
+        if stack.size < 2 { reportErr(new Underflow("OVER")) }
+        else { push((stack[stack.size - 2] as JInteger).intValue()) }
+      }
+      else if tok == "ROT" {
+        if stack.size < 3 { reportErr(new Underflow("ROT")) }
+        else { val c = pop("ROT"); val b = pop("ROT"); val a = pop("ROT"); push(b); push(c); push(a) }
+      }
+      else if tok == "2DUP" {
+        if stack.size < 2 { reportErr(new Underflow("2DUP")) }
+        else { val b = pop("2DUP"); val a = pop("2DUP"); push(a); push(b); push(a); push(b) }
+      }
+      else if tok == "NIP"   { val b = pop("NIP"); pop("NIP"); push(b) }
+      else if tok == "DEPTH" { push(depth()) }
+      else if tok == ".S"    { IO::println("Stack: " + stackStr()) }
+
+      // ── output ───────────────────────────────────────────────────────────
+      else if tok == "."     { IO::print("" + pop(".") + " ") }
+      else if tok == "CR"    { IO::println("") }
+      else if tok == "SPACE" { IO::print(" ") }
+
+      // ── loop index ───────────────────────────────────────────────────────
+      else if tok == "I" { push(loopI()) }
+
+      // ── IF … [ELSE] … THEN ───────────────────────────────────────────────
+      else if tok == "IF" {
+        val cond: Int     = pop("IF")
+        val matchIdx: Int = scanIfBranch(toks, i)
+        if cond == 0 {
+          // false: jump to just after ELSE (else-branch) or past THEN
+          i = matchIdx + 1
+        }
+        // true: continue; the ELSE word will skip to THEN when reached
+      }
+      else if tok == "ELSE" {
+        // finished true-branch: jump past the matching THEN
+        val thenIdx: Int = scanThen(toks, i)
+        i = thenIdx + 1
+      }
+      else if tok == "THEN" { /* marker: no-op */ }
+
+      // ── limit DO … LOOP (0-based: I = 0 .. limit-1) ─────────────────────
+      else if tok == "DO" {
+        val limit: Int   = pop("DO")
+        val loopEnd: Int = scanLoop(toks, i)
+        var idx: Int = 0
+        while idx < limit && ok() {
+          pushL(idx)
+          execRange(toks, i, loopEnd)
+          popL()
+          idx++
+        }
+        i = loopEnd + 1
+      }
+      else if tok == "LOOP" { /* controlled by DO — not reached normally */ }
+
+      // ── CONSTANT name ────────────────────────────────────────────────────
+      else if tok == "CONSTANT" {
+        if i >= to { reportErr(new Syntax("CONSTANT needs a name")); return }
+        val name: String = toks.get(i) as String; i++
+        val v: Int = pop("CONSTANT")
+        val body: List[String] = new ArrayList[String]()
+        body.add("" + v)
+        dict.put(name, body)
+
+      // ── user-defined word ─────────────────────────────────────────────
+      } else {
+        val body: Object? = dict.get(tok)
+        if body != null { exec(body as List[String]) }
+        else { reportErr(new Unknown(tok)) }
+      }
+    }
+  }
+
+  // ── Compiler ──────────────────────────────────────────────────────────────
+  // Processes word definitions (: name body ;) and top-level Forth code.
+  // Top-level tokens are batched so DO..LOOP, IF..THEN, and CONSTANT work.
+
+  def compile(src: String): void {
+    val toks: List[String] = tokenise(src)
+    var i: Int = 0
+    val batch: List[String] = new ArrayList[String]()
+    while i < toks.size && ok() {
+      val tok: String = toks.get(i) as String; i++
+      if tok == ":" {
+        if batch.size > 0 { exec(batch); batch.clear() }
+        if !ok() { flushErr(); return }
+        if i >= toks.size { reportErr(new Syntax("':' needs a name")); flushErr(); return }
+        val name: String = toks.get(i) as String; i++
+        val body: List[String] = new ArrayList[String]()
+        while i < toks.size && (toks.get(i) as String) != ";" {
+          body.add(toks.get(i) as String); i++
+        }
+        if i < toks.size { i++ }
+        dict.put(name, body)
+      } else {
+        batch.add(tok)
+      }
+    }
+    if batch.size > 0 && ok() { exec(batch) }
+    flushErr()
+  }
+}
+
+// ── Demo helpers ──────────────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  val line: String = "─".repeatStr(56)
+  IO::println(line)
+  IO::println("  " + title)
+  IO::println(line)
+}
+
+def show(label: String, src: String, fm: ForthMachine): void {
+  IO::print(("  " + label + ":").padLeft(22) + " ")
+  fm.compile(src)
+  IO::println("")
+}
+
+// ── Demonstration ─────────────────────────────────────────────────────────────
+
+val fm: ForthMachine = new ForthMachine()
+
+banner("1  Basic arithmetic")
+show("3 + 4",       "3 4 + .",       fm)
+show("100 - 37",    "100 37 - .",    fm)
+show("6 × 7",       "6 7 * .",       fm)
+show("100 / 4",     "100 4 / .",     fm)
+show("17 MOD 5",    "17 5 MOD .",    fm)
+show("ABS(-42)",    "-42 ABS .",     fm)
+show("MAX(8, 13)",  "8 13 MAX .",    fm)
+show("MIN(8, 13)",  "8 13 MIN .",    fm)
+
+banner("2  Stack operations")
+fm.compile("1 2 3 4 5 .S")
+fm.compile("DROP DROP DROP DROP DROP")
+show("10 20 SWAP",  "10 20 SWAP . .",   fm)
+show("7 DUP *",     "7 DUP * .",        fm)
+show("OVER copy",   "3 5 OVER . . .",   fm)
+show("ROT",         "1 2 3 ROT . . .",  fm)
+show("2DUP",        "4 5 2DUP .S DROP DROP DROP DROP", fm)
+show("NIP",         "10 20 NIP .",      fm)
+show("DEPTH",       "8 9 DEPTH . DROP DROP", fm)
+
+banner("3  Comparison  (Forth: -1 = TRUE, 0 = FALSE)")
+show("5 < 9",       "5 9 < .",     fm)
+show("5 > 9",       "5 9 > .",     fm)
+show("7 = 7",       "7 7 = .",     fm)
+show("7 <> 8",      "7 8 <> .",    fm)
+show("NOT 0",       "0 NOT .",     fm)
+show("-1 AND -1",   "-1 -1 AND .", fm)
+
+banner("4  Word definitions and CONSTANT")
+fm.compile(": SQUARE  DUP * ;")
+fm.compile(": CUBE    DUP DUP * * ;")
+fm.compile(": SUM-TO  DUP 1+ * 2/ ;")   // Gauss: n*(n+1)/2
+show("5 SQUARE",    "5 SQUARE .",    fm)
+show("3 CUBE",      "3 CUBE .",      fm)
+show("SUM 1..10",   "10 SUM-TO .",   fm)
+fm.compile("314159 CONSTANT PI-MICRO")
+show("PI-MICRO",    "PI-MICRO 100000 / . PI-MICRO 100000 MOD .", fm)
+
+banner("5  Recursion: Factorial")
+fm.compile(": FACT ( n -- n! ) DUP 1 > IF DUP 1- FACT * ELSE DROP 1 THEN ;")
+show("0!",  "0 FACT .",  fm)
+show("1!",  "1 FACT .",  fm)
+show("5!",  "5 FACT .",  fm)
+show("10!", "10 FACT .", fm)
+show("12!", "12 FACT .", fm)
+
+banner("6  Recursion: Fibonacci")
+fm.compile(": FIB ( n -- result ) DUP 2 < IF DROP 1 ELSE DUP 1- FIB SWAP 2- FIB + THEN ;")
+show("fib(0)",  "0 FIB .",  fm)
+show("fib(1)",  "1 FIB .",  fm)
+show("fib(7)",  "7 FIB .",  fm)
+show("fib(10)", "10 FIB .", fm)
+show("fib(12)", "12 FIB .", fm)
+
+banner("7  DO ... LOOP (0-based: I = 0 .. limit-1)")
+fm.compile(": PRINT-RANGE  DO I . LOOP CR ;")
+IO::print("  0..4:    ")
+fm.compile("5 DO I . LOOP CR")
+IO::print("  squares: ")
+fm.compile("8 DO I DUP * . LOOP CR")
+show("sum 0..9",  "0 10 DO I + LOOP .", fm)
+show("prod 1..5", "1 5 DO I 1+ * LOOP .", fm)
+
+banner("8  FizzBuzz 1–20 (DO LOOP + nested IF/ELSE/THEN)")
+fm.compile(": DIVBY? ( n divisor -- flag ) MOD 0 = ;")
+fm.compile(
+  ": FIZZBUZZ " +
+  "20 DO " +
+    "I 1+ " +
+    "DUP 15 DIVBY? IF DROP .\" FizzBuzz\" CR ELSE " +
+    "DUP  3 DIVBY? IF DROP .\" Fizz\"     CR ELSE " +
+    "DUP  5 DIVBY? IF DROP .\" Buzz\"     CR ELSE " +
+    ". CR " +
+    "THEN THEN THEN " +
+  "LOOP ;"
+)
+fm.compile("FIZZBUZZ")
+
+banner("9  Prime sieve 2–30")
+fm.compile(
+  ": IS-PRIME? " +
+  "DUP 2 < IF DROP 0 ELSE " +
+  "DUP 2 = IF DROP -1 ELSE " +
+  "DUP 3 = IF DROP -1 ELSE " +
+  "DUP 5 = IF DROP -1 ELSE " +
+  "DUP 2 MOD 0 = IF DROP 0 ELSE " +
+  "DUP 3 MOD 0 = IF DROP 0 ELSE " +
+  "DUP 5 MOD 0 = IF DROP 0 ELSE " +
+  "DROP -1 " +
+  "THEN THEN THEN THEN THEN THEN THEN ;"
+)
+IO::print("  Primes 2..30: ")
+fm.compile("29 DO I 2+ DUP IS-PRIME? IF . ELSE DROP THEN LOOP CR")
+
+banner("10  Stack discipline proof")
+fm.compile(".S")   // should show <empty> — if not, something left a value behind
+
+IO::println("─".repeatStr(56))
+IO::println("  Forth interpreter complete.")
+IO::println("─".repeatStr(56))

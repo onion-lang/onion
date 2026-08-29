@@ -1,0 +1,400 @@
+// MusicTheory.on — a music-theory engine: pitch classes, intervals, scales, chords.
+// Exercises: ADT enums with shared methods, data-carrying enum cases, records with
+// body methods, classes with interfaces, typed generics (List[Note] / Map[String,List[String]]),
+// collection pipelines (map/filter/groupBy/sortedBy/distinct/find/partition/zip),
+// select / type-pattern matching with exhaustiveness, nullable types and null checks,
+// closures, string interpolation, try/catch, recursion, while/foreach (ranges and
+// map (k,v) destructuring), |> pipeline, extension Int.
+
+// ─── ADT enum: chromatic pitch names ─────────────────────────────────────────
+// Each zero-field case maps to a semitone offset (C = 0 … B = 11).
+
+enum PitchName {
+  case C; case Cs; case D; case Ds; case E
+  case F; case Fs; case G; case Gs; case A; case As; case B
+public:
+  def semitone(): Int = select this {
+    case n is C:  0
+    case n is Cs: 1
+    case n is D:  2
+    case n is Ds: 3
+    case n is E:  4
+    case n is F:  5
+    case n is Fs: 6
+    case n is G:  7
+    case n is Gs: 8
+    case n is A:  9
+    case n is As: 10
+    case n is B:  11
+  }
+  def label(): String = select this {
+    case n is C:  "C"
+    case n is Cs: "C#"
+    case n is D:  "D"
+    case n is Ds: "D#"
+    case n is E:  "E"
+    case n is F:  "F"
+    case n is Fs: "F#"
+    case n is G:  "G"
+    case n is Gs: "G#"
+    case n is A:  "A"
+    case n is As: "A#"
+    case n is B:  "B"
+  }
+}
+
+// ─── ADT enum: scale types, each carrying its interval pattern ────────────────
+
+enum ScaleType {
+  case Major
+  case NaturalMinor
+  case HarmonicMinor
+  case Pentatonic
+  case Blues
+public:
+  def label(): String = select this {
+    case s is Major:         "Major"
+    case s is NaturalMinor:  "Natural Minor"
+    case s is HarmonicMinor: "Harmonic Minor"
+    case s is Pentatonic:    "Pentatonic"
+    case s is Blues:         "Blues"
+  }
+  // Whole-step / half-step intervals between consecutive scale degrees
+  def intervals(): List[Int] = select this {
+    case s is Major:         [2, 2, 1, 2, 2, 2, 1]
+    case s is NaturalMinor:  [2, 1, 2, 2, 1, 2, 2]
+    case s is HarmonicMinor: [2, 1, 2, 2, 1, 3, 1]
+    case s is Pentatonic:    [2, 2, 3, 2, 3]
+    case s is Blues:         [3, 2, 1, 1, 3, 2]
+  }
+}
+
+// ─── ADT enum: chord qualities ────────────────────────────────────────────────
+
+enum ChordQuality {
+  case Maj; case Min; case Dim; case Aug
+  case Dom7; case Maj7; case Min7
+public:
+  def symbol(): String = select this {
+    case q is Maj:  ""
+    case q is Min:  "m"
+    case q is Dim:  "dim"
+    case q is Aug:  "aug"
+    case q is Dom7: "7"
+    case q is Maj7: "maj7"
+    case q is Min7: "m7"
+  }
+  // Stacked interval sizes (in semitones) that form the chord above the root
+  def intervals(): List[Int] = select this {
+    case q is Maj:  [4, 3]
+    case q is Min:  [3, 4]
+    case q is Dim:  [3, 3]
+    case q is Aug:  [4, 4]
+    case q is Dom7: [4, 3, 3]
+    case q is Maj7: [4, 3, 4]
+    case q is Min7: [3, 4, 3]
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Note(pitch: PitchName, octave: Int) {
+public:
+  def midiPitch(): Int = self.pitch().semitone() + (self.octave() + 1) * 12
+  def label(): String = "#{self.pitch().label()}#{self.octave()}"
+}
+
+record Interval(semitones: Int) {
+public:
+  def name(): String = select self.semitones() {
+    case 0:  "Unison"
+    case 1:  "Minor 2nd"
+    case 2:  "Major 2nd"
+    case 3:  "Minor 3rd"
+    case 4:  "Major 3rd"
+    case 5:  "Perfect 4th"
+    case 6:  "Tritone"
+    case 7:  "Perfect 5th"
+    case 8:  "Minor 6th"
+    case 9:  "Major 6th"
+    case 10: "Minor 7th"
+    case 11: "Major 7th"
+    case 12: "Octave"
+    else:    "#{self.semitones()} semitones"
+  }
+  def isConsonant(): Boolean {
+    val s: Int = self.semitones()
+    return s == 0 || s == 4 || s == 5 || s == 7 || s == 9 || s == 12
+  }
+}
+
+record Scale(root: Note, scaleType: ScaleType, notes: List[Note]) {
+public:
+  def label(): String = "#{self.root().pitch().label()} #{self.scaleType().label()}"
+  def pitchLabels(): List[String] = self.notes().map { n: Note -> n.pitch().label() }
+  def size(): Int = self.notes().size()
+}
+
+record Chord(root: Note, quality: ChordQuality, notes: List[Note]) {
+public:
+  def label(): String = "#{self.root().pitch().label()}#{self.quality().symbol()}"
+  def voicing(): String {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("[")
+    var i: Int = 0
+    while i < self.notes().size() {
+      if i > 0 { sb.append("-") }
+      sb.append(self.notes().get(i).label())
+      i++
+    }
+    sb.append("]")
+    return sb.toString()
+  }
+  def noteCount(): Int = self.notes().size()
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Transposable {
+  def transposeBy(semitones: Int): Note
+}
+
+// ─── Extension on Int for musical math ────────────────────────────────────────
+
+extension Int {
+  def mod12(): Int {
+    val r: Int = self % 12
+    return if r < 0 { r + 12 } else { r }
+  }
+}
+
+// ─── Helper: map semitone index to PitchName ──────────────────────────────────
+
+def pitchByIndex(i: Int): PitchName = select i {
+  case 0:  new C()
+  case 1:  new Cs()
+  case 2:  new D()
+  case 3:  new Ds()
+  case 4:  new E()
+  case 5:  new F()
+  case 6:  new Fs()
+  case 7:  new G()
+  case 8:  new Gs()
+  case 9:  new A()
+  case 10: new As()
+  else:    new B()
+}
+
+// ─── Music theory engine class ────────────────────────────────────────────────
+
+class MusicTheory {
+public:
+
+  // Transpose a note up (positive) or down (negative) by a number of semitones
+  def transpose(note: Note, semitones: Int): Note {
+    val current: Int = note.pitch().semitone()
+    val raw: Int = current + semitones
+    val newSemitone: Int = raw.mod12()
+    val octaveDelta: Int = if raw >= 0 { raw / 12 } else { (raw - 11) / 12 }
+    val newOctave: Int  = note.octave() + octaveDelta
+    val newPitch: PitchName = pitchByIndex(newSemitone)
+    return new Note(newPitch, newOctave)
+  }
+
+  // Compute the interval from one note to another (0–11 semitones, mod 12)
+  def intervalBetween(from: Note, to: Note): Interval {
+    val diff: Int = (to.pitch().semitone() - from.pitch().semitone()).mod12()
+    return new Interval(diff)
+  }
+
+  // Generate a scale starting at root, following the ScaleType's interval pattern
+  def buildScale(root: Note, scaleType: ScaleType): Scale {
+    val steps: List[Int] = scaleType.intervals()
+    val notes: List[Note] = [root]
+    var current: Note = root
+    foreach step: Int in steps {
+      current = self.transpose(current, step)
+      notes.add(current)
+    }
+    return new Scale(root, scaleType, notes)
+  }
+
+  // Build a chord from root + quality (stacked intervals)
+  def buildChord(root: Note, quality: ChordQuality): Chord {
+    val steps: List[Int] = quality.intervals()
+    val notes: List[Note] = [root]
+    var current: Note = root
+    foreach step: Int in steps {
+      current = self.transpose(current, step)
+      notes.add(current)
+    }
+    return new Chord(root, quality, notes)
+  }
+
+  // Semitone pitch class of a note (0–11)
+  def pitchClass(note: Note): Int = note.pitch().semitone()
+
+  // Check whether two notes are enharmonic equivalents (same pitch class)
+  def areEnharmonic(a: Note, b: Note): Boolean =
+    self.pitchClass(a) == self.pitchClass(b)
+
+  // 1-based diatonic degree of a pitch within a scale (0 = not a member)
+  def degreeOf(scale: Scale, pitch: PitchName): Int {
+    val target: Int = pitch.semitone()
+    var i: Int = 0
+    while i < scale.notes().size() {
+      if scale.notes().get(i).pitch().semitone() == target { return i + 1 }
+      i++
+    }
+    return 0
+  }
+
+  // Return chord tones whose pitch class appears in the scale
+  def chordTonesInScale(chord: Chord, scale: Scale): List[Note] =
+    chord.notes().filter { n: Note -> self.degreeOf(scale, n.pitch()) > 0 }
+
+  // True if every chord tone is diatonic to the scale
+  def isChordDiatonic(chord: Chord, scale: Scale): Boolean {
+    val inside: List[Note] = self.chordTonesInScale(chord, scale)
+    return inside.size() == chord.noteCount()
+  }
+
+  // Consonance score: fraction of intervals in the chord that are consonant
+  def consonanceScore(chord: Chord): Double {
+    val root: Note = chord.root()
+    var consonant: Int = 0
+    var total: Int = 0
+    foreach n: Note in chord.notes() {
+      if !self.areEnharmonic(n, root) {
+        val iv: Interval = self.intervalBetween(root, n)
+        if iv.isConsonant() { consonant++ }
+        total++
+      }
+    }
+    return if total == 0 { 1.0 } else { (consonant as Double) / (total as Double) }
+  }
+
+  // Transpose an entire scale up or down by semitones (recursive helper)
+  def transposeScaleRec(notes: List[Note], semitones: Int, idx: Int, acc: List[Note]): List[Note] {
+    if idx >= notes.size() { return acc }
+    acc.add(self.transpose(notes.get(idx), semitones))
+    return self.transposeScaleRec(notes, semitones, idx + 1, acc)
+  }
+
+  def transposeScale(scale: Scale, semitones: Int): Scale {
+    val newRoot: Note = self.transpose(scale.root(), semitones)
+    val newNotes: List[Note] = self.transposeScaleRec(scale.notes(), semitones, 0, [])
+    return new Scale(newRoot, scale.scaleType(), newNotes)
+  }
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  val theory: MusicTheory = new MusicTheory()
+
+  // ── Scales ────────────────────────────────────────────────────────────────
+  IO::println("=== Scales ===")
+  val scales: List[Scale] = [
+    theory.buildScale(new Note(new C(), 4), new Major()),
+    theory.buildScale(new Note(new A(), 4), new NaturalMinor()),
+    theory.buildScale(new Note(new D(), 4), new HarmonicMinor()),
+    theory.buildScale(new Note(new G(), 3), new Pentatonic()),
+    theory.buildScale(new Note(new E(), 4), new Blues())
+  ]
+  foreach s: Scale in scales {
+    IO::println("#{s.label()} (#{s.size()} notes): #{s.pitchLabels()}")
+  }
+
+  // ── Chords ────────────────────────────────────────────────────────────────
+  IO::println("\n=== Chords ===")
+  val cMajor: Scale = scales.get(0)
+  val chords: List[Chord] = [
+    theory.buildChord(new Note(new C(), 4), new Maj()),
+    theory.buildChord(new Note(new A(), 3), new Min()),
+    theory.buildChord(new Note(new G(), 4), new Dom7()),
+    theory.buildChord(new Note(new D(), 4), new Min7()),
+    theory.buildChord(new Note(new B(), 3), new Dim()),
+    theory.buildChord(new Note(new Fs(), 4), new Aug()),
+    theory.buildChord(new Note(new E(), 4), new Maj7())
+  ]
+  foreach chord: Chord in chords {
+    val diatonic: String = if theory.isChordDiatonic(chord, cMajor) { "diatonic" } else { "non-diatonic" }
+    val score: Double    = theory.consonanceScore(chord)
+    IO::println("#{chord.label()} #{chord.voicing()}  [#{diatonic}, consonance=#{score}]")
+  }
+
+  // ── Intervals from C4 ─────────────────────────────────────────────────────
+  IO::println("\n=== Intervals above C4 ===")
+  val c4: Note = new Note(new C(), 4)
+  foreach n: Note in cMajor.notes() {
+    val iv: Interval = theory.intervalBetween(c4, n)
+    val tag: String = if iv.isConsonant() { "✓" } else { "✗" }
+    IO::println("  C4 → #{n.label()}: #{iv.name()} #{tag}")
+  }
+
+  // ── Transpose a scale ─────────────────────────────────────────────────────
+  IO::println("\n=== C Major transposed up a Perfect 5th (G Major) ===")
+  val gMajor: Scale = theory.transposeScale(cMajor, 7)
+  IO::println("#{gMajor.label()}: #{gMajor.pitchLabels()}")
+
+  // ── Chord-tone analysis ───────────────────────────────────────────────────
+  IO::println("\n=== Chord tones in C Major ===")
+  foreach chord: Chord in chords {
+    val inside: List[Note] = theory.chordTonesInScale(chord, cMajor)
+    val labels: List[String] = inside.map { n: Note -> n.pitch().label() }
+    IO::println("  #{chord.label()}: #{inside.size()}/#{chord.noteCount()} tones diatonic #{labels}")
+  }
+
+  // ── Group chords by type (triads vs. sevenths) ────────────────────────────
+  IO::println("\n=== Chord Groups ===")
+  val grouped: Map[String, List[Chord]] = chords.groupBy { c: Chord ->
+    if c.noteCount() == 3 { "Triads" } else { "Seventh chords" }
+  }
+  foreach (kind, group) in grouped {
+    val names: List[String] = (group as List[Chord]).map { c: Chord -> c.label() }
+    IO::println("  #{kind}: #{names}")
+  }
+
+  // ── Scale degree lookup ───────────────────────────────────────────────────
+  IO::println("\n=== Scale degrees in C Major ===")
+  val testPitches: List[PitchName] = [new C(), new E(), new G(), new B(), new Fs()]
+  foreach p: PitchName in testPitches {
+    val deg: Int = theory.degreeOf(cMajor, p)
+    val degStr: String = if deg == 0 { "chromatic (not diatonic)" } else { "scale degree #{deg}" }
+    IO::println("  #{p.label()}: #{degStr}")
+  }
+
+  // ── Enharmonic check ──────────────────────────────────────────────────────
+  IO::println("\n=== Enharmonic checks ===")
+  val pairs: List[List[Note]] = [
+    [new Note(new Cs(), 4), new Note(new Ds(), 4)],
+    [new Note(new G(), 4),  new Note(new G(), 4)]
+  ]
+  foreach pair: List[Note] in pairs {
+    val a: Note = pair.get(0)
+    val b: Note = pair.get(1)
+    IO::println("  #{a.label()} ~ #{b.label()}: #{theory.areEnharmonic(a, b)}")
+  }
+
+  // ── Sorted chords by consonance ───────────────────────────────────────────
+  IO::println("\n=== Chords by consonance score (most → least) ===")
+  val byConsonance: List[Chord] = chords.sortedBy { c: Chord ->
+    val sc: Double = theory.consonanceScore(c)
+    -(sc * 1000.0 as Int)
+  }
+  foreach chord: Chord in byConsonance {
+    IO::println("  #{chord.label()} #{theory.consonanceScore(chord)}")
+  }
+
+  // ── Try/catch for defensive coding ───────────────────────────────────────
+  IO::println("\n=== Error handling demo ===")
+  try {
+    val bad: Int = -1
+    if bad < 0 { throw new IllegalArgumentException("semitone must be >= 0: #{bad}") }
+  } catch e: IllegalArgumentException {
+    IO::println("  Caught: #{e.getMessage()}")
+  }
+
+  IO::println("\nDone.")
+}

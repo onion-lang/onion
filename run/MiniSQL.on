@@ -1,0 +1,430 @@
+// MiniSQL.on — In-memory relational database with SQL-like queries.
+//
+// Supports: INSERT, SELECT with WHERE, ORDER BY, LIMIT,
+// GROUP BY + aggregates (COUNT/SUM/AVG/MIN/MAX), INNER JOIN.
+// Uses an ADT enum (ColVal) for typed column values and predicate closures.
+//
+// Exercises: ADT enum (ColVal), records (ColDef), classes with mutable state
+// (Row, Table, QueryResult, Query, Database), generics (List[T] pipelines),
+// collection pipelines (map/filter/sortedBy), select/pattern matching,
+// nullable (String?/ColVal?), closures, string interpolation,
+// foreach over List and Map entries, while loops.
+
+import {
+  java.lang.StringBuilder
+}
+
+// ── Column value type ──────────────────────────────────────────────────────
+enum ColVal {
+  case CInt(v: Int)
+  case CLong(v: Long)
+  case CDouble(v: Double)
+  case CStr(s: String)
+  case CBool(b: Boolean)
+  case CNull
+}
+
+// ── Helpers on ColVal ──────────────────────────────────────────────────────
+class ColValOps {
+public:
+  static def asString(cv: ColVal): String = select cv {
+    case c is CInt:    c.v().toString()
+    case c is CLong:   c.v().toString() + "L"
+    case c is CDouble: fmtDouble(c.v())
+    case c is CStr:    c.s()
+    case c is CBool:   if c.b() { "true" } else { "false" }
+    else:              "NULL"
+  }
+
+  static def fmtDouble(d: Double): String {
+    val i = d.intValue()
+    if (d - (i as Double)) == 0.0 { return i.toString() + ".0" }
+    return d.toString()
+  }
+
+  static def asDouble(cv: ColVal): Double? = select cv {
+    case c is CInt:    (c.v() as Double)
+    case c is CLong:   (c.v() as Double)
+    case c is CDouble: c.v()
+    else:              null
+  }
+
+  static def cmp(a: ColVal, b: ColVal): Int {
+    val ad = asDouble(a)
+    val bd = asDouble(b)
+    if ad != null && bd != null {
+      val diff = ad - bd
+      if diff < 0.0 { return -1 }
+      if diff > 0.0 { return  1 }
+      return 0
+    }
+    return asString(a).compareTo(asString(b))
+  }
+}
+
+// ── Column definition ──────────────────────────────────────────────────────
+record ColDef(name: String, nullable: Boolean)
+
+// ── Row: ordered list of ColVals, named by the schema ─────────────────────
+class Row {
+  var vals: List[ColVal]
+  var schema: List[String]
+public:
+  def this(colDefs: List[ColDef]) {
+    self.schema = []
+    self.vals   = []
+    foreach d: ColDef in colDefs {
+      schema.add(d.name())
+      vals.add(new CNull())
+    }
+  }
+
+  def set(col: String, cv: ColVal): void {
+    val idx = schema.indexOf(col)
+    if idx >= 0 { vals[idx] = cv }
+  }
+
+  def get(col: String): ColVal {
+    val idx = schema.indexOf(col)
+    if idx < 0 { return new CNull() }
+    return vals[idx]
+  }
+
+  def colNames(): List[String] = schema
+  def colCount(): Int          = schema.size
+}
+
+// ── Table ──────────────────────────────────────────────────────────────────
+class Table {
+  var tblName: String
+  var colDefs: List[ColDef]
+  var rowList: List[Row]
+public:
+  def this(name: String, defs: List[ColDef]) {
+    self.tblName = name
+    self.colDefs = defs
+    self.rowList = []
+  }
+
+  def name(): String = tblName
+
+  def insert(values: Map[String, ColVal]): void {
+    val r = new Row(colDefs)
+    foreach (k, v) in values { r.set(k, v) }
+    rowList.add(r)
+  }
+
+  def allRows(): List[Row]      = rowList
+  def colNames(): List[String]  = colDefs.map { d -> d.name() }
+  def rowCount(): Int           = rowList.size
+}
+
+// ── QueryResult ─────────────────────────────────────────────────────────────
+class QueryResult {
+  var hdr: List[String]
+  var dat: List[List[String]]
+public:
+  def this(hdr: List[String], dat: List[List[String]]) {
+    self.hdr = hdr
+    self.dat = dat
+  }
+
+  def rowCount(): Int           = dat.size
+  def headers(): List[String]   = hdr
+  def rows(): List[List[String]] = dat
+
+  def print(): void {
+    val widths = computeWidths()
+    printSep(widths)
+    printRow(hdr, widths)
+    printSep(widths)
+    foreach r: List[String] in dat { printRow(r, widths) }
+    printSep(widths)
+    IO::println("(" + dat.size + " rows)")
+  }
+
+  def computeWidths(): List[Int] {
+    val ws: List[Int] = []
+    foreach c: String in hdr { ws.add(c.length()) }
+    foreach r: List[String] in dat {
+      foreach i: Int in 0..<r.size {
+        val len = r[i].length()
+        if len > ws[i] { ws[i] = len }
+      }
+    }
+    return ws
+  }
+
+  def printSep(ws: List[Int]): void {
+    val sb = new StringBuilder()
+    sb.append("+")
+    foreach w: Int in ws {
+      foreach _: Int in 0..(w + 1) { sb.append("-") }
+      sb.append("+")
+    }
+    IO::println(sb.toString())
+  }
+
+  def printRow(cells: List[String], ws: List[Int]): void {
+    val sb = new StringBuilder()
+    sb.append("|")
+    foreach i: Int in 0..<cells.size {
+      val cell = cells[i]
+      val w    = ws[i]
+      sb.append(" ")
+      sb.append(cell)
+      foreach _: Int in 0..<(w - cell.length()) { sb.append(" ") }
+      sb.append("|")
+    }
+    IO::println(sb.toString())
+  }
+}
+
+// ── Query builder ──────────────────────────────────────────────────────────
+class Query {
+  var tbl: Table
+  var projCols: List[String]
+  var pred: (Row) -> Boolean
+  var ordCol: String?
+  var ordAsc: Boolean
+  var lim: Int
+  var grpCol: String?
+  var aggExprs: List[String]
+public:
+  def this(t: Table) {
+    self.tbl      = t
+    self.projCols = []
+    self.pred     = (r) -> true
+    self.ordCol   = null
+    self.ordAsc   = true
+    self.lim      = -1
+    self.grpCol   = null
+    self.aggExprs = []
+  }
+
+  def project(cols: List[String]): Query { projCols = cols; return self }
+  def where(p: (Row) -> Boolean): Query  { pred = p; return self }
+  def orderBy(col: String, asc: Boolean): Query { ordCol = col; ordAsc = asc; return self }
+  def limit(n: Int): Query  { lim = n; return self }
+  def groupBy(col: String): Query { grpCol = col; return self }
+  def agg(expr: String): Query { aggExprs.add(expr); return self }
+
+  def execute(): QueryResult {
+    val myPred = pred
+    var rows: List[Row] = tbl.allRows().filter { r -> myPred(r) }
+
+    if grpCol != null { return runGroupBy(rows, grpCol!!) }
+
+    if ordCol != null {
+      val col: String = ordCol!!
+      val asc = ordAsc
+      rows = rows.sortedBy { r -> ColValOps::asString(r.get(col)) }
+      if !asc {
+        val rev: List[Row] = []
+        foreach i: Int in 0..<rows.size { rev.add(rows[rows.size - 1 - i]) }
+        rows = rev
+      }
+    }
+
+    if lim >= 0 && rows.size > lim {
+      val trimmed: List[Row] = []
+      foreach i: Int in 0..<lim { trimmed.add(rows[i]) }
+      rows = trimmed
+    }
+
+    val cols: List[String] = if projCols.isEmpty() { tbl.colNames() } else { projCols }
+    val out: List[List[String]] = rows.map { r ->
+      cols.map { c -> ColValOps::asString(r.get(c)) }
+    }
+    return new QueryResult(cols, out)
+  }
+
+  def runGroupBy(rows: List[Row], gcol: String): QueryResult {
+    val groups: Map[String, List[Row]] = [:]
+    foreach r: Row in rows {
+      val key = ColValOps::asString(r.get(gcol))
+      if !groups.containsKey(key) { groups[key] = [] }
+      groups[key].add(r)
+    }
+
+    val outHdr: List[String] = [gcol]
+    foreach ae: String in aggExprs { outHdr.add(ae) }
+
+    val outRows: List[List[String]] = []
+    foreach (k, v) in groups {
+      val grpRows: List[Row] = v
+      val outRow: List[String] = [k]
+      foreach ae: String in aggExprs { outRow.add(evalAgg(ae, grpRows)) }
+      outRows.add(outRow)
+    }
+    return new QueryResult(outHdr, outRows)
+  }
+
+  def evalAgg(expr: String, rows: List[Row]): String {
+    if expr.startsWith("COUNT(") { return rows.size.toString() }
+
+    if expr.startsWith("SUM(") {
+      val col = expr.substring(4, expr.length() - 1)
+      var s: Double = 0.0
+      foreach r: Row in rows {
+        val d = ColValOps::asDouble(r.get(col))
+        if d != null { s = s + d }
+      }
+      return ColValOps::fmtDouble(s)
+    }
+
+    if expr.startsWith("AVG(") {
+      val col = expr.substring(4, expr.length() - 1)
+      var s: Double = 0.0
+      var n: Int = 0
+      foreach r: Row in rows {
+        val d = ColValOps::asDouble(r.get(col))
+        if d != null { s = s + d; n++ }
+      }
+      if n == 0 { return "NULL" }
+      return ColValOps::fmtDouble(s / (n as Double))
+    }
+
+    if expr.startsWith("MIN(") {
+      val col = expr.substring(4, expr.length() - 1)
+      var best: ColVal? = null
+      foreach r: Row in rows {
+        val cv = r.get(col)
+        if best == null || ColValOps::cmp(cv, best!!) < 0 { best = cv }
+      }
+      if best == null { return "NULL" }
+      return ColValOps::asString(best!!)
+    }
+
+    if expr.startsWith("MAX(") {
+      val col = expr.substring(4, expr.length() - 1)
+      var best: ColVal? = null
+      foreach r: Row in rows {
+        val cv = r.get(col)
+        if best == null || ColValOps::cmp(cv, best!!) > 0 { best = cv }
+      }
+      if best == null { return "NULL" }
+      return ColValOps::asString(best!!)
+    }
+    return "?"
+  }
+}
+
+// ── Database ────────────────────────────────────────────────────────────────
+class Database {
+  var tables: Map[String, Table]
+public:
+  def this { self.tables = [:] }
+
+  def create(name: String, cols: List[ColDef]): Table {
+    val t = new Table(name, cols)
+    tables[name] = t
+    return t
+  }
+
+  def table(name: String): Table? {
+    if tables.containsKey(name) { return tables[name] } else { return null }
+  }
+
+  def join(lName: String, rName: String, lKey: String, rKey: String): QueryResult {
+    val lTbl = table(lName)
+    val rTbl = table(rName)
+    if lTbl == null || rTbl == null { return new QueryResult([], []) }
+
+    val lCols: List[String] = lTbl.colNames().map { c -> lName + "." + c }
+    val rCols: List[String] = rTbl.colNames().map { c -> rName + "." + c }
+    val allCols: List[String] = []
+    foreach c: String in lCols { allCols.add(c) }
+    foreach c: String in rCols { allCols.add(c) }
+
+    val out: List[List[String]] = []
+    foreach lr: Row in lTbl.allRows() {
+      val lv = ColValOps::asString(lr.get(lKey))
+      foreach rr: Row in rTbl.allRows() {
+        if lv == ColValOps::asString(rr.get(rKey)) {
+          val joined: List[String] = []
+          foreach c: String in lTbl.colNames() { joined.add(ColValOps::asString(lr.get(c))) }
+          foreach c: String in rTbl.colNames() { joined.add(ColValOps::asString(rr.get(c))) }
+          out.add(joined)
+        }
+      }
+    }
+    return new QueryResult(allCols, out)
+  }
+}
+
+// ── Convenience factory for ColDef ─────────────────────────────────────────
+def col(name: String): ColDef = new ColDef(name, true)
+
+// ── Demo ────────────────────────────────────────────────────────────────────
+val db = new Database()
+
+// employees table
+val emp = db.create("employees", [col("id"), col("name"), col("dept_id"), col("salary"), col("active")])
+emp.insert(["id": new CInt(1), "name": new CStr("Alice"),  "dept_id": new CInt(10), "salary": new CDouble(95000.0),  "active": new CBool(true)])
+emp.insert(["id": new CInt(2), "name": new CStr("Bob"),    "dept_id": new CInt(20), "salary": new CDouble(72000.0),  "active": new CBool(true)])
+emp.insert(["id": new CInt(3), "name": new CStr("Carol"),  "dept_id": new CInt(10), "salary": new CDouble(110000.0), "active": new CBool(true)])
+emp.insert(["id": new CInt(4), "name": new CStr("Dave"),   "dept_id": new CInt(30), "salary": new CDouble(68000.0),  "active": new CBool(false)])
+emp.insert(["id": new CInt(5), "name": new CStr("Eve"),    "dept_id": new CInt(20), "salary": new CDouble(88000.0),  "active": new CBool(true)])
+emp.insert(["id": new CInt(6), "name": new CStr("Frank"),  "dept_id": new CInt(10), "salary": new CDouble(91000.0),  "active": new CBool(true)])
+emp.insert(["id": new CInt(7), "name": new CStr("Grace"),  "dept_id": new CInt(30), "salary": new CDouble(79000.0),  "active": new CBool(true)])
+emp.insert(["id": new CInt(8), "name": new CStr("Henry"),  "dept_id": new CInt(20), "salary": new CDouble(84000.0),  "active": new CBool(false)])
+
+// departments table
+val dept = db.create("departments", [col("id"), col("name"), col("budget")])
+dept.insert(["id": new CInt(10), "name": new CStr("Engineering"), "budget": new CDouble(500000.0)])
+dept.insert(["id": new CInt(20), "name": new CStr("Marketing"),   "budget": new CDouble(300000.0)])
+dept.insert(["id": new CInt(30), "name": new CStr("Operations"),  "budget": new CDouble(250000.0)])
+
+IO::println("=== MiniSQL Demo ===")
+IO::println("")
+
+// Query 1: active employees ordered by salary desc
+IO::println("-- Active employees (sorted by salary desc) --")
+new Query(emp)
+  .project(["id", "name", "salary"])
+  .where { r -> select r.get("active") { case b is CBool: b.b(); else: false } }
+  .orderBy("salary", false)
+  .execute()
+  .print()
+IO::println("")
+
+// Query 2: salary > 80000
+IO::println("-- Salary > 80,000 --")
+new Query(emp)
+  .project(["name", "dept_id", "salary"])
+  .where { r ->
+    val d = ColValOps::asDouble(r.get("salary"))
+    d != null && d > 80000.0
+  }
+  .execute()
+  .print()
+IO::println("")
+
+// Query 3: GROUP BY dept_id with aggregates
+IO::println("-- Headcount & salary stats per department --")
+new Query(emp)
+  .groupBy("dept_id")
+  .agg("COUNT(id)")
+  .agg("AVG(salary)")
+  .agg("MAX(salary)")
+  .execute()
+  .print()
+IO::println("")
+
+// Query 4: INNER JOIN employees ⋈ departments
+IO::println("-- Employee JOIN Department --")
+db.join("employees", "departments", "dept_id", "id").print()
+IO::println("")
+
+// Query 5: departments with budget > 275000, descending
+IO::println("-- Departments with budget > 275,000 --")
+new Query(dept)
+  .project(["name", "budget"])
+  .where { r ->
+    val d = ColValOps::asDouble(r.get("budget"))
+    d != null && d > 275000.0
+  }
+  .orderBy("budget", false)
+  .execute()
+  .print()

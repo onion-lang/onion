@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of the actual mistake. The diagnostic now recognizes the Java-style
   `final Type name` shape and points at `val` instead, which is already
   immutable by default.
+- **Destructuring a generic record no longer loses its type argument.**
+  `case Wrap(v):` against a `Wrap[Int]` scrutinee bound `v` at the record's
+  bare type parameter `T` instead of the `Int` it was actually instantiated
+  with, so using `v` as an `Int` failed to typecheck (E0000: "type Int is
+  expected, but type T is used") even though `w.v()` on the same value
+  worked fine. The scrutinee's type argument is now recovered the same way
+  a root `is`-pattern already does for a sealed hierarchy (#311), and applies
+  through nested destructuring too (`Outer(Pair(a, b))` on an
+  `Outer[Int]`/`Pair[Int, String]` scrutinee binds `a: Int`, `b: String`).
 
 ## [0.26.0] - 2026-08-29
 

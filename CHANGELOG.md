@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` figures
   synced** after the `EpidemiologySim.on` corpus addition (245 samples, 185
   large programs, 4388 recorded tests).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` sample and
+  large-program counts re-synced** to 246 / 186 (`TimeSeries.on` was added to
+  `run/` without a matching doc update, so `QualityBarSpec` was red on
+  `develop`).
 
 ## [0.25.0] - 2026-08-29
 

@@ -65,6 +65,13 @@ private[compiler] object SyntaxHintClassifier {
     """\bdef\s+[A-Za-z_]\w*(?:\[[^\]]*\])?\s*\(\s*(?:(?:val|var)\s+)?([A-Za-z_]\w*)\s*[,)]""".r
   private val JavaStyleFieldDeclaration =
     """^\s*(?:public|private|protected)?\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
+  // `final` is itself a valid Onion modifier (for classes/methods, via `modifiers()`
+  // in the grammar), so this must require a capitalized type name right after it --
+  // that shape never appears for a legitimate `final class ...`/`final def ...`/
+  // `final override ...` (all lowercase keywords), only for the Java mistake of a
+  // `final`-qualified local variable, which Onion has no grammar production for at all.
+  private val JavaStyleFinalLocalDeclaration =
+    """^\s*final\s+([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*(?:=|;|$)""".r
   private val JavaStyleTypeCase =
     """^\s*case\s+[a-z_]\w*\s*:\s*[A-Z][\w.\[\]]*\??\s*:""".r
   private val JavaStyleGenericAngleBrackets =
@@ -207,6 +214,9 @@ private[compiler] object SyntaxHintClassifier {
       case (")" | ",") if expected == "\":\"" && MissingParameterType.findFirstMatchIn(sourceLine).isDefined =>
         val matched = MissingParameterType.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.missing_parameter_type", matched.group(1))
+      case _ if JavaStyleFinalLocalDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JavaStyleFinalLocalDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.java_style_final_local", matched.group(1), matched.group(2))
       case _ if JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleFieldDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_field", matched.group(1), matched.group(2))

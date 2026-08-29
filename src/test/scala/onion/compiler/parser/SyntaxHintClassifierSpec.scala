@@ -510,6 +510,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
     }
 
+    it("recognizes a Java-style `final` local variable declaration") {
+      val hint = classify(
+        found = "final",
+        expected = "\"}\"",
+        sourceLine = "final Int x = 5"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_final_local"
+      hint.arguments shouldBe Seq("Int", "x")
+    }
+
+    it("recognizes a Java-style `final` local variable declaration with no initializer") {
+      val hint = classify(
+        found = "final",
+        expected = "\"}\"",
+        sourceLine = "final String name;"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_final_local"
+      hint.arguments shouldBe Seq("String", "name")
+    }
+
+    it("does not flag a `final class` declaration as a final-local mistake") {
+      SyntaxHintClassifier.classify(
+        found = "class",
+        expected = "<ID>",
+        context = "",
+        sourceLine = "final class Point {"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.java_style_final_local")
+    }
+
     it("recognizes a JS/TS-style `constructor(...)` method") {
       val hint = classify(
         found = "constructor",

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain
+  enums (`Coin`, `Category`) with value-pattern matching, a data-carrying
+  ADT `enum MachineEvent` (`CoinAccepted`, `ItemDispensed`, `Refunded`,
+  `ErrorEvent`) with exhaustive type-pattern dispatch, records (`Product`,
+  `Sale`, `DailySummary`), a class hierarchy with primary-constructor
+  inheritance (`PremiumMachine extends VendingMachine`, `override`/`super`),
+  an interface (`Reportable`), and collection pipelines (`groupBy`,
+  `filter`, `map`, `fold`, `sortedBy`, `partition`, `find`).
+
+- **`run/TrainDispatch.on`, a 389-line railway dispatch simulation.**
+  Records (`Station`, `Route`, `Booking`), a data-carrying ADT
+  `enum TrainStatus` (`OnTime`, `Delayed`, `Cancelled`), a plain
+  `enum TicketClass`, an interface/class pair (`Reportable`, `Train`,
+  `Dispatcher`) with public fields, extension methods on `String`/`Int`,
+  ADT `select`/pattern matching, collection pipelines (`map`, `filter`,
+  `fold`, `groupBy`, `sortedBy`, `distinct`, `partition`, `zip`), nullable
+  `find`, closures, string interpolation, `try`/`catch`, recursion, and
+  `foreach` over ranges, an object list, and map entries.
+
 - **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
   An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
   substitution and beta reduction to normal form, with Church numeral

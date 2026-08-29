@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Python-style `raise` statement.**
+  Writing `raise Exception("boom")` — the idiom every Python programmer
+  reaches for to throw an exception — parsed `raise` as a bare identifier
+  statement and hit the generic "a call's arguments need parentheses"
+  fallback (suggesting the nonsensical `raise(...)`), since the parser saw
+  `raise` directly followed by another identifier with nothing in between.
+  The diagnostic now recognizes the `raise expr` shape and points at
+  Onion's actual equivalent, `throw expr` (or `throw new Name(args)` when
+  the raised expression looks like a constructor call, e.g.
+  `Exception("boom")`).
+
 - **Parser hint for a Rust/Go/Swift/C#/TypeScript-style `struct` declaration.**
   Writing `struct Point { x: Int, y: Int }` — the idiom every C-family/Rust/
   Go/Swift/TypeScript programmer reaches for first when defining a data

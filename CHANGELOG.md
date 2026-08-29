@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Swift-style `guard let ... else` early exit.** Onion
+  has no `guard`; `guard let x = expr else { ... }` parsed `guard` as a bare
+  identifier-reference statement and then hit a generic `expecting <EOF>,
+  <EOL>, ";"` error on the following `let`, surfacing the unrelated
+  "call's arguments need parentheses" hint. The diagnostic now recognizes
+  the `guard let ... else` shape (including a pattern binding like `guard
+  let Some(x) = expr else { ... }`) and points at the idiomatic bind-then-
+  null-check form: `val x = expr; if x == null { ... }` (matching the
+  existing `if let`/`while let` optional-binding hint).
 - **Parser hint for a PHP-style `elseif` clause.** Onion has no `elseif`;
   `if`/`else if` chains cover the same ground, so `if a { ... } elseif b {
   ... }` parsed `elseif` as a bare identifier-reference statement and then

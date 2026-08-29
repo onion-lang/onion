@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
 - **Parser rejected `else` on the line after a single-line `if` body.**
   `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
   syntax error at `else`: the closing `}` of the single-line body could

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-08-29
+
 ### Added
 
 - **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain

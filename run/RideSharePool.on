@@ -1,0 +1,259 @@
+// RideSharePool.on — Ride-share carpool matching & dispatch simulator (~300 lines)
+// Exercises: plain enum, data-carrying ADT enum, records, extension methods,
+// class/inheritance with a `conforms` interface, nullable types (Driver?),
+// collection pipelines (filter/sortedBy/groupBy/partition/fold/map), select/
+// pattern-matching, closures, string interpolation, try/catch, recursion,
+// foreach (range + map k,v destructuring), and while loops.
+
+// ── Extension methods ───────────────────────────────────────────────────────
+
+extension Double {
+  def round2(): Double = ((this * 100.0 + 0.5) as Int) / 100.0
+}
+
+extension Int {
+  def asMinutesLabel(): String = this + " min"
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum VehicleType { SEDAN, SUV, XL }
+
+// Data-carrying ADT: ride lifecycle event log entry
+enum RideEvent {
+  case RequestCreated(riderName: String, distanceKm: Double)
+  case DriverMatched(driverName: String, etaMinutes: Int)
+  case RideCompleted(fareCents: Int)
+  case RideCancelled(reason: String)
+public:
+  def describe(): String = select this {
+    case e is RequestCreated: "Request from " + e.riderName() + ": " + e.distanceKm().round2() + " km"
+    case e is DriverMatched:  "Matched with " + e.driverName() + " (ETA " + e.etaMinutes().asMinutesLabel() + ")"
+    case e is RideCompleted:  "Completed. Fare: " + formatCents(e.fareCents())
+    case e is RideCancelled:  "Cancelled: " + e.reason()
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Location(lat: Double, lng: Double)
+
+record RideRequest(id: Int, riderName: String, pickup: Location, dropoff: Location, seats: Int)
+
+record Trip(request: RideRequest, driverName: String, vType: VehicleType, distanceKm: Double, fareCents: Int)
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+def vehicleLabel(v: VehicleType): String = select v {
+  case VehicleType::SEDAN: "Sedan"
+  case VehicleType::SUV:   "SUV"
+  case VehicleType::XL:    "XL Van"
+  else: "Unknown"
+}
+
+def vehicleMultiplier(v: VehicleType): Double = select v {
+  case VehicleType::SEDAN: 1.0
+  case VehicleType::SUV:   1.3
+  case VehicleType::XL:    1.6
+  else: 1.0
+}
+
+def formatCents(cents: Int): String {
+  val dollars = cents / 100
+  val remainder = cents % 100
+  if remainder < 10 {
+    return "$" + dollars + ".0" + remainder
+  } else {
+    return "$" + dollars + "." + remainder
+  }
+}
+
+// Flat-earth approximation: good enough for a same-city simulation.
+def distanceKm(a: Location, b: Location): Double {
+  val dLat = a.lat() - b.lat()
+  val dLng = a.lng() - b.lng()
+  val degrees = Math::sqrt(dLat * dLat + dLng * dLng)
+  return degrees * 111.0
+}
+
+def estimateFareCents(dist: Double, vType: VehicleType, surge: Double): Int {
+  val baseCents = 350
+  val perKmCents = 120.0
+  val raw = (baseCents as Double) + dist * perKmCents
+  val withVehicle = raw * vehicleMultiplier(vType)
+  val withSurge = withVehicle * surge
+  return (withSurge + 0.5) as Int
+}
+
+// Recursive: total distance across a multi-stop pooled route.
+def totalRouteDistance(stops: List[Location], idx: Int): Double {
+  if idx + 1 >= stops.size { return 0.0 }
+  val here = (stops[idx] as Location)
+  val next = (stops[idx + 1] as Location)
+  return distanceKm(here, next) + totalRouteDistance(stops, idx + 1)
+}
+
+// ── Classes ──────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class Vehicle(val plate: String, val vType: VehicleType, val capacity: Int) {
+public:
+  def label(): String = vehicleLabel(this.vType) + " " + this.plate
+}
+
+class Driver(val id: Int, val name: String, val vehicle: Vehicle, var location: Location) conforms Reportable {
+public:
+  var available: Boolean = true
+  val trips: List[Trip] = []
+
+  def report(): String {
+    val totalFare = this.trips.fold(0) { acc, t -> (acc as Int) + (t as Trip).fareCents() }
+    return "Driver " + this.name + " (" + this.vehicle.label() + "): " +
+           this.trips.size + " trips, " + formatCents(totalFare)
+  }
+}
+
+// PremiumDriver: extends Driver, adds a sign-on bonus tracked on top of fares.
+class PremiumDriver(id: Int, name: String, vehicle: Vehicle, location: Location)
+    extends Driver(id, name, vehicle, location) {
+public:
+  var bonusCents: Int = 500
+
+  override def report(): String = super.report() + " | Bonus: " + formatCents(this.bonusCents)
+}
+
+// ── Dispatch ─────────────────────────────────────────────────────────────────
+
+def findNearestAvailableDriver(pickup: Location, seatsNeeded: Int, drivers: List[Driver]): Driver? {
+  val candidates = drivers.filter { d -> (d as Driver).available && (d as Driver).vehicle.capacity >= seatsNeeded }
+  if candidates.size == 0 {
+    return null
+  }
+  val sorted = candidates.sortedBy { d -> distanceKm((d as Driver).location, pickup) }
+  return (sorted[0] as Driver)
+}
+
+def dispatchRide(req: RideRequest, drivers: List[Driver], surge: Double, log: List[RideEvent]): Trip? {
+  try {
+    if req.seats() <= 0 || req.seats() > 6 {
+      throw new Exception("invalid seat count: " + req.seats())
+    }
+    val dist = distanceKm(req.pickup(), req.dropoff())
+    log.add(new RequestCreated(req.riderName(), dist))
+
+    val found = findNearestAvailableDriver(req.pickup(), req.seats(), drivers)
+    if found == null {
+      log.add(new RideCancelled("no available driver"))
+      return null
+    }
+    val driver = (found as Driver)
+
+    val etaMinutes = ((distanceKm(driver.location, req.pickup()) / 40.0) * 60.0 + 0.5) as Int
+    log.add(new DriverMatched(driver.name, etaMinutes))
+
+    val fare = estimateFareCents(dist, driver.vehicle.vType, surge)
+    driver.available = false
+    driver.location = req.dropoff()
+
+    val trip = new Trip(req, driver.name, driver.vehicle.vType, dist, fare)
+    driver.trips.add(trip)
+    log.add(new RideCompleted(fare))
+    return trip
+  } catch e: Exception {
+    log.add(new RideCancelled(e.message()))
+    return null
+  }
+}
+
+// ── Main simulation ────────────────────────────────────────────────────────
+
+val fleet: List[Driver] = [
+  new Driver(1, "Aiko",  new Vehicle("QX-101", VehicleType::SEDAN, 4), new Location(35.681, 139.767)),
+  new Driver(2, "Bruno", new Vehicle("QX-202", VehicleType::SUV,   6), new Location(35.700, 139.771)),
+  new PremiumDriver(3, "Chidi", new Vehicle("QX-303", VehicleType::XL, 6), new Location(35.658, 139.701)),
+  new Driver(4, "Dara",  new Vehicle("QX-404", VehicleType::SEDAN, 4), new Location(35.690, 139.750))
+]
+
+val requests: List[RideRequest] = [
+  new RideRequest(1, "Emi",   new Location(35.681, 139.767), new Location(35.658, 139.701), 1),
+  new RideRequest(2, "Farid", new Location(35.700, 139.771), new Location(35.720, 139.790), 3),
+  new RideRequest(3, "Grace", new Location(35.660, 139.700), new Location(35.630, 139.680), 2),
+  new RideRequest(4, "Hana",  new Location(35.690, 139.750), new Location(35.500, 139.900), 8),
+  new RideRequest(5, "Ivan",  new Location(35.685, 139.760), new Location(35.640, 139.690), 2),
+  new RideRequest(6, "Jun",   new Location(35.688, 139.755), new Location(35.600, 139.650), 1)
+]
+
+val log: List[RideEvent] = []
+val surge: Double = 1.2
+var completedTrips: List[Trip] = []
+
+IO::println("=== RideSharePool: dispatch simulation ===")
+foreach req: RideRequest in requests {
+  IO::println("── Request #{req.id()} from #{req.riderName()} (#{req.seats()} seat(s)) ──")
+  val before = log.size
+  val trip = dispatchRide(req, fleet, surge, log)
+  if trip != null {
+    completedTrips.add((trip as Trip))
+  }
+  foreach i: Int in before..<log.size {
+    IO::println("  " + (log[i] as RideEvent).describe())
+  }
+}
+
+IO::println("")
+IO::println("── Driver reports ──")
+foreach r: String in fleet.map { d -> (d as Driver).report() } {
+  IO::println(r)
+}
+
+IO::println("")
+IO::println("── Fleet summary ──")
+val totalRevenue = completedTrips.fold(0) { acc, t -> (acc as Int) + (t as Trip).fareCents() }
+IO::println("Completed trips: " + completedTrips.size + " / " + requests.size)
+IO::println("Total revenue:   " + formatCents(totalRevenue))
+
+val byVehicle = completedTrips.groupBy { t -> vehicleLabel((t as Trip).vType()) }
+IO::println("\n── Trips by vehicle type ──")
+foreach (vType, trips) in byVehicle {
+  val names = (trips as List).map { t -> (t as Trip).request().riderName() }
+  IO::println("  " + vType + ": " + names.toString())
+}
+
+val parts = completedTrips.partition { t -> (t as Trip).fareCents() > 1000 }
+val premiumFares = parts[0] as List[Object]
+val standardFares = parts[1] as List[Object]
+IO::println("\nFares over $10.00: " + premiumFares.size + "   $10.00 or under: " + standardFares.size)
+
+val longest = completedTrips.sortedBy { t -> -(t as Trip).distanceKm() }
+if longest.size > 0 {
+  val top = (longest[0] as Trip)
+  IO::println("Longest trip: " + top.request().riderName() + " (" + top.distanceKm().round2() + " km)")
+}
+
+IO::println("\n── Full event log ──")
+foreach ev: RideEvent in log {
+  IO::println("  " + ev.describe())
+}
+
+// Recursive multi-stop pooled route (Chidi's XL van picking up a group along one route)
+IO::println("\n── Pooled route (multi-stop recursion) ──")
+val pooledStops: List[Location] = [
+  new Location(35.658, 139.701),
+  new Location(35.665, 139.710),
+  new Location(35.672, 139.730),
+  new Location(35.690, 139.750)
+]
+val routeTotal = totalRouteDistance(pooledStops, 0)
+IO::println("Pooled route distance: " + routeTotal.round2() + " km across " + pooledStops.size + " stops")
+
+// While loop: surge pricing decays back to 1.0 after the peak window passes.
+IO::println("\n── Surge decay ──")
+var currentSurge: Double = 1.5
+while currentSurge > 1.0 {
+  IO::println("  surge x" + currentSurge.round2())
+  currentSurge = currentSurge - 0.1
+}
+IO::println("  surge x" + currentSurge.round2() + " (normal)")

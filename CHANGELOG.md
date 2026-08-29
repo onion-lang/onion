@@ -9,6 +9,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/EpidemiologySim.on`, a 403-line SEIR epidemic compartment-model
+  simulator.** Covers 8 intervention scenarios across 2 pathogens (seasonal
+  flu, COVID-like, novel), exercising a data-carrying ADT `enum
+  InterventionType`, records with body methods, `extension Double`/`extension
+  Int`, collection pipelines (`map`, `filter`, `any`, `count`, `find`),
+  `foreach` over ranges and `Map` (k, v) destructuring, nullable lookups,
+  closures, string interpolation, and `while` loops.
+
+### Fixed
+
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` figures
+  synced** after the `EpidemiologySim.on` corpus addition (245 samples, 185
+  large programs, 4388 recorded tests).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` sample and
+  large-program counts re-synced** to 246 / 186 (`TimeSeries.on` was added to
+  `run/` without a matching doc update, so `QualityBarSpec` was red on
+  `develop`).
+
+## [0.25.0] - 2026-08-29
+
+### Added
+
+- **`run/PolyCalc.on`, a 379-line polynomial arithmetic system.** Exercises
+  an ADT enum (`CalcResult` with `Value`, `RootFound`, `IntegralValue`,
+  `NoRoot` cases, including a zero-field singleton), extension methods on
+  `Double`/`Int`/`String`, a mutable `Poly` class with static factories,
+  Horner-method evaluation, polynomial add/subtract/multiply/derivative/
+  integral/composition, Newton's-method root finding (nullable `Double?`
+  return), collection pipelines, and a Chebyshev-recurrence cross-check
+  against `java.lang.Math::cos`.
+
+- **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain
+  enums (`Coin`, `Category`) with value-pattern matching, a data-carrying
+  ADT `enum MachineEvent` (`CoinAccepted`, `ItemDispensed`, `Refunded`,
+  `ErrorEvent`) with exhaustive type-pattern dispatch, records (`Product`,
+  `Sale`, `DailySummary`), a class hierarchy with primary-constructor
+  inheritance (`PremiumMachine extends VendingMachine`, `override`/`super`),
+  an interface (`Reportable`), and collection pipelines (`groupBy`,
+  `filter`, `map`, `fold`, `sortedBy`, `partition`, `find`).
+
+- **`run/TrainDispatch.on`, a 389-line railway dispatch simulation.**
+  Records (`Station`, `Route`, `Booking`), a data-carrying ADT
+  `enum TrainStatus` (`OnTime`, `Delayed`, `Cancelled`), a plain
+  `enum TicketClass`, an interface/class pair (`Reportable`, `Train`,
+  `Dispatcher`) with public fields, extension methods on `String`/`Int`,
+  ADT `select`/pattern matching, collection pipelines (`map`, `filter`,
+  `fold`, `groupBy`, `sortedBy`, `distinct`, `partition`, `zip`), nullable
+  `find`, closures, string interpolation, `try`/`catch`, recursion, and
+  `foreach` over ranges, an object list, and map entries.
+
+- **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
+  An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
+  substitution and beta reduction to normal form, with Church numeral
+  encodings exercising `succ`, `+`, and `*` end-to-end. Uses nullable
+  types, `select`/`case` pattern matching (including an `else:`
+  catch-all), extension methods on `String`, and `filter`/`fold`/`find`
+  pipelines over `List[String]`.
+
+- **Diagnostic hint for Swift/Rust-style `if let`/`while let` optional
+  binding.** `if let x = opt { ... }`, `while let x = opt { ... }`, and the
+  Rust `Some(x)` pattern-binding form (`if let Some(x) = opt { ... }`) now
+  get a bilingual parser hint pointing at the Onion equivalent (bind with
+  `var`, then null-check: `var x = opt; if x != null { ... }`), instead of
+  falling through to the generic "a block `{ ... }` is expected here"
+  message.
+
+### Fixed
+
+- **The `for (vars in coll)` destructuring-mistake hint leaked a stray `)` into
+  its suggested fix.** Writing the whole `for (key, value in entries) { ... }`
+  clause wrapped in one outer paren pair (mimicking the also-supported
+  `for (key, value) in entries { ... }` mistake) produced a hint reading
+  `foreach (key, value) in entries) { ... }` -- the wrapper's own closing
+  paren was captured as part of the collection expression, because the
+  classifier's regex only accounted for an optional close paren right after
+  the variable list, not one belonging to an outer wrap. A dedicated pattern
+  now recognizes the whole-clause-wrapped form before falling back to the
+  general one, so the suggested fix has balanced parens again; collection
+  expressions that are themselves calls (`getEntries()`) are unaffected.
+
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
+
+## [0.24.0] - 2026-08-28
+
+### Added
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A plain
+  `enum Category` (10 spending categories), an ADT `enum TransactionType`
+  (Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), and
+  `Account`/`BudgetManager`/`FinanceEngine`/`ReportPrinter` classes with
+  `public:`/`private:` sections. Two months of checking/savings
+  transactions drive per-category budget tracking and over-budget
+  detection, monthly income/expense/net-savings/savings-rate reports, a
+  top-3 expense ranking (insertion sort), and a savings-goal projection,
+  via `filter`/`fold`/`map` pipelines and `select`/`case` matching on the
+  ADT enum.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
+
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
   Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
   graph model, residual-graph min-cut derivation via reachability from the

@@ -1,0 +1,416 @@
+// PropCheck.on — mini property-based testing framework
+//
+// Exercises: ADT enums with methods, records, generic-like closures, sealed
+// pattern matching, collection pipelines (map/filter/fold/sortedBy/partition),
+// nullable, string interpolation, closures, shrinking, conditional properties.
+
+import {
+  java.util.Random
+  java.lang.Math
+  java.lang.Integer as JInteger
+  java.lang.Long    as JLong
+}
+
+// ── PRNG ──────────────────────────────────────────────────────────────────────
+
+class Rng {
+  val jRng: Random
+public:
+  def this(seed: Long) { jRng = new Random(seed) }
+  def nextInt(bound: Int): Int = Math::abs(jRng.nextInt()) % bound
+  def nextLong(): Long          = jRng.nextLong()
+  def nextBool(): Boolean       = jRng.nextBoolean()
+  def nextDouble(): Double      = jRng.nextDouble()
+  def between(lo: Int, hi: Int): Int = lo + nextInt(hi - lo + 1)
+}
+
+// ── Test-outcome ADT ──────────────────────────────────────────────────────────
+
+enum Outcome {
+  case Pass(count: Int)
+  case Fail(count: Int, example: String, shrunk: String)
+  case GaveUp(count: Int, tried: Int)
+public:
+  def ok(): Boolean = select this {
+    case p is Pass:   true
+    case f is Fail:   false
+    case g is GaveUp: false
+  }
+
+  def label(): String = select this {
+    case p is Pass:   "PASS"
+    case f is Fail:   "FAIL"
+    case g is GaveUp: "GAVE_UP"
+  }
+
+  def summary(name: String): String = select this {
+    case p is Pass:
+      "[PASS] #{name} — #{p.count()} tests"
+    case f is Fail:
+      "[FAIL] #{name} — falsified after #{f.count()} tests\n" +
+      "       example : #{f.example()}\n" +
+      "       shrunk  : #{f.shrunk()}"
+    case g is GaveUp:
+      "[GAVE] #{name} — only #{g.count()} / #{g.tried()} satisfied precondition"
+  }
+}
+
+// ── Integer shrinker ──────────────────────────────────────────────────────────
+// Minimises a failing integer counterexample by bisection then decrement.
+
+class IntShrinker {
+public:
+  static def shrink(n: Int, isFailing: Int -> Boolean): Int = {
+    var best = n
+    // bisect toward 0
+    var cur = n
+    var changed = true
+    while changed {
+      changed = false
+      val half = cur / 2
+      if half != cur && isFailing(half) {
+        best = half
+        cur  = half
+        changed = true
+      }
+    }
+    // walk toward 0 one step at a time
+    val step = if best > 0 { -1 } else { 1 }
+    var walking = true
+    while walking {
+      val next = best + step
+      if isFailing(next) && Math::abs(next) < Math::abs(best) {
+        best = next
+      } else {
+        walking = false
+      }
+    }
+    best
+  }
+}
+
+// ── String shrinker ───────────────────────────────────────────────────────────
+
+class StringShrinker {
+public:
+  static def shrink(s: String, isFailing: String -> Boolean): String = {
+    var best = s
+    var go   = best.length() > 0
+    while go {
+      val shorter = best.substring(0, best.length() - 1)
+      if isFailing(shorter) {
+        best = shorter
+        go   = best.length() > 0
+      } else {
+        go = false
+      }
+    }
+    best
+  }
+}
+
+// ── Standard generators ───────────────────────────────────────────────────────
+
+val ALPHA = ["a","b","c","d","e","f","g","h","i","j","k",
+             "l","m","n","o","p","q","r","s","t","u","v",
+             "w","x","y","z"]
+
+class Gen {
+public:
+  // integers in [lo, hi]
+  static def ints(rng: Rng, lo: Int, hi: Int): () -> Int =
+    () -> rng.between(lo, hi)
+
+  // small integers in [-100, 100]
+  static def small(rng: Rng): () -> Int = Gen::ints(rng, -100, 100)
+
+  // positive integers in [1, 1000]
+  static def positive(rng: Rng): () -> Int = Gen::ints(rng, 1, 1000)
+
+  // random lowercase strings of length 0..maxLen
+  static def alpha(rng: Rng, maxLen: Int): () -> String = () -> {
+    val len = rng.nextInt(maxLen + 1)
+    var s   = ""
+    for var i = 0; i < len; i++ {
+      s = s + ALPHA[rng.nextInt(26)]
+    }
+    s
+  }
+
+  // palindromes (reverse(half) ++ half, or half ++ reverse(half))
+  static def palindrome(rng: Rng, maxHalf: Int): () -> String = () -> {
+    val half = rng.nextInt(maxHalf + 1)
+    var h = ""
+    for var i = 0; i < half; i++ {
+      h = h + ALPHA[rng.nextInt(26)]
+    }
+    var rev = ""
+    var j = h.length() - 1
+    while j >= 0 {
+      rev = rev + h.substring(j, j + 1)
+      j--
+    }
+    h + rev
+  }
+
+  // sorted pairs (a, b) with a <= b
+  static def sortedPair(rng: Rng, lo: Int, hi: Int): () -> String = () -> {
+    val a = rng.between(lo, hi)
+    val b = rng.between(lo, hi)
+    val mn = if a <= b { a } else { b }
+    val mx = if a <= b { b } else { a }
+    "#{mn},#{mx}"
+  }
+}
+
+// ── Property runner: integers ─────────────────────────────────────────────────
+
+def checkInt(runs: Int, gen: () -> Int, prop: Int -> Boolean): Outcome = {
+  var passed = 0
+  while passed < runs {
+    val v = gen()
+    if !prop(v) {
+      val shrunk = IntShrinker::shrink(v, (x) -> !prop(x))
+      return new Fail(passed + 1, JInteger::toString(v), JInteger::toString(shrunk))
+    }
+    passed++
+  }
+  new Pass(passed)
+}
+
+// ── Property runner: strings ──────────────────────────────────────────────────
+
+def checkStr(runs: Int, gen: () -> String, prop: String -> Boolean): Outcome = {
+  var passed = 0
+  while passed < runs {
+    val v = gen()
+    if !prop(v) {
+      val shrunk = StringShrinker::shrink(v, (s) -> !prop(s))
+      return new Fail(passed + 1, "\"#{v}\"", "\"#{shrunk}\"")
+    }
+    passed++
+  }
+  new Pass(passed)
+}
+
+// ── Conditional property runner: integers ─────────────────────────────────────
+
+def checkIntWhen(runs: Int, gen: () -> Int,
+                 pre: Int -> Boolean, prop: Int -> Boolean): Outcome = {
+  var passed = 0
+  var tried  = 0
+  val maxTried = runs * 10
+  while passed < runs && tried < maxTried {
+    val v = gen()
+    tried++
+    if pre(v) {
+      if !prop(v) {
+        val shrunk = IntShrinker::shrink(v, (x) -> !pre(x) || !prop(x))
+        return new Fail(passed + 1, JInteger::toString(v), JInteger::toString(shrunk))
+      }
+      passed++
+    }
+  }
+  if passed < runs {
+    new GaveUp(passed, tried)
+  } else {
+    new Pass(passed)
+  }
+}
+
+// ── Test-suite accumulator ────────────────────────────────────────────────────
+
+class Suite {
+  val rows: List[String]
+  var nPass: Int
+  var nFail: Int
+public:
+  def this {
+    rows  = []
+    nPass = 0
+    nFail = 0
+  }
+  def add(outcome: Outcome, name: String): void {
+    rows.add(outcome.summary(name))
+    if outcome.ok() { nPass++ } else { nFail++ }
+  }
+  def report(): void {
+    IO::println("═══════════════════════════════════════════════════════")
+    IO::println("  PropCheck — results")
+    IO::println("═══════════════════════════════════════════════════════")
+    foreach r: String in rows { IO::println(r) }
+    IO::println("───────────────────────────────────────────────────────")
+    val total = nPass + nFail
+    IO::println("  #{nPass} / #{total} properties passed")
+    if nFail > 0 {
+      IO::println("  *** #{nFail} FAILURES ***")
+    } else {
+      IO::println("  All properties hold.")
+    }
+    IO::println("═══════════════════════════════════════════════════════")
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Properties
+// ─────────────────────────────────────────────────────────────────────────────
+
+val rng   = new Rng(20240101L)
+val suite = new Suite()
+
+// 1. Addition is commutative: a + b == b + a
+suite.add(
+  checkInt(300, Gen::small(rng), (a) -> {
+    val b = rng.between(-100, 100)
+    a + b == b + a
+  }),
+  "addition is commutative"
+)
+
+// 2. Subtraction anticommutativity: a - b == -(b - a)
+suite.add(
+  checkInt(300, Gen::small(rng), (a) -> {
+    val b = rng.between(-100, 100)
+    a - b == -(b - a)
+  }),
+  "subtraction anticommutativity a-b == -(b-a)"
+)
+
+// 3. Distributivity: a*(b+c) == a*b + a*c
+suite.add(
+  checkInt(300, Gen::ints(rng, -30, 30), (a) -> {
+    val b = rng.between(-30, 30)
+    val c = rng.between(-30, 30)
+    a * (b + c) == a * b + a * c
+  }),
+  "distributivity a*(b+c) = a*b+a*c"
+)
+
+// 4. abs is non-negative
+suite.add(
+  checkInt(300, Gen::small(rng), (n) -> Math::abs(n) >= 0),
+  "abs(n) >= 0 for all n"
+)
+
+// 5. n*n >= 0 (integer overflow wraps but let's test small range)
+suite.add(
+  checkInt(300, Gen::ints(rng, -1000, 1000), (n) -> n * n >= 0),
+  "n*n >= 0 for small n"
+)
+
+// 6. max(a,b) >= a and max(a,b) >= b
+suite.add(
+  checkInt(300, Gen::small(rng), (a) -> {
+    val b = rng.between(-100, 100)
+    val m = if a >= b { a } else { b }
+    m >= a && m >= b
+  }),
+  "max(a,b) dominates both operands"
+)
+
+// 7. Conditional: for even n, (n/2)*2 == n
+suite.add(
+  checkIntWhen(
+    300, Gen::small(rng),
+    (n) -> n % 2 == 0,
+    (n) -> (n / 2) * 2 == n
+  ),
+  "even n: (n/2)*2 == n"
+)
+
+// 8. String: reverse(reverse(s)) == s
+suite.add(
+  checkStr(200, Gen::alpha(rng, 20), (s) -> {
+    val sb1 = new java.lang.StringBuilder(s)
+    val r1  = sb1.reverse().toString()
+    val sb2 = new java.lang.StringBuilder(r1)
+    sb2.reverse().toString() == s
+  }),
+  "reverse(reverse(s)) == s"
+)
+
+// 9. String: length(s ++ t) == length(s) + length(t)
+suite.add(
+  checkStr(200, Gen::alpha(rng, 15), (s) -> {
+    val t = "XYZ"
+    (s + t).length() == s.length() + t.length()
+  }),
+  "length(s++t) == length(s)+length(t)"
+)
+
+// 10. Generated palindromes satisfy the palindrome property
+suite.add(
+  checkStr(200, Gen::palindrome(rng, 8), (s) -> {
+    val sb = new java.lang.StringBuilder(s)
+    sb.reverse().toString() == s
+  }),
+  "generated palindromes are palindromes"
+)
+
+// 11. INTENTIONAL FAILURE: claim all ints are positive (should be falsified)
+//     We invert the outcome so the suite still reports it as a PASS,
+//     treating the FAIL as "the falsification worked as expected."
+val intentional = checkInt(300, Gen::small(rng), (n) -> n > 0)
+val invertedOutcome: Outcome = if intentional.ok() {
+  new Fail(0, "none", "BUG: should have falsified")
+} else {
+  select intentional {
+    case f is Fail:
+      new Pass(f.count())
+    case g is GaveUp:
+      new Fail(0, "gave up", "should have falsified")
+    case p is Pass:
+      new Fail(0, "passed", "should have falsified")
+  }
+}
+suite.add(invertedOutcome, "all-ints-positive (expected falsification)")
+
+// 12. Sorted list: isSorted([[a,b] with a<=b]) should hold
+suite.add(
+  checkStr(200, Gen::sortedPair(rng, -50, 50), (pair) -> {
+    val comma = pair.indexOf(",")
+    val a = JInteger::parseInt(pair.substring(0, comma))
+    val b = JInteger::parseInt(pair.substring(comma + 1))
+    a <= b
+  }),
+  "gen.sortedPair always has first <= second"
+)
+
+// ── Print the suite summary ───────────────────────────────────────────────────
+suite.report()
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Collection pipeline demonstration
+// ─────────────────────────────────────────────────────────────────────────────
+
+IO::println("\n── Collection pipelines over random sample ──────────────────")
+val sampleRng = new Rng(9999L)
+val samples: List[Int] = []
+for var i = 0; i < 40; i++ {
+  samples.add(sampleRng.between(-50, 50))
+}
+
+val positives = samples.filter { x -> (x as Int) > 0 }
+val negatives = samples.filter { x -> (x as Int) < 0 }
+val squared   = samples.map    { x -> (x as Int) * (x as Int) }
+val total  = samples.fold(0)   { acc, x -> (acc as Int) + (x as Int) }
+val posSum = positives.fold(0) { acc, x -> (acc as Int) + (x as Int) }
+val negSum = negatives.fold(0) { acc, x -> (acc as Int) + (x as Int) }
+
+IO::println("Samples (#{samples.size}): #{samples.sortedBy { x -> x as Int }}")
+IO::println("Positives (#{positives.size}), sum = #{posSum}")
+IO::println("Negatives (#{negatives.size}), sum = #{negSum}")
+IO::println("Grand sum : #{total}")
+IO::println("5 largest squares: #{squared.sortedBy { x -> 0 - (x as Int) }.take(5)}")
+
+val parts = samples.partition { x -> (x as Int) % 2 == 0 }
+val evens = parts[0] as List[Object]
+val odds  = parts[1] as List[Object]
+IO::println("Evens (#{evens.size}) / Odds (#{odds.size})")
+
+val bySign = samples.groupBy { x -> if (x as Int) >= 0 { "pos" } else { "neg" } }
+val posGroup: List[Int]? = bySign["pos"]
+val negGroup: List[Int]? = bySign["neg"]
+IO::println("GroupBy sign: pos=#{if posGroup != null { posGroup.size } else { 0 }}, neg=#{if negGroup != null { negGroup.size } else { 0 }}")
+
+IO::println("\nDone.")

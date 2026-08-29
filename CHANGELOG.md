@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/RideSharePool.on`, a 259-line ride-share carpool matching and
+  dispatch simulator.** Covers a plain `enum VehicleType`, a data-carrying
+  ADT `enum RideEvent` (`RequestCreated`, `DriverMatched`, `RideCompleted`,
+  `RideCancelled`) with exhaustive `select`, `extension Double`/`extension
+  Int`, records (`Location`, `RideRequest`, `Trip`), a class hierarchy
+  (`PremiumDriver extends Driver`, `override`/`super`) conforming to a
+  `Reportable` interface, nullable-return driver matching (`Driver?`),
+  collection pipelines (`filter`, `sortedBy`, `groupBy`, `partition`,
+  `fold`, `map`), `try`/`catch` for invalid ride requests, recursive
+  multi-stop route distance, `foreach` over ranges and `Map` (k, v)
+  destructuring, and a `while` loop modeling surge-price decay.
+
 - **`run/EpidemiologySim.on`, a 403-line SEIR epidemic compartment-model
   simulator.** Covers 8 intervention scenarios across 2 pathogens (seasonal
   flu, COVID-like, novel), exercising a data-carrying ADT `enum

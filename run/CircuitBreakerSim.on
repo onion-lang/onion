@@ -1,0 +1,234 @@
+// CircuitBreakerSim.on — micro-service resilience demo
+// Models circuit breakers (Closed/Open/HalfOpen) across three simulated services.
+// Exercises: ADT enums, data-carrying cases, records, classes, generics,
+//   sealed-exhaustive select, closures, string interpolation, while/foreach,
+//   collection pipelines (map/filter/fold/groupBy/sortedBy/partition), try/catch.
+
+// --- Circuit-breaker state machine (sealed ADT) ---
+enum CircuitState {
+  case Closed
+  case Open(since: Int)
+  case HalfOpen
+}
+
+// --- Outcome of a single service call ---
+record CallResult(svc: String, callId: Int, success: Boolean, latencyMs: Int, reason: String)
+
+// --- Service configuration ---
+record ServiceSpec(name: String, failRate: Int, baseLatency: Int)
+
+// --- Per-service circuit breaker ---
+class CircuitBreaker {
+  val spec: ServiceSpec
+  var state: CircuitState
+  var windowFails: Int
+  var windowCalls: Int
+  var halfSucc: Int
+  var cntTotal: Int
+  var cntSuccess: Int
+  var cntFastFail: Int
+
+public:
+  def this(spec: ServiceSpec) {
+    this.spec = spec
+    state = new Closed()
+    windowFails = 0
+    windowCalls = 0
+    halfSucc = 0
+    cntTotal = 0
+    cntSuccess = 0
+    cntFastFail = 0
+  }
+
+  def call(callId: Int, clock: Int): CallResult {
+    cntTotal++
+    select state {
+      case o is Open:
+        if clock - o.since() >= 5 {
+          state = new HalfOpen()
+          halfSucc = 0
+          return probe(callId, clock)
+        } else {
+          cntFastFail++
+          return new CallResult(spec.name(), callId, false, 0, "fast-fail")
+        }
+      case h is HalfOpen:
+        return probe(callId, clock)
+      case c is Closed:
+        return execute(callId, clock)
+    }
+  }
+
+  def probe(callId: Int, clock: Int): CallResult {
+    val res = execute(callId, clock)
+    if res.success() {
+      halfSucc++
+      if halfSucc >= 2 {
+        state = new Closed()
+        windowFails = 0
+        windowCalls = 0
+      }
+    } else {
+      state = new Open(clock)
+      halfSucc = 0
+    }
+    return res
+  }
+
+  def execute(callId: Int, clock: Int): CallResult {
+    val seed = (callId * 31 + clock * 17 + spec.name().length() * 7) % 100
+    val latency = spec.baseLatency() + seed % 40
+    val failed = seed < spec.failRate()
+    windowCalls++
+    if windowCalls > 8 { windowCalls = 1; windowFails = 0 }
+
+    if failed {
+      windowFails++
+      if windowFails >= 3 {
+        select state {
+          case c is Closed: state = new Open(clock); windowFails = 0
+          case h is HalfOpen: state = new Open(clock)
+          else:
+        }
+      }
+      return new CallResult(spec.name(), callId, false, latency, "error")
+    } else {
+      cntSuccess++
+      return new CallResult(spec.name(), callId, true, latency, "ok")
+    }
+  }
+
+  def stateLabel(): String = select state {
+    case c is Closed: "CLOSED"
+    case o is Open: "OPEN(t=#{o.since()})"
+    case h is HalfOpen: "HALF-OPEN"
+  }
+
+  def name(): String = spec.name()
+  def total(): Int = cntTotal
+  def successes(): Int = cntSuccess
+  def fastFails(): Int = cntFastFail
+
+  def successRate(): Int = if cntTotal == 0 { 0 } else { cntSuccess * 100 / cntTotal }
+}
+
+// --- Simulation setup ---
+
+val specs = [
+  new ServiceSpec("alpha",  8, 20),   // reliable: rarely fails
+  new ServiceSpec("beta",  70, 50),   // flaky: high fail rate, will trip
+  new ServiceSpec("gamma", 40, 35)    // moderate: occasionally trips
+]
+
+val breakers = specs.map { s: ServiceSpec -> new CircuitBreaker(s) }
+
+// Collect all CallResults across 48 ticks, 3 services per tick
+var allResults: List[CallResult] = []
+foreach tick: Int in 1..48 {
+  foreach cb: CircuitBreaker in breakers {
+    val r = cb.call(tick * 10 + cb.name().length(), tick)
+    allResults.add(r)
+  }
+}
+
+// --- Per-service summary ---
+IO::println("=== Circuit Breaker Simulation (48 ticks × 3 services) ===")
+foreach cb: CircuitBreaker in breakers {
+  val n    = cb.name()
+  val rate = cb.successRate()
+  val ff   = cb.fastFails()
+  val st   = cb.stateLabel()
+  IO::println("  #{n}: success=#{rate}%  fast-fail=#{ff}  state=#{st}")
+}
+
+// --- Aggregate stats via collection pipelines ---
+val successes = allResults.filter { r: CallResult -> r.success() }
+val failures  = allResults.filter { r: CallResult -> !r.success() }
+val totalOk   = successes.size
+val totalFail = failures.size
+
+// Average latency (only real calls, not fast-fails)
+val realCalls = allResults.filter { r: CallResult -> r.reason() != "fast-fail" }
+val sumLat = realCalls.fold(0) { acc, r -> (acc as Int) + (r as CallResult).latencyMs() }
+val avgLat = if realCalls.size > 0 { sumLat / realCalls.size } else { 0 }
+
+IO::println("")
+IO::println("--- aggregate across all services ---")
+IO::println("  total calls : #{allResults.size}")
+IO::println("  succeeded   : #{totalOk}")
+IO::println("  failed      : #{totalFail}")
+IO::println("  avg latency : #{avgLat} ms  (real calls only)")
+
+// --- Group results by service and show min/max latency ---
+val byService = allResults.groupBy { r: CallResult -> r.svc() }
+IO::println("")
+IO::println("--- per-service latency (real calls) ---")
+foreach (svc, calls) in byService {
+  val svcReal = (calls as List).filter { r -> (r as CallResult).reason() != "fast-fail" }
+  if svcReal.size > 0 {
+    val minLat = svcReal.fold(999) { m, r -> {
+      val lat = (r as CallResult).latencyMs()
+      if lat < (m as Int) { lat } else { (m as Int) }
+    }}
+    val maxLat = svcReal.fold(0) { m, r -> {
+      val lat = (r as CallResult).latencyMs()
+      if lat > (m as Int) { lat } else { (m as Int) }
+    }}
+    IO::println("  #{svc}: min=#{minLat}ms  max=#{maxLat}ms  n=#{svcReal.size}")
+  }
+}
+
+// --- Failure breakdown by reason (using filter twice instead of partition) ---
+val badCalls  = allResults.filter { r: CallResult -> !r.success() }
+val byReason  = badCalls.groupBy  { r: CallResult -> r.reason() }
+IO::println("")
+IO::println("--- failure breakdown ---")
+foreach (reason, calls) in byReason {
+  IO::println("  #{reason}: #{(calls as List).size}")
+}
+
+// --- Recursion: Fibonacci as depth test ---
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+IO::println("")
+IO::println("fib(10) = #{fib(10)}")
+
+// --- try/catch ---
+def safeDiv(a: Int, b: Int): String {
+  try {
+    return "" + (a / b)
+  } catch e: Exception {
+    return "div-by-zero"
+  }
+}
+IO::println("10/2=#{safeDiv(10,2)}  10/0=#{safeDiv(10,0)}")
+
+// --- Range + while ---
+var rsum = 0
+foreach k: Int in 1..10 { rsum = rsum + k }
+IO::println("sum 1..10 = #{rsum}")
+
+var wsum = 0; var wi = 0
+while wi < 5 { wsum = wsum + wi * wi; wi++ }
+IO::println("sum i^2 for i in 0..4 = #{wsum}")
+
+// --- sortedBy: rank breakers by success rate descending ---
+val ranked = breakers.sortedBy { cb: CircuitBreaker -> 0 - cb.successRate() }
+val rankStr = ranked.map { cb: CircuitBreaker -> cb.name() + "(" + cb.successRate() + "%)" }
+IO::println("ranked by success (best first): #{rankStr}")
+
+// --- zip: pair service names with their final states ---
+val names  = specs.map { s: ServiceSpec -> s.name() }
+val states = breakers.map { cb: CircuitBreaker -> cb.stateLabel() }
+val pairs  = names.zip(states)
+IO::println("--- name/state pairs ---")
+foreach p: Object in pairs { IO::println("  #{p}") }
+
+// --- distinct: unique reasons observed ---
+val reasons = allResults.map { r: CallResult -> r.reason() }
+val uniq    = reasons.distinct()
+IO::println("distinct reasons: #{uniq}")
+
+// --- reduce: total fast-fail count across all breakers ---
+val totalFF = breakers.map { cb: CircuitBreaker -> cb.fastFails() }
+  .reduce { a, b -> (a as Int) + (b as Int) }
+IO::println("total fast-fails across all breakers: #{totalFF}")

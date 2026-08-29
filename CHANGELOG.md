@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain
+  enums (`Coin`, `Category`) with value-pattern matching, a data-carrying
+  ADT `enum MachineEvent` (`CoinAccepted`, `ItemDispensed`, `Refunded`,
+  `ErrorEvent`) with exhaustive type-pattern dispatch, records (`Product`,
+  `Sale`, `DailySummary`), a class hierarchy with primary-constructor
+  inheritance (`PremiumMachine extends VendingMachine`, `override`/`super`),
+  an interface (`Reportable`), and collection pipelines (`groupBy`,
+  `filter`, `map`, `fold`, `sortedBy`, `partition`, `find`).
+
+- **`run/TrainDispatch.on`, a 389-line railway dispatch simulation.**
+  Records (`Station`, `Route`, `Booking`), a data-carrying ADT
+  `enum TrainStatus` (`OnTime`, `Delayed`, `Cancelled`), a plain
+  `enum TicketClass`, an interface/class pair (`Reportable`, `Train`,
+  `Dispatcher`) with public fields, extension methods on `String`/`Int`,
+  ADT `select`/pattern matching, collection pipelines (`map`, `filter`,
+  `fold`, `groupBy`, `sortedBy`, `distinct`, `partition`, `zip`), nullable
+  `find`, closures, string interpolation, `try`/`catch`, recursion, and
+  `foreach` over ranges, an object list, and map entries.
+
+- **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
+  An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
+  substitution and beta reduction to normal form, with Church numeral
+  encodings exercising `succ`, `+`, and `*` end-to-end. Uses nullable
+  types, `select`/`case` pattern matching (including an `else:`
+  catch-all), extension methods on `String`, and `filter`/`fold`/`find`
+  pipelines over `List[String]`.
+
 - **Diagnostic hint for Swift/Rust-style `if let`/`while let` optional
   binding.** `if let x = opt { ... }`, `while let x = opt { ... }`, and the
   Rust `Some(x)` pattern-binding form (`if let Some(x) = opt { ... }`) now
@@ -16,6 +43,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `var`, then null-check: `var x = opt; if x != null { ... }`), instead of
   falling through to the generic "a block `{ ... }` is expected here"
   message.
+
+### Fixed
+
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
 
 ## [0.24.0] - 2026-08-28
 

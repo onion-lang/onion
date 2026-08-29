@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/EpidemiologySim.on`, a 403-line SEIR epidemic compartment-model
+  simulator.** Covers 8 intervention scenarios across 2 pathogens (seasonal
+  flu, COVID-like, novel), exercising a data-carrying ADT `enum
+  InterventionType`, records with body methods, `extension Double`/`extension
+  Int`, collection pipelines (`map`, `filter`, `any`, `count`, `find`),
+  `foreach` over ranges and `Map` (k, v) destructuring, nullable lookups,
+  closures, string interpolation, and `while` loops.
+
+### Fixed
+
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` figures
+  synced** after the `EpidemiologySim.on` corpus addition (245 samples, 185
+  large programs, 4388 recorded tests).
+
 ## [0.25.0] - 2026-08-29
 
 ### Added

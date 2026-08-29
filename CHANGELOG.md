@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-08-29
+
 ### Added
 
 - **`run/RideSharePool.on`, a 259-line ride-share carpool matching and

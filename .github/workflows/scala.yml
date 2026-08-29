@@ -10,6 +10,8 @@ jobs:
     steps:
     - name: Install sbt
       uses: sbt/setup-sbt@v1
+      with:
+        disk-cache: false
     - name: Checkout
       uses: actions/checkout@v4
     - name: Setup JDK

@@ -95,4 +95,45 @@ class ClassUsedAsValueSpec extends AbstractShellSpec {
         |""".stripMargin
     ).contains("E0002"))
   }
+
+  it("also fires for a bare class name used as a select-case pattern") {
+    val codes = errorCodes(
+      """
+        |class Animal {}
+        |class Test {
+        |public:
+        |  static def main(args: String[]): void {
+        |    val a: Animal = new Animal()
+        |    select a {
+        |    case Animal: IO::println("no")
+        |    else: IO::println("yes")
+        |    }
+        |  }
+        |}
+        |""".stripMargin
+    )
+    assert(codes.contains("E0091"), s"expected E0091 for a bare class name as a case pattern, got: $codes")
+  }
+
+  it("names the `is` pattern fix too, for the select-case scenario") {
+    val msgs = new OnionCompiler(new CompilerConfig(List("."), null, "UTF-8", "", 10))
+      .compile(Seq(new StreamInputSource(() => new StringReader(
+        """
+          |class Animal {}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): void {
+          |    val a: Animal = new Animal()
+          |    select a {
+          |    case Animal: IO::println("no")
+          |    else: IO::println("yes")
+          |    }
+          |  }
+          |}
+          |""".stripMargin), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+    assert(msgs.contains("is Animal"), s"expected the message to also name the `is Animal` pattern fix, got: $msgs")
+  }
 }

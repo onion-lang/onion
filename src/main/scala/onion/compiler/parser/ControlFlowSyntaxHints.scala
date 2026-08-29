@@ -8,6 +8,7 @@ private[compiler] object ControlFlowSyntaxHints {
   private val DefaultCaseLabel = """^\s*default\s*:""".r
   private val ElifStatement = """\belif\b""".r
   private val ElsifStatement = """\belsif\b""".r
+  private val ElseifStatement = """\belseif\b""".r
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val LeadingUntilStatement = """^\s*until\b""".r
   private val ExceptClause = """\bexcept\b""".r
@@ -25,6 +26,8 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.elif_not_supported")
     } else if (ElsifStatement.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.elsif_not_supported")
+    } else if (ElseifStatement.findFirstMatchIn(sourceLine).isDefined) {
+      hint("error.parsing.hint.elseif_not_supported")
     } else if (LeadingUnlessStatement.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.unless_not_supported")
     } else if (LeadingUntilStatement.findFirstMatchIn(sourceLine).isDefined) {

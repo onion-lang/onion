@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/PolyCalc.on`, a 379-line polynomial arithmetic system.** Exercises
+  an ADT enum (`CalcResult` with `Value`, `RootFound`, `IntegralValue`,
+  `NoRoot` cases, including a zero-field singleton), extension methods on
+  `Double`/`Int`/`String`, a mutable `Poly` class with static factories,
+  Horner-method evaluation, polynomial add/subtract/multiply/derivative/
+  integral/composition, Newton's-method root finding (nullable `Double?`
+  return), collection pipelines, and a Chebyshev-recurrence cross-check
+  against `java.lang.Math::cos`.
+
 - **`run/IntervalCalendar.on`, a 456-line interval-based calendar system.**
   A realistic scheduler exercising ADT enums (`Priority`, `Recurrence`) and a
   plain enum (`Weekday`), records with methods (`TimeSlot`, `Event`,

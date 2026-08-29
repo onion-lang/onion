@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Rust/Go/Swift/C#/TypeScript-style `struct` declaration.**
+  Writing `struct Point { x: Int, y: Int }` — the idiom every C-family/Rust/
+  Go/Swift/TypeScript programmer reaches for first when defining a data
+  type — parsed `struct` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (since the parser saw
+  `struct` directly followed by `Point` with nothing in between), which is
+  actively misleading: the mistake has nothing to do with a missing call.
+  The diagnostic now recognizes the `struct Name` shape and points at
+  Onion's actual equivalent, `record Name(x: Int, y: Int)`.
 - **Parser hint for a Python-style `class Foo:` header no longer says "superclass".**
   A Python-style class header (`class Foo:` or `class Foo(x: Int):`, body indented
   on the next line instead of `{ ... }`) hit the same generic colon-position error

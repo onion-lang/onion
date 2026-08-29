@@ -542,6 +542,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
     }
 
+    it("recognizes a Rust/Go/Swift/C#/TS-style `struct` declaration") {
+      val hint = classify(
+        found = "Point",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "struct Point {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.struct_declaration"
+      hint.arguments shouldBe Seq("Point")
+    }
+
     it("recognizes a Java-style `final` local variable declaration") {
       val hint = classify(
         found = "final",

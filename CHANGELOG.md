@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Diagnostic hint for Swift/Rust-style `if let`/`while let` optional
+  binding.** `if let x = opt { ... }`, `while let x = opt { ... }`, and the
+  Rust `Some(x)` pattern-binding form (`if let Some(x) = opt { ... }`) now
+  get a bilingual parser hint pointing at the Onion equivalent (bind with
+  `var`, then null-check: `var x = opt; if x != null { ... }`), instead of
+  falling through to the generic "a block `{ ... }` is expected here"
+  message.
+
 ## [0.24.0] - 2026-08-28
 
 ### Added

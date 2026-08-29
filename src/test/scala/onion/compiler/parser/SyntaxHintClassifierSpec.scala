@@ -495,6 +495,56 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
         sourceLine = "value)"
       ) shouldBe None
     }
+
+    it("recognizes a Swift-style `if let` optional binding") {
+      val hint = classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "if let x = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("if", "x", "opt")
+    }
+
+    it("recognizes a Rust-style `while let` optional binding") {
+      val hint = classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "while let x = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("while", "x", "opt")
+    }
+
+    it("recognizes a Rust-style `if let Some(x) = ...` pattern binding") {
+      val hint = classify(
+        found = "Some",
+        expected = "\"{\"",
+        sourceLine = "if let Some(x) = opt {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.if_let_binding"
+      hint.arguments shouldBe Seq("if", "x", "opt")
+    }
+
+    it("keeps the if-let-binding advice ahead of the generic block-expected fallback") {
+      classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "if let x = compute(1, 2) {"
+      ).messageKey shouldBe "error.parsing.hint.if_let_binding"
+    }
+
+    it("does not flag an ordinary `if` condition as an if-let binding") {
+      SyntaxHintClassifier.classify(
+        found = "y",
+        expected = "\"{\"",
+        context = "",
+        sourceLine = "if x == y {"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.if_let_binding")
+    }
   }
 
   private def classify(

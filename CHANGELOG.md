@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
+
 ## [0.24.0] - 2026-08-28
 
 ### Added

@@ -77,6 +77,12 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
           break(None)
         }
 
+        // `fieldType` is the enclosing field's type as seen from the outer
+        // scrutinee (already specialized if that field was itself generic),
+        // so it doubles as the scrutinee for recovering this nested record's
+        // own type arguments -- same trick as the top-level record below.
+        val nestedAppliedType = TypeSubst.specializeFromScrutinee(nestedType.asInstanceOf[ClassType], fieldType)
+
         // Build accessor for nested type check by following the access path
         def buildAccessorForCondition(base: Term, path: List[AccessStep]): Term = path match {
           case Nil => base
@@ -100,7 +106,8 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
             break(None)
           }
           val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
-          processNestedFieldPattern(nestedFieldPat, nestedField.`type`, nestedPath, bindingEntries, nestedConditions, nested)
+          val nestedFieldType = TypeSubst.withClassOnly(nestedField.`type`, nestedAppliedType)
+          processNestedFieldPattern(nestedFieldPat, nestedFieldType, nestedPath, bindingEntries, nestedConditions, nested)
         }
 
       case tp @ AST.TypePattern(_, bindingName, typeRef) =>
@@ -143,6 +150,13 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
     val classDef = resolveRecordClass(dp, constructor)
     val recordType = classDef
 
+    // `constructor` names a raw record (`Wrap`, not `Wrap[Int]`), so a
+    // generic record's fields would otherwise stay typed at their bare type
+    // parameters. Recover the actual type arguments from the scrutinee being
+    // destructured (`bind`), same trick as a root `is`-pattern (#311), so
+    // e.g. matching `Wrap(v)` out of a `Wrap[Int]` binds `v: Int`.
+    val appliedRecordType = TypeSubst.specializeFromScrutinee(recordType.asInstanceOf[ClassType], bind.tp)
+
     // Get fields in order (records store fields in insertion order)
     val fields = classDef.fields
     val fieldCount = fields.length
@@ -166,7 +180,8 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
         break(None)
       }
       val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
-      processNestedFieldPattern(fieldPattern, field.`type`, currentPath, bindingEntries, nestedConditions, dp)
+      val fieldType = TypeSubst.withClassOnly(field.`type`, appliedRecordType)
+      processNestedFieldPattern(fieldPattern, fieldType, currentPath, bindingEntries, nestedConditions, dp)
     }
 
     val bindingInfo = MultiBindings(recordType.asInstanceOf[ClassType], bindingEntries.toList, nestedConditions.toList)

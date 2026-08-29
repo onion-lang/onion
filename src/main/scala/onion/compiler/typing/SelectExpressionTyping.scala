@@ -307,7 +307,10 @@ final class SelectExpressionTyping(
 
             val bindingStmts = varBinds.zip(bindings).map { case (varBind, BindingEntry(_, _, accessPath)) =>
               val accessor = buildAccessor(new RefLocal(bind), accessPath)
-              new ExpressionActionStatement(new SetLocal(varBind, accessor))
+              // The getter's raw return type may still be an unsubstituted type
+              // variable (e.g. T) while varBind was declared at the type argument
+              // recovered from the scrutinee (e.g. Int) -- narrow/unbox to match.
+              new ExpressionActionStatement(new SetLocal(varBind, TypeSubst.withCast(accessor, varBind.tp)))
             }
             new StatementBlock(caseNodes(caseIndex).location, (setCast +: bindingStmts :+ innerBody)*)
 
@@ -445,7 +448,7 @@ final class SelectExpressionTyping(
         // The *binding* can be more precise than the check: matching a
         // `Some` out of an `Opt[String]` binds `Some[String]`, recovered from
         // the scrutinee's type arguments (#311).
-        bindingInfo = SingleBinding(name, specializeFromScrutinee(mappedType, conditionType))
+        bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType))
 
         instanceOfCheck
 
@@ -625,50 +628,6 @@ final class SelectExpressionTyping(
       case None =>
         typeBlockExpression(thenBlock, context, expected)
     }
-  }
-
-  /**
-   * Recover the matched case's type arguments from the scrutinee's.
-   *
-   * `case x is Some` names a class, not a parameterization, so the pattern
-   * alone binds the raw `Some` and its components come back as bare type
-   * variables. When the scrutinee is a parameterization the arguments are
-   * already known: matching `Some` out of an `Opt[String]` must bind
-   * `Some[String]`, so `x.value()` is a `String` rather than `T` (#311).
-   *
-   * The case's own view of the scrutinee's class (`Some[T] <: Opt[T]`) is
-   * unified against the scrutinee (`Opt[String]`), which solves the case's
-   * parameters. Anything not solved that way -- no generics involved, an
-   * unparameterized scrutinee, a variable left free -- keeps the raw type, so
-   * this only ever adds precision.
-   */
-  private def specializeFromScrutinee(matched: Type, scrutinee: Type): Type = (matched, scrutinee) match {
-    case (raw: ClassType, applied: AppliedClassType)
-      if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty =>
-      val solved = scala.collection.mutable.HashMap[String, Type]()
-      val paramNames = raw.typeParameters.map(_.name).toSet
-
-      def unify(formal: Type, actual: Type): Unit = formal match {
-        case tv: TypeVariableType if paramNames.contains(tv.name) =>
-          if (!solved.contains(tv.name)) solved += tv.name -> actual
-        case fa: AppliedClassType =>
-          actual match {
-            case aa: AppliedClassType
-              if TypeRelations.sameClass(fa.raw, aa.raw) && fa.typeArguments.length == aa.typeArguments.length =>
-              fa.typeArguments.zip(aa.typeArguments).foreach((f, a) => unify(f, a))
-            case _ =>
-          }
-        case _ =>
-      }
-
-      AppliedTypeViews.collectAppliedViewsFrom(raw)
-        .collectFirst { case (viewRaw, view) if TypeRelations.sameClass(viewRaw, applied.raw) => view }
-        .foreach(view => unify(view, applied))
-
-      if (raw.typeParameters.forall(tp => solved.contains(tp.name)))
-        AppliedClassType(raw, raw.typeParameters.map(tp => solved(tp.name)).toList)
-      else matched
-    case _ => matched
   }
 
   private def ensureBoolean(node: AST.Node, term: Term): Term =

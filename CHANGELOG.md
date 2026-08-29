@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `List[List[Int]]` ballot rankings, `groupBy`/`filter`/`map`/`fold`/
   `sortedBy`, `foreach (k, v) in map`, and `try`/`catch`.
 
+- **`run/NumberTheory.on`, a 327-line number theory explorer.** Extension
+  methods on `Int` literals and variables (`isPrime`, `gcd`, `lcm`,
+  `eulerPhi`, `divisors`, `sumOfDivisors`, `isAbundant`, `isDeficient`,
+  `isPerfect`), records (`PrimeFactor`, `Factorization`, `GoldbachPair`,
+  `IntPair`), an ADT case-enum `NumberKind` with exhaustive type-pattern
+  `select`, collection pipelines (`map`, `filter`, `fold`, `sortedBy`),
+  `foreach` over ranges and map entries, string interpolation, recursion,
+  and nullable return types. Algorithms: sieve of Eratosthenes, prime
+  factorization, Euler's totient, Collatz sequences, Goldbach
+  decompositions, and twin primes.
+
 ## [0.22.0] - 2026-08-27
 
 ### Fixed

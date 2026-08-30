@@ -478,6 +478,48 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ) shouldBe None
     }
 
+    it("recognizes a JS/Python-style `typeof` operator in an `if` condition") {
+      val hint = classify(
+        found = "x",
+        expected = "\"{\"",
+        sourceLine = "if typeof x == \"Int\" {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.typeof_not_supported"
+      hint.arguments shouldBe Seq("x")
+    }
+
+    it("recognizes a JS/Python-style `typeof` operator in a `while` condition") {
+      val hint = classify(
+        found = "y",
+        expected = "\"{\"",
+        sourceLine = "while typeof y == \"String\" {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.typeof_not_supported"
+      hint.arguments shouldBe Seq("y")
+    }
+
+    it("recognizes a JS/Python-style `typeof` operator in an `else if` condition") {
+      val hint = classify(
+        found = "z",
+        expected = "\"{\"",
+        sourceLine = "else if typeof z == \"Boolean\" {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.typeof_not_supported"
+      hint.arguments shouldBe Seq("z")
+    }
+
+    it("does not flag `typeof` when no block is expected next") {
+      SyntaxHintClassifier.classify(
+        found = "x",
+        expected = "\";\"",
+        context = "",
+        sourceLine = "if typeof x"
+      ) shouldBe None
+    }
+
     it("recognizes a Python-style `if cond:` header with a trailing colon") {
       val hint = classify(
         found = ":",

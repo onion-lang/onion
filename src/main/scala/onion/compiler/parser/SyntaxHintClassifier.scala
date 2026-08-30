@@ -16,6 +16,8 @@ private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
+  private val TypeofCondition =
+    """^\s*(?:if|while|else\s+if)\s+typeof\s+([A-Za-z_][\w.]*)""".r
   private val PythonStyleColonBlockHeader =
     """^\s*(if|while|else\s+if)\s+(.+?):\s*$""".r
   // A Python-style `class Foo:` (or `class Foo(x: Int):`) header, where the colon
@@ -302,6 +304,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.not_operator")
+      case _ if expected.contains("{") && TypeofCondition.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = TypeofCondition.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.typeof_not_supported", matched.group(1))
       // A Rust-Option-style `if let Some(x) = ...` pattern also matches the
       // plain-identifier alternative below it, so keep this ahead of the
       // generic block-expected fallback.

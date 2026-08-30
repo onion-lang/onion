@@ -1,0 +1,327 @@
+// NumberTheory.on — Number theory explorer.
+// Exercises: extension methods on Int literals and variables, records with
+// example clauses, ADT case-enum with select/type-pattern, collection pipelines
+// (map/filter/fold/sortedBy/distinct), foreach over ranges and List[Object],
+// foreach (k,v) on Map, string interpolation, recursion, nullable types,
+// closures, while loops.
+
+// ─── Extension methods on Int ─────────────────────────────────────────────────
+
+extension Int {
+  def isPrime(): Boolean {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    var i: Int = 3
+    while i * i <= self {
+      if self % i == 0 { return false }
+      i = i + 2
+    }
+    return true
+  }
+
+  def gcd(other: Int): Int {
+    var a: Int = if self < 0 { -self } else { self }
+    var b: Int = if other < 0 { -other } else { other }
+    while b != 0 {
+      val t: Int = b
+      b = a % b
+      a = t
+    }
+    return a
+  }
+
+  def lcm(other: Int): Int {
+    val g: Int = self.gcd(other)
+    if g == 0 { return 0 }
+    return (self / g) * other
+  }
+
+  def eulerPhi(): Int {
+    var n: Int = self
+    var result: Int = n
+    var p: Int = 2
+    while p * p <= n {
+      if n % p == 0 {
+        while n % p == 0 { n = n / p }
+        result = result - result / p
+      }
+      p = p + 1
+    }
+    if n > 1 { result = result - result / n }
+    return result
+  }
+
+  def divisors(): List[Object] {
+    val divs: List[Object] = []
+    var i: Int = 1
+    while i * i <= self {
+      if self % i == 0 {
+        divs.add(i)
+        if i != self / i { divs.add(self / i) }
+      }
+      i = i + 1
+    }
+    return divs.sortedBy { x -> x as Int }
+  }
+
+  def sumOfDivisors(): Int {
+    val divs: List[Object] = self.divisors()
+    return divs.fold(0) { acc, x -> (acc as Int) + (x as Int) } as Int
+  }
+
+  def isAbundant(): Boolean  = self.sumOfDivisors() - self > self
+  def isDeficient(): Boolean = self.sumOfDivisors() - self < self
+  def isPerfect(): Boolean   = self.sumOfDivisors() - self == self
+}
+
+// ─── Prime factorization records ─────────────────────────────────────────────
+
+record PrimeFactor(base: Int, exponent: Int) {
+  public:
+  def display(): String =
+    if self.exponent() == 1 { "" + self.base() } else { "#{self.base()}^#{self.exponent()}" }
+}
+
+record Factorization(n: Int, factors: List[Object]) {
+  public:
+  def display(): String {
+    if self.factors().size == 0 { return "#{self.n()} (unit)" }
+    val parts: List[Object] = self.factors().map { f -> (f as PrimeFactor).display() }
+    var s: String = parts[0] as String
+    var i: Int = 1
+    while i < parts.size {
+      s = s + " × " + (parts[i] as String)
+      i = i + 1
+    }
+    return "#{self.n()} = #{s}"
+  }
+}
+
+def factorize(n: Int): Factorization {
+  val factors: List[Object] = []
+  var rem: Int = n
+  var p: Int = 2
+  while p * p <= rem {
+    if rem % p == 0 {
+      var exp: Int = 0
+      while rem % p == 0 { rem = rem / p; exp = exp + 1 }
+      factors.add(new PrimeFactor(p, exp))
+    }
+    p = p + 1
+  }
+  if rem > 1 { factors.add(new PrimeFactor(rem, 1)) }
+  return new Factorization(n, factors)
+}
+
+// ─── Number classification ADT ────────────────────────────────────────────────
+
+enum NumberKind {
+  case PrimeNum
+  case PerfectNumber
+  case AbundantNumber
+  case DeficientNumber
+  case UnitNum
+  case ZeroNum
+
+  public:
+  def label(): String = select this {
+    case k is PrimeNum:       "prime"
+    case k is PerfectNumber:  "perfect"
+    case k is AbundantNumber: "abundant"
+    case k is DeficientNumber:"deficient"
+    case k is UnitNum:        "unit (1)"
+    case k is ZeroNum:        "zero"
+  }
+}
+
+def classify(n: Int): NumberKind {
+  if n == 0         { return new ZeroNum() }
+  if n == 1         { return new UnitNum() }
+  if n.isPrime()    { return new PrimeNum() }
+  if n.isPerfect()  { return new PerfectNumber() }
+  if n.isAbundant() { return new AbundantNumber() }
+  return new DeficientNumber()
+}
+
+// ─── Collatz sequence ─────────────────────────────────────────────────────────
+
+def collatz(start: Int): List[Object] {
+  val seq: List[Object] = []
+  var n: Int = start
+  while n != 1 {
+    seq.add(n)
+    if n % 2 == 0 { n = n / 2 } else { n = 3 * n + 1 }
+  }
+  seq.add(1)
+  return seq
+}
+
+// ─── Goldbach conjecture ──────────────────────────────────────────────────────
+
+record GoldbachPair(a: Int, b: Int)
+
+def goldbach(n: Int): GoldbachPair? {
+  if n <= 2 || n % 2 != 0 { return null }
+  var p: Int = 2
+  while p <= n / 2 {
+    if p.isPrime() && (n - p).isPrime() { return new GoldbachPair(p, n - p) }
+    p = p + 1
+  }
+  return null
+}
+
+// ─── Sieve of Eratosthenes ────────────────────────────────────────────────────
+
+def sieve(limit: Int): List[Object] {
+  val composite: Boolean[] = new Boolean[limit + 1]
+  var i: Int = 2
+  while i * i <= limit {
+    if !composite[i] {
+      var j: Int = i * i
+      while j <= limit { composite[j] = true; j = j + i }
+    }
+    i = i + 1
+  }
+  val primes: List[Object] = []
+  foreach p: Int in 2..limit { if !composite[p] { primes.add(p) } }
+  return primes
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+IO::println("=== Number Theory Explorer ===")
+IO::println("")
+
+// Prime listing via sieve
+val primes50: List[Object] = sieve(50)
+IO::println("Primes up to 50 (#{primes50.size}):")
+var primeLine: String = " "
+foreach p: Object in primes50 { primeLine = primeLine + " " + p }
+IO::println(primeLine)
+IO::println("")
+
+// Extension method demo on literals — exercises the Int extension mechanism
+IO::println("Extension methods on Int literals and variables:")
+val x: Int = 12
+IO::println("  (7).isPrime()       = #{(7).isPrime()}")
+IO::println("  (12).gcd(8)         = #{(12).gcd(8)}")
+IO::println("  (4).lcm(6)          = #{(4).lcm(6)}")
+IO::println("  x.eulerPhi() [x=12] = #{x.eulerPhi()}")
+IO::println("  x.divisors()        = #{x.divisors()}")
+IO::println("  x.sumOfDivisors()   = #{x.sumOfDivisors()}")
+IO::println("  x.isPerfect()       = #{x.isPerfect()}")
+IO::println("")
+
+// Factorizations
+IO::println("Prime factorizations:")
+val targets: List[Object] = [12, 60, 360, 2310, 9699690]
+foreach n: Object in targets {
+  IO::println("  #{factorize(n as Int).display()}")
+}
+IO::println("")
+
+// Number classification in 1..30 — grouped by kind
+IO::println("Number classification 1..30:")
+val groups: Map[Object, Object] = [:]
+foreach n: Int in 1..30 {
+  val kind: NumberKind = classify(n)
+  val label: String = kind.label()
+  if groups[label] == null { groups[label] = [] }
+  (groups[label] as List[Object]).add(n)
+}
+val orderedLabels: List[Object] = ["prime", "perfect", "abundant", "deficient", "unit (1)"]
+foreach lbl: Object in orderedLabels {
+  val members: List[Object]? = groups[lbl] as List[Object]
+  if members != null {
+    IO::println("  #{lbl}: #{members}")
+  }
+}
+IO::println("")
+
+// GCD and LCM table
+IO::println("GCD / LCM pairs:")
+record IntPair(a: Int, b: Int)
+val gcdPairs: List[Object] = [new IntPair(12, 18), new IntPair(35, 14),
+                               new IntPair(100, 75), new IntPair(17, 13)]
+foreach pair: Object in gcdPairs {
+  val ip: IntPair = pair as IntPair
+  IO::println("  gcd(#{ip.a()},#{ip.b()})=#{ip.a().gcd(ip.b())}  lcm(#{ip.a()},#{ip.b()})=#{ip.a().lcm(ip.b())}")
+}
+IO::println("")
+
+// Euler's totient
+IO::println("Euler's totient phi(n) for n in 1..12:")
+var phiLine: String = " "
+foreach n: Int in 1..12 { phiLine = phiLine + " phi(#{n})=#{n.eulerPhi()}" }
+IO::println(phiLine)
+IO::println("")
+
+// Perfect / abundant numbers in 1..100
+val range100: List[Object] = []
+foreach n: Int in 1..100 { range100.add(n) }
+val perfect: List[Object]  = range100.filter { n -> (n as Int).isPerfect() }
+val abundant: List[Object] = range100.filter { n -> (n as Int).isAbundant() }
+IO::println("Perfect numbers in 1..100:  #{perfect}")
+IO::println("Abundant numbers in 1..100: #{abundant}")
+IO::println("")
+
+// Collatz stopping times
+IO::println("Collatz sequence stats:")
+val seeds: List[Object] = [6, 11, 27, 97]
+foreach s: Object in seeds {
+  val seq: List[Object] = collatz(s as Int)
+  val maxVal: Int = seq.fold(0) { acc, x -> if (x as Int) > (acc as Int) { x as Int } else { acc as Int } } as Int
+  IO::println("  start=#{s}: #{seq.size} steps, max=#{maxVal}")
+}
+IO::println("")
+
+// Goldbach decompositions for even n in 4..30
+IO::println("Goldbach decompositions (even n, 4..30):")
+foreach n: Int in 4..30 {
+  if n % 2 == 0 {
+    val pair: GoldbachPair? = goldbach(n)
+    if pair != null {
+      IO::println("  #{n} = #{pair.a()} + #{pair.b()}")
+    }
+  }
+}
+IO::println("")
+
+// Twin primes in 1..100
+val primes100: List[Object] = sieve(100)
+IO::println("Twin primes up to 100:")
+var twinLine: String = " "
+var ti: Int = 0
+while ti < primes100.size - 1 {
+  val p: Int = primes100[ti] as Int
+  val q: Int = primes100[ti + 1] as Int
+  if q - p == 2 { twinLine = twinLine + " (#{p},#{q})" }
+  ti = ti + 1
+}
+IO::println(twinLine)
+IO::println("")
+
+// Coprimality grid — exercises (k,v) foreach on a Map
+IO::println("Coprimality table for {6,10,15,35} (gcd=1 means coprime):")
+val testNums: List[Object] = [6, 10, 15, 35]
+val coprime: Map[Object, Object] = [:]
+foreach a: Object in testNums {
+  val row: List[Object] = []
+  foreach b: Object in testNums {
+    val g: Int = (a as Int).gcd(b as Int)
+    row.add(if g == 1 { "Y" } else { "." })
+  }
+  coprime[a] = row
+}
+var header: String = "      "
+foreach b: Object in testNums { header = header + " " + b + "   " }
+IO::println(header)
+foreach (a, row) in coprime {
+  var rowStr: String = "  #{a}   "
+  foreach cell: Object in (row as List[Object]) { rowStr = rowStr + " #{cell}   " }
+  IO::println(rowStr)
+}
+IO::println("")
+
+IO::println("Done.")

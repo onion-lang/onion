@@ -1,0 +1,404 @@
+// TimeSeries.on — a toy time-series database with windowed aggregation,
+// multi-sensor tracking, downsampling, and a threshold-based alert engine.
+//
+// Exercises: records, data-carrying and plain enums, classes with interfaces,
+// collection pipelines (map/filter/fold/reduce/groupBy/sortedBy/distinct/
+// partition/zip), select/pattern matching, nullable types, closures, string
+// interpolation, try/catch, while, foreach over ranges and maps, extensions.
+
+import { java.util.ArrayList }
+
+// ── Aggregation type enum (data-carrying) ─────────────────────────────────────
+
+enum AggType(label: String) {
+  MIN("min"), MAX("max"), AVG("avg"), SUM("sum"), COUNT("count"), P95("p95")
+}
+
+// ── Alert condition ───────────────────────────────────────────────────────────
+
+enum Condition {
+  ABOVE, BELOW, SPIKE
+}
+
+// ── Data point ────────────────────────────────────────────────────────────────
+
+record DataPoint(ts: Long, value: Double) {
+public:
+  def formatted(): String = "t=#{ts} v=#{value}"
+}
+
+// ── Aggregation result ────────────────────────────────────────────────────────
+
+record AggResult(windowStart: Long, windowEnd: Long, aggType: AggType, value: Double, count: Int) {
+public:
+  def formatted(): String =
+    "  [#{windowStart}..#{windowEnd}] #{aggType.label()}=#{value} (n=#{count})"
+}
+
+// ── Alert definition ──────────────────────────────────────────────────────────
+
+record AlertDef(name: String, condition: Condition, threshold: Double) {
+public:
+  def check(current: Double, previous: Double): Boolean =
+    select condition() {
+      case ABOVE: current > threshold()
+      case BELOW: current < threshold()
+      case SPIKE: Math::abs(current - previous) > threshold()
+    }
+}
+
+// ── Fired alert event ─────────────────────────────────────────────────────────
+
+record FiredAlert(alertName: String, ts: Long, value: Double, msg: String)
+
+// ── Extension method on Double ────────────────────────────────────────────────
+
+extension Double {
+  def rounded2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+}
+
+// ── TimeSeries: single named sensor series ────────────────────────────────────
+
+class TimeSeries {
+  val name_:   String
+  val points_: List[DataPoint]
+
+public:
+  def this(name: String) {
+    self.name_   = name
+    self.points_ = []
+  }
+
+  def name(): String = name_
+  def size(): Int    = points_.size
+
+  def add(ts: Long, value: Double): void {
+    points_.add(new DataPoint(ts, value))
+  }
+
+  def pointAt(i: Int): DataPoint = points_[i]
+
+  def latest(): DataPoint? =
+    if points_.size == 0 { null } else { points_[points_.size - 1] }
+
+  // All points whose ts falls in [from, to)
+  def window(from: Long, to: Long): List[DataPoint] {
+    val result: List[DataPoint] = []
+    foreach p: DataPoint in points_ {
+      if p.ts() >= from && p.ts() < to {
+        result.add(p)
+      }
+    }
+    return result
+  }
+
+  // Compute an aggregate over a list of DataPoints
+  def aggregate(pts: List[DataPoint], agg: AggType, wStart: Long, wEnd: Long): AggResult? {
+    if pts.size == 0 { return null }
+    var mn: Double = pts[0].value()
+    var mx: Double = mn
+    var total: Double = 0.0
+    foreach p: DataPoint in pts {
+      val v = p.value()
+      if v < mn { mn = v }
+      if v > mx { mx = v }
+      total = total + v
+    }
+    val n = pts.size
+    val avg = if n > 0 { total / n } else { 0.0 }
+    val chosen = select agg {
+      case MIN:   mn
+      case MAX:   mx
+      case AVG:   avg
+      case SUM:   total
+      case COUNT: n as Double
+      case P95: {
+        val sorted = pts.sortedBy { p -> p.value() }
+        val idx = n * 95 / 100
+        val safeIdx = if idx >= n { n - 1 } else { idx }
+        sorted[safeIdx].value()
+      }
+    }
+    return new AggResult(wStart, wEnd, agg, chosen.rounded2(), n)
+  }
+
+  // Windowed aggregation: slide a window of `step` ms across all data
+  def windowedAgg(step: Long, agg: AggType): List[AggResult] {
+    if points_.size == 0 { return [] }
+    val first = points_[0].ts()
+    val last  = points_[points_.size - 1].ts()
+    val results: List[AggResult] = []
+    var t = first
+    while t <= last {
+      val w = window(t, t + step)
+      val r = aggregate(w, agg, t, t + step)
+      if r != null { results.add(r) }
+      t = t + step
+    }
+    return results
+  }
+
+  // Downsample: collapse every `step` ms into a single avg DataPoint
+  def downsample(step: Long): List[DataPoint] {
+    if points_.size == 0 { return [] }
+    val first = points_[0].ts()
+    val last  = points_[points_.size - 1].ts()
+    val result: List[DataPoint] = []
+    var t = first
+    while t <= last {
+      val bucket = window(t, t + step)
+      val r = aggregate(bucket, AggType::AVG, t, t + step)
+      if r != null { result.add(new DataPoint(t, r.value())) }
+      t = t + step
+    }
+    return result
+  }
+
+  // Summary stats over all points
+  def stats(): AggResult? {
+    if points_.size == 0 { return null }
+    return aggregate(points_, AggType::AVG, points_[0].ts(), points_[points_.size - 1].ts())
+  }
+}
+
+// ── TimeSeriesDb: manages named series ───────────────────────────────────────
+
+class TimeSeriesDb {
+  val series_: Map[String, TimeSeries]
+
+public:
+  def this() { series_ = [:] }
+
+  def getOrCreate(name: String): TimeSeries {
+    var s: TimeSeries = series_[name]
+    if s == null {
+      s = new TimeSeries(name)
+      series_[name] = s
+    }
+    return s
+  }
+
+  def insert(name: String, ts: Long, value: Double): void {
+    getOrCreate(name).add(ts, value)
+  }
+
+  def get(name: String): TimeSeries? = series_[name]
+
+  def names(): List[String] {
+    val ns: List[String] = []
+    foreach (k, _) in series_ { ns.add(k) }
+    return ns
+  }
+
+  def totalPoints(): Int {
+    var total = 0
+    foreach (_, v) in series_ { total = total + v.size() }
+    return total
+  }
+}
+
+// ── AlertEngine: evaluates alerts against a series ───────────────────────────
+
+class AlertEngine {
+  val alerts_: List[AlertDef]
+  val fired_:  List[FiredAlert]
+
+public:
+  def this() {
+    alerts_ = []
+    fired_  = []
+  }
+
+  def addAlert(a: AlertDef): void { alerts_.add(a) }
+
+  def evaluate(series: TimeSeries): void {
+    val pts = series.size()
+    if pts < 2 { return }
+    foreach i: Int in 1..<pts {
+      val curr = series.pointAt(i).value()
+      val prev = series.pointAt(i - 1).value()
+      foreach alert: AlertDef in alerts_ {
+        if alert.check(curr, prev) {
+          val ts  = series.pointAt(i).ts()
+          val msg = "#{alert.name()} fired: value=#{curr} at t=#{ts}"
+          fired_.add(new FiredAlert(alert.name(), ts, curr, msg))
+        }
+      }
+    }
+  }
+
+  def firedAlerts(): List[FiredAlert] = fired_
+
+  def summary(): String {
+    if fired_.size == 0 { return "No alerts fired." }
+    val counts: Map[String, Int] = [:]
+    foreach fa: FiredAlert in fired_ {
+      val n = fa.alertName()
+      val c: Int? = counts[n]
+      counts[n] = if c == null { 1 } else { c + 1 }
+    }
+    val parts: List[String] = []
+    foreach (k, v) in counts { parts.add("#{k}: #{v}x") }
+    return "Alerts: " + parts.fold("") { acc, s -> if acc == "" { s } else { acc + ", " + s } }
+  }
+}
+
+// ── Simulation helpers ────────────────────────────────────────────────────────
+
+// Generate a simple sine-like wave with noise
+def genWave(db: TimeSeriesDb, name: String, base: Double, amp: Double, n: Int, step: Long): void {
+  foreach i: Int in 0..<n {
+    val t   = (i as Long) * step
+    val rad = (i * 6.28318) / n
+    val v   = base + amp * Math::sin(rad) + (Rand::nextDouble() - 0.5) * amp * 0.2
+    db.insert(name, t, v)
+  }
+}
+
+// Generate a sawtooth wave
+def genSaw(db: TimeSeriesDb, name: String, base: Double, amp: Double, n: Int, step: Long): void {
+  foreach i: Int in 0..<n {
+    val t = (i as Long) * step
+    val v = base + amp * ((i % 10) / 10.0)
+    db.insert(name, t, v)
+  }
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  println("")
+  println("=== #{title} ===")
+}
+
+def printSeriesStats(db: TimeSeriesDb, name: String): void {
+  val s: TimeSeries? = db.get(name)
+  if s == null { println("  #{name}: (not found)"); return }
+  val stat = s.stats()
+  if stat == null { println("  #{name}: (empty)"); return }
+  val latest = s.latest()
+  val latestVal = if latest == null { "n/a" } else { "#{latest.value().rounded2()}" }
+  println("  #{name}: n=#{s.size()} avg=#{stat.value()} latest=#{latestVal}")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val db = new TimeSeriesDb()
+
+  // ── Seed data ──────────────────────────────────────────────────────────────
+  printSection("Seeding data")
+  genWave(db, "cpu",  50.0, 30.0, 60, 1000L)   // CPU%: sine, 60 points, 1s step
+  genWave(db, "mem",  70.0, 15.0, 60, 1000L)   // Memory%
+  genSaw( db, "disk", 20.0, 40.0, 60, 1000L)   // Disk I/O: sawtooth
+  println("  Inserted #{db.totalPoints()} data points across #{db.names().size()} series")
+
+  // ── Per-series summary ─────────────────────────────────────────────────────
+  printSection("Series overview")
+  foreach name: String in db.names() { printSeriesStats(db, name) }
+
+  // ── Windowed aggregation on CPU ────────────────────────────────────────────
+  printSection("CPU — 10s windowed avg and max")
+  val cpuSeries: TimeSeries? = db.get("cpu")
+  if cpuSeries != null {
+    val avgWindows = cpuSeries.windowedAgg(10000L, AggType::AVG)
+    val maxWindows = cpuSeries.windowedAgg(10000L, AggType::MAX)
+    // zip avg and max together for combined report
+    val zipped = avgWindows.zip(maxWindows)
+    foreach pair: Object in zipped {
+      val pairList = pair as List
+      val avg = pairList[0] as AggResult
+      val mx  = pairList[1] as AggResult
+      println("  t=#{avg.windowStart()}..#{avg.windowEnd()}: avg=#{avg.value()} max=#{mx.value()}")
+    }
+  }
+
+  // ── Downsampled CPU view ───────────────────────────────────────────────────
+  printSection("CPU — downsampled to 15s buckets")
+  if cpuSeries != null {
+    val ds = cpuSeries.downsample(15000L)
+    foreach p: DataPoint in ds {
+      println("  t=#{p.ts()}ms  avg=#{p.value().rounded2()}")
+    }
+  }
+
+  // ── Collection pipeline demo ───────────────────────────────────────────────
+  printSection("Collection pipeline demo (cpu in first 30s)")
+  if cpuSeries != null {
+    val window30 = cpuSeries.window(0L, 30000L)
+
+    // filter + map + sort + distinct
+    val high = window30
+      .filter   { p -> p.value() > 50.0 }
+      .map      { p -> p.value().rounded2() }
+      .sortedBy { v -> v }
+      .distinct()
+    println("  Distinct high (>50) values: #{high.size()} readings")
+
+    // fold for average
+    val total = high.fold(0.0) { acc, v -> acc + v }
+    val count = high.size()
+    if count > 0 { println("  Mean of high values: #{(total / count).rounded2()}") }
+
+    // partition into above/below 65
+    val parts  = cpuSeries.window(0L, 60000L).partition { p -> p.value() > 65.0 }
+    val above  = parts.get(0) as List
+    val atmost = parts.get(1) as List
+    println("  Points > 65: #{above.size}  <= 65: #{atmost.size}")
+
+    // groupBy decade bucket
+    val grouped = cpuSeries.window(0L, 60000L).groupBy { p ->
+      val bucket = (p.value() / 10.0) as Int
+      "#{bucket * 10}-#{bucket * 10 + 9}%"
+    }
+    println("  Value histogram:")
+    val buckets: List[String] = []
+    foreach (bucket, pts) in grouped { buckets.add("#{bucket}: #{pts.size()}") }
+    foreach b: String in buckets.sortedBy { s -> s } {
+      println("    #{b}")
+    }
+  }
+
+  // ── Alert engine ───────────────────────────────────────────────────────────
+  printSection("Alert engine")
+  val engine = new AlertEngine()
+  engine.addAlert(new AlertDef("high-cpu",  Condition::ABOVE, 70.0))
+  engine.addAlert(new AlertDef("low-mem",   Condition::BELOW, 60.0))
+  engine.addAlert(new AlertDef("cpu-spike", Condition::SPIKE, 20.0))
+
+  foreach name: String in db.names() {
+    val s: TimeSeries? = db.get(name)
+    if s != null { engine.evaluate(s) }
+  }
+  println("  " + engine.summary())
+
+  val fired = engine.firedAlerts()
+  if fired.size > 0 {
+    println("  First 5 fired alerts:")
+    foreach fa: FiredAlert in fired.take(5) {
+      println("    " + fa.msg())
+    }
+  }
+
+  // ── Reduce demo ───────────────────────────────────────────────────────────
+  printSection("Reduce demo — total data-points across all series")
+  val seriesNames = db.names()
+  val totalFromReduce = seriesNames.map { n ->
+    val s: TimeSeries? = db.get(n)
+    if s == null { 0 } else { s.size() }
+  }.reduce { a, b -> a + b }
+  println("  Total: #{totalFromReduce} (expect #{db.totalPoints()})")
+
+  // ── Try/catch demo ─────────────────────────────────────────────────────────
+  printSection("Error handling")
+  try {
+    val bad: TimeSeries? = db.get("nonexistent")
+    if bad == null { throw new Exception("series 'nonexistent' not found") }
+    println("  Should not reach here")
+  } catch e: Exception {
+    println("  Caught: #{e.message()}")
+  }
+
+  println("")
+  println("Done.")
+}

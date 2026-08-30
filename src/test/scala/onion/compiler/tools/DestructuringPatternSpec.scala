@@ -92,6 +92,53 @@ class DestructuringPatternSpec extends AbstractShellSpec {
       assert(Shell.Success("error: oops") == result)
     }
 
+    it("binds a generic record's field at its instantiated type argument, not the raw type parameter") {
+      // Regression test: `case Wrap(v):` on a `Wrap[Int]` scrutinee used to bind
+      // `v` at the record's bare type parameter `T` instead of the `Int` it was
+      // actually instantiated with, so using `v` as an `Int` failed to typecheck
+      // (E0000: "type Int is expected, but type T is used").
+      val result = shell.run(
+        """
+          |record Wrap[T](v: T);
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val w = new Wrap[Int](5);
+          |    return select w {
+          |      case Wrap(v): v + 1
+          |      else: -1
+          |    };
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(6) == result)
+    }
+
+    it("binds a nested generic record's field at its instantiated type argument") {
+      val result = shell.run(
+        """
+          |record Pair[A, B](first: A, second: B);
+          |record Outer[T](inner: Pair[T, String]);
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val o = new Outer[Int](new Pair[Int, String](5, "x"));
+          |    return select o {
+          |      case Outer(Pair(a, b)): a + b.length
+          |      else: -1
+          |    };
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(6) == result)
+    }
+
     it("reports error for wrong binding count") {
       val result = shell.run(
         """

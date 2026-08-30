@@ -1,0 +1,458 @@
+// PersonalFinance.on — personal finance tracker
+// Covers: records, enums, ADT enums, classes, generics, collection pipelines,
+//         select/pattern-matching, nullable, string interpolation, try/catch,
+//         foreach (ranges + map entries), closures, recursion, static members
+
+import {
+  java.util.List as JList
+}
+
+// ── Category enum (plain, homogeneous) ────────────────────────────────────────
+
+enum Category {
+  FOOD, TRANSPORT, HOUSING, UTILITIES, ENTERTAINMENT, HEALTH, EDUCATION, INCOME, SAVINGS, OTHER
+}
+
+// ── TransactionType ADT ───────────────────────────────────────────────────────
+
+enum TransactionType {
+  case Credit(note: String)
+  case Debit(note: String)
+  case Transfer(toAccount: String)
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Money(cents: Long) {
+public:
+  static def of(dollars: Double): Money = new Money((dollars * 100.0) as Long)
+  static def zero(): Money = new Money(0L)
+
+  def plus(other: Money): Money = new Money(cents() + other.cents())
+  def minus(other: Money): Money = new Money(cents() - other.cents())
+  def times(factor: Double): Money = new Money(((cents() as Double) * factor) as Long)
+  def isNegative(): Boolean = cents() < 0L
+  def isZero(): Boolean = cents() == 0L
+
+  def format(): String = {
+    val abs: Long = if cents() < 0L { -cents() } else { cents() }
+    val dollars: Long = abs / 100L
+    val rem: Long = abs % 100L
+    val sign: String = if cents() < 0L { "-" } else { "" }
+    val remStr: String = if rem < 10L { "0" + rem } else { "" + rem }
+    sign + "$" + dollars + "." + remStr
+  }
+
+  def compareTo(other: Money): Int {
+    if cents() < other.cents() { return -1 }
+    if cents() > other.cents() { return 1 }
+    return 0
+  }
+}
+
+record Transaction(
+  id: Int,
+  date: String,
+  description: String,
+  amount: Money,
+  category: Category,
+  txType: TransactionType
+) {
+public:
+  def isCredit(): Boolean = select txType() {
+    case t is Credit: true
+    else: false
+  }
+
+  def isDebit(): Boolean = !isCredit()
+
+  def summary(): String =
+    "#{date()} | #{description()} | #{amount().format()} | #{category()}"
+}
+
+record BudgetLine(category: Category, limit: Money, spent: Money) {
+public:
+  def remaining(): Money = limit().minus(spent())
+  def percentUsed(): Int {
+    if limit().isZero() { return 0 }
+    return (((spent().cents() as Double) / (limit().cents() as Double)) * 100.0) as Int
+  }
+  def isOverBudget(): Boolean = spent().cents() > limit().cents()
+}
+
+record MonthlyReport(month: String, income: Money, expenses: Money) {
+public:
+  def netSavings(): Money = income().minus(expenses())
+  def savingsRate(): Int {
+    if income().isZero() { return 0 }
+    return (((netSavings().cents() as Double) / (income().cents() as Double)) * 100.0) as Int
+  }
+}
+
+// ── Account class ─────────────────────────────────────────────────────────────
+
+class Account {
+  val name: String
+  val accountType: String
+  var balance: Money
+  var transactions: List[Transaction]
+  var nextId: Int
+
+public:
+  def this(name: String, accountType: String, initialBalance: Money) {
+    this.name = name
+    this.accountType = accountType
+    this.balance = initialBalance
+    this.transactions = []
+    this.nextId = 1
+  }
+
+  def addTransaction(date: String, desc: String, amount: Money, cat: Category, txType: TransactionType): Transaction {
+    val tx: Transaction = new Transaction(nextId, date, desc, amount, cat, txType)
+    nextId = nextId + 1
+    transactions.add(tx)
+    select txType {
+      case t is Credit: balance = balance.plus(amount)
+      case t is Debit:  balance = balance.minus(amount)
+      case t is Transfer: balance = balance.minus(amount)
+    }
+    return tx
+  }
+
+  def credit(date: String, desc: String, amount: Money, cat: Category): Transaction =
+    addTransaction(date, desc, amount, cat, new Credit(desc))
+
+  def debit(date: String, desc: String, amount: Money, cat: Category): Transaction =
+    addTransaction(date, desc, amount, cat, new Debit(desc))
+
+  def getTransactions(): List[Transaction] = transactions
+
+  def getTransactionsByCategory(cat: Category): List[Transaction] =
+    transactions.filter { t -> (t as Transaction).category() == cat }
+
+  def totalSpent(): Money =
+    transactions.filter { t -> (t as Transaction).isDebit() }
+                .fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+
+  def totalEarned(): Money =
+    transactions.filter { t -> (t as Transaction).isCredit() }
+                .fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+
+  def getBalance(): Money = balance
+
+  def summary(): String = "#{name} (#{accountType}) — Balance: #{balance.format()}"
+}
+
+// ── BudgetManager class ───────────────────────────────────────────────────────
+
+class BudgetManager {
+  var budgets: Map[Object, Object]   // Category -> Money (limit)
+
+public:
+  def this {
+    budgets = [:]
+  }
+
+  def setBudget(cat: Category, limit: Money): void {
+    budgets[cat] = limit
+  }
+
+  def getBudgetLine(cat: Category, transactions: List[Object]): BudgetLine {
+    val limit: Money = if budgets[cat] != null { budgets[cat] as Money } else { Money::zero() }
+    val spent: Money = transactions
+      .filter  { t -> (t as Transaction).isDebit() && (t as Transaction).category() == cat }
+      .fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+    return new BudgetLine(cat, limit, spent)
+  }
+
+  def allLines(transactions: List[Object]): List[Object] {
+    val cats: List[Object] = [
+      Category::FOOD, Category::TRANSPORT, Category::HOUSING,
+      Category::UTILITIES, Category::ENTERTAINMENT, Category::HEALTH,
+      Category::EDUCATION, Category::SAVINGS
+    ]
+    return cats.map { c -> getBudgetLine(c as Category, transactions) }
+  }
+}
+
+// ── FinanceEngine — statistics helpers ───────────────────────────────────────
+
+class FinanceEngine {
+public:
+  static def groupByCategory(transactions: List[Object]): Map[Object, Object] {
+    val result: Map[Object, Object] = [:]
+    foreach tx: Transaction in transactions {
+      val key: Category = tx.category()
+      val prev: Money = if result[key] != null { result[key] as Money } else { Money::zero() }
+      result[key] = prev.plus(tx.amount())
+    }
+    return result
+  }
+
+  static def topExpenseCategories(transactions: List[Object], n: Int): List[Object] {
+    val debits: List[Object] = transactions.filter { t -> (t as Transaction).isDebit() }
+    val byCategory: Map[Object, Object] = groupByCategory(debits)
+    val pairs: List[Object] = []
+    foreach (k, v) in byCategory {
+      pairs.add([k, v])
+    }
+    // Sort descending by amount (insertion sort — small n)
+    val sorted: List[Object] = insertionSortDesc(pairs)
+    if sorted.size > n { return sorted.subList(0, n) }
+    return sorted
+  }
+
+  static def insertionSortDesc(pairs: List[Object]): List[Object] {
+    val arr: List[Object] = []
+    foreach p: Object in pairs { arr.add(p) }
+    var i: Int = 1
+    while i < arr.size {
+      val key: List[Object] = arr[i] as List[Object]
+      val keyVal: Money = key[1] as Money
+      var j: Int = i - 1
+      while j >= 0 && ((arr[j] as List[Object])[1] as Money).compareTo(keyVal) < 0 {
+        arr[j + 1] = arr[j]
+        j = j - 1
+      }
+      arr[j + 1] = key
+      i = i + 1
+    }
+    return arr
+  }
+
+  static def buildMonthlyReport(month: String, transactions: List[Transaction]): MonthlyReport {
+    val monthTxs: List[Transaction] = transactions.filter { t ->
+      (t as Transaction).date().startsWith(month)
+    }
+    val income: Money = monthTxs
+      .filter { t -> (t as Transaction).isCredit() }
+      .fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+    val expenses: Money = monthTxs
+      .filter { t -> (t as Transaction).isDebit() }
+      .fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+    return new MonthlyReport(month, income, expenses)
+  }
+}
+
+// ── Report printing ───────────────────────────────────────────────────────────
+
+class ReportPrinter {
+public:
+  static def line(ch: String, n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + ch; i = i + 1 }
+    return s
+  }
+
+  static def printHeader(title: String): void {
+    val bar: String = line("=", 60)
+    IO::println(bar)
+    IO::println("  " + title)
+    IO::println(bar)
+  }
+
+  static def printAccountSummary(accounts: List[Object]): void {
+    printHeader("ACCOUNT SUMMARY")
+    foreach acct: Account in accounts {
+      IO::println("  " + acct.summary())
+    }
+    IO::println("")
+  }
+
+  static def printBudgetReport(lines: List[Object]): void {
+    printHeader("BUDGET REPORT")
+    IO::println("  Category         Limit       Spent       Remaining   Used%")
+    IO::println("  " + line("-", 58))
+    foreach bl: BudgetLine in lines {
+      if !(bl.limit().isZero()) {
+        val cat: String = padRight("" + bl.category(), 16)
+        val lim: String = padLeft(bl.limit().format(), 10)
+        val sp: String  = padLeft(bl.spent().format(), 10)
+        val rem: String = padLeft(bl.remaining().format(), 10)
+        val pct: String = padLeft("" + bl.percentUsed() + "%", 6)
+        val warn: String = if bl.isOverBudget() { " !" } else { "" }
+        IO::println("  #{cat} #{lim}  #{sp}  #{rem}  #{pct}#{warn}")
+      }
+    }
+    IO::println("")
+  }
+
+  static def printMonthlyReport(report: MonthlyReport): void {
+    printHeader("MONTHLY REPORT — #{report.month()}")
+    IO::println("  Income:        #{report.income().format()}")
+    IO::println("  Expenses:      #{report.expenses().format()}")
+    IO::println("  Net savings:   #{report.netSavings().format()}")
+    IO::println("  Savings rate:  #{report.savingsRate()}%")
+    IO::println("")
+  }
+
+  static def printTopExpenses(pairs: List[Object]): void {
+    printHeader("TOP EXPENSE CATEGORIES")
+    var rank: Int = 1
+    foreach p: List[Object] in pairs {
+      val cat: Category = p[0] as Category
+      val amt: Money = p[1] as Money
+      IO::println("  #{rank}. #{cat} — #{amt.format()}")
+      rank = rank + 1
+    }
+    IO::println("")
+  }
+
+  static def printRecentTransactions(txs: List[Transaction], n: Int): void {
+    printHeader("RECENT TRANSACTIONS (last #{n})")
+    val start: Int = if txs.size > n { txs.size - n } else { 0 }
+    var i: Int = start
+    while i < txs.size {
+      val tx: Transaction = txs[i] as Transaction
+      IO::println("  " + tx.summary())
+      i = i + 1
+    }
+    IO::println("")
+  }
+
+  static def padRight(s: String, n: Int): String {
+    var r: String = s
+    while r.length() < n { r = r + " " }
+    return r
+  }
+
+  static def padLeft(s: String, n: Int): String {
+    var r: String = s
+    while r.length() < n { r = " " + r }
+    return r
+  }
+}
+
+// ── Demo scenario ─────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Set up accounts
+  val checking: Account = new Account("Checking", "Checking", Money::of(2500.00))
+  val savings: Account  = new Account("Emergency Fund", "Savings", Money::of(8000.00))
+
+  // Set up budget manager
+  val budget: BudgetManager = new BudgetManager()
+  budget.setBudget(Category::FOOD,          Money::of(600.00))
+  budget.setBudget(Category::TRANSPORT,     Money::of(300.00))
+  budget.setBudget(Category::HOUSING,       Money::of(1500.00))
+  budget.setBudget(Category::UTILITIES,     Money::of(200.00))
+  budget.setBudget(Category::ENTERTAINMENT, Money::of(150.00))
+  budget.setBudget(Category::HEALTH,        Money::of(100.00))
+  budget.setBudget(Category::EDUCATION,     Money::of(80.00))
+  budget.setBudget(Category::SAVINGS,       Money::of(500.00))
+
+  // Record July transactions
+  checking.credit("2025-07-01", "Salary",              Money::of(4200.00), Category::INCOME)
+  checking.credit("2025-07-15", "Freelance payment",   Money::of(350.00),  Category::INCOME)
+  checking.debit("2025-07-01",  "Rent",                Money::of(1350.00), Category::HOUSING)
+  checking.debit("2025-07-02",  "Grocery store",       Money::of(127.45),  Category::FOOD)
+  checking.debit("2025-07-05",  "Electric bill",       Money::of(78.20),   Category::UTILITIES)
+  checking.debit("2025-07-06",  "Bus pass",            Money::of(85.00),   Category::TRANSPORT)
+  checking.debit("2025-07-07",  "Coffee shop",         Money::of(24.60),   Category::FOOD)
+  checking.debit("2025-07-09",  "Gym membership",      Money::of(45.00),   Category::HEALTH)
+  checking.debit("2025-07-10",  "Online course",       Money::of(59.99),   Category::EDUCATION)
+  checking.debit("2025-07-12",  "Grocery store",       Money::of(154.30),  Category::FOOD)
+  checking.debit("2025-07-14",  "Movie tickets",       Money::of(32.00),   Category::ENTERTAINMENT)
+  checking.debit("2025-07-16",  "Gas station",         Money::of(48.75),   Category::TRANSPORT)
+  checking.debit("2025-07-18",  "Pharmacy",            Money::of(23.15),   Category::HEALTH)
+  checking.debit("2025-07-20",  "Internet bill",       Money::of(65.00),   Category::UTILITIES)
+  checking.debit("2025-07-21",  "Grocery store",       Money::of(89.80),   Category::FOOD)
+  checking.debit("2025-07-22",  "Restaurant dinner",   Money::of(67.40),   Category::FOOD)
+  checking.debit("2025-07-24",  "Streaming services",  Money::of(28.97),   Category::ENTERTAINMENT)
+  checking.debit("2025-07-25",  "Uber rides",          Money::of(41.20),   Category::TRANSPORT)
+  checking.debit("2025-07-26",  "Dentist visit",       Money::of(85.00),   Category::HEALTH)
+  checking.debit("2025-07-27",  "Grocery store",       Money::of(103.55),  Category::FOOD)
+  checking.debit("2025-07-28",  "Concert ticket",      Money::of(75.00),   Category::ENTERTAINMENT)
+  checking.debit("2025-07-30",  "Transfer to savings", Money::of(400.00),  Category::SAVINGS)
+  savings.credit("2025-07-30",  "Transfer from checking", Money::of(400.00), Category::SAVINGS)
+
+  // Record August transactions
+  checking.credit("2025-08-01", "Salary",              Money::of(4200.00), Category::INCOME)
+  checking.debit("2025-08-01",  "Rent",                Money::of(1350.00), Category::HOUSING)
+  checking.debit("2025-08-03",  "Grocery store",       Money::of(138.90),  Category::FOOD)
+  checking.debit("2025-08-04",  "Water bill",          Money::of(42.80),   Category::UTILITIES)
+  checking.debit("2025-08-05",  "Bus pass",            Money::of(85.00),   Category::TRANSPORT)
+  checking.debit("2025-08-07",  "Gym membership",      Money::of(45.00),   Category::HEALTH)
+  checking.debit("2025-08-09",  "Coffee shop",         Money::of(18.40),   Category::FOOD)
+  checking.debit("2025-08-10",  "Book purchase",       Money::of(34.99),   Category::EDUCATION)
+  checking.debit("2025-08-12",  "Electric bill",       Money::of(82.50),   Category::UTILITIES)
+  checking.debit("2025-08-14",  "Grocery store",       Money::of(167.25),  Category::FOOD)
+  checking.debit("2025-08-15",  "Movie night",         Money::of(44.50),   Category::ENTERTAINMENT)
+  checking.debit("2025-08-17",  "Gas station",         Money::of(52.00),   Category::TRANSPORT)
+  checking.debit("2025-08-18",  "Doctor visit",        Money::of(120.00),  Category::HEALTH)
+  checking.debit("2025-08-20",  "Internet bill",       Money::of(65.00),   Category::UTILITIES)
+  checking.debit("2025-08-22",  "Grocery store",       Money::of(94.10),   Category::FOOD)
+  checking.debit("2025-08-24",  "Streaming services",  Money::of(28.97),   Category::ENTERTAINMENT)
+  checking.debit("2025-08-25",  "Taxi",                Money::of(29.60),   Category::TRANSPORT)
+  checking.debit("2025-08-27",  "Grocery store",       Money::of(111.40),  Category::FOOD)
+  checking.debit("2025-08-28",  "Transfer to savings", Money::of(500.00),  Category::SAVINGS)
+  savings.credit("2025-08-28",  "Transfer from checking", Money::of(500.00), Category::SAVINGS)
+
+  // Print reports
+  val accounts: List[Object] = [checking, savings]
+  ReportPrinter::printAccountSummary(accounts)
+
+  // July monthly report
+  val julyReport: MonthlyReport = FinanceEngine::buildMonthlyReport("2025-07", checking.getTransactions())
+  ReportPrinter::printMonthlyReport(julyReport)
+
+  // August monthly report
+  val augReport: MonthlyReport = FinanceEngine::buildMonthlyReport("2025-08", checking.getTransactions())
+  ReportPrinter::printMonthlyReport(augReport)
+
+  // Budget report using all transactions
+  val allTx: List[Transaction] = checking.getTransactions()
+  val budgetLines: List[Object] = budget.allLines(allTx as List[Object])
+  ReportPrinter::printBudgetReport(budgetLines)
+
+  // Top expense categories (all time)
+  val top3: List[Object] = FinanceEngine::topExpenseCategories(allTx as List[Object], 3)
+  ReportPrinter::printTopExpenses(top3)
+
+  // Recent transactions
+  ReportPrinter::printRecentTransactions(allTx, 8)
+
+  // Savings goal analysis
+  ReportPrinter::printHeader("SAVINGS ANALYSIS")
+  val target: Money = Money::of(10000.00)
+  val current: Money = savings.getBalance()
+  val gap: Money = target.minus(current)
+  IO::println("  Emergency fund target: #{target.format()}")
+  IO::println("  Current balance:       #{current.format()}")
+  if gap.isNegative() || gap.isZero() {
+    IO::println("  Status: TARGET REACHED! Great job.")
+  } else {
+    IO::println("  Still needed:          #{gap.format()}")
+    val monthsLeft: Int = (gap.cents() / 45000L) as Int + 1
+    IO::println("  At $450/month:         ~#{monthsLeft} months to goal")
+  }
+  IO::println("")
+
+  // Category breakdown for food
+  ReportPrinter::printHeader("FOOD CATEGORY DETAILS")
+  val foodTxs: List[Transaction] = checking.getTransactionsByCategory(Category::FOOD)
+  IO::println("  #{foodTxs.size} transactions:")
+  foreach tx: Transaction in foodTxs {
+    IO::println("    " + tx.summary())
+  }
+  val foodTotal: Money = foodTxs.fold(Money::zero()) { acc, t -> acc.plus((t as Transaction).amount()) }
+  IO::println("  Total food spend: #{foodTotal.format()}")
+  IO::println("")
+
+  // Null-safety demo: look up a non-existent category
+  val unusedCat: Category = Category::OTHER
+  val otherTxs: List[Transaction] = checking.getTransactionsByCategory(unusedCat)
+  IO::println("OTHER category transactions: #{otherTxs.size}")
+
+  // Try/catch demo: invalid Money construction edge case
+  try {
+    val m: Money = Money::of(-9999.99)
+    IO::println("Negative money allowed: #{m.format()}")
+  } catch e: Exception {
+    IO::println("Caught: " + e.message())
+  }
+
+  IO::println("")
+  IO::println("=== Report complete ===")
+}

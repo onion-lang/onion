@@ -18,6 +18,352 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DO`-bodies and user words), `try`/`catch`, `StringBuilder`, and collection
   pipelines. Demos cover arithmetic, recursive factorial/Fibonacci,
   `DO`/`LOOP` with nested `IF`/`ELSE`/`THEN`, FizzBuzz, and a prime sieve.
+  (Merged in #955; this entry was missing from the changelog until now.)
+
+### Fixed
+
+- **Diagnostic hint for a JS/TS-style backtick template literal used as a
+  string.** Writing `` `Hello ${name}` `` — Onion uses backticks only to
+  escape a reserved word into an identifier, not for template literals — made
+  the whole `${name}` text parse as the literal name of a local variable
+  reference. Since that variable is never declared, the mistake surfaced as a
+  `local variable Hello ${name} is not found` (E0002) error that repeated the
+  entire template text back at the user with nothing connecting it to the
+  actual mistake. The diagnostic now recognizes the `${...}` shape in the
+  unresolved name and points at Onion's actual string interpolation syntax,
+  `"text #{expr}"`, instead.
+
+- **Parser hint for a Swift-style bare `guard <condition> else { ... }` early
+  exit.** The `guard let x = ... else { ... }` binding form already had a
+  dedicated hint, but the bare form with no `let` binding fell through to
+  the generic "a call's arguments need parentheses" fallback (suggesting the
+  nonsensical `guard(...)`). The diagnostic now recognizes the bare form too
+  and points at Onion's actual equivalent: invert the condition into a plain
+  `if !(cond) { ... }`.
+
+- **Parser hint for a JS/TS/Kotlin-style `??` nullish-coalescing operator.**
+  Writing `a ?? b` reused the `cond ? a : b` ternary hint on the first `?`,
+  pointing at an `if`/`else` rewrite that doesn't fit the mistake at all —
+  the actual replacement is Onion's Elvis operator, `?:`. The diagnostic now
+  recognizes the doubled `??` and points at `a ?: b` instead.
+
+- **Parser hint for a Python-style `lambda x: expr` expression.** Writing
+  `lambda x: x + 1` — since `lambda` isn't a reserved word — parsed as a
+  bare identifier reference, so the statement `val f = lambda` was accepted
+  as complete and the actual mistake surfaced as an unrelated "unexpected
+  token" error on the parameter name that followed, with no diagnostic
+  connecting it back to `lambda`. The diagnostic now recognizes the
+  `lambda params: expr` shape and points at Onion's arrow-lambda syntax
+  (`(x) -> x + 1`) instead.
+
+## [0.28.0] - 2026-08-30
+
+### Fixed
+
+- **`_` no longer triggers "unused variable"/"unused parameter" warnings.**
+  `_` is the conventional "I'm intentionally discarding this binding" name
+  (Scala, Rust, Go, and Onion's own `run/` examples all use it, e.g.
+  `foreach (k, _) in map { ... }` to keep only one half of a destructured
+  pair). The unused-variable checker (W0001/W0006) previously flagged it
+  like any other name, which meant the one identifier whose entire point is
+  "unused" produced a warning — noise that trained users to ignore the
+  checker instead of acting on it. `_` is now exempt.
+
+- **Parser hint for a JavaScript/Python-style `typeof` operator.** Writing
+  `if typeof x == "string" { ... }` — the runtime type-check idiom from
+  JavaScript and Python — parsed `typeof` as a bare identifier expression and
+  hit the generic "a block is expected here" fallback on the operand that
+  followed it, which pointed nowhere near the actual mistake. The diagnostic
+  now recognizes the `typeof expr` shape in an `if`/`while`/`else if`
+  condition and points at Onion's actual type check, the `is` operator
+  (`expr is Type`).
+
+- **Parser hint for a Kotlin/Scala-style singleton `object` declaration.**
+  Writing `object Registry { ... }` — the singleton idiom from Kotlin and
+  Scala — parsed `object` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (suggesting the nonsensical
+  `object(...)`), since the parser saw `object` directly followed by another
+  identifier with nothing in between. The diagnostic now recognizes the
+  `object Name { ... }` shape and points at Onion's actual equivalent: a
+  class with only static members.
+
+- **Parser hints for Java-style generic constructor calls.** Writing
+  `new ArrayList<String>()` or the empty-diamond `new ArrayList<>()` parsed
+  `<` as a valid less-than operator, so `new ArrayList` and `<String>` were
+  read as a comparison chain and the real syntax error only surfaced later
+  in the line (typically at the trailing `(` or `)`), with no diagnostic
+  connecting it back to the angle brackets. The two shapes now get a
+  dedicated hint: the empty diamond points at dropping it entirely (type
+  arguments are inferred from the constructor's arguments), and an explicit
+  type argument points at Onion's square-bracket generics syntax.
+
+- **Parser hint for a JavaScript/Python-style `yield expr` generator statement.**
+  Writing `yield value` — the generator/coroutine idiom from JavaScript and
+  Python — parsed `yield` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (suggesting the nonsensical
+  `yield(...)`), since the parser saw `yield` directly followed by another
+  expression with nothing in between. The diagnostic now recognizes the
+  `yield expr` shape and explains that Onion has no generator/coroutine
+  construct — a function returns one value, so build and return a `List` of
+  the results instead.
+
+## [0.27.0] - 2026-08-30
+
+### Fixed
+
+- **Parser hint for a Java/JavaScript/PHP-style `expr instanceof Type` check.**
+  Writing `if x instanceof String { ... }` — the runtime type-check idiom from
+  Java, JavaScript, and PHP — parsed `x` as the whole `if` condition and then
+  hit the generic "a block is expected here" fallback on `instanceof`, which
+  pointed nowhere near the actual mistake. The diagnostic now recognizes the
+  `expr instanceof Type` shape and points at Onion's `is` type-check operator
+  (`x is String`, also usable as `case x is Type:` in `select`).
+
+- **Parser hint for a JavaScript/Python-style prefix `await expr` statement.**
+  Writing `await asyncOp()` — the idiom every JavaScript/Python programmer
+  reaches for to wait on an async result — parsed `await` as a bare identifier
+  statement and hit the generic "a call's arguments need parentheses" fallback
+  (suggesting the nonsensical `await(...)`), since the parser saw `await`
+  directly followed by another expression with nothing in between. The
+  diagnostic now recognizes the `await expr` shape and points at Onion's
+  actual equivalent, postfix `expr.await()` on a `Future`.
+
+### Added
+
+- **`run/GraphAlgorithms.on` extended into a property-graph showcase**
+  (360 → 432 lines): labeled weighted edges (`record Edge`), BFS/DFS
+  traversal, Dijkstra's shortest path with full path+label reconstruction,
+  3-colour DFS cycle detection, and Kahn's algorithm for topological sort,
+  over a city-transit-network and task-dependency-DAG demo.
+
+- **`run/BinaryHeap.on`, a ~280-line binary min-heap corpus sample.**
+  A `MinHeap` class with a `private:` section (`siftUp`/`siftDown`/`swap`)
+  backing heap sort, a task scheduler, and Dijkstra's shortest path; an ADT
+  `enum PathResult` (`Reached`/`Unreachable`), `record HeapEntry`/`Edge`,
+  extension methods on `String` (`repeat`, `padRight`), nullable (`Int?`)
+  `safeParse` with `try`/`catch`, and collection pipelines
+  (`filter`/`map`/`fold`/`find`/`sortedBy`/`groupBy`/`distinct`/`partition`/`zip`).
+
+### Fixed
+
+- **Parser hint for a Python-style `raise` statement.**
+  Writing `raise Exception("boom")` — the idiom every Python programmer
+  reaches for to throw an exception — parsed `raise` as a bare identifier
+  statement and hit the generic "a call's arguments need parentheses"
+  fallback (suggesting the nonsensical `raise(...)`), since the parser saw
+  `raise` directly followed by another identifier with nothing in between.
+  The diagnostic now recognizes the `raise expr` shape and points at
+  Onion's actual equivalent, `throw expr` (or `throw new Name(args)` when
+  the raised expression looks like a constructor call, e.g.
+  `Exception("boom")`).
+
+- **Parser hint for a Rust/Go/Swift/C#/TypeScript-style `struct` declaration.**
+  Writing `struct Point { x: Int, y: Int }` — the idiom every C-family/Rust/
+  Go/Swift/TypeScript programmer reaches for first when defining a data
+  type — parsed `struct` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (since the parser saw
+  `struct` directly followed by `Point` with nothing in between), which is
+  actively misleading: the mistake has nothing to do with a missing call.
+  The diagnostic now recognizes the `struct Name` shape and points at
+  Onion's actual equivalent, `record Name(x: Int, y: Int)`.
+- **Parser hint for a Python-style `class Foo:` header no longer says "superclass".**
+  A Python-style class header (`class Foo:` or `class Foo(x: Int):`, body indented
+  on the next line instead of `{ ... }`) hit the same generic colon-position error
+  as the *old* `class A : B` extends syntax and got that hint back verbatim — "a
+  superclass is named with `extends`, not `:`" — which makes no sense when there
+  is no superclass in sight. The diagnostic now tells the two mistakes apart by
+  whether anything follows the colon on the same line and, for the Python-style
+  case, points at the brace-based rewrite (`class Foo { ... }`) instead.
+- **Parser hint for a Java-style `final Type name = ...` local variable.**
+  Onion has no grammar production for a `final`-qualified local declaration
+  (`final` is only a class/method modifier), so writing one — e.g. `final
+  Int x = 5` inside a method body — previously fell straight through to the
+  generic "encountered `final`, but expecting `}`" fallback with no mention
+  of the actual mistake. The diagnostic now recognizes the Java-style
+  `final Type name` shape and points at `val` instead, which is already
+  immutable by default.
+- **Destructuring a generic record no longer loses its type argument.**
+  `case Wrap(v):` against a `Wrap[Int]` scrutinee bound `v` at the record's
+  bare type parameter `T` instead of the `Int` it was actually instantiated
+  with, so using `v` as an `Int` failed to typecheck (E0000: "type Int is
+  expected, but type T is used") even though `w.v()` on the same value
+  worked fine. The scrutinee's type argument is now recovered the same way
+  a root `is`-pattern already does for a sealed hierarchy (#311), and applies
+  through nested destructuring too (`Outer(Pair(a, b))` on an
+  `Outer[Int]`/`Pair[Int, String]` scrutinee binds `a: Int`, `b: String`).
+
+## [0.26.0] - 2026-08-29
+
+### Added
+
+- **`run/RideSharePool.on`, a 259-line ride-share carpool matching and
+  dispatch simulator.** Covers a plain `enum VehicleType`, a data-carrying
+  ADT `enum RideEvent` (`RequestCreated`, `DriverMatched`, `RideCompleted`,
+  `RideCancelled`) with exhaustive `select`, `extension Double`/`extension
+  Int`, records (`Location`, `RideRequest`, `Trip`), a class hierarchy
+  (`PremiumDriver extends Driver`, `override`/`super`) conforming to a
+  `Reportable` interface, nullable-return driver matching (`Driver?`),
+  collection pipelines (`filter`, `sortedBy`, `groupBy`, `partition`,
+  `fold`, `map`), `try`/`catch` for invalid ride requests, recursive
+  multi-stop route distance, `foreach` over ranges and `Map` (k, v)
+  destructuring, and a `while` loop modeling surge-price decay.
+
+- **`run/EpidemiologySim.on`, a 403-line SEIR epidemic compartment-model
+  simulator.** Covers 8 intervention scenarios across 2 pathogens (seasonal
+  flu, COVID-like, novel), exercising a data-carrying ADT `enum
+  InterventionType`, records with body methods, `extension Double`/`extension
+  Int`, collection pipelines (`map`, `filter`, `any`, `count`, `find`),
+  `foreach` over ranges and `Map` (k, v) destructuring, nullable lookups,
+  closures, string interpolation, and `while` loops.
+
+### Fixed
+
+- **Parser hint for a Python-style `if cond:` / `while cond:` colon body.**
+  Onion blocks use `{ ... }`, not a trailing `:`; writing `if cond:` or
+  `while cond:` (also `else if cond:`) hit only the generic "a block `{
+  ... }` is expected here" fallback with no mention of the actual mistake.
+  The diagnostic now recognizes the colon-terminated header and shows the
+  brace-based rewrite directly, e.g. `if args.length > 0 { ... }` instead
+  of `if args.length > 0:`.
+- **Parser hint for a Swift-style `guard let ... else` early exit.** Onion
+  has no `guard`; `guard let x = expr else { ... }` parsed `guard` as a bare
+  identifier-reference statement and then hit a generic `expecting <EOF>,
+  <EOL>, ";"` error on the following `let`, surfacing the unrelated
+  "call's arguments need parentheses" hint. The diagnostic now recognizes
+  the `guard let ... else` shape (including a pattern binding like `guard
+  let Some(x) = expr else { ... }`) and points at the idiomatic bind-then-
+  null-check form: `val x = expr; if x == null { ... }` (matching the
+  existing `if let`/`while let` optional-binding hint).
+- **Parser hint for a PHP-style `elseif` clause.** Onion has no `elseif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elseif b {
+  ... }` parsed `elseif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elseif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` and Ruby-style `elsif` hints).
+- **Parser hint for a Ruby-style `elsif` clause.** Onion has no `elsif`;
+  `if`/`else if` chains cover the same ground, so `if a { ... } elsif b {
+  ... }` parsed `elsif` as a bare identifier-reference statement and then
+  hit a generic `expecting <EOF>, <EOL>, ";"` error on the next token, with
+  no mention of `else if`. The diagnostic now recognizes a line containing
+  `elsif` and points at the correct `else if` form (matching the existing
+  Python-style `elif` hint).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` figures
+  synced** after the `EpidemiologySim.on` corpus addition (245 samples, 185
+  large programs, 4388 recorded tests).
+- **Diagnostics: `docs/quality-bar.md` / `docs/ja/quality-bar.md` sample and
+  large-program counts re-synced** to 246 / 186 (`TimeSeries.on` was added to
+  `run/` without a matching doc update, so `QualityBarSpec` was red on
+  `develop`).
+
+## [0.25.0] - 2026-08-29
+
+### Added
+
+- **`run/PolyCalc.on`, a 379-line polynomial arithmetic system.** Exercises
+  an ADT enum (`CalcResult` with `Value`, `RootFound`, `IntegralValue`,
+  `NoRoot` cases, including a zero-field singleton), extension methods on
+  `Double`/`Int`/`String`, a mutable `Poly` class with static factories,
+  Horner-method evaluation, polynomial add/subtract/multiply/derivative/
+  integral/composition, Newton's-method root finding (nullable `Double?`
+  return), collection pipelines, and a Chebyshev-recurrence cross-check
+  against `java.lang.Math::cos`.
+
+- **`run/VendingMachine.on`, a 290-line vending machine simulator.** Plain
+  enums (`Coin`, `Category`) with value-pattern matching, a data-carrying
+  ADT `enum MachineEvent` (`CoinAccepted`, `ItemDispensed`, `Refunded`,
+  `ErrorEvent`) with exhaustive type-pattern dispatch, records (`Product`,
+  `Sale`, `DailySummary`), a class hierarchy with primary-constructor
+  inheritance (`PremiumMachine extends VendingMachine`, `override`/`super`),
+  an interface (`Reportable`), and collection pipelines (`groupBy`,
+  `filter`, `map`, `fold`, `sortedBy`, `partition`, `find`).
+
+- **`run/TrainDispatch.on`, a 389-line railway dispatch simulation.**
+  Records (`Station`, `Route`, `Booking`), a data-carrying ADT
+  `enum TrainStatus` (`OnTime`, `Delayed`, `Cancelled`), a plain
+  `enum TicketClass`, an interface/class pair (`Reportable`, `Train`,
+  `Dispatcher`) with public fields, extension methods on `String`/`Int`,
+  ADT `select`/pattern matching, collection pipelines (`map`, `filter`,
+  `fold`, `groupBy`, `sortedBy`, `distinct`, `partition`, `zip`), nullable
+  `find`, closures, string interpolation, `try`/`catch`, recursion, and
+  `foreach` over ranges, an object list, and map entries.
+
+- **`run/LambdaCalc.on`, a 306-line untyped lambda calculus interpreter.**
+  An ADT `enum Expr` (`Var`/`Abs`/`App`) drives capture-avoiding
+  substitution and beta reduction to normal form, with Church numeral
+  encodings exercising `succ`, `+`, and `*` end-to-end. Uses nullable
+  types, `select`/`case` pattern matching (including an `else:`
+  catch-all), extension methods on `String`, and `filter`/`fold`/`find`
+  pipelines over `List[String]`.
+
+- **Diagnostic hint for Swift/Rust-style `if let`/`while let` optional
+  binding.** `if let x = opt { ... }`, `while let x = opt { ... }`, and the
+  Rust `Some(x)` pattern-binding form (`if let Some(x) = opt { ... }`) now
+  get a bilingual parser hint pointing at the Onion equivalent (bind with
+  `var`, then null-check: `var x = opt; if x != null { ... }`), instead of
+  falling through to the generic "a block `{ ... }` is expected here"
+  message.
+
+### Fixed
+
+- **The `for (vars in coll)` destructuring-mistake hint leaked a stray `)` into
+  its suggested fix.** Writing the whole `for (key, value in entries) { ... }`
+  clause wrapped in one outer paren pair (mimicking the also-supported
+  `for (key, value) in entries { ... }` mistake) produced a hint reading
+  `foreach (key, value) in entries) { ... }` -- the wrapper's own closing
+  paren was captured as part of the collection expression, because the
+  classifier's regex only accounted for an optional close paren right after
+  the variable list, not one belonging to an outer wrap. A dedicated pattern
+  now recognizes the whole-clause-wrapped form before falling back to the
+  general one, so the suggested fix has balanced parens again; collection
+  expressions that are themselves calls (`getEntries()`) are unaffected.
+
+- **E0091 (`ClassName` used as a value) didn't mention the `is` pattern fix.**
+  Writing a bare class name as a `select` case pattern (`case Nothing:`,
+  meaning to match a singleton ADT enum case or any other type by name)
+  hits E0091, but the message only suggested `::` for static-member
+  access -- correct for the `System.currentTimeMillis()` habit the error
+  was designed for, but not what fixes a pattern. The message now also
+  names the `is` fix (`case x is ClassName:`); the error code and all
+  other behavior are unchanged.
+
+- **Parser rejected `else` on the line after a single-line `if` body.**
+  `if n < 0 { n * -1 }` followed by `else { n }` on the next line raised a
+  syntax error at `else`: the closing `}` of the single-line body could
+  leave a stale end-of-line token buffered by the lexer even after it
+  reverted out of statement mode, and a bare two-token lookahead in
+  `if_expression()` saw that stale token first and rejected `else`. The
+  grammar now uses a semantic lookahead that skips buffered EOL tokens to
+  find the real next token before matching `else` (excluding `select`'s
+  `else:` fallback clause, which must still parse as before).
+
+## [0.24.0] - 2026-08-28
+
+### Added
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A plain
+  `enum Category` (10 spending categories), an ADT `enum TransactionType`
+  (Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), and
+  `Account`/`BudgetManager`/`FinanceEngine`/`ReportPrinter` classes with
+  `public:`/`private:` sections. Two months of checking/savings
+  transactions drive per-category budget tracking and over-budget
+  detection, monthly income/expense/net-savings/savings-rate reports, a
+  top-3 expense ranking (insertion sort), and a savings-goal projection,
+  via `filter`/`fold`/`map` pipelines and `select`/`case` matching on the
+  ADT enum.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `enum Outcome` (Pass/Fail/GaveUp) with
+  sealed exhaustive `select` matching, records (`PropSpec`, `Cex`), a
+  `static`-method class taking function-typed parameters (`Int -> Boolean`,
+  `String -> Boolean`, `() -> Int`), an integer bisection shrinker and a
+  string suffix shrinker, and a conditional-property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  (commutativity, distributivity, string-reverse involution,
+  concat-length, palindrome generation, an intentionally-falsified
+  property, and more) via `filter`/`map`/`fold`/`sortedBy`/`partition`/
+  `groupBy` pipelines over generated samples.
 
 - **`run/MaxFlow.on`, a 370-line maximum-flow and minimum s-t cut demo.**
   Edmonds-Karp (BFS-based Ford-Fulkerson, O(VE²)) over a `class`/`record`
@@ -38,6 +384,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`filter`, `map`, `fold`, `sortedBy`, `groupBy`, `partition`, `count`,
   `distinct`, `any`) driving conflict detection, free-slot finding, and an
   auto-scheduler.
+
+- **`run/TextTransformPipeline.on`, a 352-line composable text-transformation
+  pipeline simulator.** An ADT `case` enum `Transform` (10 cases: Upper,
+  Lower, TrimSpaces, Truncate, Repeat, Reverse, Replace, AddPrefix,
+  AddSuffix, CollapseSpaces) with `apply`/`category`/`label` methods, a
+  data-carrying `Category` enum, records with methods (`StepResult`,
+  `RunResult`), a `Pipeline` class conforming to a `Reportable` interface,
+  extension methods on `String`/`Int`, and collection pipelines (`filter`,
+  `map`, `fold`, `sortedBy`, `groupBy`, `distinct`, `find`, `partition`,
+  `any`, `count`, `zip`) run five named pipelines over five sample inputs
+  with aggregate analytics.
+
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `case` enum (`Outcome`: `Pass`/`Fail`/
+  `GaveUp`) with sealed exhaustive `select` matching, records (`PropSpec`,
+  `Cex`), static-method classes, function-type parameters, closures over
+  captured PRNG state, an integer shrinker (bisection) and a string
+  shrinker (suffix trim), and a conditional property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  end-to-end (commutativity, distributivity, `reverse(reverse(s)) == s`,
+  a deliberately-falsified property, and more).
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A
+  plain enum (`Category`), an ADT enum (`TransactionType` with
+  Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), classes with
+  `public:`/`private:` sections (`Account`, `BudgetManager`,
+  `FinanceEngine`, `ReportPrinter`), and collection pipelines drive budget
+  tracking, monthly income/expense/savings-rate reporting, top-expense
+  ranking, and a savings-goal projection over two months of transactions.
 
 ### Fixed
 
@@ -63,6 +439,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correct `import { module.name }` form.
 
 ### Added
+
+- **`run/LibraryCatalog.on`, a 361-line library catalog and loan tracking
+  sample.** A public-library book catalog and loan management system:
+  records with `example` clauses (`Book`, `Member`, `Loan`), a data-carrying
+  ADT `enum LoanStatus` (`Active(dueDay)`, `Returned(returnedDay, onTime)`,
+  `Overdue(dueDay, daysLate)`) matched exhaustively via `select`, a plain
+  `enum Genre`, extension methods on `Int` and `String`, a mutable `Library`
+  class, nullable `Int?` handling, collection pipelines (`any`/`count`/
+  `filter`/`groupBy`/`sortedBy`/`sortedByDescending`/`take`), `foreach (k, v)
+  in map` for genre/author breakdowns, and `try`/`catch` for validation
+  errors.
 
 - **`run/SymbolicMath.on`, a 283-line symbolic expression rewriting and
   calculus engine.** An ADT `enum Term` (Num, Var, Add, Sub, Mul, Div, Neg,

@@ -275,6 +275,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `any`, `count`, `zip`) run five named pipelines over five sample inputs
   with aggregate analytics.
 
+- **`run/PropCheck.on`, a 416-line mini property-based testing framework**
+  modelled on QuickCheck. An ADT `case` enum (`Outcome`: `Pass`/`Fail`/
+  `GaveUp`) with sealed exhaustive `select` matching, records (`PropSpec`,
+  `Cex`), static-method classes, function-type parameters, closures over
+  captured PRNG state, an integer shrinker (bisection) and a string
+  shrinker (suffix trim), and a conditional property runner with
+  precondition and give-up threshold. Twelve properties are checked
+  end-to-end (commutativity, distributivity, `reverse(reverse(s)) == s`,
+  a deliberately-falsified property, and more).
+
+- **`run/PersonalFinance.on`, a 458-line personal finance tracker.** A
+  plain enum (`Category`), an ADT enum (`TransactionType` with
+  Credit/Debit/Transfer cases carrying fields), records with methods
+  (`Money`, `Transaction`, `BudgetLine`, `MonthlyReport`), classes with
+  `public:`/`private:` sections (`Account`, `BudgetManager`,
+  `FinanceEngine`, `ReportPrinter`), and collection pipelines drive budget
+  tracking, monthly income/expense/savings-rate reporting, top-expense
+  ranking, and a savings-goal projection over two months of transactions.
+
 ### Fixed
 
 - **Parser hint for a Rust-style `val mut`/`var mut` declaration.** Onion has

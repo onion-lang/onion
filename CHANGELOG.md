@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-08-30
+
 ### Fixed
 
 - **Parser hint for a Java/JavaScript/PHP-style `expr instanceof Type` check.**

@@ -584,6 +584,17 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Point")
     }
 
+    it("recognizes a Kotlin/Scala-style `object` singleton declaration") {
+      val hint = classify(
+        found = "Foo",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "object Foo {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.object_declaration"
+      hint.arguments shouldBe Seq("Foo")
+    }
+
     it("recognizes a Java-style `final` local variable declaration") {
       val hint = classify(
         found = "final",

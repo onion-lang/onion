@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a Kotlin/Scala-style singleton `object` declaration.**
+  Writing `object Registry { ... }` — the singleton idiom from Kotlin and
+  Scala — parsed `object` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (suggesting the nonsensical
+  `object(...)`), since the parser saw `object` directly followed by another
+  identifier with nothing in between. The diagnostic now recognizes the
+  `object Name { ... }` shape and points at Onion's actual equivalent: a
+  class with only static members.
+
 ## [0.27.0] - 2026-08-30
 
 ### Fixed

@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the actual replacement is Onion's Elvis operator, `?:`. The diagnostic now
   recognizes the doubled `??` and points at `a ?: b` instead.
 
+- **Parser hint for a Python-style `lambda x: expr` expression.** Writing
+  `lambda x: x + 1` — since `lambda` isn't a reserved word — parsed as a
+  bare identifier reference, so the statement `val f = lambda` was accepted
+  as complete and the actual mistake surfaced as an unrelated "unexpected
+  token" error on the parameter name that followed, with no diagnostic
+  connecting it back to `lambda`. The diagnostic now recognizes the
+  `lambda params: expr` shape and points at Onion's arrow-lambda syntax
+  (`(x) -> x + 1`) instead.
+
 ## [0.28.0] - 2026-08-30
 
 ### Fixed

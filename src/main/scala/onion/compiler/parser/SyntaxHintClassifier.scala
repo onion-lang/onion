@@ -47,6 +47,15 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+?)\s*;?\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
+  // A Python-style `lambda x: expr` (or `lambda x, y: expr`) expression --
+  // `lambda` isn't a reserved word, so it parses as a bare identifier and the
+  // rest reads as a stray second statement with nothing connecting it back to
+  // the actual mistake. The `\s+` before the parameter list requires at least
+  // one space, which a real Onion identifier named `lambda` followed by its
+  // own type annotation (`lambda: Int`, no space before the colon) never has,
+  // so this can't misfire on that.
+  private val PythonStyleLambdaExpression =
+    """\blambda\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*:\s*(.+?)\s*$""".r
   private val RustStyleStructDeclaration =
     """^\s*struct\s+([A-Za-z_]\w*)\b""".r
   private val KotlinScalaStyleObjectDeclaration =
@@ -208,6 +217,9 @@ private[compiler] object SyntaxHintClassifier {
           ValVarParamPrefix.replaceFirstIn(p.trim, "")
         }.mkString(", ")
         hint("error.parsing.hint.data_class_declaration", matched.group(1), params)
+      case _ if PythonStyleLambdaExpression.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PythonStyleLambdaExpression.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.python_style_lambda", matched.group(1).trim, matched.group(2).trim)
       case _ if RustStyleStructDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleStructDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.struct_declaration", matched.group(1))

@@ -623,6 +623,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.messageKey shouldBe "error.parsing.hint.old_extends"
     }
 
+    it("recognizes a Python-style `lambda x: expr` expression") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "val f = lambda x: x + 1"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_lambda"
+      hint.arguments shouldBe Seq("x", "x + 1")
+    }
+
+    it("recognizes a Python-style multi-parameter `lambda x, y: expr` expression") {
+      val hint = classify(
+        found = "x",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "val f = lambda x, y: x + y"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.python_style_lambda"
+      hint.arguments shouldBe Seq("x, y", "x + y")
+    }
+
     it("recognizes a Kotlin-style `data class` declaration") {
       val hint = classify(
         found = "class",

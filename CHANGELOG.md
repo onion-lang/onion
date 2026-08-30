@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `object Name { ... }` shape and points at Onion's actual equivalent: a
   class with only static members.
 
+- **Parser hints for Java-style generic constructor calls.** Writing
+  `new ArrayList<String>()` or the empty-diamond `new ArrayList<>()` parsed
+  `<` as a valid less-than operator, so `new ArrayList` and `<String>` were
+  read as a comparison chain and the real syntax error only surfaced later
+  in the line (typically at the trailing `(` or `)`), with no diagnostic
+  connecting it back to the angle brackets. The two shapes now get a
+  dedicated hint: the empty diamond points at dropping it entirely (type
+  arguments are inferred from the constructor's arguments), and an explicit
+  type argument points at Onion's square-bracket generics syntax.
+
 ## [0.27.0] - 2026-08-30
 
 ### Fixed

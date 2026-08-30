@@ -595,6 +595,39 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Foo")
     }
 
+    it("recognizes a Java-style diamond-operator constructor call") {
+      val hint = classify(
+        found = "<",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "val list = new ArrayList<>()"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_diamond_operator"
+      hint.arguments shouldBe Seq("ArrayList")
+    }
+
+    it("recognizes a Java-style generic constructor call with explicit type arguments") {
+      val hint = classify(
+        found = ")",
+        expected = "\"Boolean\", \"break\", \"Byte\"",
+        sourceLine = "val list = new ArrayList<String>()"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_generic_constructor_call"
+      hint.arguments shouldBe Seq("ArrayList", "String")
+    }
+
+    it("recognizes a Java-style generic constructor call with multiple type arguments") {
+      val hint = classify(
+        found = ")",
+        expected = "\"Boolean\", \"break\", \"Byte\"",
+        sourceLine = "val m = new HashMap<String, Int>()"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.java_style_generic_constructor_call"
+      hint.arguments shouldBe Seq("HashMap", "String, Int")
+    }
+
     it("recognizes a Java-style `final` local variable declaration") {
       val hint = classify(
         found = "final",

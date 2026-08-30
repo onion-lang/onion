@@ -19,6 +19,12 @@ private[compiler] object ControlFlowSyntaxHints {
   private val LeadingRaiseConstructorCall =
     """^\s*raise\s+([A-Za-z_][\w.]*)\s*\(([^()]*)\)\s*$""".r
   private val LeadingRaiseStatement = """^\s*raise\s+(.+?)\s*$""".r
+  // A JavaScript/Python-style prefix `await expr` statement -- Onion's `Future`
+  // is awaited postfix (`f.await()`), so this reads as a bare `await` identifier
+  // followed by another expression with nothing in between, which also matches
+  // the generic missing-call-parens fallback (suggesting the nonsensical
+  // `await(...)`); keep this ahead of that case.
+  private val LeadingAwaitStatement = """^\s*await\s+(.+?)\s*$""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -47,6 +53,9 @@ private[compiler] object ControlFlowSyntaxHints {
     } else if (LeadingRaiseStatement.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingRaiseStatement.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.python_style_raise", matched.group(1))
+    } else if (LeadingAwaitStatement.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingAwaitStatement.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.await_not_supported", matched.group(1).trim)
     } else {
       None
     }

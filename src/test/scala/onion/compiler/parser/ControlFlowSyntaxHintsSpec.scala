@@ -16,7 +16,8 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
         ("until", "until done {", "error.parsing.hint.until_not_supported"),
         ("error", "} except error: Exception {", "error.parsing.hint.except_not_supported"),
         ("Exception", "raise Exception(\"boom\")", "error.parsing.hint.python_style_raise_construct"),
-        ("e", "raise e", "error.parsing.hint.python_style_raise")
+        ("e", "raise e", "error.parsing.hint.python_style_raise"),
+        ("foo", "await foo()", "error.parsing.hint.await_not_supported")
       )
 
       cases.foreach { case (found, sourceLine, expectedKey) =>
@@ -40,6 +41,15 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.python_style_raise"
       hint.arguments shouldBe Seq("e")
+    }
+
+    it("captures the awaited expression from a prefix `await expr` statement") {
+      val hint = ControlFlowSyntaxHints
+        .classify(found = "foo", sourceLine = "await foo()")
+        .getOrElse(fail("expected a syntax hint"))
+
+      hint.messageKey shouldBe "error.parsing.hint.await_not_supported"
+      hint.arguments shouldBe Seq("foo()")
     }
 
     it("preserves rule order inside the family") {

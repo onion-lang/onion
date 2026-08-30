@@ -129,6 +129,11 @@ private[compiler] object SyntaxHintClassifier {
   private val DanglingReturnTypeColon =
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*:\s*$""".r
   private val BareAdjacentTokens = """^\s*([A-Za-z_]\w*)\s+\S""".r
+  // `context` starts exactly at the found token, so a lone `?` found immediately
+  // followed by a second `?` is the two-token spelling of `??` -- distinguish it
+  // from the unrelated `cond ? a : b` ternary mistake below, which also matches
+  // on a bare `?` but has a differently-shaped fix (`?:`, not `if`/`else`).
+  private val NullishCoalescing = """\A\?\?""".r
 
   def classify(
     found: String,
@@ -284,6 +289,8 @@ private[compiler] object SyntaxHintClassifier {
       case ("\n" | "\r\n" | "\r") if DanglingReturnTypeColon.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DanglingReturnTypeColon.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.dangling_return_type_colon", matched.group(1))
+      case "?" if NullishCoalescing.findFirstMatchIn(context).isDefined =>
+        hint("error.parsing.hint.nullish_coalescing")
       case "?" =>
         hint("error.parsing.hint.ternary")
       case "else" =>

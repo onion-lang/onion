@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Swift-style bare `guard <condition> else { ... }` early
+  exit.** The `guard let x = ... else { ... }` binding form already had a
+  dedicated hint, but the bare form with no `let` binding fell through to
+  the generic "a call's arguments need parentheses" fallback (suggesting the
+  nonsensical `guard(...)`). The diagnostic now recognizes the bare form too
+  and points at Onion's actual equivalent: invert the condition into a plain
+  `if !(cond) { ... }`.
+
 - **Parser hint for a JS/TS/Kotlin-style `??` nullish-coalescing operator.**
   Writing `a ?? b` reused the `cond ? a : b` ternary hint on the first `?`,
   pointing at an `if`/`else` rewrite that doesn't fit the mistake at all —

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a JS/TS/Kotlin-style `??` nullish-coalescing operator.**
+  Writing `a ?? b` reused the `cond ? a : b` ternary hint on the first `?`,
+  pointing at an `if`/`else` rewrite that doesn't fit the mistake at all —
+  the actual replacement is Onion's Elvis operator, `?:`. The diagnostic now
+  recognizes the doubled `??` and points at `a ?: b` instead.
+
 ## [0.28.0] - 2026-08-30
 
 ### Fixed

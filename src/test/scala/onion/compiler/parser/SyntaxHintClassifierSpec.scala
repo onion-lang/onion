@@ -469,6 +469,25 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a JS/TS/Kotlin-style `??` nullish-coalescing operator") {
+      val hint = classify(
+        found = "?",
+        expected = "<EOF>, <EOL>, \";\"",
+        context = "?? 5",
+        sourceLine = "val b: Int = a ?? 5"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.nullish_coalescing"
+    }
+
+    it("keeps the plain ternary hint for a lone `?` that isn't `??`") {
+      val hint = classify(
+        found = "?",
+        context = "? 1 : 2",
+        sourceLine = "val y = (x > 3) ? 1 : 0"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.ternary"
+    }
+
     it("does not flag `not` when no block is expected next") {
       SyntaxHintClassifier.classify(
         found = "x",

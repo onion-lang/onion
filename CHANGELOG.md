@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arguments are inferred from the constructor's arguments), and an explicit
   type argument points at Onion's square-bracket generics syntax.
 
+- **Parser hint for a JavaScript/Python-style `yield expr` generator statement.**
+  Writing `yield value` — the generator/coroutine idiom from JavaScript and
+  Python — parsed `yield` as a bare identifier statement and hit the generic
+  "a call's arguments need parentheses" fallback (suggesting the nonsensical
+  `yield(...)`), since the parser saw `yield` directly followed by another
+  expression with nothing in between. The diagnostic now recognizes the
+  `yield expr` shape and explains that Onion has no generator/coroutine
+  construct — a function returns one value, so build and return a `List` of
+  the results instead.
+
 ## [0.27.0] - 2026-08-30
 
 ### Fixed

@@ -42,6 +42,8 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
   private val RustStyleStructDeclaration =
     """^\s*struct\s+([A-Za-z_]\w*)\b""".r
+  private val KotlinScalaStyleObjectDeclaration =
+    """^\s*object\s+([A-Za-z_]\w*)\b""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
@@ -179,6 +181,9 @@ private[compiler] object SyntaxHintClassifier {
       case _ if RustStyleStructDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleStructDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.struct_declaration", matched.group(1))
+      case _ if KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.object_declaration", matched.group(1))
       case _ if GoStyleShortVarDecl.findFirstMatchIn(sourceLine).isDefined =>
         val matched = GoStyleShortVarDecl.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.go_style_short_var_decl", matched.group(1), matched.group(2).trim)

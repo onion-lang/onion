@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Java/JavaScript/PHP-style `expr instanceof Type` check.**
+  Writing `if x instanceof String { ... }` — the runtime type-check idiom from
+  Java, JavaScript, and PHP — parsed `x` as the whole `if` condition and then
+  hit the generic "a block is expected here" fallback on `instanceof`, which
+  pointed nowhere near the actual mistake. The diagnostic now recognizes the
+  `expr instanceof Type` shape and points at Onion's `is` type-check operator
+  (`x is String`, also usable as `case x is Type:` in `select`).
+
 - **Parser hint for a JavaScript/Python-style prefix `await expr` statement.**
   Writing `await asyncOp()` — the idiom every JavaScript/Python programmer
   reaches for to wait on an async result — parsed `await` as a bare identifier

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ForthMachine.on`, a 474-line Forth-inspired stack-based interpreter.**
+  A tokenizer/executor over a mutable data stack and dictionary, exercising
+  an ADT `case`-enum (`ForthError` with `Underflow`/`Unknown`/`DivByZero`/
+  `Syntax`), `select`/type-pattern error dispatch, `extension String`
+  (`isInt`, `toInt`, `padLeft`, `repeatStr`), nullable types with safe calls,
+  recursive instance methods (word definitions calling themselves for
+  `DO`-bodies and user words), `try`/`catch`, `StringBuilder`, and collection
+  pipelines. Demos cover arithmetic, recursive factorial/Fibonacci,
+  `DO`/`LOOP` with nested `IF`/`ELSE`/`THEN`, FizzBuzz, and a prime sieve.
+  (Merged in #955; this entry was missing from the changelog until now.)
+
 ### Fixed
 
 - **Diagnostic hint for a JS/TS-style backtick template literal used as a

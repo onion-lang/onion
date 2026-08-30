@@ -39,9 +39,13 @@ class VariableUsageTracker {
 
   /**
    * Returns all unused variables (declared but never used).
+   *
+   * `_` is excluded: it's the conventional "I'm intentionally discarding
+   * this binding" name (e.g. `foreach (k, _) in map`), so warning on it
+   * would flag the one name whose entire point is being unused.
    */
   def unusedVariables: Seq[VariableDecl] = {
-    declarations.values.filter(d => !usages.contains(d.name)).toSeq
+    declarations.values.filter(d => d.name != "_" && !usages.contains(d.name)).toSeq
   }
 
   /**

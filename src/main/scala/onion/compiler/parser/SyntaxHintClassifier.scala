@@ -85,6 +85,16 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*case\s+[a-z_]\w*\s*:\s*[A-Z][\w.\[\]]*\??\s*:""".r
   private val JavaStyleGenericAngleBrackets =
     """\b([A-Z][A-Za-z0-9_]*)<([A-Za-z_][\w\s,\[\]?]*)>""".r
+  // A Java-style generic constructor call, e.g. `new ArrayList<String>()` or the
+  // empty-diamond `new ArrayList<>()`. Unlike JavaStyleGenericAngleBrackets above
+  // (a type-annotation position, where `<` is never valid and is itself the found
+  // token), `<` here parses as a valid less-than operator: `new ArrayList` reads as
+  // a value, then `<String>` as a comparison chain, so the real syntax error only
+  // surfaces later in the line (typically at the trailing `(` or `)`) with no token
+  // connecting it back to the angle brackets. Match on the source line directly,
+  // independent of the found token, to still catch it.
+  private val JavaStyleGenericConstructorCall =
+    """\bnew\s+([A-Za-z_][\w.]*)\s*<\s*([^<>]*?)\s*>\s*\(""".r
   private val PrimitiveTypeNames =
     Set("Int", "Long", "Double", "Float", "Boolean", "Byte", "Short", "Char")
   private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
@@ -147,6 +157,14 @@ private[compiler] object SyntaxHintClassifier {
       case "<" if JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleGenericAngleBrackets.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_generics", matched.group(1), matched.group(2).trim)
+      case _ if JavaStyleGenericConstructorCall.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JavaStyleGenericConstructorCall.findFirstMatchIn(sourceLine).get
+        val className = matched.group(1)
+        val typeArgs = matched.group(2).trim
+        if (typeArgs.isEmpty)
+          hint("error.parsing.hint.java_style_diamond_operator", className)
+        else
+          hint("error.parsing.hint.java_style_generic_constructor_call", className, typeArgs)
       // A Python-style `class Foo:` header also lands here (the parser wants
       // `extends`/`{` right where the trailing `:` sits), but it's a missing-brace
       // mistake, not the old colon-extends syntax -- keep it ahead of that case.

@@ -25,6 +25,12 @@ private[compiler] object ControlFlowSyntaxHints {
   // the generic missing-call-parens fallback (suggesting the nonsensical
   // `await(...)`); keep this ahead of that case.
   private val LeadingAwaitStatement = """^\s*await\s+(.+?)\s*$""".r
+  // A JavaScript/Python-style generator `yield expr` statement -- Onion has no
+  // generator/coroutine construct, so this reads as a bare `yield` identifier
+  // followed by another expression with nothing in between, which also matches
+  // the generic missing-call-parens fallback (suggesting the nonsensical
+  // `yield(...)`); keep this ahead of that case.
+  private val LeadingYieldStatement = """^\s*yield\s+(.+?)\s*$""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -56,6 +62,8 @@ private[compiler] object ControlFlowSyntaxHints {
     } else if (LeadingAwaitStatement.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingAwaitStatement.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.await_not_supported", matched.group(1).trim)
+    } else if (LeadingYieldStatement.findFirstMatchIn(sourceLine).isDefined) {
+      hint("error.parsing.hint.yield_not_supported")
     } else {
       None
     }

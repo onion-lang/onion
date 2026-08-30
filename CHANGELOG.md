@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for a JS/TS-style backtick template literal used as a
+  string.** Writing `` `Hello ${name}` `` — Onion uses backticks only to
+  escape a reserved word into an identifier, not for template literals — made
+  the whole `${name}` text parse as the literal name of a local variable
+  reference. Since that variable is never declared, the mistake surfaced as a
+  `local variable Hello ${name} is not found` (E0002) error that repeated the
+  entire template text back at the user with nothing connecting it to the
+  actual mistake. The diagnostic now recognizes the `${...}` shape in the
+  unresolved name and points at Onion's actual string interpolation syntax,
+  `"text #{expr}"`, instead.
+
 - **Parser hint for a Swift-style bare `guard <condition> else { ... }` early
   exit.** The `guard let x = ... else { ... }` binding form already had a
   dedicated hint, but the bare form with no `let` binding fell through to

@@ -108,6 +108,8 @@ private[compiler] object SyntaxHintClassifier {
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =
     """\(\s*([A-Z][\w.\[\]]*\??)\s*\)\s*[A-Za-z_$(]""".r
+  private val InstanceofExpression =
+    """\b([A-Za-z_][\w.]*(?:\([^()]*\))?)\s+instanceof\s+([A-Za-z_][\w.\[\]]*)""".r
   private val PythonStyleReturnArrow =
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*->\s*([A-Za-z_][\w.\[\]?]*)""".r
   private val DanglingReturnTypeColon =
@@ -129,6 +131,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.js_style_const")
       case "$" =>
         hint("error.parsing.hint.dollar_sigil")
+      case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)

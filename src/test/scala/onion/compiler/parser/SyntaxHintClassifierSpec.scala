@@ -199,6 +199,37 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("List[String]")
     }
 
+    it("recognizes a Java-style `instanceof` type check") {
+      val hint = classify(
+        found = "instanceof",
+        expected = "\"{\"",
+        sourceLine = "    if x instanceof String {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.instanceof_not_supported"
+      hint.arguments shouldBe Seq("x", "String")
+    }
+
+    it("recognizes an `instanceof` check on a method call result") {
+      val hint = classify(
+        found = "instanceof",
+        expected = "\"{\"",
+        sourceLine = "    if get() instanceof Foo {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.instanceof_not_supported"
+      hint.arguments shouldBe Seq("get()", "Foo")
+    }
+
+    it("does not flag `instanceof` used as an ordinary identifier") {
+      SyntaxHintClassifier.classify(
+        found = "instanceof",
+        expected = "\"=\"",
+        context = "",
+        sourceLine = "val instanceof: Int"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.instanceof_not_supported")
+    }
+
     it("recognizes a Python/Rust/TypeScript-style `-> Type` return type arrow") {
       val hint = classify(
         found = "->",

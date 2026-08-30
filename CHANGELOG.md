@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parser hint for a JavaScript/Python-style prefix `await expr` statement.**
+  Writing `await asyncOp()` — the idiom every JavaScript/Python programmer
+  reaches for to wait on an async result — parsed `await` as a bare identifier
+  statement and hit the generic "a call's arguments need parentheses" fallback
+  (suggesting the nonsensical `await(...)`), since the parser saw `await`
+  directly followed by another expression with nothing in between. The
+  diagnostic now recognizes the `await expr` shape and points at Onion's
+  actual equivalent, postfix `expr.await()` on a `Future`.
+
 ### Added
 
 - **`run/GraphAlgorithms.on` extended into a property-graph showcase**

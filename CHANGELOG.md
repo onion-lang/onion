@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a JavaScript/Python-style `typeof` operator.** Writing
+  `if typeof x == "string" { ... }` — the runtime type-check idiom from
+  JavaScript and Python — parsed `typeof` as a bare identifier expression and
+  hit the generic "a block is expected here" fallback on the operand that
+  followed it, which pointed nowhere near the actual mistake. The diagnostic
+  now recognizes the `typeof expr` shape in an `if`/`while`/`else if`
+  condition and points at Onion's actual type check, the `is` operator
+  (`expr is Type`).
+
 - **Parser hint for a Kotlin/Scala-style singleton `object` declaration.**
   Writing `object Registry { ... }` — the singleton idiom from Kotlin and
   Scala — parsed `object` as a bare identifier statement and hit the generic

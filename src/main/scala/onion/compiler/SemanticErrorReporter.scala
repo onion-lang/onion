@@ -481,6 +481,14 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Special case handlers ==========
 
+  // A JS/TS-style backtick template literal (`` `Hello ${name}` ``) isn't a string in
+  // Onion -- backticks only escape a reserved word into an identifier, so the whole
+  // `${...}` text becomes the literal name of a local variable reference, and the
+  // mistake surfaces as a VARIABLE_NOT_FOUND whose message repeats the entire template
+  // text back as if it were an identifier. Detect that shape in the unresolved name
+  // and point at Onion's actual interpolation syntax instead of a name-similarity guess.
+  private val TemplateLiteralInName = """\$\{.*\}""".r
+
   /**
    * Handles VARIABLE_NOT_FOUND with optional suggestions.
    */
@@ -491,7 +499,9 @@ class SemanticErrorReporter(threshold: Int) {
     // A third item is an explicit qualified-form hint (e.g. "this.x" / "C::x")
     // for a name that is actually a field; prefer it over name-similarity.
     val suggestion =
-      if (items.length > 2 && items(2) != null) {
+      if (TemplateLiteralInName.findFirstIn(name).isDefined) {
+        Some(message("suggestion.jsTemplateLiteral"))
+      } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {
         val candidates = items(1).asInstanceOf[Array[String]]

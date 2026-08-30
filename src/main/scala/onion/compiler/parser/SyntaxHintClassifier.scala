@@ -32,6 +32,11 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*(if|while)\s+let\s+(?:[A-Za-z_]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))\s*=\s*(.+?)\s*\{?\s*$""".r
   private val GuardLetElseBinding =
     """^\s*guard\s+let\s+(?:[A-Za-z_]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))\s*=\s*(.+?)\s*else\b.*$""".r
+  // A Swift-style bare `guard <condition> else { ... }` early exit, with no
+  // `let` binding -- tried only after GuardLetElseBinding above, so a `let`
+  // form is never misread as a plain condition.
+  private val GuardElseBinding =
+    """^\s*guard\s+(.+?)\s*else\b.*$""".r
   private val GoStyleShortVarDecl =
     """^\s*([A-Za-z_]\w*)\s*:=\s*(.+?)\s*$""".r
   private val UsingResourceStatement =
@@ -337,6 +342,14 @@ private[compiler] object SyntaxHintClassifier {
         val matched = GuardLetElseBinding.findFirstMatchIn(sourceLine).get
         val name = Option(matched.group(1)).getOrElse(matched.group(2))
         hint("error.parsing.hint.guard_let_else", name, matched.group(3).trim)
+      // A Swift-style bare `guard <condition> else { ... }` early exit (no
+      // `let` binding) reads the same way -- keep it ahead of the generic
+      // missing-call-parens fallback below, same as the `let` form above.
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            GuardElseBinding.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = GuardElseBinding.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.guard_else", matched.group(1).trim)
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).

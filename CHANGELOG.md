@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`_` no longer triggers "unused variable"/"unused parameter" warnings.**
+  `_` is the conventional "I'm intentionally discarding this binding" name
+  (Scala, Rust, Go, and Onion's own `run/` examples all use it, e.g.
+  `foreach (k, _) in map { ... }` to keep only one half of a destructured
+  pair). The unused-variable checker (W0001/W0006) previously flagged it
+  like any other name, which meant the one identifier whose entire point is
+  "unused" produced a warning — noise that trained users to ignore the
+  checker instead of acting on it. `_` is now exempt.
+
 - **Parser hint for a JavaScript/Python-style `typeof` operator.** Writing
   `if typeof x == "string" { ... }` — the runtime type-check idiom from
   JavaScript and Python — parsed `typeof` as a bare identifier expression and

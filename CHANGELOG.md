@@ -22,6 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for a JS-style `console.log`/`console.error`/`console.warn`
+  call.** Onion has no `console` object, so `console` parsed as a bare
+  identifier reference and the mistake surfaced as a generic
+  `local variable console is not found` (E0002) error with nothing pointing
+  at the actual fix. The diagnostic now recognizes the exact unresolved name
+  `console` and points at `IO::println(...)` instead.
+
+- **Locale-fragile assertion in `DanglingElseHintI18nSpec`.** The spec
+  asserted that the hint's message contains the English phrase
+  `` "only `if` takes an `else`" ``, assuming it was a literal code example
+  (like `TernaryHintI18nSpec`'s `` if cond { a } else { b } ``) and therefore
+  locale invariant. It is actually translated prose, so the assertion only
+  held under an English-default JVM and failed under `-Duser.language=ja` —
+  exactly the trap this project's own testing guidance warns against. Fixed
+  to assert on the backticked `` `else` ``/`` `if` `` tokens instead, which
+  are left untranslated in both bundles.
+
 - **Diagnostic hint for a JS/TS-style backtick template literal used as a
   string.** Writing `` `Hello ${name}` `` — Onion uses backticks only to
   escape a reserved word into an identifier, not for template literals — made

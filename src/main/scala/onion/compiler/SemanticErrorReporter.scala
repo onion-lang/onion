@@ -489,6 +489,13 @@ class SemanticErrorReporter(threshold: Int) {
   // and point at Onion's actual interpolation syntax instead of a name-similarity guess.
   private val TemplateLiteralInName = """\$\{.*\}""".r
 
+  // A JS-style `console.log(...)`/`console.error(...)`/`console.warn(...)` call has no
+  // `console` object in Onion, so `console` parses as a bare identifier reference and
+  // the mistake surfaces as a VARIABLE_NOT_FOUND on exactly that name, with nothing
+  // connecting it back to Onion's actual output API. Detect that exact identifier and
+  // point at `IO::println` instead of a name-similarity guess.
+  private val ConsoleObjectName = "console"
+
   /**
    * Handles VARIABLE_NOT_FOUND with optional suggestions.
    */
@@ -501,6 +508,8 @@ class SemanticErrorReporter(threshold: Int) {
     val suggestion =
       if (TemplateLiteralInName.findFirstIn(name).isDefined) {
         Some(message("suggestion.jsTemplateLiteral"))
+      } else if (name == ConsoleObjectName) {
+        Some(message("suggestion.jsConsoleLog"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {

@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backed by a regression test tying the doc to `ShapeFormats.all` so a fourth
   format can't leave the example stale again.
 
+- **Parser hint for a Python-style `with expr as name { ... }` resource block.**
+  Writing `with open(path) as f { ... }` — Python's context-manager idiom —
+  parsed `with` as a bare identifier statement and hit the generic "a call's
+  arguments need parentheses" fallback (suggesting the nonsensical
+  `with(...)`), since `with` is not a keyword in Onion's grammar. The
+  diagnostic now recognizes the `with expr as name { ... }` shape and points
+  at Onion's actual equivalent, `try (val name = expr) { ... }`.
+
 ## [0.29.0] - 2026-08-31
 
 ### Added
@@ -154,14 +162,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `yield expr` shape and explains that Onion has no generator/coroutine
   construct — a function returns one value, so build and return a `List` of
   the results instead.
-
-- **Parser hint for a Python-style `with expr as name { ... }` resource block.**
-  Writing `with open(path) as f { ... }` — Python's context-manager idiom —
-  parsed `with` as a bare identifier statement and hit the generic "a call's
-  arguments need parentheses" fallback (suggesting the nonsensical
-  `with(...)`), since `with` is not a keyword in Onion's grammar. The
-  diagnostic now recognizes the `with expr as name { ... }` shape and points
-  at Onion's actual equivalent, `try (val name = expr) { ... }`.
 
 ## [0.27.0] - 2026-08-30
 

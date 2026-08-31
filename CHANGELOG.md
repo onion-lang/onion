@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A drift guard for the "Error Categories" doc block atop `SemanticError`.**
+  That scaladoc sorts every declared code into a category (Type Errors,
+  Resolution Errors, ...) via a curated bullet list, but nothing tied it to
+  the `case object` declarations below it -- 23 of the 89 declared codes,
+  including recent additions like `CLASS_USED_AS_VALUE` and
+  `NULLABLE_MEMBER_ACCESS`, were entirely absent, and the Inheritance Errors
+  range silently included a retired code (E0017) that was never reused.
+  Recategorized every code accurately and added
+  `SemanticErrorCategoryDocCoverageSpec`, which asserts every case object
+  name appears in the doc block so a newly added code can't go
+  uncategorized again.
+
 - **A drift guard for key parity between `errorMessage.properties` and
   `errorMessage_ja.properties`.** `ResourceBundle` chains the Japanese bundle to the
   English one as its parent, so a key present only in English still *resolves* through

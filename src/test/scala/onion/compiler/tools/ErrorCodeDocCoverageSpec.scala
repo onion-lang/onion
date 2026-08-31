@@ -88,4 +88,26 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese E0063 section names every derive! marker the compiler supports") {
     checkDeriveMarkers("docs/ja/reference/error-codes.md", "src/main/resources/errorMessage_ja.properties")
   }
+
+  // `shape name = <format>` supports `json`, `yaml` and `config` (`ShapeFormats.all`),
+  // but the E0076 example comment in error-codes.md still listed only `json, yaml`
+  // -- the same whitelist-drift mistake E0063 made, against a doc whose own
+  // surrounding prose reads as authoritative. Ties the doc to `ShapeFormats.all` so
+  // adding a fourth format can't leave the example stale again.
+
+  private def checkShapeFormats(docPath: String): Unit = {
+    val names = onion.compiler.ShapeFormats.all.map(_._1)
+    assert(names.nonEmpty, "no shape formats found in ShapeFormats.all -- the scan has rotted")
+    val e0076 = section(read(docPath), "E0076")
+    val missing = names.filterNot(e0076.contains)
+    assert(missing.isEmpty, s"$docPath E0076 section does not mention format(s): ${missing.mkString(", ")}")
+  }
+
+  it("the English E0076 section names every shape format the compiler supports") {
+    checkShapeFormats("docs/reference/error-codes.md")
+  }
+
+  it("the Japanese E0076 section names every shape format the compiler supports") {
+    checkShapeFormats("docs/ja/reference/error-codes.md")
+  }
 }

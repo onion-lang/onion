@@ -111,8 +111,9 @@ private[compiler] object SyntaxHintClassifier {
   // independent of the found token, to still catch it.
   private val JavaStyleGenericConstructorCall =
     """\bnew\s+([A-Za-z_][\w.]*)\s*<\s*([^<>]*?)\s*>\s*\(""".r
-  private val PrimitiveTypeNames =
-    Set("Int", "Long", "Double", "Float", "Boolean", "Byte", "Short", "Char")
+  // Kept in sync with typing.NameResolver's own copy via the shared
+  // onion.compiler.PrimitiveTypeNames -- see its doc comment.
+  private val PrimitiveTypeNames = onion.compiler.PrimitiveTypeNames.all.toSet
   private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
   private val JavaStyleRecordBody =
     """^\s*record\s+([A-Za-z_]\w*)(?:\[[^\]]*\])?\s*\{""".r

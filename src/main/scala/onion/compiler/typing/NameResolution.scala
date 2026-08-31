@@ -26,13 +26,12 @@ final case class TypeAliasEntry(
 )
 
 object NameResolver {
-  /** Onion's primitive type keywords, capitalized (`void` is the one exception --
-    * it is already lowercase in the grammar). Included as class-not-found
-    * suggestion candidates so a Java/Scala-style lowercase spelling (`int`, `boolean`,
-    * ...), which parses as an ordinary unresolved reference type, gets "did you mean
-    * `Int`?" instead of a bare "check spelling or add import". */
-  private[typing] val PrimitiveTypeNames: Seq[String] =
-    Seq("Int", "Long", "Short", "Byte", "Char", "Float", "Double", "Boolean")
+  /** Class-not-found suggestion candidates so a Java/Scala-style lowercase spelling
+    * (`int`, `boolean`, ...), which parses as an ordinary unresolved reference type,
+    * gets "did you mean `Int`?" instead of a bare "check spelling or add import".
+    * Delegates to the shared `onion.compiler.PrimitiveTypeNames` -- see its doc
+    * comment for the other call site this must stay in sync with. */
+  private[compiler] val PrimitiveTypeNames: Seq[String] = onion.compiler.PrimitiveTypeNames.all
 }
 
 class NameResolver(private val context: NameResolutionContext) {

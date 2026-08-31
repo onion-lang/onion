@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A single source of truth for the primitive-type-name whitelist.** `typing.NameResolver`
+  (class-not-found suggestions -- "did you mean `Int`?" for a Java/Scala-style lowercase
+  `int`) and `parser.SyntaxHintClassifier` (the `hint.primitive_dot_static` hint for
+  `Int.parseInt(...)`-style mistakes) each listed Onion's eight capitalized primitive
+  type names separately -- the same two-copies-of-one-list drift risk already closed for
+  `DeriveMarkers` and `ShapeFormats`. Both now read from a shared
+  `onion.compiler.PrimitiveTypeNames.all`. Added a regression test asserting the two call
+  sites agree and that the `primitive_dot_static` hint actually fires for every name in
+  the shared list.
+
 - **A single source of truth for the builtin-extension container list.** The
   stdlib containers whose static helpers become extension methods (`onion.Colls`,
   `onion.Strings`, `onion.Maps`, ...) were listed twice: once in

@@ -765,7 +765,7 @@ what is supported.
 
 ```onion
 record Pt(x: Int, y: Int)
-  shape doc = toml     // E0076: supported formats are json, yaml
+  shape doc = toml     // E0076: supported formats are json, yaml, config
 ```
 
 For an inline pattern, write `shape name = re"..."`.

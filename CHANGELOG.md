@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by a regression test tying the doc to the property file so they can't
   drift apart again.
 
+- **Stale `E0076` example in the error-code reference.** The same whitelist-drift
+  mistake as `E0063`, one code later: `docs/reference/error-codes.md` (and its `ja`
+  translation) showed the `shape name = <format>` error listing only `json, yaml`
+  as supported formats, even though `ShapeFormats.all` (and the compiler's own
+  `E0076` message) has included `config` for a while. Docs now list all three,
+  backed by a regression test tying the doc to `ShapeFormats.all` so a fourth
+  format can't leave the example stale again.
+
 ## [0.29.0] - 2026-08-31
 
 ### Added

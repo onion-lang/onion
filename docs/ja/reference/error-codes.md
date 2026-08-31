@@ -761,7 +761,7 @@ law はコンパイル済みクラスに対して実行されます。`law` / `e
 
 ```onion
 record Pt(x: Int, y: Int)
-  shape doc = toml     // E0076: サポートしているのは json, yaml
+  shape doc = toml     // E0076: サポートしているのは json, yaml, config
 ```
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。

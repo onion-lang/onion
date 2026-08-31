@@ -58,6 +58,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name appears in the doc block so a newly added code can't go
   uncategorized again.
 
+- **A single source of truth for the E0079 "which effects take a parameter
+  argument" whitelist.** `CapabilityCheckPass` hardcoded its own private
+  `parameterized: Set[Effect]` (deciding whether a `requires { read(src) }`-style
+  entry may carry a parameter) with nothing tying it to the matching prose
+  repeated in both `docs/reference/error-codes.md` and its `ja` translation --
+  the same whitelist-drift risk already closed for E0063's `derive!` markers,
+  E0076's shape formats, and E0061/E0062/E0081's scalar types. The set now
+  lives as `Effect.parameterized` in `effects/Effect.scala`, and
+  `ErrorCodeDocCoverageSpec` asserts the E0079 sections in both docs name
+  every parameterized effect so a future addition can't leave them stale.
+
 - **A drift guard for key parity between `errorMessage.properties` and
   `errorMessage_ja.properties`.** `ResourceBundle` chains the Japanese bundle to the
   English one as its parent, so a key present only in English still *resolves* through

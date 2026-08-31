@@ -134,4 +134,27 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese E0081 section names every scalar type the compiler supports") {
     checkScalarConversions("docs/ja/reference/error-codes.md", "E0081")
   }
+
+  // `CapabilityCheckPass` used to hardcode its own private `parameterized: Set[Effect]`
+  // (which effects a `requires { read(src) }`-style entry may take a parameter for) --
+  // duplicated as prose in the E0079 section of both docs with nothing tying the two
+  // together, the same drift risk already fixed for E0063's markers, E0076's formats,
+  // and E0061/E0062/E0081's scalar types. `Effect.parameterized` is now the single
+  // source of truth both the pass and this test read from.
+
+  private def checkParameterizedEffects(docPath: String): Unit = {
+    val names = onion.compiler.effects.Effect.parameterized.toSeq.sorted.map(_.name)
+    assert(names.nonEmpty, "no parameterized effects found in Effect.parameterized -- the scan has rotted")
+    val e0079 = section(read(docPath), "E0079")
+    val missing = names.filterNot(e0079.contains)
+    assert(missing.isEmpty, s"$docPath E0079 section does not mention parameterized effect(s): ${missing.mkString(", ")}")
+  }
+
+  it("the English E0079 section names every effect that takes a parameter argument") {
+    checkParameterizedEffects("docs/reference/error-codes.md")
+  }
+
+  it("the Japanese E0079 section names every effect that takes a parameter argument") {
+    checkParameterizedEffects("docs/ja/reference/error-codes.md")
+  }
 }

@@ -29,10 +29,6 @@ final class CapabilityCheckPass(typing: Typing) {
   private val RequiresPrefix = "requires:"
   private val CapabilityForm = """([A-Za-z]+)(?:\(([A-Za-z0-9_]+)\))?""".r
 
-  /** Effects that can be tied to a parameter (`read(src)`); the rest are ambient. */
-  private val parameterized: Set[Effect] =
-    Set(Effect.Read, Effect.Write, Effect.Net, Effect.Exec)
-
   def run(classes: Seq[ClassDefinition]): Unit = {
     val tools: Seq[MethodDefinition] = for {
       cd <- classes
@@ -65,7 +61,7 @@ final class CapabilityCheckPass(typing: Typing) {
             report(SemanticError.TOOL_BAD_CAPABILITY, tool.location, tool.name, cap,
               Message("error.semantic.toolCapability.notAnEffect", name, Effect.all.map(_.name).mkString(", ")))
           case Some(effect) =>
-            if (arg != null && !parameterized.contains(effect))
+            if (arg != null && !Effect.parameterized.contains(effect))
               report(SemanticError.TOOL_BAD_CAPABILITY, tool.location, tool.name, cap,
                 Message("error.semantic.toolCapability.takesNoArgument", name))
             else if (arg != null && !paramNames.contains(arg))

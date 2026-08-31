@@ -95,4 +95,43 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese E0076 section names every shape format the compiler supports") {
     checkShapeFormats("docs/ja/reference/error-codes.md")
   }
+
+  // `record ... from re"..."`, `derive!`, and `tool` auto-CLI all restrict components to
+  // the same eight-type scalar set, read from the single `ScalarConversions.all` table
+  // (added for issue #349 after that list used to be written out five times). The E0061,
+  // E0062, and E0081 sections each repeat the set as prose/comment instead of citing the
+  // table, so nothing previously tied them to it -- the same drift risk already fixed for
+  // E0063's markers and E0076's formats, one section over each time.
+
+  private def checkScalarConversions(docPath: String, code: String): Unit = {
+    val tags = onion.compiler.ScalarConversions.all.map(_.tag)
+    assert(tags.nonEmpty, "no scalar conversions found in ScalarConversions.all -- the scan has rotted")
+    val doc = section(read(docPath), code)
+    val missing = tags.filterNot(doc.contains)
+    assert(missing.isEmpty, s"$docPath $code section does not mention scalar type(s): ${missing.mkString(", ")}")
+  }
+
+  it("the English E0061 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/reference/error-codes.md", "E0061")
+  }
+
+  it("the Japanese E0061 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/ja/reference/error-codes.md", "E0061")
+  }
+
+  it("the English E0062 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/reference/error-codes.md", "E0062")
+  }
+
+  it("the Japanese E0062 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/ja/reference/error-codes.md", "E0062")
+  }
+
+  it("the English E0081 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/reference/error-codes.md", "E0081")
+  }
+
+  it("the Japanese E0081 section names every scalar type the compiler supports") {
+    checkScalarConversions("docs/ja/reference/error-codes.md", "E0081")
+  }
 }

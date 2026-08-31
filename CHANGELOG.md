@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A drift guard tying the E0061/E0062/E0081 "supported scalar types" prose to
+  `ScalarConversions.all`.** `record ... from re"..."`, `derive!(Json, Yaml)`, and
+  `tool` auto-CLI parameters all restrict components to the same eight-type scalar
+  set, and `docs/reference/error-codes.md` (and its `ja` translation) repeat that
+  set as literal prose in all three sections -- the same whitelist-drift risk
+  already fixed for E0063's `derive!` markers and E0076's shape formats, one
+  section over each time, but with nothing tying these three to their source of
+  truth. Added `checkScalarConversions` to `ErrorCodeDocCoverageSpec`, verified it
+  actually catches a dropped type before confirming today's docs are still
+  accurate.
+
 - **A drift guard for the "Error Categories" doc block atop `SemanticError`.**
   That scaladoc sorts every declared code into a category (Type Errors,
   Resolution Errors, ...) via a curated bullet list, but nothing tied it to

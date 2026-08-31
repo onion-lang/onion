@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Stale `E0062`/`E0063` docs in the error-code reference.** `docs/reference/error-codes.md`
+  (and its `ja` translation) described `derive!(Json)` as the only supported
+  form and claimed `Json` was the sole `E0063` marker, even though `derive!`
+  has supported `Yaml` (and `derive!(Json, Yaml)`) for a while — contradicting
+  the compiler's own `E0063` message. Docs now describe both markers, backed
+  by a regression test tying the doc to the property file so they can't
+  drift apart again.
+
 ## [0.29.0] - 2026-08-31
 
 ### Added

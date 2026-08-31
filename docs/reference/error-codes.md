@@ -644,11 +644,13 @@ record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner is not a su
 Fix: keep every component in the supported scalar set, or parse the field
 manually after a plain `from re"..."` match on the rest.
 
-### `E0062` — Record component type unsupported by `derive!(Json)`
+### `E0062` — Record component type unsupported by `derive!`
 
-`derive!(Json)` generates `fromJson`/`toJson` by mapping each component to a
-JSON scalar. Only `String`, `Int`, `Long`, `Double`, `Float`, `Boolean`,
-`Short`, and `Byte` components are supported — the same set as `from re"..."`.
+`derive!(Json)` and `derive!(Yaml)` both generate their `fromX`/`toX` pair by
+mapping each component to a scalar — they share the same `toMap`/`fromMap`
+core, so the restriction is identical for both. Only `String`, `Int`, `Long`,
+`Double`, `Float`, `Boolean`, `Short`, and `Byte` components are supported —
+the same set as `from re"..."`.
 
 ```onion
 record Inner(z: Int)
@@ -659,14 +661,15 @@ Fix: keep every component in the supported scalar set.
 
 ### `E0063` — Unknown `derive!` marker
 
-`derive!(...)` names a format the compiler does not implement. The only
-supported marker today is `Json`.
+`derive!(...)` names a format the compiler does not implement. The supported
+markers are `Json` and `Yaml` — either alone, or together as
+`derive!(Json, Yaml)`.
 
 ```onion
 record U(a: String) derive!(Bogus)   // E0063: unknown derive! marker Bogus
 ```
 
-Fix: use `derive!(Json)`, or remove the clause.
+Fix: use `derive!(Json)`, `derive!(Yaml)`, or `derive!(Json, Yaml)`, or remove the clause.
 
 ### `E0086` — Duplicate record component
 

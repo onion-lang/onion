@@ -46,8 +46,10 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   // `derive!` has supported both `Json` and `Yaml` markers for a while (see
   // `error.semantic.recordDeriveUnknownMarker`), but the E0063 prose in
   // error-codes.md still claimed `Json` was the only one — actively
-  // contradicting the compiler's own error message. Ties the doc's marker
-  // list to the property file so the two can't drift apart silently again.
+  // contradicting the compiler's own error message. The marker whitelist itself
+  // used to be written out separately in `TypingOutlinePass` and in the property
+  // files' message text; both now read from `DeriveMarkers.all`, and this test
+  // ties the doc's marker list to that same source so the two can't drift apart.
 
   private def section(doc: String, code: String): String = {
     val start = doc.indexOf(s"`$code`")
@@ -56,37 +58,20 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
     if (next >= 0) doc.substring(start, next) else doc.substring(start)
   }
 
-  private def supportedMarkers(propsPath: String): Set[String] = {
-    val props = read(propsPath)
-    val line = props.linesIterator
-      .find(_.startsWith("error.semantic.recordDeriveUnknownMarker="))
-      .getOrElse(fail(s"recordDeriveUnknownMarker key not found in $propsPath"))
-    val tail = """(?:Supported markers|サポートしているマーカー): (.*)$""".r
-      .findFirstMatchIn(line)
-      .map(_.group(1))
-      .getOrElse(fail(s"unexpected recordDeriveUnknownMarker format in $propsPath: $line"))
-    tail
-      .replaceAll("[。.]\\s*$", "")
-      .split(",")
-      .map(_.trim)
-      .filter(_.nonEmpty)
-      .toSet
-  }
-
-  private def checkDeriveMarkers(docPath: String, propsPath: String): Unit = {
-    val markers = supportedMarkers(propsPath)
-    assert(markers.nonEmpty, s"no derive! markers parsed from $propsPath — the scan has rotted")
+  private def checkDeriveMarkers(docPath: String): Unit = {
+    val markers = onion.compiler.DeriveMarkers.all
+    assert(markers.nonEmpty, "no derive! markers found in DeriveMarkers.all -- the scan has rotted")
     val e0063 = section(read(docPath), "E0063")
-    val missing = markers.filterNot(e0063.contains).toSeq.sorted
+    val missing = markers.filterNot(e0063.contains)
     assert(missing.isEmpty, s"$docPath E0063 section does not mention marker(s): ${missing.mkString(", ")}")
   }
 
   it("the English E0063 section names every derive! marker the compiler supports") {
-    checkDeriveMarkers("docs/reference/error-codes.md", "src/main/resources/errorMessage.properties")
+    checkDeriveMarkers("docs/reference/error-codes.md")
   }
 
   it("the Japanese E0063 section names every derive! marker the compiler supports") {
-    checkDeriveMarkers("docs/ja/reference/error-codes.md", "src/main/resources/errorMessage_ja.properties")
+    checkDeriveMarkers("docs/ja/reference/error-codes.md")
   }
 
   // `shape name = <format>` supports `json`, `yaml` and `config` (`ShapeFormats.all`),

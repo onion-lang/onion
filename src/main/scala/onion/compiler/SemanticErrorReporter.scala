@@ -410,7 +410,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
       "error.semantic.recordDeriveUnknownMarker",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => asString(items(1)))
     ),
     SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
       "error.semantic.shapeFormatUnknown",

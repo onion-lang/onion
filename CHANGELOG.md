@@ -48,6 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backed by a regression test tying the doc to `ShapeFormats.all` so a fourth
   format can't leave the example stale again.
 
+- **`derive!`'s marker whitelist, written out three times.** The `hasData` guard
+  and the unknown-marker check in `TypingOutlinePass` each hardcoded
+  `m == "Json" || m == "Yaml"`, and `errorMessage.properties`/`errorMessage_ja.properties`
+  separately hardcoded "Supported markers: Json, Yaml." as literal text in the
+  E0063 message — the same drift risk `ShapeFormats` was introduced to close
+  for `shape name = <format>`. Added `DeriveMarkers` as the single source of
+  truth and wired both checks and the E0063 message through it; also fixes
+  `RECORD_DERIVE_UNKNOWN_MARKER`'s message-format definition, which only
+  declared one argument extractor and would have silently rendered the
+  message as "Supported markers: {1}." once a second argument was added.
+
 - **Parser hint for a Python-style `with expr as name { ... }` resource block.**
   Writing `with open(path) as f { ... }` — Python's context-manager idiom —
   parsed `with` as a bare identifier statement and hit the generic "a call's

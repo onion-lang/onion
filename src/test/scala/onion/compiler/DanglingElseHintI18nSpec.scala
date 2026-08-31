@@ -40,8 +40,12 @@ class DanglingElseHintI18nSpec extends AnyFunSpec with Diagrams {
       case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
       case _ => ""
     }
-    // The example code shown in the hint is literal, identical in both bundles,
-    // so this assertion holds regardless of the JVM's default locale.
-    assert(msgs.contains("only `if` takes an `else`"), s"expected the hint's dangling-else explanation, got: $msgs")
+    // Unlike TernaryHintI18nSpec's literal code example, this hint's explanation is
+    // ordinary prose, and the Japanese bundle translates it in full -- so an English
+    // phrase like "only `if` takes an `else`" is not actually present under a
+    // Japanese-locale JVM. The backticked tokens themselves are the one part left
+    // untranslated in both bundles, so assert on those instead.
+    assert(msgs.contains("`else`"), s"expected the hint to mention `else`, got: $msgs")
+    assert(msgs.contains("`if`"), s"expected the hint to mention `if`, got: $msgs")
   }
 }

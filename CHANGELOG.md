@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A single source of truth for the builtin-extension container list.** The
+  stdlib containers whose static helpers become extension methods (`onion.Colls`,
+  `onion.Strings`, `onion.Maps`, ...) were listed twice: once in
+  `Typing.registerBuiltinExtensions` (which registers them) and again in
+  `ExtensionMethodFallbackSupport.BuiltinExtensionContainers` (which decides
+  whether a user-declared `extension` may shadow one of them instead of
+  colliding as an ambiguity) -- the same two-copies-of-one-list drift risk
+  already closed for `derive!` markers (`DeriveMarkers`) and shape formats
+  (`ShapeFormats`), flagged by its own "keep in sync" comment. `Typing.scala`
+  now iterates `BuiltinExtensionContainers` directly (kept as an ordered `Seq`
+  so the existing first-container-wins overlap resolution is unaffected).
+  Added a regression test that shadows a builtin from a second container
+  (`onion.Strings`, alongside the existing `onion.Colls` coverage) so a future
+  drift between the two use sites fails a test instead of only miscompiling
+  silently at the ambiguity check.
+
 - **A drift guard tying the E0061/E0062/E0081 "supported scalar types" prose to
   `ScalarConversions.all`.** `record ... from re"..."`, `derive!(Json, Yaml)`, and
   `tool` auto-CLI parameters all restrict components to the same eight-type scalar

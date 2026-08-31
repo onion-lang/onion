@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A drift guard for key parity between `errorMessage.properties` and
+  `errorMessage_ja.properties`.** `ResourceBundle` chains the Japanese bundle to the
+  English one as its parent, so a key present only in English still *resolves* through
+  the Japanese bundle -- silently, in English -- and every existing bundle spec only
+  checks that a key resolves in both locales, never that both `.properties` files
+  actually declare it. A dropped or renamed translation was therefore invisible to the
+  suite. Added `MessageBundleKeyParitySpec`, which reads both files directly (bypassing
+  the fallback chain) and fails if either declares a key the other doesn't.
+
 ### Fixed
 
 - **Stale `E0062`/`E0063` docs in the error-code reference.** `docs/reference/error-codes.md`

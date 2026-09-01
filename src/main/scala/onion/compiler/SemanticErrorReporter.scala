@@ -121,6 +121,10 @@ class SemanticErrorReporter(threshold: Int) {
   // captured too ("1 binding was specified" / "2 bindings were specified").
   private def pluralizeCountVerb(count: Int, noun: String, verbSingular: String, verbPlural: String): String =
     if (count == 1) s"1 $noun $verbSingular" else s"$count ${noun}s $verbPlural"
+  // Same idea, but for a clause with no noun of its own ("1 is supplied" / "2 are
+  // supplied") -- the noun was already named earlier in the sentence.
+  private def pluralizeVerbOnly(count: Int, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $verbSingular" else s"$count $verbPlural"
   private def typeNames(types: Array[TypedAST.Type]): String = {
     if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
   }
@@ -325,9 +329,18 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.missingReturn",
       Seq(items => asString(items(0)), items => typeName(items(1)))
     ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
     SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
       "error.semantic.typeArgumentArityMismatch",
-      Seq(items => asString(items(0)), items => items(1).toString, items => items(2).toString)
+      Seq(
+        items => asString(items(0)),
+        items => items(1).toString,
+        items => items(2).toString,
+        items => pluralizeCount(items(1).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(2).asInstanceOf[Int], "is supplied", "are supplied")
+      )
     ),
     SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE -> ErrorDef(
       "error.semantic.typeArgumentMustBeReference",
@@ -337,9 +350,19 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.methodNotGeneric",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    // {2}/{3} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {4}/{5} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as TYPE_ARGUMENT_ARITY_MISMATCH above.
     SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
       "error.semantic.methodTypeArgumentArityMismatch",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => items(2).toString, items => items(3).toString)
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => items(2).toString,
+        items => items(3).toString,
+        items => pluralizeCount(items(2).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(3).asInstanceOf[Int], "is supplied", "are supplied")
+      )
     ),
     SemanticError.ERASURE_SIGNATURE_COLLISION -> ErrorDef(
       "error.semantic.erasureSignatureCollision",

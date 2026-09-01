@@ -296,7 +296,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // is meaningless; skip synthesis (no parse/parseAll) rather than emit a select
       // whose zero bindings would also dodge the E0060 group-count check.
       val hasFrom = node.fromPattern.isDefined
-      val hasData = node.derives.exists(m => m == "Json" || m == "Yaml")
+      val hasData = node.derives.exists(DeriveMarkers.isSupported)
       val hasShapes = node.shapes.nonEmpty
       // law/example methods (B3) register unconditionally — independent of from/derive and of
       // args.nonEmpty (a componentless record can still carry laws/examples; the law's own
@@ -334,9 +334,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (unsupportedFrom.isEmpty && unsupportedData.isEmpty && unsupportedShape.isEmpty && badShapes.isEmpty)
           derivedMethods.foreach(processMethodDeclaration)
       }
-      // Unknown derive! markers — Json and Yaml are supported at present.
-      node.derives.filterNot(m => m == "Json" || m == "Yaml").foreach { mk =>
-        report(SemanticError.RECORD_DERIVE_UNKNOWN_MARKER, node, mk)
+      // Unknown derive! markers.
+      node.derives.filterNot(DeriveMarkers.isSupported).foreach { mk =>
+        report(SemanticError.RECORD_DERIVE_UNKNOWN_MARKER, node, mk, DeriveMarkers.supportedNames)
       }
     }
     // User-defined members (access sections in the record body), mirroring enums.
@@ -378,7 +378,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       }
   }
 
-  /** Component types `derive!` (Json/Yaml) can serialize — the same scalar set as `from`. */
+  /** Component types `derive!` (see `DeriveMarkers`) can serialize — the same scalar set as `from`. */
   private def isDataDerivableType(tp: Type): Boolean = isFromDerivableType(tp)
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -769,14 +769,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         typeRef match
           case cd: ClassDefinition => cd.location
           case _ => null
-      report(SemanticError.ILLEGAL_INHERITANCE, location, typeRef.name)
+      report(SemanticError.ILLEGAL_INHERITANCE, location, typeRef.name, "kindMismatch")
     }
     // A final superclass used to escape typing entirely and blow up only when the
     // generated class was loaded (JVM IncompatibleClassChangeError at the law-check
     // step — an uncaught crash, found by the 0.10.1 E-code sweep). Report it where
     // the user can see it, on the supertype reference itself.
     if (!mustBeInterface && !isInterface && Modifier.isFinal(typeRef.modifier)) {
-      report(SemanticError.ILLEGAL_INHERITANCE, node, typeRef.name)
+      report(SemanticError.ILLEGAL_INHERITANCE, node, typeRef.name, "finalSuper")
     }
     typeRef
   }

@@ -257,8 +257,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
   /** A builtin stdlib extension (the bundled collection/string utilities), as
    *  opposed to a user-declared `extension` block — used so a user extension can
-   *  shadow a builtin of the same name instead of colliding as an ambiguity.
-   *  Keep in sync with the container list in Typing.registerBuiltinExtensions. */
+   *  shadow a builtin of the same name instead of colliding as an ambiguity. */
   private def isBuiltinExtension(m: ExtensionMethodDefinition): Boolean =
     ExtensionMethodFallbackSupport.BuiltinExtensionContainers.contains(m.containerClass.name)
 
@@ -275,9 +274,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 }
 
 private[compiler] object ExtensionMethodFallbackSupport {
-  /** Containers whose static helpers are registered as builtin extension methods
-   *  (see Typing.registerBuiltinExtensions). A user-declared `extension` of the
-   *  same name shadows these rather than colliding as an ambiguity. */
-  val BuiltinExtensionContainers: Set[String] =
-    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats", "onion.Format")
+  /** The single source of truth for which stdlib containers' static helpers are
+   *  registered as builtin extension methods -- consumed both by
+   *  `Typing.registerBuiltinExtensions` (which registers them, in this order: for
+   *  an overlapping receiver+name+signature the first container listed wins) and by
+   *  `isBuiltinExtension` above (so a user-declared `extension` of the same name
+   *  shadows these rather than colliding as an ambiguity). Kept as an ordered `Seq`
+   *  rather than a `Set` so that registration order -- and with it, which container
+   *  wins an overlap -- stays defined. */
+  val BuiltinExtensionContainers: Seq[String] =
+    Seq("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats", "onion.Format")
 }

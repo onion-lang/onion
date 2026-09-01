@@ -192,6 +192,15 @@ sbt shutdown && sbt -Duser.language=en testFull    # then repeat with =ja
 CI is unaffected by both: the incremental state lives in `target/`, which `setup-java`'s
 `cache: 'sbt'` does not cache, so every CI run starts cold and runs the full suite.
 
+**Heap size:** `.github/workflows/scala.yml` runs CI with `SBT_OPTS="-Xmx10G -XX:+UseG1GC -Xss16m"`.
+Match that locally — `-Xmx4G` reliably OOMs in `MutationFuzzSpec` (a heavy mutation-fuzzing
+test) even on an otherwise-clean `develop` HEAD, which looks like a test failure but is only
+an under-provisioned heap:
+
+```bash
+SBT_OPTS="-Xmx10G -XX:+UseG1GC -Xss16m" sbt -Duser.language=en testFull
+```
+
 **Test Suites:**
 - `HelloWorldSpec.scala` - Basic output
 - `FactorialSpec.scala` - Recursion

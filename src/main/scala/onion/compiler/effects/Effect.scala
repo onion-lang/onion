@@ -37,6 +37,9 @@ object Effect {
 
   val all: Seq[Effect] = Seq(Read, Write, Net, Exec, Env, Clock, Rand, Console, Unknown)
 
+  /** Effects that can be tied to a parameter (`read(src)`); the rest are ambient. */
+  val parameterized: Set[Effect] = Set(Read, Write, Net, Exec)
+
   private val byName: Map[String, Effect] = all.map(e => e.name -> e).toMap
 
   def parse(name: String): Option[Effect] = byName.get(name)

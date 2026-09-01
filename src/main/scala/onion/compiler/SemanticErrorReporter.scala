@@ -99,7 +99,32 @@ class SemanticErrorReporter(threshold: Int) {
   private def objectTypeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ObjectType])
   private def asString(item: AnyRef): String = item.asInstanceOf[String]
+  // English indefinite article for a noun starting with a vowel sound ("enum" -> "an
+  // enum") vs. one that doesn't ("record" -> "a record"). Only used where the same
+  // message key must grammatically agree with more than one substituted noun -- a fixed
+  // noun's article belongs directly in the .properties text instead, as everywhere else.
+  private def indefiniteArticled(noun: String): String = {
+    val article = noun.headOption.map(_.toLower) match {
+      case Some(c) if "aeiou".contains(c) => "an"
+      case _ => "a"
+    }
+    s"$article $noun"
+  }
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
+  // English count + noun agreement ("1 field" / "2 fields"). Only used where the same
+  // message key's Japanese counterpart uses a bare number with a counter word (e.g. "{1}
+  // 個の...") and has no plural form to agree -- English gets its own pre-pluralized
+  // argument instead of reusing the raw count, same pattern as `indefiniteArticled`.
+  private def pluralizeCount(count: Int, noun: String): String =
+    if (count == 1) s"1 $noun" else s"$count ${noun}s"
+  // Same, but also carries the trailing verb so subject-verb number agreement is
+  // captured too ("1 binding was specified" / "2 bindings were specified").
+  private def pluralizeCountVerb(count: Int, noun: String, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $noun $verbSingular" else s"$count ${noun}s $verbPlural"
+  // Same idea, but for a clause with no noun of its own ("1 is supplied" / "2 are
+  // supplied") -- the noun was already named earlier in the sentence.
+  private def pluralizeVerbOnly(count: Int, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $verbSingular" else s"$count $verbPlural"
   private def typeNames(types: Array[TypedAST.Type]): String = {
     if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
   }
@@ -271,7 +296,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
       "error.semantic.illegalInheritance",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => message(s"error.semantic.illegalInheritanceReason.${asString(items(1))}"))
     ),
     SemanticError.INTERFACE_REQUIRED -> ErrorDef(
       "error.semantic.interfaceRequired",
@@ -300,13 +325,29 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.rawTypeNotAllowed",
       Seq(items => asString(items(0)))
     ),
+    // {1} is the raw type name (used by the Japanese template, which has no
+    // article to agree). {2} is the English-only "a X"/"an X" phrase, same
+    // pattern as `indefiniteArticled`'s use for CONSTRUCTOR_IN_RECORD_OR_ENUM.
     SemanticError.MISSING_RETURN -> ErrorDef(
       "error.semantic.missingReturn",
-      Seq(items => asString(items(0)), items => typeName(items(1)))
+      Seq(
+        items => asString(items(0)),
+        items => typeName(items(1)),
+        items => indefiniteArticled(typeName(items(1)))
+      )
     ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
     SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
       "error.semantic.typeArgumentArityMismatch",
-      Seq(items => asString(items(0)), items => items(1).toString, items => items(2).toString)
+      Seq(
+        items => asString(items(0)),
+        items => items(1).toString,
+        items => items(2).toString,
+        items => pluralizeCount(items(1).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(2).asInstanceOf[Int], "is supplied", "are supplied")
+      )
     ),
     SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE -> ErrorDef(
       "error.semantic.typeArgumentMustBeReference",
@@ -316,9 +357,19 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.methodNotGeneric",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    // {2}/{3} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {4}/{5} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as TYPE_ARGUMENT_ARITY_MISMATCH above.
     SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
       "error.semantic.methodTypeArgumentArityMismatch",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => items(2).toString, items => items(3).toString)
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => items(2).toString,
+        items => items(3).toString,
+        items => pluralizeCount(items(2).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(3).asInstanceOf[Int], "is supplied", "are supplied")
+      )
     ),
     SemanticError.ERASURE_SIGNATURE_COLLISION -> ErrorDef(
       "error.semantic.erasureSignatureCollision",
@@ -334,9 +385,20 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.positionalAfterNamed",
       Seq()
     ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as CONSTRUCTOR_IN_RECORD_OR_ENUM's
+    // `indefiniteArticled` below: the English template uses {3}/{4} instead of the
+    // bare numbers so "1 fields"/"1 bindings were specified" can't happen.
     SemanticError.WRONG_BINDING_COUNT -> ErrorDef(
       "error.semantic.wrongBindingCount",
-      Seq(items => asString(items(2)), items => asInt(items(0)), items => asInt(items(1)))
+      Seq(
+        items => asString(items(2)),
+        items => asInt(items(0)),
+        items => asInt(items(1)),
+        items => pluralizeCount(items(0).asInstanceOf[Int], "field"),
+        items => pluralizeCountVerb(items(1).asInstanceOf[Int], "binding", "was specified", "were specified")
+      )
     ),
     SemanticError.NOT_A_RECORD_TYPE -> ErrorDef(
       "error.semantic.notARecordType",
@@ -396,9 +458,17 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.regexPatternInvalid",
       Seq(items => asString(items(0)))
     ),
+    // {0}/{1} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {2}/{3} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
     SemanticError.REGEX_GROUP_MISMATCH -> ErrorDef(
       "error.semantic.regexGroupMismatch",
-      Seq(items => asString(items(0)), items => asString(items(1)))
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => pluralizeCount(asString(items(0)).toInt, "capture group"),
+        items => pluralizeCountVerb(asString(items(1)).toInt, "binding", "was given", "were given")
+      )
     ),
     SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
       "error.semantic.recordFromComponentUnsupported",
@@ -410,7 +480,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
       "error.semantic.recordDeriveUnknownMarker",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => asString(items(1)))
     ),
     SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
       "error.semantic.shapeFormatUnknown",
@@ -458,9 +528,13 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.constructorDelegationCycle",
       Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
     ),
+    // {2} is derived from {0} (not a separate call-site argument): the English
+    // template needs the article to agree with whichever noun ("record" or "enum")
+    // was passed, while the Japanese template uses the bare {0} directly (no
+    // articles in Japanese), so both are extracted from the same source value.
     SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
       "error.semantic.constructorInRecordOrEnum",
-      Seq(items => asString(items(0)), items => typeName(items(1)))
+      Seq(items => asString(items(0)), items => typeName(items(1)), items => indefiniteArticled(asString(items(0))))
     ),
     SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
       "error.semantic.thisBeforeConstructorDelegation",
@@ -536,6 +610,13 @@ class SemanticErrorReporter(threshold: Int) {
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else if (name == "f" && args == "String") {
+        // A Python-style f-string prefix (`f"Hello {name}"`) is not a string in Onion --
+        // any bare identifier directly before a string literal desugars to a call (the
+        // scheme-literal sugar: `re"..."`/`file"..."`/a user-defined `id"raw"`), so this
+        // reads as a call to a function named `f` that nothing defines. Point at Onion's
+        // actual interpolation syntax instead of a name-similarity guess.
+        Some(message("suggestion.pythonFString"))
       } else if (fieldNamed(targetType, name) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

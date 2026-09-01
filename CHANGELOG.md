@@ -19,6 +19,327 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recognizes the `name!(...)` shape and explains that Onion has no macros at
   all — call `name(...)` directly, without the `!`.
 
+- **Stale stdlib class list in the effects reference doc.** `docs/reference/effects.md`
+  (and its `ja` translation) enumerated which standard-library classes carry a real
+  (non-`pure`) effect, but the list predated `Archive`, `Db`, `Net`, `Server`, `Future`,
+  `Concurrent` and `ToolCli` all gaining effectful entries in `effect-table.txt` — a
+  reader trusting the doc would wrongly assume those seven classes are effect-free.
+  Added `EffectTableDocCoverageSpec`, which computes every effectful `onion.*` class
+  straight from `effect-table.txt` and fails if either doc's enumerated list omits one,
+  the same drift-guard pattern already used for `SemanticErrorCategoryDocCoverageSpec`
+  and `ErrorCodeDocCoverageSpec`.
+
+- **E0067 "missing return" had a wrong article for vowel-initial return types.**
+  The message read `... without returning a {1}.` with `{1}` filled with the
+  method's declared return type, so a vowel-initial type read `without
+  returning a Int.` / `without returning a Object.` instead of `an Int.` /
+  `an Object.`. Same defect class as the recent E0089 wrong-article fix:
+  `SemanticErrorReporter` now derives the article from the substituted type
+  name (`indefiniteArticled`, already used for E0089) instead of hardcoding
+  one in the English message bundle; the Japanese message (no articles) is
+  unaffected. Fixed in the English message bundle only, and pinned by a new
+  `E0067MissingReturnArticleSpec` using `MessageBundles` so the exact English
+  text is checked regardless of the JVM's default locale.
+
+- **E0060 "regex capture group / binding count mismatch" had a number agreement
+  bug.** The message spliced the raw counts into a literal `(s)` suffix instead of
+  real pluralization: `the regex pattern has {0} capture group(s) but {1}
+  binding(s) were given.`, so a single group or binding read `has 1 capture
+  group(s)` (never resolving to singular or plural) and `1 binding(s) were given`
+  (trailing verb wrong for a single binding). Same defect class as the recent
+  E0031/E0034/E0046 count-agreement fixes. `SemanticErrorReporter` now supplies
+  pre-pluralized English clauses (`pluralizeCount` for the group-count clause,
+  `pluralizeCountVerb` for the binding-count-plus-verb clause) alongside the raw
+  counts the Japanese template still uses directly (Japanese counts with a
+  counter word and has no plural form to agree), so the fixed text reads `has 1
+  capture group but 1 binding was given.` / `has 2 capture groups but 3 bindings
+  were given.` as appropriate. Fixed in the English message bundle and in the
+  quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (both now read `capture group(s) but …
+  binding(s) was/were given`; the Japanese message itself was unaffected), and
+  pinned by a new `E0060RegexGroupMismatchGrammarSpec` using `MessageBundles` so
+  the exact English text is checked regardless of the JVM's default locale.
+
+- **E0031 "type argument arity mismatch" and E0034 "method type argument arity
+  mismatch" had a number agreement bug.** Both messages spliced raw counts into
+  fixed-plural text: `type X expects {1} type arguments, but {2} are supplied.`, so a
+  single expected or supplied type argument read `expects 1 type arguments` and `1
+  are supplied` -- wrong in both directions. Same defect class as the E0046
+  wrong-binding-count fix: `SemanticErrorReporter` now supplies pre-pluralized
+  English clauses (`pluralizeCount` for the expected count, and a new
+  `pluralizeVerbOnly` helper for the subject-less "N is/are supplied" clause)
+  alongside the raw counts the Japanese templates still use directly (Japanese
+  counts with a counter word and has no plural form to agree), so the fixed text
+  reads `expects 1 type argument, but 1 is supplied.` / `expects 2 type arguments,
+  but 3 are supplied.` as appropriate. Fixed in the English message bundle and in
+  the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (both now read `type argument(s), but … is/are
+  supplied`; the Japanese messages themselves were unaffected), and pinned by a new
+  `E0031E0034TypeArgumentArityGrammarSpec` using `MessageBundles` so the exact
+  English text is checked regardless of the JVM's default locale.
+
+- **E0046 "wrong number of bindings" had a number agreement bug.** The message
+  spliced the raw field/binding counts into fixed plural text: `Type X has {1}
+  fields, but {2} bindings were specified.`, so a 1-field record read `has 1
+  fields`, and a single stray binding read `1 bindings were specified` --
+  wrong in both directions. Same defect class as the recent
+  E0003/E0016/E0089 grammar fixes, but for count/noun/verb agreement instead
+  of a missing article or a fixed plural subject. `SemanticErrorReporter` now
+  supplies pre-pluralized English clauses (`indefiniteArticled`'s sibling
+  helpers `pluralizeCount`/`pluralizeCountVerb`) alongside the raw counts the
+  Japanese template still uses directly (Japanese counts with a counter word
+  and has no plural form to agree), so the fixed text reads `has 1 field, but
+  1 binding was specified.` / `has 2 fields, but 3 bindings were specified.`
+  as appropriate. Fixed in the English message bundle only (the Japanese
+  message was unaffected), and pinned by a new
+  `E0046WrongBindingCountGrammarSpec` using `MessageBundles` so the exact
+  English text is checked regardless of the JVM's default locale.
+
+- **E0003 "class not found" was missing an article.** Same defect class as the
+  recent E0005/E0016/E0018/E0020/E0021/E0023/E0027/E0028/E0050/E0051/E0089
+  fixes: the message read `... Check spelling or add import.` instead of
+  `... Check spelling or add an import.`. Fixed in the English message bundle
+  (the Japanese message itself was unaffected -- no articles in Japanese), and
+  pinned by a new `E0003MissingArticleSpec` using `MessageBundles` so the
+  exact English text is checked regardless of the JVM's default locale.
+
+- **E0089 "constructor in a record or enum body" had a wrong article for the
+  enum case.** The message read `a {0} cannot declare 'def this': ...` with
+  `{0}` filled with the literal `record` or `enum` -- a hardcoded `a` that is
+  wrong for `enum`, rendering `a enum cannot declare def this: ...` instead of
+  `an enum cannot declare def this: ...`. The `record` case already read
+  correctly (`a record cannot declare ...`), so this was invisible unless the
+  enum case was actually hit. Since the same message key has to agree with two
+  different substituted nouns, the fix derives the correct article from
+  whichever noun was passed (new `indefiniteArticled` helper in
+  `SemanticErrorReporter`) rather than hardcoding one in the English message
+  bundle; the Japanese message (no articles) is unaffected. Fixed in the
+  English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`
+  (both now read `a record / an enum cannot declare ...`), and pinned by a new
+  `E0089MissingArticleSpec` using `MessageBundles` so the exact English text
+  for both nouns is checked regardless of the JVM's default locale.
+
+- **E0021's quick-reference table row was stale.** The E0005/E0021
+  missing-article fix updated `error.semantic.constructorNotFound` to read `a
+  constructor applicable for X(Y) is not found.` and updated E0005's row in
+  the quick-reference table of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` to match, but missed E0021's row, which
+  still read the pre-fix paraphrase `constructor not found`. Now reads `a
+  constructor applicable for …(…) is not found` in both tables, pinned by a
+  new `E0021QuickReferenceDriftSpec` so the table can't drift from the
+  message bundle again.
+
+- **E0016 "cyclic inheritance" had a subject-verb agreement error.** The message
+  read `inheritance relations which includes X have cyclicity.` -- plural
+  "relations" paired with singular "includes". Now reads `inheritance relations
+  which include X have cyclicity.` Fixed in the English message bundle and in
+  the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself was
+  unaffected), and pinned by a new `E0016CyclicInheritanceGrammarSpec` using
+  `MessageBundles` so the exact English text is checked regardless of the
+  JVM's default locale.
+
+## [0.31.0] - 2026-09-01
+
+### Fixed
+
+- **E0051 "return type is required" was missing an article.** Same defect class
+  as the recent E0005/E0018/E0020/E0021/E0023/E0027/E0028/E0050 fixes: the
+  message read `return type is required for method X.` instead of `a return
+  type is required for method X.`. Fixed in the English message bundle and in
+  the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself was
+  unaffected -- no articles in Japanese), and pinned by a new
+  `E0051MissingArticleSpec` using `MessageBundles` so the exact English text is
+  checked regardless of the JVM's default locale.
+
+- **E0023 "interface required" was missing an article and a linking verb.** The
+  message read `interface required, but type X is used.` -- same defect class as
+  the recent E0005/E0018/E0020/E0021/E0027/E0028/E0050 fixes. Now reads `an
+  interface is required, but type X is used.` in the English message bundle and
+  in the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself was
+  unaffected -- no articles in Japanese), and pinned by a new
+  `E0023MissingArticleSpec` using `MessageBundles` so the exact English text is
+  checked regardless of the JVM's default locale.
+
+- **E0005 "method not found" and E0021 "constructor not found" were missing
+  articles.** Same defect class as the recent E0018/E0020/E0027/E0028/E0050
+  fixes: E0005 read `method applicable for X.Y(Z) is not found.` and E0021 read
+  `constructor applicable for X(Y) is not found.` -- both now read `a method
+  applicable for ...` / `a constructor applicable for ...`. Fixed in the
+  English message bundle, in the quick-reference table of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` (the
+  Japanese messages themselves were unaffected -- no articles in Japanese),
+  and pinned by a new `E0005E0021MissingArticleSpec` using `MessageBundles`
+  so the exact English text is checked regardless of the JVM's default
+  locale.
+
+- **E0028 "lvalue is required" and E0050 "current instance not available" were
+  missing articles.** Same defect class as the recent E0018/E0020/E0027 fixes:
+  E0028 read `lvalue is required.` instead of `an lvalue is required.`, and
+  E0050 read `... in static context.` instead of `... in a static context.`.
+  Fixed in the English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` (the
+  Japanese messages themselves were unaffected -- no articles in Japanese).
+
+- **CLI usage errors (`error.command.*`) were missing articles.** `onionc -classpath`
+  (no value) read "`-classpath` requires argument.", an unrecognized flag read
+  "is invalid argument.", `-encoding` with a bad value read "is not valid encoding
+  name.", and worst, `-maxErrorReport` with a non-numeric value read "is required to
+  natural number." -- not just missing an article but missing the verb linking
+  "required" to "natural number." These are CLI-level messages (no E-code, no doc
+  entry), so the only regression net was a new test
+  (`CommandErrorMessageGrammarSpec`) pinning the English text via `Locale.ROOT`
+  (immune to the suite's `en`/`ja` locale switch) alongside the unaffected Japanese
+  translations.
+
+- **E0020 "cannot return value" was missing an article.** Same defect as the
+  recent E0018/E0027 fixes: the message read `this method cannot return
+  value.` instead of `this method cannot return a value.`. Fixed in the
+  English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`
+  (the Japanese message itself was unaffected -- no articles in Japanese).
+
+- **E0027 "not boxable type" was missing an article.** The `void`-is-not-boxable
+  message read `type X is not boxable type.` -- grammatically broken in the same
+  way E0018 was before its recent fix. Now reads `type X is not a boxable type.`
+  in the English message bundle and in both `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself had no article
+  problem, since Japanese has no articles).
+
+- **E0018 "illegal inheritance" now explains *why*.** The message was
+  ungrammatical ("class X do inheritance illegally.") and, worse, collapsed
+  two distinct causes -- a `final` supertype, and an interface/class kind
+  mismatch between `extends`/`conforms` -- into one sentence with no hint
+  which one applies, even though `docs/reference/error-codes.md` already
+  documented both causes precisely. The message (en and ja) now names the
+  actual reason (`... : the supertype is final and cannot be extended` /
+  `... : an interface cannot appear after extends, and a class cannot
+  appear after conforms`). Also closed a coverage gap: the existing E0018
+  test only triggered the final-class cause: added a test for the kind-mismatch
+  cause (`class A extends java.lang.Runnable { ... }`).
+
+- **Diagnostic hint for a Python-style f-string prefix (`f"Hello {name}"`) used as a
+  string.** Onion desugars any bare identifier directly before a string literal into
+  a call (`f"raw"` -> `f("raw")`, the same sugar behind `re"..."`/`file"..."`), so
+  writing an f-string parsed fine and failed only because no function named `f`
+  exists — surfacing as `method applicable for X.f(String) is not found` (E0005)
+  with nothing connecting it back to the actual mistake. The diagnostic now
+  recognizes this shape and points at Onion's actual string interpolation syntax,
+  `"text #{expr}"`, instead.
+
+## [0.30.0] - 2026-09-01
+
+### Added
+
+- **A single source of truth for the primitive-type-name whitelist.** `typing.NameResolver`
+  (class-not-found suggestions -- "did you mean `Int`?" for a Java/Scala-style lowercase
+  `int`) and `parser.SyntaxHintClassifier` (the `hint.primitive_dot_static` hint for
+  `Int.parseInt(...)`-style mistakes) each listed Onion's eight capitalized primitive
+  type names separately -- the same two-copies-of-one-list drift risk already closed for
+  `DeriveMarkers` and `ShapeFormats`. Both now read from a shared
+  `onion.compiler.PrimitiveTypeNames.all`. Added a regression test asserting the two call
+  sites agree and that the `primitive_dot_static` hint actually fires for every name in
+  the shared list.
+
+- **A single source of truth for the builtin-extension container list.** The
+  stdlib containers whose static helpers become extension methods (`onion.Colls`,
+  `onion.Strings`, `onion.Maps`, ...) were listed twice: once in
+  `Typing.registerBuiltinExtensions` (which registers them) and again in
+  `ExtensionMethodFallbackSupport.BuiltinExtensionContainers` (which decides
+  whether a user-declared `extension` may shadow one of them instead of
+  colliding as an ambiguity) -- the same two-copies-of-one-list drift risk
+  already closed for `derive!` markers (`DeriveMarkers`) and shape formats
+  (`ShapeFormats`), flagged by its own "keep in sync" comment. `Typing.scala`
+  now iterates `BuiltinExtensionContainers` directly (kept as an ordered `Seq`
+  so the existing first-container-wins overlap resolution is unaffected).
+  Added a regression test that shadows a builtin from a second container
+  (`onion.Strings`, alongside the existing `onion.Colls` coverage) so a future
+  drift between the two use sites fails a test instead of only miscompiling
+  silently at the ambiguity check.
+
+- **A drift guard tying the E0061/E0062/E0081 "supported scalar types" prose to
+  `ScalarConversions.all`.** `record ... from re"..."`, `derive!(Json, Yaml)`, and
+  `tool` auto-CLI parameters all restrict components to the same eight-type scalar
+  set, and `docs/reference/error-codes.md` (and its `ja` translation) repeat that
+  set as literal prose in all three sections -- the same whitelist-drift risk
+  already fixed for E0063's `derive!` markers and E0076's shape formats, one
+  section over each time, but with nothing tying these three to their source of
+  truth. Added `checkScalarConversions` to `ErrorCodeDocCoverageSpec`, verified it
+  actually catches a dropped type before confirming today's docs are still
+  accurate.
+
+- **A drift guard for the "Error Categories" doc block atop `SemanticError`.**
+  That scaladoc sorts every declared code into a category (Type Errors,
+  Resolution Errors, ...) via a curated bullet list, but nothing tied it to
+  the `case object` declarations below it -- 23 of the 89 declared codes,
+  including recent additions like `CLASS_USED_AS_VALUE` and
+  `NULLABLE_MEMBER_ACCESS`, were entirely absent, and the Inheritance Errors
+  range silently included a retired code (E0017) that was never reused.
+  Recategorized every code accurately and added
+  `SemanticErrorCategoryDocCoverageSpec`, which asserts every case object
+  name appears in the doc block so a newly added code can't go
+  uncategorized again.
+
+- **A single source of truth for the E0079 "which effects take a parameter
+  argument" whitelist.** `CapabilityCheckPass` hardcoded its own private
+  `parameterized: Set[Effect]` (deciding whether a `requires { read(src) }`-style
+  entry may carry a parameter) with nothing tying it to the matching prose
+  repeated in both `docs/reference/error-codes.md` and its `ja` translation --
+  the same whitelist-drift risk already closed for E0063's `derive!` markers,
+  E0076's shape formats, and E0061/E0062/E0081's scalar types. The set now
+  lives as `Effect.parameterized` in `effects/Effect.scala`, and
+  `ErrorCodeDocCoverageSpec` asserts the E0079 sections in both docs name
+  every parameterized effect so a future addition can't leave them stale.
+
+- **A drift guard for key parity between `errorMessage.properties` and
+  `errorMessage_ja.properties`.** `ResourceBundle` chains the Japanese bundle to the
+  English one as its parent, so a key present only in English still *resolves* through
+  the Japanese bundle -- silently, in English -- and every existing bundle spec only
+  checks that a key resolves in both locales, never that both `.properties` files
+  actually declare it. A dropped or renamed translation was therefore invisible to the
+  suite. Added `MessageBundleKeyParitySpec`, which reads both files directly (bypassing
+  the fallback chain) and fails if either declares a key the other doesn't.
+
+### Fixed
+
+- **Stale `E0062`/`E0063` docs in the error-code reference.** `docs/reference/error-codes.md`
+  (and its `ja` translation) described `derive!(Json)` as the only supported
+  form and claimed `Json` was the sole `E0063` marker, even though `derive!`
+  has supported `Yaml` (and `derive!(Json, Yaml)`) for a while — contradicting
+  the compiler's own `E0063` message. Docs now describe both markers, backed
+  by a regression test tying the doc to the property file so they can't
+  drift apart again.
+
+- **Stale `E0076` example in the error-code reference.** The same whitelist-drift
+  mistake as `E0063`, one code later: `docs/reference/error-codes.md` (and its `ja`
+  translation) showed the `shape name = <format>` error listing only `json, yaml`
+  as supported formats, even though `ShapeFormats.all` (and the compiler's own
+  `E0076` message) has included `config` for a while. Docs now list all three,
+  backed by a regression test tying the doc to `ShapeFormats.all` so a fourth
+  format can't leave the example stale again.
+
+- **`derive!`'s marker whitelist, written out three times.** The `hasData` guard
+  and the unknown-marker check in `TypingOutlinePass` each hardcoded
+  `m == "Json" || m == "Yaml"`, and `errorMessage.properties`/`errorMessage_ja.properties`
+  separately hardcoded "Supported markers: Json, Yaml." as literal text in the
+  E0063 message — the same drift risk `ShapeFormats` was introduced to close
+  for `shape name = <format>`. Added `DeriveMarkers` as the single source of
+  truth and wired both checks and the E0063 message through it; also fixes
+  `RECORD_DERIVE_UNKNOWN_MARKER`'s message-format definition, which only
+  declared one argument extractor and would have silently rendered the
+  message as "Supported markers: {1}." once a second argument was added.
+
+- **Parser hint for a Python-style `with expr as name { ... }` resource block.**
+  Writing `with open(path) as f { ... }` — Python's context-manager idiom —
+  parsed `with` as a bare identifier statement and hit the generic "a call's
+  arguments need parentheses" fallback (suggesting the nonsensical
+  `with(...)`), since `with` is not a keyword in Onion's grammar. The
+  diagnostic now recognizes the `with expr as name { ... }` shape and points
+  at Onion's actual equivalent, `try (val name = expr) { ... }`.
+
 ## [0.29.0] - 2026-08-31
 
 ### Added
@@ -86,6 +407,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connecting it back to `lambda`. The diagnostic now recognizes the
   `lambda params: expr` shape and points at Onion's arrow-lambda syntax
   (`(x) -> x + 1`) instead.
+
+- **Parser hint for a C++/C#-style `auto x = expr` type-inferred
+  declaration.** Since `auto` isn't a reserved word in Onion, `auto x = 5`
+  parsed `auto` as a bare identifier reference, which left `x = 5` reading as
+  a second, unrelated statement; the failure previously surfaced as the
+  generic missing-call-parens fallback (suggesting the nonsensical
+  `auto(...)`). The diagnostic now recognizes the `auto name = value` shape
+  and points at Onion's actual equivalent: `val name = value` (immutable) or
+  `var name = value` (mutable).
 
 ## [0.28.0] - 2026-08-30
 

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0028 "lvalue is required" and E0050 "current instance not available" were
+  missing articles.** Same defect class as the recent E0018/E0020/E0027 fixes:
+  E0028 read `lvalue is required.` instead of `an lvalue is required.`, and
+  E0050 read `... in static context.` instead of `... in a static context.`.
+  Fixed in the English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` (the
+  Japanese messages themselves were unaffected -- no articles in Japanese).
+
 - **CLI usage errors (`error.command.*`) were missing articles.** `onionc -classpath`
   (no value) read "`-classpath` requires argument.", an unrecognized flag read
   "is invalid argument.", `-encoding` with a bad value read "is not valid encoding

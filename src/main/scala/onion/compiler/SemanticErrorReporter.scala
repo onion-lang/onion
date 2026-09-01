@@ -451,9 +451,17 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.regexPatternInvalid",
       Seq(items => asString(items(0)))
     ),
+    // {0}/{1} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {2}/{3} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
     SemanticError.REGEX_GROUP_MISMATCH -> ErrorDef(
       "error.semantic.regexGroupMismatch",
-      Seq(items => asString(items(0)), items => asString(items(1)))
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => pluralizeCount(asString(items(0)).toInt, "capture group"),
+        items => pluralizeCountVerb(asString(items(1)).toInt, "binding", "was given", "were given")
+      )
     ),
     SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
       "error.semantic.recordFromComponentUnsupported",

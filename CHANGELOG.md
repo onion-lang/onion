@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0060 "regex capture group / binding count mismatch" had a number agreement
+  bug.** The message spliced the raw counts into a literal `(s)` suffix instead of
+  real pluralization: `the regex pattern has {0} capture group(s) but {1}
+  binding(s) were given.`, so a single group or binding read `has 1 capture
+  group(s)` (never resolving to singular or plural) and `1 binding(s) were given`
+  (trailing verb wrong for a single binding). Same defect class as the recent
+  E0031/E0034/E0046 count-agreement fixes. `SemanticErrorReporter` now supplies
+  pre-pluralized English clauses (`pluralizeCount` for the group-count clause,
+  `pluralizeCountVerb` for the binding-count-plus-verb clause) alongside the raw
+  counts the Japanese template still uses directly (Japanese counts with a
+  counter word and has no plural form to agree), so the fixed text reads `has 1
+  capture group but 1 binding was given.` / `has 2 capture groups but 3 bindings
+  were given.` as appropriate. Fixed in the English message bundle and in the
+  quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (both now read `capture group(s) but …
+  binding(s) was/were given`; the Japanese message itself was unaffected), and
+  pinned by a new `E0060RegexGroupMismatchGrammarSpec` using `MessageBundles` so
+  the exact English text is checked regardless of the JVM's default locale.
+
 - **E0031 "type argument arity mismatch" and E0034 "method type argument arity
   mismatch" had a number agreement bug.** Both messages spliced raw counts into
   fixed-plural text: `type X expects {1} type arguments, but {2} are supplied.`, so a

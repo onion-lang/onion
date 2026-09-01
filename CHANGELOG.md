@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0027 "not boxable type" was missing an article.** The `void`-is-not-boxable
+  message read `type X is not boxable type.` -- grammatically broken in the same
+  way E0018 was before its recent fix. Now reads `type X is not a boxable type.`
+  in the English message bundle and in both `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself had no article
+  problem, since Japanese has no articles).
+
 - **E0018 "illegal inheritance" now explains *why*.** The message was
   ungrammatical ("class X do inheritance illegally.") and, worse, collapsed
   two distinct causes -- a `final` supertype, and an interface/class kind

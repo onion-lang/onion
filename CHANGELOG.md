@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Stale stdlib class list in the effects reference doc.** `docs/reference/effects.md`
+  (and its `ja` translation) enumerated which standard-library classes carry a real
+  (non-`pure`) effect, but the list predated `Archive`, `Db`, `Net`, `Server`, `Future`,
+  `Concurrent` and `ToolCli` all gaining effectful entries in `effect-table.txt` — a
+  reader trusting the doc would wrongly assume those seven classes are effect-free.
+  Added `EffectTableDocCoverageSpec`, which computes every effectful `onion.*` class
+  straight from `effect-table.txt` and fails if either doc's enumerated list omits one,
+  the same drift-guard pattern already used for `SemanticErrorCategoryDocCoverageSpec`
+  and `ErrorCodeDocCoverageSpec`.
+
 - **E0067 "missing return" had a wrong article for vowel-initial return types.**
   The message read `... without returning a {1}.` with `{1}` filled with the
   method's declared return type, so a vowel-initial type read `without

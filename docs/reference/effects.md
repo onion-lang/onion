@@ -52,7 +52,8 @@ onion.Cli#parse=console,exec
 
 The table ships with the whole effectful surface of the standard library classified —
 `Files`, `FileResource`, `Proc`, `Http`, `HttpResource`, `Config`, `IO`, `Cli`,
-`DateTime`, `Timing`, `Rand`, `OnionMath` — plus the pure remainder of the stdlib, a
+`DateTime`, `Timing`, `Rand`, `OnionMath`, `Archive`, `Db`, `Net`, `Server`, `Future`,
+`Concurrent`, `ToolCli` — plus the pure remainder of the stdlib, a
 pure baseline for common JDK value and collection types, and the JDK's well-known
 effect points (`System::getenv`, `System::exit`, `Runtime::exec`, `Thread::sleep`,
 `PrintStream` as the type of `System::out`).

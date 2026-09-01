@@ -99,6 +99,17 @@ class SemanticErrorReporter(threshold: Int) {
   private def objectTypeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ObjectType])
   private def asString(item: AnyRef): String = item.asInstanceOf[String]
+  // English indefinite article for a noun starting with a vowel sound ("enum" -> "an
+  // enum") vs. one that doesn't ("record" -> "a record"). Only used where the same
+  // message key must grammatically agree with more than one substituted noun -- a fixed
+  // noun's article belongs directly in the .properties text instead, as everywhere else.
+  private def indefiniteArticled(noun: String): String = {
+    val article = noun.headOption.map(_.toLower) match {
+      case Some(c) if "aeiou".contains(c) => "an"
+      case _ => "a"
+    }
+    s"$article $noun"
+  }
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
   private def typeNames(types: Array[TypedAST.Type]): String = {
     if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
@@ -458,9 +469,13 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.constructorDelegationCycle",
       Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
     ),
+    // {2} is derived from {0} (not a separate call-site argument): the English
+    // template needs the article to agree with whichever noun ("record" or "enum")
+    // was passed, while the Japanese template uses the bare {0} directly (no
+    // articles in Japanese), so both are extracted from the same source value.
     SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
       "error.semantic.constructorInRecordOrEnum",
-      Seq(items => asString(items(0)), items => typeName(items(1)))
+      Seq(items => asString(items(0)), items => typeName(items(1)), items => indefiniteArticled(asString(items(0))))
     ),
     SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
       "error.semantic.thisBeforeConstructorDelegation",

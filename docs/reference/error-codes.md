@@ -1547,7 +1547,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0086` | duplicated record component … in … |
 | `E0087` | class … has a primary constructor, so every `def this` must delegate to it |
 | `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
-| `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
+| `E0089` | a record / an enum cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 

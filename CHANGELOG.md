@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0089 "constructor in a record or enum body" had a wrong article for the
+  enum case.** The message read `a {0} cannot declare 'def this': ...` with
+  `{0}` filled with the literal `record` or `enum` -- a hardcoded `a` that is
+  wrong for `enum`, rendering `a enum cannot declare def this: ...` instead of
+  `an enum cannot declare def this: ...`. The `record` case already read
+  correctly (`a record cannot declare ...`), so this was invisible unless the
+  enum case was actually hit. Since the same message key has to agree with two
+  different substituted nouns, the fix derives the correct article from
+  whichever noun was passed (new `indefiniteArticled` helper in
+  `SemanticErrorReporter`) rather than hardcoding one in the English message
+  bundle; the Japanese message (no articles) is unaffected. Fixed in the
+  English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`
+  (both now read `a record / an enum cannot declare ...`), and pinned by a new
+  `E0089MissingArticleSpec` using `MessageBundles` so the exact English text
+  for both nouns is checked regardless of the JVM's default locale.
+
 - **E0021's quick-reference table row was stale.** The E0005/E0021
   missing-article fix updated `error.semantic.constructorNotFound` to read `a
   constructor applicable for X(Y) is not found.` and updated E0005's row in

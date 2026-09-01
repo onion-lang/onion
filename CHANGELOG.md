@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-09-01
+
 ### Fixed
 
 - **E0051 "return type is required" was missing an article.** Same defect class

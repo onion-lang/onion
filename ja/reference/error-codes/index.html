@@ -2476,10 +2476,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0062-derivejson" class="md-nav__link">
+  <a href="#e0062-derive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0062 — derive!(Json) がサポートしないレコード成分型
+        E0062 — derive! がサポートしないレコード成分型
       
     </span>
   </a>
@@ -6097,10 +6097,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0062-derivejson" class="md-nav__link">
+  <a href="#e0062-derive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0062 — derive!(Json) がサポートしないレコード成分型
+        E0062 — derive! がサポートしないレコード成分型
       
     </span>
   </a>
@@ -7281,20 +7281,23 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 </span></code></pre></div>
 <p>対処: すべての成分をサポートされているスカラー型にとどめるか、通常の <code>from re"..."</code>
 マッチのあとで該当フィールドを手動でパースしてください。</p>
-<h3 id="e0062-derivejson"><code>E0062</code> — <code>derive!(Json)</code> がサポートしないレコード成分型<a class="headerlink" href="#e0062-derivejson" title="Permanent link">&para;</a></h3>
-<p><code>derive!(Json)</code> は各成分を JSON のスカラー値にマッピングすることで <code>fromJson</code>/<code>toJson</code>
-を生成します。サポートされる成分型は <code>from re"..."</code> と同じ、<code>String</code>、<code>Int</code>、<code>Long</code>、
-<code>Double</code>、<code>Float</code>、<code>Boolean</code>、<code>Short</code>、<code>Byte</code> です。</p>
+<h3 id="e0062-derive"><code>E0062</code> — <code>derive!</code> がサポートしないレコード成分型<a class="headerlink" href="#e0062-derive" title="Permanent link">&para;</a></h3>
+<p><code>derive!(Json)</code> と <code>derive!(Yaml)</code> はどちらも、各成分をスカラー値にマッピングする
+ことで <code>fromX</code>/<code>toX</code> の対を生成します。両者は同じ <code>toMap</code>/<code>fromMap</code> コアを共有して
+いるため、この制約はどちらでも同一です。サポートされる成分型は <code>from re"..."</code> と
+同じ、<code>String</code>、<code>Int</code>、<code>Long</code>、<code>Double</code>、<code>Float</code>、<code>Boolean</code>、<code>Short</code>、<code>Byte</code> です。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Inner</span><span class="p">(</span><span class="n">z</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Bad</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Inner</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nb">Json</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0062: Inner はシリアライズできない</span>
 </span></code></pre></div>
 <p>対処: すべての成分をサポートされているスカラー型にとどめてください。</p>
 <h3 id="e0063-derive"><code>E0063</code> — 未知の <code>derive!</code> マーカー<a class="headerlink" href="#e0063-derive" title="Permanent link">&para;</a></h3>
 <p><code>derive!(...)</code> が、コンパイラが実装していないフォーマット名を指定しています。
-現在サポートされているマーカーは <code>Json</code> のみです。</p>
+サポートされているマーカーは <code>Json</code> と <code>Yaml</code> で、単独でも
+<code>derive!(Json, Yaml)</code> のように併用してもかまいません。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">U</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nc">Bogus</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0063: 未知の derive! マーカー Bogus</span>
 </span></code></pre></div>
-<p>対処: <code>derive!(Json)</code> を使うか、この句を削除してください。</p>
+<p>対処: <code>derive!(Json)</code>、<code>derive!(Yaml)</code>、<code>derive!(Json, Yaml)</code> のいずれかを使うか、
+この句を削除してください。</p>
 <h3 id="e0086"><code>E0086</code> — レコード成分名の重複<a class="headerlink" href="#e0086" title="Permanent link">&para;</a></h3>
 <p>同じレコード内の2つの成分が同じ名前を宣言しています。成分名はそれぞれ private
 フィールドと public アクセサメソッドを1つずつ生成するため、名前が重複すると
@@ -7354,7 +7357,7 @@ Java/Kotlin の癖でインスタンスに <code>::</code> を使ってしまう
 推測すると「何も読まない shape」が黙って出来上がるため、サポート対象を列挙した
 エラーにしています。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">toml</span><span class="w">     </span><span class="c1">// E0076: サポートしているのは json, yaml</span>
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">toml</span><span class="w">     </span><span class="c1">// E0076: サポートしているのは json, yaml, config</span>
 </span></code></pre></div>
 <p>インラインのパターンを書く場合は <code>shape name = re"..."</code> としてください。</p>
 <h3 id="e0080-shape-law"><code>E0080</code> — 自作の <code>Shape</code> に law がない<a class="headerlink" href="#e0080-shape-law" title="Permanent link">&para;</a></h3>

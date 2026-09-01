@@ -4276,10 +4276,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0062-record-component-type-unsupported-by-derivejson" class="md-nav__link">
+  <a href="#e0062-record-component-type-unsupported-by-derive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0062 — Record component type unsupported by derive!(Json)
+        E0062 — Record component type unsupported by derive!
       
     </span>
   </a>
@@ -6079,10 +6079,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0062-record-component-type-unsupported-by-derivejson" class="md-nav__link">
+  <a href="#e0062-record-component-type-unsupported-by-derive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0062 — Record component type unsupported by derive!(Json)
+        E0062 — Record component type unsupported by derive!
       
     </span>
   </a>
@@ -7266,20 +7266,23 @@ this way.</p>
 </span></code></pre></div>
 <p>Fix: keep every component in the supported scalar set, or parse the field
 manually after a plain <code>from re"..."</code> match on the rest.</p>
-<h3 id="e0062-record-component-type-unsupported-by-derivejson"><code>E0062</code> — Record component type unsupported by <code>derive!(Json)</code><a class="headerlink" href="#e0062-record-component-type-unsupported-by-derivejson" title="Permanent link">&para;</a></h3>
-<p><code>derive!(Json)</code> generates <code>fromJson</code>/<code>toJson</code> by mapping each component to a
-JSON scalar. Only <code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>,
-<code>Short</code>, and <code>Byte</code> components are supported — the same set as <code>from re"..."</code>.</p>
+<h3 id="e0062-record-component-type-unsupported-by-derive"><code>E0062</code> — Record component type unsupported by <code>derive!</code><a class="headerlink" href="#e0062-record-component-type-unsupported-by-derive" title="Permanent link">&para;</a></h3>
+<p><code>derive!(Json)</code> and <code>derive!(Yaml)</code> both generate their <code>fromX</code>/<code>toX</code> pair by
+mapping each component to a scalar — they share the same <code>toMap</code>/<code>fromMap</code>
+core, so the restriction is identical for both. Only <code>String</code>, <code>Int</code>, <code>Long</code>,
+<code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, and <code>Byte</code> components are supported —
+the same set as <code>from re"..."</code>.</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Inner</span><span class="p">(</span><span class="n">z</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Bad</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Inner</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nb">Json</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0062: Inner cannot be serialized</span>
 </span></code></pre></div>
 <p>Fix: keep every component in the supported scalar set.</p>
 <h3 id="e0063-unknown-derive-marker"><code>E0063</code> — Unknown <code>derive!</code> marker<a class="headerlink" href="#e0063-unknown-derive-marker" title="Permanent link">&para;</a></h3>
-<p><code>derive!(...)</code> names a format the compiler does not implement. The only
-supported marker today is <code>Json</code>.</p>
+<p><code>derive!(...)</code> names a format the compiler does not implement. The supported
+markers are <code>Json</code> and <code>Yaml</code> — either alone, or together as
+<code>derive!(Json, Yaml)</code>.</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">U</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nc">Bogus</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0063: unknown derive! marker Bogus</span>
 </span></code></pre></div>
-<p>Fix: use <code>derive!(Json)</code>, or remove the clause.</p>
+<p>Fix: use <code>derive!(Json)</code>, <code>derive!(Yaml)</code>, or <code>derive!(Json, Yaml)</code>, or remove the clause.</p>
 <h3 id="e0086-duplicate-record-component"><code>E0086</code> — Duplicate record component<a class="headerlink" href="#e0086-duplicate-record-component" title="Permanent link">&para;</a></h3>
 <p>Two components of the same record declare the same name. Each component name
 generates a private field and a public accessor method, so a repeated name
@@ -7340,7 +7343,7 @@ for the same reason as <code>E0074</code>.</p>
 Guessing would produce a shape that silently reads nothing, so it is an error listing
 what is supported.</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">toml</span><span class="w">     </span><span class="c1">// E0076: supported formats are json, yaml</span>
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">toml</span><span class="w">     </span><span class="c1">// E0076: supported formats are json, yaml, config</span>
 </span></code></pre></div>
 <p>For an inline pattern, write <code>shape name = re"..."</code>.</p>
 <h3 id="e0080-a-user-written-shape-asserts-no-law"><code>E0080</code> — A user-written <code>Shape</code> asserts no law<a class="headerlink" href="#e0080-a-user-written-shape-asserts-no-law" title="Permanent link">&para;</a></h3>

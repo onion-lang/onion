@@ -271,7 +271,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
       "error.semantic.illegalInheritance",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => message(s"error.semantic.illegalInheritanceReason.${asString(items(1))}"))
     ),
     SemanticError.INTERFACE_REQUIRED -> ErrorDef(
       "error.semantic.interfaceRequired",

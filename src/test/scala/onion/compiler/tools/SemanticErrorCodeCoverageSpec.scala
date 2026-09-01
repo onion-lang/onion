@@ -253,6 +253,11 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
         """class A extends java.lang.String { public: def this {} }
           |""".stripMargin)
     }
+    it("E0018 illegal inheritance (extends names an interface, not a class)") {
+      failsWith("E0018",
+        """class A extends java.lang.Runnable { public: def this {} }
+          |""".stripMargin)
+    }
     it("E0023 a forward-delegation field requires an interface type") {
       failsWith("E0023",
         """class A {

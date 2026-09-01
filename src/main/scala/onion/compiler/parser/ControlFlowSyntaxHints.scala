@@ -31,6 +31,13 @@ private[compiler] object ControlFlowSyntaxHints {
   // the generic missing-call-parens fallback (suggesting the nonsensical
   // `yield(...)`); keep this ahead of that case.
   private val LeadingYieldStatement = """^\s*yield\s+(.+?)\s*$""".r
+  // A Python-style `with expr as name { ... }` resource-management block --
+  // `with` is not a keyword in Onion, so this reads as a bare `with` identifier
+  // followed by another expression with nothing in between, which also matches
+  // the generic missing-call-parens fallback (suggesting the nonsensical
+  // `with(...)`); keep this ahead of that case.
+  private val LeadingWithAsStatement =
+    """^\s*with\s+(.+?)\s+as\s+([A-Za-z_]\w*)\s*:?\s*\{?\s*$""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -64,6 +71,9 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.await_not_supported", matched.group(1).trim)
     } else if (LeadingYieldStatement.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.yield_not_supported")
+    } else if (LeadingWithAsStatement.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingWithAsStatement.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.with_as_statement", matched.group(2), matched.group(1).trim)
     } else {
       None
     }

@@ -271,7 +271,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
       "error.semantic.illegalInheritance",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => message(s"error.semantic.illegalInheritanceReason.${asString(items(1))}"))
     ),
     SemanticError.INTERFACE_REQUIRED -> ErrorDef(
       "error.semantic.interfaceRequired",
@@ -410,7 +410,7 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
       "error.semantic.recordDeriveUnknownMarker",
-      Seq(items => asString(items(0)))
+      Seq(items => asString(items(0)), items => asString(items(1)))
     ),
     SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
       "error.semantic.shapeFormatUnknown",
@@ -489,6 +489,13 @@ class SemanticErrorReporter(threshold: Int) {
   // and point at Onion's actual interpolation syntax instead of a name-similarity guess.
   private val TemplateLiteralInName = """\$\{.*\}""".r
 
+  // A JS-style `console.log(...)`/`console.error(...)`/`console.warn(...)` call has no
+  // `console` object in Onion, so `console` parses as a bare identifier reference and
+  // the mistake surfaces as a VARIABLE_NOT_FOUND on exactly that name, with nothing
+  // connecting it back to Onion's actual output API. Detect that exact identifier and
+  // point at `IO::println` instead of a name-similarity guess.
+  private val ConsoleObjectName = "console"
+
   /**
    * Handles VARIABLE_NOT_FOUND with optional suggestions.
    */
@@ -501,6 +508,8 @@ class SemanticErrorReporter(threshold: Int) {
     val suggestion =
       if (TemplateLiteralInName.findFirstIn(name).isDefined) {
         Some(message("suggestion.jsTemplateLiteral"))
+      } else if (name == ConsoleObjectName) {
+        Some(message("suggestion.jsConsoleLog"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {

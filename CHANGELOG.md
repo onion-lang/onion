@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0018 "illegal inheritance" now explains *why*.** The message was
+  ungrammatical ("class X do inheritance illegally.") and, worse, collapsed
+  two distinct causes -- a `final` supertype, and an interface/class kind
+  mismatch between `extends`/`conforms` -- into one sentence with no hint
+  which one applies, even though `docs/reference/error-codes.md` already
+  documented both causes precisely. The message (en and ja) now names the
+  actual reason (`... : the supertype is final and cannot be extended` /
+  `... : an interface cannot appear after extends, and a class cannot
+  appear after conforms`). Also closed a coverage gap: the existing E0018
+  test only triggered the final-class cause: added a test for the kind-mismatch
+  cause (`class A extends java.lang.Runnable { ... }`).
+
 - **Diagnostic hint for a Python-style f-string prefix (`f"Hello {name}"`) used as a
   string.** Onion desugars any bare identifier directly before a string literal into
   a call (`f"raw"` -> `f("raw")`, the same sugar behind `re"..."`/`file"..."`), so
@@ -17,6 +29,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with nothing connecting it back to the actual mistake. The diagnostic now
   recognizes this shape and points at Onion's actual string interpolation syntax,
   `"text #{expr}"`, instead.
+
+## [0.30.0] - 2026-09-01
+
+### Added
+
+- **A single source of truth for the primitive-type-name whitelist.** `typing.NameResolver`
+  (class-not-found suggestions -- "did you mean `Int`?" for a Java/Scala-style lowercase
+  `int`) and `parser.SyntaxHintClassifier` (the `hint.primitive_dot_static` hint for
+  `Int.parseInt(...)`-style mistakes) each listed Onion's eight capitalized primitive
+  type names separately -- the same two-copies-of-one-list drift risk already closed for
+  `DeriveMarkers` and `ShapeFormats`. Both now read from a shared
+  `onion.compiler.PrimitiveTypeNames.all`. Added a regression test asserting the two call
+  sites agree and that the `primitive_dot_static` hint actually fires for every name in
+  the shared list.
+
+- **A single source of truth for the builtin-extension container list.** The
+  stdlib containers whose static helpers become extension methods (`onion.Colls`,
+  `onion.Strings`, `onion.Maps`, ...) were listed twice: once in
+  `Typing.registerBuiltinExtensions` (which registers them) and again in
+  `ExtensionMethodFallbackSupport.BuiltinExtensionContainers` (which decides
+  whether a user-declared `extension` may shadow one of them instead of
+  colliding as an ambiguity) -- the same two-copies-of-one-list drift risk
+  already closed for `derive!` markers (`DeriveMarkers`) and shape formats
+  (`ShapeFormats`), flagged by its own "keep in sync" comment. `Typing.scala`
+  now iterates `BuiltinExtensionContainers` directly (kept as an ordered `Seq`
+  so the existing first-container-wins overlap resolution is unaffected).
+  Added a regression test that shadows a builtin from a second container
+  (`onion.Strings`, alongside the existing `onion.Colls` coverage) so a future
+  drift between the two use sites fails a test instead of only miscompiling
+  silently at the ambiguity check.
+
+- **A drift guard tying the E0061/E0062/E0081 "supported scalar types" prose to
+  `ScalarConversions.all`.** `record ... from re"..."`, `derive!(Json, Yaml)`, and
+  `tool` auto-CLI parameters all restrict components to the same eight-type scalar
+  set, and `docs/reference/error-codes.md` (and its `ja` translation) repeat that
+  set as literal prose in all three sections -- the same whitelist-drift risk
+  already fixed for E0063's `derive!` markers and E0076's shape formats, one
+  section over each time, but with nothing tying these three to their source of
+  truth. Added `checkScalarConversions` to `ErrorCodeDocCoverageSpec`, verified it
+  actually catches a dropped type before confirming today's docs are still
+  accurate.
+
+- **A drift guard for the "Error Categories" doc block atop `SemanticError`.**
+  That scaladoc sorts every declared code into a category (Type Errors,
+  Resolution Errors, ...) via a curated bullet list, but nothing tied it to
+  the `case object` declarations below it -- 23 of the 89 declared codes,
+  including recent additions like `CLASS_USED_AS_VALUE` and
+  `NULLABLE_MEMBER_ACCESS`, were entirely absent, and the Inheritance Errors
+  range silently included a retired code (E0017) that was never reused.
+  Recategorized every code accurately and added
+  `SemanticErrorCategoryDocCoverageSpec`, which asserts every case object
+  name appears in the doc block so a newly added code can't go
+  uncategorized again.
+
+- **A single source of truth for the E0079 "which effects take a parameter
+  argument" whitelist.** `CapabilityCheckPass` hardcoded its own private
+  `parameterized: Set[Effect]` (deciding whether a `requires { read(src) }`-style
+  entry may carry a parameter) with nothing tying it to the matching prose
+  repeated in both `docs/reference/error-codes.md` and its `ja` translation --
+  the same whitelist-drift risk already closed for E0063's `derive!` markers,
+  E0076's shape formats, and E0061/E0062/E0081's scalar types. The set now
+  lives as `Effect.parameterized` in `effects/Effect.scala`, and
+  `ErrorCodeDocCoverageSpec` asserts the E0079 sections in both docs name
+  every parameterized effect so a future addition can't leave them stale.
+
+- **A drift guard for key parity between `errorMessage.properties` and
+  `errorMessage_ja.properties`.** `ResourceBundle` chains the Japanese bundle to the
+  English one as its parent, so a key present only in English still *resolves* through
+  the Japanese bundle -- silently, in English -- and every existing bundle spec only
+  checks that a key resolves in both locales, never that both `.properties` files
+  actually declare it. A dropped or renamed translation was therefore invisible to the
+  suite. Added `MessageBundleKeyParitySpec`, which reads both files directly (bypassing
+  the fallback chain) and fails if either declares a key the other doesn't.
+
+### Fixed
+
+- **Stale `E0062`/`E0063` docs in the error-code reference.** `docs/reference/error-codes.md`
+  (and its `ja` translation) described `derive!(Json)` as the only supported
+  form and claimed `Json` was the sole `E0063` marker, even though `derive!`
+  has supported `Yaml` (and `derive!(Json, Yaml)`) for a while — contradicting
+  the compiler's own `E0063` message. Docs now describe both markers, backed
+  by a regression test tying the doc to the property file so they can't
+  drift apart again.
+
+- **Stale `E0076` example in the error-code reference.** The same whitelist-drift
+  mistake as `E0063`, one code later: `docs/reference/error-codes.md` (and its `ja`
+  translation) showed the `shape name = <format>` error listing only `json, yaml`
+  as supported formats, even though `ShapeFormats.all` (and the compiler's own
+  `E0076` message) has included `config` for a while. Docs now list all three,
+  backed by a regression test tying the doc to `ShapeFormats.all` so a fourth
+  format can't leave the example stale again.
+
+- **`derive!`'s marker whitelist, written out three times.** The `hasData` guard
+  and the unknown-marker check in `TypingOutlinePass` each hardcoded
+  `m == "Json" || m == "Yaml"`, and `errorMessage.properties`/`errorMessage_ja.properties`
+  separately hardcoded "Supported markers: Json, Yaml." as literal text in the
+  E0063 message — the same drift risk `ShapeFormats` was introduced to close
+  for `shape name = <format>`. Added `DeriveMarkers` as the single source of
+  truth and wired both checks and the E0063 message through it; also fixes
+  `RECORD_DERIVE_UNKNOWN_MARKER`'s message-format definition, which only
+  declared one argument extractor and would have silently rendered the
+  message as "Supported markers: {1}." once a second argument was added.
+
+- **Parser hint for a Python-style `with expr as name { ... }` resource block.**
+  Writing `with open(path) as f { ... }` — Python's context-manager idiom —
+  parsed `with` as a bare identifier statement and hit the generic "a call's
+  arguments need parentheses" fallback (suggesting the nonsensical
+  `with(...)`), since `with` is not a keyword in Onion's grammar. The
+  diagnostic now recognizes the `with expr as name { ... }` shape and points
+  at Onion's actual equivalent, `try (val name = expr) { ... }`.
+
+## [0.29.0] - 2026-08-31
 
 ### Added
 
@@ -32,6 +156,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Merged in #955; this entry was missing from the changelog until now.)
 
 ### Fixed
+
+- **Diagnostic hint for a JS-style `console.log`/`console.error`/`console.warn`
+  call.** Onion has no `console` object, so `console` parsed as a bare
+  identifier reference and the mistake surfaced as a generic
+  `local variable console is not found` (E0002) error with nothing pointing
+  at the actual fix. The diagnostic now recognizes the exact unresolved name
+  `console` and points at `IO::println(...)` instead.
+
+- **Locale-fragile assertion in `DanglingElseHintI18nSpec`.** The spec
+  asserted that the hint's message contains the English phrase
+  `` "only `if` takes an `else`" ``, assuming it was a literal code example
+  (like `TernaryHintI18nSpec`'s `` if cond { a } else { b } ``) and therefore
+  locale invariant. It is actually translated prose, so the assertion only
+  held under an English-default JVM and failed under `-Duser.language=ja` —
+  exactly the trap this project's own testing guidance warns against. Fixed
+  to assert on the backticked `` `else` ``/`` `if` `` tokens instead, which
+  are left untranslated in both bundles.
 
 - **Diagnostic hint for a JS/TS-style backtick template literal used as a
   string.** Writing `` `Hello ${name}` `` — Onion uses backticks only to

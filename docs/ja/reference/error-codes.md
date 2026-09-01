@@ -641,11 +641,12 @@ record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポ�
 対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
 マッチのあとで該当フィールドを手動でパースしてください。
 
-### `E0062` — `derive!(Json)` がサポートしないレコード成分型
+### `E0062` — `derive!` がサポートしないレコード成分型
 
-`derive!(Json)` は各成分を JSON のスカラー値にマッピングすることで `fromJson`/`toJson`
-を生成します。サポートされる成分型は `from re"..."` と同じ、`String`、`Int`、`Long`、
-`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
+`derive!(Json)` と `derive!(Yaml)` はどちらも、各成分をスカラー値にマッピングする
+ことで `fromX`/`toX` の対を生成します。両者は同じ `toMap`/`fromMap` コアを共有して
+いるため、この制約はどちらでも同一です。サポートされる成分型は `from re"..."` と
+同じ、`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
 
 ```onion
 record Inner(z: Int)
@@ -657,13 +658,15 @@ record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner はシリアラ�
 ### `E0063` — 未知の `derive!` マーカー
 
 `derive!(...)` が、コンパイラが実装していないフォーマット名を指定しています。
-現在サポートされているマーカーは `Json` のみです。
+サポートされているマーカーは `Json` と `Yaml` で、単独でも
+`derive!(Json, Yaml)` のように併用してもかまいません。
 
 ```onion
 record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bogus
 ```
 
-対処: `derive!(Json)` を使うか、この句を削除してください。
+対処: `derive!(Json)`、`derive!(Yaml)`、`derive!(Json, Yaml)` のいずれかを使うか、
+この句を削除してください。
 
 ### `E0086` — レコード成分名の重複
 
@@ -758,7 +761,7 @@ law はコンパイル済みクラスに対して実行されます。`law` / `e
 
 ```onion
 record Pt(x: Int, y: Int)
-  shape doc = toml     // E0076: サポートしているのは json, yaml
+  shape doc = toml     // E0076: サポートしているのは json, yaml, config
 ```
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
@@ -1464,7 +1467,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0014` | field ….… is not accessible from class … |
 | `E0015` | class … is not accessible from class … |
 | `E0016` | inheritance relations which includes … have cyclicity |
-| `E0018` | class … do inheritance illegally |
+| `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
 | `E0020` | this method cannot return value |
 | `E0021` | constructor not found |

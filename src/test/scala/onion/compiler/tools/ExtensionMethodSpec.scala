@@ -181,5 +181,33 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("user:A") == result)
     }
+
+    it("lets a user extension method shadow a builtin Strings extension of the same name") {
+      // Colls and Strings are two of several containers listed in
+      // ExtensionMethodFallbackSupport.BuiltinExtensionContainers -- the single list
+      // that both registers builtin extensions (Typing.registerBuiltinExtensions) and
+      // decides which extensions a user `extension` block is allowed to shadow
+      // (isBuiltinExtension). Exercising a second container here, not just Colls,
+      // guards against that list losing an entry on just one of its two use sites: if
+      // it did, this shadowing would fail with an ambiguous-extension-method error
+      // instead of returning the user's implementation.
+      val result = shell.run(
+        """
+          |extension String {
+          |  def upper(): String { return "user:" + this }
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "a".upper()
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("user:a") == result)
+    }
   }
 }

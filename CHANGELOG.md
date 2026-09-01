@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CLI usage errors (`error.command.*`) were missing articles.** `onionc -classpath`
+  (no value) read "`-classpath` requires argument.", an unrecognized flag read
+  "is invalid argument.", `-encoding` with a bad value read "is not valid encoding
+  name.", and worst, `-maxErrorReport` with a non-numeric value read "is required to
+  natural number." -- not just missing an article but missing the verb linking
+  "required" to "natural number." These are CLI-level messages (no E-code, no doc
+  entry), so the only regression net was a new test
+  (`CommandErrorMessageGrammarSpec`) pinning the English text via `Locale.ROOT`
+  (immune to the suite's `en`/`ja` locale switch) alongside the unaffected Japanese
+  translations.
+
 - **E0020 "cannot return value" was missing an article.** Same defect as the
   recent E0018/E0027 fixes: the message read `this method cannot return
   value.` instead of `this method cannot return a value.`. Fixed in the

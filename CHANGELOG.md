@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0003 "class not found" was missing an article.** Same defect class as the
+  recent E0005/E0016/E0018/E0020/E0021/E0023/E0027/E0028/E0050/E0051/E0089
+  fixes: the message read `... Check spelling or add import.` instead of
+  `... Check spelling or add an import.`. Fixed in the English message bundle
+  (the Japanese message itself was unaffected -- no articles in Japanese), and
+  pinned by a new `E0003MissingArticleSpec` using `MessageBundles` so the
+  exact English text is checked regardless of the JVM's default locale.
+
 - **E0089 "constructor in a record or enum body" had a wrong article for the
   enum case.** The message read `a {0} cannot declare 'def this': ...` with
   `{0}` filled with the literal `record` or `enum` -- a hardcoded `a` that is

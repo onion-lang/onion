@@ -325,9 +325,16 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.rawTypeNotAllowed",
       Seq(items => asString(items(0)))
     ),
+    // {1} is the raw type name (used by the Japanese template, which has no
+    // article to agree). {2} is the English-only "a X"/"an X" phrase, same
+    // pattern as `indefiniteArticled`'s use for CONSTRUCTOR_IN_RECORD_OR_ENUM.
     SemanticError.MISSING_RETURN -> ErrorDef(
       "error.semantic.missingReturn",
-      Seq(items => asString(items(0)), items => typeName(items(1)))
+      Seq(
+        items => asString(items(0)),
+        items => typeName(items(1)),
+        items => indefiniteArticled(typeName(items(1)))
+      )
     ),
     // {1}/{2} are the raw counts (used by the Japanese template, which counts with
     // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized

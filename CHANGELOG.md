@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0067 "missing return" had a wrong article for vowel-initial return types.**
+  The message read `... without returning a {1}.` with `{1}` filled with the
+  method's declared return type, so a vowel-initial type read `without
+  returning a Int.` / `without returning a Object.` instead of `an Int.` /
+  `an Object.`. Same defect class as the recent E0089 wrong-article fix:
+  `SemanticErrorReporter` now derives the article from the substituted type
+  name (`indefiniteArticled`, already used for E0089) instead of hardcoding
+  one in the English message bundle; the Japanese message (no articles) is
+  unaffected. Fixed in the English message bundle only, and pinned by a new
+  `E0067MissingReturnArticleSpec` using `MessageBundles` so the exact English
+  text is checked regardless of the JVM's default locale.
+
 - **E0060 "regex capture group / binding count mismatch" had a number agreement
   bug.** The message spliced the raw counts into a literal `(s)` suffix instead of
   real pluralization: `the regex pattern has {0} capture group(s) but {1}

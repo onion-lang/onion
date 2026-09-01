@@ -1475,7 +1475,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0023` | interface required, but type … is used |
 | `E0025` | duplicated constructor definition …(…) |
 | `E0026` | duplicated generated method ….…(…) |
-| `E0027` | type … is not boxable type |
+| `E0027` | type … is not a boxable type |
 | `E0028` | lvalue is required |
 | `E0029` | duplicated type parameter definition … |
 | `E0030` | type … does not take type arguments |

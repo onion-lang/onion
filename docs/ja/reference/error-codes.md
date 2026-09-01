@@ -1499,7 +1499,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0048` | break is only allowed inside a loop |
 | `E0049` | continue is only allowed inside a loop |
 | `E0050` | current instance is not available in a static context |
-| `E0051` | return type is required for method … |
+| `E0051` | a return type is required for method … |
 | `E0052` | lambda parameter … must specify a type |
 | `E0053` | cyclic type alias detected: … |
 | `E0054` | duplicate type alias: … |

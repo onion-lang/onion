@@ -536,6 +536,13 @@ class SemanticErrorReporter(threshold: Int) {
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else if (name == "f" && args == "String") {
+        // A Python-style f-string prefix (`f"Hello {name}"`) is not a string in Onion --
+        // any bare identifier directly before a string literal desugars to a call (the
+        // scheme-literal sugar: `re"..."`/`file"..."`/a user-defined `id"raw"`), so this
+        // reads as a call to a function named `f` that nothing defines. Point at Onion's
+        // actual interpolation syntax instead of a name-similarity guess.
+        Some(message("suggestion.pythonFString"))
       } else if (fieldNamed(targetType, name) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

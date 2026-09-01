@@ -1476,7 +1476,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0025` | duplicated constructor definition …(…) |
 | `E0026` | duplicated generated method ….…(…) |
 | `E0027` | type … is not a boxable type |
-| `E0028` | lvalue is required |
+| `E0028` | an lvalue is required |
 | `E0029` | duplicated type parameter definition … |
 | `E0030` | type … does not take type arguments |
 | `E0031` | type … expects … type arguments, but … are supplied |
@@ -1498,7 +1498,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0047` | … is not a record type or does not exist |
 | `E0048` | break is only allowed inside a loop |
 | `E0049` | continue is only allowed inside a loop |
-| `E0050` | current instance is not available in static context |
+| `E0050` | current instance is not available in a static context |
 | `E0051` | return type is required for method … |
 | `E0052` | lambda parameter … must specify a type |
 | `E0053` | cyclic type alias detected: … |

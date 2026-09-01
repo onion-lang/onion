@@ -1518,7 +1518,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0057` | value of type parameter … may be null and cannot be dereferenced directly |
 | `E0058` | label … is not defined on any enclosing loop |
 | `E0059` | invalid regular expression literal: … |
-| `E0060` | the regex pattern has … capture group(s) but … binding(s) were given |
+| `E0060` | the regex pattern has … capture group(s) but … binding(s) was/were given |
 | `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |

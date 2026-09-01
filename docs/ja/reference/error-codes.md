@@ -1470,7 +1470,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
 | `E0020` | this method cannot return a value |
-| `E0021` | constructor not found |
+| `E0021` | a constructor applicable for …(…) is not found |
 | `E0022` | ambiguous constructor |
 | `E0023` | an interface is required, but type … is used |
 | `E0025` | duplicated constructor definition …(…) |

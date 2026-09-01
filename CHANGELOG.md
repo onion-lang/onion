@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0021's quick-reference table row was stale.** The E0005/E0021
+  missing-article fix updated `error.semantic.constructorNotFound` to read `a
+  constructor applicable for X(Y) is not found.` and updated E0005's row in
+  the quick-reference table of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` to match, but missed E0021's row, which
+  still read the pre-fix paraphrase `constructor not found`. Now reads `a
+  constructor applicable for …(…) is not found` in both tables, pinned by a
+  new `E0021QuickReferenceDriftSpec` so the table can't drift from the
+  message bundle again.
+
 - **E0016 "cyclic inheritance" had a subject-verb agreement error.** The message
   read `inheritance relations which includes X have cyclicity.` -- plural
   "relations" paired with singular "includes". Now reads `inheritance relations

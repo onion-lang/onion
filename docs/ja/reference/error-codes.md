@@ -1467,7 +1467,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0014` | field ….… is not accessible from class … |
 | `E0015` | class … is not accessible from class … |
 | `E0016` | inheritance relations which includes … have cyclicity |
-| `E0018` | class … do inheritance illegally |
+| `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
 | `E0020` | this method cannot return value |
 | `E0021` | constructor not found |

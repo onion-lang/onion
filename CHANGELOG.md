@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **E0018 "illegal inheritance" now explains *why*.** The message was
+  ungrammatical ("class X do inheritance illegally.") and, worse, collapsed
+  two distinct causes -- a `final` supertype, and an interface/class kind
+  mismatch between `extends`/`conforms` -- into one sentence with no hint
+  which one applies, even though `docs/reference/error-codes.md` already
+  documented both causes precisely. The message (en and ja) now names the
+  actual reason (`... : the supertype is final and cannot be extended` /
+  `... : an interface cannot appear after extends, and a class cannot
+  appear after conforms`). Also closed a coverage gap: the existing E0018
+  test only triggered the final-class cause: added a test for the kind-mismatch
+  cause (`class A extends java.lang.Runnable { ... }`).
+
 ## [0.30.0] - 2026-09-01
 
 ### Added

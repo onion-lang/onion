@@ -38,7 +38,7 @@ package onion.compiler
  *   - CYCLIC_INHERITANCE, ILLEGAL_INHERITANCE, INTERFACE_REQUIRED
  *   - UNIMPLEMENTED_ABSTRACT_METHOD, ABSTRACT_CLASS_INSTANTIATION, FINAL_METHOD_OVERRIDE
  *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY
- *   (E0017 and E0024 are retired codes, kept unassigned rather than reused.)
+ *   (E0017, E0024, and E0056 are retired codes, kept unassigned rather than reused.)
  *
  * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091)'''
  *   - ILLEGAL_METHOD_CALL, CANNOT_RETURN_VALUE, CANNOT_CALL_METHOD_ON_PRIMITIVE

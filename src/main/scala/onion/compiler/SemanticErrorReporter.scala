@@ -111,6 +111,16 @@ class SemanticErrorReporter(threshold: Int) {
     s"$article $noun"
   }
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
+  // English count + noun agreement ("1 field" / "2 fields"). Only used where the same
+  // message key's Japanese counterpart uses a bare number with a counter word (e.g. "{1}
+  // 個の...") and has no plural form to agree -- English gets its own pre-pluralized
+  // argument instead of reusing the raw count, same pattern as `indefiniteArticled`.
+  private def pluralizeCount(count: Int, noun: String): String =
+    if (count == 1) s"1 $noun" else s"$count ${noun}s"
+  // Same, but also carries the trailing verb so subject-verb number agreement is
+  // captured too ("1 binding was specified" / "2 bindings were specified").
+  private def pluralizeCountVerb(count: Int, noun: String, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $noun $verbSingular" else s"$count ${noun}s $verbPlural"
   private def typeNames(types: Array[TypedAST.Type]): String = {
     if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
   }
@@ -345,9 +355,20 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.positionalAfterNamed",
       Seq()
     ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as CONSTRUCTOR_IN_RECORD_OR_ENUM's
+    // `indefiniteArticled` below: the English template uses {3}/{4} instead of the
+    // bare numbers so "1 fields"/"1 bindings were specified" can't happen.
     SemanticError.WRONG_BINDING_COUNT -> ErrorDef(
       "error.semantic.wrongBindingCount",
-      Seq(items => asString(items(2)), items => asInt(items(0)), items => asInt(items(1)))
+      Seq(
+        items => asString(items(2)),
+        items => asInt(items(0)),
+        items => asInt(items(1)),
+        items => pluralizeCount(items(0).asInstanceOf[Int], "field"),
+        items => pluralizeCountVerb(items(1).asInstanceOf[Int], "binding", "was specified", "were specified")
+      )
     ),
     SemanticError.NOT_A_RECORD_TYPE -> ErrorDef(
       "error.semantic.notARecordType",

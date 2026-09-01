@@ -786,6 +786,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("foo")
     }
 
+    it("recognizes a Rust-style `name!(...)` macro call") {
+      val hint = classify(
+        found = "!",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "println!(\"hi\")"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_macro_call"
+      hint.arguments shouldBe Seq("println")
+    }
+
+    it("recognizes a Rust-style macro call with a longer name, e.g. `assert_eq!`") {
+      val hint = classify(
+        found = "!",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "assert_eq!(x, y)"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.rust_style_macro_call"
+      hint.arguments shouldBe Seq("assert_eq")
+    }
+
     it("recognizes a Python2-style `print` statement missing its parentheses") {
       val hint = classify(
         found = "\"Hello\"",

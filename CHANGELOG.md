@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Rust-style `name!(...)` macro call.** Writing
+  `println!("hi")`, `assert_eq!(x, y)`, `vec!(1, 2)`, or any other
+  Rust `macro!(...)` invocation — `!` is Onion's prefix logical-not operator,
+  never a postfix one, so the identifier parsed as a complete statement on
+  its own and the trailing `!` surfaced as a bare
+  `Syntax error. Encountered "!", but expecting <EOF>, <EOL>, ";"` with no
+  diagnostic connecting it to the actual mistake. The diagnostic now
+  recognizes the `name!(...)` shape and explains that Onion has no macros at
+  all — call `name(...)` directly, without the `!`.
+
 - **Stale stdlib class list in the effects reference doc.** `docs/reference/effects.md`
   (and its `ja` translation) enumerated which standard-library classes carry a real
   (non-`pure`) effect, but the list predated `Archive`, `Db`, `Net`, `Server`, `Future`,

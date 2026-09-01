@@ -147,6 +147,12 @@ private[compiler] object SyntaxHintClassifier {
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*->\s*([A-Za-z_][\w.\[\]?]*)""".r
   private val DanglingReturnTypeColon =
     """\bdef\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*:\s*$""".r
+  // A Rust-style `name!(...)` macro call (`println!`, `vec!`, `assert_eq!`, ...) --
+  // `!` is Onion's prefix logical-not operator, never a postfix one, so this parses
+  // the identifier as a complete statement on its own and then hits the trailing `!`
+  // where only end-of-statement is expected. Requires the `(` right after `!` so a
+  // real (if unusual) `foo ! bar` typo -- not a macro call -- doesn't misfire.
+  private val RustStyleMacroCall = """^\s*([A-Za-z_]\w*)!\s*\(""".r
   private val BareAdjacentTokens = """^\s*([A-Za-z_]\w*)\s+\S""".r
   // `context` starts exactly at the found token, so a lone `?` found immediately
   // followed by a second `?` is the two-token spelling of `??` -- distinguish it
@@ -369,6 +375,14 @@ private[compiler] object SyntaxHintClassifier {
             GuardElseBinding.findFirstMatchIn(sourceLine).isDefined =>
         val matched = GuardElseBinding.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.guard_else", matched.group(1).trim)
+      // A Rust-style `name!(...)` macro call -- keep this ahead of the generic
+      // bare-adjacent-tokens fallback below, which would otherwise misread the `!`
+      // as an unrelated second statement with no diagnostic naming the actual mistake.
+      case "!"
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            RustStyleMacroCall.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = RustStyleMacroCall.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.rust_style_macro_call", matched.group(1))
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).

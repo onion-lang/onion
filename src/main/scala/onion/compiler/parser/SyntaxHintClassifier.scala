@@ -26,6 +26,10 @@ private[compiler] object SyntaxHintClassifier {
   private val PythonStyleColonBlockClassHeader =
     """^\s*class\s+(.+?):\s*$""".r
   private val LeadingLetDeclaration = """^\s*let\s+[A-Za-z_]\w*\b""".r
+  // A C++/C#-style `auto x = expr;` type-inferred declaration -- `auto` isn't
+  // a reserved word, so it parses as a bare identifier and the rest reads as
+  // a stray second statement, same failure mode as LeadingLetDeclaration above.
+  private val LeadingAutoDeclaration = """^\s*auto\s+[A-Za-z_]\w*\s*=""".r
   private val RustStyleMutDeclaration =
     """^\s*(val|var)\s+mut\s+([A-Za-z_]\w*)""".r
   private val IfWhileLetBinding =
@@ -209,6 +213,8 @@ private[compiler] object SyntaxHintClassifier {
         controlFlowHint
       case _ if LeadingLetDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.js_style_let")
+      case _ if LeadingAutoDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.cpp_style_auto")
       case _ if RustStyleMutDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleMutDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.rust_style_mut", matched.group(1), matched.group(2))

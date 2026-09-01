@@ -297,6 +297,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lambda params: expr` shape and points at Onion's arrow-lambda syntax
   (`(x) -> x + 1`) instead.
 
+- **Parser hint for a C++/C#-style `auto x = expr` type-inferred
+  declaration.** Since `auto` isn't a reserved word in Onion, `auto x = 5`
+  parsed `auto` as a bare identifier reference, which left `x = 5` reading as
+  a second, unrelated statement; the failure previously surfaced as the
+  generic missing-call-parens fallback (suggesting the nonsensical
+  `auto(...)`). The diagnostic now recognizes the `auto name = value` shape
+  and points at Onion's actual equivalent: `val name = value` (immutable) or
+  `var name = value` (mutable).
+
 ## [0.28.0] - 2026-08-30
 
 ### Fixed

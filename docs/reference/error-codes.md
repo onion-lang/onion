@@ -1466,7 +1466,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0002` | variable not found |
 | `E0003` | class not found |
 | `E0004` | field ….… is not found |
-| `E0005` | method applicable for ….…(…) is not found |
+| `E0005` | a method applicable for ….…(…) is not found |
 | `E0006` | ambiguous method |
 | `E0007` | duplicated local variable definition … |
 | `E0008` | duplicated class definition … |

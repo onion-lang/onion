@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0005 "method not found" and E0021 "constructor not found" were missing
+  articles.** Same defect class as the recent E0018/E0020/E0027/E0028/E0050
+  fixes: E0005 read `method applicable for X.Y(Z) is not found.` and E0021 read
+  `constructor applicable for X(Y) is not found.` -- both now read `a method
+  applicable for ...` / `a constructor applicable for ...`. Fixed in the
+  English message bundle, in the quick-reference table of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` (the
+  Japanese messages themselves were unaffected -- no articles in Japanese),
+  and pinned by a new `E0005E0021MissingArticleSpec` using `MessageBundles`
+  so the exact English text is checked regardless of the JVM's default
+  locale.
+
 - **E0028 "lvalue is required" and E0050 "current instance not available" were
   missing articles.** Same defect class as the recent E0018/E0020/E0027 fixes:
   E0028 read `lvalue is required.` instead of `an lvalue is required.`, and

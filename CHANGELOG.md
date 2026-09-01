@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **E0016 "cyclic inheritance" had a subject-verb agreement error.** The message
+  read `inheritance relations which includes X have cyclicity.` -- plural
+  "relations" paired with singular "includes". Now reads `inheritance relations
+  which include X have cyclicity.` Fixed in the English message bundle and in
+  the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself was
+  unaffected), and pinned by a new `E0016CyclicInheritanceGrammarSpec` using
+  `MessageBundles` so the exact English text is checked regardless of the
+  JVM's default locale.
+
 ## [0.31.0] - 2026-09-01
 
 ### Fixed

@@ -769,14 +769,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         typeRef match
           case cd: ClassDefinition => cd.location
           case _ => null
-      report(SemanticError.ILLEGAL_INHERITANCE, location, typeRef.name)
+      report(SemanticError.ILLEGAL_INHERITANCE, location, typeRef.name, "kindMismatch")
     }
     // A final superclass used to escape typing entirely and blow up only when the
     // generated class was loaded (JVM IncompatibleClassChangeError at the law-check
     // step — an uncaught crash, found by the 0.10.1 E-code sweep). Report it where
     // the user can see it, on the supertype reference itself.
     if (!mustBeInterface && !isInterface && Modifier.isFinal(typeRef.modifier)) {
-      report(SemanticError.ILLEGAL_INHERITANCE, node, typeRef.name)
+      report(SemanticError.ILLEGAL_INHERITANCE, node, typeRef.name, "finalSuper")
     }
     typeRef
   }

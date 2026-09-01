@@ -1466,7 +1466,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0002` | variable not found |
 | `E0003` | class not found |
 | `E0004` | field ….… is not found |
-| `E0005` | method applicable for ….…(…) is not found |
+| `E0005` | a method applicable for ….…(…) is not found |
 | `E0006` | ambiguous method |
 | `E0007` | duplicated local variable definition … |
 | `E0008` | duplicated class definition … |
@@ -1477,23 +1477,23 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0013` | method ….…(…) is not accessible from class … |
 | `E0014` | field ….… is not accessible from class … |
 | `E0015` | class … is not accessible from class … |
-| `E0016` | inheritance relations which includes … have cyclicity |
-| `E0018` | class … do inheritance illegally |
+| `E0016` | inheritance relations which include … have cyclicity |
+| `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
-| `E0020` | this method cannot return value |
-| `E0021` | constructor not found |
+| `E0020` | this method cannot return a value |
+| `E0021` | a constructor applicable for …(…) is not found |
 | `E0022` | ambiguous constructor |
-| `E0023` | interface required, but type … is used |
+| `E0023` | an interface is required, but type … is used |
 | `E0025` | duplicated constructor definition …(…) |
 | `E0026` | duplicated generated method ….…(…) |
-| `E0027` | type … is not boxable type |
-| `E0028` | lvalue is required |
+| `E0027` | type … is not a boxable type |
+| `E0028` | an lvalue is required |
 | `E0029` | duplicated type parameter definition … |
 | `E0030` | type … does not take type arguments |
-| `E0031` | type … expects … type arguments, but … are supplied |
+| `E0031` | type … expects … type argument(s), but … is/are supplied |
 | `E0032` | type argument … must be a reference type |
 | `E0033` | method ….… does not take type arguments |
-| `E0034` | method ….… expects … type arguments, but … are supplied |
+| `E0034` | method ….… expects … type argument(s), but … is/are supplied |
 | `E0035` | Erased JVM signature collision: ….…… |
 | `E0036` | cannot assign to val … |
 | `E0037` | class … must implement abstract method …(…) or be declared abstract |
@@ -1509,8 +1509,8 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0047` | … is not a record type or does not exist |
 | `E0048` | break is only allowed inside a loop |
 | `E0049` | continue is only allowed inside a loop |
-| `E0050` | current instance is not available in static context |
-| `E0051` | return type is required for method … |
+| `E0050` | current instance is not available in a static context |
+| `E0051` | a return type is required for method … |
 | `E0052` | lambda parameter … must specify a type |
 | `E0053` | cyclic type alias detected: … |
 | `E0054` | duplicate type alias: … |
@@ -1518,7 +1518,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0057` | value of type parameter … may be null and cannot be dereferenced directly |
 | `E0058` | label … is not defined on any enclosing loop |
 | `E0059` | invalid regular expression literal: … |
-| `E0060` | the regex pattern has … capture group(s) but … binding(s) were given |
+| `E0060` | the regex pattern has … capture group(s) but … binding(s) was/were given |
 | `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
@@ -1547,7 +1547,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0086` | duplicated record component … in … |
 | `E0087` | class … has a primary constructor, so every `def this` must delegate to it |
 | `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
-| `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
+| `E0089` | a record / an enum cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 

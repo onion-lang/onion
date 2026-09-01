@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic hint for a Python-style f-string prefix (`f"Hello {name}"`) used as a
+  string.** Onion desugars any bare identifier directly before a string literal into
+  a call (`f"raw"` -> `f("raw")`, the same sugar behind `re"..."`/`file"..."`), so
+  writing an f-string parsed fine and failed only because no function named `f`
+  exists — surfacing as `method applicable for X.f(String) is not found` (E0005)
+  with nothing connecting it back to the actual mistake. The diagnostic now
+  recognizes this shape and points at Onion's actual string interpolation syntax,
+  `"text #{expr}"`, instead.
+
 ### Added
 
 - **`run/ForthMachine.on`, a 474-line Forth-inspired stack-based interpreter.**

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0020 "cannot return value" was missing an article.** Same defect as the
+  recent E0018/E0027 fixes: the message read `this method cannot return
+  value.` instead of `this method cannot return a value.`. Fixed in the
+  English message bundle and in the quick-reference tables of
+  `docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md`
+  (the Japanese message itself was unaffected -- no articles in Japanese).
+
 - **E0027 "not boxable type" was missing an article.** The `void`-is-not-boxable
   message read `type X is not boxable type.` -- grammatically broken in the same
   way E0018 was before its recent fix. Now reads `type X is not a boxable type.`

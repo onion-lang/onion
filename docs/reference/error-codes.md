@@ -1480,7 +1480,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0016` | inheritance relations which includes … have cyclicity |
 | `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
-| `E0020` | this method cannot return value |
+| `E0020` | this method cannot return a value |
 | `E0021` | constructor not found |
 | `E0022` | ambiguous constructor |
 | `E0023` | interface required, but type … is used |

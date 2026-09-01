@@ -1490,10 +1490,10 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0028` | an lvalue is required |
 | `E0029` | duplicated type parameter definition … |
 | `E0030` | type … does not take type arguments |
-| `E0031` | type … expects … type arguments, but … are supplied |
+| `E0031` | type … expects … type argument(s), but … is/are supplied |
 | `E0032` | type argument … must be a reference type |
 | `E0033` | method ….… does not take type arguments |
-| `E0034` | method ….… expects … type arguments, but … are supplied |
+| `E0034` | method ….… expects … type argument(s), but … is/are supplied |
 | `E0035` | Erased JVM signature collision: ….…… |
 | `E0036` | cannot assign to val … |
 | `E0037` | class … must implement abstract method …(…) or be declared abstract |

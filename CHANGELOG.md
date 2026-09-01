@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0031 "type argument arity mismatch" and E0034 "method type argument arity
+  mismatch" had a number agreement bug.** Both messages spliced raw counts into
+  fixed-plural text: `type X expects {1} type arguments, but {2} are supplied.`, so a
+  single expected or supplied type argument read `expects 1 type arguments` and `1
+  are supplied` -- wrong in both directions. Same defect class as the E0046
+  wrong-binding-count fix: `SemanticErrorReporter` now supplies pre-pluralized
+  English clauses (`pluralizeCount` for the expected count, and a new
+  `pluralizeVerbOnly` helper for the subject-less "N is/are supplied" clause)
+  alongside the raw counts the Japanese templates still use directly (Japanese
+  counts with a counter word and has no plural form to agree), so the fixed text
+  reads `expects 1 type argument, but 1 is supplied.` / `expects 2 type arguments,
+  but 3 are supplied.` as appropriate. Fixed in the English message bundle and in
+  the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (both now read `type argument(s), but … is/are
+  supplied`; the Japanese messages themselves were unaffected), and pinned by a new
+  `E0031E0034TypeArgumentArityGrammarSpec` using `MessageBundles` so the exact
+  English text is checked regardless of the JVM's default locale.
+
 - **E0046 "wrong number of bindings" had a number agreement bug.** The message
   spliced the raw field/binding counts into fixed plural text: `Type X has {1}
   fields, but {2} bindings were specified.`, so a 1-field record read `has 1

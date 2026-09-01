@@ -1472,7 +1472,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0020` | this method cannot return a value |
 | `E0021` | constructor not found |
 | `E0022` | ambiguous constructor |
-| `E0023` | interface required, but type … is used |
+| `E0023` | an interface is required, but type … is used |
 | `E0025` | duplicated constructor definition …(…) |
 | `E0026` | duplicated generated method ….…(…) |
 | `E0027` | type … is not a boxable type |

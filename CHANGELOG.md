@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0023 "interface required" was missing an article and a linking verb.** The
+  message read `interface required, but type X is used.` -- same defect class as
+  the recent E0005/E0018/E0020/E0021/E0027/E0028/E0050 fixes. Now reads `an
+  interface is required, but type X is used.` in the English message bundle and
+  in the quick-reference tables of `docs/reference/error-codes.md` and
+  `docs/ja/reference/error-codes.md` (the Japanese message itself was
+  unaffected -- no articles in Japanese), and pinned by a new
+  `E0023MissingArticleSpec` using `MessageBundles` so the exact English text is
+  checked regardless of the JVM's default locale.
+
 - **E0005 "method not found" and E0021 "constructor not found" were missing
   articles.** Same defect class as the recent E0018/E0020/E0027/E0028/E0050
   fixes: E0005 read `method applicable for X.Y(Z) is not found.` and E0021 read

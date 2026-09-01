@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.32.0] - 2026-09-01
-
 ### Fixed
 
 - **E0067 "missing return" had a wrong article for vowel-initial return types.**

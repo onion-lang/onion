@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **E0046 "wrong number of bindings" had a number agreement bug.** The message
+  spliced the raw field/binding counts into fixed plural text: `Type X has {1}
+  fields, but {2} bindings were specified.`, so a 1-field record read `has 1
+  fields`, and a single stray binding read `1 bindings were specified` --
+  wrong in both directions. Same defect class as the recent
+  E0003/E0016/E0089 grammar fixes, but for count/noun/verb agreement instead
+  of a missing article or a fixed plural subject. `SemanticErrorReporter` now
+  supplies pre-pluralized English clauses (`indefiniteArticled`'s sibling
+  helpers `pluralizeCount`/`pluralizeCountVerb`) alongside the raw counts the
+  Japanese template still uses directly (Japanese counts with a counter word
+  and has no plural form to agree), so the fixed text reads `has 1 field, but
+  1 binding was specified.` / `has 2 fields, but 3 bindings were specified.`
+  as appropriate. Fixed in the English message bundle only (the Japanese
+  message was unaffected), and pinned by a new
+  `E0046WrongBindingCountGrammarSpec` using `MessageBundles` so the exact
+  English text is checked regardless of the JVM's default locale.
+
 - **E0003 "class not found" was missing an article.** Same defect class as the
   recent E0005/E0016/E0018/E0020/E0021/E0023/E0027/E0028/E0050/E0051/E0089
   fixes: the message read `... Check spelling or add import.` instead of

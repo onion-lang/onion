@@ -89,6 +89,29 @@ final class MethodCallTyping(
   ): Option[ResolvedMethodInvocation] =
     methodInvocationBuilderSupport.resolveInvocation(node, method, params, typeArgs, classSubst, expected)
 
+  /** Whether any method of `name` accepted by `filter` exists in the hierarchy: the walk of
+    * `collectMethodsMatching` with an early exit and no candidate set. */
+  private[typing] def existsMethodMatching(sourceType: ObjectType, name: String, filter: Method => Boolean): Boolean = {
+    def walk(currentType: ObjectType): Boolean = {
+      if (currentType == null) return false
+      val own = currentType.methods(name)
+      var i = 0
+      while (i < own.length) {
+        if (filter(own(i))) return true
+        i += 1
+      }
+      if (walk(currentType.superClass)) return true
+      val ifaces = currentType.interfaces
+      var j = 0
+      while (j < ifaces.length) {
+        if (walk(ifaces(j))) return true
+        j += 1
+      }
+      false
+    }
+    walk(sourceType)
+  }
+
   /** Collects methods matching the filter from a type hierarchy into candidates set */
   private[typing] def collectMethodsMatching(
     sourceType: ObjectType,

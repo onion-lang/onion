@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Less bookkeeping per typed node and per call site: the applied-type cache is keyed by
+  raw class identity then argument list (no tuple, no name hashing); the per-compilation
+  candidate memos are nested maps rather than tuple-keyed; extension-method candidates are
+  memoized per (receiver type, name); the bridge emitter indexes a class's methods by
+  name instead of scanning them for every method of every generic supertype; the
+  named-method existence test walks with an early exit instead of collecting a candidate
+  set; `MethodResolutionSupport` creates its caches on first use; `openTypeParams` and
+  `LocalFrame.open` are inlined so their blocks are no longer closures; the reflective
+  child walk fills one buffer instead of chaining iterators.
+
 ## [0.37.0] - 2026-09-03
 
 ### Changed

@@ -75,7 +75,7 @@ final class TypingTypeSupport(private val typing: Typing) {
       case _ =>
     }
 
-  def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
+  inline def openTypeParams[A](scope: TypeParamScope)(inline block: A): A = {
     val prev = typing.typeParams_
     // Most openings add nothing (a method without type parameters inside a class without
     // them); `++` then returns the same scope, and there is nothing to switch.

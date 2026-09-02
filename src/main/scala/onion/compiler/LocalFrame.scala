@@ -23,7 +23,7 @@ class LocalFrame(val parent: LocalFrame) {
 
   allScopes += scope
 
-  def open[A](block: => A): A = {
+  inline def open[A](inline block: A): A = {
     try {
       scope = new LocalScope(scope)
       allScopes += scope

@@ -93,14 +93,29 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
    * Per-compilation memo of the overload candidates of (receiver type, method name): the
    * hierarchy walk that collects them is the same at every call site of that pair.
    */
-  private val candidateMemo = new java.util.HashMap[(TypedAST.ObjectType, String), Array[TypedAST.Method]]()
+  private val candidateMemo = new java.util.IdentityHashMap[TypedAST.ObjectType, java.util.HashMap[String, Array[TypedAST.Method]]]()
   def methodCandidatesOf(target: TypedAST.ObjectType, name: String)(compute: => Array[TypedAST.Method]): Array[TypedAST.Method] = {
-    val key = (target, name)
-    val cached = candidateMemo.get(key)
+    var byName = candidateMemo.get(target)
+    if (byName == null) { byName = new java.util.HashMap[String, Array[TypedAST.Method]](); candidateMemo.put(target, byName) }
+    val cached = byName.get(name)
     if (cached != null) cached
     else {
       val fresh = compute
-      candidateMemo.put(key, fresh)
+      byName.put(name, fresh)
+      fresh
+    }
+  }
+
+  /** Per-compilation memo of the extension methods named `name` visible from a receiver type. */
+  private val extensionMemo = new java.util.IdentityHashMap[TypedAST.ObjectType, java.util.HashMap[String, Seq[onion.compiler.TypedAST.ExtensionMethodDefinition]]]()
+  def extensionCandidatesOf(target: TypedAST.ObjectType, name: String)(compute: => Seq[onion.compiler.TypedAST.ExtensionMethodDefinition]): Seq[onion.compiler.TypedAST.ExtensionMethodDefinition] = {
+    var byName = extensionMemo.get(target)
+    if (byName == null) { byName = new java.util.HashMap[String, Seq[onion.compiler.TypedAST.ExtensionMethodDefinition]](); extensionMemo.put(target, byName) }
+    val cached = byName.get(name)
+    if (cached != null) cached
+    else {
+      val fresh = compute
+      byName.put(name, fresh)
       fresh
     }
   }

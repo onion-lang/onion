@@ -21,9 +21,13 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // a method declared at several levels of the generic hierarchy (e.g. addLast
     // on both List and SequencedCollection) yields a single bridge instead of a
     // duplicate (which would be a ClassFormatError).
-    val emitted = scala.collection.mutable.HashSet.from(classDef.methods.map { m =>
+    val ownMethods = classDef.methods // one copy: `methods` builds a fresh Seq per call
+    val emitted = scala.collection.mutable.HashSet.from(ownMethods.map { m =>
       (m.name, methodDesc(m.returnType, m.arguments))
     })
+    // Indexed by name: the search below ran over every method of the class for every
+    // method of every generic supertype, with per-argument compatibility checks.
+    val ownByName = ownMethods.groupBy(_.name)
 
     for source <- sources do
       val subst: Map[String, TypedAST.Type] =
@@ -35,9 +39,9 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
         if Modifier.isStatic(rawMethod.modifier) || Modifier.isPrivate(rawMethod.modifier) then
           ()
         else
-          val specializedArgs = rawMethod.arguments.map(substituteClassParams)
-          val implOpt = classDef.methods.find { m =>
-            m.name == rawMethod.name &&
+          val sameName = ownByName.getOrElse(rawMethod.name, Nil)
+          val specializedArgs = if sameName.isEmpty then null else rawMethod.arguments.map(substituteClassParams)
+          val implOpt = if sameName.isEmpty then None else sameName.find { m =>
             m.arguments.length == specializedArgs.length &&
             m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
           }

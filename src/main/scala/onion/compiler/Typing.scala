@@ -334,7 +334,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFromDeclared(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typeSupport.mapFrom(typeNode, mapper, banRaw = true)
 
-  private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
+  private[compiler] inline def openTypeParams[A](scope: TypeParamScope)(inline block: A): A =
     typeSupport.openTypeParams(scope)(block)
 
   private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =

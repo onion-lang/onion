@@ -5,6 +5,15 @@ private[compiler] object ControlFlowSyntaxHints {
   private val LeadingSwitchStatement = """^\s*switch\b""".r
   private val LeadingWhenStatement = """^\s*when\b""".r
   private val LeadingMatchStatement = """^\s*match\b""".r
+  // Scala/OCaml's actual `match` shape is postfix (`value match { case ... }`),
+  // unlike Rust's prefix `match value { ... }` above -- `match` isn't a reserved
+  // word, so `value` parses as a complete statement on its own and the following
+  // `match` reads as a stray second statement, which also matches the generic
+  // missing-call-parens fallback (suggesting the nonsensical `value match(...)`
+  // reading `match` as a call target); keep this ahead of that case. Requires
+  // at least one token before `match` so a genuine leading `match {` (handled
+  // above) is never double-matched here.
+  private val PostfixMatchExpression = """^\s*\S.*?\bmatch\s*\{\s*$""".r
   private val DefaultCaseLabel = """^\s*default\s*:""".r
   private val ElifStatement = """\belif\b""".r
   private val ElsifStatement = """\belsif\b""".r
@@ -59,6 +68,8 @@ private[compiler] object ControlFlowSyntaxHints {
     } else if (found == "when" && LeadingWhenStatement.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.when_not_supported")
     } else if (LeadingMatchStatement.findFirstMatchIn(sourceLine).isDefined) {
+      hint("error.parsing.hint.match_not_supported")
+    } else if (found == "match" && PostfixMatchExpression.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.match_not_supported")
     } else if (DefaultCaseLabel.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.default_case_not_supported")

@@ -10,6 +10,7 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
         ("value", "switch value {", "error.parsing.hint.switch_not_supported"),
         ("when", "when value {", "error.parsing.hint.when_not_supported"),
         ("value", "match value {", "error.parsing.hint.match_not_supported"),
+        ("match", "value match {", "error.parsing.hint.match_not_supported"),
         (":", "default:", "error.parsing.hint.default_case_not_supported"),
         ("condition", "} elif condition {", "error.parsing.hint.elif_not_supported"),
         ("unless", "unless done {", "error.parsing.hint.unless_not_supported"),

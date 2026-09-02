@@ -40,4 +40,17 @@ class WarningCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese compiler tool reference mentions every declared warning code, and no retired one") {
     check("docs/ja/tools/compiler.md")
   }
+
+  // error-codes.md's "Every diagnostic code" table explicitly claims to list every
+  // code "so a code seen in a build log can always be looked up" — but a build log
+  // shows W-codes too, and the table only ever collected E-codes (via
+  // ErrorCodeDocCoverageSpec's separate guard on SemanticError.scala).
+
+  it("the English diagnostic-code reference mentions every declared warning code, and no retired one") {
+    check("docs/reference/error-codes.md")
+  }
+
+  it("the Japanese diagnostic-code reference mentions every declared warning code, and no retired one") {
+    check("docs/ja/reference/error-codes.md")
+  }
 }

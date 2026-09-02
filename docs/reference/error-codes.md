@@ -1473,10 +1473,36 @@ Parser errors do not carry `E` codes; they report the encountered token and the 
 Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 ```
 
+## Warnings
+
+Unlike `E` codes, `W` codes don't fail compilation by default (`--warn error` turns
+them into errors) and can be suppressed individually with `--Wno` (see
+[Compiler tools](../tools/compiler.md#-wno-codes) for the `--Wno` name of each code).
+
+| Code | Meaning |
+|------|---------|
+| `W0001` | unused variable |
+| `W0002` | unused import |
+| `W0003` | unreachable code |
+| `W0004` | deprecated feature |
+| `W0005` | shadowed variable |
+| `W0006` | unused parameter |
+| `W0007` | empty block |
+| `W0008` | redundant cast |
+| `W0009` | possible null dereference |
+| `W0010` | unnecessary type conversion |
+| `W0011` | unchecked cast |
+| `W0012` | null assigned to non-nullable type |
+| `W0013` | suspicious string interpolation syntax |
+| `W0014` | top-level statements ignored because a main is defined |
+| `W0015` | boxed platform value implicitly unboxed to a non-null primitive |
+| `W0016` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
+
 ## Every diagnostic code
 
 The sections above explain the codes you are most likely to meet, with examples. This
-table lists all of them, so a code seen in a build log can always be looked up.
+table lists every `E` and `I` code, so a code seen in a build log can always be looked
+up; see [Warnings](#warnings) above for the `W` codes.
 
 | Code | Meaning |
 |------|---------|

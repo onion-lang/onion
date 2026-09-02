@@ -51,6 +51,12 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+?)\s*;?\s*$""".r
   private val DataClassDeclaration =
     """^\s*data\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
+  // A Scala-style `case class Point(x: Int, y: Int)` declaration -- unlike `data`
+  // above, `case` IS an Onion reserved word (used by `select` patterns), so this
+  // fails immediately at the `case` token itself rather than parsing as a bare
+  // identifier followed by a stray `class`.
+  private val CaseClassDeclaration =
+    """^\s*case\s+class\s+([A-Za-z_]\w*)\s*\(([^)]*)\)""".r
   // A Python-style `lambda x: expr` (or `lambda x, y: expr`) expression --
   // `lambda` isn't a reserved word, so it parses as a bare identifier and the
   // rest reads as a stray second statement with nothing connecting it back to
@@ -230,6 +236,12 @@ private[compiler] object SyntaxHintClassifier {
           ValVarParamPrefix.replaceFirstIn(p.trim, "")
         }.mkString(", ")
         hint("error.parsing.hint.data_class_declaration", matched.group(1), params)
+      case "case" if CaseClassDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = CaseClassDeclaration.findFirstMatchIn(sourceLine).get
+        val params = matched.group(2).split(",").map { p =>
+          ValVarParamPrefix.replaceFirstIn(p.trim, "")
+        }.mkString(", ")
+        hint("error.parsing.hint.case_class_declaration", matched.group(1), params)
       case _ if PythonStyleLambdaExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = PythonStyleLambdaExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.python_style_lambda", matched.group(1).trim, matched.group(2).trim)

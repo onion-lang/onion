@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic hint for a Scala-style `case class` declaration.** Onion has no
+  `case class` — a data-carrying type is a `record` — but unlike the existing
+  Kotlin-style `data class` hint, `case` is itself an Onion reserved word (used
+  by `select` patterns), so `case class Point(x: Int, y: Int)` failed right at
+  the `case` token with a generic "expecting `abstract`, `class`, `record`,
+  `def`, ..." message instead of pointing at the actual fix. `SyntaxHintClassifier`
+  now recognizes the `case class Name(...)` shape the same way it already
+  recognizes `data class`, stripping any `val`/`var` component prefixes and
+  suggesting `record Name(...)`. Pinned by new `CaseClassDeclarationHintI18nSpec`
+  and cases in `SyntaxHintClassifierSpec`.
+
 ## [0.33.0] - 2026-09-02
 
 ### Fixed

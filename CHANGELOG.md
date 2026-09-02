@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class (`JByte`, `JShort`, `JCharacter`, `JInteger`, `JLong`, `JFloat`, `JDouble`,
   `JBoolean`) if a boxed `java.lang.Object` is actually needed. Pinned by new
   `CannotInstantiatePrimitiveTypeHintI18nSpec`.
+- **`docs/reference/error-codes.md`'s "Every diagnostic code" table was missing every
+  `W0001`-`W0016` warning code** (en/ja), despite claiming to list all codes "so a code
+  seen in a build log can always be looked up" — `W` codes are surfaced the same way as
+  `E` codes (`--warn error`, `--Wno`) but had no entry there, only in
+  `docs/tools/compiler.md`. Added a Warnings section to both language versions, and
+  extended `WarningCodeDocCoverageSpec` to guard `error-codes.md` against this drift
+  too.
 
 ## [0.34.0] - 2026-09-02
 

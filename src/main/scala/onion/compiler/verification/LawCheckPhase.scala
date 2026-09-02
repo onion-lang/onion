@@ -34,6 +34,11 @@ final class LawCheckPhase(config: CompilerConfig)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (!config.checkLaws) return classes
+    // Most programs declare no law or example. Reading the check index first (a cheap scan
+    // of the class bytes) avoids building a class loader and defining every generated class
+    // just to discover there is nothing to run -- which was ~15% of a warm compilation.
+    val indexes = classes.collect { case cc if CheckMethodIndex.mayHaveChecks(cc.content) => cc -> CheckMethodIndex.read(cc.content) }
+    if (!indexes.exists(_._2.hasChecks)) return classes
     // Same parent CL as Shell.run so synthesized methods resolve the onion stdlib.
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)
     val errors = ArrayBuffer.empty[CompileError]
@@ -41,10 +46,9 @@ final class LawCheckPhase(config: CompilerConfig)
     val previous = thread.getContextClassLoader
     thread.setContextClassLoader(loader)
     try {
-      for (cc <- classes) {
+      for ((cc, index) <- indexes) {
         // initialize=false: don't run static initializers (top-level side effects) just to
         // scan for check methods; invoking a check lazily initializes only that record class.
-        val index = CheckMethodIndex.read(cc.content)
         val clazz = try Class.forName(cc.className, false, loader) catch { case _: Throwable => null }
         if (clazz != null) {
           for (m <- clazz.getDeclaredMethods if isBooleanStatic(m)) {

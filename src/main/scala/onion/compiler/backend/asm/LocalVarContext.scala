@@ -19,10 +19,10 @@ class LocalVarContext(gen: GeneratorAdapter) {
   // the time codegen runs. A slot with no name is simply left out of the table rather
   // than invented — a debugger showing `var3` is worse than showing nothing.
   private var nameFrame: onion.compiler.LocalFrame = null
-  private var namesCache: Map[Int, String] = null
+  private var namesCache: Array[String] = null
   // Built on the first slot that needs a name: a method with no locals never pays for it.
-  private def names: Map[Int, String] = {
-    if (namesCache == null) namesCache = if (nameFrame == null) Map.empty else nameFrame.namesByIndex
+  private def names: Array[String] = {
+    if (namesCache == null) namesCache = if (nameFrame == null) Array.empty else nameFrame.namesArray
     namesCache
   }
   private val debugLocals = mutable.Buffer[DebugLocal]()
@@ -36,7 +36,9 @@ class LocalVarContext(gen: GeneratorAdapter) {
   def declaredLocals: Seq[DebugLocal] = debugLocals.toSeq
 
   private def recordDebug(typedIndex: Int, slot: Int, tp: AsmType): Unit =
-    names.get(typedIndex).foreach { name =>
+    val table = names
+    val name = if (typedIndex >= 0 && typedIndex < table.length) table(typedIndex) else null
+    Option(name).foreach { name =>
       debugLocals += DebugLocal(slot, name, tp.getDescriptor)
     }
 

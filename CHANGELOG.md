@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Law checking no longer costs anything for programs without laws.** `LawCheckPhase`
+  built a class loader, defined every generated class and reflected over its methods on
+  every compilation, only to find no `law`/`example` to run -- about 15% of a warm
+  compilation. It now scans the class bytes for the check-method name prefixes (a
+  method name is a constant-pool UTF8 entry, so a class without the bytes has no check)
+  and returns before touching a class loader when nothing carries one.
+- Smaller per-compilation costs: classpath entry URLs are cached by path and kind
+  (`File.toURI` stat-ed every entry per compilation); the handwritten lexer computes
+  token positions with a cursor instead of two ints per source character, and shares the
+  images of keywords and operators; the constructor-delegation cycle walk is skipped
+  for classes without a self-delegating constructor; `MethodFinder` returns a lone
+  candidate without filtering and sorting; the assigned-variable scan indexes product
+  elements directly and treats `Location` as a leaf; the LocalVariableTable names come
+  from an array rather than a `Map`.
+
 ## [0.35.0] - 2026-09-02
 
 ### Changed

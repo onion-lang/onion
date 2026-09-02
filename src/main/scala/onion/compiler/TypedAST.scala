@@ -1341,6 +1341,8 @@ object TypedAST {
       find(methods, target, name, arguments)
       // Java-style phasing: a fixed-arity match beats vararg matches
       val all = methods.asScala.toArray
+      // Zero or one candidate needs no filtering or sorting; that is the common case.
+      if (all.length <= 1) return all
       val candidates = {
         val fixedArity = all.filter(m => !m.isVararg || matcher.matches(m.arguments, arguments))
         if (fixedArity.nonEmpty) fixedArity else all

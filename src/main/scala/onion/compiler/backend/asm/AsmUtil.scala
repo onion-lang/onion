@@ -10,7 +10,15 @@ object AsmUtil {
 
   def internalName(fqcn: String): String = fqcn.replace('.', '/')
 
-  def objectType(fqcn: String): AsmType = AsmType.getObjectType(internalName(fqcn))
+  // Built per call site before; a name maps to one Type, so it is kept.
+  private val objectTypes = new java.util.concurrent.ConcurrentHashMap[String, AsmType]()
+  def objectType(fqcn: String): AsmType =
+    val cached = objectTypes.get(fqcn)
+    if cached != null then cached
+    else
+      val fresh = AsmType.getObjectType(internalName(fqcn))
+      val winner = objectTypes.putIfAbsent(fqcn, fresh)
+      if winner == null then fresh else winner
 
   def getField(gen: GeneratorAdapter, ownerFqcn: String, name: String, fieldType: AsmType): Unit =
     gen.getField(objectType(ownerFqcn), name, fieldType)

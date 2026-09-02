@@ -89,6 +89,34 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
     }
   }
 
+  /**
+   * Per-compilation memo of the overload candidates of (receiver type, method name): the
+   * hierarchy walk that collects them is the same at every call site of that pair.
+   */
+  private val candidateMemo = new java.util.HashMap[(TypedAST.ObjectType, String), Array[TypedAST.Method]]()
+  def methodCandidatesOf(target: TypedAST.ObjectType, name: String)(compute: => Array[TypedAST.Method]): Array[TypedAST.Method] = {
+    val key = (target, name)
+    val cached = candidateMemo.get(key)
+    if (cached != null) cached
+    else {
+      val fresh = compute
+      candidateMemo.put(key, fresh)
+      fresh
+    }
+  }
+
+  /** Per-compilation memo of whether a class's hierarchy contains a parameterized type. */
+  private val specializedViewsMemo = new java.util.IdentityHashMap[TypedAST.ClassType, java.lang.Boolean]()
+  def specializedViewsRequired(target: TypedAST.ClassType)(compute: => Boolean): Boolean = {
+    val cached = specializedViewsMemo.get(target)
+    if (cached != null) cached.booleanValue
+    else {
+      val fresh = compute
+      specializedViewsMemo.put(target, java.lang.Boolean.valueOf(fresh))
+      fresh
+    }
+  }
+
   def appliedViewsOf(target: TypedAST.ClassType)(compute: => scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType]): scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType] = {
     val cached = appliedViewsMemo.get(target)
     if (cached != null) cached

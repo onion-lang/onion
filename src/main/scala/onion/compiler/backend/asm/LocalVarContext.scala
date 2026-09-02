@@ -92,7 +92,8 @@ class LocalVarContext(gen: GeneratorAdapter) {
     */
   def withBoxedVariables(frame: onion.compiler.LocalFrame): LocalVarContext = {
     if (frame != null) {
-      for (binding <- frame.entries) {
+      // Order is irrelevant here; `entries` sorted a fresh array per method.
+      for (binding <- frame.allBindings) {
         if (binding.isBoxed) {
           boxedSet += binding.index
         }

@@ -450,7 +450,12 @@ object AsmRefs {
     // per call was visible in the profile. The array is handed out as-is: callers only read it.
     private val methodArrays = new java.util.concurrent.ConcurrentHashMap[String, Array[TypedAST.Method]]()
     def methods(name: String): Array[TypedAST.Method] =
-      methodArrays.computeIfAbsent(name, n => methods_.get(n).toArray)
+      val cached = methodArrays.get(name)
+      if cached != null then cached
+      else
+        val fresh = methods_.get(name).toArray
+        val winner = methodArrays.putIfAbsent(name, fresh)
+        if winner == null then fresh else winner
     def fields: Array[TypedAST.FieldRef] = fields_.values.toArray
     def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray

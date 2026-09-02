@@ -14,6 +14,28 @@ final class StringInterpolationTyping(
   private val body: TypingBodyPass
 ) {
 
+  // `StringBuilder.append` has a dozen overloads and every interpolated part resolved
+  // them from scratch; the overload depends only on the part's type, so it is kept per
+  // type for the pass. Same for the final `toString`.
+  private val appendMemo = new java.util.HashMap[Type, Array[Method]]()
+  private var sbToStringMemo: Array[Method] = null
+
+  private def appendFor(sbType: ClassType, part: Term): Array[Method] = {
+    val key = part.`type`
+    val cached = appendMemo.get(key)
+    if (cached != null) cached
+    else {
+      val found = sbType.findMethod("append", Array(part))
+      appendMemo.put(key, found)
+      found
+    }
+  }
+
+  private def sbToString(sbType: ClassType): Array[Method] = {
+    if (sbToStringMemo == null) sbToStringMemo = sbType.findMethod("toString", Array[Term]())
+    sbToStringMemo
+  }
+
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] = boundary {
     val typedExprs = node.expressions.map(e => typed(e, context).getOrElse(null))
     if (typedExprs.contains(null)) break(None)
@@ -35,7 +57,7 @@ final class StringInterpolationTyping(
     for (i <- parts.indices) {
       if (parts(i).nonEmpty) {
         val part = new StringValue(node.location, parts(i), stringType)
-        val appendMethods = sbType.findMethod("append", Array(part))
+        val appendMethods = appendFor(sbType, part)
         if (appendMethods.nonEmpty) {
           result = new Call(result, appendMethods(0), Array(part))
         }
@@ -47,7 +69,7 @@ final class StringInterpolationTyping(
         val expr =
           if (typedExprs(i).`type`.isNullType) new AsInstanceOf(typedExprs(i), bodyContext.rootClass)
           else typedExprs(i)
-        val appendMethods = sbType.findMethod("append", Array(expr))
+        val appendMethods = appendFor(sbType, expr)
         if (appendMethods.nonEmpty) {
           result = new Call(result, appendMethods(0), Array(expr))
         } else {
@@ -56,7 +78,7 @@ final class StringInterpolationTyping(
               val toStringMethods = objectType.findMethod("toString", Array[Term]())
               if (toStringMethods.nonEmpty) {
                 val stringExpr = new Call(expr, toStringMethods(0), Array[Term]())
-                val appendStringMethods = sbType.findMethod("append", Array(stringExpr))
+                val appendStringMethods = appendFor(sbType, stringExpr)
                 if (appendStringMethods.nonEmpty) {
                   result = new Call(result, appendStringMethods(0), Array(stringExpr))
                 }
@@ -69,7 +91,7 @@ final class StringInterpolationTyping(
       }
     }
 
-    val toStringMethods = sbType.findMethod("toString", Array[Term]())
+    val toStringMethods = sbToString(sbType)
     if (toStringMethods.isEmpty) {
       bodyContext.report(METHOD_NOT_FOUND, node, sbType, "toString", Array[Type]())
       break(None)

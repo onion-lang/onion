@@ -81,7 +81,7 @@ private[compiler] object CapturedVariableCollector {
     // Build index -> ClosureLocalBinding map from frame
     val bindingsByIndex: Map[Int, ClosureLocalBinding] =
       if (frame != null) {
-        frame.entries.collect {
+        frame.allBindings.collect {
           case cb: ClosureLocalBinding => cb.index -> cb
           case lb: LocalBinding => lb.index -> new ClosureLocalBinding(0, lb.index, lb.tp, lb.isMutable, lb.isBoxed)
         }.toMap

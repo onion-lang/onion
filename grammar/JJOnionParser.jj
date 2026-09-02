@@ -42,12 +42,19 @@ public class JJOnionParser implements Parser {
     public final int column;
     public final String found;
     public final String expected;
+    /** Every expected token, untruncated: what the hint classifier reads (see Parsing). */
+    public final String expectedAll;
 
     public ParseError(int line, int column, String found, String expected) {
+      this(line, column, found, expected, expected);
+    }
+
+    public ParseError(int line, int column, String found, String expected, String expectedAll) {
       this.line = line;
       this.column = column;
       this.found = found;
       this.expected = expected;
+      this.expectedAll = expectedAll;
     }
 
     @Override
@@ -92,6 +99,10 @@ public class JJOnionParser implements Parser {
    * @return true if parsing should continue, false if should stop
    */
   private boolean collectError(Token errorToken, String expected) {
+    return collectError(errorToken, expected, expected);
+  }
+
+  private boolean collectError(Token errorToken, String expected, String expectedAll) {
     if (!errorRecoveryMode) {
       return false; // Don't collect, let normal exception handling occur
     }
@@ -100,7 +111,8 @@ public class JJOnionParser implements Parser {
       errorToken.beginLine,
       errorToken.beginColumn,
       errorToken.image,
-      expected
+      expected,
+      expectedAll
     ));
 
     return collectedErrors.size() < maxErrors;
@@ -170,6 +182,58 @@ public class JJOnionParser implements Parser {
    * position, the next token is "." or "?.". Lets a method chain span lines.
    * Pure token peeking (no consumption).
    */
+  /**
+   * Whether a `Type::` shape lies ahead, mirroring the receivers static_access_primary()
+   * accepts: an identifier with optional dotted qualification, a `#<...>` name, or a boxed
+   * primitive keyword; then an optional bracketed type-argument list; then `::`. It must
+   * say yes whenever one of those alternatives would match, because the choice commits.
+   */
+  private boolean staticAccessAhead() {
+    int k = 1;
+    int kind = getToken(1).kind;
+    if (kind == ID) {
+      while (getToken(k + 1).kind == DOT && getToken(k + 2).kind == ID) k += 2;
+    } else if (kind == FQCN || kind == K_BYTE || kind == K_SHORT || kind == K_CHAR || kind == K_INT
+               || kind == K_LONG || kind == K_FLOAT || kind == K_DOUBLE || kind == K_BOOLEAN) {
+      // a single-token receiver
+    } else return false;
+    if (getToken(k + 1).kind == LBRACKET) {
+      int depth = 0;
+      k++;
+      for (; k <= 4096; k++) {
+        int t = getToken(k).kind;
+        if (t == LBRACKET) depth++;
+        else if (t == RBRACKET) { depth--; if (depth == 0) break; }
+        else if (t == EOF) return false;
+      }
+      if (depth != 0) return false;
+    }
+    return getToken(k + 1).kind == COLON2;
+  }
+
+  /** Whether the next token can begin a block element: anything but a closer or `case`/`else`. */
+  private boolean blockElementFollows() {
+    int k = getToken(1).kind;
+    return k != RBRACE && k != EOF && k != K_CASE && k != K_ELSE;
+  }
+
+  /** Whether the tokens ahead are `( ... )`, balanced, followed (after newlines) by `->`. */
+  private boolean arrowAfterParenAhead() {
+    if (getToken(1).kind != LPAREN) return false;
+    int depth = 0;
+    int k = 1;
+    for (; k <= 4096; k++) {
+      int kind = getToken(k).kind;
+      if (kind == LPAREN) depth++;
+      else if (kind == RPAREN) { depth--; if (depth == 0) break; }
+      else if (kind == EOF) return false;
+    }
+    if (depth != 0) return false;
+    k++;
+    while (getToken(k).kind == EOL) k++;
+    return getToken(k).kind == ARROW;
+  }
+
   private boolean dotContinuationFollows() {
     int i = 1;
     while (getToken(i).kind == EOL) i++;
@@ -392,6 +456,14 @@ public class JJOnionParser implements Parser {
   /**
    * Summarize the expected tokens of a ParseException for collected errors.
    */
+  /** All expected token images, comma-separated, in JavaCC's order; no truncation. */
+  private String expectedAll(ParseException e) {
+    if (e.expectedTokenSequences == null || e.expectedTokenSequences.length == 0) return "valid token";
+    java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<String>();
+    for (int[] seq : e.expectedTokenSequences) if (seq.length > 0) seen.add(e.tokenImage[seq[0]]);
+    return seen.isEmpty() ? "valid token" : String.join(", ", seen);
+  }
+
   private String expectedSummary(ParseException e) {
     if (e.expectedTokenSequences == null || e.expectedTokenSequences.length == 0) {
       return "valid token";
@@ -838,7 +910,7 @@ public class JJOnionParser implements Parser {
       // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
       String padding = interpolationPadding(str, interpStart + 2, loc, 1);
-      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(padding + exprStr));
+      JJOnionParser exprParser = new JJOnionParser(new OnionLexer(padding + exprStr));
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);
@@ -907,7 +979,7 @@ public class JJOnionParser implements Parser {
       // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
       String padding = interpolationPadding(str, interpStart + 2, loc, 3);
-      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(padding + exprStr));
+      JJOnionParser exprParser = new JJOnionParser(new OnionLexer(padding + exprStr));
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);
@@ -1228,13 +1300,13 @@ AST.CompilationUnit unit() :{
 }{
   [module=module_decl()]
   [imports=import_decl()]
-  (
+  ( LOOKAHEAD({ getToken(1).kind != EOF })
     try {
       top=top_level() {append(tops, top);}
     } catch (ParseException e) {
       if (!errorRecoveryMode) { throw e; }
       Token errorToken = (e.currentToken != null && e.currentToken.next != null) ? e.currentToken.next : token;
-      if (!collectError(errorToken, expectedSummary(e))) { throw e; }
+      if (!collectError(errorToken, expectedSummary(e), expectedAll(e))) { throw e; }
       if (!skipToToplevelSyncPoint()) {
         // EOF reached while recovering: return what we have, errors are collected
         return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops));
@@ -1489,7 +1561,7 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
 }
 
 AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AST.BlockElement>)AST.NIL(); AST.BlockExpression s;}{
-  t="{" eols() [elements=block_elements()] eols() "}" {return new AST.BlockExpression(p(t), elements);}
+  t="{" eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) elements=block_elements() ] eols() "}" {return new AST.BlockExpression(p(t), elements);}
 }
 
 List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<AST.BlockElement> elements = new ArrayBuffer<AST.BlockElement>(); }{
@@ -1502,7 +1574,7 @@ List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<
   // after such an element is tokenized as an EOL and would otherwise stall the
   // next element. In the DEFAULT lexer state (ordinary statement blocks) EOLs are
   // skipped, so this eols() is a harmless no-op there.
-  (element=block_element() { append(elements, element); } eols())+ {return toList(elements);}
+  ( LOOKAHEAD({ blockElementFollows() }) element=block_element() { append(elements, element); } eols() )+ {return toList(elements);}
 }
 
 int modifiers():{ mset = 0; Token t = null, last = null; }{
@@ -2393,7 +2465,7 @@ AST.SelectExpression select_expression() :{
     )*
     eols()
     [LOOKAHEAD({la("else")})
-      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); } [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); } [ LOOKAHEAD({ blockElementFollows() }) ss=block_elements() ] { elseBlock = new AST.BlockExpression(p(t2), ss); }
     ]
   eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
@@ -2469,7 +2541,7 @@ AST.Expression expression() :{AST.Expression e;}{
 | e=return_expression()      {return e;}
 | e=synchronized_expression() {return e;}
 | e=foreach_expression()      {return e;}
-| e=assignable()             {return e;}
+| LOOKAHEAD({ true }) e=assignable() {return e;}
 }
 
 AST.Expression term() :{AST.Expression e;}{
@@ -2478,6 +2550,8 @@ AST.Expression term() :{AST.Expression e;}{
 
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   a=pipeline()
+  // Two tokens on purpose: `x => y` must fail at the `=`, not after consuming it, for the
+  // old-arrow hint to see the `=>`.
   [ LOOKAHEAD(2)
     ( t="="  eols() b=expression() {a = new AST.Assignment(span(a, b), a, b);}
     | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(span(a, b), a, b);}
@@ -2512,7 +2586,7 @@ AST.Expression pipeline() :{Token t; AST.Expression a, b; }{
 
 AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
   a=logical_and()
-  ( LOOKAHEAD(2)
+  ( LOOKAHEAD(1)
     ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(span(a, b), a, b);}
     | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(span(a, b), a, b);}
     )
@@ -2521,24 +2595,24 @@ AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
 }
 
 AST.Expression logical_and() :{Token t; AST.Expression a, b; }{
-  a=bit_or() (LOOKAHEAD(2) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(span(a, b), a, b);})* {return a;}
+  a=bit_or() (LOOKAHEAD(1) t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_or() :{Token t; AST.Expression a, b; }{
-  a=xor() (LOOKAHEAD(2) t="|" eols() b=xor() {a = new AST.BitOr(span(a, b), a, b);})* {return a;}
+  a=xor() (LOOKAHEAD(1) t="|" eols() b=xor() {a = new AST.BitOr(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression xor() :{Token t; AST.Expression a, b;}{
-  a = bit_and() (LOOKAHEAD(2) t="^" eols() b=bit_and() {a = new AST.XOR(span(a, b), a, b);})* {return a;}
+  a = bit_and() (LOOKAHEAD(1) t="^" eols() b=bit_and() {a = new AST.XOR(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression bit_and() :{Token t; AST.Expression a, b; }{
-  a=equal() (LOOKAHEAD(2) t = "&" eols() b=equal() {a = new AST.BitAnd(span(a, b), a, b);})* {return a;}
+  a=equal() (LOOKAHEAD(1) t = "&" eols() b=equal() {a = new AST.BitAnd(span(a, b), a, b);})* {return a;}
 }
 
 AST.Expression equal() :{ Token t; AST.Expression a, b; }{
   a=comparative()
-  ( LOOKAHEAD(2)
+  ( LOOKAHEAD(1)
     ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(span(a, b), a, b);}
     | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(span(a, b), a, b);}
     | t="=="  eols() b=comparative() {a= new AST.Equal(span(a, b), a, b);}
@@ -2549,7 +2623,7 @@ AST.Expression equal() :{ Token t; AST.Expression a, b; }{
 
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
   a=range_expr()
-  ( LOOKAHEAD(2)
+  ( LOOKAHEAD(1)
     ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(span(a, b), a, b);}
     | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(span(a, b), a, b);}
     | t="<"  eols() b=range_expr() {a = new AST.LessThan(span(a, b), a, b);}
@@ -2564,7 +2638,7 @@ AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type
 // foreach works without further compiler support.
 AST.Expression range_expr() :{Token t; AST.Expression a, b;}{
   a=bit_shift()
-  [ LOOKAHEAD(2)
+  [ LOOKAHEAD(1)
     ( t="..<" eols() b=bit_shift() { a = rangeNew(p(t), a, b, false); }
     | t=".." eols() b=bit_shift() { a = rangeNew(p(t), a, b, true); }
     )
@@ -2574,7 +2648,7 @@ AST.Expression range_expr() :{Token t; AST.Expression a, b;}{
 
 AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
   e1=additive()
-( LOOKAHEAD(2)
+( LOOKAHEAD(1)
   ( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(span(e1, e2), e1, e2);}
   | t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(span(e1, e2), e1, e2);}
   | t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(span(e1, e2), e1, e2);}
@@ -2584,7 +2658,7 @@ AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
 
 AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
   e1=unary_prefix()
-( LOOKAHEAD(2)
+( LOOKAHEAD(1)
   ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(span(e1, e2), e1, e2);}
   | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(span(e1, e2), e1, e2);}
   )
@@ -2596,13 +2670,13 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 | t="-" e=unary_prefix() {e = new AST.Negate(p(t), e);}
 | t="!" e=unary_prefix() {e = new AST.Not(p(t), e);}
 | t=<BN> e=unary_prefix() {e = new AST.BitNot(p(t), e);}
-| e=multitive()
+| LOOKAHEAD({ true }) e=multitive()
 ) {return e;}
 }
 
 AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
   e1=primary_suffix()
-( LOOKAHEAD(2)
+( LOOKAHEAD(1)
   ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(span(e1, e2), e1, e2);}
   | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(span(e1, e2), e1, e2);}
   | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(span(e1, e2), e1, e2);}
@@ -2699,7 +2773,8 @@ AST.Expression safe_access_suffix(AST.Expression e) : {
     ) { return e; }
 }
 
-AST.Expression primary() : {
+/** The `Type::member` forms of primary, reached only when staticAccessAhead() holds. */
+AST.Expression static_access_primary() : {
   Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
   List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
@@ -2707,14 +2782,7 @@ AST.Expression primary() : {
   AST.BlockExpression body;
   AST.ClosureExpression tl = null;
 }{
-  LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
-    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
-| t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(through(n), c(n), es); }
-| LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
+  LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
@@ -2740,7 +2808,49 @@ AST.Expression primary() : {
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
-| LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
+| LOOKAHEAD({ true }) e=primary_rest() {return e;}
+}
+
+/** A `(`: a lambda when lambda_head() parses, else a parenthesised term. */
+AST.Expression lambda_or_paren() : { AST.Expression e; }{
+  LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function() {return e;}
+| "(" eols() e=term() eols() ")" {return e;}
+}
+
+AST.Expression primary() : {
+  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
+  List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
+  AST.BlockExpression body;
+  AST.ClosureExpression tl = null;
+}{
+  LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
+    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
+| t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(through(n), c(n), es); }
+// Every alternative below needs a `::` after a type. Peeking for that first spares the
+// full syntactic type scans -- eleven of them, per primary -- on the common case.
+// During a syntactic scan the guard is skipped (a peek there would lex ahead in the
+// wrong lexical state); static_access_primary() then falls through to primary_rest(),
+// which is exactly the old alternative order.
+| LOOKAHEAD({ jj_lookingAhead || staticAccessAhead() }) e=static_access_primary() {return e;}
+| LOOKAHEAD({ true }) e=primary_rest() {return e;}
+}
+
+/** The alternatives of primary after the `Type::` forms. */
+AST.Expression primary_rest() : {
+  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
+  List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
+  AST.BlockExpression body;
+  AST.ClosureExpression tl = null;
+}{
+  LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es, tas); }
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"
@@ -2749,7 +2859,9 @@ AST.Expression primary() : {
 | LOOKAHEAD(2, id() <ARROW>) e=arrow_anonymous_function()                 {return e;}
 | LOOKAHEAD(1) t=id()                                               {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() e=bracket_literal_rest(t) {leaveDefault();} {return e;}
-| LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function()                 {return e;}
+// A parenthesised lambda is `( ... ) ->`; matching the parenthesis by depth is a token peek,
+// where lambda_head() re-parsed the whole parenthesised expression on every `(`.
+| LOOKAHEAD({ jj_lookingAhead || arrowAfterParenAhead() }) e=lambda_or_paren() {return e;}
 | LOOKAHEAD("do" "[") e=do_expression()                                   {return e;}
 | LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
     { return new AST.NewArrayWithValues(p(t), ty, es); }
@@ -2799,13 +2911,15 @@ AST.Expression primary() : {
 AST.Expression argument_expr() :{Token n; AST.Expression e;}{
   LOOKAHEAD(2, id() "=")
     n=id() "=" eols() e=term()  {return new AST.NamedArgument(p(n), c(n), e);}
-  | e=term()                    {return e;}
+  | LOOKAHEAD({ true }) e=term()  {return e;}
 }
 
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
   // eols() before each argument and at the end lets argument lists span
   // multiple lines: f(\n a,\n b\n)
-  [eols() arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})* eols()] {
+  // Leading newlines are consumed before the choice: with them inside the optional, JavaCC
+  // had to run a syntactic scan (through the nullable eols()) to decide it at every call.
+  eols() [ LOOKAHEAD({ getToken(1).kind != RPAREN }) arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})* eols()] {
     return toList(args);
   }
 }
@@ -2918,7 +3032,7 @@ AST.ClosureExpression trailing_lambda() :{
   AST.TypeNode ty = null;
 }{
   {enterDefault();}
-  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() [stmts=block_elements()] eols() "}" {
+  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) stmts=block_elements() ] eols() "}" {
     body = new AST.BlockExpression(p(t), stmts);
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();

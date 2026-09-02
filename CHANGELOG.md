@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Parsing is about 3.5x faster** (the whole `run/` corpus, 247 files: 365 -> 105 ms of CPU
+  after warm-up), which takes the parser from ~16% of a warm compilation to ~5%.
+  - **A handwritten lexer** (`OnionLexer`) replaces the JavaCC-generated token manager. It
+    is a drop-in subclass of it, so the generated parser, `onion fmt` and the language
+    server's semantic tokens use it unchanged, and it produces a byte-identical token
+    stream: kinds, images, positions, comment special-token chains, the two lexical
+    states, Java unicode escapes and tab columns exactly as `JavaCharStream` recorded
+    them, the `return"x"` keyword re-cut. Pinned by a golden comparison over 455k tokens.
+    Under the parser most source is lexed in `IN_STATEMENT`, and the generated NFA for that
+    state was about five times slower than for `DEFAULT`; the two differ only in whether a
+    newline is an `EOL`, so one scanner with a flag does the same work.
+  - **The grammar's implicit one-token scans are gone.** JavaCC cannot compute a first set
+    through a choice that carries semantic lookahead, so the catch-all alternatives of
+    `expression`, `argument_expr`, `unary_prefix`, `primary`, and the optionals in `terms`,
+    `block`, `block_elements` and `unit` were each decided by a syntactic scan that
+    descended the whole precedence chain for one token -- roughly half of parse time.
+    They are now explicit token checks (`LOOKAHEAD({ true })`, `getToken(1).kind != RPAREN`).
+    The `Type::member` alternatives of `primary` (eleven unbounded type scans per primary)
+    and the `( ... ) ->` lambda alternative sit behind a cheap token peek, guarded so the
+    peek never runs during a syntactic scan (it would lex ahead in the wrong lexical state).
+    ASTs are identical to before over all 258 programs in `run/` and `src/test/run/`.
+  - Syntax hints now classify against the **full** expected-token list. The classifier read
+    the four-item user-facing summary, so which hint fired depended on the order JavaCC
+    happened to record choice points in -- a grammar change moved `;` to fifth place and
+    silently switched off sixteen hints. The message users see is unchanged.
+
 ### Fixed
 
 - **Diagnostic for a Java/C#/Kotlin-style access modifier before a type declaration

@@ -2,7 +2,7 @@ package onion.tools.doc
 
 import java.io.StringReader
 import onion.compiler.AST
-import onion.compiler.parser.JJOnionParser
+import onion.compiler.parser.{JJOnionParser, OnionLexer}
 
 /** A documented member (method, field, or constructor) within a type. */
 final case class DocMember(
@@ -37,7 +37,7 @@ object DocModel {
    * @param sourceName a display name for the file (used in the model)
    */
   def fromSource(sourceText: String, sourceName: String): DocFile = {
-    val parser = new JJOnionParser(new StringReader(sourceText))
+    val parser = new JJOnionParser(new OnionLexer(sourceText))
     parser.enableErrorRecovery(100)
     val unit = parser.unit()
     val comments = scanDocComments(sourceText)

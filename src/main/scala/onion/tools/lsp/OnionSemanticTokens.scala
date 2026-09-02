@@ -2,7 +2,7 @@ package onion.tools.lsp
 
 import java.io.StringReader
 
-import onion.compiler.parser.{JJOnionParserConstants as K, JJOnionParserTokenManager, JavaCharStream, Token}
+import onion.compiler.parser.{JJOnionParserConstants as K, OnionLexer, Token}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -219,7 +219,7 @@ object OnionSemanticTokens:
   private def tokens(content: String): Seq[(Token, Boolean)] =
     val out = mutable.Buffer[(Token, Boolean)]()
     try
-      val manager = new JJOnionParserTokenManager(new JavaCharStream(new StringReader(content)))
+      val manager = new OnionLexer(content)
       var token = manager.getNextToken()
       var done = false
       while !done do

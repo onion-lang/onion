@@ -6,6 +6,20 @@ private[compiler] object ExpectedTokenFormatter {
   private val Fallback = "valid token"
 
   /** Render the first token of each JavaCC expected-token sequence. */
+  /**
+   * Every expected token, untruncated, for the hint classifier. The user-facing `format`
+   * shows the first four, and which four those are depends on the order JavaCC recorded
+   * its choice points in -- a detail a grammar change moves around, and one no hint
+   * should hinge on.
+   */
+  def formatAll(expectedTokenSequences: Array[Array[Int]], tokenImages: Array[String]): String = {
+    if (expectedTokenSequences == null || expectedTokenSequences.isEmpty) return Fallback
+    val expectedSet = LinkedHashSet[String]()
+    for (sequence <- expectedTokenSequences)
+      if (sequence != null && sequence.nonEmpty) expectedSet += tokenImages(sequence(0))
+    if (expectedSet.isEmpty) Fallback else expectedSet.mkString(", ")
+  }
+
   def format(expectedTokenSequences: Array[Array[Int]], tokenImages: Array[String]): String = {
     if (expectedTokenSequences == null || expectedTokenSequences.isEmpty) {
       return Fallback

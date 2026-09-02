@@ -2,7 +2,7 @@ package onion.tools.format
 
 import java.io.StringReader
 
-import onion.compiler.parser.{JJOnionParserConstants as K, JJOnionParserTokenManager, JavaCharStream, Token}
+import onion.compiler.parser.{JJOnionParserConstants as K, OnionLexer, Token}
 
 import scala.collection.mutable
 
@@ -172,7 +172,7 @@ object OnionFormatter:
   private def lex(source: String): Seq[Lexeme] =
     val raw = mutable.Buffer[Token]()
     val comments = mutable.Set[Token]()
-    val manager = new JJOnionParserTokenManager(new JavaCharStream(new StringReader(source)))
+    val manager = new OnionLexer(source)
     var token = manager.getNextToken()
     var done = false
     while !done do
@@ -240,7 +240,7 @@ object OnionFormatter:
   /** Every token and comment image, in order — the invariant a format must not disturb. */
   def signature(source: String): Seq[(Int, String)] =
     val out = mutable.Buffer[(Int, String)]()
-    val manager = new JJOnionParserTokenManager(new JavaCharStream(new StringReader(source)))
+    val manager = new OnionLexer(source)
     var token = manager.getNextToken()
     var done = false
     while !done do

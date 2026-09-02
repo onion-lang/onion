@@ -7,6 +7,7 @@ import java.io.{IOException, Reader, StringReader}
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.parser.{
+  OnionLexer,
   ExpectedTokenFormatter,
   JJOnionParser,
   ParseException,
@@ -78,8 +79,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
   ): Unit = {
     try {
       val sourceText = stripShebang(source.openReader())
-      val reader = new StringReader(sourceText)
-      val parser = new JJOnionParser(reader)
+      val parser = new JJOnionParser(new OnionLexer(sourceText))
 
       // Enable error recovery mode to collect multiple errors
       parser.enableErrorRecovery(maxErrorsPerFile)
@@ -104,8 +104,6 @@ class Parsing(config: CompilerConfig) extends AnyRef
           }
           // Then add the final error that stopped parsing
           addParseException(e, source.name, sourceText, problems)
-      } finally {
-        reader.close()
       }
     } catch {
       case e: IOException =>
@@ -133,7 +131,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
           error.found,
           error.expected,
           sourceContext.context,
-          sourceContext.sourceLine
+          sourceContext.sourceLine,
+          error.expectedAll
         )
       )
     }
@@ -155,6 +154,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     } else {
       val error = e.currentToken.next
       val expected = ExpectedTokenFormatter.format(e.expectedTokenSequences, e.tokenImage)
+      val expectedAll = ExpectedTokenFormatter.formatAll(e.expectedTokenSequences, e.tokenImage)
       val sourceContext = SourceContext.at(sourceText, error.beginLine, error.beginColumn)
       problems += CompileError(
         fileName,
@@ -163,7 +163,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
           error.image,
           expected,
           sourceContext.context,
-          sourceContext.sourceLine
+          sourceContext.sourceLine,
+          expectedAll
         )
       )
     }
@@ -174,7 +175,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * (complete strings lex as a single STRING token); report it as such
    * instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String, context: String = "", sourceLine: String = ""): String = {
+  private def syntaxErrorMessage(found: String, expected: String, context: String = "", sourceLine: String = "", expectedAll: String = null): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
     // problem (an unclosed block/paren) instead.
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
@@ -182,7 +183,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       if (found == "\"") Message("error.parsing.unterminated_string")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier
-      .classify(found, expected, context, sourceLine)
+      .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine)
       .map(renderSyntaxHint)
       .getOrElse("")
     if (hint.isEmpty) base else base + " " + hint

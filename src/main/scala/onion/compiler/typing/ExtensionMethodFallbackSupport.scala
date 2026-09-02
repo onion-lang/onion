@@ -3,6 +3,8 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Boxing
+import scala.util.boundary
+import scala.util.boundary.break
 
 private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
@@ -148,7 +150,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     context: LocalContext,
     expected: Type,
     untypedClosureIndices: Set[Int]
-  ): Option[Term] = {
+  ): Option[Term] = boundary {
     val name = node.name
     val args = node.args.toArray
 
@@ -156,7 +158,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     for (i <- args.indices if !untypedClosureIndices.contains(i)) {
       calls.typed(args(i), context) match {
         case Some(term) => preliminaryParams(i) = term
-        case None => return None
+        case None => break(None)
       }
     }
 

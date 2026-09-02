@@ -491,6 +491,35 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe empty
     }
 
+    it("recognizes a TypeScript-style optional field `name?: Type`") {
+      val hint = classify(
+        found = "?:",
+        expected = "\":\"",
+        sourceLine = "  var name?: String"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.typescript_style_optional_annotation"
+      hint.arguments shouldBe Seq("name", "String")
+    }
+
+    it("recognizes a TypeScript-style optional parameter `name?: Type`") {
+      val hint = classify(
+        found = "?:",
+        expected = "\":\"",
+        sourceLine = "  def bar(count?: Int): Int {"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.typescript_style_optional_annotation"
+      hint.arguments shouldBe Seq("count", "Int")
+    }
+
+    it("does not flag a real Elvis expression that happens to precede a colon-expecting context") {
+      SyntaxHintClassifier.classify(
+        found = "?:",
+        expected = "\",\"",
+        context = "",
+        sourceLine = "  val x = a ?: b"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.typescript_style_optional_annotation")
+    }
+
     it("recognizes a JS/TS/Kotlin-style `??` nullish-coalescing operator") {
       val hint = classify(
         found = "?",

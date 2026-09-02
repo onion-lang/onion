@@ -171,6 +171,14 @@ private[compiler] object SyntaxHintClassifier {
   // from the unrelated `cond ? a : b` ternary mistake below, which also matches
   // on a bare `?` but has a differently-shaped fix (`?:`, not `if`/`else`).
   private val NullishCoalescing = """\A\?\?""".r
+  // A TypeScript-style optional field/parameter, e.g. `name?: Type`. Onion's Elvis
+  // operator `?:` lexes as a single token, so this never reaches the parser as the
+  // separate `?` and `:` a TypeScript reader intended -- it reports the whole `?:`
+  // as the found token where a plain `:` was expected, a shape that's otherwise
+  // impossible to reach (a real Elvis expression is never followed by a bare colon).
+  // Onion attaches nullability to the type instead: `name: Type?`.
+  private val TypeScriptStyleOptionalAnnotation =
+    """\b([A-Za-z_]\w*)\s*\?:\s*([A-Za-z_][\w.\[\]]*)""".r
 
   def classify(
     found: String,
@@ -340,6 +348,9 @@ private[compiler] object SyntaxHintClassifier {
       case ("\n" | "\r\n" | "\r") if DanglingReturnTypeColon.findFirstMatchIn(sourceLine).isDefined =>
         val matched = DanglingReturnTypeColon.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.dangling_return_type_colon", matched.group(1))
+      case "?:" if expected == "\":\"" && TypeScriptStyleOptionalAnnotation.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = TypeScriptStyleOptionalAnnotation.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.typescript_style_optional_annotation", matched.group(1), matched.group(2))
       case "?" if NullishCoalescing.findFirstMatchIn(context).isDefined =>
         hint("error.parsing.hint.nullish_coalescing")
       case "?" =>

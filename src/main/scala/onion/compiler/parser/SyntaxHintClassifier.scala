@@ -76,6 +76,13 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*struct\s+([A-Za-z_]\w*)\b""".r
   private val KotlinScalaStyleObjectDeclaration =
     """^\s*object\s+([A-Za-z_]\w*)\b""".r
+  // A Kotlin-style `companion object { ... }` (optionally named, `companion object
+  // Factory { ... }`) nested inside a class body -- `companion` isn't a reserved
+  // word, so the parser reports the generic "expecting abstract/def/final/..."
+  // member-declaration error right at the `companion` token itself, with nothing
+  // connecting it back to the actual mistake. Onion has no companion-object
+  // concept: static members are declared directly in the enclosing class body.
+  private val CompanionObjectDeclaration = """^\s*companion\s+object\b""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
@@ -257,6 +264,8 @@ private[compiler] object SyntaxHintClassifier {
       case _ if KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.object_declaration", matched.group(1))
+      case "companion" if CompanionObjectDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.companion_object_declaration")
       case _ if GoStyleShortVarDecl.findFirstMatchIn(sourceLine).isDefined =>
         val matched = GoStyleShortVarDecl.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.go_style_short_var_decl", matched.group(1), matched.group(2).trim)

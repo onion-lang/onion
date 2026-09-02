@@ -40,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suggesting `record Name(...)`. Pinned by new `CaseClassDeclarationHintI18nSpec`
   and cases in `SyntaxHintClassifierSpec`.
 
+- **Diagnostic hint for a Kotlin-style `companion object { ... }` declaration.**
+  Onion has no companion-object concept, and `companion` isn't a reserved word,
+  so `companion object { ... }` (optionally named, `companion object Factory { ... }`)
+  nested inside a class body parsed as a bare identifier where a member
+  declaration was expected, producing a generic "expecting `abstract`, `def`,
+  `final`, ..." error with nothing pointing at the actual fix. `SyntaxHintClassifier`
+  now recognizes the `companion object` shape and points at Onion's equivalent:
+  declaring the members directly in the enclosing class body as `static`
+  members. Pinned by new `CompanionObjectDeclarationHintI18nSpec` and cases in
+  `SyntaxHintClassifierSpec`.
+
 ## [0.33.0] - 2026-09-02
 
 ### Fixed

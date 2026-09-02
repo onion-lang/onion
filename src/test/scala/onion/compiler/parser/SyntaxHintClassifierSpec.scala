@@ -721,6 +721,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Foo")
     }
 
+    it("recognizes a Kotlin-style `companion object` declaration") {
+      val hint = classify(
+        found = "companion",
+        expected = "\"abstract\", \"def\", \"final\", \"forward\"",
+        sourceLine = "companion object {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.companion_object_declaration"
+      hint.arguments shouldBe empty
+    }
+
+    it("recognizes a named Kotlin-style `companion object Name` declaration") {
+      val hint = classify(
+        found = "companion",
+        expected = "\"abstract\", \"def\", \"final\", \"forward\"",
+        sourceLine = "companion object Factory {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.companion_object_declaration"
+      hint.arguments shouldBe empty
+    }
+
     it("recognizes a Java-style diamond-operator constructor call") {
       val hint = classify(
         found = "<",

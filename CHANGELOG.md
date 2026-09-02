@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/UnionFind.on`** -- a disjoint-set (union-find) sample with path compression
+  and union by rank, used for incremental cycle detection while building a graph and
+  for Kruskal's minimum-spanning-tree algorithm. `docs/quality-bar.md` (en/ja) updated
+  to the new sample counts (248 total, 188 large programs).
+
 ## [0.42.0] - 2026-09-03
 
 ### Changed

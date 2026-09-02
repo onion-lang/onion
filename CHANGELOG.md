@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic hint for a bare call to a former default import.** `readText(p)`,
+  `get(url)`, `now()`, `exit(1)` and similar calls used to resolve bare; v0.10 narrowed
+  the default static import set to pure classes, dropping `System`, `Runtime`, `Files`,
+  `Http` and `DateTime` (CLAUDE.md's own migration note for #360). An unqualified call
+  to one of their real static methods surfaced as an ordinary "method not found" naming
+  the synthetic top-level (or enclosing) class as if the call were simply misspelled,
+  with nothing connecting it back to the import change. `SemanticErrorReporter` now
+  points at the qualified form (e.g. `Files::readText(...)`) whenever the call's name
+  and argument count exactly match one of those five classes' real static methods --
+  looked up by reflecting on the actual runtime classes rather than a hand-maintained
+  list that could drift -- restricted to a genuinely unqualified call so a qualified
+  call on an unrelated receiver is left alone even when the name happens to collide.
+  Pinned by new `StdlibNoLongerDefaultImportedHintSpec` and
+  `StdlibNoLongerDefaultImportedMessageSpec` tests.
+
 ## [0.32.0] - 2026-09-02
 
 ### Fixed

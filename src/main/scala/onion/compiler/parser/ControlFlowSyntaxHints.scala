@@ -45,6 +45,13 @@ private[compiler] object ControlFlowSyntaxHints {
   // `with(...)`); keep this ahead of that case.
   private val LeadingWithAsStatement =
     """^\s*with\s+(.+?)\s+as\s+([A-Za-z_]\w*)\s*:?\s*\{?\s*$""".r
+  // A JavaScript/Python/Rust-style prefix `async def`/`async function`/`async fn`/
+  // `async func` declaration -- `async` is not a reserved word, so it parses as a
+  // bare identifier statement and the declaration keyword that follows reads as a
+  // stray second statement, which also matches the generic missing-call-parens
+  // fallback (suggesting the nonsensical `async(...)`); keep this ahead of that case.
+  private val LeadingAsyncFunctionDeclaration =
+    """^\s*async\s+(?:def|fun|func|fn|function)\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\(([^()]*)\)""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -86,6 +93,9 @@ private[compiler] object ControlFlowSyntaxHints {
     } else if (LeadingWithAsStatement.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingWithAsStatement.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.with_as_statement", matched.group(2), matched.group(1).trim)
+    } else if (LeadingAsyncFunctionDeclaration.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingAsyncFunctionDeclaration.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.async_function_not_supported", matched.group(1), matched.group(2).trim)
     } else {
       None
     }

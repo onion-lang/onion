@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for a JavaScript/Python/Rust-style `async def`/`async function`/
+  `async fn` declaration.** Onion has no `async` keyword, so `async def foo():`,
+  `async function foo() { ... }`, and similar forms parsed `async` as a bare
+  identifier statement, with the following declaration keyword falling through to
+  the generic "missing call parens" fallback and suggesting the nonsensical
+  `async(...)`. `ControlFlowSyntaxHints` now recognizes the leading `async` +
+  `def`/`fun`/`func`/`fn`/`function` shape and points at Onion's actual equivalent:
+  a plain `def` returning a `Future`, built with `Future::async(() -> { ... })`.
+  Pinned by new `AsyncFunctionDeclarationHintI18nSpec`.
+
 - **Diagnostic hint for a Java/Kotlin/C#/Go-style `package` declaration.** Onion's
   source-file header declaration is `module foo.bar;`, not `package`. Since
   `package` isn't a reserved word, `package com.example.app;` (Java/Kotlin/C#)

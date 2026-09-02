@@ -51,6 +51,9 @@ public class JJOnionParser implements Parser {
     return cachedInterpolationParser;
   }
 
+  /** Set when a do-expression or trait method call is parsed; see AST.CompilationUnit.needsBodyRewrite. */
+  boolean needsBodyRewrite = false;
+
   private boolean errorRecoveryMode = false;
   private ArrayList<ParseError> collectedErrors = new ArrayList<ParseError>();
   private int maxErrors = 10; // Maximum number of errors to collect before giving up
@@ -934,6 +937,7 @@ public class JJOnionParser implements Parser {
       JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
+        needsBodyRewrite |= exprParser.needsBodyRewrite;
         append(expressions, expr);
       } catch (Exception e) {
         throw new ParseException("Invalid expression in string interpolation: " + exprStr + " at " + loc);
@@ -1003,6 +1007,7 @@ public class JJOnionParser implements Parser {
       JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
+        needsBodyRewrite |= exprParser.needsBodyRewrite;
         append(expressions, expr);
       } catch (Exception e) {
         throw new ParseException("Invalid expression in string interpolation: " + exprStr + " at " + loc);
@@ -1330,11 +1335,11 @@ AST.CompilationUnit unit() :{
       if (!collectError(errorToken, expectedSummary(e), expectedAll(e))) { throw e; }
       if (!skipToToplevelSyncPoint()) {
         // EOF reached while recovering: return what we have, errors are collected
-        return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops));
+        return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops), needsBodyRewrite);
       }
     }
   )+ <EOF> {
-    return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops));
+    return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops), needsBodyRewrite);
   }
 }
 
@@ -2805,7 +2810,7 @@ AST.Expression static_access_primary() : {
 }{
   LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
+    { es = AST.appendToList(es, tl); needsBodyRewrite = true; return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
@@ -3008,6 +3013,7 @@ AST.DoExpression do_expression() :{
   {enterDefault();}
   t="do" "[" monadType=type() "]" "{" eols() stmts=do_clauses() eols() "}" {
     leaveDefault();
+    needsBodyRewrite = true;
     return new AST.DoExpression(p(t), monadType, stmts);
   }
 }

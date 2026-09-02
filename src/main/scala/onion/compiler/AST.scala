@@ -103,7 +103,14 @@ object AST {
   case class Argument(location: Location, name: String, typeRef: TypeNode, defaultValue: Expression = null, isVararg: Boolean = false) extends Node
   case class CompilationUnit(
     location: Location, sourceFile: String/*nullable*/, module: ModuleDeclaration/*nullable*/,
-    imports: ImportClause, toplevels: List[Toplevel]) extends Node
+    imports: ImportClause, toplevels: List[Toplevel],
+    /**
+     * Whether any body of this unit contains a construct the Rewriting phase transforms
+     * (do-notation, a trait method call). The parser records it; when false, Rewriting
+     * leaves method bodies as they are instead of copying every node. Defaults to true
+     * so a unit built anywhere else is still rewritten.
+     */
+    needsBodyRewrite: Boolean = true) extends Node
   case class ModuleDeclaration(location: Location, name: String) extends Node
   case class ImportClause(
     location: Location,

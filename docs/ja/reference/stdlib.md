@@ -862,9 +862,11 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 `onion.Option`で提供。
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
+- `opt.isDefined()` / `opt.isEmpty()` / `opt.get()` — `get()` は `None` の場合 `NoSuchElementException` を投げる
 - `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElseThrow()` / `opt.orElseThrow(() -> customException)`
 - `opt.orElse(otherOption)`
-- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)` / `opt.forEach(action)`
 - `opt.contains(value)` / `opt.exists(predicate)`
 - `opt.fold(() -> ifEmpty, v -> ifPresent)` — 単一の値へ畳み込む
 - `opt.toList()` — 0個または1個の要素のリスト
@@ -875,8 +877,11 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
+- `res.isOk()` / `res.isErr()` / `res.get()` / `res.getError()` — `get()` は `Err` で、`getError()` は `Ok` で例外を投げる
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 - `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.getOrThrow()` / `res.getOrThrow(e -> customException)` — エラーを（`Throwable` でなければラップして）投げる、またはマッピングした例外を投げる
+- `res.forEach(action)` / `res.forEachError(action)`
 - `res.fold(e -> ifErr, v -> ifOk)` — 単一の値へ畳み込む
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — `Err` を回復
 - `res.exists(predicate)` / `res.toList()`

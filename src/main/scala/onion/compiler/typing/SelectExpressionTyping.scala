@@ -614,8 +614,8 @@ final class SelectExpressionTyping(
       case Some(GuardInfo(guardAst, _)) =>
         val savedNarrowings = context.saveNarrowings()
         val narrowing = body.extractNarrowing(guardAst, context)
-        val guardReassigned = AssignedVariableScanner.scan(guardAst)
-        val bodyReassigned = AssignedVariableScanner.scan(thenBlock)
+        val guardReassigned = bodyContext.assignedNames(guardAst)
+        val bodyReassigned = bodyContext.assignedNames(thenBlock)
         narrowing.positive.foreach { case (name, tp) =>
           context.addNarrowing(name, tp)
         }

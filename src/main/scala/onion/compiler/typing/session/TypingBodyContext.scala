@@ -18,6 +18,16 @@ final class TypingBodyContext(
   private val topLevelClassProvider: () => Option[ClassType] = () => None,
   private val problemCountProvider: () => Int = () => 0
 ) {
+  // `AssignedVariableScanner.scan` walks a subtree reflectively. Body typing asked for the
+  // same subtrees repeatedly -- a method body once, then every `if`/`while` inside it
+  // again for its own branches -- so the answer is kept per node. The AST is immutable.
+  private val assignedNamesMemo = new java.util.IdentityHashMap[AST.Node, Set[String]]()
+  def assignedNames(node: AST.Node): Set[String] = {
+    val cached = assignedNamesMemo.get(node)
+    if (cached != null) cached
+    else AssignedVariableScanner.scan(node, assignedNamesMemo)
+  }
+
   def definition: ClassDefinition = currentDefinitionProvider()
   def mapper: NameResolver = currentMapperProvider()
   def staticImportedList: StaticImportList = staticImportsProvider()

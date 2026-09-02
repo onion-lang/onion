@@ -27,6 +27,22 @@ class AsmCodeGenerationVisitor(
   // Helper method to convert TypedAST types to ASM types
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
 
+  // A call site's argument types, descriptor and owner depend only on the Method, and a
+  // program calls the same few methods over and over; building the descriptor string and
+  // the owner Type per call site was a visible share of code generation.
+  private final class CallShape(val argTypes: Array[AsmType], val descriptor: String, val owner: AsmType)
+  private val callShapes = new java.util.IdentityHashMap[TypedAST.Method, CallShape]()
+  private def callShape(method: TypedAST.Method, ownerName: String): CallShape = {
+    val cached = callShapes.get(method)
+    if (cached != null && cached.owner.getInternalName == AsmUtil.internalName(ownerName)) cached
+    else {
+      val argTypes = method.arguments.map(asmType)
+      val shape = new CallShape(argTypes, AsmType.getMethodDescriptor(asmType(method.returnType), argTypes*), AsmUtil.objectType(ownerName))
+      callShapes.put(method, shape)
+      shape
+    }
+  }
+
   // Emit line number if location exists and line changed
   private def emitLineNumber(location: Location): Unit =
     location match
@@ -221,13 +237,11 @@ class AsmCodeGenerationVisitor(
   
   override def visitCall(node: Call): Unit =
     visitTerm(node.target)
-    val argTypes = node.method.arguments.map(asmType)
+    val shape = callShape(node.method, node.method.affiliation.name)
+    val argTypes = shape.argTypes
     emitArgumentsWithAdaptation(node.parameters, argTypes, Array(asmType(node.target.`type`)))
-    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
-    val methodDesc = AsmType.getMethodDescriptor(
-      asmType(node.method.returnType),
-      argTypes*
-    )
+    val ownerType = shape.owner
+    val methodDesc = shape.descriptor
     val isInterface = node.method.affiliation.isInterface
 
     // Select correct invoke instruction based on method type
@@ -240,13 +254,11 @@ class AsmCodeGenerationVisitor(
       gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallStatic(node: CallStatic): Unit =
-    val argTypes = node.method.arguments.map(asmType)
+    val shape = callShape(node.method, node.target.name)
+    val argTypes = shape.argTypes
     emitArgumentsWithAdaptation(node.parameters, argTypes)
-    val ownerType = AsmUtil.objectType(node.target.name)
-    val methodDesc = AsmType.getMethodDescriptor(
-      asmType(node.method.returnType),
-      argTypes*
-    )
+    val ownerType = shape.owner
+    val methodDesc = shape.descriptor
     if node.target.isInterface then
       // Static interface methods need an InterfaceMethodref constant (itf=true);
       // a plain Methodref makes the JVM throw IncompatibleClassChangeError.

@@ -40,17 +40,27 @@ object TermWalk:
             case _ => false
           }
 
-  private def children(node: AnyRef): Seq[AnyRef] = node match
+  private[compiler] def children(node: AnyRef): Seq[AnyRef] = node match
     case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
     case _ => reflectiveChildren(node)
 
+  // The accessor set of a node class never changes, and getMethods() plus the filter is
+  // the expensive part of a reflective walk -- it ran for every node on every walk, and
+  // codegen walks the right-hand side of every assignment. One lookup per class instead.
+  private val accessors = new java.util.concurrent.ConcurrentHashMap[Class[?], Array[java.lang.reflect.Method]]()
+
+  private def accessorsOf(cls: Class[?]): Array[java.lang.reflect.Method] =
+    accessors.computeIfAbsent(cls, c =>
+      c.getMethods.iterator
+        .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
+          (classOf[Term].isAssignableFrom(m.getReturnType) ||
+           classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
+           m.getReturnType.isArray ||
+           classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
+        .toArray)
+
   private def reflectiveChildren(node: AnyRef): Seq[AnyRef] =
-    node.getClass.getMethods.iterator
-      .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
-        (classOf[Term].isAssignableFrom(m.getReturnType) ||
-         classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
-         m.getReturnType.isArray ||
-         classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
+    accessorsOf(node.getClass).iterator
       .flatMap { m =>
         try
           m.invoke(node) match

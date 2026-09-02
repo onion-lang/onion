@@ -42,18 +42,15 @@ private[compiler] final class StaticImportMethodCallSupport(
 
     val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
     var ambiguous: Option[StaticImportAmbiguous] = None
-    bodyContext.staticImportedList.getItems.foreach { item =>
-      if (!item.importsMethod(node.name)) ()
-      else bodyContext.loadOption(item.getName).foreach { typeRef =>
-        resolveStaticImportOnType(node, typeRef, params, expected, mappedTypeArgs) match {
-          case found: StaticImportResolved =>
-            // Deduplicate: the same method may be reachable through both a
-            // class-level static import and a single-method static import.
-            if (!resolved.exists(_.method eq found.method)) resolved += found
-          case amb: StaticImportAmbiguous =>
-            if (ambiguous.isEmpty) ambiguous = Some(amb)
-          case StaticImportNoMatch =>
-        }
+    staticCandidates(node.name).foreach { case (typeRef, candidates) =>
+      resolveStaticImportOnType(node, typeRef, candidates, params, expected, mappedTypeArgs) match {
+        case found: StaticImportResolved =>
+          // Deduplicate: the same method may be reachable through both a
+          // class-level static import and a single-method static import.
+          if (!resolved.exists(_.method eq found.method)) resolved += found
+        case amb: StaticImportAmbiguous =>
+          if (ambiguous.isEmpty) ambiguous = Some(amb)
+        case StaticImportNoMatch =>
       }
     }
 
@@ -73,20 +70,38 @@ private[compiler] final class StaticImportMethodCallSupport(
     }
   }
 
+  /**
+   * The imported types that declare a static method of this name, with those methods.
+   *
+   * A bare call such as `println(x)` used to walk every static import -- a couple of
+   * dozen classes by default -- loading each and collecting its methods, on every call
+   * site. The set of imports is fixed for the unit, so the walk is done once per name.
+   */
+  private val candidateMemo = scala.collection.mutable.HashMap[String, Seq[(ClassType, Seq[Method])]]()
+
+  private def staticCandidates(name: String): Seq[(ClassType, Seq[Method])] =
+    candidateMemo.getOrElseUpdate(name, {
+      bodyContext.staticImportedList.getItems.iterator.flatMap { item =>
+        if (!item.importsMethod(name)) Iterator.empty
+        else bodyContext.loadOption(item.getName).iterator.flatMap { typeRef =>
+          val candidates = new JTreeSet[Method](new MethodComparator)
+          calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
+          if (candidates.isEmpty) Iterator.empty else Iterator.single((typeRef, candidates.asScala.toList))
+        }
+      }.toList
+    })
+
   private def resolveStaticImportOnType(
     node: AST.UnqualifiedMethodCall,
     typeRef: ClassType,
+    candidates: Seq[Method],
     params: Array[Term],
     expected: Type,
     mappedTypeArgs: Option[Array[Type]]
   ): StaticImportResolution = {
-    val candidates = new JTreeSet[Method](new MethodComparator)
-    calls.collectMethodsMatching(typeRef, node.name, candidates, calls.isStaticMethod)
-    if (candidates.isEmpty) return StaticImportNoMatch
-
     val applicable = overloadSupport.collectStaticApplicables(
       typeRef,
-      candidates.asScala,
+      candidates,
       node,
       params,
       expected,

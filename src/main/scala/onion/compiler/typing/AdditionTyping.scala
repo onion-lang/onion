@@ -99,9 +99,19 @@ private[typing] class AdditionTyping(
       case nullableType: NullableType => nullableType.innerType.asInstanceOf[ObjectType]
       case other => other.asInstanceOf[ObjectType]
     }
-    val concatMethod = body.findMethod(node, leftStringType, "concat", Array[Term](rightString))
+    // `"a" + b + c + ...` is the most common expression in a script, and every operand
+    // resolved String.valueOf and String.concat afresh; both are fixed for a pass.
+    val concatMethod =
+      if (leftStringType eq stringType) {
+        if (cachedConcat == null) cachedConcat = body.findMethod(node, leftStringType, "concat", Array[Term](rightString))
+        cachedConcat
+      } else body.findMethod(node, leftStringType, "concat", Array[Term](rightString))
     Some(new Call(leftString, concatMethod, Array[Term](rightString)))
   }
+
+  private lazy val stringType: ObjectType = bodyContext.load("java.lang.String")
+  private var cachedConcat: Method = null
+  private var cachedValueOf: Method = null
 
   /**
    * Box a primitive type for string concatenation.
@@ -121,11 +131,11 @@ private[typing] class AdditionTyping(
    * concatenation semantics for null ("a" + null == "anull") and never NPEs.
    */
   private def toStringCall(node: AST.Expression, term: Term): Term = {
-    val stringType = bodyContext.load("java.lang.String")
     val arg: Term = new AsInstanceOf(term, bodyContext.rootClass)
-    val valueOfMethods = stringType.findMethod("valueOf", Array[Term](arg))
-    // String.valueOf(Object) always exists on the JDK
-    new CallStatic(stringType, valueOfMethods(0), Array[Term](arg))
+    // String.valueOf(Object) always exists on the JDK; the argument is always the Object
+    // upcast, so the overload chosen is the same every time.
+    if (cachedValueOf == null) cachedValueOf = stringType.findMethod("valueOf", Array[Term](arg))(0)
+    new CallStatic(stringType, cachedValueOf, Array[Term](arg))
   }
 
   /**

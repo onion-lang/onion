@@ -82,8 +82,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   
   override def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] =
     generatedClosures.clear()
-    val mainClasses = classes.map(generateClass)
-    mainClasses ++ generatedClosures.toSeq
+    TermContainsTry.reset()
+    try
+      val mainClasses = classes.map(generateClass)
+      mainClasses ++ generatedClosures.toSeq
+    finally TermContainsTry.reset()
 
   /**
    * The SourceFile attribute. TypingHeaderPass records the unit a class came from, so

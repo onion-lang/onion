@@ -17,5 +17,33 @@ import onion.compiler.TypedAST.*
  */
 private[asm] object TermContainsTry:
 
-  def contains(term: Term): Boolean =
-    onion.compiler.TermWalk.exists(term) { case _: Try => true; case _ => false }
+  def contains(term: Term): Boolean = containsNode(term)
+
+  // Codegen asks this for the right-hand side of every assignment and for every call
+  // argument, at every nesting level, so a plain walk revisited the same subterms once per
+  // enclosing operand. The answer is memoized per node for the duration of one code
+  // generation (see `reset`), and computed bottom-up so a nested question is a lookup.
+  private val memo = new ThreadLocal[java.util.IdentityHashMap[AnyRef, java.lang.Boolean]] {
+    override def initialValue() = new java.util.IdentityHashMap[AnyRef, java.lang.Boolean]()
+  }
+
+  /** Forgets the answers of the previous code generation. */
+  def reset(): Unit = memo.get.clear()
+
+  private def containsNode(node: AnyRef): Boolean =
+    val m = memo.get
+    val cached = m.get(node)
+    if cached != null then cached.booleanValue
+    else
+      val result = node match
+        case _: Try => true
+        case _: NewClosure => false
+        case stmt: StatementTerm => containsNode(stmt.statement)
+        case other =>
+          onion.compiler.TermWalk.children(other).exists {
+            case t: Term => containsNode(t)
+            case s: ActionStatement => containsNode(s)
+            case _ => false
+          }
+      m.put(node, java.lang.Boolean.valueOf(result))
+      result

@@ -96,7 +96,7 @@ final class BlockElementLowering(
         // A loop variable never reassigned in the body is effectively final, so
         // (like an unassigned parameter) it may be smart-cast by a null/is check;
         // otherwise it stays mutable and is not narrowed.
-        val loopVarReassigned = AssignedVariableScanner.scan(node.statement).contains(arg.name)
+        val loopVarReassigned = bodyContext.assignedNames(node.statement).contains(arg.name)
         addForeachElement(arg, collection, context, isMutable = loopVarReassigned)
         var block = context.openLoop {
           translate(node.statement, context)
@@ -189,9 +189,9 @@ final class BlockElementLowering(
           // update expression (typed above) or past the loop.
           if (node.condition != null) {
             val narrowing = body.extractNarrowing(node.condition, context)
-            val condReassigned = AssignedVariableScanner.scan(node.condition)
+            val condReassigned = bodyContext.assignedNames(node.condition)
             val updateReassigned =
-              if (node.update != null) AssignedVariableScanner.scan(node.update) else Set.empty[String]
+              if (node.update != null) bodyContext.assignedNames(node.update) else Set.empty[String]
             narrowing.positive.foreach { case (name, tp) =>
               context.addNarrowing(name, tp)
             }
@@ -222,11 +222,11 @@ final class BlockElementLowering(
         // apply it inside a branch only when the var is not reassigned in the
         // condition or within that branch. A reassignment AFTER the branch does
         // not invalidate the narrowing inside it.
-        val condReassigned = AssignedVariableScanner.scan(node.condition)
+        val condReassigned = bodyContext.assignedNames(node.condition)
         def safeMutableNarrowings(m: Map[String, Type], branch: AST.BlockExpression): Map[String, Type] = {
           if (m.isEmpty) Map.empty
           else {
-            val branchReassigned = AssignedVariableScanner.scan(branch)
+            val branchReassigned = bodyContext.assignedNames(branch)
             m.filter { case (name, _) => !condReassigned.contains(name) && !branchReassigned.contains(name) }
           }
         }
@@ -500,7 +500,7 @@ final class BlockElementLowering(
         // a var reassigned in the CONDITION itself (it is not reliably non-null
         // at body entry), matching the if/&& handling of #288/#289/#294.
         val narrowing = body.extractNarrowing(node.condition, context)
-        val condReassigned = AssignedVariableScanner.scan(node.condition)
+        val condReassigned = bodyContext.assignedNames(node.condition)
         narrowing.positive.foreach { case (name, tp) =>
           context.addNarrowing(name, tp)
         }
@@ -607,7 +607,7 @@ final class BlockElementLowering(
   /** The element type of a collection, via its java.lang.Iterable view. */
   private def iterableElementType(tp: Type): Option[Type] = tp match {
     case ct: ClassType =>
-      AppliedTypeViews.collectAppliedViewsFrom(ct).collectFirst {
+      bodyContext.table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct)).collectFirst {
         case (raw, applied) if raw.name == "java.lang.Iterable" && applied.typeArguments.nonEmpty =>
           applied.typeArguments.head
       }

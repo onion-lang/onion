@@ -42,6 +42,9 @@ class LocalScope(val parent: LocalScope) {
    */
   def names: Set[String] = bindings.keySet.toSet
 
+  /** The bindings of this scope only, without copying into a Set. */
+  def bindingEntries: Iterator[(String, LocalBinding)] = bindings.iterator
+
   /**
    * Gets all variable names in this scope and its ancestors.
    * @return Set of variable names

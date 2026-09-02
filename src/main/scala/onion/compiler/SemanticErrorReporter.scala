@@ -1,5 +1,7 @@
 package onion.compiler
 
+import SemanticErrorReporter.*
+
 /* ************************************************************** *
  *                                                                *
  * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
@@ -92,476 +94,7 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Type extractors ==========
 
-  private def typeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])
-  private def classTypeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ClassType])
-  private def objectTypeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ObjectType])
-  private def asString(item: AnyRef): String = item.asInstanceOf[String]
-  // English indefinite article for a noun starting with a vowel sound ("enum" -> "an
-  // enum") vs. one that doesn't ("record" -> "a record"). Only used where the same
-  // message key must grammatically agree with more than one substituted noun -- a fixed
-  // noun's article belongs directly in the .properties text instead, as everywhere else.
-  private def indefiniteArticled(noun: String): String = {
-    val article = noun.headOption.map(_.toLower) match {
-      case Some(c) if "aeiou".contains(c) => "an"
-      case _ => "a"
-    }
-    s"$article $noun"
-  }
-  private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
-  // English count + noun agreement ("1 field" / "2 fields"). Only used where the same
-  // message key's Japanese counterpart uses a bare number with a counter word (e.g. "{1}
-  // 個の...") and has no plural form to agree -- English gets its own pre-pluralized
-  // argument instead of reusing the raw count, same pattern as `indefiniteArticled`.
-  private def pluralizeCount(count: Int, noun: String): String =
-    if (count == 1) s"1 $noun" else s"$count ${noun}s"
-  // Same, but also carries the trailing verb so subject-verb number agreement is
-  // captured too ("1 binding was specified" / "2 bindings were specified").
-  private def pluralizeCountVerb(count: Int, noun: String, verbSingular: String, verbPlural: String): String =
-    if (count == 1) s"1 $noun $verbSingular" else s"$count ${noun}s $verbPlural"
-  // Same idea, but for a clause with no noun of its own ("1 is supplied" / "2 are
-  // supplied") -- the noun was already named earlier in the sentence.
-  private def pluralizeVerbOnly(count: Int, verbSingular: String, verbPlural: String): String =
-    if (count == 1) s"1 $verbSingular" else s"$count $verbPlural"
-  private def typeNames(types: Array[TypedAST.Type]): String = {
-    if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
-  }
-  private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
-
-  // ========== Message formatting ==========
-
-  private def message(property: String): String = Message(property)
-
-  private def format(template: String, args: Seq[String]): String = {
-    if (args.isEmpty) template
-    else MessageFormat.format(template, args.asInstanceOf[Seq[AnyRef]]: _*)
-  }
-
-  private def appendSuggestion(baseMessage: String, suggestion: Option[String]): String =
-    suggestion match {
-      case Some(text) => s"$baseMessage${Systems.lineSeparator}  $text"
-      case None => baseMessage
-    }
-
-  private def problem(position: Location, message: String): Unit = {
-    val errorCode = Option(currentError).map(_.errorCode)
-    val ctx = if (context == CompilationContext.empty) None else Some(context)
-    // Closure bodies are typed more than once (return-type inference,
-    // bidirectional trials); drop exact duplicates so each problem is
-    // reported a single time
-    val duplicate = problems.exists(p =>
-      p.sourceFile == sourceFile && p.location == position && p.message == message
-    )
-    if (!duplicate) {
-      problems.append(CompileError(sourceFile, position, message, errorCode, ctx))
-    }
-  }
-
-  // ========== Error definitions ==========
-
-  /**
-   * Error definition with message key and argument extractors.
-   * Each extractor function takes the items array and returns a format argument.
-   */
-  private case class ErrorDef(
-    messageKey: String,
-    extractors: Seq[Array[AnyRef] => String]
-  )
-
-  /**
-   * Error definitions for standard errors.
-   * Special cases (with suggestions, complex formatting) are handled separately.
-   */
-  private val errorDefs: Map[SemanticError, ErrorDef] = Map(
-    // Type errors
-    SemanticError.ILLEGAL_METHOD_CALL -> ErrorDef(
-      "error.semantic.illegalMethodCall",
-      Seq(items => classTypeName(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.INCOMPATIBLE_TYPE -> ErrorDef(
-      "error.semantic.incompatibleType",
-      Seq(items => typeName(items(0)), items => typeName(items(1)))
-    ),
-    SemanticError.INCOMPATIBLE_OPERAND_TYPE -> ErrorDef(
-      "error.semantic.incompatibleOperandType",
-      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.LVALUE_REQUIRED -> ErrorDef(
-      "error.semantic.lValueRequired",
-      Seq()
-    ),
-    SemanticError.CANNOT_ASSIGN_TO_VAL -> ErrorDef(
-      "error.semantic.cannotAssignToVal",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.VAL_REQUIRES_INITIALIZER -> ErrorDef(
-      "error.semantic.valRequiresInitializer",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.CANNOT_RETURN_VALUE -> ErrorDef(
-      "error.semantic.cannotReturnValue",
-      Seq()
-    ),
-    SemanticError.IS_NOT_BOXABLE_TYPE -> ErrorDef(
-      "error.semantic.isNotBoxableType",
-      Seq(items => typeName(items(0)))
-    ),
-
-    // Resolution errors - CLASS_NOT_FOUND handled specially with suggestions
-    SemanticError.FIELD_NOT_FOUND -> ErrorDef(
-      "error.semantic.fieldNotFound",
-      Seq(items => typeName(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.METHOD_NOT_FOUND -> ErrorDef(
-      "error.semantic.methodNotFound",
-      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
-    ),
-    // CONSTRUCTOR_NOT_FOUND handled specially with available constructors
-    SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE -> ErrorDef(
-      "error.semantic.cannotCallMethodOnPrimitive",
-      Seq(items => typeName(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.INVALID_METHOD_CALL_TARGET -> ErrorDef(
-      "error.semantic.invalidMethodCallTarget",
-      Seq(items => typeName(items(0)))
-    ),
-
-    // Duplication errors
-    SemanticError.DUPLICATE_LOCAL_VARIABLE -> ErrorDef(
-      "error.semantic.duplicatedVariable",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_CLASS -> ErrorDef(
-      "error.semantic.duplicatedClass",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_FIELD -> ErrorDef(
-      "error.semantic.duplicatedField",
-      Seq(items => typeName(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.DUPLICATE_METHOD -> ErrorDef(
-      "error.semantic.duplicatedMethod",
-      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
-    ),
-    SemanticError.DUPLICATE_GLOBAL_VARIABLE -> ErrorDef(
-      "error.semantic.duplicatedGlobalVariable",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_FUNCTION -> ErrorDef(
-      "error.semantic.duplicatedFunction",
-      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.DUPLICATE_CONSTRUCTOR -> ErrorDef(
-      "error.semantic.duplicatedConstructor",
-      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.DUPLICATE_TYPE_PARAMETER -> ErrorDef(
-      "error.semantic.duplicatedTypeParameter",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_GENERATED_METHOD -> ErrorDef(
-      "error.semantic.duplicateGeneratedMethod",
-      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
-    ),
-    SemanticError.DUPLICATE_EXTENSION_METHOD -> ErrorDef(
-      "error.semantic.duplicateExtensionMethod",
-      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
-    ),
-
-    // Access errors
-    SemanticError.METHOD_NOT_ACCESSIBLE -> ErrorDef(
-      "error.semantic.methodNotAccessible",
-      Seq(
-        items => objectTypeName(items(0)),
-        items => asString(items(1)),
-        items => typeNames(asTypeArray(items(2))),
-        items => classTypeName(items(3))
-      )
-    ),
-    SemanticError.FIELD_NOT_ACCESSIBLE -> ErrorDef(
-      "error.semantic.fieldNotAccessible",
-      Seq(items => classTypeName(items(0)), items => asString(items(1)), items => classTypeName(items(2)))
-    ),
-    SemanticError.CLASS_NOT_ACCESSIBLE -> ErrorDef(
-      "error.semantic.classNotAccessible",
-      Seq(items => classTypeName(items(0)), items => classTypeName(items(1)))
-    ),
-
-    // Inheritance errors
-    SemanticError.CYCLIC_INHERITANCE -> ErrorDef(
-      "error.semantic.cyclicInheritance",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
-      "error.semantic.illegalInheritance",
-      Seq(items => asString(items(0)), items => message(s"error.semantic.illegalInheritanceReason.${asString(items(1))}"))
-    ),
-    SemanticError.INTERFACE_REQUIRED -> ErrorDef(
-      "error.semantic.interfaceRequired",
-      Seq(items => typeName(items(0)))
-    ),
-    SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD -> ErrorDef(
-      "error.semantic.unimplementedAbstractMethod",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
-      "error.semantic.abstractClassInstantiation",
-      Seq(items => typeName(items(0)))
-    ),
-    SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
-      "error.semantic.finalMethodOverride",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    // OVERRIDE_TARGET_NOT_FOUND handled specially with suggestions
-
-    // Generic type errors
-    SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
-      "error.semantic.typeNotGeneric",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.RAW_TYPE_NOT_ALLOWED -> ErrorDef(
-      "error.semantic.rawTypeNotAllowed",
-      Seq(items => asString(items(0)))
-    ),
-    // {1} is the raw type name (used by the Japanese template, which has no
-    // article to agree). {2} is the English-only "a X"/"an X" phrase, same
-    // pattern as `indefiniteArticled`'s use for CONSTRUCTOR_IN_RECORD_OR_ENUM.
-    SemanticError.MISSING_RETURN -> ErrorDef(
-      "error.semantic.missingReturn",
-      Seq(
-        items => asString(items(0)),
-        items => typeName(items(1)),
-        items => indefiniteArticled(typeName(items(1)))
-      )
-    ),
-    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
-    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
-    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
-    SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
-      "error.semantic.typeArgumentArityMismatch",
-      Seq(
-        items => asString(items(0)),
-        items => items(1).toString,
-        items => items(2).toString,
-        items => pluralizeCount(items(1).asInstanceOf[Int], "type argument"),
-        items => pluralizeVerbOnly(items(2).asInstanceOf[Int], "is supplied", "are supplied")
-      )
-    ),
-    SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE -> ErrorDef(
-      "error.semantic.typeArgumentMustBeReference",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.METHOD_NOT_GENERIC -> ErrorDef(
-      "error.semantic.methodNotGeneric",
-      Seq(items => asString(items(0)), items => asString(items(1)))
-    ),
-    // {2}/{3} are the raw counts (used by the Japanese template, which counts with
-    // "個" and has no plural form to agree). {4}/{5} are English-only pre-pluralized
-    // clauses for the same counts, same pattern as TYPE_ARGUMENT_ARITY_MISMATCH above.
-    SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
-      "error.semantic.methodTypeArgumentArityMismatch",
-      Seq(
-        items => asString(items(0)),
-        items => asString(items(1)),
-        items => items(2).toString,
-        items => items(3).toString,
-        items => pluralizeCount(items(2).asInstanceOf[Int], "type argument"),
-        items => pluralizeVerbOnly(items(3).asInstanceOf[Int], "is supplied", "are supplied")
-      )
-    ),
-    SemanticError.ERASURE_SIGNATURE_COLLISION -> ErrorDef(
-      "error.semantic.erasureSignatureCollision",
-      Seq(items => typeName(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-
-    // Pattern matching errors
-    SemanticError.DUPLICATE_ARGUMENT -> ErrorDef(
-      "error.semantic.duplicateArgument",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.POSITIONAL_AFTER_NAMED -> ErrorDef(
-      "error.semantic.positionalAfterNamed",
-      Seq()
-    ),
-    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
-    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
-    // clauses for the same counts, same pattern as CONSTRUCTOR_IN_RECORD_OR_ENUM's
-    // `indefiniteArticled` below: the English template uses {3}/{4} instead of the
-    // bare numbers so "1 fields"/"1 bindings were specified" can't happen.
-    SemanticError.WRONG_BINDING_COUNT -> ErrorDef(
-      "error.semantic.wrongBindingCount",
-      Seq(
-        items => asString(items(2)),
-        items => asInt(items(0)),
-        items => asInt(items(1)),
-        items => pluralizeCount(items(0).asInstanceOf[Int], "field"),
-        items => pluralizeCountVerb(items(1).asInstanceOf[Int], "binding", "was specified", "were specified")
-      )
-    ),
-    SemanticError.NOT_A_RECORD_TYPE -> ErrorDef(
-      "error.semantic.notARecordType",
-      Seq(items => asString(items(0)))
-    ),
-
-    SemanticError.BREAK_OUTSIDE_LOOP -> ErrorDef(
-      "error.semantic.breakOutsideLoop",
-      Seq()
-    ),
-    SemanticError.CONTINUE_OUTSIDE_LOOP -> ErrorDef(
-      "error.semantic.continueOutsideLoop",
-      Seq()
-    ),
-    SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE -> ErrorDef(
-      "error.semantic.currentInstanceNotAvailable",
-      Seq()
-    ),
-    SemanticError.RETURN_TYPE_REQUIRED -> ErrorDef(
-      "error.semantic.returnTypeRequired",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.LAMBDA_PARAM_TYPE_REQUIRED -> ErrorDef(
-      "error.semantic.lambdaParamTypeRequired",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.FUNCTION_BODY_REQUIRED -> ErrorDef(
-      "error.semantic.functionBodyRequired",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
-      "error.semantic.typeParameterMayBeNull",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.NULLABLE_MEMBER_ACCESS -> ErrorDef(
-      "error.semantic.nullableMemberAccess",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.STATIC_CALL_ON_INSTANCE -> ErrorDef(
-      "error.semantic.staticCallOnInstance",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.CLASS_USED_AS_VALUE -> ErrorDef(
-      "error.semantic.classUsedAsValue",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.ABSTRACT_METHOD_WITH_BODY -> ErrorDef(
-      "error.semantic.abstractMethodWithBody",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.MAP_NOT_DIRECTLY_ITERABLE -> ErrorDef(
-      "error.semantic.mapNotDirectlyIterable",
-      Seq(items => typeName(items(0)))
-    ),
-    // LABEL_NOT_FOUND handled specially with suggestions
-    SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
-      "error.semantic.regexPatternInvalid",
-      Seq(items => asString(items(0)))
-    ),
-    // {0}/{1} are the raw counts (used by the Japanese template, which counts with
-    // "個" and has no plural form to agree). {2}/{3} are English-only pre-pluralized
-    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
-    SemanticError.REGEX_GROUP_MISMATCH -> ErrorDef(
-      "error.semantic.regexGroupMismatch",
-      Seq(
-        items => asString(items(0)),
-        items => asString(items(1)),
-        items => pluralizeCount(asString(items(0)).toInt, "capture group"),
-        items => pluralizeCountVerb(asString(items(1)).toInt, "binding", "was given", "were given")
-      )
-    ),
-    SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
-      "error.semantic.recordFromComponentUnsupported",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED -> ErrorDef(
-      "error.semantic.recordDeriveComponentUnsupported",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
-      "error.semantic.recordDeriveUnknownMarker",
-      Seq(items => asString(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
-      "error.semantic.shapeFormatUnknown",
-      Seq(items => asString(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.TOOL_UNDECLARED_EFFECT -> ErrorDef(
-      "error.semantic.toolUndeclaredEffect",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    SemanticError.TOOL_UNUSED_CAPABILITY -> ErrorDef(
-      "error.semantic.toolUnusedCapability",
-      Seq(items => asString(items(0)), items => asString(items(1)))
-    ),
-    SemanticError.TOOL_BAD_CAPABILITY -> ErrorDef(
-      "error.semantic.toolBadCapability",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
-    ),
-    SemanticError.DUPLICATE_TOOL_NAME -> ErrorDef(
-      "error.semantic.duplicateToolName",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.UNREACHABLE_CATCH_CLAUSE -> ErrorDef(
-      "error.semantic.unreachableCatchClause",
-      Seq(items => typeName(items(0)), items => typeName(items(1)))
-    ),
-    SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
-      "error.semantic.shapeInstanceWithoutLaw",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
-      "error.semantic.staticMethodWithoutBody",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_RECORD_COMPONENT -> ErrorDef(
-      "error.semantic.duplicateRecordComponent",
-      Seq(items => typeName(items(0)), items => asString(items(1)))
-    ),
-    // {0} = the class, {1} = the primary constructor's parameter types, so the fix is
-    // copy-pasteable: `def this(...) : this(<{1}>) { ... }`.
-    SemanticError.SECONDARY_CONSTRUCTOR_MUST_DELEGATE -> ErrorDef(
-      "error.semantic.secondaryConstructorMustDelegate",
-      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.CONSTRUCTOR_DELEGATION_CYCLE -> ErrorDef(
-      "error.semantic.constructorDelegationCycle",
-      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    // {2} is derived from {0} (not a separate call-site argument): the English
-    // template needs the article to agree with whichever noun ("record" or "enum")
-    // was passed, while the Japanese template uses the bare {0} directly (no
-    // articles in Japanese), so both are extracted from the same source value.
-    SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
-      "error.semantic.constructorInRecordOrEnum",
-      Seq(items => asString(items(0)), items => typeName(items(1)), items => indefiniteArticled(asString(items(0))))
-    ),
-    SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
-      "error.semantic.thisBeforeConstructorDelegation",
-      Seq(items => typeName(items(0)))
-    ),
-    // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
-    // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
-    // sweeping E-code coverage for 0.10.1).
-    SemanticError.CYCLIC_TYPE_ALIAS -> ErrorDef(
-      "error.semantic.cyclicTypeAlias",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
-      "error.semantic.duplicateTypeAlias",
-      Seq(items => asString(items(0)))
-    )
-  )
-
-  // ========== Special case handlers ==========
-
-  // A JS/TS-style backtick template literal (`` `Hello ${name}` ``) isn't a string in
-  // Onion -- backticks only escape a reserved word into an identifier, so the whole
-  // `${...}` text becomes the literal name of a local variable reference, and the
-  // mistake surfaces as a VARIABLE_NOT_FOUND whose message repeats the entire template
-  // text back as if it were an identifier. Detect that shape in the unresolved name
-  // and point at Onion's actual interpolation syntax instead of a name-similarity guess.
-  private val TemplateLiteralInName = """\$\{.*\}""".r
+  private def TemplateLiteralInName = SemanticErrorReporter.TemplateLiteralInName
 
   // A JS-style `console.log(...)`/`console.error(...)`/`console.warn(...)` call has no
   // `console` object in Onion, so `console` parses as a bare identifier reference and
@@ -959,4 +492,488 @@ class SemanticErrorReporter(threshold: Int) {
   def resetContext(): Unit = {
     context = CompilationContext.empty
   }
+
+  private def problem(position: Location, message: String): Unit = {
+    val errorCode = Option(currentError).map(_.errorCode)
+    val ctx = if (context == CompilationContext.empty) None else Some(context)
+    // Closure bodies are typed more than once (return-type inference,
+    // bidirectional trials); drop exact duplicates so each problem is
+    // reported a single time
+    val duplicate = problems.exists(p =>
+      p.sourceFile == sourceFile && p.location == position && p.message == message
+    )
+    if (!duplicate) {
+      problems.append(CompileError(sourceFile, position, message, errorCode, ctx))
+    }
+  }
+}
+
+/**
+ * The error-definition table and its pure helpers live on the companion object: they
+ * carry no per-compilation state, and as class members the ~90-entry map with a closure
+ * per entry was rebuilt for every `new SemanticErrorReporter` -- once per compilation.
+ * The reporter's constructor showed up in profiles of a one-line program for that reason.
+ */
+object SemanticErrorReporter {
+  // Compiled once: a reporter is created per compilation, and a regex in its body was too.
+  private val TemplateLiteralInName = """\$\{.*\}""".r
+
+  private def typeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])
+  private def classTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ClassType])
+  private def objectTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ObjectType])
+  private def asString(item: AnyRef): String = item.asInstanceOf[String]
+  // English indefinite article for a noun starting with a vowel sound ("enum" -> "an
+  // enum") vs. one that doesn't ("record" -> "a record"). Only used where the same
+  // message key must grammatically agree with more than one substituted noun -- a fixed
+  // noun's article belongs directly in the .properties text instead, as everywhere else.
+  private def indefiniteArticled(noun: String): String = {
+    val article = noun.headOption.map(_.toLower) match {
+      case Some(c) if "aeiou".contains(c) => "an"
+      case _ => "a"
+    }
+    s"$article $noun"
+  }
+  private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
+  // English count + noun agreement ("1 field" / "2 fields"). Only used where the same
+  // message key's Japanese counterpart uses a bare number with a counter word (e.g. "{1}
+  // 個の...") and has no plural form to agree -- English gets its own pre-pluralized
+  // argument instead of reusing the raw count, same pattern as `indefiniteArticled`.
+  private def pluralizeCount(count: Int, noun: String): String =
+    if (count == 1) s"1 $noun" else s"$count ${noun}s"
+  // Same, but also carries the trailing verb so subject-verb number agreement is
+  // captured too ("1 binding was specified" / "2 bindings were specified").
+  private def pluralizeCountVerb(count: Int, noun: String, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $noun $verbSingular" else s"$count ${noun}s $verbPlural"
+  // Same idea, but for a clause with no noun of its own ("1 is supplied" / "2 are
+  // supplied") -- the noun was already named earlier in the sentence.
+  private def pluralizeVerbOnly(count: Int, verbSingular: String, verbPlural: String): String =
+    if (count == 1) s"1 $verbSingular" else s"$count $verbPlural"
+  private def typeNames(types: Array[TypedAST.Type]): String = {
+    if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
+  }
+  private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
+
+  // ========== Message formatting ==========
+
+  private def message(property: String): String = Message(property)
+
+  private def format(template: String, args: Seq[String]): String = {
+    if (args.isEmpty) template
+    else MessageFormat.format(template, args.asInstanceOf[Seq[AnyRef]]: _*)
+  }
+
+  private def appendSuggestion(baseMessage: String, suggestion: Option[String]): String =
+    suggestion match {
+      case Some(text) => s"$baseMessage${Systems.lineSeparator}  $text"
+      case None => baseMessage
+    }
+
+
+  // ========== Error definitions ==========
+
+  /**
+   * Error definition with message key and argument extractors.
+   * Each extractor function takes the items array and returns a format argument.
+   */
+
+  private case class ErrorDef(
+    messageKey: String,
+    extractors: Seq[Array[AnyRef] => String]
+  )
+
+  /**
+   * Error definitions for standard errors.
+   * Special cases (with suggestions, complex formatting) are handled separately.
+   */
+
+  private val errorDefs: Map[SemanticError, ErrorDef] = Map(
+    // Type errors
+    SemanticError.ILLEGAL_METHOD_CALL -> ErrorDef(
+      "error.semantic.illegalMethodCall",
+      Seq(items => classTypeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.INCOMPATIBLE_TYPE -> ErrorDef(
+      "error.semantic.incompatibleType",
+      Seq(items => typeName(items(0)), items => typeName(items(1)))
+    ),
+    SemanticError.INCOMPATIBLE_OPERAND_TYPE -> ErrorDef(
+      "error.semantic.incompatibleOperandType",
+      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.LVALUE_REQUIRED -> ErrorDef(
+      "error.semantic.lValueRequired",
+      Seq()
+    ),
+    SemanticError.CANNOT_ASSIGN_TO_VAL -> ErrorDef(
+      "error.semantic.cannotAssignToVal",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.VAL_REQUIRES_INITIALIZER -> ErrorDef(
+      "error.semantic.valRequiresInitializer",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CANNOT_RETURN_VALUE -> ErrorDef(
+      "error.semantic.cannotReturnValue",
+      Seq()
+    ),
+    SemanticError.IS_NOT_BOXABLE_TYPE -> ErrorDef(
+      "error.semantic.isNotBoxableType",
+      Seq(items => typeName(items(0)))
+    ),
+
+    // Resolution errors - CLASS_NOT_FOUND handled specially with suggestions
+    SemanticError.FIELD_NOT_FOUND -> ErrorDef(
+      "error.semantic.fieldNotFound",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.METHOD_NOT_FOUND -> ErrorDef(
+      "error.semantic.methodNotFound",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+    // CONSTRUCTOR_NOT_FOUND handled specially with available constructors
+    SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE -> ErrorDef(
+      "error.semantic.cannotCallMethodOnPrimitive",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.INVALID_METHOD_CALL_TARGET -> ErrorDef(
+      "error.semantic.invalidMethodCallTarget",
+      Seq(items => typeName(items(0)))
+    ),
+
+    // Duplication errors
+    SemanticError.DUPLICATE_LOCAL_VARIABLE -> ErrorDef(
+      "error.semantic.duplicatedVariable",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_CLASS -> ErrorDef(
+      "error.semantic.duplicatedClass",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_FIELD -> ErrorDef(
+      "error.semantic.duplicatedField",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.DUPLICATE_METHOD -> ErrorDef(
+      "error.semantic.duplicatedMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+    SemanticError.DUPLICATE_GLOBAL_VARIABLE -> ErrorDef(
+      "error.semantic.duplicatedGlobalVariable",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_FUNCTION -> ErrorDef(
+      "error.semantic.duplicatedFunction",
+      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.DUPLICATE_CONSTRUCTOR -> ErrorDef(
+      "error.semantic.duplicatedConstructor",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.DUPLICATE_TYPE_PARAMETER -> ErrorDef(
+      "error.semantic.duplicatedTypeParameter",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_GENERATED_METHOD -> ErrorDef(
+      "error.semantic.duplicateGeneratedMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+    SemanticError.DUPLICATE_EXTENSION_METHOD -> ErrorDef(
+      "error.semantic.duplicateExtensionMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+
+    // Access errors
+    SemanticError.METHOD_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.methodNotAccessible",
+      Seq(
+        items => objectTypeName(items(0)),
+        items => asString(items(1)),
+        items => typeNames(asTypeArray(items(2))),
+        items => classTypeName(items(3))
+      )
+    ),
+    SemanticError.FIELD_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.fieldNotAccessible",
+      Seq(items => classTypeName(items(0)), items => asString(items(1)), items => classTypeName(items(2)))
+    ),
+    SemanticError.CLASS_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.classNotAccessible",
+      Seq(items => classTypeName(items(0)), items => classTypeName(items(1)))
+    ),
+
+    // Inheritance errors
+    SemanticError.CYCLIC_INHERITANCE -> ErrorDef(
+      "error.semantic.cyclicInheritance",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
+      "error.semantic.illegalInheritance",
+      Seq(items => asString(items(0)), items => message(s"error.semantic.illegalInheritanceReason.${asString(items(1))}"))
+    ),
+    SemanticError.INTERFACE_REQUIRED -> ErrorDef(
+      "error.semantic.interfaceRequired",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.unimplementedAbstractMethod",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
+      "error.semantic.abstractClassInstantiation",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
+      "error.semantic.finalMethodOverride",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    // OVERRIDE_TARGET_NOT_FOUND handled specially with suggestions
+
+    // Generic type errors
+    SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
+      "error.semantic.typeNotGeneric",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.RAW_TYPE_NOT_ALLOWED -> ErrorDef(
+      "error.semantic.rawTypeNotAllowed",
+      Seq(items => asString(items(0)))
+    ),
+    // {1} is the raw type name (used by the Japanese template, which has no
+    // article to agree). {2} is the English-only "a X"/"an X" phrase, same
+    // pattern as `indefiniteArticled`'s use for CONSTRUCTOR_IN_RECORD_OR_ENUM.
+    SemanticError.MISSING_RETURN -> ErrorDef(
+      "error.semantic.missingReturn",
+      Seq(
+        items => asString(items(0)),
+        items => typeName(items(1)),
+        items => indefiniteArticled(typeName(items(1)))
+      )
+    ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
+    SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.typeArgumentArityMismatch",
+      Seq(
+        items => asString(items(0)),
+        items => items(1).toString,
+        items => items(2).toString,
+        items => pluralizeCount(items(1).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(2).asInstanceOf[Int], "is supplied", "are supplied")
+      )
+    ),
+    SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE -> ErrorDef(
+      "error.semantic.typeArgumentMustBeReference",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.METHOD_NOT_GENERIC -> ErrorDef(
+      "error.semantic.methodNotGeneric",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    // {2}/{3} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {4}/{5} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as TYPE_ARGUMENT_ARITY_MISMATCH above.
+    SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.methodTypeArgumentArityMismatch",
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => items(2).toString,
+        items => items(3).toString,
+        items => pluralizeCount(items(2).asInstanceOf[Int], "type argument"),
+        items => pluralizeVerbOnly(items(3).asInstanceOf[Int], "is supplied", "are supplied")
+      )
+    ),
+    SemanticError.ERASURE_SIGNATURE_COLLISION -> ErrorDef(
+      "error.semantic.erasureSignatureCollision",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+
+    // Pattern matching errors
+    SemanticError.DUPLICATE_ARGUMENT -> ErrorDef(
+      "error.semantic.duplicateArgument",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.POSITIONAL_AFTER_NAMED -> ErrorDef(
+      "error.semantic.positionalAfterNamed",
+      Seq()
+    ),
+    // {1}/{2} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {3}/{4} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as CONSTRUCTOR_IN_RECORD_OR_ENUM's
+    // `indefiniteArticled` below: the English template uses {3}/{4} instead of the
+    // bare numbers so "1 fields"/"1 bindings were specified" can't happen.
+    SemanticError.WRONG_BINDING_COUNT -> ErrorDef(
+      "error.semantic.wrongBindingCount",
+      Seq(
+        items => asString(items(2)),
+        items => asInt(items(0)),
+        items => asInt(items(1)),
+        items => pluralizeCount(items(0).asInstanceOf[Int], "field"),
+        items => pluralizeCountVerb(items(1).asInstanceOf[Int], "binding", "was specified", "were specified")
+      )
+    ),
+    SemanticError.NOT_A_RECORD_TYPE -> ErrorDef(
+      "error.semantic.notARecordType",
+      Seq(items => asString(items(0)))
+    ),
+
+    SemanticError.BREAK_OUTSIDE_LOOP -> ErrorDef(
+      "error.semantic.breakOutsideLoop",
+      Seq()
+    ),
+    SemanticError.CONTINUE_OUTSIDE_LOOP -> ErrorDef(
+      "error.semantic.continueOutsideLoop",
+      Seq()
+    ),
+    SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE -> ErrorDef(
+      "error.semantic.currentInstanceNotAvailable",
+      Seq()
+    ),
+    SemanticError.RETURN_TYPE_REQUIRED -> ErrorDef(
+      "error.semantic.returnTypeRequired",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.LAMBDA_PARAM_TYPE_REQUIRED -> ErrorDef(
+      "error.semantic.lambdaParamTypeRequired",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.FUNCTION_BODY_REQUIRED -> ErrorDef(
+      "error.semantic.functionBodyRequired",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
+      "error.semantic.typeParameterMayBeNull",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.NULLABLE_MEMBER_ACCESS -> ErrorDef(
+      "error.semantic.nullableMemberAccess",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.STATIC_CALL_ON_INSTANCE -> ErrorDef(
+      "error.semantic.staticCallOnInstance",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CLASS_USED_AS_VALUE -> ErrorDef(
+      "error.semantic.classUsedAsValue",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.ABSTRACT_METHOD_WITH_BODY -> ErrorDef(
+      "error.semantic.abstractMethodWithBody",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.MAP_NOT_DIRECTLY_ITERABLE -> ErrorDef(
+      "error.semantic.mapNotDirectlyIterable",
+      Seq(items => typeName(items(0)))
+    ),
+    // LABEL_NOT_FOUND handled specially with suggestions
+    SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
+      "error.semantic.regexPatternInvalid",
+      Seq(items => asString(items(0)))
+    ),
+    // {0}/{1} are the raw counts (used by the Japanese template, which counts with
+    // "個" and has no plural form to agree). {2}/{3} are English-only pre-pluralized
+    // clauses for the same counts, same pattern as WRONG_BINDING_COUNT above.
+    SemanticError.REGEX_GROUP_MISMATCH -> ErrorDef(
+      "error.semantic.regexGroupMismatch",
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => pluralizeCount(asString(items(0)).toInt, "capture group"),
+        items => pluralizeCountVerb(asString(items(1)).toInt, "binding", "was given", "were given")
+      )
+    ),
+    SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
+      "error.semantic.recordFromComponentUnsupported",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED -> ErrorDef(
+      "error.semantic.recordDeriveComponentUnsupported",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
+      "error.semantic.recordDeriveUnknownMarker",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
+      "error.semantic.shapeFormatUnknown",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.TOOL_UNDECLARED_EFFECT -> ErrorDef(
+      "error.semantic.toolUndeclaredEffect",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.TOOL_UNUSED_CAPABILITY -> ErrorDef(
+      "error.semantic.toolUnusedCapability",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.TOOL_BAD_CAPABILITY -> ErrorDef(
+      "error.semantic.toolBadCapability",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.DUPLICATE_TOOL_NAME -> ErrorDef(
+      "error.semantic.duplicateToolName",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.UNREACHABLE_CATCH_CLAUSE -> ErrorDef(
+      "error.semantic.unreachableCatchClause",
+      Seq(items => typeName(items(0)), items => typeName(items(1)))
+    ),
+    SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
+      "error.semantic.shapeInstanceWithoutLaw",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
+      "error.semantic.staticMethodWithoutBody",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_RECORD_COMPONENT -> ErrorDef(
+      "error.semantic.duplicateRecordComponent",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    // {0} = the class, {1} = the primary constructor's parameter types, so the fix is
+    // copy-pasteable: `def this(...) : this(<{1}>) { ... }`.
+    SemanticError.SECONDARY_CONSTRUCTOR_MUST_DELEGATE -> ErrorDef(
+      "error.semantic.secondaryConstructorMustDelegate",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CONSTRUCTOR_DELEGATION_CYCLE -> ErrorDef(
+      "error.semantic.constructorDelegationCycle",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    // {2} is derived from {0} (not a separate call-site argument): the English
+    // template needs the article to agree with whichever noun ("record" or "enum")
+    // was passed, while the Japanese template uses the bare {0} directly (no
+    // articles in Japanese), so both are extracted from the same source value.
+    SemanticError.CONSTRUCTOR_IN_RECORD_OR_ENUM -> ErrorDef(
+      "error.semantic.constructorInRecordOrEnum",
+      Seq(items => asString(items(0)), items => typeName(items(1)), items => indefiniteArticled(asString(items(0))))
+    ),
+    SemanticError.THIS_BEFORE_CONSTRUCTOR_DELEGATION -> ErrorDef(
+      "error.semantic.thisBeforeConstructorDelegation",
+      Seq(items => typeName(items(0)))
+    ),
+    // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
+    // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
+    // sweeping E-code coverage for 0.10.1).
+    SemanticError.CYCLIC_TYPE_ALIAS -> ErrorDef(
+      "error.semantic.cyclicTypeAlias",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
+      "error.semantic.duplicateTypeAlias",
+      Seq(items => asString(items(0)))
+    )
+  )
+
+  // ========== Special case handlers ==========
+
+  // A JS/TS-style backtick template literal (`` `Hello ${name}` ``) isn't a string in
+  // Onion -- backticks only escape a reserved word into an identifier, so the whole
+  // `${...}` text becomes the literal name of a local variable reference, and the
+  // mistake surfaces as a VARIABLE_NOT_FOUND whose message repeats the entire template
+  // text back as if it were an identifier. Detect that shape in the unresolved name
+  // and point at Onion's actual interpolation syntax instead of a name-similarity guess.
 }

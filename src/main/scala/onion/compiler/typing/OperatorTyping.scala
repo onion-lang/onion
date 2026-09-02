@@ -15,6 +15,7 @@ final class OperatorTyping(
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {
+  import OperatorTyping.*
 
   def createEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term = {
     lhs.`type` match {
@@ -295,8 +296,6 @@ final class OperatorTyping(
    * Returns None when there is no mapping or no matching method, so callers
    * fall back to the primitive/concat path.
    */
-  private val operatorMethodNames: Map[String, String] =
-    Map("+" -> "plus", "-" -> "minus", "*" -> "times", "/" -> "div", "%" -> "rem")
 
   def tryOperatorMethod(node: AST.Node, symbol: String, left: Term, right: Term): Option[Term] =
     operatorMethodNames.get(symbol).flatMap { methodName =>
@@ -480,10 +479,6 @@ final class OperatorTyping(
 
   private def hasNumericType(term: Term): Boolean = numeric(term.`type`)
 
-  private val numericTypes: Set[BasicType] = Set(
-    BasicType.BYTE, BasicType.SHORT, BasicType.CHAR, BasicType.INT,
-    BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE
-  )
 
   private def numeric(symbol: Type): Boolean =
     symbol.isBasicType && numericTypes.contains(symbol.asInstanceOf[BasicType])
@@ -500,4 +495,15 @@ final class OperatorTyping(
     case BasicType.LONG => BasicType.LONG
     case _ => null
   }
+}
+
+object OperatorTyping {
+  // Constant tables, built once: they sat in the class body and were rebuilt per instance.
+  private val operatorMethodNames: Map[String, String] =
+    Map("+" -> "plus", "-" -> "minus", "*" -> "times", "/" -> "div", "%" -> "rem")
+
+  private val numericTypes: Set[BasicType] = Set(
+    BasicType.BYTE, BasicType.SHORT, BasicType.CHAR, BasicType.INT,
+    BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE
+  )
 }

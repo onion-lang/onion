@@ -202,7 +202,9 @@ object TypedAST {
       this(newStatements.asScala.toIndexedSeq: _*)
     }
 
-    def statements: Array[TypedAST.ActionStatement] = newStatements.toArray
+    // Accessed on every visit of the block by typing, optimization and codegen; the
+    // varargs Seq was copied into a new array each time.
+    val statements: Array[TypedAST.ActionStatement] = newStatements.toArray
   }
 
   /**
@@ -1006,10 +1008,14 @@ object TypedAST {
   case class TypeParameter(name: String, upperBound: Option[TypedAST.Type], nullability: Nullability = Nullability.Platform, constraints: scala.collection.immutable.List[ClassType] = scala.collection.immutable.Nil)
 
   object AppliedClassType {
-    private val cache = scala.collection.mutable.HashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()
+    // Process-wide, and reached from concurrent compilations (the language server, test
+    // suites), so it has to be a concurrent map. It only pays off when the raw class types
+    // are the same instances across compilations, which ClassTable.shared now guarantees
+    // for platform and runtime classes.
+    private val cache = new java.util.concurrent.ConcurrentHashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()
 
     def apply(raw: TypedAST.ClassType, typeArguments: scala.collection.immutable.List[TypedAST.Type]): AppliedClassType =
-      cache.getOrElseUpdate((raw, typeArguments), new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type]))
+      cache.computeIfAbsent((raw, typeArguments), _ => new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type]))
   }
 
   final class AppliedClassType private(val raw: TypedAST.ClassType, val typeArguments: Array[TypedAST.Type])
@@ -1822,8 +1828,17 @@ object TypedAST {
           }
           return true
         case _ =>
-      isSuperTypeForClass(left, right.superClass) ||
-        right.interfaces.exists(iface => isSuperTypeForClass(left, iface))
+      if (isSuperTypeForClass(left, right.superClass)) return true
+      // An index loop: `exists` on the interface Vector allocated an iterator and a closure
+      // per class on the walk, and a failed check walks the whole hierarchy -- which is the
+      // common outcome during overload resolution. It was the top allocation site.
+      val ifaces = right.interfaces
+      var i = 0
+      while (i < ifaces.length) {
+        if (isSuperTypeForClass(left, ifaces(i))) return true
+        i += 1
+      }
+      false
     }
 
     private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean =

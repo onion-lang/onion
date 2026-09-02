@@ -216,7 +216,7 @@ private[compiler] final class MethodBodySupport(
     context.add("this", receiverType)
 
     val arguments = staticMethod.arguments
-    val assigned = if (node.block == null) node.args.map(_.name).toSet else AssignedVariableScanner.scan(node.block)
+    val assigned = if (node.block == null) node.args.map(_.name).toSet else bodyContext.assignedNames(node.block)
     context.setReassignedNames(assigned)
     for ((arg, i) <- node.args.zipWithIndex) {
       context.add(arg.name, arguments(i + 1), isMutable = assigned.contains(arg.name))
@@ -254,7 +254,7 @@ private[compiler] final class MethodBodySupport(
     // casts (is / null checks) can narrow them
     val assigned =
       if (body == null) args.map(_.name).toSet
-      else AssignedVariableScanner.scan(body)
+      else bodyContext.assignedNames(body)
     // Share the reassigned-name set with local `var` declarations so a var
     // never reassigned in this body can be smart-cast (issue #273).
     context.setReassignedNames(assigned)

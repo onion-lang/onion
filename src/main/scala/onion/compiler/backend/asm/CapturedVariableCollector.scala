@@ -49,14 +49,20 @@ private[compiler] object CapturedVariableCollector {
 
   // TypedAST terms/statements are plain classes, not case classes, so walk
   // their public accessor methods that return Terms/Statements/collections.
+  // The accessor set of a node class is fixed; getMethods() plus the filter was the cost of
+  // this walk, and it ran per node per method. Looked up once per class instead (the same
+  // fix TermWalk has).
+  private val accessors = new java.util.concurrent.ConcurrentHashMap[Class[?], Array[java.lang.reflect.Method]]()
+
   private def reflectiveChildren(node: AnyRef): Seq[AnyRef] = {
-    node.getClass.getMethods.iterator
+    accessors.computeIfAbsent(node.getClass, c => c.getMethods.iterator
       .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
         (classOf[Term].isAssignableFrom(m.getReturnType) ||
          classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
          m.getReturnType.isArray ||
          classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
-      .flatMap { m =>
+      .toArray).iterator
+.flatMap { m =>
         try {
           m.invoke(node) match {
             case null => Nil

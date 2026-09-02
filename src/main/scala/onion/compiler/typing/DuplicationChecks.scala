@@ -74,7 +74,7 @@ private[compiler] object DuplicationChecks {
 
   def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     if clazz.isInterface then return
-    val allViews = AppliedTypeViews.collectAppliedViewsFrom(clazz)
+    val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself to avoid checking methods against themselves
     val views = allViews - clazz
     if views.isEmpty then return
@@ -82,7 +82,7 @@ private[compiler] object DuplicationChecks {
     val implByErasedParams: scala.collection.immutable.Map[(String, String), Method] =
       clazz.methods
         .filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
-        .map(m => ((m.name, erasedParamDescriptor(m.arguments)), m))
+        .map(m => ((m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments))), m))
         .toMap
 
     for (view <- views.values) {
@@ -145,7 +145,7 @@ private[compiler] object DuplicationChecks {
           !Modifier.isPrivate(m.modifier))
     if overrideMethods.isEmpty then return
 
-    val allViews = AppliedTypeViews.collectAppliedViewsFrom(clazz)
+    val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself: an override must target a *base* member.
     val views = allViews - clazz
 
@@ -224,7 +224,7 @@ private[compiler] object DuplicationChecks {
     // Skip if the class is abstract or an interface
     if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return
 
-    val allViews = AppliedTypeViews.collectAppliedViewsFrom(clazz)
+    val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself to avoid checking methods against themselves
     val views = allViews - clazz
     if views.isEmpty then return
@@ -236,13 +236,13 @@ private[compiler] object DuplicationChecks {
     // Add this class's own methods
     for m <- clazz.methods do
       if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-        implByErasedParams((m.name, erasedParamDescriptor(m.arguments))) = m
+        implByErasedParams((m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments)))) = m
 
     // Also add concrete methods from parent classes (not just interfaces)
     for view <- views.values do
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-          val key = (m.name, erasedParamDescriptor(m.arguments))
+          val key = (m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments)))
           if !implByErasedParams.contains(key) then
             implByErasedParams(key) = m
 

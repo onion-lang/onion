@@ -23,11 +23,16 @@ import onion.compiler.effects.{Effect, EffectInference}
  * backend — sees any of this. A tool compiles to the same bytecode as the equivalent
  * function, which `ToolErasureSpec` pins.
  */
-final class CapabilityCheckPass(typing: Typing) {
-
+object CapabilityCheckPass {
+  // Constants of the pass, not of a run: the regex in particular was compiled anew for
+  // every compilation because it lived in the class body.
   private val ToolMarker = "onion.tool"
   private val RequiresPrefix = "requires:"
   private val CapabilityForm = """([A-Za-z]+)(?:\(([A-Za-z0-9_]+)\))?""".r
+}
+
+final class CapabilityCheckPass(typing: Typing) {
+  import CapabilityCheckPass.*
 
   def run(classes: Seq[ClassDefinition]): Unit = {
     val tools: Seq[MethodDefinition] = for {

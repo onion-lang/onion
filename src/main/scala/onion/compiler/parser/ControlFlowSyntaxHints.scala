@@ -12,6 +12,7 @@ private[compiler] object ControlFlowSyntaxHints {
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val LeadingUntilStatement = """^\s*until\b""".r
   private val ExceptClause = """\bexcept\b""".r
+  private val RescueClause = """\brescue\b""".r
   // A raised value shaped like a constructor call (`raise Exception("boom")`)
   // gets a `throw new` suggestion; anything else (e.g. a bare re-raise like
   // `raise e`) falls through to the plain `throw` case below it, so this must
@@ -37,6 +38,13 @@ private[compiler] object ControlFlowSyntaxHints {
   // fallback (suggesting the nonsensical `defer(...)`); keep this ahead of
   // that case.
   private val LeadingDeferStatement = """^\s*defer\s+(.+?)\s*$""".r
+  // A Python-style `with expr as name { ... }` resource-management block --
+  // `with` is not a keyword in Onion, so this reads as a bare `with` identifier
+  // followed by another expression with nothing in between, which also matches
+  // the generic missing-call-parens fallback (suggesting the nonsensical
+  // `with(...)`); keep this ahead of that case.
+  private val LeadingWithAsStatement =
+    """^\s*with\s+(.+?)\s+as\s+([A-Za-z_]\w*)\s*:?\s*\{?\s*$""".r
 
   def classify(found: String, sourceLine: String): Option[SyntaxHint] = {
     if (LeadingSwitchStatement.findFirstMatchIn(sourceLine).isDefined) {
@@ -59,6 +67,8 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.until_not_supported")
     } else if (ExceptClause.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.except_not_supported")
+    } else if (RescueClause.findFirstMatchIn(sourceLine).isDefined) {
+      hint("error.parsing.hint.rescue_not_supported")
     } else if (LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.python_style_raise_construct", matched.group(1), matched.group(2).trim)
@@ -73,6 +83,9 @@ private[compiler] object ControlFlowSyntaxHints {
     } else if (LeadingDeferStatement.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingDeferStatement.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.defer_not_supported", matched.group(1).trim)
+    } else if (LeadingWithAsStatement.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingWithAsStatement.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.with_as_statement", matched.group(2), matched.group(1).trim)
     } else {
       None
     }

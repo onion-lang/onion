@@ -15,9 +15,11 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
         ("unless", "unless done {", "error.parsing.hint.unless_not_supported"),
         ("until", "until done {", "error.parsing.hint.until_not_supported"),
         ("error", "} except error: Exception {", "error.parsing.hint.except_not_supported"),
+        ("error", "} rescue error {", "error.parsing.hint.rescue_not_supported"),
         ("Exception", "raise Exception(\"boom\")", "error.parsing.hint.python_style_raise_construct"),
         ("e", "raise e", "error.parsing.hint.python_style_raise"),
-        ("foo", "await foo()", "error.parsing.hint.await_not_supported")
+        ("foo", "await foo()", "error.parsing.hint.await_not_supported"),
+        ("f", "with openResource() as f {", "error.parsing.hint.with_as_statement")
       )
 
       cases.foreach { case (found, sourceLine, expectedKey) =>
@@ -50,6 +52,15 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
 
       hint.messageKey shouldBe "error.parsing.hint.await_not_supported"
       hint.arguments shouldBe Seq("foo()")
+    }
+
+    it("captures the resource expression and bound name from a `with ... as ...` block") {
+      val hint = ControlFlowSyntaxHints
+        .classify(found = "f", sourceLine = "with openResource() as f {")
+        .getOrElse(fail("expected a syntax hint"))
+
+      hint.messageKey shouldBe "error.parsing.hint.with_as_statement"
+      hint.arguments shouldBe Seq("f", "openResource()")
     }
 
     it("preserves rule order inside the family") {

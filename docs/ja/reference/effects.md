@@ -48,7 +48,8 @@ onion.Cli#parse=console,exec
 ```
 
 表には標準ライブラリの効果を持つ全表面 — `Files`、`FileResource`、`Proc`、`Http`、
-`HttpResource`、`Config`、`IO`、`Cli`、`DateTime`、`Timing`、`Rand`、`OnionMath` — の
+`HttpResource`、`Config`、`IO`、`Cli`、`DateTime`、`Timing`、`Rand`、`OnionMath`、
+`Archive`、`Db`、`Net`、`Server`、`Future`、`Concurrent`、`ToolCli` — の
 分類に加えて、純粋な残りの stdlib、よく使う JDK の値型・コレクション型の純粋ベースライン、
 JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
 `System::out` の型としての `PrintStream`）が入っています。

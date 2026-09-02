@@ -641,11 +641,12 @@ record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポ�
 対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
 マッチのあとで該当フィールドを手動でパースしてください。
 
-### `E0062` — `derive!(Json)` がサポートしないレコード成分型
+### `E0062` — `derive!` がサポートしないレコード成分型
 
-`derive!(Json)` は各成分を JSON のスカラー値にマッピングすることで `fromJson`/`toJson`
-を生成します。サポートされる成分型は `from re"..."` と同じ、`String`、`Int`、`Long`、
-`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
+`derive!(Json)` と `derive!(Yaml)` はどちらも、各成分をスカラー値にマッピングする
+ことで `fromX`/`toX` の対を生成します。両者は同じ `toMap`/`fromMap` コアを共有して
+いるため、この制約はどちらでも同一です。サポートされる成分型は `from re"..."` と
+同じ、`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
 
 ```onion
 record Inner(z: Int)
@@ -657,13 +658,15 @@ record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner はシリアラ�
 ### `E0063` — 未知の `derive!` マーカー
 
 `derive!(...)` が、コンパイラが実装していないフォーマット名を指定しています。
-現在サポートされているマーカーは `Json` のみです。
+サポートされているマーカーは `Json` と `Yaml` で、単独でも
+`derive!(Json, Yaml)` のように併用してもかまいません。
 
 ```onion
 record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bogus
 ```
 
-対処: `derive!(Json)` を使うか、この句を削除してください。
+対処: `derive!(Json)`、`derive!(Yaml)`、`derive!(Json, Yaml)` のいずれかを使うか、
+この句を削除してください。
 
 ### `E0086` — レコード成分名の重複
 
@@ -758,7 +761,7 @@ law はコンパイル済みクラスに対して実行されます。`law` / `e
 
 ```onion
 record Pt(x: Int, y: Int)
-  shape doc = toml     // E0076: サポートしているのは json, yaml
+  shape doc = toml     // E0076: サポートしているのは json, yaml, config
 ```
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
@@ -1452,7 +1455,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0002` | variable not found |
 | `E0003` | class not found |
 | `E0004` | field ….… is not found |
-| `E0005` | method applicable for ….…(…) is not found |
+| `E0005` | a method applicable for ….…(…) is not found |
 | `E0006` | ambiguous method |
 | `E0007` | duplicated local variable definition … |
 | `E0008` | duplicated class definition … |
@@ -1463,23 +1466,23 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0013` | method ….…(…) is not accessible from class … |
 | `E0014` | field ….… is not accessible from class … |
 | `E0015` | class … is not accessible from class … |
-| `E0016` | inheritance relations which includes … have cyclicity |
-| `E0018` | class … do inheritance illegally |
+| `E0016` | inheritance relations which include … have cyclicity |
+| `E0018` | class … has illegal inheritance: … |
 | `E0019` | method ….… cannot be called |
-| `E0020` | this method cannot return value |
-| `E0021` | constructor not found |
+| `E0020` | this method cannot return a value |
+| `E0021` | a constructor applicable for …(…) is not found |
 | `E0022` | ambiguous constructor |
-| `E0023` | interface required, but type … is used |
+| `E0023` | an interface is required, but type … is used |
 | `E0025` | duplicated constructor definition …(…) |
 | `E0026` | duplicated generated method ….…(…) |
-| `E0027` | type … is not boxable type |
-| `E0028` | lvalue is required |
+| `E0027` | type … is not a boxable type |
+| `E0028` | an lvalue is required |
 | `E0029` | duplicated type parameter definition … |
 | `E0030` | type … does not take type arguments |
-| `E0031` | type … expects … type arguments, but … are supplied |
+| `E0031` | type … expects … type argument(s), but … is/are supplied |
 | `E0032` | type argument … must be a reference type |
 | `E0033` | method ….… does not take type arguments |
-| `E0034` | method ….… expects … type arguments, but … are supplied |
+| `E0034` | method ….… expects … type argument(s), but … is/are supplied |
 | `E0035` | Erased JVM signature collision: ….…… |
 | `E0036` | cannot assign to val … |
 | `E0037` | class … must implement abstract method …(…) or be declared abstract |
@@ -1495,8 +1498,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0047` | … is not a record type or does not exist |
 | `E0048` | break is only allowed inside a loop |
 | `E0049` | continue is only allowed inside a loop |
-| `E0050` | current instance is not available in static context |
-| `E0051` | return type is required for method … |
+| `E0050` | current instance is not available in a static context |
+| `E0051` | a return type is required for method … |
 | `E0052` | lambda parameter … must specify a type |
 | `E0053` | cyclic type alias detected: … |
 | `E0054` | duplicate type alias: … |
@@ -1504,7 +1507,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0057` | value of type parameter … may be null and cannot be dereferenced directly |
 | `E0058` | label … is not defined on any enclosing loop |
 | `E0059` | invalid regular expression literal: … |
-| `E0060` | the regex pattern has … capture group(s) but … binding(s) were given |
+| `E0060` | the regex pattern has … capture group(s) but … binding(s) was/were given |
 | `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
@@ -1533,7 +1536,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0086` | duplicated record component … in … |
 | `E0087` | class … has a primary constructor, so every `def this` must delegate to it |
 | `E0088` | constructor delegation in … never reaches a constructor that calls the superclass |
-| `E0089` | a … cannot declare `def this`: … already has its canonical constructor |
+| `E0089` | a record / an enum cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 

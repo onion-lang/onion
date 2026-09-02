@@ -66,8 +66,13 @@ Class Loading & Execution
 All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 
 1. **Parsing** (`src/main/scala/onion/compiler/Parsing.scala`)
-   - Uses JavaCC-generated parser from `grammar/JJOnionParser.jj` (36KB grammar file)
-   - Parser class: `JJOnionParser` (auto-generated in `sourceManaged/`)
+   - Fast path: the handwritten recursive-descent parser `parser/OnionParser.scala` over the
+     handwritten lexer `parser/OnionLexer.scala`; it must produce the same AST as the JavaCC
+     parser for every accepted program, and gives up (`OnionParser.Fail`) on anything else
+   - Fallback and specification: the JavaCC-generated parser from `grammar/JJOnionParser.jj`
+     (parser class `JJOnionParser`, auto-generated in `sourceManaged/`) re-parses what the fast
+     path rejects and owns error recovery, expected tokens and syntax hints. **A grammar change
+     must be mirrored in `OnionParser.scala`**; `-Donion.parser.javacc=true` disables the fast path
    - Converts source text → Untyped AST (`AST.scala`)
    - Uses `ASTBuilder.scala` to construct AST from parser tokens
 

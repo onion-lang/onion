@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for a Java/Kotlin/C#/Go-style `package` declaration.** Onion's
+  source-file header declaration is `module foo.bar;`, not `package`. Since
+  `package` isn't a reserved word, `package com.example.app;` (Java/Kotlin/C#)
+  or a bare `package main` (Go) previously parsed as a stray bare identifier
+  followed by an unconnected second statement, producing a generic "expecting
+  `<EOF>`, `<EOL>`, `;`" parse error instead of pointing at the fix.
+  `SyntaxHintClassifier` now recognizes both the dotted and bare `package`
+  forms and suggests the equivalent `module` declaration. Pinned by new
+  `PackageDeclarationHintI18nSpec` and cases in `SyntaxHintClassifierSpec`.
+
 - **Diagnostic hint for a Scala-style `case class` declaration.** Onion has no
   `case class` — a data-carrying type is a `record` — but unlike the existing
   Kotlin-style `data class` hint, `case` is itself an Onion reserved word (used

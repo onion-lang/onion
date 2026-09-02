@@ -47,6 +47,12 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*using\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*\{?\s*$""".r
   private val CSharpStyleUsingImport =
     """^\s*using\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;\s*$""".r
+  // A Java/Kotlin/C#/Go-style `package foo.bar;` (or bare Go `package main`) source-file
+  // header -- `package` isn't a reserved word, so it parses as a bare identifier and the
+  // dotted path (or the next token) reads as a stray second statement, same failure mode
+  // as CSharpStyleUsingImport above. Onion's own file-header declaration is `module`.
+  private val PackageDeclaration =
+    """^\s*package\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;?\s*$""".r
   private val PythonStyleFromImport =
     """^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+?)\s*;?\s*$""".r
   private val DataClassDeclaration =
@@ -260,6 +266,9 @@ private[compiler] object SyntaxHintClassifier {
       case _ if CSharpStyleUsingImport.findFirstMatchIn(sourceLine).isDefined =>
         val matched = CSharpStyleUsingImport.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.csharp_style_using_import", matched.group(1))
+      case _ if PackageDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = PackageDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.package_declaration", matched.group(1))
       case _ if PythonStyleFromImport.findFirstMatchIn(sourceLine).isDefined =>
         val matched = PythonStyleFromImport.findFirstMatchIn(sourceLine).get
         val module = matched.group(1)

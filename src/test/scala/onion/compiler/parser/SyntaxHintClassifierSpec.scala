@@ -318,6 +318,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).messageKey shouldBe "error.parsing.hint.using_resource_statement"
     }
 
+    it("recognizes a Java/Kotlin/C#-style dotted `package` declaration") {
+      val hint = classify(
+        found = "com",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "package com.example.app;"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.package_declaration"
+      hint.arguments shouldBe Seq("com.example.app")
+    }
+
+    it("recognizes a Go-style bare `package main` declaration") {
+      val hint = classify(
+        found = "main",
+        expected = "<EOF>, <EOL>, \";\"",
+        sourceLine = "package main"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.package_declaration"
+      hint.arguments shouldBe Seq("main")
+    }
+
     it("recognizes a Python-style `from ... import ...` statement") {
       val hint = classify(
         found = "import",

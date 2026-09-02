@@ -45,6 +45,10 @@ object AssignedVariableScanner {
     }
 
     def visitNode(n: AST.Node): Set[String] = {
+      n match {
+        case b: AST.BlockExpression if b.assignedNames != null => return b.assignedNames // the parser's answer
+        case _ =>
+      }
       val remember = memoizable(n)
       if (remember) {
         val cached = memo.get(n)

@@ -157,4 +157,25 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese E0079 section names every effect that takes a parameter argument") {
     checkParameterizedEffects("docs/ja/reference/error-codes.md")
   }
+
+  // The E0079 section also states the *full* effect vocabulary (all nine names, not
+  // just the ones that take a parameter) as a prose sentence in both docs. Nothing
+  // tied that sentence to `Effect.all` -- the same drift risk `checkParameterizedEffects`
+  // above already guards for the parameterized subset, one list over.
+
+  private def checkEffectVocabulary(docPath: String): Unit = {
+    val names = onion.compiler.effects.Effect.all.map(_.name)
+    assert(names.nonEmpty, "no effects found in Effect.all -- the scan has rotted")
+    val e0079 = section(read(docPath), "E0079")
+    val missing = names.filterNot(e0079.contains)
+    assert(missing.isEmpty, s"$docPath E0079 section does not mention effect(s): ${missing.mkString(", ")}")
+  }
+
+  it("the English E0079 section names every effect in the vocabulary") {
+    checkEffectVocabulary("docs/reference/error-codes.md")
+  }
+
+  it("the Japanese E0079 section names every effect in the vocabulary") {
+    checkEffectVocabulary("docs/ja/reference/error-codes.md")
+  }
 }

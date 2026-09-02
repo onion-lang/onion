@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A syntax hint for JavaScript/TypeScript-style `for (const x of arr)` loops.**
+  Onion's `for` clauses aren't parenthesized and have no `of` form, so this mistake
+  previously fell through to the generic C-style-for hint (which suggested adding
+  semicolons that don't belong in a foreach-shaped loop) or, for the `const` spelling
+  specifically, the unrelated `const`-declaration hint. `SyntaxHintClassifier` now
+  recognizes `for (const|let|var x of expr)` (and the bare `for (x of expr)` form) and
+  points at `foreach x: Type in expr { ... }` instead.
+
 ### Documentation
 
 - **`onion.Option`'s and `onion.Result`'s full instance-method sets.** `docs/reference/stdlib.md`

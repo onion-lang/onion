@@ -96,6 +96,56 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("entry", "Map.Entry[String, Int]", "map.entrySet()")
     }
 
+    it("prefers JS-style for-of advice over generic C-style-for advice") {
+      val hint = classify(
+        found = "x",
+        sourceLine = "for (const x of arr) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_for_of"
+      hint.arguments shouldBe Seq("x", "arr")
+    }
+
+    it("recognizes a `let`-declared for-of loop over a call-expression collection") {
+      val hint = classify(
+        found = "item",
+        sourceLine = "for (let item of getItems()) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_for_of"
+      hint.arguments shouldBe Seq("item", "getItems()")
+    }
+
+    it("recognizes a for-of loop with no declarator keyword") {
+      val hint = classify(
+        found = "x",
+        sourceLine = "for (x of arr) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_for_of"
+      hint.arguments shouldBe Seq("x", "arr")
+    }
+
+    it("prefers for-of advice over the generic const-declaration hint when found is `const`") {
+      val hint = classify(
+        found = "const",
+        sourceLine = "for (const x of arr) {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_for_of"
+      hint.arguments shouldBe Seq("x", "arr")
+    }
+
+    it("keeps the generic const-declaration hint for an ordinary `const` statement") {
+      val hint = classify(
+        found = "const",
+        sourceLine = "const x = 1;"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.js_style_const"
+      hint.arguments shouldBe empty
+    }
+
     it("captures Java-style import alias arguments in Onion order") {
       val hint = classify(
         found = "=",

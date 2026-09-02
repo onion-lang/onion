@@ -230,6 +230,48 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) should not be Some("error.parsing.hint.instanceof_not_supported")
     }
 
+    it("recognizes a Java/C#/Kotlin-style `public` modifier before a class declaration") {
+      val hint = classify(
+        found = "public",
+        expected = "\"abstract\", \"class\", \"record\", \"def\"",
+        sourceLine = "public class Foo {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.access_modifier_before_declaration"
+      hint.arguments shouldBe Seq("public")
+    }
+
+    it("recognizes a `private` modifier before a record declaration") {
+      val hint = classify(
+        found = "private",
+        expected = "\"abstract\", \"class\", \"record\", \"def\"",
+        sourceLine = "private record Point(x: Int, y: Int)"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.access_modifier_before_declaration"
+      hint.arguments shouldBe Seq("private")
+    }
+
+    it("recognizes a `protected` modifier before an interface declaration") {
+      val hint = classify(
+        found = "protected",
+        expected = "\"abstract\", \"class\", \"record\", \"def\"",
+        sourceLine = "protected interface Shape {"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.access_modifier_before_declaration"
+      hint.arguments shouldBe Seq("protected")
+    }
+
+    it("does not flag `public` when it isn't followed by a stray type-declaration expectation") {
+      SyntaxHintClassifier.classify(
+        found = "public",
+        expected = "\":\"",
+        context = "",
+        sourceLine = "public"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.access_modifier_before_declaration")
+    }
+
     it("recognizes a Python/Rust/TypeScript-style `-> Type` return type arrow") {
       val hint = classify(
         found = "->",

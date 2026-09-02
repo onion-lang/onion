@@ -10,9 +10,21 @@ private[compiler] final class MethodResolutionSupport(
   params: Array[Term],
   table: ClassTable
 ) {
-  private val specializedArgsCache = HashMap[Method, Array[Type]]()
-  private val methodArgsWithTypeParamsCache = HashMap[Method, Array[Type]]()
-  private val viewSubstCache = HashMap[ClassType, scala.collection.immutable.Map[String, Type]]()
+  // Created on first use: a support object is built per call site, and most call sites
+  // never touch all three. (Plain null checks -- a `lazy val` here measurably slowed the
+  // hot path.)
+  private var specializedArgsCache0: HashMap[Method, Array[Type]] = null
+  private def specializedArgsCache: HashMap[Method, Array[Type]] =
+    if specializedArgsCache0 == null then specializedArgsCache0 = HashMap[Method, Array[Type]]()
+    specializedArgsCache0
+  private var methodArgsWithTypeParamsCache0: HashMap[Method, Array[Type]] = null
+  private def methodArgsWithTypeParamsCache: HashMap[Method, Array[Type]] =
+    if methodArgsWithTypeParamsCache0 == null then methodArgsWithTypeParamsCache0 = HashMap[Method, Array[Type]]()
+    methodArgsWithTypeParamsCache0
+  private var viewSubstCache0: HashMap[ClassType, scala.collection.immutable.Map[String, Type]] = null
+  private def viewSubstCache: HashMap[ClassType, scala.collection.immutable.Map[String, Type]] =
+    if viewSubstCache0 == null then viewSubstCache0 = HashMap[ClassType, scala.collection.immutable.Map[String, Type]]()
+    viewSubstCache0
   private val emptySubst = scala.collection.immutable.Map.empty[String, Type]
 
   def specializedArgs(method: Method): Array[Type] =

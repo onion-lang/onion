@@ -60,13 +60,29 @@ object TermWalk:
         .toArray)
 
   private def reflectiveChildren(node: AnyRef): Seq[AnyRef] =
-    accessorsOf(node.getClass).iterator
-      .flatMap { m =>
-        try
-          m.invoke(node) match
-            case null => Nil
-            case arr: Array[?] => arr.toSeq.collect { case r: AnyRef => r }
-            case list: java.util.List[?] => scala.jdk.CollectionConverters.ListHasAsScala(list).asScala.toSeq.collect { case r: AnyRef => r }
-            case other: AnyRef => Seq(other)
-        catch case _: Throwable => Nil
-      }.toSeq
+    // One buffer, filled by index: the iterator/flatMap/toSeq chain it replaces allocated
+    // several collections per node on every walk.
+    val methods = accessorsOf(node.getClass)
+    val out = new scala.collection.mutable.ArrayBuffer[AnyRef](methods.length)
+    var i = 0
+    while i < methods.length do
+      try
+        methods(i).invoke(node) match
+          case null =>
+          case arr: Array[?] =>
+            var j = 0
+            while j < arr.length do
+              arr(j) match
+                case r: AnyRef => out += r
+                case _ =>
+              j += 1
+          case list: java.util.List[?] =>
+            val it = list.iterator()
+            while it.hasNext do
+              it.next() match
+                case r: AnyRef => out += r
+                case _ =>
+          case other: AnyRef => out += other
+      catch case _: Throwable => ()
+      i += 1
+    out.toSeq

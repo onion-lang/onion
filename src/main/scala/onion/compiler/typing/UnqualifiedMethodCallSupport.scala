@@ -120,11 +120,8 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     }
   }
 
-  private def hasNamedMethod(targetType: ClassType, name: String, filter: Method => Boolean): Boolean = {
-    val candidates = new JTreeSet[Method](new MethodComparator)
-    calls.collectMethodsMatching(targetType, name, candidates, filter)
-    !candidates.isEmpty
-  }
+  private def hasNamedMethod(targetType: ClassType, name: String, filter: Method => Boolean): Boolean =
+    calls.existsMethodMatching(targetType, name, filter) // an existence test: no candidate set, early exit
 
   /**
    * Bidirectional-inference entry for an unqualified call whose arguments include

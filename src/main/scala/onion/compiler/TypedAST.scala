@@ -1012,10 +1012,23 @@ object TypedAST {
     // suites), so it has to be a concurrent map. It only pays off when the raw class types
     // are the same instances across compilations, which ClassTable.shared now guarantees
     // for platform and runtime classes.
-    private val cache = new java.util.concurrent.ConcurrentHashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()
+    // Two levels: the raw class by identity, then the argument list. A single map keyed by
+    // a (raw, list) tuple hashed the raw type's name and allocated the tuple on every
+    // lookup, and this is asked for every written type annotation.
+    private val cache = new java.util.concurrent.ConcurrentHashMap[TypedAST.ClassType, java.util.concurrent.ConcurrentHashMap[scala.collection.immutable.List[TypedAST.Type], AppliedClassType]]()
 
     def apply(raw: TypedAST.ClassType, typeArguments: scala.collection.immutable.List[TypedAST.Type]): AppliedClassType =
-      cache.computeIfAbsent((raw, typeArguments), _ => new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type]))
+      var perRaw = cache.get(raw)
+      if perRaw == null then
+        perRaw = new java.util.concurrent.ConcurrentHashMap[scala.collection.immutable.List[TypedAST.Type], AppliedClassType]()
+        val winner = cache.putIfAbsent(raw, perRaw)
+        if winner != null then perRaw = winner
+      val cached = perRaw.get(typeArguments)
+      if cached != null then cached
+      else
+        val fresh = new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type])
+        val winner = perRaw.putIfAbsent(typeArguments, fresh)
+        if winner == null then fresh else winner
   }
 
   final class AppliedClassType private(val raw: TypedAST.ClassType, val typeArguments: Array[TypedAST.Type])

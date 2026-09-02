@@ -231,6 +231,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private def collectExtensionMethods(
     targetType: ObjectType,
     name: String
+  ): Seq[ExtensionMethodDefinition] =
+    // The receiver hierarchy walk and the per-type name filter depend only on the
+    // (receiver type, name) pair; user extensions are all registered before body typing.
+    typing.table_.extensionCandidatesOf(targetType, name)(collectExtensionMethodsUncached(targetType, name))
+
+  private def collectExtensionMethodsUncached(
+    targetType: ObjectType,
+    name: String
   ): Seq[ExtensionMethodDefinition] = {
     val result = scala.collection.mutable.LinkedHashSet.empty[ExtensionMethodDefinition]
 

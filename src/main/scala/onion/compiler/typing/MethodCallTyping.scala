@@ -214,9 +214,10 @@ final class MethodCallTyping(
     node: AST.Node,
     targetType: AnyRef,
     name: String,
-    argTypes: Array[Type]
+    argTypes: Array[Type],
+    isUnqualifiedCall: Boolean = false
   ): Unit =
-    methodCallReportingSupport.reportMethodNotFound(node, targetType, name, argTypes)
+    methodCallReportingSupport.reportMethodNotFound(node, targetType, name, argTypes, isUnqualifiedCall)
 
   /** Error count so far; a checkpoint before typing a trailing-closure body and a
    *  comparison after tells whether the body itself reported an error, so a

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic hint for a Go-style prefix `defer expr` statement.** Onion has
+  no `defer`, so it parsed as a bare identifier followed by another
+  expression with nothing in between, and the mistake fell through to the
+  generic "a call's arguments need parentheses" fallback — suggesting the
+  nonsensical `defer(...)`. The diagnostic now recognizes the leading
+  `defer` shape and points at Onion's actual equivalent, `try { ... }
+  finally { ... }`.
+
 ## [0.29.0] - 2026-08-31
 
 ### Added

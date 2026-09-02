@@ -500,6 +500,7 @@ These are frequently confused with other languages. **Always check these:**
 |-------|-----------------|
 | `x -> x * 2` | ✓ correct - bare single param works; expression bodies too |
 | `(x) -> expr` | ✓ correct - param types inferred from the expected function type |
+| `lambda x: x * 2` (Python) | `(x) -> x * 2` - no `lambda` keyword, use an arrow lambda |
 | `func(arg)` for lambda | ✓ correct - function values are called directly |
 | lambda as `Runnable`/`Comparator` | ✓ correct - SAM conversion to Java functional interfaces |
 | `Int -> Int` | ✓ correct - single param function type |
@@ -522,6 +523,7 @@ These are frequently confused with other languages. **Always check these:**
 | `throw new Exception();` | `throw new Exception("msg")` - same syntax |
 | `try { } catch { } finally { }` | ✓ correct - finally is supported |
 | `using r = expr { }` | `try (val r = expr) { }` - try-with-resources; multiple via `;`, closed in reverse order |
+| `with expr as r { }` (Python) | `try (val r = expr) { }` - try-with-resources, same as above |
 | `catch (Type e)` | `catch e: Type` - no parens, type after colon |
 
 ### Tools, capabilities and effects (v0.10)
@@ -545,6 +547,8 @@ These are frequently confused with other languages. **Always check these:**
 | `&&`, `\|\|` operators | ✓ correct - same as Java |
 | `!condition` | ✓ correct - same as Java |
 | `a ? b : c` ternary | Not supported - use `if/else` expression |
+| `a ?? b` nullish coalescing (JS) | `a ?: b` - use the Elvis operator instead |
+| `typeof x` (JS/Python) | `x is Type` - check a value's type with the `is` operator instead |
 | `operator fun plus` (Kotlin) | `def plus(o: T): T` - `+ - * / %` map to plus/minus/times/div/rem on the left operand |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
 | `this` only | `self` also works - both refer to current instance |

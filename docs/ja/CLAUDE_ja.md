@@ -449,6 +449,7 @@ try {
 |-----|----------------|
 | `x -> x * 2` | ✓ 正しい - 裸の単一引数はそのまま使える。式本体も使える |
 | `(x) -> expr` | ✓ 正しい - 引数の型は期待される関数型から推論される |
+| `lambda x: x * 2`（Python風） | `(x) -> x * 2` - `lambda`キーワードはなく、アロー式ラムダを使う |
 | `func(arg)` でラムダ呼び出し | ✓ 正しい - 関数値は直接呼び出せる |
 | `Runnable`/`Comparator`としてのラムダ | ✓ 正しい - JavaのSAM（関数型インターフェース）への変換が効く |
 | `Int -> Int` | ✓ 正しい - 単一引数の関数型 |
@@ -471,6 +472,7 @@ try {
 | `throw new Exception();` | `throw new Exception("msg")` - 同じ構文 |
 | `try { } catch { } finally { }` | ✓ 正しい - finallyサポートあり |
 | `using r = expr { }` | `try (val r = expr) { }` - try-with-resources。複数のリソースは`;`で区切り、逆順にクローズされる |
+| `with expr as r { }`（Python風） | `try (val r = expr) { }` - 上と同じtry-with-resources |
 | `catch (Type e)` | `catch e: Type` - 括弧なし、コロンの後に型 |
 
 ### ツール、capability、と効果 (v0.10)
@@ -494,6 +496,8 @@ try {
 | `&&`, `\|\|` 演算子 | ✓ 正しい - Javaと同じ |
 | `!condition` | ✓ 正しい - Javaと同じ |
 | `a ? b : c` 三項演算子 | 非サポート - `if/else`式を使用 |
+| `a ?? b`（JS風のnull合体演算子） | `a ?: b` - 代わりにElvis演算子を使う |
+| `typeof x`（JS/Python風） | `x is Type` - 型チェックには`is`演算子を使う |
 | `operator fun plus`（Kotlin風） | `def plus(o: T): T` - 左オペランドの`+ - * / %`はそれぞれplus/minus/times/div/remにマップされる |
 | 文字列テンプレート `$var` や `${expr}` | `"text #{expr}"` - `#{}` 構文を使用 |
 | `this`のみ | `self`も使用可 - 両方とも現在のインスタンスを参照 |

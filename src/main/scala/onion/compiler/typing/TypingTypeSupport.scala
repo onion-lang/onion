@@ -77,9 +77,14 @@ final class TypingTypeSupport(private val typing: Typing) {
 
   def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
     val prev = typing.typeParams_
-    typing.setTypeParams(scope)
-    try block
-    finally typing.setTypeParams(prev)
+    // Most openings add nothing (a method without type parameters inside a class without
+    // them); `++` then returns the same scope, and there is nothing to switch.
+    if (scope eq prev) block
+    else {
+      typing.setTypeParams(scope)
+      try block
+      finally typing.setTypeParams(prev)
+    }
   }
 
   def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {

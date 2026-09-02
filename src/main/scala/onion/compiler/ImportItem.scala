@@ -19,12 +19,23 @@ case class ImportItem(simpleName : String, fqcn: Seq[String]) {
    * @param simpleName
    * @return fqcn.  if simpleName is not matched, then return null.
    */
+  // Every unresolved name is tried against every import, so these strings were rebuilt
+  // -- take/append/mkString over the segment list -- on each attempt. They depend only on
+  // the item, so they are built once.
+  // The default package's on-demand import is the single segment `*`: its prefix is the
+  // empty string, not `.` -- a leading dot made every default-package class unresolvable.
+  private val onDemandPrefix: String =
+    if (!isOnDemand || fqcn.isEmpty) null
+    else if (fqcn.length == 1) ""
+    else fqcn.take(fqcn.length - 1).mkString("", ".", ".")
+  private val fullName: String = fqcn.mkString(".")
+
   def matches(simpleName: String): Option[String] = {
     if (isOnDemand) {
-      if(fqcn.length == 0) None
-      else Some(fqcn.take(fqcn.length - 1).appended(simpleName).mkString("."))
+      if (onDemandPrefix == null) None
+      else Some(onDemandPrefix + simpleName)
     } else if (this.simpleName == simpleName) {
-      Some(fqcn.mkString((".")))
+      Some(fullName)
     } else {
       None
     }

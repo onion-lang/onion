@@ -43,13 +43,16 @@ class LocalFrame(val parent: LocalFrame) {
    *
    * Shadowing is not a collision: two scopes declaring the same name produce two indices.
    */
+  // Built once per method at code generation, for the LocalVariableTable. It walked every
+  // scope through `names` (a fresh Set per scope) and a lookup per name; iterating the
+  // bindings directly is the same relation without the copies.
   def namesByIndex: Map[Int, String] =
-    allScopes.iterator.flatMap { scope =>
-      scope.names.iterator.flatMap(name => scope.get(name).map(binding => binding.index -> name))
-    }.toMap
+    allScopes.iterator.flatMap(_.bindingEntries.map { case (name, binding) => binding.index -> name }).toMap
 
   def entries: Seq[LocalBinding] = {
-    val binds: Array[LocalBinding] = entrySet.toArray
+    // Per method at codegen and for closures; the HashSet-per-scope merge it replaced
+    // showed on the profile.
+    val binds: Array[LocalBinding] = allScopes.iterator.flatMap(_.bindingEntries.map(_._2)).toArray
     JArrays.sort(binds, (b1: LocalBinding, b2: LocalBinding) => {
       val i1 = b1.index
       val i2 = b2.index

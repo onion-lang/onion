@@ -147,7 +147,7 @@ private[compiler] final class AssignabilitySupport(
           // type-variable-parameterized subtype (matched via this path because
           // the expected type contains a type variable) was rejected even though
           // the concrete-argument form is accepted by the normal hierarchy check.
-          AppliedTypeViews.collectAppliedViewsFrom(aa)
+          bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>

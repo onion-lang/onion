@@ -84,10 +84,10 @@ private[compiler] object MethodResolution {
   def findMethods(target: ObjectType, name: String, params: Array[Term], table: ClassTable): Array[Method] =
     target match
       case ct: AppliedClassType =>
-        val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
+        val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
         findMethodsWithViews(ct, name, params, views, table)
       case ct: ClassType if requiresSpecializedViews(ct) =>
-        val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
+        val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
         findMethodsWithViews(ct, name, params, views, table)
       case ct: ClassType =>
         findMethodsWithViews(ct, name, params, scala.collection.immutable.Map.empty, table)
@@ -105,9 +105,17 @@ private[compiler] object MethodResolution {
         case raw if !visited.add(raw.name) =>
           false
         case raw =>
-          loop(raw.superClass) || raw.interfaces.exists(loop)
+          loop(raw.superClass) || anyInterface(raw, loop)
 
-    loop(target.superClass) || target.interfaces.exists(loop)
+    def anyInterface(tp: ClassType, f: ClassType => Boolean): Boolean =
+      val ifaces = tp.interfaces
+      var i = 0
+      while i < ifaces.length do
+        if f(ifaces(i)) then return true
+        i += 1
+      false
+
+    loop(target.superClass) || anyInterface(target, loop)
 
   private def findMethodsWithViews(
     target: ObjectType,
@@ -121,9 +129,17 @@ private[compiler] object MethodResolution {
 
     def collectMethods(tp: ObjectType): Unit =
       if tp == null then return
-      tp.methods(name).foreach(candidates.add)
+      val own = tp.methods(name)
+      var i = 0
+      while i < own.length do
+        candidates.add(own(i))
+        i += 1
       collectMethods(tp.superClass)
-      tp.interfaces.foreach(collectMethods)
+      val ifaces = tp.interfaces
+      var j = 0
+      while j < ifaces.length do
+        collectMethods(ifaces(j))
+        j += 1
 
     collectMethods(target)
     val applicableMethods = candidates.asScala.filter(support.applicable).toList

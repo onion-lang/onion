@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Compiler throughput: a warm compilation runs roughly 2-2.5x faster.** Profiled with
+  JFR at full stack depth (the default `jfr print` depth of 5 frames had been
+  mis-attributing the hot paths) and reworked the per-compilation waste it exposed,
+  without changing what any program means:
+  - A shared, immutable class universe (`ClassTable.shared`) for `java.*`/`onion.*`
+    classes, so platform and runtime classes are read and parsed once per JVM rather than
+    once per compilation; `java.*` absences are final there and no longer re-probed.
+  - The built-in extension-method registry is built once per JVM instead of by reflective
+    scan per compilation; `SemanticErrorReporter`'s error table and regexes,
+    `CapabilityCheckPass`'s regex and `OperatorTyping`'s constant tables no longer live in
+    per-compilation instances.
+  - Name resolution: unqualified names are memoized per import list; scan-generated
+    candidates are no longer fed back through the import scan (`onion.Object` used to fan
+    out into `java.lang.onion$Object` and seven more probes); an absent class is a `null`,
+    not a `ClassNotFoundException` with a stack trace (~50 per compilation).
+  - Bare static-import calls (`println(x)`) resolve their candidate classes once per name
+    per unit instead of walking every default static import per call site.
+  - `AssignedVariableScanner` answers bottom-up with a per-unit memo (it re-walked each
+    method body once per nesting level); `TermContainsTry` is memoized per code generation.
+  - Fewer copies on hot paths: `AppliedTypeViews` memoized per compilation, identity maps
+    for AST bindings, cached per-name method arrays, `StatementBlock.statements`,
+    hierarchy walks without iterator/closure allocation, integer-literal parsing without
+    three regex compilations per literal, a semantic lookahead in `eols()`.
+  On the readiness benchmark (`sbt benchmark`, same machine, same session, interleaved):
+  steady-fresh stats-app 66 -> 32 ms, todo-manager 75 -> 35 ms, hello 16 -> 9 ms, REPL
+  growing-state 45 -> 26 ms, multi-file 77 -> 57 ms (medians; absolute values depend on
+  machine load, the ratios were stable across runs). Process-cold start is unchanged: it
+  is JVM start-up, not compilation. A dedicated harness measuring CPU time after JIT
+  warm-up shows 13.1 -> 5.5 ms on stats-app and 3.4 -> 0.6 ms on hello.
+  Two latent correctness bugs surfaced along the way and are fixed: the default package's
+  on-demand import produced `.Name` candidates, and arrays of user classes substituted into
+  a runtime method's vararg parameter (`T[] -> Transaction[]`) were cached by name in a
+  table that outlives the compilation, so a later compilation could see an array of the
+  previous `Transaction`.
+
 ### Fixed
 
 - **Diagnostic hint for a Ruby-style bare `puts(...)` call.** Onion has no

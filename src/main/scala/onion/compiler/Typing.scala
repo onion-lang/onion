@@ -7,6 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
+import scala.jdk.CollectionConverters.*
+
 import _root_.scala.jdk.CollectionConverters._
 import _root_.onion.compiler.toolbox.{Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
@@ -82,6 +84,60 @@ import collection.mutable.{HashMap, Map}
 object Typing {
   /** Pseudo receiver name for extension methods on array types. */
   final val ArrayExtensionReceiver = "<array>"
+
+  /**
+   * The bundled collection utilities' static helpers, as extension methods keyed by the
+   * FQCN of their first parameter's type -- so scripts write `list.map { x -> ... }`
+   * instead of `Colls::map(list) { x -> ... }`.
+   *
+   * Built once per process, on first use, against the shared class table: the containers
+   * are `onion.*` runtime classes, so their `ClassType`s and every type they mention are
+   * the shared instances, and the resulting definitions are safe to hand to every
+   * compilation. (A builtin definition has no body and no frame; only user-declared
+   * extensions ever have those set.) Before this, the same reflective scan over ten
+   * classes ran inside each compilation that resolved an extension call.
+   *
+   * Colls and Iterables overlap (both declare take(List, int)); a given
+   * receiver+name+erased-signature is registered once, first container wins, so
+   * `xs.take(2)` is not ambiguous. Explicit static calls are unaffected.
+   */
+  lazy val builtinExtensions: scala.collection.immutable.Map[String, List[ExtensionMethodDefinition]] = {
+    val table = ClassTable.shared
+    def boxed(bt: BasicType): ClassType = bt match
+      case BasicType.BOOLEAN => table.loadRequired("java.lang.Boolean")
+      case BasicType.BYTE => table.loadRequired("java.lang.Byte")
+      case BasicType.SHORT => table.loadRequired("java.lang.Short")
+      case BasicType.CHAR => table.loadRequired("java.lang.Character")
+      case BasicType.INT => table.loadRequired("java.lang.Integer")
+      case BasicType.LONG => table.loadRequired("java.lang.Long")
+      case BasicType.FLOAT => table.loadRequired("java.lang.Float")
+      case _ => table.loadRequired("java.lang.Double")
+    val registered = scala.collection.mutable.HashSet[String]()
+    val out = scala.collection.mutable.LinkedHashMap[String, scala.collection.mutable.ListBuffer[ExtensionMethodDefinition]]()
+    for {
+      containerName <- _root_.onion.compiler.typing.ExtensionMethodFallbackSupport.BuiltinExtensionContainers
+      container <- table.load(containerName)
+      method <- container.methods
+      if Modifier.isStatic(method.modifier) && Modifier.isPublic(method.modifier) && method.arguments.nonEmpty
+    } {
+      val receiverName = method.arguments(0) match {
+        case applied: AppliedClassType => applied.raw.name
+        case ct: ClassType => ct.name
+        case _: ArrayType => ArrayExtensionReceiver
+        case bt: BasicType if bt != BasicType.VOID => boxed(bt).name
+        case _ => null
+      }
+      if (receiverName != null) {
+        val signature = receiverName + "#" + method.name +
+          method.arguments.map(a => onion.compiler.generics.Erasure.asmType(a).getDescriptor).mkString
+        if (registered.add(signature))
+          out.getOrElseUpdate(receiverName, scala.collection.mutable.ListBuffer()) += new ExtensionMethodDefinition(
+            null, method.modifier, method.arguments(0), container, method.name,
+            method.arguments.drop(1), method.returnType, null, method.typeParameters)
+      }
+    }
+    out.view.mapValues(_.toList).toMap
+  }
 }
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
@@ -116,10 +172,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     loop(descriptor, 0)
   }
   private val globalState = TypingGlobalState(
-    table = new ClassTable(classpath(config.classPath)),
+    table = new ClassTable(classpath(config.classPath), Some(ClassTable.shared)),
     bindings = new AstBindingIndex,
     mappers = Map[String, NameResolver](),
-    declaredTypeParams = HashMap[AST.Node, Seq[TypeParam]](),
+    // Identity-keyed for the same reason as AstBindingIndex: a structural key hashes the
+    // whole declaration subtree on every lookup.
+    declaredTypeParams = new java.util.IdentityHashMap[AST.Node, Seq[TypeParam]]().asScala,
     typeAliases = new TypeAliasRegistry,
     extensions = new ExtensionRegistry,
     diagnostics = new SemanticErrorReporter(config.maxErrorReports),
@@ -129,68 +187,6 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private val diagnostics = new TypingDiagnostics(this, session)
   private val typeSupport = new TypingTypeSupport(this)
 
-  // Lazy so that compilations that never reach an extension lookup (parse
-  // failures, most fuzz mutants) don't pay for scanning the builtin
-  // containers; eager registration in the constructor caused GC thrashing
-  // when thousands of compilers were constructed in one JVM.
-  private var builtinExtensionsRegistered = false
-  private def ensureBuiltinExtensions(): Unit = {
-    if (!builtinExtensionsRegistered) {
-      builtinExtensionsRegistered = true
-      registerBuiltinExtensions()
-    }
-  }
-
-  /**
-   * Registers the static helpers of the bundled collection utilities as
-   * extension methods on their first parameter's type, so scripts can write
-   * `list.map { x => ... }` instead of `Colls::map(list) { x => ... }`.
-   */
-  private def registerBuiltinExtensions(): Unit = {
-    // Colls and Iterables overlap (e.g. both declare take(List, int)); register a
-    // given receiver+name+erased-signature as an extension only once so a call
-    // like `xs.take(2)` is not ambiguous. The first container (Colls) wins; an
-    // identical method in a later container is skipped. Explicit static calls
-    // (Colls::take, Iterables::take) and the default Iterables import are
-    // unaffected — this only deduplicates the extension registry.
-    val registered = scala.collection.mutable.HashSet[String]()
-    for {
-      containerName <- _root_.onion.compiler.typing.ExtensionMethodFallbackSupport.BuiltinExtensionContainers
-      container <- load(containerName)
-      method <- container.methods
-      if Modifier.isStatic(method.modifier) && Modifier.isPublic(method.modifier) && method.arguments.nonEmpty
-    } {
-      val receiverName = method.arguments(0) match {
-        case applied: AppliedClassType => applied.raw.name
-        case ct: ClassType => ct.name
-        case _: ArrayType => Typing.ArrayExtensionReceiver
-        // A primitive first parameter registers on its boxed class (like a user
-        // `extension Int { ... }` does), so e.g. Format::bytes(long) becomes
-        // (1536L).bytes() — the primitive receiver is boxed for lookup and
-        // unboxed again when the backing static call is built.
-        case bt: BasicType if bt != BasicType.VOID => boxedClass(bt).name
-        case _ => null
-      }
-      val signature =
-        if (receiverName == null) null
-        else receiverName + "#" + method.name +
-          method.arguments.map(a => onion.compiler.generics.Erasure.asmType(a).getDescriptor).mkString
-      if (receiverName != null && registered.add(signature)) {
-        val extMethod = new ExtensionMethodDefinition(
-          null,
-          method.modifier,
-          method.arguments(0),
-          container,
-          method.name,
-          method.arguments.drop(1),
-          method.returnType,
-          null,
-          method.typeParameters
-        )
-        registerExtensionMethod(receiverName, extMethod)
-      }
-    }
-  }
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -214,8 +210,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
-  def processTyping(unit: AST.CompilationUnit): Unit =
-    new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)).run()
+  def processTyping(unit: AST.CompilationUnit): Unit = {
+    val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
+    pass.run()
+  }
 
   // Typing body pass moved to onion.compiler.typing.TypingBodyPass
 
@@ -315,10 +313,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def registerExtensionMethod(receiverFqcn: String, method: ExtensionMethodDefinition): Unit = {
     session.global.extensions.registerMethod(receiverFqcn, method)
   }
-  private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] = {
-    ensureBuiltinExtensions()
+  private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] =
     session.global.extensions.methodsFor(receiverFqcn)
-  }
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String =
     paths.mkString(Systems.pathSeparator)

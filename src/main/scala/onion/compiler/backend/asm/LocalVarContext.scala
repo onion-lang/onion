@@ -18,12 +18,18 @@ class LocalVarContext(gen: GeneratorAdapter) {
   // the scopes are the only thing that still knows what the author called a variable by
   // the time codegen runs. A slot with no name is simply left out of the table rather
   // than invented — a debugger showing `var3` is worse than showing nothing.
-  private var names: Map[Int, String] = Map.empty
+  private var nameFrame: onion.compiler.LocalFrame = null
+  private var namesCache: Map[Int, String] = null
+  // Built on the first slot that needs a name: a method with no locals never pays for it.
+  private def names: Map[Int, String] = {
+    if (namesCache == null) namesCache = if (nameFrame == null) Map.empty else nameFrame.namesByIndex
+    namesCache
+  }
   private val debugLocals = mutable.Buffer[DebugLocal]()
 
   /** Must be called before slots are allocated, or those allocations go unnamed. */
   def withNames(frame: onion.compiler.LocalFrame): LocalVarContext = {
-    if (frame != null) names = frame.namesByIndex
+    if (frame != null) { nameFrame = frame; namesCache = null }
     this
   }
 

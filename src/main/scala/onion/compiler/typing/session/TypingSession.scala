@@ -1,5 +1,7 @@
 package onion.compiler.typing.session
 
+import scala.jdk.CollectionConverters.*
+
 import onion.compiler.{AST, CompilerConfig}
 import onion.compiler.typing.TypeParamScope
 
@@ -10,7 +12,9 @@ final class TypingSession(
   val global: TypingGlobalState,
   emptyTypeParams: TypeParamScope
 ) {
-  private val unitContexts = HashMap[AST.CompilationUnit, TypingUnitContext]()
+  // Identity-keyed: a structural key would hash the entire compilation unit.
+  private val unitContexts: scala.collection.mutable.Map[AST.CompilationUnit, TypingUnitContext] =
+    new java.util.IdentityHashMap[AST.CompilationUnit, TypingUnitContext]().asScala
   private var activeContext: TypingUnitContext = null
 
   def activate(unit: AST.CompilationUnit): TypingUnitContext = {

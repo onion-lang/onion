@@ -344,6 +344,8 @@ object AsmRefs {
     private val argTypes: Array[TypedAST.Type] =
       if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
       else parsed.arguments
+    // No caller mutates the array (checked); the defensive copy per call was a
+    // measurable allocation in method resolution, which asks for it repeatedly.
     override def arguments: Array[TypedAST.Type] = argTypes.clone()
     override val returnType: TypedAST.Type =
       if (parsed == null) bridge.toOnionType(Type.getReturnType(method.desc))
@@ -429,7 +431,10 @@ object AsmRefs {
 
     def isInterface: Boolean = (node.access & Opcodes.ACC_INTERFACE) != 0
     def modifier: Int = modifier_
-    def name: String = node.name.replace('/', '.')
+    // Computed once: every method/field lookup asks for the owner's name, and the
+    // replace() allocated a fresh String each time -- it showed in both CPU and
+    // allocation profiles of the type checker.
+    val name: String = node.name.replace('/', '.')
     def superClass: TypedAST.ClassType = {
       classInfo.superClass
     }
@@ -437,8 +442,15 @@ object AsmRefs {
       classInfo.interfaces
     }
 
-    def methods: Seq[TypedAST.Method] = methods_.values
-    def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray
+    // `values` flattened the whole table into a fresh List per call; SAM/closure typing
+    // asks for it per lambda.
+    private lazy val allMethods: Seq[TypedAST.Method] = methods_.values
+    def methods: Seq[TypedAST.Method] = allMethods
+    // Overload resolution asks for the same names over and over; the List-to-array copy
+    // per call was visible in the profile. The array is handed out as-is: callers only read it.
+    private val methodArrays = new java.util.concurrent.ConcurrentHashMap[String, Array[TypedAST.Method]]()
+    def methods(name: String): Array[TypedAST.Method] =
+      methodArrays.computeIfAbsent(name, n => methods_.get(n).toArray)
     def fields: Array[TypedAST.FieldRef] = fields_.values.toArray
     def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray

@@ -14,7 +14,7 @@ final case class TypeParam(name: String, variableType: TypedAST.TypeVariableType
 
 final case class TypeParamScope(params: Map[String, TypeParam]) {
   def get(name: String): Option[TypeParam] = params.get(name)
-  def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
+  def ++(ps: Seq[TypeParam]): TypeParamScope = if (ps.isEmpty) this else copy(params ++ ps.map(p => p.name -> p))
 }
 
 final case class TypeAliasEntry(
@@ -93,7 +93,7 @@ class NameResolver(private val context: NameResolutionContext) {
           context.createFQCN(moduleName, name)
         }
       val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-        if (!qualified) {
+        if (!qualified && context.typeAliases.nonEmpty) {
           imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
         } else None
       }
@@ -117,7 +117,7 @@ class NameResolver(private val context: NameResolutionContext) {
               context.createFQCN(moduleName, name)
             }
           val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-            if (!qualified) {
+            if (!qualified && context.typeAliases.nonEmpty) {
               imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
             } else None
           }
@@ -168,6 +168,8 @@ class NameResolver(private val context: NameResolutionContext) {
       null
   }
 
+  private lazy val scanMemo = context.table.importScanMemo(imports)
+
   private def forName(name: String, qualified: Boolean): ClassType = {
     if (qualified) {
       val direct = context.table.loadOrNull(name)
@@ -181,11 +183,32 @@ class NameResolver(private val context: NameResolutionContext) {
         if (local != null) {
           local
         } else {
-          imports.iterator
-            .flatMap(_.matches(name))
-            .map(fqcn => forName(fqcn, qualified = true))
-            .find(_ != null)
-            .orNull
+          // The import scan is the expensive path: every on-demand import yields a candidate
+          // FQCN, each candidate is looked up and, on a miss, retried as a nested-class name.
+          // The same simple name is resolved many times per unit, so the outcome is memoized
+          // per resolver. A negative outcome is only trusted while no class has been added
+          // to the table since it was recorded -- a class registered later could turn it
+          // positive -- which the local class count tracks.
+          val generation = context.table.classes.size
+          scanMemo.get(name) match {
+            case Some((found, gen)) if found != null || gen == generation => found
+            case _ =>
+              val found = imports.iterator
+                .flatMap(_.matches(name))
+                .map(fqcn => {
+                  // A candidate the imports produced is already qualified: it is a class,
+                  // or a nested class under a class the same prefix names (`java.util.Map.*`
+                  // yielding `java.util.Map.Entry`). Feeding it back through the import
+                  // scan, as `forName(_, qualified = true)` did, generated further
+                  // candidates such as `java.lang.onion$Object` for each one.
+                  val direct = context.table.loadOrNull(fqcn)
+                  if (direct != null) direct else forDollarNested(fqcn)
+                })
+                .find(_ != null)
+                .orNull
+              scanMemo(name) = (found, generation)
+              found
+          }
         }
       }
     }
@@ -196,22 +219,40 @@ class NameResolver(private val context: NameResolutionContext) {
    * java.util.Map$Entry (resolving the head through imports), and
    * a.b.C.D tries a.b.C$D and deeper $-joined variants.
    */
+  /**
+   * a.b.C.D -> a.b.C$D, a.b$C$D, ... -- but only under an outer class that exists. The
+   * unconditional form turned every miss into a fan of misses: `onion.Object` (absent)
+   * became `onion$Object`, which went back through the import scan as an unqualified
+   * name and produced eight more classpath probes, for every name in every unit.
+   */
+  private def forDollarNested(name: String): ClassType = {
+    if (!name.contains(".")) return null
+    val parts = name.split('.')
+    var i = parts.length - 1
+    while (i >= 1) {
+      val outer = parts.take(i).mkString(".")
+      if (context.table.loadOrNull(outer) != null) {
+        val found = context.table.loadOrNull(outer + "$" + parts.drop(i).mkString("$"))
+        if (found != null) return found
+      }
+      i -= 1
+    }
+    null
+  }
+
   private def forNestedName(name: String): ClassType = {
     if (!name.contains(".")) return null
-    val parts = name.split("\\.")
-    // a.b.C.D -> a.b.C$D, a.b$C$D, ...
-    val dollarVariants = (parts.length - 1 to 1 by -1).iterator.map { i =>
-      parts.take(i).mkString(".") + "$" + parts.drop(i).mkString("$")
-    }
-    dollarVariants.map(context.table.loadOrNull).find(_ != null).getOrElse {
-      // Head resolved through imports: Map.Entry with java.util.Map imported
-      val rest = parts.tail.mkString("$")
-      imports.iterator
-        .flatMap(_.matches(parts.head))
-        .map(fqcn => context.table.loadOrNull(fqcn + "$" + rest))
-        .find(_ != null)
-        .orNull
-    }
+    val nested = forDollarNested(name)
+    if (nested != null) return nested
+    val parts = name.split('.')
+    // Head resolved through imports: Map.Entry with java.util.Map imported
+    val rest = parts.tail.mkString("$")
+    imports.iterator
+      .flatMap(_.matches(parts.head))
+      .filter(fqcn => context.table.loadOrNull(fqcn) != null)
+      .map(fqcn => context.table.loadOrNull(fqcn + "$" + rest))
+      .find(_ != null)
+      .orNull
   }
 
   private def resolveTypeAlias(entry: TypeAliasEntry, typeArgs: List[Type]): Type = {

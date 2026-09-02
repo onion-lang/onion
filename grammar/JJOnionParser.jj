@@ -642,10 +642,14 @@ public class JJOnionParser implements Parser {
   private static int parseIntLiteral(String content) throws ParseException {
     try {
       long lv;
-      boolean radix = content.matches("0[xXbB].*");
-      if (content.matches("0[xX].*"))      lv = Long.parseLong(content.substring(2), 16);
-      else if (content.matches("0[bB].*")) lv = Long.parseLong(content.substring(2), 2);
-      else                                  lv = Long.parseLong(content);
+      // Prefix tests, not String.matches(): each matches() call compiled a fresh
+      // regex, three per integer literal, which put literal parsing on the profile.
+      boolean hex = content.length() > 2 && content.charAt(0) == '0' && (content.charAt(1) == 'x' || content.charAt(1) == 'X');
+      boolean bin = content.length() > 2 && content.charAt(0) == '0' && (content.charAt(1) == 'b' || content.charAt(1) == 'B');
+      boolean radix = hex || bin;
+      if (hex)      lv = Long.parseLong(content.substring(2), 16);
+      else if (bin) lv = Long.parseLong(content.substring(2), 2);
+      else          lv = Long.parseLong(content);
       if (radix) { if (lv < 0L || lv > 0xFFFFFFFFL) throw new ParseException("integer literal out of range: " + content); }
       else       { if (lv < Integer.MIN_VALUE || lv > 2147483648L) throw new ParseException("integer literal out of range for Int: " + content); }
       return (int) lv;
@@ -2200,8 +2204,11 @@ void eos() :{} {
 }
 
 void eols() :{} {
-  // Lookahead reduces choice conflicts with EOL-consuming constructs.
-  ( LOOKAHEAD(2) <EOL> )*
+  // A semantic lookahead on the next token: it settles the choice conflict with
+  // EOL-consuming constructs like the LOOKAHEAD(2) it replaces, but as a kind test
+  // instead of a scan -- this loop runs at every line end and was the hottest lookahead
+  // in the parser profile.
+  ( LOOKAHEAD({ getToken(1).kind == EOL }) <EOL> )*
 }
 
 void eos_or_block_end() :{} {

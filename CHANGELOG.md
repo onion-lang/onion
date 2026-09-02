@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`onion.Option`'s and `onion.Result`'s full instance-method sets.** `docs/reference/stdlib.md`
+  and its Japanese translation documented only part of each interface — `isDefined`/`isEmpty`/`get`/
+  `orElseThrow`/`forEach` were missing from `Option`, and `isOk`/`isErr`/`get`/`getError`/
+  `getOrThrow`/`forEach`/`forEachError` were missing from `Result`. A new
+  `OptionResultDocCoverageSpec` guards both interfaces' full member sets against both files
+  going forward.
 - **`onion.Colls`'s factories and list/set/map utilities.** `docs/reference/stdlib.md` and
   its Japanese translation only ever documented a handful of `Colls`'s members; `setOf`,
   `mapOf`/`mutableMapOf`/`entry`, `emptyList`/`emptySet`/`emptyMap`, `mutableSetOf`,

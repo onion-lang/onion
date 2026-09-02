@@ -786,9 +786,11 @@ Access iteration utilities for collections and arrays:
 Provided via `onion.Option`.
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
+- `opt.isDefined()` / `opt.isEmpty()` / `opt.get()` — `get()` throws `NoSuchElementException` on `None`
 - `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElseThrow()` / `opt.orElseThrow(() -> customException)`
 - `opt.orElse(otherOption)`
-- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)` / `opt.forEach(action)`
 - `opt.contains(value)` / `opt.exists(predicate)`
 - `opt.fold(() -> ifEmpty, v -> ifPresent)` — collapse to a single value
 - `opt.toList()` — zero- or one-element list
@@ -799,8 +801,11 @@ Provided via `onion.Result`.
 
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
+- `res.isOk()` / `res.isErr()` / `res.get()` / `res.getError()` — `get()` throws on `Err`, `getError()` throws on `Ok`
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 - `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.getOrThrow()` / `res.getOrThrow(e -> customException)` — throws the error (wrapped if not a `Throwable`) or a mapped exception
+- `res.forEach(action)` / `res.forEachError(action)`
 - `res.fold(e -> ifErr, v -> ifOk)` — collapse to a single value
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — rescue an `Err`
 - `res.exists(predicate)` / `res.toList()`

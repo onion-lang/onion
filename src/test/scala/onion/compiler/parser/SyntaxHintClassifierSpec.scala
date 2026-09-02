@@ -656,6 +656,27 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
     }
 
+    it("recognizes a Scala-style `case class` declaration") {
+      val hint = classify(
+        found = "case",
+        expected = "\"abstract\", \"class\", \"record\", \"def\"",
+        sourceLine = "case class Point(x: Int, y: Int)"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.case_class_declaration"
+      hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
+    }
+
+    it("strips val/var from a Scala-style `case class` declaration's components") {
+      val hint = classify(
+        found = "case",
+        sourceLine = "case class Point(val x: Int, val y: Int)"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.case_class_declaration"
+      hint.arguments shouldBe Seq("Point", "x: Int, y: Int")
+    }
+
     it("recognizes a Rust/Go/Swift/C#/TS-style `struct` declaration") {
       val hint = classify(
         found = "Point",

@@ -1,0 +1,66 @@
+package onion.compiler.tools
+
+import org.scalatest.funspec.AnyFunSpec
+
+/**
+ * Coverage guard for the `Colls` module docs.
+ *
+ * `onion.Colls` is a large factory/pipeline module (`Colls::listOf`, `Colls::setOf`,
+ * `Colls::chunked`, ...), but docs/reference/stdlib.md and docs/ja/reference/stdlib.md only
+ * ever documented a handful of its members -- most Colls operations are meant to be called
+ * as List/Map/Set extension methods (`xs.map { ... }`, not `Colls::map(xs, ...)`), so this
+ * guard looks for each member name anywhere in the file rather than requiring the
+ * `Colls::name` static-call spelling (contrast `OnionMathDocCoverageSpec`, whose module has
+ * no such extension-method form).
+ *
+ * Arity-suffixed overload-resolution helpers (`listOf0`, `setOf3`, `mapOf1`,
+ * `mutableSetOf2`, ...) exist only so the compiler can dispatch a call written as
+ * `Colls::listOf(a, b, c)` -- Onion code never spells the suffixed name -- so they are
+ * excluded from the guard; the varargs name they back (`listOf`, `setOf`, `mapOf`,
+ * `mutableSetOf`) is still required.
+ */
+class CollsDocCoverageSpec extends AnyFunSpec {
+
+  private def read(p: String): String =
+    java.nio.file.Files.readString(java.nio.file.Path.of(p))
+
+  private def documentedNames(doc: String, names: Set[String]): Set[String] =
+    names.filter(n => s"\\b${java.util.regex.Pattern.quote(n)}\\b".r.findFirstIn(doc).isDefined)
+
+  private val arityOverloadHelper = """^(?:listOf|setOf|mapOf|mutableSetOf)\d+$""".r
+
+  private lazy val actualNames: Set[String] = {
+    val c = classOf[onion.Colls]
+    val methodNames = c.getMethods
+      .filter(m => java.lang.reflect.Modifier.isStatic(m.getModifiers))
+      .filter(_.getDeclaringClass == c)
+      .map(_.getName)
+      .filterNot(arityOverloadHelper.matches)
+    methodNames.toSet
+  }
+
+  it("actual onion.Colls exposes the names this guard assumes (sanity check)") {
+    assert(actualNames.nonEmpty, "reflection on onion.Colls found no static members -- the scan has rotted")
+  }
+
+  it("docs/reference/stdlib.md documents every onion.Colls member") {
+    val documented = documentedNames(read("docs/reference/stdlib.md"), actualNames)
+    val missing = actualNames -- documented
+    assert(missing.isEmpty,
+      s"docs/reference/stdlib.md is missing Colls:: members: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("docs/ja/reference/stdlib.md documents every onion.Colls member") {
+    val documented = documentedNames(read("docs/ja/reference/stdlib.md"), actualNames)
+    val missing = actualNames -- documented
+    assert(missing.isEmpty,
+      s"docs/ja/reference/stdlib.md is missing Colls:: members: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("\"Modules at a glance\" mentions Colls in both languages") {
+    assert(read("docs/reference/stdlib.md").contains("Colls"),
+      "docs/reference/stdlib.md's overview table should mention Colls")
+    assert(read("docs/ja/reference/stdlib.md").contains("Colls"),
+      "docs/ja/reference/stdlib.md's overview table should mention Colls")
+  }
+}

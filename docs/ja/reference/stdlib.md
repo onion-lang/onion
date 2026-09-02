@@ -1498,9 +1498,48 @@ parsed.positional()                     // オプション以外の引数の Lis
 Colls::listOf("a", "b", "c")            // 不変の List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::rangeWithStep(0, 10, 2)          // List [0,2,4,6,8]
 Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
 // xs.map { x -> x * 2 }.filter { x -> x > 0 }
+```
+
+### 追加のファクトリ: Set・Map・空のコレクション
+
+```onion
+Colls::setOf("a", "b", "c")             // 不変の Set（反復順序は保証されない）
+Colls::mutableSetOf(1, 2, 3)            // HashSet
+
+Colls::entry("name", "Alice")           // mapOf/mutableMapOf 用の Map.Entry
+Colls::mapOf(Colls::entry("name", "Alice"), Colls::entry("age", "30"))   // 不変の Map、挿入順を保持
+Colls::mutableMapOf(Colls::entry("x", 1))                               // HashMap
+
+Colls::emptyList()                      // []
+Colls::emptySet()                       // 空の Set
+Colls::emptyMap()                       // 空の Map
+```
+
+### List・Set・Map のユーティリティ
+
+`Colls` の他のメソッドと同様、最初の引数（list/map）に対する拡張メソッドとしても
+呼び出せ、パイプラインとして連結できる:
+
+```onion
+xs.concat(ys)                     // xs の要素に続けて ys の要素
+[[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
+xs.partition { x -> x > 1 }       // [matching, nonMatching] - 2つの List
+xs.toSet()                        // xs の要素から作った Set
+xs.distinct()                     // 重複を除去、最初に出現した順を保持
+xs.slice(0, 2)                    // [0, 2) の部分リスト、範囲内にクランプ
+xs.sorted()                       // 昇順の新しい List（要素は Comparable である必要がある）
+xs.sortedByDescending { x -> x }  // sortedBy と同様だが降順
+xs.head()                         // 先頭要素、空ならnull（first の別名）
+xs.tail()                         // 先頭要素を除いた残り（空リストでは例外）
+xs.takeWhile { x -> x < 3 }       // 述語を満たす先頭の連続部分
+xs.dropWhile { x -> x < 3 }       // その先頭の連続部分を取り除いた残り
+xs.mkString(", ")                 // "1, 2, 3" - 要素を文字列として連結（join は別名）
+Colls::isNotEmpty(xs)             // true - isEmpty の否定
+m.filterMap { k, v -> k == "name" }   // 条件に合うエントリだけの Map
 ```
 
 ### バッチ化・ウィンドウ化・セレクタ集計

@@ -75,9 +75,20 @@ final class ClosureTyping(
 
       val inferredReturnType =
         if ((inferredTarget == null || needsReturnTypeInference) && node.typeRef.isRelaxed) {
-          val inferred =
-            if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes, samReturnTemplate)
-            else inferReturnTypeFromReturns(node, context, argTypes, samReturnTemplate)
+          // Memoized like inferBodyReturnType: the bidirectional call path types the same
+          // closure against the same template more than once per call site.
+          val inferred = {
+            val key = (node, argTypes.toList, samReturnTemplate)
+            val cached = returnInferenceMemo.get(key)
+            if (cached != null) cached
+            else {
+              val computed =
+                if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes, samReturnTemplate)
+                else inferReturnTypeFromReturns(node, context, argTypes, samReturnTemplate)
+              returnInferenceMemo.put(key, computed)
+              computed
+            }
+          }
           // A closure whose only produced value is `null` widens to Object: a
           // null-typed slot carries no information and Object is the honest
           // static type.
@@ -378,9 +389,25 @@ final class ClosureTyping(
     }
   }
 
-  private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] =
-    if (containsReturn(node.body)) inferReturnTypeFromReturns(node, context, argTypes)
-    else inferReturnTypeFromExpressionBody(node, context, argTypes)
+  // SAM disambiguation asks this once per candidate overload, and the candidates of one
+  // call site nearly always hand the lambda the same parameter types -- so the speculative
+  // typing of the body (a full walk under suppressed reporting) is memoized per
+  // (closure, parameter types). Types are interned, so the list compares by identity.
+  private val bodyReturnMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type]), Option[Type]]()
+  private val returnInferenceMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type], Type), Option[Type]]()
+
+  private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] = {
+    val key = (node, argTypes.toList)
+    val cached = bodyReturnMemo.get(key)
+    if (cached != null) cached
+    else {
+      val result =
+        if (containsReturn(node.body)) inferReturnTypeFromReturns(node, context, argTypes)
+        else inferReturnTypeFromExpressionBody(node, context, argTypes)
+      bodyReturnMemo.put(key, result)
+      result
+    }
+  }
 
   /**
    * If `tp` is exactly a boxed-primitive wrapper (java.lang.Integer, ...),
@@ -417,7 +444,7 @@ final class ClosureTyping(
     // Unassigned lambda parameters behave like vals so smart casts apply
     val assigned =
       if (closureBody == null) args.map(_.name).toSet
-      else AssignedVariableScanner.scan(closureBody)
+      else bodyContext.assignedNames(closureBody) // memoized: this runs once per candidate overload
     var i = 0
     while (i < args.length) {
       val arg = args(i)

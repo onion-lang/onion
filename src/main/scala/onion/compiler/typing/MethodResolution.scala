@@ -86,7 +86,7 @@ private[compiler] object MethodResolution {
       case ct: AppliedClassType =>
         val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
         findMethodsWithViews(ct, name, params, views, table)
-      case ct: ClassType if requiresSpecializedViews(ct) =>
+      case ct: ClassType if table.specializedViewsRequired(ct)(requiresSpecializedViews(ct)) =>
         val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
         findMethodsWithViews(ct, name, params, views, table)
       case ct: ClassType =>
@@ -124,25 +124,29 @@ private[compiler] object MethodResolution {
     views: scala.collection.immutable.Map[ClassType, AppliedClassType],
     table: ClassTable
   ): Array[Method] =
-    val candidates = new JTreeSet[Method](new MethodComparator)
     val support = new MethodResolutionSupport(views, params, table)
 
-    def collectMethods(tp: ObjectType): Unit =
-      if tp == null then return
-      val own = tp.methods(name)
-      var i = 0
-      while i < own.length do
-        candidates.add(own(i))
-        i += 1
-      collectMethods(tp.superClass)
-      val ifaces = tp.interfaces
-      var j = 0
-      while j < ifaces.length do
-        collectMethods(ifaces(j))
-        j += 1
-
-    collectMethods(target)
-    val applicableMethods = candidates.asScala.filter(support.applicable).toList
+    // The candidate set depends on (receiver, name) only; it is collected once per
+    // compilation and the per-call work is the applicability filter below.
+    val all = table.methodCandidatesOf(target, name) {
+      val candidates = new JTreeSet[Method](new MethodComparator)
+      def collectMethods(tp: ObjectType): Unit =
+        if tp == null then return
+        val own = tp.methods(name)
+        var i = 0
+        while i < own.length do
+          candidates.add(own(i))
+          i += 1
+        collectMethods(tp.superClass)
+        val ifaces = tp.interfaces
+        var j = 0
+        while j < ifaces.length do
+          collectMethods(ifaces(j))
+          j += 1
+      collectMethods(target)
+      candidates.toArray(new Array[Method](0))
+    }
+    val applicableMethods = all.iterator.filter(support.applicable).toList
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)
 

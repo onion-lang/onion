@@ -46,8 +46,8 @@ private[compiler] final class CallOverloadSupport(
     mappedTypeArgs: Option[Array[Type]] = None,
     reportExplicitTypeArgErrors: Boolean = false
   ): List[ApplicableMethod] =
+    val classSubst = TypeSubstitution.classSubstitution(typeRef) // same for every candidate
     candidates.flatMap { method =>
-      val classSubst = TypeSubstitution.classSubstitution(typeRef)
       val methodSubstOpt = mappedTypeArgs match {
         case Some(mapped) =>
           GenericMethodTypeArguments.explicitFromMappedArgs(
@@ -86,6 +86,7 @@ private[compiler] final class CallOverloadSupport(
     }
     val argsCount = params.length
 
+    val classSubst = TypeSubstitution.classSubstitution(receiverType) // same for every candidate
     candidates.flatMap { method =>
       val methodArgCount = method.arguments.length
       val countOk =
@@ -94,7 +95,6 @@ private[compiler] final class CallOverloadSupport(
 
       if (!countOk) None
       else {
-        val classSubst = TypeSubstitution.classSubstitution(receiverType)
         // Applicability collection: suppress bound errors so a discarded bounded
         // overload cannot leak its constraint onto the call (issue #298).
         val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, knownParams, classSubst, expected, reportErrors = false)

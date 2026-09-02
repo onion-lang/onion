@@ -729,8 +729,21 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitStatements(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String): Unit =
     emitStatementsWithContext(gen, stmts, className, new LocalVarContext(gen))
 
+  // One visitor per (generator, locals): local-variable emission re-enters here mid-body,
+  // and a fresh visitor each time threw away its per-method caches (call shapes, the last
+  // emitted line) and re-allocated its emitters.
+  private var lastVisitor: AsmCodeGenerationVisitor = null
+  private var lastVisitorGen: GeneratorAdapter = null
+  private var lastVisitorLocals: LocalVarContext = null
+  private var lastVisitorClass: String = null
+
   private def withVisitor(gen: GeneratorAdapter, className: String, localVars: LocalVarContext)(action: AsmCodeGenerationVisitor => Unit): Unit =
-    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+    val visitor =
+      if (lastVisitor != null) && (lastVisitorGen eq gen) && (lastVisitorLocals eq localVars) && (lastVisitorClass == className) then lastVisitor
+      else
+        val v = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+        lastVisitor = v; lastVisitorGen = gen; lastVisitorLocals = localVars; lastVisitorClass = className
+        v
     action(visitor)
 
   private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit =

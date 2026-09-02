@@ -49,6 +49,9 @@ class LocalFrame(val parent: LocalFrame) {
   def namesByIndex: Map[Int, String] =
     allScopes.iterator.flatMap(_.bindingEntries.map { case (name, binding) => binding.index -> name }).toMap
 
+  /** Every binding of every scope of this frame, unsorted. */
+  def allBindings: Iterator[LocalBinding] = allScopes.iterator.flatMap(_.bindingEntries.map(_._2))
+
   /** The same relation as `namesByIndex` as an array (null = no name), which is what codegen needs. */
   def namesArray: Array[String] = {
     var max = -1

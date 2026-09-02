@@ -35,9 +35,21 @@ object AssignedVariableScanner {
       case _ => acc // field/index assignment doesn't rebind the local name
     }
 
+    // Only the nodes typing asks about are memoized -- method bodies and the control-flow
+    // expressions whose branches it inspects. Recording every node made the memo writes
+    // the walk's dominant cost; a miss on any other node is just a (small) re-walk.
+    def memoizable(n: AST.Node): Boolean = n match {
+      case _: AST.BlockExpression | _: AST.IfExpression | _: AST.WhileExpression | _: AST.DoWhileExpression |
+           _: AST.ForExpression | _: AST.ForeachExpression | _: AST.SelectExpression | _: AST.TryExpression => true
+      case _ => false
+    }
+
     def visitNode(n: AST.Node): Set[String] = {
-      val cached = memo.get(n)
-      if (cached != null) return cached
+      val remember = memoizable(n)
+      if (remember) {
+        val cached = memo.get(n)
+        if (cached != null) return cached
+      }
       var acc: Set[String] = n match {
         case b: AST.BinaryExpression if b.symbol.endsWith("=") && !comparisonSymbols.contains(b.symbol) =>
           target(b.lhs, Set.empty)
@@ -57,7 +69,7 @@ object AssignedVariableScanner {
           }
         case _ =>
       }
-      memo.put(n, acc)
+      if (remember) memo.put(n, acc)
       acc
     }
 

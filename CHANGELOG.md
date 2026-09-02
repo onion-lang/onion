@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Type checking and code generation shed repeated work** (about 10% of a warm
+  compilation over the whole `run/` corpus, 13% of type checking):
+  - The overload candidates of a (receiver type, method name) pair are collected once per
+    compilation instead of by a hierarchy walk at every call site, and whether a class's
+    hierarchy needs specialized views is memoized per class.
+  - A lambda argument's speculative body typing -- run once per candidate overload to tell
+    a value-returning body from a void one, and again for return-type inference -- is
+    memoized per (closure, parameter types, expected template); the assigned-variable scan
+    inside it goes through the per-unit memo as well.
+  - String interpolation resolves `StringBuilder.append`/`toString` once per part type
+    instead of per part; the class substitution of an overload set is computed once, not
+    per candidate.
+  - The AST/typed-node binding index keeps one map; the reverse lookup only the REPL and
+    debug output make scans it.
+  - Code generation reuses one visitor per method (local-variable emission re-entered
+    with a fresh one, discarding its caches), caches ASM object types by name, and walks
+    frame bindings without sorting; the assigned-variable scan memoizes only the block and
+    control-flow nodes typing asks about.
+
 ## [0.36.0] - 2026-09-03
 
 ### Changed

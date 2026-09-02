@@ -16,20 +16,25 @@ final class AstBindingIndex {
   // Presized: a few thousand bindings per unit is ordinary, and IdentityHashMap doubles
   // by copying, which showed up as resize() in profiles when it started at the default 32.
   private val astToTypedJ = new java.util.IdentityHashMap[AST.Node, TypedAST.Node](1024)
-  private val typedToAstJ = new java.util.IdentityHashMap[TypedAST.Node, AST.Node](1024)
   private val astToTyped: scala.collection.mutable.Map[AST.Node, TypedAST.Node] = astToTypedJ.asScala
-  private val typedToAst: scala.collection.mutable.Map[TypedAST.Node, AST.Node] = typedToAstJ.asScala
 
-  def bind(ast: AST.Node, typed: TypedAST.Node): Unit = {
-    astToTyped(ast) = typed
-    typedToAst(typed) = ast
-  }
+  // One put per typed node. The reverse direction used to be a second identity map
+  // maintained on every bind, for a lookup only the REPL and debug artifacts make; those
+  // scan the forward map instead.
+  def bind(ast: AST.Node, typed: TypedAST.Node): Unit =
+    astToTypedJ.put(ast, typed)
 
   def typedOf(ast: AST.Node): Option[TypedAST.Node] =
     astToTyped.get(ast)
 
-  def astOf(typed: TypedAST.Node): Option[AST.Node] =
-    typedToAst.get(typed)
+  def astOf(typed: TypedAST.Node): Option[AST.Node] = {
+    val it = astToTypedJ.entrySet().iterator()
+    while (it.hasNext) {
+      val e = it.next()
+      if (e.getValue eq typed) return Some(e.getKey)
+    }
+    None
+  }
 
   /**
    * A read-only, identity-keyed view for debug artifacts and the REPL, which look up node

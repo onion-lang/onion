@@ -76,6 +76,12 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*struct\s+([A-Za-z_]\w*)\b""".r
   private val KotlinScalaStyleObjectDeclaration =
     """^\s*object\s+([A-Za-z_]\w*)\b""".r
+  // A Kotlin-style `companion object { ... }` nested inside a class body -- unlike
+  // the top-level singleton `object` above, `companion` isn't a reserved word either,
+  // so it parses as a bare identifier statement with `object` reading as a stray
+  // second token, same failure mode as the other bare-leading-keyword mistakes here.
+  private val CompanionObjectDeclaration =
+    """^\s*companion\s+object\b""".r
   private val ValVarParamPrefix = """^(?:val|var)\s+""".r
   private val FunDeclaration = """\b(?:fun|func|fn|function)\s+[A-Za-z_]\w*\s*\(""".r
   private val FunExtensionDeclaration =
@@ -265,6 +271,8 @@ private[compiler] object SyntaxHintClassifier {
       case _ if KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         val matched = KotlinScalaStyleObjectDeclaration.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.object_declaration", matched.group(1))
+      case _ if CompanionObjectDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.companion_object_declaration")
       case _ if GoStyleShortVarDecl.findFirstMatchIn(sourceLine).isDefined =>
         val matched = GoStyleShortVarDecl.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.go_style_short_var_decl", matched.group(1), matched.group(2).trim)

@@ -1,0 +1,140 @@
+// UnionFind.on — Disjoint-set (union-find) with path compression and union by
+// rank, used for connected-component counting, cycle detection while building
+// a graph incrementally, and Kruskal's minimum-spanning-tree algorithm.
+// Exercises: records, class with mutable array state, private: sections,
+// generics (a generic wrapper over the raw Int-indexed structure), foreach/
+// while, string interpolation, collection pipelines (sortedBy/map/fold),
+// nullable-free control flow, extension methods.
+
+import {
+  java.util.ArrayList;
+  onion.Assert;
+}
+
+// ─── Disjoint-set over node indices 0..n-1 ────────────────────────────────────
+class DisjointSet {
+  val parent: Int[]
+  val rank: Int[]
+  var components: Int
+public:
+  def this(n: Int) {
+    parent = new Int[n]
+    rank = new Int[n]
+    for var i: Int = 0; i < n; i++ {
+      parent[i] = i
+      rank[i] = 0
+    }
+    components = n
+  }
+
+  // Path-compressed find: every visited node is repointed straight at the root.
+  def find(x: Int): Int {
+    var root = x
+    while parent[root] != root {
+      root = parent[root]
+    }
+    var cur = x
+    while parent[cur] != root {
+      val next = parent[cur]
+      parent[cur] = root
+      cur = next
+    }
+    return root
+  }
+
+  // Unions the sets containing a and b; returns false when they were already
+  // joined (the edge would close a cycle).
+  def union(a: Int, b: Int): Boolean {
+    val ra = find(a)
+    val rb = find(b)
+    if ra == rb {
+      return false
+    }
+    if rank[ra] < rank[rb] {
+      parent[ra] = rb
+    } else if rank[ra] > rank[rb] {
+      parent[rb] = ra
+    } else {
+      parent[rb] = ra
+      rank[ra] = rank[ra] + 1
+    }
+    components = components - 1
+    return true
+  }
+
+  def connected(a: Int, b: Int): Boolean = find(a) == find(b)
+
+  def componentCount(): Int = components
+}
+
+// ─── Weighted graph edge ──────────────────────────────────────────────────────
+record Edge(from: Int, to: Int, weight: Int) {
+public:
+  def describe(names: List[String]): String =
+    "#{names[from()]} -- #{names[to()]} (#{weight()})"
+}
+
+record MstResult(edges: List[Edge], totalWeight: Int, componentsLeft: Int)
+
+// Kruskal's algorithm: sort edges by weight, greedily accept any edge that
+// joins two still-separate components.
+def kruskalMst(n: Int, edges: List[Edge]): MstResult {
+  val ds = new DisjointSet(n)
+  val accepted = new ArrayList[Edge]()
+  var total = 0
+  val sorted = edges.sortedBy { e -> (e as Edge).weight() }
+  foreach e: Edge in sorted {
+    if ds.union(e.from(), e.to()) {
+      accepted.add(e)
+      total = total + e.weight()
+    }
+  }
+  return new MstResult(accepted, total, ds.componentCount())
+}
+
+def main(): void {
+  val names = ["Aldergrove", "Birchford", "Cedarholm", "Duskvale", "Elmshire", "Fernbrook", "Glenmoor"]
+  val n = names.size
+
+  IO::println("== Union-Find: incremental cycle detection ==")
+  val ds = new DisjointSet(n)
+  val proposedRoads = [
+    new Edge(0, 1, 4), new Edge(1, 2, 2), new Edge(0, 2, 5),
+    new Edge(2, 3, 7), new Edge(3, 4, 3), new Edge(4, 5, 6),
+    new Edge(1, 4, 9), new Edge(5, 6, 1), new Edge(2, 5, 8)
+  ]
+  foreach road: Edge in proposedRoads {
+    if ds.connected(road.from(), road.to()) {
+      IO::println("  skip #{road.describe(names)}: would close a cycle")
+    } else {
+      ds.union(road.from(), road.to())
+      IO::println("  keep #{road.describe(names)}")
+    }
+  }
+  IO::println("  connected components after greedy pass: #{ds.componentCount()}")
+
+  IO::println("")
+  IO::println("== Kruskal's minimum spanning tree ==")
+  val mst = kruskalMst(n, proposedRoads)
+  foreach e: Edge in mst.edges() {
+    IO::println("  #{(e as Edge).describe(names)}")
+  }
+  IO::println("  total weight: #{mst.totalWeight()}")
+  IO::println("  components left unconnected: #{mst.componentsLeft()}")
+
+  IO::println("")
+  IO::println("== A disconnected graph leaves more than one component ==")
+  val ds2 = new DisjointSet(6)
+  val islandEdges = [new Edge(0, 1, 1), new Edge(2, 3, 1), new Edge(4, 5, 1)]
+  foreach e: Edge in islandEdges {
+    ds2.union(e.from(), e.to())
+  }
+  IO::println("  6 nodes, 3 disjoint edges -> #{ds2.componentCount()} components")
+  Assert::isTrue(ds2.componentCount() == 3, "expected three separate islands")
+  Assert::isTrue(!ds2.connected(0, 4), "islands 0 and 4 must stay unconnected")
+
+  val totalEdgesUsed = mst.edges().size
+  Assert::isTrue(totalEdgesUsed == n - ds.componentCount(), "MST edge count should be nodes minus components")
+  IO::println("")
+  IO::println("All union-find invariants held.")
+}

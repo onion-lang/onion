@@ -20,6 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The handwritten lexer looks keywords up by length and first character instead of hashing
   every identifier, and no longer builds an identifier's string twice.
 
+## [0.43.0] - 2026-09-03
+
+### Added
+
+- **`run/UnionFind.on`** -- a disjoint-set (union-find) sample with path compression
+  and union by rank, used for incremental cycle detection while building a graph and
+  for Kruskal's minimum-spanning-tree algorithm. `docs/quality-bar.md` (en/ja) updated
+  to the new sample counts (248 total, 188 large programs).
+
+### Fixed
+
+- **Diagnostic for a Scala-style postfix `match` expression (`value match { case ... }`).**
+  `match` isn't a reserved word, so this parsed as a complete statement (`value`)
+  followed by a stray second one (`match { ... }`), falling through to the generic
+  "missing call parentheses" hint (suggesting the nonsensical `value match(...)`) even
+  though the existing `error.parsing.hint.match_not_supported` message already claimed
+  to cover Scala's `match` -- only Rust's prefix `match value { ... }` shape actually
+  triggered it. `ControlFlowSyntaxHints` now recognizes the postfix shape too and
+  points at the same `select` fix. Pinned by a new case in `MatchStatementHintI18nSpec`.
+
 ## [0.42.0] - 2026-09-03
 
 ### Changed

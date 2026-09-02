@@ -52,4 +52,26 @@ class MatchStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     // assertion holds regardless of the JVM's default locale.
     assert(msgs.contains("select"), s"expected the hint's `select` suggestion, got: $msgs")
   }
+
+  it("fires for a Scala-style postfix `expr match { ... }` expression") {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    val src =
+      """
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void {
+        |    val x: Int = 1
+        |    x match {
+        |      case 1:
+        |        IO::println("one")
+        |    }
+        |  }
+        |}
+        |""".stripMargin
+    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+    assert(msgs.contains("select"), s"expected the hint's `select` suggestion, got: $msgs")
+  }
 }

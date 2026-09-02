@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A handwritten recursive-descent parser** (`onion.compiler.parser.OnionParser`) now parses
+  every program the JavaCC parser accepts, producing the identical AST (verified token-for-token
+  and node-for-node over the whole example corpus). It decides by token kinds instead of
+  JavaCC's re-scanning lookaheads, and places interpolated expressions by offset instead of
+  padding their text. Anything it cannot parse is re-parsed by the JavaCC parser, which keeps
+  owning error recovery, expected-token sets and syntax hints, so diagnostics are unchanged.
+  Warm parsing of the corpus takes about 60% of the time it did; `-Donion.parser.javacc=true`
+  disables the fast path.
+- The handwritten lexer looks keywords up by length and first character instead of hashing
+  every identifier, and no longer builds an identifier's string twice.
+
 ## [0.43.0] - 2026-09-03
 
 ### Added

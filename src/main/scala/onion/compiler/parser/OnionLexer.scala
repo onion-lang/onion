@@ -56,27 +56,30 @@ final class OnionLexer(text: String)
   private def advanceTo(index: Int): Unit =
     if index < cursorIndex then
       cursorIndex = -1; cursorLine = 1; cursorColumn = 0; cursorPrevCR = false; cursorPrevLF = false
-    while cursorIndex < index do
-      cursorIndex += 1
-      val c = chars(cursorIndex)
-      cursorColumn += 1
-      if cursorPrevLF then
-        cursorPrevLF = false
-        cursorColumn = 1
-        cursorLine += 1
-      else if cursorPrevCR then
-        cursorPrevCR = false
-        if c == '\n' then cursorPrevLF = true
-        else
-          cursorColumn = 1
-          cursorLine += 1
-      c match
-        case '\r' => cursorPrevCR = true
-        case '\n' => cursorPrevLF = true
-        case '\t' =>
-          cursorColumn -= 1
-          cursorColumn += TabSize - (cursorColumn % TabSize)
-        case _ =>
+    // `cursorPrevLF` doubles as "the next character starts a new line": a line terminator is
+    // counted on its own line and the character after it opens the next one. A CR followed by
+    // LF is one terminator: the CR defers to the LF (JavaCC's SimpleCharStream does the same).
+    var i = cursorIndex
+    var line = cursorLine
+    var col = cursorColumn
+    var newLine = cursorPrevLF
+    while i < index do
+      i += 1
+      val c = chars(i)
+      if newLine then
+        newLine = false
+        col = 1
+        line += 1
+      else col += 1
+      if c == '\n' then newLine = true
+      else if c == '\r' then newLine = !(i + 1 < n && chars(i + 1) == '\n')
+      else if c == '\t' then
+        col -= 1
+        col += TabSize - (col % TabSize)
+    cursorIndex = i
+    cursorLine = line
+    cursorColumn = col
+    cursorPrevLF = newLine
 
   private def lineAt(index: Int): Int = if fast then { advanceTo(index); cursorLine } else lines(index)
   private def columnAt(index: Int): Int = if fast then { advanceTo(index); cursorColumn } else cols(index)
@@ -299,19 +302,19 @@ final class OnionLexer(text: String)
   private def identifierOrScheme(start: Int): Token =
     var i = start + 1
     while i < n && isIdentPart(chars(i)) do i += 1
-    val word = new String(chars, start, i - start)
-    val kw = keywordKind(word)
+    val kw = OnionLexer.keywordKind(chars, start, i)
+    val word = if kw != -1 then null else new String(chars, start, i - start)
     if i < n && chars(i) == '"' then
       val end = rawStringEnd(i + 1)
       if end >= 0 then
         // A scheme string is the longest match. If its prefix is a keyword the grammar's
         // lexical action gives the string back and emits the keyword alone.
         if kw != -1 then return emit(kw, start, i)
-        val kind = word match
-          case "re" => K.RE_STRING
-          case "file" => K.FILE_STRING
-          case "http" => K.HTTP_STRING
-          case _ => K.SCHEME_STRING
+        val kind =
+          if word == "re" then K.RE_STRING
+          else if word == "file" then K.FILE_STRING
+          else if word == "http" then K.HTTP_STRING
+          else K.SCHEME_STRING
         return emit(kind, start, end)
     emit(if kw != -1 then kw else K.ID, start, i)
 
@@ -607,6 +610,38 @@ object OnionLexer:
       kind += 1
     a
 
-  private def keywordKind(word: String): Int =
-    val k = keywords.get(word)
-    if k == null then -1 else k.intValue
+  /**
+   * Keyword lookup without hashing: the keywords are bucketed by length and first character
+   * (every bucket holds one to three words), and a candidate is compared character by
+   * character against the source. Identifiers are far more common than keywords, and most
+   * miss on an empty bucket.
+   */
+  private val kwWords: Array[String] =
+    val words = new java.util.ArrayList[String]()
+    keywords.forEach((w, _) => words.add(w))
+    words.toArray(new Array[String](0))
+  private val kwKinds: Array[Int] = kwWords.map(w => keywords.get(w).intValue)
+  private val kwBuckets: Array[Array[Int]] =
+    val b = new Array[Array[Int]](32 * 128)
+    var i = 0
+    while i < kwWords.length do
+      val w = kwWords(i)
+      val slot = w.length * 128 + w.charAt(0)
+      b(slot) = if b(slot) == null then Array(i) else b(slot) :+ i
+      i += 1
+    b
+
+  private[parser] def keywordKind(chars: Array[Char], start: Int, end: Int): Int =
+    val len = end - start
+    val c0 = chars(start)
+    if len >= 32 || c0 >= 128 then return -1
+    val bucket = kwBuckets(len * 128 + c0)
+    if bucket == null then return -1
+    var bi = 0
+    while bi < bucket.length do
+      val w = kwWords(bucket(bi))
+      var j = 1
+      while j < len && chars(start + j) == w.charAt(j) do j += 1
+      if j == len then return kwKinds(bucket(bi))
+      bi += 1
+    -1

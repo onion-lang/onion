@@ -8,6 +8,7 @@ import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.parser.{
   OnionLexer,
+  OnionParser,
   ExpectedTokenFormatter,
   JJOnionParser,
   ParseException,
@@ -79,6 +80,18 @@ class Parsing(config: CompilerConfig) extends AnyRef
   ): Unit = {
     try {
       val sourceText = stripShebang(source.openReader())
+
+      // Fast path: the handwritten parser. It produces the same AST as the JavaCC parser
+      // for every program the latter accepts, and gives up (Fail) on anything else, in which
+      // case the JavaCC parser below re-parses the file and owns the diagnostics.
+      if (!Parsing.forceJavaCC) {
+        val fast = try OnionParser.parse(sourceText) catch { case _: OnionParser.Fail => null }
+        if (fast != null) {
+          units += fast.copy(sourceFile = source.name)
+          return
+        }
+      }
+
       val parser = new JJOnionParser(new OnionLexer(sourceText))
 
       // Enable error recovery mode to collect multiple errors
@@ -202,4 +215,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
     if (image == null || image.isEmpty) "<EOF>"
     else image.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
+}
+
+object Parsing {
+  /** `-Donion.parser.javacc=true` disables the handwritten fast path (for A/B tests and triage). */
+  private[compiler] val forceJavaCC: Boolean = java.lang.Boolean.getBoolean("onion.parser.javacc")
 }

@@ -11,10 +11,16 @@ rem   ONION_DEBUG_STARTUP show what the JVM thinks of the archive rather than si
 
 set "ONION_JVM_ARGS="
 
+rem The parallel collector: a compile is one short-lived burst of allocation, and G1 costs
+rem it about 10% of its time for nothing (see bin/onion-jvm.sh). A collector named
+rem in ONION_JAVA_OPTS wins -- the JVM refuses two.
+echo.%ONION_JAVA_OPTS% | findstr /C:"GC" >nul
+if errorlevel 1 set "ONION_JVM_ARGS=-XX:+UseParallelGC"
+
 if not defined ONION_CDS_ARCHIVE set "ONION_CDS_ARCHIVE=%ONION_HOME%\lib\onion.jsa"
 
 if defined ONION_GENERATE_CDS (
-    set "ONION_JVM_ARGS=-XX:ArchiveClassesAtExit=%ONION_CDS_ARCHIVE%"
+    set "ONION_JVM_ARGS=%ONION_JVM_ARGS% -XX:ArchiveClassesAtExit=%ONION_CDS_ARCHIVE%"
     goto :eof
 )
 
@@ -24,7 +30,7 @@ rem -Xshare:auto means an archive from another JDK, or from an install that has 
 rem moved, is refused and the JVM carries on normally -- but it says so on stderr every
 rem run, which would leak into anything capturing a tool's output. Silence unless asked.
 if defined ONION_DEBUG_STARTUP (
-    set "ONION_JVM_ARGS=-XX:SharedArchiveFile=%ONION_CDS_ARCHIVE% -Xshare:auto"
+    set "ONION_JVM_ARGS=%ONION_JVM_ARGS% -XX:SharedArchiveFile=%ONION_CDS_ARCHIVE% -Xshare:auto"
 ) else (
-    set "ONION_JVM_ARGS=-XX:SharedArchiveFile=%ONION_CDS_ARCHIVE% -Xshare:auto -Xlog:cds=off -Xlog:cds+dynamic=off"
+    set "ONION_JVM_ARGS=%ONION_JVM_ARGS% -XX:SharedArchiveFile=%ONION_CDS_ARCHIVE% -Xshare:auto -Xlog:cds=off -Xlog:cds+dynamic=off"
 )

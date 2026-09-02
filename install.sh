@@ -139,7 +139,7 @@ echo ""
 echo "Generating class-data-sharing archive (faster startup)..."
 CDS_TMP="$(mktemp /tmp/onion-cds-XXXXXX.on)"
 echo 'IO::println("")' > "$CDS_TMP"
-if java $JVM_FLAGS -XX:ArchiveClassesAtExit="$LIB_DIR/onion.jsa" \
+if java $JVM_FLAGS -XX:+UseParallelGC -XX:ArchiveClassesAtExit="$LIB_DIR/onion.jsa" \
      -cp "$LIB_DIR/onion.jar" onion.tools.OnionCli "$CDS_TMP" >/dev/null 2>&1 \
    && [ -f "$LIB_DIR/onion.jsa" ]; then
   echo "  $LIB_DIR/onion.jsa"
@@ -162,6 +162,14 @@ if [ -z "\$JAVA_HOME" ]; then
 else
     JAVA_CMD="\$JAVA_HOME/bin/java"
 fi
+# The parallel collector: a compile is one short-lived burst of allocation, and G1 costs it
+# about 10% of its time for nothing (see bin/onion-jvm.sh in the distribution). A
+# collector named in ONION_JAVA_OPTS wins -- the JVM refuses two.
+GC_FLAGS=""
+case "\$ONION_JAVA_OPTS" in
+    *GC*) ;;
+    *) GC_FLAGS="-XX:+UseParallelGC" ;;
+esac
 CDS_FLAGS=""
 if [ -f "$LIB_DIR/onion.jsa" ]; then
     # -Xshare:auto means an archive built by a different JDK, or for an install that has
@@ -172,7 +180,7 @@ if [ -f "$LIB_DIR/onion.jsa" ]; then
     [ -z "\$ONION_DEBUG_STARTUP" ] && CDS_FLAGS="\$CDS_FLAGS -Xlog:cds=off -Xlog:cds+dynamic=off"
 fi
 $extra
-exec "\$JAVA_CMD" $JVM_FLAGS \$CDS_FLAGS \$ONION_JAVA_OPTS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
+exec "\$JAVA_CMD" $JVM_FLAGS \$GC_FLAGS \$CDS_FLAGS \$ONION_JAVA_OPTS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
 LAUNCHER
   chmod +x "$BIN_DIR/$name"
   echo "  $BIN_DIR/$name"

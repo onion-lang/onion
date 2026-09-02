@@ -50,7 +50,9 @@ private[compiler] final class TopLevelTypingSupport(
     context.markAsBoxed(CapturedVariableScanner.scanElements(blockElements, Set("args")))
     // A top-level `var` never reassigned across the script body is effectively
     // final and can be smart-cast like a `val` (issue #273).
-    context.setReassignedNames(blockElements.flatMap(AssignedVariableScanner.scan).toSet)
+    context.setReassignedNames(
+      if (unit.topLevelAssignedNames != null) unit.topLevelAssignedNames // recorded by the parser
+      else blockElements.flatMap(AssignedVariableScanner.scan).toSet)
     context.add("args", argsType)
     PreparedUnit(context, statements, fieldInitStatements, klass, argsType, startMethod)
   }

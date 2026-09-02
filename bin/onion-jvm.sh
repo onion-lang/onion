@@ -45,6 +45,17 @@ if [ -r "$_onion_release" ]; then
     fi
 fi
 
+# The parallel collector. A compile is one short-lived burst of allocation; G1's write
+# barriers and concurrent machinery buy it nothing and cost about 10% of both CPU and wall
+# time (whole example corpus, warm: ~720 ms -> ~650 ms per pass). The serial collector
+# spends even less CPU but its single-threaded pauses make the wall time worse, and a cold
+# single-file run is the same under all three. A collector named in ONION_JAVA_OPTS wins
+# -- the JVM refuses two.
+case "$ONION_JAVA_OPTS" in
+    *GC*) ;;
+    *) ONION_JVM_ARGS="$ONION_JVM_ARGS -XX:+UseParallelGC" ;;
+esac
+
 # Application class-data sharing. Starting `onion` on a trivial script loads about 2650
 # classes; sharing them costs ~15 MB on disk and cuts the run roughly in half (measured
 # on JDK 25: 0.68s -> 0.35s for `onion run/Hello.on`).

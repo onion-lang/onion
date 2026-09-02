@@ -200,6 +200,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   var needsBodyRewrite = false
 
   private val assignedScopes = new ArrayBuffer[java.util.HashSet[String]](16)
+  private val unitAssigned = new java.util.HashSet[String]()
+  private def leaveAssignScopeIntoUnit(): Unit = {
+    val s = assignedScopes.remove(assignedScopes.length - 1)
+    if (s != null) unitAssigned.addAll(s)
+  }
 
   private def rawAt(i: Int): Token = if (i < len) buf(i) else lexAhead(i)
 
@@ -322,14 +327,27 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def la(s: String): Boolean = image(1) == s
   private def la2(s: String): Boolean = image(2) == s
 
-  private def enterAssignScope(): Unit = assignedScopes += new java.util.HashSet[String]()
+  // The sets are allocated on first use: most blocks assign and capture nothing.
+  private def enterAssignScope(): Unit = assignedScopes += null
+  private def addTo(scopes: ArrayBuffer[java.util.HashSet[String]], i: Int, name: String): Unit = {
+    var s = scopes(i)
+    if (s == null) { s = new java.util.HashSet[String](); scopes(i) = s }
+    s.add(name)
+  }
+  private def addAllTo(scopes: ArrayBuffer[java.util.HashSet[String]], i: Int, names: java.util.Set[String]): Unit =
+    if (names != null && !names.isEmpty) {
+      var s = scopes(i)
+      if (s == null) { s = new java.util.HashSet[String](); scopes(i) = s }
+      s.addAll(names)
+    }
   private def leaveAssignScope(): Set[String] = {
     val s = assignedScopes.remove(assignedScopes.length - 1)
-    if (assignedScopes.nonEmpty) assignedScopes(assignedScopes.length - 1).addAll(s)
-    AST.toScalaSet(s)
+    if (assignedScopes.nonEmpty) addAllTo(assignedScopes, assignedScopes.length - 1, s)
+    if (s == null) Set.empty else AST.toScalaSet(s)
   }
+
   private def noteAssigned(target: AST.Expression): Unit = target match {
-    case id: AST.Id if assignedScopes.nonEmpty => assignedScopes(assignedScopes.length - 1).add(id.name)
+    case id: AST.Id if assignedScopes.nonEmpty => addTo(assignedScopes, assignedScopes.length - 1, id.name)
     case _ =>
   }
 
@@ -367,7 +385,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val tops = new ArrayBuffer[AST.Toplevel]()
     while (kind(1) != K.EOF) tops += topLevel()
     if (tops.isEmpty) throw fail // the grammar demands at least one top-level element
-    AST.CompilationUnit(new Location(1, 1), null, module, imports, tops.toList, needsBodyRewrite)
+    AST.CompilationUnit(new Location(1, 1), null, module, imports, tops.toList, needsBodyRewrite, AST.toScalaSet(unitAssigned))
   }
 
   private def moduleDecl(): AST.ModuleDeclaration = {
@@ -420,14 +438,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def topLevel(): AST.Toplevel = {
     val k = kind(1)
     val img = image(1)
-    if (img == "break" || img == "continue") return blockElement()
+    if (img == "break" || img == "continue") return topLevelElement()
     if (k == K.ID && img == "tool" && kind(2) == K.ID && image(3) == "(") return toolDecl()
     if (k == K.ID && img == "example" && (kind(2) == K.LBRACE || (kind(2) == K.ID && kind(3) == K.LBRACE))) return topLevelExample()
     if (k == K.K_EXTENSION) return extensionDecl()
     if (k == K.K_INSTANCE) return instanceDecl()
     val declStart = isModifierKind(k) || k == K.K_TYPE || k == K.K_CLASS || k == K.K_INTERFACE || k == K.K_TRAIT ||
       k == K.K_RECORD || k == K.K_ENUM || k == K.K_DEF || k == K.ANNOTATION
-    if (!declStart) return blockElement()
+    if (!declStart) return topLevelElement()
     val mset = if (isModifierKind(k)) modifiers() else 0
     kind(1) match {
       case K.K_TYPE => typeAliasDecl(mset)
@@ -436,6 +454,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case K.K_VAL | K.K_VAR => varDecl(mset)
       case _ => throw fail
     }
+  }
+
+  private def topLevelElement(): AST.BlockElement = {
+    enterAssignScope()
+    val e = blockElement()
+    leaveAssignScopeIntoUnit()
+    e
   }
 
   private def extensionDecl(): AST.ExtensionDeclaration = {
@@ -504,10 +529,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         enterSection()
         next()
         eols()
+        enterAssignScope()
         val e = term()
         eos()
         AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty,
-          AST.BlockExpression(p(t1), List(AST.ReturnExpression(p(t1), e)), null), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t1), List(AST.ReturnExpression(p(t1), e)), leaveAssignScope()), tparams, throwsTypes, anns)
       case _ =>
         enterSection()
         eos()
@@ -912,10 +938,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case K.ASSIGN =>
         next()
         eols()
+        enterAssignScope()
         val e = term()
         eosOrBlockEnd()
         AST.MethodDeclaration(p(t), mset, c(t), args, ty,
-          AST.BlockExpression(p(t), List(AST.ReturnExpression(p(t), e)), null), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t), List(AST.ReturnExpression(p(t), e)), leaveAssignScope()), tparams, throwsTypes, anns)
       case K.LBRACE =>
         leaveSection()
         val b = block()
@@ -938,10 +965,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case K.ASSIGN =>
         next()
         eols()
+        enterAssignScope()
         val e = term()
         eosOrBlockEnd()
         AST.MethodDeclaration(p(n), AST.M_PUBLIC, c(n), args, ty,
-          AST.BlockExpression(p(n), List(AST.ReturnExpression(p(n), e)), null), tparams, throwsTypes, Nil)
+          AST.BlockExpression(p(n), List(AST.ReturnExpression(p(n), e)), leaveAssignScope()), tparams, throwsTypes, Nil)
       case K.LBRACE =>
         leaveSection()
         val b = block()
@@ -1374,8 +1402,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       expect(K.K_ELSE)
       if (kind(1) == K.LBRACE) b2 = block()
       else {
+        enterAssignScope()
         val elif = ifExpression()
-        b2 = AST.BlockExpression(elif.location, List(elif), null)
+        b2 = AST.BlockExpression(elif.location, List(elif), leaveAssignScope())
       }
     }
     AST.IfExpression(p(t), e, b1, b2)
@@ -2250,8 +2279,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       AST.ClosureExpression(p(t), ty, "call", args, null, body)
     } else {
       leaveDefault()
+      enterAssignScope()
       val eb = term()
-      val body = AST.BlockExpression(eb.location, List(eb), null)
+      val body = AST.BlockExpression(eb.location, List(eb), leaveAssignScope())
       AST.ClosureExpression(p(t), functionTypeNode(t, args.length), "call", args, null, body)
     }
   }

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`onion.Colls`'s factories and list/set/map utilities.** `docs/reference/stdlib.md` and
+  its Japanese translation only ever documented a handful of `Colls`'s members; `setOf`,
+  `mapOf`/`mutableMapOf`/`entry`, `emptyList`/`emptySet`/`emptyMap`, `mutableSetOf`,
+  `rangeWithStep`, and the `concat`/`flatten`/`partition`/`toSet`/`distinct`/`slice`/
+  `sorted`/`sortedByDescending`/`head`/`tail`/`takeWhile`/`dropWhile`/`mkString`/
+  `isNotEmpty`/`filterMap` list-and-map utilities were undiscoverable without reading
+  `src/main/java/onion/Colls.java`. A new `CollsDocCoverageSpec` guards every public
+  `onion.Colls` member against both files going forward.
+
 ## [0.45.0] - 2026-09-03
 
 ### Changed

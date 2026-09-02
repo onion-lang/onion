@@ -1485,9 +1485,48 @@ Collection factories and pipelines (`onion.Colls`):
 Colls::listOf("a", "b", "c")            // immutable List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::rangeWithStep(0, 10, 2)          // List [0,2,4,6,8]
 Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold pipelines are extension methods on
 // List/Iterable/arrays: xs.map { x -> x * 2 }.filter { x -> x > 0 }
+```
+
+### More factories: sets, maps, and empty collections
+
+```onion
+Colls::setOf("a", "b", "c")             // immutable Set (iteration order unspecified)
+Colls::mutableSetOf(1, 2, 3)            // HashSet
+
+Colls::entry("name", "Alice")           // a Map.Entry, for mapOf/mutableMapOf
+Colls::mapOf(Colls::entry("name", "Alice"), Colls::entry("age", "30"))   // immutable Map, insertion order preserved
+Colls::mutableMapOf(Colls::entry("x", 1))                               // HashMap
+
+Colls::emptyList()                      // []
+Colls::emptySet()                       // empty Set
+Colls::emptyMap()                       // empty Map
+```
+
+### List, set, and map utilities
+
+Also usable as extension methods on their first (list/map) argument, chaining
+into a pipeline like the rest of `Colls`:
+
+```onion
+xs.concat(ys)                     // elements of xs followed by elements of ys
+[[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
+xs.partition { x -> x > 1 }       // [matching, nonMatching] - two Lists
+xs.toSet()                        // Set built from xs's elements
+xs.distinct()                     // duplicates removed, first-seen order preserved
+xs.slice(0, 2)                    // sublist [0, 2), clamped into range
+xs.sorted()                       // new List, ascending (elements must be Comparable)
+xs.sortedByDescending { x -> x }  // like sortedBy, but descending
+xs.head()                         // first element, or null if empty (alias for first)
+xs.tail()                         // all but the first element (throws on an empty list)
+xs.takeWhile { x -> x < 3 }       // longest leading run matching the predicate
+xs.dropWhile { x -> x < 3 }       // xs with that leading run removed
+xs.mkString(", ")                 // "1, 2, 3" - joins elements into a String (join is an alias)
+Colls::isNotEmpty(xs)             // true - the negation of isEmpty
+m.filterMap { k, v -> k == "name" }   // Map with only the matching entries
 ```
 
 ### Batching, windowing, and selector aggregation

@@ -204,6 +204,15 @@ private[compiler] object SyntaxHintClassifier {
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))
+      // A Java/C#/Kotlin-style access modifier written before a type declaration
+      // (`public class Foo`, `private record Point(...)`, ...). None of the three
+      // words are reserved (they only mean something after `:` inside a class body),
+      // so each parses as a bare leading token with the declaration keyword landing
+      // in the same "expecting class/record/..." token set this fires from -- keep
+      // this ahead of the generic reserved-word-as-identifier case below, which
+      // never applies here since a declaration keyword isn't `<ID>`.
+      case ("public" | "private" | "protected") if expected.contains("\"class\"") =>
+        hint("error.parsing.hint.access_modifier_before_declaration", found)
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)

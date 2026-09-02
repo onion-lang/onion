@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic for a Java/C#/Kotlin-style access modifier before a type declaration
+  (`public class Foo`, `private record Point(...)`, `protected interface Shape`).**
+  None of `public`/`private`/`protected` are reserved words in Onion (they only mean
+  something after `:` inside a class body's access sections), so this common habit
+  from other languages previously parsed as a bare leading token, with the actual
+  declaration keyword landing in a generic "expecting class, record, def, ..." parse
+  error and nothing connecting it back to the mistake. `SyntaxHintClassifier` now
+  recognizes the shape directly and points at the fix: drop the modifier and declare
+  members under a `public:`/`private:`/`protected:` section inside the body instead.
+  Pinned by new `AccessModifierBeforeDeclarationHintI18nSpec`.
+
 - **Diagnostic for a Kotlin-style `companion object` nested inside a class.** `companion`
   isn't a reserved word, so `companion object { ... }` previously parsed as a bare
   identifier statement followed by a stray `object` token, falling through to the

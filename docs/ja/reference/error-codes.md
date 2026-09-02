@@ -433,6 +433,26 @@ static def main(args: String[]): void {
 対しては正しく解決されます — このエラーは名前が変数にもフィールドにも
 解決されない場合にのみ発生します。
 
+### `E0092` — プリミティブ型はインスタンス化できない
+
+`new` が Onion の大文字始まりのプリミティブ型名（`Int`、`Long`、`Double`、
+`Boolean`、`Byte`、`Short`、`Char`、`Float`）に対して使われました —
+`new Integer(...)`／`new Double(...)` で boxing する Java/Kotlin の癖です。
+これらの名前はクラスではなくプリミティブな `BasicType` に解決されるため、
+このチェックがなければ汎用的な `E0000`「type Object is expected, but type
+Double is used」として表面化し、修正方法を何も示しませんでした。
+
+```onion
+static def main(args: String[]): void {
+  val d = new Double(1.5)   // E0092: Double はプリミティブ型でありクラスではない
+}
+```
+
+対処: プリミティブ値の生成にコンストラクタは不要です — リテラルをそのまま
+書いてください（`val d = 1.5`）。boxing された `java.lang.Object` が本当に
+必要な場合は、代わりにラッパークラス（`JByte`、`JShort`、`JCharacter`、
+`JInteger`、`JLong`、`JFloat`、`JDouble`、`JBoolean`）を構築してください。
+
 ### `E0020` — 値を返すことができない
 
 宣言された戻り値の型が `void` ではないメソッド内でベアな `return;` が使われて
@@ -1539,6 +1559,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0089` | a record / an enum cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
+| `E0092` | cannot instantiate primitive type … with `new` |
 
 ## 関連項目
 

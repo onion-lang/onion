@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0091) for identification
+ * type checking. Each error has a unique code (E0000-E0092) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -40,9 +40,10 @@ package onion.compiler
  *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY
  *   (E0017, E0024, and E0056 are retired codes, kept unassigned rather than reused.)
  *
- * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091)'''
+ * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091-E0092)'''
  *   - ILLEGAL_METHOD_CALL, CANNOT_RETURN_VALUE, CANNOT_CALL_METHOD_ON_PRIMITIVE
  *   - INVALID_METHOD_CALL_TARGET, STATIC_CALL_ON_INSTANCE, CLASS_USED_AS_VALUE
+ *   - CANNOT_INSTANTIATE_PRIMITIVE_TYPE
  *
  * '''Assignment and Declaration Errors (E0028, E0036, E0051-E0052, E0055, E0069, E0085)'''
  *   - LVALUE_REQUIRED, CANNOT_ASSIGN_TO_VAL, RETURN_TYPE_REQUIRED
@@ -222,6 +223,16 @@ object SemanticError {
    * (E0002), never mentioning `::`.
    */
   case object CLASS_USED_AS_VALUE extends SemanticError(91)
+  /**
+   * `new` applied to a primitive type name (`new Double(1.5)`, `new Int(3)`, ...).
+   * Onion's capitalized primitive names (`Double`, `Int`, `Boolean`, ...) resolve
+   * declared-type positions to a `BasicType`, not a class, so without this check the
+   * mismatch surfaced as the generic INCOMPATIBLE_TYPE (E0000) reporting "type Object
+   * is expected, but type Double is used" -- accurate but disconnected from the actual
+   * mistake, and silent about the fix (drop `new`, or construct the `J`-prefixed boxed
+   * wrapper instead).
+   */
+  case object CANNOT_INSTANTIATE_PRIMITIVE_TYPE extends SemanticError(92)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

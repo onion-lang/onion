@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diagnostic for `new` applied to a primitive type (`new Double(1.5)`, `new Int(3)`,
+  ...).** Onion's capitalized primitive type names resolve to a `BasicType`, not a
+  class, so this Java/Kotlin boxing habit previously fell through to the generic
+  `E0000` INCOMPATIBLE_TYPE, reporting "type Object is expected, but type Double is
+  used" with nothing connecting it back to the actual mistake. `ConstructionTyping`
+  now reports a dedicated `E0092` CANNOT_INSTANTIATE_PRIMITIVE_TYPE instead, pointing
+  at the fix: write the literal directly, or construct the `J`-prefixed boxed wrapper
+  class (`JByte`, `JShort`, `JCharacter`, `JInteger`, `JLong`, `JFloat`, `JDouble`,
+  `JBoolean`) if a boxed `java.lang.Object` is actually needed. Pinned by new
+  `CannotInstantiatePrimitiveTypeHintI18nSpec`.
+
 ## [0.34.0] - 2026-09-02
 
 ### Changed

@@ -281,6 +281,13 @@ final class ConstructionTyping(
     val typeRef = diamondType(node, expected).orElse(diamondTypeFromArguments(node, context)).getOrElse {
       typing.mapFromDeclared(node.typeRef) match {
         case Some(ct: ClassType) => ct
+        case Some(bt: BasicType) =>
+          // `new Double(...)`, `new Int(...)`, etc. -- a capitalized primitive name
+          // resolves here to its BasicType, not a class, so without this check the
+          // mismatch fell through to the generic INCOMPATIBLE_TYPE below with nothing
+          // connecting "type Object is expected" back to the actual mistake.
+          bodyContext.report(CANNOT_INSTANTIATE_PRIMITIVE_TYPE, node, bt)
+          break(None)
         case Some(other) =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
           break(None)

@@ -864,6 +864,10 @@ object SemanticErrorReporter {
       "error.semantic.staticCallOnInstance",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.CANNOT_INSTANTIATE_PRIMITIVE_TYPE -> ErrorDef(
+      "error.semantic.cannotInstantiatePrimitiveType",
+      Seq(items => typeName(items(0)))
+    ),
     SemanticError.CLASS_USED_AS_VALUE -> ErrorDef(
       "error.semantic.classUsedAsValue",
       Seq(items => asString(items(0)))

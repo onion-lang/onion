@@ -23,8 +23,11 @@ object AST {
   /** Append an element to an immutable list (returns new list) - used for trailing lambda */
   /** For the parser: a Java set of names as an immutable Scala set. */
   def toScalaSet(names: java.util.Set[String]): Set[String] = {
-    import scala.jdk.CollectionConverters.*
-    names.asScala.toSet
+    if (names.isEmpty) Set.empty // the common case: most blocks assign and capture nothing
+    else {
+      import scala.jdk.CollectionConverters.*
+      names.asScala.toSet
+    }
   }
 
   def appendToList[A](list: List[A], element: A): List[A] = {
@@ -116,7 +119,10 @@ object AST {
      * leaves method bodies as they are instead of copying every node. Defaults to true
      * so a unit built anywhere else is still rewritten.
      */
-    needsBodyRewrite: Boolean = true) extends Node
+    needsBodyRewrite: Boolean = true,
+    /** Names assigned by the top-level block elements (nested blocks and lambdas included), as
+     *  recorded by the parser; `null` when unknown. Decides which top-level `var`s are effectively vals. */
+    topLevelAssignedNames: Set[String] = null) extends Node
   case class ModuleDeclaration(location: Location, name: String) extends Node
   case class ImportClause(
     location: Location,

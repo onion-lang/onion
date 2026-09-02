@@ -28,7 +28,10 @@ private[asm] object TermContainsTry:
   }
 
   /** Forgets the answers of the previous code generation. */
-  def reset(): Unit = memo.get.clear()
+  def reset(): Unit =
+    // A fresh map, not clear(): the table keeps the size of the largest class it ever held
+    // (the map lives in a ThreadLocal), and clear() walks all of it for every class.
+    if !memo.get.isEmpty then memo.set(new java.util.IdentityHashMap[AnyRef, java.lang.Boolean]())
 
   private def containsNode(node: AnyRef): Boolean =
     val m = memo.get

@@ -63,9 +63,14 @@ public class JJOnionParser implements Parser {
     if (!assignedScopes.isEmpty()) assignedScopes.peek().addAll(s);
     return AST.toScalaSet(s);
   }
+  /** Names assigned by the top-level block elements of the unit (see AST.CompilationUnit.topLevelAssignedNames). */
+  private final java.util.HashSet<String> unitAssigned = new java.util.HashSet<String>();
+  private void leaveAssignScopeIntoUnit() { unitAssigned.addAll(assignedScopes.pop()); }
+
   private void noteAssigned(AST.Expression target) {
     if (target instanceof AST.Id && !assignedScopes.isEmpty()) assignedScopes.peek().add(((AST.Id) target).name());
   }
+
 
   /** Set when a do-expression or trait method call is parsed; see AST.CompilationUnit.needsBodyRewrite. */
   boolean needsBodyRewrite = false;
@@ -1351,11 +1356,11 @@ AST.CompilationUnit unit() :{
       if (!collectError(errorToken, expectedSummary(e), expectedAll(e))) { throw e; }
       if (!skipToToplevelSyncPoint()) {
         // EOF reached while recovering: return what we have, errors are collected
-        return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops), needsBodyRewrite);
+        return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops), needsBodyRewrite, AST.toScalaSet(unitAssigned));
       }
     }
   )+ <EOF> {
-    return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops), needsBodyRewrite);
+    return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops), needsBodyRewrite, AST.toScalaSet(unitAssigned));
   }
 }
 
@@ -1421,7 +1426,7 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   // buffers `break <stmt>` and the statement's EOL terminator is lost -- yielding
   // a confusing syntax error instead of E0048/E0049. A 1-token predicate commits
   // to block_element before that happens, so enterSection() can tokenize the EOL.
-  top=block_element()
+  {enterAssignScope();} top=block_element() {leaveAssignScopeIntoUnit();}
 | LOOKAHEAD({getToken(1).image.equals("tool") && getToken(2).kind == ID && getToken(3).image.equals("(")})
   // `tool` is a soft keyword: only `tool name(` opens a tool declaration, so it stays
   // usable as an ordinary identifier everywhere else.
@@ -1432,7 +1437,7 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   // asserts its laws. `example` stays an ordinary identifier everywhere else.
   top=top_level_example()
 | LOOKAHEAD(2)
-  top=block_element()
+  {enterAssignScope();} top=block_element() {leaveAssignScopeIntoUnit();}
 | LOOKAHEAD("extension")
   top=extension_decl()
 | LOOKAHEAD("instance")
@@ -1524,10 +1529,10 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   (  (b=block() | {enterSection();} eos()) {
        return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns);
      }
-  |  ({enterSection();} "=" eols() e=term() eos()) {
+  |  ({enterSection();} "=" eols() {enterAssignScope();} e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t2), args, ty,
-         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)), null),
+         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)), leaveAssignScope()),
          tparams, throwsTypes, anns
        );
      }
@@ -1985,10 +1990,10 @@ AST.MethodDeclaration method_decl(int mset) : {
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
   anns=annotations() {enterSection();} "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  (  "=" eols() e=term() eos_or_block_end() {
+  (  "=" eols() {enterAssignScope();} e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
-         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)), null),
+         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)), leaveAssignScope()),
          tparams, throwsTypes, anns
        );
      }
@@ -2015,10 +2020,10 @@ AST.MethodDeclaration interface_method_decl() : {
 }{
   {enterSection();}
   "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  (  "=" eols() e=term() eos_or_block_end() {
+  (  "=" eols() {enterAssignScope();} e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(n), AST.M_PUBLIC(), c(n), args, ty,
-         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e)), null),
+         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e)), leaveAssignScope()),
          tparams, throwsTypes
        );
      }
@@ -2428,10 +2433,10 @@ AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpressio
   t="if" e=term() b1=block()
   [ LOOKAHEAD({elseFollows()}) eols() "else"
     ( b2=block()
-    | elif=if_expression() {
+    | {enterAssignScope();} elif=if_expression() {
         // else-if chain: wrap the nested if in a synthetic block
         append(elifElems, elif);
-        b2 = new AST.BlockExpression(elif.location(), toList(elifElems), null);
+        b2 = new AST.BlockExpression(elif.location(), toList(elifElems), leaveAssignScope());
       }
     )
   ]
@@ -3010,10 +3015,10 @@ AST.ClosureExpression arrow_anonymous_function() :{
     }
     // Expression body: (x: Int) -> x * 2. Leave the EOL-skipping default
     // state first so the newline after the expression terminates it.
-  | {leaveDefault();} eb=term() {
+  | {leaveDefault(); enterAssignScope();} eb=term() {
       ArrayBuffer<AST.BlockElement> bodyElems = new ArrayBuffer<AST.BlockElement>();
       append(bodyElems, eb);
-      body = new AST.BlockExpression(eb.location(), toList(bodyElems), null);
+      body = new AST.BlockExpression(eb.location(), toList(bodyElems), leaveAssignScope());
       ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
       return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
     }

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The launchers run the JVM with the parallel collector.** A compile is one short-lived burst
+  of allocation; G1's write barriers and concurrent machinery cost it about 10% of both CPU
+  and wall time for nothing (whole example corpus, warm: ~720 ms -> ~650 ms per pass; a cold
+  single-file run is unchanged). `bin/onion-jvm.sh`, the Windows setup and the `install.sh`
+  launchers all add `-XX:+UseParallelGC`; a collector named in `ONION_JAVA_OPTS` wins.
+- The parser also records the assigned names of expression-bodied methods and lambdas, of
+  `else if` chains and of the top-level script body (`AST.CompilationUnit.topLevelAssignedNames`),
+  so the type checker no longer rescans those; the codegen `try`-detection memo starts a fresh
+  map per class instead of clearing a table sized by the largest class seen.
+
 ## [0.44.0] - 2026-09-03
 
 ### Changed

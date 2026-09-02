@@ -67,7 +67,8 @@ class LauncherParitySpec extends AnyFunSpec {
       "class-data sharing"             -> "SharedArchiveFile",
       "tolerating a stale archive"     -> "-Xshare:auto",
       "silencing stale-archive noise"  -> "-Xlog:cds",
-      "the sun.misc.Unsafe workaround" -> "sun-misc-unsafe-memory-access"
+      "the sun.misc.Unsafe workaround" -> "sun-misc-unsafe-memory-access",
+      "the parallel collector"         -> "UseParallelGC"
     )
 
     for ((what, marker) <- capabilities) {
@@ -91,7 +92,7 @@ class LauncherParitySpec extends AnyFunSpec {
     it("mirrors the POSIX one, since it cannot source it") {
       val bat = read("bin/onion-jvm.bat")
       for (marker <- Seq("ONION_JAVA_OPTS", "SharedArchiveFile", "-Xshare:auto", "-Xlog:cds",
-                         "ArchiveClassesAtExit", ArchiveName))
+                         "ArchiveClassesAtExit", ArchiveName, "UseParallelGC"))
         assert(bat.contains(marker), s"bin/onion-jvm.bat is missing $marker")
     }
   }

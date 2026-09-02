@@ -5845,6 +5845,10 @@
 <td>✓ 正しい - 引数の型は期待される関数型から推論される</td>
 </tr>
 <tr>
+<td><code>lambda x: x * 2</code>（Python風）</td>
+<td><code>(x) -&gt; x * 2</code> - <code>lambda</code>キーワードはなく、アロー式ラムダを使う</td>
+</tr>
+<tr>
 <td><code>func(arg)</code> でラムダ呼び出し</td>
 <td>✓ 正しい - 関数値は直接呼び出せる</td>
 </tr>
@@ -5913,6 +5917,10 @@
 <tr>
 <td><code>using r = expr { }</code></td>
 <td><code>try (val r = expr) { }</code> - try-with-resources。複数のリソースは<code>;</code>で区切り、逆順にクローズされる</td>
+</tr>
+<tr>
+<td><code>with expr as r { }</code>（Python風）</td>
+<td><code>try (val r = expr) { }</code> - 上と同じtry-with-resources</td>
 </tr>
 <tr>
 <td><code>catch (Type e)</code></td>
@@ -5987,6 +5995,14 @@
 <tr>
 <td><code>a ? b : c</code> 三項演算子</td>
 <td>非サポート - <code>if/else</code>式を使用</td>
+</tr>
+<tr>
+<td><code>a ?? b</code>（JS風のnull合体演算子）</td>
+<td><code>a ?: b</code> - 代わりにElvis演算子を使う</td>
+</tr>
+<tr>
+<td><code>typeof x</code>（JS/Python風）</td>
+<td><code>x is Type</code> - 型チェックには<code>is</code>演算子を使う</td>
 </tr>
 <tr>
 <td><code>operator fun plus</code>（Kotlin風）</td>

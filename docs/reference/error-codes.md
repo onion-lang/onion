@@ -435,6 +435,26 @@ only for an instance's members. A real local variable with the same name as
 a class still resolves correctly — this only fires when the name resolves to
 neither a variable nor a field.
 
+### `E0092` — Cannot instantiate primitive type
+
+`new` was applied to one of Onion's capitalized primitive type names (`Int`,
+`Long`, `Double`, `Boolean`, `Byte`, `Short`, `Char`, `Float`) — the
+Java/Kotlin habit of boxing with `new Integer(...)`/`new Double(...)`.
+Those names resolve to the primitive `BasicType`, not a class, so without
+this check the mismatch surfaced as the generic `E0000` "type Object is
+expected, but type Double is used", with nothing pointing at the fix.
+
+```onion
+static def main(args: String[]): void {
+  val d = new Double(1.5)   // E0092: Double is primitive, not a class
+}
+```
+
+Fix: primitive values need no construction — write the literal directly
+(`val d = 1.5`). If a boxed `java.lang.Object` is actually needed, construct
+the boxed wrapper class instead: `JByte`, `JShort`, `JCharacter`,
+`JInteger`, `JLong`, `JFloat`, `JDouble`, or `JBoolean`.
+
 ### `E0020` — Cannot return value
 
 A bare `return;` appears in a method whose declared return type isn't `void`,
@@ -1550,6 +1570,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0089` | a record / an enum cannot declare `def this`: … already has its canonical constructor |
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
+| `E0092` | cannot instantiate primitive type … with `new` |
 
 ## See also
 

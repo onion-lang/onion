@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The parser records, for every block, the local names assigned anywhere inside it
+  (`AST.BlockExpression.assignedNames`); the type checker's smart-cast analysis reads that
+  instead of rescanning each method body, branch and loop body reflectively -- the largest
+  single leaf left in the corpus profile.
 - **Rewriting no longer copies method bodies that have nothing to rewrite.** The only
   body-level transforms are do-notation desugaring and trait-method-call lowering; the
   parser records whether a unit contains either, and for the (common) units that do not,

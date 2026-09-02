@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Classes are generated in parallel.** Each class's code generation only reads the typed
+  structures, so the classes of one compilation are emitted on the common pool when there
+  are at least two; per-class state (closure counter, closure classes, visitor cache) is
+  thread-local, closure classes are numbered per host class (`Host$Closure1`, ...) so the
+  names are deterministic regardless of completion order, and output order is unchanged.
+  `-Donion.codegen.sequential=true` restores the old single-threaded order.
+
 ## [0.38.0] - 2026-09-03
 
 ### Changed

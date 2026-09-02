@@ -417,6 +417,7 @@ These are frequently confused with other languages. **Always check these:**
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
 | `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
+| `for (const x of arr) { }` (JS/TS) | `foreach x: Type in arr { }` - no `for (... of ...)` |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
 

@@ -65,28 +65,58 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       case _ =>
         ()
 
-  // Counter for generating unique closure class names
-  private var closureCounter = 0
-  
-  // Collect generated closure classes
-  private val generatedClosures = mutable.ArrayBuffer[CompiledClass]()
-
-  private def nextClosureId(): Int = {
-    closureCounter += 1
-    closureCounter
+  /**
+   * The mutable state of generating ONE class: its closure counter, the closure classes it
+   * produced, the closure emitter bound to them, and the visitor cache. Classes are
+   * generated in parallel (see `process`), so this lives in a thread-local slot set for
+   * the duration of one `generateClass` -- nested closure generation stays on the same
+   * thread. Closure classes are numbered per host class (`Host$Closure1`, ...), which is
+   * deterministic regardless of the order classes finish in.
+   */
+  private final class ClassGenState(val host: TypedAST.ClassDefinition) {
+    var closureCounter = 0
+    val closures = mutable.ArrayBuffer[CompiledClass]()
+    val closureCodegen: ClosureCodegen =
+      new ClosureCodegen(AsmCodeGeneration.this, config.outputDirectory, () => { closureCounter += 1; closureCounter }, compiled => closures += compiled)
+    var lastVisitor: AsmCodeGenerationVisitor = null
+    var lastVisitorGen: GeneratorAdapter = null
+    var lastVisitorLocals: LocalVarContext = null
+    var lastVisitorClass: String = null
   }
 
-  private val closureCodegen =
-    new ClosureCodegen(this, config.outputDirectory, () => nextClosureId(), compiled => generatedClosures += compiled)
+  private val genState = new ThreadLocal[ClassGenState]()
+  private def state: ClassGenState = genState.get
+  private def closureCodegen: ClosureCodegen = state.closureCodegen
+  private def generatedClosures: mutable.ArrayBuffer[CompiledClass] = state.closures
+
   private val bridgeMethodEmitter = new BridgeMethodEmitter(this)
-  
-  override def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] =
-    generatedClosures.clear()
+
+  private def generateClassIsolated(classDef: TypedAST.ClassDefinition): (CompiledClass, Seq[CompiledClass]) =
+    val st = new ClassGenState(classDef)
+    val previous = genState.get
+    genState.set(st)
     TermContainsTry.reset()
     try
-      val mainClasses = classes.map(generateClass)
-      mainClasses ++ generatedClosures.toSeq
-    finally TermContainsTry.reset()
+      val main = generateClass(classDef)
+      (main, st.closures.toSeq)
+    finally
+      TermContainsTry.reset()
+      if previous == null then genState.remove() else genState.set(previous)
+
+  override def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] =
+    // Each class is generated against read-only typed structures and its own state, so
+    // classes of one compilation are generated in parallel when there are enough of them
+    // to pay for the hand-off; output order is the declaration order either way.
+    val results: Seq[(CompiledClass, Seq[CompiledClass])] =
+      if classes.length >= 2 && AsmCodeGeneration.parallelClasses then
+        val arr = classes.toArray
+        try
+          java.util.Arrays.stream(arr).parallel().map(cd => generateClassIsolated(cd)).toArray.toSeq
+            .asInstanceOf[Seq[(CompiledClass, Seq[CompiledClass])]]
+        catch
+          case e: java.util.concurrent.CompletionException if e.getCause != null => throw e.getCause
+      else classes.map(generateClassIsolated)
+    results.map(_._1) ++ results.flatMap(_._2)
 
   /**
    * The SourceFile attribute. TypingHeaderPass records the unit a class came from, so
@@ -732,17 +762,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   // One visitor per (generator, locals): local-variable emission re-enters here mid-body,
   // and a fresh visitor each time threw away its per-method caches (call shapes, the last
   // emitted line) and re-allocated its emitters.
-  private var lastVisitor: AsmCodeGenerationVisitor = null
-  private var lastVisitorGen: GeneratorAdapter = null
-  private var lastVisitorLocals: LocalVarContext = null
-  private var lastVisitorClass: String = null
-
   private def withVisitor(gen: GeneratorAdapter, className: String, localVars: LocalVarContext)(action: AsmCodeGenerationVisitor => Unit): Unit =
+    val st = state
     val visitor =
-      if (lastVisitor != null) && (lastVisitorGen eq gen) && (lastVisitorLocals eq localVars) && (lastVisitorClass == className) then lastVisitor
+      if (st.lastVisitor != null) && (st.lastVisitorGen eq gen) && (st.lastVisitorLocals eq localVars) && (st.lastVisitorClass == className) then st.lastVisitor
       else
         val v = new AsmCodeGenerationVisitor(gen, className, localVars, this)
-        lastVisitor = v; lastVisitorGen = gen; lastVisitorLocals = localVars; lastVisitorClass = className
+        st.lastVisitor = v; st.lastVisitorGen = gen; st.lastVisitorLocals = localVars; st.lastVisitorClass = className
         v
     action(visitor)
 
@@ -990,6 +1016,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 object AsmCodeGeneration:
   import org.objectweb.asm.commons.{Method => AsmMethod}
   import TypedAST._
+
+  /** Parallel class generation; `-Donion.codegen.sequential=true` forces sequential. */
+  val parallelClasses: Boolean =
+    !java.lang.Boolean.getBoolean("onion.codegen.sequential") && Runtime.getRuntime.availableProcessors > 1
 
   private[compiler] val LongBoxedType: AsmType = AsmType.getType(classOf[java.lang.Long])
   private[compiler] val DoubleBoxedType: AsmType = AsmType.getType(classOf[java.lang.Double])

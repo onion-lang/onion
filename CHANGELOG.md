@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-02
+
 ### Changed
 
 - **Parsing is about 3.5x faster** (the whole `run/` corpus, 247 files: 365 -> 105 ms of CPU

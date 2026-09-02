@@ -47,8 +47,14 @@ object AssignedVariableScanner {
       }
       n match {
         case p: Product =>
-          val it = p.productIterator
-          while (it.hasNext) acc = union(acc, visitAny(it.next()))
+          // productElement by index: the iterator form allocated per node and this is the
+          // innermost loop of the walk.
+          val arity = p.productArity
+          var i = 0
+          while (i < arity) {
+            acc = union(acc, visitAny(p.productElement(i)))
+            i += 1
+          }
         case _ =>
       }
       memo.put(n, acc)
@@ -56,6 +62,7 @@ object AssignedVariableScanner {
     }
 
     def visitAny(any: Any): Set[String] = any match {
+      case _: String | _: java.lang.Number | _: java.lang.Boolean | _: Location | null => Set.empty
       case n: AST.Node => visitNode(n)
       case s: Iterable[_] =>
         var acc: Set[String] = Set.empty

@@ -42,6 +42,33 @@ private[verification] object CheckMethodIndex {
    * Never throws: a class file this phase cannot parse must not fail the build on its
    * own, it just yields no position and the diagnostic degrades to what it printed before.
    */
+  private val LawNeedle = "onion$$law$$".getBytes("UTF-8")
+  private val ExampleNeedle = "onion$$example$$".getBytes("UTF-8")
+
+  /**
+   * Whether the class can carry a check at all: a check is a method whose name starts with
+   * one of the two prefixes, and a method name is a UTF8 constant-pool entry, so a class
+   * without either byte sequence has none. A byte scan is far cheaper than the ClassReader
+   * pass `read` makes, and nearly every class fails it.
+   */
+  def mayHaveChecks(bytes: Array[Byte]): Boolean =
+    contains(bytes, LawNeedle) || contains(bytes, ExampleNeedle)
+
+  private def contains(hay: Array[Byte], needle: Array[Byte]): Boolean = {
+    val first = needle(0)
+    val last = hay.length - needle.length
+    var i = 0
+    while (i <= last) {
+      if (hay(i) == first) {
+        var j = 1
+        while (j < needle.length && hay(i + j) == needle(j)) j += 1
+        if (j == needle.length) return true
+      }
+      i += 1
+    }
+    false
+  }
+
   def read(bytes: Array[Byte]): CheckMethodIndex =
     try {
       var source: Option[String] = None

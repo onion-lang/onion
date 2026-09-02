@@ -75,6 +75,8 @@ private[compiler] final class DeclarationBodySupport(
    */
   private def reportDelegationCycles(node: AST.ClassDeclaration, definition: ClassDefinition): Unit = {
     val ctors = definition.constructors.collect { case c: ConstructorDefinition => c }
+    // A cycle needs a self-delegating constructor; without one there is nothing to walk.
+    if (!ctors.exists(c => c.superInitializer != null && c.superInitializer.selfDelegation)) return
     def target(c: ConstructorDefinition): Option[ConstructorDefinition] =
       Option(c.superInitializer).filter(_.selfDelegation).flatMap { init =>
         ctors.find(sibling => sibling.getArgs.toSeq == init.arguments.toSeq)

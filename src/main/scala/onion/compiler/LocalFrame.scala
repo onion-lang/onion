@@ -49,6 +49,15 @@ class LocalFrame(val parent: LocalFrame) {
   def namesByIndex: Map[Int, String] =
     allScopes.iterator.flatMap(_.bindingEntries.map { case (name, binding) => binding.index -> name }).toMap
 
+  /** The same relation as `namesByIndex` as an array (null = no name), which is what codegen needs. */
+  def namesArray: Array[String] = {
+    var max = -1
+    allScopes.foreach(_.bindingEntries.foreach { case (_, b) => if (b.index > max) max = b.index })
+    val names = new Array[String](max + 1)
+    allScopes.foreach(_.bindingEntries.foreach { case (name, b) => if (b.index >= 0) names(b.index) = name })
+    names
+  }
+
   def entries: Seq[LocalBinding] = {
     // Per method at codegen and for closures; the HashSet-per-scope merge it replaced
     // showed on the profile.

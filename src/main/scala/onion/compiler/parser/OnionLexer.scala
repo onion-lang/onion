@@ -35,10 +35,51 @@ final class OnionLexer(text: String)
   // ---------------------------------------------------------------- decoded input
 
   private val length: Int = text.length
-  private val chars: Array[Char] = new Array[Char](length)
-  private val lines: Array[Int] = new Array[Int](length)
-  private val cols: Array[Int] = new Array[Int](length)
-  private val n: Int = decode()
+  // A source without a `\u` escape -- nearly all of them -- is scanned in place and its
+  // positions are computed by a cursor that follows the tokens (they are emitted in order),
+  // instead of two ints per character up front. The escape path keeps the eager tables,
+  // because a decoded char's position is not a function of its index alone.
+  private val fast: Boolean = text.indexOf("\\u") < 0
+  private val chars: Array[Char] = if fast then text.toCharArray else new Array[Char](length)
+  private val lines: Array[Int] = if fast then null else new Array[Int](length)
+  private val cols: Array[Int] = if fast then null else new Array[Int](length)
+  private val n: Int = if fast then length else decode()
+
+  // The position cursor of the fast path: the line/column JavaCharStream would have
+  // recorded for chars(cursorIndex), advanced with the same rules as `decode`.
+  private var cursorIndex = -1
+  private var cursorLine = 1
+  private var cursorColumn = 0
+  private var cursorPrevCR = false
+  private var cursorPrevLF = false
+
+  private def advanceTo(index: Int): Unit =
+    if index < cursorIndex then
+      cursorIndex = -1; cursorLine = 1; cursorColumn = 0; cursorPrevCR = false; cursorPrevLF = false
+    while cursorIndex < index do
+      cursorIndex += 1
+      val c = chars(cursorIndex)
+      cursorColumn += 1
+      if cursorPrevLF then
+        cursorPrevLF = false
+        cursorColumn = 1
+        cursorLine += 1
+      else if cursorPrevCR then
+        cursorPrevCR = false
+        if c == '\n' then cursorPrevLF = true
+        else
+          cursorColumn = 1
+          cursorLine += 1
+      c match
+        case '\r' => cursorPrevCR = true
+        case '\n' => cursorPrevLF = true
+        case '\t' =>
+          cursorColumn -= 1
+          cursorColumn += TabSize - (cursorColumn % TabSize)
+        case _ =>
+
+  private def lineAt(index: Int): Int = if fast then { advanceTo(index); cursorLine } else lines(index)
+  private def columnAt(index: Int): Int = if fast then { advanceTo(index); cursorColumn } else cols(index)
 
   private var pos: Int = 0
   private var pendingSpecial: Token = null
@@ -190,19 +231,21 @@ final class OnionLexer(text: String)
     val t = Token.newToken(K.EOF, "")
     // JavaCC reports the position of the last character it consumed.
     if n > 0 then
-      t.beginLine = lines(n - 1); t.beginColumn = cols(n - 1)
-      t.endLine = lines(n - 1); t.endColumn = cols(n - 1)
+      t.beginLine = lineAt(n - 1); t.beginColumn = columnAt(n - 1)
+      t.endLine = t.beginLine; t.endColumn = t.beginColumn
     else
       t.beginLine = 0; t.beginColumn = 0; t.endLine = 0; t.endColumn = 0
     t
 
   /** A token covering `[start, end)` of the decoded input. */
   private def make(kind: Int, start: Int, end: Int): Token =
-    val t = Token.newToken(kind, new String(chars, start, end - start))
-    t.beginLine = lines(start)
-    t.beginColumn = cols(start)
-    t.endLine = lines(end - 1)
-    t.endColumn = cols(end - 1)
+    // Keywords and operators have one spelling; their image is the shared constant.
+    val fixed = fixedImages(kind)
+    val t = Token.newToken(kind, if fixed != null then fixed else new String(chars, start, end - start))
+    t.beginLine = lineAt(start)
+    t.beginColumn = columnAt(start)
+    t.endLine = lineAt(end - 1)
+    t.endColumn = columnAt(end - 1)
     t
 
   private def blockCommentEnd(from: Int): Int =
@@ -553,6 +596,16 @@ object OnionLexer:
     m.put("void", K.K_VOID)
     m.put("Unit", K.K_VOID)
     m
+
+  /** The image of each single-spelling token (keywords, operators); null for the rest. */
+  private val fixedImages: Array[String] =
+    val a = new Array[String](K.tokenImage.length)
+    var kind = K.K_ABSTRACT
+    while kind <= K.SAFE_INDEX do
+      val image = K.tokenImage(kind)
+      if image.length >= 2 && image.charAt(0) == '"' then a(kind) = image.substring(1, image.length - 1)
+      kind += 1
+    a
 
   private def keywordKind(word: String): Int =
     val k = keywords.get(word)

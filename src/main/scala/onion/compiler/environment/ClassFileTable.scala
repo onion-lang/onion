@@ -21,10 +21,18 @@ class ClassFileTable(classPathString: String) {
   private val bytesCache = new ConcurrentHashMap[String, Option[Array[Byte]]]()
 
   private def createClassLoader(classPath: String): ClassLoader = {
+    // `File.toURI` stats the path to decide on a trailing slash (directory vs jar), on
+    // every entry of every compilation. The URL depends only on the path and that one
+    // bit, so it is cached by both; the bit is still checked each time, so a directory
+    // created after the first compilation is picked up.
     val urls =
       classPath.split(File.pathSeparator, -1).iterator
         .filter(_.nonEmpty)
-        .map(path => new File(path).toURI.toURL)
+        .map { path =>
+          val file = new File(path)
+          val key = if (file.isDirectory) path + File.separator else path
+          ClassFileTable.urls.computeIfAbsent(key, _ => file.toURI.toURL)
+        }
         .toArray
     ExplicitClasspathClassLoader(
       urls,
@@ -57,4 +65,8 @@ class ClassFileTable(classPathString: String) {
     bytesCache.putIfAbsent(className, loaded)
     loaded.orNull
   }
+}
+
+object ClassFileTable {
+  private val urls = new ConcurrentHashMap[String, java.net.URL]()
 }

@@ -101,7 +101,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
               resolveTopLevelStaticCall(node, params, expected) match {
                 case Some(term) => Some(term)
                 case None =>
-                  calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+                  calls.reportMethodNotFound(node, targetType, node.name, calls.types(params), isUnqualifiedCall = true)
                   None
               }
           }
@@ -195,7 +195,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
             callableValueCallSupport.resolveCallableValue(node, params0, context, expected) match {
               case some @ Some(_) => some
               case None =>
-                calls.reportMethodNotFound(node, targetType, name, calls.types(params0))
+                calls.reportMethodNotFound(node, targetType, name, calls.types(params0), isUnqualifiedCall = true)
                 None
             }
         }

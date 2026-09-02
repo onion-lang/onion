@@ -13,9 +13,10 @@ private[compiler] final class MethodCallReportingSupport(
     node: AST.Node,
     targetType: AnyRef,
     name: String,
-    argTypes: Array[Type]
+    argTypes: Array[Type],
+    isUnqualifiedCall: Boolean = false
   ): Unit =
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes)
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall))
 
   def reportAmbiguousMethods(
     node: AST.Node,

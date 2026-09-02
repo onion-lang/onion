@@ -597,7 +597,11 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportMethodNotFound(position: Location, items: Array[AnyRef]): Unit = {
     val targetType = items(0).asInstanceOf[TypedAST.Type]
     val name = asString(items(1))
-    val args = typeNames(asTypeArray(items(2)))
+    val argTypes = asTypeArray(items(2))
+    val args = typeNames(argTypes)
+    // Set only by an actually-unqualified call (UnqualifiedMethodCallSupport); every
+    // other report site omits it, defaulting to false -- see FormerDefaultImportLookup.
+    val isUnqualifiedCall = items.length > 3 && items(3) == java.lang.Boolean.TRUE
     val baseMessage = format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
     // A method with that exact name exists: show its signatures instead of
     // a (possibly misleading) name-similarity suggestion
@@ -626,6 +630,14 @@ class SemanticErrorReporter(threshold: Int) {
         // fieldNamed to match (their length is resolved specially, not as a
         // TypedAST field), so it needs its own check.
         Some(format(message("suggestion.fieldNotMethod"), Seq(name)))
+      } else if (isUnqualifiedCall && FormerDefaultImportLookup.find(name, argTypes.length).isDefined) {
+        // A bare call to a method that used to be default-imported (v0.10 narrowed the
+        // set to pure classes -- CLAUDE.md's own migration note). Restricted to
+        // genuinely unqualified calls: at that report site every other resolution path
+        // (current class, top-level functions, static imports, callable values) has
+        // already failed, so a name+arity match here can only be this stdlib method.
+        val className = FormerDefaultImportLookup.find(name, argTypes.length).get
+        Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
       } else {
         val candidates = targetType match
           case obj: TypedAST.ObjectType =>
@@ -634,6 +646,45 @@ class SemanticErrorReporter(threshold: Int) {
         toolbox.Suggestions.formatSuggestion(name, candidates)
       }
     problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
+   * `readText(p)`, `get(url)`, `now()`, `exit(1)` and similar calls used to resolve
+   * bare: v0.10 narrowed the default static import set to pure classes, dropping
+   * `System`, `Runtime`, `Files`, `Http` and `DateTime` (CLAUDE.md's own migration
+   * note for that change). An unqualified call to one of their real static methods
+   * then surfaces as an ordinary METHOD_NOT_FOUND with nothing connecting it back to
+   * that change, so `reportMethodNotFound` points at the qualified form instead of a
+   * name-similarity guess. Built by reflecting on the actual runtime classes -- shipped
+   * with the compiler itself, so always on its classpath regardless of the program
+   * being compiled -- rather than a hand-maintained list that could drift from the
+   * real API surface.
+   */
+  private object FormerDefaultImportLookup {
+    private val classes: Seq[Class[?]] = Seq(
+      classOf[java.lang.System],
+      classOf[java.lang.Runtime],
+      classOf[onion.Files],
+      classOf[onion.Http],
+      classOf[onion.DateTime]
+    )
+
+    // (name, arity) -> simple class name. A name/arity pair shared by two of these
+    // classes is dropped rather than guessed at.
+    private lazy val index: Map[(String, Int), String] = {
+      val entries = for {
+        cls <- classes
+        m <- cls.getMethods
+        mods = m.getModifiers
+        if java.lang.reflect.Modifier.isStatic(mods) && java.lang.reflect.Modifier.isPublic(mods)
+        if m.getDeclaringClass == cls
+      } yield (m.getName, m.getParameterCount) -> cls.getSimpleName
+      entries.groupBy(_._1).collect {
+        case (key, matches) if matches.map(_._2).distinct.size == 1 => key -> matches.head._2
+      }
+    }
+
+    def find(name: String, arity: Int): Option[String] = index.get((name, arity))
   }
 
   private def fieldNamed(targetType: TypedAST.Type, name: String): Boolean =

@@ -162,7 +162,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   private var topLevelExampleCount: Int = 0
 
+  // See AST.CompilationUnit.needsBodyRewrite: the only body-level transforms are do-notation
+  // and trait method calls, and most units have neither.
+  private var bodyRewriteNeeded: Boolean = true
+
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
+    bodyRewriteNeeded = unit.needsBodyRewrite
     checkInstanceCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
     for (top <- unit.toplevels) top match {
@@ -1231,12 +1236,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteBlockExpression(block: AST.BlockExpression): AST.BlockExpression = {
+    if (!bodyRewriteNeeded) return block
     if (block == null) return null
     val newElements = block.elements.map(rewriteBlockElement)
     block.copy(elements = newElements)
   }
 
-  def rewriteBlockElement(element: AST.BlockElement): AST.BlockElement = element match {
+  def rewriteBlockElement(element: AST.BlockElement): AST.BlockElement = if (!bodyRewriteNeeded) element else element match {
     case AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
       val rewrittenInit = init match {
         // `val r: M[E] = do[M] { ... }` — thread the declared element type E into
@@ -1262,7 +1268,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       empty
   }
 
-  def rewriteExpression(expr: AST.Expression): AST.Expression = expr match {
+  def rewriteExpression(expr: AST.Expression): AST.Expression = if (!bodyRewriteNeeded) expr else expr match {
     // Do notation desugaring - the main transformation
     case doExpr: AST.DoExpression => desugarDoExpression(doExpr)
     case AST.RetStatement(loc, e) => AST.RetStatement(loc, rewriteExpression(e))

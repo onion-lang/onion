@@ -22,10 +22,12 @@ final class TypingBodyContext(
   // same subtrees repeatedly -- a method body once, then every `if`/`while` inside it
   // again for its own branches -- so the answer is kept per node. The AST is immutable.
   private val assignedNamesMemo = new java.util.IdentityHashMap[AST.Node, Set[String]]()
-  def assignedNames(node: AST.Node): Set[String] = {
-    val cached = assignedNamesMemo.get(node)
-    if (cached != null) cached
-    else AssignedVariableScanner.scan(node, assignedNamesMemo)
+  def assignedNames(node: AST.Node): Set[String] = node match {
+    case b: AST.BlockExpression if b.assignedNames != null => b.assignedNames // recorded by the parser
+    case _ =>
+      val cached = assignedNamesMemo.get(node)
+      if (cached != null) cached
+      else AssignedVariableScanner.scan(node, assignedNamesMemo)
   }
 
   def definition: ClassDefinition = currentDefinitionProvider()

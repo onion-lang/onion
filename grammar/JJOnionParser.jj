@@ -51,6 +51,22 @@ public class JJOnionParser implements Parser {
     return cachedInterpolationParser;
   }
 
+  /**
+   * Assignment scopes: one set per open block, holding the names assigned inside it. A
+   * block's set is folded into its parent's when it closes, so an outer block sees the
+   * assignments of inner blocks and lambda bodies too (see AST.BlockExpression.assignedNames).
+   */
+  private final java.util.ArrayDeque<java.util.HashSet<String>> assignedScopes = new java.util.ArrayDeque<java.util.HashSet<String>>();
+  private void enterAssignScope() { assignedScopes.push(new java.util.HashSet<String>()); }
+  private scala.collection.immutable.Set<String> leaveAssignScope() {
+    java.util.HashSet<String> s = assignedScopes.pop();
+    if (!assignedScopes.isEmpty()) assignedScopes.peek().addAll(s);
+    return AST.toScalaSet(s);
+  }
+  private void noteAssigned(AST.Expression target) {
+    if (target instanceof AST.Id && !assignedScopes.isEmpty()) assignedScopes.peek().add(((AST.Id) target).name());
+  }
+
   /** Set when a do-expression or trait method call is parsed; see AST.CompilationUnit.needsBodyRewrite. */
   boolean needsBodyRewrite = false;
 
@@ -189,7 +205,7 @@ public class JJOnionParser implements Parser {
     append(elems, new AST.LocalVariableDeclaration(loc, AST.M_FINAL(), kName, null, getKey));
     append(elems, new AST.LocalVariableDeclaration(loc, AST.M_FINAL(), vName, null, getValue));
     append(elems, body);
-    AST.BlockExpression newBody = new AST.BlockExpression(loc, toList(elems));
+    AST.BlockExpression newBody = new AST.BlockExpression(loc, toList(elems), null);
     return new AST.ForeachExpression(loc, entryArg, entrySet, newBody);
   }
 
@@ -1511,7 +1527,7 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t2), args, ty,
-         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e))),
+         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)), null),
          tparams, throwsTypes, anns
        );
      }
@@ -1587,7 +1603,7 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
 }
 
 AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AST.BlockElement>)AST.NIL(); AST.BlockExpression s;}{
-  t="{" eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) elements=block_elements() ] eols() "}" {return new AST.BlockExpression(p(t), elements);}
+  t="{" {enterAssignScope();} eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) elements=block_elements() ] eols() "}" {return new AST.BlockExpression(p(t), elements, leaveAssignScope());}
 }
 
 List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<AST.BlockElement> elements = new ArrayBuffer<AST.BlockElement>(); }{
@@ -1723,7 +1739,7 @@ AST.ClassDeclaration class_decl(int mset) : {
       // selfDelegation = false, primary = true, primaryAssignments = the count above.
       append(members, new AST.ConstructorDeclaration(
         p(t1), 0, toList(ctorArgs), superInits,
-        new AST.BlockExpression(p(t1), toList(assigns)), false, true, assigns.size()
+        new AST.BlockExpression(p(t1), toList(assigns), null), false, true, assigns.size()
       ));
       append(sec2s, new AST.AccessSection(p(t1), AST.M_PUBLIC(), toList(members)));
     }
@@ -1972,7 +1988,7 @@ AST.MethodDeclaration method_decl(int mset) : {
   (  "=" eols() e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
-         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
+         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)), null),
          tparams, throwsTypes, anns
        );
      }
@@ -2002,7 +2018,7 @@ AST.MethodDeclaration interface_method_decl() : {
   (  "=" eols() e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(n), AST.M_PUBLIC(), c(n), args, ty,
-         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e))),
+         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e)), null),
          tparams, throwsTypes
        );
      }
@@ -2415,7 +2431,7 @@ AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpressio
     | elif=if_expression() {
         // else-if chain: wrap the nested if in a synthetic block
         append(elifElems, elif);
-        b2 = new AST.BlockExpression(elif.location(), toList(elifElems));
+        b2 = new AST.BlockExpression(elif.location(), toList(elifElems), null);
       }
     )
   ]
@@ -2483,15 +2499,15 @@ AST.SelectExpression select_expression() :{
   t1="select" e1=term() eols() "{" eols()
     (
       LOOKAHEAD({la("case")})
-      t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() ss=block_elements() {
-        append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss)));
+      t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() {enterAssignScope();} ss=block_elements() {
+        append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss, leaveAssignScope())));
         patterns = new ArrayBuffer<AST.Pattern>();
       }
       eols()
     )*
     eols()
     [LOOKAHEAD({la("else")})
-      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); } [ LOOKAHEAD({ blockElementFollows() }) ss=block_elements() ] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+      t2="else" ":" eols() { ss = (List<AST.BlockElement>)AST.NIL(); enterAssignScope(); } [ LOOKAHEAD({ blockElementFollows() }) ss=block_elements() ] { elseBlock = new AST.BlockExpression(p(t2), ss, leaveAssignScope()); }
     ]
   eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
@@ -2579,18 +2595,18 @@ AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   // Two tokens on purpose: `x => y` must fail at the `=`, not after consuming it, for the
   // old-arrow hint to see the `=>`.
   [ LOOKAHEAD(2)
-    ( t="="  eols() b=expression() {a = new AST.Assignment(span(a, b), a, b);}
-    | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(span(a, b), a, b);}
-    | t="-=" eols() b=expression() {a = new AST.SubtractionAssignment(span(a, b), a, b);}
-    | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(span(a, b), a, b);}
-    | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(span(a, b), a, b);}
-    | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(span(a, b), a, b);}
-    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(span(a, b), a, b);}
-    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(span(a, b), a, b);}
-    | t="^=" eols() b=expression() {a = new AST.XorAssignment(span(a, b), a, b);}
-    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(span(a, b), a, b);}
-    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(span(a, b), a, b);}
-    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(span(a, b), a, b);}
+    ( t="="  eols() b=expression() {noteAssigned(a); a = new AST.Assignment(span(a, b), a, b);}
+    | t="+=" eols() b=expression() {noteAssigned(a); a = new AST.AdditionAssignment(span(a, b), a, b);}
+    | t="-=" eols() b=expression() {noteAssigned(a); a = new AST.SubtractionAssignment(span(a, b), a, b);}
+    | t="*=" eols() b=expression() {noteAssigned(a); a = new AST.MultiplicationAssignment(span(a, b), a, b);}
+    | t="/=" eols() b=expression() {noteAssigned(a); a = new AST.DivisionAssignment(span(a, b), a, b);}
+    | t="%=" eols() b=expression() {noteAssigned(a); a = new AST.ModuloAssignment(span(a, b), a, b);}
+    | t="&=" eols() b=expression() {noteAssigned(a); a = new AST.BitAndAssignment(span(a, b), a, b);}
+    | t="|=" eols() b=expression() {noteAssigned(a); a = new AST.BitOrAssignment(span(a, b), a, b);}
+    | t="^=" eols() b=expression() {noteAssigned(a); a = new AST.XorAssignment(span(a, b), a, b);}
+    | t="<<=" eols() b=expression() {noteAssigned(a); a = new AST.LeftShiftAssignment(span(a, b), a, b);}
+    | t=">>=" eols() b=expression() {noteAssigned(a); a = new AST.MathRightShiftAssignment(span(a, b), a, b);}
+    | t=">>>=" eols() b=expression() {noteAssigned(a); a = new AST.LogicalRightShiftAssignment(span(a, b), a, b);}
     )
   ]{return a;}
 }
@@ -2742,9 +2758,9 @@ AST.Expression primary_suffix() : {
   | e=dot_suffix(e)
   | e=safe_access_suffix(e)
   | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
-  | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
+  | t="++"                                                                                        {noteAssigned(e); e = new AST.PostIncrement(p(t), e);}
   | t=<NOT_NULL>                                                                                  {e = new AST.NotNullAssertion(p(t), e);}
-  | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
+  | t="--"                                                                                        {noteAssigned(e); e = new AST.PostDecrement(p(t), e);}
   )
 )* {return e;}
 }
@@ -2997,7 +3013,7 @@ AST.ClosureExpression arrow_anonymous_function() :{
   | {leaveDefault();} eb=term() {
       ArrayBuffer<AST.BlockElement> bodyElems = new ArrayBuffer<AST.BlockElement>();
       append(bodyElems, eb);
-      body = new AST.BlockExpression(eb.location(), toList(bodyElems));
+      body = new AST.BlockExpression(eb.location(), toList(bodyElems), null);
       ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
       return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
     }
@@ -3059,8 +3075,8 @@ AST.ClosureExpression trailing_lambda() :{
   AST.TypeNode ty = null;
 }{
   {enterDefault();}
-  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) stmts=block_elements() ] eols() "}" {
-    body = new AST.BlockExpression(p(t), stmts);
+  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() {enterAssignScope();} [ LOOKAHEAD({ getToken(1).kind != RBRACE }) stmts=block_elements() ] eols() "}" {
+    body = new AST.BlockExpression(p(t), stmts, leaveAssignScope());
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();
     return new AST.ClosureExpression(p(t), ty, "call", args, null, body);

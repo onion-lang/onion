@@ -21,6 +21,12 @@ object AST {
   }
 
   /** Append an element to an immutable list (returns new list) - used for trailing lambda */
+  /** For the parser: a Java set of names as an immutable Scala set. */
+  def toScalaSet(names: java.util.Set[String]): Set[String] = {
+    import scala.jdk.CollectionConverters.*
+    names.asScala.toSet
+  }
+
   def appendToList[A](list: List[A], element: A): List[A] = {
     if (element == null) list else list :+ element
   }
@@ -253,7 +259,14 @@ object AST {
   }
   case class ForInitEmpty(location: Location) extends ForInitializer
 
-  case class BlockExpression(location: Location, elements: List[BlockElement]) extends Expression
+  /**
+   * `assignedNames`: every local name that is the target of an assignment, compound
+   * assignment or `++`/`--` anywhere inside the block (nested blocks and lambdas
+   * included), as recorded by the parser; `null` when the block was built elsewhere and
+   * the scanner has to compute it. Typing uses it to decide which parameters and locals
+   * behave like vals for smart casts.
+   */
+  case class BlockExpression(location: Location, elements: List[BlockElement], assignedNames: Set[String] = null) extends Expression
   case class BreakExpression(location: Location, label: String = null) extends Expression
   case class ContinueExpression(location: Location, label: String = null) extends Expression
   /** label: while/for/foreach/do — target for labeled break/continue */

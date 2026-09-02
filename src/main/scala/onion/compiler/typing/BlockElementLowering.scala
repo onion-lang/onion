@@ -40,7 +40,7 @@ final class BlockElementLowering(
   }
 
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement = node match {
-    case AST.BlockExpression(loc, elements) =>
+    case AST.BlockExpression(loc, elements, _) =>
       context.openScope {
         // Guard-clause narrowings (see IfExpression) leak forward to later
         // statements in this block; bound them so they don't escape it.

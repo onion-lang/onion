@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Rewriting no longer copies method bodies that have nothing to rewrite.** The only
+  body-level transforms are do-notation desugaring and trait-method-call lowering; the
+  parser records whether a unit contains either, and for the (common) units that do not,
+  Rewriting returns bodies as parsed instead of rebuilding every node. Declaration-level
+  rewriting (records, enums, tools, dictionaries) is unchanged.
+
 ## [0.40.0] - 2026-09-03
 
 ### Changed

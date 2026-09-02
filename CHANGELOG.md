@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suggesting `record Name(...)`. Pinned by new `CaseClassDeclarationHintI18nSpec`
   and cases in `SyntaxHintClassifierSpec`.
 
+- **Diagnostic hint for a TypeScript-style optional field/parameter `name?: Type`.**
+  Onion attaches nullability to the type (`name: Type?`), not the name. Because
+  Onion's Elvis operator `?:` lexes as a single token, `name?: Type` never reached
+  the parser as the separate `?` and `:` a TypeScript reader intended — it reported
+  the whole `?:` as an unexpected token where a plain `:` was expected, with nothing
+  connecting the error back to the actual mistake. `SyntaxHintClassifier` now
+  recognizes this shape in both field and parameter position and suggests the
+  equivalent `name: Type?`. Pinned by new `TypeScriptStyleOptionalAnnotationHintI18nSpec`
+  and cases in `SyntaxHintClassifierSpec`.
+
 ## [0.33.0] - 2026-09-02
 
 ### Fixed

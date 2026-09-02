@@ -621,6 +621,14 @@ class SemanticErrorReporter(threshold: Int) {
         // reads as a call to a function named `f` that nothing defines. Point at Onion's
         // actual interpolation syntax instead of a name-similarity guess.
         Some(message("suggestion.pythonFString"))
+      } else if (isUnqualifiedCall && name == "puts") {
+        // A Ruby-style bare `puts(...)` call -- Onion has no default-imported `puts`
+        // function, so this reads as an ordinary unresolved call on the enclosing
+        // script's synthesized main class. Point at Onion's actual output API instead
+        // of a name-similarity guess. Restricted to unqualified calls, same as
+        // FormerDefaultImportLookup below, so a real method named `puts` on some other
+        // type is unaffected.
+        Some(message("suggestion.rubyPuts"))
       } else if (fieldNamed(targetType, name) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

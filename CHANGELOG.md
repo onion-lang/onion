@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic hint for a Ruby-style bare `puts(...)` call.** Onion has no
+  default-imported `puts` function, so `puts("hi")` surfaced as an ordinary
+  `E0005` "method not found" on the enclosing script's synthesized main class,
+  with nothing connecting it back to Onion's actual output API.
+  `SemanticErrorReporter.reportMethodNotFound` now recognizes an unqualified
+  call to the exact name `puts` and points at `IO::println` instead of a
+  name-similarity guess. Pinned by new `RubyStylePutsHintI18nSpec`.
+
 - **Diagnostic hint for a JavaScript/Python/Rust-style `async def`/`async function`/
   `async fn` declaration.** Onion has no `async` keyword, so `async def foo():`,
   `async function foo() { ... }`, and similar forms parsed `async` as a bare

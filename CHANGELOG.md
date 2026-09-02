@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parser hint for a Ruby-style `rescue` clause on a `try` block.** Writing
+  `try { ... } rescue e: Exception { ... }` (or any other Ruby `rescue`
+  clause) — `rescue` isn't a keyword in Onion, so it parsed as a bare
+  identifier-reference statement and the parser tripped on whatever followed
+  it (the exception type or bound name) instead of naming the actual mistake.
+  `ControlFlowSyntaxHints` now recognizes a bare `rescue` the same way it
+  already recognized Python's `except`, and explains that exceptions are
+  caught with `catch e: Exception { ... }` instead. Same pattern as the
+  existing `except`/`unless`/`until` Ruby/Python-style hints; pinned by new
+  `RescueClauseHintI18nSpec` and `RescueClauseHintSpec` tests plus a case in
+  `ControlFlowSyntaxHintsSpec`.
+
 - **Parser hint for a Rust-style `name!(...)` macro call.** Writing
   `println!("hi")`, `assert_eq!(x, y)`, `vec!(1, 2)`, or any other
   Rust `macro!(...)` invocation — `!` is Onion's prefix logical-not operator,

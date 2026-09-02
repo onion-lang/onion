@@ -12,6 +12,7 @@ private[compiler] object ControlFlowSyntaxHints {
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val LeadingUntilStatement = """^\s*until\b""".r
   private val ExceptClause = """\bexcept\b""".r
+  private val RescueClause = """\brescue\b""".r
   // A raised value shaped like a constructor call (`raise Exception("boom")`)
   // gets a `throw new` suggestion; anything else (e.g. a bare re-raise like
   // `raise e`) falls through to the plain `throw` case below it, so this must
@@ -60,6 +61,8 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.until_not_supported")
     } else if (ExceptClause.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.except_not_supported")
+    } else if (RescueClause.findFirstMatchIn(sourceLine).isDefined) {
+      hint("error.parsing.hint.rescue_not_supported")
     } else if (LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingRaiseConstructorCall.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.python_style_raise_construct", matched.group(1), matched.group(2).trim)

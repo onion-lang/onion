@@ -15,6 +15,7 @@ class ControlFlowSyntaxHintsSpec extends AnyFunSpec with Matchers {
         ("unless", "unless done {", "error.parsing.hint.unless_not_supported"),
         ("until", "until done {", "error.parsing.hint.until_not_supported"),
         ("error", "} except error: Exception {", "error.parsing.hint.except_not_supported"),
+        ("error", "} rescue error {", "error.parsing.hint.rescue_not_supported"),
         ("Exception", "raise Exception(\"boom\")", "error.parsing.hint.python_style_raise_construct"),
         ("e", "raise e", "error.parsing.hint.python_style_raise"),
         ("foo", "await foo()", "error.parsing.hint.await_not_supported"),

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- No exceptions on two ordinary paths: `OnionClassLoader` defines the classes it carries
+  directly instead of delegating to the parent first (a `ClassNotFoundException` per
+  generated class on every law-checked compilation and script run), and the string
+  interpolation sub-parser is reused across a file's `#{...}` fragments instead of being
+  constructed -- lookahead tables and a stack-trace-filling `LookaheadSuccess` -- per
+  fragment.
 - **Classes are generated in parallel.** Each class's code generation only reads the typed
   structures, so the classes of one compilation are emitted on the common pool when there
   are at least two; per-class state (closure counter, closure classes, visitor cache) is

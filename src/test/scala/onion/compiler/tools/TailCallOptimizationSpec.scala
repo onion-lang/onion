@@ -70,6 +70,41 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success("6") == result)
     }
 
+    it("optimizes a @TailRecursive mutual-recursion group (no stack overflow at depth 1000000)") {
+      // MutualRecursionOptimization rewrites an all-private, matching-signature
+      // @TailRecursive group into a state machine (see
+      // src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala).
+      // IneffectiveTailRecursiveWarningSpec only checks that W0016 fires or not at
+      // compile time; this checks the optimized bytecode is actually correct at runtime.
+      val result = shell.run(
+        """
+          |class Parity {
+          |private:
+          |  @TailRecursive
+          |  def isEven(n: Int): Boolean {
+          |    if n == 0 { return true }
+          |    return isOdd(n - 1)
+          |  }
+          |  @TailRecursive
+          |  def isOdd(n: Int): Boolean {
+          |    if n == 0 { return false }
+          |    return isEven(n - 1)
+          |  }
+          |public:
+          |  def check(n: Int): Boolean = isEven(n)
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Boolean = new Parity().check(1000000)
+          |}
+          |""".stripMargin,
+        "MutualTailRecursiveDepth.on",
+        Array()
+      )
+      assert(Shell.Success(true) == result)
+    }
+
     it("optimizes a zero-argument static method without crashing") {
       val result = shell.run(
         """

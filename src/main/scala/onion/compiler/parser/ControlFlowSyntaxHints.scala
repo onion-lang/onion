@@ -32,6 +32,12 @@ private[compiler] object ControlFlowSyntaxHints {
   // the generic missing-call-parens fallback (suggesting the nonsensical
   // `yield(...)`); keep this ahead of that case.
   private val LeadingYieldStatement = """^\s*yield\s+(.+?)\s*$""".r
+  // A Go-style prefix `defer expr` statement -- Onion has no `defer`, so this
+  // reads as a bare `defer` identifier followed by another expression with
+  // nothing in between, which also matches the generic missing-call-parens
+  // fallback (suggesting the nonsensical `defer(...)`); keep this ahead of
+  // that case.
+  private val LeadingDeferStatement = """^\s*defer\s+(.+?)\s*$""".r
   // A Python-style `with expr as name { ... }` resource-management block --
   // `with` is not a keyword in Onion, so this reads as a bare `with` identifier
   // followed by another expression with nothing in between, which also matches
@@ -74,6 +80,9 @@ private[compiler] object ControlFlowSyntaxHints {
       hint("error.parsing.hint.await_not_supported", matched.group(1).trim)
     } else if (LeadingYieldStatement.findFirstMatchIn(sourceLine).isDefined) {
       hint("error.parsing.hint.yield_not_supported")
+    } else if (LeadingDeferStatement.findFirstMatchIn(sourceLine).isDefined) {
+      val matched = LeadingDeferStatement.findFirstMatchIn(sourceLine).get
+      hint("error.parsing.hint.defer_not_supported", matched.group(1).trim)
     } else if (LeadingWithAsStatement.findFirstMatchIn(sourceLine).isDefined) {
       val matched = LeadingWithAsStatement.findFirstMatchIn(sourceLine).get
       hint("error.parsing.hint.with_as_statement", matched.group(2), matched.group(1).trim)

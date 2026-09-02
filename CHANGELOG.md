@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic for a Kotlin-style `companion object` nested inside a class.** `companion`
+  isn't a reserved word, so `companion object { ... }` previously parsed as a bare
+  identifier statement followed by a stray `object` token, falling through to the
+  generic "missing call parentheses" hint (suggesting `companion(...)`) with nothing
+  connecting it back to the actual mistake. `SyntaxHintClassifier` now recognizes the
+  shape directly and points at the fix: declare the members as `static` members of the
+  enclosing class instead, since Onion has no per-class singleton to nest them in.
+  Pinned by new `CompanionObjectDeclarationHintI18nSpec`.
 - **Diagnostic for `new` applied to a primitive type (`new Double(1.5)`, `new Int(3)`,
   ...).** Onion's capitalized primitive type names resolve to a `BasicType`, not a
   class, so this Java/Kotlin boxing habit previously fell through to the generic

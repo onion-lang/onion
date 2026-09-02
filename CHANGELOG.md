@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-09-03
+
 ### Changed
 
 - Less bookkeeping per typed node and per call site: the applied-type cache is keyed by

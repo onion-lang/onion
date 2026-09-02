@@ -30,6 +30,27 @@ public class JJOnionParser implements Parser {
   private int mset; // used for semantic lookahead
 
   // ========== Error Recovery Support ==========
+  /**
+   * The sub-parser for `#{...}` fragments, reused across the fragments of this parser:
+   * constructing a JJOnionParser allocates its lookahead tables and a LookaheadSuccess
+   * (an Error, with a stack trace) every time, and a file has one fragment per
+   * interpolated value. ReInit resets the generated state; the user state is reset here.
+   */
+  private JJOnionParser cachedInterpolationParser = null;
+
+  private JJOnionParser interpolationParser(String text) {
+    if (cachedInterpolationParser == null) {
+      cachedInterpolationParser = new JJOnionParser(new OnionLexer(text));
+    } else {
+      cachedInterpolationParser.ReInit(new OnionLexer(text));
+      cachedInterpolationParser.states.clear();
+      cachedInterpolationParser.errorRecoveryMode = false;
+      cachedInterpolationParser.collectedErrors.clear();
+      cachedInterpolationParser.mset = 0;
+    }
+    return cachedInterpolationParser;
+  }
+
   private boolean errorRecoveryMode = false;
   private ArrayList<ParseError> collectedErrors = new ArrayList<ParseError>();
   private int maxErrors = 10; // Maximum number of errors to collect before giving up
@@ -910,7 +931,7 @@ public class JJOnionParser implements Parser {
       // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
       String padding = interpolationPadding(str, interpStart + 2, loc, 1);
-      JJOnionParser exprParser = new JJOnionParser(new OnionLexer(padding + exprStr));
+      JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);
@@ -979,7 +1000,7 @@ public class JJOnionParser implements Parser {
       // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
       String padding = interpolationPadding(str, interpStart + 2, loc, 3);
-      JJOnionParser exprParser = new JJOnionParser(new OnionLexer(padding + exprStr));
+      JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);

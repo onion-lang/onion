@@ -26,6 +26,21 @@ class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoa
 
   classes.foreach(k => loadClass(k.className))
 
+  // A class this loader carries is defined here directly. Delegating to the parent first
+  // (the default) made the parent throw ClassNotFoundException for every one of them --
+  // a stack trace per generated class, on every law-checked compilation and script run.
+  @throws(classOf[ClassNotFoundException])
+  protected override def loadClass(name: String, resolve: Boolean): Class[?] =
+    getClassLoadingLock(name).synchronized {
+      val loaded = findLoadedClass(name)
+      val result =
+        if (loaded != null) loaded
+        else if (pendingClasses.contains(name)) findClass(name)
+        else super.loadClass(name, false)
+      if (resolve) resolveClass(result)
+      result
+    }
+
   @throws(classOf[ClassNotFoundException])
   protected override def findClass(name: String): Class[?] =
     pendingClasses.remove(name) match {

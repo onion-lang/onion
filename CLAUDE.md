@@ -38,6 +38,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
 - `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
 - `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)
+- `ONION_DAEMON=1` (environment) - `onionc` compiles through a resident daemon (`onion.tools.daemon`), started on first use; falls back to in-process compilation when it cannot be reached. `java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` controls it
 
 ## High-Level Architecture
 

@@ -32,21 +32,31 @@ object CompilerFrontend {
   private def printError(message: String): Unit = System.err.println(message)
 
   def main(args: Array[String]): Unit = {
+    // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
+    // onion.tools.daemon.DaemonClient); when the daemon cannot be reached, compile here.
+    val viaDaemon =
+      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version"))
+        onion.tools.daemon.DaemonClient.compile(args)
+      else None
+    val exitCode = viaDaemon.getOrElse(runCommandLine(args))
+    if (exitCode != 0) System.exit(exitCode)
+  }
+
+  /** `main` without the exit: runs a complete `onionc` command line and returns its exit code. */
+  def runCommandLine(args: Array[String]): Int = {
     // Handle help and version flags early
     if (args.exists(a => a == "-h" || a == "--help")) {
       new CompilerFrontend().printUsage()
-      return
+      return 0
     }
     if (args.exists(a => a == "-v" || a == "--version")) {
       println(s"Onion Compiler version $VERSION")
-      return
+      return 0
     }
     val verbose = args.exists(_ == "--verbose")
     val filteredArgs = args.filterNot(_ == "--verbose")
-    try {
-      val exitCode = new CompilerFrontend().run(filteredArgs, verbose)
-      if (exitCode != 0) System.exit(exitCode)
-    } catch {
+    try new CompilerFrontend().run(filteredArgs, verbose)
+    catch {
       case e: ScriptException => throw e.getCause
     }
   }

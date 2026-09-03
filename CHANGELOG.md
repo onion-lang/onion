@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A compile daemon** (`ONION_DAEMON=1`). `onionc` hands its command line to a resident
+  compiler process -- started on first use, one per user, JDK and Onion installation -- over a
+  Unix domain socket in a user-private directory, and relays its output and exit code. The
+  daemon keeps the JIT-compiled compiler and the shared class universe between runs, exits
+  after 30 minutes idle, and is controlled with `java -cp onion.jar
+  onion.tools.daemon.DaemonClient stop|status`. Whenever it cannot be reached or started,
+  `onionc` compiles in-process as before. Paths in the command line are made absolute by the
+  client, since the daemon has its own working directory.
+
 ## [0.50.0] - 2026-09-03
 
 ### Changed

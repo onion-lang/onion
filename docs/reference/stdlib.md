@@ -2194,6 +2194,15 @@ Maps::keys(m)                              // List of keys, in order
 Maps::values(m)                            // List of values, in order
 ```
 
+`getOrDefault`, `keys` and `values` are also usable as extension methods on the
+map itself, chaining into a pipeline like the rest of `Maps`:
+
+```onion
+m.getOrDefault("x", 0)   // same as Maps::getOrDefault(m, "x", 0)
+m.keys()                 // same as Maps::keys(m)
+m.values()               // same as Maps::values(m)
+```
+
 ### Transformation
 
 ```onion

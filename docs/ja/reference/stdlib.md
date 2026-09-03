@@ -1345,6 +1345,7 @@ val m: Map[String, Int] = Maps::newMap()
 Maps::getOrDefault(m, "a", 0)                 // あればその値、無ければデフォルト
 Maps::getOrElse(m, "x", () -> compute())      // 遅延デフォルト
 Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
+m.getOrDefault("x", 0) / m.keys() / m.values() // 拡張メソッドとしても呼べる（上と同じ）
 Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUpperCase())
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語

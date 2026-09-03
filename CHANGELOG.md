@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-09-03
+
 ### Changed
 
 - Arrays built on the type checker's and backend's hot paths pass a precomputed `ClassTag`

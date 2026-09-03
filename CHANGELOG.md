@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Smaller fixed costs: lazily allocated scope tables, the parser's next-token cache, cached
     string-interpolation helpers, a shared empty index set for calls without lambda arguments,
     and no string copy for a module-less qualified name.
+
 ### Documentation
 
 - **`IO::input`.** `docs/reference/stdlib.md` and its Japanese translation documented

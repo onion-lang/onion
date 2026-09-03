@@ -2399,6 +2399,21 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
   }
 
+  /** An ASCII identifier that is not a keyword: what the lexer would turn into a single ID token. */
+  private def isPlainIdentifier(text: String): Boolean = {
+    val n = text.length
+    if (n == 0 || n >= 32) return false
+    val c0 = text.charAt(0)
+    if (!((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z') || c0 == '_')) return false
+    var i = 1
+    while (i < n) {
+      val c = text.charAt(i)
+      if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) return false
+      i += 1
+    }
+    OnionLexer.keywordKind(text.toCharArray, 0, n) == -1
+  }
+
   /** `parseInterpolatedString` / `parseMultiLineInterpolatedString` of the grammar. */
   private def interpolated(loc: Location, whole: String, quoteLen: Int): AST.Expression = {
     val str = whole.substring(quoteLen, whole.length - quoteLen)
@@ -2432,9 +2447,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         if (braceCount > 0) throw fail
         val exprStr = str.substring(interpStart + 2, interpEnd - 1)
         val (line, col) = interpolationOrigin(str, interpStart + 2, loc, quoteLen)
-        val sub = new OnionParser(exprStr, line - 1, col - 1)
-        val expr = try sub.term() catch { case _: Exception => throw fail }
-        needsBodyRewrite |= sub.needsBodyRewrite
+        // `#{name}` is most interpolations; a plain identifier needs no sub-parser (and its
+        // lexer). Anything else is parsed as a term at its position in the enclosing file.
+        val expr =
+          if (isPlainIdentifier(exprStr)) AST.Id(Location(line, col, line, col + exprStr.length - 1), exprStr)
+          else {
+            val sub = new OnionParser(exprStr, line - 1, col - 1)
+            val parsed = try sub.term() catch { case _: Exception => throw fail }
+            needsBodyRewrite |= sub.needsBodyRewrite
+            parsed
+          }
         expressions += expr
         start = interpEnd
         pos = interpEnd

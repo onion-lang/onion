@@ -430,7 +430,12 @@ object TypedAST {
       this.isResolutionComplete = isInResolution
     }
 
+    // Per-name method arrays, as AsmClassType keeps: overload resolution asks for the same
+    // names over and over, and the table-to-array copy per call showed in the profile.
+    private var methodArrays: java.util.HashMap[String, Array[TypedAST.Method]] = null
+
     def add(method: TypedAST.Method): Unit = {
+      methodArrays = null
       methods_.add(method)
     }
 
@@ -444,7 +449,16 @@ object TypedAST {
     def addDefaultConstructor: Unit =
       constructors_ += ConstructorDefinition.newDefaultConstructor(this)
 
-    def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray(using methodTag)
+    def methods(name: String): Array[TypedAST.Method] = {
+      if (methodArrays == null) methodArrays = new java.util.HashMap[String, Array[TypedAST.Method]]()
+      val cached = methodArrays.get(name)
+      if (cached != null) cached
+      else {
+        val fresh = methods_.get(name).toArray(using methodTag)
+        methodArrays.put(name, fresh)
+        fresh
+      }
+    }
 
     def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
 
@@ -1036,8 +1050,24 @@ object TypedAST {
     // a (raw, list) tuple hashed the raw type's name and allocated the tuple on every
     // lookup, and this is asked for every written type annotation.
     private val cache = new java.util.concurrent.ConcurrentHashMap[TypedAST.ClassType, java.util.concurrent.ConcurrentHashMap[scala.collection.immutable.List[TypedAST.Type], AppliedClassType]]()
+    // Most applied types have one argument (List[String], Function1[...]'s aside); those are
+    // keyed by that argument's identity, which hashes in O(1), instead of by the list, whose
+    // hash walks its elements on every lookup.
+    private val cache1 = new java.util.concurrent.ConcurrentHashMap[TypedAST.ClassType, java.util.concurrent.ConcurrentHashMap[TypedAST.Type, AppliedClassType]]()
 
     def apply(raw: TypedAST.ClassType, typeArguments: scala.collection.immutable.List[TypedAST.Type]): AppliedClassType =
+      if typeArguments.nonEmpty && typeArguments.tail.isEmpty then
+        var perRaw1 = cache1.get(raw)
+        if perRaw1 == null then
+          perRaw1 = new java.util.concurrent.ConcurrentHashMap[TypedAST.Type, AppliedClassType]()
+          val winner = cache1.putIfAbsent(raw, perRaw1)
+          if winner != null then perRaw1 = winner
+        val arg = typeArguments.head
+        val cached1 = perRaw1.get(arg)
+        if cached1 != null then return cached1
+        val fresh1 = new AppliedClassType(raw, Array[TypedAST.Type](arg))
+        val winner1 = perRaw1.putIfAbsent(arg, fresh1)
+        return if winner1 == null then fresh1 else winner1
       var perRaw = cache.get(raw)
       if perRaw == null then
         perRaw = new java.util.concurrent.ConcurrentHashMap[scala.collection.immutable.List[TypedAST.Type], AppliedClassType]()
@@ -1813,6 +1843,8 @@ object TypedAST {
     private def isSuperTypeForClass(left: TypedAST.ClassType, right: TypedAST.ClassType): Boolean = {
       if (right == null) return false
       if (left eq right) return true
+      // Identity maps on purpose: a hashed map would call the types' hashCode, which for an
+      // applied type is not identity-based (measured slower than the walk it replaces).
       val memo = subtypeMemo.get
       var byRight = memo.get(left)
       if (byRight == null) {

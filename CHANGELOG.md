@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Smaller fixed costs in typing and codegen (each below measurement noise on the corpus,
+  kept because they only remove work): a class's method lists are cached until a member is
+  added; single-argument applied types are cached by that argument's identity instead of a
+  list hash; every remaining candidate collection uses the memoized per-compilation candidate
+  array; the codegen call-shape cache compares owner names instead of converting one per call
+  and carries the ASM method handle; a source file is read and decoded in one step; a `#{name}`
+  interpolation builds its identifier directly instead of running a sub-parser.
+
 ## [0.48.0] - 2026-09-03
 
 ### Changed

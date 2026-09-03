@@ -361,7 +361,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     var access = toAsmModifier(node.modifier)
     if (node.isVararg) access |= Opcodes.ACC_VARARGS
-    val argTypes = node.arguments.map(asmType)
+    val argTypes = node.arguments.map(asmType)(using AsmUtil.asmTypeTag)
     val returnType = asmType(node.returnType)
     val exceptions = if (node.throwsTypes.isEmpty) null
                      else node.throwsTypes.map(t => AsmUtil.internalName(t.name))

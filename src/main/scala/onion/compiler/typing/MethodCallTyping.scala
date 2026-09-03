@@ -119,15 +119,14 @@ final class MethodCallTyping(
     candidates: JTreeSet[Method],
     filter: Method => Boolean
   ): Unit = {
-    def collect(currentType: ObjectType): Unit = {
-      if (currentType == null) return
-      currentType.methods(name).foreach { method =>
-        if (filter(method)) candidates.add(method)
-      }
-      collect(currentType.superClass)
-      currentType.interfaces.foreach(collect)
+    // The hierarchy walk is memoized per (receiver, name) for the compilation; only the
+    // filter is applied here.
+    val all = MethodResolution.candidatesOf(sourceType, name, typing.table_)
+    var i = 0
+    while (i < all.length) {
+      if (filter(all(i))) candidates.add(all(i))
+      i += 1
     }
-    collect(sourceType)
   }
 
   /** Filter for instance (non-static) methods */

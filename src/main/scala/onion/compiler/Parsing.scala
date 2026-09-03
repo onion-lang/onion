@@ -59,14 +59,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * every other line keeps its original line number. On any other line `#!` is
    * left for the lexer to reject rather than being silently skipped (issue #262).
    */
-  private def stripShebang(reader: Reader): String = {
-    val sb = new StringBuilder
-    val buf = new Array[Char](4096)
-    try {
-      var n = reader.read(buf)
-      while (n != -1) { sb.appendAll(buf, 0, n); n = reader.read(buf) }
-    } finally reader.close()
-    val text = sb.toString
+  private def stripShebang(text: String): String = {
     if (text.startsWith("#!")) {
       val nl = text.indexOf('\n')
       if (nl < 0) "" else text.substring(nl)
@@ -79,7 +72,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     try {
-      val sourceText = stripShebang(source.openReader())
+      val sourceText = stripShebang(source.readText())
 
       // Fast path: the handwritten parser. It produces the same AST as the JavaCC parser
       // for every program the latter accepts, and gives up (Fail) on anything else, in which

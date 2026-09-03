@@ -13,7 +13,12 @@ class MultiTable[E <: Named] extends Iterable[E] {
   // table for every name ever asked of every class, `size` on `Object` included.
   private[this] final val mapping = new mutable.HashMap[String, List[E]]
 
+  // `values` is asked for on every method lookup over a user class; it is rebuilt only
+  // after an `add`.
+  private[this] var cachedValues: List[E] = null
+
   def add(entry: E): Boolean = {
+    cachedValues = null
     mapping.get(entry.name) match {
       case Some(v) =>
         mapping(entry.name) = v :+ entry
@@ -26,6 +31,9 @@ class MultiTable[E <: Named] extends Iterable[E] {
 
   def get(key: String): Seq[E] = mapping.getOrElse(key, Nil)
 
-  def values: Seq[E] = mapping.values.toList.flatten
+  def values: Seq[E] = {
+    if (cachedValues == null) cachedValues = mapping.values.toList.flatten
+    cachedValues
+  }
   def iterator: Iterator[E] = values.iterator
 }

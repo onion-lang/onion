@@ -30,14 +30,17 @@ class AsmCodeGenerationVisitor(
   // A call site's argument types, descriptor and owner depend only on the Method, and a
   // program calls the same few methods over and over; building the descriptor string and
   // the owner Type per call site was a visible share of code generation.
-  private final class CallShape(val argTypes: Array[AsmType], val descriptor: String, val owner: AsmType)
+  private final class CallShape(val argTypes: Array[AsmType], val descriptor: String, val owner: AsmType, val ownerName: String, val asmMethod: AsmMethod)
   private val callShapes = new java.util.IdentityHashMap[TypedAST.Method, CallShape]()
   private def callShape(method: TypedAST.Method, ownerName: String): CallShape = {
     val cached = callShapes.get(method)
-    if (cached != null && cached.owner.getInternalName == AsmUtil.internalName(ownerName)) cached
+    // Compared by the owner's source name (the same string instance nearly always): the
+    // internal-name conversion this used to do on every hit allocated a string per call.
+    if (cached != null && (cached.ownerName eq ownerName) || (cached != null && cached.ownerName == ownerName)) cached
     else {
       val argTypes = method.arguments.map(asmType)(using AsmUtil.asmTypeTag)
-      val shape = new CallShape(argTypes, AsmType.getMethodDescriptor(asmType(method.returnType), argTypes*), AsmUtil.objectType(ownerName))
+      val descriptor = AsmType.getMethodDescriptor(asmType(method.returnType), argTypes*)
+      val shape = new CallShape(argTypes, descriptor, AsmUtil.objectType(ownerName), ownerName, new AsmMethod(method.name, descriptor))
       callShapes.put(method, shape)
       shape
     }
@@ -247,19 +250,21 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     val shape = callShape(node.method, node.method.affiliation.name)
     val argTypes = shape.argTypes
-    emitArgumentsWithAdaptation(node.parameters, argTypes, Array(asmType(node.target.`type`)))
+    val pendingReceiver = new Array[AsmType](1)
+    pendingReceiver(0) = asmType(node.target.`type`)
+    emitArgumentsWithAdaptation(node.parameters, argTypes, pendingReceiver)
     val ownerType = shape.owner
     val methodDesc = shape.descriptor
     val isInterface = node.method.affiliation.isInterface
 
     // Select correct invoke instruction based on method type
     if isInterface then
-      gen.invokeInterface(ownerType, AsmMethod(node.method.name, methodDesc))
+      gen.invokeInterface(ownerType, shape.asmMethod)
     else
       // Since JEP 181 (class file v55+) invokevirtual is legal for private
       // instance methods within a nest, which lets closures (nest members)
       // call the host's private methods
-      gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
+      gen.invokeVirtual(ownerType, shape.asmMethod)
   
   override def visitCallStatic(node: CallStatic): Unit =
     val shape = callShape(node.method, node.target.name)
@@ -272,7 +277,7 @@ class AsmCodeGenerationVisitor(
       // a plain Methodref makes the JVM throw IncompatibleClassChangeError.
       gen.visitMethodInsn(Opcodes.INVOKESTATIC, ownerType.getInternalName, node.method.name, methodDesc, true)
     else
-      gen.invokeStatic(ownerType, AsmMethod(node.method.name, methodDesc))
+      gen.invokeStatic(ownerType, shape.asmMethod)
   
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
@@ -319,18 +324,17 @@ class AsmCodeGenerationVisitor(
     // Non-null path: call the method. The target survives the null check on
     // the stack (the dup'd copy IFNULL consumed was the other one), so it is
     // a pending operand across the arguments just like visitCall's receiver.
-    val argTypes = node.method.arguments.map(asmType)
-    emitArgumentsWithAdaptation(node.parameters, argTypes, Array(asmType(node.target.`type`)))
-    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
-    val methodDesc = AsmType.getMethodDescriptor(
-      asmType(node.method.returnType),
-      argTypes*
-    )
+    val shape = callShape(node.method, node.method.affiliation.name)
+    val argTypes = shape.argTypes
+    val pendingReceiver = new Array[AsmType](1)
+    pendingReceiver(0) = asmType(node.target.`type`)
+    emitArgumentsWithAdaptation(node.parameters, argTypes, pendingReceiver)
+    val ownerType = shape.owner
     val isInterface = node.method.affiliation.isInterface
     if isInterface then
-      gen.invokeInterface(ownerType, AsmMethod(node.method.name, methodDesc))
+      gen.invokeInterface(ownerType, shape.asmMethod)
     else
-      gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
+      gen.invokeVirtual(ownerType, shape.asmMethod)
 
     // Box primitive return type if needed (safe call always returns nullable)
     node.method.returnType match

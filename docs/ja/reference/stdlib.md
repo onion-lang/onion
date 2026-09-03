@@ -1007,6 +1007,10 @@ val f: Future[Int] = Future::successful(42)
 f.toOption()   // Option[Int] - Some(42) または None（ブロックする）
 f.toResult()   // Result[Int, Throwable]（ブロックする）
 f.underlying() // 相互運用のための Java CompletableFuture
+
+// 逆方向: Java の CompletableFuture を Future でラップする
+val cf: java.util.concurrent.CompletableFuture[Int] = someJavaApi()
+val wrapped: Future[Int] = Future::fromCompletableFuture(cf)
 ```
 
 ### Do記法サポート

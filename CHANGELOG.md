@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Hash`, `Codec`, `Text` and `Format`'s extension-method call syntax
+  documented.** `docs/reference/stdlib.md` and its Japanese translation only ever
+  showed these four modules as `Hash::name(...)` / `Codec::name(...)` /
+  `Text::name(...)` / `Format::name(...)` static calls, but every one of their
+  public static methods is also auto-registered as a builtin extension method on
+  its first parameter's type (`"pw".sha256()`, `"Hi".base64Encode()`,
+  `text.wrap(40)`, `(1536L).bytes()`, ... -- verified against a running script),
+  which was never shown in either doc. Added the extension-call spellings to all
+  four Module sections in both files and a new
+  `HashCodecTextFormatExtensionCallDocSpec` regression test.
+
 - **`Map`'s `keys()`/`values()`/`getOrDefault()` extension-method call syntax
   documented.** `docs/reference/stdlib.md` and its Japanese translation only ever
   showed these as `Maps::name(m, ...)` static calls, but `m.keys()`, `m.values()`

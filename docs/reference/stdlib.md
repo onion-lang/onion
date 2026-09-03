@@ -569,6 +569,66 @@ the sugar.
 - `orElse(other)` — this shape, or `other` when it doesn't read; reports both shapes'
   defects when neither does. Prints with this shape.
 
+## Scalars Module
+
+Strict scalar parsing for boundary derivations, used by `record ... from re"..."`/`shape`
+generated code (and callable directly) wherever the JDK's own parser is too lenient to
+serve as one.
+
+### Why not `Boolean::parseBoolean`?
+
+Every `java.lang.X.parseX` rejects malformed input by throwing — except
+`Boolean::parseBoolean`, which maps everything that isn't `"true"` to `false`. That is
+the one failure mode a parser must never have: `"maybe"`, `"yes"` and `"1"` would all
+silently become `false` with nothing to indicate the data was wrong.
+
+```onion
+Scalars::toBoolean("TRUE")     // true
+Scalars::toBoolean("false")    // false
+Scalars::toBoolean("yes")      // throws IllegalArgumentException
+Scalars::isBoolean("yes")      // false -- check before you call toBoolean
+```
+
+`toBoolean` throws `IllegalArgumentException`, the supertype of the
+`NumberFormatException` the numeric parsers throw, so a derivation catches both the
+same way.
+
+### Scalars::read
+
+Reads `text` as the scalar kind named by `tag` (one of `String`, `Int`, `Long`,
+`Double`, `Float`, `Boolean`, `Short`, `Byte`), reporting a positioned `Defect` rather
+than throwing.
+
+```onion
+import { onion.Scalars; onion.Outcome; }
+
+val port: Outcome[Object] = Scalars::read("Int", "8080", null, "port")
+println(port.get())                                    // 8080
+
+val bad: Outcome[Object] = Scalars::read("Int", "http", null, "port")
+println(bad.defects().get(0).describe())                // port: expected Int, found "http"
+```
+
+`origin` (an `Origin` or `null`) positions the defect in the source text; `path` names
+where in the value being built this field belongs.
+
+### Scalars::coerce
+
+Coerces an already-parsed document value (from `Json`/`Yaml`/...) to the scalar kind
+named by `tag`. Unlike `read`, the value arrives typed — a JSON number is already a
+`Number`, so this narrows rather than parses; a value of the wrong shape entirely (a
+string where an `Int` was required) is a defect, not a silent `null`.
+
+```onion
+Scalars::coerce("Int", 8080, null, "port")        // Outcome::ok(8080)
+Scalars::coerce("Int", "8080", null, "port")      // Outcome::ok(8080) -- numeric string still parses
+Scalars::coerce("Int", [1, 2], null, "port")      // a defect: expected Int, found an array
+```
+
+Both `read` and `coerce` speak the same tag vocabulary as the compiler's own scalar
+conversion table, so a `shape`/`from re"..."` derivation and hand-written code using
+`Scalars` directly report defects the same way.
+
 ## Function Interfaces
 
 Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f(args)`.

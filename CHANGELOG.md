@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Scalars` module documented.** `docs/reference/stdlib.md` and its Japanese
+  translation listed `Scalars` in the "Modules at a glance" table but had no section
+  documenting any of its members (`toBoolean`, `isBoolean`, `read`, `coerce`) -- the
+  strict scalar parser that `record ... from re"..."`/`shape` derivations use at
+  boundaries was effectively undocumented. Added a "Scalars Module" section to both
+  files and a new `ScalarsDocCoverageSpec` regression test.
+
 - **`Net::listen(port)` (single-argument overload) documented.** `docs/reference/stdlib.md`
   and its Japanese translation only ever named the three-argument
   `Net::listen(host, port, backlog)` form in the `### Net::listen` section, even though the

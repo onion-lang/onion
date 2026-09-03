@@ -509,6 +509,66 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 - `orElse(other)` — この shape、読めなければ `other`。どちらも読めない場合は両方の
   defect を報告します。印字はこの shape で行います。
 
+## Scalars モジュール
+
+境界（外部データを読み込む場所）向けの、厳格なスカラー変換です。`record ... from
+re"..."` や `shape` が生成するコードから使われるほか、直接呼び出すこともできます。
+JDK 自身のパーサが緩すぎてそのままでは使えない場面のためのものです。
+
+### なぜ `Boolean::parseBoolean` ではないのか
+
+`java.lang.X.parseX` はどれも不正な入力を例外で拒否します -- `Boolean::parseBoolean`
+だけが例外で、`"true"` 以外のすべてを `false` に変換してしまいます。これはパーサが
+絶対にやってはいけない失敗の仕方です。`"maybe"`・`"yes"`・`"1"` がすべて `false` に
+なり、データが不正だったことを示すものが何も残りません。
+
+```onion
+Scalars::toBoolean("TRUE")     // true
+Scalars::toBoolean("false")    // false
+Scalars::toBoolean("yes")      // IllegalArgumentException が発生
+Scalars::isBoolean("yes")      // false -- toBoolean を呼ぶ前に確認できる
+```
+
+`toBoolean` は `IllegalArgumentException` を投げます。これは数値パーサが投げる
+`NumberFormatException` の親クラスなので、派生コードは両方を同じ方法で捕捉できます。
+
+### Scalars::read
+
+`text` を `tag` で指定したスカラー種別（`String`・`Int`・`Long`・`Double`・`Float`・
+`Boolean`・`Short`・`Byte` のいずれか）として読み取り、例外ではなく位置情報付きの
+`Defect` として報告します。
+
+```onion
+import { onion.Scalars; onion.Outcome; }
+
+val port: Outcome[Object] = Scalars::read("Int", "8080", null, "port")
+println(port.get())                                    // 8080
+
+val bad: Outcome[Object] = Scalars::read("Int", "http", null, "port")
+println(bad.defects().get(0).describe())                // port: expected Int, found "http"
+```
+
+`origin`（`Origin` または `null`）は defect をソーステキスト上の位置に結び付け、
+`path` は構築中の値のどこに該当するフィールドかを示します。
+
+### Scalars::coerce
+
+`Json`/`Yaml` などで既にパース済みのドキュメント値を、`tag` で指定したスカラー種別に
+変換します。`read` と異なり値は既に型付きで渡ってくるため -- JSON の数値はすでに
+`Number` になっている -- これはパースではなく絞り込みです。形そのものが違う値
+（`Int` が必要な場所に文字列がある等）は、黙って `null` になるのではなく defect に
+なります。
+
+```onion
+Scalars::coerce("Int", 8080, null, "port")        // Outcome::ok(8080)
+Scalars::coerce("Int", "8080", null, "port")      // Outcome::ok(8080) -- 数値文字列も読める
+Scalars::coerce("Int", [1, 2], null, "port")      // defect: expected Int, found an array
+```
+
+`read` と `coerce` はどちらもコンパイラ自身のスカラー変換テーブルと同じタグの語彙を
+使うため、`shape`/`from re"..."` による導出と `Scalars` を直接使う手書きコードは、
+同じ方法で defect を報告します。
+
 ## 関数インターフェース
 
 ラムダとクロージャのための組み込み関数型。`f(args)`の代わりに`f(args)`として呼び出せます。

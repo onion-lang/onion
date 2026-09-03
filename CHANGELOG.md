@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strengthened `StdlibDocRandModuleParitySpec` to check bounded-overload coverage, not
   just name coverage.
 
+- **CLAUDE.md's and CLAUDE_ja.md's Standard Library summaries were missing 21 of the
+  ~38 documented `onion.*` stdlib modules** (`Colls`, `Iterables`, `Maps`, `Sets`,
+  `Text`, `OnionMath`, `Stats`, `Format`, `Yaml`, `Csv`, `Config`, `Codec`, `Hash`,
+  `Outcome`, `Defect`, `Origin`, `Shape`, `Shapes`, `Scalars`, `Proc`, `Args`) --
+  the existing drift guard only checked that *listed* names were real, not that the
+  list was complete. Added the missing bullets to both files and extended
+  `StdlibDocDriftSpec` with a completeness check against the "Modules at a glance"
+  table in `docs/reference/stdlib.md`.
+
 ## [0.52.0] - 2026-09-03
 
 ### Changed

@@ -160,6 +160,22 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Concurrent` - スレッドプール、カウンタ、ロック、チャネル
 - `Net` - TCPソケット (connect, listen)
 - `Server` - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)
+- `Proc` - サブプロセス実行 (run, capture)
+- `Args` - コマンドライン引数のパース
+- `Colls` - コレクションのファクトリとパイプライン (map/filter/fold、chunked/windowed、sumBy/maxBy)
+- `Iterables`, `Maps`, `Sets` - イテレーションとマップ/セットのユーティリティ関数
+- `Text` - コンソール向けテキストレイアウト (wrap、indent、テーブル整形)
+- `OnionMath` - 双曲線三角関数、安全な丸め/クランプ、範囲付き乱数整数
+- `Stats` - 数値集計 (sum、average、median、stddev)
+- `Format` - ロケール非依存のフォーマット (桁区切り、バイトサイズ、時間長)
+- `Yaml`, `Csv` - YAMLおよびRFC 4180 CSVのパース/シリアライズ
+- `Config` - パース済みJSONに対するドット記法での設定アクセス
+- `Codec` - Base64/hex/URLエンコード・デコード
+- `Hash` - 暗号学的/チェックサムダイジェスト (md5, sha256, ...)
+- `Outcome`, `Defect` - 外部データの読み取り結果: 値、またはそれが読めなかったすべての理由
+- `Origin` - 値がどこから来たか（読み取り元のテキスト上の位置）
+- `Shape`, `Shapes` - 外部テキストと型付きの値との双方向対応
+- `Scalars` - 境界導出のための厳密なスカラー値パース
 
 ## テスト
 

@@ -67,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Stats::sumInt(...)` in an actual example — `sumLong` never appeared as a real call in
   either file. A new `StatsDocCoverageSpec` guards every public `onion.Stats` member against
   both files going forward.
+- **`Db::connect`'s single-argument overload and `Conn::isClosed`.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed the 3-argument `Db::connect(url, user, password)`
+  call and `db.close()` — the credential-less `Db::connect(url)` overload (for databases needing
+  none, e.g. SQLite/H2) and `db.isClosed()` (alongside `close()`, as `Concurrent`'s Channel docs
+  already pair `close()`/`isClosed()`) never appeared in either file. A new `DbDocCoverageSpec`
+  guards both overloads and `isClosed()` against both files going forward.
 
 ## [0.45.0] - 2026-09-03
 

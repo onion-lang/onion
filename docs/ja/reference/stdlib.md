@@ -1950,8 +1950,12 @@ db.transaction((conn) -> {
   conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
 })
 
+db.isClosed()   // db.close() を呼ぶまでは false
 db.close()
 ```
+
+`Db::connect(url)` には認証情報が不要なデータベース（SQLite、H2 など）向けの引数 1 つの形式
+もあります。`Db::connect("jdbc:sqlite:local.db")` は `Db::connect(url, null, null)` と同じです。
 
 値は常に**バインド**され、SQL 文字列に埋め込まれることはありません。`WHERE name = ?` は
 どんな名前でも安全で、うっかり文字列連結してしまう余地がそもそもありません。

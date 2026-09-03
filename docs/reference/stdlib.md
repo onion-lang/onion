@@ -1429,6 +1429,9 @@ Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
 Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
 Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
+
+val ys: List[Long] = [10L, 20L, 30L, 40L]
+Stats::sumLong(ys)   // 100L   (Long, exact precision)
 ```
 
 These are also reachable as method calls, which is the form most code reaches

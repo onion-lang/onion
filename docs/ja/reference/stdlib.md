@@ -1316,6 +1316,9 @@ Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
 Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
 Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
+
+val ys: List[Long] = [10L, 20L, 30L, 40L]
+Stats::sumLong(ys)   // 100L   （Long: 整数精度を保持）
 ```
 
 メソッド呼び出しの形でも使えます（実際のコードではこちらが自然です）。ただし

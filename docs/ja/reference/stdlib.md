@@ -1041,6 +1041,7 @@ val age = Json::getInt(obj, "age")                     // 3
 val m = Json::object()                                  // 空の Map
 m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
+val pretty = Json::stringifyPretty(m)                   // インデント付きで整形
 val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
 ```
 

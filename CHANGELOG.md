@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`IO::input`.** `docs/reference/stdlib.md` and its Japanese translation documented
+  `IO::readln(prompt)` and `IO::readLine()` but never mentioned `IO::input(prompt)` — a
+  fully public sibling method that `readln(prompt)` is itself implemented in terms of. A
+  new `IODocCoverageSpec` guards its presence in both files going forward.
 - **`Yaml.YamlParseException::getLine`.** `docs/reference/stdlib.md` and its Japanese
   translation documented `Yaml::parse`/`Yaml::stringify` but never mentioned that a caught
   `Yaml.YamlParseException` also carries `getLine()` — the 1-based line number where parsing

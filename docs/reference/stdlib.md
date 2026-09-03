@@ -1646,6 +1646,15 @@ xs.groupBy { x -> x % 2 }         // Map from key to the List of elements with t
 xs.mkString(", ")                 // "1, 2, 3" - joins elements into a String (join is an alias)
 Colls::isNotEmpty(xs)             // true - the negation of isEmpty
 m.filterMap { k, v -> k == "name" }   // Map with only the matching entries
+xs.any { x -> x > 1 }             // true if some element matches
+xs.all { x -> x > 0 }             // true if every element matches
+xs.none { x -> x > 5 }            // true if no element matches
+xs.find { x -> x > 1 }            // first matching element, or null
+xs.forEach { x -> println(x) }    // runs an action per element, returns nothing
+xs.count { x -> x > 1 }           // how many elements match
+xs.reverse()                      // new List, elements in reverse order
+xs.contains(2)                    // true if some element equals 2
+Colls::toList(args)               // a Java array (e.g. main's String[]) as a List
 ```
 
 ### Batching, windowing, and selector aggregation

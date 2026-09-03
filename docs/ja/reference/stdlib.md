@@ -1573,6 +1573,8 @@ Colls::emptyMap()                       // 空の Map
 ```onion
 xs.concat(ys)                     // xs の要素に続けて ys の要素
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
+xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
+                                   // （bind はその別名で、do[List] { x <- xs; ... } が使う）
 xs.partition { x -> x > 1 }       // [matching, nonMatching] - 2つの List
 xs.toSet()                        // xs の要素から作った Set
 xs.distinct()                     // 重複を除去、最初に出現した順を保持
@@ -1583,6 +1585,8 @@ xs.head()                         // 先頭要素、空ならnull（first の別
 xs.tail()                         // 先頭要素を除いた残り（空リストでは例外）
 xs.takeWhile { x -> x < 3 }       // 述語を満たす先頭の連続部分
 xs.dropWhile { x -> x < 3 }       // その先頭の連続部分を取り除いた残り
+xs.zip(ys)                        // [[x0, y0], [x1, y1], ...] - ペアのList、短い方に合わせて切り詰め
+xs.groupBy { x -> x % 2 }         // キーごとの要素の List を値に持つ Map
 xs.mkString(", ")                 // "1, 2, 3" - 要素を文字列として連結（join は別名）
 Colls::isNotEmpty(xs)             // true - isEmpty の否定
 m.filterMap { k, v -> k == "name" }   // 条件に合うエントリだけの Map

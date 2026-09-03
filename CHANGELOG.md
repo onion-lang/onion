@@ -57,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrap a Java async API's result for use with Onion's `map`/`flatMap`/`await`/`do` notation. A new
   `FutureDocCoverageSpec` guards every public `onion.Future` member against both files going
   forward.
+- **`Stats::sumLong`.** `docs/reference/stdlib.md` and its Japanese translation mentioned
+  `sumInt`/`sumLong` together in prose ("keep integer precision") but only ever showed
+  `Stats::sumInt(...)` in an actual example — `sumLong` never appeared as a real call in
+  either file. A new `StatsDocCoverageSpec` guards every public `onion.Stats` member against
+  both files going forward.
 
 ## [0.45.0] - 2026-09-03
 

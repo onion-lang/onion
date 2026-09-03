@@ -1847,6 +1847,17 @@ Pool threads are daemons, so a pool someone forgot to close cannot keep the JVM 
 `main` returns. `close()` is still the right thing to call; `awaitClose(millis)` waits for
 work in flight.
 
+Full API:
+
+- `Concurrent::cpus()` - processors available on this machine (what `Concurrent::pool()`,
+  with no argument, sizes itself to)
+- `pool.size()` - how many threads this pool has
+- `pool.submit(f)` - runs `f` on a worker, returns a `Future`
+- `pool.mapAll(items, f)` - see above
+- `pool.close()` - stops accepting work and interrupts what is running; idempotent
+- `pool.awaitClose(timeoutMillis)` - stops accepting work and waits for what is running;
+  returns whether everything finished within the timeout
+
 ### Counter, Lock, Channel
 
 ```onion
@@ -1865,6 +1876,26 @@ Prefer `withLock` to `acquire`/`release`: a body that throws between a manual pa
 the lock and every other thread waits forever. A channel is bounded because an unbounded
 one hides a producer outrunning its consumer until memory runs out, and it refuses `null`,
 which would be indistinguishable from an empty receive.
+
+Full API:
+
+- `Concurrent::counter()` / `Concurrent::counter(initial)`
+- `counter.get()` / `counter.increment()` / `counter.decrement()` / `counter.add(delta)` /
+  `counter.set(next)`
+- `counter.compareAndSet(expected, next)` - sets the value only if it still equals `expected`
+- `Concurrent::lock()`
+- `lock.withLock(body)` - see above
+- `lock.acquire()` / `lock.release()` - the manual pair `withLock` exists to avoid
+- `lock.tryAcquire()` - takes the lock only if it is free; returns whether it was taken
+- `lock.isHeld()` - whether the lock is currently held
+- `Concurrent::channel(capacity)`
+- `chan.send(item)` / `chan.trySend(item)` - blocks while full vs. returns false instead
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - blocks until something arrives
+  vs. returns null after the timeout
+- `chan.size()` / `chan.isEmpty()`
+- `chan.close()` / `chan.isClosed()` - refuses further sends; what is already queued can
+  still be received
+- `chan.drain()` - everything queued right now, leaving the channel empty
 
 ---
 

@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isNotEmpty`/`filterMap` list-and-map utilities were undiscoverable without reading
   `src/main/java/onion/Colls.java`. A new `CollsDocCoverageSpec` guards every public
   `onion.Colls` member against both files going forward.
+- **`onion.Concurrent`'s full `Pool`/`Counter`/`Lock`/`Channel` API.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed a narrow "getting started" slice of each type
+  in prose examples — `Concurrent::cpus`, `Counter.compareAndSet`, `Lock.acquire`/`release`/
+  `tryAcquire`/`isHeld`, and `Channel.trySend`/`size`/`isEmpty`/`isClosed`/`drain` were all
+  real, callable members with no mention anywhere in either file. A new
+  `ConcurrentDocCoverageSpec` guards every public `onion.Concurrent`/`Pool`/`Counter`/`Lock`/
+  `Channel` member against both files going forward.
 
 ## [0.45.0] - 2026-09-03
 

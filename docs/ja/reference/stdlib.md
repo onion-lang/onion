@@ -1385,6 +1385,14 @@ Hash::sha512(text)         // 128文字 hex
 Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突耐性なし）
 ```
 
+いずれも `String` の組み込み拡張メソッドとしても使え、静的呼び出しの代わりに
+メソッドチェーンで書けます:
+
+```onion
+"password".sha256()        // Hash::sha256("password") と同じ
+"x".base64Encode().sha256().substring(0, 8)   // 下の Codec とチェーン可能
+```
+
 ## Codec モジュール
 
 テキストのエンコード・デコード（`onion.Codec`）: Base64・hex・URL/パーセント形式。
@@ -1394,6 +1402,14 @@ val enc = Codec::base64Encode("Hello")    // "SGVsbG8="
 Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
+```
+
+これらも `String` の組み込み拡張メソッドです:
+
+```onion
+"Hello".base64Encode().base64Decode()   // "Hello"
+"Hi".hexEncode() / "4869".hexDecode()
+"a b&c".urlEncode() / s.urlDecode()
 ```
 
 ## Stats モジュール
@@ -1438,6 +1454,17 @@ Format::duration(3661)            // "1h 1m 1s"
 Format::ordinal(21)               // "21st"
 ```
 
+いずれも数値レシーバの組み込み拡張メソッドとしても使えます（`integer`/`bytes`/
+`duration`/`ordinal` は `Long`、`number`/`fixed`/`percent` は `Double`）:
+
+```onion
+(1536L).bytes()                   // "1.5 KB"
+(3661L).duration()                // "1h 1m 1s"
+(21L).ordinal()                   // "21st"
+(0.756).percent(1)                // "75.6%"
+(3.14159).fixed(2)                // "3.14"
+```
+
 ## Text モジュール
 
 コンソールのテキストレイアウト（`onion.Text`）——折返し・インデント・整列テーブル。
@@ -1451,6 +1478,15 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Name   Dept
 // Alice  Eng
 // Bob    Sales
+```
+
+いずれもレシーバの組み込み拡張メソッドとしても使えます（`wrap`/`indent`/`dedent`
+は `String`、`table` は `List`）:
+
+```onion
+"長い文章 ...".wrap(40)            // 折り返した行のリスト
+"a\nb".indent("> ")                // "> a\n> b"
+[["Name", "Dept"], ["Alice", "Eng"]].table()
 ```
 
 ## System モジュール

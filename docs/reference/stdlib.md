@@ -1495,6 +1495,14 @@ Hash::sha512(text)         // 128-char hex
 Hash::md5(text) / Hash::sha1(text)   // checksums / interop (not collision-safe)
 ```
 
+Each is also a builtin extension method on `String`, so it can be written as a
+method chain instead of a static call:
+
+```onion
+"password".sha256()        // same as Hash::sha256("password")
+"x".base64Encode().sha256().substring(0, 8)   // chains with Codec below
+```
+
 ## Codec Module
 
 Text encoding and decoding (`onion.Codec`): Base64, hex, and URL/percent form.
@@ -1504,6 +1512,14 @@ val enc = Codec::base64Encode("Hello")    // "SGVsbG8="
 Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
+```
+
+These are also builtin extension methods on `String`:
+
+```onion
+"Hello".base64Encode().base64Decode()   // "Hello"
+"Hi".hexEncode() / "4869".hexDecode()
+"a b&c".urlEncode() / s.urlDecode()
 ```
 
 ## Stats Module
@@ -1552,6 +1568,17 @@ Format::duration(3661)            // "1h 1m 1s"
 Format::ordinal(21)               // "21st"
 ```
 
+Each is also a builtin extension method on its numeric receiver (`Long` for
+`integer`/`bytes`/`duration`/`ordinal`, `Double` for `number`/`fixed`/`percent`):
+
+```onion
+(1536L).bytes()                   // "1.5 KB"
+(3661L).duration()                // "1h 1m 1s"
+(21L).ordinal()                   // "21st"
+(0.756).percent(1)                // "75.6%"
+(3.14159).fixed(2)                // "3.14"
+```
+
 ## Text Module
 
 Console text layout (`onion.Text`): word wrapping, indenting, and aligned tables.
@@ -1565,6 +1592,15 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Name   Dept
 // Alice  Eng
 // Bob    Sales
+```
+
+Each is also a builtin extension method on its receiver (`String` for
+`wrap`/`indent`/`dedent`, `List` for `table`):
+
+```onion
+"a long sentence ...".wrap(40)    // List of wrapped lines
+"a\nb".indent("> ")                // "> a\n> b"
+[["Name", "Dept"], ["Alice", "Eng"]].table()
 ```
 
 ## Proc Module

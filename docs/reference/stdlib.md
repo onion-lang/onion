@@ -1979,6 +1979,19 @@ Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
 ```
 
+### Anchored match
+
+```
+Regex::matchGroups(input, pattern): List[String]
+```
+
+Matches only if the **whole** `input` matches `pattern` (anchored, unlike `find`/
+`findAll`, which match anywhere); returns `null` otherwise. On a match, returns the
+capture groups (index 0 is group 1); a group that did not participate in the match
+yields `""` rather than `null`. This is the primitive behind the `case re"..." (a, b):`
+select pattern (see "Regex literals" in CLAUDE.md) — the compiler desugars an anchored
+regex pattern into a `matchGroups` call plus a null check.
+
 ### Pattern literal overloads
 
 A `re"..."` literal compiles to a `java.util.regex.Pattern`, not a `String`.

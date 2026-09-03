@@ -1857,6 +1857,17 @@ pool.close()
 プールのスレッドはデーモンなので、閉じ忘れたプールが `main` の後も JVM を生かし続けることは
 ありません。とはいえ `close()` は呼ぶべきですし、処理中のものを待つなら `awaitClose(millis)` です。
 
+API 一覧:
+
+- `Concurrent::cpus()` - このマシンで使えるプロセッサ数（引数なしの `Concurrent::pool()` が
+  採用するサイズ）
+- `pool.size()` - このプールのスレッド数
+- `pool.submit(f)` - `f` をワーカーで実行し、`Future` を返す
+- `pool.mapAll(items, f)` - 上記の通り
+- `pool.close()` - 新規の受け付けを止め、実行中のものを中断する。冪等
+- `pool.awaitClose(timeoutMillis)` - 新規の受け付けを止め、実行中のものを待つ。
+  タイムアウト内に全て終わったかを返す
+
 ### Counter・Lock・Channel
 
 ```onion
@@ -1875,6 +1886,25 @@ val item = chan.receiveTimeout(1000) // 永久にブロックせず null を返�
 ロックが漏れ、他のスレッドが永久に待ちます。チャネルに上限があるのは、無制限だと生産者が
 消費者を追い越していることがメモリ枯渇まで見えないからです。`null` の送信は拒否します——
 受信側で「何も来なかった」と区別できなくなるためです。
+
+API 一覧:
+
+- `Concurrent::counter()` / `Concurrent::counter(initial)`
+- `counter.get()` / `counter.increment()` / `counter.decrement()` / `counter.add(delta)` /
+  `counter.set(next)`
+- `counter.compareAndSet(expected, next)` - 値がまだ `expected` と等しい場合のみ設定する
+- `Concurrent::lock()`
+- `lock.withLock(body)` - 上記の通り
+- `lock.acquire()` / `lock.release()` - `withLock` が避けるための手動ペア
+- `lock.tryAcquire()` - ロックが空いているときだけ取得する。取得できたかを返す
+- `lock.isHeld()` - ロックが現在保持されているか
+- `Concurrent::channel(capacity)`
+- `chan.send(item)` / `chan.trySend(item)` - 満杯ならブロック / 満杯なら false を返す
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック /
+  タイムアウト後は null を返す
+- `chan.size()` / `chan.isEmpty()`
+- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信できる
+- `chan.drain()` - 現在キューにあるもの全てを取り出し、チャネルを空にする
 
 ---
 

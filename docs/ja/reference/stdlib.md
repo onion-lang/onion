@@ -1364,15 +1364,24 @@ Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
 
 Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持し、集合演算は null 安全。
 
+どのメソッドも `Set` の組み込み拡張メソッドとして呼び出せます（例: `Sets::union(a, b)` は `a.union(b)`）。
+
 ```onion
 Sets::of(1, 2, 3) / Sets::newSet[Int]() / Sets::fromList([1, 1, 2]) / Sets::toList(a)
 Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
+a.union(b) / a.intersection(b) / a.difference(b)
 Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
+a.symmetricDifference(b)
 Sets::containsAll(a, b)                       // a が b の要素をすべて含む
+a.containsAll(b)
 Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
+a.isSubsetOf(b) / a.isSupersetOf(b) / a.isDisjoint(b)
 Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
+a.map(f) / a.filter(p) / a.find(p)
 Sets::forEach(a, (x: Int) -> println(x))
+a.forEach((x: Int) -> println(x))
 Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
+a.count(p) / a.any(p) / a.all(p)
 ```
 
 ## Hash モジュール

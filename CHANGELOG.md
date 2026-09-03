@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Sets`'s extension-method call syntax documented.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed `onion.Sets`'s set-algebra and
+  functional operations (`union`, `intersection`, `difference`,
+  `symmetricDifference`, `containsAll`, `isSubsetOf`, `isSupersetOf`,
+  `isDisjoint`, `map`, `filter`, `forEach`, `count`, `any`, `all`, `find`) as
+  `Sets::name(a, ...)` static calls, but every one of them is also a builtin
+  extension method on `Set` (`a.union(b)`, `a.isDisjoint(c)`, ... -- several
+  already exercised as compiling/running extension calls by
+  `StdlibMethodChainSpec`), which was never shown in either doc. Added the
+  extension-call spellings to both files' Sets Module section and a new
+  `SetsExtensionCallDocSpec` regression test.
+
 - **`Hash`, `Codec`, `Text` and `Format`'s extension-method call syntax
   documented.** `docs/reference/stdlib.md` and its Japanese translation only ever
   showed these four modules as `Hash::name(...)` / `Codec::name(...)` /

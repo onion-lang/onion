@@ -11,6 +11,11 @@ import org.scalatest.funspec.AnyFunSpec
  * `writeLine`/`writeBytes`/`timeout`/`closeWrite`/`close` for `Conn` and `accept`/`port`/
  * `close` for `Listener` -- never `isClosed()` on either, even though `Db.Conn` and
  * `Concurrent`'s Channel docs pair `close()`/`isClosed()` explicitly.
+ *
+ * `Net::listen(port)` -- the single-argument overload that binds every local address
+ * with a default backlog of 50 -- is likewise real (`Net.java` even opens its own class
+ * javadoc example with `Net::listen(0)`), but both doc files' `### Net::listen` section
+ * only ever showed the three-argument `Net::listen(host, port, backlog)` form by name.
  */
 class NetDocCoverageSpec extends AnyFunSpec {
 
@@ -22,6 +27,9 @@ class NetDocCoverageSpec extends AnyFunSpec {
 
   private def hasListenerIsClosedCall(doc: String): Boolean =
     doc.contains("listener.isClosed()")
+
+  private def hasSingleArgListenCall(doc: String): Boolean =
+    doc.contains("Net::listen(port)") || doc.contains("Net::listen(0)")
 
   it("actual onion.Net.Conn exposes isClosed (sanity check)") {
     val hasIsClosed = classOf[onion.Net.Conn].getDeclaredMethods.exists(_.getName == "isClosed")
@@ -51,5 +59,22 @@ class NetDocCoverageSpec extends AnyFunSpec {
   it("docs/ja/reference/stdlib.md documents Listener::isClosed()") {
     assert(hasListenerIsClosedCall(read("docs/ja/reference/stdlib.md")),
       "docs/ja/reference/stdlib.md never shows listener.isClosed()")
+  }
+
+  it("actual onion.Net exposes the single-argument listen(port) overload (sanity check)") {
+    val hasSingleArgListen = classOf[onion.Net].getDeclaredMethods.exists { m =>
+      m.getName == "listen" && m.getParameterCount == 1
+    }
+    assert(hasSingleArgListen, "reflection on onion.Net found no one-argument listen method -- the scan has rotted")
+  }
+
+  it("docs/reference/stdlib.md documents the single-argument Net::listen(port) overload") {
+    assert(hasSingleArgListenCall(read("docs/reference/stdlib.md")),
+      "docs/reference/stdlib.md never shows Net::listen(port) or Net::listen(0)")
+  }
+
+  it("docs/ja/reference/stdlib.md documents the single-argument Net::listen(port) overload") {
+    assert(hasSingleArgListenCall(read("docs/ja/reference/stdlib.md")),
+      "docs/ja/reference/stdlib.md never shows Net::listen(port) or Net::listen(0)")
   }
 }

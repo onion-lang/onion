@@ -98,6 +98,27 @@ ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5
 `ONION_DEBUG_STARTUP=1` を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
 表示されます。アーカイブが使われない理由はこれで分かります。
 
+### コンパイルデーモン
+
+`onionc` は毎回 JVM を起動し、コンパイラを読み込み、JIT で温めてからようやくファイルを
+コンパイルします。`ONION_DAEMON=1` を設定すると、`onionc` はコマンドラインを常駐の
+コンパイラプロセス（初回に自動起動、ユーザー・JDK・Onion のインストールごとに 1 つ）へ
+渡し、その出力と終了コードを中継します。デーモンは温まったコンパイラを実行間で保持する
+ので、典型的な 1 ファイルのコンパイルはずっと短い時間で終わります。
+
+```bash
+export ONION_DAEMON=1
+onionc Hello.on            # 初回はデーモンを起動し、以後はそれを再利用する
+```
+
+デーモンは 30 分仕事が無ければ自分で終了します。手動では `java -cp onion.jar
+onion.tools.daemon.DaemonClient stop`（または `status`）で操作できます。待ち受けは自分
+だけが読めるディレクトリ（`$XDG_RUNTIME_DIR` または一時ディレクトリ。
+`ONION_DAEMON_SOCKET` で上書き可）の Unix ドメインソケットで、Java 16 以降が必要です。
+デーモンに到達・起動できないときは、`onionc` はこれまでどおりプロセス内でコンパイル
+します。`ONION_DAEMON_JAVA_OPTS` はデーモン自身の JVM フラグです。`onion` による
+スクリプト実行はデーモンを経由しません（プログラムは自分のプロセスで動きます）。
+
 ## IDEセットアップ
 
 ### Visual Studio Code

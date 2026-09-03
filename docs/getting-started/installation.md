@@ -98,6 +98,27 @@ ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5
 `ONION_DEBUG_STARTUP=1` stops the launcher silencing the JVM's class-sharing messages,
 which is how to find out why an archive is being ignored.
 
+### The compile daemon
+
+Every `onionc` run starts a JVM, loads the compiler and compiles it just-in-time before it
+gets to your file. With `ONION_DAEMON=1`, `onionc` instead hands the command line to a
+resident compiler process — started on first use, one per user, JDK and Onion
+installation — and relays its output and exit code. The daemon keeps the warmed-up
+compiler between runs, so a typical single-file compile takes a fraction of the time:
+
+```bash
+export ONION_DAEMON=1
+onionc Hello.on            # starts the daemon the first time, then reuses it
+```
+
+The daemon stops itself after 30 minutes without work; `java -cp onion.jar
+onion.tools.daemon.DaemonClient stop` (or `status`) controls it by hand. It listens on a
+Unix domain socket in a directory only you can read (`$XDG_RUNTIME_DIR` or the temp
+directory; override with `ONION_DAEMON_SOCKET`), needs Java 16 or later for that, and
+whenever it cannot be reached or started `onionc` simply compiles in-process as before.
+`ONION_DAEMON_JAVA_OPTS` adds JVM flags to the daemon itself. Running a script with
+`onion` is not routed through the daemon (the program runs in your own process).
+
 ## IDE Setup
 
 ### Visual Studio Code

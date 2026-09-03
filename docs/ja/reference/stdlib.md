@@ -1071,6 +1071,17 @@ v["users"][0]["name"].asString()
 val obj = Json::parseOrNull("not json")   // 例外を投げず null
 ```
 
+不正入力の失敗をその場で処理したい場合、`Json.JsonParseException` は通常の `message()` に加えて
+`getPosition()`（パースを諦めた位置の文字オフセット）を持っています:
+
+```onion
+try {
+  Json::parse("{bad json")
+} catch e: Json.JsonParseException {
+  IO::println(e.message() + " at offset " + e.getPosition())
+}
+```
+
 `Json::asObject(obj)` と `Json::asArray(obj)` は素の `Map`/`List` 表現に対する型安全なキャストです。
 実行時の型が一致していれば `Map`/`List` にキャストした値を、そうでなければ `null` を返します。
 `Json::get`・`Json::parse`・`Json::parseOrNull` が `Object` を返した後、Map/List として

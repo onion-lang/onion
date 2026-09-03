@@ -1228,6 +1228,18 @@ another "absent" case rather than an error to handle separately:
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
 
+When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
+`getPosition()` — the character offset into the input where parsing gave up — in addition
+to the usual `message()`:
+
+```onion
+try {
+  Json::parse("{bad json")
+} catch e: Json.JsonParseException {
+  IO::println(e.message() + " at offset " + e.getPosition())
+}
+```
+
 `Json::asObject(obj)` and `Json::asArray(obj)` are type-safe casts on the plain
 `Map`/`List` representation: each returns its argument cast to `Map`/`List` when the
 runtime type matches, or `null` otherwise. They're handy after `Json::get`, `Json::parse`,

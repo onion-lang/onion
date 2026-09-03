@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Net::listen(port)` (single-argument overload) documented.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever named the three-argument
+  `Net::listen(host, port, backlog)` form in the `### Net::listen` section, even though the
+  single-argument shorthand (binding every local address with a default backlog of 50) is a
+  real overload -- `Net.java`'s own class javadoc opens its usage example with
+  `Net::listen(0)`. Documented the shorthand in both docs and extended `NetDocCoverageSpec`
+  to guard it.
+
 - **`Rand::nextLong(bound)` (bounded overload) documented.** `docs/reference/stdlib.md`
   and its Japanese translation covered the bounded overloads of `Rand::nextInt` and
   `Rand::nextDouble` but not the equivalent `Rand::nextLong(bound)` -- the doc-coverage

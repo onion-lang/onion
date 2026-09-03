@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Json.JsonParseException::getPosition`.** `docs/reference/stdlib.md` and its Japanese
+  translation mentioned `Json.JsonParseException` only as the thing `Json::parseOrNull`
+  avoids throwing, never documenting that a caught instance also carries `getPosition()` —
+  the character offset where parsing gave up — alongside the usual `message()`. A new
+  `JsonParseExceptionPositionSpec` exercises both accessors via `shell.run`.
 - **`onion.Option`'s and `onion.Result`'s full instance-method sets.** `docs/reference/stdlib.md`
   and its Japanese translation documented only part of each interface — `isDefined`/`isEmpty`/`get`/
   `orElseThrow`/`forEach` were missing from `Option`, and `isOk`/`isErr`/`get`/`getError`/

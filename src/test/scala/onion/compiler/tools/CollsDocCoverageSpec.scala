@@ -95,4 +95,47 @@ class CollsDocCoverageSpec extends AnyFunSpec {
     assert(missing.isEmpty,
       s"docs/ja/reference/stdlib.md's Colls section is missing: ${missing.toSeq.sorted.mkString(", ")}")
   }
+
+  /**
+   * `any`/`all`/`none`/`find`/`forEach`/`count`/`reverse`/`contains` are real List
+   * extension methods backed by `onion.Colls` (same fallback mechanism as
+   * `flatMap`/`bind`/`zip`/`groupBy` above), but the whole-file checks miss their absence
+   * by accident too: `forEach`/`count`/`contains` are documented for `Option`/`Result`/
+   * `Maps`/`Sets` elsewhere in the file, and `any`/`all`/`none`/`find`/`reverse` are common
+   * enough English words to appear in unrelated prose. Pin their presence in the Colls
+   * section itself, spelled as an actual List call, so neither coincidence hides a real gap.
+   */
+  private val listPredicateAndQueryNames = Set("any", "all", "none", "find", "forEach", "count", "reverse", "contains")
+
+  private def documentedCalls(doc: String, names: Set[String]): Set[String] =
+    names.filter(n => doc.contains(s"xs.$n(") || doc.contains(s".$n {"))
+
+  it("docs/reference/stdlib.md's Colls Module section documents List any/all/none/find/forEach/count/reverse/contains") {
+    val doc = collsSection(read("docs/reference/stdlib.md"), "## Colls Module")
+    val missing = listPredicateAndQueryNames -- documentedCalls(doc, listPredicateAndQueryNames)
+    assert(missing.isEmpty,
+      s"docs/reference/stdlib.md's Colls Module section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("docs/ja/reference/stdlib.md's Colls section documents List any/all/none/find/forEach/count/reverse/contains") {
+    val doc = collsSection(read("docs/ja/reference/stdlib.md"), "## Colls モジュール")
+    val missing = listPredicateAndQueryNames -- documentedCalls(doc, listPredicateAndQueryNames)
+    assert(missing.isEmpty,
+      s"docs/ja/reference/stdlib.md's Colls section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  /**
+   * `Colls::toList(array)` -- converting a Java array (e.g. `main(args: String[])`) into a
+   * `List` -- is the one crossing point CLAUDE.md itself calls out ("Use Colls::toList(args)
+   * to cross over"), but neither doc file ever showed the call.
+   */
+  it("docs/reference/stdlib.md documents Colls::toList(array)") {
+    assert(read("docs/reference/stdlib.md").contains("Colls::toList("),
+      "docs/reference/stdlib.md never shows Colls::toList(...)")
+  }
+
+  it("docs/ja/reference/stdlib.md documents Colls::toList(array)") {
+    assert(read("docs/ja/reference/stdlib.md").contains("Colls::toList("),
+      "docs/ja/reference/stdlib.md never shows Colls::toList(...)")
+  }
 }

@@ -1658,6 +1658,15 @@ xs.groupBy { x -> x % 2 }         // キーごとの要素の List を値に持�
 xs.mkString(", ")                 // "1, 2, 3" - 要素を文字列として連結（join は別名）
 Colls::isNotEmpty(xs)             // true - isEmpty の否定
 m.filterMap { k, v -> k == "name" }   // 条件に合うエントリだけの Map
+xs.any { x -> x > 1 }             // いずれかの要素が条件を満たせば true
+xs.all { x -> x > 0 }             // すべての要素が条件を満たせば true
+xs.none { x -> x > 5 }            // どの要素も条件を満たさなければ true
+xs.find { x -> x > 1 }            // 最初に条件を満たす要素、なければ null
+xs.forEach { x -> println(x) }    // 各要素に対して処理を実行、戻り値なし
+xs.count { x -> x > 1 }           // 条件を満たす要素の数
+xs.reverse()                      // 要素を逆順にした新しい List
+xs.contains(2)                    // いずれかの要素が2と等しければ true
+Colls::toList(args)               // Java配列（例: main の String[]）を List に変換
 ```
 
 ### バッチ化・ウィンドウ化・セレクタ集計

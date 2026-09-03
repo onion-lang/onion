@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **List `any`/`all`/`none`/`find`/`forEach`/`count`/`reverse`/`contains` and
+  `Colls::toList(array)` documented.** `docs/reference/stdlib.md` and its Japanese
+  translation never showed these as List extension methods in the Colls Module section
+  (`CollsDocCoverageSpec`'s whole-file check missed the gap by coincidence: `forEach`/
+  `count`/`contains` are documented for `Option`/`Result`/`Maps`/`Sets` elsewhere in the
+  file, and `any`/`all`/`none`/`find`/`reverse` are common English words that appear in
+  unrelated prose), and `Colls::toList(array)` -- the array-to-`List` crossing point
+  CLAUDE.md itself calls out -- was never shown in either doc at all. Added examples for
+  all nine to both files and extended `CollsDocCoverageSpec` with section-scoped checks
+  for actual call syntax, not just word presence.
+
 - **`Scalars` module documented.** `docs/reference/stdlib.md` and its Japanese
   translation listed `Scalars` in the "Modules at a glance" table but had no section
   documenting any of its members (`toBoolean`, `isBoolean`, `read`, `coerce`) -- the

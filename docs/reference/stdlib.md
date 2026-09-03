@@ -1090,6 +1090,8 @@ Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 // Measure and print execution time, return result
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // Prints: "Elapsed: 123.45ms"
+val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+// Prints: "task: 123.45ms"
 
 // Same, but for a function that returns nothing
 Timing::measureVoid(() -> { expensiveOperation(); })

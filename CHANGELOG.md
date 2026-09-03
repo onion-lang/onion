@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`Rand::nextLong(bound)` (bounded overload) documented.** `docs/reference/stdlib.md`
+  and its Japanese translation covered the bounded overloads of `Rand::nextInt` and
+  `Rand::nextDouble` but not the equivalent `Rand::nextLong(bound)` -- the doc-coverage
+  test only checked method *names*, so the already-documented zero-arg `Rand::nextLong()`
+  masked the missing bounded form. Added the missing subsection to both docs and
+  strengthened `StdlibDocRandModuleParitySpec` to check bounded-overload coverage, not
+  just name coverage.
+
 ## [0.52.0] - 2026-09-03
 
 ### Changed

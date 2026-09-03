@@ -417,12 +417,22 @@ final class ConstructionTyping(
    */
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
     if (parameters.length != formals.length) parameters
-    else parameters.zip(formals).map { (p, f) =>
-      if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-      else f match {
-        case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
-        case _ => p
+    else {
+      // An index loop: zip + map built two arrays (and a ClassTag each) per constructor call.
+      val out = new Array[Term](parameters.length)
+      var i = 0
+      while (i < parameters.length) {
+        val p = parameters(i)
+        val f = formals(i)
+        out(i) =
+          if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+          else f match {
+            case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
+            case _ => p
+          }
+        i += 1
       }
+      out
     }
 
   /** Whether `actual` can fill a parameter declared `formal`, either through

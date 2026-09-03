@@ -36,7 +36,7 @@ class AsmCodeGenerationVisitor(
     val cached = callShapes.get(method)
     if (cached != null && cached.owner.getInternalName == AsmUtil.internalName(ownerName)) cached
     else {
-      val argTypes = method.arguments.map(asmType)
+      val argTypes = method.arguments.map(asmType)(using AsmUtil.asmTypeTag)
       val shape = new CallShape(argTypes, AsmType.getMethodDescriptor(asmType(method.returnType), argTypes*), AsmUtil.objectType(ownerName))
       callShapes.put(method, shape)
       shape
@@ -67,7 +67,7 @@ class AsmCodeGenerationVisitor(
   private def emitArgumentsWithAdaptation(
     params: Array[Term],
     expectedTypes: Array[AsmType],
-    pendingTypes: Array[AsmType] = Array.empty
+    pendingTypes: Array[AsmType] = AsmUtil.noAsmTypes
   ): Unit =
     if TermContainsTry.currentMethodHasNoTry then
       // Nothing to spill around: emit the arguments in order.

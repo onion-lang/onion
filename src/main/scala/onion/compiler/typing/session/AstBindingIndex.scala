@@ -15,7 +15,7 @@ final class AstBindingIndex {
   // share a binding, and their Locations differ anyway.
   // Presized: a few thousand bindings per unit is ordinary, and IdentityHashMap doubles
   // by copying, which showed up as resize() in profiles when it started at the default 32.
-  private val astToTypedJ = new java.util.IdentityHashMap[AST.Node, TypedAST.Node](1024)
+  private val astToTypedJ = new java.util.IdentityHashMap[AST.Node, TypedAST.Node](8192)
   private val astToTyped: scala.collection.mutable.Map[AST.Node, TypedAST.Node] = astToTypedJ.asScala
 
   // One put per typed node. The reverse direction used to be a second identity map

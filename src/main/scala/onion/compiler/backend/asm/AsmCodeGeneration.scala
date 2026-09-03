@@ -156,7 +156,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       AsmUtil.internalName(classDef.superClass.name) 
     else 
       "java/lang/Object"
-    val interfaces: Array[String] = classDef.interfaces.map(i => AsmUtil.internalName(i.name)).toArray
+    val interfaces: Array[String] = classDef.interfaces.map(i => AsmUtil.internalName(i.name)).toArray(using TypedAST.stringTag)
 
     val classSignature =
       if classDef.isInterface then

@@ -156,7 +156,7 @@ private[compiler] final class MethodResolutionSupport(
       owner0,
       views.get(owner0) match
         case Some(view) =>
-          view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
+          view.raw.typeParameters.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(view.typeArguments).toMap
         case None =>
           emptySubst
     )

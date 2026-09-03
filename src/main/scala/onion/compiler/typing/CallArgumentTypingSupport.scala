@@ -77,7 +77,7 @@ private[compiler] final class CallArgumentTypingSupport(
 
     val fixedResults = (0 until fixedArgCount).map { i =>
       if (i < params.length) processAssignable(node, expectedArgs(i), params(i)) else null
-    }.toArray
+    }.toArray(using onion.compiler.TypedAST.termTag)
 
     if (fixedResults.contains(null)) return None
 
@@ -127,7 +127,7 @@ private[compiler] final class CallArgumentTypingSupport(
     context: LocalContext
   ): Option[Array[Term]] = {
     val argsWithDefaults = method.argumentsWithDefaults
-    val paramNames = argsWithDefaults.map(_.name)
+    val paramNames = argsWithDefaults.map(_.name)(using onion.compiler.TypedAST.stringTag)
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
 

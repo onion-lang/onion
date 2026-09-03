@@ -18,14 +18,14 @@ private[compiler] object AppliedTypeViews {
       tp match
         case ap: TypedAST.AppliedClassType =>
           val specializedArgs =
-            ap.typeArguments.map(arg => TypeSubstitution.substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = false))
+            ap.typeArguments.map(arg => TypeSubstitution.substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
           val specialized = TypedAST.AppliedClassType(ap.raw, specializedArgs.toList)
           val k = keyOf(specialized)
           if visited.contains(k) then return
           visited += k
           views += specialized.raw -> specialized
           val nextSubst: scala.collection.immutable.Map[String, Type] =
-            specialized.raw.typeParameters.map(_.name).zip(specialized.typeArguments).toMap
+            specialized.raw.typeParameters.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(specialized.typeArguments).toMap
           traverse(specialized.raw.superClass, nextSubst)
           specialized.raw.interfaces.foreach(traverse(_, nextSubst))
         case raw =>

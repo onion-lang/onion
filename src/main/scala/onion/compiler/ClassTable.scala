@@ -95,6 +95,9 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
    */
   private val candidateMemo = new java.util.IdentityHashMap[TypedAST.ObjectType, java.util.HashMap[String, Array[TypedAST.Method]]]()
   def methodCandidatesOf(target: TypedAST.ObjectType, name: String)(compute: => Array[TypedAST.Method]): Array[TypedAST.Method] = {
+    // The candidates of a platform or runtime class never change: keep them in the shared
+    // universe, so the next compilation finds them instead of walking the hierarchy again.
+    if (parent.isDefined && isShareableReceiver(target)) return parent.get.sharedMethodCandidatesOf(target, name)(compute)
     var byName = candidateMemo.get(target)
     if (byName == null) { byName = new java.util.HashMap[String, Array[TypedAST.Method]](); candidateMemo.put(target, byName) }
     val cached = byName.get(name)
@@ -102,6 +105,31 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
     else {
       val fresh = compute
       byName.put(name, fresh)
+      fresh
+    }
+  }
+
+  /**
+   * Per-compilation memos for overload resolution: a method's parameter types specialized to
+   * a receiver's supertype views, and its type-parameter names. Both were recomputed by every
+   * call site of the same method (`MethodResolutionSupport` is built per call).
+   */
+  private val specializedArgsMemo = new java.util.IdentityHashMap[AnyRef, java.util.IdentityHashMap[TypedAST.Method, Array[TypedAST.Type]]]()
+  def specializedArgsOf(views: AnyRef, method: TypedAST.Method)(compute: => Array[TypedAST.Type]): Array[TypedAST.Type] = {
+    var byMethod = specializedArgsMemo.get(views)
+    if (byMethod == null) { byMethod = new java.util.IdentityHashMap[TypedAST.Method, Array[TypedAST.Type]](); specializedArgsMemo.put(views, byMethod) }
+    val cached = byMethod.get(method)
+    if (cached != null) cached
+    else { val fresh = compute; byMethod.put(method, fresh); fresh }
+  }
+  private val typeParamNamesMemo = new java.util.IdentityHashMap[TypedAST.Method, Set[String]]()
+  def typeParamNamesOf(method: TypedAST.Method): Set[String] = {
+    val cached = typeParamNamesMemo.get(method)
+    if (cached != null) cached
+    else {
+      val tps = method.typeParameters
+      val fresh = if (tps.isEmpty) Set.empty[String] else tps.map(_.name).toSet
+      typeParamNamesMemo.put(method, fresh)
       fresh
     }
   }
@@ -133,6 +161,7 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
   }
 
   def appliedViewsOf(target: TypedAST.ClassType)(compute: => scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType]): scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType] = {
+    if (parent.isDefined && isShareableReceiver(target)) return parent.get.sharedAppliedViewsOf(target)(compute)
     val cached = appliedViewsMemo.get(target)
     if (cached != null) cached
     else {
@@ -161,6 +190,38 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
     val winner = arrayClasses.putIfAbsent(arrayName, fresh)
     if (winner == null) fresh else winner
   }
+
+  /**
+   * Whether a receiver type belongs wholly to the shared universe: a platform or runtime
+   * class, or such a class applied to shared type arguments. Only then may anything derived
+   * from it -- its supertype views, its overload candidates -- outlive this compilation
+   * (a user class in a type argument would leak into the next compilation's results).
+   */
+  private def isShareableReceiver(target: TypedAST.Type): Boolean =
+    target match {
+      case a: TypedAST.AppliedClassType =>
+        ClassTable.isSharedName(a.raw.name) && a.typeArguments.forall(isShareableReceiver)
+      case ct: TypedAST.ClassType => ClassTable.isSharedName(ct.name)
+      case other => isSharedComponent(other)
+    }
+
+  // The shared table's memos are reached from every compilation, possibly on several
+  // threads; each is guarded by its own monitor (uncontended in the common case).
+  private def sharedMethodCandidatesOf(target: TypedAST.ObjectType, name: String)(compute: => Array[TypedAST.Method]): Array[TypedAST.Method] =
+    candidateMemo.synchronized {
+      var byName = candidateMemo.get(target)
+      if (byName == null) { byName = new java.util.HashMap[String, Array[TypedAST.Method]](); candidateMemo.put(target, byName) }
+      val cached = byName.get(name)
+      if (cached != null) cached
+      else { val fresh = compute; byName.put(name, fresh); fresh }
+    }
+
+  private def sharedAppliedViewsOf(target: TypedAST.ClassType)(compute: => scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType]): scala.collection.immutable.Map[TypedAST.ClassType, TypedAST.AppliedClassType] =
+    appliedViewsMemo.synchronized {
+      val cached = appliedViewsMemo.get(target)
+      if (cached != null) cached
+      else { val views = compute; appliedViewsMemo.put(target, views); views }
+    }
 
   private def isSharedComponent(component: TypedAST.Type): Boolean =
     component match {
@@ -239,10 +300,8 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
   def rootClass: TypedAST.ClassType = loadRequired("java.lang.Object")
 
   def lookup(className: String): TypedAST.ClassType = {
-    classes.get(className) match {
-      case Some(ref) => ref
-      case None => classFiles.get(className)
-    }
+    val own = classes.getOrNull(className)
+    if (own != null) own else classFiles.get(className)
   }
 
   /** Option-returning version of lookup for safer null handling */

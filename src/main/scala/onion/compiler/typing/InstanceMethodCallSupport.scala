@@ -24,9 +24,7 @@ private[compiler] final class InstanceMethodCallSupport(
     val target = calls.typed(node.target, context).getOrElse(null)
     if (target == null) return None
 
-    val untypedClosureIndices = node.args.zipWithIndex.collect {
-      case (expr, i) if isClosureWithUntypedParams(expr) => i
-    }.toSet
+    val untypedClosureIndices = untypedClosureIndicesOf(node.args)
 
     val params =
       if (untypedClosureIndices.isEmpty) calls.typedTerms(node.args.toArray, context)
@@ -62,9 +60,7 @@ private[compiler] final class InstanceMethodCallSupport(
     }
 
     if (params0 == null) {
-      val untypedClosureIndices = node.args.zipWithIndex.collect {
-        case (expr, i) if isClosureWithUntypedParams(expr) => i
-      }.toSet
+      val untypedClosureIndices = untypedClosureIndicesOf(node.args)
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
@@ -249,6 +245,19 @@ private[compiler] final class InstanceMethodCallSupport(
 
   private def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
     closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure)
+
+  /** Positions of arguments that are lambdas with untyped parameters; the shared empty set when there are none (the common case). */
+  private def untypedClosureIndicesOf(args: List[AST.Expression]): Set[Int] = {
+    var i = 0
+    var found: Set[Int] = null
+    var rest = args
+    while (rest.nonEmpty) {
+      if (isClosureWithUntypedParams(rest.head)) { if (found == null) found = Set.empty; found = found + i }
+      i += 1
+      rest = rest.tail
+    }
+    if (found == null) Set.empty else found
+  }
 
   private def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
     expr match {

@@ -18,6 +18,9 @@ final class TypingBodyContext(
   private val topLevelClassProvider: () => Option[ClassType] = () => None,
   private val problemCountProvider: () => Int = () => 0
 ) {
+  /** Typed `Try` nodes created so far in this unit; bracketing a body typing tells whether it made one. */
+  var tryCount: Int = 0
+
   // `AssignedVariableScanner.scan` walks a subtree reflectively. Body typing asked for the
   // same subtrees repeatedly -- a method body once, then every `if`/`while` inside it
   // again for its own branches -- so the answer is kept per node. The AST is immutable.

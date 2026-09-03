@@ -117,18 +117,13 @@ private[compiler] object MethodResolution {
 
     loop(target.superClass) || anyInterface(target, loop)
 
-  private def findMethodsWithViews(
-    target: ObjectType,
-    name: String,
-    params: Array[Term],
-    views: scala.collection.immutable.Map[ClassType, AppliedClassType],
-    table: ClassTable
-  ): Array[Method] =
-    val support = new MethodResolutionSupport(views, params, table)
-
-    // The candidate set depends on (receiver, name) only; it is collected once per
-    // compilation and the per-call work is the applicability filter below.
-    val all = table.methodCandidatesOf(target, name) {
+  /**
+   * Every method named `name` visible on `target` (own, inherited, from interfaces), in
+   * MethodComparator order. The set depends on (receiver, name) only, so it is collected once
+   * per compilation; the per-call work is the applicability filter.
+   */
+  def candidatesOf(target: ObjectType, name: String, table: ClassTable): Array[Method] =
+    table.methodCandidatesOf(target, name) {
       val candidates = new JTreeSet[Method](new MethodComparator)
       def collectMethods(tp: ObjectType): Unit =
         if tp == null then return
@@ -146,6 +141,16 @@ private[compiler] object MethodResolution {
       collectMethods(target)
       candidates.toArray(new Array[Method](0))
     }
+
+  private def findMethodsWithViews(
+    target: ObjectType,
+    name: String,
+    params: Array[Term],
+    views: scala.collection.immutable.Map[ClassType, AppliedClassType],
+    table: ClassTable
+  ): Array[Method] =
+    val support = new MethodResolutionSupport(views, params, table)
+    val all = candidatesOf(target, name, table)
     val applicableMethods = all.iterator.filter(support.applicable).toList
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)

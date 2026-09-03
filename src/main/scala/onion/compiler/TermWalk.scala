@@ -40,7 +40,62 @@ object TermWalk:
             case _ => false
           }
 
+  /**
+   * The direct children of a node: every term and statement it holds. Written out per node
+   * class -- the reflective walk below did the same through each class's accessors, at the
+   * cost of a `Method.invoke` per accessor per node -- and the reflection stays only as the
+   * fallback for a node class not listed here.
+   */
   private[compiler] def children(node: AnyRef): Seq[AnyRef] = node match
+    // leaves
+    case _: RefLocal | _: This | _: OuterThis | _: NullValue | _: IntValue | _: LongValue | _: DoubleValue |
+         _: FloatValue | _: BoolValue | _: ByteValue | _: ShortValue | _: CharacterValue | _: StringValue |
+         _: RefStaticField | _: NOP | _: Break | _: Continue => Nil
+    // one child
+    case n: ArrayLength => n.target :: Nil
+    case n: NonNullAssert => n.target :: Nil
+    case n: AsInstanceOf => n.target :: Nil
+    case n: InstanceOf => n.target :: Nil
+    case n: RefField => n.target :: Nil
+    case n: SafeFieldAccess => n.target :: Nil
+    case n: SetLocal => n.value :: Nil
+    case n: SetStaticField => n.value :: Nil
+    case n: UnaryTerm => n.operand :: Nil
+    case n: ExpressionActionStatement => n.term :: Nil
+    case n: Return => if n.term == null then Nil else n.term :: Nil
+    case n: Throw => n.term :: Nil
+    case n: StatementTerm => n.statement :: Nil
+    case n: NewClosure => n.block :: Nil
+    // two or three children
+    case n: RefArray => n.target :: n.index :: Nil
+    case n: SafeRefArray => n.target :: n.index :: Nil
+    case n: SetArray => n.target :: n.index :: n.value :: Nil
+    case n: BinaryTerm => n.lhs :: n.rhs :: Nil
+    case n: SetField => n.target :: n.value :: Nil
+    case n: SynchronizedTerm => n.lock :: n.body :: Nil
+    case n: Synchronized => n.term :: n.statement :: Nil
+    case n: IfStatement => if n.elseStatement == null then n.condition :: n.thenStatement :: Nil else n.condition :: n.thenStatement :: n.elseStatement :: Nil
+    case n: ConditionalLoop => if n.update == null then n.condition :: n.stmt :: Nil else n.condition :: n.stmt :: n.update :: Nil
+    // arrays of children
+    case n: Begin => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.terms)
+    case n: StatementBlock => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.statements)
+    case n: Call => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters).toList
+    case n: SafeCall => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters).toList
+    case n: CallSuper => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.params).toList
+    case n: CallStatic => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters)
+    case n: NewObject => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters)
+    case n: NewArray => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters)
+    case n: NewArrayWithValues => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.values)
+    case n: ListLiteral => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.elements)
+    case n: MapLiteral => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.keys) ++ scala.collection.immutable.ArraySeq.unsafeWrapArray(n.values)
+    case n: Try =>
+      // Resource initializers are held as (binding, term) pairs; the reflective walk saw the
+      // pairs, not the terms, and never entered them -- kept as is.
+      val out = new scala.collection.mutable.ArrayBuffer[AnyRef](2 + n.catchStatements.length)
+      if n.tryStatement != null then out += n.tryStatement
+      out ++= n.catchStatements
+      if n.finallyStatement != null then out += n.finallyStatement
+      out.toSeq
     case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
     case _ => reflectiveChildren(node)
 

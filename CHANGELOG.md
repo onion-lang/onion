@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Less repeated work in the type checker and the backend** (whole example corpus, user
+  instructions under `perf stat`: about 10% fewer than v0.45.0):
+  - `Location` stores its span end as two ints instead of two `Option[Int]`s -- one object per
+    location instead of four; the `Option` accessors remain.
+  - Class subtyping (`TypeRules.isSuperType`) is memoized per thread; the hierarchy walk ran
+    again at every call site resolving against the same receiver.
+  - Overload resolution keeps a method's specialized parameter types and type-parameter names
+    per compilation instead of per call site, and the bidirectional (lambda-argument) path reuses
+    the memoized candidate set instead of rebuilding a sorted set per call.
+  - Supertype views and overload candidates of platform and runtime classes live in the shared
+    class universe, so a later compilation in the same process does not recompute them.
+  - The duplication pass skips the abstract-contract and override-contract checks for classes
+    whose ancestors contribute no contract, or that implement none of the contract names
+    (previously every class was checked against all of `java.lang.Object`'s methods).
+  - The type checker marks each method and closure body that contains a `try`; codegen skips its
+    per-operand `try` detection and operand spilling for the rest.
+  - The typed-AST child enumeration is written out per node class (reflection remains only as a
+    fallback), captured-variable collection is memoized per closure body within a class,
+    ASM types are cached on the type objects, and the expression and codegen dispatches test the
+    most common node kinds first.
+  - Smaller fixed costs: lazily allocated scope tables, the parser's next-token cache, cached
+    string-interpolation helpers, a shared empty index set for calls without lambda arguments,
+    and no string copy for a module-less qualified name.
+
 ### Documentation
 
 - **`IO::input`.** `docs/reference/stdlib.md` and its Japanese translation documented

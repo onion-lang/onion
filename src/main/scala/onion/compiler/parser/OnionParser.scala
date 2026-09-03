@@ -188,6 +188,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private var last: Token = null      // the last consumed token (JavaCC's `token`)
   private var lexedEof = false
   private var eolSignificant = false  // DEFAULT state at the start, as in the grammar
+  private var cur: Token = null       // the next visible token, when already determined
   private val modeStack = new ArrayBuffer[Boolean](16)
 
   /** The give-up signal; with -Donion.parser.debug=true it says where. */
@@ -221,6 +222,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   /** The k-th (1-based) upcoming token as the parser sees it: EOLs skipped unless significant. */
   private def peek(k: Int): Token = {
+    if (k == 1) {
+      if (cur == null) cur = peekUncached(1)
+      return cur
+    }
+    peekUncached(k)
+  }
+
+  private def peekUncached(k: Int): Token = {
     if (eolSignificant) rawAt(pos + k - 1)
     else {
       while (rawAt(pos).kind == K.EOL) pos += 1 // invisible here, and enterSection() skips them too
@@ -248,6 +257,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val t = rawAt(pos)
     if (t.kind != K.EOF) pos += 1
     last = t
+    cur = null
     t
   }
 
@@ -264,10 +274,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def accept(k: Int): Boolean = if (kind(1) == k) { next(); true } else false
 
   /** `eols()`: swallow visible EOL tokens. */
-  private def eols(): Unit = if (eolSignificant) while (rawAt(pos).kind == K.EOL) pos += 1
+  private def eols(): Unit = if (eolSignificant) while (rawAt(pos).kind == K.EOL) { pos += 1; cur = null }
 
-  private def enterState(significant: Boolean): Unit = { modeStack += eolSignificant; eolSignificant = significant }
-  private def leaveState(): Unit = { eolSignificant = modeStack.remove(modeStack.length - 1) }
+  private def enterState(significant: Boolean): Unit = { modeStack += eolSignificant; eolSignificant = significant; cur = null }
+  private def leaveState(): Unit = { eolSignificant = modeStack.remove(modeStack.length - 1); cur = null }
   /**
    * `enterSection()` of the grammar. The JavaCC parser decides which production to enter by
    * peeking at the next token, so that token is already lexed -- in the enclosing state -- when
@@ -291,7 +301,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private final class Mark(val pos: Int, val last: Token, val sig: Boolean, val depth: Int)
   private def mark(): Mark = new Mark(pos, last, eolSignificant, modeStack.length)
   private def reset(m: Mark): Unit = {
-    pos = m.pos; last = m.last; eolSignificant = m.sig
+    pos = m.pos; last = m.last; eolSignificant = m.sig; cur = null
     while (modeStack.length > m.depth) modeStack.remove(modeStack.length - 1)
   }
 
@@ -306,11 +316,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   // ---------------------------------------------------------------- helpers
 
   private def p(t: Token): Location = {
-    if (lineBase == 0 && colBase == 0) new Location(t.beginLine, t.beginColumn).withSpan(t.endLine, t.endColumn)
+    if (lineBase == 0 && colBase == 0) Location(t.beginLine, t.beginColumn, t.endLine, t.endColumn)
     else {
       val bc = if (t.beginLine == 1) t.beginColumn + colBase else t.beginColumn
       val ec = if (t.endLine == 1) t.endColumn + colBase else t.endColumn
-      new Location(t.beginLine + lineBase, bc).withSpan(t.endLine + lineBase, ec)
+      Location(t.beginLine + lineBase, bc, t.endLine + lineBase, ec)
     }
   }
   private def through(start: Token): Location = p(start).spanningTo(p(last))

@@ -685,6 +685,8 @@ object TypedAST {
    */
   class NewClosure(location: Location, val `type`: TypedAST.ClassType, val method: TypedAST.Method, val block: TypedAST.ActionStatement) extends Term(location) {
     var frame: LocalFrame = _
+    /** As MethodDefinition.mayContainTry, for the closure's own body. */
+    var mayContainTry: Boolean = true
 
     def this(`type`: TypedAST.ClassType, method: TypedAST.Method, block: TypedAST.ActionStatement) = {
       this(null, `type`, method, block)
@@ -746,6 +748,13 @@ object TypedAST {
     private val vararg: Boolean = false,
     val annotations: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
   ) extends Node with Method {
+    /**
+     * Whether the body may contain a `try` (a closure body inside it does not count: it is
+     * compiled as its own method). Left `true` when unknown; the type checker clears it for
+     * bodies it typed without creating one, and codegen then skips its per-operand `try`
+     * detection (see backend.asm.TermContainsTry).
+     */
+    var mayContainTry: Boolean = true
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null
@@ -1555,6 +1564,12 @@ object TypedAST {
    * @author Kota Mizushima
    */
   sealed trait ObjectType extends Type {
+    /**
+     * The backend's ASM `Type` for this type, once computed (typed `AnyRef` so the AST does not
+     * depend on ASM). A benign race: every writer stores an equal value.
+     */
+    @volatile var asmTypeCache: AnyRef = null
+
     def isInterface: Boolean
 
     def modifier: Int
@@ -1774,9 +1789,34 @@ object TypedAST {
       else isSuperType(lb, rb)
     }
 
+    // The walk below is repeated for the same (left, right) pair at every call site that
+    // resolves against the same receiver, and a failed check -- the common outcome in overload
+    // resolution -- walks the whole hierarchy. Subtyping between two class types is fixed for
+    // the life of both, and class types compare by identity, so the answer is memoized per
+    // thread. A stale entry from an earlier compilation is harmless (its keys are unreachable
+    // instances); the map is emptied when it grows large so it cannot leak without bound.
+    private val subtypeMemo = new ThreadLocal[java.util.IdentityHashMap[TypedAST.ClassType, java.util.IdentityHashMap[TypedAST.ClassType, java.lang.Boolean]]] {
+      override def initialValue() = new java.util.IdentityHashMap
+    }
+
     private def isSuperTypeForClass(left: TypedAST.ClassType, right: TypedAST.ClassType): Boolean = {
       if (right == null) return false
       if (left eq right) return true
+      val memo = subtypeMemo.get
+      var byRight = memo.get(left)
+      if (byRight == null) {
+        if (memo.size >= 4096) memo.clear()
+        byRight = new java.util.IdentityHashMap[TypedAST.ClassType, java.lang.Boolean]()
+        memo.put(left, byRight)
+      }
+      val cached = byRight.get(right)
+      if (cached != null) return cached.booleanValue
+      val result = isSuperTypeForClassUncached(left, right)
+      byRight.put(right, java.lang.Boolean.valueOf(result))
+      result
+    }
+
+    private def isSuperTypeForClassUncached(left: TypedAST.ClassType, right: TypedAST.ClassType): Boolean = {
 
       (left, right) match
         case (lraw, rapp: TypedAST.AppliedClassType) if lraw eq rapp.raw =>

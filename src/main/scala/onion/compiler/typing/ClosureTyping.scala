@@ -208,6 +208,7 @@ final class ClosureTyping(
                   }
                 }
 
+                val triesBefore = bodyContext.tryCount
                 val baseBlockOpt =
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
@@ -233,6 +234,7 @@ final class ClosureTyping(
                     if (useExpressionBody) block
                     else body.addReturnNode(block, expectedRet)
                   val result = new NewClosure(staticType, typedMethod, finalBlock)
+                  result.mayContainTry = bodyContext.tryCount != triesBefore
                   result.frame_=(context.getContextFrame)
                   Some(result)
                 }

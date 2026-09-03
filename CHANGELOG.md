@@ -32,6 +32,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Smaller fixed costs: lazily allocated scope tables, the parser's next-token cache, cached
     string-interpolation helpers, a shared empty index set for calls without lambda arguments,
     and no string copy for a module-less qualified name.
+### Documentation
+
+- **`IO::input`.** `docs/reference/stdlib.md` and its Japanese translation documented
+  `IO::readln(prompt)` and `IO::readLine()` but never mentioned `IO::input(prompt)` — a
+  fully public sibling method that `readln(prompt)` is itself implemented in terms of. A
+  new `IODocCoverageSpec` guards its presence in both files going forward.
+- **`Yaml.YamlParseException::getLine`.** `docs/reference/stdlib.md` and its Japanese
+  translation documented `Yaml::parse`/`Yaml::stringify` but never mentioned that a caught
+  `Yaml.YamlParseException` also carries `getLine()` — the 1-based line number where parsing
+  gave up — alongside the usual `message()`, mirroring `Json.JsonParseException::getPosition`.
+  A new `YamlParseExceptionLineSpec` exercises both accessors via `shell.run`.
+
+## [0.46.0] - 2026-09-03
+
+### Added
+
+- **A syntax hint for JavaScript/TypeScript-style `for (const x of arr)` loops.**
+  Onion's `for` clauses aren't parenthesized and have no `of` form, so this mistake
+  previously fell through to the generic C-style-for hint (which suggested adding
+  semicolons that don't belong in a foreach-shaped loop) or, for the `const` spelling
+  specifically, the unrelated `const`-declaration hint. `SyntaxHintClassifier` now
+  recognizes `for (const|let|var x of expr)` (and the bare `for (x of expr)` form) and
+  points at `foreach x: Type in expr { ... }` instead.
+
+### Documentation
+
+- **`Json::stringifyPretty`.** `docs/reference/stdlib.md` showed both
+  `Json::stringify(obj) / Json::stringifyPretty(obj)`, but its Japanese translation's
+  equivalent example only ever called the plain `Json::stringify`, never mentioning the
+  pretty-printing sibling at all. A new `JsonDocCoverageSpec` guards its presence in both
+  files going forward.
+- **`Timing::measure`'s labeled overload.** `docs/reference/stdlib.md` and its Japanese
+  translation showed `Timing::measure(fn)` and both `Timing::measureVoid` forms, but never
+  the labeled `Timing::measure(label, fn)` overload sitting right next to `measureVoid`'s
+  labeled example. A new `TimingDocCoverageSpec` guards both overloads' presence in both
+  files going forward.
+- **`Json.JsonParseException::getPosition`.** `docs/reference/stdlib.md` and its Japanese
+  translation mentioned `Json.JsonParseException` only as the thing `Json::parseOrNull`
+  avoids throwing, never documenting that a caught instance also carries `getPosition()` —
+  the character offset where parsing gave up — alongside the usual `message()`. A new
+  `JsonParseExceptionPositionSpec` exercises both accessors via `shell.run`.
+- **`onion.Option`'s and `onion.Result`'s full instance-method sets.** `docs/reference/stdlib.md`
+  and its Japanese translation documented only part of each interface — `isDefined`/`isEmpty`/`get`/
+  `orElseThrow`/`forEach` were missing from `Option`, and `isOk`/`isErr`/`get`/`getError`/
+  `getOrThrow`/`forEach`/`forEachError` were missing from `Result`. A new
+  `OptionResultDocCoverageSpec` guards both interfaces' full member sets against both files
+  going forward.
+- **`onion.Colls`'s factories and list/set/map utilities.** `docs/reference/stdlib.md` and
+  its Japanese translation only ever documented a handful of `Colls`'s members; `setOf`,
+  `mapOf`/`mutableMapOf`/`entry`, `emptyList`/`emptySet`/`emptyMap`, `mutableSetOf`,
+  `rangeWithStep`, and the `concat`/`flatten`/`partition`/`toSet`/`distinct`/`slice`/
+  `sorted`/`sortedByDescending`/`head`/`tail`/`takeWhile`/`dropWhile`/`mkString`/
+  `isNotEmpty`/`filterMap` list-and-map utilities were undiscoverable without reading
+  `src/main/java/onion/Colls.java`. A new `CollsDocCoverageSpec` guards every public
+  `onion.Colls` member against both files going forward.
+- **`onion.Concurrent`'s full `Pool`/`Counter`/`Lock`/`Channel` API.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed a narrow "getting started" slice of each type
+  in prose examples — `Concurrent::cpus`, `Counter.compareAndSet`, `Lock.acquire`/`release`/
+  `tryAcquire`/`isHeld`, and `Channel.trySend`/`size`/`isEmpty`/`isClosed`/`drain` were all
+  real, callable members with no mention anywhere in either file. A new
+  `ConcurrentDocCoverageSpec` guards every public `onion.Concurrent`/`Pool`/`Counter`/`Lock`/
+  `Channel` member against both files going forward.
+- **`onion.Regex::matchGroups`.** `docs/reference/stdlib.md` and its Japanese translation
+  documented `matches`/`find`/`findAll`/`findFirst`/`groups`/`groupsAll`/`replace`/
+  `replaceFirst`/`split`/`quote`/`isValid`, but never mentioned `matchGroups` — the anchored,
+  whole-string match that backs the `case re"..." (a, b):` select pattern. A new
+  `RegexDocCoverageSpec` guards every public `onion.Regex` member against both files going
+  forward.
+- **`Future::fromCompletableFuture`.** `docs/reference/stdlib.md` and its Japanese translation
+  documented `f.underlying()` (Future -> Java `CompletableFuture`) under "Conversions" but never
+  its inverse, `Future::fromCompletableFuture` (Java `CompletableFuture` -> Future) — the way to
+  wrap a Java async API's result for use with Onion's `map`/`flatMap`/`await`/`do` notation. A new
+  `FutureDocCoverageSpec` guards every public `onion.Future` member against both files going
+  forward.
+- **`Stats::sumLong`.** `docs/reference/stdlib.md` and its Japanese translation mentioned
+  `sumInt`/`sumLong` together in prose ("keep integer precision") but only ever showed
+  `Stats::sumInt(...)` in an actual example — `sumLong` never appeared as a real call in
+  either file. A new `StatsDocCoverageSpec` guards every public `onion.Stats` member against
+  both files going forward.
+- **`Db::connect`'s single-argument overload and `Conn::isClosed`.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed the 3-argument `Db::connect(url, user, password)`
+  call and `db.close()` — the credential-less `Db::connect(url)` overload (for databases needing
+  none, e.g. SQLite/H2) and `db.isClosed()` (alongside `close()`, as `Concurrent`'s Channel docs
+  already pair `close()`/`isClosed()`) never appeared in either file. A new `DbDocCoverageSpec`
+  guards both overloads and `isClosed()` against both files going forward.
+- **`Net.Conn::isClosed` and `Net.Listener::isClosed`.** `docs/reference/stdlib.md` and its
+  Japanese translation described `Conn`'s `readLine`/`readAll`/`readBytes`/`write`/`writeLine`/
+  `writeBytes`/`timeout`/`closeWrite`/`close` and `Listener`'s `accept`/`port`/`close`, but never
+  mentioned either class's `isClosed()` — the same `close()`/`isClosed()` pairing `Db.Conn` and
+  `Concurrent`'s Channel already document. A new `NetDocCoverageSpec` guards both members against
+  both files going forward.
 
 ## [0.45.0] - 2026-09-03
 

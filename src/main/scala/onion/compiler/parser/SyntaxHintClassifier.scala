@@ -99,6 +99,14 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*for\s*\(\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*in\s+([^{]+?)\)\s*\{?\s*$""".r
   private val JavaStyleEnhancedForLoop =
     """^\s*for\s*\(\s*(?:final\s+)?([A-Za-z_][\w.\[\],\s]*\??)\s+([A-Za-z_]\w*)\s*:\s*(.+?)\s*\)\s*\{?\s*$""".r
+  // A JavaScript/TypeScript-style `for (const x of arr)` (or `let`/`var`, or no
+  // declarator at all) -- unlike JavaStyleEnhancedForLoop's `Type name : expr` shape,
+  // `of` isn't followed by a colon, so it never collides with that rule, but it still
+  // matches the generic CStyleForLoop fallback below (which assumes the C-style
+  // three-clause counting loop and would suggest adding semicolons that don't belong
+  // here), so this must be tried first.
+  private val JsStyleForOfLoop =
+    """^\s*for\s*\(\s*(?:const|let|var)?\s*([A-Za-z_]\w*)\s+of\s+(.+?)\s*\)\s*\{?\s*$""".r
   private val ForeachParenMistake = """\bforeach\s*\(""".r
   private val JavaStyleImport = """^\s*import\s+(?!\{)\S""".r
   private val JavaStyleImportAlias =
@@ -197,6 +205,13 @@ private[compiler] object SyntaxHintClassifier {
     found match {
       case "<:" =>
         hint("error.parsing.hint.old_conforms")
+      // A JS/TS `for (const x of arr)` fails right at `const` itself (`for (`
+      // parses as the start of a C-style clause, which never accepts `const`),
+      // so the generic const-declaration hint below would otherwise win before
+      // the sourceLine-based JsStyleForOfLoop case further down ever runs.
+      case "const" if JsStyleForOfLoop.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JsStyleForOfLoop.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.js_style_for_of", matched.group(1), matched.group(2).trim)
       case "const" =>
         hint("error.parsing.hint.js_style_const")
       case "$" =>
@@ -325,6 +340,10 @@ private[compiler] object SyntaxHintClassifier {
       case _ if JavaStyleEnhancedForLoop.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleEnhancedForLoop.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_enhanced_for", matched.group(2), matched.group(1).trim, matched.group(3).trim)
+      // A JS/TS `for (const x of arr)` also matches CStyleForLoop, so keep this first.
+      case _ if JsStyleForOfLoop.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = JsStyleForOfLoop.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.js_style_for_of", matched.group(1), matched.group(2).trim)
       case _ if CStyleForLoop.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.c_style_for")
       case _ if JavaStyleImport.findFirstMatchIn(sourceLine).isDefined =>

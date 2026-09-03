@@ -59,6 +59,13 @@ val name: String = IO::readln("名前は？ ")
 IO::println("こんにちは、" + name)
 ```
 
+`IO::input(prompt)` はこの名前で直接呼び出せる同じ操作 -- `readln(prompt)` は
+内部で `input` を呼び出す実装：
+
+```onion
+val name: String = IO::input("名前は？ ")
+```
+
 ### IO::readLine
 
 標準入力から1行読み取り、入力の終端では `null` を返す。プロンプトなしの
@@ -846,6 +853,8 @@ Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 // 実行時間を計測して表示し、結果を返す
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // 出力: "Elapsed: 123.45ms"
+val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+// 出力: "task: 123.45ms"
 
 // 戻り値のない関数版
 Timing::measureVoid(() -> { expensiveOperation(); })
@@ -862,9 +871,11 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 `onion.Option`で提供。
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
+- `opt.isDefined()` / `opt.isEmpty()` / `opt.get()` — `get()` は `None` の場合 `NoSuchElementException` を投げる
 - `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElseThrow()` / `opt.orElseThrow(() -> customException)`
 - `opt.orElse(otherOption)`
-- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)` / `opt.forEach(action)`
 - `opt.contains(value)` / `opt.exists(predicate)`
 - `opt.fold(() -> ifEmpty, v -> ifPresent)` — 単一の値へ畳み込む
 - `opt.toList()` — 0個または1個の要素のリスト
@@ -875,8 +886,11 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
+- `res.isOk()` / `res.isErr()` / `res.get()` / `res.getError()` — `get()` は `Err` で、`getError()` は `Ok` で例外を投げる
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 - `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.getOrThrow()` / `res.getOrThrow(e -> customException)` — エラーを（`Throwable` でなければラップして）投げる、またはマッピングした例外を投げる
+- `res.forEach(action)` / `res.forEachError(action)`
 - `res.fold(e -> ifErr, v -> ifOk)` — 単一の値へ畳み込む
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — `Err` を回復
 - `res.exists(predicate)` / `res.toList()`
@@ -1002,6 +1016,10 @@ val f: Future[Int] = Future::successful(42)
 f.toOption()   // Option[Int] - Some(42) または None（ブロックする）
 f.toResult()   // Result[Int, Throwable]（ブロックする）
 f.underlying() // 相互運用のための Java CompletableFuture
+
+// 逆方向: Java の CompletableFuture を Future でラップする
+val cf: java.util.concurrent.CompletableFuture[Int] = someJavaApi()
+val wrapped: Future[Int] = Future::fromCompletableFuture(cf)
 ```
 
 ### Do記法サポート
@@ -1030,6 +1048,7 @@ val age = Json::getInt(obj, "age")                     // 3
 val m = Json::object()                                  // 空の Map
 m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
+val pretty = Json::stringifyPretty(m)                   // インデント付きで整形
 val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
 ```
 
@@ -1064,6 +1083,17 @@ v["users"][0]["name"].asString()
 
 ```onion
 val obj = Json::parseOrNull("not json")   // 例外を投げず null
+```
+
+不正入力の失敗をその場で処理したい場合、`Json.JsonParseException` は通常の `message()` に加えて
+`getPosition()`（パースを諦めた位置の文字オフセット）を持っています:
+
+```onion
+try {
+  Json::parse("{bad json")
+} catch e: Json.JsonParseException {
+  IO::println(e.message() + " at offset " + e.getPosition())
+}
 ```
 
 `Json::asObject(obj)` と `Json::asArray(obj)` は素の `Map`/`List` 表現に対する型安全なキャストです。
@@ -1104,6 +1134,17 @@ scalar の型推論規則（Json と同一）:
 
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
+
+不正入力の失敗をその場で処理したい場合、`Yaml.YamlParseException` は通常の `message()` に加えて
+`getLine()`（パースを諦めた行番号、1始まり）を持っています:
+
+```onion
+try {
+  Yaml::parse("no colon here")
+} catch e: Yaml.YamlParseException {
+  IO::println(e.message() + " at line " + e.getLine())
+}
+```
 
 ### Yaml::stringify
 
@@ -1296,6 +1337,9 @@ Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
 Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
 Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
+
+val ys: List[Long] = [10L, 20L, 30L, 40L]
+Stats::sumLong(ys)   // 100L   （Long: 整数精度を保持）
 ```
 
 メソッド呼び出しの形でも使えます（実際のコードではこちらが自然です）。ただし
@@ -1498,9 +1542,48 @@ parsed.positional()                     // オプション以外の引数の Lis
 Colls::listOf("a", "b", "c")            // 不変の List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::rangeWithStep(0, 10, 2)          // List [0,2,4,6,8]
 Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
 // xs.map { x -> x * 2 }.filter { x -> x > 0 }
+```
+
+### 追加のファクトリ: Set・Map・空のコレクション
+
+```onion
+Colls::setOf("a", "b", "c")             // 不変の Set（反復順序は保証されない）
+Colls::mutableSetOf(1, 2, 3)            // HashSet
+
+Colls::entry("name", "Alice")           // mapOf/mutableMapOf 用の Map.Entry
+Colls::mapOf(Colls::entry("name", "Alice"), Colls::entry("age", "30"))   // 不変の Map、挿入順を保持
+Colls::mutableMapOf(Colls::entry("x", 1))                               // HashMap
+
+Colls::emptyList()                      // []
+Colls::emptySet()                       // 空の Set
+Colls::emptyMap()                       // 空の Map
+```
+
+### List・Set・Map のユーティリティ
+
+`Colls` の他のメソッドと同様、最初の引数（list/map）に対する拡張メソッドとしても
+呼び出せ、パイプラインとして連結できる:
+
+```onion
+xs.concat(ys)                     // xs の要素に続けて ys の要素
+[[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
+xs.partition { x -> x > 1 }       // [matching, nonMatching] - 2つの List
+xs.toSet()                        // xs の要素から作った Set
+xs.distinct()                     // 重複を除去、最初に出現した順を保持
+xs.slice(0, 2)                    // [0, 2) の部分リスト、範囲内にクランプ
+xs.sorted()                       // 昇順の新しい List（要素は Comparable である必要がある）
+xs.sortedByDescending { x -> x }  // sortedBy と同様だが降順
+xs.head()                         // 先頭要素、空ならnull（first の別名）
+xs.tail()                         // 先頭要素を除いた残り（空リストでは例外）
+xs.takeWhile { x -> x < 3 }       // 述語を満たす先頭の連続部分
+xs.dropWhile { x -> x < 3 }       // その先頭の連続部分を取り除いた残り
+xs.mkString(", ")                 // "1, 2, 3" - 要素を文字列として連結（join は別名）
+Colls::isNotEmpty(xs)             // true - isEmpty の否定
+m.filterMap { k, v -> k == "name" }   // 条件に合うエントリだけの Map
 ```
 
 ### バッチ化・ウィンドウ化・セレクタ集計
@@ -1689,7 +1772,7 @@ conn.close()
 `write(text)`、`writeLine(text)`（CRLF を付加。行指向プロトコルが期待する形）、`writeBytes(bytes)`
 で書きます。書き込みは毎回フラッシュするので、バッファに溜まったまま送られないことはありません。
 `timeout(millis)` はブロックする読み込みの上限、`closeWrite()` は読みを続けたまま書き側だけ閉じて
-EOF を通知します。`close()` は冪等です。
+EOF を通知します。`close()` は冪等で、`conn.isClosed()` で既に閉じているかを確認できます。
 
 ### Net::listen
 
@@ -1706,7 +1789,7 @@ listener.close()
 ポート 0 は OS に空きポートを選ばせ、`port()` が実際のポートを返します。番号を決め打ちして祈らずに
 サーバをテストできるのはこのためです。`"localhost"` を指定するとネットワークからは到達できません。
 ホストに `null` を渡すとすべてのローカルアドレスにバインドします。`accept()` でブロックしている
-スレッドを解除するにはリスナーを閉じます。
+スレッドを解除するにはリスナーを閉じます。閉じたかどうかは `listener.isClosed()` で分かります。
 
 失敗時は失敗したアドレスがメッセージに入るので、Onion の `catch` で「connection refused」だけでなく
 どのホストかが分かります。
@@ -1813,6 +1896,17 @@ pool.close()
 プールのスレッドはデーモンなので、閉じ忘れたプールが `main` の後も JVM を生かし続けることは
 ありません。とはいえ `close()` は呼ぶべきですし、処理中のものを待つなら `awaitClose(millis)` です。
 
+API 一覧:
+
+- `Concurrent::cpus()` - このマシンで使えるプロセッサ数（引数なしの `Concurrent::pool()` が
+  採用するサイズ）
+- `pool.size()` - このプールのスレッド数
+- `pool.submit(f)` - `f` をワーカーで実行し、`Future` を返す
+- `pool.mapAll(items, f)` - 上記の通り
+- `pool.close()` - 新規の受け付けを止め、実行中のものを中断する。冪等
+- `pool.awaitClose(timeoutMillis)` - 新規の受け付けを止め、実行中のものを待つ。
+  タイムアウト内に全て終わったかを返す
+
 ### Counter・Lock・Channel
 
 ```onion
@@ -1831,6 +1925,25 @@ val item = chan.receiveTimeout(1000) // 永久にブロックせず null を返�
 ロックが漏れ、他のスレッドが永久に待ちます。チャネルに上限があるのは、無制限だと生産者が
 消費者を追い越していることがメモリ枯渇まで見えないからです。`null` の送信は拒否します——
 受信側で「何も来なかった」と区別できなくなるためです。
+
+API 一覧:
+
+- `Concurrent::counter()` / `Concurrent::counter(initial)`
+- `counter.get()` / `counter.increment()` / `counter.decrement()` / `counter.add(delta)` /
+  `counter.set(next)`
+- `counter.compareAndSet(expected, next)` - 値がまだ `expected` と等しい場合のみ設定する
+- `Concurrent::lock()`
+- `lock.withLock(body)` - 上記の通り
+- `lock.acquire()` / `lock.release()` - `withLock` が避けるための手動ペア
+- `lock.tryAcquire()` - ロックが空いているときだけ取得する。取得できたかを返す
+- `lock.isHeld()` - ロックが現在保持されているか
+- `Concurrent::channel(capacity)`
+- `chan.send(item)` / `chan.trySend(item)` - 満杯ならブロック / 満杯なら false を返す
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック /
+  タイムアウト後は null を返す
+- `chan.size()` / `chan.isEmpty()`
+- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信できる
+- `chan.drain()` - 現在キューにあるもの全てを取り出し、チャネルを空にする
 
 ---
 
@@ -1856,8 +1969,12 @@ db.transaction((conn) -> {
   conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
 })
 
+db.isClosed()   // db.close() を呼ぶまでは false
 db.close()
 ```
+
+`Db::connect(url)` には認証情報が不要なデータベース（SQLite、H2 など）向けの引数 1 つの形式
+もあります。`Db::connect("jdbc:sqlite:local.db")` は `Db::connect(url, null, null)` と同じです。
 
 値は常に**バインド**され、SQL 文字列に埋め込まれることはありません。`WHERE name = ?` は
 どんな名前でも安全で、うっかり文字列連結してしまう余地がそもそもありません。
@@ -1912,6 +2029,20 @@ Regex::split(input, pattern, limit): List[String]
 Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
 ```
+
+### アンカー付きマッチ
+
+```
+Regex::matchGroups(input, pattern): List[String]
+```
+
+`input` **全体**が `pattern` にマッチしたときだけマッチしたとみなし（`find`/`findAll`
+のようにどこかにマッチすれば良いのではなくアンカー付き）、マッチしなければ `null` を
+返す。マッチした場合はキャプチャグループを返す(インデックス0がグループ1)。マッチに
+参加しなかったグループは `null` ではなく `""` になる。これは `case re"..." (a, b):`
+という select パターン（CLAUDE.md の「Regex literals」を参照）を支える基本操作で、
+コンパイラはアンカー付き正規表現パターンを `matchGroups` 呼び出しと null チェックに
+脱糖する。
 
 ### Pattern リテラルのオーバーロード
 

@@ -59,6 +59,13 @@ val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name)
 ```
 
+`IO::input(prompt)` is the same operation callable directly by that name --
+`readln(prompt)` is implemented in terms of it:
+
+```onion
+val name: String = IO::input("What's your name? ")
+```
+
 ### IO::readLine
 
 Read a line from standard input, or `null` at end of input. `IO::readln()` (no
@@ -786,9 +793,11 @@ Access iteration utilities for collections and arrays:
 Provided via `onion.Option`.
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
+- `opt.isDefined()` / `opt.isEmpty()` / `opt.get()` — `get()` throws `NoSuchElementException` on `None`
 - `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElseThrow()` / `opt.orElseThrow(() -> customException)`
 - `opt.orElse(otherOption)`
-- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)` / `opt.forEach(action)`
 - `opt.contains(value)` / `opt.exists(predicate)`
 - `opt.fold(() -> ifEmpty, v -> ifPresent)` — collapse to a single value
 - `opt.toList()` — zero- or one-element list
@@ -799,8 +808,11 @@ Provided via `onion.Result`.
 
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
+- `res.isOk()` / `res.isErr()` / `res.get()` / `res.getError()` — `get()` throws on `Err`, `getError()` throws on `Ok`
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 - `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.getOrThrow()` / `res.getOrThrow(e -> customException)` — throws the error (wrapped if not a `Throwable`) or a mapped exception
+- `res.forEach(action)` / `res.forEachError(action)`
 - `res.fold(e -> ifErr, v -> ifOk)` — collapse to a single value
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — rescue an `Err`
 - `res.exists(predicate)` / `res.toList()`
@@ -926,6 +938,10 @@ val f: Future[Int] = Future::successful(42)
 f.toOption()  // Option[Int] - Some(42) or None (blocks)
 f.toResult()  // Result[Int, Throwable] (blocks)
 f.underlying() // Java CompletableFuture for interop
+
+// The reverse direction: wrap a Java CompletableFuture as a Future
+val cf: java.util.concurrent.CompletableFuture[Int] = someJavaApi()
+val wrapped: Future[Int] = Future::fromCompletableFuture(cf)
 ```
 
 ### Do Notation Support
@@ -1081,6 +1097,8 @@ Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 // Measure and print execution time, return result
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // Prints: "Elapsed: 123.45ms"
+val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+// Prints: "task: 123.45ms"
 
 // Same, but for a function that returns nothing
 Timing::measureVoid(() -> { expensiveOperation(); })
@@ -1223,6 +1241,18 @@ another "absent" case rather than an error to handle separately:
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
 
+When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
+`getPosition()` — the character offset into the input where parsing gave up — in addition
+to the usual `message()`:
+
+```onion
+try {
+  Json::parse("{bad json")
+} catch e: Json.JsonParseException {
+  IO::println(e.message() + " at offset " + e.getPosition())
+}
+```
+
 `Json::asObject(obj)` and `Json::asArray(obj)` are type-safe casts on the plain
 `Map`/`List` representation: each returns its argument cast to `Map`/`List` when the
 runtime type matches, or `null` otherwise. They're handy after `Json::get`, `Json::parse`,
@@ -1261,6 +1291,18 @@ Scalar type inference rules (identical to `Json`):
 
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
+
+When you do want to handle a malformed-input failure, `Yaml.YamlParseException` carries
+`getLine()` — the 1-based line number where parsing gave up — in addition to the usual
+`message()`:
+
+```onion
+try {
+  Yaml::parse("no colon here")
+} catch e: Yaml.YamlParseException {
+  IO::println(e.message() + " at line " + e.getLine())
+}
+```
 
 ### Yaml::stringify
 
@@ -1408,6 +1450,9 @@ Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
 Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
 Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
+
+val ys: List[Long] = [10L, 20L, 30L, 40L]
+Stats::sumLong(ys)   // 100L   (Long, exact precision)
 ```
 
 These are also reachable as method calls, which is the form most code reaches
@@ -1485,9 +1530,48 @@ Collection factories and pipelines (`onion.Colls`):
 Colls::listOf("a", "b", "c")            // immutable List
 Colls::mutableListOf(1, 2, 3)           // ArrayList
 Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::rangeWithStep(0, 10, 2)          // List [0,2,4,6,8]
 Colls::sortedBy(people) { p -> p.age() }
 // map/filter/reduce/fold pipelines are extension methods on
 // List/Iterable/arrays: xs.map { x -> x * 2 }.filter { x -> x > 0 }
+```
+
+### More factories: sets, maps, and empty collections
+
+```onion
+Colls::setOf("a", "b", "c")             // immutable Set (iteration order unspecified)
+Colls::mutableSetOf(1, 2, 3)            // HashSet
+
+Colls::entry("name", "Alice")           // a Map.Entry, for mapOf/mutableMapOf
+Colls::mapOf(Colls::entry("name", "Alice"), Colls::entry("age", "30"))   // immutable Map, insertion order preserved
+Colls::mutableMapOf(Colls::entry("x", 1))                               // HashMap
+
+Colls::emptyList()                      // []
+Colls::emptySet()                       // empty Set
+Colls::emptyMap()                       // empty Map
+```
+
+### List, set, and map utilities
+
+Also usable as extension methods on their first (list/map) argument, chaining
+into a pipeline like the rest of `Colls`:
+
+```onion
+xs.concat(ys)                     // elements of xs followed by elements of ys
+[[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
+xs.partition { x -> x > 1 }       // [matching, nonMatching] - two Lists
+xs.toSet()                        // Set built from xs's elements
+xs.distinct()                     // duplicates removed, first-seen order preserved
+xs.slice(0, 2)                    // sublist [0, 2), clamped into range
+xs.sorted()                       // new List, ascending (elements must be Comparable)
+xs.sortedByDescending { x -> x }  // like sortedBy, but descending
+xs.head()                         // first element, or null if empty (alias for first)
+xs.tail()                         // all but the first element (throws on an empty list)
+xs.takeWhile { x -> x < 3 }       // longest leading run matching the predicate
+xs.dropWhile { x -> x < 3 }       // xs with that leading run removed
+xs.mkString(", ")                 // "1, 2, 3" - joins elements into a String (join is an alias)
+Colls::isNotEmpty(xs)             // true - the negation of isEmpty
+m.filterMap { k, v -> k == "name" }   // Map with only the matching entries
 ```
 
 ### Batching, windowing, and selector aggregation
@@ -1676,7 +1760,8 @@ A connection reads with `readLine()` (null at end of stream), `readAll()` (UTF-8
 peer closes) and `readBytes()`; it writes with `write(text)`, `writeLine(text)` (appends
 CRLF, which is what line-oriented protocols expect) and `writeBytes(bytes)`. Every write
 flushes, so nothing sits in a buffer unsent. `timeout(millis)` bounds a blocking read,
-`closeWrite()` half-closes to signal EOF while still reading, and `close()` is idempotent.
+`closeWrite()` half-closes to signal EOF while still reading, `close()` is idempotent, and
+`conn.isClosed()` reports whether it already has been.
 
 ### Net::listen
 
@@ -1693,7 +1778,8 @@ listener.close()
 Port 0 asks the OS for a free port, and `port()` reports the one it chose — that is what
 makes a server testable without picking a number and hoping. Binding `"localhost"` keeps it
 off the network; passing `null` as the host binds every local address. Closing the listener
-is how to unblock a thread parked in `accept()`.
+is how to unblock a thread parked in `accept()`, and `listener.isClosed()` reports whether
+that has happened.
 
 Failures carry the address that failed, so a `catch` in Onion names the host rather than
 just saying "connection refused".
@@ -1803,6 +1889,17 @@ Pool threads are daemons, so a pool someone forgot to close cannot keep the JVM 
 `main` returns. `close()` is still the right thing to call; `awaitClose(millis)` waits for
 work in flight.
 
+Full API:
+
+- `Concurrent::cpus()` - processors available on this machine (what `Concurrent::pool()`,
+  with no argument, sizes itself to)
+- `pool.size()` - how many threads this pool has
+- `pool.submit(f)` - runs `f` on a worker, returns a `Future`
+- `pool.mapAll(items, f)` - see above
+- `pool.close()` - stops accepting work and interrupts what is running; idempotent
+- `pool.awaitClose(timeoutMillis)` - stops accepting work and waits for what is running;
+  returns whether everything finished within the timeout
+
 ### Counter, Lock, Channel
 
 ```onion
@@ -1821,6 +1918,26 @@ Prefer `withLock` to `acquire`/`release`: a body that throws between a manual pa
 the lock and every other thread waits forever. A channel is bounded because an unbounded
 one hides a producer outrunning its consumer until memory runs out, and it refuses `null`,
 which would be indistinguishable from an empty receive.
+
+Full API:
+
+- `Concurrent::counter()` / `Concurrent::counter(initial)`
+- `counter.get()` / `counter.increment()` / `counter.decrement()` / `counter.add(delta)` /
+  `counter.set(next)`
+- `counter.compareAndSet(expected, next)` - sets the value only if it still equals `expected`
+- `Concurrent::lock()`
+- `lock.withLock(body)` - see above
+- `lock.acquire()` / `lock.release()` - the manual pair `withLock` exists to avoid
+- `lock.tryAcquire()` - takes the lock only if it is free; returns whether it was taken
+- `lock.isHeld()` - whether the lock is currently held
+- `Concurrent::channel(capacity)`
+- `chan.send(item)` / `chan.trySend(item)` - blocks while full vs. returns false instead
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - blocks until something arrives
+  vs. returns null after the timeout
+- `chan.size()` / `chan.isEmpty()`
+- `chan.close()` / `chan.isClosed()` - refuses further sends; what is already queued can
+  still be received
+- `chan.drain()` - everything queued right now, leaving the channel empty
 
 ---
 
@@ -1846,8 +1963,12 @@ db.transaction((conn) -> {
   conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
 })
 
+db.isClosed()   // false until db.close() is called
 db.close()
 ```
+
+`Db::connect(url)` also has a credential-less, one-argument form for databases that need
+none (SQLite, H2): `Db::connect("jdbc:sqlite:local.db")` is `Db::connect(url, null, null)`.
 
 Values are always **bound**, never pasted into the SQL, so `WHERE name = ?` is safe with
 any name and there is no way to build the string by accident.
@@ -1903,6 +2024,19 @@ Regex::split(input, pattern, limit): List[String]
 Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
 ```
+
+### Anchored match
+
+```
+Regex::matchGroups(input, pattern): List[String]
+```
+
+Matches only if the **whole** `input` matches `pattern` (anchored, unlike `find`/
+`findAll`, which match anywhere); returns `null` otherwise. On a match, returns the
+capture groups (index 0 is group 1); a group that did not participate in the match
+yields `""` rather than `null`. This is the primitive behind the `case re"..." (a, b):`
+select pattern (see "Regex literals" in CLAUDE.md) — the compiler desugars an anchored
+regex pattern into a `matchGroups` call plus a null check.
 
 ### Pattern literal overloads
 

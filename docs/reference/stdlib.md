@@ -1795,6 +1795,9 @@ off the network; passing `null` as the host binds every local address. Closing t
 is how to unblock a thread parked in `accept()`, and `listener.isClosed()` reports whether
 that has happened.
 
+`Net::listen(port)` is the shorthand for that last case: it binds every local address with
+a default backlog of 50, equivalent to `Net::listen(null, port, 50)`.
+
 Failures carry the address that failed, so a `catch` in Onion names the host rather than
 just saying "connection refused".
 

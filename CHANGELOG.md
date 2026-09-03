@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real, callable members with no mention anywhere in either file. A new
   `ConcurrentDocCoverageSpec` guards every public `onion.Concurrent`/`Pool`/`Counter`/`Lock`/
   `Channel` member against both files going forward.
+- **`onion.Regex::matchGroups`.** `docs/reference/stdlib.md` and its Japanese translation
+  documented `matches`/`find`/`findAll`/`findFirst`/`groups`/`groupsAll`/`replace`/
+  `replaceFirst`/`split`/`quote`/`isValid`, but never mentioned `matchGroups` — the anchored,
+  whole-string match that backs the `case re"..." (a, b):` select pattern. A new
+  `RegexDocCoverageSpec` guards every public `onion.Regex` member against both files going
+  forward.
 
 ## [0.45.0] - 2026-09-03
 

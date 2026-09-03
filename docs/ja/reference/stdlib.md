@@ -1987,6 +1987,20 @@ Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
 ```
 
+### アンカー付きマッチ
+
+```
+Regex::matchGroups(input, pattern): List[String]
+```
+
+`input` **全体**が `pattern` にマッチしたときだけマッチしたとみなし（`find`/`findAll`
+のようにどこかにマッチすれば良いのではなくアンカー付き）、マッチしなければ `null` を
+返す。マッチした場合はキャプチャグループを返す(インデックス0がグループ1)。マッチに
+参加しなかったグループは `null` ではなく `""` になる。これは `case re"..." (a, b):`
+という select パターン（CLAUDE.md の「Regex literals」を参照）を支える基本操作で、
+コンパイラはアンカー付き正規表現パターンを `matchGroups` 呼び出しと null チェックに
+脱糖する。
+
 ### Pattern リテラルのオーバーロード
 
 `re"..."` リテラルは `String` ではなく `java.util.regex.Pattern` にコンパイルされます。

@@ -300,10 +300,8 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
   def rootClass: TypedAST.ClassType = loadRequired("java.lang.Object")
 
   def lookup(className: String): TypedAST.ClassType = {
-    classes.get(className) match {
-      case Some(ref) => ref
-      case None => classFiles.get(className)
-    }
+    val own = classes.getOrNull(className)
+    if (own != null) own else classFiles.get(className)
   }
 
   /** Option-returning version of lookup for safer null handling */

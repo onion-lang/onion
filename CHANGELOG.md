@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   process as always. `ScriptRunner.run` is split into `prepare` (parse options, compile,
   report) and `execute` for this; behaviour without the daemon is unchanged.
 
+### Documentation
+
+- **`Colls::flatMap`/`bind`/`zip`/`groupBy` on `List`.** `docs/reference/stdlib.md` and its
+  Japanese translation never mentioned these four `List` extension methods in the Colls
+  Module section -- a whole-file coverage guard missed the gap because `Option`, `Result`,
+  `Future`, `Outcome`, and `Maps` happen to document their own same-named methods
+  elsewhere in the file. Documented all four (`bind` as the `do[List]` alias for
+  `flatMap`) and added a scoped regression test that checks the Colls section itself.
+
 ## [0.51.0] - 2026-09-03
 
 ### Added

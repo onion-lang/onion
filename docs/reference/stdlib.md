@@ -1561,6 +1561,8 @@ into a pipeline like the rest of `Colls`:
 ```onion
 xs.concat(ys)                     // elements of xs followed by elements of ys
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
+xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
+                                   // (bind is an alias, used by do[List] { x <- xs; ... })
 xs.partition { x -> x > 1 }       // [matching, nonMatching] - two Lists
 xs.toSet()                        // Set built from xs's elements
 xs.distinct()                     // duplicates removed, first-seen order preserved
@@ -1571,6 +1573,8 @@ xs.head()                         // first element, or null if empty (alias for 
 xs.tail()                         // all but the first element (throws on an empty list)
 xs.takeWhile { x -> x < 3 }       // longest leading run matching the predicate
 xs.dropWhile { x -> x < 3 }       // xs with that leading run removed
+xs.zip(ys)                        // [[x0, y0], [x1, y1], ...] - pairs, truncated to the shorter list
+xs.groupBy { x -> x % 2 }         // Map from key to the List of elements with that key
 xs.mkString(", ")                 // "1, 2, 3" - joins elements into a String (join is an alias)
 Colls::isNotEmpty(xs)             // true - the negation of isEmpty
 m.filterMap { k, v -> k == "name" }   // Map with only the matching entries

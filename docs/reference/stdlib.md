@@ -981,6 +981,14 @@ val percent: Int = Rand::nextInt(100)     // 0 to 99
 val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
 ```
 
+### Rand::nextLong (bounded)
+
+Generate a random long in a range:
+
+```onion
+val bigId: Long = Rand::nextLong(1000000L)   // 0 to 999999
+```
+
 ### Rand::nextDouble (bounded)
 
 ```onion

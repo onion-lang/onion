@@ -732,6 +732,14 @@ val percent: Int = Rand::nextInt(100)     // 0から99
 val d20: Int = Rand::nextInt(1, 21)       // 1から20（min, 排他的max）
 ```
 
+### Rand::nextLong（範囲指定）
+
+範囲内の乱数longを生成：
+
+```onion
+val bigId: Long = Rand::nextLong(1000000L)   // 0から999999
+```
+
 ### Rand::nextDouble（範囲指定）
 
 ```onion

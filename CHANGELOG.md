@@ -97,6 +97,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StdlibDocDriftSpec` with a completeness check against the "Modules at a glance"
   table in `docs/reference/stdlib.md`.
 
+- **`Iterables`'s extension-method call syntax documented.** `docs/reference/stdlib.md`
+  and its Japanese translation only ever showed `onion.Iterables`'s methods as
+  `Iterables::name(list, ...)` static calls, but every one of them except `listOf`
+  and `newList` (which build a `List` rather than operate on one) is also a builtin
+  extension method, callable as a chain on its first argument (`xs.map { ... }`,
+  `xs.take(2)`, `(1..5).toList()`, `m.mapMap(f)`, ... -- verified against a running
+  script). Added the extension-call spellings to both files' Iterables Module section
+  and a new `IterablesExtensionCallDocSpec` regression test that locks in the
+  behavior and checks both docs for the spellings.
+
 ## [0.52.0] - 2026-09-03
 
 ### Changed

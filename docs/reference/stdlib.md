@@ -848,6 +848,25 @@ Access iteration utilities for collections and arrays:
 - `Iterables::take(list, n)` / `Iterables::drop(list, n)`
 - `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - the second overload requires `Comparable` elements
 
+Every method above (`listOf` and `newList` excepted -- they build a `List`
+rather than operate on one) is also a builtin extension method, callable as
+a chain on its first argument:
+
+```onion
+xs.map { x -> x * 2 }             // also Set/Iterable receivers
+m.mapMap((e) -> Colls::entry(e.getKey(), e.getValue() * 2))
+(1..5).toList()                   // ranges included
+xs.filter { x -> x > 0 }
+xs.foldl(0, (acc, x) -> acc + x)
+xs.reduce(0, (acc, x) -> acc + x)
+xs.exists { x -> x > 2 }
+xs.forAll { x -> x > 0 }
+xs.first() / xs.last()
+xs.reverse()
+xs.take(2) / xs.drop(1)
+xs.sort() / xs.sort(comparator)
+```
+
 ## Option Module
 
 Provided via `onion.Option`.

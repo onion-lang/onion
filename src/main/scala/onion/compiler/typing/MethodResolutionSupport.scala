@@ -13,10 +13,6 @@ private[compiler] final class MethodResolutionSupport(
   // Created on first use: a support object is built per call site, and most call sites
   // never touch all three. (Plain null checks -- a `lazy val` here measurably slowed the
   // hot path.)
-  private var specializedArgsCache0: HashMap[Method, Array[Type]] = null
-  private def specializedArgsCache: HashMap[Method, Array[Type]] =
-    if specializedArgsCache0 == null then specializedArgsCache0 = HashMap[Method, Array[Type]]()
-    specializedArgsCache0
   private var methodArgsWithTypeParamsCache0: HashMap[Method, Array[Type]] = null
   private def methodArgsWithTypeParamsCache: HashMap[Method, Array[Type]] =
     if methodArgsWithTypeParamsCache0 == null then methodArgsWithTypeParamsCache0 = HashMap[Method, Array[Type]]()
@@ -28,8 +24,7 @@ private[compiler] final class MethodResolutionSupport(
   private val emptySubst = scala.collection.immutable.Map.empty[String, Type]
 
   def specializedArgs(method: Method): Array[Type] =
-    specializedArgsCache.getOrElseUpdate(
-      method,
+    table.specializedArgsOf(views, method)(
       {
         val args = method.arguments
         val substituted = new Array[Type](args.length)
@@ -44,7 +39,7 @@ private[compiler] final class MethodResolutionSupport(
 
   def applicable(method: Method): Boolean = {
     val expected = specializedArgs(method)
-    val methodTypeParams = method.typeParameters.map(_.name).toSet
+    val methodTypeParams = table.typeParamNamesOf(method)
     val argsWithTypeParams =
       if methodTypeParams.nonEmpty then methodArgsWithTypeParams(method) else expected
 

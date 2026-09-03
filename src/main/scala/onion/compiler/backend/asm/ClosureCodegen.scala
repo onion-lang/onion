@@ -50,7 +50,9 @@ final class ClosureCodegen(
 
     val outerThisType = CapturedVariableCollector.findOuterThis(closure.block)
 
-    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, closure.frame, capturedVars, outerThisType)
+    val closureBytes = TermContainsTry.withKnown(closure.mayContainTry) {
+      generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, closure.frame, capturedVars, outerThisType)
+    }
     registerCompiledClass(CompiledClass(closureClassName.replace('/', '.'), outputDirectory, closureBytes))
 
     val closureType = AsmUtil.objectType(closureClassName)

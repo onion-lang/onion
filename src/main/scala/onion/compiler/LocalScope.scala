@@ -18,7 +18,14 @@ import scala.collection.mutable
  * @author Kota Mizushima
  */
 class LocalScope(val parent: LocalScope) {
-  private val bindings = mutable.HashMap[String, LocalBinding]()
+  // Allocated on the first `put`: most scopes (loop bodies, branches, lambda bodies) declare
+  // nothing, and a scope is opened for every block.
+  private var bindings0: mutable.HashMap[String, LocalBinding] = null
+  private def bindings: mutable.HashMap[String, LocalBinding] = {
+    if (bindings0 == null) bindings0 = mutable.HashMap[String, LocalBinding]()
+    bindings0
+  }
+  private def isEmpty: Boolean = bindings0 == null || bindings0.isEmpty
 
 
   /**
@@ -26,7 +33,7 @@ class LocalScope(val parent: LocalScope) {
    * @return Set object which element is LocalBinding object
    */
   def entries: mutable.Set[LocalBinding] = {
-    mutable.HashSet[LocalBinding]() ++ bindings.values
+    if (isEmpty) mutable.HashSet[LocalBinding]() else mutable.HashSet[LocalBinding]() ++ bindings0.values
   }
 
   /**
@@ -34,16 +41,16 @@ class LocalScope(val parent: LocalScope) {
    * @param name
    * @return true if this scope has entry, false otherwise
    */
-  def contains(name: String): Boolean = bindings.contains(name)
+  def contains(name: String): Boolean = bindings0 != null && bindings0.contains(name)
 
   /**
    * Gets all variable names in this scope.
    * @return Set of variable names
    */
-  def names: Set[String] = bindings.keySet.toSet
+  def names: Set[String] = if (isEmpty) Set.empty else bindings0.keySet.toSet
 
   /** The bindings of this scope only, without copying into a Set. */
-  def bindingEntries: Iterator[(String, LocalBinding)] = bindings.iterator
+  def bindingEntries: Iterator[(String, LocalBinding)] = if (isEmpty) Iterator.empty else bindings0.iterator
 
   /**
    * Gets all variable names in this scope and its ancestors.
@@ -77,7 +84,11 @@ class LocalScope(val parent: LocalScope) {
    * @param name
    * @return the LocalBinding object if registered, null otherwise
    */
-  def get(name: String): Option[LocalBinding] = bindings.get(name)
+  def get(name: String): Option[LocalBinding] = if (bindings0 == null) None else bindings0.get(name)
+
+  /** As `get`, without the Option. */
+  private def getOrNull(name: String): LocalBinding =
+    if (bindings0 == null) null else bindings0.getOrElse(name, null)
 
   /**
    * Finds the registered binding object from this scope and its ancestors
@@ -86,16 +97,13 @@ class LocalScope(val parent: LocalScope) {
    * @return the LocalBinding object if found, null otherwise
    */
   def lookup(name: String): LocalBinding = {
-    def find(table: LocalScope): LocalBinding = {
-      if (table == null) {
-        null
-      } else if(table.contains(name)) {
-        table.get(name).get
-      } else {
-        find(table.parent)
-      }
+    var table = this
+    while (table != null) {
+      val found = table.getOrNull(name)
+      if (found != null) return found
+      table = table.parent
     }
-    find(this)
+    null
   }
 
   override def toString(): String = {

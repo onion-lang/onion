@@ -79,25 +79,30 @@ private[compiler] object DuplicationChecks {
     val views = allViews - clazz
     if views.isEmpty then return
 
+    val implementations = clazz.methods.filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
+    if implementations.isEmpty then return
     val implByErasedParams: scala.collection.immutable.Map[(String, String), Method] =
-      clazz.methods
-        .filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
+      implementations
         .map(m => ((m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments))), m))
         .toMap
+    // A contract can only be matched by an implementation of the same name; every ancestor
+    // contributes its whole method list here (java.lang.Object's included, for every class),
+    // so the descriptors below are computed for those names only.
+    val implementedNames = implementations.iterator.map(_.name).toSet
 
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
 
       for (contract <- view.raw.methods) {
-        if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
+        if implementedNames.contains(contract.name) && !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
           // An implementation may declare the specialized parameter types
           // (id(x: String) for Id[String]) or the erased ones (id(x: Object)):
           // look the contract up under both keys.
           val specializedKey = (contract.name, erasedParamDescriptor(specializedArgs))
-          val erasedKey = (contract.name, erasedParamDescriptor(contract.arguments))
+          val erasedKey = (contract.name, typing.table_.erasedParamsOf(contract)(erasedParamDescriptor(contract.arguments)))
           implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey)).foreach { impl =>
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
@@ -228,6 +233,12 @@ private[compiler] object DuplicationChecks {
     // Exclude the target class itself to avoid checking methods against themselves
     val views = allViews - clazz
     if views.isEmpty then return
+
+    // Most classes extend Object and conform to nothing, so no view has an abstract contract:
+    // then there is nothing to check and the implementation map below need not be built.
+    def isContract(m: Method): Boolean =
+      Modifier.isAbstract(m.modifier) && !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
+    if !views.values.exists(_.raw.methods.exists(isContract)) then return
 
     // Collect all implemented methods from this class AND all ancestor classes
     // Parent classes may already provide concrete implementations for abstract methods

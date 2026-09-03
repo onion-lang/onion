@@ -21,7 +21,9 @@ private[compiler] final class MethodBodySupport(
     block: AST.BlockExpression
   ): Unit = {
     val context = prepareMethodContext(method, args, block)
+    val triesBefore = bodyContext.tryCount
     val translated = translate(block, context)
+    method.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(method.returnType, translated, method.name, block)
     val translatedBlock = addReturnNode(translated, method.returnType)
     method.setBlock(translatedBlock)
@@ -161,7 +163,9 @@ private[compiler] final class MethodBodySupport(
     receiverType: Type
   ): Unit = {
     val context = prepareExtensionContext(staticMethod, node, receiverType)
+    val triesBefore = bodyContext.tryCount
     val extTranslated = translate(node.block, context)
+    staticMethod.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(staticMethod.returnType, extTranslated, staticMethod.name, node.block)
     val translatedBlock = addReturnNode(extTranslated, staticMethod.returnType)
     staticMethod.setBlock(translatedBlock)

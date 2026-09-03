@@ -120,8 +120,15 @@ private[compiler] final class MethodCallFallbackSupport(
         None
     }
 
-    val candidates = new JTreeSet[Method](new MethodComparator)
-    calls.collectMethodsMatching(targetType, name, candidates, calls.isInstanceMethod)
+    // The (receiver, name) candidate set is memoized per compilation (the same array the
+    // eager path uses); only the instance-method filter is applied here.
+    val allCandidates = MethodResolution.candidatesOf(targetType, name, typing.table_)
+    val candidates = new java.util.ArrayList[Method](allCandidates.length)
+    var ci = 0
+    while (ci < allCandidates.length) {
+      if (calls.isInstanceMethod(allCandidates(ci))) candidates.add(allCandidates(ci))
+      ci += 1
+    }
 
     if (candidates.isEmpty) {
       return extensionFallback(Array[Type]())

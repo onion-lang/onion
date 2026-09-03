@@ -17,7 +17,26 @@ import onion.compiler.TypedAST.*
  */
 private[asm] object TermContainsTry:
 
-  def contains(term: Term): Boolean = containsNode(term)
+  def contains(term: Term): Boolean =
+    if methodHasTry.get eq java.lang.Boolean.FALSE then false else containsNode(term)
+
+  // Whether the method being emitted contains a `try` at all (null: not known). Most do
+  // not, and for them every question above is answered without touching the memo. Set per
+  // emitted method -- a closure body is its own method and gets its own answer, because a
+  // `try` inside a closure is invisible from the enclosing body (see `anywhere`).
+  private val methodHasTry = new ThreadLocal[java.lang.Boolean]
+
+  /** Whether the method being emitted is known to contain no `try` (see `withKnown`). */
+  def currentMethodHasNoTry: Boolean = methodHasTry.get eq java.lang.Boolean.FALSE
+
+  /**
+   * Runs `emit` for a method or closure body that the type checker says may (`true`) or
+   * cannot (`false`) contain a `try` -- MethodDefinition.mayContainTry / NewClosure.mayContainTry.
+   */
+  def withKnown[T](mayContainTry: Boolean)(emit: => T): T =
+    val previous = methodHasTry.get
+    methodHasTry.set(if mayContainTry then null else java.lang.Boolean.FALSE)
+    try emit finally methodHasTry.set(previous)
 
   // Codegen asks this for the right-hand side of every assignment and for every call
   // argument, at every nesting level, so a plain walk revisited the same subterms once per

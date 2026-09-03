@@ -36,19 +36,26 @@ final class StringInterpolationTyping(
     sbToStringMemo
   }
 
+  private lazy val cachedStringType: ClassType = bodyContext.load("java.lang.String")
+  private lazy val cachedSbType: ClassType = bodyContext.load("java.lang.StringBuilder")
+  private lazy val cachedNoArgConstructor: ConstructorRef = {
+    val constructors = cachedSbType.findConstructor(Array[Term]())
+    if (constructors.isEmpty) null else constructors(0)
+  }
+
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] = boundary {
     val typedExprs = node.expressions.map(e => typed(e, context).getOrElse(null))
     if (typedExprs.contains(null)) break(None)
 
-    val stringType = bodyContext.load("java.lang.String")
-    val sbType = bodyContext.load("java.lang.StringBuilder")
-
-    val constructors = sbType.findConstructor(Array[Term]())
-    if (constructors.isEmpty) {
+    // Fixed for a pass: the two JDK types and StringBuilder's no-arg constructor were looked
+    // up (the constructor through overload resolution) at every interpolated string.
+    val stringType = cachedStringType
+    val sbType = cachedSbType
+    val noArgConstructor = cachedNoArgConstructor
+    if (noArgConstructor == null) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type](), sbType.constructors)
       break(None)
     }
-    val noArgConstructor = constructors(0)
 
     val sb = new NewObject(noArgConstructor, Array[Term]())
     var result: Term = sb

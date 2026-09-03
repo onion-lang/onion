@@ -96,11 +96,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val previous = genState.get
     genState.set(st)
     TermContainsTry.reset()
+    CapturedVariableCollector.reset()
     try
       val main = generateClass(classDef)
       (main, st.closures.toSeq)
     finally
       TermContainsTry.reset()
+      CapturedVariableCollector.reset()
       if previous == null then genState.remove() else genState.set(previous)
 
   override def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] =
@@ -424,7 +426,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
                        (node.name == "values" || node.name == "valueOf")
 
     if node.block != null then
-      emitStatementsWithContext(gen, node.block.statements, className, localVars)
+      TermContainsTry.withKnown(node.mayContainTry) {
+        emitStatementsWithContext(gen, node.block.statements, className, localVars)
+      }
     else if isEnumHelper then
       if node.name == "values" then emitEnumValues(gen, className, enumClassDef)
       else emitEnumValueOf(gen, className)
@@ -1052,11 +1056,22 @@ object AsmCodeGeneration:
         case BasicType.FLOAT   => AsmUtil.objectType("java.lang.Float")
         case BasicType.DOUBLE  => AsmUtil.objectType("java.lang.Double")
         case other => asmType(other)
-    case ct: ClassType     => AsmUtil.objectType(ct.name)
+    case ct: ClassType     =>
+      val cached = ct.asmTypeCache
+      if cached != null then cached.asInstanceOf[AsmType]
+      else
+        val fresh = AsmUtil.objectType(ct.name)
+        ct.asmTypeCache = fresh
+        fresh
     case at: ArrayType     =>
-      // Build descriptor with correct number of dimensions
-      val componentDescriptor = asmType(at.component).getDescriptor
-      AsmType.getType("[" * at.dimension + componentDescriptor)
+      val cached = at.asmTypeCache
+      if cached != null then cached.asInstanceOf[AsmType]
+      else
+        // Build descriptor with correct number of dimensions
+        val componentDescriptor = asmType(at.component).getDescriptor
+        val fresh = AsmType.getType("[" * at.dimension + componentDescriptor)
+        at.asmTypeCache = fresh
+        fresh
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _: BottomType     => AsmType.VOID_TYPE
     case unknown =>

@@ -276,7 +276,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def checkAndReportShadowing(name: String, location: Location, context: LocalContext): Unit =
     diagnostics.checkAndReportShadowing(name, location, context)
 
-  def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
+  def createFQCN(moduleName: String, simpleName: String): String =
+    if (moduleName != null) moduleName + "." + simpleName else simpleName // no copy for the common module-less case
   def load(name: String): Option[ClassType] = table_.load(name)
   /** Loads a class the compiler itself depends on; throws if the classpath is broken. */
   def loadRequired(name: String): ClassType = table_.loadRequired(name)

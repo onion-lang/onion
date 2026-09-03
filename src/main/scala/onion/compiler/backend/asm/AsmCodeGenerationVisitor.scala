@@ -69,6 +69,14 @@ class AsmCodeGenerationVisitor(
     expectedTypes: Array[AsmType],
     pendingTypes: Array[AsmType] = Array.empty
   ): Unit =
+    if TermContainsTry.currentMethodHasNoTry then
+      // Nothing to spill around: emit the arguments in order.
+      var i = 0
+      while i < params.length do
+        visitTerm(params(i))
+        asmCodeGen.adaptValueOnStack(gen, params(i).`type`, expectedTypes(i))
+        i += 1
+      return
     val pending = scala.collection.mutable.ArrayBuffer[AsmType](pendingTypes*)
     var i = 0
     while i < params.length do

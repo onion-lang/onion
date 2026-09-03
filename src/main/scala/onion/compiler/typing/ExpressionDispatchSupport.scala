@@ -8,6 +8,22 @@ import onion.compiler.TypedAST.UnaryTerm.Kind.*
 private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     node match {
+      // In frequency order: identifiers, literals and calls are most of the expressions in a
+      // program, and every case below is an instanceof test the node has to fall through.
+      case _: AST.Id | _: AST.StringLiteral | _: AST.IntegerLiteral | _: AST.BooleanLiteral |
+           _: AST.NullLiteral | _: AST.CurrentInstance | _: AST.DoubleLiteral | _: AST.LongLiteral |
+           _: AST.CharacterLiteral =>
+        body.typeSimpleExpression(node, context, expected)
+      case node: AST.MethodCall =>
+        body.typeMethodCall(node, context, expected)
+      case node: AST.UnqualifiedMethodCall =>
+        body.typeUnqualifiedMethodCall(node, context, expected)
+      case node: AST.MemberSelection =>
+        body.typeMemberSelection(node, context)
+      case node: AST.StaticMethodCall =>
+        body.typeStaticMethodCall(node, context, expected)
+      case node: AST.StringInterpolation =>
+        body.typeStringInterpolation(node, context)
       case node: AST.Addition =>
         body.typeAdditionNode(node, context)
       case node@AST.Subtraction(_, _, _) =>
@@ -66,10 +82,6 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.typeClosureNode(node, context, expected)
       case node: AST.IsInstance =>
         body.typeIsInstance(node, context)
-      case node: AST.MemberSelection =>
-        body.typeMemberSelection(node, context)
-      case node: AST.MethodCall =>
-        body.typeMethodCall(node, context, expected)
       case node: AST.SafeMemberSelection =>
         body.typeSafeMemberSelection(node, context)
       case node: AST.SafeMethodCall =>
@@ -92,14 +104,8 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.typePostUpdate(node, node.term, "--", SUBTRACT, context)
       case node@AST.PostIncrement(_, _) =>
         body.typePostUpdate(node, node.term, "++", ADD, context)
-      case node: AST.UnqualifiedMethodCall =>
-        body.typeUnqualifiedMethodCall(node, context, expected)
       case node: AST.StaticMemberSelection =>
         body.typeStaticMemberSelection(node)
-      case node: AST.StaticMethodCall =>
-        body.typeStaticMethodCall(node, context, expected)
-      case node: AST.StringInterpolation =>
-        body.typeStringInterpolation(node, context)
       case node: AST.SuperMethodCall =>
         body.typeSuperMethodCall(node, context, expected)
       case node: AST.BlockExpression =>

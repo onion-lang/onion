@@ -129,6 +129,7 @@ final class TryExpressionTyping(
           null
         }
 
+      bodyContext.tryCount += 1
       val statement = new Try(node.location, resourceBindings.toArray, tryStmt, binds, catchStatements, finallyStmt)
       if (resultVar == null) {
         Some(control.statementTerm(statement, resultType, node.location))

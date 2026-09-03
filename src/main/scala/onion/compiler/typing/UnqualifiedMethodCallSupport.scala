@@ -55,9 +55,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     // the overload first, then type each such closure against its resolved
     // functional-interface parameter type (issue #232). The eager path below
     // would otherwise fail with E0052 on the closure.
-    val untypedClosureIndices = node.args.zipWithIndex.collect {
-      case (expr, i) if isClosureWithUntypedParams(expr) => i
-    }.toSet
+    val untypedClosureIndices = untypedClosureIndicesOf(node.args)
     if (untypedClosureIndices.nonEmpty) {
       return typeUnqualifiedCallWithClosures(node, context, expected, untypedClosureIndices)
     }
@@ -201,6 +199,19 @@ private[compiler] final class UnqualifiedMethodCallSupport(
 
   private def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
     closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure)
+
+  /** Positions of arguments that are lambdas with untyped parameters; the shared empty set when there are none (the common case). */
+  private def untypedClosureIndicesOf(args: List[AST.Expression]): Set[Int] = {
+    var i = 0
+    var found: Set[Int] = null
+    var rest = args
+    while (rest.nonEmpty) {
+      if (isClosureWithUntypedParams(rest.head)) { if (found == null) found = Set.empty; found = found + i }
+      i += 1
+      rest = rest.tail
+    }
+    if (found == null) Set.empty else found
+  }
 
   private def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
     expr match {

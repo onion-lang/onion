@@ -15,22 +15,33 @@ package onion.compiler;
  * @param endLine optional end line number for span (1-origin)
  * @param endColumn optional end column number for span (1-origin)
  */
+/**
+ * A source position, optionally with the end of the span it covers.
+ *
+ * The span end is stored as two plain ints (`-1` = absent) rather than `Option[Int]`s: a
+ * location is allocated for every token and most AST nodes, and the boxed representation
+ * was four objects per location (the location, a copy, two `Some`s), each a pointer to chase.
+ * `endLine`/`endColumn` keep the `Option` view for the few readers that want it.
+ */
 final case class Location(
   line: Int,
   column: Int,
-  endLine: Option[Int] = None,
-  endColumn: Option[Int] = None
+  endLineOrNone: Int = -1,
+  endColumnOrNone: Int = -1
 ) {
   /** Java-compatible constructor with just line and column */
-  def this(line: Int, column: Int) = this(line, column, None, None)
+  def this(line: Int, column: Int) = this(line, column, -1, -1)
+
+  def endLine: Option[Int] = if (endLineOrNone < 0) None else Some(endLineOrNone)
+  def endColumn: Option[Int] = if (endColumnOrNone < 0) None else Some(endColumnOrNone)
 
   /** Returns true if this location has span information */
-  def hasSpan: Boolean = endLine.isDefined && endColumn.isDefined
+  def hasSpan: Boolean = endLineOrNone >= 0 && endColumnOrNone >= 0
 
   /** Returns the span length on a single line, or 1 if no span */
   def spanLength: Int = {
-    if (hasSpan && endLine.contains(line)) {
-      math.max(1, endColumn.get - column + 1)
+    if (hasSpan && endLineOrNone == line) {
+      math.max(1, endColumnOrNone - column + 1)
     } else {
       1
     }
@@ -38,7 +49,7 @@ final case class Location(
 
   /** Creates a new Location with span information */
   def withSpan(endLine: Int, endColumn: Int): Location =
-    copy(endLine = Some(endLine), endColumn = Some(endColumn))
+    Location(line, column, endLine, endColumn)
 
   /**
    * A location starting where this one starts and ending where `other` ends.
@@ -51,13 +62,18 @@ final case class Location(
   def spanningTo(other: Location): Location =
     if (other == null) this
     else {
-      val (endL, endC) = (other.endLine, other.endColumn) match {
-        case (Some(l), Some(c)) => (l, c)
-        case _                  => (other.line, other.column)
-      }
+      val spanned = other.hasSpan
+      val endL = if (spanned) other.endLineOrNone else other.line
+      val endC = if (spanned) other.endColumnOrNone else other.column
       // A malformed pair -- an end before the start -- would make the renderer draw
       // nothing or worse; keep this location rather than produce one that lies.
       if (endL < line || (endL == line && endC < column)) this
-      else copy(endLine = Some(endL), endColumn = Some(endC))
+      else Location(line, column, endL, endC)
     }
+}
+
+object Location {
+  /** The former shape of the constructor, for callers that hold the span as options. */
+  def apply(line: Int, column: Int, endLine: Option[Int], endColumn: Option[Int]): Location =
+    Location(line, column, endLine.getOrElse(-1), endColumn.getOrElse(-1))
 }

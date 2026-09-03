@@ -42,39 +42,30 @@ private[compiler] object CapturedVariableCollector {
     found
   }
 
-  private def productChildren(node: AnyRef): Seq[AnyRef] = node match {
-    case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
-    case _ => reflectiveChildren(node)
+  // One child enumeration for the whole compiler: TermWalk lists each node class's children
+  // explicitly (reflection only for a class it does not know).
+  private def productChildren(node: AnyRef): Seq[AnyRef] = onion.compiler.TermWalk.children(node)
+
+  // A nested closure's captures are collected once for every enclosing closure (which relays
+  // them) and once more when the nested closure itself is emitted; the walk is the same each
+  // time, so the answer is memoized per body for the duration of one class's code generation.
+  private val memo = new ThreadLocal[java.util.IdentityHashMap[ActionStatement, Seq[ClosureLocalBinding]]] {
+    override def initialValue() = new java.util.IdentityHashMap
   }
 
-  // TypedAST terms/statements are plain classes, not case classes, so walk
-  // their public accessor methods that return Terms/Statements/collections.
-  // The accessor set of a node class is fixed; getMethods() plus the filter was the cost of
-  // this walk, and it ran per node per method. Looked up once per class instead (the same
-  // fix TermWalk has).
-  private val accessors = new java.util.concurrent.ConcurrentHashMap[Class[?], Array[java.lang.reflect.Method]]()
-
-  private def reflectiveChildren(node: AnyRef): Seq[AnyRef] = {
-    accessors.computeIfAbsent(node.getClass, c => c.getMethods.iterator
-      .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
-        (classOf[Term].isAssignableFrom(m.getReturnType) ||
-         classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
-         m.getReturnType.isArray ||
-         classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
-      .toArray).iterator
-.flatMap { m =>
-        try {
-          m.invoke(node) match {
-            case null => Nil
-            case arr: Array[?] => arr.toSeq.collect { case r: AnyRef => r }
-            case list: java.util.List[?] => scala.jdk.CollectionConverters.ListHasAsScala(list).asScala.toSeq.collect { case r: AnyRef => r }
-            case other: AnyRef => Seq(other)
-          }
-        } catch { case _: Throwable => Nil }
-      }.toSeq
-  }
+  /** Forgets the answers of the previous code generation. */
+  def reset(): Unit = if (!memo.get.isEmpty) memo.set(new java.util.IdentityHashMap)
 
   def collect(stmt: ActionStatement, frame: onion.compiler.LocalFrame = null): Seq[ClosureLocalBinding] = {
+    val m = memo.get
+    val cached = m.get(stmt)
+    if (cached != null) return cached
+    val fresh = collectUncached(stmt, frame)
+    m.put(stmt, fresh)
+    fresh
+  }
+
+  private def collectUncached(stmt: ActionStatement, frame: onion.compiler.LocalFrame): Seq[ClosureLocalBinding] = {
     // Use (frameIndex, index) as key to handle nested closures correctly
     val captured = mutable.LinkedHashMap[(Int, Int), ClosureLocalBinding]()
 

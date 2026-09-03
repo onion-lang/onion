@@ -1942,8 +1942,12 @@ db.transaction((conn) -> {
   conn.update("UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
 })
 
+db.isClosed()   // false until db.close() is called
 db.close()
 ```
+
+`Db::connect(url)` also has a credential-less, one-argument form for databases that need
+none (SQLite, H2): `Db::connect("jdbc:sqlite:local.db")` is `Db::connect(url, null, null)`.
 
 Values are always **bound**, never pasted into the SQL, so `WHERE name = ?` is safe with
 any name and there is no way to build the string by accident.

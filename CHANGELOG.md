@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Timing::measure`'s labeled overload.** `docs/reference/stdlib.md` and its Japanese
+  translation showed `Timing::measure(fn)` and both `Timing::measureVoid` forms, but never
+  the labeled `Timing::measure(label, fn)` overload sitting right next to `measureVoid`'s
+  labeled example. A new `TimingDocCoverageSpec` guards both overloads' presence in both
+  files going forward.
 - **`Json.JsonParseException::getPosition`.** `docs/reference/stdlib.md` and its Japanese
   translation mentioned `Json.JsonParseException` only as the thing `Json::parseOrNull`
   avoids throwing, never documenting that a caught instance also carries `getPosition()` —

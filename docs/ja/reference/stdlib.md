@@ -846,6 +846,8 @@ Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 // 実行時間を計測して表示し、結果を返す
 val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 // 出力: "Elapsed: 123.45ms"
+val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+// 出力: "task: 123.45ms"
 
 // 戻り値のない関数版
 Timing::measureVoid(() -> { expensiveOperation(); })

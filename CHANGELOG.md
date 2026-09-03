@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`onion script.on` uses the compile daemon too** (`ONION_DAEMON=1`): the daemon compiles
+  the script and hands the classes and class path back, and the program runs in the caller's
+  process as always. `ScriptRunner.run` is split into `prepare` (parse options, compile,
+  report) and `execute` for this; behaviour without the daemon is unchanged.
+
 ### Documentation
 
 - **`Colls::flatMap`/`bind`/`zip`/`groupBy` on `List`.** `docs/reference/stdlib.md` and its

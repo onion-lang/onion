@@ -93,14 +93,40 @@ object OnionDaemon {
       case "compile" =>
         DaemonProtocol.writeResponse(out, compile(request.args))
         true
+      case "compile-script" =>
+        val (response, bundle) = compileScript(request.args)
+        DaemonProtocol.writeResponse(out, response)
+        if (bundle != null) DaemonProtocol.writeBundle(out, bundle)
+        true
       case other =>
         DaemonProtocol.writeResponse(out, DaemonProtocol.Response(2, "", s"unknown daemon command: $other\n"))
         true
     }
   }
 
+  /**
+   * The compile half of an `onion` script run (see ScriptRunner.prepare): the classes come
+   * back to the client, which runs them. The bundle is null when there is nothing to run.
+   */
+  private[daemon] def compileScript(args: Array[String]): (DaemonProtocol.Response, DaemonProtocol.ClassBundle) = synchronized {
+    var bundle: DaemonProtocol.ClassBundle = null
+    val response = captured { () =>
+      val verbose = args.contains("--verbose")
+      new onion.tools.ScriptRunner().prepare(args.filterNot(_ == "--verbose"), verbose) match {
+        case Left(code) => code
+        case Right(prepared) =>
+          bundle = DaemonProtocol.ClassBundle(prepared.scriptName, prepared.classPath.toArray, prepared.classes.toArray)
+          0
+      }
+    }
+    (response, bundle)
+  }
+
   /** Runs one `onionc` command line with its output captured. Serialized: the streams are process-wide. */
-  private[daemon] def compile(args: Array[String]): DaemonProtocol.Response = synchronized {
+  private[daemon] def compile(args: Array[String]): DaemonProtocol.Response =
+    captured(() => CompilerFrontend.runCommandLine(args))
+
+  private def captured(body: () => Int): DaemonProtocol.Response = synchronized {
     val outBytes = new ByteArrayOutputStream()
     val errBytes = new ByteArrayOutputStream()
     val outStream = new PrintStream(outBytes, true, StandardCharsets.UTF_8)
@@ -110,7 +136,7 @@ object OnionDaemon {
     System.setOut(outStream)
     System.setErr(errStream)
     val code =
-      try Console.withOut(outStream) { Console.withErr(errStream) { CompilerFrontend.runCommandLine(args) } }
+      try Console.withOut(outStream) { Console.withErr(errStream) { body() } }
       catch {
         case NonFatal(e) =>
           errStream.println(s"onion daemon: internal error: $e")

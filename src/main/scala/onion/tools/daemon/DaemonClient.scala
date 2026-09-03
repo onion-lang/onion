@@ -56,6 +56,63 @@ object DaemonClient {
       }
     } catch { case NonFatal(_) => None }
 
+  /**
+   * The compile half of `onion` through the daemon: Some(Left(code)) when the daemon answered
+   * but there is nothing to run (a compile error, `--help`...), Some(Right(prepared)) when the
+   * classes came back, None when the daemon is not available. Runner options before the
+   * script get their paths made absolute; the script's own arguments are passed verbatim.
+   */
+  def compileScript(args: Array[String]): Option[Either[Int, onion.tools.ScriptRunner.Prepared]] =
+    try {
+      val socket = socketPath()
+      if (!ensureRunning(socket)) None
+      else {
+        val cwd = Paths.get("").toAbsolutePath
+        val si = onion.tools.ScriptRunner.scriptIndex(args)
+        if (si >= args.length) return None // no script: let the in-process runner print usage
+        val runner = absolutizeRunnerOptions(args.take(si), cwd) :+ abs(args(si), cwd)
+        val sent = runner ++ args.drop(si + 1)
+        val channel = SocketChannel.open(UnixDomainSocketAddress.of(socket))
+        try {
+          val out = new DataOutputStream(Channels.newOutputStream(channel))
+          val in = new DataInputStream(Channels.newInputStream(channel))
+          DaemonProtocol.writeRequest(out, DaemonProtocol.Request("compile-script", cwd.toString, sent))
+          val response = DaemonProtocol.readResponse(in)
+          System.out.print(response.out)
+          System.err.print(response.err)
+          System.out.flush(); System.err.flush()
+          if (response.exitCode != 0) Some(Left(response.exitCode))
+          else {
+            val bundle = DaemonProtocol.readBundle(in)
+            Some(Right(onion.tools.ScriptRunner.Prepared(bundle.scriptName, bundle.classPath.toSeq, bundle.classes.toSeq, args.drop(si + 1))))
+          }
+        } finally channel.close()
+      }
+    } catch { case NonFatal(_) => None }
+
+  /** `-classpath` entries made absolute and the `.` default supplied; other runner options pass through. */
+  private[daemon] def absolutizeRunnerOptions(options: Array[String], cwd: Path): Array[String] = {
+    val out = scala.collection.mutable.ArrayBuffer[String]()
+    var sawClasspath = false
+    var i = 0
+    while (i < options.length) {
+      val a = options(i)
+      if (a == "-classpath" && i + 1 < options.length) {
+        sawClasspath = true
+        out += a += options(i + 1).split(File.pathSeparator).map(abs(_, cwd)).mkString(File.pathSeparator); i += 1
+      } else if ((a == "-encoding" || a == "-maxErrorReport" || a == "-super" || a == "--Wno" || a == "--warn" ||
+                  a == "--law-seed" || a == "--law-samples" || a == "--profile-format") && i + 1 < options.length) {
+        out += a += options(i + 1); i += 1
+      } else if (a == "--profile-output" && i + 1 < options.length) {
+        val target = options(i + 1)
+        out += a += (if (target == "stderr" || target == "stdout") target else abs(target, cwd)); i += 1
+      } else out += a
+      i += 1
+    }
+    if (!sawClasspath) out += "-classpath" += cwd.toString
+    out.toArray
+  }
+
   private def control(command: String): Int = {
     val socket = socketPath()
     if (!Files.exists(socket)) { println("onion daemon: not running"); return if (command == "ping") 1 else 0 }

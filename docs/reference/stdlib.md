@@ -59,6 +59,13 @@ val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name)
 ```
 
+`IO::input(prompt)` is the same operation callable directly by that name --
+`readln(prompt)` is implemented in terms of it:
+
+```onion
+val name: String = IO::input("What's your name? ")
+```
+
 ### IO::readLine
 
 Read a line from standard input, or `null` at end of input. `IO::readln()` (no

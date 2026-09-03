@@ -2293,27 +2293,32 @@ Sets::toList(a)                        // back to a List
 
 ### Set algebra
 
+Every method below is also a builtin extension method on `Set`, callable as
+`a.union(b)` instead of `Sets::union(a, b)`.
+
 ```onion
-Sets::union(a, b)
-Sets::intersection(a, b)
-Sets::difference(a, b)
-Sets::symmetricDifference(a, b)        // in exactly one of the two
-Sets::containsAll(a, b)
-Sets::isSubsetOf(a, b)                 // every element of a is in b
-Sets::isSupersetOf(a, b)
-Sets::isDisjoint(a, b)                 // share no elements
+Sets::union(a, b)                      // a.union(b)
+Sets::intersection(a, b)               // a.intersection(b)
+Sets::difference(a, b)                 // a.difference(b)
+Sets::symmetricDifference(a, b)        // a.symmetricDifference(b) -- in exactly one of the two
+Sets::containsAll(a, b)                // a.containsAll(b)
+Sets::isSubsetOf(a, b)                 // a.isSubsetOf(b) -- every element of a is in b
+Sets::isSupersetOf(a, b)               // a.isSupersetOf(b)
+Sets::isDisjoint(a, b)                 // a.isDisjoint(b) -- share no elements
 ```
 
 ### Functional operations
 
+These are also builtin extension methods on `Set` (`a.map(...)`, `a.filter(...)`, ...):
+
 ```onion
-Sets::map(a, (x: Int) -> x * 2)
-Sets::filter(a, (x: Int) -> x > 1)
-Sets::forEach(a, (x: Int) -> println(x))
-Sets::count(a, (x: Int) -> x > 1)
-Sets::any(a, (x: Int) -> x > 2)
-Sets::all(a, (x: Int) -> x > 0)
-Sets::find(a, (x: Int) -> x > 2)       // matching element or null
+Sets::map(a, (x: Int) -> x * 2)        // a.map((x: Int) -> x * 2)
+Sets::filter(a, (x: Int) -> x > 1)     // a.filter((x: Int) -> x > 1)
+Sets::forEach(a, (x: Int) -> println(x))  // a.forEach((x: Int) -> println(x))
+Sets::count(a, (x: Int) -> x > 1)      // a.count((x: Int) -> x > 1)
+Sets::any(a, (x: Int) -> x > 2)        // a.any((x: Int) -> x > 2)
+Sets::all(a, (x: Int) -> x > 0)        // a.all((x: Int) -> x > 0)
+Sets::find(a, (x: Int) -> x > 2)       // a.find((x: Int) -> x > 2) -- matching element or null
 ```
 
 ---

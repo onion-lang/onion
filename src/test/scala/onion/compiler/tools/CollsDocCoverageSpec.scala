@@ -63,4 +63,36 @@ class CollsDocCoverageSpec extends AnyFunSpec {
     assert(read("docs/ja/reference/stdlib.md").contains("Colls"),
       "docs/ja/reference/stdlib.md's overview table should mention Colls")
   }
+
+  /**
+   * `flatMap`/`bind`/`zip`/`groupBy` on `List` are real `onion.Colls` members (caught by
+   * the two whole-file checks above only by accident, because `Option`/`Result`/`Future`/
+   * `Outcome`/`Maps` happen to document their own same-named methods elsewhere in the
+   * file). Pin their presence in the Colls section itself so that coincidence is not the
+   * only thing standing between this file and a real gap.
+   */
+  private def collsSection(doc: String, heading: String): String = {
+    val lines = doc.linesIterator.toIndexedSeq
+    val start = lines.indexWhere(_.contains(heading))
+    assert(start >= 0, s"""could not find a "$heading" heading -- the scan has rotted""")
+    val rest = lines.drop(start + 1)
+    val end = rest.indexWhere(_.startsWith("## "))
+    (if (end < 0) rest else rest.take(end)).mkString("\n")
+  }
+
+  private val listMonadAndPairingNames = Set("flatMap", "bind", "zip", "groupBy")
+
+  it("docs/reference/stdlib.md's Colls Module section documents List flatMap/bind/zip/groupBy") {
+    val doc = collsSection(read("docs/reference/stdlib.md"), "## Colls Module")
+    val missing = listMonadAndPairingNames -- documentedNames(doc, listMonadAndPairingNames)
+    assert(missing.isEmpty,
+      s"docs/reference/stdlib.md's Colls Module section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("docs/ja/reference/stdlib.md's Colls section documents List flatMap/bind/zip/groupBy") {
+    val doc = collsSection(read("docs/ja/reference/stdlib.md"), "## Colls モジュール")
+    val missing = listMonadAndPairingNames -- documentedNames(doc, listMonadAndPairingNames)
+    assert(missing.isEmpty,
+      s"docs/ja/reference/stdlib.md's Colls section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
 }

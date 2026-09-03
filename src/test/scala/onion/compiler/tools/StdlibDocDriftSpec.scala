@@ -97,4 +97,43 @@ class StdlibDocDriftSpec extends AnyFunSpec {
     val unknown = named.filter(n => !notStdlibClasses.contains(n) && membersOf(n).isEmpty)
     assert(unknown.isEmpty, s"CLAUDE.md names stdlib modules that do not exist: ${unknown.mkString(", ")}")
   }
+
+  /** Module names (backtick-quoted, real `onion.*` classes) in the "Modules at a
+   * glance" table of `docs/reference/stdlib.md` — the authoritative list of what
+   * counts as a documented stdlib module. */
+  private def glanceModules(): Set[String] = {
+    val lines = read("docs/reference/stdlib.md").linesIterator.toSeq
+    val start = lines.indexWhere(_.contains("## Modules at a glance"))
+    assert(start >= 0, "docs/reference/stdlib.md has no Modules at a glance section — the scan has rotted")
+    val table = lines.drop(start + 1).takeWhile(!_.trim.startsWith("Most helpers"))
+    """`([A-Z][A-Za-z0-9]*)`""".r
+      .findAllMatchIn(table.mkString("\n"))
+      .map(_.group(1))
+      .filterNot(notStdlibClasses.contains)
+      .filter(membersOf(_).nonEmpty)
+      .toSet
+  }
+
+  /** Module names bulleted (`` - `Name` ... ``) under a "Standard Library" section header. */
+  private def namedInStandardLibrarySection(path: String, marker: String): Set[String] = {
+    val lines = read(path).linesIterator.toSeq
+    val start = lines.indexWhere(_.contains(marker))
+    assert(start >= 0, s"$path has no $marker section — the scan has rotted")
+    val section = lines.drop(start + 1).takeWhile(_.trim.startsWith("- `"))
+    """`([A-Z][A-Za-z0-9]*)`""".r.findAllMatchIn(section.mkString("\n")).map(_.group(1)).toSet
+  }
+
+  it("CLAUDE.md's Standard Library list covers every module in the stdlib reference") {
+    val missing = glanceModules() -- namedInStandardLibrarySection("CLAUDE.md", "**Standard Library**")
+    assert(missing.isEmpty,
+      s"CLAUDE.md's Standard Library list is missing modules documented in docs/reference/stdlib.md: " +
+      s"${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("docs/ja/CLAUDE_ja.md's 標準ライブラリ list covers every module in the stdlib reference") {
+    val missing = glanceModules() -- namedInStandardLibrarySection("docs/ja/CLAUDE_ja.md", "**標準ライブラリ**")
+    assert(missing.isEmpty,
+      s"docs/ja/CLAUDE_ja.md's 標準ライブラリ list is missing modules documented in docs/reference/stdlib.md: " +
+      s"${missing.toSeq.sorted.mkString(", ")}")
+  }
 }

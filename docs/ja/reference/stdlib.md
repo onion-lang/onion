@@ -1591,6 +1591,25 @@ System::exit(1)  // エラー
 - `Iterables::take(list, n)` / `Iterables::drop(list, n)`
 - `Iterables::sort(list, comparator)` / `Iterables::sort(list)` - 後者は要素が `Comparable` であることが必要
 
+上記のメソッド（`listOf` と `newList` を除く -- これらは `List` を操作するの
+ではなく生成するため）は、いずれも組み込みの拡張メソッドとしても呼び出せ、
+第一引数に対するメソッドチェーンとして書ける:
+
+```onion
+xs.map { x -> x * 2 }             // Set / Iterable レシーバでも同様
+m.mapMap((e) -> Colls::entry(e.getKey(), e.getValue() * 2))
+(1..5).toList()                   // 範囲(Range)も対象
+xs.filter { x -> x > 0 }
+xs.foldl(0, (acc, x) -> acc + x)
+xs.reduce(0, (acc, x) -> acc + x)
+xs.exists { x -> x > 2 }
+xs.forAll { x -> x > 0 }
+xs.first() / xs.last()
+xs.reverse()
+xs.take(2) / xs.drop(1)
+xs.sort() / xs.sort(comparator)
+```
+
 ## Files モジュール
 
 ファイル I/O（`onion.Files`）:

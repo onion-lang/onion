@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Map`'s `keys()`/`values()`/`getOrDefault()` extension-method call syntax
+  documented.** `docs/reference/stdlib.md` and its Japanese translation only ever
+  showed these as `Maps::name(m, ...)` static calls, but `m.keys()`, `m.values()`
+  and `m.getOrDefault("x", 0)` are also real extension methods on `Map` (verified
+  by running them against a `Map` literal) that were never shown in either doc.
+  Added the extension-call spellings to both files' Maps Module section and a new
+  `MapsExtensionCallDocSpec` regression test.
+
 - **List `any`/`all`/`none`/`find`/`forEach`/`count`/`reverse`/`contains` and
   `Colls::toList(array)` documented.** `docs/reference/stdlib.md` and its Japanese
   translation never showed these as List extension methods in the Colls Module section

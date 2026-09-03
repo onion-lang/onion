@@ -1741,7 +1741,8 @@ A connection reads with `readLine()` (null at end of stream), `readAll()` (UTF-8
 peer closes) and `readBytes()`; it writes with `write(text)`, `writeLine(text)` (appends
 CRLF, which is what line-oriented protocols expect) and `writeBytes(bytes)`. Every write
 flushes, so nothing sits in a buffer unsent. `timeout(millis)` bounds a blocking read,
-`closeWrite()` half-closes to signal EOF while still reading, and `close()` is idempotent.
+`closeWrite()` half-closes to signal EOF while still reading, `close()` is idempotent, and
+`conn.isClosed()` reports whether it already has been.
 
 ### Net::listen
 
@@ -1758,7 +1759,8 @@ listener.close()
 Port 0 asks the OS for a free port, and `port()` reports the one it chose — that is what
 makes a server testable without picking a number and hoping. Binding `"localhost"` keeps it
 off the network; passing `null` as the host binds every local address. Closing the listener
-is how to unblock a thread parked in `accept()`.
+is how to unblock a thread parked in `accept()`, and `listener.isClosed()` reports whether
+that has happened.
 
 Failures carry the address that failed, so a `catch` in Onion names the host rather than
 just saying "connection refused".

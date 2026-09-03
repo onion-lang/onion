@@ -73,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   none, e.g. SQLite/H2) and `db.isClosed()` (alongside `close()`, as `Concurrent`'s Channel docs
   already pair `close()`/`isClosed()`) never appeared in either file. A new `DbDocCoverageSpec`
   guards both overloads and `isClosed()` against both files going forward.
+- **`Net.Conn::isClosed` and `Net.Listener::isClosed`.** `docs/reference/stdlib.md` and its
+  Japanese translation described `Conn`'s `readLine`/`readAll`/`readBytes`/`write`/`writeLine`/
+  `writeBytes`/`timeout`/`closeWrite`/`close` and `Listener`'s `accept`/`port`/`close`, but never
+  mentioned either class's `isClosed()` — the same `close()`/`isClosed()` pairing `Db.Conn` and
+  `Concurrent`'s Channel already document. A new `NetDocCoverageSpec` guards both members against
+  both files going forward.
 
 ## [0.45.0] - 2026-09-03
 

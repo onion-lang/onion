@@ -1285,6 +1285,18 @@ Scalar type inference rules (identical to `Json`):
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
 
+When you do want to handle a malformed-input failure, `Yaml.YamlParseException` carries
+`getLine()` — the 1-based line number where parsing gave up — in addition to the usual
+`message()`:
+
+```onion
+try {
+  Yaml::parse("no colon here")
+} catch e: Yaml.YamlParseException {
+  IO::println(e.message() + " at line " + e.getLine())
+}
+```
+
 ### Yaml::stringify
 
 Serialize a `Map` (or scalar) to a YAML flat block-mapping string:

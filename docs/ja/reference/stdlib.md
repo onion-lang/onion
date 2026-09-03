@@ -1128,6 +1128,17 @@ scalar の型推論規則（Json と同一）:
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
 
+不正入力の失敗をその場で処理したい場合、`Yaml.YamlParseException` は通常の `message()` に加えて
+`getLine()`（パースを諦めた行番号、1始まり）を持っています:
+
+```onion
+try {
+  Yaml::parse("no colon here")
+} catch e: Yaml.YamlParseException {
+  IO::println(e.message() + " at line " + e.getLine())
+}
+```
+
 ### Yaml::stringify
 
 `Map`（または scalar）を YAML の flat block-mapping 文字列にシリアライズします:

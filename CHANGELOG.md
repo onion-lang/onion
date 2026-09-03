@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole-string match that backs the `case re"..." (a, b):` select pattern. A new
   `RegexDocCoverageSpec` guards every public `onion.Regex` member against both files going
   forward.
+- **`Future::fromCompletableFuture`.** `docs/reference/stdlib.md` and its Japanese translation
+  documented `f.underlying()` (Future -> Java `CompletableFuture`) under "Conversions" but never
+  its inverse, `Future::fromCompletableFuture` (Java `CompletableFuture` -> Future) — the way to
+  wrap a Java async API's result for use with Onion's `map`/`flatMap`/`await`/`do` notation. A new
+  `FutureDocCoverageSpec` guards every public `onion.Future` member against both files going
+  forward.
 
 ## [0.45.0] - 2026-09-03
 

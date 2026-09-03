@@ -931,6 +931,10 @@ val f: Future[Int] = Future::successful(42)
 f.toOption()  // Option[Int] - Some(42) or None (blocks)
 f.toResult()  // Result[Int, Throwable] (blocks)
 f.underlying() // Java CompletableFuture for interop
+
+// The reverse direction: wrap a Java CompletableFuture as a Future
+val cf: java.util.concurrent.CompletableFuture[Int] = someJavaApi()
+val wrapped: Future[Int] = Future::fromCompletableFuture(cf)
 ```
 
 ### Do Notation Support

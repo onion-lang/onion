@@ -4,6 +4,10 @@ import org.objectweb.asm.{Opcodes, Type as AsmType}
 import org.objectweb.asm.commons.GeneratorAdapter
 
 object AsmUtil {
+  /** Precomputed, so array maps over ASM types do not synthesize a ClassTag (a ClassValue lookup) per call. */
+  val asmTypeTag: scala.reflect.ClassTag[AsmType] = scala.reflect.ClassTag(classOf[AsmType])
+  /** The shared empty array (a default argument built with `Array.empty` synthesized a ClassTag per call). */
+  val noAsmTypes: Array[AsmType] = new Array[AsmType](0)
   val JavaLangObject: String = "java.lang.Object"
   val JavaUtilArrayList: String = "java.util.ArrayList"
   val JavaUtilLinkedHashMap: String = "java.util.LinkedHashMap"

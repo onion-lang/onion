@@ -73,6 +73,17 @@ import scala.jdk.CollectionConverters._
  */
 object TypedAST {
 
+  // Precomputed ClassTags for the arrays built on hot paths, passed explicitly with `using`.
+  // Left to the compiler, `toArray`/array `map` synthesize `ClassTag(classOf[X])` per call,
+  // and that goes through a ClassValue lookup every time (a top leaf in the profile). They are
+  // plain vals, not givens: a given ClassTag in scope also steers element-type inference.
+  import scala.reflect.ClassTag
+  val termTag: ClassTag[TypedAST.Term] = ClassTag(classOf[TypedAST.Term])
+  val actionStatementTag: ClassTag[TypedAST.ActionStatement] = ClassTag(classOf[TypedAST.ActionStatement])
+  val typeTag: ClassTag[TypedAST.Type] = ClassTag(classOf[TypedAST.Type])
+  val methodTag: ClassTag[TypedAST.Method] = ClassTag(classOf[TypedAST.Method])
+  val stringTag: ClassTag[String] = ClassTag(classOf[String])
+
   /**
    * Base trait for all typed AST nodes.
    *
@@ -204,7 +215,7 @@ object TypedAST {
 
     // Accessed on every visit of the block by typing, optimization and codegen; the
     // varargs Seq was copied into a new array each time.
-    val statements: Array[TypedAST.ActionStatement] = newStatements.toArray
+    val statements: Array[TypedAST.ActionStatement] = newStatements.toArray(using actionStatementTag)
   }
 
   /**
@@ -433,7 +444,7 @@ object TypedAST {
     def addDefaultConstructor: Unit =
       constructors_ += ConstructorDefinition.newDefaultConstructor(this)
 
-    def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray
+    def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray(using methodTag)
 
     def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
 
@@ -1035,7 +1046,7 @@ object TypedAST {
       val cached = perRaw.get(typeArguments)
       if cached != null then cached
       else
-        val fresh = new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type])
+        val fresh = new AppliedClassType(raw, typeArguments.toArray(using typeTag))
         val winner = perRaw.putIfAbsent(typeArguments, fresh)
         if winner == null then fresh else winner
   }

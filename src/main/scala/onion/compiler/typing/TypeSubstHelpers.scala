@@ -45,7 +45,7 @@ private[typing] object TypeSubst {
 
   /** Substitute all argument types of a method */
   def args(method: Method, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Array[Type] =
-    method.arguments.map(tp => apply(tp, classSubst, methodSubst))
+    method.arguments.map(tp => apply(tp, classSubst, methodSubst))(using onion.compiler.TypedAST.typeTag)
 
   /** Wrap term in AsInstanceOf if types differ, otherwise return as-is */
   def withCast(term: Term, targetType: Type): Term =

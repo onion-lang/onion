@@ -127,7 +127,7 @@ private[typing] object GenericMethodTypeArguments {
     val inferred = HashMap[String, Type]()
     val upperConstraints = HashMap[String, Type]()
     val lowerConstraints = HashMap[String, Type]()
-    val paramNames = typeParams.map(_.name).toSet
+    val paramNames = typeParams.iterator.map(_.name).toSet
 
     def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
       if (bound == null || bound.isNullType) return
@@ -230,7 +230,7 @@ private[typing] object GenericMethodTypeArguments {
     }
 
     val formalArgs =
-      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
     if (method.isVararg && formalArgs.nonEmpty) {
       // Vararg methods: unify fixed params positionally, then unify the vararg
       // component with each trailing argument (boxing primitives), unless the
@@ -341,7 +341,7 @@ private[typing] object GenericMethodTypeArguments {
     val inferred = HashMap[String, Type]()
     val upperConstraints = HashMap[String, Type]()
     val lowerConstraints = HashMap[String, Type]()
-    val paramNames = typeParams.map(_.name).toSet
+    val paramNames = typeParams.iterator.map(_.name).toSet
 
     def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
       if (bound == null || bound.isNullType) return
@@ -445,7 +445,7 @@ private[typing] object GenericMethodTypeArguments {
     }
 
     val formalArgs =
-      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
     if (method.isVararg && formalArgs.nonEmpty) {
       // Vararg methods: unify fixed params positionally, then unify the vararg
       // component with each trailing argument (boxing primitives), unless the

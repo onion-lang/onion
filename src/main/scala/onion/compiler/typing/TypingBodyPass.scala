@@ -248,7 +248,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     operatorTyping.processRefEquals(kind, node, context)
   def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] = {
     var failed = false
-    val result = nodes.map{node => typed(node, context).getOrElse{failed = true; null}}
+    val result = nodes.map{node => typed(node, context).getOrElse{failed = true; null}}(using onion.compiler.TypedAST.termTag)
     if(failed) null else result
   }
 

@@ -62,7 +62,7 @@ private[compiler] object TypeSubstitution {
   def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
-      rawParams.map(_.name).zip(applied.typeArguments).toMap
+      rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(applied.typeArguments).toMap
     case _ =>
       scala.collection.immutable.Map.empty
   }
@@ -94,8 +94,8 @@ private[compiler] object TypeSubstitution {
       parents.iterator.flatMap { parent =>
         val parentSubst = parent match {
           case ap: TypedAST.AppliedClassType =>
-            ap.raw.typeParameters.map(_.name)
-              .zip(ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = true)))
+            ap.raw.typeParameters.map(_.name)(using onion.compiler.TypedAST.stringTag)
+              .zip(ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = true))(using onion.compiler.TypedAST.typeTag))
               .toMap
           case _ => scala.collection.immutable.Map.empty[String, Type]
         }
@@ -133,7 +133,7 @@ private[compiler] object TypeSubstitution {
       case tv: TypedAST.TypeVariableType =>
         lookup(tv.name).getOrElse(if (defaultToBound) tv.upperBound else tv)
       case applied: TypedAST.AppliedClassType =>
-        val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))
+        val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))(using onion.compiler.TypedAST.typeTag)
         if (newArgs.sameElements(applied.typeArguments)) applied
         else TypedAST.AppliedClassType(applied.raw, newArgs.toList)
       case at: ArrayType =>

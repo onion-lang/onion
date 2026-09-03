@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Arrays built on the type checker's and backend's hot paths pass a precomputed `ClassTag`
+  explicitly (`TypedAST.termTag` and friends): left to the compiler, every `toArray` and array
+  `map` synthesized one through a `ClassValue` lookup. Constructor-argument adaptation is an
+  index loop instead of zip + map, the codegen argument emitter's default spill list is a
+  shared empty array, class lookup no longer allocates an `Option` per name, and the AST
+  binding index is presized for a whole unit.
+
 ## [0.47.0] - 2026-09-03
 
 ### Changed

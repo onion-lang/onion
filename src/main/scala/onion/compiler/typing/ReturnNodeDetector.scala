@@ -126,14 +126,17 @@ private[typing] object ReturnNodeDetector {
         ()
     }
 
+    // One function object for the whole walk (passing the local def eta-expanded a lambda per node).
+    var visitF: AST.Node => Unit = null
     def visit(n: AST.Node): Unit = n match {
       case _: AST.ReturnExpression =>
         found = true
       case _: AST.ClosureExpression =>
         () // do not inspect nested closures
       case _ =>
-        visitChildren(n)(visit)
+        visitChildren(n)(visitF)
     }
+    visitF = visit
 
     visit(node)
     found

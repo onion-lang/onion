@@ -10,9 +10,22 @@ import scala.collection.mutable
 final case class DebugLocal(slot: Int, name: String, descriptor: String)
 
 class LocalVarContext(gen: GeneratorAdapter) {
-  private val indexMap = mutable.Map[Int, Int]()
-  private val parameterSet = mutable.Set[Int]()
-  private val boxedSet = mutable.Set[Int]()
+  // Typed-AST index -> JVM slot, and two index sets, as flat structures: a boxed
+  // `Map[Int, Int]` and two `Set[Int]`s were consulted for every local read and write.
+  private var slots: Array[Int] = new Array[Int](16)
+  java.util.Arrays.fill(slots, -1)
+  private val parameterSet = new java.util.BitSet()
+  private val boxedSet = new java.util.BitSet()
+  private def setSlot(typedIndex: Int, slot: Int): Unit = {
+    if (typedIndex >= slots.length) {
+      val grown = java.util.Arrays.copyOf(slots, math.max(slots.length * 2, typedIndex + 1))
+      java.util.Arrays.fill(grown, slots.length, grown.length, -1)
+      slots = grown
+    }
+    slots(typedIndex) = slot
+  }
+  private def slotOrMinusOne(typedIndex: Int): Int =
+    if (typedIndex >= 0 && typedIndex < slots.length) slots(typedIndex) else -1
 
   // Debug info. Names come from the frame, because `LocalBinding` does not carry one and
   // the scopes are the only thing that still knows what the author called a variable by
@@ -42,41 +55,48 @@ class LocalVarContext(gen: GeneratorAdapter) {
       debugLocals += DebugLocal(slot, name, tp.getDescriptor)
     }
 
-  def slotOf(typedIndex: Int): Option[Int] = indexMap.get(typedIndex)
+  def slotOf(typedIndex: Int): Option[Int] = {
+    val slot = slotOrMinusOne(typedIndex)
+    if (slot < 0) None else Some(slot)
+  }
 
-  def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
-    indexMap.get(typedIndex) match {
-      case Some(slot) => slot
-      case None =>
-        val slot = gen.newLocal(tp)
-        indexMap(typedIndex) = slot
-        recordDebug(typedIndex, slot, tp)
-        slot
+  def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int = {
+    val existing = slotOrMinusOne(typedIndex)
+    if (existing >= 0) existing
+    else {
+      val slot = gen.newLocal(tp)
+      setSlot(typedIndex, slot)
+      recordDebug(typedIndex, slot, tp)
+      slot
     }
+  }
 
   def allocateSlot(typedIndex: Int, tp: AsmType): Int = {
     val slot = gen.newLocal(tp)
-    indexMap(typedIndex) = slot
+    setSlot(typedIndex, slot)
     recordDebug(typedIndex, slot, tp)
     slot
   }
 
-  def isParameter(typedIndex: Int): Boolean = parameterSet.contains(typedIndex)
+  def isParameter(typedIndex: Int): Boolean = typedIndex >= 0 && parameterSet.get(typedIndex)
 
-  def isBoxed(typedIndex: Int): Boolean = boxedSet.contains(typedIndex)
+  def isBoxed(typedIndex: Int): Boolean = typedIndex >= 0 && boxedSet.get(typedIndex)
 
-  def markAsBoxed(typedIndex: Int): Unit = boxedSet += typedIndex
+  def markAsBoxed(typedIndex: Int): Unit = boxedSet.set(typedIndex)
 
   /**
     * Register JVM parameter slots. Slot0 is `this` for instance methods.
     */
   def withParameters(isStatic: Boolean, argTypes: Array[AsmType]): LocalVarContext = {
-    val startSlot = if isStatic then 0 else 1
-    argTypes.zipWithIndex.foldLeft(startSlot) { case (slot, (tp, i)) =>
-      indexMap(i) = slot
-      parameterSet += i
+    var slot = if isStatic then 0 else 1
+    var i = 0
+    while (i < argTypes.length) {
+      val tp = argTypes(i)
+      setSlot(i, slot)
+      parameterSet.set(i)
       recordDebug(i, slot, tp)
-      slot + tp.getSize
+      slot += tp.getSize
+      i += 1
     }
     this
   }
@@ -95,7 +115,7 @@ class LocalVarContext(gen: GeneratorAdapter) {
       // Order is irrelevant here; `entries` sorted a fresh array per method.
       for (binding <- frame.allBindings) {
         if (binding.isBoxed) {
-          boxedSet += binding.index
+          boxedSet.set(binding.index)
         }
       }
     }
@@ -108,13 +128,18 @@ class ClosureLocalVarContext(
   val closureClassName: String,
   val capturedVars: Seq[onion.compiler.ClosureLocalBinding]
 ) extends LocalVarContext(gen) {
-  // Use (frameIndex, index) as key to handle nested closures correctly
-  private val capturedByKey: Map[(Int, Int), onion.compiler.ClosureLocalBinding] =
-    capturedVars.map(b => (b.frameIndex, b.index) -> b).toMap
-
-  // Also maintain index-only lookup for backward compatibility with non-nested cases
-  private val capturedByIndex: Map[Int, onion.compiler.ClosureLocalBinding] =
-    capturedVars.filter(_.frameIndex == 0).map(b => b.index -> b).toMap
+  // A closure captures a handful of variables; a linear scan over an array beats a map
+  // keyed by a (frame, index) tuple that had to be allocated for every local read.
+  private val capturedArray: Array[onion.compiler.ClosureLocalBinding] = capturedVars.toArray
+  private def find(frameIndex: Int, typedIndex: Int): onion.compiler.ClosureLocalBinding = {
+    var i = 0
+    while (i < capturedArray.length) {
+      val b = capturedArray(i)
+      if (b.frameIndex == frameIndex && b.index == typedIndex) return b
+      i += 1
+    }
+    null
+  }
 
   def capturedFieldName(frameIndex: Int, typedIndex: Int): String = s"captured_${frameIndex}_$typedIndex"
 
@@ -122,13 +147,13 @@ class ClosureLocalVarContext(
     capturedFieldName(binding.frameIndex, binding.index)
 
   def capturedBinding(frameIndex: Int, typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] =
-    capturedByKey.get((frameIndex, typedIndex))
+    Option(find(frameIndex, typedIndex))
 
-  def capturedBinding(typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] = capturedByIndex.get(typedIndex)
+  def capturedBinding(typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] = Option(find(0, typedIndex))
 
-  def isCapturedVariable(frameIndex: Int, typedIndex: Int): Boolean = capturedByKey.contains((frameIndex, typedIndex))
+  def isCapturedVariable(frameIndex: Int, typedIndex: Int): Boolean = find(frameIndex, typedIndex) != null
 
-  def isCapturedVariable(typedIndex: Int): Boolean = capturedByIndex.contains(typedIndex)
+  def isCapturedVariable(typedIndex: Int): Boolean = find(0, typedIndex) != null
 
   override def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
     capturedBinding(typedIndex) match {

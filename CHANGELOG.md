@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`Yaml.YamlParseException::getLine`.** `docs/reference/stdlib.md` and its Japanese
+  translation documented `Yaml::parse`/`Yaml::stringify` but never mentioned that a caught
+  `Yaml.YamlParseException` also carries `getLine()` — the 1-based line number where parsing
+  gave up — alongside the usual `message()`, mirroring `Json.JsonParseException::getPosition`.
+  A new `YamlParseExceptionLineSpec` exercises both accessors via `shell.run`.
+
 ## [0.46.0] - 2026-09-03
 
 ### Added

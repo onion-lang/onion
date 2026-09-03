@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-09-03
+
 ### Changed
 
 - Fewer allocations on the compile path (each below measurement noise on the corpus): the

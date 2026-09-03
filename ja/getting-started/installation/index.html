@@ -752,6 +752,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="起動時間と JVM フラグ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンパイルデーモン
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -794,7 +811,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4581,6 +4598,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="起動時間と JVM フラグ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンパイルデーモン
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4623,7 +4657,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4732,6 +4766,22 @@ JDK を切り替えたときは作り直してください。作り直すまで�
 </span></code></pre></div>
 <p><code>ONION_DEBUG_STARTUP=1</code> を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
 表示されます。アーカイブが使われない理由はこれで分かります。</p>
+<h3 id="_5">コンパイルデーモン<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p><code>onionc</code> は毎回 JVM を起動し、コンパイラを読み込み、JIT で温めてからようやくファイルを
+コンパイルします。<code>ONION_DAEMON=1</code> を設定すると、<code>onionc</code> はコマンドラインを常駐の
+コンパイラプロセス（初回に自動起動、ユーザー・JDK・Onion のインストールごとに 1 つ）へ
+渡し、その出力と終了コードを中継します。デーモンは温まったコンパイラを実行間で保持する
+ので、典型的な 1 ファイルのコンパイルはずっと短い時間で終わります。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># 初回はデーモンを起動し、以後はそれを再利用する</span>
+</span></code></pre></div>
+<p>デーモンは 30 分仕事が無ければ自分で終了します。手動では <code>java -cp onion.jar
+onion.tools.daemon.DaemonClient stop</code>（または <code>status</code>）で操作できます。待ち受けは自分
+だけが読めるディレクトリ（<code>$XDG_RUNTIME_DIR</code> または一時ディレクトリ。
+<code>ONION_DAEMON_SOCKET</code> で上書き可）の Unix ドメインソケットで、Java 16 以降が必要です。
+デーモンに到達・起動できないときは、<code>onionc</code> はこれまでどおりプロセス内でコンパイル
+します。<code>ONION_DAEMON_JAVA_OPTS</code> はデーモン自身の JVM フラグです。<code>onion</code> による
+スクリプト実行はデーモンを経由しません（プログラムは自分のプロセスで動きます）。</p>
 <h2 id="ide">IDEセットアップ<a class="headerlink" href="#ide" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>公式のOnion拡張機能はまだありませんが、以下を使用できます：</p>
@@ -4746,7 +4796,7 @@ JDK を切り替えたときは作り直してください。作り直すまで�
 <li>プロジェクトをSBTプロジェクトとしてインポート</li>
 <li>IDEが自動的に依存関係をダウンロード</li>
 </ol>
-<h2 id="_5">次のステップ<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h2 id="_6">次のステップ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../hello-world/">Hello Worldチュートリアル</a> - 最初のOnionプログラムを書く</li>
 <li><a href="../quick-start/">クイックスタートガイド</a> - 基本機能を学ぶ</li>

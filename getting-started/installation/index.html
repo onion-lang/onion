@@ -2568,6 +2568,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Startup Time and JVM Flags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compile-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compile daemon
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4560,6 +4577,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Startup Time and JVM Flags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compile-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compile daemon
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4711,6 +4745,22 @@ quietly refuses the stale archive and runs normally, just without the speedup.</
 </span></code></pre></div>
 <p><code>ONION_DEBUG_STARTUP=1</code> stops the launcher silencing the JVM's class-sharing messages,
 which is how to find out why an archive is being ignored.</p>
+<h3 id="the-compile-daemon">The compile daemon<a class="headerlink" href="#the-compile-daemon" title="Permanent link">&para;</a></h3>
+<p>Every <code>onionc</code> run starts a JVM, loads the compiler and compiles it just-in-time before it
+gets to your file. With <code>ONION_DAEMON=1</code>, <code>onionc</code> instead hands the command line to a
+resident compiler process — started on first use, one per user, JDK and Onion
+installation — and relays its output and exit code. The daemon keeps the warmed-up
+compiler between runs, so a typical single-file compile takes a fraction of the time:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># starts the daemon the first time, then reuses it</span>
+</span></code></pre></div>
+<p>The daemon stops itself after 30 minutes without work; <code>java -cp onion.jar
+onion.tools.daemon.DaemonClient stop</code> (or <code>status</code>) controls it by hand. It listens on a
+Unix domain socket in a directory only you can read (<code>$XDG_RUNTIME_DIR</code> or the temp
+directory; override with <code>ONION_DAEMON_SOCKET</code>), needs Java 16 or later for that, and
+whenever it cannot be reached or started <code>onionc</code> simply compiles in-process as before.
+<code>ONION_DAEMON_JAVA_OPTS</code> adds JVM flags to the daemon itself. Running a script with
+<code>onion</code> is not routed through the daemon (the program runs in your own process).</p>
 <h2 id="ide-setup">IDE Setup<a class="headerlink" href="#ide-setup" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>While there's no official Onion extension yet, you can use:</p>

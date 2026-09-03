@@ -44,6 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Yaml.YamlParseException` also carries `getLine()` — the 1-based line number where parsing
   gave up — alongside the usual `message()`, mirroring `Json.JsonParseException::getPosition`.
   A new `YamlParseExceptionLineSpec` exercises both accessors via `shell.run`.
+- **`Proc::runIn`/`Proc::execIn` and `Proc.Result::failed`.** `docs/reference/stdlib.md` and
+  its Japanese translation showed `Proc::capture`/`Proc::run`/`Proc::exec`/`Proc::captureIn`
+  and said the "...In variants set the working directory" (plural), but never actually showed
+  `Proc::runIn`/`Proc::execIn`, and `Proc.Result::failed()` was missing alongside the other
+  `Result` accessors. A new `ProcDocCoverageSpec` guards the full `Proc`/`Proc.Result` member
+  set against both files going forward.
 
 ## [0.46.0] - 2026-09-03
 

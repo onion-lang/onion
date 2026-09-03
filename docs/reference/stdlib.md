@@ -1504,10 +1504,12 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 Process execution for scripting (`onion.Proc`):
 
 ```onion
-val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded()
+val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded() / r.failed()
 Proc::run("ls", "-la")                  // stdout as String (throws on failure)
 Proc::exec("make", "build")             // exit code, output passes through
 Proc::captureIn("/tmp", "ls")           // ...In variants set the working directory
+Proc::runIn("/tmp", "ls")               // like run, but in the given working directory
+Proc::execIn("/tmp", "make", "build")   // like exec, but in the given working directory
 ```
 
 ## Args Module

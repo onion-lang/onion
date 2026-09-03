@@ -1516,10 +1516,12 @@ val out2 = Csv::stringifyWithHeader(recs)     // records -> CSV（parseWithHeade
 スクリプト向けのプロセス実行（`onion.Proc`）:
 
 ```onion
-val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded()
+val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded() / r.failed()
 Proc::run("ls", "-la")                  // stdout を String で取得（失敗時は例外）
 Proc::exec("make", "build")             // 終了コード、出力はそのまま素通し
 Proc::captureIn("/tmp", "ls")           // ...In 系は作業ディレクトリを指定
+Proc::runIn("/tmp", "ls")               // run と同様だが、指定した作業ディレクトリで実行
+Proc::execIn("/tmp", "make", "build")   // exec と同様だが、指定した作業ディレクトリで実行
 ```
 
 ## Args モジュール

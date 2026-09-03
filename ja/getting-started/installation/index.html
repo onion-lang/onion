@@ -4780,8 +4780,9 @@ onion.tools.daemon.DaemonClient stop</code>（または <code>status</code>）�
 だけが読めるディレクトリ（<code>$XDG_RUNTIME_DIR</code> または一時ディレクトリ。
 <code>ONION_DAEMON_SOCKET</code> で上書き可）の Unix ドメインソケットで、Java 16 以降が必要です。
 デーモンに到達・起動できないときは、<code>onionc</code> はこれまでどおりプロセス内でコンパイル
-します。<code>ONION_DAEMON_JAVA_OPTS</code> はデーモン自身の JVM フラグです。<code>onion</code> による
-スクリプト実行はデーモンを経由しません（プログラムは自分のプロセスで動きます）。</p>
+します。<code>ONION_DAEMON_JAVA_OPTS</code> はデーモン自身の JVM フラグです。<code>onion script.on</code> も
+デーモンを使います。コンパイルはデーモンが行ってクラスを返し、プログラム自体はこれまで
+どおり自分のプロセスで動きます。</p>
 <h2 id="ide">IDEセットアップ<a class="headerlink" href="#ide" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>公式のOnion拡張機能はまだありませんが、以下を使用できます：</p>

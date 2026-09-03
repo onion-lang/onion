@@ -4759,8 +4759,9 @@ onion.tools.daemon.DaemonClient stop</code> (or <code>status</code>) controls it
 Unix domain socket in a directory only you can read (<code>$XDG_RUNTIME_DIR</code> or the temp
 directory; override with <code>ONION_DAEMON_SOCKET</code>), needs Java 16 or later for that, and
 whenever it cannot be reached or started <code>onionc</code> simply compiles in-process as before.
-<code>ONION_DAEMON_JAVA_OPTS</code> adds JVM flags to the daemon itself. Running a script with
-<code>onion</code> is not routed through the daemon (the program runs in your own process).</p>
+<code>ONION_DAEMON_JAVA_OPTS</code> adds JVM flags to the daemon itself. <code>onion script.on</code> uses it
+too: the daemon compiles and hands the classes back, and the program itself runs in your
+own process, as always.</p>
 <h2 id="ide-setup">IDE Setup<a class="headerlink" href="#ide-setup" title="Permanent link">&para;</a></h2>
 <h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
 <p>While there's no official Onion extension yet, you can use:</p>

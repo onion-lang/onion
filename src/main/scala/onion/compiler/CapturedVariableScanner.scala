@@ -162,13 +162,17 @@ object CapturedVariableScanner {
   private def findClosures(node: AST.Node): List[AST.ClosureExpression] = {
     val result = mutable.ListBuffer[AST.ClosureExpression]()
 
+    // One function object for the whole walk: passing the local `visit` as an argument
+    // eta-expanded it into a new lambda at every node.
+    var visitF: AST.Node => Unit = null
     def visit(n: AST.Node): Unit = n match {
       case closure: AST.ClosureExpression =>
         result += closure
         // Don't descend into nested closures - they will be handled separately
       case _ =>
-        visitChildren(n)(visit)
+        visitChildren(n)(visitF)
     }
+    visitF = visit
 
     visit(node)
     result.toList
@@ -194,6 +198,7 @@ object CapturedVariableScanner {
     // closure are visible in the declaring closure.
     val capturedByNested = mutable.Set[String]()
 
+    var visitF: AST.Node => Unit = null
     def visit(n: AST.Node): Unit = {
       n match {
         case id: AST.Id =>
@@ -224,8 +229,9 @@ object CapturedVariableScanner {
 
         case _ =>
       }
-      visitChildren(n)(visit)
+      visitChildren(n)(visitF)
     }
+    visitF = visit
 
     visit(node)
     // Exclude variables that are both locally declared AND not captured by any

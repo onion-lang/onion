@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Fewer allocations on the compile path (each below measurement noise on the corpus): the
+  captured-variable and return scanners keep one visitor function per walk instead of
+  eta-expanding one per node; the handwritten lexer shares its never-read character stream
+  and hands out one `String` per distinct identifier per file; codegen's local-variable
+  context keeps slots in an array and its index sets in bit sets, and a closure's captured
+  variables are found by a linear scan instead of a tuple-keyed map.
+
 ## [0.49.0] - 2026-09-03
 
 ### Changed

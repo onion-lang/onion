@@ -28,7 +28,7 @@ import onion.compiler.parser.{JJOnionParserConstants as K}
  *    that starts nothing is an `ERROR` token rather than an exception.
  */
 final class OnionLexer(text: String)
-  extends JJOnionParserTokenManager(new JavaCharStream(new java.io.StringReader(""), 1, 1, 1)):
+  extends JJOnionParserTokenManager(OnionLexer.unusedStream):
 
   import OnionLexer.*
 
@@ -244,12 +244,42 @@ final class OnionLexer(text: String)
   private def make(kind: Int, start: Int, end: Int): Token =
     // Keywords and operators have one spelling; their image is the shared constant.
     val fixed = fixedImages(kind)
-    val t = Token.newToken(kind, if fixed != null then fixed else new String(chars, start, end - start))
+    val image =
+      if fixed != null then fixed
+      else if kind == K.ID then internedIdentifier(start, end)
+      else new String(chars, start, end - start)
+    val t = Token.newToken(kind, image)
     t.beginLine = lineAt(start)
     t.beginColumn = columnAt(start)
     t.endLine = lineAt(end - 1)
     t.endColumn = columnAt(end - 1)
     t
+
+  // Identifiers repeat within a file (`i`, `x`, `println`, the same locals over and over);
+  // a small open-addressing table hands the same String back instead of a copy per token.
+  private val identTable = new Array[String](512)
+  private def internedIdentifier(start: Int, end: Int): String =
+    val len = end - start
+    var h = 0
+    var i = start
+    while i < end do
+      h = h * 31 + chars(i)
+      i += 1
+    var slot = h & (identTable.length - 1)
+    var probes = 0
+    while probes < 4 do
+      val existing = identTable(slot)
+      if existing == null then
+        val fresh = new String(chars, start, len)
+        identTable(slot) = fresh
+        return fresh
+      if existing.length == len then
+        var j = 0
+        while j < len && existing.charAt(j) == chars(start + j) do j += 1
+        if j == len then return existing
+      slot = (slot + 1) & (identTable.length - 1)
+      probes += 1
+    new String(chars, start, len)
 
   private def blockCommentEnd(from: Int): Int =
     var i = from
@@ -578,6 +608,11 @@ final class OnionLexer(text: String)
   extension [A](a: A) private inline def tap(f: A => Unit): A = { f(a); a }
 
 object OnionLexer:
+  // The generated token manager wants a character stream, but this lexer never reads it (it
+  // scans `text` itself). One shared, never-advanced stream instead of an 8 KiB buffer per
+  // lexer -- and a lexer is built per file and per interpolated expression.
+  private val unusedStream: JavaCharStream = new JavaCharStream(new java.io.StringReader(""), 1, 1, 1)
+
   private val TabSize = 8
   private val DEFAULT = 0
   private val IN_STATEMENT = 1

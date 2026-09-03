@@ -116,8 +116,9 @@ onion.tools.daemon.DaemonClient stop`（または `status`）で操作できま�
 だけが読めるディレクトリ（`$XDG_RUNTIME_DIR` または一時ディレクトリ。
 `ONION_DAEMON_SOCKET` で上書き可）の Unix ドメインソケットで、Java 16 以降が必要です。
 デーモンに到達・起動できないときは、`onionc` はこれまでどおりプロセス内でコンパイル
-します。`ONION_DAEMON_JAVA_OPTS` はデーモン自身の JVM フラグです。`onion` による
-スクリプト実行はデーモンを経由しません（プログラムは自分のプロセスで動きます）。
+します。`ONION_DAEMON_JAVA_OPTS` はデーモン自身の JVM フラグです。`onion script.on` も
+デーモンを使います。コンパイルはデーモンが行ってクラスを返し、プログラム自体はこれまで
+どおり自分のプロセスで動きます。
 
 ## IDEセットアップ
 

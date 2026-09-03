@@ -24,6 +24,9 @@ import onion.tools.option._
  *
  */
 object ScriptRunner {
+  /** What `execute` needs after a successful compile: the script's name, the class path and classes, and the script's own arguments. */
+  final case class Prepared(scriptName: String, classPath: Seq[String], classes: Seq[CompiledClass], scriptArgs: Array[String])
+
   val VERSION = OnionVersion.value
 
   private def conf(optionName: String, requireArgument: Boolean) = OptionConfig(optionName, requireArgument)
@@ -74,8 +77,18 @@ object ScriptRunner {
     // wrote (issue #450). Render it like a diagnostic instead; --stacktrace keeps the
     // untouched trace for when the JVM detail is the point.
     val wantTrace = prefix.exists(_ == STACKTRACE)
+    val runnerArgs = filteredArgs.filterNot(_ == STACKTRACE)
     try {
-      new ScriptRunner().run(filteredArgs.filterNot(_ == STACKTRACE), verbose)
+      // With ONION_DAEMON set, the compile happens in the resident daemon and only the run
+      // happens here (the program must run in the user's own process). When the daemon
+      // cannot be reached, everything happens here as before.
+      val viaDaemon =
+        if (onion.tools.daemon.DaemonClient.enabledByEnvironment) onion.tools.daemon.DaemonClient.compileScript(runnerArgs) else None
+      viaDaemon match {
+        case Some(Left(exitCode)) => exitCode
+        case Some(Right(prepared)) => new ScriptRunner().execute(prepared)
+        case None => new ScriptRunner().run(runnerArgs, verbose)
+      }
     }
     catch {
       case e: ScriptException =>
@@ -188,32 +201,43 @@ class ScriptRunner {
     conf(SHOW_EFFECTS, false)
   )
 
-  def run(commandLine: Array[String], verbose: Boolean = false): Int = {
+  def run(commandLine: Array[String], verbose: Boolean = false): Int =
+    prepare(commandLine, verbose) match {
+      case Left(exitCode) => exitCode
+      case Right(prepared) => execute(prepared)
+    }
+
+  /**
+   * The compile half of `run`: option parsing, compilation, diagnostics and profile output.
+   * Returns the exit code when there is nothing to run, else what `execute` needs. Split out
+   * so the compile daemon can do this half in its own process and hand the classes back.
+   */
+  def prepare(commandLine: Array[String], verbose: Boolean = false): Either[Int, ScriptRunner.Prepared] = {
     if (commandLine.isEmpty) {
       printUsage()
-      return -1
+      return Left(-1)
     }
     // Runner options end at the script file; everything after it goes to the
     // script verbatim (so script flags like --count are never parsed here).
     val si = ScriptRunner.scriptIndex(commandLine)
     if (si >= commandLine.length) {
       printUsage()
-      return -1
+      return Left(-1)
     }
     val runnerLine = commandLine.take(si + 1)
     val passThroughArgs = commandLine.drop(si + 1)
     parser.parse(runnerLine) match {
       case failure@ParseFailure(_, _) =>
         printFailure(failure)
-        return -1
+        return Left(-1)
       case success@ParseSuccess(_, _) =>
         val params = success.arguments
         if (params.isEmpty) {
           printUsage()
-          return -1
+          return Left(-1)
         }
         createConfig(success, verbose) match {
-          case None => -1
+          case None => Left(-1)
           case Some(config) =>
             val scriptArgs = passThroughArgs
             val result = compile(config, Array(params.head))
@@ -227,22 +251,24 @@ class ScriptRunner {
                 System.err.println(me.render)
               }
             }
-            if (result.hasErrors) {
-              -1
-            } else {
-              // Expose the script's file name so auto-CLI usage messages read
-              // `usage: myscript.on <arg>` instead of the literal `<script>`.
-              System.setProperty("onion.cli.script", new java.io.File(params.head).getName)
-              new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(result.classes, scriptArgs) match {
-                // main's returned Int is the documented exit code (docs/guide/tools.md's
-                // "Failures are exit codes ... return 1 from main"); a void main (or any
-                // other return type) has no such meaning, so it keeps exiting 0.
-                case Shell.Success(value: java.lang.Integer) => value.intValue()
-                case Shell.Success(_) => 0
-                case Shell.Failure(code) => code
-              }
-            }
+            if (result.hasErrors) Left(-1)
+            else Right(ScriptRunner.Prepared(new java.io.File(params.head).getName, config.classPath, result.classes, scriptArgs))
         }
+    }
+  }
+
+  /** The run half of `run`: executes compiled classes in this process. */
+  def execute(prepared: ScriptRunner.Prepared): Int = {
+    // Expose the script's file name so auto-CLI usage messages read
+    // `usage: myscript.on <arg>` instead of the literal `<script>`.
+    System.setProperty("onion.cli.script", prepared.scriptName)
+    new Shell(classOf[OnionClassLoader].getClassLoader, prepared.classPath).run(prepared.classes, prepared.scriptArgs) match {
+      // main's returned Int is the documented exit code (docs/guide/tools.md's
+      // "Failures are exit codes ... return 1 from main"); a void main (or any
+      // other return type) has no such meaning, so it keeps exiting 0.
+      case Shell.Success(value: java.lang.Integer) => value.intValue()
+      case Shell.Success(_) => 0
+      case Shell.Failure(code) => code
     }
   }
 

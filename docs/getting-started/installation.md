@@ -116,8 +116,9 @@ onion.tools.daemon.DaemonClient stop` (or `status`) controls it by hand. It list
 Unix domain socket in a directory only you can read (`$XDG_RUNTIME_DIR` or the temp
 directory; override with `ONION_DAEMON_SOCKET`), needs Java 16 or later for that, and
 whenever it cannot be reached or started `onionc` simply compiles in-process as before.
-`ONION_DAEMON_JAVA_OPTS` adds JVM flags to the daemon itself. Running a script with
-`onion` is not routed through the daemon (the program runs in your own process).
+`ONION_DAEMON_JAVA_OPTS` adds JVM flags to the daemon itself. `onion script.on` uses it
+too: the daemon compiles and hands the classes back, and the program itself runs in your
+own process, as always.
 
 ## IDE Setup
 

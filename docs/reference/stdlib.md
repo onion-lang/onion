@@ -1227,6 +1227,21 @@ Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
 ```
 
+Most `Strings` methods (`upper`, `trim`, `startsWith`, `indexOf`, `capitalize`,
+...) also work as extension-call method chains (`s.upper()`, `s.trim()`, ...)
+with identical behavior to the static form. **`split`, `substring`, `lines`,
+`chars` and `repeat` are the exception**: `java.lang.String` already defines
+methods with these same names, and an instance method always wins over an
+extension method of the same name, so `s.split(",")`, `s.substring(1)`,
+`s.lines()`, `s.chars()` and `s.repeat(3)` silently call the *native JDK
+method* instead of `onion.Strings`'s. That means `s.split(",")` returns a
+`String[]` (not a `List`), `s.substring(10)` throws on an out-of-range start
+instead of returning `""`, `s.lines()` / `s.chars()` return a JDK
+`Stream`/`IntStream` (not a `List`), and `s.repeat(-1)` throws instead of
+returning `""`. Use the `Strings::` static-call form (e.g. `Strings::split(...)`,
+`Strings::substring(...)`) for these five methods to get `onion.Strings`'s
+List-returning, exception-safe behavior.
+
 ## Files Module
 
 File I/O (`onion.Files`):

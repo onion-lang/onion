@@ -1336,6 +1336,22 @@ Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrN
 Strings::toIntOr("nope", 0)              // 0
 ```
 
+`Strings` の大半のメソッド（`upper`、`trim`、`startsWith`、`indexOf`、
+`capitalize` など）は拡張メソッドのメソッドチェーン（`s.upper()`、
+`s.trim()` など）としても静的呼び出しと同じ挙動で使えます。**例外は
+`split`・`substring`・`lines`・`chars`・`repeat` の5つ**です。
+`java.lang.String` にはすでに同名のメソッドが定義されており、同名の
+インスタンスメソッドは常に拡張メソッドより優先されるため、
+`s.split(",")`、`s.substring(1)`、`s.lines()`、`s.chars()`、`s.repeat(3)`
+は `onion.Strings` 側ではなく **JDK 標準の同名メソッド** を暗黙のうちに
+呼び出します。そのため `s.split(",")` は `List` ではなく `String[]` を
+返し、`s.substring(10)` は範囲外の開始位置で `""` を返す代わりに例外を
+投げ、`s.lines()` / `s.chars()` は `List` ではなく JDK の `Stream` /
+`IntStream` を返し、`s.repeat(-1)` は `""` を返す代わりに例外を投げます。
+これら5つのメソッドについて `onion.Strings` の List を返す・例外を
+投げない挙動を得るには、`Strings::` の静的呼び出し形式（例:
+`Strings::split(...)`、`Strings::substring(...)`）を使ってください。
+
 ## Maps モジュール
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Strings`'s extension-call shadowing by `java.lang.String` documented.**
+  `onion.Strings` is registered as a builtin extension container, so most of
+  its methods work as method chains (`s.upper()`, `s.trim()`, ...) -- but an
+  instance method always wins over an extension method of the same name, and
+  `java.lang.String` already defines `split`, `substring`, `lines`, `chars`
+  and `repeat`. So `s.split(",")`, `s.substring(10)`, `s.lines()`,
+  `s.chars()` and `s.repeat(-1)` silently reach the *native JDK method*
+  instead of `onion.Strings`'s (an array instead of a `List`, a thrown
+  exception instead of a safe fallback -- confirmed by running each against
+  `ScriptRunner`), which neither `docs/reference/stdlib.md` nor its Japanese
+  translation warned about. Added the caveat to both files' Strings Module
+  section and a new `StringsExtensionCallShadowingSpec` regression test that
+  locks in the shadowing behavior and checks both docs for the warning.
+
 - **`Sets`'s extension-method call syntax documented.** `docs/reference/stdlib.md`
   and its Japanese translation only ever showed `onion.Sets`'s set-algebra and
   functional operations (`union`, `intersection`, `difference`,

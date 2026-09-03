@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Json::stringifyPretty`.** `docs/reference/stdlib.md` showed both
+  `Json::stringify(obj) / Json::stringifyPretty(obj)`, but its Japanese translation's
+  equivalent example only ever called the plain `Json::stringify`, never mentioning the
+  pretty-printing sibling at all. A new `JsonDocCoverageSpec` guards its presence in both
+  files going forward.
 - **`Timing::measure`'s labeled overload.** `docs/reference/stdlib.md` and its Japanese
   translation showed `Timing::measure(fn)` and both `Timing::measureVoid` forms, but never
   the labeled `Timing::measure(label, fn)` overload sitting right next to `measureVoid`'s

@@ -5322,7 +5322,23 @@
 - <code>Archive</code> - Zip/gzipの作成と展開
 - <code>Concurrent</code> - スレッドプール、カウンタ、ロック、チャネル
 - <code>Net</code> - TCPソケット (connect, listen)
-- <code>Server</code> - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)</p>
+- <code>Server</code> - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)
+- <code>Proc</code> - サブプロセス実行 (run, capture)
+- <code>Args</code> - コマンドライン引数のパース
+- <code>Colls</code> - コレクションのファクトリとパイプライン (map/filter/fold、chunked/windowed、sumBy/maxBy)
+- <code>Iterables</code>, <code>Maps</code>, <code>Sets</code> - イテレーションとマップ/セットのユーティリティ関数
+- <code>Text</code> - コンソール向けテキストレイアウト (wrap、indent、テーブル整形)
+- <code>OnionMath</code> - 双曲線三角関数、安全な丸め/クランプ、範囲付き乱数整数
+- <code>Stats</code> - 数値集計 (sum、average、median、stddev)
+- <code>Format</code> - ロケール非依存のフォーマット (桁区切り、バイトサイズ、時間長)
+- <code>Yaml</code>, <code>Csv</code> - YAMLおよびRFC 4180 CSVのパース/シリアライズ
+- <code>Config</code> - パース済みJSONに対するドット記法での設定アクセス
+- <code>Codec</code> - Base64/hex/URLエンコード・デコード
+- <code>Hash</code> - 暗号学的/チェックサムダイジェスト (md5, sha256, ...)
+- <code>Outcome</code>, <code>Defect</code> - 外部データの読み取り結果: 値、またはそれが読めなかったすべての理由
+- <code>Origin</code> - 値がどこから来たか（読み取り元のテキスト上の位置）
+- <code>Shape</code>, <code>Shapes</code> - 外部テキストと型付きの値との双方向対応
+- <code>Scalars</code> - 境界導出のための厳密なスカラー値パース</p>
 <h2 id="_7">テスト<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p><strong>フレームワーク:</strong> ScalaTest 3.2.19</p>
 <p><strong>テストの場所:</strong> <code>src/test/scala/onion/compiler/tools/</code></p>

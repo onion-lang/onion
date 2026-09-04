@@ -1338,9 +1338,9 @@ Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrN
 Strings::toIntOr("nope", 0)              // 0
 ```
 
-`Strings` の大半のメソッド（`upper`、`trim`、`startsWith`、`indexOf`、
-`capitalize` など）は拡張メソッドのメソッドチェーン（`s.upper()`、
-`s.trim()` など）としても静的呼び出しと同じ挙動で使えます。**例外は
+`Strings` の大半のメソッド（`upper`、`lower`、`capitalize`、`reverse`
+など）は拡張メソッドのメソッドチェーン（`s.upper()`、`s.reverse()`
+など）としても静的呼び出しと同じ挙動で使えます。**例外は
 `split`・`substring`・`lines`・`chars`・`repeat` の5つ**です。
 `java.lang.String` にはすでに同名のメソッドが定義されており、同名の
 インスタンスメソッドは常に拡張メソッドより優先されるため、
@@ -1383,6 +1383,20 @@ JDK 側のメソッドから `NullPointerException` を投げますが、
 `Strings::contains(null, x) == false`）です。受け手が未検査の
 プラットフォーム `null` になり得る場合は `Strings::contains(...)` /
 `Strings::isEmpty(...)` の静的呼び出し形式を使ってください。
+
+**`trim`・`startsWith`・`indexOf` も同様に遮蔽されます**:
+`java.lang.String` にはすでに `trim()`・`startsWith(String)`・
+`indexOf(String)` というインスタンスメソッドが定義されているため、
+`s.trim()`・`s.startsWith(x)`・`s.indexOf(x)` も `onion.Strings` 側
+ではなく **JDK 標準の同名メソッド** を暗黙のうちに呼び出します。
+上の `contains`/`isEmpty` と同様、`null` でない `String` では見分けが
+付かず、差が表面化するのはプラットフォーム型の `null` を受け手にした
+場合だけです: このとき JDK 側のメソッドは `NullPointerException` を
+投げますが、`onion.Strings` の版は null 安全です
+（`Strings::trim(null) == ""`、`Strings::startsWith(null, x) == false`、
+`Strings::indexOf(null, x) == -1`）。受け手が未検査のプラットフォーム
+`null` になり得る場合は `Strings::trim(...)` / `Strings::startsWith(...)`
+/ `Strings::indexOf(...)` の静的呼び出し形式を使ってください。
 
 **`isBlank` も遮蔽されますが、`null` を渡さない通常の `String` でも
 挙動差が表面化します**: `java.lang.String` には Java 11 以降

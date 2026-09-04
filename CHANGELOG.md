@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Fixed a false "identical behavior" claim for `Strings::trim`/`startsWith`/
+  `indexOf` extension-call syntax.** `docs/reference/stdlib.md`/
+  `docs/ja/reference/stdlib.md` listed `trim`, `startsWith` and `indexOf`
+  as examples of `onion.Strings` methods that work identically via
+  extension-call syntax (`s.trim()`, `s.startsWith(...)`, `s.indexOf(...)`).
+  That's false in general: `java.lang.String` already declares instance
+  methods with these same names, and an instance method always wins over an
+  extension method of the same name, so these three always reach the
+  *native* method -- which throws `NullPointerException` for a
+  platform-typed `null` receiver, unlike `onion.Strings`'s null-safe
+  static-call form. Same shadowing hazard already documented for
+  `contains`/`isEmpty` a few paragraphs below; removed the three from the
+  "identical behavior" example list, added the caveat, and added a
+  regression case to a new `StringsTrimStartsWithIndexOfExtensionCallShadowingSpec`.
+
 - **Fixed an incorrect `getOrDefault` claim in the Maps Module docs.**
   `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md` claimed
   `onion.Colls`, `onion.Maps`, and native `java.util.Map` all behave

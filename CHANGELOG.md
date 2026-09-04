@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Strings::endsWith` extension-call shadowing by native
+  `java.lang.String`.** `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`
+  omitted `endsWith` from the exception list of `onion.Strings` methods
+  that behave differently via extension-call syntax, even though
+  `java.lang.String` already declares an instance `endsWith(String)`
+  method that always wins over the extension method of the same name --
+  the exact shadowing hazard already documented for its sibling
+  `startsWith` a few paragraphs below. `s.endsWith(x)` reaches the
+  *native* method and throws `NullPointerException` for a platform-typed
+  `null` receiver, unlike `onion.Strings::endsWith`'s null-safe
+  false-returning static-call form. Folded `endsWith` into the existing
+  `trim`/`startsWith`/`indexOf` shadowing paragraph and added a
+  regression case in a new
+  `StringsEndsWithExtensionCallShadowingSpec`.
+
 - **Fixed a false "identical behavior" claim for `Strings::trim`/`startsWith`/
   `indexOf` extension-call syntax.** `docs/reference/stdlib.md`/
   `docs/ja/reference/stdlib.md` listed `trim`, `startsWith` and `indexOf`

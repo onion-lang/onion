@@ -492,8 +492,10 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  1行だけ変わる
 ```
 
-`Shapes::config` と `Shapes::yaml` は、`shape name = config` / `shape name = yaml` の
-糖衣構文の裏にある lossless shape を、`Shape[T]` の値として直接組み立てます。
+`Shapes::regex` と `Shapes::json` は `shape name = re"..."` / `shape name = json` の
+裏にある shape を、`Shapes::config` と `Shapes::yaml` は `shape name = config` /
+`shape name = yaml` の糖衣構文の裏にある lossless shape を、それぞれ `Shape[T]` の値として
+直接組み立てます。
 
 ### コンビネータ
 

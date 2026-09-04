@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-09-04
+
 ### Documentation
 
 - **`Strings`'s `isBlank` extension-call shadowing by native `java.lang.String`

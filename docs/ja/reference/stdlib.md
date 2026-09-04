@@ -1462,6 +1462,21 @@ xs.sum()             // 100.0  （Double: 汎用集計）
 Stats::sumInt(xs)    // 100    （Int）
 ```
 
+**`min`/`max` は例外です**: `onion.Colls` にも消去後シグネチャが同じ
+`min(List)`/`max(List)` 拡張メソッドがあり、`onion.Stats` より先に登録される
+ため、`xs.min()` と `xs.max()` は常に *`onion.Colls`* 側に到達し、
+`onion.Stats` 側には到達しません。つまり `xs.min()` はリストの要素型そのまま
+（`List[Int]` なら精度の落ちない `Int`）を返し、**空リストでは `0.0` を返す
+代わりに `NoSuchElementException` を投げます**。`Double` の結果と空リストに
+安全な `0.0` フォールバックが必要な場合は `Stats::min`/`Stats::max` の静的
+呼び出し形式を使ってください:
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+xs.min()             // 10   （Int: onion.Colls::min であって onion.Stats::min ではない）
+Stats::min(xs)       // 10.0 （Double。空リストでも例外ではなく 0.0）
+```
+
 `Int` を返す `sum()` のオーバーロードが無いのは型消去のためです。実行時には要素型が
 消えるので、`sum(List[Int])` と `sum(List[Double])` は同じ JVM シグネチャになります。
 

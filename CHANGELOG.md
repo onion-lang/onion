@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Iterables::first`/`last` extension-call shadowing by `onion.Colls`
+  documented.** `onion.Colls` also declares `first(List)`/`last(List)`
+  extensions with the same erased signature as `onion.Iterables`'s, and
+  `Colls` is registered ahead of `Iterables` in the builtin extension
+  container list, so `xs.first()`/`xs.last()` always reach `onion.Colls`'s
+  versions -- `onion.Iterables`'s are never reachable by extension-call
+  syntax at all, same as the already-documented `map`/`filter`/`take`/
+  `drop`/`reverse`/`reduce` shadowing in that section. Unlike those, the two
+  implementations are identical, so the shadowing has no observable effect.
+  Added the caveat to both docs' Iterables Module section and a new
+  `IterablesFirstLastShadowingSpec` regression test that locks in the
+  agreement and checks both docs for the note.
+
 - **`Sets::containsAll` extension-call shadowing by native `java.util.Set`
   documented.** `java.util.Set` (via `java.util.Collection`) already declares
   an instance method `containsAll(Collection)`, and an instance method always

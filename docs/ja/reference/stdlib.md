@@ -2015,8 +2015,18 @@ xs.forEach { x -> println(x) }    // 各要素に対して処理を実行、戻�
 xs.count { x -> x > 1 }           // 条件を満たす要素の数
 xs.reverse()                      // 要素を逆順にした新しい List
 xs.contains(2)                    // いずれかの要素が2と等しければ true
+xs.isEmpty()                      // 要素が1つもなければ true
+xs.size()                         // 要素数
+m.get("key")                      // "key" に対応する値、なければ null
+m.containsKey("key")              // "key" というエントリがあれば true
 Colls::toList(args)               // Java配列（例: main の String[]）を List に変換
 ```
+
+`isEmpty`・`size`・`get`・`containsKey` は `List`/`Set`/`Map` 自体のインスタンス
+メソッドでもあり、インスタンスメソッドは常に同名の拡張メソッドより優先される
+ため、この4つの呼び出しは実際には `onion.Colls` 側には決して届かず、ネイティブ
+側のメソッドにしか届かない。ただしこれは観測できない差異である: `Colls` 側の
+実装はどれも同じネイティブメソッドへの1行委譲でしかないため。
 
 ### バッチ化・ウィンドウ化・セレクタ集計
 

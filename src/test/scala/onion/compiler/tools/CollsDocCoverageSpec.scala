@@ -125,6 +125,36 @@ class CollsDocCoverageSpec extends AnyFunSpec {
   }
 
   /**
+   * `isEmpty(Collection)`, `size(Collection)`, `get(Map, K)` and `containsKey(Map, K)` are
+   * real `onion.Colls` members, registered as builtin extensions the same as everything
+   * else in this file -- but the whole-file checks above miss their absence entirely by
+   * coincidence: `isEmpty`, `get` and `size` are common enough words to appear all over the
+   * doc for unrelated reasons, and `containsKey` is shown once already, in the unrelated
+   * `java.util.HashMap` interop example earlier in the file. None of the four is ever shown
+   * as Colls-backed usage in the Colls Module section itself. Pin their presence there, so
+   * this guard's "documents every onion.Colls member" claim is no longer only accidentally
+   * true for these.
+   */
+  private val collectionAndMapUtilityNames = Set("isEmpty", "size", "get", "containsKey")
+
+  private def documentedCollectionAndMapCalls(doc: String, names: Set[String]): Set[String] =
+    names.filter(n => doc.contains(s"xs.$n(") || doc.contains(s"m.$n("))
+
+  it("docs/reference/stdlib.md's Colls Module section documents isEmpty/size/get/containsKey") {
+    val doc = collsSection(read("docs/reference/stdlib.md"), "## Colls Module")
+    val missing = collectionAndMapUtilityNames -- documentedCollectionAndMapCalls(doc, collectionAndMapUtilityNames)
+    assert(missing.isEmpty,
+      s"docs/reference/stdlib.md's Colls Module section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  it("docs/ja/reference/stdlib.md's Colls section documents isEmpty/size/get/containsKey") {
+    val doc = collsSection(read("docs/ja/reference/stdlib.md"), "## Colls モジュール")
+    val missing = collectionAndMapUtilityNames -- documentedCollectionAndMapCalls(doc, collectionAndMapUtilityNames)
+    assert(missing.isEmpty,
+      s"docs/ja/reference/stdlib.md's Colls section is missing: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
+  /**
    * `Colls::toList(array)` -- converting a Java array (e.g. `main(args: String[])`) into a
    * `List` -- is the one crossing point CLAUDE.md itself calls out ("Use Colls::toList(args)
    * to cross over"), but neither doc file ever showed the call.

@@ -2309,14 +2309,26 @@ map itself, chaining into a pipeline like the rest of `Maps`:
 
 ```onion
 m.getOrDefault("x", 0)   // same as Maps::getOrDefault(m, "x", 0)
-m.keys()                 // same as Maps::keys(m)
-m.values()               // same as Maps::values(m)
+m.keys()                 // NOT the same as Maps::keys(m) -- see caveat below
+m.values()               // NOT the same as Maps::values(m) -- see caveat below
 ```
+
+**Extension-call shadowing:** `onion.Colls` also declares `keys(Map)`/
+`values(Map)`/`mapValues(Map, Function1)` extension methods with the same
+erased signatures as `onion.Maps`'s, and `Colls` is registered ahead of
+`Maps` in the builtin extension container list, so `m.keys()`, `m.values()`
+and `m.mapValues(...)` always reach *`onion.Colls`*'s versions --
+`onion.Maps`'s versions of these three are never reachable by extension-call
+syntax at all. `Colls`'s results are **unmodifiable** (`ks.add(...)` throws
+`UnsupportedOperationException`); `Maps::keys`/`values`/`mapValues` called
+directly return a plain mutable `ArrayList`/`LinkedHashMap`. `getOrDefault`
+is unaffected -- both containers' implementations behave the same for any
+map you can actually call an extension method on.
 
 ### Transformation
 
 ```onion
-Maps::mapValues(m, (v: Int) -> v * 2)
+Maps::mapValues(m, (v: Int) -> v * 2)   // extension call m.mapValues(...) reaches onion.Colls's -- see caveat above
 Maps::mapKeys(m, (k: String) -> k.toUpperCase())
 Maps::filterValues(m, (v: Int) -> v > 0)
 Maps::filterKeys(m, (k: String) -> k.startsWith("a"))

@@ -1893,9 +1893,9 @@ m.containsKey("key")              // true if the map has a "key" entry
 Colls::toList(args)               // a Java array (e.g. main's String[]) as a List
 ```
 
-`isEmpty`, `size`, `get` and `containsKey` are also plain instance methods on
+`contains`, `isEmpty`, `size`, `get` and `containsKey` are also plain instance methods on
 `List`/`Set`/`Map`, which always win over an extension method of the same name --
-so these four calls never actually reach `onion.Colls`'s versions, only the
+so these five calls never actually reach `onion.Colls`'s versions, only the
 native ones. That is not observable here: `Colls`'s implementations are
 one-line pass-throughs to the same native method.
 

@@ -155,6 +155,30 @@ class CollsDocCoverageSpec extends AnyFunSpec {
   }
 
   /**
+   * `contains(Collection<T>, T)` is, like `isEmpty`/`size`/`get`/`containsKey` above, a
+   * one-line pass-through to the identically-named native instance method
+   * (`Collection.contains(Object)`), which always wins over the `onion.Colls` extension --
+   * but the shadowing-explanation paragraph right after the code block names only
+   * "isEmpty, size, get and containsKey" ("these four calls"), omitting `contains` even
+   * though it is shadowed the exact same way. Pin that `contains` is named in the
+   * explanation itself (not merely shown as a call, which the whole-file check and the
+   * `listPredicateAndQueryNames` guard above already pin) so this omission cannot recur.
+   */
+  it("docs/reference/stdlib.md's Colls Module section names contains in the native-shadowing explanation") {
+    val doc = collsSection(read("docs/reference/stdlib.md"), "## Colls Module")
+    assert(doc.contains("`contains`"),
+      "docs/reference/stdlib.md's Colls Module section's shadowing explanation should name `contains` " +
+        "alongside isEmpty/size/get/containsKey -- it is shadowed by Collection.contains(Object) the same way")
+  }
+
+  it("docs/ja/reference/stdlib.md's Colls section names contains in the native-shadowing explanation") {
+    val doc = collsSection(read("docs/ja/reference/stdlib.md"), "## Colls モジュール")
+    assert(doc.contains("`contains`"),
+      "docs/ja/reference/stdlib.md's Colls section's shadowing explanation should name `contains` " +
+        "alongside isEmpty/size/get/containsKey -- it is shadowed by Collection.contains(Object) the same way")
+  }
+
+  /**
    * `Colls::toList(array)` -- converting a Java array (e.g. `main(args: String[])`) into a
    * `List` -- is the one crossing point CLAUDE.md itself calls out ("Use Colls::toList(args)
    * to cross over"), but neither doc file ever showed the call.

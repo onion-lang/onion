@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented that `Colls::contains` is also native-shadowed, alongside
+  `isEmpty`/`size`/`get`/`containsKey`.** The Colls Module section's
+  shadowing-explanation paragraph said instance methods on `List`/`Set`/`Map`
+  always win over an extension method of the same name for "`isEmpty`,
+  `size`, `get` and `containsKey`" ("these four calls"), but `contains` is
+  shadowed by `Collection.contains(Object)` the exact same way and was left
+  out of that list in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, even though the code example right above it
+  already showed `xs.contains(2)`. Added `contains` to both paragraphs and a
+  `CollsDocCoverageSpec` regression pinning that the explanation names it.
+
 - **Documented `Colls`'s `isEmpty`/`size`/`get`/`containsKey` extension-call
   spellings, and closed a false-coverage gap in `CollsDocCoverageSpec`.**
   `onion.Colls` declares `isEmpty(Collection)`, `size(Collection)`,

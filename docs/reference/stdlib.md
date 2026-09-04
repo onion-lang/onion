@@ -1357,16 +1357,18 @@ the native method, while `onion.Strings`'s versions are null-safe
 false`). Use the `Strings::contains(...)` / `Strings::isEmpty(...)`
 static-call form when the receiver may be an unchecked platform `null`.
 
-**`trim`, `startsWith` and `indexOf` are shadowed the same way**:
-`java.lang.String` already defines `trim()`, `startsWith(String)` and
-`indexOf(String)` instance methods, so `s.trim()`, `s.startsWith(x)` and
-`s.indexOf(x)` also silently reach the *native JDK method* instead of
-`onion.Strings`'s. As with `contains`/`isEmpty` above, this is invisible for
-a non-null `String` and only becomes observable for a platform-typed `null`
-receiver, where the native methods throw `NullPointerException` while
-`onion.Strings`'s versions are null-safe (`Strings::trim(null) == ""`,
-`Strings::startsWith(null, x) == false`, `Strings::indexOf(null, x) ==
--1`). Use the `Strings::trim(...)` / `Strings::startsWith(...)` /
+**`trim`, `startsWith`, `endsWith` and `indexOf` are shadowed the same way**:
+`java.lang.String` already defines `trim()`, `startsWith(String)`,
+`endsWith(String)` and `indexOf(String)` instance methods, so `s.trim()`,
+`s.startsWith(x)`, `s.endsWith(x)` and `s.indexOf(x)` also silently reach
+the *native JDK method* instead of `onion.Strings`'s. As with
+`contains`/`isEmpty` above, this is invisible for a non-null `String` and
+only becomes observable for a platform-typed `null` receiver, where the
+native methods throw `NullPointerException` while `onion.Strings`'s
+versions are null-safe (`Strings::trim(null) == ""`,
+`Strings::startsWith(null, x) == false`, `Strings::endsWith(null, x) ==
+false`, `Strings::indexOf(null, x) == -1`). Use the `Strings::trim(...)` /
+`Strings::startsWith(...)` / `Strings::endsWith(...)` /
 `Strings::indexOf(...)` static-call form when the receiver may be an
 unchecked platform `null`.
 

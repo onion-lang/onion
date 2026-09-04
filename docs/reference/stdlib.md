@@ -867,12 +867,18 @@ xs.take(2) / xs.drop(1)
 xs.sort() / xs.sort(comparator)
 ```
 
-**`take`/`drop`/`reverse` are exceptions**: `onion.Colls` also declares
-`take(List, int)`/`drop(List, int)`/`reverse(List)` extensions with the same
-erased signatures, and it is registered ahead of `onion.Iterables`, so
+**`map`/`filter`/`take`/`drop`/`reverse` are exceptions**: `onion.Colls` also
+declares `map(List, Function1)`/`filter(List, Function1)`/`take(List, int)`/
+`drop(List, int)`/`reverse(List)` extensions with the same erased signatures,
+and it is registered ahead of `onion.Iterables`, so `xs.map(f)`, `xs.filter(p)`,
 `xs.take(n)`, `xs.drop(n)` and `xs.reverse()` always reach *`onion.Colls`*'s
 versions, never `onion.Iterables`'s. The two disagree on edge cases:
 
+- `xs.map(f)` returns an **unmodifiable** list; `Iterables::map` returns a
+  plain mutable copy
+- `xs.filter(p)` calls `p` and auto-unboxes its `Boolean` result, throwing
+  **`NullPointerException`** if `p` returns `null`; `Iterables::filter` treats
+  a `null` result as "not kept" instead of throwing
 - a negative `n` -- `xs.take(-1)` / `xs.drop(-1)` return an empty/unchanged
   result; `Iterables::take`/`Iterables::drop` throw instead
 - `n` at or past the list's size -- `xs.take(n)` / `xs.drop(n)` return the
@@ -881,11 +887,16 @@ versions, never `onion.Iterables`'s. The two disagree on edge cases:
 - `xs.reverse()` returns an **unmodifiable** list; `Iterables::reverse` returns
   a plain mutable copy
 
-Use the `Iterables::take`/`Iterables::drop`/`Iterables::reverse` static-call
-form when you need copying, size-safe semantics instead:
+Use the `Iterables::map`/`Iterables::filter`/`Iterables::take`/
+`Iterables::drop`/`Iterables::reverse` static-call form when you need
+mutable-copy or null-tolerant, size-safe semantics instead:
 
 ```onion
 val xs: List[Int] = [1, 2, 3]
+xs.map { x -> x * 2 }.add(8)   // throws UnsupportedOperationException (onion.Colls::map)
+Iterables::map(xs, (x) -> x * 2).add(8)  // ok, mutable copy (onion.Iterables::map)
+xs.filter { x -> null }        // throws NullPointerException (onion.Colls::filter)
+Iterables::filter(xs, (x) -> null)       // []  (onion.Iterables::filter, null is not-kept)
 xs.take(-1)                    // []      (onion.Colls::take, clamps instead of throwing)
 xs.take(xs.size() + 1) === xs  // true    (onion.Colls::take, same list reference)
 xs.reverse().add(4)            // throws UnsupportedOperationException (onion.Colls::reverse)

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Iterables`'s `map`/`filter` extension-call shadowing by `onion.Colls`
+  documented.** `onion.Colls` also declares `map(List, Function1)`/
+  `filter(List, Function1)` extensions with the same erased signatures as
+  `onion.Iterables`'s, and `Colls` is registered ahead of `Iterables` in
+  `ExtensionMethodFallbackSupport.BuiltinExtensionContainers` -- the same
+  ordering that already causes `take`/`drop`/`reverse` to shadow, and
+  previously documented as such, but `map`/`filter` were left out even
+  though they collide the same way. So `xs.map(f)` and `xs.filter(p)` always
+  reach *`onion.Colls`*'s versions -- `onion.Iterables`'s `map`/`filter` are
+  never reachable by extension-call syntax at all. The two disagree: `xs.map(f)`
+  returns an unmodifiable list (`Iterables::map` returns a mutable copy), and
+  `xs.filter(p)` throws `NullPointerException` when `p` returns `null`
+  (`Iterables::filter` treats a `null` result as "not kept" instead). Added
+  the caveat to both docs' Iterables Module section and a new
+  `IterablesMapFilterShadowingSpec` regression test that locks in the
+  shadowing and checks both docs for the warning.
+
 - **Fixed: `Maps`'s `m.values()` extension-call shadowing was documented incorrectly.**
   A previous entry in this file (and `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`'s
   Maps Module section) claimed `m.values()` reaches `onion.Colls`'s extension method, the same

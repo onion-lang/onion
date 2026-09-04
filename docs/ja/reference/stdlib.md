@@ -1662,12 +1662,18 @@ xs.take(2) / xs.drop(1)
 xs.sort() / xs.sort(comparator)
 ```
 
-**`take`/`drop`/`reverse` は例外です**: `onion.Colls` にも消去後シグネチャが
-同じ `take(List, int)`/`drop(List, int)`/`reverse(List)` 拡張メソッドがあり、
-`onion.Iterables` より先に登録されるため、`xs.take(n)`・`xs.drop(n)`・
-`xs.reverse()` は常に *`onion.Colls`* 側に到達し、`onion.Iterables` 側には
-到達しません。両者はエッジケースで挙動が異なります:
+**`map`/`filter`/`take`/`drop`/`reverse` は例外です**: `onion.Colls` にも消去後
+シグネチャが同じ `map(List, Function1)`/`filter(List, Function1)`/
+`take(List, int)`/`drop(List, int)`/`reverse(List)` 拡張メソッドがあり、
+`onion.Iterables` より先に登録されるため、`xs.map(f)`・`xs.filter(p)`・
+`xs.take(n)`・`xs.drop(n)`・`xs.reverse()` は常に *`onion.Colls`* 側に到達し、
+`onion.Iterables` 側には到達しません。両者はエッジケースで挙動が異なります:
 
+- `xs.map(f)` は**変更不可 (unmodifiable)** なリストを返す。`Iterables::map`
+  は変更可能なコピーを返す
+- `xs.filter(p)` は `p` を呼び出した後にその `Boolean` 結果をアンボックスする
+  ため、`p` が `null` を返すと **`NullPointerException`** を投げる。
+  `Iterables::filter` は `null` を「保持しない」として扱い、例外を投げない
 - `n` が負の場合 -- `xs.take(-1)` / `xs.drop(-1)` は空/変更なしの結果を返す
   が、`Iterables::take`/`Iterables::drop` は例外を投げる
 - `n` がリストのサイズ以上の場合 -- `xs.take(n)` / `xs.drop(n)` はコピーで
@@ -1676,11 +1682,16 @@ xs.sort() / xs.sort(comparator)
 - `xs.reverse()` は**変更不可 (unmodifiable)** なリストを返す。
   `Iterables::reverse` は変更可能なコピーを返す
 
-コピーされ、サイズに関して安全な挙動が必要な場合は `Iterables::take`/
-`Iterables::drop`/`Iterables::reverse` の静的呼び出し形式を使ってください:
+変更可能なコピーや、`null` を許容しサイズに関して安全な挙動が必要な場合は
+`Iterables::map`/`Iterables::filter`/`Iterables::take`/`Iterables::drop`/
+`Iterables::reverse` の静的呼び出し形式を使ってください:
 
 ```onion
 val xs: List[Int] = [1, 2, 3]
+xs.map { x -> x * 2 }.add(8)   // UnsupportedOperationException を投げる（onion.Colls::map）
+Iterables::map(xs, (x) -> x * 2).add(8)  // OK、変更可能なコピー（onion.Iterables::map）
+xs.filter { x -> null }        // NullPointerException を投げる（onion.Colls::filter）
+Iterables::filter(xs, (x) -> null)       // []（onion.Iterables::filter。null は「保持しない」扱い）
 xs.take(-1)                    // []      （onion.Colls::take。例外ではなく空リストにクランプ）
 xs.take(xs.size() + 1) === xs  // true    （onion.Colls::take。同じリスト参照）
 xs.reverse().add(4)            // UnsupportedOperationException を投げる（onion.Colls::reverse）

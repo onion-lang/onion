@@ -1506,8 +1506,8 @@ Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)  // 変更
 a.union(b) / a.intersection(b) / a.difference(b)  // onion.Colls 側の実装 -- 変更不可
 Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
 a.symmetricDifference(b)
-Sets::containsAll(a, b)                       // a が b の要素をすべて含む
-a.containsAll(b)
+Sets::containsAll(a, b)                       // a が b の要素をすべて含む -- a.containsAll(b) では到達不可、下記参照
+a.containsAll(b)                              // java.util.Set のネイティブメソッド -- null で NullPointerException
 Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
 a.isSubsetOf(b) / a.isSupersetOf(b) / a.isDisjoint(b)
 Sets::map(a, f)                               // NOT a.map(f) で到達不可 -- 下記参照
@@ -1529,6 +1529,17 @@ a.count(p) / a.any(p) / a.all(p)
 `NullPointerException` を投げますが、`Sets::map` は `LinkedHashSet`（挿入順保持）
 に集約し、`null` の Set には空の Set を返します。挿入順が保たれた null 安全な
 結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接呼んでください。
+
+**`containsAll` のシャドーイング:** このリストの他のメソッドと異なり、
+`a.containsAll(b)` は `onion.Sets::containsAll` には一切到達しません --
+`java.util.Set`（`java.util.Collection` 由来）がすでにインスタンスメソッド
+`containsAll(Collection)` を宣言しており、拡張メソッドのフォールバック経路が
+参照される前に、インスタンスメソッドが常に優先されるためです。両者は `null`
+の扱いが異なります: `onion.Sets::containsAll` は null 安全（`null` の subset は
+「すべて含む」、`null` の container は「何も含まない」として扱う）ですが、
+ネイティブの `Set.containsAll` は `null` を渡すと `NullPointerException` を
+投げます。null 安全な結果が必要な場合は `a.containsAll(...)` ではなく
+`Sets::containsAll(...)` を直接呼んでください。
 
 ## Hash モジュール
 

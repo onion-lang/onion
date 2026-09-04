@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Sets::containsAll` extension-call shadowing by native `java.util.Set`
+  documented.** `java.util.Set` (via `java.util.Collection`) already declares
+  an instance method `containsAll(Collection)`, and an instance method always
+  wins over an extension method of the same name -- so `a.containsAll(b)`
+  never reaches `onion.Sets::containsAll` at all. The two disagree on `null`:
+  `onion.Sets::containsAll` is null-safe (a `null` subset means "contains
+  all," a `null` container means "contains none"), while native
+  `Set.containsAll` throws `NullPointerException` for a `null` argument.
+  Added the caveat to both docs' Sets Module section and a new
+  `SetsContainsAllExtensionCallShadowingSpec` regression test that locks in
+  the shadowing and checks both docs for the warning.
+
 - **`Sets::toList` extension-call ambiguity documented -- not shadowing, a
   compile error.** `onion.Colls` also declares a `toList(Set)` extension
   with the same erased signature as `onion.Sets`'s, which would ordinarily

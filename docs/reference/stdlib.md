@@ -2529,10 +2529,26 @@ a.union(b)                             // onion.Colls's version instead -- unmod
 a.intersection(b)                      // onion.Colls's version instead -- unmodifiable
 a.difference(b)                        // onion.Colls's version instead -- unmodifiable
 Sets::symmetricDifference(a, b)        // a.symmetricDifference(b) -- in exactly one of the two
-Sets::containsAll(a, b)                // a.containsAll(b)
+Sets::containsAll(a, b)                // NOT a.containsAll(b) -- see the shadowing note below
 Sets::isSubsetOf(a, b)                 // a.isSubsetOf(b) -- every element of a is in b
 Sets::isSupersetOf(a, b)               // a.isSupersetOf(b)
 Sets::isDisjoint(a, b)                 // a.isDisjoint(b) -- share no elements
+```
+
+**Extension-call shadowing:** unlike every other method in this list, `a.containsAll(b)`
+does not reach `onion.Sets::containsAll` at all -- `java.util.Set` (via
+`java.util.Collection`) already declares an instance method `containsAll(Collection)`,
+and an instance method always wins over an extension method before the extension
+fallback path is even consulted. The two disagree on `null`: `onion.Sets::containsAll`
+is null-safe (a `null` subset means "contains all," a `null` container means "contains
+none"), while native `Set.containsAll` throws `NullPointerException` for a `null`
+argument. Call `Sets::containsAll(...)` directly (not `a.containsAll(...)`) to get
+`onion.Sets`'s null-safe result.
+
+```onion
+a.containsAll(b)                       // java.util.Set's native method -- throws NullPointerException on null
+Sets::containsAll(a, null)             // true -- onion.Sets's null-safe result
+Sets::containsAll(null, b)             // false -- onion.Sets's null-safe result
 ```
 
 ### Functional operations

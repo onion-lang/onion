@@ -1380,12 +1380,19 @@ Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
 
 Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持し、集合演算は null 安全。
 
-どのメソッドも `Set` の組み込み拡張メソッドとして呼び出せます（例: `Sets::union(a, b)` は `a.union(b)`）。
+どのメソッドも `Set` の組み込み拡張メソッドとして呼び出せます（例: `Sets::union(a, b)` は `a.union(b)`）
+-- **ただし `union`/`intersection`/`difference` は例外**: `onion.Colls` も同じ
+`(Set, Set)` 消去シグネチャでこの3つの名前の拡張メソッドを宣言しており、組み込み拡張コンテナ
+リストで `Colls` が `Sets` より先に登録されているため、`a.union(b)` / `a.intersection(b)` /
+`a.difference(b)` は常に *`onion.Colls`* 側の実装に到達し、`onion.Sets` 側のこの3つには拡張呼び出し
+構文からは一切到達できません。`Colls` の結果は **変更不可**（`Collections.unmodifiableSet`）、
+直接呼んだ `Sets::union`/`intersection`/`difference` は通常の **変更可能**な `LinkedHashSet` を
+返します。変更可能な結果が必要な場合は `Sets::` 形式を使ってください。
 
 ```onion
 Sets::of(1, 2, 3) / Sets::newSet[Int]() / Sets::fromList([1, 1, 2]) / Sets::toList(a)
-Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
-a.union(b) / a.intersection(b) / a.difference(b)
+Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)  // 変更可能; a.union(b) 等では到達不可
+a.union(b) / a.intersection(b) / a.difference(b)  // onion.Colls 側の実装 -- 変更不可
 Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
 a.symmetricDifference(b)
 Sets::containsAll(a, b)                       // a が b の要素をすべて含む

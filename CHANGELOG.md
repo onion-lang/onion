@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Sets`'s `union`/`intersection`/`difference` extension-call shadowing by
+  `onion.Colls` documented.** `onion.Colls` also declares `union(Set, Set)`/
+  `intersection(Set, Set)`/`difference(Set, Set)` extension methods with the
+  same erased signatures as `onion.Sets`'s, and `Colls` is registered ahead
+  of `Sets` in the builtin extension container list, so `a.union(b)`,
+  `a.intersection(b)` and `a.difference(b)` always reach *`onion.Colls`*'s
+  versions -- `onion.Sets`'s versions of these three are never reachable by
+  extension-call syntax at all, even though `docs/reference/stdlib.md` (and
+  its Japanese translation) showed them as if they were plain `Sets` calls.
+  `Colls`'s results are unmodifiable; `Sets::union`/`intersection`/`difference`
+  called directly return a plain mutable `LinkedHashSet`. Added the caveat to
+  both files' Sets Module section and a new
+  `SetsUnionIntersectionDifferenceShadowingSpec` regression test that locks
+  in the shadowing and checks both docs for the warning.
+
 - **`Stats`'s `min`/`max` extension-call shadowing by `onion.Colls` documented.**
   `onion.Colls` also declares a `min(List)`/`max(List)` extension method with the
   same erased signature as `onion.Stats`'s, and `Colls` is registered ahead of

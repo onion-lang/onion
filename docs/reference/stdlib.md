@@ -1298,6 +1298,19 @@ returning `""`. Use the `Strings::` static-call form (e.g. `Strings::split(...)`
 `Strings::substring(...)`) for these five methods to get `onion.Strings`'s
 List-returning, exception-safe behavior.
 
+**`join` is shadowed too, but by `onion.Colls`, not the JDK**: `String` has
+no native `join` instance method, but `onion.Colls` also declares a
+`join(List, String)` extension (an alias for `mkString`, see the Colls
+Module section below) with the same erased signature, and `Colls` is
+registered ahead of `Strings` in the builtin extension container list, so
+`parts.join(sep)` always reaches *`onion.Colls`*'s version --
+`onion.Strings`'s `join` is never reachable by extension-call syntax at
+all. The two disagree on a `null` element: `Colls::join` appends the
+literal `"null"`, while `Strings::join` throws `NullPointerException`. Use
+the `Strings::join(...)` static-call form to get the throwing behavior (or
+just rely on `Colls`'s `xs.join(sep)` / `xs.mkString(sep)`, which never
+throws on a `null` element).
+
 ## Files Module
 
 File I/O (`onion.Files`):

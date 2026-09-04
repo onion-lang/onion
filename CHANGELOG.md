@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Strings`'s `join` extension-call shadowing by `onion.Colls` documented.**
+  `onion.Colls` also declares a `join(List, String)` extension (an alias for
+  `mkString`) with the same erased signature as `onion.Strings`'s, and
+  `Colls` is registered ahead of `Strings` in the builtin extension
+  container list, so `parts.join(sep)` always reaches *`onion.Colls`*'s
+  version -- `onion.Strings`'s `join` is never reachable by extension-call
+  syntax at all. This is a different shadowing than the five JDK-native
+  methods (`split`/`substring`/`lines`/`chars`/`repeat`) already documented
+  in the same section: `String` has no native `join` method, `onion.Colls`
+  is the one claiming it. The two disagree on a `null` element:
+  `Colls::join`/`mkString` appends the literal `"null"`
+  (`StringBuilder.append(Object)`), while `Strings::join` throws
+  `NullPointerException` (`Object::toString` over a `null` element). Added
+  the caveat to both docs' Strings Module section and a new
+  `StringsJoinExtensionCallShadowingSpec` regression test that locks in the
+  shadowing and checks both docs for the warning.
+
 - **`Shapes::regex`/`Shapes::json` documented alongside `Shapes::config`/`Shapes::yaml`
   in the stdlib reference.** `docs/reference/stdlib.md`'s Shape section (and its
   Japanese translation) named `Shapes::config` and `Shapes::yaml` as the direct-API

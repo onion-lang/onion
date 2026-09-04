@@ -1354,6 +1354,20 @@ Strings::toIntOr("nope", 0)              // 0
 投げない挙動を得るには、`Strings::` の静的呼び出し形式（例:
 `Strings::split(...)`、`Strings::substring(...)`）を使ってください。
 
+**`join` も遮蔽されますが、JDK ではなく `onion.Colls` によるものです**:
+`String` に `join` というインスタンスメソッドはありませんが、
+`onion.Colls` も同じ消去シグネチャの `join(List, String)` 拡張メソッド
+（`mkString` の別名。後述の Colls モジュールを参照）を宣言しており、
+組み込み拡張コンテナのリストで `Colls` が `Strings` より先に登録されて
+いるため、`parts.join(sep)` は常に **`onion.Colls`** 側の実装に到達し、
+`onion.Strings` の `join` は拡張呼び出し構文からは一切到達できません。
+両者は `null` 要素の扱いが異なります: `Colls::join` は文字列
+`"null"` をそのまま連結しますが、`Strings::join` は
+`NullPointerException` を投げます。例外を投げる挙動が必要なら
+`Strings::join(...)` の静的呼び出し形式を使ってください（あるいは
+`null` 要素で例外を投げない `Colls` の `xs.join(sep)` /
+`xs.mkString(sep)` をそのまま使う手もあります）。
+
 ## Maps モジュール
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。

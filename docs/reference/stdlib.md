@@ -2310,20 +2310,39 @@ map itself, chaining into a pipeline like the rest of `Maps`:
 ```onion
 m.getOrDefault("x", 0)   // same as Maps::getOrDefault(m, "x", 0)
 m.keys()                 // NOT the same as Maps::keys(m) -- see caveat below
-m.values()               // NOT the same as Maps::values(m) -- see caveat below
+m.values()               // NOT onion.Maps's or onion.Colls's values() -- see caveat below
 ```
 
 **Extension-call shadowing:** `onion.Colls` also declares `keys(Map)`/
 `values(Map)`/`mapValues(Map, Function1)` extension methods with the same
 erased signatures as `onion.Maps`'s, and `Colls` is registered ahead of
-`Maps` in the builtin extension container list, so `m.keys()`, `m.values()`
-and `m.mapValues(...)` always reach *`onion.Colls`*'s versions --
-`onion.Maps`'s versions of these three are never reachable by extension-call
-syntax at all. `Colls`'s results are **unmodifiable** (`ks.add(...)` throws
-`UnsupportedOperationException`); `Maps::keys`/`values`/`mapValues` called
-directly return a plain mutable `ArrayList`/`LinkedHashMap`. `getOrDefault`
-is unaffected -- both containers' implementations behave the same for any
-map you can actually call an extension method on.
+`Maps` in the builtin extension container list -- but that registration
+order only decides `keys()` and `mapValues()`. `m.keys()` and
+`m.mapValues(...)` reach *`onion.Colls`*'s versions (`onion.Maps`'s
+versions of these two are never reachable by extension-call syntax at
+all); `Colls`'s results are **unmodifiable** (`ks.add(...)` throws
+`UnsupportedOperationException`).
+
+`m.values()` is different: it never reaches either extension container.
+`Map[K, V]` is backed by `java.util.Map`, which already declares an
+instance `values()` method taking no arguments, and an applicable
+instance method on the receiver's own type is always tried before any
+extension fallback -- `Colls` included. So `m.values()` reaches the
+**native `java.util.Map.values()`**, which returns a *live view* backed
+by the map, not a snapshot: removing through the view's iterator removes
+the entry from `m` itself, and mutating `m` afterward is visible through
+a `values()` view obtained earlier. Calling `.add(...)` on that view
+throws `UnsupportedOperationException` too (views don't support
+insertion), which happens to match `Colls`'s unmodifiable behavior on
+that one call but for an unrelated reason -- the live-view aliasing has
+no equivalent in either `Colls`'s unmodifiable snapshot or
+`Maps::values`'s mutable `ArrayList` snapshot. `Maps::keys`/`values`/
+`mapValues` called directly return a plain mutable
+`ArrayList`/`LinkedHashMap`. `getOrDefault` is unaffected by any of this
+-- `java.util.Map` also declares a matching two-arg `getOrDefault`, so it
+too resolves to the native method rather than an extension, but all three
+implementations behave identically for any map you can actually call an
+extension method on.
 
 ### Transformation
 

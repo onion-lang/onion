@@ -10,14 +10,22 @@ import onion.tools.Shell
  * `mapValues(Map, Function1)` static methods with the same erased
  * receiver+name+signature. Extension registration keeps the first container
  * that claims a given receiver+name+erased-signature, and `Colls` is listed
- * ahead of `Maps`, so `m.keys()`/`m.values()`/`m.mapValues(...)` always reach
- * `onion.Colls`'s versions -- `onion.Maps`'s are never reachable by
- * extension-call syntax at all. `Colls`'s results are unmodifiable;
- * `Maps::keys`/`values`/`mapValues` called directly return a plain mutable
- * `ArrayList`/`LinkedHashMap`. This locks in that shadowing so a future
- * reordering of `BuiltinExtensionContainers` doesn't silently flip it, and
- * checks that both docs carry the warning (docs/reference/stdlib.md and
- * its Japanese translation, Maps Module section).
+ * ahead of `Maps` -- but that ordering only decides `keys()`/`mapValues()`:
+ * `m.keys()`/`m.mapValues(...)` always reach `onion.Colls`'s versions,
+ * `onion.Maps`'s are never reachable by extension-call syntax at all, and
+ * `Colls`'s results are unmodifiable.
+ *
+ * `m.values()` never reaches either extension container at all: ordinary
+ * instance-method resolution runs before any extension fallback, and
+ * `java.util.Map` (the runtime type backing `Map[K, V]`) already declares a
+ * no-arg `values()` instance method, so `m.values()` reaches the *native*
+ * `java.util.Map.values()` -- a live view over the map, not a snapshot from
+ * either `Colls` or `Maps`. `Maps::keys`/`values`/`mapValues` called
+ * directly return a plain mutable `ArrayList`/`LinkedHashMap`. This locks
+ * in that shadowing so a future reordering of `BuiltinExtensionContainers`
+ * doesn't silently flip it, and checks that both docs carry the warning
+ * (docs/reference/stdlib.md and its Japanese translation, Maps Module
+ * section).
  */
 class MapsExtensionCallShadowingSpec extends AbstractShellSpec {
 
@@ -38,7 +46,18 @@ class MapsExtensionCallShadowingSpec extends AbstractShellSpec {
       assert(thrown.getCause.isInstanceOf[UnsupportedOperationException])
     }
 
-    it("m.values() returns an unmodifiable List (onion.Colls's behavior), not onion.Maps's mutable one") {
+    it("m.values() reaches the native java.util.Map.values() -- a live view, not a snapshot from onion.Colls or onion.Maps") {
+      // If this reached a snapshot (either Colls's unmodifiable copy or Maps's
+      // mutable ArrayList copy), a mutation made to the map *after* calling
+      // .values() would not show up in the already-obtained result. It does,
+      // because the native view stays backed by the map.
+      run(
+        "val m: Map[String, Int] = [\"a\": 1, \"b\": 2]\n" +
+        "    val vs = m.values()\n    m[\"c\"] = 3\n    return vs.toString()",
+        Shell.Success("[1, 2, 3]"))
+    }
+
+    it("m.values().add(9) still throws, but as an unsupported view mutation, not onion.Colls's unmodifiable-snapshot behavior") {
       val thrown = intercept[ScriptException] {
         shell.run(
           "class Test {\npublic:\n  static def main(args: String[]): Int {\n" +

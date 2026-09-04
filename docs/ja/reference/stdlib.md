@@ -1358,13 +1358,31 @@ Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持�
 
 **拡張呼び出しのシャドーイング**: `onion.Colls` も `keys(Map)` / `values(Map)` /
 `mapValues(Map, Function1)` を同じ消去シグネチャで拡張メソッドとして宣言しており、
-組み込み拡張コンテナリストで `Colls` が `Maps` より先に登録されているため、
-`m.keys()` / `m.values()` / `m.mapValues(...)` は常に *`onion.Colls`* 側の実装に
-到達し、`onion.Maps` 側のこの3つには拡張呼び出し構文からは一切到達できません。
-`Colls` の結果は **変更不可**（`ks.add(...)` は `UnsupportedOperationException`
-を投げる）、直接呼んだ `Maps::keys`/`values`/`mapValues` は通常の **変更可能**な
-`ArrayList`/`LinkedHashMap` を返します。`getOrDefault` はこの影響を受けません --
-拡張メソッドとして呼び出せる Map に対しては、どちらの実装でも結果は同じです。
+組み込み拡張コンテナリストで `Colls` が `Maps` より先に登録されています -- ただし
+この登録順が効くのは `keys()` と `mapValues()` だけです。`m.keys()` /
+`m.mapValues(...)` は常に *`onion.Colls`* 側の実装に到達し、`onion.Maps` 側の
+この2つには拡張呼び出し構文からは一切到達できません。`Colls` の結果は
+**変更不可**（`ks.add(...)` は `UnsupportedOperationException` を投げる）です。
+
+`m.values()` は事情が異なり、どちらの拡張コンテナにも到達しません。
+`Map[K, V]` の実体は `java.util.Map` であり、これは引数なしのインスタンス
+メソッド `values()` を既に宣言しています。レシーバ自身の型に適用可能な
+インスタンスメソッドは、拡張メソッドへのフォールバック（`Colls` を含む）
+より常に先に試されるため、`m.values()` は **ネイティブの
+`java.util.Map.values()`** に到達します。これはスナップショットではなく
+map を裏で参照する *ライブビュー* を返すため、そのビューの iterator 経由で
+削除すると `m` 自体からエントリが削除され、あとから `m` を変更すると
+以前取得した `values()` ビューにもその変更が反映されます。このビューに
+対する `.add(...)` も `UnsupportedOperationException` を投げます（ビューは
+挿入をサポートしないため）が、これは `Colls` の変更不可な挙動とたまたま
+一致しているだけで理由は別物です -- このライブビューのエイリアシングは
+`Colls` の変更不可スナップショットにも `Maps::values` の変更可能な
+`ArrayList` スナップショットにも存在しません。直接呼んだ
+`Maps::keys`/`values`/`mapValues` は通常の **変更可能**な
+`ArrayList`/`LinkedHashMap` を返します。`getOrDefault` はこれらの影響を
+受けません -- `java.util.Map` も同じ2引数の `getOrDefault` を宣言している
+ため、これもネイティブメソッドに解決されますが、拡張メソッドとして
+呼び出せる Map に対しては3つの実装とも結果は同じです。
 
 ```onion
 val m: Map[String, Int] = Maps::newMap()
@@ -1372,7 +1390,8 @@ Maps::getOrDefault(m, "a", 0)                 // あればその値、無けれ�
 Maps::getOrElse(m, "x", () -> compute())      // 遅延デフォルト
 Maps::keys(m) / Maps::values(m)               // 変更可能なリスト; m.keys() / m.values() では到達不可
 m.getOrDefault("x", 0)                        // 拡張メソッドとしても呼べる（上と同じ）
-m.keys() / m.values() / m.mapValues(f)        // onion.Colls 側の実装 -- 変更不可
+m.keys() / m.mapValues(f)                     // onion.Colls 側の実装 -- 変更不可
+m.values()                                    // ネイティブ java.util.Map.values() -- ライブビュー
 Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUpperCase())
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語

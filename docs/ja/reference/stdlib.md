@@ -1384,6 +1384,22 @@ JDK 側のメソッドから `NullPointerException` を投げますが、
 プラットフォーム `null` になり得る場合は `Strings::contains(...)` /
 `Strings::isEmpty(...)` の静的呼び出し形式を使ってください。
 
+**`isBlank` も遮蔽されますが、`null` を渡さない通常の `String` でも
+挙動差が表面化します**: `java.lang.String` には Java 11 以降
+`isBlank()` というインスタンスメソッドが定義されているため、
+`s.isBlank()` も上記と同様に `onion.Strings` 側ではなく **JDK 標準の
+同名メソッド** を暗黙のうちに呼び出します。`contains`/`isEmpty` とは
+異なり、この差はプラットフォーム型の `null` がなくても現れます:
+`onion.Strings::isBlank` は `str.trim().isEmpty()` として実装されて
+おり、`String::trim` は `U+0020` 以下の文字しか取り除きません。一方
+ネイティブの `String::isBlank` は `Character.isWhitespace` を満たす
+すべての文字を空白とみなすため、EM SPACE（U+2003）のような `trim()`
+では取り除かれない Unicode の空白文字も対象になります。そのため
+EM SPACE だけからなる文字列は `s.isBlank()`（拡張呼び出し構文）では
+空白扱いになりますが、`Strings::isBlank(s)`（静的呼び出し構文）では
+空白扱いになりません。`trim()` ベースの ASCII 空白の意味論が必要な
+場合は `Strings::isBlank(...)` の静的呼び出し形式を使ってください。
+
 ## Maps モジュール
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Strings`'s `isBlank` extension-call shadowing by native `java.lang.String`
+  documented.** `String` has defined an `isBlank()` instance method since
+  Java 11, so `s.isBlank()` silently reaches the *native JDK method* instead
+  of `onion.Strings`'s. Unlike the `contains`/`isEmpty` shadowing, this one
+  is observable on an ordinary non-null `String`: `onion.Strings::isBlank`
+  is `trim()`-based (only strips characters `<= U+0020`), while native
+  `isBlank()` treats any `Character.isWhitespace` character as blank,
+  including Unicode space separators like EM SPACE (U+2003) that `trim()`
+  does not strip. Added the caveat to both docs' Strings Module section and
+  a new `StringsIsBlankExtensionCallShadowingSpec` regression test that
+  locks in the shadowing and checks both docs for the warning.
+
 - **`Sets`'s `map` extension-call shadowing by `onion.Iterables` documented.**
   `onion.Iterables` also declares a `map(Set, Function1)` extension with the
   same erased signature as `onion.Sets`'s, and `Iterables` is registered

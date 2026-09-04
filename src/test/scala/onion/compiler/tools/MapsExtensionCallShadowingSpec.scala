@@ -21,11 +21,25 @@ import onion.tools.Shell
  * no-arg `values()` instance method, so `m.values()` reaches the *native*
  * `java.util.Map.values()` -- a live view over the map, not a snapshot from
  * either `Colls` or `Maps`. `Maps::keys`/`values`/`mapValues` called
- * directly return a plain mutable `ArrayList`/`LinkedHashMap`. This locks
- * in that shadowing so a future reordering of `BuiltinExtensionContainers`
- * doesn't silently flip it, and checks that both docs carry the warning
- * (docs/reference/stdlib.md and its Japanese translation, Maps Module
- * section).
+ * directly return a plain mutable `ArrayList`/`LinkedHashMap`.
+ *
+ * `getOrDefault(Map, K, V)` shadows the same way as `values()`: `Map`
+ * already declares a matching two-arg instance `getOrDefault`, so
+ * `m.getOrDefault(k, d)` reaches the *native* method rather than either
+ * extension container. For a non-null receiver that is invisible, since
+ * the native method and both extension versions agree. It becomes
+ * observable for a receiver that is `null` at runtime but was never
+ * checked at compile time (a "platform type", per CLAUDE.md, with no
+ * compile-time nullability tracking): `onion.Maps::getOrDefault` is
+ * null-safe (`map == null` returns the default), but the native method
+ * extension-call syntax actually reaches throws `NullPointerException`
+ * instead -- the same hazard `StringsContainsIsEmptyExtensionCallShadowingSpec`
+ * documents for `String#contains`/`isEmpty`.
+ *
+ * This locks in that shadowing so a future reordering of
+ * `BuiltinExtensionContainers` doesn't silently flip it, and checks that
+ * both docs carry the warning (docs/reference/stdlib.md and its Japanese
+ * translation, Maps Module section).
  */
 class MapsExtensionCallShadowingSpec extends AbstractShellSpec {
 
@@ -88,12 +102,32 @@ class MapsExtensionCallShadowingSpec extends AbstractShellSpec {
         Shell.Success("{a=2, b=4}"))
     }
 
-    it("non-colliding Maps methods behave identically via extension-call and static-call syntax") {
+    it("m.getOrDefault(k, d) on a non-null Map agrees with the static Maps:: form (native method, both extensions concur)") {
       run(
         "val m: Map[String, Int] = [\"a\": 1]\n    return m.getOrDefault(\"x\", 0).toString()",
         Shell.Success("0"))
       run(
         "val m: Map[String, Int] = [\"a\": 1]\n    return Maps::getOrDefault(m, \"x\", 0).toString()",
+        Shell.Success("0"))
+    }
+
+    it("m.getOrDefault(k, d) on a null platform Map reaches the native Map.getOrDefault and throws NullPointerException") {
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          "class Test {\npublic:\n  static def main(args: String[]): Int {\n" +
+          "    val outer: HashMap[String, Map[String, Int]] = new HashMap[String, Map[String, Int]]\n" +
+          "    val m: Map[String, Int] = outer.get(\"missing\") as Map[String, Int]\n" +
+          "    return m.getOrDefault(\"x\", 0)\n  }\n}\n",
+          "MapsShadowGetOrDefaultNpe.on", Array())
+      }
+      assert(thrown.getCause.isInstanceOf[NullPointerException])
+    }
+
+    it("Maps::getOrDefault(m, k, d) on the same null platform Map is null-safe and returns the default instead") {
+      run(
+        "val outer: HashMap[String, Map[String, Int]] = new HashMap[String, Map[String, Int]]\n" +
+        "    val m: Map[String, Int] = outer.get(\"missing\") as Map[String, Int]\n" +
+        "    return Maps::getOrDefault(m, \"x\", 0).toString()",
         Shell.Success("0"))
     }
   }
@@ -112,19 +146,21 @@ class MapsExtensionCallShadowingSpec extends AbstractShellSpec {
     }
 
     val enMarkers =
-      Set("m.keys(", "m.values(", "m.mapValues(", "onion.Colls", "unmodifiable")
+      Set("m.keys(", "m.values(", "m.mapValues(", "onion.Colls", "unmodifiable",
+        "getOrDefault", "platform")
 
     val jaMarkers =
-      Set("m.keys(", "m.values(", "m.mapValues(", "onion.Colls")
+      Set("m.keys(", "m.values(", "m.mapValues(", "onion.Colls",
+        "getOrDefault", "プラットフォーム")
 
-    it("docs/reference/stdlib.md's Maps Module section warns about keys()/values()/mapValues() shadowing") {
+    it("docs/reference/stdlib.md's Maps Module section warns about keys()/values()/mapValues()/getOrDefault() shadowing") {
       val doc = section(read("docs/reference/stdlib.md"), "## Maps Module")
       val missing = enMarkers.filterNot(doc.contains)
       assert(missing.isEmpty,
         s"docs/reference/stdlib.md's Maps Module section is missing shadowing-warning markers: ${missing.toSeq.sorted.mkString(", ")}")
     }
 
-    it("docs/ja/reference/stdlib.md's Maps section warns about keys()/values()/mapValues() shadowing") {
+    it("docs/ja/reference/stdlib.md's Maps section warns about keys()/values()/mapValues()/getOrDefault() shadowing") {
       val doc = section(read("docs/ja/reference/stdlib.md"), "## Maps モジュール")
       val missing = jaMarkers.filterNot(doc.contains)
       assert(missing.isEmpty,

@@ -2423,11 +2423,20 @@ that one call but for an unrelated reason -- the live-view aliasing has
 no equivalent in either `Colls`'s unmodifiable snapshot or
 `Maps::values`'s mutable `ArrayList` snapshot. `Maps::keys`/`values`/
 `mapValues` called directly return a plain mutable
-`ArrayList`/`LinkedHashMap`. `getOrDefault` is unaffected by any of this
--- `java.util.Map` also declares a matching two-arg `getOrDefault`, so it
-too resolves to the native method rather than an extension, but all three
-implementations behave identically for any map you can actually call an
-extension method on.
+`ArrayList`/`LinkedHashMap`. `getOrDefault` shadows the same way as
+`values()` -- `java.util.Map` also declares a matching two-arg
+`getOrDefault`, so `m.getOrDefault(k, d)` resolves to the native method
+rather than either extension too. For a non-null receiver that is
+invisible, since the native method and both extensions agree. It becomes
+observable for a receiver that is `null` at runtime but was never checked
+at compile time -- a "platform type" (per CLAUDE.md) read back from
+unparameterized Java interop carries no compile-time nullability
+tracking, so Onion's null-safety typechecking does not force a null check
+first. `onion.Maps::getOrDefault` is null-safe (a `null` map returns the
+default), but `m.getOrDefault(k, d)` on that same null map reaches the
+native method and throws `NullPointerException` instead -- call
+`Maps::getOrDefault(...)` directly to get the null-safe behavior on a
+value that might be null.
 
 ### Transformation
 

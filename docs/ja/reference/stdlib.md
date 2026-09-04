@@ -1427,10 +1427,20 @@ map を裏で参照する *ライブビュー* を返すため、そのビュー
 `Colls` の変更不可スナップショットにも `Maps::values` の変更可能な
 `ArrayList` スナップショットにも存在しません。直接呼んだ
 `Maps::keys`/`values`/`mapValues` は通常の **変更可能**な
-`ArrayList`/`LinkedHashMap` を返します。`getOrDefault` はこれらの影響を
-受けません -- `java.util.Map` も同じ2引数の `getOrDefault` を宣言している
-ため、これもネイティブメソッドに解決されますが、拡張メソッドとして
-呼び出せる Map に対しては3つの実装とも結果は同じです。
+`ArrayList`/`LinkedHashMap` を返します。`getOrDefault` も `values()` と
+同様にシャドーイングされます -- `java.util.Map` も同じ2引数の
+`getOrDefault` を宣言しているため、`m.getOrDefault(k, d)` はどちらの
+拡張メソッドでもなくネイティブメソッドに解決されます。レシーバが
+非 null であればこれは見えません（ネイティブメソッドと両方の拡張実装が
+一致するため）。実行時には `null` だがコンパイル時にはチェックされて
+いなかったレシーバ（CLAUDE.md でいう「プラットフォーム型」-- 型引数の
+無い Java 相互運用から読み戻された値はコンパイル時の null 許容性
+追跡を持たない）に対しては、この違いが表面化します: `onion.Maps::getOrDefault`
+は null 安全（map が `null` ならデフォルト値を返す）ですが、同じ
+null な map に対する `m.getOrDefault(k, d)` はネイティブメソッドに
+到達し、代わりに `NullPointerException` を投げます -- null かもしれない
+値には `Maps::getOrDefault(...)` を直接呼んで null 安全な挙動を得て
+ください。
 
 ```onion
 val m: Map[String, Int] = Maps::newMap()

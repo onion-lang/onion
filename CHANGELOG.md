@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`Stats`'s `min`/`max` extension-call shadowing by `onion.Colls` documented.**
+  `onion.Colls` also declares a `min(List)`/`max(List)` extension method with the
+  same erased signature as `onion.Stats`'s, and `Colls` is registered ahead of
+  `Stats` in the builtin extension container list, so `xs.min()`/`xs.max()`
+  always reach *`onion.Colls`*'s versions -- `onion.Stats`'s `min`/`max` are
+  never reachable by extension-call syntax at all. That means `xs.min()` on a
+  `List[Int]` returns the exact `Int` element (not a lossy `Double`) and
+  **throws `NoSuchElementException` on an empty list** instead of returning
+  `0.0` as `Stats::min` does, which neither `docs/reference/stdlib.md` nor its
+  Japanese translation warned about. Added the caveat to both files' Stats
+  Module section and a new `StatsExtensionCallShadowingSpec` regression test
+  that locks in the shadowing and checks both docs for the warning.
+
 ## [0.53.0] - 2026-09-03
 
 ### Documentation

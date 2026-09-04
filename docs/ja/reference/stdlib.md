@@ -1368,6 +1368,22 @@ Strings::toIntOr("nope", 0)              // 0
 `null` 要素で例外を投げない `Colls` の `xs.join(sep)` /
 `xs.mkString(sep)` をそのまま使う手もあります）。
 
+**`contains` と `isEmpty` も遮蔽されますが、プラットフォーム型の
+`null` を渡したときだけ挙動差が見えます**: `java.lang.String` には
+すでに `contains`・`isEmpty` というインスタンスメソッドが定義されて
+いるため、`s.contains(x)` と `s.isEmpty()` も上の5つと同様に
+`onion.Strings` 側ではなく **JDK 標準の同名メソッド** を暗黙のうちに
+呼び出します。`null` でない `String` に対しては両者は同じ JDK ロジック
+に行き着くため通常のコードでは見分けが付きません。差が表面化するのは、
+型引数を持たない Java 相互運用から読み戻した値 -- コンパイル時の
+null 安全性チェックが及ばない「プラットフォーム」型の値 -- が実行時に
+`null` だった場合です: このとき `s.isEmpty()` / `s.contains(x)` は
+JDK 側のメソッドから `NullPointerException` を投げますが、
+`onion.Strings` の版は null 安全（`Strings::isEmpty(null) == true`、
+`Strings::contains(null, x) == false`）です。受け手が未検査の
+プラットフォーム `null` になり得る場合は `Strings::contains(...)` /
+`Strings::isEmpty(...)` の静的呼び出し形式を使ってください。
+
 ## Maps モジュール
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。

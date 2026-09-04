@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Strings`'s `contains`/`isEmpty` extension-call shadowing by native
+  `java.lang.String` documented.** `String` already defines `contains` and
+  `isEmpty` instance methods, so `s.contains(x)`/`s.isEmpty()` silently
+  reach the *native JDK method* instead of `onion.Strings`'s, same as the
+  already-documented `split`/`substring`/`lines`/`chars`/`repeat`. The
+  difference is invisible for an ordinary non-null `String` (both paths run
+  the same JDK logic) but becomes observable for a platform-typed value
+  read back from unparameterized Java interop that is `null` at runtime:
+  the native method throws `NullPointerException`, while
+  `onion.Strings::contains`/`isEmpty` are null-safe. Added the caveat to
+  both docs' Strings Module section and a new
+  `StringsContainsIsEmptyExtensionCallShadowingSpec` regression test that
+  locks in the shadowing (via a `HashMap.get` platform-typed null) and
+  checks both docs for the warning.
+
 - **`Maps`'s `groupBy` extension-call shadowing by `onion.Colls` documented.**
   `onion.Colls` also declares a `groupBy(List, Function1)` extension with the
   same erased signature as `onion.Maps`'s, and `Colls` is registered ahead of

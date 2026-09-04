@@ -1311,6 +1311,22 @@ the `Strings::join(...)` static-call form to get the throwing behavior (or
 just rely on `Colls`'s `xs.join(sep)` / `xs.mkString(sep)`, which never
 throws on a `null` element).
 
+**`contains` and `isEmpty` are shadowed too, but only observably for a
+platform-typed `null`**: `java.lang.String` already defines `contains`
+and `isEmpty` instance methods, so `s.contains(x)` and `s.isEmpty()` also
+silently reach the *native JDK method* instead of `onion.Strings`'s, same
+as the five methods above. For a non-null `String` the two agree (both
+end up running the same JDK logic), so this is invisible in ordinary
+code. It becomes observable for a value read back from unparameterized
+Java interop -- a platform type carries no compile-time nullability
+tracking, so Onion's null-safety checking does not force a null check
+before the call -- and that value happens to be `null` at runtime:
+`s.isEmpty()` / `s.contains(x)` then throw `NullPointerException` from
+the native method, while `onion.Strings`'s versions are null-safe
+(`Strings::isEmpty(null) == true`, `Strings::contains(null, x) ==
+false`). Use the `Strings::contains(...)` / `Strings::isEmpty(...)`
+static-call form when the receiver may be an unchecked platform `null`.
+
 ## Files Module
 
 File I/O (`onion.Files`):

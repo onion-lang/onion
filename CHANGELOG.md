@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Fixed: `Maps`'s `m.values()` extension-call shadowing was documented incorrectly.**
+  A previous entry in this file (and `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`'s
+  Maps Module section) claimed `m.values()` reaches `onion.Colls`'s extension method, the same
+  as `m.keys()` and `m.mapValues(...)`. Running it showed otherwise: `Map[K, V]` is backed by
+  `java.util.Map`, which already declares a no-arg `values()` instance method, and an applicable
+  instance method on the receiver's own type is always tried before any extension fallback --
+  `Colls` included. So `m.values()` never reaches an extension container at all; it reaches the
+  **native `java.util.Map.values()`**, which returns a *live view* backed by the map, not a
+  snapshot: removing through the view's iterator removes the entry from the map itself, and
+  mutating the map afterward is visible through a `values()` view obtained earlier. Neither
+  `Colls`'s unmodifiable snapshot nor `Maps::values`'s mutable `ArrayList` snapshot behaves that
+  way (`m.keys()`/`m.mapValues(...)` do still reach `Colls`, unaffected by this fix). Corrected
+  both docs and strengthened `MapsExtensionCallShadowingSpec` with a test that mutates the map
+  after calling `.values()` to prove the result is a live view, not a copy.
+
 - **`Maps`'s `keys`/`values`/`mapValues` extension-call shadowing by `onion.Colls`
   documented.** `onion.Colls` also declares `keys(Map)`/`values(Map)`/
   `mapValues(Map, Function1)` extension methods with the same erased signatures

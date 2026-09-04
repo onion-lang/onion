@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Shapes::regex`/`Shapes::json` documented alongside `Shapes::config`/`Shapes::yaml`
+  in the stdlib reference.** `docs/reference/stdlib.md`'s Shape section (and its
+  Japanese translation) named `Shapes::config` and `Shapes::yaml` as the direct-API
+  equivalents of `shape name = config` / `shape name = yaml`, but never mentioned
+  `Shapes::regex` or `Shapes::json` -- the equivalents of the more common `shape name =
+  re"..."` / `shape name = json` forms -- even though all four are equally public
+  (`src/main/java/onion/Shapes.java`) and the sibling guide doc already covered all
+  four. Added the missing prose to both stdlib reference docs and extended
+  `StdlibDocShapeModuleParitySpec` to guard all four factory names.
+
 - **`Iterables`'s `map`/`filter` extension-call shadowing by `onion.Colls`
   documented.** `onion.Colls` also declares `map(List, Function1)`/
   `filter(List, Function1)` extensions with the same erased signatures as

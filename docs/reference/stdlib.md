@@ -1886,8 +1886,18 @@ xs.forEach { x -> println(x) }    // runs an action per element, returns nothing
 xs.count { x -> x > 1 }           // how many elements match
 xs.reverse()                      // new List, elements in reverse order
 xs.contains(2)                    // true if some element equals 2
+xs.isEmpty()                      // true if xs has no elements
+xs.size()                         // element count
+m.get("key")                      // value for "key", or null if absent
+m.containsKey("key")              // true if the map has a "key" entry
 Colls::toList(args)               // a Java array (e.g. main's String[]) as a List
 ```
+
+`isEmpty`, `size`, `get` and `containsKey` are also plain instance methods on
+`List`/`Set`/`Map`, which always win over an extension method of the same name --
+so these four calls never actually reach `onion.Colls`'s versions, only the
+native ones. That is not observable here: `Colls`'s implementations are
+one-line pass-throughs to the same native method.
 
 ### Batching, windowing, and selector aggregation
 

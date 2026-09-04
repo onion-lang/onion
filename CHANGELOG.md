@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Colls`'s `isEmpty`/`size`/`get`/`containsKey` extension-call
+  spellings, and closed a false-coverage gap in `CollsDocCoverageSpec`.**
+  `onion.Colls` declares `isEmpty(Collection)`, `size(Collection)`,
+  `get(Map, K)` and `containsKey(Map, K)`, registered as builtin extensions
+  the same as the rest of the module, but none of the four was ever shown
+  as `Colls`-backed usage in either `docs/reference/stdlib.md`'s or
+  `docs/ja/reference/stdlib.md`'s Colls Module section. `CollsDocCoverageSpec`
+  claims to check "every onion.Colls member" but only ever looks for a name
+  anywhere in the whole file, so this gap passed silently: `isEmpty`, `get`
+  and `size` are common enough words to appear elsewhere in the docs for
+  unrelated reasons, and `containsKey` already appears once, in the
+  unrelated `java.util.HashMap` interop example. Added the four calls to
+  both docs' Colls Module section (noting that, like several methods
+  already documented elsewhere, an instance method on `List`/`Set`/`Map`
+  always wins over an extension method of the same name, so these four
+  never actually reach `onion.Colls`'s versions -- unobservable here since
+  `Colls`'s implementations are one-line pass-throughs to the same native
+  method) and added a section-scoped regression check to
+  `CollsDocCoverageSpec` that pins their presence, so the whole-file check's
+  false coverage cannot hide this again.
+
 - **Documented `Iterables::sort`'s two-arg form extension-call shadowing by
   native `java.util.List`.** `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`
   listed `xs.sort() / xs.sort(comparator)` together as plain `onion.Iterables`

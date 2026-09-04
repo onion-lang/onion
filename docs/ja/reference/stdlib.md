@@ -1472,13 +1472,25 @@ Sets::containsAll(a, b)                       // a が b の要素をすべて�
 a.containsAll(b)
 Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
 a.isSubsetOf(b) / a.isSupersetOf(b) / a.isDisjoint(b)
-Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
-a.map(f) / a.filter(p) / a.find(p)
+Sets::map(a, f)                               // NOT a.map(f) で到達不可 -- 下記参照
+Sets::filter(a, p) / Sets::find(a, p)
+a.filter(p) / a.find(p)
 Sets::forEach(a, (x: Int) -> println(x))
 a.forEach((x: Int) -> println(x))
 Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
 a.count(p) / a.any(p) / a.all(p)
 ```
+
+**拡張呼び出しのシャドーイング:** `onion.Iterables` も同じ `(Set, Function1)` 消去
+シグネチャで `map` 拡張メソッドを宣言しており、組み込み拡張コンテナリストで
+`Iterables` が `Sets` より先に登録されているため、`a.map(f)` は常に
+*`onion.Iterables`* 側の `map` に到達し、`onion.Sets` 側の `map` には拡張呼び出し
+構文からは一切到達できません。両者は順序と `null` の扱いが異なります:
+`Iterables::map` は結果を通常の `HashSet` に集約する（反復順序は不定で、上記の
+「挿入順を保持する」という約束が破れる）うえ `null` の Set に対して
+`NullPointerException` を投げますが、`Sets::map` は `LinkedHashSet`（挿入順保持）
+に集約し、`null` の Set には空の Set を返します。挿入順が保たれた null 安全な
+結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接呼んでください。
 
 ## Hash モジュール
 

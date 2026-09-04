@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Maps`'s `keys`/`values`/`mapValues` extension-call shadowing by `onion.Colls`
+  documented.** `onion.Colls` also declares `keys(Map)`/`values(Map)`/
+  `mapValues(Map, Function1)` extension methods with the same erased signatures
+  as `onion.Maps`'s, and `Colls` is registered ahead of `Maps` in the builtin
+  extension container list, so `m.keys()`, `m.values()` and `m.mapValues(...)`
+  always reach *`onion.Colls`*'s versions -- `onion.Maps`'s versions of these
+  three are never reachable by extension-call syntax at all, even though
+  `docs/reference/stdlib.md` (and its Japanese translation) showed
+  `m.keys()`/`m.values()` as if they were "the same as" the `Maps::` static
+  calls. `Colls`'s results are unmodifiable (confirmed by running each against
+  `ScriptRunner`); `Maps::keys`/`values`/`mapValues` called directly return a
+  plain mutable `ArrayList`/`LinkedHashMap`. `getOrDefault` is unaffected --
+  both containers behave the same for any map an extension method can actually
+  be called on. Added the caveat to both files' Maps Module section and a new
+  `MapsExtensionCallShadowingSpec` regression test that locks in the shadowing
+  and checks both docs for the warning.
+
 - **`Sets`'s `union`/`intersection`/`difference` extension-call shadowing by
   `onion.Colls` documented.** `onion.Colls` also declares `union(Set, Set)`/
   `intersection(Set, Set)`/`difference(Set, Set)` extension methods with the

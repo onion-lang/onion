@@ -1356,12 +1356,23 @@ Strings::toIntOr("nope", 0)              // 0
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。
 
+**拡張呼び出しのシャドーイング**: `onion.Colls` も `keys(Map)` / `values(Map)` /
+`mapValues(Map, Function1)` を同じ消去シグネチャで拡張メソッドとして宣言しており、
+組み込み拡張コンテナリストで `Colls` が `Maps` より先に登録されているため、
+`m.keys()` / `m.values()` / `m.mapValues(...)` は常に *`onion.Colls`* 側の実装に
+到達し、`onion.Maps` 側のこの3つには拡張呼び出し構文からは一切到達できません。
+`Colls` の結果は **変更不可**（`ks.add(...)` は `UnsupportedOperationException`
+を投げる）、直接呼んだ `Maps::keys`/`values`/`mapValues` は通常の **変更可能**な
+`ArrayList`/`LinkedHashMap` を返します。`getOrDefault` はこの影響を受けません --
+拡張メソッドとして呼び出せる Map に対しては、どちらの実装でも結果は同じです。
+
 ```onion
 val m: Map[String, Int] = Maps::newMap()
 Maps::getOrDefault(m, "a", 0)                 // あればその値、無ければデフォルト
 Maps::getOrElse(m, "x", () -> compute())      // 遅延デフォルト
-Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
-m.getOrDefault("x", 0) / m.keys() / m.values() // 拡張メソッドとしても呼べる（上と同じ）
+Maps::keys(m) / Maps::values(m)               // 変更可能なリスト; m.keys() / m.values() では到達不可
+m.getOrDefault("x", 0)                        // 拡張メソッドとしても呼べる（上と同じ）
+m.keys() / m.values() / m.mapValues(f)        // onion.Colls 側の実装 -- 変更不可
 Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUpperCase())
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語

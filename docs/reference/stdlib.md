@@ -934,6 +934,28 @@ section, the two containers' implementations are **identical**
 index), so the shadowing has no observable effect: `xs.first()` always
 equals `Iterables::first(xs)`, and likewise for `last`.
 
+**`sort`'s two-arg form is shadowed too, harder than any of the above**:
+`java.util.List` already declares an instance method `sort(Comparator)` (a
+default method since Java 8), and an instance method always wins over an
+extension method of the same name -- so `xs.sort(comparator)` never reaches
+`onion.Iterables::sort(List, Comparator)` at all. This isn't just a runtime
+edge case: native `List.sort` mutates the receiver **in place** and returns
+`void`, while `Iterables::sort` leaves the receiver untouched and returns a
+**new** sorted `List`. So `xs.sort(comparator)` compiles fine as a bare,
+unused statement (it destructively sorts `xs`), but fails to compile the
+moment its result is used as a value:
+
+```onion
+val xs: List[Int] = [3, 1, 2]
+xs.sort((a, b) -> a - b)              // xs is now [1, 2, 3] -- native List.sort, in place
+val ys = xs.sort((a, b) -> a - b)     // [E0000] type Object is expected, but type void is used
+Iterables::sort(xs, (a, b) -> a - b)  // ok -- new sorted copy, xs untouched
+```
+
+The no-arg form is unaffected: `List` declares no no-arg `sort()`, so
+`xs.sort()` always reaches `Iterables::sort(List)` and returns a new sorted
+copy, exactly as shown above.
+
 ## Option Module
 
 Provided via `onion.Option`.

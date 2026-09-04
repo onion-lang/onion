@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Iterables`'s three-arg `reduce` extension-call shadowing by `onion.Colls`
+  documented -- the first shadowing case with a compile-time, not just
+  runtime, effect.** `onion.Colls` also declares a `reduce(List, Object,
+  Function2)` extension with the same erased signature as `onion.Iterables`'s,
+  and `Colls` is registered ahead of `Iterables` in the builtin extension
+  container list, so `xs.reduce(initial, f)` always reaches *`onion.Colls`*'s
+  implementation -- `onion.Iterables`'s three-arg `reduce` is never reachable
+  by extension-call syntax at all. Unlike the already-documented
+  `map`/`filter`/`take`/`drop`/`reverse` shadowing (runtime edge cases only),
+  this one changes what *type-checks*: `Colls::reduce`'s declared signature
+  types the accumulator as the actual generic `U`, while `Iterables::reduce`'s
+  erases it to `Object`, so `xs.reduce(0, (acc, x) -> acc + x)` compiles and
+  sums to an `Int` only because it silently reaches `Colls::reduce`; calling
+  `Iterables::reduce(xs, 0, (acc, x) -> acc + x)` explicitly fails to compile
+  with E0001 ("operator + is not applicable for type Object, Int"). Added the
+  caveat to both docs' Iterables Module section and a new
+  `IterablesReduceShadowingSpec` regression test that locks in the shadowing
+  (including the E0001 compile failure) and checks both docs for the warning.
+
 - **`Strings`'s `isBlank` extension-call shadowing by native `java.lang.String`
   documented.** `String` has defined an `isBlank()` instance method since
   Java 11, so `s.isBlank()` silently reaches the *native JDK method* instead

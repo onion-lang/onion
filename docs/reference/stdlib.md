@@ -904,6 +904,26 @@ xs.reverse().add(4)            // throws UnsupportedOperationException (onion.Co
 Iterables::take(xs, -1)        // throws  (onion.Iterables::take, no clamping)
 ```
 
+**`reduce` is shadowed too, but at compile time, not just runtime**: `onion.Colls`
+also declares a three-arg `reduce(List, Object, Function2)` extension with the
+same erased signature as `onion.Iterables`'s, so `xs.reduce(initial, f)` always
+reaches *`onion.Colls`*'s implementation -- `onion.Iterables`'s three-arg
+`reduce` is never reachable by extension-call syntax at all. Unlike
+`map`/`filter`/`take`/`drop`/`reverse` above, the two don't just disagree on
+runtime edge cases: `Colls::reduce`'s declared signature types `initial` and
+the return value as the actual generic `U`, so the accumulator gets a concrete
+inferred type (e.g. `Int`); `Iterables::reduce`'s declared signature erases
+both to plain `Object`. So `xs.reduce(0, (acc, x) -> acc + x)` above compiles
+and sums to an `Int` because it silently reaches `onion.Colls::reduce`, not
+`onion.Iterables::reduce` as its placement in this list suggests -- calling
+`Iterables::reduce` explicitly fails to compile instead:
+
+```onion
+val xs: List[Int] = [1, 2, 3]
+xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce, acc: Int)
+Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
+```
+
 ## Option Module
 
 Provided via `onion.Option`.

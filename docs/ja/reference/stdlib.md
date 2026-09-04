@@ -1769,6 +1769,26 @@ xs.reverse().add(4)            // UnsupportedOperationException を投げる（o
 Iterables::take(xs, -1)        // 例外を投げる（onion.Iterables::take。クランプしない）
 ```
 
+**`reduce` もシャドーイングされますが、実行時ではなくコンパイル時に現れます**:
+`onion.Colls` にも消去後シグネチャが同じ3引数の `reduce(List, Object, Function2)`
+拡張メソッドがあり、`xs.reduce(initial, f)` は常に *`onion.Colls`* 側の実装に
+到達します -- `onion.Iterables` の3引数 `reduce` は拡張呼び出し構文からは
+一切到達できません。上記の `map`/`filter`/`take`/`drop`/`reverse` と違い、
+両者は実行時のエッジケースだけでなく型で異なります: `Colls::reduce` の宣言
+シグネチャは `initial` と戻り値を実際のジェネリック型 `U` として型付けする
+ため、アキュムレータには具体的な型（例えば `Int`）が推論されますが、
+`Iterables::reduce` の宣言シグネチャは両方とも単なる `Object` に消去します。
+そのため上のコード例の `xs.reduce(0, (acc, x) -> acc + x)` がコンパイルでき
+`Int` を合計しているのは、このリストでの見た目とは異なり `onion.Iterables::reduce`
+ではなく `onion.Colls::reduce` に静かに到達しているからです -- `Iterables::reduce`
+を明示的に呼び出すとコンパイルが失敗します:
+
+```onion
+val xs: List[Int] = [1, 2, 3]
+xs.reduce(0, (acc, x) -> acc + x)                    // 6  （onion.Colls::reduce。acc は Int）
+Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
+```
+
 ## Files モジュール
 
 ファイル I/O（`onion.Files`）:

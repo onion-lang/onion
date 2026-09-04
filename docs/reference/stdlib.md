@@ -867,6 +867,31 @@ xs.take(2) / xs.drop(1)
 xs.sort() / xs.sort(comparator)
 ```
 
+**`take`/`drop`/`reverse` are exceptions**: `onion.Colls` also declares
+`take(List, int)`/`drop(List, int)`/`reverse(List)` extensions with the same
+erased signatures, and it is registered ahead of `onion.Iterables`, so
+`xs.take(n)`, `xs.drop(n)` and `xs.reverse()` always reach *`onion.Colls`*'s
+versions, never `onion.Iterables`'s. The two disagree on edge cases:
+
+- a negative `n` -- `xs.take(-1)` / `xs.drop(-1)` return an empty/unchanged
+  result; `Iterables::take`/`Iterables::drop` throw instead
+- `n` at or past the list's size -- `xs.take(n)` / `xs.drop(n)` return the
+  **very same list reference**, not a copy; `Iterables::take`/`Iterables::drop`
+  always copy
+- `xs.reverse()` returns an **unmodifiable** list; `Iterables::reverse` returns
+  a plain mutable copy
+
+Use the `Iterables::take`/`Iterables::drop`/`Iterables::reverse` static-call
+form when you need copying, size-safe semantics instead:
+
+```onion
+val xs: List[Int] = [1, 2, 3]
+xs.take(-1)                    // []      (onion.Colls::take, clamps instead of throwing)
+xs.take(xs.size() + 1) === xs  // true    (onion.Colls::take, same list reference)
+xs.reverse().add(4)            // throws UnsupportedOperationException (onion.Colls::reverse)
+Iterables::take(xs, -1)        // throws  (onion.Iterables::take, no clamping)
+```
+
 ## Option Module
 
 Provided via `onion.Option`.

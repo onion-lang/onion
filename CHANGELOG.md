@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Module section and a new `StatsExtensionCallShadowingSpec` regression test
   that locks in the shadowing and checks both docs for the warning.
 
+- **`Iterables`'s `take`/`drop`/`reverse` extension-call shadowing by `onion.Colls`
+  documented.** `onion.Colls` also declares `take(List, int)`/`drop(List, int)`/
+  `reverse(List)` extensions with the same erased signatures as `onion.Iterables`'s,
+  and `Colls` is registered ahead of `Iterables`, so `xs.take(n)`, `xs.drop(n)` and
+  `xs.reverse()` always reach *`onion.Colls`*'s versions -- `onion.Iterables`'s are
+  never reachable by extension-call syntax at all, even though both docs showed
+  them as plain `Iterables` chaining examples. The two disagree on a negative `n`
+  (`Colls` clamps to an empty/unchanged result, `Iterables` throws), on `n` at or
+  past the list's size (`Colls` returns the same list reference, not a copy;
+  `Iterables` always copies), and on `reverse` (`Colls`'s result is unmodifiable,
+  `Iterables`'s is a mutable copy). Added the caveat to both files' Iterables
+  Module section and a new `IterablesTakeDropReverseShadowingSpec` regression
+  test that locks in the shadowing and checks both docs for the warning.
+
 ## [0.53.0] - 2026-09-03
 
 ### Documentation

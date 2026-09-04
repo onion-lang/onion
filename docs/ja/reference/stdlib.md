@@ -1625,6 +1625,31 @@ xs.take(2) / xs.drop(1)
 xs.sort() / xs.sort(comparator)
 ```
 
+**`take`/`drop`/`reverse` は例外です**: `onion.Colls` にも消去後シグネチャが
+同じ `take(List, int)`/`drop(List, int)`/`reverse(List)` 拡張メソッドがあり、
+`onion.Iterables` より先に登録されるため、`xs.take(n)`・`xs.drop(n)`・
+`xs.reverse()` は常に *`onion.Colls`* 側に到達し、`onion.Iterables` 側には
+到達しません。両者はエッジケースで挙動が異なります:
+
+- `n` が負の場合 -- `xs.take(-1)` / `xs.drop(-1)` は空/変更なしの結果を返す
+  が、`Iterables::take`/`Iterables::drop` は例外を投げる
+- `n` がリストのサイズ以上の場合 -- `xs.take(n)` / `xs.drop(n)` はコピーで
+  はなく**同じリスト参照そのもの**を返す。`Iterables::take`/`Iterables::drop`
+  は必ずコピーする
+- `xs.reverse()` は**変更不可 (unmodifiable)** なリストを返す。
+  `Iterables::reverse` は変更可能なコピーを返す
+
+コピーされ、サイズに関して安全な挙動が必要な場合は `Iterables::take`/
+`Iterables::drop`/`Iterables::reverse` の静的呼び出し形式を使ってください:
+
+```onion
+val xs: List[Int] = [1, 2, 3]
+xs.take(-1)                    // []      （onion.Colls::take。例外ではなく空リストにクランプ）
+xs.take(xs.size() + 1) === xs  // true    （onion.Colls::take。同じリスト参照）
+xs.reverse().add(4)            // UnsupportedOperationException を投げる（onion.Colls::reverse）
+Iterables::take(xs, -1)        // 例外を投げる（onion.Iterables::take。クランプしない）
+```
+
 ## Files モジュール
 
 ファイル I/O（`onion.Files`）:

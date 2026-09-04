@@ -1422,6 +1422,17 @@ Maps::mergeWith(a, b, (x: Int, y: Int) -> x + y)  // 衝突を結合
 Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
 ```
 
+**拡張メソッドとしてのシャドーイング:** `onion.Colls` も `onion.Maps` と同じ消去
+シグネチャで `groupBy(List, Function1)` 拡張メソッドを宣言しており、組み込み拡張
+コンテナリストで `Colls` が `Maps` より先に登録されているため、`xs.groupBy(f)` は
+常に *onion.Colls 側の `groupBy`* に到達します -- `onion.Maps` 側は拡張メソッド
+構文からは到達できません。`null` と変更可能性の扱いが異なります:
+`Colls::groupBy` は `null` の List に対して `NullPointerException` を投げ、内側の
+List も含めて**変更不可**な `Map` を返しますが、`Maps::groupBy` は `null` の
+List に対して空の変更可能な `Map` を返し、それ以外は変更可能な `ArrayList` を
+バケツとして使います。`onion.Maps` 側の変更可能な結果が欲しい場合は
+`xs.groupBy(...)` ではなく `Maps::groupBy(...)` を直接呼び出してください。
+
 ## Sets モジュール
 
 Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持し、集合演算は null 安全。

@@ -2397,6 +2397,18 @@ Maps::groupBy(items, (x: Item) -> x.category())   // Map[K, List[Item]]
 Maps::countBy(items, (x: Item) -> x.category())   // Map[K, Integer] frequency
 ```
 
+**Extension-call shadowing:** `onion.Colls` also declares a `groupBy(List,
+Function1)` extension method with the same erased signature as
+`onion.Maps`'s, and `Colls` is registered ahead of `Maps` in the builtin
+extension container list, so `xs.groupBy(f)` always reaches onion.Colls's
+`groupBy` -- `onion.Maps`'s is never reachable by extension-call syntax at
+all. The two disagree on `null` and on mutability: `Colls::groupBy` throws
+`NullPointerException` on a `null` list and returns an **unmodifiable**
+`Map` of unmodifiable inner `List`s, while `Maps::groupBy` returns an empty
+mutable `Map` for a `null` list and mutable `ArrayList` buckets otherwise.
+Call `Maps::groupBy(...)` directly (not `xs.groupBy(...)`) to get
+`onion.Maps`'s mutable result.
+
 ### Combination
 
 ```onion

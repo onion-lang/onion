@@ -1822,6 +1822,15 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  （onion.Colls::reduc
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
+**`first`/`last` もシャドーイングされますが、無害です**: `onion.Colls` にも
+消去後シグネチャが同じ `first(List)`/`last(List)` 拡張メソッドがあり、
+`xs.first()`/`xs.last()` は常に *`onion.Colls`* 側に到達します --
+`onion.Iterables` 側の `first`/`last` は拡張呼び出し構文からは一切到達でき
+ません。このセクションの他の名前と違い、両者の実装は**同一**です
+（`list.isEmpty() ? null : list.get(0)`、末尾側も同様）。そのためシャドー
+イングされていても挙動に影響はなく、`xs.first()` は常に `Iterables::first(xs)`
+と等しく、`last` も同様です。
+
 ## Files モジュール
 
 ファイル I/O（`onion.Files`）:

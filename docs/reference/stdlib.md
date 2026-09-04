@@ -924,6 +924,16 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce,
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
+**`first`/`last` are shadowed too, but harmlessly**: `onion.Colls` also
+declares `first(List)`/`last(List)` extensions with the same erased
+signature as `onion.Iterables`'s, so `xs.first()`/`xs.last()` always reach
+*`onion.Colls`*'s versions -- `onion.Iterables`'s `first`/`last` are never
+reachable by extension-call syntax at all. Unlike every other name in this
+section, the two containers' implementations are **identical**
+(`list.isEmpty() ? null : list.get(0)`, and the equivalent for the last
+index), so the shadowing has no observable effect: `xs.first()` always
+equals `Iterables::first(xs)`, and likewise for `last`.
+
 ## Option Module
 
 Provided via `onion.Option`.

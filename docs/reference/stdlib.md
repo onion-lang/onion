@@ -1583,6 +1583,21 @@ xs.sum()             // 100.0  (Double — the generic aggregate)
 Stats::sumInt(xs)    // 100    (Int)
 ```
 
+**`min`/`max` are the exception**: `onion.Colls` also declares a
+`min(List)`/`max(List)` extension with the same erased signature, and it is
+registered ahead of `onion.Stats`, so `xs.min()` and `xs.max()` always reach
+*`onion.Colls`'s* versions, never `onion.Stats`'s. That means `xs.min()`
+returns the list's exact element type (an `Int` for `List[Int]`, not a lossy
+`Double`) and **throws `NoSuchElementException` on an empty list** instead of
+returning `0.0`. Use the `Stats::min`/`Stats::max` static-call form when you
+need the `Double` result and the empty-list-safe `0.0` fallback:
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+xs.min()             // 10   (Int — onion.Colls::min, not onion.Stats::min)
+Stats::min(xs)       // 10.0 (Double, and 0.0 rather than a throw for [])
+```
+
 Type erasure is the reason there is no `Int`-returning `sum()` overload: the
 element type is gone at runtime, so `sum(List[Int])` and `sum(List[Double])`
 would be the same JVM signature.

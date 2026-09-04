@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Sets::toList` extension-call ambiguity documented -- not shadowing, a
+  compile error.** `onion.Colls` also declares a `toList(Set)` extension
+  with the same erased signature as `onion.Sets`'s, which would ordinarily
+  just shadow it (as `union`/`intersection`/`difference`/`map` already are
+  in this module). But `Set` also conforms to `Iterable`, and
+  `onion.Iterables` separately declares a `toList(Iterable)` extension with
+  a genuinely different erasure that is also applicable to a `Set`
+  argument, so `a.toList()` is ambiguous between the two and fails to
+  compile with E0006 instead of silently resolving to either -- unlike
+  every other method this module documents as "also a builtin extension
+  method." Added the caveat to both docs' Sets Module section (with the
+  static forms' disagreement on mutability and `null` handling) and a new
+  `SetsToListExtensionCallShadowingSpec` regression test that locks in the
+  E0006 compile failure and checks both docs for the warning.
+
 - **`Iterables`'s three-arg `reduce` extension-call shadowing by `onion.Colls`
   documented -- the first shadowing case with a compile-time, not just
   runtime, effect.** `onion.Colls` also declares a `reduce(List, Object,

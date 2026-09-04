@@ -1313,9 +1313,9 @@ Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
 ```
 
-Most `Strings` methods (`upper`, `trim`, `startsWith`, `indexOf`, `capitalize`,
-...) also work as extension-call method chains (`s.upper()`, `s.trim()`, ...)
-with identical behavior to the static form. **`split`, `substring`, `lines`,
+Most `Strings` methods (`upper`, `lower`, `capitalize`, `reverse`, ...) also
+work as extension-call method chains (`s.upper()`, `s.reverse()`, ...) with
+identical behavior to the static form. **`split`, `substring`, `lines`,
 `chars` and `repeat` are the exception**: `java.lang.String` already defines
 methods with these same names, and an instance method always wins over an
 extension method of the same name, so `s.split(",")`, `s.substring(1)`,
@@ -1356,6 +1356,19 @@ the native method, while `onion.Strings`'s versions are null-safe
 (`Strings::isEmpty(null) == true`, `Strings::contains(null, x) ==
 false`). Use the `Strings::contains(...)` / `Strings::isEmpty(...)`
 static-call form when the receiver may be an unchecked platform `null`.
+
+**`trim`, `startsWith` and `indexOf` are shadowed the same way**:
+`java.lang.String` already defines `trim()`, `startsWith(String)` and
+`indexOf(String)` instance methods, so `s.trim()`, `s.startsWith(x)` and
+`s.indexOf(x)` also silently reach the *native JDK method* instead of
+`onion.Strings`'s. As with `contains`/`isEmpty` above, this is invisible for
+a non-null `String` and only becomes observable for a platform-typed `null`
+receiver, where the native methods throw `NullPointerException` while
+`onion.Strings`'s versions are null-safe (`Strings::trim(null) == ""`,
+`Strings::startsWith(null, x) == false`, `Strings::indexOf(null, x) ==
+-1`). Use the `Strings::trim(...)` / `Strings::startsWith(...)` /
+`Strings::indexOf(...)` static-call form when the receiver may be an
+unchecked platform `null`.
 
 **`isBlank` is shadowed too, and observably so even on an ordinary non-null
 `String`**: `java.lang.String` has defined an `isBlank()` instance method

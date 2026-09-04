@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Fixed an incorrect `getOrDefault` claim in the Maps Module docs.**
+  `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md` claimed
+  `onion.Colls`, `onion.Maps`, and native `java.util.Map` all behave
+  identically for `m.getOrDefault(k, d)` extension-call syntax. That's
+  only true for a non-null receiver: `java.util.Map` already declares an
+  instance `getOrDefault`, so the extension call always reaches the
+  *native* method -- which throws `NullPointerException` for a
+  platform-typed `null` map, unlike `onion.Maps::getOrDefault`'s
+  null-safe default-returning behavior. Same shadowing hazard already
+  documented for `values()`/`contains()`/`isEmpty()` elsewhere in these
+  docs; added the caveat and a regression case to
+  `MapsExtensionCallShadowingSpec`.
+
 - **`Iterables::first`/`last` extension-call shadowing by `onion.Colls`
   documented.** `onion.Colls` also declares `first(List)`/`last(List)`
   extensions with the same erased signature as `onion.Iterables`'s, and

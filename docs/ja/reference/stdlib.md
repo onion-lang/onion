@@ -1856,6 +1856,28 @@ Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is n
 イングされていても挙動に影響はなく、`xs.first()` は常に `Iterables::first(xs)`
 と等しく、`last` も同様です。
 
+**`sort` の2引数版もシャドーイングされますが、これまでのどれよりも深刻です**:
+`java.util.List` は既にインスタンスメソッド `sort(Comparator)`（Java 8 以降の
+デフォルトメソッド）を宣言しており、インスタンスメソッドは同名の拡張メソッド
+に常に優先するため、`xs.sort(comparator)` は `onion.Iterables::sort(List,
+Comparator)` に一切到達しません。これは実行時のエッジケースにとどまりません:
+ネイティブの `List.sort` はレシーバを**破壊的に（in place で）**ソートして
+`void` を返しますが、`Iterables::sort` はレシーバに触れず**新しい**ソート済み
+`List` を返します。そのため `xs.sort(comparator)` は使い捨ての文としては問題
+なくコンパイルできます（`xs` を破壊的にソートするだけです）が、その結果を値
+として使おうとした瞬間にコンパイルエラーになります:
+
+```onion
+val xs: List[Int] = [3, 1, 2]
+xs.sort((a, b) -> a - b)              // xs は [1, 2, 3] に -- ネイティブ List.sort、in place
+val ys = xs.sort((a, b) -> a - b)     // [E0000] type Object is expected, but type void is used
+Iterables::sort(xs, (a, b) -> a - b)  // ok -- 新しいソート済みコピー、xs は変化しない
+```
+
+引数無しの形は影響を受けません: `List` は引数無しの `sort()` を宣言していない
+ため、`xs.sort()` は常に `Iterables::sort(List)` に到達し、上記の通り新しい
+ソート済みコピーを返します。
+
 ## Files モジュール
 
 ファイル I/O（`onion.Files`）:

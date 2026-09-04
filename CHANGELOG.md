@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented `Iterables::sort`'s two-arg form extension-call shadowing by
+  native `java.util.List`.** `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`
+  listed `xs.sort() / xs.sort(comparator)` together as plain `onion.Iterables`
+  chaining examples, but `java.util.List` already declares an instance method
+  `sort(Comparator)`, and an instance method always wins over an extension
+  method of the same name -- so `xs.sort(comparator)` never reaches
+  `Iterables::sort(List, Comparator)` at all. Unlike the runtime-only edge
+  cases documented for `map`/`filter`/`take`/`drop`/`reverse` nearby, this one
+  is a compile-time trap: native `List.sort` mutates its receiver in place and
+  returns `void`, while `Iterables::sort` returns a new sorted copy, so
+  `val ys = xs.sort(comparator)` fails to compile with E0000 ("type Object is
+  expected, but type void is used") instead of doing what the docs implied.
+  The no-arg form is unaffected (`List` declares no no-arg `sort()`). Added
+  the caveat to both docs' Iterables Module section and a new
+  `IterablesSortShadowingSpec` regression test.
+
 - **Documented `Strings::endsWith` extension-call shadowing by native
   `java.lang.String`.** `docs/reference/stdlib.md`/`docs/ja/reference/stdlib.md`
   omitted `endsWith` from the exception list of `onion.Strings` methods

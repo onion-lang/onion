@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Maps`'s `groupBy` extension-call shadowing by `onion.Colls` documented.**
+  `onion.Colls` also declares a `groupBy(List, Function1)` extension with the
+  same erased signature as `onion.Maps`'s, and `Colls` is registered ahead of
+  `Maps` in the builtin extension container list, so `xs.groupBy(f)` always
+  reaches *onion.Colls*'s version -- `onion.Maps`'s `groupBy` is never
+  reachable by extension-call syntax at all. The two disagree on `null` and
+  on mutability: `Colls::groupBy` throws `NullPointerException` on a `null`
+  list and returns an unmodifiable `Map` of unmodifiable inner `List`s,
+  while `Maps::groupBy` returns an empty mutable `Map` for a `null` list and
+  mutable `ArrayList` buckets otherwise. Added the caveat to both docs'
+  Maps Module section and a new `MapsGroupByShadowingSpec` regression test
+  that locks in the shadowing and checks both docs for the warning.
+
 - **`Strings`'s `join` extension-call shadowing by `onion.Colls` documented.**
   `onion.Colls` also declares a `join(List, String)` extension (an alias for
   `mkString`) with the same erased signature as `onion.Strings`'s, and

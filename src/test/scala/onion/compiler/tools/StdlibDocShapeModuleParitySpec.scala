@@ -7,10 +7,12 @@ import org.scalatest.funspec.AnyFunSpec
  * translation) against `onion.Shape`'s public API. The section covered `parse`,
  * `print`, `canPrint`, and the L1/L2 laws, but never mentioned the lossless-shapes /
  * lens API (`isLossless`, `parseLossless`, `printLossless`, `Lossless`, `Residue`), the
- * combinators (`eachLine`, `lines`, `sepBy`, `xmap`, `orElse`), or the `Shapes::config`
- * / `Shapes::yaml` factories (see src/main/java/onion/Shape.java, Lossless.java,
- * Shapes.java) — making a real, actively-used feature undiscoverable from the API
- * reference doc a user would actually search.
+ * combinators (`eachLine`, `lines`, `sepBy`, `xmap`, `orElse`), or all four `Shapes`
+ * factories (see src/main/java/onion/Shape.java, Lossless.java, Shapes.java) — it named
+ * `Shapes::config` / `Shapes::yaml` but not `Shapes::regex` / `Shapes::json`, even though
+ * all four are equally public and `regex`/`json` back the more common `shape name =
+ * re"..."` / `shape name = json` forms — making a real, actively-used feature
+ * undiscoverable from the API reference doc a user would actually search.
  */
 class StdlibDocShapeModuleParitySpec extends AnyFunSpec {
 
@@ -28,7 +30,7 @@ class StdlibDocShapeModuleParitySpec extends AnyFunSpec {
     "isLossless", "parseLossless", "printLossless",
     "eachLine", "sepBy", "xmap", "orElse",
     "Lossless", "Residue",
-    "Shapes::config", "Shapes::yaml"
+    "Shapes::regex", "Shapes::json", "Shapes::config", "Shapes::yaml"
   )
 
   it("mentions every lossless-shape/lens/combinator member in the English stdlib reference's Shape section") {

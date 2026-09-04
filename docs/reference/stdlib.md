@@ -552,9 +552,10 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  one changed line
 ```
 
-`Shapes::config` and `Shapes::yaml` build the lossless shapes behind `shape name =
-config` / `shape name = yaml` when you want the `Shape[T]` value directly instead of
-the sugar.
+`Shapes::regex` and `Shapes::json` build the shapes behind `shape name = re"..."` /
+`shape name = json`, and `Shapes::config` and `Shapes::yaml` build the lossless shapes
+behind `shape name = config` / `shape name = yaml` -- all four for when you want the
+`Shape[T]` value directly instead of the sugar.
 
 ### Combinators
 

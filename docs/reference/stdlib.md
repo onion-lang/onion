@@ -2368,12 +2368,24 @@ Sets::toList(a)                        // back to a List
 ### Set algebra
 
 Every method below is also a builtin extension method on `Set`, callable as
-`a.union(b)` instead of `Sets::union(a, b)`.
+`a.union(b)` instead of `Sets::union(a, b)` -- **except `union`/`intersection`/
+`difference`**: `onion.Colls` also declares extension methods of those three
+names with the same erased `(Set, Set)` signature, and `Colls` is registered
+ahead of `Sets` in the builtin extension container list, so `a.union(b)`,
+`a.intersection(b)` and `a.difference(b)` always reach *`onion.Colls`*'s
+versions -- `onion.Sets`'s versions of these three are never reachable by
+extension-call syntax at all. `Colls`'s results are **unmodifiable**
+(`Collections.unmodifiableSet`); `Sets::union`/`intersection`/`difference`
+called directly return a plain **mutable** `LinkedHashSet`. Use the `Sets::`
+form when a mutable result is required.
 
 ```onion
-Sets::union(a, b)                      // a.union(b)
-Sets::intersection(a, b)               // a.intersection(b)
-Sets::difference(a, b)                 // a.difference(b)
+Sets::union(a, b)                      // mutable; NOT reachable as a.union(b)
+Sets::intersection(a, b)               // mutable; NOT reachable as a.intersection(b)
+Sets::difference(a, b)                 // mutable; NOT reachable as a.difference(b)
+a.union(b)                             // onion.Colls's version instead -- unmodifiable
+a.intersection(b)                      // onion.Colls's version instead -- unmodifiable
+a.difference(b)                        // onion.Colls's version instead -- unmodifiable
 Sets::symmetricDifference(a, b)        // a.symmetricDifference(b) -- in exactly one of the two
 Sets::containsAll(a, b)                // a.containsAll(b)
 Sets::isSubsetOf(a, b)                 // a.isSubsetOf(b) -- every element of a is in b

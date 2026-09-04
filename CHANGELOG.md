@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`Sets`'s `map` extension-call shadowing by `onion.Iterables` documented.**
+  `onion.Iterables` also declares a `map(Set, Function1)` extension with the
+  same erased signature as `onion.Sets`'s, and `Iterables` is registered
+  ahead of `Sets` in the builtin extension container list, so `a.map(f)` on
+  a `Set` always reaches *`onion.Iterables`*'s `map` -- `onion.Sets`'s `map`
+  is never reachable by extension-call syntax at all. The two disagree on
+  order and on `null`: `Iterables::map` collects into a plain `HashSet`
+  (iteration order unspecified, contradicting the Sets Module's documented
+  insertion-order promise) and throws `NullPointerException` on a `null`
+  set, while `Sets::map` collects into a `LinkedHashSet` (insertion order
+  preserved) and returns an empty set for a `null` one. Added the caveat to
+  both docs' Sets Module section and a new
+  `SetsMapExtensionCallShadowingSpec` regression test that locks in the
+  shadowing and checks both docs for the warning.
+
 - **`Strings`'s `contains`/`isEmpty` extension-call shadowing by native
   `java.lang.String` documented.** `String` already defines `contains` and
   `isEmpty` instance methods, so `s.contains(x)`/`s.isEmpty()` silently

@@ -2479,10 +2479,11 @@ Sets::isDisjoint(a, b)                 // a.isDisjoint(b) -- share no elements
 
 ### Functional operations
 
-These are also builtin extension methods on `Set` (`a.map(...)`, `a.filter(...)`, ...):
+These are also builtin extension methods on `Set` (`a.filter(...)`, `a.forEach(...)`,
+...) -- **except `map`**, see the shadowing note below:
 
 ```onion
-Sets::map(a, (x: Int) -> x * 2)        // a.map((x: Int) -> x * 2)
+Sets::map(a, (x: Int) -> x * 2)        // NOT reachable as a.map(...) -- see below
 Sets::filter(a, (x: Int) -> x > 1)     // a.filter((x: Int) -> x > 1)
 Sets::forEach(a, (x: Int) -> println(x))  // a.forEach((x: Int) -> println(x))
 Sets::count(a, (x: Int) -> x > 1)      // a.count((x: Int) -> x > 1)
@@ -2490,6 +2491,19 @@ Sets::any(a, (x: Int) -> x > 2)        // a.any((x: Int) -> x > 2)
 Sets::all(a, (x: Int) -> x > 0)        // a.all((x: Int) -> x > 0)
 Sets::find(a, (x: Int) -> x > 2)       // a.find((x: Int) -> x > 2) -- matching element or null
 ```
+
+**Extension-call shadowing:** `onion.Iterables` also declares a `map(Set,
+Function1)` extension method with the same erased signature as
+`onion.Sets`'s, and `Iterables` is registered ahead of `Sets` in the builtin
+extension container list, so `a.map(f)` always reaches *`onion.Iterables`*'s
+`map` -- `onion.Sets`'s `map` is never reachable by extension-call syntax at
+all. The two disagree on order and on `null`: `Iterables::map` collects into
+a plain `HashSet` (iteration order unspecified, breaking this module's
+insertion-order promise above) and throws `NullPointerException` for a
+`null` set, while `Sets::map` collects into a `LinkedHashSet` (insertion
+order preserved) and returns an empty set for a `null` one. Call
+`Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
+order-preserving, null-safe result.
 
 ---
 

@@ -1327,6 +1327,20 @@ the native method, while `onion.Strings`'s versions are null-safe
 false`). Use the `Strings::contains(...)` / `Strings::isEmpty(...)`
 static-call form when the receiver may be an unchecked platform `null`.
 
+**`isBlank` is shadowed too, and observably so even on an ordinary non-null
+`String`**: `java.lang.String` has defined an `isBlank()` instance method
+since Java 11, so `s.isBlank()` also silently reaches the *native JDK
+method* instead of `onion.Strings`'s. Unlike `contains`/`isEmpty` above, the
+two disagree without needing a platform-typed `null`: `onion.Strings::isBlank`
+is implemented as `str.trim().isEmpty()`, and `String::trim` only strips
+characters `<= U+0020`, while native `String::isBlank` treats every
+character satisfying `Character.isWhitespace` as blank -- including Unicode
+space separators like EM SPACE (U+2003) that `trim()` does not strip. So a
+string consisting only of an EM SPACE is blank under `s.isBlank()`
+(extension-call syntax) but not blank under `Strings::isBlank(s)`
+(static-call syntax). Use the `Strings::isBlank(...)` static-call form for
+`trim()`-based, ASCII-whitespace semantics.
+
 ## Files Module
 
 File I/O (`onion.Files`):

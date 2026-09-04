@@ -2022,9 +2022,9 @@ m.containsKey("key")              // "key" というエントリがあれば tru
 Colls::toList(args)               // Java配列（例: main の String[]）を List に変換
 ```
 
-`isEmpty`・`size`・`get`・`containsKey` は `List`/`Set`/`Map` 自体のインスタンス
+`contains`・`isEmpty`・`size`・`get`・`containsKey` は `List`/`Set`/`Map` 自体のインスタンス
 メソッドでもあり、インスタンスメソッドは常に同名の拡張メソッドより優先される
-ため、この4つの呼び出しは実際には `onion.Colls` 側には決して届かず、ネイティブ
+ため、この5つの呼び出しは実際には `onion.Colls` 側には決して届かず、ネイティブ
 側のメソッドにしか届かない。ただしこれは観測できない差異である: `Colls` 側の
 実装はどれも同じネイティブメソッドへの1行委譲でしかないため。
 

@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/ja/reference/stdlib.md`, and a new `MapsForEachShadowingSpec`
   regression test.
 
+- **Documented that `Sets::forEach`'s extension-call form is shadowed by
+  native `Iterable.forEach`.** `Set` conforms to `java.lang.Iterable`, which
+  already declares a default instance method `forEach(Consumer)` (Java 8+),
+  and instance-method resolution always wins over the extension fallback, so
+  `a.forEach(action)` silently reaches the native method instead of
+  `onion.Sets::forEach` -- the same shadowing pattern already documented for
+  `Maps::forEach` above. This is invisible on a non-null `Set`, but on a null
+  platform-typed `Set` the native method throws `NullPointerException` while
+  `Sets::forEach(...)` is a null-safe no-op. Added the note to the Sets
+  Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new `SetsForEachShadowingSpec`
+  regression test.
+
 ## [0.54.0] - 2026-09-05
 
 ### Documentation

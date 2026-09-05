@@ -1553,8 +1553,7 @@ a.isSubsetOf(b) / a.isSupersetOf(b) / a.isDisjoint(b)
 Sets::map(a, f)                               // NOT a.map(f) で到達不可 -- 下記参照
 Sets::filter(a, p) / Sets::find(a, p)
 a.filter(p) / a.find(p)
-Sets::forEach(a, (x: Int) -> println(x))
-a.forEach((x: Int) -> println(x))
+Sets::forEach(a, (x: Int) -> println(x))      // NOT a.forEach(...) で到達不可 -- 下記参照
 Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
 a.count(p) / a.any(p) / a.all(p)
 ```
@@ -1569,6 +1568,26 @@ a.count(p) / a.any(p) / a.all(p)
 `NullPointerException` を投げますが、`Sets::map` は `LinkedHashSet`（挿入順保持）
 に集約し、`null` の Set には空の Set を返します。挿入順が保たれた null 安全な
 結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接呼んでください。
+
+**`forEach` は他の onion モジュールではなく JDK にシャドーイングされます**:
+`Set` は `java.lang.Iterable` にも適合しており、`Iterable` はすでに default
+インスタンスメソッド `forEach(Consumer)` を宣言しています。拡張メソッドの
+フォールバック経路が参照される前にインスタンスメソッドが常に優先されるため
+（上記の `Maps::forEach` と同じシャドーイングのパターンです）、1引数の
+Onion ラムダは `onion.Sets::forEach` の `Function1` と同様に `Consumer` へ
+SAM 変換され、`a.forEach(action)` は常に **ネイティブの `Iterable.forEach`**
+に到達し、`onion.Sets::forEach` には到達しません。非 null のレシーバでは
+両者とも挿入順で全要素を訪問するため違いが見えませんが、コンパイル時には
+チェックされない「プラットフォーム型」が実行時に `null` だった場合に違いが
+現れます: `onion.Sets::forEach` は null 安全（`null` の Set は何もしない）
+ですが、同じ null な Set に対する `a.forEach(action)` はネイティブメソッドに
+到達して `NullPointerException` を投げます。null 安全な挙動を得るには
+`Sets::forEach(...)` を直接呼んでください。
+
+```onion
+a.forEach((x: Int) -> println(x))      // ネイティブの Iterable.forEach -- null の Set で NullPointerException
+Sets::forEach(a, (x: Int) -> println(x))  // onion.Sets の null 安全な結果
+```
 
 **`containsAll` のシャドーイング:** このリストの他のメソッドと異なり、
 `a.containsAll(b)` は `onion.Sets::containsAll` には一切到達しません --

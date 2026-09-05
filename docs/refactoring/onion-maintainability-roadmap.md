@@ -185,6 +185,50 @@ Each item uses RED/GREEN/refactor and is a separate commit.
 Candidate files are determined after Phase 2; no speculative class names are
 committed before the call graph is read.
 
+### First slice: ADT enum lowering
+
+Base: `c9e77b96`. The 200-commit audit reports `Rewriting.scala` at 1,688
+lines / 392 branch proxies, with two recent edits (126 lines of churn).
+Those two edits touch only this file, so they provide no recent co-change
+evidence for separating stateful body rewriting. Parser hint development is
+still active (44 edits / 522 lines of churn); further hint grouping remains
+optional, not a prerequisite for this independent Phase 4 slice.
+
+The inspected call path is `rewrite -> desugarAdtEnum ->
+rewriteToplevelDeclaration -> rewriteInterfaceDeclaration / rewriteRecordDeclaration`.
+The lowering itself reads only its enum argument, constructs AST nodes, and
+can throw a `CompilationException`. It does not read dictionary scope,
+body-rewrite flags, counters, configuration, or compiler services.
+
+1. Characterize complete compilation-unit ASTs: product/singleton order,
+   generic application and bounds, metadata and positions, method filtering,
+   generated-body rewriting, homogeneous passthrough, and error provenance.
+2. Remove the sealed bit temporarily and confirm the characterization fails;
+   restore it before extraction.
+3. Move only the lowering into `rewrite.AdtEnumLowering`; retain dispatch,
+   subsequent rewriting, and source-file diagnostic enrichment in `Rewriting`.
+4. Run focused enum/rewriting tests and fresh English/Japanese `testFull`.
+5. Review the diff and update boundary documentation. This move adds no
+   traversal and does not modify the existing body-rewrite fast path.
+
+Rollback is a revert of this slice; no grammar, runtime, or public API changes.
+
+Verification (2026-09-05): the first slice is complete. The five full-AST
+characterizations passed before extraction; removing the sealed bit failed
+three, and all passed again after restoration and extraction. The focused
+suite passed 75 tests. Fresh English and Japanese JVMs each passed 5,230 tests
+in 714 suites (zero failures; one opt-in distribution smoke cancellation).
+`run/AdtExpr.on` emitted eight byte-identical class files totaling 10,545 bytes
+before/after, and the generated program returned `-15`. The audit test,
+`git diff --check`, strict MkDocs build, and independent review passed.
+
+`Rewriting.scala` moved from 1,688 lines / 392 branch proxies to 1,610 / 371;
+the new boundary is 87 / 21. These are responsibility-localization metrics,
+not evidence of less total complexity: package fan-out for the root compiler
+package rises from 11 to 12 because it now explicitly imports `rewrite`.
+No runtime speedup or measured performance improvement is claimed. Further
+extractions still require their own call-map and invariant evidence.
+
 ## Phase 5: typing dependency narrowing
 
 1. Inventory every helper that receives concrete `Typing`.

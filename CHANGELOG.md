@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already documented in both files; this guard now fails the build if a
   future addition to `onion.Sets` goes undocumented.
 
+- **Added a `StringsDocCoverageSpec` regression guard checking that every
+  public `onion.Strings` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Strings` is a large, default-imported stdlib module (`Strings::trim`,
+  `Strings::padLeft`, `Strings::capitalizeWords`, ...) with almost 40 distinct
+  public static member names, several already individually guarded against
+  native-method shadowing by its `*ExtensionCallShadowingSpec` files, but --
+  unlike `Maps`/`Sets`/`Csv` -- it never had a regression test checking that
+  every member stays documented using the `Strings::name` spelling. All ~40
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Strings` goes undocumented.
+
 ## [0.55.0] - 2026-09-05
 
 ### Documentation

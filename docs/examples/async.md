@@ -8,10 +8,10 @@ Run work in the background with `Future::async`.
 
 ```onion
 def fetchPage(url: String, delayMs: Long): Future[String] {
-  return Future::async(() -> {
+  return Future::async { ->
     Thread::sleep(delayMs)
-    return "body of " + url
-  })
+    "body of " + url
+  }
 }
 
 val f = fetchPage("https://example.com", 100L)
@@ -74,10 +74,10 @@ println("value=" + recovered.getOrElse(-1))
 
 ```onion
 def fetchPage(url: String, delayMs: Long): Future[String] {
-  return Future::async(() -> {
+  return Future::async { ->
     Thread::sleep(delayMs)
-    return "body of " + url
-  })
+    "body of " + url
+  }
 }
 
 val urls = [

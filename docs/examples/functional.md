@@ -443,18 +443,18 @@ val nested: Option[Int] = do[Option] {
 val immediate: Future[Int] = Future::successful(42)
 
 // Async computation
-val async: Future[String] = Future::async(() -> {
-  Thread::sleep(1000L);
-  return "Hello after 1 second";
-})
+val async: Future[String] = Future::async { ->
+  Thread::sleep(1000L)
+  "Hello after 1 second"
+}
 
 // From throwing operation
-val risky: Future[Int] = Future::asyncThrowing(() -> {
+val risky: Future[Int] = Future::asyncThrowing { ->
   if Math::random() < 0.5 {
-    throw new RuntimeException("Bad luck!");
+    throw new RuntimeException("Bad luck!")
   }
-  return 100;
-})
+  100
+}
 ```
 
 ### Transforming Futures
@@ -467,9 +467,9 @@ val doubled: Future[Int] = numbers.map((x: Int) -> { return x * 2; })
 
 // FlatMap: chain async operations
 val chained: Future[String] = numbers.flatMap((x: Int) -> {
-  return Future::async(() -> {
-    return "Number is: " + x;
-  });
+  return Future::async { ->
+    "Number is: " + x
+  };
 })
 
 // Filter: fail if predicate not met
@@ -496,8 +496,8 @@ val retried: Future[Int] = failing.recoverWith((error: Throwable) -> {
 ### Combining Futures
 
 ```onion
-val f1: Future[Int] = Future::async(() -> { Thread::sleep(100L); return 1; })
-val f2: Future[Int] = Future::async(() -> { Thread::sleep(200L); return 2; })
+val f1: Future[Int] = Future::async { -> Thread::sleep(100L); 1 }
+val f2: Future[Int] = Future::async { -> Thread::sleep(200L); 2 }
 
 // Wait for all
 val all: Future[Object[]] = Future::all(f1, f2)
@@ -518,9 +518,9 @@ val zipped: Future[Object[]] = f1.zip(f2)
 ### Callbacks
 
 ```onion
-val future: Future[String] = Future::async(() -> {
-  return "Async result";
-})
+val future: Future[String] = Future::async { ->
+  "Async result"
+}
 
 future
   .onSuccess((value: String) -> { println("Success: " + value); })
@@ -530,7 +530,7 @@ future
 ### Blocking (Use Sparingly)
 
 ```onion
-val future: Future[Int] = Future::async(() -> { return 42; })
+val future: Future[Int] = Future::async { -> 42 }
 
 // Block until complete
 val result: Int = future.await()
@@ -546,11 +546,11 @@ val safe: Int = future.getOrElse(0)
 
 ```onion
 def fetchUser(id: Int): Future[String] {
-  return Future::async(() -> { return "User" + id; });
+  return Future::async { -> "User" + id };
 }
 
 def fetchProfile(name: String): Future[String] {
-  return Future::async(() -> { return name + "'s profile"; });
+  return Future::async { -> name + "'s profile" };
 }
 
 val profile: Future[String] = do[Future] {
@@ -567,11 +567,11 @@ profile.onSuccess((p: String) -> { println(p); })
 
 ```onion
 def fetchFromApi(url: String): Future[String] {
-  return Future::async(() -> {
+  return Future::async { ->
     // Simulate network request
-    Thread::sleep((Math::random() * 1000L) as Long);
-    return "Data from " + url;
-  });
+    Thread::sleep((Math::random() * 1000L) as Long)
+    "Data from " + url
+  };
 }
 
 // Fire off multiple requests in parallel

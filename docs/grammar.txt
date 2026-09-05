@@ -111,7 +111,8 @@ primary               ::= id
 
 /* One arrow, everywhere a function is written: function types, parenthesized
    lambdas, and trailing lambdas all use '->'. A trailing lambda follows a call
-   (with or without parentheses) as its last argument; its parameters are not
+   -- unqualified, instance (`obj.m`) or static (`Type::m`), with or without
+   parentheses -- as its last argument; its parameters are not
    parenthesized, and a parameter's type may not itself be a bare function type
    (write such a lambda in the parenthesized form). */
 lambda                ::= '(' [lambda_param (',' lambda_param)*] ')' '->' (block | term)

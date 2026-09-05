@@ -186,8 +186,8 @@ Onion supports Haskell-style do notation for composing monadic operations (Optio
 ```onion
 // Async computation with do notation
 val result: Future[Int] = do[Future] {
-  x <- Future::async(() -> { return fetchUser(); })
-  y <- Future::async(() -> { return fetchData(x); })
+  x <- Future::async { -> fetchUser() }
+  y <- Future::async { -> fetchData(x) }
   ret x + y
 }
 
@@ -205,7 +205,7 @@ Methods accepting a function as the last parameter can use trailing lambda synta
 
 ```onion
 // Traditional call
-list.map((x: Int) -> { return x * 2; })
+list.map((x: Int) -> x * 2)
 
 // With trailing lambda
 list.map { x -> x * 2 }
@@ -214,6 +214,9 @@ list.map { x -> x * 2 }
 list.fold(0) { acc, x ->
   acc + x
 }
+
+// Zero parameters: `{ -> body }`; works on static calls too
+val answer: Future[Int] = Future::async { -> compute() }
 ```
 
 ### Asynchronous Programming with Future
@@ -221,13 +224,13 @@ list.fold(0) { acc, x ->
 Built-in `Future[T]` type for async operations:
 
 ```onion
-val future: Future[String] = Future::async(() -> {
-  return Http::get("https://api.example.com/data");
-})
+val future: Future[String] = Future::async { ->
+  Http::get("https://api.example.com/data")
+}
 
-future.map((data: String) -> { return parseJson(data); })
-      .onSuccess((result: Object) -> { println(result); })
-      .onFailure((error: Throwable) -> { println("Error: " + error); })
+future.map { data -> parseJson(data) }
+      .onSuccess { result -> println(result) }
+      .onFailure { error -> println("Error: " + error) }
 ```
 
 ### Shape-First Scripting

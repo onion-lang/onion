@@ -114,11 +114,16 @@ primary               ::= id
    -- unqualified, instance (`obj.m`) or static (`Type::m`), with or without
    parentheses -- as its last argument; its parameters are not
    parenthesized, and a parameter's type may not itself be a bare function type
-   (write such a lambda in the parenthesized form). */
+   (write such a lambda in the parenthesized form). With no parameters the
+   arrow may be omitted (`f { body }`), except in a condition position -- the
+   condition of if/while/do-while, the collection of foreach, the scrutinee of
+   select, the for header -- where a bare '{' is the statement block; there
+   only the arrow form is a lambda (`if xs.any { x -> x > 0 } { ... }`), and a
+   parenthesized call restores the arrow-less form. */
 lambda                ::= '(' [lambda_param (',' lambda_param)*] ')' '->' (block | term)
                        | id '->' (block | term)
 lambda_param          ::= id [':' type]
-trailing_lambda       ::= '{' [trailing_param (',' trailing_param)*] '->' block_elements? '}'
+trailing_lambda       ::= '{' [[trailing_param (',' trailing_param)*] '->'] block_elements? '}'
 trailing_param        ::= id [':' type_no_arrow]
 
 list_literal          ::= '[' terms? ']'

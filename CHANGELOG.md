@@ -9,22 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **A trailing lambda now attaches to a static call without an empty argument
-  list: `Future::async { -> compute() }`, `Helper::twice { x -> x + 1 }`.**
+- **A trailing lambda with no parameters needs no arrow, and attaches to a
+  static or bare call without an empty argument list:
+  `Future::async { return fetchUser() }`, `Helper::twice { x -> x + 1 }`,
+  `once { 3 }`.** `{ body }` is the zero-parameter closure `{ -> body }`
+  (the arrow form still works); the block's last expression is its value.
   Instance calls already accepted `list.map { x -> x * 2 }`, but the
-  `Type::method` forms only took a trailing lambda after `(...)`, so the
-  zero-argument case had to be written `Future::async() { -> ... }` or
-  `Future::async(() -> { return compute(); })`. Both the JavaCC grammar and
-  the handwritten fast-path parser gained the alternative; `Type::name`
-  without a following `{ ... -> }` is still a static member selection, so
-  no accepted program changes meaning (`StaticTrailingLambdaSpec`).
+  `Type::method` forms only took a trailing lambda after `(...)` and a bare
+  name took none, so the zero-argument case had to be written
+  `Future::async() { -> ... }` or `Future::async(() -> { return compute(); })`.
+  The `{` is read as a lambda only where a block could not follow the call
+  anyway: in a condition position -- the condition of `if`/`while`/`do ...
+  while`, the collection of `foreach ... in`, the scrutinee of `select`, the
+  `for` header -- a bare `{` is still the statement block, so `if flag { ... }`
+  and `foreach x in xs { ... }` keep their meaning, the arrow form is a lambda
+  there as before, and parentheses, argument lists, index brackets and blocks
+  restore the arrow-less form (`if (once { 1 }) == 1 { ... }`). Both the
+  JavaCC grammar and the handwritten fast-path parser track the condition
+  context; the `{ (k, v) -> ... }` and `{ x => ... }` hints are still reported
+  at the `{` (`BareTrailingLambdaSpec`, `StaticTrailingLambdaSpec`).
 
 ### Documentation
 
 - **The README, `docs/index.md`, the async/functional examples, the stdlib
   and specification references and `CLAUDE.md` (EN/JA) now write zero-argument
-  callbacks as trailing lambdas (`Future::async { -> ... }`,
-  `Timing::measure { -> ... }`) instead of `(() -> { return ...; })`.**
+  callbacks as trailing lambdas (`Future::async { ... }`,
+  `Timing::measure { ... }`) instead of `(() -> { return ...; })`; the lambda
+  guide (EN/JA) gained a "Trailing Lambdas" section with the condition rule.**
 
 - **Added an `IterablesDocCoverageSpec` regression guard checking that every
   public `onion.Iterables` member is documented in both

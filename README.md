@@ -186,8 +186,8 @@ Onion supports Haskell-style do notation for composing monadic operations (Optio
 ```onion
 // Async computation with do notation
 val result: Future[Int] = do[Future] {
-  x <- Future::async { -> fetchUser() }
-  y <- Future::async { -> fetchData(x) }
+  x <- Future::async { fetchUser() }
+  y <- Future::async { fetchData(x) }
   ret x + y
 }
 
@@ -215,8 +215,8 @@ list.fold(0) { acc, x ->
   acc + x
 }
 
-// Zero parameters: `{ -> body }`; works on static calls too
-val answer: Future[Int] = Future::async { -> compute() }
+// No parameters: just the body; works on static calls too
+val answer: Future[Int] = Future::async { compute() }
 ```
 
 ### Asynchronous Programming with Future
@@ -224,7 +224,7 @@ val answer: Future[Int] = Future::async { -> compute() }
 Built-in `Future[T]` type for async operations:
 
 ```onion
-val future: Future[String] = Future::async { ->
+val future: Future[String] = Future::async {
   Http::get("https://api.example.com/data")
 }
 

@@ -862,6 +862,44 @@ public class JJOnionParser implements Parser {
     leaveState();
   }
 
+  // ---- Condition positions: where a bare `{` after a call is the statement block, not a lambda.
+  // A trailing lambda without an arrow (`f { body }`) is only read as such where no block could
+  // follow the call anyway. In the condition of if/while/do-while, the collection of foreach, the
+  // scrutinee of select and the for header, `if flag { ... }` keeps its block; the arrow form
+  // `{ x -> ... }` is recognised there as before. Parentheses, argument lists, index brackets and
+  // blocks (including lambda bodies) start a fresh operand context, so `if (f { 1 }) == 1 { ... }`
+  // and `if xs.any { x -> g { x } } { ... }` see the lambda again.
+  private final java.util.ArrayDeque<Boolean> conditionContexts = new java.util.ArrayDeque<Boolean>();
+  private void enterCondition() { conditionContexts.push(Boolean.TRUE); }
+  private void enterOperand() { conditionContexts.push(Boolean.FALSE); }
+  private void leaveCondition() { if (!conditionContexts.isEmpty()) conditionContexts.pop(); }
+  private boolean inCondition() { return !conditionContexts.isEmpty() && conditionContexts.peek().booleanValue(); }
+  private boolean bareTrailingBlockAhead() { return getToken(1).kind == LBRACE && !inCondition(); }
+
+  /** After the `{` of an arrow-less trailing lambda: `(a, b) ->` -- the parenthesized-parameter slip the hint names. */
+  private boolean parenthesizedLambdaHeadAhead() {
+    if (getToken(1).kind != LPAREN) return false;
+    int i = 2;
+    while (i < 64) {
+      int k = getToken(i).kind;
+      if (k == RPAREN) return getToken(i + 1).kind == ARROW;
+      if (!(k == ID || k == COMMA || k == COLON || k == LBRACKET || k == RBRACKET || k == QUESTION || k == FQCN || k == DOT)) return false;
+      i++;
+    }
+    return false;
+  }
+
+  /** After the `{` of an arrow-less trailing lambda: `a, b =>` -- the old arrow, lexed as `=` `>`. */
+  private boolean oldArrowLambdaHeadAhead() {
+    int i = 1;
+    int k = getToken(i).kind;
+    if (k == LPAREN) { i++; k = getToken(i).kind; }
+    while (i < 64 && (k == ID || k == COMMA || k == COLON || k == LBRACKET || k == RBRACKET || k == QUESTION || k == FQCN || k == DOT || k == RPAREN)) { i++; k = getToken(i).kind; }
+    if (k != ASSIGN) return false;
+    Token eq = getToken(i), gt = getToken(i + 1);
+    return gt.kind == GT && gt.beginLine == eq.endLine && gt.beginColumn == eq.endColumn + 1;
+  }
+
   private void enterSection() {
     enterState(IN_STATEMENT);
   }
@@ -1616,7 +1654,7 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
 }
 
 AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AST.BlockElement>)AST.NIL(); AST.BlockExpression s;}{
-  t="{" {enterAssignScope();} eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) elements=block_elements() ] eols() "}" {return new AST.BlockExpression(p(t), elements, leaveAssignScope());}
+  t="{" {enterAssignScope(); enterOperand();} eols() [ LOOKAHEAD({ getToken(1).kind != RBRACE }) elements=block_elements() ] eols() "}" {leaveCondition(); return new AST.BlockExpression(p(t), elements, leaveAssignScope());}
 }
 
 List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<AST.BlockElement> elements = new ArrayBuffer<AST.BlockElement>(); }{
@@ -2438,7 +2476,7 @@ AST.Expression expression_element() :{AST.Expression e;}{
 }
 
 AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null; AST.IfExpression elif = null; ArrayBuffer<AST.BlockElement> elifElems = new ArrayBuffer<AST.BlockElement>();}{
-  t="if" e=term() b1=block()
+  t="if" {enterCondition();} e=term() {leaveCondition();} b1=block()
   [ LOOKAHEAD({elseFollows()}) eols() "else"
     ( b2=block()
     | {enterAssignScope();} elif=if_expression() {
@@ -2509,7 +2547,7 @@ AST.SelectExpression select_expression() :{
   ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>>();
   AST.BlockExpression elseBlock = null ;
 }{
-  t1="select" e1=term() eols() "{" eols()
+  t1="select" {enterCondition();} e1=term() {leaveCondition();} eols() "{" eols()
     (
       LOOKAHEAD({la("case")})
       t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() {enterAssignScope();} ss=block_elements() {
@@ -2544,11 +2582,11 @@ AST.SynchronizedExpression synchronized_expression() :{Token t; AST.Expression e
 }
 
 AST.WhileExpression while_expression() :{Token t; AST.Expression e; AST.BlockExpression b;}{
-  t="while" e=term() b=block() {return new AST.WhileExpression(p(t), e, b);}
+  t="while" {enterCondition();} e=term() {leaveCondition();} b=block() {return new AST.WhileExpression(p(t), e, b);}
 }
 
 AST.DoWhileExpression do_while_expression() :{Token t; AST.Expression e; AST.BlockExpression b;}{
-  t="do" b=block() "while" {enterSection();} e=term() eos_or_block_end() {
+  t="do" b=block() "while" {enterSection(); enterCondition();} e=term() {leaveCondition();} eos_or_block_end() {
     return new AST.DoWhileExpression(p(t), b, e);
   }
 }
@@ -2556,10 +2594,10 @@ AST.DoWhileExpression do_while_expression() :{Token t; AST.Expression e; AST.Blo
 AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
   t="foreach"
   ( LOOKAHEAD("(")
-    "(" k=id() "," v=id() ")" (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
+    "(" k=id() "," v=id() ")" (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return desugarMapForeach(p(t), c(k), c(v), e, b);
     }
-  | a=argument() (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
+  | a=argument() (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return new AST.ForeachExpression(p(t), a, e, b);
     }
   )
@@ -2577,8 +2615,8 @@ AST.ForInitializer for_initializer() :{AST.BlockElement d; AST.Expression e; Tok
 }
 
 AST.ForExpression for_expression() :{Token t; AST.ForInitializer init; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
-  t="for" init=for_initializer()
-  [e1=term()] ";" [LOOKAHEAD({!la("{")}) e2=term()] b=block() {
+  t="for" {enterCondition();} init=for_initializer()
+  [e1=term()] ";" [LOOKAHEAD({!la("{")}) e2=term()] {leaveCondition();} b=block() {
   	return new AST.ForExpression(p(t), init, e1, e2, b);
   }
 }
@@ -2766,7 +2804,7 @@ AST.Expression primary_suffix() : {
   // suffixes leave the optional eols() unmatched.
 ( LOOKAHEAD({ suffixContinues() })
   eols()
-  ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
+  ( t="[" {enterOperand();} eols() a=term() eols() "]"                                            {leaveCondition(); e = new AST.Indexing(p(t), e, a);}
   | t=<SAFE_INDEX> eols() a=term() eols() "]"                                                     {e = new AST.SafeIndexing(p(t), e, a);}
   | e=dot_suffix(e)
   | e=safe_access_suffix(e)
@@ -2785,12 +2823,12 @@ AST.Expression dot_suffix(AST.Expression e) : {
   t="." eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
-        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+        tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
-        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+        tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args); }
-    | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
+    | tl=trailing_lambda_opt() {
         if (tl != null) {
           args = (List<AST.Expression>)AST.NIL();
           args = AST.appendToList(args, tl);
@@ -2810,12 +2848,12 @@ AST.Expression safe_access_suffix(AST.Expression e) : {
   t=<SAFE_ACCESS> eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
-        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+        tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.SafeMethodCall(p(t), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
-        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+        tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.SafeMethodCall(p(t), e, c(n), args); }
-    | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
+    | tl=trailing_lambda_opt() {
         if (tl != null) {
           args = (List<AST.Expression>)AST.NIL();
           args = AST.appendToList(args, tl);
@@ -2838,34 +2876,34 @@ AST.Expression static_access_primary() : {
   AST.ClosureExpression tl = null;
 }{
   LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); needsBodyRewrite = true; return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( boxed_class_type() "::" id() "(" ) ty=boxed_class_type() t="::" n=id() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( dotted_class_type() "::" id() "(" ) ty=dotted_class_type() t="::" n=id() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD({ true }) e=primary_rest() {return e;}
 }
@@ -2873,7 +2911,7 @@ AST.Expression static_access_primary() : {
 /** A `(`: a lambda when lambda_head() parses, else a parenthesised term. */
 AST.Expression lambda_or_paren() : { AST.Expression e; }{
   LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function() {return e;}
-| "(" eols() e=term() eols() ")" {return e;}
+| "(" {enterOperand();} eols() e=term() eols() ")" {leaveCondition(); return e;}
 }
 
 AST.Expression primary() : {
@@ -2886,10 +2924,10 @@ AST.Expression primary() : {
 }{
   LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
     t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(through(n), c(n), es); }
 // Every alternative below needs a `::` after a type. Peeking for that first spares the
 // full syntactic type scans -- eleven of them, per primary -- on the common case.
@@ -2910,14 +2948,18 @@ AST.Expression primary_rest() : {
   AST.ClosureExpression tl = null;
 }{
   LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es, tas); }
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"
-    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es); }
 | LOOKAHEAD(2, id() <ARROW>) e=arrow_anonymous_function()                 {return e;}
-| LOOKAHEAD(1) t=id()                                               {return new AST.Id(p(t), c(t));}
-| {enterDefault();} t="[" eols() e=bracket_literal_rest(t) {leaveDefault();} {return e;}
+| LOOKAHEAD(1) t=id() tl=trailing_lambda_opt() {
+    if (tl == null) return new AST.Id(p(t), c(t));
+    es = AST.appendToList(es, tl);
+    return new AST.UnqualifiedMethodCall(through(t), c(t), es);
+  }
+| {enterDefault();} t="[" {enterOperand();} eols() e=bracket_literal_rest(t) {leaveCondition(); leaveDefault();} {return e;}
 // A parenthesised lambda is `( ... ) ->`; matching the parenthesis by depth is a token peek,
 // where lambda_head() re-parsed the whole parenthesised expression on every `(`.
 | LOOKAHEAD({ jj_lookingAhead || arrowAfterParenAhead() }) e=lambda_or_paren() {return e;}
@@ -2964,7 +3006,7 @@ AST.Expression primary_rest() : {
 | e=scheme_literal()                                                      {return e;}
 | e=boolean_literal()                                                     {return e;}
 | e=null_literal()                                                        {return e;}
-| "(" eols() e=term() eols() ")"                                          {return e;}
+| "(" {enterOperand();} eols() e=term() eols() ")"                        {leaveCondition(); return e;}
 }
 
 AST.Expression argument_expr() :{Token n; AST.Expression e;}{
@@ -2978,7 +3020,9 @@ List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> a
   // multiple lines: f(\n a,\n b\n)
   // Leading newlines are consumed before the choice: with them inside the optional, JavaCC
   // had to run a syntactic scan (through the nullable eols()) to decide it at every call.
+  {enterOperand();}
   eols() [ LOOKAHEAD({ getToken(1).kind != RPAREN }) arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})* eols()] {
+    leaveCondition();
     return toList(args);
   }
 }
@@ -3085,19 +3129,39 @@ Object do_clause() :{
 // nowhere else, which made `[1, 2, 3].filter { x -> x % 2 == 0 }` a syntax error for no
 // reason a reader could see.
 AST.ClosureExpression trailing_lambda() :{
-  Token t;
+  Token t, prev;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   List<AST.BlockElement> stmts = (List<AST.BlockElement>)AST.NIL();
   AST.BlockExpression body;
   AST.TypeNode ty = null;
 }{
-  {enterDefault();}
-  t="{" eols() args=lambda_args(false) eols() <ARROW> eols() {enterAssignScope();} [ LOOKAHEAD({ getToken(1).kind != RBRACE }) stmts=block_elements() ] eols() "}" {
+  {enterDefault(); prev = token;}
+  t="{" eols()
+  ( LOOKAHEAD( [trailing_lambda_arg_head() ("," eols() trailing_lambda_arg_head())*] eols() <ARROW> )
+      args=lambda_args(false) eols() <ARROW> eols()
+  | {
+      // No arrow: a zero-parameter lambda, `{ body }`. Three slips still get their hints, reported
+      // at the `{` as before: `{ (k, v) -> ... }`, the old arrow `{ x => ... }`, and a `case`
+      // right after the brace (`switch (x) { case ... }` -- no lambda body starts with `case`).
+      if (getToken(1).kind == K_CASE || parenthesizedLambdaHeadAhead() || oldArrowLambdaHeadAhead()) {
+        throw new ParseException(prev, new int[][] { { ARROW } }, tokenImage);
+      }
+    }
+  )
+  {enterOperand(); enterAssignScope();} [ LOOKAHEAD({ getToken(1).kind != RBRACE }) stmts=block_elements() ] eols() "}" {
+    leaveCondition();
     body = new AST.BlockExpression(p(t), stmts, leaveAssignScope());
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();
     return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
   }
+}
+
+/** The trailing lambda that may follow a call: the arrow form anywhere, the arrow-less form outside a condition. */
+AST.ClosureExpression trailing_lambda_opt() :{ AST.ClosureExpression tl = null; }{
+  [ LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda() ]
+  [ LOOKAHEAD({ tl == null && bareTrailingBlockAhead() }) tl=trailing_lambda() ]
+  { return tl; }
 }
 
 // Look-ahead for trailing lambda: { [args] -> ... }

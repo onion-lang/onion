@@ -21,6 +21,35 @@ val add = (a: Int, b: Int) -> a + b
 val greet: () -> String = () -> { println("Hello!"); return "done"; }
 ```
 
+### Trailing Lambdas
+
+When a lambda is the last argument of a call, it can follow the call as a
+brace block. Parameters go before `->` inside the braces, and a lambda with no
+parameters needs no arrow at all: the block's last expression is its value.
+This works on instance, static and unqualified calls, with or without an
+argument list in between:
+
+```onion
+list.map { x -> x * 2 }
+list.fold(0) { acc, x -> acc + x }
+val f: Future[Int] = Future::async { compute() }
+val g: Future[Int] = Future::async { -> compute() }   // same, with an explicit arrow
+Timing::measure("step") { expensiveOperation() }
+```
+
+In a condition position -- the condition of `if`, `while` and `do ... while`,
+the collection of `foreach ... in`, the scrutinee of `select`, the `for`
+header -- a bare `{` is the statement block, so `if flag { ... }` and
+`foreach x in xs { ... }` mean what they always did. Only the arrow form is a
+lambda there; to pass an arrow-less lambda inside a condition, parenthesize
+the call:
+
+```onion
+if xs.any { x -> x > 0 } { println("positive") }   // arrow form: a lambda
+if (once { 1 }) == 1 { println("one") }             // parenthesized: a lambda
+if ready { println("go") }                          // block of the if
+```
+
 ## Type Inference
 
 When the target function type is known, parameter types can be omitted:

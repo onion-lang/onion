@@ -386,7 +386,7 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 
 **Asynchronous Programming:**
 ```onion
-val future: Future[String] = Future::async { -> longOperation() }
+val future: Future[String] = Future::async { longOperation() }
 future.map((s) -> s.toUpperCase())
 future.onSuccess((s) -> IO::println(s))
 future.onFailure((e) -> IO::println("Error: " + e.message()))
@@ -530,7 +530,7 @@ These are frequently confused with other languages. **Always check these:**
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
 | `list.map { x => x * 2 }` | `list.map { x -> x * 2 }` - the trailing-lambda arrow is `->` too; `=>` is not part of the language (one arrow everywhere: function types, `(x) -> e`, `{ x -> e }`) |
-| `Future::async(() -> { return compute(); })` | `Future::async { -> compute() }` - a trailing lambda attaches to a static call too, with no empty `()` in between; `{ -> body }` is the zero-parameter form, and the block's last expression is its value |
+| `Future::async(() -> { return compute(); })` | `Future::async { compute() }` - a trailing lambda attaches to a static call too, with no empty `()` in between; with no parameters it needs no arrow (`{ -> body }` also works), and the block's last expression is its value. In a condition position (`if c {`, `while c {`, `foreach x in xs {`, `select v {`, the `for` header) a bare `{` is still the statement block; parenthesize the call (`if (f { 1 }) == 1 {`) to pass a lambda there |
 | `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable/arrays have builtin extension pipelines |
 
 ### Method Calls

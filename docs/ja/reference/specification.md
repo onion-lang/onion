@@ -524,7 +524,7 @@ throw new IllegalStateException("message")
 val f: Int -> Int = x -> x * 2          // 裸パラメータ、式本体
 val g = (a: Int, b: Int) -> a + b
 list.map { x -> x * 2 }                 // 末尾ラムダ
-Future::async { -> compute() }
+Future::async { compute() }             // 引数なしなら矢印も不要
 val r: Runnable = () -> println("hi")   // SAM 変換
 ```
 

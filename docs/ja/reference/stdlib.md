@@ -921,19 +921,19 @@ Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 
 ```onion
 // 実行時間を計測して表示し、結果を返す
-val result: Int = Timing::measure { -> expensiveOperation() }
+val result: Int = Timing::measure { expensiveOperation() }
 // 出力: "Elapsed: 123.45ms"
-val result2: Int = Timing::measure("task") { -> expensiveOperation() }
+val result2: Int = Timing::measure("task") { expensiveOperation() }
 // 出力: "task: 123.45ms"
 
 // 戻り値のない関数版
-Timing::measureVoid { -> expensiveOperation() }
+Timing::measureVoid { expensiveOperation() }
 // 出力: "Elapsed: 123.45ms"
-Timing::measureVoid("task") { -> expensiveOperation() }
+Timing::measureVoid("task") { expensiveOperation() }
 // 出力: "task: 123.45ms"
 
 // 表示なしで実行時間（ナノ秒）を取得
-val timeNanos: Long = Timing::time { -> expensiveOperation() }
+val timeNanos: Long = Timing::time { expensiveOperation() }
 ```
 
 ## Option モジュール
@@ -979,10 +979,10 @@ val done: Future[Int] = Future::successful(42)
 val fail: Future[Int] = Future::failed(new RuntimeException("error"))
 
 // バックグラウンドスレッドで非同期実行
-val async: Future[String] = Future::async { -> compute() }
+val async: Future[String] = Future::async { compute() }
 
 // 例外処理付きの非同期実行
-val safe: Future[Int] = Future::asyncThrowing { ->
+val safe: Future[Int] = Future::asyncThrowing {
   riskyOperation()
 }
 
@@ -1026,7 +1026,7 @@ f.mapError((e: Throwable) -> { return new CustomException(e); })
 ### コールバック
 
 ```onion
-val f: Future[String] = Future::async { -> "result" }
+val f: Future[String] = Future::async { "result" }
 
 f.onSuccess((value: String) -> { IO::println(value); })
 f.onFailure((error: Throwable) -> { IO::println(error); })
@@ -1098,8 +1098,8 @@ Futureは順次非同期合成のためのdo記法で動作：
 
 ```onion
 val result: Future[Int] = do[Future] {
-  x <- Future::async { -> fetchA() }
-  y <- Future::async { -> fetchB(x) }
+  x <- Future::async { fetchA() }
+  y <- Future::async { fetchB(x) }
   ret x + y
 }
 ```
@@ -2403,7 +2403,7 @@ val hits = Concurrent::counter()
 hits.increment()
 
 val lock = Concurrent::lock()
-lock.withLock { -> /* … */ }         // 本体が例外を投げても解放される
+lock.withLock { /* … */ }         // 本体が例外を投げても解放される
 
 val chan = Concurrent::channel(16)   // 意図的に上限つき
 chan.send("work")

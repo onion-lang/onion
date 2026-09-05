@@ -444,13 +444,13 @@ val nested: Option[Int] = do[Option] {
 val immediate: Future[Int] = Future::successful(42)
 
 // 非同期計算
-val async: Future[String] = Future::async { ->
+val async: Future[String] = Future::async {
   Thread::sleep(1000L)
   "Hello after 1 second"
 }
 
 // 例外を投げうる操作から
-val risky: Future[Int] = Future::asyncThrowing { ->
+val risky: Future[Int] = Future::asyncThrowing {
   if Math::random() < 0.5 {
     throw new RuntimeException("Bad luck!")
   }
@@ -468,7 +468,7 @@ val doubled: Future[Int] = numbers.map((x: Int) -> { return x * 2; })
 
 // flatMap: 非同期操作を連鎖
 val chained: Future[String] = numbers.flatMap((x: Int) -> {
-  return Future::async { ->
+  return Future::async {
     "Number is: " + x
   };
 })
@@ -497,8 +497,8 @@ val retried: Future[Int] = failing.recoverWith((error: Throwable) -> {
 ### Future の合成
 
 ```onion
-val f1: Future[Int] = Future::async { -> Thread::sleep(100L); 1 }
-val f2: Future[Int] = Future::async { -> Thread::sleep(200L); 2 }
+val f1: Future[Int] = Future::async { Thread::sleep(100L); 1 }
+val f2: Future[Int] = Future::async { Thread::sleep(200L); 2 }
 
 // すべて待つ
 val all: Future[Object[]] = Future::all(f1, f2)
@@ -519,7 +519,7 @@ val zipped: Future[Object[]] = f1.zip(f2)
 ### コールバック
 
 ```onion
-val future: Future[String] = Future::async { ->
+val future: Future[String] = Future::async {
   "Async result"
 }
 
@@ -531,7 +531,7 @@ future
 ### ブロッキング（控えめに使う）
 
 ```onion
-val future: Future[Int] = Future::async { -> 42 }
+val future: Future[Int] = Future::async { 42 }
 
 // 完了までブロック
 val result: Int = future.await()
@@ -547,11 +547,11 @@ val safe: Int = future.getOrElse(0)
 
 ```onion
 def fetchUser(id: Int): Future[String] {
-  return Future::async { -> "User" + id };
+  return Future::async { "User" + id };
 }
 
 def fetchProfile(name: String): Future[String] {
-  return Future::async { -> name + "'s profile" };
+  return Future::async { name + "'s profile" };
 }
 
 val profile: Future[String] = do[Future] {
@@ -568,7 +568,7 @@ profile.onSuccess((p: String) -> { println(p); })
 
 ```onion
 def fetchFromApi(url: String): Future[String] {
-  return Future::async { ->
+  return Future::async {
     // ネットワークリクエストをシミュレート
     Thread::sleep((Math::random() * 1000L) as Long)
     "Data from " + url

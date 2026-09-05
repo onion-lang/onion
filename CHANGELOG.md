@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Added an `ArchiveDocCoverageSpec` regression guard checking that every public
+  `onion.Archive` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Archive` is a genuine, default-imported
+  stdlib module (`Archive::zip`, `Archive::zipDir`, `Archive::entries`,
+  `Archive::unzip`, `Archive::gzip`, `Archive::gunzip`, `Archive::gzipFile`,
+  `Archive::gunzipFile`) with 8 distinct public static member names, but --
+  unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`,
+  `Rand`, `Csv`, `Hash`, `Codec`, `Text`, `Format`, `Assert` and `Yaml`, each
+  already guarded by its own coverage spec -- it never had one. All 8 members
+  were already documented in both files; this guard now fails the build if a
+  future addition to `onion.Archive` goes undocumented.
+
 ## [0.56.0] - 2026-09-05
 
 ### Added

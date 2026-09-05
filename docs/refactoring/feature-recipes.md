@@ -86,6 +86,18 @@ foreign syntax usually needs no grammar change.
 5. Run `CodegenCorrectnessSpec`, relevant focused suites, samples, and both
    locale full suites.
 
+## Change ADT enum expansion
+
+1. Change `rewrite.AdtEnumLowering` for generated interface/case declarations.
+   Do not give it the `Rewriting` instance or its mutable scopes.
+2. Keep ADT selection and generated-body traversal in `Rewriting.rewrite`.
+   Homogeneous enums must continue down their separate path.
+3. Extend `AdtEnumRewritingSpec` with a complete expected AST, including
+   generic arguments, declaration order and source positions.
+4. Run the enum execution suites and `RewritingErrorLocationSpec`, then both
+   full locale suites. For a pure move, compare emitted `run/AdtExpr.on` classes
+   before and after without regenerating expected outputs from the new code.
+
 ## Before committing any compiler refactor
 
 - Focused RED was observed for the intended missing behavior or seam.

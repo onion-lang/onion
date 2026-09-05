@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added an `AssertDocCoverageSpec` regression guard checking that every public
+  `onion.Assert` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Assert` is a genuine, default-imported
+  stdlib module (`Assert::isTrue`, `Assert::isFalse`, `Assert::equals`,
+  `Assert::notEquals`, `Assert::notNull`, `Assert::isNull`, `Assert::fail`) with
+  7 distinct public static member names, but -- unlike `OnionMath`, `Stats`,
+  `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash` and
+  `Codec`, each already guarded by its own coverage spec -- it never had one.
+  All 7 members were already documented in both files; this guard now fails
+  the build if a future addition to `onion.Assert` goes undocumented.
+
 - **Added a `CodecDocCoverageSpec` regression guard checking that every public
   `onion.Codec` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Codec` is a genuine, default-imported

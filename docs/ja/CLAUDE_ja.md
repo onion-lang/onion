@@ -331,7 +331,7 @@ do[Option] { a <- getA(); b <- getB(); ret a + b }
 
 **非同期プログラミング:**
 ```onion
-val future: Future[String] = Future::async(() -> { longOperation() })
+val future: Future[String] = Future::async { -> longOperation() }
 future.map((s) -> s.toUpperCase())
 future.onSuccess((s) -> IO::println(s))
 future.onFailure((e) -> IO::println("Error: " + e.message()))
@@ -471,6 +471,7 @@ try {
 | `Int -> Int` | ✓ 正しい - 単一引数の関数型 |
 | `(Int, Int) -> Int` | ✓ 正しい - 複数引数の関数型 |
 | `list.map { x => x * 2 }` | `list.map { x -> x * 2 }` - トレイリングラムダの矢印も`->`。`=>`は言語には存在しない（関数型、`(x) -> e`、`{ x -> e }`のすべてで矢印は`->`の一種類だけ） |
+| `Future::async(() -> { return compute(); })` | `Future::async { -> compute() }` - トレイリングラムダは static 呼び出しにも直接付けられる（間に空の`()`は不要）。引数なしは`{ -> 本体 }`と書き、ブロック最後の式が値になる |
 | `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable/配列に組み込みのextensionパイプラインがある |
 
 ### メソッド呼び出し

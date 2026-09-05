@@ -352,6 +352,14 @@ public class JJOnionParser implements Parser {
    * right-hand side: f -> f(e); f(a) -> f(e, a); obj.m -> obj.m(e);
    * obj.m(a) -> obj.m(e, a); C::m(a) -> C::m(e, a).
    */
+  /** `Type::name` is a member selection, unless a trailing lambda follows: then it is a call with that one argument. */
+  private AST.Expression staticMemberOrCall(Token colon2, Token name, AST.TypeNode ty, AST.ClosureExpression tl) {
+    if (tl == null) return new AST.StaticMemberSelection(p(colon2), ty, c(name));
+    List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
+    es = AST.appendToList(es, tl);
+    return new AST.StaticMethodCall(through(name), ty, c(name), es);
+  }
+
   private AST.Expression pipeInto(Location loc, AST.Expression value, AST.Expression rhs) throws ParseException {
     if (rhs instanceof AST.UnqualifiedMethodCall) {
       AST.UnqualifiedMethodCall c = (AST.UnqualifiedMethodCall) rhs;
@@ -2839,7 +2847,8 @@ AST.Expression static_access_primary() : {
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
-    { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
@@ -2847,14 +2856,17 @@ AST.Expression static_access_primary() : {
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
 | LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
-    { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es); }
-| LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
+| LOOKAHEAD(2) ty=class_type() t="::" n=id()
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { return staticMemberOrCall(t, n, ty, tl); }
 | LOOKAHEAD({ true }) e=primary_rest() {return e;}
 }
 

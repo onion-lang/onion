@@ -551,7 +551,7 @@ Resources close automatically in reverse declaration order.
 val f: Int -> Int = x -> x * 2          // bare param, expression body
 val g = (a: Int, b: Int) -> a + b
 list.map { x -> x * 2 }                 // trailing lambda
-Future::async(() -> { return compute() })
+Future::async { -> compute() }
 val r: Runnable = () -> println("hi")   // SAM conversion
 ```
 

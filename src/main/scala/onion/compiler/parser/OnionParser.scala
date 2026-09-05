@@ -1998,7 +1998,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       }
       if (looksLike { boxedClassType(); expect(K.COLON2) }) {
         val ty = boxedClassType(); val t = expect(K.COLON2); val n = id()
-        return AST.StaticMemberSelection(p(t), ty, c(n))
+        return staticMemberOrCall(t, n, ty, trailingLambdaOpt())
       }
     }
     if (isId(kind(1)) && kind(2) == K.DOT) {
@@ -2016,7 +2016,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       }
       if (looksLike { dottedClassType(); expect(K.COLON2) }) {
         val ty = dottedClassType(); val t = expect(K.COLON2); val n = id()
-        return AST.StaticMemberSelection(p(t), ty, c(n))
+        return staticMemberOrCall(t, n, ty, trailingLambdaOpt())
       }
     }
     if (looksLike { classType(); expect(K.COLON2); id(); typeArguments(); expect(K.LPAREN) }) {
@@ -2033,10 +2033,15 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     if ((isId(kind(1)) || kind(1) == K.FQCN) && kind(2) == K.COLON2) {
       val ty = classType(); val t = expect(K.COLON2); val n = id()
-      return AST.StaticMemberSelection(p(t), ty, c(n))
+      return staticMemberOrCall(t, n, ty, trailingLambdaOpt())
     }
     primaryRest()
   }
+
+  /** `Type::name` is a member selection, unless a trailing lambda follows: then it is a call with that one argument. */
+  private def staticMemberOrCall(colon2: Token, name: Token, ty: AST.TypeNode, tl: AST.ClosureExpression): AST.Expression =
+    if (tl == null) AST.StaticMemberSelection(p(colon2), ty, c(name))
+    else new AST.StaticMethodCall(through(name), ty, c(name), List[AST.Expression](tl))
 
   private def lambdaOrParen(): AST.Expression = {
     if (looksLike(lambdaHead())) arrowAnonymousFunction()

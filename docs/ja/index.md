@@ -68,7 +68,7 @@ val result: Option[Int] = do[Option] {
 }
 
 // Futureによる非同期プログラミング
-val future: Future[String] = Future::async(() -> { return fetchData(); })
+val future: Future[String] = Future::async { -> fetchData() }
 future.map { data -> processData(data) }
       .onSuccess { result -> println(result) }
 

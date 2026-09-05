@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A trailing lambda now attaches to a static call without an empty argument
+  list: `Future::async { -> compute() }`, `Helper::twice { x -> x + 1 }`.**
+  Instance calls already accepted `list.map { x -> x * 2 }`, but the
+  `Type::method` forms only took a trailing lambda after `(...)`, so the
+  zero-argument case had to be written `Future::async() { -> ... }` or
+  `Future::async(() -> { return compute(); })`. Both the JavaCC grammar and
+  the handwritten fast-path parser gained the alternative; `Type::name`
+  without a following `{ ... -> }` is still a static member selection, so
+  no accepted program changes meaning (`StaticTrailingLambdaSpec`).
+
 ### Documentation
+
+- **The README, `docs/index.md`, the async/functional examples, the stdlib
+  and specification references and `CLAUDE.md` (EN/JA) now write zero-argument
+  callbacks as trailing lambdas (`Future::async { -> ... }`,
+  `Timing::measure { -> ... }`) instead of `(() -> { return ...; })`.**
 
 - **Added an `IterablesDocCoverageSpec` regression guard checking that every
   public `onion.Iterables` member is documented in both

@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   members were already documented in both files; this guard now fails the
   build if a future addition to `onion.Csv` goes undocumented.
 
+- **Added a `SetsDocCoverageSpec` regression guard checking that every public
+  `onion.Sets` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Sets` is a genuine, default-imported
+  stdlib module (`Sets::newSet`, `Sets::union`, `Sets::isDisjoint`, ...) with
+  19 distinct public static member names, but -- unlike `Maps`, already
+  guarded by `MapsDocCoverageSpec` -- it never had one. All 19 members were
+  already documented in both files; this guard now fails the build if a
+  future addition to `onion.Sets` goes undocumented.
+
 ## [0.55.0] - 2026-09-05
 
 ### Documentation

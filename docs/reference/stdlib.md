@@ -2631,13 +2631,14 @@ Sets::containsAll(null, b)             // false -- onion.Sets's null-safe result
 
 ### Functional operations
 
-These are also builtin extension methods on `Set` (`a.filter(...)`, `a.forEach(...)`,
-...) -- **except `map`**, see the shadowing note below:
+These are also builtin extension methods on `Set` (`a.filter(...)`,
+`a.count(...)`, ...) -- **except `map` and `forEach`**, see the shadowing
+notes below:
 
 ```onion
 Sets::map(a, (x: Int) -> x * 2)        // NOT reachable as a.map(...) -- see below
 Sets::filter(a, (x: Int) -> x > 1)     // a.filter((x: Int) -> x > 1)
-Sets::forEach(a, (x: Int) -> println(x))  // a.forEach((x: Int) -> println(x))
+Sets::forEach(a, (x: Int) -> println(x))  // NOT reachable as a.forEach(...) -- see below
 Sets::count(a, (x: Int) -> x > 1)      // a.count((x: Int) -> x > 1)
 Sets::any(a, (x: Int) -> x > 2)        // a.any((x: Int) -> x > 2)
 Sets::all(a, (x: Int) -> x > 0)        // a.all((x: Int) -> x > 0)
@@ -2656,6 +2657,28 @@ insertion-order promise above) and throws `NullPointerException` for a
 order preserved) and returns an empty set for a `null` one. Call
 `Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
 order-preserving, null-safe result.
+
+**`forEach` is shadowed too, but by the JDK, not another onion module**:
+`Set` conforms to `java.lang.Iterable`, which already declares a default
+instance method `forEach(Consumer)`, and an instance method always wins
+over an extension method before the extension fallback path is even
+consulted -- the same shadowing pattern already documented for
+`Maps::forEach` above. A one-arg Onion lambda SAM-converts to `Consumer`
+the same way it converts to `onion.Sets::forEach`'s `Function1`, so
+`a.forEach(action)` always reaches the **native `Iterable.forEach`**,
+never `onion.Sets::forEach`. For a non-null receiver that is invisible,
+since both visit every element in iteration order. It becomes observable
+for a receiver that is `null` at runtime but was never checked at compile
+time (a "platform type"): `onion.Sets::forEach` is null-safe (a `null` set
+is a no-op), but `a.forEach(action)` on that same null set reaches the
+native method and throws `NullPointerException` instead -- call
+`Sets::forEach(...)` directly to get the null-safe behavior on a value
+that might be null.
+
+```onion
+a.forEach((x: Int) -> println(x))      // native Iterable.forEach -- throws NullPointerException on a null Set
+Sets::forEach(a, (x: Int) -> println(x))  // onion.Sets's null-safe result
+```
 
 ---
 

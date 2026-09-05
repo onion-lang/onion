@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Added a `FilesDocCoverageSpec` regression guard checking that every public
+  `onion.Files` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Files` is a genuine, default-imported
+  stdlib module (`Files::readText`, `Files::writeLines`, `Files::glob`, ...)
+  with 26 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars` and `DateTime`, each already guarded by its
+  own `*DocCoverageSpec` -- it never had one. All 26 members were already
+  documented in both files; this guard now fails the build if a future
+  addition to `onion.Files` goes undocumented.
+
 - **Documented that `Regex::matches`/`replace`/`replaceFirst`/`split`'s
   extension-call forms are shadowed by native `String` methods of the same
   name, and that `replace` in particular silently switches from regex to

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added a `FormatDocCoverageSpec` regression guard checking that every public
+  `onion.Format` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Format` is a genuine, default-imported
+  stdlib module (`Format::integer`, `Format::number`, `Format::fixed`,
+  `Format::percent`, `Format::bytes`, `Format::duration`, `Format::ordinal`)
+  with 7 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`
+  and `Codec`, each already guarded by its own coverage spec -- it never had
+  one. All 7 members were already documented in both files; this guard now
+  fails the build if a future addition to `onion.Format` goes undocumented.
+
 - **Added an `AssertDocCoverageSpec` regression guard checking that every public
   `onion.Assert` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Assert` is a genuine, default-imported

@@ -69,28 +69,31 @@ private[compiler] object DuplicationChecks {
 
     val implementations = clazz.methods.filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
     if implementations.isEmpty then return
-    val implByErasedParams: scala.collection.immutable.Map[(String, String), Method] =
-      implementations
-        .map(m => ((m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments))), m))
-        .toMap
-    // A contract can only be matched by an implementation of the same name; every ancestor
-    // contributes its whole method list here (java.lang.Object's included, for every class),
-    // so the descriptors below are computed for those names only.
-    val implementedNames = implementations.iterator.map(_.name).toSet
+    // Most methods do not override anything. Index by name first and only erase
+    // a name's implementations when an inherited contract actually needs them.
+    // Each per-name index retains the old last-implementation-wins behavior.
+    val implByName = implementations.groupBy(_.name)
+    val erasedByName = mutable.HashMap.empty[String, scala.collection.immutable.Map[String, Method]]
 
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
 
       for (contract <- view.raw.methods) {
-        if implementedNames.contains(contract.name) && !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
+        if implByName.contains(contract.name) && !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
+          val implByErasedParams = erasedByName.getOrElseUpdate(
+            contract.name,
+            implByName(contract.name).iterator
+              .map(m => (typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments)), m))
+              .toMap
+          )
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
           // An implementation may declare the specialized parameter types
           // (id(x: String) for Id[String]) or the erased ones (id(x: Object)):
           // look the contract up under both keys.
-          val specializedKey = (contract.name, erasedParamDescriptor(specializedArgs))
-          val erasedKey = (contract.name, typing.table_.erasedParamsOf(contract)(erasedParamDescriptor(contract.arguments)))
+          val specializedKey = erasedParamDescriptor(specializedArgs)
+          val erasedKey = typing.table_.erasedParamsOf(contract)(erasedParamDescriptor(contract.arguments))
           implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey)).foreach { impl =>
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)

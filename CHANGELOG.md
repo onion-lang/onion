@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Added a `CsvDocCoverageSpec` regression guard checking that every public
+  `onion.Csv` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Csv` is a genuine, default-imported
+  stdlib module (`Csv::parse`, `Csv::stringify`, `Csv::column`, ...) with 6
+  distinct public static member names, but -- unlike `OnionMath`, `Stats`,
+  `Net`, `Proc`, `Scalars`, `DateTime`, `Files` and `Rand`, each already
+  guarded by its own coverage or parity spec -- it never had one. All 6
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Csv` goes undocumented.
+
 ## [0.55.0] - 2026-09-05
 
 ### Documentation

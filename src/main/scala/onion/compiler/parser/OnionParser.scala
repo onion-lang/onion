@@ -339,6 +339,44 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   // The sets are allocated on first use: most blocks assign and capture nothing.
   private def enterAssignScope(): Unit = assignedScopes += null
+
+  // Condition positions (see the grammar): where a bare `{` after a call is the statement
+  // block, not an arrow-less trailing lambda. Parentheses, argument lists, index brackets and
+  // blocks (including lambda bodies) push a fresh operand context.
+  private val conditionContexts = new ArrayBuffer[Boolean]()
+  private def enterCondition(): Unit = conditionContexts += true
+  private def enterOperand(): Unit = conditionContexts += false
+  private def leaveCondition(): Unit = if (conditionContexts.nonEmpty) conditionContexts.remove(conditionContexts.length - 1)
+  private def inCondition(): Boolean = conditionContexts.nonEmpty && conditionContexts(conditionContexts.length - 1)
+  private inline def inOperand[A](inline body: A): A = { enterOperand(); try body finally leaveCondition() }
+  private inline def inConditionOf[A](inline body: A): A = { enterCondition(); try body finally leaveCondition() }
+
+  private def isLambdaHeadKind(k: Int): Boolean =
+    k == K.ID || k == K.COMMA || k == K.COLON || k == K.LBRACKET || k == K.RBRACKET || k == K.QUESTION || k == K.FQCN || k == K.DOT
+
+  /** After the `{` of an arrow-less trailing lambda: `(a, b) ->`, the slip the JavaCC hint names. */
+  private def parenthesizedLambdaHeadAhead(): Boolean = {
+    if (kind(1) != K.LPAREN) return false
+    var i = 2
+    while (i < 64) {
+      val k = kind(i)
+      if (k == K.RPAREN) return kind(i + 1) == K.ARROW
+      if (!isLambdaHeadKind(k)) return false
+      i += 1
+    }
+    false
+  }
+
+  /** After the `{` of an arrow-less trailing lambda: `a, b =>`, the old arrow lexed as `=` `>`. */
+  private def oldArrowLambdaHeadAhead(): Boolean = {
+    var i = 1
+    var k = kind(i)
+    if (k == K.LPAREN) { i += 1; k = kind(i) }
+    while (i < 64 && (isLambdaHeadKind(k) || k == K.RPAREN)) { i += 1; k = kind(i) }
+    if (k != K.ASSIGN) return false
+    val eq = peek(i); val gt = peek(i + 1)
+    gt.kind == K.GT && gt.beginLine == eq.endLine && gt.beginColumn == eq.endColumn + 1
+  }
   private def addTo(scopes: ArrayBuffer[java.util.HashSet[String]], i: Int, name: String): Unit = {
     var s = scopes(i)
     if (s == null) { s = new java.util.HashSet[String](); scopes(i) = s }
@@ -608,10 +646,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def block(): AST.BlockExpression = {
     val t = expect(K.LBRACE)
     enterAssignScope()
+    enterOperand()
     eols()
     val elements = if (kind(1) != K.RBRACE) blockElements() else Nil
     eols()
     expect(K.RBRACE)
+    leaveCondition()
     AST.BlockExpression(p(t), elements, leaveAssignScope())
   }
 
@@ -1203,6 +1243,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def trailingLambdaHead(): Unit = {
     expect(K.LBRACE)
+    trailingLambdaHeadAfterBrace()
+  }
+
+  /** `[params] ->` after the `{`: the arrow form of a trailing lambda. */
+  private def trailingLambdaHeadAfterBrace(): Unit = {
     eols()
     if (isId(kind(1))) {
       trailingLambdaArgHead()
@@ -1404,7 +1449,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def ifExpression(): AST.IfExpression = {
     val t = expect(K.K_IF)
-    val e = term()
+    val e = inConditionOf(term())
     val b1 = block()
     var b2: AST.BlockExpression = null
     if (elseFollows()) {
@@ -1491,7 +1536,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def selectExpression(): AST.SelectExpression = {
     val t1 = expect(K.K_SELECT)
-    val e1 = term()
+    val e1 = inConditionOf(term())
     eols()
     expect(K.LBRACE)
     eols()
@@ -1546,7 +1591,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def whileExpression(): AST.WhileExpression = {
     val t = expect(K.K_WHILE)
-    val e = term()
+    val e = inConditionOf(term())
     AST.WhileExpression(p(t), e, block())
   }
 
@@ -1555,7 +1600,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val b = block()
     expect(K.K_WHILE)
     enterSection()
-    val e = term()
+    val e = inConditionOf(term())
     eosOrBlockEnd()
     AST.DoWhileExpression(p(t), b, e)
   }
@@ -1569,13 +1614,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val v = id()
       expect(K.RPAREN)
       if (la("in")) id()
-      val e = term()
+      val e = inConditionOf(term())
       val b = block()
       desugarMapForeach(p(t), c(k), c(v), e, b)
     } else {
       val a = argument()
       if (la("in")) id()
-      val e = term()
+      val e = inConditionOf(term())
       val b = block()
       AST.ForeachExpression(p(t), a, e, b)
     }
@@ -1607,10 +1652,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def forExpression(): AST.ForExpression = {
     val t = expect(K.K_FOR)
+    enterCondition()
     val init = forInitializer()
     val e1 = if (kind(1) != K.SEMI) term() else null
     expect(K.SEMI)
     val e2 = if (!la("{")) term() else null
+    leaveCondition()
     AST.ForExpression(p(t), init, e1, e2, block())
   }
 
@@ -1841,10 +1888,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       eols()
       kind(1) match {
         case K.LBRACKET =>
-          val t = next(); eols(); val a = term(); eols(); expect(K.RBRACKET)
+          val t = next(); val a = inOperand { eols(); val x = term(); eols(); x }; expect(K.RBRACKET)
           e = AST.Indexing(p(t), e, a)
         case K.SAFE_INDEX =>
-          val t = next(); eols(); val a = term(); eols(); expect(K.RBRACKET)
+          val t = next(); val a = inOperand { eols(); val x = term(); eols(); x }; expect(K.RBRACKET)
           e = AST.SafeIndexing(p(t), e, a)
         case K.DOT => e = dotSuffix(e)
         case K.SAFE_ACCESS => e = safeAccessSuffix(e)
@@ -1864,7 +1911,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def trailingLambdaOpt(): AST.ClosureExpression =
-    if (kind(1) == K.LBRACE && looksLike(trailingLambdaHead())) trailingLambda() else null
+    if (kind(1) == K.LBRACE && (looksLike(trailingLambdaHead()) || !inCondition())) trailingLambda() else null
 
   private def typeArgsThenParen(): Boolean =
     kind(1) == K.LBRACKET && looksLike { typeArguments(); eols(); expect(K.LPAREN) }
@@ -2046,9 +2093,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def lambdaOrParen(): AST.Expression = {
     if (looksLike(lambdaHead())) arrowAnonymousFunction()
     else {
-      expect(K.LPAREN); eols()
-      val e = term()
-      eols(); expect(K.RPAREN)
+      expect(K.LPAREN)
+      val e = inOperand { eols(); val x = term(); eols(); x }
+      expect(K.RPAREN)
       e
     }
   }
@@ -2091,22 +2138,22 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       }
       if (kind(2) == K.ARROW) return arrowAnonymousFunction()
       val t = id()
-      return AST.Id(p(t), c(t))
+      val tl = trailingLambdaOpt()
+      return if (tl == null) AST.Id(p(t), c(t)) else new AST.UnqualifiedMethodCall(through(t), c(t), List(tl))
     }
     k match {
       case K.LBRACKET =>
         enterDefault()
         val t = next()
-        eols()
-        val e = bracketLiteralRest(t)
+        val e = inOperand { eols(); bracketLiteralRest(t) }
         leaveDefault()
         e
       case K.LPAREN =>
         if (arrowAfterParenAhead()) lambdaOrParen()
         else {
-          next(); eols()
-          val e = term()
-          eols(); expect(K.RPAREN)
+          next()
+          val e = inOperand { eols(); val x = term(); eols(); x }
+          expect(K.RPAREN)
           e
         }
       case K.K_DO if kind(2) == K.LBRACKET => doExpression()
@@ -2231,14 +2278,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     } else term()
   }
 
-  private def terms(): List[AST.Expression] = {
+  private def terms(): List[AST.Expression] = inOperand {
     eols()
-    if (kind(1) == K.RPAREN) return Nil
-    val args = new ArrayBuffer[AST.Expression]()
-    args += argumentExpr()
-    while (accept(K.COMMA)) { eols(); args += argumentExpr() }
-    eols()
-    args.toList
+    if (kind(1) == K.RPAREN) Nil
+    else {
+      val args = new ArrayBuffer[AST.Expression]()
+      args += argumentExpr()
+      while (accept(K.COMMA)) { eols(); args += argumentExpr() }
+      eols()
+      args.toList
+    }
   }
 
   private def bracketLiteralRest(t: Token): AST.Expression = {
@@ -2345,14 +2394,26 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     enterDefault()
     val t = expect(K.LBRACE)
     eols()
-    val args = lambdaArgs(false)
-    eols()
-    expect(K.ARROW)
-    eols()
+    val args =
+      if (looksLike(trailingLambdaHeadAfterBrace())) {
+        val a = lambdaArgs(false)
+        eols()
+        expect(K.ARROW)
+        eols()
+        a
+      } else {
+        // No arrow: a zero-parameter lambda. The slips that have hints (`{ (k, v) -> }`,
+        // `{ x => }`, `switch (x) { case ... }`) are left to the JavaCC parser, which reports
+        // them at the `{`.
+        if (kind(1) == K.K_CASE || parenthesizedLambdaHeadAhead() || oldArrowLambdaHeadAhead()) throw fail
+        Nil
+      }
+    enterOperand()
     enterAssignScope()
     val stmts = if (kind(1) != K.RBRACE) blockElements() else Nil
     eols()
     expect(K.RBRACE)
+    leaveCondition()
     val body = AST.BlockExpression(p(t), stmts, leaveAssignScope())
     val ty = functionTypeNode(t, args.length)
     leaveDefault()

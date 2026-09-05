@@ -8,7 +8,7 @@ Run work in the background with `Future::async`.
 
 ```onion
 def fetchPage(url: String, delayMs: Long): Future[String] {
-  return Future::async { ->
+  return Future::async {
     Thread::sleep(delayMs)
     "body of " + url
   }
@@ -74,7 +74,7 @@ println("value=" + recovered.getOrElse(-1))
 
 ```onion
 def fetchPage(url: String, delayMs: Long): Future[String] {
-  return Future::async { ->
+  return Future::async {
     Thread::sleep(delayMs)
     "body of " + url
   }

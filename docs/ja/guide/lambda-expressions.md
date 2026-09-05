@@ -20,6 +20,33 @@ val add = (a: Int, b: Int) -> a + b
 val greet: () -> String = () -> { println("Hello!"); return "done"; }
 ```
 
+### トレイリングラムダ
+
+ラムダが呼び出しの最後の引数なら、呼び出しの後ろに波括弧ブロックとして書けます。
+パラメータは波括弧の中の `->` の前に置き、パラメータがなければ矢印も不要です。
+ブロック最後の式がラムダの値になります。インスタンス呼び出し・static 呼び出し・
+非修飾呼び出しのいずれにも、間に引数リストがあってもなくても付けられます：
+
+```onion
+list.map { x -> x * 2 }
+list.fold(0) { acc, x -> acc + x }
+val f: Future[Int] = Future::async { compute() }
+val g: Future[Int] = Future::async { -> compute() }   // 同じ意味（矢印を明示）
+Timing::measure("step") { expensiveOperation() }
+```
+
+条件位置 ── `if`・`while`・`do ... while` の条件、`foreach ... in` の反復対象、
+`select` の被検査式、`for` ヘッダ ── では裸の `{` は従来どおり文ブロックです。
+`if flag { ... }` や `foreach x in xs { ... }` の意味は変わりません。そこでラムダに
+なるのは矢印付きの形だけで、矢印なしのラムダを条件の中で渡したいときは呼び出しを
+括弧で囲みます：
+
+```onion
+if xs.any { x -> x > 0 } { println("positive") }   // 矢印付き：ラムダ
+if (once { 1 }) == 1 { println("one") }             // 括弧付き：ラムダ
+if ready { println("go") }                          // if のブロック
+```
+
 ## 型推論
 
 ターゲットの関数型が分かっている場合、パラメータの型を省略できます：

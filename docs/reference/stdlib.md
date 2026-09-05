@@ -999,10 +999,10 @@ val done: Future[Int] = Future::successful(42)
 val fail: Future[Int] = Future::failed(new RuntimeException("error"))
 
 // Run async on background thread
-val async: Future[String] = Future::async { -> compute() }
+val async: Future[String] = Future::async { compute() }
 
 // Async with exception handling
-val safe: Future[Int] = Future::asyncThrowing { ->
+val safe: Future[Int] = Future::asyncThrowing {
   riskyOperation()
 }
 
@@ -1046,7 +1046,7 @@ f.mapError((e: Throwable) -> { return new CustomException(e); })
 ### Callbacks
 
 ```onion
-val f: Future[String] = Future::async { -> "result" }
+val f: Future[String] = Future::async { "result" }
 
 f.onSuccess((value: String) -> { IO::println(value); })
 f.onFailure((error: Throwable) -> { IO::println(error); })
@@ -1118,8 +1118,8 @@ Future works with do notation for sequential async composition:
 
 ```onion
 val result: Future[Int] = do[Future] {
-  x <- Future::async { -> fetchA() }
-  y <- Future::async { -> fetchB(x) }
+  x <- Future::async { fetchA() }
+  y <- Future::async { fetchB(x) }
   ret x + y
 }
 ```
@@ -1271,19 +1271,19 @@ Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 
 ```onion
 // Measure and print execution time, return result
-val result: Int = Timing::measure { -> expensiveOperation() }
+val result: Int = Timing::measure { expensiveOperation() }
 // Prints: "Elapsed: 123.45ms"
-val result2: Int = Timing::measure("task") { -> expensiveOperation() }
+val result2: Int = Timing::measure("task") { expensiveOperation() }
 // Prints: "task: 123.45ms"
 
 // Same, but for a function that returns nothing
-Timing::measureVoid { -> expensiveOperation() }
+Timing::measureVoid { expensiveOperation() }
 // Prints: "Elapsed: 123.45ms"
-Timing::measureVoid("task") { -> expensiveOperation() }
+Timing::measureVoid("task") { expensiveOperation() }
 // Prints: "task: 123.45ms"
 
 // Get execution time in nanoseconds without printing
-val timeNanos: Long = Timing::time { -> expensiveOperation() }
+val timeNanos: Long = Timing::time { expensiveOperation() }
 ```
 
 ## Strings Module
@@ -2245,7 +2245,7 @@ val hits = Concurrent::counter()
 hits.increment()
 
 val lock = Concurrent::lock()
-lock.withLock { -> /* … */ }         // releases even if the body throws
+lock.withLock { /* … */ }         // releases even if the body throws
 
 val chan = Concurrent::channel(16)   // bounded on purpose
 chan.send("work")

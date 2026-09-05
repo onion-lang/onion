@@ -53,6 +53,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented that `Strings::equalsIgnoreCase`'s and `Strings::lastIndexOf`'s
+  extension-call forms are shadowed by native `String.equalsIgnoreCase`/
+  `String.lastIndexOf`.** `java.lang.String` already declares instance
+  methods with these same names, and instance-method resolution always wins
+  over the extension fallback, so `s.equalsIgnoreCase(x)` and
+  `s.lastIndexOf(x)` silently reach the native methods instead of
+  `onion.Strings`'s -- the same shadowing pattern already documented for
+  `trim`/`startsWith`/`endsWith`/`indexOf`/`replace` in the same section.
+  This is invisible on a non-null `String`, but on a null platform-typed
+  `String` the native methods throw `NullPointerException` while
+  `Strings::equalsIgnoreCase`/`Strings::lastIndexOf` are null-safe. Added
+  the note to the Strings Module section of both `docs/reference/stdlib.md`
+  and `docs/ja/reference/stdlib.md`, and a new
+  `StringsEqualsIgnoreCaseLastIndexOfShadowingSpec` regression test.
+
 - **The README, `docs/index.md`, the async/functional examples, the stdlib
   and specification references and `CLAUDE.md` (EN/JA) now write zero-argument
   callbacks as trailing lambdas (`Future::async { ... }`,

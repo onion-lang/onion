@@ -1409,6 +1409,19 @@ string consisting only of an EM SPACE is blank under `s.isBlank()`
 (static-call syntax). Use the `Strings::isBlank(...)` static-call form for
 `trim()`-based, ASCII-whitespace semantics.
 
+**`equalsIgnoreCase` and `lastIndexOf` are shadowed the same way as
+`trim`/`startsWith`/`endsWith`/`indexOf`/`replace` above**:
+`java.lang.String` already defines `equalsIgnoreCase(String)` and
+`lastIndexOf(String)` instance methods, so `s.equalsIgnoreCase(x)` and
+`s.lastIndexOf(x)` also silently reach the *native JDK method* instead of
+`onion.Strings`'s. As above, this is invisible for a non-null `String` and
+only becomes observable for a platform-typed `null` receiver, where the
+native methods throw `NullPointerException` while `onion.Strings`'s
+versions are null-safe (`Strings::equalsIgnoreCase(null, x) == false`,
+`Strings::lastIndexOf(null, x) == -1`). Use the
+`Strings::equalsIgnoreCase(...)` / `Strings::lastIndexOf(...)` static-call
+form when the receiver may be an unchecked platform `null`.
+
 ## Files Module
 
 File I/O (`onion.Files`):

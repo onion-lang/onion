@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-09-05
+
 ### Documentation
 
 - **Documented that `Strings::replace`'s extension-call form is shadowed by

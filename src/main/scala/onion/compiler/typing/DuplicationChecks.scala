@@ -17,35 +17,23 @@ private[compiler] object DuplicationChecks {
   private def erasedParamDescriptor(args: Array[Type]): String =
     args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
 
-  private def allErasedParamDescriptors(args: Array[Type], typing: Typing): Set[String] = {
-    val base = erasedParamDescriptor(args)
-    val variants = Set.newBuilder[String]
-    variants += base
-    // For each argument that is a boxed primitive, also generate a descriptor
-    // where that argument uses the primitive form, and vice versa. This lets
-    // a user implement `compare(a: Int, b: Int)` for `Comparator[Int]`.
-    if args.nonEmpty then
-      val perArg = args.map { arg =>
-        val baseDesc = Erasure.asmType(arg).getDescriptor
-        arg match
-          case bt: BasicType if bt != BasicType.VOID =>
-            Set(baseDesc, Erasure.asmType(typing.boxedTypeArgument(bt)).getDescriptor)
-          case ct: ClassType =>
-            val base = Set(baseDesc)
-            Boxing.unboxedType(typing.table_, ct) match
-              case Some(bt) => base + Erasure.asmType(bt).getDescriptor
-              case None => base
-          case _ =>
-            Set(baseDesc)
-      }
-      // Combine descriptors position-wise.
-      def combine(index: Int, current: String): Unit =
-        if index == args.length then
-          variants += current + ")"
-        else
-          perArg(index).foreach(desc => combine(index + 1, current + desc))
-      combine(0, "(")
-    variants.result()
+  private def parameterPattern(args: Array[Type], typing: Typing): ErasedParameterPattern = {
+    // Keep alternatives independent: materializing all complete signatures
+    // would require 2^arity strings for primitive/boxed parameters.
+    val perArg = args.map { arg =>
+      val baseDesc = Erasure.asmType(arg).getDescriptor
+      arg match
+        case bt: BasicType if bt != BasicType.VOID =>
+          Set(baseDesc, Erasure.asmType(typing.boxedTypeArgument(bt)).getDescriptor)
+        case ct: ClassType =>
+          val base = Set(baseDesc)
+          Boxing.unboxedType(typing.table_, ct) match
+            case Some(bt) => base + Erasure.asmType(bt).getDescriptor
+            case None => base
+        case _ =>
+          Set(baseDesc)
+    }
+    ErasedParameterPattern(perArg)
   }
 
   private def primitiveAwareSuperType(implArg: Type, contractArg: Type, typing: Typing): Boolean = {
@@ -154,30 +142,35 @@ private[compiler] object DuplicationChecks {
     // Exclude the target class itself: an override must target a *base* member.
     val views = allViews - clazz
 
-    // Build the set of overridable base signatures: (name, erasedParamDescriptor).
+    // Index actual base methods by name and arity, keeping per-position choices.
     // Include both the specialized (type-argument substituted) and the raw erased
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
-    val baseKeys = mutable.HashSet[(String, String)]()
+    val basePatterns = mutable.HashMap[(String, Int), mutable.ArrayBuffer[ErasedParameterPattern]]()
+    val baseNames = mutable.HashSet[String]()
+    val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
       for (contract <- view.raw.methods) {
         if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
-          val specializedArgs =
-            contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-          allErasedParamDescriptors(specializedArgs, typing).foreach(desc => baseKeys += ((contract.name, desc)))
-          allErasedParamDescriptors(contract.arguments, typing).foreach(desc => baseKeys += ((contract.name, desc)))
+          baseNames += contract.name
+          val key = (contract.name, contract.arguments.length)
+          if requestedKeys.contains(key) then
+            val specializedArgs =
+              contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+            val patterns = basePatterns.getOrElseUpdate(key, mutable.ArrayBuffer.empty)
+            patterns += parameterPattern(specializedArgs, typing)
+            patterns += parameterPattern(contract.arguments, typing)
       }
     }
 
-    val baseNames = baseKeys.map(_._1).toArray.distinct
-
     for (impl <- overrideMethods) {
-      val implKeys = allErasedParamDescriptors(impl.arguments, typing).map(desc => (impl.name, desc))
-      if !implKeys.exists(baseKeys.contains) then
+      val implPattern = parameterPattern(impl.arguments, typing)
+      val candidates = basePatterns.get((impl.name, impl.arguments.length))
+      if !candidates.exists(_.exists(implPattern.overlaps)) then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
-        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames)
+        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)
     }
   }
 
@@ -242,20 +235,23 @@ private[compiler] object DuplicationChecks {
 
     // Collect all implemented methods from this class AND all ancestor classes
     // Parent classes may already provide concrete implementations for abstract methods
-    val implByErasedParams = mutable.HashMap[(String, String), Method]()
+    val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Array[String]]]()
+
+    def registerImplementation(m: Method): Unit = {
+      val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
+      candidates += m.arguments.map(arg => Erasure.asmType(arg).getDescriptor)
+    }
 
     // Add this class's own methods
     for m <- clazz.methods do
       if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-        implByErasedParams((m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments)))) = m
+        registerImplementation(m)
 
     // Also add concrete methods from parent classes (not just interfaces)
     for view <- views.values do
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-          val key = (m.name, typing.table_.erasedParamsOf(m)(erasedParamDescriptor(m.arguments)))
-          if !implByErasedParams.contains(key) then
-            implByErasedParams(key) = m
+          registerImplementation(m)
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {
@@ -268,9 +264,9 @@ private[compiler] object DuplicationChecks {
           // Example: Picker[String].pick(T) → pick(String) (NOT pick(Object))
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-          val possibleKeys = allErasedParamDescriptors(specializedArgs, typing).map(desc => (contract.name, desc))
-
-          if !possibleKeys.exists(implByErasedParams.contains) then
+          val pattern = parameterPattern(specializedArgs, typing)
+          val candidates = implByNameAndArity.get((contract.name, specializedArgs.length))
+          if !candidates.exists(_.exists(pattern.accepts)) then
             val paramDescriptor = specializedArgs.map(_.name).mkString(", ")
             typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
       }

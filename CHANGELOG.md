@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added a `TextDocCoverageSpec` regression guard checking that every public
+  `onion.Text` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Text` is a genuine, default-imported
+  stdlib module (`Text::wrap`, `Text::indent`, `Text::dedent`, `Text::table`)
+  with 4 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`
+  and `Codec`, each already guarded by its own coverage spec -- it never had
+  one. All 4 members were already documented in both files; this guard now
+  fails the build if a future addition to `onion.Text` goes undocumented.
+
 - **Added a `FormatDocCoverageSpec` regression guard checking that every public
   `onion.Format` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Format` is a genuine, default-imported

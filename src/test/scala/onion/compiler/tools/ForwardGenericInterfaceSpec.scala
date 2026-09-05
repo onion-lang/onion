@@ -33,6 +33,45 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
   }
 
   describe("forward over a generic interface") {
+    it("keeps explicit methods and forwarding separate across ordinary classes") {
+      val result = shell.run(
+        """
+          |interface Value { def get(): String }
+          |class Before {
+          |  val n: Int
+          |public:
+          |  def this { n = 1 }
+          |  def get(): Int = n
+          |}
+          |class Real conforms Value {
+          |public:
+          |  def this {}
+          |  def get(): String = "delegate"
+          |}
+          |class Forwarded conforms Value {
+          |  forward val value: Value
+          |public:
+          |  def this(v: Value) { value = v }
+          |}
+          |class Explicit conforms Value {
+          |  forward val value: Value
+          |public:
+          |  def this(v: Value) { value = v }
+          |  def get(): String = "explicit"
+          |}
+          |class After {
+          |public:
+          |  def this {}
+          |  def get(): String = "after"
+          |}
+          |def main(args: String[]): String {
+          |  return new Before().get() + ":" + new Forwarded(new Real()).get() +
+          |    ":" + new Explicit(new Real()).get() + ":" + new After().get()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("1:delegate:explicit:after") == result)
+    }
+
     it("single-level user-defined interface") {
       val r = shell.run(
         """

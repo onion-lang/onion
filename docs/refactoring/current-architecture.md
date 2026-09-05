@@ -84,6 +84,13 @@ show that some transformations cross semantic boundaries. It should be split
 by explicit pass contracts only after characterization tests identify each
 pass's input/output invariants.
 
+`rewrite.AdtEnumLowering` is the first closed lowering boundary: an ADT enum
+becomes a sealed interface followed by its case records. It owns parameter
+validation and generated declaration construction, but no traversal or mutable
+compiler state. `Rewriting` still selects ADT versus homogeneous enums, rewrites
+the generated declarations at the original position, and enriches exceptions
+with the compilation unit's source file. The body-rewrite fast path is unchanged.
+
 ## Typing
 
 `Typing.scala` is now primarily a facade over four passes:

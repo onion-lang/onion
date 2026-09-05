@@ -18,14 +18,12 @@ import scala.collection.mutable
  * @author Kota Mizushima
  */
 class LocalScope(val parent: LocalScope) {
-  // Allocated on the first `put`: most scopes (loop bodies, branches, lambda bodies) declare
-  // nothing, and a scope is opened for every block.
+  // Most scopes are empty or contain one parameter/local. Keep that binding inline;
+  // larger scopes retain the existing hash-based lookup and iteration behavior.
   private var bindings0: mutable.HashMap[String, LocalBinding] = null
-  private def bindings: mutable.HashMap[String, LocalBinding] = {
-    if (bindings0 == null) bindings0 = mutable.HashMap[String, LocalBinding]()
-    bindings0
-  }
-  private def isEmpty: Boolean = bindings0 == null || bindings0.isEmpty
+  private var hasFirst = false
+  private var firstName: String = null
+  private var firstBinding: LocalBinding = null
 
 
   /**
@@ -33,7 +31,9 @@ class LocalScope(val parent: LocalScope) {
    * @return Set object which element is LocalBinding object
    */
   def entries: mutable.Set[LocalBinding] = {
-    if (isEmpty) mutable.HashSet[LocalBinding]() else mutable.HashSet[LocalBinding]() ++ bindings0.values
+    if (bindings0 != null) mutable.HashSet[LocalBinding]() ++ bindings0.values
+    else if (hasFirst) mutable.HashSet(firstBinding)
+    else mutable.HashSet[LocalBinding]()
   }
 
   /**
@@ -41,16 +41,24 @@ class LocalScope(val parent: LocalScope) {
    * @param name
    * @return true if this scope has entry, false otherwise
    */
-  def contains(name: String): Boolean = bindings0 != null && bindings0.contains(name)
+  def contains(name: String): Boolean =
+    if (bindings0 != null) bindings0.contains(name)
+    else hasFirst && java.util.Objects.equals(firstName, name)
 
   /**
    * Gets all variable names in this scope.
    * @return Set of variable names
    */
-  def names: Set[String] = if (isEmpty) Set.empty else bindings0.keySet.toSet
+  def names: Set[String] =
+    if (bindings0 != null) bindings0.keySet.toSet
+    else if (hasFirst) Set(firstName)
+    else Set.empty
 
   /** The bindings of this scope only, without copying into a Set. */
-  def bindingEntries: Iterator[(String, LocalBinding)] = if (isEmpty) Iterator.empty else bindings0.iterator
+  def bindingEntries: Iterator[(String, LocalBinding)] =
+    if (bindings0 != null) bindings0.iterator
+    else if (hasFirst) Iterator.single(firstName -> firstBinding)
+    else Iterator.empty
 
   /**
    * Gets all variable names in this scope and its ancestors.
@@ -71,10 +79,24 @@ class LocalScope(val parent: LocalScope) {
    * @return true if already putted for given name, false otherwise
    */
   def put(name: String, binding: LocalBinding): Boolean = {
-    if(bindings.contains(name)){
+    if (contains(name)) {
       true
+    } else if (bindings0 != null) {
+      bindings0.put(name, binding)
+      false
+    } else if (hasFirst) {
+      val grown = mutable.HashMap[String, LocalBinding]()
+      grown.put(firstName, firstBinding)
+      grown.put(name, binding)
+      bindings0 = grown
+      firstName = null
+      firstBinding = null
+      hasFirst = false
+      false
     } else {
-      bindings.put(name, binding)
+      firstName = name
+      firstBinding = binding
+      hasFirst = true
       false
     }
   }
@@ -84,11 +106,16 @@ class LocalScope(val parent: LocalScope) {
    * @param name
    * @return the LocalBinding object if registered, null otherwise
    */
-  def get(name: String): Option[LocalBinding] = if (bindings0 == null) None else bindings0.get(name)
+  def get(name: String): Option[LocalBinding] =
+    if (bindings0 != null) bindings0.get(name)
+    else if (contains(name)) Some(firstBinding)
+    else None
 
   /** As `get`, without the Option. */
   private def getOrNull(name: String): LocalBinding =
-    if (bindings0 == null) null else bindings0.getOrElse(name, null)
+    if (bindings0 != null) bindings0.getOrElse(name, null)
+    else if (contains(name)) firstBinding
+    else null
 
   /**
    * Finds the registered binding object from this scope and its ancestors
@@ -108,7 +135,10 @@ class LocalScope(val parent: LocalScope) {
 
   override def toString(): String = {
     val separator = Systems.lineSeparator
-    val lines = for(name <- bindings.keySet) yield s"  ${name}:${bindings(name).tp}"
+    val lines =
+      if (bindings0 != null) for (name <- bindings0.keySet) yield s"  ${name}:${bindings0(name).tp}"
+      else if (hasFirst) Set(s"  ${firstName}:${firstBinding.tp}")
+      else Set.empty[String]
     lines.mkString(s"[${separator}", separator, "]")
   }
 }

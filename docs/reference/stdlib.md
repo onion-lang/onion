@@ -999,12 +999,12 @@ val done: Future[Int] = Future::successful(42)
 val fail: Future[Int] = Future::failed(new RuntimeException("error"))
 
 // Run async on background thread
-val async: Future[String] = Future::async(() -> { return compute(); })
+val async: Future[String] = Future::async { compute() }
 
 // Async with exception handling
-val safe: Future[Int] = Future::asyncThrowing(() -> {
-  return riskyOperation();
-})
+val safe: Future[Int] = Future::asyncThrowing {
+  riskyOperation()
+}
 
 // Delay
 val delayed: Future[Void] = Future::delay(1000L)  // 1 second
@@ -1046,7 +1046,7 @@ f.mapError((e: Throwable) -> { return new CustomException(e); })
 ### Callbacks
 
 ```onion
-val f: Future[String] = Future::async(() -> { return "result"; })
+val f: Future[String] = Future::async { "result" }
 
 f.onSuccess((value: String) -> { IO::println(value); })
 f.onFailure((error: Throwable) -> { IO::println(error); })
@@ -1118,8 +1118,8 @@ Future works with do notation for sequential async composition:
 
 ```onion
 val result: Future[Int] = do[Future] {
-  x <- Future::async(() -> { return fetchA(); })
-  y <- Future::async(() -> { return fetchB(x); })
+  x <- Future::async { fetchA() }
+  y <- Future::async { fetchB(x) }
   ret x + y
 }
 ```
@@ -1271,19 +1271,19 @@ Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 
 ```onion
 // Measure and print execution time, return result
-val result: Int = Timing::measure(() -> { return expensiveOperation(); })
+val result: Int = Timing::measure { expensiveOperation() }
 // Prints: "Elapsed: 123.45ms"
-val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+val result2: Int = Timing::measure("task") { expensiveOperation() }
 // Prints: "task: 123.45ms"
 
 // Same, but for a function that returns nothing
-Timing::measureVoid(() -> { expensiveOperation(); })
+Timing::measureVoid { expensiveOperation() }
 // Prints: "Elapsed: 123.45ms"
-Timing::measureVoid("task", () -> { expensiveOperation(); })
+Timing::measureVoid("task") { expensiveOperation() }
 // Prints: "task: 123.45ms"
 
 // Get execution time in nanoseconds without printing
-val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
+val timeNanos: Long = Timing::time { expensiveOperation() }
 ```
 
 ## Strings Module
@@ -2258,7 +2258,7 @@ val hits = Concurrent::counter()
 hits.increment()
 
 val lock = Concurrent::lock()
-lock.withLock(() -> { /* … */ })     // releases even if the body throws
+lock.withLock { /* … */ }         // releases even if the body throws
 
 val chan = Concurrent::channel(16)   // bounded on purpose
 chan.send("work")
@@ -2375,6 +2375,40 @@ Regex::split(input, pattern, limit): List[String]
 Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
 ```
+
+### Extension-call shadowing
+
+`matches`, `replace`, `replaceFirst` and `split` also work as extension-call
+method chains (`s.matches(p)`, `s.replace(p, r)`, ...), but `java.lang.String`
+already declares instance methods with these exact names and arities, and an
+instance method always wins over an extension method of the same name -- the
+same hazard already documented for `Strings`/`Colls`/`Iterables`/`Maps`/`Sets`.
+`find`, `findAll`, `findFirst`, `groups`, `groupsAll`, `quote`, `isValid` and
+`matchGroups` have no such collision and are not shadowed.
+
+Two different traps hide behind that one shadowing mechanism:
+
+- **`replace` silently changes meaning, not just null-safety.**
+  `String.replace(CharSequence, CharSequence)` is a **literal** substring
+  replacement, while `onion.Regex::replace` treats its second argument as a
+  **regex**. So `s.replace(pattern, replacement)` reaches the literal native
+  method and gives the wrong answer even for an ordinary non-null `s`:
+  ```
+  "a1b22c333".replace("\\d+", "-")     // "a1b22c333" -- no literal "\d+" substring, unchanged
+  Regex::replace("a1b22c333", "\\d+", "-")  // "a-b-c-"   -- \d+ matched as a regex
+  ```
+  Use `Regex::replace(...)` explicitly whenever the pattern is a regex, not
+  `s.replace(...)`.
+
+- **`matches`/`replaceFirst`/`split` reach a native method that already uses
+  regex semantics, so results agree on a non-null receiver -- the divergence
+  only shows up on a `null` platform-typed receiver** (a value from
+  unparameterized Java interop, per CLAUDE.md), where the native method
+  extension-call syntax reaches throws `NullPointerException` instead of the
+  null-safe result `onion.Regex` would give (`false` for `matches`, `""` for
+  `replaceFirst`, `[]` for `split`). `split` has a second gap even for a
+  non-null receiver: `s.split(pattern)` returns a raw `String[]` array, not
+  the `List[String]` every other stdlib collection-returning method promises.
 
 ### Anchored match
 

@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Added a `CodecDocCoverageSpec` regression guard checking that every public
+  `onion.Codec` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Codec` is a genuine, default-imported
+  stdlib module (`Codec::base64Encode`, `Codec::base64Decode`,
+  `Codec::hexEncode`, `Codec::hexDecode`, `Codec::urlEncode`,
+  `Codec::urlDecode`) with 6 distinct public static member names, but --
+  unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`,
+  `Rand`, `Csv` and `Hash`, each already guarded by its own coverage spec --
+  it never had one. All 6 members were already documented in both files;
+  this guard now fails the build if a future addition to `onion.Codec` goes
+  undocumented.
+
+- **Added a `HashDocCoverageSpec` regression guard checking that every public
+  `onion.Hash` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Hash` is a genuine, default-imported
+  stdlib module (`Hash::md5`, `Hash::sha1`, `Hash::sha256`, `Hash::sha512`)
+  with 4 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand` and `Csv`,
+  each already guarded by its own coverage spec -- it never had one. All 4
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Hash` goes undocumented.
+
+- **A trailing lambda with no parameters needs no arrow, and attaches to a
+  static or bare call without an empty argument list:
+  `Future::async { return fetchUser() }`, `Helper::twice { x -> x + 1 }`,
+  `once { 3 }`.** `{ body }` is the zero-parameter closure `{ -> body }`
+  (the arrow form still works); the block's last expression is its value.
+  Instance calls already accepted `list.map { x -> x * 2 }`, but the
+  `Type::method` forms only took a trailing lambda after `(...)` and a bare
+  name took none, so the zero-argument case had to be written
+  `Future::async() { -> ... }` or `Future::async(() -> { return compute(); })`.
+  The `{` is read as a lambda only where a block could not follow the call
+  anyway: in a condition position -- the condition of `if`/`while`/`do ...
+  while`, the collection of `foreach ... in`, the scrutinee of `select`, the
+  `for` header -- a bare `{` is still the statement block, so `if flag { ... }`
+  and `foreach x in xs { ... }` keep their meaning, the arrow form is a lambda
+  there as before, and parentheses, argument lists, index brackets and blocks
+  restore the arrow-less form (`if (once { 1 }) == 1 { ... }`). Both the
+  JavaCC grammar and the handwritten fast-path parser track the condition
+  context; the `{ (k, v) -> ... }` and `{ x => ... }` hints are still reported
+  at the `{` (`BareTrailingLambdaSpec`, `StaticTrailingLambdaSpec`).
+
 ### Documentation
 
 - **Documented that `Strings::equalsIgnoreCase`'s and `Strings::lastIndexOf`'s
@@ -23,6 +67,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the note to the Strings Module section of both `docs/reference/stdlib.md`
   and `docs/ja/reference/stdlib.md`, and a new
   `StringsEqualsIgnoreCaseLastIndexOfShadowingSpec` regression test.
+
+- **The README, `docs/index.md`, the async/functional examples, the stdlib
+  and specification references and `CLAUDE.md` (EN/JA) now write zero-argument
+  callbacks as trailing lambdas (`Future::async { ... }`,
+  `Timing::measure { ... }`) instead of `(() -> { return ...; })`; the lambda
+  guide (EN/JA) gained a "Trailing Lambdas" section with the condition rule.**
+
+- **Added an `IterablesDocCoverageSpec` regression guard checking that every
+  public `onion.Iterables` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Iterables` is a default-imported stdlib module (`Iterables::map`,
+  `Iterables::filter`, `Iterables::foldl`, ...) with 16 distinct public static
+  member names, but -- unlike `Strings`/`Regex`/`Csv`, the other
+  default-imported modules, each already guarded by its own
+  `*DocCoverageSpec` -- it never had one. All 16 members were already
+  documented in both files; this guard now fails the build if a future
+  addition to `onion.Iterables` goes undocumented.
+
+- **Added a `CsvDocCoverageSpec` regression guard checking that every public
+  `onion.Csv` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Csv` is a genuine, default-imported
+  stdlib module (`Csv::parse`, `Csv::stringify`, `Csv::column`, ...) with 6
+  distinct public static member names, but -- unlike `OnionMath`, `Stats`,
+  `Net`, `Proc`, `Scalars`, `DateTime`, `Files` and `Rand`, each already
+  guarded by its own coverage or parity spec -- it never had one. All 6
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Csv` goes undocumented.
+
+- **Added a `SetsDocCoverageSpec` regression guard checking that every public
+  `onion.Sets` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Sets` is a genuine, default-imported
+  stdlib module (`Sets::newSet`, `Sets::union`, `Sets::isDisjoint`, ...) with
+  19 distinct public static member names, but -- unlike `Maps`, already
+  guarded by `MapsDocCoverageSpec` -- it never had one. All 19 members were
+  already documented in both files; this guard now fails the build if a
+  future addition to `onion.Sets` goes undocumented.
+
+- **Added a `StringsDocCoverageSpec` regression guard checking that every
+  public `onion.Strings` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Strings` is a large, default-imported stdlib module (`Strings::trim`,
+  `Strings::padLeft`, `Strings::capitalizeWords`, ...) with almost 40 distinct
+  public static member names, several already individually guarded against
+  native-method shadowing by its `*ExtensionCallShadowingSpec` files, but --
+  unlike `Maps`/`Sets`/`Csv` -- it never had a regression test checking that
+  every member stays documented using the `Strings::name` spelling. All ~40
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Strings` goes undocumented.
+
+- **Added a `RandDocCoverageSpec` regression guard checking that every public
+  `onion.Rand` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Rand` is a default-imported stdlib
+  module (`Rand::nextInt`, `Rand::shuffle`, `Rand::uuid`, ...) with 8 distinct
+  public static member names, but -- unlike `DateTime`/`Stats`/`OnionMath`,
+  the other default-imported date/random/numeric modules, each already
+  guarded by its own `*DocCoverageSpec` -- it never had one. All 8 members
+  were already documented in both files; this guard now fails the build if a
+  future addition to `onion.Rand` goes undocumented.
+
+## [0.55.0] - 2026-09-05
+
+### Documentation
+
+- **Added a `FilesDocCoverageSpec` regression guard checking that every public
+  `onion.Files` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Files` is a genuine, default-imported
+  stdlib module (`Files::readText`, `Files::writeLines`, `Files::glob`, ...)
+  with 26 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars` and `DateTime`, each already guarded by its
+  own `*DocCoverageSpec` -- it never had one. All 26 members were already
+  documented in both files; this guard now fails the build if a future
+  addition to `onion.Files` goes undocumented.
+
+- **Documented that `Regex::matches`/`replace`/`replaceFirst`/`split`'s
+  extension-call forms are shadowed by native `String` methods of the same
+  name, and that `replace` in particular silently switches from regex to
+  literal semantics.** `java.lang.String` already declares `matches`,
+  `replace`, `replaceFirst` and `split` instance methods with the same
+  arity as their `onion.Regex` counterparts, and an instance method always
+  wins over an extension method of the same name -- the same shadowing
+  pattern already documented for `Strings`/`Colls`/`Iterables`/`Maps`/`Sets`.
+  Unlike those, `replace` is not just a null-safety gap: `String.replace`
+  does a **literal** substring replacement while `onion.Regex::replace`
+  treats its pattern as a **regex**, so `s.replace(pattern, replacement)`
+  silently gives the wrong result even on a non-null receiver (e.g.
+  `"a1b22c333".replace("\d+", "-")` is unchanged, while
+  `Regex::replace("a1b22c333", "\d+", "-")` is `"a-b-c-"`). `matches`/
+  `replaceFirst`/`split` agree on a non-null receiver (the native methods
+  are already regex-based there) but throw `NullPointerException` on a
+  `null` platform receiver instead of `onion.Regex`'s null-safe result;
+  `split` also returns a raw `String[]` array rather than `List[String]`.
+  Added a new "Extension-call shadowing" subsection to the Regex module
+  section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new
+  `RegexExtensionCallShadowingSpec` regression test.
 
 - **Documented that `Colls::forEach`'s extension-call form is shadowed by
   native `List.forEach`, and that -- unlike `Maps::forEach`/`Sets::forEach`

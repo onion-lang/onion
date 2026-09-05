@@ -344,9 +344,11 @@ object AsmRefs {
     private val argTypes: Array[TypedAST.Type] =
       if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
       else parsed.arguments
-    // No caller mutates the array (checked); the defensive copy per call was a
-    // measurable allocation in method resolution, which asks for it repeatedly.
+    // Keep the stored signature isolated from callers. Count-only queries need
+    // not allocate the defensive array.
     override def arguments: Array[TypedAST.Type] = argTypes.clone()
+    override def argumentCount: Int = argTypes.length
+    override def argumentTypeAt(index: Int): TypedAST.Type = argTypes(index)
     override val returnType: TypedAST.Type =
       if (parsed == null) bridge.toOnionType(Type.getReturnType(method.desc))
       else parsed.returnType

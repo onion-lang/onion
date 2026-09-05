@@ -38,6 +38,14 @@ private[compiler] final class MethodResolutionSupport(
     )
 
   def applicable(method: Method): Boolean = {
+    // Substitution preserves arity. Reject impossible candidates before creating
+    // specialized parameter arrays or inspecting generic parameter names.
+    val arity = method.argumentCount
+    if method.isVararg && arity > 0 then
+      if params.length < arity - 1 then return false
+    else
+      if params.length < method.minArguments || params.length > arity then return false
+
     val expected = specializedArgs(method)
     val methodTypeParams = table.typeParamNamesOf(method)
     val argsWithTypeParams =
@@ -67,8 +75,6 @@ private[compiler] final class MethodResolutionSupport(
             case _ => componentType
         else componentType
 
-      if params.length < fixedArgCount then return false
-
       var i = 0
       while i < fixedArgCount do
         if !checkArg(i) then return false
@@ -96,7 +102,6 @@ private[compiler] final class MethodResolutionSupport(
       else
         true
     else
-      if params.length < method.minArguments || params.length > expected.length then return false
       var i = 0
       while i < params.length do
         if !checkArg(i) then return false

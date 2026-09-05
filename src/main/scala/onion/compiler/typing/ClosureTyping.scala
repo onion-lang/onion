@@ -180,6 +180,8 @@ final class ClosureTyping(
             def affiliation: ClassType = method.affiliation
             def name: String = method.name
             override def arguments: Array[Type] = argTypes.clone()
+            override def argumentCount: Int = argTypes.length
+            override def argumentTypeAt(index: Int): Type = argTypes(index)
             override def returnType: Type = expectedRet
             override def typeParameters: Array[TypedAST.TypeParameter] = Array()
           }

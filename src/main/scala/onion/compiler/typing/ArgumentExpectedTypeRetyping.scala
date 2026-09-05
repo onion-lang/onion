@@ -114,7 +114,7 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
 
   private def acceptsArity(method: Method, argCount: Int): Boolean =
     if (method.isVararg) argCount >= method.minArguments - 1
-    else argCount >= method.minArguments && argCount <= method.arguments.length
+    else argCount >= method.minArguments && argCount <= method.argumentCount
 
   /** Re-type an argument expression against the expected parameter type. */
   private def retypeArgument(

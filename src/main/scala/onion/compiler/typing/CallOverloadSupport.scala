@@ -88,7 +88,7 @@ private[compiler] final class CallOverloadSupport(
 
     val classSubst = TypeSubstitution.classSubstitution(receiverType) // same for every candidate
     candidates.flatMap { method =>
-      val methodArgCount = method.arguments.length
+      val methodArgCount = method.argumentCount
       val countOk =
         if (method.isVararg) argsCount >= method.minArguments
         else argsCount >= method.minArguments && argsCount <= methodArgCount

@@ -921,19 +921,19 @@ Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 
 ```onion
 // 実行時間を計測して表示し、結果を返す
-val result: Int = Timing::measure(() -> { return expensiveOperation(); })
+val result: Int = Timing::measure { expensiveOperation() }
 // 出力: "Elapsed: 123.45ms"
-val result2: Int = Timing::measure("task", () -> { return expensiveOperation(); })
+val result2: Int = Timing::measure("task") { expensiveOperation() }
 // 出力: "task: 123.45ms"
 
 // 戻り値のない関数版
-Timing::measureVoid(() -> { expensiveOperation(); })
+Timing::measureVoid { expensiveOperation() }
 // 出力: "Elapsed: 123.45ms"
-Timing::measureVoid("task", () -> { expensiveOperation(); })
+Timing::measureVoid("task") { expensiveOperation() }
 // 出力: "task: 123.45ms"
 
 // 表示なしで実行時間（ナノ秒）を取得
-val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
+val timeNanos: Long = Timing::time { expensiveOperation() }
 ```
 
 ## Option モジュール
@@ -979,12 +979,12 @@ val done: Future[Int] = Future::successful(42)
 val fail: Future[Int] = Future::failed(new RuntimeException("error"))
 
 // バックグラウンドスレッドで非同期実行
-val async: Future[String] = Future::async(() -> { return compute(); })
+val async: Future[String] = Future::async { compute() }
 
 // 例外処理付きの非同期実行
-val safe: Future[Int] = Future::asyncThrowing(() -> {
-  return riskyOperation();
-})
+val safe: Future[Int] = Future::asyncThrowing {
+  riskyOperation()
+}
 
 // 遅延
 val delayed: Future[Void] = Future::delay(1000L)  // 1秒
@@ -1026,7 +1026,7 @@ f.mapError((e: Throwable) -> { return new CustomException(e); })
 ### コールバック
 
 ```onion
-val f: Future[String] = Future::async(() -> { return "result"; })
+val f: Future[String] = Future::async { "result" }
 
 f.onSuccess((value: String) -> { IO::println(value); })
 f.onFailure((error: Throwable) -> { IO::println(error); })
@@ -1098,8 +1098,8 @@ Futureは順次非同期合成のためのdo記法で動作：
 
 ```onion
 val result: Future[Int] = do[Future] {
-  x <- Future::async(() -> { return fetchA(); })
-  y <- Future::async(() -> { return fetchB(x); })
+  x <- Future::async { fetchA() }
+  y <- Future::async { fetchB(x) }
   ret x + y
 }
 ```
@@ -2417,7 +2417,7 @@ val hits = Concurrent::counter()
 hits.increment()
 
 val lock = Concurrent::lock()
-lock.withLock(() -> { /* … */ })     // 本体が例外を投げても解放される
+lock.withLock { /* … */ }         // 本体が例外を投げても解放される
 
 val chan = Concurrent::channel(16)   // 意図的に上限つき
 chan.send("work")
@@ -2532,6 +2532,40 @@ Regex::split(input, pattern, limit): List[String]
 Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
 ```
+
+### 拡張呼び出しでのシャドーイング
+
+`matches`、`replace`、`replaceFirst`、`split` は拡張呼び出しのメソッドチェーン
+（`s.matches(p)`、`s.replace(p, r)` など）としても書けるが、`java.lang.String`
+にはこれと同名・同じ引数の数のインスタンスメソッドが既にあり、インスタンス
+メソッドは常に同名の拡張メソッドより優先される -- `Strings`/`Colls`/`Iterables`/
+`Maps`/`Sets` で既に説明している問題と同じ現象。`find`、`findAll`、`findFirst`、
+`groups`、`groupsAll`、`quote`、`isValid`、`matchGroups` はこの衝突が無く、
+シャドーイングされない。
+
+この1つのシャドーイング機構の裏に、性質の異なる2つの罠がある:
+
+- **`replace` は null 安全性だけでなく意味そのものが変わってしまう。**
+  `String.replace(CharSequence, CharSequence)` は**リテラル**な部分文字列
+  置換であるのに対し、`onion.Regex::replace` は第2引数を**正規表現**として
+  扱う。そのため `s.replace(pattern, replacement)` はリテラル版のネイティブ
+  メソッドに到達し、`s` が非 null の通常の値であっても誤った結果になる:
+  ```
+  "a1b22c333".replace("\\d+", "-")          // "a1b22c333" -- リテラル "\d+" は含まれないので変化なし
+  Regex::replace("a1b22c333", "\\d+", "-")  // "a-b-c-"    -- \d+ が正規表現としてマッチ
+  ```
+  パターンが正規表現である場合は `s.replace(...)` ではなく必ず
+  `Regex::replace(...)` を明示的に使うこと。
+
+- **`matches`/`replaceFirst`/`split` が到達するネイティブメソッドは既に正規表現
+  として動作するため、非 null な受信者では結果が一致する -- 違いが表面化する
+  のは `null` なプラットフォーム型の受信者のときだけ**（CLAUDE.md の通り、
+  型パラメータ無しの Java 相互運用から得た値）。その場合、拡張呼び出しが到達
+  するネイティブメソッドは `NullPointerException` を投げるが、`onion.Regex`
+  なら null 安全な結果（`matches` は `false`、`replaceFirst` は `""`、`split`
+  は `[]`）を返す。`split` には非 null な受信者でも起きるもう1つの問題があり、
+  `s.split(pattern)` は他のコレクションを返す標準ライブラリメソッドが約束する
+  `List[String]` ではなく、生の `String[]` 配列を返してしまう。
 
 ### アンカー付きマッチ
 

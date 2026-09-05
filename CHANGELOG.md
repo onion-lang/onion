@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Documented that `Maps::forEach`'s extension-call form is shadowed by
+  native `Map.forEach`.** `java.util.Map` already declares a default
+  instance method `forEach(BiConsumer)` (Java 8+), and instance-method
+  resolution always wins over the extension fallback, so `m.forEach(action)`
+  silently reaches the native method instead of `onion.Maps::forEach` -- the
+  same shadowing pattern already documented for `getOrDefault` in the same
+  section. This is invisible on a non-null `Map`, but on a null
+  platform-typed `Map` the native method throws `NullPointerException`
+  while `Maps::forEach(...)` is a null-safe no-op. Added the note to the
+  Maps Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new `MapsForEachShadowingSpec`
+  regression test.
+
 ## [0.54.0] - 2026-09-05
 
 ### Documentation

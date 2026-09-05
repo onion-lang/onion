@@ -1458,7 +1458,19 @@ map を裏で参照する *ライブビュー* を返すため、そのビュー
 null な map に対する `m.getOrDefault(k, d)` はネイティブメソッドに
 到達し、代わりに `NullPointerException` を投げます -- null かもしれない
 値には `Maps::getOrDefault(...)` を直接呼んで null 安全な挙動を得て
-ください。
+ください。`forEach` も同様にシャドーイングされます -- `java.util.Map` も
+同じ形の default メソッド `forEach(BiConsumer)`（Java 8 以降）を宣言して
+いるため、2引数の Onion ラムダは `onion.Maps::forEach` の `Function2` と
+同様に `BiConsumer` へ SAM 変換され、`m.forEach(action)` は
+`onion.Maps::forEach` ではなく **ネイティブの `java.util.Map.forEach`** に
+到達します。レシーバが非 null であればこれは見えません（どちらも
+反復順序ですべての (key, value) ペアを処理するため）。実行時には
+`null` だがコンパイル時にはチェックされていなかったレシーバ（上記と
+同じ「プラットフォーム型」の落とし穴）に対しては、この違いが表面化
+します: `onion.Maps::forEach` は null 安全（map が `null` なら何もしない）
+ですが、同じ null な map に対する `m.forEach(action)` はネイティブ
+メソッドに到達し、代わりに `NullPointerException` を投げます -- null 安全な
+挙動を得るには `Maps::forEach(...)` を直接呼んでください。
 
 ```onion
 val m: Map[String, Int] = Maps::newMap()

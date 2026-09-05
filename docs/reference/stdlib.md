@@ -2484,7 +2484,18 @@ first. `onion.Maps::getOrDefault` is null-safe (a `null` map returns the
 default), but `m.getOrDefault(k, d)` on that same null map reaches the
 native method and throws `NullPointerException` instead -- call
 `Maps::getOrDefault(...)` directly to get the null-safe behavior on a
-value that might be null.
+value that might be null. `forEach` shadows the same way too: `java.util.Map`
+also declares a matching default instance method `forEach(BiConsumer)`
+(since Java 8), and a two-arg Onion lambda SAM-converts to `BiConsumer` the
+same way it converts to `onion.Maps::forEach`'s `Function2`, so
+`m.forEach(action)` reaches the **native `java.util.Map.forEach`** rather
+than `onion.Maps::forEach`. For a non-null receiver that is invisible, since
+both visit every (key, value) pair in iteration order. It becomes observable
+for a receiver that is `null` at runtime but was never checked at compile
+time (the same "platform type" hazard as above): `onion.Maps::forEach` is
+null-safe (a `null` map is a no-op), but `m.forEach(action)` on that same
+null map reaches the native method and throws `NullPointerException`
+instead -- call `Maps::forEach(...)` directly to get the null-safe behavior.
 
 ### Transformation
 

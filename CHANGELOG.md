@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Added a `CodecDocCoverageSpec` regression guard checking that every public
+  `onion.Codec` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Codec` is a default-imported stdlib
+  module (`Codec::base64Encode`, `Codec::hexEncode`, `Codec::urlEncode`, ...)
+  registered as a builtin extension container, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime` and `Files`, each already
+  guarded by its own `*DocCoverageSpec` -- it never had one. All 6 members
+  were already documented in both files; this guard now fails the build if a
+  future addition to `onion.Codec` goes undocumented.
+
 ## [0.55.0] - 2026-09-05
 
 ### Documentation

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added a `HashDocCoverageSpec` regression guard checking that every public
+  `onion.Hash` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Hash` is a genuine, default-imported
+  stdlib module (`Hash::md5`, `Hash::sha1`, `Hash::sha256`, `Hash::sha512`)
+  with 4 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand` and `Csv`,
+  each already guarded by its own coverage spec -- it never had one. All 4
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Hash` goes undocumented.
+
 - **A trailing lambda with no parameters needs no arrow, and attaches to a
   static or bare call without an empty argument list:
   `Future::async { return fetchUser() }`, `Helper::twice { x -> x + 1 }`,

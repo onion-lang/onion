@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented that `Regex::matches`/`replace`/`replaceFirst`/`split`'s
+  extension-call forms are shadowed by native `String` methods of the same
+  name, and that `replace` in particular silently switches from regex to
+  literal semantics.** `java.lang.String` already declares `matches`,
+  `replace`, `replaceFirst` and `split` instance methods with the same
+  arity as their `onion.Regex` counterparts, and an instance method always
+  wins over an extension method of the same name -- the same shadowing
+  pattern already documented for `Strings`/`Colls`/`Iterables`/`Maps`/`Sets`.
+  Unlike those, `replace` is not just a null-safety gap: `String.replace`
+  does a **literal** substring replacement while `onion.Regex::replace`
+  treats its pattern as a **regex**, so `s.replace(pattern, replacement)`
+  silently gives the wrong result even on a non-null receiver (e.g.
+  `"a1b22c333".replace("\d+", "-")` is unchanged, while
+  `Regex::replace("a1b22c333", "\d+", "-")` is `"a-b-c-"`). `matches`/
+  `replaceFirst`/`split` agree on a non-null receiver (the native methods
+  are already regex-based there) but throw `NullPointerException` on a
+  `null` platform receiver instead of `onion.Regex`'s null-safe result;
+  `split` also returns a raw `String[]` array rather than `List[String]`.
+  Added a new "Extension-call shadowing" subsection to the Regex module
+  section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new
+  `RegexExtensionCallShadowingSpec` regression test.
+
 - **Documented that `Colls::forEach`'s extension-call form is shadowed by
   native `List.forEach`, and that -- unlike `Maps::forEach`/`Sets::forEach`
   -- this hides no null-safety gap.** `java.util.List` conforms to

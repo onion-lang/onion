@@ -2363,6 +2363,40 @@ Regex::quote(literal): String    // Escape special characters
 Regex::isValid(pattern): Boolean
 ```
 
+### Extension-call shadowing
+
+`matches`, `replace`, `replaceFirst` and `split` also work as extension-call
+method chains (`s.matches(p)`, `s.replace(p, r)`, ...), but `java.lang.String`
+already declares instance methods with these exact names and arities, and an
+instance method always wins over an extension method of the same name -- the
+same hazard already documented for `Strings`/`Colls`/`Iterables`/`Maps`/`Sets`.
+`find`, `findAll`, `findFirst`, `groups`, `groupsAll`, `quote`, `isValid` and
+`matchGroups` have no such collision and are not shadowed.
+
+Two different traps hide behind that one shadowing mechanism:
+
+- **`replace` silently changes meaning, not just null-safety.**
+  `String.replace(CharSequence, CharSequence)` is a **literal** substring
+  replacement, while `onion.Regex::replace` treats its second argument as a
+  **regex**. So `s.replace(pattern, replacement)` reaches the literal native
+  method and gives the wrong answer even for an ordinary non-null `s`:
+  ```
+  "a1b22c333".replace("\\d+", "-")     // "a1b22c333" -- no literal "\d+" substring, unchanged
+  Regex::replace("a1b22c333", "\\d+", "-")  // "a-b-c-"   -- \d+ matched as a regex
+  ```
+  Use `Regex::replace(...)` explicitly whenever the pattern is a regex, not
+  `s.replace(...)`.
+
+- **`matches`/`replaceFirst`/`split` reach a native method that already uses
+  regex semantics, so results agree on a non-null receiver -- the divergence
+  only shows up on a `null` platform-typed receiver** (a value from
+  unparameterized Java interop, per CLAUDE.md), where the native method
+  extension-call syntax reaches throws `NullPointerException` instead of the
+  null-safe result `onion.Regex` would give (`false` for `matches`, `""` for
+  `replaceFirst`, `[]` for `split`). `split` has a second gap even for a
+  non-null receiver: `s.split(pattern)` returns a raw `String[]` array, not
+  the `List[String]` every other stdlib collection-returning method promises.
+
 ### Anchored match
 
 ```

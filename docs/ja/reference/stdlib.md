@@ -2519,6 +2519,40 @@ Regex::quote(literal): String    // 特殊文字をエスケープ
 Regex::isValid(pattern): Boolean
 ```
 
+### 拡張呼び出しでのシャドーイング
+
+`matches`、`replace`、`replaceFirst`、`split` は拡張呼び出しのメソッドチェーン
+（`s.matches(p)`、`s.replace(p, r)` など）としても書けるが、`java.lang.String`
+にはこれと同名・同じ引数の数のインスタンスメソッドが既にあり、インスタンス
+メソッドは常に同名の拡張メソッドより優先される -- `Strings`/`Colls`/`Iterables`/
+`Maps`/`Sets` で既に説明している問題と同じ現象。`find`、`findAll`、`findFirst`、
+`groups`、`groupsAll`、`quote`、`isValid`、`matchGroups` はこの衝突が無く、
+シャドーイングされない。
+
+この1つのシャドーイング機構の裏に、性質の異なる2つの罠がある:
+
+- **`replace` は null 安全性だけでなく意味そのものが変わってしまう。**
+  `String.replace(CharSequence, CharSequence)` は**リテラル**な部分文字列
+  置換であるのに対し、`onion.Regex::replace` は第2引数を**正規表現**として
+  扱う。そのため `s.replace(pattern, replacement)` はリテラル版のネイティブ
+  メソッドに到達し、`s` が非 null の通常の値であっても誤った結果になる:
+  ```
+  "a1b22c333".replace("\\d+", "-")          // "a1b22c333" -- リテラル "\d+" は含まれないので変化なし
+  Regex::replace("a1b22c333", "\\d+", "-")  // "a-b-c-"    -- \d+ が正規表現としてマッチ
+  ```
+  パターンが正規表現である場合は `s.replace(...)` ではなく必ず
+  `Regex::replace(...)` を明示的に使うこと。
+
+- **`matches`/`replaceFirst`/`split` が到達するネイティブメソッドは既に正規表現
+  として動作するため、非 null な受信者では結果が一致する -- 違いが表面化する
+  のは `null` なプラットフォーム型の受信者のときだけ**（CLAUDE.md の通り、
+  型パラメータ無しの Java 相互運用から得た値）。その場合、拡張呼び出しが到達
+  するネイティブメソッドは `NullPointerException` を投げるが、`onion.Regex`
+  なら null 安全な結果（`matches` は `false`、`replaceFirst` は `""`、`split`
+  は `[]`）を返す。`split` には非 null な受信者でも起きるもう1つの問題があり、
+  `s.split(pattern)` は他のコレクションを返す標準ライブラリメソッドが約束する
+  `List[String]` ではなく、生の `String[]` 配列を返してしまう。
+
 ### アンカー付きマッチ
 
 ```

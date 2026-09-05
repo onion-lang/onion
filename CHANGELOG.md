@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented that `Strings::replace`'s extension-call form is shadowed by
+  native `String.replace`, closing a gap in the "identical behavior" claim.**
+  The Strings Module section's opening paragraph claims most `Strings`
+  methods "also work as extension-call method chains ... with identical
+  behavior to the static form," but `java.lang.String` already declares an
+  instance method `replace(CharSequence, CharSequence)`, and an instance
+  method always wins over an extension method of the same name -- the same
+  hazard already documented for `trim`/`startsWith`/`endsWith`/`indexOf` in
+  the same section. `s.replace(a, b)` on a platform-typed `null` receiver
+  throws `NullPointerException` from the native method, while
+  `Strings::replace(null, a, b)` is null-safe and returns `""`. Added
+  `replace` to the `trim`/`startsWith`/`endsWith`/`indexOf` shadowing
+  paragraph in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new
+  `StringsReplaceExtensionCallShadowingSpec` regression test.
+
 - **Documented that `Colls::contains` is also native-shadowed, alongside
   `isEmpty`/`size`/`get`/`containsKey`.** The Colls Module section's
   shadowing-explanation paragraph said instance methods on `List`/`Set`/`Map`

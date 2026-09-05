@@ -1379,20 +1379,21 @@ the native method, while `onion.Strings`'s versions are null-safe
 false`). Use the `Strings::contains(...)` / `Strings::isEmpty(...)`
 static-call form when the receiver may be an unchecked platform `null`.
 
-**`trim`, `startsWith`, `endsWith` and `indexOf` are shadowed the same way**:
-`java.lang.String` already defines `trim()`, `startsWith(String)`,
-`endsWith(String)` and `indexOf(String)` instance methods, so `s.trim()`,
-`s.startsWith(x)`, `s.endsWith(x)` and `s.indexOf(x)` also silently reach
-the *native JDK method* instead of `onion.Strings`'s. As with
-`contains`/`isEmpty` above, this is invisible for a non-null `String` and
-only becomes observable for a platform-typed `null` receiver, where the
-native methods throw `NullPointerException` while `onion.Strings`'s
-versions are null-safe (`Strings::trim(null) == ""`,
+**`trim`, `startsWith`, `endsWith`, `indexOf` and `replace` are shadowed the
+same way**: `java.lang.String` already defines `trim()`,
+`startsWith(String)`, `endsWith(String)`, `indexOf(String)` and
+`replace(CharSequence, CharSequence)` instance methods, so `s.trim()`,
+`s.startsWith(x)`, `s.endsWith(x)`, `s.indexOf(x)` and `s.replace(a, b)`
+also silently reach the *native JDK method* instead of `onion.Strings`'s.
+As with `contains`/`isEmpty` above, this is invisible for a non-null
+`String` and only becomes observable for a platform-typed `null` receiver,
+where the native methods throw `NullPointerException` while
+`onion.Strings`'s versions are null-safe (`Strings::trim(null) == ""`,
 `Strings::startsWith(null, x) == false`, `Strings::endsWith(null, x) ==
-false`, `Strings::indexOf(null, x) == -1`). Use the `Strings::trim(...)` /
-`Strings::startsWith(...)` / `Strings::endsWith(...)` /
-`Strings::indexOf(...)` static-call form when the receiver may be an
-unchecked platform `null`.
+false`, `Strings::indexOf(null, x) == -1`, `Strings::replace(null, a, b) ==
+""`). Use the `Strings::trim(...)` / `Strings::startsWith(...)` /
+`Strings::endsWith(...)` / `Strings::indexOf(...)` / `Strings::replace(...)`
+static-call form when the receiver may be an unchecked platform `null`.
 
 **`isBlank` is shadowed too, and observably so even on an ordinary non-null
 `String`**: `java.lang.String` has defined an `isBlank()` instance method

@@ -1384,20 +1384,23 @@ JDK 側のメソッドから `NullPointerException` を投げますが、
 プラットフォーム `null` になり得る場合は `Strings::contains(...)` /
 `Strings::isEmpty(...)` の静的呼び出し形式を使ってください。
 
-**`trim`・`startsWith`・`endsWith`・`indexOf` も同様に遮蔽されます**:
-`java.lang.String` にはすでに `trim()`・`startsWith(String)`・
-`endsWith(String)`・`indexOf(String)` というインスタンスメソッドが
-定義されているため、`s.trim()`・`s.startsWith(x)`・`s.endsWith(x)`・
-`s.indexOf(x)` も `onion.Strings` 側ではなく **JDK 標準の同名メソッド**
+**`trim`・`startsWith`・`endsWith`・`indexOf`・`replace` も同様に遮蔽され
+ます**: `java.lang.String` にはすでに `trim()`・`startsWith(String)`・
+`endsWith(String)`・`indexOf(String)`・`replace(CharSequence,
+CharSequence)` というインスタンスメソッドが定義されているため、
+`s.trim()`・`s.startsWith(x)`・`s.endsWith(x)`・`s.indexOf(x)`・
+`s.replace(a, b)` も `onion.Strings` 側ではなく **JDK 標準の同名メソッド**
 を暗黙のうちに呼び出します。上の `contains`/`isEmpty` と同様、`null`
 でない `String` では見分けが付かず、差が表面化するのはプラットフォーム型の
 `null` を受け手にした場合だけです: このとき JDK 側のメソッドは
 `NullPointerException` を投げますが、`onion.Strings` の版は null 安全です
 （`Strings::trim(null) == ""`、`Strings::startsWith(null, x) == false`、
 `Strings::endsWith(null, x) == false`、`Strings::indexOf(null, x) ==
--1`）。受け手が未検査のプラットフォーム `null` になり得る場合は
-`Strings::trim(...)` / `Strings::startsWith(...)` / `Strings::endsWith(...)`
-/ `Strings::indexOf(...)` の静的呼び出し形式を使ってください。
+-1`、`Strings::replace(null, a, b) == ""`）。受け手が未検査の
+プラットフォーム `null` になり得る場合は `Strings::trim(...)` /
+`Strings::startsWith(...)` / `Strings::endsWith(...)` /
+`Strings::indexOf(...)` / `Strings::replace(...)` の静的呼び出し形式を
+使ってください。
 
 **`isBlank` も遮蔽されますが、`null` を渡さない通常の `String` でも
 挙動差が表面化します**: `java.lang.String` には Java 11 以降

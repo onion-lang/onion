@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added a `YamlDocCoverageSpec` regression guard checking that every public
+  `onion.Yaml` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Yaml` is a genuine, default-imported
+  stdlib module (`Yaml::parse`, `Yaml::stringify`) with 2 distinct public
+  static member names, but -- unlike `OnionMath`, `Stats`, `Net`, `Proc`,
+  `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`, `Codec`, `Text`,
+  `Format` and `Assert`, each already guarded by its own coverage spec -- it
+  never had one. Both members were already documented in both files; this
+  guard now fails the build if a future addition to `onion.Yaml` goes
+  undocumented.
+
 - **Added a `TextDocCoverageSpec` regression guard checking that every public
   `onion.Text` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Text` is a genuine, default-imported

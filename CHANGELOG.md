@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Added an `IterablesDocCoverageSpec` regression guard checking that every
+  public `onion.Iterables` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Iterables` is a default-imported stdlib module (`Iterables::map`,
+  `Iterables::filter`, `Iterables::foldl`, ...) with 16 distinct public static
+  member names, but -- unlike `Strings`/`Regex`/`Csv`, the other
+  default-imported modules, each already guarded by its own
+  `*DocCoverageSpec` -- it never had one. All 16 members were already
+  documented in both files; this guard now fails the build if a future
+  addition to `onion.Iterables` goes undocumented.
+
 - **Added a `CsvDocCoverageSpec` regression guard checking that every public
   `onion.Csv` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Csv` is a genuine, default-imported

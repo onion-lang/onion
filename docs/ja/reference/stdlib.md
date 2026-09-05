@@ -1418,6 +1418,20 @@ EM SPACE だけからなる文字列は `s.isBlank()`（拡張呼び出し構文
 空白扱いになりません。`trim()` ベースの ASCII 空白の意味論が必要な
 場合は `Strings::isBlank(...)` の静的呼び出し形式を使ってください。
 
+**`equalsIgnoreCase` と `lastIndexOf` も、上の
+`trim`・`startsWith`・`endsWith`・`indexOf`・`replace` と同様に遮蔽され
+ます**: `java.lang.String` にはすでに `equalsIgnoreCase(String)`・
+`lastIndexOf(String)` というインスタンスメソッドが定義されているため、
+`s.equalsIgnoreCase(x)` と `s.lastIndexOf(x)` も `onion.Strings` 側では
+なく **JDK 標準の同名メソッド** を暗黙のうちに呼び出します。上と同様、
+`null` でない `String` では見分けが付かず、差が表面化するのはプラット
+フォーム型の `null` を受け手にした場合だけです: このとき JDK 側の
+メソッドは `NullPointerException` を投げますが、`onion.Strings` の版は
+null 安全です（`Strings::equalsIgnoreCase(null, x) == false`、
+`Strings::lastIndexOf(null, x) == -1`）。受け手が未検査のプラット
+フォーム `null` になり得る場合は `Strings::equalsIgnoreCase(...)` /
+`Strings::lastIndexOf(...)` の静的呼び出し形式を使ってください。
+
 ## Maps モジュール
 
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。

@@ -516,21 +516,6 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   // Synthetic Record Methods: equals, hashCode, toString, copy
   // =====================================================
 
-  private val ObjectsType: AsmType = AsmType.getType(classOf[java.util.Objects])
-  private val ObjectsEquals: AsmMethod = AsmMethod.getMethod("boolean equals(Object, Object)")
-  private val ObjectsHashCode: AsmMethod = AsmMethod.getMethod("int hashCode(Object)")
-  private val StringBuilderType: AsmType = AsmType.getType(classOf[java.lang.StringBuilder])
-  private val StringBuilderAppendString: AsmMethod = AsmMethod.getMethod("StringBuilder append(String)")
-  private val StringBuilderAppendObject: AsmMethod = AsmMethod.getMethod("StringBuilder append(Object)")
-  private val StringBuilderAppendInt: AsmMethod = AsmMethod.getMethod("StringBuilder append(int)")
-  private val StringBuilderAppendLong: AsmMethod = AsmMethod.getMethod("StringBuilder append(long)")
-  private val StringBuilderAppendDouble: AsmMethod = AsmMethod.getMethod("StringBuilder append(double)")
-  private val StringBuilderAppendFloat: AsmMethod = AsmMethod.getMethod("StringBuilder append(float)")
-  private val StringBuilderAppendBoolean: AsmMethod = AsmMethod.getMethod("StringBuilder append(boolean)")
-  private val StringBuilderAppendChar: AsmMethod = AsmMethod.getMethod("StringBuilder append(char)")
-  private val StringBuilderToString: AsmMethod = AsmMethod.getMethod("String toString()")
-  private val StringBuilderInit: AsmMethod = AsmMethod.getMethod("void <init>(String)")
-
   /**
    * Generate equals method for record:
    * {{{
@@ -1020,6 +1005,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 object AsmCodeGeneration:
   import org.objectweb.asm.commons.{Method => AsmMethod}
   import TypedAST._
+
+  // Immutable JVM descriptors are shared, not parsed for every compiler instance.
+  private val ObjectsType: AsmType = AsmType.getType(classOf[java.util.Objects])
+  private val ObjectsEquals: AsmMethod = AsmMethod.getMethod("boolean equals(Object, Object)")
+  private val ObjectsHashCode: AsmMethod = AsmMethod.getMethod("int hashCode(Object)")
+  private val StringBuilderType: AsmType = AsmType.getType(classOf[java.lang.StringBuilder])
+  private val StringBuilderAppendString: AsmMethod = AsmMethod.getMethod("StringBuilder append(String)")
+  private val StringBuilderAppendObject: AsmMethod = AsmMethod.getMethod("StringBuilder append(Object)")
+  private val StringBuilderAppendInt: AsmMethod = AsmMethod.getMethod("StringBuilder append(int)")
+  private val StringBuilderAppendLong: AsmMethod = AsmMethod.getMethod("StringBuilder append(long)")
+  private val StringBuilderAppendDouble: AsmMethod = AsmMethod.getMethod("StringBuilder append(double)")
+  private val StringBuilderAppendFloat: AsmMethod = AsmMethod.getMethod("StringBuilder append(float)")
+  private val StringBuilderAppendBoolean: AsmMethod = AsmMethod.getMethod("StringBuilder append(boolean)")
+  private val StringBuilderAppendChar: AsmMethod = AsmMethod.getMethod("StringBuilder append(char)")
+  private val StringBuilderToString: AsmMethod = AsmMethod.getMethod("String toString()")
+  private val StringBuilderInit: AsmMethod = AsmMethod.getMethod("void <init>(String)")
 
   /** Parallel class generation; `-Donion.codegen.sequential=true` forces sequential. */
   val parallelClasses: Boolean =

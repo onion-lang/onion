@@ -127,6 +127,8 @@ object ReflectionRefs {
     override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
     private val argTypes: Array[TypedAST.Type] = method.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
     override def arguments: Array[TypedAST.Type] = argTypes.clone()
+    override def argumentCount: Int = argTypes.length
+    override def argumentTypeAt(index: Int): TypedAST.Type = argTypes(index)
     override val returnType: TypedAST.Type = mapper.toOnionType(method.getGenericReturnType, env0)
     val underlying: Method = method
   }

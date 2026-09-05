@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Documented that `Colls::forEach`'s extension-call form is shadowed by
+  native `List.forEach`, and that -- unlike `Maps::forEach`/`Sets::forEach`
+  -- this hides no null-safety gap.** `java.util.List` conforms to
+  `Iterable`, which already declares a default instance method
+  `forEach(Consumer)` (Java 8+), so `xs.forEach(action)` always reaches the
+  native method, never `onion.Colls::forEach` -- the same shadowing pattern
+  already documented for `Maps::forEach`/`Sets::forEach`. But
+  `onion.Colls::forEach` performs no null check at all (unlike its `Maps`/
+  `Sets` counterparts), so calling it directly on a null platform `List`
+  also throws `NullPointerException`, same as the native method it's
+  shadowed by -- there is no null-safe form to fall back on here. Added the
+  note to the Colls Module section of both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`, and a new `CollsForEachShadowingSpec`
+  regression test.
+
 - **Documented that `Maps::forEach`'s extension-call form is shadowed by
   native `Map.forEach`.** `java.util.Map` already declares a default
   instance method `forEach(BiConsumer)` (Java 8+), and instance-method

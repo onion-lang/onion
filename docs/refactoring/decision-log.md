@@ -142,3 +142,22 @@ after the removed `for ... in` cases and before declaration rules, and it stays
 ahead of the generic missing-block fallback. Message keys, arguments, regular
 expressions, localization, source locations, and no-match behavior do not
 change.
+
+## D012: extract ADT declaration construction, not another whole-tree pass
+
+Decision: `rewrite.AdtEnumLowering.lower` maps one ADT enum to its sealed
+interface and ordered case records. The caller keeps selection, traversal,
+and diagnostic source enrichment.
+
+Reason: this is a closed transformation with no reads of `Rewriting` state.
+Extracting it does not require callbacks, a service facade, a registry, or an
+additional tree walk. The surrounding dictionary scopes and body fast path
+remain untouched. Recent churn is low here; the benefit is an explicit tested
+declaration-construction boundary, not a claimed performance improvement.
+
+Invariant: modifiers, type-parameter order/bounds, applied parent type, field
+defaults, method filtering and order, singleton representation, and the
+shared-parameter rejection remain unchanged. Generated declaration locations
+remain the enum location, not the case location. Bodies still pass through
+the existing rewriters after expansion; homogeneous enums do not enter this
+lowering. No new singleton accessor or mixed-constant policy is introduced.

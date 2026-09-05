@@ -69,6 +69,7 @@ markdown_extensions:
 exclude_docs: |
   superpowers/
   refactoring/
+  compilation-speed.md
 
 nav:
   - Home: index.md

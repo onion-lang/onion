@@ -1454,6 +1454,12 @@ object TypedAST {
 
     def arguments: Array[TypedAST.Type]
 
+    /** Parameter count without requiring callers to request a defensive array copy. */
+    def argumentCount: Int = arguments.length
+
+    /** Read one parameter type without exposing an implementation's stored array. */
+    def argumentTypeAt(index: Int): TypedAST.Type = arguments(index)
+
     def returnType: TypedAST.Type
 
     /**
@@ -1508,13 +1514,14 @@ object TypedAST {
     def compare(m1: TypedAST.Method, m2: TypedAST.Method): Int = {
       var result: Int = m1.name.compareTo(m2.name)
       if (result != 0) return result
-      val args1: Array[TypedAST.Type] = m1.arguments
-      val args2: Array[TypedAST.Type] = m2.arguments
-      result = args1.length - args2.length
+      val count = m1.argumentCount
+      result = count - m2.argumentCount
       if (result != 0) return result
       var i = 0
-      while (i < args1.length) {
-        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
+      while (i < count) {
+        val arg1 = m1.argumentTypeAt(i)
+        val arg2 = m2.argumentTypeAt(i)
+        if (arg1 ne arg2) return arg1.name.compareTo(arg2.name)
         i += 1
       }
       0

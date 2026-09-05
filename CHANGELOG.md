@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   callbacks as trailing lambdas (`Future::async { -> ... }`,
   `Timing::measure { -> ... }`) instead of `(() -> { return ...; })`.**
 
+- **Added an `IterablesDocCoverageSpec` regression guard checking that every
+  public `onion.Iterables` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Iterables` is a default-imported stdlib module (`Iterables::map`,
+  `Iterables::filter`, `Iterables::foldl`, ...) with 16 distinct public static
+  member names, but -- unlike `Strings`/`Regex`/`Csv`, the other
+  default-imported modules, each already guarded by its own
+  `*DocCoverageSpec` -- it never had one. All 16 members were already
+  documented in both files; this guard now fails the build if a future
+  addition to `onion.Iterables` goes undocumented.
+
 - **Added a `CsvDocCoverageSpec` regression guard checking that every public
   `onion.Csv` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Csv` is a genuine, default-imported
@@ -35,6 +46,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarded by its own coverage or parity spec -- it never had one. All 6
   members were already documented in both files; this guard now fails the
   build if a future addition to `onion.Csv` goes undocumented.
+
+- **Added a `SetsDocCoverageSpec` regression guard checking that every public
+  `onion.Sets` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Sets` is a genuine, default-imported
+  stdlib module (`Sets::newSet`, `Sets::union`, `Sets::isDisjoint`, ...) with
+  19 distinct public static member names, but -- unlike `Maps`, already
+  guarded by `MapsDocCoverageSpec` -- it never had one. All 19 members were
+  already documented in both files; this guard now fails the build if a
+  future addition to `onion.Sets` goes undocumented.
+
+- **Added a `StringsDocCoverageSpec` regression guard checking that every
+  public `onion.Strings` member is documented in both
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md`.**
+  `onion.Strings` is a large, default-imported stdlib module (`Strings::trim`,
+  `Strings::padLeft`, `Strings::capitalizeWords`, ...) with almost 40 distinct
+  public static member names, several already individually guarded against
+  native-method shadowing by its `*ExtensionCallShadowingSpec` files, but --
+  unlike `Maps`/`Sets`/`Csv` -- it never had a regression test checking that
+  every member stays documented using the `Strings::name` spelling. All ~40
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Strings` goes undocumented.
 
 ## [0.55.0] - 2026-09-05
 

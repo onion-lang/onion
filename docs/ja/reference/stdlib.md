@@ -2062,6 +2062,16 @@ Colls::toList(args)               // Java配列（例: main の String[]）を L
 側のメソッドにしか届かない。ただしこれは観測できない差異である: `Colls` 側の
 実装はどれも同じネイティブメソッドへの1行委譲でしかないため。
 
+`forEach` も同じ理由でシャドーイングされる（上記の `Maps::forEach`・
+`Sets::forEach` と同様）: `List` は（`Iterable` 経由で）同じ形の1引数
+インスタンスメソッド `forEach(Consumer)`（Java 8 以降の default メソッド）を
+宣言しているため、`xs.forEach(action)` は常に**ネイティブの**メソッドに到達し、
+`onion.Colls::forEach` には到達しない。ただし `Maps`/`Sets` とは null 安全性の
+話が逆になる: `onion.Colls::forEach` はそもそも null チェックを行わないため、
+null なプラットフォーム型の `List` に対して直接呼び出しても同様に
+`NullPointerException` が発生する -- ここには頼れる null 安全な代替呼び出し方が
+無い。
+
 ### バッチ化・ウィンドウ化・セレクタ集計
 
 これらも `Colls::` の静的呼び出しとして、また `Colls` の他のメソッドと同様に

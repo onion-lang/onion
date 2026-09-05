@@ -1900,6 +1900,15 @@ so these five calls never actually reach `onion.Colls`'s versions, only the
 native ones. That is not observable here: `Colls`'s implementations are
 one-line pass-throughs to the same native method.
 
+`forEach` shadows the same way, for the same underlying reason as
+`Maps::forEach`/`Sets::forEach` documented above: `List` (via `Iterable`)
+already declares a matching one-arg instance `forEach(Consumer)` (a default
+method since Java 8), so `xs.forEach(action)` reaches the *native* method,
+never `onion.Colls::forEach`. Unlike `Maps`/`Sets`, though, that shadowing
+hides no null-safety gap: `onion.Colls::forEach` performs no null check at
+all, so calling it directly on a null platform `List` also throws
+`NullPointerException` -- there is no null-safe form to fall back on here.
+
 ### Batching, windowing, and selector aggregation
 
 Also available as `Colls::` static calls and, like the rest of `Colls`, as

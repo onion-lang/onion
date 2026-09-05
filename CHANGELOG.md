@@ -68,6 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   members were already documented in both files; this guard now fails the
   build if a future addition to `onion.Strings` goes undocumented.
 
+- **Added a `RandDocCoverageSpec` regression guard checking that every public
+  `onion.Rand` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Rand` is a default-imported stdlib
+  module (`Rand::nextInt`, `Rand::shuffle`, `Rand::uuid`, ...) with 8 distinct
+  public static member names, but -- unlike `DateTime`/`Stats`/`OnionMath`,
+  the other default-imported date/random/numeric modules, each already
+  guarded by its own `*DocCoverageSpec` -- it never had one. All 8 members
+  were already documented in both files; this guard now fails the build if a
+  future addition to `onion.Rand` goes undocumented.
+
 ## [0.55.0] - 2026-09-05
 
 ### Documentation

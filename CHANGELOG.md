@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Added a `ServerDocCoverageSpec` regression guard checking that every public
+  `onion.Server` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Server` is a genuine, default-imported
+  stdlib module (`Server::start`, `Server::text`, `Server::json`, `Server::html`,
+  `Server::notFound`, `Server::status`) with 6 distinct public static member
+  names, but -- unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`,
+  `Files`, `Rand`, `Csv`, `Hash`, `Codec`, `Text`, `Format`, `Assert`, `Yaml` and
+  `Archive`, each already guarded by its own coverage spec -- it never had one.
+  All 6 members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Server` goes undocumented.
+
 - **Added an `ArchiveDocCoverageSpec` regression guard checking that every public
   `onion.Archive` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Archive` is a genuine, default-imported

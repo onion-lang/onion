@@ -382,4 +382,32 @@ final class MethodCallTyping(
    */
   def typeSafeMethodCall(node: AST.SafeMethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     safeNavigationTypingSupport.typeSafeMethodCall(node, context, expected)
+
+  /**
+   * The arguments typed ahead of overload resolution for a call with untyped-parameter
+   * closures: null at the closure positions (their parameter types come from the callee),
+   * None when any other argument fails to type (already reported).
+   */
+  private[typing] def typePreliminaryParams(args: Seq[AST.Expression], context: LocalContext, untypedClosureIndices: Set[Int]): Option[Array[Term]] = {
+    val params = new Array[Term](args.length)
+    var failed = false
+    var i = 0
+    val it = args.iterator
+    while (it.hasNext) {
+      val arg = it.next()
+      if (!untypedClosureIndices.contains(i)) typed(arg, context) match {
+        case Some(term) => params(i) = term
+        case None => failed = true
+      }
+      i += 1
+    }
+    if (failed) None else Some(params)
+  }
+
+  /** For overload disambiguation: whether the closure at argument `i` fits a candidate's SAM parameter type. */
+  private[typing] def closureSamMatcher(args: Seq[AST.Expression], context: LocalContext): (Int, Type) => Option[Boolean] =
+    (i, samType) => args(i) match {
+      case c: AST.ClosureExpression => closureMatchesSam(c, context, samType)
+      case _ => None
+    }
 }

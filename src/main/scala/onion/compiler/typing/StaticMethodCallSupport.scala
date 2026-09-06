@@ -168,21 +168,7 @@ private[compiler] final class StaticMethodCallSupport(
   ): Option[Term] = {
     val args = argList.toArray
 
-    val preliminaryParams = new Array[Term](args.length)
-    var hasNonClosureError = false
-    for (i <- args.indices) {
-      if (untypedClosureIndices.contains(i)) {
-        preliminaryParams(i) = null
-      } else {
-        calls.typed(args(i), context) match {
-          case Some(term) => preliminaryParams(i) = term
-          case None =>
-            hasNonClosureError = true
-            preliminaryParams(i) = null
-        }
-      }
-    }
-    if (hasNonClosureError) return None
+    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices).getOrElse(return None)
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
@@ -210,10 +196,7 @@ private[compiler] final class StaticMethodCallSupport(
     val disambiguated = overloadSupport.disambiguateClosureOverloads(
       applicableMethods,
       untypedClosureIndices,
-      (i, samType) => args(i) match {
-        case c: AST.ClosureExpression => calls.closureMatchesSam(c, context, samType)
-        case _ => None
-      }
+      calls.closureSamMatcher(args, context)
     )
 
     val method = overloadSupport.selectMostSpecificApplicable(

@@ -850,12 +850,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         }
       } else going = false
     }
-    val superTypes = new ArrayBuffer[AST.TypeNode]()
-    if (kind(1) == K.ID && image(1) == "conforms") {
-      next()
-      superTypes += typ()
-      while (accept(K.COMMA)) superTypes += typ()
-    }
+    val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
     if (accept(K.LBRACE)) {
       while (isAccessSectionStart(kind(1))) sections += accessSection()
@@ -870,12 +865,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val start = expect(K.K_INTERFACE)
     val name = id()
     val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
-    val superTypes = new ArrayBuffer[AST.TypeNode]()
-    if (kind(1) == K.ID && image(1) == "conforms") {
-      next()
-      superTypes += typ()
-      while (accept(K.COMMA)) superTypes += typ()
-    }
+    val superTypes = conformsClause()
     val signatures = new ArrayBuffer[AST.MethodDeclaration]()
     if (kind(1) == K.LBRACE) {
       next()
@@ -886,16 +876,22 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     AST.InterfaceDeclaration(p(start), mset, c(name), superTypes.toList, signatures.toList, tparams)
   }
 
-  private def traitDecl(mset: Int): AST.InterfaceDeclaration = {
-    val start = expect(K.K_TRAIT)
-    val name = id()
-    val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
+  /** `conforms T1, T2, ...` when present, else empty. */
+  private def conformsClause(): ArrayBuffer[AST.TypeNode] = {
     val superTypes = new ArrayBuffer[AST.TypeNode]()
     if (kind(1) == K.ID && image(1) == "conforms") {
       next()
       superTypes += typ()
       while (accept(K.COMMA)) superTypes += typ()
     }
+    superTypes
+  }
+
+  private def traitDecl(mset: Int): AST.InterfaceDeclaration = {
+    val start = expect(K.K_TRAIT)
+    val name = id()
+    val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
+    val superTypes = conformsClause()
     expect(K.LBRACE)
     val signatures = new ArrayBuffer[AST.MethodDeclaration]()
     while (kind(1) == K.K_DEF) signatures += interfaceMethodDecl()
@@ -975,6 +971,18 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     enterSection()
     expect(K.K_DEF)
     val t = id()
+    methodDeclRest(t, mset, anns)
+  }
+
+  private def interfaceMethodDecl(): AST.MethodDeclaration = {
+    enterSection()
+    expect(K.K_DEF)
+    val n = id()
+    methodDeclRest(n, AST.M_PUBLIC, Nil)
+  }
+
+  /** Everything after a method's name: type parameters, parameters, return type, throws, and an `=` body, a block or none. */
+  private def methodDeclRest(t: Token, mset: Int, anns: List[AST.Annotation]): AST.MethodDeclaration = {
     val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
     val args = if (accept(K.LPAREN)) { val a = argsList(); expect(K.RPAREN); a } else Nil
     val ty = if (accept(K.COLON)) returnType() else null
@@ -995,33 +1003,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case _ =>
         eosOrBlockEnd()
         AST.MethodDeclaration(p(t), mset, c(t), args, ty, null, tparams, throwsTypes, anns)
-    }
-  }
-
-  private def interfaceMethodDecl(): AST.MethodDeclaration = {
-    enterSection()
-    expect(K.K_DEF)
-    val n = id()
-    val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
-    val args = if (accept(K.LPAREN)) { val a = argsList(); expect(K.RPAREN); a } else Nil
-    val ty = if (accept(K.COLON)) returnType() else null
-    val throwsTypes = if (kind(1) == K.K_THROWS) throwsClause() else Nil
-    kind(1) match {
-      case K.ASSIGN =>
-        next()
-        eols()
-        enterAssignScope()
-        val e = term()
-        eosOrBlockEnd()
-        AST.MethodDeclaration(p(n), AST.M_PUBLIC, c(n), args, ty,
-          AST.BlockExpression(p(n), List(AST.ReturnExpression(p(n), e)), leaveAssignScope()), tparams, throwsTypes, Nil)
-      case K.LBRACE =>
-        leaveSection()
-        val b = block()
-        AST.MethodDeclaration(p(n), AST.M_PUBLIC, c(n), args, ty, b, tparams, throwsTypes, Nil)
-      case _ =>
-        eosOrBlockEnd()
-        AST.MethodDeclaration(p(n), AST.M_PUBLIC, c(n), args, ty, null, tparams, throwsTypes, Nil)
     }
   }
 
@@ -1472,19 +1453,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def simplePattern(): AST.Pattern = {
     val k = kind(1)
-    if (k == K.ID && image(1) == "_") { val t = next(); return AST.WildcardPattern(p(t)) }
-    if (isId(k) && kind(2) == K.LPAREN) {
-      val t = id()
-      expect(K.LPAREN)
-      val bindings = destructuringBindings()
-      expect(K.RPAREN)
-      return AST.DestructuringPattern(p(t), c(t), bindings)
-    }
-    if (isId(k) && kind(2) == K.K_IS) {
-      val t = id()
-      expect(K.K_IS)
-      return AST.TypePattern(p(t), c(t), typ())
-    }
+    val structured = structuredPatternOpt(k)
+    if (structured != null) return structured
     if (isId(k) && kind(2) == K.K_WHEN) {
       val t = id()
       return AST.BindingPattern(p(t), c(t))
@@ -1502,8 +1472,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     AST.ExpressionPattern(term())
   }
 
-  private def destructuringFieldPattern(): AST.Pattern = {
-    val k = kind(1)
+  /** The patterns select and destructuring share: `_`, `Name(...)` and `name is Type`; null when the next tokens are something else. */
+  private def structuredPatternOpt(k: Int): AST.Pattern = {
     if (k == K.ID && image(1) == "_") { val t = next(); return AST.WildcardPattern(p(t)) }
     if (isId(k) && kind(2) == K.LPAREN) {
       val t = id()
@@ -1517,6 +1487,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       expect(K.K_IS)
       return AST.TypePattern(p(t), c(t), typ())
     }
+    null
+  }
+
+  private def destructuringFieldPattern(): AST.Pattern = {
+    val k = kind(1)
+    val structured = structuredPatternOpt(k)
+    if (structured != null) return structured
     val t = expect(K.ID)
     AST.BindingPattern(p(t), c(t))
   }

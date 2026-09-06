@@ -20,7 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helpers live once in `ArgumentHelpers`. A `-Wunused:all` pass then removed
   61 unused imports, 30 unused pattern variables, never-used default
   arguments and constructor parameters, and private members nothing called.
-  About 900 lines gone.
+  A second pass folded `AsmRefs`' class/method signature visitors, the
+  method-call receiver normalisation, the parser's method-signature, pattern
+  and `conforms` helpers, the backend's boxed-local assignment and the
+  bidirectional call paths' preliminary argument typing. About 1200 lines
+  gone in all.
 
 ### Added
 

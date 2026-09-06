@@ -129,19 +129,17 @@ object AsmRefs {
       }
     }
 
-    final case class ClassInfo(
-      typeParameters: Array[TypedAST.TypeParameter],
-      superClass: TypedAST.ClassType,
-      interfaces: Seq[TypedAST.ClassType],
-      env: Map[String, TypedAST.TypeVariableType]
-    )
-
-    def parseClass(signature: String, fallbackSuper: String, fallbackIfaces: java.util.List[String]): ClassInfo = {
+    /**
+     * The `<T extends B, ...>` prefix a class or method signature may start with, collected
+     * into `typeParamsBuf` (each bound resolved against the parameters seen so far); a
+     * subclass adds what follows the prefix. `finishTypeParam()` closes the parameter being
+     * read and must be called before the buffer is used.
+     */
+    abstract class FormalTypeParamsVisitor extends SignatureVisitor(Opcodes.ASM9) {
       val typeParamsBuf = mutable.ArrayBuffer[TypedAST.TypeParameter]()
-      var currentName: String = null
-      var currentUpper: TypedAST.ClassType = null
-      var parsedSuper: TypedAST.ClassType = null
-      val parsedIfaces = mutable.ArrayBuffer[TypedAST.ClassType]()
+      private var currentName: String = null
+      private var currentUpper: TypedAST.ClassType = null
+      private val tmpEnv = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
 
       def finishTypeParam(): Unit = {
         if (currentName == null) return
@@ -151,48 +149,45 @@ object AsmRefs {
         currentUpper = null
       }
 
-      val tmpEnv = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
+      override def visitFormalTypeParameter(name: String): Unit = {
+        finishTypeParam()
+        currentName = name
+        tmpEnv += name -> new TypedAST.TypeVariableType(name, root)
+      }
 
-      val reader = new SignatureReader(signature)
-      reader.accept(new SignatureVisitor(Opcodes.ASM9) {
-        override def visitFormalTypeParameter(name: String): Unit = {
-          finishTypeParam()
-          currentName = name
-          tmpEnv += name -> new TypedAST.TypeVariableType(name, root)
-        }
+      /** The first bound is the upper bound; further interface bounds are not tracked. */
+      private def boundVisitor(): SignatureVisitor =
+        new TypeRefVisitor(
+          t =>
+            if (currentUpper == null) {
+              currentUpper = t match {
+                case ap: TypedAST.AppliedClassType => ap.raw
+                case ct: TypedAST.ClassType => ct
+                case _ => root
+              }
+            },
+          tmpEnv.toMap
+        )
 
-        override def visitClassBound(): SignatureVisitor =
-          new TypeRefVisitor(
-            t =>
-              if (currentUpper == null) {
-                currentUpper = t match {
-                  case ap: TypedAST.AppliedClassType => ap.raw
-                  case ct: TypedAST.ClassType => ct
-                  case _ => root
-                }
-              },
-            tmpEnv.toMap
-          )
+      override def visitClassBound(): SignatureVisitor = boundVisitor()
+      override def visitInterfaceBound(): SignatureVisitor = boundVisitor()
+    }
 
-        override def visitInterfaceBound(): SignatureVisitor =
-          new TypeRefVisitor(
-            t =>
-              if (currentUpper == null) {
-                currentUpper = t match {
-                  case ap: TypedAST.AppliedClassType => ap.raw
-                  case ct: TypedAST.ClassType => ct
-                  case _ => root
-                }
-              },
-            tmpEnv.toMap
-          )
 
+    final case class ClassInfo(
+      typeParameters: Array[TypedAST.TypeParameter],
+      superClass: TypedAST.ClassType,
+      interfaces: Seq[TypedAST.ClassType],
+      env: Map[String, TypedAST.TypeVariableType]
+    )
+
+    def parseClass(signature: String, fallbackSuper: String, fallbackIfaces: java.util.List[String]): ClassInfo = {
+      var parsedSuper: TypedAST.ClassType = null
+      val parsedIfaces = mutable.ArrayBuffer[TypedAST.ClassType]()
+      val visitor = new FormalTypeParamsVisitor {
         override def visitSuperclass(): SignatureVisitor = {
           finishTypeParam()
-          val (_, nextEnv) = {
-            val arr = typeParamsBuf.toArray
-            (arr, typeParamEnv(arr))
-          }
+          val nextEnv = typeParamEnv(typeParamsBuf.toArray)
           new TypeRefVisitor(
             t =>
               parsedSuper = t match {
@@ -203,22 +198,20 @@ object AsmRefs {
           )
         }
 
-        override def visitInterface(): SignatureVisitor = {
-          val arr = typeParamsBuf.toArray
-          val nextEnv = typeParamEnv(arr)
+        override def visitInterface(): SignatureVisitor =
           new TypeRefVisitor(
             t =>
               t match {
                 case ct: TypedAST.ClassType => parsedIfaces += ct
                 case _ =>
               },
-            nextEnv
+            typeParamEnv(typeParamsBuf.toArray)
           )
-        }
-      })
+      }
+      new SignatureReader(signature).accept(visitor)
 
-      finishTypeParam()
-      val typeParams = typeParamsBuf.toArray
+      visitor.finishTypeParam()
+      val typeParams = visitor.typeParamsBuf.toArray
       val finalEnv = typeParamEnv(typeParams)
 
       val superClass0 =
@@ -242,71 +235,22 @@ object AsmRefs {
     )
 
     def parseMethod(signature: String, desc: String): MethodInfo = {
-      val typeParamsBuf = mutable.ArrayBuffer[TypedAST.TypeParameter]()
-      var currentName: String = null
-      var currentUpper: TypedAST.ClassType = null
       val argsBuf = mutable.ArrayBuffer[TypedAST.Type]()
       var return0: TypedAST.Type = null
-
-      def finishTypeParam(): Unit = {
-        if (currentName == null) return
-        val upper = if (currentUpper == null) root else currentUpper
-        typeParamsBuf += TypedAST.TypeParameter(currentName, Some(upper))
-        currentName = null
-        currentUpper = null
-      }
-
-      val tmpEnv = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
-      val reader = new SignatureReader(signature)
-      reader.accept(new SignatureVisitor(Opcodes.ASM9) {
-        override def visitFormalTypeParameter(name: String): Unit = {
-          finishTypeParam()
-          currentName = name
-          tmpEnv += name -> new TypedAST.TypeVariableType(name, root)
-        }
-
-        override def visitClassBound(): SignatureVisitor =
-          new TypeRefVisitor(
-            t =>
-              if (currentUpper == null) {
-                currentUpper = t match {
-                  case ap: TypedAST.AppliedClassType => ap.raw
-                  case ct: TypedAST.ClassType => ct
-                  case _ => root
-                }
-              },
-            tmpEnv.toMap
-          )
-
-        override def visitInterfaceBound(): SignatureVisitor =
-          new TypeRefVisitor(
-            t =>
-              if (currentUpper == null) {
-                currentUpper = t match {
-                  case ap: TypedAST.AppliedClassType => ap.raw
-                  case ct: TypedAST.ClassType => ct
-                  case _ => root
-                }
-              },
-            tmpEnv.toMap
-          )
-
+      val visitor = new FormalTypeParamsVisitor {
         override def visitParameterType(): SignatureVisitor = {
           finishTypeParam()
-          val typeParams = typeParamsBuf.toArray
-          val env = typeParamEnv(typeParams)
-          new TypeRefVisitor(t => argsBuf += t, env)
+          new TypeRefVisitor(t => argsBuf += t, typeParamEnv(typeParamsBuf.toArray))
         }
 
         override def visitReturnType(): SignatureVisitor = {
           finishTypeParam()
-          val typeParams = typeParamsBuf.toArray
-          val env = typeParamEnv(typeParams)
-          new TypeRefVisitor(t => return0 = t, env)
+          new TypeRefVisitor(t => return0 = t, typeParamEnv(typeParamsBuf.toArray))
         }
-      })
+      }
+      new SignatureReader(signature).accept(visitor)
 
-      val typeParams = typeParamsBuf.toArray
+      val typeParams = visitor.typeParamsBuf.toArray
       val env = typeParamEnv(typeParams)
 
       if (argsBuf.isEmpty && return0 == null) {

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`onion.HttpResource` (the object behind the `http"…"` literal) had no `##
+  HttpResource` section in `docs/reference/stdlib.md` (or its Japanese translation),
+  unlike its sibling `file"…"` literal's `## FileResource` section.** `url()`,
+  `get(headers)`, `getJson()`, `read(shape)`, `eachLine(shape)`, `post(body)`,
+  `postJson(jsonBody)`, `put(body)` and `delete()` were undiscoverable from the API
+  reference. A new `HttpResourceStdlibDocCoverageSpec` guards both docs now carry a
+  `## HttpResource` section mentioning every public member.
+
 - **`Shape::describe()` was undocumented in the `## Shape` section of
   `docs/reference/stdlib.md` (and its Japanese translation), even though every other
   `Shape` instance method was covered there.** The word "describe" did appear

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A syntax hint for an annotation written before a modifier, e.g.
+  `@TailRecursive static def foo() { ... }`.** The grammar requires
+  `[modifiers] [annotations] "def"` in that exact order — an annotation must sit
+  immediately before `def`, after any `static`/`final`/etc. Writing them in the
+  natural Java/Kotlin order failed right at the annotation with a generic
+  "expecting one of the modifier keywords" error that never mentioned annotations
+  at all, and gave no guidance for what is otherwise a completely natural pattern
+  (a `@TailRecursive` mutually-recursive **static** helper). `SyntaxHintClassifier`
+  now recognizes `@Ann modifier+ def` and points at `modifier @Ann def` instead.
+  Pinned by a new `AnnotationBeforeModifierHintI18nSpec`.
+
 ### Fixed
 
 - **The operator precedence table in `docs/reference/specification.md` (and its

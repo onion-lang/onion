@@ -153,6 +153,15 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*(?:extends\s+[A-Za-z_][\w.\[\]]*(?:\([^)]*\))?\s*)?implements\s+([A-Za-z_][\w.\[\], ]*?)\s*\{?\s*$""".r
   private val JavaStyleAnnotatedMethod =
     """\A@([A-Za-z_]\w*)\s+(?:public|private|protected)?\s*(?!public\b|private\b|protected\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+  // The grammar requires `[modifiers] [annotations] "def"` in that exact order --
+  // an annotation must sit immediately before `def`, after any `static`/`final`/...
+  // Writing them in the natural Java/Kotlin order (`@Ann static def foo()`) fails
+  // right at the annotation with a generic "expecting one of the modifier keywords"
+  // error that never mentions annotations at all. Distinct from JavaStyleAnnotatedMethod
+  // above, which has no `def` in its shape (a whole Java-style method with no `def`).
+  private val ModifierWord = "static|final|override|abstract|synchronized|volatile|internal|sealed"
+  private val AnnotationBeforeModifierMethod =
+    s"""\\A@([A-Za-z_]\\w*)\\s+((?:$ModifierWord)(?:\\s+(?:$ModifierWord))*)\\s+def\\b""".r
   private val ReservedWords = Set(
     "abstract", "and", "as", "Boolean", "break", "Byte", "case", "catch", "Char", "class",
     "const", "continue", "def", "do", "Double", "else", "enum", "extends", "extension",
@@ -231,6 +240,9 @@ private[compiler] object SyntaxHintClassifier {
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)
+      case _ if found.startsWith("@") && AnnotationBeforeModifierMethod.findFirstMatchIn(context).isDefined =>
+        val matched = AnnotationBeforeModifierMethod.findFirstMatchIn(context).get
+        hint("error.parsing.hint.annotation_before_modifier", matched.group(1), matched.group(2).trim)
       case _ if found.startsWith("@") && JavaStyleAnnotatedMethod.findFirstMatchIn(context).isDefined =>
         val matched = JavaStyleAnnotatedMethod.findFirstMatchIn(context).get
         hint("error.parsing.hint.java_style_annotated_method", matched.group(1))

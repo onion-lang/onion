@@ -1479,19 +1479,22 @@ Unlike `E` codes, `W` codes don't fail compilation by default (`--warn error` tu
 them into errors) and can be suppressed individually with `--Wno` (see
 [Compiler tools](../tools/compiler.md#-wno-codes) for the `--Wno` name of each code).
 
+A code marked **(reserved)** is declared and can be named with `--Wno`, but no compiler
+pass reports it yet -- it can never actually appear in a build log.
+
 | Code | Meaning |
 |------|---------|
 | `W0001` | unused variable |
-| `W0002` | unused import |
+| `W0002` | unused import (reserved) |
 | `W0003` | unreachable code |
-| `W0004` | deprecated feature |
+| `W0004` | deprecated feature (reserved) |
 | `W0005` | shadowed variable |
 | `W0006` | unused parameter |
-| `W0007` | empty block |
-| `W0008` | redundant cast |
-| `W0009` | possible null dereference |
-| `W0010` | unnecessary type conversion |
-| `W0011` | unchecked cast |
+| `W0007` | empty block (reserved) |
+| `W0008` | redundant cast (reserved) |
+| `W0009` | possible null dereference (reserved) |
+| `W0010` | unnecessary type conversion (reserved) |
+| `W0011` | unchecked cast (reserved) |
 | `W0012` | null assigned to non-nullable type |
 | `W0013` | suspicious string interpolation syntax |
 | `W0014` | top-level statements ignored because a main is defined |

@@ -6,8 +6,7 @@ import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class MethodCallReportingSupport(
-  bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  bodyContext: TypingBodyContext
 ) {
   def reportMethodNotFound(
     node: AST.Node,

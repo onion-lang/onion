@@ -587,7 +587,7 @@ final class SelectExpressionTyping(
   private def typed(node: AST.Expression, context: LocalContext): Option[Term] =
     body.typed(node, context)
 
-  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
+  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type): Option[Term] =
     control.typeBlockExpression(node, context, expected)
 
   /**

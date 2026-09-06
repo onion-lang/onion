@@ -195,7 +195,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     for method <- classDef.methods do
       val methodDef = method.asInstanceOf[MethodDefinition]
       if Modifier.isAbstract(methodDef.modifier) || (classDef.isInterface && methodDef.getBlock == null) then
-        codeInterfaceMethod(cw, methodDef, name)
+        codeInterfaceMethod(cw, methodDef)
       else
         codeMethod(cw, methodDef, name)
 
@@ -322,7 +322,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     gen.returnValue()
     gen.endMethod()
 
-  private def codeInterfaceMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
+  private def codeInterfaceMethod(cw: ClassWriter, node: MethodDefinition): Unit =
     // Interface methods are abstract, so no method body
     var access = toAsmModifier(node.modifier) | Opcodes.ACC_ABSTRACT
     if (node.isVararg) access |= Opcodes.ACC_VARARGS

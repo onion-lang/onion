@@ -26,7 +26,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
   private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
-  private val assignabilitySupport = new AssignabilitySupport(typing, bodyContext)
+  private val assignabilitySupport = new AssignabilitySupport(bodyContext)
   private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
   private val patternMatchSupport = new PatternMatchSupport(bodyContext, (node, context) => typed(node, context), createEqualsForRef)
   private val simpleExpressionTypingSupport = new SimpleExpressionTypingSupport(

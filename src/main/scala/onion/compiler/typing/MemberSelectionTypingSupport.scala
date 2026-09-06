@@ -5,7 +5,6 @@ import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class MemberSelectionTypingSupport(
-  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {

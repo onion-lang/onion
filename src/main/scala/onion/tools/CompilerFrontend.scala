@@ -137,7 +137,7 @@ class CompilerFrontend {
     }
   }
 
-  private def createConfig(result: ParseSuccess, verbose: Boolean = false): Option[CompilerConfig] = {
+  private def createConfig(result: ParseSuccess, verbose: Boolean): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
     val outputDirectory = option.get(OUTPUT).collect { case ValuedParam(value) => value }.getOrElse(DEFAULT_OUTPUT)
     configFrom(option, outputDirectory, verbose, emitDebugInfo = !option.get(NO_DEBUG_INFO).contains(NoValuedParam))

@@ -577,7 +577,7 @@ final class BlockElementLowering(
    * getKey/getValue return the unsubstituted type variables. Recovering the
    * element type from the collection (`Set[Map.Entry[K, V]]`) restores K and V.
    */
-  private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext, isMutable: Boolean = true): Unit = {
+  private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext, isMutable: Boolean): Unit = {
     if (context.lookupOnlyCurrentScope(arg.name) != null) {
       bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
     } else typing.mapFrom(arg.typeRef) match { // raw-exempt: `foreach (k,v)` desugars to a raw Map$Entry placeholder that refineElementType restores

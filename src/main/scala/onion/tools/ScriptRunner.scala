@@ -254,6 +254,6 @@ class ScriptRunner {
          |  onion -classpath lib/*.jar Script.on arg1 arg2""".stripMargin)
   }
 
-  private def createConfig(result: ParseSuccess, verbose: Boolean = false): Option[CompilerConfig] =
+  private def createConfig(result: ParseSuccess, verbose: Boolean): Option[CompilerConfig] =
     configFrom(result.options.toMap, ".", verbose)
 }

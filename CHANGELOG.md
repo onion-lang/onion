@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/DateTimeDemo.on`, a runnable example for `onion.DateTime`.** `DateTime`
+  (parsing, formatting, component access, arithmetic, comparison) had no sample
+  under `run/`, unlike every other default- or commonly-imported stdlib module.
+  The new sample builds a fixed, reproducible timestamp with `DateTime::of(...)`
+  and checks each function family against a hand-computed expected value,
+  reporting how many checks failed, pinned by a `RunSamplesSpec` regression
+  test. Bumped `docs/quality-bar.md` (en/ja) row 2's sample count from 250 to
+  251 to match, since `QualityBarSpec` derives that figure from the actual
+  `run/*.on` count.
+
 - **`run/HashDemo.on`, a runnable example for `onion.Hash`.** `Hash` (md5, sha1,
   sha256, sha512) had no sample under `run/`, unlike every other default- or
   commonly-imported stdlib module. The new sample checks each algorithm against

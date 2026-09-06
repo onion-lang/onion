@@ -1,0 +1,91 @@
+// DateTimeDemo — onion.DateTime: epoch-millis date/time utilities.
+//
+// DateTime is not default-imported, so every call below is qualified as
+// DateTime::name. All values are built with DateTime::of(...) rather than
+// now() so the checks below are reproducible: they are all relative to the
+// local timezone, so both "of" (encode) and every reader below (decode) agree
+// regardless of which zone the check actually runs in.
+//
+//   onion DateTimeDemo.on
+
+class DateTimeDemo {
+public:
+
+  static def checkInt(actual: Int, expected: Int, label: String): Boolean {
+    val ok = actual == expected
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def checkLong(actual: Long, expected: Long, label: String): Boolean {
+    val ok = actual == expected
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def checkStr(actual: String, expected: String, label: String): Boolean {
+    val ok = actual == expected
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def checkBool(actual: Boolean, expected: Boolean, label: String): Boolean {
+    val ok = actual == expected
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    // Monday, January 15, 2024, 10:30:00.
+    val t = DateTime::of(2024, 1, 15, 10, 30, 0)
+
+    IO::println("components")
+    if !checkInt(DateTime::year(t), 2024, "year") { failures = failures + 1 }
+    if !checkInt(DateTime::month(t), 1, "month") { failures = failures + 1 }
+    if !checkInt(DateTime::day(t), 15, "day") { failures = failures + 1 }
+    if !checkInt(DateTime::hour(t), 10, "hour") { failures = failures + 1 }
+    if !checkInt(DateTime::minute(t), 30, "minute") { failures = failures + 1 }
+    if !checkInt(DateTime::second(t), 0, "second") { failures = failures + 1 }
+    if !checkInt(DateTime::dayOfWeek(t), 1, "dayOfWeek (1=Monday)") { failures = failures + 1 }
+    if !checkInt(DateTime::dayOfYear(t), 15, "dayOfYear") { failures = failures + 1 }
+    if !checkStr(DateTime::dayName(t), "Monday", "dayName") { failures = failures + 1 }
+    if !checkStr(DateTime::monthName(t), "January", "monthName") { failures = failures + 1 }
+
+    IO::println("\nformat / parse round-trip")
+    val iso = DateTime::format(t)
+    if !checkLong(DateTime::parse(iso), t, "parse(format(t)) == t") { failures = failures + 1 }
+    val custom = DateTime::format(t, "yyyy/MM/dd")
+    if !checkStr(custom, "2024/01/15", "format(t, \"yyyy/MM/dd\")") { failures = failures + 1 }
+    if !checkLong(DateTime::parse(custom, "yyyy/MM/dd"), DateTime::of(2024, 1, 15), "parse(custom, pattern)") { failures = failures + 1 }
+
+    IO::println("\narithmetic")
+    val plus20Days = DateTime::addDays(t, 20)
+    if !checkInt(DateTime::month(plus20Days), 2, "month(addDays(t, 20))") { failures = failures + 1 }
+    if !checkInt(DateTime::day(plus20Days), 4, "day(addDays(t, 20))") { failures = failures + 1 }
+    val plus1Month = DateTime::addMonths(t, 1)
+    if !checkInt(DateTime::month(plus1Month), 2, "month(addMonths(t, 1))") { failures = failures + 1 }
+    if !checkInt(DateTime::day(plus1Month), 15, "day(addMonths(t, 1))") { failures = failures + 1 }
+    val plus1Year = DateTime::addYears(t, 1)
+    if !checkInt(DateTime::year(plus1Year), 2025, "year(addYears(t, 1))") { failures = failures + 1 }
+
+    IO::println("\ncomparison and diff")
+    val later = DateTime::of(2024, 1, 20, 10, 30, 0)
+    if !checkInt(DateTime::diffDays(later, t), 5, "diffDays(later, t)") { failures = failures + 1 }
+    if !checkLong(DateTime::diffHours(later, t), 120L, "diffHours(later, t)") { failures = failures + 1 }
+    if !checkBool(DateTime::isBefore(t, later), true, "isBefore(t, later)") { failures = failures + 1 }
+    if !checkBool(DateTime::isAfter(later, t), true, "isAfter(later, t)") { failures = failures + 1 }
+
+    IO::println("\nstart / end of day")
+    val sod = DateTime::startOfDay(t)
+    if !checkInt(DateTime::hour(sod), 0, "hour(startOfDay(t))") { failures = failures + 1 }
+    if !checkInt(DateTime::minute(sod), 0, "minute(startOfDay(t))") { failures = failures + 1 }
+    val eod = DateTime::endOfDay(t)
+    if !checkInt(DateTime::hour(eod), 23, "hour(endOfDay(t))") { failures = failures + 1 }
+    if !checkInt(DateTime::second(eod), 59, "second(endOfDay(t))") { failures = failures + 1 }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

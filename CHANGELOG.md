@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/HashDemo.on`, a runnable example for `onion.Hash`.** `Hash` (md5, sha1,
+  sha256, sha512) had no sample under `run/`, unlike every other default- or
+  commonly-imported stdlib module. The new sample checks each algorithm against
+  published test vectors for `"hello"` and the empty string and reports how many
+  checks failed, pinned by a `RunSamplesSpec` regression test.
+
 ### Fixed
 
 - **`Range`, `FileResource`, `HttpResource` and `Lossless`/`Residue` each have a

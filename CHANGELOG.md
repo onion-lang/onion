@@ -28,6 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/reference/error-codes.md` and `docs/tools/compiler.md` (and their Japanese
+  translations) listed seven `W` warning codes -- `W0002` (unused import), `W0004`
+  (deprecated feature), `W0007` (empty block), `W0008` (redundant cast), `W0009`
+  (possible null dereference), `W0010` (unnecessary type conversion) and `W0011`
+  (unchecked cast) -- as if the compiler emits them.** It never has: each one's
+  `WarningReporter` convenience method is declared but called from nowhere in the
+  compiler, so `--Wno` accepts the name and silently does nothing -- there is no pass
+  that could ever produce that warning to suppress. All four docs now mark these seven
+  **(reserved)**, and a new `ReservedWarningCodeSpec` regression guard fails the build
+  if a doc's reserved marker and the compiler's actual wiring drift apart again (in
+  either direction). Separately, `W0003` (unreachable code), `W0005` (shadowed
+  variable) and `W0014` (discarded top-level statements) *are* wired in but had no
+  test compiling a program and checking the warning actually comes out; a new
+  `WarningEmissionSpec` closes that gap, joining the existing behavioral coverage for
+  `W0001`/`W0006`, `W0012`, `W0013`, `W0015` and `W0016`.
+
 - **`docs/reference/stdlib.md` and its Japanese translation never had a section for
   `onion.Range`, the runtime type behind the `a..b` / `a..<b` range literals.**
   `start()`, `endExclusive()`, `isEmpty()`, `size()` and `contains(value)` are all real,

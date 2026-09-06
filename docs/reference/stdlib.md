@@ -1834,6 +1834,7 @@ Command-line argument parsing (`onion.Args`):
 val parsed = Args::parse(args)
 parsed.flag("verbose")                  // --verbose
 parsed.option("out", "a.out")           // --out path (with default)
+parsed.option("out")                    // --out path, or null if absent
 parsed.intOption("level", 3)
 parsed.positional()                     // List of non-option arguments
 ```

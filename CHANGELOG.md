@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+
+- **Duplicated code folded into single owners, and dead code removed (no
+  behaviour change).** The untyped-AST child walk that `CapturedVariableScanner`
+  and `ReturnNodeDetector` each carried is one `ASTWalk`; `onionc` and `onion`
+  share their option names, validators, `CompilerConfig` assembly and output
+  emitters through `CompilerOptions` (this also makes `onionc` report a
+  non-positive `-maxErrorReport` instead of failing silently, as `onion`
+  already did); `GenericMethodTypeArguments.infer` and `inferWithoutDefaults`
+  drive one constraint collector; the closure-argument and named-argument
+  helpers live once in `ArgumentHelpers`. A `-Wunused:all` pass then removed
+  61 unused imports, 30 unused pattern variables, never-used default
+  arguments and constructor parameters, and private members nothing called.
+  About 900 lines gone.
+
 ### Added
 
 - **A trailing lambda with no parameters needs no arrow, and attaches to a

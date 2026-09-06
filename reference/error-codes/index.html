@@ -7878,6 +7878,8 @@ group count.</p>
 <p>Unlike <code>E</code> codes, <code>W</code> codes don't fail compilation by default (<code>--warn error</code> turns
 them into errors) and can be suppressed individually with <code>--Wno</code> (see
 <a href="../../tools/compiler/#-wno-codes">Compiler tools</a> for the <code>--Wno</code> name of each code).</p>
+<p>A code marked <strong>(reserved)</strong> is declared and can be named with <code>--Wno</code>, but no compiler
+pass reports it yet -- it can never actually appear in a build log.</p>
 <table>
 <thead>
 <tr>
@@ -7892,7 +7894,7 @@ them into errors) and can be suppressed individually with <code>--Wno</code> (se
 </tr>
 <tr>
 <td><code>W0002</code></td>
-<td>unused import</td>
+<td>unused import (reserved)</td>
 </tr>
 <tr>
 <td><code>W0003</code></td>
@@ -7900,7 +7902,7 @@ them into errors) and can be suppressed individually with <code>--Wno</code> (se
 </tr>
 <tr>
 <td><code>W0004</code></td>
-<td>deprecated feature</td>
+<td>deprecated feature (reserved)</td>
 </tr>
 <tr>
 <td><code>W0005</code></td>
@@ -7912,23 +7914,23 @@ them into errors) and can be suppressed individually with <code>--Wno</code> (se
 </tr>
 <tr>
 <td><code>W0007</code></td>
-<td>empty block</td>
+<td>empty block (reserved)</td>
 </tr>
 <tr>
 <td><code>W0008</code></td>
-<td>redundant cast</td>
+<td>redundant cast (reserved)</td>
 </tr>
 <tr>
 <td><code>W0009</code></td>
-<td>possible null dereference</td>
+<td>possible null dereference (reserved)</td>
 </tr>
 <tr>
 <td><code>W0010</code></td>
-<td>unnecessary type conversion</td>
+<td>unnecessary type conversion (reserved)</td>
 </tr>
 <tr>
 <td><code>W0011</code></td>
-<td>unchecked cast</td>
+<td>unchecked cast (reserved)</td>
 </tr>
 <tr>
 <td><code>W0012</code></td>

@@ -5349,7 +5349,9 @@ generation) as it runs.</p>
 <p>Suppress specific warning categories by code or name.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>onionc<span class="w"> </span>--Wno<span class="w"> </span>W0001,unused-parameter<span class="w"> </span>MyProgram.on
 </span></code></pre></div>
-<p>Every code accepts either its <code>W####</code> form or the <code>--Wno</code> name shown below:</p>
+<p>Every code accepts either its <code>W####</code> form or the <code>--Wno</code> name shown below. A
+description marked <strong>(reserved)</strong> names a code the compiler accepts here but never
+actually reports -- there is no pass yet that detects it, so suppressing it is a no-op.</p>
 <table>
 <thead>
 <tr>
@@ -5367,7 +5369,7 @@ generation) as it runs.</p>
 <tr>
 <td><code>W0002</code></td>
 <td><code>unused-import</code></td>
-<td>Unused import</td>
+<td>Unused import (reserved)</td>
 </tr>
 <tr>
 <td><code>W0003</code></td>
@@ -5377,7 +5379,7 @@ generation) as it runs.</p>
 <tr>
 <td><code>W0004</code></td>
 <td><code>deprecated</code>, <code>deprecated-feature</code></td>
-<td>Deprecated feature</td>
+<td>Deprecated feature (reserved)</td>
 </tr>
 <tr>
 <td><code>W0005</code></td>
@@ -5392,27 +5394,27 @@ generation) as it runs.</p>
 <tr>
 <td><code>W0007</code></td>
 <td><code>empty-block</code></td>
-<td>Empty block</td>
+<td>Empty block (reserved)</td>
 </tr>
 <tr>
 <td><code>W0008</code></td>
 <td><code>redundant-cast</code></td>
-<td>Redundant cast</td>
+<td>Redundant cast (reserved)</td>
 </tr>
 <tr>
 <td><code>W0009</code></td>
 <td><code>possible-null-deref</code>, <code>null-deref</code></td>
-<td>Possible null dereference</td>
+<td>Possible null dereference (reserved)</td>
 </tr>
 <tr>
 <td><code>W0010</code></td>
 <td><code>unnecessary-conversion</code></td>
-<td>Unnecessary type conversion</td>
+<td>Unnecessary type conversion (reserved)</td>
 </tr>
 <tr>
 <td><code>W0011</code></td>
 <td><code>unchecked-cast</code></td>
-<td>Unchecked cast</td>
+<td>Unchecked cast (reserved)</td>
 </tr>
 <tr>
 <td><code>W0012</code></td>

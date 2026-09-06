@@ -5911,9 +5911,10 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <strong>なりません</strong> — <code>return"x"</code> は <code>return("x")</code> ではなく <code>return "x"</code> として再字句解析されます。
 未定義の接頭辞は lexer エラーではなく通常の「メソッドが見つかりません」エラーです。</p>
 <h4 id="shape_1">shape でリソースを読む<a class="headerlink" href="#shape_1" title="Permanent link">&para;</a></h4>
-<p><code>file"…"</code> と <code>http"…"</code> は <code>text</code>、<code>lines</code>、<code>json</code>、<code>csv</code>、<code>csvRows</code> という固定の
-メニューを持ち、どのゲッタを呼ぶかでパース方法が決まるため、読み方の集合が閉じています。
-<code>read(shape)</code> はこれを開きます。</p>
+<p><code>file"…"</code> と <code>http"…"</code> はそれぞれ固定のメニューを持ちます —— <code>file"…"</code> は
+<code>text</code>、<code>lines</code>、<code>json</code>、<code>csv</code>、<code>csvRows</code>、<code>http"…"</code> は <code>get</code>、<code>getJson</code>、
+<code>post</code>、<code>postJson</code>、<code>put</code>、<code>delete</code> —— どのゲッタを呼ぶかでパース方法が決まるため、
+読み方の集合が閉じています。<code>read(shape)</code> はこれを開きます。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">line</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>

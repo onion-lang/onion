@@ -7885,6 +7885,8 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 <p><code>E</code> コードと異なり <code>W</code> コードは既定ではコンパイルを失敗させません（<code>--warn error</code> で
 エラー扱いにできます）。<code>--Wno</code> で個別に抑制することもできます（各コードの <code>--Wno</code> 名は
 <a href="../../tools/compiler/#-wno-codes">コンパイラツール</a> を参照）。</p>
+<p><strong>(予約)</strong> と付いたコードは宣言されており <code>--Wno</code> で名指しできますが、実際に報告する
+コンパイラのパスがまだ無いため、ビルドログに出現することはありません。</p>
 <table>
 <thead>
 <tr>
@@ -7899,7 +7901,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>W0002</code></td>
-<td>未使用の import</td>
+<td>未使用の import（予約）</td>
 </tr>
 <tr>
 <td><code>W0003</code></td>
@@ -7907,7 +7909,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>W0004</code></td>
-<td>非推奨の機能</td>
+<td>非推奨の機能（予約）</td>
 </tr>
 <tr>
 <td><code>W0005</code></td>
@@ -7919,23 +7921,23 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>W0007</code></td>
-<td>空のブロック</td>
+<td>空のブロック（予約）</td>
 </tr>
 <tr>
 <td><code>W0008</code></td>
-<td>冗長なキャスト</td>
+<td>冗長なキャスト（予約）</td>
 </tr>
 <tr>
 <td><code>W0009</code></td>
-<td>null 参照の可能性</td>
+<td>null 参照の可能性（予約）</td>
 </tr>
 <tr>
 <td><code>W0010</code></td>
-<td>不要な型変換</td>
+<td>不要な型変換（予約）</td>
 </tr>
 <tr>
 <td><code>W0011</code></td>
-<td>未検査キャスト</td>
+<td>未検査キャスト（予約）</td>
 </tr>
 <tr>
 <td><code>W0012</code></td>

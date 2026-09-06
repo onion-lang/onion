@@ -5923,9 +5923,11 @@ a string. A reserved keyword immediately followed by a string is <strong>not</st
 scheme literal — <code>return"x"</code> re-lexes as <code>return "x"</code>, never <code>return("x")</code>. An
 undefined prefix is a normal "method not found" error, not a lexer error.</p>
 <h4 id="reading-a-resource-through-a-shape">Reading a resource through a shape<a class="headerlink" href="#reading-a-resource-through-a-shape" title="Permanent link">&para;</a></h4>
-<p><code>file"…"</code> and <code>http"…"</code> expose a fixed menu — <code>text</code>, <code>lines</code>, <code>json</code>, <code>csv</code>,
-<code>csvRows</code> — so the parse step is chosen by which getter you call and the set of
-things a resource can be read as is closed. <code>read(shape)</code> opens it:</p>
+<p><code>file"…"</code> and <code>http"…"</code> each expose a fixed menu — <code>text</code>, <code>lines</code>, <code>json</code>,
+<code>csv</code>, <code>csvRows</code> for <code>file"…"</code>; <code>get</code>, <code>getJson</code>, <code>post</code>, <code>postJson</code>, <code>put</code>,
+<code>delete</code> for <code>http"…"</code> — so the parse step is chosen by which getter you call
+and the set of things a resource can be read as is closed. <code>read(shape)</code> opens
+it:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">line</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>

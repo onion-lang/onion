@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The operator precedence table in `docs/reference/specification.md` (and its
+  Japanese translation) claimed `&`, `^` and `|` share one precedence level, and
+  that `&&` and `||` share another, with `?:` looser still — and never mentioned
+  the range operators `..`/`..<` at all.** The parser (`grammar/JJOnionParser.jj`)
+  actually nests them strictly: `&` binds tighter than `^`, which binds tighter
+  than `|`; `&&` binds tighter than `||`; `?:` sits at the *same* level as `||`
+  (chained left to right), not below it; and `..`/`..<` sit between the shift and
+  relational operators. For example `6 | 1 & 2` evaluates to `6` (i.e.
+  `6 | (1 & 2)`), not `2` (`(6 | 1) & 2`) as the flattened table implied. The
+  table now lists each operator's real level, and a new `OperatorPrecedenceSpec`
+  pins the grouping down operationally so it can't silently drift again.
+
 - **`onion.HttpResource` (the object behind the `http"…"` literal) had no `##
   HttpResource` section in `docs/reference/stdlib.md` (or its Japanese translation),
   unlike its sibling `file"…"` literal's `## FileResource` section.** `url()`,

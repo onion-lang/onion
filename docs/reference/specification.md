@@ -639,12 +639,18 @@ Precedence (highest first):
 4. Multiplicative: `*` `/` `%`
 5. Additive: `+` `-`
 6. Shifts: `<<` `>>` `>>>` (`<<` on collections appends)
-7. Relational: `<` `>` `<=` `>=` `is`
-8. Equality: `==` `!=` (value), `===` `!==` (reference)
-9. Bitwise: `&` `^` `|`
-10. Logical: `&&` `||`
-11. Elvis: `?:`
-12. Assignment: `=` and compound `+=` `-=` `*=` `/=` `%=` `&=` `|=` `^=` `<<=` `>>=` `>>>=`
+7. Range: `..` `..<`
+8. Relational: `<` `>` `<=` `>=` `is`
+9. Equality: `==` `!=` (value), `===` `!==` (reference)
+10. Bitwise AND: `&`
+11. Bitwise XOR: `^`
+12. Bitwise OR: `|`
+13. Logical AND: `&&`
+14. Logical OR / Elvis: `||` `?:` (same level, left to right)
+15. Assignment: `=` and compound `+=` `-=` `*=` `/=` `%=` `&=` `|=` `^=` `<<=` `>>=` `>>>=`
+
+Each row binds tighter than the one below it — `6 | 1 & 2` is `6 | (1 & 2)`,
+not `(6 | 1) & 2`, and `a || b && c` is `a || (b && c)`, not `(a || b) && c`.
 
 `==` on objects is value equality (`equals`); `===` compares references.
 `+` performs string concatenation when either operand is a `String`.

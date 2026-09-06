@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HttpResourceDocCoverageSpec` regression guard fails the build if the two
   literals' menus are conflated again.
 
+- **`docs/reference/stdlib.md` and its Japanese translation never mentioned
+  `Outcome::isBad()` or `Defect::hasOrigin()`.** Both are real, callable
+  members with no doc coverage at all. Both docs now document them, and a
+  new `OutcomeDefectOriginDocCoverageSpec` regression guard (same pattern as
+  `OptionResultDocCoverageSpec`) fails the build if `Outcome`, `Defect` or
+  `Origin` gain an undocumented member again.
+
 ### Added
 
 - **Documented the single-argument `Args.Parsed::option(name)` overload and added an

@@ -378,19 +378,23 @@ Origin::at("log.txt", 1, 3).onLine(40).describe()   // log.txt:40:3
 ## Outcome と Defect
 
 外部データを読んだ結果です。値か、あるいは**読めなかった理由すべて**を表します。
-`Defect` は「1つの不具合」、`Outcome[T]` は「値、またはその一覧」です。
+`Defect` は「1つの不具合」、`Outcome[T]` は「値、またはその一覧」です。`isOk()`/`isBad()`
+でどちらのケースかがわかります。
 
 `Defect` は呼び出し側が実際に知りたい3点に答えます——テキストのどこか（`origin`、無い場合
-もある）、値のどこか（`path`）、そして何を期待して何があったか。
+もある）、値のどこか（`path`）、そして何を期待して何があったか。`origin()` を読む前に、
+位置がそもそもわかっているかを `hasOrigin()` で確認できます。
 
 ```onion
 import { onion.Outcome; onion.Defect; onion.Origin; }
 
 val d = Defect::at(Origin::atLine("config.json", 4), "port", "Int", "\"http\"")
 println(d.describe())     // config.json:4: port: expected Int, found "http"
+println(d.hasOrigin())    // true -- config.json のどこかがわかっている
 
 val missing = Defect::of("name", "String", "absent")
-println(missing.describe())   // name: expected String, found absent
+println(missing.describe())     // name: expected String, found absent
+println(missing.hasOrigin())    // false -- 欠落したキーには指し示す位置が無い
 ```
 
 ### なぜ Result ではないのか

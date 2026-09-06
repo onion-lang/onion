@@ -71,9 +71,9 @@ The formatting provider calls the same code as `onion fmt`, so an editor and a C
 never disagree about what formatted means — a difference there shows up as a file that
 changes every time it crosses between the two.
 
-It tightens punctuation and converts leading tabs to spaces. It does not reindent, does not
-move a line break, and does not collapse runs of spaces used for alignment; the reasoning
-is in [the `onion fmt` section of the project CLI page](project-cli.md#onion-fmt).
+It tightens punctuation. It does not reindent, does not move a line break, does not collapse
+runs of spaces used for alignment, and does not touch tabs; the reasoning is in
+[the `onion fmt` section of the project CLI page](project-cli.md#onion-fmt).
 
 The result is one edit replacing the whole document. A minimal diff would preserve editor
 decorations better, but computing one from two strings risks producing an edit that does not

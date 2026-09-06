@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- **`onion.View` was a public class with a public `asCollection` method, but it is a
+  pure internal adapter** -- it turns a `Map` into a mutable `Collection[Map.Entry]`
+  so `Iterables.mapMap` can reuse its `Collection`-based loop -- used from nowhere
+  outside `onion.Iterables` in the same package, mentioned in no documentation, and
+  covered by no test, unlike every other class under `src/main/java/onion`. Both the
+  class and its method are now package-private; a new `ViewInternalVisibilitySpec`
+  guards against the visibility widening back out. No behaviour change.
+
 - **Duplicated code folded into single owners, and dead code removed (no
   behaviour change).** The untyped-AST child walk that `CapturedVariableScanner`
   and `ReturnNodeDetector` each carried is one `ASTWalk`; `onionc` and `onion`

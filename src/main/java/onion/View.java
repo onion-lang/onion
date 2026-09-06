@@ -5,8 +5,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-public class View {
-  public static <A, B> Collection<Map.Entry<A, B>> asCollection(
+final class View {
+  static <A, B> Collection<Map.Entry<A, B>> asCollection(
     final Map<A, B> map
   ) {
     return new Collection<Map.Entry<A, B>>() {

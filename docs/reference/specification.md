@@ -695,6 +695,22 @@ absent, and a usage line is derived from the signature on error.
 Everything after the script file on the `onion` command line is passed to
 the script verbatim.
 
+Two more parameter shapes are also accepted, alongside the all-scalar form
+above:
+
+```onion
+def main(args: String[]): void { ... }              // raw argv, unparsed
+def main(cmd: String, files: String[]): void { ... } // scalar prefix + rest collector
+```
+
+A single `String[]` parameter receives the raw, unparsed command-line
+arguments (the conventional Java-style entry point). A `String[]` parameter
+at the *end* of an otherwise-scalar parameter list instead collects every
+remaining argument after the required leading ones are consumed. A
+`String[]` parameter anywhere else — first with more parameters after it,
+or in the middle — is a compile error: it must be either the only
+parameter (raw argv) or the last one (rest collector).
+
 ## Warnings
 
 `--warn off|on|error` sets the level; `--Wno codes` suppresses specific

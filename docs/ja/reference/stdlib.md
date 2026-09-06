@@ -6,19 +6,19 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
-| **ネットワーク** | `Http`（HTTPクライアント）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `FileResource`（`file"…"`リテラル）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **ネットワーク** | `Http`（HTTPクライアント）, `HttpResource`（`http"…"`リテラル）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
 | **データストア** | `Db`（JDBC経由のSQL） |
 | **アーカイブ** | `Archive`（zip・gzip） |
 | **並行処理** | `Future`, `Concurrent`（プール・カウンタ・ロック・チャネル） |
-| **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
+| **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets`, `Range`（`a..b`/`a..<b`リテラルの型） |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
 | **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future`, `Outcome`・`Defect`（外部データの読み取り） |
 | **位置情報** | `Origin`（値がどのテキストのどこから来たか） |
-| **境界** | `Shape`・`Shapes`（テキスト↔型付き値）, `Scalars` |
+| **境界** | `Shape`・`Shapes`（テキスト↔型付き値）, `Scalars`, `Lossless`・`Residue`（ロスレスshapeの往復変換レンズ） |
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
 | **テスト・計測** | `Assert`, `Timing` |
 

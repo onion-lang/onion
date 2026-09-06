@@ -176,6 +176,9 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Origin` - 値がどこから来たか（読み取り元のテキスト上の位置）
 - `Shape`, `Shapes` - 外部テキストと型付きの値との双方向対応
 - `Scalars` - 境界導出のための厳密なスカラー値パース
+- `Range` - `a..b`/`a..<b` 範囲リテラルの実体型、`Iterable[Int]`
+- `FileResource`, `HttpResource` - `file"…"`/`http"…"` リテラルの実体: パス/URLと読み書き・リクエスト操作を束ねる
+- `Lossless`, `Residue` - ロスレスなshapeパース (`parseLossless`/`printLossless`) のための往復変換レンズ
 
 ## テスト
 

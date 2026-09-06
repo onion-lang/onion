@@ -6,19 +6,19 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
-| **Network** | `Http` (HTTP client), `Net` (TCP sockets), `Server` (HTTP server) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `FileResource` (the `file"…"` literal), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **Network** | `Http` (HTTP client), `HttpResource` (the `http"…"` literal), `Net` (TCP sockets), `Server` (HTTP server) |
 | **Data stores** | `Db` (SQL over JDBC) |
 | **Archives** | `Archive` (zip, gzip) |
 | **Concurrency** | `Future`, `Concurrent` (pools, counters, locks, channels) |
-| **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
+| **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets`, `Range` (the `a..b`/`a..<b` literal type) |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
 | **Positions** | `Origin` (where a value came from, in the text it was read out of) |
-| **Boundaries** | `Shape` + `Shapes` (text <-> typed value), `Scalars` |
+| **Boundaries** | `Shape` + `Shapes` (text <-> typed value), `Scalars`, `Lossless` + `Residue` (round-trip-preserving lens over a lossless shape) |
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
 | **Testing & timing** | `Assert`, `Timing` |
 

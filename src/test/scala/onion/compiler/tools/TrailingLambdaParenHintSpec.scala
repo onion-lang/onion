@@ -85,6 +85,76 @@ class TrailingLambdaParenHintSpec extends AbstractShellSpec {
       assert(msgs.contains("=>"), s"expected the arrow hint first, got: $msgs")
     }
 
+    it("hints at the unparenthesized form for a bare (unqualified) call") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def once(f: Function1[Int, Int]): Int = f.call(1)
+          |  static def main(args: String[]): Int {
+          |    val r = once { (x) -> x + 1 }
+          |    return r
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("x ->"), s"expected a hint naming the unparenthesized form, got: $msgs")
+    }
+
+    it("names the arrow when a bare call's trailing lambda uses the old `=>`") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def once(f: Function1[Int, Int]): Int = f.call(1)
+          |  static def main(args: String[]): Int {
+          |    val r = once { x => x + 1 }
+          |    return r
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("->"), s"expected the arrow hint, got: $msgs")
+      assert(msgs.contains("=>"), s"expected the hint to name the old arrow, got: $msgs")
+    }
+
+    it("hints at the unparenthesized form for a parenless static call") {
+      val msgs = messages(
+        """
+          |class Helper {
+          |public:
+          |  static def twice(f: Function1[Int, Int]): Int = f.call(f.call(1))
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Helper::twice { (x) -> x + 1 }
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("x ->"), s"expected a hint naming the unparenthesized form, got: $msgs")
+    }
+
+    it("names the arrow when a parenless static call's trailing lambda uses the old `=>`") {
+      val msgs = messages(
+        """
+          |class Helper {
+          |public:
+          |  static def twice(f: Function1[Int, Int]): Int = f.call(f.call(1))
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Helper::twice { x => x + 1 }
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("->"), s"expected the arrow hint, got: $msgs")
+      assert(msgs.contains("=>"), s"expected the hint to name the old arrow, got: $msgs")
+    }
+
     it("does not add the hint for an unrelated unexpected brace") {
       val msgs = messages(
         """

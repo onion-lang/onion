@@ -5,7 +5,6 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.typing.session.TypingBodyContext
-import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 
@@ -40,7 +39,7 @@ final class BlockElementLowering(
   }
 
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement = node match {
-    case AST.BlockExpression(loc, elements, _) =>
+    case AST.BlockExpression(_, elements, _) =>
       context.openScope {
         // Guard-clause narrowings (see IfExpression) leak forward to later
         // statements in this block; bound them so they don't escape it.
@@ -624,9 +623,6 @@ final class BlockElementLowering(
   // annotations) forbid raw generic types.
   private def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typing.mapFromDeclared(typeNode)
-
-  private def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =
-    body.processNodes(nodes, typeRef, bind, context)
 
   private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     body.findMethod(node, target, name)

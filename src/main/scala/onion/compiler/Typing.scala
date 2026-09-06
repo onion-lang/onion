@@ -7,16 +7,13 @@
  * ************************************************************** */
 package onion.compiler
 
-import scala.jdk.CollectionConverters.*
 
 import _root_.scala.jdk.CollectionConverters._
 import _root_.onion.compiler.toolbox.{Paths, Systems}
-import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.typing.{NameResolver, TypeAliasEntry, TypeParam, TypeParamScope, TypingDiagnostics, TypingTypeSupport}
 import _root_.onion.compiler.typing.session.{AstBindingIndex, ExtensionRegistry, TypeAliasRegistry, TypingGlobalState, TypingSession, TypingUnitContext}
 import _root_.onion.compiler.TypedAST._
-import _root_.onion.compiler.SemanticError._
-import collection.mutable.{HashMap, Map}
+import collection.mutable.{Map}
 
 /**
  * Type Checking Phase - Static Type Analysis and Type Inference

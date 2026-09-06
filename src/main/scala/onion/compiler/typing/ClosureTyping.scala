@@ -304,7 +304,7 @@ final class ClosureTyping(
       }
       Some(argTypes)
     } else if (inferredTarget == null) {
-      args.zipWithIndex.foreach { case (arg, idx) =>
+      args.zipWithIndex.foreach { case (arg, _) =>
         if (arg.typeRef == null) bodyContext.report(LAMBDA_PARAM_TYPE_REQUIRED, arg, arg.name)
       }
       None
@@ -463,9 +463,6 @@ final class ClosureTyping(
     }
     true
   }
-
-  private def sameTypes(left: Array[Type], right: Array[Type]): Boolean =
-    TypeCheckingHelpers.sameTypes(left, right)
 
   private def inferFunctionType(
     rawType: ClassType,

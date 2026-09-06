@@ -36,7 +36,7 @@ object GenericSignatureEncoder:
   private def isGeneric(tp: Type): Boolean = tp match
     case _: TypeVariableType => true
     case _: AppliedClassType => true
-    case w: WildcardType     => true
+    case _: WildcardType     => true
     case at: ArrayType       => isGeneric(at.component)
     case nt: NullableType    => isGeneric(nt.innerType)
     case _                   => false
@@ -76,7 +76,7 @@ object GenericSignatureEncoder:
       "V"
     case ct: ClassType =>
       s"L${internal(ct.name)};"
-    case other =>
+    case _ =>
       // Defensive fallback (unknown types should not reach codegen): erase to
       // java.lang.Object so we never emit a malformed signature.
       "Ljava/lang/Object;"

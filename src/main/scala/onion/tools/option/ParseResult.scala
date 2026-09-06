@@ -1,5 +1,5 @@
 package onion.tools.option
-import scala.collection.mutable.{Map, Seq}
+import scala.collection.mutable.{Map}
 
 sealed trait ParseResult {
   def status: Int

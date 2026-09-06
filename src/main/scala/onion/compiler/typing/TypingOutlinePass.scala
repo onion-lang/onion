@@ -6,7 +6,6 @@ import onion.compiler.typing.session.NameResolutionContext
 import onion.compiler.typing.session.TypingUnitContext
 import onion.compiler.toolbox.Boxing
 
-import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, Set => MutableSet}
 
 final class TypingOutlinePass(private val typing: Typing, private val unitContext: TypingUnitContext) {
@@ -393,7 +392,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val paramTypes: Array[Type] = typesOf(node.params).map(_.toArray).getOrElse(Array.empty)
 
     // Create static final fields for each enum constant
-    node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
+    node.constants.zipWithIndex.foreach { case (constant, _) =>
       val fieldModifier = Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL
       val field = new FieldDefinition(constant.location, fieldModifier, definition_, constant.name, definition_)
       definition_.add(field)

@@ -1,6 +1,5 @@
 package onion.tools.doc
 
-import java.io.StringReader
 import onion.compiler.AST
 import onion.compiler.parser.{JJOnionParser, OnionLexer}
 
@@ -193,7 +192,7 @@ object DocModel {
         fields += DocMember("field", d.name, SignatureRenderer.renderDelegatedField(d), locLine(d.location), docFor(comments, d.location))
       case ct: AST.ConstructorDeclaration =>
         ctors += DocMember("constructor", "new", SignatureRenderer.renderConstructor(ct), locLine(ct.location), docFor(comments, ct.location))
-      case _ => // ignore other member kinds
+      case null => ()
     }
     (ctors.toList, methods.toList, fields.toList)
   }

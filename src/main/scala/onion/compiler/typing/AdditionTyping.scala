@@ -1,7 +1,6 @@
 package onion.compiler.typing
 
 import onion.compiler.*
-import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
@@ -18,7 +17,6 @@ import onion.compiler.typing.session.TypingBodyContext
  * String concatenation auto-boxes primitives and calls toString().
  */
 private[typing] class AdditionTyping(
-  private val typing: Typing,
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {

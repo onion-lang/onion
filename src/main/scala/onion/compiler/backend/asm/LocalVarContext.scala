@@ -1,6 +1,5 @@
 package onion.compiler.backend.asm
 
-import onion.compiler.LocalBinding
 import org.objectweb.asm.{Type as AsmType}
 import org.objectweb.asm.commons.GeneratorAdapter
 

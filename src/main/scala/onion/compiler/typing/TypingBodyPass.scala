@@ -6,11 +6,8 @@ import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
-import onion.compiler.TypedAST.UnaryTerm.Kind.*
 import onion.compiler.typing.session.{TypingBodyContext, TypingUnitContext}
 
-import scala.jdk.CollectionConverters.*
-import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
 
 import TypeNarrowingAnalysis.NarrowingInfo
 
@@ -19,12 +16,12 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val bodyContext = TypingBodyContext.fromTyping(typing, unitContext)
   private val methodCallTyping = new MethodCallTyping(typing, bodyContext, this)
   private val assignmentTyping = new AssignmentTyping(typing, bodyContext, this)
-  private[typing] val operatorTyping = new OperatorTyping(typing, bodyContext, this)
+  private[typing] val operatorTyping = new OperatorTyping(bodyContext, this)
   private val expressionFormTyping = new ExpressionFormTyping(typing, bodyContext, this)
   private val closureTyping = new ClosureTyping(typing, bodyContext, this)
   private val blockElementLowering = new BlockElementLowering(typing, bodyContext, this)
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, bodyContext, this)
-  private val additionTyping = new AdditionTyping(typing, bodyContext, this)
+  private val additionTyping = new AdditionTyping(bodyContext, this)
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
   private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
@@ -431,8 +428,6 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private[typing] def tryExtensionOperatorMethod(node: AST.Node, name: String, target: Term, targetType: ObjectType, param: Term, expected: Type): Option[Term] =
     methodCallTyping.tryExtensionOperatorMethod(node, name, target, targetType, param, expected)
 
-  private def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
-    operatorTyping.processNumericExpression(kind, node, lt, rt)
   private[typing] def addArgument(arg: AST.Argument, context: LocalContext): Type =
     methodLookupSupport.addArgument(arg, context)
   private[typing] def typeClosureNode(node: AST.ClosureExpression, context: LocalContext, expected: Type): Option[Term] =

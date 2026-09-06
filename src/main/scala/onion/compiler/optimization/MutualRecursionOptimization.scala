@@ -195,7 +195,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Check 5: All tail calls must be to methods in the group
     val groupNames = group.map(_.name).toSet
-    var validationError: Option[String] = None
+    val validationError: Option[String] = None
     val iterator = group.iterator
     while (iterator.hasNext && validationError.isEmpty) {
       val method = iterator.next()

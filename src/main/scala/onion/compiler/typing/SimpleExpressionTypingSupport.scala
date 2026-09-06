@@ -60,9 +60,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
         typeMapLiteral(node, context, expected)
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
-      case node@AST.CurrentInstance(loc) =>
+      case node@AST.CurrentInstance(_) =>
         typeCurrentInstance(node, context)
-      case node@AST.Id(loc, name) =>
+      case node@AST.Id(_, name) =>
         typeIdentifier(node, context)
       case node: AST.UnqualifiedFieldReference =>
         typeUnqualifiedFieldReference(node, context)

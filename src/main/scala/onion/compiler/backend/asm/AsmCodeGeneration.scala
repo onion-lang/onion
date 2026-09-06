@@ -1,9 +1,8 @@
 package onion.compiler.backend.asm
 
-import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
+import org.objectweb.asm.{ClassWriter, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.{AST, BytecodeGenerator, CompiledClass, CompilerConfig, Modifier, TypedAST}
-import scala.jdk.CollectionConverters._
+import onion.compiler.{BytecodeGenerator, CompiledClass, CompilerConfig, Modifier, TypedAST}
 import scala.collection.mutable
 
 /**
@@ -745,9 +744,6 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)
     gen.invokeConstructor(classType, AsmMethod("<init>", ctorDesc))
 
-  private def emitStatements(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String): Unit =
-    emitStatementsWithContext(gen, stmts, className, new LocalVarContext(gen))
-
   // One visitor per (generator, locals): local-variable emission re-enters here mid-body,
   // and a fresh visitor each time threw away its per-method caches (call shapes, the last
   // emitted line) and re-allocated its emitters.
@@ -764,14 +760,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit =
     withVisitor(gen, className, localVars)(visitor => stmts.foreach(visitor.visitStatement))
 
-  private def emitStatement(gen: GeneratorAdapter, stmt: ActionStatement, className: String): Unit =
-    emitStatementsWithContext(gen, Array(stmt), className, new LocalVarContext(gen))
-    
   private[compiler] def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit =
     emitStatementsWithContext(gen, Array(stmt), className, localVars)
-    
-  private def emitExpression(gen: GeneratorAdapter, expr: Term, className: String): Unit =
-    emitExpressionWithContext(gen, expr, className, new LocalVarContext(gen))
     
   private def emitExpressionWithContext(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit =
     withVisitor(gen, className, localVars)(_.visitTerm(expr))
@@ -1075,7 +1065,7 @@ object AsmCodeGeneration:
         fresh
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _: BottomType     => AsmType.VOID_TYPE
-    case unknown =>
+    case _ =>
       // Defensive fallback: unknown types should not reach codegen, but emitting
       // java.lang.Object keeps the compiler from crashing with an internal error.
       AsmUtil.objectType(AsmUtil.JavaLangObject)

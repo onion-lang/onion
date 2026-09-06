@@ -10,7 +10,6 @@ package onion.compiler.typing
 import onion.compiler.TypedAST
 import onion.compiler.TypedAST.{ArrayType, Type}
 
-import scala.collection.mutable.HashMap
 
 /**
  * Type Substitution Utilities for Generic Type Handling

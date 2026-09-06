@@ -1,8 +1,8 @@
 package onion.compiler.backend.asm
 
-import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
+import org.objectweb.asm.{Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.{Location, Modifier, TypedAST, TypedASTVisitor}
+import onion.compiler.{Location, TypedAST, TypedASTVisitor}
 import TypedAST.*
 
 /**
@@ -254,7 +254,6 @@ class AsmCodeGenerationVisitor(
     pendingReceiver(0) = asmType(node.target.`type`)
     emitArgumentsWithAdaptation(node.parameters, argTypes, pendingReceiver)
     val ownerType = shape.owner
-    val methodDesc = shape.descriptor
     val isInterface = node.method.affiliation.isInterface
 
     // Select correct invoke instruction based on method type

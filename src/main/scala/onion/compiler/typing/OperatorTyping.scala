@@ -11,7 +11,6 @@ import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
 final class OperatorTyping(
-  private val typing: Typing,
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {

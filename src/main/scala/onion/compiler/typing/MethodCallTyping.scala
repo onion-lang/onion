@@ -5,7 +5,6 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
-import ArgumentHelpers.hasNamedArguments
 import java.util.{TreeSet => JTreeSet}
 
 final class MethodCallTyping(

@@ -11,7 +11,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.boundary
 import scala.util.boundary.break
 
-import ArgumentHelpers.{hasNamedArguments, hasUntypedParams, isClosureWithUntypedParams, untypedClosureIndicesOf}
+import ArgumentHelpers.{hasNamedArguments, untypedClosureIndicesOf}
 
 private[compiler] final class InstanceMethodCallSupport(
   bodyContext: TypingBodyContext,

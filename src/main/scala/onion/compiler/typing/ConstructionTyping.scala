@@ -566,7 +566,7 @@ final class ConstructionTyping(
   ): Option[Term] = {
     // Extract named argument info
     val namedInfo = extractNamedArgInfo(node.args)
-    val (positionalCount, namedNames) = namedInfo
+    val (_, _) = namedInfo
 
     // Filter constructors by named argument compatibility
     val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)

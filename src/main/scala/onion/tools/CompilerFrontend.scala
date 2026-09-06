@@ -9,7 +9,6 @@ package onion.tools
 
 import onion.compiler.{CompiledClass, CompilerConfig}
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.toolbox.Message
 import onion.tools.option._
 import onion.tools.CompilerOptions.*
 
@@ -55,7 +54,6 @@ object CompilerFrontend {
 
 class CompilerFrontend {
 
-  import CompilerFrontend._
 
   private val commandLineParser = new CommandLineParser(
     (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false))*

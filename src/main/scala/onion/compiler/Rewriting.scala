@@ -7,19 +7,14 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.util.{TreeSet => JTreeSet}
 
-import _root_.onion.compiler.TypedAST.BinaryTerm.Kind._
-import _root_.onion.compiler.TypedAST.UnaryTerm.Kind._
-import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.toolbox.{Boxing, Classes, Message, Paths, Systems}
+import _root_.onion.compiler.toolbox.{Message}
 import onion.compiler.AST.{ClassDeclaration, InterfaceDeclaration, RecordDeclaration}
 import onion.compiler.rewrite.AdtEnumLowering
 
-import _root_.scala.jdk.CollectionConverters._
-import scala.collection.mutable.{Buffer, Map, Set => MutableSet}
+import scala.collection.mutable.Buffer
 
 /**
  * AST Rewriting Phase - Syntax Sugar Desugaring
@@ -270,7 +265,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // Overloading is fine for functions, but the CLI selects a tool by NAME alone, so a
     // second tool with the same name is unreachable and the contract lists it twice
     // with no way to address either (issue #436). Reject it here.
-    val duplicateNames = tools.groupBy(_.name).collect { case (n, ts) if ts.size > 1 => ts.tail }.flatten
+    val duplicateNames = tools.groupBy(_.name).collect { case (_, ts) if ts.size > 1 => ts.tail }.flatten
     if (duplicateNames.nonEmpty) {
       throw new CompilationException(duplicateNames.toSeq.map { t =>
         CompileError("", t.location,
@@ -913,7 +908,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         // Lead with "" so the whole chain is String-typed even when the first
         // segment is a slot or a non-String component.
         val chain = parts match {
-          case (s: AST.StringLiteral) :: _ => parts
+          case (_: AST.StringLiteral) :: _ => parts
           case _ => AST.StringLiteral(loc, "") :: parts
         }
         val body = chain.reduceLeft((a, b) => AST.Addition(loc, a, b))
@@ -1287,8 +1282,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.Cast(loc, src, to) => AST.Cast(loc, rewriteExpression(src), to)
     case AST.ClosureExpression(loc, typeRef, mname, args, returns, body) =>
       AST.ClosureExpression(loc, typeRef, mname, args, returns, rewriteBlockExpression(body))
-    case AST.CurrentInstance(loc) => expr
-    case AST.Id(loc, name) => expr
+    case AST.CurrentInstance(_) => expr
+    case AST.Id(_, name) => expr
     case AST.IsInstance(loc, target, typeRef) => AST.IsInstance(loc, rewriteExpression(target), typeRef)
     case AST.ListLiteral(loc, elements) => AST.ListLiteral(loc, elements.map(rewriteExpression))
     case AST.MapLiteral(loc, entries) =>
@@ -1305,11 +1300,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.NewArray(loc, typeRef, args) => AST.NewArray(loc, typeRef, args.map(rewriteExpression))
     case AST.NewArrayWithValues(loc, typeRef, values) => AST.NewArrayWithValues(loc, typeRef, values.map(rewriteExpression))
     case AST.NewObject(loc, typeRef, args) => AST.NewObject(loc, typeRef, args.map(rewriteExpression))
-    case AST.UnqualifiedFieldReference(loc, name) => expr
+    case AST.UnqualifiedFieldReference(_, name) => expr
     case AST.UnqualifiedMethodCall(loc, name, args, typeArgs) =>
       AST.UnqualifiedMethodCall(loc, name, args.map(rewriteExpression), typeArgs)
     case AST.NamedArgument(loc, name, value) => AST.NamedArgument(loc, name, rewriteExpression(value))
-    case AST.StaticMemberSelection(loc, typeRef, name) => expr
+    case AST.StaticMemberSelection(_, typeRef, name) => expr
     case AST.StaticMethodCall(loc, typeRef, name, args, typeArgs) =>
       AST.StaticMethodCall(loc, typeRef, name, args.map(rewriteExpression), typeArgs)
     case node: AST.TraitMethodCall =>
@@ -1483,7 +1478,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case None => statements
       case Some(typeNode) =>
         statements.map {
-          case b @ AST.DoBinding(loc, name, expr) if isEmptyGenerativeCall(expr) =>
+          case _ @ AST.DoBinding(loc, name, expr) if isEmptyGenerativeCall(expr) =>
             AST.DoBinding(loc, name, withTypeArgument(expr, typeNode))
           case other => other
         }

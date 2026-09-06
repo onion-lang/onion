@@ -105,14 +105,6 @@ class TailCallOptimization(config: CompilerConfig)
   }
 
   /**
-   * Check if method is private
-   */
-  private def isPrivate(method: MethodDefinition): Boolean = {
-    // Use Onion's M_PRIVATE constant, not Java's Modifier.PRIVATE
-    (method.modifier & AST.M_PRIVATE) != 0
-  }
-
-  /**
    * A method is safe to convert to a loop when it cannot be overridden, so a
    * self-call is always this exact method: private, static, or final.
    */
@@ -624,7 +616,7 @@ class TailCallOptimization(config: CompilerConfig)
     // Check if the last statement is an unreachable return
     // (a return that follows a statement containing a tail call)
     stmts.last match {
-      case ret: Return =>
+      case _: Return =>
         // If there are previous statements and the last one contains returns,
         // this return is likely unreachable
         if (stmts.length > 1) {
@@ -827,7 +819,7 @@ class TailCallOptimization(config: CompilerConfig)
           stmtTerm.statement match {
             case exprStmt: ExpressionActionStatement =>
               extractCall(exprStmt.term, depth + 1)
-            case ifStmt: IfStatement =>
+            case _: IfStatement =>
               trace(s"$indent[TCO extractCall] IfStatement - should have been handled in transformStatement")
               None
             case _ => None

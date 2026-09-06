@@ -136,7 +136,7 @@ object TermWalk:
             while it.hasNext do
               it.next() match
                 case r: AnyRef => out += r
-                case _ =>
+                case null => ()
           case other: AnyRef => out += other
       catch case _: Throwable => ()
       i += 1

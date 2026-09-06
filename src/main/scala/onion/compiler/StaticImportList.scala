@@ -7,8 +7,6 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.util.ArrayList
-import java.util.List
 import collection.mutable.ArrayBuffer
 
 /**

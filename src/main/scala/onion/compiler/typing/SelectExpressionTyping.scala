@@ -507,7 +507,7 @@ final class SelectExpressionTyping(
             break((null, NoBindings, false, None))
         }
 
-      case AST.GuardedPattern(loc, innerPattern, guard) =>
+      case AST.GuardedPattern(_, innerPattern, guard) =>
         // Process the inner pattern recursively
         val (innerCond, innerBindingInfo, innerHasWildcard, _) = processPatterns(Array(innerPattern), conditionType, bind, context)
         if (innerCond == null) break((null, NoBindings, false, None))
@@ -524,7 +524,7 @@ final class SelectExpressionTyping(
               context.add(varName, varType, isMutable = false)
               typed(guard, context)
             }
-          case MultiBindings(recordType, bindings, _) =>
+          case MultiBindings(_, bindings, _) =>
             context.openScope {
               bindings.foreach { case BindingEntry(varName, varType, _) =>
                 context.add(varName, varType, isMutable = false)

@@ -1,8 +1,7 @@
 package onion.compiler
 
 import collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
-import java.io.{IOException, Reader, StringReader}
+import java.io.{IOException}
 
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
@@ -112,7 +111,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           addParseException(e, source.name, sourceText, problems)
       }
     } catch {
-      case e: IOException =>
+      case _: IOException =>
         problems += CompileError(null, null, Message("error.parsing.read_error", source.name))
     }
   }

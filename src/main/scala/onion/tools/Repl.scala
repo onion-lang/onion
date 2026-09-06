@@ -13,7 +13,6 @@ import onion.compiler.diagnostics.DiagnosticRenderer
 import org.objectweb.asm.ClassReader
 import org.jline.reader._
 import org.jline.reader.impl.DefaultParser
-import org.jline.reader.impl.completer.StringsCompleter
 import org.jline.terminal.{Terminal, TerminalBuilder}
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
@@ -23,7 +22,6 @@ import java.io.{BufferedReader, ByteArrayOutputStream, File, FileInputStream, Fi
 import java.nio.file.Paths
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
 
 /**
  * Interactive REPL for Onion language with JLine3 support.
@@ -662,7 +660,7 @@ class Repl(classpath: Seq[String]) {
   private def parseSnippet(code: String, fileName: String): Option[AST.CompilationUnit] = {
     tryParse(code, fileName) match {
       case Right(unit) => Some(unit)
-      case Left(errors) if looksLikeHeaderOnly(code) =>
+      case Left(_) if looksLikeHeaderOnly(code) =>
         dummyCounter += 1
         val dummyName = s"__ReplDummy${dummyCounter}__"
         val wrapped = s"$code\nclass $dummyName {}"
@@ -866,8 +864,6 @@ class Repl(classpath: Seq[String]) {
     }
   }
 
-  private def terminalWriter(): java.io.PrintStream = Console.out
-
   private def loadFile(path: String, terminal: Terminal, readerOpt: Option[LineReader]): Unit = {
     val file = new File(path)
     if (!file.exists()) {
@@ -912,18 +908,6 @@ class Repl(classpath: Seq[String]) {
       Console.err.println(Colors.RED + error + Colors.RESET)
     }
     Console.err.println(Colors.RED + onion.compiler.toolbox.Message("error.count", errors.size) + Colors.RESET)
-  }
-
-  private def capturePrintStream(render: PrintStream => Unit): String = {
-    val buffer = new ByteArrayOutputStream()
-    val out = new PrintStream(buffer, true, encoding)
-    try {
-      render(out)
-      out.flush()
-      buffer.toString(encoding).trim
-    } finally {
-      out.close()
-    }
   }
 
   private def renderBytecode(classes: Seq[CompiledClass]): String =

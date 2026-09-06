@@ -2,7 +2,6 @@ package onion.compiler.pipeline
 
 import onion.compiler.*
 import onion.compiler.backend.BytecodeGenerationPhase
-import onion.compiler.diagnostics.DiagnosticBag
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.parser.ParsingPhase
 import onion.compiler.rewrite.RewritingPhase
@@ -111,7 +110,7 @@ final class PipelineRunner(phases: CompilationPhases) {
   ): CompilationResult =
     runPhase(phases.mutualRecursionOptimization, optimizedTail, ctx)(_ => ()) match {
       case None => result(Seq.empty, ctx, request)
-      case Some(optimizedMutual) if request.config.warningLevel == WarningLevel.Error && ctx.diagnostics.warnings.nonEmpty =>
+      case Some(_) if request.config.warningLevel == WarningLevel.Error && ctx.diagnostics.warnings.nonEmpty =>
         ctx.addErrors(promoteWarnings(ctx.diagnostics.warnings))
         result(Seq.empty, ctx, request)
       case Some(optimizedMutual) =>

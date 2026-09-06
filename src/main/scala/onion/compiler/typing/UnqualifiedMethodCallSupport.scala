@@ -1,6 +1,6 @@
 package onion.compiler.typing
 
-import ArgumentHelpers.{hasUntypedParams, isClosureWithUntypedParams, untypedClosureIndicesOf}
+import ArgumentHelpers.{untypedClosureIndicesOf}
 
 import onion.compiler.*
 import onion.compiler.SemanticError.*

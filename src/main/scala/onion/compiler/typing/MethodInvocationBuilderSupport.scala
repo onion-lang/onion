@@ -138,7 +138,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
         // type (which unboxes primitives and NPEs on the null path)
         castType match {
           case _: NullableType | _: NullType => TypeSubst.withCast(call, castType)
-          case bt: BasicType => call // SafeCall.type is already NullableType(bt)
+          case _: BasicType => call // SafeCall.type is already NullableType(bt)
           case other if other eq method.returnType => call
           case other => TypeSubst.withCast(call, NullableType.of(other))
         }

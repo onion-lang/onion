@@ -7,10 +7,8 @@
  * ************************************************************** */
 package onion.tools
 
-import java.lang.System.err
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.toolbox.Message
 import onion.tools.option._
 import onion.tools.CompilerOptions.*
 
@@ -149,7 +147,6 @@ object ScriptRunner {
 }
 
 class ScriptRunner {
-  import ScriptRunner._
   private[this] val parser = new CommandLineParser(sharedOptionConfigs*)
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int =

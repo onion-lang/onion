@@ -243,7 +243,7 @@ final class ControlFlowEmitter(
     // リソースを逆順でclose()するコードを生成するヘルパー
     def emitCloseResources(): Unit =
       for i <- (node.resources.length - 1) to 0 by -1 do
-        val (binding, _) = node.resources(i)
+        val (_, _) = node.resources(i)
         val slot = resourceSlots(i)
         // if (resource != null) resource.close()
         val skipClose = gen.newLabel()
@@ -251,7 +251,6 @@ final class ControlFlowEmitter(
         gen.ifNull(skipClose)
         gen.loadLocal(slot)
         // AutoCloseableのclose()を呼び出し
-        val closeMethod = AsmType.getType(classOf[AutoCloseable]).getInternalName
         gen.invokeInterface(
           AsmType.getType(classOf[AutoCloseable]),
           new org.objectweb.asm.commons.Method("close", "()V")

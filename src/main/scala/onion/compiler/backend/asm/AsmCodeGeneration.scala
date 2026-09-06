@@ -767,6 +767,51 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     withVisitor(gen, className, localVars)(_.visitTerm(expr))
 
 
+  /**
+   * Assignment to a boxed local (one a closure captures and mutates): the box is created on
+   * the first assignment and its `value` field updated afterwards, leaving the assigned value
+   * on the stack. `slots` is where the box lives -- the method's own locals, or the closure
+   * body's -- while `localVars` is the context the value expression is emitted in.
+   */
+  private def emitBoxedSet(gen: GeneratorAdapter, set: SetLocal, className: String, localVars: LocalVarContext, slots: LocalVarContext): Unit =
+    val boxType = boxAsmType(set.`type`)
+    val valueType = boxedValueType(set.`type`)
+    slots.slotOf(set.index) match
+      case Some(slot) =>
+        // Update: load box, compute value, put into box.value.
+        // If the value may run its own try/catch, the box reference can't
+        // stay on the operand stack across it -- see the boxed-captured-
+        // variable branch above for why (issue #745/#669 sibling).
+        if TermContainsTry.contains(set.value) then
+          emitExpressionWithContext(gen, set.value, className, localVars)
+          val valueSlot = gen.newLocal(valueType)
+          gen.storeLocal(valueSlot)
+          gen.loadLocal(slot)
+          gen.loadLocal(valueSlot)
+          gen.putField(boxType, "value", valueType)
+          gen.loadLocal(valueSlot)
+        else
+          gen.loadLocal(slot)
+          emitExpressionWithContext(gen, set.value, className, localVars)
+          if valueType.getSize() == 2 then
+            gen.dup2X1()
+          else
+            gen.dupX1()
+          gen.putField(boxType, "value", valueType)
+      case None =>
+        // Initialize: compute value, create box, store box, return value
+        emitExpressionWithContext(gen, set.value, className, localVars)
+        val tempSlot = gen.newLocal(valueType)
+        gen.storeLocal(tempSlot)
+        gen.newInstance(boxType)
+        gen.dup()
+        gen.loadLocal(tempSlot)
+        val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
+        gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
+        val slot = slots.allocateSlot(set.index, boxType)
+        gen.storeLocal(slot)
+        gen.loadLocal(tempSlot) // Return the value
+
   // Helper methods for visitor pattern
   def emitRefLocal(gen: GeneratorAdapter, ref: RefLocal, localVars: LocalVarContext): Unit =
     localVars match
@@ -896,39 +941,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               // this one): mirror the top-level-method boxed-local path below --
               // box-reference-then-value ordering, with the try/catch guard for
               // the same operand-stack-clearing reason as issue #745/#669.
-              val boxType = boxAsmType(set.`type`)
-              val valueType = boxedValueType(set.`type`)
-              closureCtx.slotOf(set.index) match
-                case Some(slot) =>
-                  if TermContainsTry.contains(set.value) then
-                    emitExpressionWithContext(gen, set.value, className, localVars)
-                    val valueSlot = gen.newLocal(valueType)
-                    gen.storeLocal(valueSlot)
-                    gen.loadLocal(slot)
-                    gen.loadLocal(valueSlot)
-                    gen.putField(boxType, "value", valueType)
-                    gen.loadLocal(valueSlot)
-                  else
-                    gen.loadLocal(slot)
-                    emitExpressionWithContext(gen, set.value, className, localVars)
-                    if valueType.getSize() == 2 then
-                      gen.dup2X1()
-                    else
-                      gen.dupX1()
-                    gen.putField(boxType, "value", valueType)
-                case None =>
-                  // Initialize: compute value, create box, store box, return value
-                  emitExpressionWithContext(gen, set.value, className, localVars)
-                  val tempSlot = gen.newLocal(valueType)
-                  gen.storeLocal(tempSlot)
-                  gen.newInstance(boxType)
-                  gen.dup()
-                  gen.loadLocal(tempSlot)
-                  val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
-                  gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
-                  val slot = closureCtx.allocateSlot(set.index, boxType)
-                  gen.storeLocal(slot)
-                  gen.loadLocal(tempSlot) // Return the value
+              emitBoxedSet(gen, set, className, localVars, closureCtx)
             else
               emitExpressionWithContext(gen, set.value, className, localVars)
               val valueType = asmType(set.`type`)
@@ -942,43 +955,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           if setValueType.getSize() == 2 then gen.dup2() else gen.dup()
           gen.storeArg(set.index)
         else if localVars.isBoxed(set.index) then
-          val boxType = boxAsmType(set.`type`)
-          val valueType = boxedValueType(set.`type`)
-          localVars.slotOf(set.index) match
-            case Some(slot) =>
-              // Update: load box, compute value, put into box.value.
-              // If the value may run its own try/catch, the box reference can't
-              // stay on the operand stack across it -- see the boxed-captured-
-              // variable branch above for why (issue #745/#669 sibling).
-              if TermContainsTry.contains(set.value) then
-                emitExpressionWithContext(gen, set.value, className, localVars)
-                val valueSlot = gen.newLocal(valueType)
-                gen.storeLocal(valueSlot)
-                gen.loadLocal(slot)
-                gen.loadLocal(valueSlot)
-                gen.putField(boxType, "value", valueType)
-                gen.loadLocal(valueSlot)
-              else
-                gen.loadLocal(slot)
-                emitExpressionWithContext(gen, set.value, className, localVars)
-                if valueType.getSize() == 2 then
-                  gen.dup2X1()
-                else
-                  gen.dupX1()
-                gen.putField(boxType, "value", valueType)
-            case None =>
-              // Initialize: compute value, create box, store box, return value
-              emitExpressionWithContext(gen, set.value, className, localVars)
-              val tempSlot = gen.newLocal(valueType)
-              gen.storeLocal(tempSlot)
-              gen.newInstance(boxType)
-              gen.dup()
-              gen.loadLocal(tempSlot)
-              val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
-              gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
-              val slot = localVars.allocateSlot(set.index, boxType)
-              gen.storeLocal(slot)
-              gen.loadLocal(tempSlot) // Return the value
+          emitBoxedSet(gen, set, className, localVars, localVars)
         else
           emitExpressionWithContext(gen, set.value, className, localVars)
           if setValueType.getSize() == 2 then gen.dup2() else gen.dup()

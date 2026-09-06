@@ -27,45 +27,30 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
       case nullable: NullableType =>
         bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName)
         None
-      case targetType: ObjectType =>
-        Some(ResolvedMethodTarget(target, targetType))
-      case basicType: BasicType =>
-        if (basicType == BasicType.VOID) {
-          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
-          None
-        } else {
-          val boxed = Boxing.boxing(bodyContext.table, target)
-          Some(ResolvedMethodTarget(boxed, boxed.`type`.asInstanceOf[ObjectType]))
-        }
-      case wildcardType: WildcardType =>
-        wildcardType.upperBound match {
-          case objType: ObjectType =>
-            Some(ResolvedMethodTarget(new AsInstanceOf(target, objType), objType))
-          case _ =>
-            bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
-            None
-        }
-      case _ =>
-        bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
-        None
+      case targetType =>
+        resolve(node, node.name, target, targetType, isNullablePrimitive = false)
     }
 
+  /** `?.` accepts a nullable receiver: the call is typed against the inner type. */
   def normalizeSafeMethodCallTarget(
     node: AST.SafeMethodCall,
     target: Term
   ): Option[ResolvedMethodTarget] = {
-    val isNullablePrimitive = target.`type`.isInstanceOf[NullableType]
-    val targetType = target.`type` match {
-      case nullableType: NullableType => nullableType.innerType
-      case other => other
+    val (targetType, isNullablePrimitive) = target.`type` match {
+      case nullableType: NullableType => (nullableType.innerType, true)
+      case other => (other, false)
     }
+    resolve(node, node.name, target, targetType, isNullablePrimitive)
+  }
 
+  /** The receiver a method can be looked up on: an object type as is, a primitive boxed, a wildcard through its upper bound. */
+  private def resolve(node: AST.Node, name: String, target: Term, targetType: Type, isNullablePrimitive: Boolean): Option[ResolvedMethodTarget] =
     targetType match {
       case objType: ObjectType =>
         Some(ResolvedMethodTarget(target, objType))
       case basicType: BasicType =>
         if (basicType == BasicType.VOID) {
-          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, name)
           None
         } else if (isNullablePrimitive) {
           // A nullable primitive (e.g. Int?) is already a boxed value at runtime,
@@ -89,5 +74,4 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
         bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
         None
     }
-  }
 }

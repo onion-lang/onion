@@ -7,7 +7,8 @@ import java.time.temporal.ChronoUnit;
 /**
  * Date and time utilities for Onion programs.
  * Uses epoch milliseconds as the primary time representation.
- * All methods are static and can be used without import.
+ * All methods are static; call them qualified, e.g. {@code DateTime::now()}
+ * (DateTime is not in the default static import set).
  */
 public final class DateTime {
     private DateTime() {} // Prevent instantiation

@@ -436,19 +436,22 @@ and editor already knows how to parse. `toString` returns the same.
 
 The result of reading external data: either a value, or **every** reason it could not be
 read. `Defect` is one thing that was wrong; `Outcome[T]` is a value or a list of them.
+`isOk()`/`isBad()` say which case it is.
 
 A `Defect` answers three questions a caller actually has — where in the text (`origin`,
 which may be absent), where in the value (`path`), and what was expected against what was
-found.
+found. `hasOrigin()` says whether a position is known at all, before `origin()` is read.
 
 ```onion
 import { onion.Outcome; onion.Defect; onion.Origin; }
 
 val d = Defect::at(Origin::atLine("config.json", 4), "port", "Int", "\"http\"")
 println(d.describe())     // config.json:4: port: expected Int, found "http"
+println(d.hasOrigin())    // true -- it knows where in config.json
 
 val missing = Defect::of("name", "String", "absent")
-println(missing.describe())   // name: expected String, found absent
+println(missing.describe())     // name: expected String, found absent
+println(missing.hasOrigin())    // false -- a missing key has no position to point at
 ```
 
 ### Why not Result?

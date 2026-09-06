@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Range`, `FileResource`, `HttpResource` and `Lossless`/`Residue` each have a
+  dedicated section in `docs/reference/stdlib.md` (and its Japanese translation), but
+  none of them appeared in the "Modules at a glance" summary table at the top of
+  either file, and the same omission propagated into `CLAUDE.md`/`CLAUDE_ja.md`'s
+  "Standard Library" list (`StdlibDocDriftSpec` derives that check from the glance
+  table, so the gap in the table hid the gap in CLAUDE.md too).** Added the four to
+  both glance tables and both CLAUDE.md lists, and pinned the table itself with a new
+  `ModulesAtAGlanceCoverageSpec`.
+
 ## [0.58.0] - 2026-09-06
 
 ### Added

@@ -188,6 +188,9 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Origin` - Where a value came from, in the text it was read out of
 - `Shape`, `Shapes` - Bidirectional correspondence between external text and a typed value
 - `Scalars` - Strict scalar parsing for boundary derivations
+- `Range` - The runtime type behind `a..b`/`a..<b` range literals, `Iterable[Int]`
+- `FileResource`, `HttpResource` - The objects behind the `file"…"`/`http"…"` literals: bundle a path/URL with its read/write or request operations
+- `Lossless`, `Residue` - Round-trip-preserving lens pair for lossless shape parsing (`parseLossless`/`printLossless`)
 
 ## Testing
 

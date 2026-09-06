@@ -112,172 +112,9 @@ private[typing] object GenericMethodTypeArguments {
     args: Array[Term],
     classSubst: scala.collection.immutable.Map[String, Type],
     expectedReturn: Type = null
-  ): scala.collection.immutable.Map[String, Type] = {
-    val rootClass = typing.rootClass
-    def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
-      typing.report(error, node, items*)
-    def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
-    val typeParams = method.typeParameters
-    if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
-
-    def isSuperTypeForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
-      else TypeRules.isSuperType(left, right)
-
-    val inferred = HashMap[String, Type]()
-    val upperConstraints = HashMap[String, Type]()
-    val lowerConstraints = HashMap[String, Type]()
-    val paramNames = typeParams.iterator.map(_.name).toSet
-
-    def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
-      if (bound == null || bound.isNullType) return
-      upperConstraints.get(name) match
-        case None =>
-          upperConstraints += name -> bound
-        case Some(prev) =>
-          if (isSuperTypeForBounds(prev, bound)) upperConstraints += name -> bound
-          else if (isSuperTypeForBounds(bound, prev)) ()
-          else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
-    }
-
-    def addLower(name: String, bound: Type): Unit = {
-      if (bound == null || bound.isNullType) return
-      lowerConstraints.get(name) match
-        case None =>
-          lowerConstraints += name -> bound
-        case Some(prev) =>
-          if (isSuperTypeForBounds(prev, bound)) ()
-          else if (isSuperTypeForBounds(bound, prev)) lowerConstraints += name -> bound
-          else lowerConstraints += name -> rootClass
-    }
-
-    def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
-      if (actual.isNullType) return
-      formal match
-        case w: TypedAST.WildcardType =>
-          w.lowerBound match
-            case Some(lb) =>
-              lb match
-                case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
-                  addUpper(tv.name, actual, position)
-                case _ =>
-                  unify(lb, actual, position)
-            case None =>
-              w.upperBound match
-                case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
-                  addLower(tv.name, actual)
-                case _ =>
-                  unify(w.upperBound, actual, position)
-        case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
-          // Type arguments are reference types: box primitives (Future::async
-          // of an Int-returning lambda is a Future[Integer], not Future[int])
-          val bound = actual match {
-            case bt: BasicType if bt != BasicType.VOID => typing.boxedTypeArgument(bt)
-            // A smart-cast non-null view of a variable still binds the
-            // declared variable, so occurrences across arguments stay eq
-            case tva: TypedAST.TypeVariableType => tva.widen
-            case other => other
-          }
-          inferred.get(tv.name) match {
-            case Some(prev) =>
-              if (!(prev eq bound)) {
-                val merged = mergeNullability(prev, bound)
-                if (merged != null) inferred += tv.name -> merged
-                else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
-              }
-            case None =>
-              inferred += tv.name -> bound
-          }
-        case fn: TypedAST.NullableType =>
-          // A nullable formal such as `T?` (e.g. a `List[T?]` parameter) must
-          // still bind its type variable: unwrap the formal's nullability and
-          // unify the inner type against the actual's non-null view. Without
-          // this, `T?` matched no case and T was left unbound (defaulting to
-          // Object), so a generic call over `List[T?]` never inferred T.
-          val innerActual = actual match {
-            case an: TypedAST.NullableType => an.innerType
-            case _ => actual
-          }
-          unify(fn.innerType, innerActual, position)
-        case af: TypedAST.ArrayType =>
-          actual match {
-            case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)
-            case _ =>
-          }
-        case apf: TypedAST.AppliedClassType =>
-          def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
-            (c1 eq c2) || (c1.name == c2.name)
-
-          def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
-            if sameRawClass(apf.raw, apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
-              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position) }
-
-          actual match
-            case apa: TypedAST.AppliedClassType =>
-              if sameRawClass(apf.raw, apa.raw) then unifyWithApplied(apa)
-              else
-                val views = AppliedTypeViews.collectAppliedViewsFrom(apa)
-                views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
-                  case Some(view) => unifyWithApplied(view)
-                  case None =>
-            case ct: ClassType =>
-              val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
-              views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
-                case Some(view) => unifyWithApplied(view)
-                case None =>
-            case _ =>
-        case _ =>
-    }
-
-    val formalArgs =
-      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
-    if (method.isVararg && formalArgs.nonEmpty) {
-      // Vararg methods: unify fixed params positionally, then unify the vararg
-      // component with each trailing argument (boxing primitives), unless the
-      // caller already passes a packed array. Null slots (untyped closures not
-      // yet resolved) are skipped so positions stay aligned (issue #256).
-      val fixedCount = formalArgs.length - 1
-      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
-      val packed = args.length == formalArgs.length && (args.last != null) && args.last.`type`.isArrayType
-      if (packed) {
-        unify(formalArgs.last, args.last.`type`, callNode)
-      } else {
-        val component = formalArgs.last match {
-          case at: ArrayType => at.base
-          case other => other
-        }
-        args.drop(fixedCount).foreach { actual =>
-          if (actual != null) {
-            val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
-            unify(component, actualType, callNode)
-          }
-        }
-      }
-    } else {
-      // Skip null actuals (untyped closures whose SAM parameter types are still
-      // being inferred): remaining arguments stay aligned to their formals so a
-      // determining argument after a closure is still unified (issue #256).
-      formalArgs.zip(args).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
-    }
-
-    if (expectedReturn != null) {
-      val formalReturn =
-        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
-      unify(formalReturn, expectedReturn, callNode)
-    }
-
-    // Only include type parameters that were actually constrained
-    // (either directly inferred or have lower constraints)
-    val result = HashMap[String, Type]()
-    for (tp <- typeParams) {
-      val name = tp.name
-      inferred.get(name).orElse(lowerConstraints.get(name)).foreach { t =>
-        result += name -> t
-      }
-    }
-
-    result.toMap
-  }
+  ): scala.collection.immutable.Map[String, Type] =
+    if (method.typeParameters.isEmpty) scala.collection.immutable.Map.empty
+    else new Constraints(typing, callNode, method, args, classSubst, expectedReturn, reportErrors = true).constrainedOnly()
 
   def explicit(
     typing: Typing,
@@ -309,20 +146,41 @@ private[typing] object GenericMethodTypeArguments {
     classSubst: scala.collection.immutable.Map[String, Type],
     expectedReturn: Type,
     reportErrors: Boolean = true
-  ): scala.collection.immutable.Map[String, Type] = {
+  ): scala.collection.immutable.Map[String, Type] =
+    if (method.typeParameters.isEmpty) scala.collection.immutable.Map.empty
+    else new Constraints(typing, callNode, method, args, classSubst, expectedReturn, reportErrors).withDefaults()
+
+  /**
+   * The type-argument constraints one call places on a generic method: every formal
+   * parameter (and the expected return type, when known) unified against the actual, into
+   * direct bindings (`inferred`), lower bounds from wildcard uppers and upper bounds from
+   * wildcard lowers. `constrainedOnly()` and `withDefaults()` are the two ways of reading
+   * the result; the collection itself is the same for both.
+   *
+   * `args` MAY contain `null` slots for arguments not yet typed (untyped-parameter closures
+   * whose SAM parameter types are still being inferred). Those slots are skipped, so the
+   * remaining arguments still unify against their correct formal positions (issue #256).
+   *
+   * `reportErrors`: during overload-applicability collection this inference runs over EVERY
+   * candidate, including ones a later arity/specificity check discards. Emitting bound-check
+   * errors there leaks a bounded overload's constraint onto the call even when an unbounded
+   * overload is the one selected (issue #298), so the collection phase passes false; the
+   * final resolution of the SELECTED method keeps errors on.
+   */
+  private final class Constraints(
+    typing: Typing,
+    callNode: AST.Node,
+    method: Method,
+    args: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    expectedReturn: Type,
+    reportErrors: Boolean
+  ) {
     val rootClass = typing.rootClass
-    // During overload-applicability collection this inference is run over EVERY
-    // candidate, including ones a later arity/specificity check discards. Emitting
-    // bound-check errors here leaks a bounded overload's constraint onto the call
-    // even when an unbounded overload is the one actually selected (issue #298).
-    // Callers in the collection phase pass reportErrors = false; the final
-    // resolution of the SELECTED method keeps errors on so real bound violations
-    // are still rejected.
     def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
       if (reportErrors) typing.report(error, node, items*)
     def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
-    if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
 
     def isSuperTypeForBounds(left: Type, right: Type): Boolean =
       if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
@@ -444,76 +302,107 @@ private[typing] object GenericMethodTypeArguments {
         case _ =>
     }
 
-    val formalArgs =
-      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
-    if (method.isVararg && formalArgs.nonEmpty) {
-      // Vararg methods: unify fixed params positionally, then unify the vararg
-      // component with each trailing argument (boxing primitives), unless the
-      // caller already passes a packed array.
-      val fixedCount = formalArgs.length - 1
-      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
-      val packed = args.length == formalArgs.length && args.last.`type`.isArrayType
-      if (packed) {
-        unify(formalArgs.last, args.last.`type`, callNode)
-      } else {
-        val component = formalArgs.last match {
-          case at: ArrayType => at.base
-          case other => other
-        }
-        args.drop(fixedCount).foreach { actual =>
-          val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
-          unify(component, actualType, callNode)
-        }
-      }
-    } else {
-      formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
-    }
 
-    if (expectedReturn != null) {
-      val formalReturn =
-        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
-      unify(formalReturn, expectedReturn, callNode)
-    }
-
-    for (tp <- typeParams) {
-      val name = tp.name
-      val bound0 = bounds(name)
-      val bound =
-        upperConstraints.get(name) match
-          case None => bound0
-          case Some(upper) =>
-            if (isSuperTypeForBounds(bound0, upper)) upper
-            else if (isSuperTypeForBounds(upper, bound0)) bound0
-            else {
-              reportError(callNode, INCOMPATIBLE_TYPE, bound0, upper)
-              bound0
-            }
-
-      val inferredType0 =
-        inferred.get(name)
-          .orElse(lowerConstraints.get(name))
-          .getOrElse(bound)
-
-      // Nullable inferences satisfy the bound through their inner type and
-      // are rejected outright for non-null parameters (the Object top-type
-      // rule would otherwise let String? through an Object bound)
-      val boundsOk = inferredType0 match {
-        case n: NullableType =>
-          tp.nullability != Nullability.NonNull && isAssignableForBounds(bound, n.innerType)
-        case other =>
-          isAssignableForBounds(bound, other)
-      }
-      val inferredType =
-        if (!boundsOk) {
-          reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
-          bound
+    /** Unifies every formal parameter, and the expected return type when known, against the actuals. */
+    private def collect(): Unit = {
+      val formalArgs =
+        method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))(using onion.compiler.TypedAST.typeTag)
+      if (method.isVararg && formalArgs.nonEmpty) {
+        // Vararg methods: unify fixed params positionally, then unify the vararg
+        // component with each trailing argument (boxing primitives), unless the
+        // caller already passes a packed array. Null slots (untyped closures not
+        // yet resolved) are skipped so positions stay aligned (issue #256).
+        val fixedCount = formalArgs.length - 1
+        formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
+        val packed = args.length == formalArgs.length && (args.last != null) && args.last.`type`.isArrayType
+        if (packed) {
+          unify(formalArgs.last, args.last.`type`, callNode)
         } else {
-          inferredType0
+          val component = formalArgs.last match {
+            case at: ArrayType => at.base
+            case other => other
+          }
+          args.drop(fixedCount).foreach { actual =>
+            if (actual != null) {
+              val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
+              unify(component, actualType, callNode)
+            }
+          }
         }
+      } else {
+        // Skip null actuals (untyped closures whose SAM parameter types are still
+        // being inferred): remaining arguments stay aligned to their formals so a
+        // determining argument after a closure is still unified (issue #256).
+        formalArgs.zip(args).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
+      }
 
-      inferred += name -> inferredType
+      if (expectedReturn != null) {
+        val formalReturn =
+          TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        unify(formalReturn, expectedReturn, callNode)
+      }
+
     }
 
-    inferred.toMap
+    /** Only the type parameters that were actually constrained: no defaults to bounds, so closure return inference still sees type variables. */
+    def constrainedOnly(): scala.collection.immutable.Map[String, Type] = {
+      collect()
+      // Only include type parameters that were actually constrained
+      // (either directly inferred or have lower constraints)
+      val result = HashMap[String, Type]()
+      for (tp <- typeParams) {
+        val name = tp.name
+        inferred.get(name).orElse(lowerConstraints.get(name)).foreach { t =>
+          result += name -> t
+        }
+      }
+
+      result.toMap
+    }
+
+    /** Every type parameter: inferred, else its lower constraint, else its (upper-constrained) bound; violations reported. */
+    def withDefaults(): scala.collection.immutable.Map[String, Type] = {
+      collect()
+      for (tp <- typeParams) {
+        val name = tp.name
+        val bound0 = bounds(name)
+        val bound =
+          upperConstraints.get(name) match
+            case None => bound0
+            case Some(upper) =>
+              if (isSuperTypeForBounds(bound0, upper)) upper
+              else if (isSuperTypeForBounds(upper, bound0)) bound0
+              else {
+                reportError(callNode, INCOMPATIBLE_TYPE, bound0, upper)
+                bound0
+              }
+
+        val inferredType0 =
+          inferred.get(name)
+            .orElse(lowerConstraints.get(name))
+            .getOrElse(bound)
+
+        // Nullable inferences satisfy the bound through their inner type and
+        // are rejected outright for non-null parameters (the Object top-type
+        // rule would otherwise let String? through an Object bound)
+        val boundsOk = inferredType0 match {
+          case n: NullableType =>
+            tp.nullability != Nullability.NonNull && isAssignableForBounds(bound, n.innerType)
+          case other =>
+            isAssignableForBounds(bound, other)
+        }
+        val inferredType =
+          if (!boundsOk) {
+            reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
+            bound
+          } else {
+            inferredType0
+          }
+
+        inferred += name -> inferredType
+      }
+
+      inferred.toMap
+    }
   }
 }

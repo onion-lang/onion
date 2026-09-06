@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/tools/language-server.md` (and its Japanese translation) claimed the LSP's
+  format-on-save "converts leading tabs to spaces".** It shares `OnionFormatter` with
+  `onion fmt`, which does the opposite: it deliberately preserves tabs, after an earlier
+  version that rebuilt indentation from JavaCC's tab-expanding column numbers silently
+  turned tab-indented sample programs into eight-space-indented ones. The sibling doc page
+  `docs/tools/project-cli.md` already described the same formatter correctly ("tabs
+  included"). A new `LanguageServerFormattingDocSpec` guards against the claim drifting
+  back in.
+
 ## [0.57.0] - 2026-09-06
 
 ### Internal

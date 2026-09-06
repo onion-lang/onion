@@ -1,6 +1,5 @@
 package onion.tools.format
 
-import java.io.StringReader
 
 import onion.compiler.parser.{JJOnionParserConstants as K, OnionLexer, Token}
 

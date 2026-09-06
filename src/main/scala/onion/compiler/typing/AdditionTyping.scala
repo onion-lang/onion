@@ -1,7 +1,6 @@
 package onion.compiler.typing
 
 import onion.compiler.*
-import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
@@ -18,7 +17,6 @@ import onion.compiler.typing.session.TypingBodyContext
  * String concatenation auto-boxes primitives and calls toString().
  */
 private[typing] class AdditionTyping(
-  private val typing: Typing,
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {
@@ -92,8 +90,8 @@ private[typing] class AdditionTyping(
     val rightBoxed = boxForConcat(node.rhs, right)
     if (leftBoxed.isEmpty || rightBoxed.isEmpty) return None
 
-    val leftString = toStringCall(node.lhs, leftBoxed.get)
-    val rightString = toStringCall(node.rhs, rightBoxed.get)
+    val leftString = toStringCall(leftBoxed.get)
+    val rightString = toStringCall(rightBoxed.get)
     // Unwrap NullableType to get the inner type for method lookup
     val leftStringType = leftString.`type` match {
       case nullableType: NullableType => nullableType.innerType.asInstanceOf[ObjectType]
@@ -130,7 +128,7 @@ private[typing] class AdditionTyping(
    * Convert a term to String via String.valueOf(Object), which matches Java's
    * concatenation semantics for null ("a" + null == "anull") and never NPEs.
    */
-  private def toStringCall(node: AST.Expression, term: Term): Term = {
+  private def toStringCall(term: Term): Term = {
     val arg: Term = new AsInstanceOf(term, bodyContext.rootClass)
     // String.valueOf(Object) always exists on the JDK; the argument is always the Object
     // upcast, so the overload chosen is the same every time.

@@ -5,7 +5,6 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
-import ArgumentHelpers.hasNamedArguments
 import java.util.{TreeSet => JTreeSet}
 
 final class MethodCallTyping(
@@ -15,10 +14,10 @@ final class MethodCallTyping(
 ) {
   private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable)
   private val methodInvocationBuilderSupport = new MethodInvocationBuilderSupport(typing, this)
-  private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext, this)
+  private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext)
   private val methodTargetTypingSupport = new MethodTargetTypingSupport(bodyContext)
   private val memberSelectionResolutionSupport = new MemberSelectionResolutionSupport(typing, bodyContext, this)
-  private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(bodyContext, this)
+  private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(this)
   private val methodCallFallbackSupport = new MethodCallFallbackSupport(typing, this)
   private val instanceMethodCallSupport = new InstanceMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
   private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)

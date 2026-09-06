@@ -1,8 +1,7 @@
 package onion.compiler
 
 import collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
-import java.io.{IOException, Reader, StringReader}
+import java.io.{IOException}
 
 import _root_.onion.compiler.toolbox.Message
 import _root_.onion.compiler.exceptions.CompilationException
@@ -112,7 +111,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           addParseException(e, source.name, sourceText, problems)
       }
     } catch {
-      case e: IOException =>
+      case _: IOException =>
         problems += CompileError(null, null, Message("error.parsing.read_error", source.name))
     }
   }
@@ -181,7 +180,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * (complete strings lex as a single STRING token); report it as such
    * instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String, context: String = "", sourceLine: String = "", expectedAll: String = null): String = {
+  private def syntaxErrorMessage(found: String, expected: String, context: String, sourceLine: String, expectedAll: String): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
     // problem (an unclosed block/paren) instead.
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")

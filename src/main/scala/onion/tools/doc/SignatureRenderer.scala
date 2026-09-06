@@ -28,7 +28,7 @@ object SignatureRenderer {
         case (None, Some(l)) => s"? super ${renderDesc(l)}"
         case _               => "?"
       }
-    case other => other.toString
+    case null => "null"
   }
 
   /** Strip a package qualifier for a compact display name. */

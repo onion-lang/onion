@@ -3,7 +3,6 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
 import scala.collection.mutable.Buffer

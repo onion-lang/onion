@@ -138,9 +138,4 @@ class LocalFrame(val parent: LocalFrame) {
 
   def depth: Int = frames.length - 1
 
-  private def entrySet: mutable.Set[LocalBinding] = {
-    val entries = new mutable.HashSet[LocalBinding]()
-    mutable.Set[LocalBinding]() ++ (for (s1 <- allScopes; s2 <- s1.entries) yield s2)
-  }
-
 }

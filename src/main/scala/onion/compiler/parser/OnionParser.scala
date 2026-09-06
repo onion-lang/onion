@@ -266,11 +266,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     next()
   }
 
-  private def expectImage(s: String): Token = {
-    if (image(1) != s) throw fail
-    next()
-  }
-
   private def accept(k: Int): Boolean = if (kind(1) == k) { next(); true } else false
 
   /** `eols()`: swallow visible EOL tokens. */

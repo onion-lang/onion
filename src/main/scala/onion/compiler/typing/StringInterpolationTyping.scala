@@ -9,7 +9,6 @@ import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
 final class StringInterpolationTyping(
-  private val typing: Typing,
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {

@@ -7,7 +7,6 @@ import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class AssignabilitySupport(
-  typing: Typing,
   bodyContext: TypingBodyContext
 ) {
 

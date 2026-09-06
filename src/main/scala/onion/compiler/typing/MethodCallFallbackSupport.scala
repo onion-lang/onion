@@ -3,7 +3,6 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.TypedAST.*
 
-import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
 

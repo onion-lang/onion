@@ -8,7 +8,7 @@
 package onion.compiler.typing
 
 import onion.compiler.TypedAST.*
-import onion.compiler.{ClassTable, toolbox}
+import onion.compiler.{ClassTable}
 
 import java.util.{TreeSet => JTreeSet}
 

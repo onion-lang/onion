@@ -13,7 +13,7 @@ final class ExpressionFormTyping(
   private val body: TypingBodyPass
 ) {
   private val constructionTyping = new ConstructionTyping(typing, bodyContext, body)
-  private val stringInterpolationTyping = new StringInterpolationTyping(typing, bodyContext, body)
+  private val stringInterpolationTyping = new StringInterpolationTyping(bodyContext, body)
 
   def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] =
     constructionTyping.typeIndexing(node, context)
@@ -158,7 +158,7 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
-      case (_: NullType, bt: BasicType) =>
+      case (_: NullType, _: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>
         // The exact wrapper (`Int as JInteger`) and boxing supertypes

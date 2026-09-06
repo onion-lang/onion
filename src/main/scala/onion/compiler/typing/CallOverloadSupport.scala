@@ -5,7 +5,6 @@ import onion.compiler.TypedAST.*
 
 import java.util.{TreeSet => JTreeSet}
 
-import scala.jdk.CollectionConverters.*
 
 import ArgumentHelpers.{extractNamedArgInfo, filterByNamedArgs, fillDefaultArguments}
 

@@ -1201,8 +1201,8 @@ object TypedAST {
    * @author Kota Mizushima
    */
   abstract class AbstractObjectType extends ObjectType {
-    private var methodRefFinder: TypedAST.MethodFinder = new TypedAST.MethodFinder
-    private var fieldRefFinder: TypedAST.FieldFinder   = new TypedAST.FieldFinder
+    private val methodRefFinder: TypedAST.MethodFinder = new TypedAST.MethodFinder
+    private val fieldRefFinder: TypedAST.FieldFinder   = new TypedAST.FieldFinder
 
     def findField(name: String): TypedAST.FieldRef = fieldRefFinder.find(this, name)
 
@@ -1777,7 +1777,7 @@ object TypedAST {
         case (tv: TypedAST.TypeVariableType, r: TypedAST.NullableType) if tv.acceptsNullable =>
           return isSuperType(tv.upperBound, r.innerType)
         // T ← T? : NOT allowed (requires explicit unwrap)
-        case (_, r: TypedAST.NullableType) =>
+        case (_, _: TypedAST.NullableType) =>
           return false
         case _ => // continue with normal logic
       }

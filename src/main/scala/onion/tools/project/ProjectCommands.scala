@@ -159,7 +159,7 @@ class ProjectCommands:
             err.println(s"error: ${error.message}")
             err.println("Name source files explicitly, or run inside a project.")
             2
-          case Right((paths, layout)) if layout.productionSources.isEmpty =>
+          case Right((_, layout)) if layout.productionSources.isEmpty =>
             err.println("error: Project has no production sources")
             1
           case Right((paths, layout)) =>

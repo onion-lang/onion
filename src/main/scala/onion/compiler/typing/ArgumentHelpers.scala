@@ -115,4 +115,27 @@ private[typing] object ArgumentHelpers {
       Some(result)
     }
   }
+
+  /** A lambda argument whose parameter types must come from the callee (bidirectional inference), or whose body never returns normally. */
+  def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
+    closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure)
+
+  /** Positions of arguments that are lambdas with untyped parameters; the shared empty set when there are none (the common case). */
+  def untypedClosureIndicesOf(args: List[AST.Expression]): Set[Int] = {
+    var i = 0
+    var found: Set[Int] = null
+    var rest = args
+    while (rest.nonEmpty) {
+      if (isClosureWithUntypedParams(rest.head)) { if (found == null) found = Set.empty; found = found + i }
+      i += 1
+      rest = rest.tail
+    }
+    if (found == null) Set.empty else found
+  }
+
+  def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
+    expr match {
+      case closure: AST.ClosureExpression => hasUntypedParams(closure)
+      case _ => false
+    }
 }

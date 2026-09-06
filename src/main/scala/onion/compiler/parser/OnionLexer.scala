@@ -50,12 +50,11 @@ final class OnionLexer(text: String)
   private var cursorIndex = -1
   private var cursorLine = 1
   private var cursorColumn = 0
-  private var cursorPrevCR = false
   private var cursorPrevLF = false
 
   private def advanceTo(index: Int): Unit =
     if index < cursorIndex then
-      cursorIndex = -1; cursorLine = 1; cursorColumn = 0; cursorPrevCR = false; cursorPrevLF = false
+      cursorIndex = -1; cursorLine = 1; cursorColumn = 0; cursorPrevLF = false
     // `cursorPrevLF` doubles as "the next character starts a new line": a line terminator is
     // counted on its own line and the character after it opens the next one. A CR followed by
     // LF is one terminator: the CR defers to the LF (JavaCC's SimpleCharStream does the same).
@@ -614,7 +613,6 @@ object OnionLexer:
   private val unusedStream: JavaCharStream = new JavaCharStream(new java.io.StringReader(""), 1, 1, 1)
 
   private val TabSize = 8
-  private val DEFAULT = 0
   private val IN_STATEMENT = 1
 
   private def isIdentStart(c: Char): Boolean =

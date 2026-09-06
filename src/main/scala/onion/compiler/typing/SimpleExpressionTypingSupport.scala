@@ -60,9 +60,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
         typeMapLiteral(node, context, expected)
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
-      case node@AST.CurrentInstance(loc) =>
+      case node@AST.CurrentInstance(_) =>
         typeCurrentInstance(node, context)
-      case node@AST.Id(loc, name) =>
+      case node@AST.Id(_, name) =>
         typeIdentifier(node, context)
       case node: AST.UnqualifiedFieldReference =>
         typeUnqualifiedFieldReference(node, context)
@@ -224,7 +224,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
     case _ => null
   }
 
-  private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type = null): Option[Term] = {
+  private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)
     val expectedElem = expectedListElement(expected)
     var elementType: Type = null
@@ -426,7 +426,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
     case _ => (null, null)
   }
 
-  private def typeMapLiteral(node: AST.MapLiteral, context: LocalContext, expected: Type = null): Option[Term] = {
+  private def typeMapLiteral(node: AST.MapLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val keys = new Array[Term](node.entries.size)
     val values = new Array[Term](node.entries.size)
     val (expectedKey, expectedValue) = expectedMapKeyValue(expected)

@@ -1,5 +1,7 @@
 package onion.compiler.typing
 
+import ArgumentHelpers.hasNamedArguments
+
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
@@ -564,7 +566,7 @@ final class ConstructionTyping(
   ): Option[Term] = {
     // Extract named argument info
     val namedInfo = extractNamedArgInfo(node.args)
-    val (positionalCount, namedNames) = namedInfo
+    val (_, _) = namedInfo
 
     // Filter constructors by named argument compatibility
     val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
@@ -624,12 +626,6 @@ final class ConstructionTyping(
       }
     }
   }
-
-  /**
-   * Check if argument list contains named arguments
-   */
-  private def hasNamedArguments(args: List[AST.Expression]): Boolean =
-    args.exists(_.isInstanceOf[AST.NamedArgument])
 
   /**
    * Extract (positionalCount, namedNames) from argument list

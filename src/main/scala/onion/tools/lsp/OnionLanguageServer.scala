@@ -13,7 +13,6 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 
 import java.io.{InputStream, OutputStream}
 import java.util.concurrent.CompletableFuture
-import scala.jdk.CollectionConverters._
 
 /**
  * Onion Language Server implementing LSP protocol.

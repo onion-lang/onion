@@ -5,7 +5,6 @@ import scala.jdk.CollectionConverters.*
 import onion.compiler.{AST, CompilerConfig}
 import onion.compiler.typing.TypeParamScope
 
-import scala.collection.mutable.HashMap
 
 final class TypingSession(
   val config: CompilerConfig,

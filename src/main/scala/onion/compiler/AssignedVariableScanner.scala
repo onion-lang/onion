@@ -1,6 +1,5 @@
 package onion.compiler
 
-import scala.collection.mutable
 
 /**
  * Scans untyped AST for simple names that are targets of assignments,
@@ -71,7 +70,7 @@ object AssignedVariableScanner {
             acc = union(acc, visitAny(p.productElement(i)))
             i += 1
           }
-        case _ =>
+        case null =>
       }
       if (remember) memo.put(n, acc)
       acc

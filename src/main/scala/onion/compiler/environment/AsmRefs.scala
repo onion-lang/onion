@@ -189,7 +189,7 @@ object AsmRefs {
 
         override def visitSuperclass(): SignatureVisitor = {
           finishTypeParam()
-          val (params, nextEnv) = {
+          val (_, nextEnv) = {
             val arr = typeParamsBuf.toArray
             (arr, typeParamEnv(arr))
           }

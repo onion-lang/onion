@@ -138,7 +138,7 @@ private[typing] object TypeNarrowingAnalysis {
    */
   private def extractNullCheckNarrowing(
     name: String, context: LocalContext, positive: Boolean, fieldNarrow: String => Option[Type],
-    fieldOnly: Boolean = false
+    fieldOnly: Boolean
   ): NarrowingInfo = {
     val binding = if (fieldOnly) null else context.lookup(name)
     // The non-null view of a nullable local/field type, or None if not nullable.

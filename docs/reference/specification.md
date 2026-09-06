@@ -594,9 +594,11 @@ undefined prefix is a normal "method not found" error, not a lexer error.
 
 #### Reading a resource through a shape
 
-`file"…"` and `http"…"` expose a fixed menu — `text`, `lines`, `json`, `csv`,
-`csvRows` — so the parse step is chosen by which getter you call and the set of
-things a resource can be read as is closed. `read(shape)` opens it:
+`file"…"` and `http"…"` each expose a fixed menu — `text`, `lines`, `json`,
+`csv`, `csvRows` for `file"…"`; `get`, `getJson`, `post`, `postJson`, `put`,
+`delete` for `http"…"` — so the parse step is chosen by which getter you call
+and the set of things a resource can be read as is closed. `read(shape)` opens
+it:
 
 ```onion
 record Pt(x: Int, y: Int)

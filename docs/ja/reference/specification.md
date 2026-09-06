@@ -564,9 +564,10 @@ val body = http"https://api.example.com".get() // HttpResource: get/getJson/post
 
 #### shape でリソースを読む
 
-`file"…"` と `http"…"` は `text`、`lines`、`json`、`csv`、`csvRows` という固定の
-メニューを持ち、どのゲッタを呼ぶかでパース方法が決まるため、読み方の集合が閉じています。
-`read(shape)` はこれを開きます。
+`file"…"` と `http"…"` はそれぞれ固定のメニューを持ちます —— `file"…"` は
+`text`、`lines`、`json`、`csv`、`csvRows`、`http"…"` は `get`、`getJson`、
+`post`、`postJson`、`put`、`delete` —— どのゲッタを呼ぶかでパース方法が決まるため、
+読み方の集合が閉じています。`read(shape)` はこれを開きます。
 
 ```onion
 record Pt(x: Int, y: Int)

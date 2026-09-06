@@ -12,7 +12,8 @@ import java.util.List;
 
 /**
  * HTTP client utilities for Onion programs.
- * All methods are static and can be used without import.
+ * All methods are static; call them qualified, e.g. {@code Http::get(url)}
+ * (Http is not in the default static import set).
  */
 public final class Http {
     private Http() {} // Prevent instantiation

@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`onion.DateTime` and `onion.Http`'s class-level Javadoc still claimed "All
+  methods are static and can be used without import," even though #360
+  narrowed the default static import set to pure classes and deliberately
+  dropped both (effectful stdlib members must be called qualified, e.g.
+  `DateTime::now()`, `Http::get(url)`).** `DefaultStaticImportSpec` already
+  enforces that bare `now()`/`get(url)` don't resolve, but the class doc
+  comments still told readers the opposite. Updated both to point at the
+  qualified call form, and added `EffectfulStdlibJavadocSpec` to guard
+  against the claim resurfacing.
+
 - **`docs/tools/project-cli.md` (and its Japanese translation) still listed
   "formatter ... integration" among the features "intentionally out of scope for
   this first version," even though `onion fmt` has shipped as a fully documented

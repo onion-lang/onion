@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/OnionMathDemo.on`, a runnable example for `onion.OnionMath`.** Every other
+  default-imported stdlib module had at least one sample under `run/`; `OnionMath`
+  (trig, hyperbolic, exponential/log, rounding, clamping, `hypot`) had none. The new
+  sample checks each function family against a known answer and reports how many
+  checks failed, pinned by a `RunSamplesSpec` regression test.
+
 - **A syntax hint for an annotation written before a modifier, e.g.
   `@TailRecursive static def foo() { ... }`.** The grammar requires
   `[modifiers] [annotations] "def"` in that exact order — an annotation must sit

@@ -1,0 +1,80 @@
+// OnionMathDemo — onion.OnionMath: trig, exponential, rounding, clamping, hypot.
+//
+// OnionMath is distinct from java.lang.Math: it is default-imported, so every
+// method below is reachable as OnionMath::name with no import block. This demo
+// checks each family of functions against a known answer and reports how many
+// of the checks failed (0 means everything above still behaves as documented).
+//
+//   onion OnionMathDemo.on
+
+class OnionMathDemo {
+public:
+
+  static def near(actual: Double, expected: Double, label: String): Boolean {
+    val ok = OnionMath::abs(actual - expected) < 1e-9
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    IO::println("trigonometric (radians)")
+    if !near(OnionMath::sin(OnionMath::PI / 2.0), 1.0, "sin(pi/2)") { failures = failures + 1 }
+    if !near(OnionMath::cos(0.0), 1.0, "cos(0)") { failures = failures + 1 }
+    if !near(OnionMath::atan2(1.0, 1.0), OnionMath::PI / 4.0, "atan2(1, 1)") { failures = failures + 1 }
+
+    IO::println("\nhyperbolic")
+    if !near(OnionMath::sinh(0.0), 0.0, "sinh(0)") { failures = failures + 1 }
+    if !near(OnionMath::cosh(0.0), 1.0, "cosh(0)") { failures = failures + 1 }
+    if !near(OnionMath::tanh(0.0), 0.0, "tanh(0)") { failures = failures + 1 }
+
+    IO::println("\nexponential and logarithmic")
+    if !near(OnionMath::exp(0.0), 1.0, "exp(0)") { failures = failures + 1 }
+    if !near(OnionMath::log(OnionMath::E), 1.0, "log(E)") { failures = failures + 1 }
+    if !near(OnionMath::log10(100.0), 2.0, "log10(100)") { failures = failures + 1 }
+
+    IO::println("\npowers and roots")
+    if !near(OnionMath::pow(2.0, 10.0), 1024.0, "pow(2, 10)") { failures = failures + 1 }
+    if !near(OnionMath::sqrt(16.0), 4.0, "sqrt(16)") { failures = failures + 1 }
+    if !near(OnionMath::cbrt(27.0), 3.0, "cbrt(27)") { failures = failures + 1 }
+
+    IO::println("\nabsolute value, by primitive type")
+    if !near(OnionMath::abs(-3.5), 3.5, "abs(-3.5)") { failures = failures + 1 }
+    if OnionMath::absInt(-10) != 10 { IO::println("  FAIL absInt(-10)"); failures = failures + 1 } else { IO::println("  ok   absInt(-10) = 10") }
+    if OnionMath::absLong(-10L) != 10L { IO::println("  FAIL absLong(-10)"); failures = failures + 1 } else { IO::println("  ok   absLong(-10) = 10") }
+
+    IO::println("\nmin / max")
+    if OnionMath::minInt(10, 20) != 10 || OnionMath::maxInt(10, 20) != 20 {
+      IO::println("  FAIL minInt/maxInt(10, 20)"); failures = failures + 1
+    } else {
+      IO::println("  ok   minInt/maxInt(10, 20) = 10, 20")
+    }
+
+    IO::println("\nrounding")
+    if !near(OnionMath::floor(3.7), 3.0, "floor(3.7)") { failures = failures + 1 }
+    if !near(OnionMath::ceil(3.2), 4.0, "ceil(3.2)") { failures = failures + 1 }
+    if OnionMath::round(3.5) != 4L { IO::println("  FAIL round(3.5)"); failures = failures + 1 } else { IO::println("  ok   round(3.5) = 4") }
+
+    IO::println("\nsign, conversion, clamp, hypot")
+    if !near(OnionMath::signum(-5.0), -1.0, "signum(-5.0)") { failures = failures + 1 }
+    if !near(OnionMath::toDegrees(OnionMath::PI), 180.0, "toDegrees(PI)") { failures = failures + 1 }
+    if OnionMath::clampInt(-5, 0, 10) != 0 || OnionMath::clampInt(15, 0, 10) != 10 {
+      IO::println("  FAIL clampInt out-of-range on both sides"); failures = failures + 1
+    } else {
+      IO::println("  ok   clampInt(-5, 0, 10) = 0, clampInt(15, 0, 10) = 10")
+    }
+    if !near(OnionMath::hypot(3.0, 4.0), 5.0, "hypot(3, 4)") { failures = failures + 1 }
+
+    // random()/randomInt() are non-deterministic, so only their contract is checked:
+    // the value must land inside the documented bounds, not against a fixed answer.
+    val r = OnionMath::random()
+    val n = OnionMath::randomInt(1, 10)
+    val randomInBounds = r >= 0.0 && r < 1.0 && n >= 1 && n <= 10
+    if !randomInBounds { IO::println("  FAIL random()/randomInt(1, 10) out of bounds"); failures = failures + 1 }
+    else { IO::println("\n  ok   random() and randomInt(1, 10) landed in bounds") }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

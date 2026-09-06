@@ -2234,6 +2234,42 @@ val postResponse: String = Http::postJson(
 );
 ```
 
+## HttpResource
+
+`http"…"` リテラル（動的な形式: `http(url)`）が返すオブジェクトで、`onion.Resources::http`
+が生成する。1つの URL と、そのエンドポイントに対するリクエストメソッドをまとめたもの——
+フェッチしてパースするパイプラインが1つの式で書ける:
+
+```onion
+val h = http"https://api.example.com/users"
+h.url()                                 // 元の URL 文字列
+
+h.get()                                 // GET、レスポンスボディを String として
+h.get(["Authorization", "Bearer t"])    // ヘッダー付き GET（名前と値を交互に並べる）
+h.getJson()                             // GET、ボディを JSON としてパース（Json::parse を参照）
+
+h.post("body text")                     // POST、レスポンスボディを String として
+h.postJson("{\"name\": \"Bob\"}")       // Content-Type: application/json を付けて POST
+h.put("body text")                      // PUT、レスポンスボディを String として
+h.delete()                              // DELETE、レスポンスボディを String として
+```
+
+`read(shape)` はエンドポイントに GET し、渡した `Shape[T]` でボディをパースする——
+失敗（通信エラーでもパース失敗でも）した場合に生成される `Defect` にこの URL が乗る
+（＝*どのエンドポイントか*がわかる）:
+
+```onion
+val o: Outcome[Config] = http"https://api.example.com/config".read(shape)   // 例外ではなく Outcome[T]
+```
+
+`eachLine(shape)` はエンドポイントに GET し、レスポンスボディの1行につき1つの値を読む。
+パースできた行と、できなかった行それぞれの `Defect`（レスポンス中の該当行に位置づけ
+られる）を両方保持する。通信エラーは単一の defect になり、例外にはならない:
+
+```onion
+val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
 ---
 
 ## DateTime

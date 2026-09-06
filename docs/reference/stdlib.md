@@ -2070,6 +2070,43 @@ val postResponse: String = Http::postJson(
 );
 ```
 
+## HttpResource
+
+The object behind the `http"…"` literal (dynamic form: `http(url)`), returned by
+`onion.Resources::http`. It bundles a URL with the request methods for that one
+endpoint, so a fetch-and-parse pipeline is one expression:
+
+```onion
+val h = http"https://api.example.com/users"
+h.url()                                // the underlying URL string
+
+h.get()                                // GET, response body as String
+h.get(["Authorization", "Bearer t"])   // GET with headers (alternating names/values)
+h.getJson()                            // GET, body parsed as JSON (see Json::parse)
+
+h.post("body text")                    // POST, response body as String
+h.postJson("{\"name\": \"Bob\"}")      // POST with Content-Type: application/json
+h.put("body text")                     // PUT, response body as String
+h.delete()                             // DELETE, response body as String
+```
+
+`read(shape)` GETs the endpoint and parses the body through the `Shape[T]` you pass —
+the parse step comes from the shape, and a failure (transport or parse) carries this
+URL into the resulting `Defect` (so it says *which endpoint*):
+
+```onion
+val o: Outcome[Config] = http"https://api.example.com/config".read(shape)   // Outcome[T], not an exception
+```
+
+`eachLine(shape)` GETs the endpoint and reads one value per line of the response body,
+keeping both the lines that parsed and the `Defect`s for the ones that didn't — each
+positioned on its own line of the response. A transport failure is a single defect, not
+an exception:
+
+```onion
+val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
 ---
 
 ## DateTime

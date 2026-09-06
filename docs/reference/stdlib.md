@@ -1460,6 +1460,50 @@ Files::stem("report.txt")              // "report"
 Files::withExtension("report.txt", "md")   // "report.md"
 ```
 
+## FileResource
+
+The object behind the `file"…"` literal (dynamic form: `file(path)`), returned by
+`onion.Resources::file`. It bundles a path with the read/write operations for that one
+file, so the parse step is chosen by which getter you call:
+
+```onion
+val f = file"data.csv"
+f.path()                               // the underlying path string, "data.csv"
+f.exists()                             // Boolean
+
+f.text()                               // whole file as String (UTF-8)
+f.lines()                              // List[String]
+f.json()                               // parsed JSON value (see Json::parse)
+f.csv()                                // List of List of String (see Csv::parse)
+f.csvRows()                            // List of Map, header -> value (see Csv::parseWithHeader)
+
+f.write("new content")                 // replaces the file's contents
+f.append("more\n")                     // appends, creating the file if needed
+```
+
+The fixed getters above close the set of things a file can be read as. `read(shape)`
+opens it — the parse step comes from the `Shape[T]` you pass, and a read failure carries
+this file's path into the resulting `Defect` (so it says *which file*):
+
+```onion
+val o: Outcome[Config] = file"app.json".read(shape)     // Outcome[T], not an exception
+```
+
+`readLossless(shape)` is the lossless counterpart — the read half of a config lens,
+pairing with `Lossless::edit`/`render` to rewrite one value in place while preserving
+comments, spacing and key order:
+
+```onion
+val lossless: Outcome[Lossless[Config]] = file"app.conf".readLossless(shape)
+```
+
+`eachLine(shape)` reads one value per line, keeping both the lines that parsed and the
+`Defect`s for the ones that didn't — each positioned on its own line of the file:
+
+```onion
+val results: List[Outcome[Row]] = file"data.log".eachLine(shape)
+```
+
 ## Json Module
 
 JSON parsing and serialization (`onion.Json`). The intermediate representation is

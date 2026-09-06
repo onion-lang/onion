@@ -1965,6 +1965,49 @@ Files::stem("report.txt")              // "report"
 Files::withExtension("report.txt", "md")   // "report.md"
 ```
 
+## FileResource
+
+`file"…"` リテラル（動的な形式: `file(path)`）が返すオブジェクトで、`onion.Resources::file`
+が生成する。1つのファイルパスと、そのファイルに対する読み書き操作をまとめたもの——どの
+ゲッターを呼ぶかでパース方法が決まる:
+
+```onion
+val f = file"data.csv"
+f.path()                               // 元のパス文字列、"data.csv"
+f.exists()                             // Boolean
+
+f.text()                               // ファイル全体を String として（UTF-8）
+f.lines()                              // List[String]
+f.json()                               // パース済みの JSON 値（Json::parse を参照）
+f.csv()                                // List of List of String（Csv::parse を参照）
+f.csvRows()                            // List of Map、ヘッダー -> 値（Csv::parseWithHeader を参照）
+
+f.write("new content")                 // ファイルの内容を置き換える
+f.append("more\n")                     // 追記。ファイルが無ければ新規作成
+```
+
+上記の固定ゲッターは、ファイルを何として読めるかの集合を閉じている。`read(shape)` は
+その集合を開く——パース方法は渡した `Shape[T]` が決め、読み取りに失敗すると生成される
+`Defect` にこのファイルのパスが乗る（＝*どのファイルか*がわかる）:
+
+```onion
+val o: Outcome[Config] = file"app.json".read(shape)     // 例外ではなく Outcome[T]
+```
+
+`readLossless(shape)` はロスレス版——`Lossless::edit`/`render` と組み合わせて、コメント・
+空白・キー順序を保ったまま1つの値だけを書き換える、設定用レンズの読み取り半分:
+
+```onion
+val lossless: Outcome[Lossless[Config]] = file"app.conf".readLossless(shape)
+```
+
+`eachLine(shape)` は1行につき1つの値を読み、パースできた行と、できなかった行それぞれの
+`Defect`（ファイル中の該当行に位置づけられる）を両方保持する:
+
+```onion
+val results: List[Outcome[Row]] = file"data.log".eachLine(shape)
+```
+
 ## Csv モジュール
 
 RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。

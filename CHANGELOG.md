@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/reference/stdlib.md` and its Japanese translation never had a section for
+  `FileResource`, the object behind the `file"…"` literal.** `path()`, `exists()`,
+  `read(shape)`, `readLossless(shape)`, `eachLine(shape)`, `write(content)` and
+  `append(content)` are all real, callable members with no API-reference coverage at
+  all -- only `text`/`lines`/`json`/`csv`/`csvRows` were mentioned, and only in
+  `docs/reference/specification.md`'s syntax guide, not the stdlib reference. Both docs
+  now carry a `## FileResource` section documenting every member, and a new
+  `FileResourceDocCoverageSpec` regression guard fails the build if this regresses.
+
 - **`docs/reference/specification.md` and its Japanese translation claimed `http"…"`
   exposes the same fixed menu as `file"…"` (`text`/`lines`/`json`/`csv`/`csvRows`);
   it doesn't.** `onion.HttpResource` (the runtime type behind the `http"…"` literal)

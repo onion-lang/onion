@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   included"). A new `LanguageServerFormattingDocSpec` guards against the claim drifting
   back in.
 
+- **The "Auto-CLI" section of `docs/reference/specification.md` (and its Japanese
+  translation) only documented the "all scalar parameters" `main` shape**, e.g.
+  `def main(name: String, count: Int = 3): void`. It never mentioned that
+  `Rewriting.appendAutoCliCall` also accepts a single `String[]` parameter (raw,
+  unparsed argv) or a scalar prefix followed by a trailing `String[]` rest
+  collector (e.g. `def main(cmd: String, files: String[])`), nor the placement
+  restriction that rejects a `String[]` parameter anywhere else. Both pages now
+  document all three shapes; a new `AutoCliDocParitySpec` guards against the gap
+  reopening.
+
 ## [0.57.0] - 2026-09-06
 
 ### Internal

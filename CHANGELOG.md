@@ -86,6 +86,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   were already documented in both files; this guard now fails the build if a
   future addition to `onion.Archive` goes undocumented.
 
+- **Added an `HttpDocCoverageSpec` regression guard checking that every public
+  `onion.Http` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Http` is a genuine, default-imported
+  stdlib module (`Http::get`, `Http::post`, `Http::postJson`,
+  `Http::getResponse`, `Http::postResponse`, `Http::put`, `Http::delete`,
+  `Http::encodeUrl`, `Http::decodeUrl`, `Http::buildQuery`, `Http::buildUrl`)
+  with 11 distinct public static member names, but -- unlike `HttpResource`
+  (the `http"..."` resource literal), `OnionMath`, `Stats`, `Net`, `Proc`,
+  `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`, `Codec`, `Text`,
+  `Format`, `Assert`, `Yaml`, `Archive`, `Server` and `Config`, each already
+  guarded by its own coverage spec -- it never had one. All 11 members were
+  already documented in both files; this guard now fails the build if a
+  future addition to `onion.Http` goes undocumented.
+
 ## [0.56.0] - 2026-09-05
 
 ### Added

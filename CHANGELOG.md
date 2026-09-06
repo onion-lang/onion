@@ -24,6 +24,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Documented the single-argument `Args.Parsed::option(name)` overload and added an
+  `ArgsDocCoverageSpec` regression guard.** `onion.Args.Parsed::option(String)` --
+  returning the raw `--name`/`--name=value` value or `null` when absent -- is a real,
+  callable method alongside the two-argument `option(name, defaultValue)` form, but
+  docs/reference/stdlib.md and its Japanese translation only ever showed
+  `parsed.option("out", "a.out")`, never the one-argument call, making the
+  nullable-return overload undiscoverable without reading the Java source. Both docs
+  now show `parsed.option("out")` and a new spec fails the build if this regresses.
+
+- **Added a `ConfigDocCoverageSpec` regression guard checking that every public
+  `onion.Config` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Config` is a genuine, default-imported
+  stdlib module (`Config::loadJson`, `Config::parseJson`, `Config::get`,
+  `Config::getString`, `Config::getInt`, `Config::getLong`, `Config::getDouble`,
+  `Config::getBoolean`, `Config::getEnv`, `Config::getWithEnvOverride`,
+  `Config::hasPath`) with 11 distinct public static member names, but -- unlike
+  `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`,
+  `Csv`, `Hash`, `Codec`, `Text`, `Format`, `Assert`, `Yaml`, `Archive` and
+  `Server`, each already guarded by its own coverage spec -- it never had one.
+  All 11 members were already documented in both files; this guard now fails
+  the build if a future addition to `onion.Config` goes undocumented.
+
+- **Added a `ServerDocCoverageSpec` regression guard checking that every public
+  `onion.Server` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Server` is a genuine, default-imported
+  stdlib module (`Server::start`, `Server::text`, `Server::json`, `Server::html`,
+  `Server::notFound`, `Server::status`) with 6 distinct public static member
+  names, but -- unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`,
+  `Files`, `Rand`, `Csv`, `Hash`, `Codec`, `Text`, `Format`, `Assert`, `Yaml` and
+  `Archive`, each already guarded by its own coverage spec -- it never had one.
+  All 6 members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Server` goes undocumented.
+
+- **Added an `ArchiveDocCoverageSpec` regression guard checking that every public
+  `onion.Archive` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Archive` is a genuine, default-imported
+  stdlib module (`Archive::zip`, `Archive::zipDir`, `Archive::entries`,
+  `Archive::unzip`, `Archive::gzip`, `Archive::gunzip`, `Archive::gzipFile`,
+  `Archive::gunzipFile`) with 8 distinct public static member names, but --
+  unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`,
+  `Rand`, `Csv`, `Hash`, `Codec`, `Text`, `Format`, `Assert` and `Yaml`, each
+  already guarded by its own coverage spec -- it never had one. All 8 members
+  were already documented in both files; this guard now fails the build if a
+  future addition to `onion.Archive` goes undocumented.
+
+## [0.56.0] - 2026-09-05
+
+### Added
+
+- **Added a `YamlDocCoverageSpec` regression guard checking that every public
+  `onion.Yaml` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Yaml` is a genuine, default-imported
+  stdlib module (`Yaml::parse`, `Yaml::stringify`) with 2 distinct public
+  static member names, but -- unlike `OnionMath`, `Stats`, `Net`, `Proc`,
+  `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`, `Codec`, `Text`,
+  `Format` and `Assert`, each already guarded by its own coverage spec -- it
+  never had one. Both members were already documented in both files; this
+  guard now fails the build if a future addition to `onion.Yaml` goes
+  undocumented.
+
+- **Added a `TextDocCoverageSpec` regression guard checking that every public
+  `onion.Text` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Text` is a genuine, default-imported
+  stdlib module (`Text::wrap`, `Text::indent`, `Text::dedent`, `Text::table`)
+  with 4 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`
+  and `Codec`, each already guarded by its own coverage spec -- it never had
+  one. All 4 members were already documented in both files; this guard now
+  fails the build if a future addition to `onion.Text` goes undocumented.
+
+- **Added a `FormatDocCoverageSpec` regression guard checking that every public
+  `onion.Format` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Format` is a genuine, default-imported
+  stdlib module (`Format::integer`, `Format::number`, `Format::fixed`,
+  `Format::percent`, `Format::bytes`, `Format::duration`, `Format::ordinal`)
+  with 7 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash`
+  and `Codec`, each already guarded by its own coverage spec -- it never had
+  one. All 7 members were already documented in both files; this guard now
+  fails the build if a future addition to `onion.Format` goes undocumented.
+
+- **Added an `AssertDocCoverageSpec` regression guard checking that every public
+  `onion.Assert` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Assert` is a genuine, default-imported
+  stdlib module (`Assert::isTrue`, `Assert::isFalse`, `Assert::equals`,
+  `Assert::notEquals`, `Assert::notNull`, `Assert::isNull`, `Assert::fail`) with
+  7 distinct public static member names, but -- unlike `OnionMath`, `Stats`,
+  `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand`, `Csv`, `Hash` and
+  `Codec`, each already guarded by its own coverage spec -- it never had one.
+  All 7 members were already documented in both files; this guard now fails
+  the build if a future addition to `onion.Assert` goes undocumented.
+
+- **Added a `CodecDocCoverageSpec` regression guard checking that every public
+  `onion.Codec` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Codec` is a genuine, default-imported
+  stdlib module (`Codec::base64Encode`, `Codec::base64Decode`,
+  `Codec::hexEncode`, `Codec::hexDecode`, `Codec::urlEncode`,
+  `Codec::urlDecode`) with 6 distinct public static member names, but --
+  unlike `OnionMath`, `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`,
+  `Rand`, `Csv` and `Hash`, each already guarded by its own coverage spec --
+  it never had one. All 6 members were already documented in both files;
+  this guard now fails the build if a future addition to `onion.Codec` goes
+  undocumented.
+
+- **Added a `HashDocCoverageSpec` regression guard checking that every public
+  `onion.Hash` member is documented in both `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md`.** `onion.Hash` is a genuine, default-imported
+  stdlib module (`Hash::md5`, `Hash::sha1`, `Hash::sha256`, `Hash::sha512`)
+  with 4 distinct public static member names, but -- unlike `OnionMath`,
+  `Stats`, `Net`, `Proc`, `Scalars`, `DateTime`, `Files`, `Rand` and `Csv`,
+  each already guarded by its own coverage spec -- it never had one. All 4
+  members were already documented in both files; this guard now fails the
+  build if a future addition to `onion.Hash` goes undocumented.
+
 - **A trailing lambda with no parameters needs no arrow, and attaches to a
   static or bare call without an empty argument list:
   `Future::async { return fetchUser() }`, `Helper::twice { x -> x + 1 }`,
@@ -45,6 +159,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at the `{` (`BareTrailingLambdaSpec`, `StaticTrailingLambdaSpec`).
 
 ### Documentation
+
+- **Documented that `Strings::equalsIgnoreCase`'s and `Strings::lastIndexOf`'s
+  extension-call forms are shadowed by native `String.equalsIgnoreCase`/
+  `String.lastIndexOf`.** `java.lang.String` already declares instance
+  methods with these same names, and instance-method resolution always wins
+  over the extension fallback, so `s.equalsIgnoreCase(x)` and
+  `s.lastIndexOf(x)` silently reach the native methods instead of
+  `onion.Strings`'s -- the same shadowing pattern already documented for
+  `trim`/`startsWith`/`endsWith`/`indexOf`/`replace` in the same section.
+  This is invisible on a non-null `String`, but on a null platform-typed
+  `String` the native methods throw `NullPointerException` while
+  `Strings::equalsIgnoreCase`/`Strings::lastIndexOf` are null-safe. Added
+  the note to the Strings Module section of both `docs/reference/stdlib.md`
+  and `docs/ja/reference/stdlib.md`, and a new
+  `StringsEqualsIgnoreCaseLastIndexOfShadowingSpec` regression test.
 
 - **The README, `docs/index.md`, the async/functional examples, the stdlib
   and specification references and `CLAUDE.md` (EN/JA) now write zero-argument

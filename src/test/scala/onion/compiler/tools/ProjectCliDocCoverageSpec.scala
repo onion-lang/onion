@@ -71,4 +71,27 @@ class ProjectCliDocCoverageSpec extends AnyFunSpec {
       assert(missing.isEmpty, s"$path has no section for: ${missing.mkString(", ")}")
     }
   }
+
+  /**
+   * `onion fmt` shipped as a real, documented subcommand (see the test above), but the
+   * "Deferred" section on both pages still listed "formatter ... integration" among the
+   * features "intentionally out of scope for this first version" — a leftover from before
+   * the formatter existed. A page that both documents a command in full and disclaims it as
+   * unbuilt sends a reader in two directions at once.
+   */
+  private def deferredSection(path: String): String = {
+    val page = read(path)
+    val heading = """(?m)^## (Deferred|対象外の機能)$""".r.findFirstMatchIn(page)
+      .getOrElse(fail(s"$path has no Deferred section — the scan has rotted"))
+    val nextHeading = page.indexOf("\n## ", heading.end)
+    page.substring(heading.end, if (nextHeading >= 0) nextHeading else page.length)
+  }
+
+  it("does not disclaim the formatter as deferred now that `onion fmt` ships") {
+    assert(subcommands.contains("fmt"), "onion fmt is no longer a subcommand — this guard is stale")
+    val en = deferredSection("docs/tools/project-cli.md")
+    assert(!en.toLowerCase.contains("formatter"), "docs/tools/project-cli.md still lists the formatter as deferred")
+    val ja = deferredSection("docs/ja/tools/project-cli.md")
+    assert(!ja.contains("フォーマッター"), "docs/ja/tools/project-cli.md still lists the formatter as deferred")
+  }
 }

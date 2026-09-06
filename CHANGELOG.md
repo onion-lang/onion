@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/tools/project-cli.md` (and its Japanese translation) still listed
+  "formatter ... integration" among the features "intentionally out of scope for
+  this first version," even though `onion fmt` has shipped as a fully documented
+  subcommand for a while (same file, `### \`onion fmt\`` section).** The page
+  contradicted itself: one section explained the formatter's CLI contract in
+  detail, the other disclaimed it as unbuilt. Removed "formatter" from the
+  Deferred list on both pages (linter integration is still genuinely absent), and
+  added a `ProjectCliDocCoverageSpec` guard so a shipped command can't be
+  re-listed as deferred again.
+
 ### Added
 
 - **A syntax hint for an annotation written before a modifier, e.g.

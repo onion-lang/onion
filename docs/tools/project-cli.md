@@ -347,9 +347,9 @@ The following are intentionally out of scope for this first version, to keep
 justifies it: publishing, offline resolution, multiple modules
 or workspaces, configurable source/test/output/entrypoint paths, incremental
 (per-file) or parallel compilation, a project watch mode, test annotations or
-a new test framework, package/archive commands, formatter or linter
-integration, lifecycle hooks or manifest scripts, terminal color, and an
-`onion init` for adopting an existing directory.
+a new test framework, package/archive commands, linter integration, lifecycle
+hooks or manifest scripts, terminal color, and an `onion init` for adopting an
+existing directory.
 
 ## Next Steps
 

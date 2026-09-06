@@ -1997,6 +1997,7 @@ Proc::execIn("/tmp", "make", "build")   // exec と同様だが、指定した�
 val parsed = Args::parse(args)
 parsed.flag("verbose")                  // --verbose
 parsed.option("out", "a.out")           // --out path（デフォルト値付き）
+parsed.option("out")                    // --out path。無ければ null
 parsed.intOption("level", 3)
 parsed.positional()                     // オプション以外の引数の List
 ```

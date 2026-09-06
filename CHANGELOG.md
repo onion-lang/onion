@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`docs/reference/stdlib.md` and its Japanese translation never had a section for
+  `onion.Range`, the runtime type behind the `a..b` / `a..<b` range literals.**
+  `start()`, `endExclusive()`, `isEmpty()`, `size()` and `contains(value)` are all real,
+  callable members with no API-reference coverage at all -- only the `a..b`/`a..<b`
+  literal syntax itself was mentioned, in `docs/reference/specification.md`'s syntax
+  guide. Both docs now carry a `## Range` section documenting every member, and a new
+  `RangeDocCoverageSpec` regression guard fails the build if this regresses.
+
+- **`docs/reference/stdlib.md` and its Japanese translation never had a section for
   `FileResource`, the object behind the `file"…"` literal.** `path()`, `exists()`,
   `read(shape)`, `readLossless(shape)`, `eachLine(shape)`, `write(content)` and
   `append(content)` are all real, callable members with no API-reference coverage at

@@ -1803,6 +1803,25 @@ System::exit(0)  // 成功
 System::exit(1)  // エラー
 ```
 
+## Range
+
+範囲リテラル `a..b`（両端を含む）と `a..<b`（終端を含まない）の実行時表現である
+`onion.Range`。`Iterable[Int]` なので `foreach` や `Iterables`／拡張呼び出し系の
+メソッドでそのまま使えるが、それに加えて独自のメンバーも持つ:
+
+```onion
+val r = 2..5                 // Range(2..<6)、両端を含む終端は内部で畳み込まれる
+r.start()                    // 2、最初の値
+r.endExclusive()             // 6、最後の値の次（a..<b でも同じ）
+r.isEmpty()                  // false
+r.size()                     // 4
+r.contains(3)                // true
+r.contains(9)                // false
+r.toString()                 // "Range(2..<6)"; 空の範囲は "Range(empty)"
+
+foreach i: Int in r { IO::println(i) }   // 2 3 4 5
+```
+
 ## Iterables モジュール
 
 `onion.Iterables`（Java インターフェース）で提供。

@@ -831,6 +831,25 @@ writer.newLine()
 writer.close()
 ```
 
+## Range
+
+The runtime type behind the range literals `a..b` (inclusive) and `a..<b` (exclusive),
+`onion.Range`. It is `Iterable[Int]`, so it works directly in `foreach` and with the
+`Iterables`/extension pipeline methods, but it also exposes its own small set of members:
+
+```onion
+val r = 2..5                 // Range(2..<6), inclusive endpoint folded in
+r.start()                    // 2, the first value
+r.endExclusive()             // 6, one past the last value (works the same for a..<b)
+r.isEmpty()                  // false
+r.size()                     // 4
+r.contains(3)                // true
+r.contains(9)                // false
+r.toString()                 // "Range(2..<6)"; empty ranges print "Range(empty)"
+
+foreach i: Int in r { IO::println(i) }   // 2 3 4 5
+```
+
 ## Iterables Module
 
 Provided via `onion.Iterables` (Java interface).

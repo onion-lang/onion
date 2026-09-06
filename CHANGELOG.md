@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bidirectional call paths' preliminary argument typing. About 1200 lines
   gone in all.
 
+### Fixed
+
+- **`docs/reference/specification.md` and its Japanese translation claimed `http"…"`
+  exposes the same fixed menu as `file"…"` (`text`/`lines`/`json`/`csv`/`csvRows`);
+  it doesn't.** `onion.HttpResource` (the runtime type behind the `http"…"` literal)
+  has no `text`, `lines`, `csv` or `csvRows` methods at all -- its menu is the HTTP
+  verbs `get`/`getJson`/`post`/`postJson`/`put`/`delete`. The "Reading a resource
+  through a shape" section described both literals with one shared list borrowed
+  from `FileResource`, which would send a reader looking for `http"...".csv()`.
+  Both docs now list each literal's actual menu, and a new
+  `HttpResourceDocCoverageSpec` regression guard fails the build if the two
+  literals' menus are conflated again.
+
 ### Added
 
 - **Documented the single-argument `Args.Parsed::option(name)` overload and added an

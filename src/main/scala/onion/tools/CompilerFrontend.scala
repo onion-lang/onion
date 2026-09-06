@@ -7,15 +7,11 @@
  * ************************************************************** */
 package onion.tools
 
-import java.io.UnsupportedEncodingException
-import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler, WarningCategory, WarningLevel}
-import onion.compiler.diagnostics.DiagnosticRenderer
+import onion.compiler.{CompiledClass, CompilerConfig}
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.Message
-import onion.compiler.toolbox.Systems
-import onion.compiler.verification.ArgGenerator
 import onion.tools.option._
+import onion.tools.CompilerOptions.*
 
 /**
  *
@@ -24,12 +20,6 @@ import onion.tools.option._
  */
 object CompilerFrontend {
   val VERSION = OnionVersion.value
-
-  private def config(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
-
-  private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
-
-  private def printError(message: String): Unit = System.err.println(message)
 
   def main(args: Array[String]): Unit = {
     // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
@@ -61,29 +51,6 @@ object CompilerFrontend {
     }
   }
 
-  private final val CLASSPATH: String = "-classpath"
-  private final val SCRIPT_SUPER_CLASS: String = "-super"
-  private final val ENCODING: String = "-encoding"
-  private final val OUTPUT: String = "-d"
-  private final val MAX_ERROR: String = "-maxErrorReport"
-  private final val VERBOSE: String = "--verbose"
-  private final val DUMP_AST: String = "--dump-ast"
-  private final val DUMP_TYPED_AST: String = "--dump-typed-ast"
-  private final val PROFILE_COMPILE: String = "--profile-compile"
-  private final val PROFILE_FORMAT: String = "--profile-format"
-  private final val PROFILE_OUTPUT: String = "--profile-output"
-  private final val WARN_LEVEL: String = "--warn"
-  private final val SUPPRESS_WARNINGS: String = "--Wno"
-  private final val NO_CHECK_LAWS: String = "--no-check-laws"
-  private final val LAW_SEED: String = "--law-seed"
-  private final val LAW_SAMPLES: String = "--law-samples"
-  private final val SHOW_EFFECTS: String = "--effects"
-  // Named after javac's -g:none, and meaning the same thing: no LocalVariableTable.
-  private final val NO_DEBUG_INFO: String = "-g:none"
-  private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
-  private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
-  private final val DEFAULT_OUTPUT: String = "."
-  private final val DEFAULT_MAX_ERROR: Int = 10
 }
 
 class CompilerFrontend {
@@ -91,23 +58,7 @@ class CompilerFrontend {
   import CompilerFrontend._
 
   private val commandLineParser = new CommandLineParser(
-    config(CLASSPATH, true),
-    config(SCRIPT_SUPER_CLASS, true),
-    config(ENCODING, true),
-    config(OUTPUT, true),
-    config(MAX_ERROR, true),
-    config(DUMP_AST, false),
-    config(DUMP_TYPED_AST, false),
-    config(PROFILE_COMPILE, false),
-    config(PROFILE_FORMAT, true),
-    config(PROFILE_OUTPUT, true),
-    config(WARN_LEVEL, true),
-    config(SUPPRESS_WARNINGS, true),
-    config(NO_CHECK_LAWS, false),
-    config(LAW_SEED, true),
-    config(LAW_SAMPLES, true),
-    config(SHOW_EFFECTS, false),
-    config(NO_DEBUG_INFO, false)
+    (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false))*
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -183,201 +134,14 @@ class CompilerFrontend {
     result match {
       case success: ParseSuccess => Some(success)
       case failure: ParseFailure =>
-        val lackedOptions = failure.lackedOptions
-        val invalidOptions = failure.invalidOptions
-        invalidOptions.foreach{opt => printError(Message.apply("error.command.invalidArgument", opt.value)) }
-        lackedOptions.foreach{opt => printError(Message.apply("error.command.noArgument", opt.value)) }
+        printFailure(failure)
         None
     }
   }
 
   private def createConfig(result: ParseSuccess, verbose: Boolean = false): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
-    val classpath: Array[String] = checkClasspath(
-      option.get(CLASSPATH).collect{ case ValuedParam(value) => value }
-    )
-    val encoding: Option[String] = checkEncoding(
-      option.get(ENCODING).collect{ case ValuedParam(value) => value }
-    )
-    val outputDirectory: String = checkOutputDirectory(
-      option.get(OUTPUT).collect{ case ValuedParam(value) => value}
-    )
-    val maxErrorReport: Option[Int] = checkMaxErrorReport(
-      option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
-    )
-    val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
-    val noCheckLaws = option.get(NO_CHECK_LAWS).contains(NoValuedParam)
-    val noDebugInfo = option.get(NO_DEBUG_INFO).contains(NoValuedParam)
-    val lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed)
-    val lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples)
-    val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
-    val compileProfile = parseCompileProfile(option)
-    val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
-    val suppressedWarnings = parseSuppressedWarnings(option.get(SUPPRESS_WARNINGS))
-    for {
-      e <- encoding
-      m <- maxErrorReport
-      profile <- compileProfile
-      level <- warningLevel
-      suppressed <- suppressedWarnings
-    } yield {
-      new CompilerConfig(
-        classpath.toIndexedSeq,
-        "",
-        e,
-        outputDirectory,
-        m,
-        verbose = verbose,
-        warningLevel = level,
-        suppressedWarnings = suppressed,
-        dumpAst = dumpAst,
-        dumpTypedAst = dumpTypedAst,
-        compileProfile = profile,
-        checkLaws = !noCheckLaws,
-        emitDebugInfo = !noDebugInfo,
-        lawSeed = lawSeed,
-        lawSamples = lawSamples
-      )
-    }
+    val outputDirectory = option.get(OUTPUT).collect { case ValuedParam(value) => value }.getOrElse(DEFAULT_OUTPUT)
+    configFrom(option, outputDirectory, verbose, emitDebugInfo = !option.get(NO_DEBUG_INFO).contains(NoValuedParam))
   }
-
-
-  /** A positive integer option, falling back to `default` when absent or unparsable. */
-  private def intParam(option: Map[String, CommandLineParam], name: String, default: Int): Int =
-    option.get(name).collect { case ValuedParam(v) => v }
-      .flatMap(v => v.toIntOption).filter(_ > 0).getOrElse(default)
-
-  /** A long option, falling back to `default` when absent or unparsable. */
-  private def longParam(option: Map[String, CommandLineParam], name: String, default: Long): Long =
-    option.get(name).collect { case ValuedParam(v) => v }
-      .flatMap(v => v.toLongOption).getOrElse(default)
-
-  private def parseCompileProfile(option: Map[String, CommandLineParam]): Option[CompileProfileSettings] = {
-    val enabled = option.get(PROFILE_COMPILE).contains(NoValuedParam)
-    val format = option.get(PROFILE_FORMAT) match {
-      case None => Some(CompileProfileFormat.Text)
-      case Some(ValuedParam(value)) =>
-        value.toLowerCase match {
-          case "text" => Some(CompileProfileFormat.Text)
-          case "json" => Some(CompileProfileFormat.Json)
-          case _ =>
-            printError(s"Invalid profile format: $value")
-            None
-        }
-      case Some(NoValuedParam) =>
-        Some(CompileProfileFormat.Text)
-    }
-    format.map { selected =>
-      CompileProfileSettings(
-        enabled = enabled,
-        format = selected,
-        output = option.get(PROFILE_OUTPUT).collect { case ValuedParam(value) => value }
-      )
-    }
-  }
-
-  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationResult =
-    new OnionCompiler(config).compileDetailed(fileNames)
-
-  private def emitDiagnostics(result: CompilationResult): Unit =
-    DiagnosticRenderer.printDiagnostics(result.diagnostics)
-
-  /** `--effects`: the inferred effect set of every compiled method, to stderr. */
-  private def emitEffects(result: CompilationResult): Unit = {
-    val classes = result.debugArtifacts.typedClasses.getOrElse(Seq.empty)
-    onion.compiler.effects.EffectInference.infer(classes).foreach { me =>
-      System.err.println(me.render)
-    }
-  }
-
-  /** `--dump-ast`: the parsed AST, to stderr. Available even if a later phase fails. */
-  private def emitAstDump(result: CompilationResult): Unit =
-    result.debugArtifacts.parsedUnits.foreach(DiagnosticRenderer.dumpAst(_))
-
-  /** `--dump-typed-ast`: the typed AST summary, to stderr. */
-  private def emitTypedAstDump(result: CompilationResult): Unit =
-    result.debugArtifacts.typedClasses.foreach(DiagnosticRenderer.dumpTyped(_))
-
-  private def emitProfile(config: CompilerConfig, result: CompilationResult): Unit = {
-    if (config.verbose) {
-      System.err.println(CompileProfileReporter.renderVerbose(result.toCompileProfile))
-    }
-    if (config.compileProfile.enabled) {
-      CompileProfileReporter.report(result.toCompileProfile, config.compileProfile)
-    }
-  }
-
-  private def checkClasspath(classpath: Option[String]): Array[String] = {
-    (for (c <- classpath) yield pathArray(c)).getOrElse(DEFAULT_CLASSPATH)
-  }
-
-  private def checkOutputDirectory(outputDirectory: Option[String]): String = outputDirectory.getOrElse(DEFAULT_OUTPUT)
-
-  private def checkEncoding(encoding: Option[String]): Option[String] = {
-    try {
-      (for (e <- encoding) yield {
-        "".getBytes(e)
-        e
-      }).orElse(Some(DEFAULT_ENCODING))
-    } catch {
-      case e: UnsupportedEncodingException => {
-        printError(Message.apply("error.command.invalidEncoding", ENCODING))
-        None
-      }
-    }
-  }
-
-  private def checkMaxErrorReport(maxErrorReport: Option[String]): Option[Int] = {
-    try {
-      maxErrorReport match {
-        case Some(m) =>
-          val value = Integer.parseInt(m)
-          if (value > 0) Some(value) else None
-        case None => Some(DEFAULT_MAX_ERROR)
-      }
-    } catch {
-      case e: NumberFormatException =>
-        printError(Message.apply("error.command.requireNaturalNumber", MAX_ERROR))
-        None
-    }
-  }
-
-  private def parseWarningLevel(param: Option[CommandLineParam]): Option[WarningLevel] = {
-    param match {
-      case Some(ValuedParam(value)) =>
-        value.toLowerCase match {
-          case "off" => Some(WarningLevel.Off)
-          case "on" => Some(WarningLevel.On)
-          case "error" => Some(WarningLevel.Error)
-          case _ =>
-            printError(Message.apply("error.command.invalidArgument", WARN_LEVEL))
-            None
-        }
-      case Some(NoValuedParam) =>
-        printError(Message.apply("error.command.noArgument", WARN_LEVEL))
-        None
-      case None =>
-        Some(WarningLevel.On)
-    }
-  }
-
-  private def parseSuppressedWarnings(param: Option[CommandLineParam]): Option[Set[WarningCategory]] = {
-    param match {
-      case Some(ValuedParam(value)) =>
-        val tokens = value.split(",").map(_.trim).filter(_.nonEmpty)
-        val parsed = tokens.flatMap(t => WarningCategory.fromString(t))
-        if (parsed.length != tokens.length) {
-          printError(Message.apply("error.command.invalidArgument", SUPPRESS_WARNINGS))
-          None
-        } else {
-          Some(parsed.toSet)
-        }
-      case Some(NoValuedParam) =>
-        printError(Message.apply("error.command.noArgument", SUPPRESS_WARNINGS))
-        None
-      case None =>
-        Some(Set.empty)
-    }
-  }
-
 }

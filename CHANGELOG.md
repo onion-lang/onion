@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Documented the single-argument `Args.Parsed::option(name)` overload and added an
+  `ArgsDocCoverageSpec` regression guard.** `onion.Args.Parsed::option(String)` --
+  returning the raw `--name`/`--name=value` value or `null` when absent -- is a real,
+  callable method alongside the two-argument `option(name, defaultValue)` form, but
+  docs/reference/stdlib.md and its Japanese translation only ever showed
+  `parsed.option("out", "a.out")`, never the one-argument call, making the
+  nullable-return overload undiscoverable without reading the Java source. Both docs
+  now show `parsed.option("out")` and a new spec fails the build if this regresses.
+
 - **Added a `ConfigDocCoverageSpec` regression guard checking that every public
   `onion.Config` member is documented in both `docs/reference/stdlib.md` and
   `docs/ja/reference/stdlib.md`.** `onion.Config` is a genuine, default-imported

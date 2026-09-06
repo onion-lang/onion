@@ -18,7 +18,7 @@ import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
 import org.objectweb.asm.util.TraceClassVisitor
 
-import java.io.{BufferedReader, ByteArrayOutputStream, File, FileInputStream, FileOutputStream, InputStreamReader, PrintStream, PrintWriter, StringReader, StringWriter}
+import java.io.{BufferedReader, File, FileInputStream, FileOutputStream, InputStreamReader, PrintWriter, StringReader, StringWriter}
 import java.nio.file.Paths
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

@@ -5945,13 +5945,18 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <li>乗算: <code>*</code> <code>/</code> <code>%</code></li>
 <li>加算: <code>+</code> <code>-</code></li>
 <li>シフト: <code>&lt;&lt;</code> <code>&gt;&gt;</code> <code>&gt;&gt;&gt;</code>（コレクションでの <code>&lt;&lt;</code> は追加）</li>
+<li>範囲: <code>..</code> <code>..&lt;</code></li>
 <li>関係: <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>is</code></li>
 <li>等価: <code>==</code> <code>!=</code>（値）、<code>===</code> <code>!==</code>（参照）</li>
-<li>ビット演算: <code>&amp;</code> <code>^</code> <code>|</code></li>
-<li>論理: <code>&amp;&amp;</code> <code>||</code></li>
-<li>Elvis: <code>?:</code></li>
+<li>ビット AND: <code>&amp;</code></li>
+<li>ビット XOR: <code>^</code></li>
+<li>ビット OR: <code>|</code></li>
+<li>論理 AND: <code>&amp;&amp;</code></li>
+<li>論理 OR / Elvis: <code>||</code> <code>?:</code>（同じ優先順位、左から右へ）</li>
 <li>代入: <code>=</code> および複合代入 <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code> <code>&amp;=</code> <code>|=</code> <code>^=</code> <code>&lt;&lt;=</code> <code>&gt;&gt;=</code> <code>&gt;&gt;&gt;=</code></li>
 </ol>
+<p>各行はその下の行より強く結合します。<code>6 | 1 &amp; 2</code> は <code>(6 | 1) &amp; 2</code> ではなく
+<code>6 | (1 &amp; 2)</code>、<code>a || b &amp;&amp; c</code> は <code>(a || b) &amp;&amp; c</code> ではなく <code>a || (b &amp;&amp; c)</code> です。</p>
 <p>オブジェクトの <code>==</code> は値の等価性（<code>equals</code>）。<code>===</code> は参照を比較します。
 オペランドのいずれかが <code>String</code> の場合、<code>+</code> は文字列連結を行います。</p>
 <h2 id="_26">インポートとモジュール<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h2>
@@ -5981,6 +5986,17 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 フラグがない場合はデフォルト式が評価され、エラー時はシグネチャから使用法の行が
 導出されます。<code>onion</code> コマンドラインでは、スクリプトファイル以降のすべてが
 そのままスクリプトに渡されます。</p>
+<p>上記のスカラー限定の形に加えて、次の2つのパラメータ形も受け付けられます:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">              </span><span class="c1">// 生の argv（未パース）</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">cmd</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">files</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// スカラーの接頭列 + rest コレクタ</span>
+</span></code></pre></div>
+<p>単一の <code>String[]</code> パラメータは、パースされていない生のコマンドライン引数を
+受け取ります（従来の Java 流のエントリーポイント）。それ以外がスカラーである
+パラメータ列の <em>末尾</em> にある <code>String[]</code> パラメータは、代わりに必須の先頭パラメータを
+消費したあとの残りの引数すべてを集めます。それ以外の位置にある <code>String[]</code>
+パラメータ — 後ろにさらにパラメータが続く先頭や、途中にあるもの — はコンパイル
+エラーです。唯一のパラメータ（生の argv）か、最後のパラメータ（rest コレクタ）の
+どちらかでなければなりません。</p>
 <h2 id="_28">警告<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h2>
 <p><code>--warn off|on|error</code> でレベルを設定します。<code>--Wno codes</code> で特定の警告を抑制します。
 注目: W0006 未使用パラメータ、W0012 null リテラルが非 nullable 型に流れる。</p>

@@ -5958,13 +5958,18 @@ between assignment and <code>||</code> in precedence.</p>
 <li>Multiplicative: <code>*</code> <code>/</code> <code>%</code></li>
 <li>Additive: <code>+</code> <code>-</code></li>
 <li>Shifts: <code>&lt;&lt;</code> <code>&gt;&gt;</code> <code>&gt;&gt;&gt;</code> (<code>&lt;&lt;</code> on collections appends)</li>
+<li>Range: <code>..</code> <code>..&lt;</code></li>
 <li>Relational: <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>is</code></li>
 <li>Equality: <code>==</code> <code>!=</code> (value), <code>===</code> <code>!==</code> (reference)</li>
-<li>Bitwise: <code>&amp;</code> <code>^</code> <code>|</code></li>
-<li>Logical: <code>&amp;&amp;</code> <code>||</code></li>
-<li>Elvis: <code>?:</code></li>
+<li>Bitwise AND: <code>&amp;</code></li>
+<li>Bitwise XOR: <code>^</code></li>
+<li>Bitwise OR: <code>|</code></li>
+<li>Logical AND: <code>&amp;&amp;</code></li>
+<li>Logical OR / Elvis: <code>||</code> <code>?:</code> (same level, left to right)</li>
 <li>Assignment: <code>=</code> and compound <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code> <code>&amp;=</code> <code>|=</code> <code>^=</code> <code>&lt;&lt;=</code> <code>&gt;&gt;=</code> <code>&gt;&gt;&gt;=</code></li>
 </ol>
+<p>Each row binds tighter than the one below it — <code>6 | 1 &amp; 2</code> is <code>6 | (1 &amp; 2)</code>,
+not <code>(6 | 1) &amp; 2</code>, and <code>a || b &amp;&amp; c</code> is <code>a || (b &amp;&amp; c)</code>, not <code>(a || b) &amp;&amp; c</code>.</p>
 <p><code>==</code> on objects is value equality (<code>equals</code>); <code>===</code> compares references.
 <code>+</code> performs string concatenation when either operand is a <code>String</code>.</p>
 <h2 id="imports-and-modules">Imports and Modules<a class="headerlink" href="#imports-and-modules" title="Permanent link">&para;</a></h2>
@@ -5996,6 +6001,18 @@ to the declared types, default expressions are evaluated when the flag is
 absent, and a usage line is derived from the signature on error.
 Everything after the script file on the <code>onion</code> command line is passed to
 the script verbatim.</p>
+<p>Two more parameter shapes are also accepted, alongside the all-scalar form
+above:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">              </span><span class="c1">// raw argv, unparsed</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">cmd</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">files</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// scalar prefix + rest collector</span>
+</span></code></pre></div>
+<p>A single <code>String[]</code> parameter receives the raw, unparsed command-line
+arguments (the conventional Java-style entry point). A <code>String[]</code> parameter
+at the <em>end</em> of an otherwise-scalar parameter list instead collects every
+remaining argument after the required leading ones are consumed. A
+<code>String[]</code> parameter anywhere else — first with more parameters after it,
+or in the middle — is a compile error: it must be either the only
+parameter (raw argv) or the last one (rest collector).</p>
 <h2 id="warnings">Warnings<a class="headerlink" href="#warnings" title="Permanent link">&para;</a></h2>
 <p><code>--warn off|on|error</code> sets the level; <code>--Wno codes</code> suppresses specific
 warnings. Notable: W0006 unused parameter, W0012 null literal flowing into

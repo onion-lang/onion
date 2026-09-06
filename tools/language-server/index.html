@@ -4647,9 +4647,9 @@ declare support; <code>"editor.semanticHighlighting.enabled": true</code> forces
 <p>The formatting provider calls the same code as <code>onion fmt</code>, so an editor and a CI check can
 never disagree about what formatted means — a difference there shows up as a file that
 changes every time it crosses between the two.</p>
-<p>It tightens punctuation and converts leading tabs to spaces. It does not reindent, does not
-move a line break, and does not collapse runs of spaces used for alignment; the reasoning
-is in <a href="../project-cli/#onion-fmt">the <code>onion fmt</code> section of the project CLI page</a>.</p>
+<p>It tightens punctuation. It does not reindent, does not move a line break, does not collapse
+runs of spaces used for alignment, and does not touch tabs; the reasoning is in
+<a href="../project-cli/#onion-fmt">the <code>onion fmt</code> section of the project CLI page</a>.</p>
 <p>The result is one edit replacing the whole document. A minimal diff would preserve editor
 decorations better, but computing one from two strings risks producing an edit that does not
 reconstruct the formatted text, and a formatter that corrupts a buffer on save is worse than

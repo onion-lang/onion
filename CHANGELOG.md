@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Shape::describe()` was undocumented in the `## Shape` section of
+  `docs/reference/stdlib.md` (and its Japanese translation), even though every other
+  `Shape` instance method was covered there.** The word "describe" did appear
+  elsewhere in the same file (`Origin::describe`, `Defect::describe`), which is how a
+  whole-file substring check would have missed the gap; a new `ShapeDocCoverageSpec`
+  scopes its check to the `## Shape` section's own text instead, and now documents
+  `describe()` there.
+
 - **`docs/tools/language-server.md` (and its Japanese translation) claimed the LSP's
   format-on-save "converts leading tabs to spaces".** It shares `OnionFormatter` with
   `onion fmt`, which does the opposite: it deliberately preserves tabs, after an earlier

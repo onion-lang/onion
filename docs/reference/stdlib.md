@@ -531,6 +531,13 @@ Not every shape can render. A regex with a `\s+` separator has no unique renderi
 the shape is read-only and `canPrint()` says so before `print` is called — rather than
 the method silently not existing.
 
+### describe
+
+`describe()` names what a shape reads, for use in diagnostics — `re"\d+-\d+"` for a
+regex shape, for instance. It is what an `UnsupportedOperationException` from `print`
+or `printLossless` quotes to say *which* shape refused, since "this shape is not
+invertible" is useless on its own.
+
 ### Component failures accumulate
 
 Reading two `Int` components out of `"abc,def"` reports **two** defects, not the first

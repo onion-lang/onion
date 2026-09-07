@@ -133,6 +133,31 @@ class ToolContractCliSpec extends AbstractShellSpec {
     }
   }
 
+  describe("computed (non-literal) defaults") {
+    val computed =
+      """tool greet(name: String, times: Int = 1 + 2): Int
+        |  requires { console }
+        |{
+        |  IO::println(name)
+        |  return 0
+        |}
+        |""".stripMargin
+
+    it("marks a non-literal default as computed instead of faking a literal value in --contract") {
+      val (r, out) = run(computed, "--contract")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(out.contains(""""name":"times","type":"Int","role":"flag","defaultComputed":true}"""), out)
+      assert(!out.contains("<computed>"), out)
+    }
+
+    it("describes a computed default honestly in --help instead of the literal placeholder") {
+      val (r, out) = run(computed, "--help")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(out.contains("(default: computed at call time)"), out)
+      assert(!out.contains("<computed>"), out)
+    }
+  }
+
   describe("several tools in one script") {
     val multi =
       """tool add(a: Int, b: Int): Int requires { console } { IO::println("" + (a + b)); return 0 }

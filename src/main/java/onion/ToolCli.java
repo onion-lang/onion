@@ -29,7 +29,10 @@ import java.util.Map;
  * or {@code --name=value}), {@code switch} ({@code --name}, boolean). A defaulted
  * parameter whose flag is absent yields a {@code null} slot in {@link Result#value};
  * the synthesized call site evaluates the default expression in-language, so defaults
- * stay arbitrary expressions, not strings.
+ * stay arbitrary expressions, not strings. A default that is not a literal (e.g.
+ * {@code = 1 + 2}) has no value to quote, so the entry carries
+ * {@code "defaultComputed":true} instead of a {@code "default"} key; {@code --help}
+ * and {@code --plan} describe it as computed rather than fabricating a value.
  */
 public final class ToolCli {
     private ToolCli() {}
@@ -257,8 +260,16 @@ public final class ToolCli {
                     String bound;
                     if (values[idx] != null) bound = String.valueOf(values[idx]);
                     else {
-                        Object dflt = params.get(idx).get("default");
-                        bound = dflt == null ? "(unset)" : dflt + " (default)";
+                        Map<String, Object> p = params.get(idx);
+                        Object dflt = p.get("default");
+                        if (dflt != null) bound = dflt + " (default)";
+                        else if (Boolean.TRUE.equals(p.get("defaultComputed")))
+                            // A non-literal default (e.g. `= 1 + 2`) has no value the
+                            // contract can quote -- saying so is more honest than
+                            // fabricating one (issue: this used to print the literal
+                            // placeholder text "<computed>" as if it were the argument).
+                            bound = "(computed default; exact value determined at call time)";
+                        else bound = "(unset)";
                     }
                     // The capability ties the effect to a PARAMETER, not to the path the
                     // body finally passes to the effectful call — a body is free to build
@@ -324,6 +335,8 @@ public final class ToolCli {
         StringBuilder sb = new StringBuilder(str(p, "type"));
         Object dflt = p.get("default");
         if (dflt != null) sb.append(" (default: ").append(dflt).append(')');
+        else if (Boolean.TRUE.equals(p.get("defaultComputed")))
+            sb.append(" (default: computed at call time)");
         return sb.toString();
     }
 

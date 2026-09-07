@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `tool`'s `--contract`, `--help`, and `--plan` all rendered a non-literal default
+  parameter value (e.g. `= 1 + 2`) as the literal placeholder text `"<computed>"`,
+  indistinguishable from a genuine string default and, in `--plan`, presented as if it
+  were the actual bound argument** — directly contradicting the CLI's own documented
+  honesty rule that an operand the analysis cannot pin down is reported as such, never
+  guessed. `Rewriting.toolContractJson` (`src/main/scala/onion/compiler/Rewriting.scala`)
+  now emits `"defaultComputed":true` instead of a fake `"default"` value for a
+  non-literal default expression; `ToolCli` (`src/main/java/onion/ToolCli.java`)
+  describes it in `--help` as `(default: computed at call time)` and in `--plan` as
+  `(computed default; exact value determined at call time)` rather than fabricating or
+  omitting it. Added regression coverage in `ToolContractCliSpec` and `ToolPlanSpec`,
+  and documented the new contract field in `docs/guide/tools.md` (EN/JA).
+
 ## [0.64.0] - 2026-09-07
 
 ### Fixed

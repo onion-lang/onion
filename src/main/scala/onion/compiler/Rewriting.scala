@@ -347,6 +347,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         case c if c < ' ' => f"\\u${c.toInt}%04x"
         case c    => c.toString
       }
+    // A default's rendering is either a literal value the contract can quote
+    // verbatim, or None for anything else (a computed expression) -- the contract
+    // must never present a made-up placeholder string as if it were the real
+    // default value (issue: `--contract`/`--help`/`--plan` all quoted the literal
+    // text "<computed>" as though it were the tool's actual default, which is
+    // indistinguishable from a genuine default of that string and, in `--plan`,
+    // reads as the bound argument value rather than a description of it).
     def defaultRendering(e: AST.Expression): Option[String] = e match {
       case AST.IntegerLiteral(_, v)   => Some(v.toString)
       case AST.LongLiteral(_, v)      => Some(v.toString)
@@ -355,7 +362,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case AST.BooleanLiteral(_, v)   => Some(v.toString)
       case AST.StringLiteral(_, v)    => Some(v)
       case AST.CharacterLiteral(_, v) => Some(v.toString)
-      case _                          => Some("<computed>")
+      case _                          => None
     }
     val params = tool.args.map { a =>
       val kind = cliKindOf(a.typeRef).get
@@ -363,8 +370,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         if (a.defaultValue == null) "positional"
         else if (kind == "Boolean") "switch"
         else "flag"
-      val dflt = Option(a.defaultValue).flatMap(defaultRendering)
-        .map(d => s""","default":"${esc(d)}"""").getOrElse("")
+      val dflt = Option(a.defaultValue) match {
+        case None => ""
+        case Some(e) =>
+          defaultRendering(e) match {
+            case Some(d) => s""","default":"${esc(d)}""""
+            case None    => ""","defaultComputed":true"""
+          }
+      }
       s"""{"name":"${esc(a.name)}","type":"$kind","role":"$role"$dflt}"""
     }.mkString("[", ",", "]")
     val returns = cliKindOf(tool.returnType).getOrElse(

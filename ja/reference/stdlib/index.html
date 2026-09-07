@@ -9089,7 +9089,7 @@ JDK 自身のパーサが緩すぎてそのままでは使えない場面のた�
 使うため、<code>shape</code>/<code>from re"..."</code> による導出と <code>Scalars</code> を直接使う手書きコードは、
 同じ方法で defect を報告します。</p>
 <h2 id="_12">関数インターフェース<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
-<p>ラムダとクロージャのための組み込み関数型。<code>f(args)</code>の代わりに<code>f(args)</code>として呼び出せます。</p>
+<p>ラムダとクロージャのための組み込み関数型。<code>f.call(args)</code>の代わりに<code>f(args)</code>として呼び出せます。</p>
 <h3 id="function0">Function0<a class="headerlink" href="#function0" title="Permanent link">&para;</a></h3>
 <p>パラメータなしの関数：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">func</span><span class="p">:</span><span class="w"> </span><span class="nc">Function0</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>

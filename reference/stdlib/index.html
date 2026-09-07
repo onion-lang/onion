@@ -9295,7 +9295,7 @@ string where an <code>Int</code> was required) is a defect, not a silent <code>n
 conversion table, so a <code>shape</code>/<code>from re"..."</code> derivation and hand-written code using
 <code>Scalars</code> directly report defects the same way.</p>
 <h2 id="function-interfaces">Function Interfaces<a class="headerlink" href="#function-interfaces" title="Permanent link">&para;</a></h2>
-<p>Built-in function types for lambdas and closures. You can call them with <code>f(args)</code> as a shorthand for <code>f(args)</code>.</p>
+<p>Built-in function types for lambdas and closures. You can call them with <code>f(args)</code> as a shorthand for <code>f.call(args)</code>.</p>
 <h3 id="function0">Function0<a class="headerlink" href="#function0" title="Permanent link">&para;</a></h3>
 <p>Function with no parameters:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">func</span><span class="p">:</span><span class="w"> </span><span class="nc">Function0</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>

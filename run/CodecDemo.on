@@ -1,0 +1,41 @@
+// CodecDemo — onion.Codec: base64, hex, and URL/percent encoding and decoding.
+//
+// Codec is not default-imported, so each call below is qualified as Codec::name.
+// Every method operates on the UTF-8 bytes of a string and returns a string. This
+// demo checks each encoding against the examples documented in
+// docs/reference/stdlib.md and reports how many checks failed (0 means everything
+// still matches the docs).
+//
+//   onion CodecDemo.on
+
+class CodecDemo {
+public:
+
+  static def check(actual: String, expected: String, label: String): Boolean {
+    val ok = actual == expected
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label + " = " + actual)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    IO::println("base64")
+    val b64 = Codec::base64Encode("Hello")
+    if !check(b64, "SGVsbG8=", "base64Encode(Hello)") { failures = failures + 1 }
+    if !check(Codec::base64Decode(b64), "Hello", "base64Decode(SGVsbG8=)") { failures = failures + 1 }
+
+    IO::println("\nhex")
+    val hex = Codec::hexEncode("Hi")
+    if !check(hex, "4869", "hexEncode(Hi)") { failures = failures + 1 }
+    if !check(Codec::hexDecode(hex), "Hi", "hexDecode(4869)") { failures = failures + 1 }
+
+    IO::println("\nurl")
+    val url = Codec::urlEncode("a b&c")
+    if !check(url, "a+b%26c", "urlEncode(a b&c)") { failures = failures + 1 }
+    if !check(Codec::urlDecode(url), "a b&c", "urlDecode(a+b%26c)") { failures = failures + 1 }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

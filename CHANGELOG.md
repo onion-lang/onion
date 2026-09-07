@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/quality-bar.md` (en/ja) row 2's sample count from 251 to 252 to match, since
   `QualityBarSpec` derives that figure from the actual `run/*.on` count.
 
+- **`run/CodecDemo.on`, a runnable example for `onion.Codec`.** `Codec`
+  (`base64Encode`/`base64Decode`/`hexEncode`/`hexDecode`/`urlEncode`/`urlDecode`) had
+  no sample under `run/`. The new sample checks each encoding against the examples
+  documented in `docs/reference/stdlib.md` and reports how many checks failed, pinned
+  by a `RunSamplesSpec` regression test. Bumped `docs/quality-bar.md` (en/ja) row 2's
+  sample count from 252 to 253 to match.
+
 ## [0.59.0] - 2026-09-07
 
 ### Fixed

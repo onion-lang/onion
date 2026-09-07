@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Timing::formatNanos`'s microsecond band claimed to render the Greek mu sign
+  (`"45.67μs"`) in its Javadoc and both `docs/reference/stdlib.md` copies, but the
+  implementation (`String.format("%.2fus", ...)`) has only ever emitted the ASCII
+  `"us"`** — `TimerSpec`'s own `endsWith("us")` assertion already pinned the real
+  behavior, so this was doc/impl drift, not a live bug. Corrected the Javadoc and
+  both doc copies to `"us"` and added `TimingFormatNanosDocParitySpec`, which asserts
+  the actual output of all four formatting bands against both docs so they can't
+  drift back to a unit sign the implementation never produces.
+
 ## [0.61.0] - 2026-09-07
 
 ### Added

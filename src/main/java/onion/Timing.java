@@ -60,7 +60,7 @@ public final class Timing {
 
     /**
      * Formats nanoseconds to a human-readable string.
-     * Examples: "500ns", "1.23μs", "4.56ms", "1.23s"
+     * Examples: "500ns", "1.23us", "4.56ms", "1.23s"
      */
     public static String formatNanos(long nanos) {
         if (nanos < 1_000) {

@@ -162,6 +162,7 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Server` - 最小限のHTTPサーバー (ルーティング、リクエスト/レスポンス)
 - `Proc` - サブプロセス実行 (run, capture)
 - `Args` - コマンドライン引数のパース
+- `Cli` - auto-CLI を支える低レベルランタイム（spec文字列のパース、型変換、usage テキスト生成）
 - `Colls` - コレクションのファクトリとパイプライン (map/filter/fold、chunked/windowed、sumBy/maxBy)
 - `Iterables`, `Maps`, `Sets` - イテレーションとマップ/セットのユーティリティ関数
 - `Text` - コンソール向けテキストレイアウト (wrap、indent、テーブル整形)

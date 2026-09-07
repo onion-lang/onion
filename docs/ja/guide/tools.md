@@ -125,6 +125,11 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 `--count=5`）、`Boolean` のデフォルトはスイッチになります。コマンドラインで省略された
 デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。
 
+`--help` やフラグ処理の背後にあるパースと型変換は、生成コードが `onion.Cli` という
+より低レベルのランタイムモジュールを呼び出して行っています。このモジュールは直接
+使うことも可能です — stdlib リファレンスの [`Cli` モジュール](../reference/stdlib.md#cli-モジュール)
+を参照してください。
+
 リテラルでないデフォルト（`= retries() + 1` など）には契約が引用できる値がないため、
 そのエントリは `"default"` キーの代わりに `"defaultComputed":true` を持ちます。
 `--help` はそれを `(default: computed at call time)` と説明し、`--plan` はそのような

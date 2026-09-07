@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   omitting it. Added regression coverage in `ToolContractCliSpec` and `ToolPlanSpec`,
   and documented the new contract field in `docs/guide/tools.md` (EN/JA).
 
+### Documentation
+
+- **`onion.Cli` — the public runtime the compiler's auto-CLI (`tool` declarations and
+  auto-derived `main`) generates calls to for spec-string parsing, typed flag
+  conversion and usage text — had no documentation anywhere under `docs/`**, unlike
+  the closely related `Args` module. A script can `import { onion.Cli; }` and call
+  `Cli::parse`/`tryParse`/`parseInt`/`parseLong`/`parseDouble`/`parseFloat`/
+  `parseShort`/`parseByte`/`parseBoolean`/`rest`/`requireArgs` directly (proven by the
+  existing `CliErrorMessageSpec`), but nothing said so. Added a `Cli Module` section to
+  `docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md` (also listed in each
+  file's "Modules at a glance" table), a one-line cross-reference from
+  `docs/guide/tools.md`/`docs/ja/guide/tools.md`, and an entry in `CLAUDE.md`'s
+  Standard Library list.
+
 ## [0.64.0] - 2026-09-07
 
 ### Fixed

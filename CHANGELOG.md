@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/examples/index.md`'s Basic/OOP/Functional bullets linked to the bare
+  `basic.md`/`oop.md`/`functional.md` page instead of the named section**, unlike the
+  English `docs/examples/overview.md`, which anchors those same nine bullets straight
+  into their heading (e.g. `basic.md#user-input`). Added the matching `#anchor`
+  fragments, and fixed a long-vowel-mark inconsistency in `docs/ja/examples/basic.md`
+  (`## ユーザ入力` vs. the term used everywhere else in the docs, `ユーザー入力`) that
+  the new anchor exposed. Added `ExamplesIndexAnchorParitySpec` as a drift guard.
+
 - **A `tool`'s `--contract`, `--help`, and `--plan` all rendered a non-literal default
   parameter value (e.g. `= 1 + 2`) as the literal placeholder text `"<computed>"`,
   indistinguishable from a genuine string default and, in `--plan`, presented as if it

@@ -5338,7 +5338,11 @@
 - <code>Outcome</code>, <code>Defect</code> - 外部データの読み取り結果: 値、またはそれが読めなかったすべての理由
 - <code>Origin</code> - 値がどこから来たか（読み取り元のテキスト上の位置）
 - <code>Shape</code>, <code>Shapes</code> - 外部テキストと型付きの値との双方向対応
-- <code>Scalars</code> - 境界導出のための厳密なスカラー値パース</p>
+- <code>Scalars</code> - 境界導出のための厳密なスカラー値パース
+- <code>Range</code> - <code>a..b</code>/<code>a..&lt;b</code> 範囲リテラルの実体型、<code>Iterable[Int]</code>
+- <code>FileResource</code>, <code>HttpResource</code> - <code>file"…"</code>/<code>http"…"</code> リテラルの実体: パス/URLと読み書き・リクエスト操作を束ねる
+- <code>Resources</code> - <code>file"…"</code>/<code>http"…"</code>/<code>re"…"</code> リテラルを支えるデフォルトインポート済みのファクトリ関数（<code>file</code>, <code>http</code>, <code>re</code>）。リテラルと素の関数呼び出しは完全に等価
+- <code>Lossless</code>, <code>Residue</code> - ロスレスなshapeパース (<code>parseLossless</code>/<code>printLossless</code>) のための往復変換レンズ</p>
 <h2 id="_7">テスト<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p><strong>フレームワーク:</strong> ScalaTest 3.2.19</p>
 <p><strong>テストの場所:</strong> <code>src/test/scala/onion/compiler/tools/</code></p>

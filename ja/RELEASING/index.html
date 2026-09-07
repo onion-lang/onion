@@ -4505,17 +4505,38 @@
    リリース日と、ユーザーに影響する変更、バグ修正、内部改善の概要を含む新しいセクションを追加します。</p>
 </li>
 <li>
-<p><strong>タグを作成してプッシュする。</strong>
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>pull
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.2.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Release v0.2.0"</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
-</span></code></pre></div></p>
+<p><strong>リリースを開始する。</strong></p>
 </li>
-<li>
-<p><strong>CI に残りの作業を任せる。</strong>
-   <a href="https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml">release workflow</a> は以下を実行します。</p>
-</li>
+</ol>
+<p>推奨: リリースワークフローの <code>workflow_dispatch</code> イベントを起動し、タグは
+   ワークフロー自身に作らせる。クライアントから <code>v*</code> タグをプッシュすると、
+   リポジトリのタグ保護によって HTTP 403 で拒否され、これが何ヶ月もリリースを
+   止めていた原因でした（issue #334）。そのためクライアント側のプッシュに頼らず、
+   ワークフロー自身が Actions トークンでタグを作成します:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span>v0.2.0<span class="w"> </span>--ref<span class="w"> </span>develop
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>gh<span class="w"> </span>run<span class="w"> </span>watch<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gh<span class="w"> </span>run<span class="w"> </span>list<span class="w"> </span>--workflow<span class="o">=</span>release.yml<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--json<span class="w"> </span>databaseId<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[0].databaseId'</span><span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<p><code>gh</code> CLI が無い場合（GitHub API/MCP ツールしか無いセッションなど）は、同じ
+   <code>workflow_dispatch</code> イベントを <code>POST
+   /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches</code> に
+   <code>{"ref": "develop", "inputs": {"version": "v0.2.0"}}</code> を渡して呼び出せます。
+   GitHub MCP サーバでは通常 <code>workflow_id: "release.yml"</code>、<code>ref: "develop"</code>、
+   <code>inputs: {version: "v0.2.0"}</code> を取る「ワークフロー実行」アクションとして
+   公開されています。</p>
+<p><code>v*</code> refをプッシュできる権限を持つ認証情報であれば、タグをプッシュする方法も
+   引き続き使えます:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>pull
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.2.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Release v0.2.0"</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
+</span></code></pre></div>
+<p>タグが存在する前に <code>## [X.Y.Z]</code> の CHANGELOG 見出しをコミットしては
+   <strong>いけません</strong>。リリースが失敗した場合に見出しを元に戻す必要が生じ、これは
+   まさに #334 が説明しているリリース・差し戻しループです。まずリリースを
+   確定させてから、見出しを確定してください。</p>
+<ol>
+<li><strong>CI に残りの作業を任せる。</strong>
+   <a href="https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml">release workflow</a> は以下を実行します。</li>
 <li>テストスイートの実行</li>
 <li>fat jar（<code>sbt assembly</code>）と配布用ZIP（<code>sbt dist</code>）のビルド</li>
 <li>タグがsbtから導出されたバージョンと一致することの確認</li>
@@ -4529,12 +4550,12 @@
 </li>
 <li>GitHubリリースページを確認</li>
 <li><code>onion-&lt;version&gt;.jar</code> をダウンロードして確認:
-     <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>onion-&lt;version&gt;.jar<span class="w"> </span>onion.tools.ScriptRunner<span class="w"> </span>run/Hello.on
+     <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>onion-&lt;version&gt;.jar<span class="w"> </span>onion.tools.ScriptRunner<span class="w"> </span>run/Hello.on
 </span></code></pre></div></li>
 </ol>
 <h2 id="_2">ローカルでの成果物確認<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>リリースを作成せずに同じ成果物をローカルでビルドするには:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span><span class="s2">"assembly; dist"</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sbt<span class="w"> </span><span class="s2">"assembly; dist"</span>
 </span></code></pre></div>
 <p>出力 (sbt 2 の既定レイアウトではビルド成果物が <code>target/out/&lt;platform&gt;/&lt;scalaVersion&gt;/&lt;project&gt;/</code> 以下に配置される):
 - <code>target/out/jvm/scala-3.3.7/onion/onion-&lt;version&gt;.jar</code> (fat jar)

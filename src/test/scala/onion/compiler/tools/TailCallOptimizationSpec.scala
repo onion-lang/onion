@@ -105,6 +105,39 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(true) == result)
     }
 
+    it("does not treat a same-signature call on a different instance as self-recursion") {
+      // Regression: isSelfCall matched name/class/argument-types only, so a tail call
+      // to the same method on a *different* receiver (e.g. next.sumAcc(...) while
+      // walking a linked structure) was misidentified as self-recursion. optimizeMethod
+      // then rewrote the body into a while(true) loop that only ever updated this
+      // method's own parameter slots, never advancing to the new receiver, so the
+      // loop's exit condition could never become true -- an infinite loop/hang.
+      val result = shell.run(
+        """
+          |class Node {
+          |  val value: Int
+          |  val next: Node?
+          |public:
+          |  def this(value: Int, next: Node?) { this.value = value; this.next = next }
+          |  final def sumAcc(acc: Int): Int {
+          |    if next == null { return acc + value }
+          |    return next.sumAcc(acc + value)
+          |  }
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val n1 = new Node(1, new Node(2, new Node(3, null)))
+          |    return n1.sumAcc(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "TcoDifferentReceiverNotSelfCall.on",
+        Array()
+      )
+      assert(Shell.Success(6) == result)
+    }
+
     it("optimizes a zero-argument static method without crashing") {
       val result = shell.run(
         """

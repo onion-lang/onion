@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tail-call optimization could rewrite a call to the same method on a *different*
+  instance as self-recursion, producing an infinite loop.** `TailCallOptimization`'s
+  `isSelfCall` (`src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`)
+  matched a tail call's target method purely by name, declaring class, and argument
+  types — it never checked that the call's receiver was `this`. A `final`/`private`/
+  `static` method walking a linked structure via same-signature calls on other
+  instances (e.g. `next.sumAcc(acc + value)` while traversing a `Node` chain) was
+  misidentified as self-recursion and rewritten into a `while(true)` loop that only
+  ever updated its own parameter slots, never advancing to the new receiver — the
+  loop's exit condition could then never become true, hanging at runtime instead of
+  returning a (wrong) value. Added a `call.target.isInstanceOf[This]` guard so only
+  true `this`-receiver calls are optimized, and added a regression case to
+  `TailCallOptimizationSpec` pinning correct behavior for a same-signature call on a
+  different receiver.
+
 - **The "Function Interfaces" intro in `docs/reference/stdlib.md` (and its Japanese
   translation) described `f(args)` as "a shorthand for `f(args)`"** — a tautology that
   explains nothing about what the sugar actually does. `Function0`..`Function10`

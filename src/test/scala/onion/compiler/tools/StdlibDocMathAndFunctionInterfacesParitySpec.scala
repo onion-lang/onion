@@ -38,4 +38,17 @@ class StdlibDocMathAndFunctionInterfacesParitySpec extends AnyFunSpec {
       s"docs/reference/stdlib.md has ${en.size} Function Interfaces subsections but " +
       s"docs/ja/reference/stdlib.md has ${ja.size} — the section is missing or incomplete in Japanese")
   }
+
+  it("describes f(args) as shorthand for the real call target f.call(args), not a tautology of itself") {
+    // Function0..Function10 (src/main/java/onion/Function1.java etc.) declare a single
+    // abstract `call` method, and CallableValueCallSupport.resolveCallableValue desugars
+    // an unqualified f(args) call into f.call(args) — so the intro sentence must name
+    // `call` as the desugaring target, not restate `f(args)` on both sides.
+    val en = read("docs/reference/stdlib.md")
+    val ja = read("docs/ja/reference/stdlib.md")
+    assert(en.contains("as a shorthand for `f.call(args)`"),
+      "docs/reference/stdlib.md's Function Interfaces intro no longer names f.call(args) as the desugaring target")
+    assert(ja.contains("`f.call(args)`の代わりに`f(args)`として呼び出せます"),
+      "docs/ja/reference/stdlib.md's Function Interfaces intro no longer names f.call(args) as the desugaring target")
+  }
 }

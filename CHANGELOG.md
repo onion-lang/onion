@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`onion.Resources` — the default-imported factory module backing the `file"…"`,
+  `http"…"` and `re"…"` literals (`file`, `http`, `re`) — had no `## Resources Module`
+  section in `docs/reference/stdlib.md` (or its Japanese translation), and was missing
+  from both languages' "Modules at a glance" table and from `CLAUDE.md`/`CLAUDE_ja.md`'s
+  "Standard Library" list, even though every other default-static-imported class
+  (`Strings`, `Iterables`, `Regex`, `Csv`) has all three. Added the module section, the
+  glance-table entries and the CLAUDE.md list entries, pinned by a new
+  `ResourcesDocCoverageSpec`.
+
 ### Added
 
 - **`run/DateTimeDemo.on`, a runnable example for `onion.DateTime`.** `DateTime`

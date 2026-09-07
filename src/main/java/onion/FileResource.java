@@ -56,17 +56,6 @@ public final class FileResource {
     }
 
     /**
-     * The file read through {@code shape}.
-     *
-     * <p>The fixed getters above close the set of things a file can be read as -- the
-     * parse step is chosen by which one you call, and a user cannot add to it. A shape
-     * opens that set, and carries this file's path into every defect, so a failure says
-     * *which file* rather than only what was wrong (issue #353). Named `read` rather than `as`, which is Onion's cast keyword.
-     *
-     * <p>An unreadable file is a defect too, not an exception: reading a file that might
-     * not be there is the ordinary case at a boundary.
-     */
-    /**
      * The file read through a lossless shape, keeping the residue — the read half of a
      * config lens: {@code file"app.conf".readLossless(Server::cfg())}, then
      * {@code .edit { ... }.render()} and write the result back.
@@ -85,6 +74,17 @@ public final class FileResource {
         }
     }
 
+    /**
+     * The file read through {@code shape}.
+     *
+     * <p>The fixed getters above close the set of things a file can be read as -- the
+     * parse step is chosen by which one you call, and a user cannot add to it. A shape
+     * opens that set, and carries this file's path into every defect, so a failure says
+     * *which file* rather than only what was wrong (issue #353). Named `read` rather than `as`, which is Onion's cast keyword.
+     *
+     * <p>An unreadable file is a defect too, not an exception: reading a file that might
+     * not be there is the ordinary case at a boundary.
+     */
     public <T> Outcome<T> read(Shape<T> shape) {
         String content;
         try {

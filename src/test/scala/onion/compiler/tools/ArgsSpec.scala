@@ -40,5 +40,26 @@ class ArgsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("true:true:[--not-a-flag]") == result)
     }
+
+    it("does not alias a short flag to a long flag's name") {
+      // Args.java's class Javadoc used to read "--verbose / -v style" next to the
+      // flag("verbose") example, which reads as though -v sets flag("verbose").
+      // It doesn't: a short flag is registered under its own single-character
+      // name, independently of any long flag with a similar-sounding name.
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return o.flag("verbose") + ":" + o.flag("v")
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsShortNotLongAlias.on",
+        Array("-v")
+      )
+      assert(Shell.Success("false:true") == result)
+    }
   }
 }

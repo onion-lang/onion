@@ -10,7 +10,7 @@ import java.util.Map;
  *
  * Usage:
  *   val opts = Args::parse(args)
- *   if opts.flag("verbose") { ... }            // --verbose / -v style
+ *   if opts.flag("verbose") { ... }            // --verbose
  *   val out = opts.option("output", "a.txt")   // --output=x / --output x
  *   val files = opts.positional()              // everything else
  *
@@ -18,7 +18,10 @@ import java.util.Map;
  *   --name           boolean flag
  *   --name=value     option with value
  *   --name value     option with value (when the next token is not an option)
- *   -abc             short flags a, b, c
+ *   -abc             short flags a, b, c (each registered under its own
+ *                    single-character name, e.g. flag("a"); NOT an alias for
+ *                    any same-named long flag, e.g. -v does not satisfy
+ *                    flag("verbose"))
  *   --               everything after is positional
  */
 public final class Args {

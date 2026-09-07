@@ -642,7 +642,7 @@ conversion table, so a `shape`/`from re"..."` derivation and hand-written code u
 
 ## Function Interfaces
 
-Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f(args)`.
+Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
 
 ### Function0
 

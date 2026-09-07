@@ -584,7 +584,7 @@ Scalars::coerce("Int", [1, 2], null, "port")      // defect: expected Int, found
 
 ## 関数インターフェース
 
-ラムダとクロージャのための組み込み関数型。`f(args)`の代わりに`f(args)`として呼び出せます。
+ラムダとクロージャのための組み込み関数型。`f.call(args)`の代わりに`f(args)`として呼び出せます。
 
 ### Function0
 

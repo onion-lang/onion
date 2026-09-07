@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The "Function Interfaces" intro in `docs/reference/stdlib.md` (and its Japanese
+  translation) described `f(args)` as "a shorthand for `f(args)`"** — a tautology that
+  explains nothing about what the sugar actually does. `Function0`..`Function10`
+  (`src/main/java/onion/Function1.java` etc.) each declare a single abstract `call`
+  method, and the compiler's unqualified-call desugaring
+  (`CallableValueCallSupport.resolveCallableValue`) rewrites a bare `f(args)` call on a
+  callable value into `f.call(args)`. Corrected both doc copies to name `f.call(args)`
+  as the real desugaring target, and added a regression case to
+  `StdlibDocMathAndFunctionInterfacesParitySpec` pinning the corrected wording in both
+  languages.
+
 - **`Args`'s class Javadoc read `if opts.flag("verbose") { ... } // --verbose / -v style`**, which
   reads as though a short flag like `-v` sets `flag("verbose")`. It doesn't: `-v` registers under
   the literal single-character name `"v"`, independent of any long flag with a similar-sounding

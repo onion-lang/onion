@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own names, not aliases, and added `ArgsSpec`'s "does not alias a short flag to a long flag's
   name" regression test pinning the real behavior.
 
+- **`FileResource#read(Shape)`'s Javadoc was orphaned above `readLossless(Shape)` instead of
+  documenting `read`.** The two `/** ... */` blocks between the methods sat back-to-back; only
+  the second attached to a declaration under normal Javadoc adjacency, leaving the first block
+  (which explicitly says `` Named `read` rather than `as` `` and plainly describes `read`, not
+  `readLossless`) as dead text, and `read(Shape<T> shape)` itself undocumented. Moved the doc
+  block down to directly precede `read`, matching the sibling `HttpResource#read(Shape)`, and
+  added `FileResourceReadJavadocSpec` to pin the doc's placement so it can't silently re-drift.
+
 ## [0.62.0] - 2026-09-07
 
 ### Fixed

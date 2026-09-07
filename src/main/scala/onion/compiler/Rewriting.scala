@@ -536,7 +536,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val key = mangleInstanceClassName(inst.traitType.desc)
         if (seen.contains(key)) {
           throw new CompilationException(Seq(CompileError("", inst.location,
-            s"instance ${inst.traitType.desc} は既に定義されています（型クラスの instance は (trait, 型) ごとに1つまでです）")))
+            s"instance ${inst.traitType.desc} is already defined (at most one instance is allowed per (trait, type))")))
         }
         seen(key) = inst
       case _ =>

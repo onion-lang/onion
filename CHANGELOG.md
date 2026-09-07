@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Config::getBoolean` silently returned `false` instead of falling back to the
+  supplied default for a present-but-unconvertible value**, unlike every sibling typed
+  getter. `getInt`/`getLong`/`getDouble` (`src/main/java/onion/Config.java`) each catch
+  their parse failure and return `defaultValue`, matching the docs' claim that "a value
+  that can't convert to the requested type" falls back to the default instead of
+  throwing — but `getBoolean` delegated to `Boolean.parseBoolean`, which never throws
+  and instead silently returns `false` for any string other than a case-insensitive
+  `"true"`. A config value like `"ssl": "yes"` would silently disable SSL even when
+  `getBoolean(config, "database.ssl", true)` asked for a safe `true` default on failure.
+  `getBoolean` now returns `defaultValue` unless the value is a `Boolean` or a
+  case-insensitive `"true"`/`"false"` string, and `ConfigSpec` gained a regression case
+  pinning the fallback for a non-boolean string value.
+
 ## [0.63.0] - 2026-09-07
 
 ### Fixed

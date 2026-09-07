@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-09-07
+
 ### Fixed
 
 - **`Timing::formatNanos`'s microsecond band claimed to render the Greek mu sign

@@ -2065,6 +2065,41 @@ val postResponse: String = Http::postJson(
 
 ---
 
+## HttpResource
+
+The object behind the `http"…"` literal (dynamic form: `http(url)`), returned by
+`onion.Resources::http`. It bundles a URL with the verb methods for that one endpoint,
+wrapping `Http` so a fetch-and-parse pipeline is one expression:
+
+```onion
+val h = http"https://api.example.com/users"
+h.url()                                 // the underlying URL string
+h.get()                                 // response body as String
+h.get(["Authorization", "Bearer t"])    // GET with headers (alternating names/values)
+h.getJson()                             // response body parsed as JSON (see Json::parse)
+
+h.post("payload")                       // POST a body, returning the response body
+h.postJson("{\"id\":1}")                // POST with Content-Type: application/json
+h.put("payload")                        // PUT a body
+h.delete()                              // DELETE
+```
+
+`read(shape)` reads the response body through a `Shape[T]` — the parse step comes from
+the shape you pass, and a transport failure carries this URL into the resulting
+`Defect` too (so it says *which endpoint*), not an exception:
+
+```onion
+val o: Outcome[Config] = http"https://api.example.com/config".read(shape)
+```
+
+`eachLine(shape)` reads one value per line of the response body, keeping both the lines
+that parsed and the `Defect`s for the ones that didn't — each positioned on its own line
+of the response:
+
+```onion
+val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
 ## DateTime
 
 Date and time utilities using epoch milliseconds.

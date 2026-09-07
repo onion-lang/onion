@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/reference/stdlib.md` and its Japanese translation never had a section for
+  `HttpResource`, the object behind the `http"…"` literal.** `url()`, `get()`,
+  `get(headers)`, `getJson()`, `read(shape)`, `eachLine(shape)`, `post(body)`,
+  `postJson(jsonBody)`, `put(body)` and `delete()` are all real, callable members with
+  no API-reference coverage at all -- the existing `## Http` section documents only the
+  static `onion.Http` module, not the instance returned by the literal. Both docs now
+  carry a `## HttpResource` section documenting every member, and the existing
+  `HttpResourceDocCoverageSpec` (previously guarding only the `specification.md`
+  fixed-menu wording) gained new cases that fail the build if this regresses.
+
 ## [0.57.0] - 2026-09-06
 
 ### Internal

@@ -57,4 +57,35 @@ class HttpResourceDocCoverageSpec extends AnyFunSpec {
       "docs/ja/reference/specification.md describes http\"…\"'s fixed menu as file\"…\"'s " +
         "text/lines/csv/csvRows instead of http\"…\"'s own get/getJson/post/postJson/put/delete")
   }
+
+  // docs/reference/stdlib.md documents the static `onion.Http` module (`## Http`) but,
+  // until now, never the instance returned by `http"…"` itself: there was no `## HttpResource`
+  // section, so `url()`, `read(shape)` and `eachLine(shape)` were undiscoverable from the API
+  // reference (only the verb methods were mentioned, and only in specification.md's syntax guide).
+  private val stdlibMembers = Seq(
+    "url", "get", "getJson", "read", "eachLine", "post", "postJson", "put", "delete"
+  )
+
+  it("actual onion.HttpResource exposes every stdlib.md-documented-below member (sanity check)") {
+    val names = methodNames(classOf[onion.HttpResource])
+    stdlibMembers.foreach { name =>
+      assert(names.contains(name), s"onion.HttpResource lost method $name -- the scan has rotted")
+    }
+  }
+
+  it("docs/reference/stdlib.md has an HttpResource section mentioning every public member") {
+    val doc = read("docs/reference/stdlib.md")
+    assert(doc.contains("## HttpResource"), "docs/reference/stdlib.md has no '## HttpResource' section")
+    stdlibMembers.foreach { name =>
+      assert(doc.contains(name), s"docs/reference/stdlib.md doesn't mention $name, a public onion.HttpResource member")
+    }
+  }
+
+  it("docs/ja/reference/stdlib.md has an HttpResource section mentioning every public member") {
+    val doc = read("docs/ja/reference/stdlib.md")
+    assert(doc.contains("## HttpResource"), "docs/ja/reference/stdlib.md has no '## HttpResource' section")
+    stdlibMembers.foreach { name =>
+      assert(doc.contains(name), s"docs/ja/reference/stdlib.md doesn't mention $name, a public onion.HttpResource member")
+    }
+  }
 }

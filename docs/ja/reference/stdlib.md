@@ -2229,6 +2229,40 @@ val postResponse: String = Http::postJson(
 
 ---
 
+## HttpResource
+
+`http"…"` リテラル（動的な形式: `http(url)`）が返すオブジェクトで、`onion.Resources::http`
+が生成する。1つの URL と、そのエンドポイントに対する各動詞メソッドをまとめたもの——
+`Http` をラップしているので、取得してパースする処理を1つの式で書ける:
+
+```onion
+val h = http"https://api.example.com/users"
+h.url()                                 // 元の URL 文字列
+h.get()                                 // レスポンスボディを String として
+h.get(["Authorization", "Bearer t"])    // ヘッダー付き GET（名前と値を交互に並べる）
+h.getJson()                             // レスポンスボディを JSON としてパース（Json::parse を参照）
+
+h.post("payload")                       // ボディを POST し、レスポンスボディを返す
+h.postJson("{\"id\":1}")                // Content-Type: application/json 付きで POST
+h.put("payload")                        // ボディを PUT
+h.delete()                              // DELETE
+```
+
+`read(shape)` はレスポンスボディを `Shape[T]` 経由で読む——パース方法は渡した `Shape[T]`
+が決め、通信に失敗した場合もこの URL を乗せた `Defect`（＝*どのエンドポイントか*がわかる）
+になる。例外にはならない:
+
+```onion
+val o: Outcome[Config] = http"https://api.example.com/config".read(shape)
+```
+
+`eachLine(shape)` はレスポンスボディの1行につき1つの値を読み、パースできた行と、できなかった
+行それぞれの `Defect`（レスポンス中の該当行に位置づけられる）を両方保持する:
+
+```onion
+val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
 ## DateTime
 
 エポックミリ秒を使った日時ユーティリティ。

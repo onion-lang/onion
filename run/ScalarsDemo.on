@@ -1,0 +1,59 @@
+// ScalarsDemo — onion.Scalars: strict scalar parsing for boundary derivations.
+//
+// Scalars is not default-imported, so each call below is qualified as Scalars::name.
+// toBoolean/isBoolean are strict-boolean helpers (unlike Boolean::parseBoolean, anything
+// that isn't "true"/"false" is a parse failure, not a silent false); read parses raw text,
+// coerce narrows an already-typed value (as JSON/YAML would hand it). This demo checks
+// each against the documented examples in docs/reference/stdlib.md and reports how many
+// checks failed (0 means the docs still match the implementation).
+//
+//   onion ScalarsDemo.on
+
+import { onion.Scalars; onion.Outcome; }
+
+class ScalarsDemo {
+public:
+
+  static def check(ok: Boolean, label: String): Boolean {
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    IO::println("toBoolean / isBoolean")
+    if !check(Scalars::toBoolean("TRUE") == true, "toBoolean(\"TRUE\") == true") { failures = failures + 1 }
+    if !check(Scalars::toBoolean("false") == false, "toBoolean(\"false\") == false") { failures = failures + 1 }
+    if !check(Scalars::isBoolean("yes") == false, "isBoolean(\"yes\") == false") { failures = failures + 1 }
+
+    var threw = false
+    try {
+      Scalars::toBoolean("yes")
+    } catch e: IllegalArgumentException {
+      threw = true
+    }
+    if !check(threw, "toBoolean(\"yes\") throws IllegalArgumentException") { failures = failures + 1 }
+
+    IO::println("\nScalars::read")
+    val port: Outcome[Object] = Scalars::read("Int", "8080", null, "port")
+    if !check((port.get() as Int) == 8080, "read(\"Int\", \"8080\").get() == 8080") { failures = failures + 1 }
+
+    val badPort: Outcome[Object] = Scalars::read("Int", "http", null, "port")
+    if !check(badPort.defects().get(0).describe() == "port: expected Int, found http",
+      "read(\"Int\", \"http\") defect describes the failure") { failures = failures + 1 }
+
+    IO::println("\nScalars::coerce")
+    val fromNumber: Outcome[Object] = Scalars::coerce("Int", 8080, null, "port")
+    if !check((fromNumber.get() as Int) == 8080, "coerce(\"Int\", 8080).get() == 8080") { failures = failures + 1 }
+
+    val fromString: Outcome[Object] = Scalars::coerce("Int", "8080", null, "port")
+    if !check((fromString.get() as Int) == 8080, "coerce(\"Int\", \"8080\").get() == 8080") { failures = failures + 1 }
+
+    val fromArray: Outcome[Object] = Scalars::coerce("Int", [1, 2], null, "port")
+    if !check(fromArray.isBad(), "coerce(\"Int\", [1, 2]) is a defect") { failures = failures + 1 }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

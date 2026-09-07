@@ -145,6 +145,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == runSample("run/DateTimeDemo.on"))
     }
 
+    it("runs ScalarsDemo.on") {
+      assert(Shell.Success(0) == runSample("run/ScalarsDemo.on"))
+    }
+
     it("runs SetOperations.on") {
       assert(Shell.Success("union=[apple, banana, cherry, date] intersection=[banana, cherry] diff=[apple]") ==
         runSample("run/SetOperations.on"))

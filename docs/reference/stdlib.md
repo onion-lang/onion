@@ -617,7 +617,7 @@ val port: Outcome[Object] = Scalars::read("Int", "8080", null, "port")
 println(port.get())                                    // 8080
 
 val bad: Outcome[Object] = Scalars::read("Int", "http", null, "port")
-println(bad.defects().get(0).describe())                // port: expected Int, found "http"
+println(bad.defects().get(0).describe())                // port: expected Int, found http
 ```
 
 `origin` (an `Origin` or `null`) positions the defect in the source text; `path` names

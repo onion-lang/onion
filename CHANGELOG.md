@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-09-07
+
 ### Fixed
 
 - **`docs/reference/stdlib.md` and its Japanese translation claimed `Scalars::read`'s

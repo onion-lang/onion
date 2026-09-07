@@ -174,6 +174,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Server` - Minimal HTTP server (routing, request/response)
 - `Proc` - Subprocess execution (run, capture)
 - `Args` - Command-line argument parsing
+- `Cli` - Lower-level runtime behind auto-CLI (spec-string parsing, typed conversion, usage text)
 - `Colls` - Collection factories and pipelines (map/filter/fold, chunked/windowed, sumBy/maxBy)
 - `Iterables`, `Maps`, `Sets` - Iteration and map/set utility functions
 - `Text` - Console text layout (wrap, indent, aligned tables)

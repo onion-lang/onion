@@ -6,7 +6,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `FileResource`（`file"…"`リテラル）, `Resources`（`file"…"`/`http"…"`/`re"…"`リテラルを非修飾関数として支える）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `FileResource`（`file"…"`リテラル）, `Resources`（`file"…"`/`http"…"`/`re"…"`リテラルを非修飾関数として支える）, `System`, `Proc`（サブプロセス）, `Args`（CLI）, `Cli`（auto-CLI ランタイム） |
 | **ネットワーク** | `Http`（HTTPクライアント）, `HttpResource`（`http"…"`リテラル）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
 | **データストア** | `Db`（JDBC経由のSQL） |
 | **アーカイブ** | `Archive`（zip・gzip） |
@@ -2090,6 +2090,36 @@ parsed.option("out")                    // --out path。無ければ null
 parsed.intOption("level", 3)
 parsed.positional()                     // オプション以外の引数の List
 ```
+
+## Cli モジュール
+
+`onion.Cli` は、コンパイラの **auto-CLI** 機能（トップレベルの `def main(...)`
+や `tool` 宣言 — [ツール・ケーパビリティ・エフェクト](../guide/tools.md) 参照）
+が生成するコードから呼ばれる、より低レベルのランタイムです。カンマ区切りの
+spec 文字列を解析済みの値へ変換し、各フラグを宣言された型に変換し、spec から
+使い方（usage）表示を組み立てます。通常は自分で呼び出す必要はありません —
+手書きの引数パースには上記の `Args` を使ってください — が、生成コードと全く
+同じ spec 文字列パースをスクリプト側から使いたい場合のために public かつ
+import 可能になっています:
+
+```onion
+import { onion.Cli; }
+
+// spec の各要素: "name"（位置引数）、"name="（--name VALUE）、"name?"（--name スイッチ）
+val args: String[] = Cli::parse(rawArgs, "path,top=,verbose?")
+
+Cli::parseInt("count", "5")             // 型変換。不正な値では例外ではなく
+Cli::parseLong("size", "100")           // usage メッセージを出して終了する
+Cli::parseDouble("ratio", "3.14")
+Cli::parseBoolean("loud", "true")       // Boolean::parseBoolean と異なり true/false のみ許可
+
+Cli::rest(rawArgs, 2)                   // インデックス2以降の残りの位置引数（String[] rest 用）
+Cli::requireArgs(rawArgs, 1, "<name> [more...]")  // 引数が1個未満なら usage を出して終了
+```
+
+`Cli::tryParse(args, specString)` は `parse` の非終了版です。stderr への出力や
+`System::exit` を行わず、代わりに `Outcome[String[]]` を返すので、呼び出し側で
+パース失敗を自分で処理したい場合に使えます。
 
 ## Colls モジュール
 

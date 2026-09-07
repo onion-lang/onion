@@ -134,6 +134,10 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
 
+The parsing and typed conversion behind `--help`/flag handling is generated code calling
+`onion.Cli`, a lower-level runtime module also available for direct use — see
+[`Cli` Module](../reference/stdlib.md#cli-module) in the stdlib reference.
+
 A default that isn't a literal (`= retries() + 1`, say) has no value the contract can
 quote, so its entry carries `"defaultComputed":true` instead of a `"default"` key.
 `--help` describes it as `(default: computed at call time)`, and `--plan` reports an

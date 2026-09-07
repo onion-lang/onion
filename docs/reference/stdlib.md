@@ -6,7 +6,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `FileResource` (the `file"…"` literal), `Resources` (backs the `file"…"`/`http"…"`/`re"…"` literals as bare functions), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `FileResource` (the `file"…"` literal), `Resources` (backs the `file"…"`/`http"…"`/`re"…"` literals as bare functions), `System`, `Proc` (subprocesses), `Args` (CLI), `Cli` (auto-CLI runtime) |
 | **Network** | `Http` (HTTP client), `HttpResource` (the `http"…"` literal), `Net` (TCP sockets), `Server` (HTTP server) |
 | **Data stores** | `Db` (SQL over JDBC) |
 | **Archives** | `Archive` (zip, gzip) |
@@ -1927,6 +1927,36 @@ parsed.option("out")                    // --out path, or null if absent
 parsed.intOption("level", 3)
 parsed.positional()                     // List of non-option arguments
 ```
+
+## Cli Module
+
+`onion.Cli` is the lower-level runtime that the compiler's **auto-CLI**
+feature (a top-level `def main(...)` or a `tool` declaration — see
+[Tools, capabilities and effects](../guide/tools.md)) generates calls to: it
+turns a comma-separated spec string into parsed values, converts each flag to
+its declared scalar type, and prints a usage line derived from the spec. You
+normally never call it yourself — `Args` (above) is the module meant for
+hand-written argument parsing — but it is public and importable when a script
+wants the exact same spec-string parsing the generated code uses:
+
+```onion
+import { onion.Cli; }
+
+// spec entries: "name" (positional), "name=" (--name VALUE), "name?" (--name switch)
+val args: String[] = Cli::parse(rawArgs, "path,top=,verbose?")
+
+Cli::parseInt("count", "5")             // typed conversion; exits with a usage
+Cli::parseLong("size", "100")           // message (not an exception) on a bad value
+Cli::parseDouble("ratio", "3.14")
+Cli::parseBoolean("loud", "true")       // accepts true/false only, unlike Boolean::parseBoolean
+
+Cli::rest(rawArgs, 2)                   // trailing positionals from index 2 on, for a String[] rest param
+Cli::requireArgs(rawArgs, 1, "<name> [more...]")  // usage-and-exit if fewer than 1 argument given
+```
+
+`Cli::tryParse(args, specString)` is the non-exiting counterpart to `parse`:
+it returns an `Outcome[String[]]` instead of printing to stderr and calling
+`System::exit`, for callers that want to handle a parse failure themselves.
 
 ## Colls Module
 

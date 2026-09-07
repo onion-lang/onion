@@ -914,7 +914,7 @@ val elapsedMillis: Long = Timing::elapsedMillis(start) // Timing::millis()起点
 ```onion
 val nanos: Long = 1234567890L
 val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
-// 出力形式: "123ns", "45.67μs", "12.34ms", "1.23s"
+// 出力形式: "123ns", "45.67us", "12.34ms", "1.23s"
 
 val millis: Long = 125000L
 val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"

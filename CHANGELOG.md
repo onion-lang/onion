@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Args`'s class Javadoc read `if opts.flag("verbose") { ... } // --verbose / -v style`**, which
+  reads as though a short flag like `-v` sets `flag("verbose")`. It doesn't: `-v` registers under
+  the literal single-character name `"v"`, independent of any long flag with a similar-sounding
+  name (`flag("verbose")` stays `false`). Reworded the Javadoc to state that short flags are their
+  own names, not aliases, and added `ArgsSpec`'s "does not alias a short flag to a long flag's
+  name" regression test pinning the real behavior.
+
 ## [0.62.0] - 2026-09-07
 
 ### Fixed

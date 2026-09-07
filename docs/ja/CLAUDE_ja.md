@@ -178,6 +178,7 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Scalars` - 境界導出のための厳密なスカラー値パース
 - `Range` - `a..b`/`a..<b` 範囲リテラルの実体型、`Iterable[Int]`
 - `FileResource`, `HttpResource` - `file"…"`/`http"…"` リテラルの実体: パス/URLと読み書き・リクエスト操作を束ねる
+- `Resources` - `file"…"`/`http"…"`/`re"…"` リテラルを支えるデフォルトインポート済みのファクトリ関数（`file`, `http`, `re`）。リテラルと素の関数呼び出しは完全に等価
 - `Lossless`, `Residue` - ロスレスなshapeパース (`parseLossless`/`printLossless`) のための往復変換レンズ
 
 ## テスト

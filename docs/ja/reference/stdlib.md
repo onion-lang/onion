@@ -6,7 +6,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `FileResource`（`file"…"`リテラル）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `FileResource`（`file"…"`リテラル）, `Resources`（`file"…"`/`http"…"`/`re"…"`リテラルを非修飾関数として支える）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
 | **ネットワーク** | `Http`（HTTPクライアント）, `HttpResource`（`http"…"`リテラル）, `Net`（TCPソケット）, `Server`（HTTPサーバ） |
 | **データストア** | `Db`（JDBC経由のSQL） |
 | **アーカイブ** | `Archive`（zip・gzip） |
@@ -1990,6 +1990,22 @@ Files::ext("report.txt")               // "txt"（拡張子。予約語を避け
 Files::stem("report.txt")              // "report"
 Files::withExtension("report.txt", "md")   // "report.md"
 ```
+
+## Resources Module
+
+Onionのスキームプレフィックス文字列リテラルの実体（`onion.Resources`）。デフォルトの静的
+インポート対象なので、3つのファクトリ関数はすべて非修飾で解決する——リテラル糖衣構文と
+まったく同じように:
+
+```onion
+Resources::file(path)                  // file"path" / file(path) と同じ、FileResourceを返す
+Resources::http(url)                   // http"url" / http(url) と同じ、HttpResourceを返す
+Resources::re(pattern)                 // re"pattern" / re(pattern) と同じ、コンパイル済みPattern
+```
+
+`file"x"` は非修飾呼び出し `file("x")` に脱糖される。動的なパスには関数形式をそのまま使う
+（`file(pathVariable)`）——リテラルと関数呼び出しは完全に等価。`http"…"` / `http(url)`、
+`re"…"` / `re(pattern)` も同様。
 
 ## FileResource
 

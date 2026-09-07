@@ -190,6 +190,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Scalars` - Strict scalar parsing for boundary derivations
 - `Range` - The runtime type behind `a..b`/`a..<b` range literals, `Iterable[Int]`
 - `FileResource`, `HttpResource` - The objects behind the `file"…"`/`http"…"` literals: bundle a path/URL with its read/write or request operations
+- `Resources` - The default-imported factory functions (`file`, `http`, `re`) backing the `file"…"`/`http"…"`/`re"…"` literals; the literal and the bare function call are exactly equivalent
 - `Lossless`, `Residue` - Round-trip-preserving lens pair for lossless shape parsing (`parseLossless`/`printLossless`)
 
 ## Testing

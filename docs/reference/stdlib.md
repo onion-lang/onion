@@ -6,7 +6,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `FileResource` (the `file"…"` literal), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `FileResource` (the `file"…"` literal), `Resources` (backs the `file"…"`/`http"…"`/`re"…"` literals as bare functions), `System`, `Proc` (subprocesses), `Args` (CLI) |
 | **Network** | `Http` (HTTP client), `HttpResource` (the `http"…"` literal), `Net` (TCP sockets), `Server` (HTTP server) |
 | **Data stores** | `Db` (SQL over JDBC) |
 | **Archives** | `Archive` (zip, gzip) |
@@ -1485,6 +1485,22 @@ Files::ext("report.txt")               // "txt"   (extension, keyword-safe name)
 Files::stem("report.txt")              // "report"
 Files::withExtension("report.txt", "md")   // "report.md"
 ```
+
+## Resources Module
+
+The entry points behind Onion's scheme-prefixed string literals (`onion.Resources`), on
+the default static import list — so all three factory functions resolve unqualified,
+exactly like the literal sugar they back:
+
+```onion
+Resources::file(path)                  // same as file"path" / file(path), a FileResource
+Resources::http(url)                   // same as http"url" / http(url), an HttpResource
+Resources::re(pattern)                 // same as re"pattern" / re(pattern), a compiled Pattern
+```
+
+`file"x"` desugars to the unqualified call `file("x")`; a dynamic path uses the function
+form directly (`file(pathVariable)`) — the literal and the function are exactly
+equivalent. Same for `http"…"` / `http(url)` and `re"…"` / `re(pattern)`.
 
 ## FileResource
 

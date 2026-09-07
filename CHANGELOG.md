@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/TextDemo.on`, a runnable example for `onion.Text`.** `Text`
+  (`wrap`/`indent`/`dedent`/`table`, console text layout) had no sample under
+  `run/`, unlike every other default- or commonly-imported stdlib module. The
+  new sample checks each function — both the qualified `Text::name` call and
+  its builtin extension-method form (`"...".wrap(40)`, `[[...]].table()`) —
+  against the documented examples in `docs/reference/stdlib.md` and reports
+  how many checks failed, pinned by a `RunSamplesSpec` regression test. Bumped
+  `docs/quality-bar.md` (en/ja) row 2's sample count from 253 to 254 to match,
+  since `QualityBarSpec` derives that figure from the actual `run/*.on` count.
+
 ### Fixed
 
 - **`E0057` (`TYPE_PARAMETER_MAY_BE_NULL`, "a bare type parameter may be null and

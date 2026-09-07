@@ -1,0 +1,64 @@
+// TextDemo — onion.Text: console text layout (word wrapping, indenting,
+// dedenting, and simple aligned tables).
+//
+// Text is not default-imported, so each call below is qualified as Text::name.
+// wrap/indent/dedent/table are also builtin extension methods (String for the
+// first three, List for table) — this demo checks both call forms against the
+// documented examples in docs/reference/stdlib.md and reports how many checks
+// failed (0 means the docs still match the implementation).
+//
+//   onion TextDemo.on
+
+import { onion.Text; }
+
+class TextDemo {
+public:
+
+  static def check(ok: Boolean, label: String): Boolean {
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    IO::println("Text::wrap")
+    val wrapped: List[String] = Text::wrap("a long sentence that needs wrapping at forty chars", 40)
+    if !check(wrapped.size == 2, "wrap(...) returns 2 lines") { failures = failures + 1 }
+    if !check(wrapped[0] == "a long sentence that needs wrapping at",
+      "wrap(...) line 1 stops before the word that would exceed 40 chars") { failures = failures + 1 }
+    if !check(wrapped[1] == "forty chars", "wrap(...) line 2 is the remainder") { failures = failures + 1 }
+
+    IO::println("\nText::indent")
+    if !check(Text::indent("a\nb", "> ") == "> a\n> b", "indent(\"a\\nb\", \"> \") == \"> a\\n> b\"") {
+      failures = failures + 1
+    }
+
+    IO::println("\nText::dedent")
+    if !check(Text::dedent("    a\n    b") == "a\nb", "dedent(\"    a\\n    b\") == \"a\\nb\"") {
+      failures = failures + 1
+    }
+
+    IO::println("\nText::table")
+    val table: String = Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
+    val expectedTable: String = "Name   Dept\nAlice  Eng\nBob    Sales"
+    if !check(table == expectedTable, "table([[\"Name\", \"Dept\"], ...]) matches the documented layout") {
+      failures = failures + 1
+    }
+
+    IO::println("\nextension methods")
+    if !check("a long sentence that needs wrapping at forty chars".wrap(40) == wrapped,
+      "\"...\".wrap(40) matches Text::wrap") { failures = failures + 1 }
+    if !check("a\nb".indent("> ") == "> a\n> b", "\"a\\nb\".indent(\"> \") == \"> a\\n> b\"") {
+      failures = failures + 1
+    }
+    if !check("    a\n    b".dedent() == "a\nb", "\"    a\\n    b\".dedent() == \"a\\nb\"") {
+      failures = failures + 1
+    }
+    if !check([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]].table() == expectedTable,
+      "[[...]].table() matches Text::table") { failures = failures + 1 }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

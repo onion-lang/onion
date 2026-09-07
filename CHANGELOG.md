@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/FormatDemo.on`, a runnable example for `onion.Format`.** `Format`
+  (`integer`/`number`/`fixed`/`percent`/`bytes`/`duration`/`ordinal`, locale-independent
+  human-readable formatting) had no sample under `run/` exercising every function —
+  `FormatDocCoverageSpec` only checked that each member name is still mentioned in the
+  docs, not that the documented example outputs (`"1,234,567"`, `"75.6%"`, `"1h 1m 1s"`,
+  `"21st"`, ...) still match what the implementation actually produces. The new sample
+  checks each function — both the qualified `Format::name` call and its builtin
+  extension-method form (`(1536L).bytes()`, `(0.756).percent(1)`) — against the
+  documented examples in `docs/reference/stdlib.md` and reports how many checks failed,
+  pinned by a `RunSamplesSpec` regression test. Bumped `docs/quality-bar.md` (en/ja)
+  row 2's sample count from 254 to 255 to match, since `QualityBarSpec` derives that
+  figure from the actual `run/*.on` count.
+
 - **`run/TextDemo.on`, a runnable example for `onion.Text`.** `Text`
   (`wrap`/`indent`/`dedent`/`table`, console text layout) had no sample under
   `run/`, unlike every other default- or commonly-imported stdlib module. The

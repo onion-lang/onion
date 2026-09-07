@@ -1,0 +1,73 @@
+// FormatDemo — onion.Format: locale-independent human-readable formatting
+// (comma grouping, fixed decimals, percentages, byte sizes, durations, ordinals).
+//
+// Format is not default-imported, so each call below is qualified as Format::name.
+// integer/number/fixed/percent/bytes/duration/ordinal are also builtin extension
+// methods (Long for integer/bytes/duration/ordinal, Double for number/fixed/percent)
+// — this demo checks both call forms against the documented examples in
+// docs/reference/stdlib.md and reports how many checks failed (0 means the docs
+// still match the implementation).
+//
+//   onion FormatDemo.on
+
+import { onion.Format; }
+
+class FormatDemo {
+public:
+
+  static def check(ok: Boolean, label: String): Boolean {
+    IO::println("  " + (if ok { "ok  " } else { "FAIL" }) + " " + label)
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    var failures = 0
+
+    IO::println("Format::integer")
+    if !check(Format::integer(1234567) == "1,234,567",
+      "integer(1234567) == \"1,234,567\"") { failures = failures + 1 }
+
+    IO::println("\nFormat::number")
+    if !check(Format::number(1234.5678, 2) == "1,234.57",
+      "number(1234.5678, 2) == \"1,234.57\"") { failures = failures + 1 }
+
+    IO::println("\nFormat::fixed")
+    if !check(Format::fixed(3.14159, 2) == "3.14",
+      "fixed(3.14159, 2) == \"3.14\"") { failures = failures + 1 }
+
+    IO::println("\nFormat::percent")
+    if !check(Format::percent(0.756, 1) == "75.6%",
+      "percent(0.756, 1) == \"75.6%\"") { failures = failures + 1 }
+
+    IO::println("\nFormat::bytes")
+    if !check(Format::bytes(1536) == "1.5 KB",
+      "bytes(1536) == \"1.5 KB\" (1024-based)") { failures = failures + 1 }
+
+    IO::println("\nFormat::duration")
+    if !check(Format::duration(3661) == "1h 1m 1s",
+      "duration(3661) == \"1h 1m 1s\"") { failures = failures + 1 }
+
+    IO::println("\nFormat::ordinal")
+    if !check(Format::ordinal(21) == "21st",
+      "ordinal(21) == \"21st\"") { failures = failures + 1 }
+
+    IO::println("\nextension methods")
+    if !check((1234567L).integer() == "1,234,567",
+      "(1234567L).integer() matches Format::integer") { failures = failures + 1 }
+    if !check((1536L).bytes() == "1.5 KB",
+      "(1536L).bytes() matches Format::bytes") { failures = failures + 1 }
+    if !check((3661L).duration() == "1h 1m 1s",
+      "(3661L).duration() matches Format::duration") { failures = failures + 1 }
+    if !check((21L).ordinal() == "21st",
+      "(21L).ordinal() matches Format::ordinal") { failures = failures + 1 }
+    if !check((1234.5678).number(2) == "1,234.57",
+      "(1234.5678).number(2) matches Format::number") { failures = failures + 1 }
+    if !check((3.14159).fixed(2) == "3.14",
+      "(3.14159).fixed(2) matches Format::fixed") { failures = failures + 1 }
+    if !check((0.756).percent(1) == "75.6%",
+      "(0.756).percent(1) matches Format::percent") { failures = failures + 1 }
+
+    IO::println("\n" + failures + " failure(s)")
+    return failures
+  }
+}

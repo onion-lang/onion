@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/RELEASING.md` and its Japanese translation `docs/ja/RELEASING.md` — the copies
+  actually published by mkdocs — still told a reader to `git push origin vX.Y.Z` as the
+  only way to cut a release, with no mention of the tag-protection HTTP 403 (issue #334,
+  re-confirmed by #1184) or the `workflow_dispatch` fallback that works around it.** Only
+  the repo-root `RELEASING.md` had been updated when that fallback was added, so the
+  published docs/ pair silently drifted back to the exact failure mode #1184 spent 12
+  attempts rediscovering. Brought both copies up to date with the root file (and named
+  the GitHub API/MCP equivalent of `gh workflow run` for sessions without the `gh` CLI),
+  and fixed the root file's own leftover pre-sbt-2 `target/scala-3.3.7/...` artifact
+  paths and single-locale test command while at it. Added
+  `ReleasingDocWorkflowDispatchParitySpec` so the three copies can't lose the
+  `workflow_dispatch`/403 guidance, the bilingual `testFull` step, or the sbt 2 target
+  layout independently again.
+
 - **The type-class "duplicate instance" coherence error was hardcoded in Japanese**,
   unlike every other diagnostic in `Rewriting.scala`, so English-locale users (and
   release CI, which runs in English) saw `instance Numeric[Integer] は既に定義され

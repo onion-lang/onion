@@ -6,10 +6,17 @@ is no manual `version := ...` line to update in `build.sbt`.
 
 ## Release checklist
 
-1. **Make sure `develop` is green.**
+1. **Make sure `develop` is green — in both locales.**
    ```bash
-   sbt test
+   sbt shutdown && sbt -Duser.language=en testFull
+   sbt shutdown && sbt -Duser.language=ja testFull
    ```
+   Both parts matter. Diagnostics are bilingual, and release CI runs in English while
+   local development is usually `ja_JP`, so a test asserting on message text can pass
+   in one locale and fail in the other. Under sbt 2, `test` delegates to `testQuick`
+   and reports `No tests to run` on an unchanged tree, and `-D` is only picked up by a
+   *freshly started* server — so without `shutdown` and `testFull` this step can look
+   green having run nothing.
 
 2. **Decide the next version.**
    Onion follows [Semantic Versioning](https://semver.org/) with milestone and
@@ -25,15 +32,23 @@ is no manual `version := ...` line to update in `build.sbt`.
 
 4. **Start the release.**
 
-   Preferred — let the release workflow create the tag. Pushing a `v*` tag from
-   a client is rejected by the repository's tag protection (HTTP 403), which is
-   what left releases stuck for months (issue #334), so the workflow creates the
-   tag itself with the Actions token:
+   Preferred — trigger the release workflow's `workflow_dispatch` event and let
+   it create the tag itself. Pushing a `v*` tag from a client is rejected by the
+   repository's tag protection (HTTP 403), which is what left releases stuck for
+   months (issue #334), so the workflow creates the tag itself with the Actions
+   token instead of relying on a client-side push:
 
    ```bash
    gh workflow run release.yml -f version=v0.2.0 --ref develop
    gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
    ```
+
+   Without the `gh` CLI (e.g. a session with only the GitHub API/MCP tools), the
+   same `workflow_dispatch` event is `POST
+   /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches` with
+   `{"ref": "develop", "inputs": {"version": "v0.2.0"}}` — a GitHub MCP server
+   typically exposes this as an "run workflow" action taking `workflow_id:
+   "release.yml"`, `ref: "develop"`, `inputs: {version: "v0.2.0"}`.
 
    The tag-push path still works for anyone whose credentials are allowed to
    create `v*` refs:
@@ -71,12 +86,12 @@ is no manual `version := ...` line to update in `build.sbt`.
 To build the same artifacts locally without creating a release:
 
 ```bash
-sbt assembly dist
+sbt "assembly; dist"
 ```
 
-Outputs:
-- `target/scala-3.3.7/onion-<version>.jar` (fat jar)
-- `target/onion-dist-<version>.zip` (distribution archive)
+Outputs (sbt 2's default layout nests build products under `target/out/<platform>/<scalaVersion>/<project>/`):
+- `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar` (fat jar)
+- `target/out/jvm/scala-3.3.7/onion/onion-dist-<version>.zip` (distribution archive)
 
 ## Hotfix releases
 

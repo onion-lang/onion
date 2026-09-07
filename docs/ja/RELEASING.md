@@ -25,13 +25,41 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 3. **`CHANGELOG.md` を更新する。**
    リリース日と、ユーザーに影響する変更、バグ修正、内部改善の概要を含む新しいセクションを追加します。
 
-4. **タグを作成してプッシュする。**
+4. **リリースを開始する。**
+
+   推奨: リリースワークフローの `workflow_dispatch` イベントを起動し、タグは
+   ワークフロー自身に作らせる。クライアントから `v*` タグをプッシュすると、
+   リポジトリのタグ保護によって HTTP 403 で拒否され、これが何ヶ月もリリースを
+   止めていた原因でした（issue #334）。そのためクライアント側のプッシュに頼らず、
+   ワークフロー自身が Actions トークンでタグを作成します:
+
+   ```bash
+   gh workflow run release.yml -f version=v0.2.0 --ref develop
+   gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+   ```
+
+   `gh` CLI が無い場合（GitHub API/MCP ツールしか無いセッションなど）は、同じ
+   `workflow_dispatch` イベントを `POST
+   /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches` に
+   `{"ref": "develop", "inputs": {"version": "v0.2.0"}}` を渡して呼び出せます。
+   GitHub MCP サーバでは通常 `workflow_id: "release.yml"`、`ref: "develop"`、
+   `inputs: {version: "v0.2.0"}` を取る「ワークフロー実行」アクションとして
+   公開されています。
+
+   `v*` refをプッシュできる権限を持つ認証情報であれば、タグをプッシュする方法も
+   引き続き使えます:
+
    ```bash
    git checkout develop
    git pull
    git tag -a v0.2.0 -m "Release v0.2.0"
    git push origin v0.2.0
    ```
+
+   タグが存在する前に `## [X.Y.Z]` の CHANGELOG 見出しをコミットしては
+   **いけません**。リリースが失敗した場合に見出しを元に戻す必要が生じ、これは
+   まさに #334 が説明しているリリース・差し戻しループです。まずリリースを
+   確定させてから、見出しを確定してください。
 
 5. **CI に残りの作業を任せる。**
    [release workflow](https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml) は以下を実行します。

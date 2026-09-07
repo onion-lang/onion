@@ -178,7 +178,12 @@ class TailCallOptimization(config: CompilerConfig)
       case call: Call =>
         call.method match {
           case targetMethod: MethodDefinition =>
-            val isSelf = targetMethod.name == method.name &&
+            // The receiver must be `this`: a matching name/class/signature call on
+            // some other instance of the same class (e.g. `next.sumAcc(...)`) is not
+            // self-recursion, and rewriting it into a loop would keep updating this
+            // method's own locals while never advancing to the new receiver.
+            val isSelf = call.target.isInstanceOf[This] &&
+            targetMethod.name == method.name &&
             targetMethod.classType.name == method.classType.name &&
             argumentTypesMatch(targetMethod.arguments, method.arguments)
             if (config.verbose) {

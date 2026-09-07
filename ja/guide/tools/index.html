@@ -4660,6 +4660,16 @@ tool が印字するラムダを作るなら、そのラムダが他所でしか
 必須パラメータは位置引数、デフォルト付きパラメータは <code>--name</code> フラグ（<code>--count 5</code> /
 <code>--count=5</code>）、<code>Boolean</code> のデフォルトはスイッチになります。コマンドラインで省略された
 デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。</p>
+<p><code>--help</code> やフラグ処理の背後にあるパースと型変換は、生成コードが <code>onion.Cli</code> という
+より低レベルのランタイムモジュールを呼び出して行っています。このモジュールは直接
+使うことも可能です — stdlib リファレンスの <a href="../../reference/stdlib/#cli-モジュール"><code>Cli</code> モジュール</a>
+を参照してください。</p>
+<p>リテラルでないデフォルト（<code>= retries() + 1</code> など）には契約が引用できる値がないため、
+そのエントリは <code>"default"</code> キーの代わりに <code>"defaultComputed":true</code> を持ちます。
+<code>--help</code> はそれを <code>(default: computed at call time)</code> と説明し、<code>--plan</code> はそのような
+パラメータに紐づく未指定のオペランドについて、値をでっち上げたり黙って省いたりせず
+「計算されるデフォルト」だと報告します — <code>--plan</code> が他の場所で守っている正直さの
+ルールと同じです。</p>
 <p>裸の <code>--</code> はオプションの終わりを示します。それ以降はどう綴られていてもすべて値なので、
 <code>--</code> で始まる引数も tool に渡せます。3つのモードフラグ（<code>--help</code>、<code>--contract</code>、
 <code>--plan</code>）は排他で、2つ渡すと黙ってどちらかが選ばれるのではなくエラーになります。

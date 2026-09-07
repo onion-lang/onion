@@ -4648,6 +4648,14 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 <code>--name</code> flags (<code>--count 5</code> or <code>--count=5</code>); <code>Boolean</code> defaults become switches. A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.</p>
+<p>The parsing and typed conversion behind <code>--help</code>/flag handling is generated code calling
+<code>onion.Cli</code>, a lower-level runtime module also available for direct use — see
+<a href="../../reference/stdlib/#cli-module"><code>Cli</code> Module</a> in the stdlib reference.</p>
+<p>A default that isn't a literal (<code>= retries() + 1</code>, say) has no value the contract can
+quote, so its entry carries <code>"defaultComputed":true</code> instead of a <code>"default"</code> key.
+<code>--help</code> describes it as <code>(default: computed at call time)</code>, and <code>--plan</code> reports an
+unset operand tied to such a parameter as a computed default rather than fabricating or
+omitting a value — the same honesty rule <code>--plan</code> applies everywhere else.</p>
 <p>A bare <code>--</code> ends the options: everything after it is a value, however it is spelled, so
 a tool can be handed an argument that starts with <code>--</code>. The three mode flags
 (<code>--help</code>, <code>--contract</code>, <code>--plan</code>) are mutually exclusive and passing two is an error

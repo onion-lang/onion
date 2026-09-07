@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-09-07
+
 ### Fixed
 
 - **`docs/RELEASING.md` and its Japanese translation `docs/ja/RELEASING.md` — the copies

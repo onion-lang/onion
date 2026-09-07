@@ -118,13 +118,16 @@ public class Config {
     }
 
     /**
-     * Gets a boolean value at path, or returns default if not found.
+     * Gets a boolean value at path, or returns default if not found or not convertible.
      */
     public static boolean getBoolean(Object config, String path, boolean defaultValue) {
         Object value = get(config, path);
         if (value == null) return defaultValue;
         if (value instanceof Boolean) return (Boolean) value;
-        return Boolean.parseBoolean(value.toString());
+        String text = value.toString();
+        if ("true".equalsIgnoreCase(text)) return true;
+        if ("false".equalsIgnoreCase(text)) return false;
+        return defaultValue;
     }
 
     /**

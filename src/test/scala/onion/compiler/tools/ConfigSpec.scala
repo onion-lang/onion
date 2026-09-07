@@ -310,6 +310,25 @@ class ConfigSpec extends AbstractShellSpec {
         )
         assert(Shell.Success("true,false") == result)
       }
+
+      it("falls back to the default when getBoolean's value can't convert to boolean") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"ssl\": \"yes\"}";
+            |    val config = Config::parseJson(json);
+            |    val ssl = Config::getBoolean(config, "ssl", true);
+            |    return "" + ssl;
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
     }
 
     describe("environment variables") {

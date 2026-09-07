@@ -86,6 +86,22 @@ class ToolPlanSpec extends AbstractShellSpec {
       assert(out.contains("not a valid Int"), out)
     }
 
+    it("does not claim an operand with a computed default is unset, or fake its value") {
+      val (r, out) = run(
+        """tool peek(path: String = "/tmp/" + "x"): Int
+          |  requires { read(path), console }
+          |{
+          |  IO::println(Files::readText(path))
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(out.contains("read"), out)
+      assert(!out.contains("(unset)"), out)
+      assert(!out.contains("<computed>"), out)
+      assert(out.contains("computed"), out)
+    }
+
     it("is listed in --help") {
       val (r, out) = run(
         """tool t(): Int { return 0 }

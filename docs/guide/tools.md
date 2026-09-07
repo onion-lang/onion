@@ -134,6 +134,12 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
 
+A default that isn't a literal (`= retries() + 1`, say) has no value the contract can
+quote, so its entry carries `"defaultComputed":true` instead of a `"default"` key.
+`--help` describes it as `(default: computed at call time)`, and `--plan` reports an
+unset operand tied to such a parameter as a computed default rather than fabricating or
+omitting a value — the same honesty rule `--plan` applies everywhere else.
+
 A bare `--` ends the options: everything after it is a value, however it is spelled, so
 a tool can be handed an argument that starts with `--`. The three mode flags
 (`--help`, `--contract`, `--plan`) are mutually exclusive and passing two is an error

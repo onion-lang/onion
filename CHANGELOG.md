@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/reference/stdlib.md` and its Japanese translation claimed `Scalars::read`'s
+  defect quotes the malformed text it found (`found "http"`), but it doesn't** — unlike
+  `Scalars::coerce`, which does quote a rejected `String` value, the `catch` branch of
+  `Scalars.read` passes the raw text straight into `Defect.at` unquoted, so the actual
+  output is `found http`. `docs/guide/shapes.md`'s example, which exercises the same
+  code path, already showed the correct unquoted form (`found abc`), so the two
+  `stdlib.md` copies had drifted from both the implementation and the rest of the docs.
+  Fixed both copies and added `ScalarsReadDefectDocParitySpec`, which asserts the exact
+  runtime defect text against both docs so they can't drift apart again.
+
+### Added
+
+- **`run/ScalarsDemo.on`, a runnable example for `onion.Scalars`.** `Scalars`
+  (`toBoolean`/`isBoolean`/`read`/`coerce`) had no sample under `run/`, unlike every
+  other default- or commonly-imported stdlib module. The new sample checks each
+  function against the documented examples in `docs/reference/stdlib.md` and reports
+  how many checks failed, pinned by a `RunSamplesSpec` regression test. Bumped
+  `docs/quality-bar.md` (en/ja) row 2's sample count from 251 to 252 to match, since
+  `QualityBarSpec` derives that figure from the actual `run/*.on` count.
+
 ## [0.59.0] - 2026-09-07
 
 ### Fixed

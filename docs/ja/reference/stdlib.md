@@ -558,7 +558,7 @@ val port: Outcome[Object] = Scalars::read("Int", "8080", null, "port")
 println(port.get())                                    // 8080
 
 val bad: Outcome[Object] = Scalars::read("Int", "http", null, "port")
-println(bad.defects().get(0).describe())                // port: expected Int, found "http"
+println(bad.defects().get(0).describe())                // port: expected Int, found http
 ```
 
 `origin`（`Origin` または `null`）は defect をソーステキスト上の位置に結び付け、

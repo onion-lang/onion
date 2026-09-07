@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`E0057` (`TYPE_PARAMETER_MAY_BE_NULL`, "a bare type parameter may be null and
+  cannot be dereferenced directly") is documented in `docs/reference/error-codes.md`
+  with a worked example, and has live report sites in `MemberSelectionResolutionSupport`,
+  `ConstructionTyping` and `MethodTargetTypingSupport`, but had zero regression
+  coverage — no test in the suite ever compiled a program and asserted the code
+  actually fires, unlike the ~60 other codes `SemanticErrorCodeCoverageSpec` already
+  pins. Added a case compiling the doc's own example (`class Box[T] { def size(x: T):
+  Int = x.toString().length() }`) and asserting `E0057` appears in the diagnostics.
+
 ## [0.60.0] - 2026-09-07
 
 ### Fixed

@@ -460,6 +460,14 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
     }
+    it("E0057 a bare type parameter may be null and cannot be dereferenced directly") {
+      failsWith("E0057",
+        """class Box[T] {
+          |public:
+          |  def size(x: T): Int = x.toString().length()
+          |}
+          |""".stripMargin)
+    }
   }
 
   describe("statements and expressions") {

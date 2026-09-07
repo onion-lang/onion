@@ -1,6 +1,8 @@
 package onion.compiler.tools
 
+import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
 import onion.tools.Shell
+import java.io.StringReader
 
 /**
  * Type classes stage 1: coherence -- at most one instance per (trait, type) in a
@@ -9,10 +11,24 @@ import onion.tools.Shell
  * leaked internal class name; verified manually via the CLI.)
  */
 class TypeClassCoherenceSpec extends AbstractShellSpec {
+  private def errorMessages(src: String): Seq[String] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errs) => errs.map(_.message)
+      case _ => Seq.empty
+    }
+  }
+
   describe("instance coherence") {
     it("rejects two instances for the same trait application") {
       assert(Shell.Failure(-1) == shell.run(
         "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\ninstance Numeric[Integer] { def zero(): Integer = 1 }\ndef main(args: String[]): void { IO::println(\"x\") }", "None", Array()))
+    }
+    it("reports the duplicate-instance message in English regardless of JVM locale") {
+      val messages = errorMessages(
+        "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\ninstance Numeric[Integer] { def zero(): Integer = 1 }\ndef main(args: String[]): void { IO::println(\"x\") }")
+      assert(messages.exists(_.toLowerCase.contains("already defined")))
+      assert(!messages.exists(_.contains("は既に定義されています")))
     }
     it("allows distinct type arguments of the same trait") {
       assert(Shell.Success("ok") == shell.run(

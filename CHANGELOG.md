@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The type-class "duplicate instance" coherence error was hardcoded in Japanese**,
+  unlike every other diagnostic in `Rewriting.scala`, so English-locale users (and
+  release CI, which runs in English) saw `instance Numeric[Integer] は既に定義され
+  ています（型クラスの instance は (trait, 型) ごとに1つまでです）` instead of an
+  English message. Translated it to English, matching the plain-English literals
+  used by the sibling diagnostics in the same function/file, and added a regression
+  test (`TypeClassCoherenceSpec`) asserting on the message content so this can't
+  silently regress back to a locale-only string.
+
 - **`onion.Resources` — the default-imported factory module backing the `file"…"`,
   `http"…"` and `re"…"` literals (`file`, `http`, `re`) — had no `## Resources Module`
   section in `docs/reference/stdlib.md` (or its Japanese translation), and was missing

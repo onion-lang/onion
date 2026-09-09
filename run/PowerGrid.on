@@ -1,0 +1,442 @@
+// PowerGrid.on — Electric power grid management simulation.
+// Exercises: records (PowerStation, ConsumerZone, TransmissionLine, GridReport),
+// homogeneous enum (EnergySource), ADT case-enum (GridEvent), interface
+// (Monitorable), generic class (History[T]), class GridManager with mutable
+// state, collection pipelines (filter/map/fold/sortedBy/groupBy/partition/
+// zip/distinct/find/any/count), select / type-pattern matching, closures,
+// string interpolation, nullable types, try/catch, while loop, foreach over
+// list and map entries.
+
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+  java.lang.Math;
+  java.lang.Double as JDouble;
+  java.lang.Integer as JInteger;
+}
+
+// ── Energy source (homogeneous enum) ─────────────────────────────────────────
+
+enum EnergySource {
+  SOLAR, WIND, COAL, NATURAL_GAS, NUCLEAR, HYDRO
+public:
+  def isRenewable(): Boolean = select this {
+    case EnergySource::SOLAR:       true
+    case EnergySource::WIND:        true
+    case EnergySource::HYDRO:       true
+    else:                           false
+  }
+  def co2PerMwh(): Double = select this {
+    case EnergySource::COAL:        820.0
+    case EnergySource::NATURAL_GAS: 490.0
+    case EnergySource::NUCLEAR:     12.0
+    case EnergySource::SOLAR:       48.0
+    case EnergySource::WIND:        11.0
+    case EnergySource::HYDRO:       24.0
+  }
+  def label(): String = select this {
+    case EnergySource::SOLAR:       "Solar"
+    case EnergySource::WIND:        "Wind"
+    case EnergySource::COAL:        "Coal"
+    case EnergySource::NATURAL_GAS: "Natural Gas"
+    case EnergySource::NUCLEAR:     "Nuclear"
+    case EnergySource::HYDRO:       "Hydro"
+  }
+}
+
+// ── Grid event (ADT case-enum) ───────────────────────────────────────────────
+
+enum GridEvent {
+  case StationOnline(stationId: String)
+  case StationOffline(stationId: String, reason: String)
+  case DemandSpike(zoneId: String, deltaMw: Double)
+  case OverloadAlert(lineId: String, loadMw: Double, capMw: Double)
+  case MaintenanceStarted(stationId: String, durationHours: Int)
+public:
+  def describe(): String = select this {
+    case e is StationOnline:      "ONLINE  #{e.stationId()}"
+    case e is StationOffline:     "OFFLINE #{e.stationId()} — #{e.reason()}"
+    case e is DemandSpike:        "SPIKE   zone #{e.zoneId()} +#{e.deltaMw()} MW"
+    case e is OverloadAlert:      "OVERLOAD line #{e.lineId()} #{e.loadMw()}/#{e.capMw()} MW"
+    case e is MaintenanceStarted: "MAINT   #{e.stationId()} for #{e.durationHours()}h"
+  }
+  def severity(): Int = select this {
+    case e is OverloadAlert:  3
+    case e is StationOffline: 2
+    case e is DemandSpike:    1
+    else:                     0
+  }
+}
+
+// ── Monitorable interface ────────────────────────────────────────────────────
+
+interface Monitorable {
+  def assetId(): String
+  def assetName(): String
+  def statusLabel(): String
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record PowerStation(stationId: String, stationName: String, source: EnergySource, capacityMw: Double, online: Boolean) conforms Monitorable {
+public:
+  def assetId(): String     = stationId
+  def assetName(): String   = stationName
+  def statusLabel(): String = (if online { "ONLINE" } else { "OFFLINE" })
+  def outputMw(): Double    = (if online { capacityMw } else { 0.0 })
+  def co2Rate(): Double     = source.co2PerMwh() * outputMw()
+  def summary(): String     = "[#{statusLabel()}] #{stationName} (#{source.label()}) #{outputMw()}/#{capacityMw} MW"
+}
+
+record ConsumerZone(zoneId: String, zoneName: String, baseDemandMw: Double, currentDemandMw: Double) {
+public:
+  def isStressed(): Boolean = currentDemandMw > baseDemandMw * 1.15
+  def stressRatio(): Double = (if baseDemandMw > 0.0 { currentDemandMw / baseDemandMw } else { 0.0 })
+  def summary(): String     = "#{zoneName}: #{currentDemandMw} MW (base #{baseDemandMw} MW)" + (if isStressed() { " [STRESSED]" } else { "" })
+}
+
+record TransmissionLine(lineId: String, fromId: String, toId: String, capacityMw: Double, loadMw: Double) {
+public:
+  def utilizationPct(): Double = (if capacityMw > 0.0 { loadMw / capacityMw * 100.0 } else { 0.0 })
+  def isOverloaded(): Boolean  = loadMw > capacityMw * 0.90
+  def summary(): String        = "Line #{lineId} (#{fromId}→#{toId}): #{loadMw}/#{capacityMw} MW (#{utilizationPct()}%)"
+}
+
+record GridReport(tick: Int, totalOutputMw: Double, totalDemandMw: Double, renewablePct: Double, co2TonnesPerHour: Double, eventCount: Int) {
+public:
+  def surplusMw(): Double = totalOutputMw - totalDemandMw
+  def balanced(): Boolean = Math::abs(surplusMw()) < 50.0
+  def summary(): String   = "T=#{tick} out=#{totalOutputMw} MW dem=#{totalDemandMw} MW surplus=#{surplusMw()} MW renew=#{renewablePct}% CO2=#{co2TonnesPerHour}t/h"
+}
+
+// ── Generic fixed-size event history ─────────────────────────────────────────
+
+class History[T] {
+  var _items: List[Object] = []
+  var _max: Int
+public:
+  def this(max: Int) { _max = max }
+  def add(item: T): void {
+    _items.add(item)
+    while _items.size > _max { _items.remove(0) }
+  }
+  def all(): List[Object]   = _items
+  def size(): Int           = _items.size
+  def recent(n: Int): List[Object] {
+    val from: Int = Math::max(0, _items.size - n)
+    return _items.subList(from, _items.size)
+  }
+  def containsAny(pred: Function1[T, Boolean]): Boolean {
+    foreach item: Object in _items { if pred(item as T) { return true } }
+    return false
+  }
+}
+
+// ── Grid manager ─────────────────────────────────────────────────────────────
+
+class GridManager {
+  var _stations: List[PowerStation] = []
+  var _zones: List[ConsumerZone] = []
+  var _lines: List[TransmissionLine] = []
+  var _events: History[GridEvent] = new History[GridEvent](100)
+  var _reports: List[GridReport] = []
+  var _tick: Int = 0
+public:
+  def addStation(s: PowerStation): void  { _stations.add(s) }
+  def addZone(z: ConsumerZone): void     { _zones.add(z) }
+  def addLine(l: TransmissionLine): void { _lines.add(l) }
+
+  def totalOutputMw(): Double =
+    _stations.fold(0.0) { acc, s -> acc + s.outputMw() }
+
+  def totalDemandMw(): Double =
+    _zones.fold(0.0) { acc, z -> acc + z.currentDemandMw }
+
+  def renewablePct(): Double {
+    val renew: Double = _stations
+      .filter { s -> s.source.isRenewable() }
+      .fold(0.0) { acc, s -> acc + s.outputMw() }
+    val total: Double = totalOutputMw()
+    return (if total > 0.0 { renew / total * 100.0 } else { 0.0 })
+  }
+
+  def totalCo2TonnesPerHour(): Double =
+    _stations.fold(0.0) { acc, s -> acc + s.co2Rate() } / 1000.0
+
+  def outputBySource(): Map[String, Double] {
+    val m: Map[String, Double] = [:]
+    foreach s: PowerStation in _stations {
+      val key: String = s.source.label()
+      val prev: Double = (if m.containsKey(key) { m[key] as Double } else { 0.0 })
+      m[key] = prev + s.outputMw()
+    }
+    return m
+  }
+
+  def stressedZones(): List[ConsumerZone]      = _zones.filter { z -> z.isStressed() }
+  def overloadedLines(): List[TransmissionLine] = _lines.filter { l -> l.isOverloaded() }
+  def onlineStations(): List[PowerStation]      = _stations.filter { s -> s.online }
+
+  def fireEvent(e: GridEvent): void { _events.add(e) }
+
+  def snapshot(): GridReport {
+    return new GridReport(_tick, totalOutputMw(), totalDemandMw(),
+                          renewablePct(), totalCo2TonnesPerHour(), _events.size())
+  }
+
+  def advanceTick(): void {
+    _tick++
+    foreach l: TransmissionLine in _lines {
+      if l.isOverloaded() {
+        fireEvent(new OverloadAlert(l.lineId, l.loadMw, l.capacityMw))
+      }
+    }
+    _reports.add(snapshot())
+  }
+
+  def printStatus(): void {
+    val out: Double  = totalOutputMw()
+    val dem: Double  = totalDemandMw()
+    val surp: Double = out - dem
+    IO::println("  Online stations : #{onlineStations().size} / #{_stations.size}")
+    IO::println("  Total output    : #{out} MW")
+    IO::println("  Total demand    : #{dem} MW")
+    IO::println("  Surplus         : #{surp} MW")
+    IO::println("  Renewable share : #{renewablePct()}%")
+    IO::println("  CO2 rate        : #{totalCo2TonnesPerHour()} t/h")
+  }
+
+  def stations(): List[PowerStation]   = _stations
+  def zones(): List[ConsumerZone]      = _zones
+  def lines(): List[TransmissionLine]  = _lines
+  def events(): History[GridEvent]     = _events
+  def reports(): List[GridReport]      = _reports
+  def currentTick(): Int               = _tick
+}
+
+// ── Utility: round double to 2 decimal places ────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val s: String = "" + (Math::round(self * 100.0) as Long)
+    val len: Int = s.length()
+    return (if len <= 2 {
+      "0." + (if len == 1 { "0" + s } else { s })
+    } else {
+      s.substring(0, len - 2) + "." + s.substring(len - 2)
+    })
+  }
+}
+
+// ── Simulation setup ─────────────────────────────────────────────────────────
+
+val grid: GridManager = new GridManager()
+
+grid.addStation(new PowerStation("S01", "Mountain Hydro",    EnergySource::HYDRO,        1200.0, true))
+grid.addStation(new PowerStation("S02", "Desert Solar Farm", EnergySource::SOLAR,          800.0, true))
+grid.addStation(new PowerStation("S03", "Coastal Wind Park", EnergySource::WIND,           600.0, true))
+grid.addStation(new PowerStation("S04", "Valley Gas Plant",  EnergySource::NATURAL_GAS,   500.0, true))
+grid.addStation(new PowerStation("S05", "Metro Coal Plant",  EnergySource::COAL,           400.0, false))
+grid.addStation(new PowerStation("S06", "National Nuclear",  EnergySource::NUCLEAR,       1000.0, true))
+
+grid.addZone(new ConsumerZone("Z01", "Downtown",        900.0,  1050.0))
+grid.addZone(new ConsumerZone("Z02", "Industrial West", 1500.0, 1480.0))
+grid.addZone(new ConsumerZone("Z03", "North Suburbs",    700.0,  720.0))
+grid.addZone(new ConsumerZone("Z04", "Port District",    400.0,  350.0))
+
+grid.addLine(new TransmissionLine("L01", "S01", "Z01", 1100.0, 1050.0))
+grid.addLine(new TransmissionLine("L02", "S06", "Z02", 1100.0,  980.0))
+grid.addLine(new TransmissionLine("L03", "S02", "Z03",  900.0,  800.0))
+grid.addLine(new TransmissionLine("L04", "S03", "Z04",  700.0,  690.0))
+grid.addLine(new TransmissionLine("L05", "S04", "Z01",  600.0,  560.0))
+
+// ── Initial state ────────────────────────────────────────────────────────────
+
+IO::println("=== POWER GRID MANAGEMENT SIMULATION ===")
+IO::println("")
+IO::println("--- Initial Grid Status ---")
+grid.printStatus()
+
+// ── Stations sorted by output ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Stations (descending output) ---")
+foreach s: PowerStation in grid.stations().sortedBy { s -> -s.outputMw() } {
+  IO::println("  " + s.summary())
+}
+
+// ── Renewable vs. fossil partition ──────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Renewable vs Fossil ---")
+val parts = grid.stations().partition { s -> s.source.isRenewable() }
+val renewStations: List[Object] = parts[0] as List[Object]
+val fossilStations: List[Object] = parts[1] as List[Object]
+val renewMw: Double = renewStations.fold(0.0) { acc, s -> acc + (s as PowerStation).outputMw() }
+val fossilMw: Double = fossilStations.fold(0.0) { acc, s -> acc + (s as PowerStation).outputMw() }
+IO::println("  Renewable : #{renewStations.size} stations, #{renewMw} MW")
+IO::println("  Fossil    : #{fossilStations.size} stations, #{fossilMw} MW")
+
+// ── Output grouped by source ─────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Output by Energy Source ---")
+foreach (src, mw) in grid.outputBySource() {
+  IO::println("  #{src}: #{mw} MW")
+}
+
+// ── Zip station names with capacity ──────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Station Capacities ---")
+val stNames: List[String] = grid.stations().map { s -> s.stationName }
+val stCaps: List[Double]  = grid.stations().map { s -> s.capacityMw }
+val zipped = stNames.zip(stCaps)
+foreach pair: Object in zipped {
+  val p: List[Object] = pair as List[Object]
+  val nm: String = p[0] as String
+  val cap: Double = p[1] as Double
+  IO::println("  #{nm}: #{cap} MW capacity")
+}
+
+// ── Distinct energy sources in use ───────────────────────────────────────────
+
+val sourceLabels: List[String] = grid.stations()
+  .map { s -> s.source.label() }
+  .distinct()
+IO::println("")
+IO::println("--- Distinct energy sources in use: #{sourceLabels.size} ---")
+foreach lbl: String in sourceLabels { IO::println("  #{lbl}") }
+
+// ── Consumer zones ───────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Consumer Zones ---")
+foreach z: ConsumerZone in grid.zones() { IO::println("  " + z.summary()) }
+
+// ── Transmission lines (by utilization) ──────────────────────────────────────
+
+IO::println("")
+IO::println("--- Transmission Lines (by utilization) ---")
+foreach l: TransmissionLine in grid.lines().sortedBy { l -> -l.utilizationPct() } {
+  val warn: String = (if l.isOverloaded() { " [!OVERLOAD!]" } else { "" })
+  IO::println("  " + l.summary() + warn)
+}
+
+// ── Event simulation ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== EVENT SIMULATION ===")
+val eventList: List[GridEvent] = [
+  new StationOnline("S05"),
+  new DemandSpike("Z01", 200.0),
+  new MaintenanceStarted("S02", 48),
+  new OverloadAlert("L01", 1095.0, 1100.0),
+  new StationOffline("S03", "weather"),
+  new DemandSpike("Z02", 80.0)
+]
+foreach e: GridEvent in eventList {
+  IO::println("  [EVENT] " + e.describe())
+  grid.fireEvent(e)
+}
+grid.advanceTick()
+
+// ── Events sorted by severity ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Events by severity (desc) ---")
+foreach e: GridEvent in grid.events().all().sortedBy { e -> -(e as GridEvent).severity() } {
+  IO::println("  [sev=#{(e as GridEvent).severity()}] " + e.describe())
+}
+
+// ── High-severity event check via generic History ────────────────────────────
+
+val hasHighSeverity: Boolean = grid.events().containsAny { e -> e.severity() >= 2 }
+IO::println("")
+IO::println("Has high-severity event: #{hasHighSeverity}")
+
+// ── Stressed zones and overloaded lines ──────────────────────────────────────
+
+IO::println("")
+val stressed: List[ConsumerZone] = grid.stressedZones()
+if stressed.size > 0 {
+  IO::println("WARNING: #{stressed.size} stressed zone(s):")
+  foreach z: ConsumerZone in stressed {
+    IO::println("  #{z.zoneName} stress ratio: #{z.stressRatio()}")
+  }
+} else {
+  IO::println("All zones within normal demand.")
+}
+
+val overloaded: List[TransmissionLine] = grid.overloadedLines()
+if overloaded.size > 0 {
+  IO::println("WARNING: #{overloaded.size} overloaded line(s):")
+  foreach l: TransmissionLine in overloaded { IO::println("  " + l.summary()) }
+} else {
+  IO::println("All transmission lines within safe limits.")
+}
+
+// ── Snapshot report ───────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== GRID SNAPSHOT ===")
+val snap: GridReport = grid.snapshot()
+IO::println(snap.summary())
+IO::println("  Balanced: #{snap.balanced()}")
+
+// ── Find highest CO2 station ─────────────────────────────────────────────────
+
+val worstStation: PowerStation? =
+  grid.stations()
+    .filter { s -> s.online }
+    .sortedBy { s -> -s.co2Rate() }
+    .find { s -> true } as PowerStation?
+
+if worstStation != null {
+  IO::println("")
+  IO::println("Highest CO2 emitter: #{worstStation.stationName}")
+  IO::println("  Rate: #{worstStation.co2Rate()} gCO2/h")
+}
+
+// ── Total emission with try/catch ─────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== EMISSION SUMMARY ===")
+try {
+  var totalCo2: Double = 0.0
+  foreach s: PowerStation in grid.stations() {
+    val rate: Double = s.co2Rate()
+    if rate < 0.0 { throw new Exception("Negative CO2 rate for #{s.stationName}") }
+    totalCo2 = totalCo2 + rate
+  }
+  IO::println("Total CO2 rate : #{totalCo2 / 1000.0} t/h")
+  IO::println("Annual estimate: #{totalCo2 / 1000.0 * 8760.0} t/year")
+} catch e: Exception {
+  IO::println("Emission calc error: " + e.message())
+}
+
+// ── Recursive capacity finder ─────────────────────────────────────────────────
+
+def findSufficient(stns: List[PowerStation], needed: Double, idx: Int): PowerStation? {
+  if idx >= stns.size { return null }
+  val s: PowerStation = stns[idx]
+  if s.online && s.capacityMw >= needed { return s }
+  return findSufficient(stns, needed, idx + 1)
+}
+
+val needed: Double = 900.0
+val candidate: PowerStation? = findSufficient(grid.stations(), needed, 0)
+IO::println("")
+IO::println("First station with >= #{needed} MW capacity: " +
+  (if candidate != null { candidate.stationName } else { "none found" }))
+
+// ── Historical reports ────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== TICK HISTORY ===")
+foreach r: GridReport in grid.reports() {
+  IO::println("  " + r.summary())
+}
+
+IO::println("")
+IO::println("Simulation complete. Current tick: #{grid.currentTick()}")

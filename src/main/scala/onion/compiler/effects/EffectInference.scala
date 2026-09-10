@@ -128,7 +128,7 @@ object EffectInference {
     "StatementBlock", "ExpressionActionStatement", "IfStatement", "ConditionalLoop",
     "Return", "Throw", "Synchronized", "Try", "Break", "Continue", "NOP",
     // terms with children
-    "Call", "SafeCall", "CallStatic", "CallSuper", "NewObject", "NewClosure",
+    "Call", "SafeCall", "SafeCallStatic", "CallStatic", "CallSuper", "NewObject", "NewClosure",
     "Begin", "BinaryTerm", "UnaryTerm", "ArrayLength", "RefArray", "SafeRefArray",
     "SetArray", "NonNullAssert", "AsInstanceOf", "InstanceOf", "StatementTerm",
     "SynchronizedTerm", "RefField", "SafeFieldAccess", "SetField", "SetStaticField",
@@ -242,6 +242,7 @@ object EffectInference {
       case null => ()
       case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location))
       case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location))
+      case c: SafeCallStatic => term(c.nullTarget); c.parameters.foreach(term); method(c.method, here(c.location))
       case c: CallStatic    => c.parameters.foreach(term); method(c.method, here(c.location))
       case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, here(c.location))
       case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, here(n.location))

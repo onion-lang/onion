@@ -81,6 +81,7 @@ object TermWalk:
     case n: StatementBlock => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.statements)
     case n: Call => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters).toList
     case n: SafeCall => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters).toList
+    case n: SafeCallStatic => n.nullTarget :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters).toList
     case n: CallSuper => n.target :: scala.collection.immutable.ArraySeq.unsafeWrapArray(n.params).toList
     case n: CallStatic => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters)
     case n: NewObject => scala.collection.immutable.ArraySeq.unsafeWrapArray(n.parameters)

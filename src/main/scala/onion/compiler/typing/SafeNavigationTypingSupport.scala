@@ -6,7 +6,8 @@ import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class SafeNavigationTypingSupport(
   bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  calls: MethodCallTyping,
+  fallback: MethodCallFallbackSupport
 ) {
   def typeSafeMemberSelection(node: AST.SafeMemberSelection, context: LocalContext): Option[Term] = {
     val target = calls.typed(node.target, context).getOrElse(null)
@@ -47,6 +48,23 @@ private[compiler] final class SafeNavigationTypingSupport(
     val name = node.name
     val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
+      // No instance method found — try extension methods before reporting.
+      // For the null-safe call, we need two terms:
+      //   nullTarget    — the nullable value to null-check (the target as-is, which may be
+      //                   String? or the AsInstanceOf-boxed Integer for a nullable primitive)
+      //   nonNullTarget — a non-nullable view of the receiver for the static extension call
+      val (nullTarget, nonNullTarget) = target.`type` match {
+        case nt: NullableType =>
+          // Reference nullable (e.g. String?): strip the NullableType wrapper via a cast
+          val inner = nt.innerType.asInstanceOf[ObjectType]
+          (target, new AsInstanceOf(target, inner))
+        case _ =>
+          // Already an ObjectType (nullable primitive was boxed by normalizeSafeMethodCallTarget,
+          // e.g. AsInstanceOf(n, Integer) for Int?): null-check the boxed value directly
+          (target, target)
+      }
+      val ext = fallback.tryExtensionSafeMethodCall(node, nullTarget, nonNullTarget, targetType, params, expected)
+      if (ext.isDefined) return ext
       calls.reportMethodNotFound(node, targetType, name, calls.types(params))
       return None
     }

@@ -76,7 +76,60 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
   }
 
-  private def selectApplicableExtensionMethod(
+  /**
+   * Try to resolve a null-safe extension method call (the `?.` operator on a nullable receiver).
+   * If found, returns a `SafeCallStatic` that null-checks `nullTarget` and, when non-null,
+   * invokes the static backing method with `nonNullTarget` (or its unboxed form) as the receiver.
+   *
+   * `nullTarget`    — the original nullable term to null-check (e.g. `s: String?` or `AsInstanceOf(n, Integer)`)
+   * `nonNullTarget` — a non-nullable view of the receiver for the static call (e.g. `AsInstanceOf(s, String)`)
+   * `targetType`    — the ObjectType used for extension lookup (inner type, e.g. `String` or `Integer`)
+   */
+  def tryExtensionSafeMethodCall(
+    node: AST.SafeMethodCall,
+    nullTarget: Term,
+    nonNullTarget: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] = {
+    selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.NoMatch => None
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousSignature(
+          node,
+          first.containerClass,
+          node.name,
+          first.arguments,
+          second.containerClass,
+          node.name,
+          second.arguments
+        )
+        None
+      case CandidateSelection.Selected(extMethod) =>
+        val containerClass = extMethod.containerClass
+        val receiverArg = extMethod.receiverType match {
+          case bt: BasicType => onion.compiler.toolbox.Boxing.unboxing(typing.table_, nonNullTarget, bt)
+          case _             => nonNullTarget
+        }
+        val staticArgs = Array(receiverArg) ++ params
+        containerClass.findMethod(node.name, staticArgs) match {
+          case Array(staticMethod) =>
+            val classSubst = TypeSubstitution.classSubstitution(containerClass)
+            val methodSubst = scala.collection.immutable.Map.empty[String, Type]
+            val expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
+            calls.processParamsWithExpected(node, staticArgs, expectedArgs).map { finalParams =>
+              new TypedAST.SafeCallStatic(node.location, nullTarget, containerClass, staticMethod, finalParams)
+            }
+          case Array() => None
+          case multiple =>
+            calls.reportAmbiguousMethods(node, node.name, multiple)
+            None
+        }
+    }
+  }
+
+  private[typing] def selectApplicableExtensionMethod(
     targetType: ObjectType,
     name: String,
     params: Array[Term]

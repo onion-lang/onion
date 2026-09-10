@@ -23,6 +23,17 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  /** Extension-method resolution for null-safe calls (`target?.extensionMethod(args)`). */
+  def tryExtensionSafeMethodCall(
+    node: AST.SafeMethodCall,
+    nullTarget: Term,
+    nonNullTarget: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryExtensionSafeMethodCall(node, nullTarget, nonNullTarget, targetType, params, expected)
+
   /** Extension-method resolution for the operator-overloading path (`a + b`). */
   def tryExtensionOperatorMethod(
     node: AST.Node,

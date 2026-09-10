@@ -274,6 +274,27 @@ object TypedAST {
   }
 
   /**
+   * A null-safe static method call: target?.extensionMethod(args) where extensionMethod is a
+   * user-declared extension. Evaluates nullTarget; if null, returns null; otherwise evaluates
+   * all parameters (which include the receiver as first element) and invokes the static method.
+   * Result type is nullable because it can be null when nullTarget is null.
+   */
+  class SafeCallStatic(
+    location: Location,
+    val nullTarget: TypedAST.Term,
+    val target: TypedAST.ObjectType,
+    val method: TypedAST.Method,
+    val parameters: Array[TypedAST.Term]
+  ) extends Term(location) {
+    def this(nullTarget: TypedAST.Term, target: TypedAST.ObjectType, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
+      this(null, nullTarget, target, method, parameters)
+    }
+
+    /** Result type is nullable because it can be null when nullTarget is null */
+    def `type`: TypedAST.Type = NullableType.of(method.returnType)
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {

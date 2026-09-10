@@ -1,0 +1,356 @@
+// Measurements.on — unit-conversion system.
+// Exercises: ADT enums with dispatch methods; records; extension methods on
+// primitive types (Double/Int); collection pipelines (map/filter/fold/sortedBy);
+// closures; string interpolation; foreach with ranges; while loops; select inside
+// enum methods; nullable; try/catch.
+
+// ── length ────────────────────────────────────────────────────────────────────
+
+enum LengthUnit {
+  case Meter
+  case Centimeter
+  case Millimeter
+  case Kilometer
+  case Foot
+  case Inch
+  case Mile
+public:
+  def symbol(): String = select this {
+    case u is Meter:       "m"
+    case u is Centimeter:  "cm"
+    case u is Millimeter:  "mm"
+    case u is Kilometer:   "km"
+    case u is Foot:        "ft"
+    case u is Inch:        "in"
+    case u is Mile:        "mi"
+  }
+  // returns the multiplier to convert THIS unit to meters
+  def toMeters(): Double = select this {
+    case u is Meter:       1.0
+    case u is Centimeter:  0.01
+    case u is Millimeter:  0.001
+    case u is Kilometer:   1000.0
+    case u is Foot:        0.3048
+    case u is Inch:        0.0254
+    case u is Mile:        1609.344
+  }
+}
+
+record Length(value: Double, unit: LengthUnit) {
+public:
+  def toMeters(): Double = value * unit.toMeters()
+  def convertTo(target: LengthUnit): Length {
+    val meters: Double = toMeters()
+    return new Length(meters / target.toMeters(), target)
+  }
+  def display(): String = "#{round4(value)} #{unit.symbol()}"
+}
+
+// ── mass ──────────────────────────────────────────────────────────────────────
+
+enum MassUnit {
+  case Kilogram
+  case Gram
+  case Milligram
+  case Pound
+  case Ounce
+public:
+  def symbol(): String = select this {
+    case u is Kilogram:  "kg"
+    case u is Gram:      "g"
+    case u is Milligram: "mg"
+    case u is Pound:     "lb"
+    case u is Ounce:     "oz"
+  }
+  def toGrams(): Double = select this {
+    case u is Kilogram:  1000.0
+    case u is Gram:      1.0
+    case u is Milligram: 0.001
+    case u is Pound:     453.592
+    case u is Ounce:     28.3495
+  }
+}
+
+record Mass(value: Double, unit: MassUnit) {
+public:
+  def toGrams(): Double = value * unit.toGrams()
+  def convertTo(target: MassUnit): Mass {
+    val grams: Double = toGrams()
+    return new Mass(grams / target.toGrams(), target)
+  }
+  def display(): String = "#{round4(value)} #{unit.symbol()}"
+}
+
+// ── temperature ───────────────────────────────────────────────────────────────
+
+enum TemperatureUnit {
+  case Celsius
+  case Fahrenheit
+  case Kelvin
+public:
+  def symbol(): String = select this {
+    case u is Celsius:    "C"
+    case u is Fahrenheit: "F"
+    case u is Kelvin:     "K"
+  }
+}
+
+record Temperature(value: Double, unit: TemperatureUnit) {
+public:
+  def toCelsius(): Double = select unit {
+    case u is Celsius:    value
+    case u is Fahrenheit: (value - 32.0) * 5.0 / 9.0
+    case u is Kelvin:     value - 273.15
+  }
+  def convertTo(target: TemperatureUnit): Temperature {
+    val c: Double = toCelsius()
+    val newVal: Double = select target {
+      case u is Celsius:    c
+      case u is Fahrenheit: c * 9.0 / 5.0 + 32.0
+      case u is Kelvin:     c + 273.15
+    }
+    return new Temperature(newVal, target)
+  }
+  def display(): String {
+    val suffix: String = select unit {
+      case u is Celsius:    "°C"
+      case u is Fahrenheit: "°F"
+      case u is Kelvin:     " K"
+    }
+    return "#{round2(value)}#{suffix}"
+  }
+}
+
+// ── rounding helpers ──────────────────────────────────────────────────────────
+
+static def round4(v: Double): Double {
+  return Math::floor(v * 10000.0 + 0.5) / 10000.0
+}
+static def round2(v: Double): Double {
+  return Math::floor(v * 100.0 + 0.5) / 100.0
+}
+static def round1(v: Double): Double {
+  return Math::floor(v * 10.0 + 0.5) / 10.0
+}
+
+// ── extension methods on Double for ergonomic construction ───────────────────
+
+extension Double {
+  def meters(): Length      = new Length(self, new Meter())
+  def centimeters(): Length = new Length(self, new Centimeter())
+  def kilometers(): Length  = new Length(self, new Kilometer())
+  def feet(): Length        = new Length(self, new Foot())
+  def inches(): Length      = new Length(self, new Inch())
+  def miles(): Length       = new Length(self, new Mile())
+
+  def kilograms(): Mass     = new Mass(self, new Kilogram())
+  def grams(): Mass         = new Mass(self, new Gram())
+  def pounds(): Mass        = new Mass(self, new Pound())
+  def ounces(): Mass        = new Mass(self, new Ounce())
+
+  def celsius(): Temperature    = new Temperature(self, new Celsius())
+  def fahrenheit(): Temperature = new Temperature(self, new Fahrenheit())
+  def kelvin(): Temperature     = new Temperature(self, new Kelvin())
+}
+
+// ── demo ──────────────────────────────────────────────────────────────────────
+
+IO::println("=== Length Conversions ===")
+
+val marathon: Length = 42.195.kilometers()
+IO::println("Marathon: #{marathon.display()}")
+IO::println("  = #{marathon.convertTo(new Mile()).display()}")
+IO::println("  = #{marathon.convertTo(new Foot()).display()}")
+
+val sixFeet: Length = 6.0.feet()
+IO::println("6 ft = #{sixFeet.convertTo(new Centimeter()).display()}")
+
+IO::println("")
+IO::println("=== Mass Conversions ===")
+
+val bodyWeight: Mass = 70.0.kilograms()
+IO::println("Body weight: #{bodyWeight.display()}")
+IO::println("  = #{bodyWeight.convertTo(new Pound()).display()}")
+IO::println("  = #{bodyWeight.convertTo(new Ounce()).display()}")
+
+val onePound: Mass = 1.0.pounds()
+IO::println("1 lb = #{onePound.convertTo(new Gram()).display()}")
+
+IO::println("")
+IO::println("=== Temperature Conversions ===")
+
+val boiling: Temperature = 100.0.celsius()
+IO::println("Boiling: #{boiling.display()}")
+IO::println("  = #{boiling.convertTo(new Fahrenheit()).display()}")
+IO::println("  = #{boiling.convertTo(new Kelvin()).display()}")
+
+val absZero: Temperature = 0.0.kelvin()
+IO::println("Absolute zero: #{absZero.display()}")
+IO::println("  = #{absZero.convertTo(new Celsius()).display()}")
+IO::println("  = #{absZero.convertTo(new Fahrenheit()).display()}")
+
+val bodyTemp: Temperature = 98.6.fahrenheit()
+IO::println("Body temp: #{bodyTemp.display()}")
+IO::println("  = #{bodyTemp.convertTo(new Celsius()).display()}")
+
+IO::println("")
+IO::println("=== Sorted Length Measurements ===")
+
+val lengths: List[Length] = [
+  1.0.miles(),
+  100.0.centimeters(),
+  5280.0.feet(),
+  1.0.kilometers(),
+  39.37.inches()
+]
+
+val sortedLengths: List[Length] = lengths.sortedBy { m -> m.toMeters() }
+
+foreach m: Length in sortedLengths {
+  IO::println("  #{m.display()} = #{round4(m.toMeters())} m")
+}
+
+IO::println("")
+IO::println("=== Masses Heavier Than 1 kg ===")
+
+val masses: List[Mass] = [
+  500.0.grams(),
+  2.0.kilograms(),
+  0.5.kilograms(),
+  3.0.pounds(),
+  16.0.ounces(),
+  5.0.kilograms()
+]
+
+val heavy: List[Mass] = masses.filter { m -> m.toGrams() > 1000.0 }
+
+foreach m: Mass in heavy {
+  IO::println("  #{m.display()} = #{round4(m.convertTo(new Kilogram()).value())} kg")
+}
+
+IO::println("")
+IO::println("=== Temperature Statistics ===")
+
+val temps: List[Temperature] = [
+  (-40.0).celsius(),
+  0.0.celsius(),
+  20.0.celsius(),
+  37.0.celsius(),
+  100.0.celsius()
+]
+
+val celsiusValues: List[Double] = temps.map { t -> t.toCelsius() }
+
+var sum: Double = 0.0
+foreach c: Double in celsiusValues { sum = sum + c }
+val avg: Double = sum / (celsiusValues.size() as Double)
+IO::println("Average: #{round2(avg)}°C")
+
+var maxC: Double = celsiusValues.get(0) as Double
+var minC: Double = celsiusValues.get(0) as Double
+foreach c: Double in celsiusValues {
+  if c > maxC { maxC = c }
+  if c < minC { minC = c }
+}
+IO::println("Max: #{round2(maxC)}°C, Min: #{round2(minC)}°C")
+
+// Range-based iteration for a conversion table
+IO::println("")
+IO::println("=== Celsius to Fahrenheit Table ===")
+foreach i: Int in 0..5 {
+  val tempC: Double = (i * 20) as Double
+  val tempF: Double = tempC.celsius().convertTo(new Fahrenheit()).value()
+  IO::println("  #{(i * 20)} C = #{round1(tempF)} F")
+}
+
+IO::println("")
+IO::println("=== Int Extension Methods ===")
+
+// Extension methods on Int for creating integer-valued measurements
+extension Int {
+  def centimeters(): Length = new Length(self as Double, new Centimeter())
+  def inches(): Length      = new Length(self as Double, new Inch())
+  def grams(): Mass         = new Mass(self as Double, new Gram())
+  def ounces(): Mass        = new Mass(self as Double, new Ounce())
+  def celsius(): Temperature    = new Temperature(self as Double, new Celsius())
+  def fahrenheit(): Temperature = new Temperature(self as Double, new Fahrenheit())
+}
+
+val pencil: Length = 19.centimeters()
+IO::println("Pencil: #{pencil.display()} = #{pencil.convertTo(new Inch()).display()}")
+
+val sugar: Mass = 200.grams()
+IO::println("Sugar: #{sugar.display()} = #{sugar.convertTo(new Ounce()).display()}")
+
+val freezing: Temperature = 32.fahrenheit()
+IO::println("Freezing point: #{freezing.display()} = #{freezing.convertTo(new Celsius()).display()}")
+
+IO::println("")
+IO::println("=== Unit Consistency Checks ===")
+
+// Round-trip conversions: m -> ft -> m should be ~same
+val oneM: Length = 1.0.meters()
+val inFeet: Length = oneM.convertTo(new Foot())
+val backToM: Length = inFeet.convertTo(new Meter())
+IO::println("1 m -> ft -> m: #{round4(backToM.value())} m (round-trip)")
+
+// kg -> lb -> kg round-trip
+val oneKg: Mass = 1.0.kilograms()
+val inLbs: Mass = oneKg.convertTo(new Pound())
+val backToKg: Mass = inLbs.convertTo(new Kilogram())
+IO::println("1 kg -> lb -> kg: #{round4(backToKg.value())} kg (round-trip)")
+
+// 0°C -> K -> °C round-trip
+val zeroC: Temperature = 0.0.celsius()
+val inK: Temperature = zeroC.convertTo(new Kelvin())
+val backToC: Temperature = inK.convertTo(new Celsius())
+IO::println("0°C -> K -> °C: #{round2(backToC.value())}°C (round-trip)")
+
+IO::println("")
+IO::println("=== Mixed Calculation: Human Height vs Weight ===")
+
+// BMI approximation using measurement conversions
+val heights: List[Length] = [
+  160.0.centimeters(),
+  175.0.centimeters(),
+  185.0.centimeters()
+]
+val weights: List[Mass] = [
+  55.0.kilograms(),
+  75.0.kilograms(),
+  95.0.kilograms()
+]
+
+var idx: Int = 0
+foreach h: Length in heights {
+  val w: Mass = weights.get(idx) as Mass
+  val hm: Double = h.convertTo(new Meter()).value()
+  val wkg: Double = w.convertTo(new Kilogram()).value()
+  val bmi: Double = wkg / (hm * hm)
+  IO::println("  #{h.display()} / #{w.display()} -> BMI #{round1(bmi)}")
+  idx++
+}
+
+IO::println("")
+IO::println("=== Try/Catch: Guarded Conversion ===")
+
+static def safeLengthDisplay(value: Double, symbol: String): String {
+  try {
+    val unit: LengthUnit = select symbol {
+      case "m":  new Meter()
+      case "cm": new Centimeter()
+      case "km": new Kilometer()
+      case "ft": new Foot()
+      case "in": new Inch()
+      case "mi": new Mile()
+      else: throw new Exception("unknown unit: " + symbol)
+    }
+    return new Length(value, unit).display()
+  } catch e: Exception {
+    return "ERROR: " + e.getMessage()
+  }
+}
+
+IO::println(safeLengthDisplay(42.0, "km"))
+IO::println(safeLengthDisplay(10.0, "m"))
+IO::println(safeLengthDisplay(5.0, "xyz"))

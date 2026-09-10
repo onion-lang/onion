@@ -1,0 +1,409 @@
+// NetFlowAnalyzer — network flow analysis exercising many Onion features.
+// Features: records with from re"...", ADT enums, regex select patterns,
+// classes, typed collection pipelines, closures, string interpolation,
+// foreach over ranges, try/catch, nullable types.
+
+// ------------------------------------------------------------------
+// Data model
+// ------------------------------------------------------------------
+
+record FlowRecord(
+  srcIp: String, dstIp: String, proto: String,
+  srcPort: Int, dstPort: Int, bytes: Int, packets: Int
+) from re"(\d+\.\d+\.\d+\.\d+) (\d+\.\d+\.\d+\.\d+) (\w+) (\d+) (\d+) (\d+) (\d+)"
+
+record HostStats(ip: String, bytesSent: Int, flowCount: Int)
+
+record Alert(levelName: String, ip: String, message: String)
+
+// ADT enum for connection state tracking
+enum ConnState {
+  case NewConn(firstBytes: Int)
+  case EstablishedConn(totalBytes: Int, packetCount: Int)
+  case ClosedConn(reason: String)
+
+public:
+  def label(): String {
+    select this {
+      case s is NewConn:         return "NEW(#{s.firstBytes()}B)"
+      case s is EstablishedConn: return "EST(#{s.totalBytes()}B/#{s.packetCount()}pkt)"
+      case s is ClosedConn:      return "CLOSED(#{s.reason()})"
+      else:                      return "?"
+    }
+  }
+
+  def totalBytes(): Int {
+    select this {
+      case s is NewConn:         return s.firstBytes()
+      case s is EstablishedConn: return s.totalBytes()
+      case s is ClosedConn:      return 0
+      else:                      return 0
+    }
+  }
+}
+
+// ------------------------------------------------------------------
+// Protocol categorization
+// ------------------------------------------------------------------
+
+def categorizePort(port: Int): String {
+  select port {
+    case 80, 443, 8080, 8443: return "Web"
+    case 53:                  return "DNS"
+    case 25, 587, 465, 993, 143: return "Mail"
+    case 21, 20:              return "FTP"
+    case 22:                  return "SSH"
+    case 3306, 5432, 1433:   return "Database"
+    case 1935, 554, 8554:    return "Streaming"
+    else:                     return "Other"
+  }
+}
+
+// Fingerprint a flow via regex select on "PROTO PORT" key
+def fingerprint(f: FlowRecord): String {
+  val key = "#{f.proto()} #{f.dstPort()}"
+  select key {
+    case re"TCP 80":   return "plain-http"
+    case re"TCP 443":  return "https"
+    case re"UDP 53":   return "dns-query"
+    case re"TCP 22":   return "ssh-session"
+    case re"TCP 3306": return "mysql"
+    case re"TCP 5432": return "postgres"
+    case re"TCP 21":   return "ftp-control"
+    case re"TCP 25":   return "smtp"
+    case re"TCP 1935": return "rtmp-stream"
+    case re"TCP (\d+)" (port): return "tcp-#{port}"
+    case re"UDP (\d+)" (port): return "udp-#{port}"
+    else:              return "unknown"
+  }
+}
+
+// ------------------------------------------------------------------
+// String formatting helpers
+// ------------------------------------------------------------------
+
+def padRight(s: String, width: Int): String {
+  var r = s
+  while r.length() < width { r = r + " " }
+  return r
+}
+
+def bar(value: Int, scale: Int): String {
+  val n = if scale > 0 { value / scale } else { 0 }
+  var b = ""
+  var i = 0
+  while i < n { b = b + "#"; i = i + 1 }
+  return b
+}
+
+def separator(ch: String, n: Int): String {
+  var s = ""
+  var i = 0
+  while i < n { s = s + ch; i = i + 1 }
+  return s
+}
+
+// ------------------------------------------------------------------
+// Statistics computation
+// ------------------------------------------------------------------
+
+def computeStats(flows: List[FlowRecord]): List[HostStats] {
+  val byIp = flows.groupBy { f -> f.srcIp() }
+  val result: List[HostStats] = []
+  foreach (ip, ipFlows) in byIp {
+    val fs = ipFlows as List[Object]
+    val sent = fs.fold(0) { acc, f -> (acc as Int) + (f as FlowRecord).bytes() }
+    result.add(new HostStats(ip as String, sent as Int, fs.size))
+  }
+  return result
+}
+
+// ------------------------------------------------------------------
+// Alert detection
+// ------------------------------------------------------------------
+
+def detectAlerts(flows: List[FlowRecord], stats: List[HostStats]): List[Alert] {
+  val alerts: List[Alert] = []
+
+  // High-volume senders (> 500 KB)
+  foreach s: HostStats in stats {
+    if s.bytesSent() > 500000 {
+      alerts.add(new Alert("WARNING", s.ip(),
+        "High egress: #{s.bytesSent()} bytes across #{s.flowCount()} flows"))
+    }
+  }
+
+  // Potential port scanners: many distinct dest ports from one src
+  val bySource = flows.groupBy { f -> f.srcIp() }
+  foreach (src, srcFlows) in bySource {
+    val fs = srcFlows as List[Object]
+    val ports = fs.map { f -> (f as FlowRecord).dstPort() }.distinct()
+    if ports.size > 4 {
+      alerts.add(new Alert("CRITICAL", src as String,
+        "Possible port scan: #{ports.size} distinct dst ports"))
+    }
+  }
+
+  // Database access warnings
+  foreach f: FlowRecord in flows {
+    if categorizePort(f.dstPort()) == "Database" {
+      alerts.add(new Alert("WARNING", f.srcIp(),
+        "DB access to #{f.dstIp()}:#{f.dstPort()} (#{f.bytes()} bytes)"))
+    }
+  }
+
+  return alerts
+}
+
+// ------------------------------------------------------------------
+// Report class
+// ------------------------------------------------------------------
+
+class FlowReport {
+  val flows: List[FlowRecord]
+  val stats: List[HostStats]
+  val alerts: List[Alert]
+
+public:
+  def this(fs: List[FlowRecord]) {
+    this.flows = fs
+    this.stats = computeStats(fs)
+    this.alerts = detectAlerts(fs, this.stats)
+  }
+
+  def printHeader(): void {
+    IO::println(separator("=", 62))
+    IO::println("  NETWORK FLOW ANALYSIS REPORT")
+    IO::println(separator("=", 62))
+    IO::println("  Flows analyzed : #{flows.size}")
+    IO::println("  Unique sources : #{stats.size}")
+    IO::println("  Alerts raised  : #{alerts.size}")
+    IO::println("")
+  }
+
+  def printCategoryBreakdown(): void {
+    IO::println("--- Traffic by Application Category ---")
+    val byCat = flows.groupBy { f -> categorizePort(f.dstPort()) }
+    foreach (cat, catFlows) in byCat {
+      val fs = catFlows as List[Object]
+      val total = fs.fold(0) { acc, f -> (acc as Int) + (f as FlowRecord).bytes() }
+      IO::println("  #{padRight(cat as String, 12)} #{padRight(fs.size + " flows", 12)} #{total} bytes")
+    }
+    IO::println("")
+  }
+
+  def printProtoBreakdown(): void {
+    IO::println("--- Protocol (TCP/UDP) Breakdown ---")
+    val byProto = flows.groupBy { f -> f.proto() }
+    foreach (proto, pFlows) in byProto {
+      val fs = pFlows as List[Object]
+      val total = fs.fold(0) { acc, f -> (acc as Int) + (f as FlowRecord).bytes() }
+      IO::println("  #{padRight(proto as String, 6)} #{padRight(fs.size + " flows", 12)} #{total} bytes")
+    }
+    IO::println("")
+  }
+
+  def printTopTalkers(): void {
+    IO::println("--- Top Talkers (by bytes sent) ---")
+    val sorted: List[HostStats] = stats.sortedBy { s -> 0 - s.bytesSent() } as List[HostStats]
+    var rank = 1
+    foreach s: HostStats in sorted {
+      val kb = s.bytesSent() / 1024
+      val barStr = padRight(bar(s.bytesSent(), 30000), 40)
+      IO::println("  #{rank}. #{padRight(s.ip(), 14)} |#{barStr}| #{kb} KB")
+      rank = rank + 1
+      if rank > 8 { break }
+    }
+    IO::println("")
+  }
+
+  def printFingerprints(): void {
+    IO::println("--- Flow Fingerprints (first 10) ---")
+    var n = 0
+    foreach f: FlowRecord in flows {
+      val kb = f.bytes() / 1024
+      IO::println("  #{padRight(f.srcIp(), 13)} -> #{padRight(f.dstIp() + ":" + f.dstPort(), 22)} #{padRight(fingerprint(f), 16)} #{kb} KB")
+      n = n + 1
+      if n >= 10 { break }
+    }
+    IO::println("")
+  }
+
+  def printAlerts(): void {
+    IO::println("--- Security Alerts ---")
+    if alerts.size == 0 {
+      IO::println("  No alerts detected.")
+    } else {
+      foreach a: Alert in alerts {
+        val sym = if a.levelName() == "CRITICAL" { "[!!!]" } else { "[ ! ]" }
+        IO::println("  #{sym} #{a.ip()}: #{a.message()}")
+      }
+    }
+    IO::println("")
+  }
+
+  def printBandwidthPie(): void {
+    IO::println("--- Bandwidth Distribution ---")
+    val total = flows.fold(0) { acc, f -> (acc as Int) + f.bytes() }
+    val byCat = flows.groupBy { f -> categorizePort(f.dstPort()) }
+    foreach (cat, catFlows) in byCat {
+      val fs = catFlows as List[Object]
+      val catBytes = fs.fold(0) { acc, f -> (acc as Int) + (f as FlowRecord).bytes() }
+      val pct = if total > 0 { catBytes * 100 / total } else { 0 }
+      val barStr = bar(pct, 3)
+      IO::println("  #{padRight(cat as String, 12)} |#{padRight(barStr, 20)}| #{pct}%")
+    }
+    IO::println("  Total: #{total} bytes")
+    IO::println("")
+  }
+
+  def printAll(): void {
+    printHeader()
+    printCategoryBreakdown()
+    printProtoBreakdown()
+    printTopTalkers()
+    printFingerprints()
+    printBandwidthPie()
+    printAlerts()
+  }
+}
+
+// ------------------------------------------------------------------
+// ADT enum connection-state demo
+// ------------------------------------------------------------------
+
+def demoConnStates(): void {
+  IO::println("--- Connection State Transitions ---")
+  val states: List[ConnState] = [
+    new NewConn(512),
+    new EstablishedConn(85000, 60),
+    new ClosedConn("FIN"),
+    new EstablishedConn(2048, 4),
+    new ClosedConn("RST")
+  ]
+  foreach s: ConnState in states {
+    IO::println("  " + s.label())
+  }
+  val established: List[ConnState] = states.filter { s -> s is EstablishedConn } as List[ConnState]
+  val estBytes = established.fold(0) { acc, s -> (acc as Int) + (s as ConnState).totalBytes() }
+  IO::println("  Bytes in established conns: #{estBytes}")
+  IO::println("")
+}
+
+// ------------------------------------------------------------------
+// Recursion demo
+// ------------------------------------------------------------------
+
+def fibonacci(n: Int): Int = if n <= 1 { n } else { fibonacci(n - 1) + fibonacci(n - 2) }
+
+def showFibonacci(): void {
+  IO::println("--- Fibonacci Sequence (first 12) ---")
+  var result = ""
+  foreach i: Int in 0..<12 {
+    if i > 0 { result = result + ", " }
+    result = result + fibonacci(i)
+  }
+  IO::println("  " + result)
+  IO::println("")
+}
+
+// ------------------------------------------------------------------
+// Error handling demo
+// ------------------------------------------------------------------
+
+def safeParse(line: String): void {
+  try {
+    val r = FlowRecord::parse(line)
+    if r == null {
+      IO::println("  [null] no match for: \"#{line}\"")
+    } else {
+      val f = r as FlowRecord
+      IO::println("  [ok]   #{f.srcIp()} -> #{f.dstIp()} #{f.bytes()}B cat=#{categorizePort(f.dstPort())}")
+    }
+  } catch e: Exception {
+    IO::println("  [err]  #{e.message()}")
+  }
+}
+
+// ------------------------------------------------------------------
+// Sample data
+// ------------------------------------------------------------------
+
+val rawFlows = [
+  "10.0.0.1 8.8.8.8 UDP 54321 53 512 4",
+  "10.0.0.1 8.8.4.4 UDP 54322 53 256 2",
+  "10.0.0.2 93.184.216.34 TCP 45000 80 15000 12",
+  "10.0.0.2 93.184.216.34 TCP 45001 443 85000 60",
+  "10.0.0.3 203.0.113.10 TCP 50001 22 4096 8",
+  "10.0.0.3 203.0.113.10 TCP 50002 22 2048 4",
+  "10.0.0.4 198.51.100.1 TCP 60000 3306 120000 150",
+  "10.0.0.5 192.0.2.1 TCP 40000 443 320000 200",
+  "10.0.0.5 192.0.2.2 TCP 40001 80 18000 14",
+  "10.0.0.5 192.0.2.3 TCP 40002 8080 9500 8",
+  "10.0.0.5 192.0.2.4 TCP 40003 8443 11000 9",
+  "10.0.0.5 192.0.2.5 UDP 40004 53 640 5",
+  "10.0.0.5 192.0.2.6 TCP 40005 25 3200 6",
+  "10.0.0.5 192.0.2.7 TCP 40006 21 78000 40",
+  "10.0.0.6 172.16.0.1 TCP 30000 5432 95000 80",
+  "10.0.0.7 1.1.1.1 UDP 63000 53 128 1",
+  "10.0.0.8 104.16.0.0 TCP 42000 443 1200000 900",
+  "10.0.0.9 104.17.0.0 TCP 43000 1935 450000 350"
+]
+
+// Join with newlines
+var rawText = ""
+var first = true
+foreach line: String in rawFlows {
+  if !first { rawText = rawText + "\n" }
+  rawText = rawText + line
+  first = false
+}
+
+val flows: List[FlowRecord] = FlowRecord::parseAll(rawText) as List[FlowRecord]
+IO::println("Loaded #{flows.size} of #{rawFlows.size} flow records.\n")
+
+val report = new FlowReport(flows)
+report.printAll()
+
+demoConnStates()
+showFibonacci()
+
+IO::println("--- Safe Parse Demo ---")
+safeParse("10.0.0.1 8.8.8.8 TCP 5000 443 4096 3")
+safeParse("not a valid flow record")
+safeParse("10.0.0.2 1.2.3.4 UDP 9999 53 128 1")
+IO::println("")
+
+// Closure composition demo
+val isLargeFlow = (f: FlowRecord) -> f.bytes() > 50000
+val kilobytes = (b: Int) -> b / 1024
+
+val largeFlows: List[FlowRecord] = flows.filter { f -> isLargeFlow(f) } as List[FlowRecord]
+IO::println("--- Large Flows (>50KB) ---")
+foreach f: FlowRecord in largeFlows {
+  IO::println("  #{padRight(f.srcIp(), 14)} -> #{f.dstIp()}:#{f.dstPort()} = #{kilobytes(f.bytes())} KB  [#{fingerprint(f)}]")
+}
+IO::println("")
+
+// Nullable lookup with Elvis operator
+val found = flows.find { f -> f.dstIp() == "8.8.8.8" } as FlowRecord?
+val notFound = flows.find { f -> f.dstIp() == "9.9.9.9" } as FlowRecord?
+IO::println("--- Nullable Lookup ---")
+val foundLabel = if found != null { found.proto() + " port " + found.dstPort() } else { "not found" }
+val notFoundLabel = notFound?.proto() ?: "not found"
+IO::println("  8.8.8.8  -> #{foundLabel}")
+IO::println("  9.9.9.9  -> #{notFoundLabel}")
+IO::println("")
+
+// Partition demo using filter
+val largeP: List[FlowRecord] = flows.filter { f -> f.bytes() > 10000 } as List[FlowRecord]
+val smallP: List[FlowRecord] = flows.filter { f -> f.bytes() <= 10000 } as List[FlowRecord]
+IO::println("--- Partition by Size ---")
+IO::println("  Large (>10KB): #{largeP.size} flows")
+IO::println("  Small (<=10KB): #{smallP.size} flows")
+// Show average bytes per group
+val largeAvg = if largeP.size > 0 { largeP.fold(0) { acc, f -> (acc as Int) + f.bytes() } / largeP.size } else { 0 }
+val smallAvg = if smallP.size > 0 { smallP.fold(0) { acc, f -> (acc as Int) + f.bytes() } / smallP.size } else { 0 }
+IO::println("  Avg bytes large: #{largeAvg as Int}")
+IO::println("  Avg bytes small: #{smallAvg as Int}")
+IO::println("")

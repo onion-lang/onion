@@ -1,0 +1,334 @@
+// DiscreteEventSim.on — Bank-queue discrete-event simulation (~250 lines).
+// Features: ADT enum with shared method; records with example clauses; classes
+// with public/private fields and getters; extension Double/Int; typed List[T];
+// collection pipelines (map/filter/fold/sortedBy/groupBy/partition/reduce/zip/distinct);
+// select / type-pattern matching; closures; string interpolation; nullable types;
+// foreach over ranges and Map entries; while loop; try/catch; recursion.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Customer(id: Int, arrivalTime: Double, serviceTime: Double, vip: Boolean)
+  example { new Customer(0, 0.0, 2.0, false).id() == 0 }
+  example { new Customer(1, 1.5, 3.0, true).vip() == true }
+
+record CompletedServ(custId: Int, wait: Double, depart: Double, tellerId: Int)
+  example { new CompletedServ(0, 0.0, 3.5, 0).custId() == 0 }
+  example { new CompletedServ(1, 1.5, 5.5, 1).wait() == 1.5 }
+
+// ── Event ADT ────────────────────────────────────────────────────────────────
+
+enum SimEvent {
+  case Arrival(custId: Int, evtTime: Double, vip: Boolean)
+  case ServiceEnd(tellerId: Int, custId: Int, evtTime: Double)
+public:
+  def time(): Double = select this {
+    case a is Arrival:    a.evtTime()
+    case e is ServiceEnd: e.evtTime()
+  }
+  def label(): String = select this {
+    case a is Arrival:    "ARR  cust-#{a.custId()}#{if a.vip() { " [VIP]" } else { "" }}"
+    case e is ServiceEnd: "DONE cust-#{e.custId()} on teller-#{e.tellerId()}"
+  }
+}
+
+// ── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val ip = self as Int
+    val fp = ((self - ip as Double) * 100.0) as Int
+    val fs = if fp < 10 { "0" + fp } else { "" + fp }
+    return "#{ip}.#{fs}"
+  }
+  def pct(): String = "" + (self * 100.0) as Int + "%"
+}
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+}
+
+// ── Teller state (mutable, public fields via getters) ────────────────────────
+
+class TellerState {
+  val id: Int
+  var busyUntil: Double
+  var served: Int
+  var totalIdleTime: Double
+  var lastFreeAt: Double
+
+public:
+  def this(id: Int) {
+    this.id = id
+    this.busyUntil = 0.0
+    this.served = 0
+    this.totalIdleTime = 0.0
+    this.lastFreeAt = 0.0
+  }
+
+  def getId(): Int = id
+  def getServed(): Int = served
+  def isAvailable(time: Double): Boolean = busyUntil <= time
+
+  def assign(startTime: Double, endTime: Double): void {
+    totalIdleTime = totalIdleTime + (startTime - lastFreeAt)
+    busyUntil = endTime
+    served = served + 1
+  }
+
+  def release(time: Double): void { lastFreeAt = time }
+
+  def utilization(simLen: Double): Double {
+    if simLen <= 0.0 { return 0.0 }
+    val busyTime = simLen - totalIdleTime
+    return if busyTime < 0.0 { 0.0 } else { busyTime / simLen }
+  }
+}
+
+// ── Statistics collector ─────────────────────────────────────────────────────
+
+class Stats {
+  var totalWait: Double
+  var maxWait: Double
+  val completions: List[CompletedServ]
+
+public:
+  def this {
+    this.totalWait = 0.0
+    this.maxWait = 0.0
+    this.completions = []
+  }
+
+  def getCompletions(): List[CompletedServ] = completions
+  def getMaxWait(): Double = maxWait
+
+  def track(custId: Int, wait: Double, depart: Double, tellerId: Int): void {
+    totalWait = totalWait + wait
+    if wait > maxWait { maxWait = wait }
+    completions.add(new CompletedServ(custId, wait, depart, tellerId))
+  }
+
+  def count(): Int = completions.size
+
+  def avgWait(): Double =
+    if completions.size == 0 { 0.0 }
+    else { totalWait / completions.size as Double }
+
+  def p90Wait(): Double {
+    if completions.size == 0 { return 0.0 }
+    val waits: List[Object] = completions.map { c -> (c as CompletedServ).wait() }
+    val sorted = waits.sortedBy { w -> (w as Double) }
+    val idx = (completions.size as Double * 0.9) as Int
+    val safeIdx = if idx >= sorted.size { sorted.size - 1 } else { idx }
+    return sorted[safeIdx] as Double
+  }
+}
+
+// ── Simulation engine ────────────────────────────────────────────────────────
+
+class BankSim {
+  val tellers: List[TellerState]
+  val pending: List[Object]       // SimEvent objects
+  val vipQueue: List[Int]
+  val regQueue: List[Int]
+  val customers: List[Customer]
+  val stats: Stats
+  var clock: Double
+  val verbose: Boolean
+
+public:
+  def this(numTellers: Int, custs: List[Customer], verb: Boolean) {
+    this.tellers = []
+    this.pending = []
+    this.vipQueue = []
+    this.regQueue = []
+    this.customers = custs
+    this.stats = new Stats
+    this.clock = 0.0
+    this.verbose = verb
+
+    foreach i: Int in 0..<numTellers {
+      tellers.add(new TellerState(i))
+    }
+    foreach cust: Customer in custs {
+      pending.add(new Arrival(cust.id(), cust.arrivalTime(), cust.vip()))
+    }
+  }
+
+  def findFreeTeller(): TellerState? {
+    foreach t: Object in tellers {
+      val ts = t as TellerState
+      if ts.isAvailable(clock) { return ts }
+    }
+    return null
+  }
+
+  def hasWaiting(): Boolean = vipQueue.size > 0 || regQueue.size > 0
+
+  def nextWaitingCust(): Int {
+    if vipQueue.size > 0 {
+      val id = vipQueue[0]
+      vipQueue.remove(0)
+      return id
+    }
+    val id = regQueue[0]
+    regQueue.remove(0)
+    return id
+  }
+
+  def dequeue(): SimEvent? {
+    if pending.size == 0 { return null }
+    var minIdx: Int = 0
+    var minTime: Double = (pending[0] as SimEvent).time()
+    foreach i: Int in 1..<pending.size {
+      val t = (pending[i] as SimEvent).time()
+      if t < minTime { minTime = t; minIdx = i }
+    }
+    val ev = pending[minIdx] as SimEvent
+    pending.remove(minIdx)
+    return ev
+  }
+
+  def scheduleService(teller: TellerState, custId: Int, startTime: Double): void {
+    val cust = customers[custId]
+    val endTime = startTime + cust.serviceTime()
+    val wait = startTime - cust.arrivalTime()
+    teller.assign(startTime, endTime)
+    stats.track(custId, wait, endTime, teller.getId())
+    pending.add(new ServiceEnd(teller.getId(), custId, endTime))
+    if verbose {
+      IO::println("    → teller-#{teller.getId()} wait=#{wait.fmt2()} end=#{endTime.fmt2()}")
+    }
+  }
+
+  def run(): void {
+    var ev = dequeue()
+    while ev != null {
+      clock = ev.time()
+      if verbose { IO::println("t=#{clock.fmt2()}  #{ev.label()}") }
+      select ev {
+        case a is Arrival:
+          val teller = findFreeTeller()
+          if teller != null {
+            scheduleService(teller as TellerState, a.custId(), clock)
+          } else {
+            if a.vip() { vipQueue.add(a.custId()) }
+            else { regQueue.add(a.custId()) }
+            if verbose {
+              IO::println("    → queue (VIP=#{vipQueue.size} reg=#{regQueue.size})")
+            }
+          }
+        case e is ServiceEnd:
+          val teller = tellers[e.tellerId()]
+          teller.release(clock)
+          if hasWaiting() { scheduleService(teller, nextWaitingCust(), clock) }
+      }
+      ev = dequeue()
+    }
+  }
+
+  def report(): void {
+    val simLen = clock
+    IO::println("")
+    IO::println("── Simulation Results ──────────────────────────────────")
+    IO::println("Customers served : #{stats.count().plural("customer")}")
+    IO::println("Avg wait time    : #{stats.avgWait().fmt2()} min")
+    IO::println("Max wait time    : #{stats.getMaxWait().fmt2()} min")
+    IO::println("90th-pct wait    : #{stats.p90Wait().fmt2()} min")
+    IO::println("")
+    IO::println("── Teller Utilization ──────────────────────────────────")
+    foreach t: Object in tellers {
+      val teller = t as TellerState
+      val u = teller.utilization(simLen).pct()
+      IO::println("  Teller #{teller.getId()}: #{teller.getServed().plural("customer")}, #{u} busy")
+    }
+
+    // partition: short vs long waits
+    val comps = stats.getCompletions()
+    val waits: List[Object] = comps.map { c -> (c as CompletedServ).wait() }
+    val parts = waits.partition { w -> (w as Double) <= 2.0 }
+    val short: List[Object] = parts[0] as List[Object]
+    val long: List[Object]  = parts[1] as List[Object]
+    IO::println("")
+    IO::println("Wait distribution: #{short.size.plural("customer")} ≤2 min, #{long.size.plural("customer")} >2 min")
+
+    // groupBy teller to show per-teller load
+    val byTeller = comps.groupBy { c -> "teller-#{(c as CompletedServ).tellerId()}" }
+    IO::println("")
+    IO::println("── Per-teller breakdown ────────────────────────────────")
+    foreach (k, v) in byTeller {
+      val grp = v as List
+      val sumW = grp.fold(0.0) { acc, c -> (acc as Double) + (c as CompletedServ).wait() }
+      val avgW = (sumW as Double) / grp.size as Double
+      IO::println("  #{k}: #{grp.size.plural("customer")}, avg wait #{avgW.fmt2()} min")
+    }
+  }
+}
+
+// ── Customer data ────────────────────────────────────────────────────────────
+
+val customers: List[Customer] = [
+  new Customer(0, 0.0,  3.5, false),
+  new Customer(1, 1.0,  2.0, false),
+  new Customer(2, 1.5,  4.0, true),
+  new Customer(3, 2.0,  1.5, false),
+  new Customer(4, 3.0,  2.5, false),
+  new Customer(5, 4.0,  3.0, false),
+  new Customer(6, 4.5,  1.0, true),
+  new Customer(7, 5.0,  2.0, false),
+  new Customer(8, 6.0,  3.5, false),
+  new Customer(9, 7.0,  1.5, false)
+]
+
+IO::println("── Bank Queue Simulation (2 tellers, 10 customers) ─────")
+val sim = new BankSim(2, customers, true)
+sim.run()
+sim.report()
+
+// ── Pipeline demos ───────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("── Pipeline Demos ──────────────────────────────────────")
+
+// zip: arrival vs service time pairs
+val arrivals: List[Object] = customers.map { c -> c.arrivalTime() }
+val services: List[Object] = customers.map { c -> c.serviceTime() }
+val zipped = arrivals.zip(services)
+IO::println("Arrival/service pairs (first 4):")
+foreach i: Int in 0..<4 {
+  val pair = zipped[i] as List
+  IO::println("  arr=#{(pair[0] as Double).fmt2()}  svc=#{(pair[1] as Double).fmt2()}")
+}
+
+// reduce: total service time
+val totalSvc = services.reduce { a, b -> (a as Double) + (b as Double) }
+IO::println("Total service time: #{(totalSvc as Double).fmt2()} min")
+
+// distinct: VIP flag values seen
+val flags: List[Object] = customers.map { c -> c.vip() }
+val distinctFlags = flags.distinct()
+IO::println("Distinct VIP flags: #{distinctFlags.toString()}")
+
+// find + sortedBy: earliest VIP customer
+val vips = customers.filter { c -> c.vip() }
+val sortedVips = vips.sortedBy { c -> (c as Customer).arrivalTime() }
+if sortedVips.size > 0 {
+  val fv = sortedVips[0] as Customer
+  IO::println("First VIP: cust-#{fv.id()} at t=#{fv.arrivalTime().fmt2()}")
+}
+
+// try/catch: out-of-bounds guard
+try {
+  val bad = customers[999]
+  IO::println("unexpected: #{bad}")
+} catch e: Exception {
+  IO::println("Caught: #{e.message()}")
+}
+
+// recursion: Fibonacci via tail-call style
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+IO::println("fib(10) = #{fib(10)}")
+
+// count and interpolation
+val numVip = customers.filter { c -> c.vip() }.size
+IO::println("Simulation: #{customers.size.plural("customer")}, #{numVip} VIP")

@@ -1,0 +1,429 @@
+// ShiftPlanner.on — employee shift scheduling with overtime detection and reporting.
+// Exercises: records, data-carrying ADT enums, homogeneous enums, classes,
+// extension methods on Int/String, collection pipelines, select pattern-matching
+// on both enum values and ADT cases, foreach over ranges and maps, string
+// interpolation, nullable types, explicit returns, closures, and try/catch.
+
+// ── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def hoursLabel(): String = if self == 1 { "1 hr" } else { "#{self} hrs" }
+  def padLeft2(): String {
+    val s: String = "" + self
+    if s.length() >= 2 { return s }
+    return " " + s
+  }
+}
+
+extension String {
+  def truncate(max: Int): String {
+    if self.length() <= max { return self }
+    return self.substring(0, max - 2) + ".."
+  }
+  def rpad(width: Int): String {
+    var result: String = self
+    while result.length() < width { result = result + " " }
+    return result
+  }
+}
+
+// ── Domain enums ─────────────────────────────────────────────────────────────
+
+enum DayOfWeek {
+  MON, TUE, WED, THU, FRI, SAT, SUN
+public:
+  def label(): String = select this {
+    case DayOfWeek::MON: "Mon"
+    case DayOfWeek::TUE: "Tue"
+    case DayOfWeek::WED: "Wed"
+    case DayOfWeek::THU: "Thu"
+    case DayOfWeek::FRI: "Fri"
+    case DayOfWeek::SAT: "Sat"
+    case DayOfWeek::SUN: "Sun"
+  }
+  def isWeekend(): Boolean = select this {
+    case DayOfWeek::SAT: true
+    case DayOfWeek::SUN: true
+    else:                false
+  }
+}
+
+enum ShiftKind {
+  MORNING, AFTERNOON, NIGHT, ONCALL
+public:
+  def label(): String = select this {
+    case ShiftKind::MORNING:   "Morning  "
+    case ShiftKind::AFTERNOON: "Afternoon"
+    case ShiftKind::NIGHT:     "Night    "
+    case ShiftKind::ONCALL:    "OnCall   "
+  }
+  def baseHours(): Int = select this {
+    case ShiftKind::MORNING:   8
+    case ShiftKind::AFTERNOON: 8
+    case ShiftKind::NIGHT:     8
+    case ShiftKind::ONCALL:    0
+  }
+}
+
+// ── ADT: overtime classification ─────────────────────────────────────────────
+
+enum OvertimeStatus {
+  case NoOvertime
+  case Standard(extraHours: Int)
+  case Weekend(extraHours: Int, day: DayOfWeek)
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Employee(id: Int, name: String, dept: String, hourlyRate: Int)
+
+record Shift(empId: Int, day: DayOfWeek, kind: ShiftKind, startHr: Int, endHr: Int) {
+public:
+  def hours(): Int = endHr() - startHr()
+  def label(): String =
+    "#{day().label()} #{kind().label()} #{startHr().padLeft2()}:00-#{endHr().padLeft2()}:00"
+}
+
+record WeekSummary(empId: Int, name: String, dept: String,
+                   totalHours: Int, overtimeHours: Int, overtimePay: Int)
+
+// ── Schedule class ────────────────────────────────────────────────────────────
+
+class Schedule {
+public:
+  val employees: List[Employee]
+  val shifts: List[Shift]
+
+  def this(employees: List[Employee], shifts: List[Shift]) {
+    this.employees = employees
+    this.shifts    = shifts
+  }
+
+  def findEmployee(id: Int): Employee? {
+    var found: Employee? = null
+    foreach e: Employee in employees {
+      if e.id() == id { found = e }
+    }
+    return found
+  }
+
+  def shiftsFor(empId: Int): List[Shift] =
+    shifts.filter { s -> s.empId() == empId }
+
+  def totalHours(empId: Int): Int {
+    val list: List[Shift] = shiftsFor(empId)
+    var total: Int = 0
+    foreach s: Shift in list { total = total + s.hours() }
+    return total
+  }
+
+  def weekendShifts(empId: Int): List[Shift] =
+    shiftsFor(empId).filter { s -> s.day().isWeekend() }
+
+  def overtime(empId: Int): OvertimeStatus {
+    val total: Int = totalHours(empId)
+    val wknd: List[Shift] = weekendShifts(empId)
+    if total <= 40 {
+      return new NoOvertime()
+    }
+    val extra: Int = total - 40
+    if wknd.size > 0 {
+      return new Weekend(extra, wknd[0].day())
+    }
+    return new Standard(extra)
+  }
+
+  def overtimePay(empId: Int): Int {
+    val emp: Employee? = findEmployee(empId)
+    if emp == null { return 0 }
+    val rate: Int = emp.hourlyRate()
+    val ot: OvertimeStatus = overtime(empId)
+    select ot {
+      case s is NoOvertime: return 0
+      case s is Standard:   return s.extraHours() * rate * 3 / 2
+      case s is Weekend:    return s.extraHours() * rate * 2
+    }
+  }
+
+  def summaries(): List[WeekSummary] =
+    employees.map { e ->
+      val id:    Int = e.id()
+      val hrs:   Int = totalHours(id)
+      val ot:    OvertimeStatus = overtime(id)
+      val extra: Int = select ot {
+        case s is NoOvertime: 0
+        case s is Standard:   s.extraHours()
+        case s is Weekend:    s.extraHours()
+      }
+      new WeekSummary(id, e.name(), e.dept(), hrs, extra, overtimePay(id))
+    }
+}
+
+// ── Report printer ────────────────────────────────────────────────────────────
+
+class Reporter {
+  val schedule: Schedule
+public:
+  def this(schedule: Schedule) {
+    this.schedule = schedule
+  }
+
+  def printBanner(): void {
+    IO::println("╔══════════════════════════════════════════════════════════╗")
+    IO::println("║        Weekly Shift Plan & Overtime Report               ║")
+    IO::println("╚══════════════════════════════════════════════════════════╝")
+    IO::println("")
+  }
+
+  def printEmployee(emp: Employee): void {
+    val id:     Int            = emp.id()
+    val shifts: List[Shift]    = schedule.shiftsFor(id)
+    val hrs:    Int            = schedule.totalHours(id)
+    val ot:     OvertimeStatus = schedule.overtime(id)
+    val pay:    Int            = schedule.overtimePay(id)
+
+    IO::println("  ┌─ #{emp.name().rpad(20)} │ #{emp.dept().rpad(12)} │ ¥#{emp.hourlyRate()}/hr")
+
+    foreach s: Shift in shifts {
+      IO::println("  │  #{s.label()}")
+    }
+
+    IO::println("  │  ──────────────────────────────────────────────────────")
+    IO::println("  │  Total hours : #{hrs.hoursLabel()}")
+
+    val otDesc: String = select ot {
+      case s is NoOvertime: "(no overtime)"
+      case s is Standard:
+        "#{s.extraHours().hoursLabel()} over 40 (standard ×1.5) → ¥#{pay}"
+      case s is Weekend:
+        "#{s.extraHours().hoursLabel()} over 40 (#{s.day().label()} weekend ×2.0) → ¥#{pay}"
+    }
+    IO::println("  │  Overtime    : #{otDesc}")
+    IO::println("  └──────────────────────────────────────────────────────────")
+    IO::println("")
+  }
+
+  def printSummaryTable(summaries: List[WeekSummary]): void {
+    IO::println("  SUMMARY TABLE")
+    IO::println("  ┌──────────────────────┬──────────────┬──────┬──────┬──────────┐")
+    IO::println("  │ Name                 │ Dept         │  Hrs │ O/T  │ O/T Pay  │")
+    IO::println("  ├──────────────────────┼──────────────┼──────┼──────┼──────────┤")
+    foreach ws: WeekSummary in summaries {
+      val nameCol: String = ws.name().rpad(20)
+      val deptCol: String = ws.dept().rpad(12)
+      val hrsCol:  String = ("" + ws.totalHours()).rpad(4)
+      val otCol:   String = ("" + ws.overtimeHours()).rpad(4)
+      val payCol:  String = ("¥" + ws.overtimePay()).rpad(8)
+      IO::println("  │ #{nameCol} │ #{deptCol} │ #{hrsCol} │ #{otCol} │ #{payCol} │")
+    }
+    IO::println("  └──────────────────────┴──────────────┴──────┴──────┴──────────┘")
+    IO::println("")
+  }
+
+  def printDeptTotals(summaries: List[WeekSummary]): void {
+    IO::println("  DEPARTMENT TOTALS")
+    IO::println("  ┌──────────────┬──────┬──────────┐")
+    IO::println("  │ Dept         │  Hrs │ O/T Pay  │")
+    IO::println("  ├──────────────┼──────┼──────────┤")
+
+    // build dept buckets imperatively (distinct ordered departments)
+    val seen: List[String] = []
+    foreach ws: WeekSummary in summaries {
+      val d: String = ws.dept()
+      if !seen.contains(d) { seen << d }
+    }
+
+    foreach dept: String in seen {
+      val members: List[WeekSummary] = summaries.filter { ws -> ws.dept() == dept }
+      var dHrs: Int = 0
+      var dPay: Int = 0
+      foreach ws: WeekSummary in members {
+        dHrs = dHrs + ws.totalHours()
+        dPay = dPay + ws.overtimePay()
+      }
+      IO::println("  │ #{dept.rpad(12)} │ #{("" + dHrs).rpad(4)} │ #{("¥" + dPay).rpad(8)} │")
+    }
+    IO::println("  └──────────────┴──────┴──────────┘")
+    IO::println("")
+  }
+
+  def printAll(): void {
+    printBanner()
+    foreach emp: Employee in schedule.employees {
+      printEmployee(emp)
+    }
+    val sums: List[WeekSummary] = schedule.summaries()
+    printSummaryTable(sums)
+    printDeptTotals(sums)
+  }
+}
+
+// ── Pipeline analytics ────────────────────────────────────────────────────────
+
+def pipelineStats(schedule: Schedule): void {
+  IO::println("  PIPELINE ANALYTICS")
+  IO::println("  ─────────────────────────────────────────────────────")
+
+  val allShifts: List[Shift] = schedule.shifts
+
+  // Total hours across entire team
+  val totalHrs: Int = schedule.employees.fold(0) { acc, e ->
+    (acc as Int) + schedule.totalHours(e.id())
+  }
+  IO::println("  Team hours total      : #{totalHrs}")
+
+  // Count by shift kind
+  val nightCount: Int = allShifts.filter { s -> s.kind() == ShiftKind::NIGHT }.size
+  val oncallCount: Int = allShifts.filter { s -> s.kind() == ShiftKind::ONCALL }.size
+  IO::println("  Night shifts          : #{nightCount}")
+  IO::println("  On-call slots         : #{oncallCount}")
+
+  // Weekend coverage
+  val weekendCount: Int = allShifts.filter { s -> s.day().isWeekend() }.size
+  IO::println("  Weekend shift slots   : #{weekendCount}")
+
+  // Employees WITH overtime
+  val withOt: List[Employee] = schedule.employees.filter { e ->
+    select schedule.overtime(e.id()) {
+      case s is NoOvertime: false
+      else: true
+    }
+  }
+  IO::println("  Employees w/ overtime : #{withOt.size}")
+  foreach e: Employee in withOt {
+    val pay: Int = schedule.overtimePay(e.id())
+    val ot: OvertimeStatus = schedule.overtime(e.id())
+    val extra: Int = select ot {
+      case s is NoOvertime: 0
+      case s is Standard:   s.extraHours()
+      case s is Weekend:    s.extraHours()
+    }
+    IO::println("    #{e.name()} : +#{extra} hrs → ¥#{pay}")
+  }
+
+  // Total overtime pay
+  val totalOtPay: Int = schedule.employees.fold(0) { acc, e ->
+    (acc as Int) + schedule.overtimePay(e.id())
+  }
+  IO::println("  Total overtime pay    : ¥#{totalOtPay}")
+
+  // Longest single shift
+  var longest: Shift? = null
+  foreach s: Shift in allShifts {
+    val cur: Shift? = longest
+    if cur == null { longest = s } else if s.hours() > cur.hours() { longest = s }
+  }
+  if longest != null {
+    IO::println("  Longest shift         : #{longest.label()} (#{longest.hours()} hrs)")
+  }
+
+  // Average hours per employee
+  val empCount: Int = schedule.employees.size
+  if empCount > 0 {
+    val avg: Int = totalHrs / empCount
+    IO::println("  Avg hrs/employee      : #{avg}")
+  }
+
+  // Day with most shifts
+  val dayNames: List[String] = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+  val dayEnums: List[DayOfWeek] = [DayOfWeek::MON, DayOfWeek::TUE, DayOfWeek::WED,
+                                    DayOfWeek::THU, DayOfWeek::FRI, DayOfWeek::SAT,
+                                    DayOfWeek::SUN]
+  var maxDay: String = "?"
+  var maxDayCount: Int = 0
+  var di: Int = 0
+  foreach dow: DayOfWeek in dayEnums {
+    val cnt: Int = allShifts.filter { s -> s.day() == dow }.size
+    if cnt > maxDayCount { maxDayCount = cnt; maxDay = dayNames[di] }
+    di++
+  }
+  IO::println("  Busiest day           : #{maxDay} (#{maxDayCount} shifts)")
+  IO::println("")
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+def validateSchedule(schedule: Schedule): void {
+  IO::println("  SCHEDULE VALIDATION")
+  IO::println("  ─────────────────────────────────────────────────────")
+  var issues: Int = 0
+  foreach emp: Employee in schedule.employees {
+    val shifts: List[Shift] = schedule.shiftsFor(emp.id())
+    // Check for double-booking (same employee on same day twice)
+    foreach s1: Shift in shifts {
+      foreach s2: Shift in shifts {
+        if s1 != s2 && s1.day() == s2.day() {
+          if s1.startHr() < s2.endHr() && s2.startHr() < s1.endHr() {
+            IO::println("  !! OVERLAP: #{emp.name()} on #{s1.day().label()} — #{s1.label()} / #{s2.label()}")
+            issues++
+          }
+        }
+      }
+    }
+    // Check excessively long shifts
+    foreach s: Shift in shifts {
+      if s.hours() > 12 {
+        IO::println("  !! LONG SHIFT: #{emp.name()} #{s.label()} (#{s.hours()} hrs)")
+        issues++
+      }
+    }
+  }
+  if issues == 0 {
+    IO::println("  All OK — no scheduling conflicts detected.")
+  } else {
+    IO::println("  #{issues} issue(s) found.")
+  }
+  IO::println("")
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+
+val employees: List[Employee] = [
+  new Employee(1, "Alice Chen",   "Engineering", 3200),
+  new Employee(2, "Bob Tanaka",   "Engineering", 2800),
+  new Employee(3, "Carol Lima",   "Operations",  2500),
+  new Employee(4, "David Park",   "Operations",  2500),
+  new Employee(5, "Eva Müller",   "Support",     2200)
+]
+
+val shifts: List[Shift] = [
+  // Alice — 46 hrs total (6 overtime, weekend)
+  new Shift(1, DayOfWeek::MON, ShiftKind::MORNING,   8, 16),
+  new Shift(1, DayOfWeek::TUE, ShiftKind::MORNING,   8, 16),
+  new Shift(1, DayOfWeek::WED, ShiftKind::NIGHT,     22, 30),
+  new Shift(1, DayOfWeek::THU, ShiftKind::MORNING,   8, 16),
+  new Shift(1, DayOfWeek::FRI, ShiftKind::AFTERNOON, 14, 22),
+  new Shift(1, DayOfWeek::SAT, ShiftKind::ONCALL,    10, 16),
+  // Bob — 40 hrs total (no overtime)
+  new Shift(2, DayOfWeek::MON, ShiftKind::MORNING,   8, 16),
+  new Shift(2, DayOfWeek::TUE, ShiftKind::MORNING,   8, 16),
+  new Shift(2, DayOfWeek::WED, ShiftKind::MORNING,   8, 16),
+  new Shift(2, DayOfWeek::THU, ShiftKind::MORNING,   8, 16),
+  new Shift(2, DayOfWeek::FRI, ShiftKind::MORNING,   8, 16),
+  // Carol — 45 hrs total (5 standard overtime)
+  new Shift(3, DayOfWeek::MON, ShiftKind::AFTERNOON, 12, 20),
+  new Shift(3, DayOfWeek::TUE, ShiftKind::AFTERNOON, 12, 20),
+  new Shift(3, DayOfWeek::WED, ShiftKind::AFTERNOON, 12, 20),
+  new Shift(3, DayOfWeek::THU, ShiftKind::AFTERNOON, 12, 20),
+  new Shift(3, DayOfWeek::FRI, ShiftKind::AFTERNOON, 12, 20),
+  new Shift(3, DayOfWeek::FRI, ShiftKind::ONCALL,    20, 25),
+  // David — 38 hrs (no overtime)
+  new Shift(4, DayOfWeek::TUE, ShiftKind::MORNING,   8, 16),
+  new Shift(4, DayOfWeek::WED, ShiftKind::MORNING,   8, 16),
+  new Shift(4, DayOfWeek::THU, ShiftKind::MORNING,   8, 16),
+  new Shift(4, DayOfWeek::FRI, ShiftKind::MORNING,   8, 14),
+  new Shift(4, DayOfWeek::SAT, ShiftKind::MORNING,   8, 14),
+  // Eva — 44 hrs (4 overtime, weekend)
+  new Shift(5, DayOfWeek::MON, ShiftKind::MORNING,   8, 16),
+  new Shift(5, DayOfWeek::TUE, ShiftKind::MORNING,   8, 16),
+  new Shift(5, DayOfWeek::WED, ShiftKind::MORNING,   8, 16),
+  new Shift(5, DayOfWeek::THU, ShiftKind::MORNING,   8, 16),
+  new Shift(5, DayOfWeek::FRI, ShiftKind::MORNING,   8, 16),
+  new Shift(5, DayOfWeek::SUN, ShiftKind::ONCALL,    10, 14)
+]
+
+val schedule: Schedule = new Schedule(employees, shifts)
+val reporter: Reporter = new Reporter(schedule)
+reporter.printAll()
+pipelineStats(schedule)
+validateSchedule(schedule)

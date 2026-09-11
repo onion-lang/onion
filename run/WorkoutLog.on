@@ -1,0 +1,543 @@
+// WorkoutLog.on — a structured workout log with progressive overload tracking.
+// Exercises: records (with methods + example law clauses); ADT data-carrying
+// enums (GoalType with cases, ProgressEvent); plain enums (MuscleGroup,
+// Intensity with methods); classes (WorkoutLog with public/private sections);
+// interfaces (Printable, Trackable); generics (ArrayList[T], TreeMap[K,V]);
+// collection pipelines via foreach/while; select / type-pattern matching with
+// ADT cases; nullable types and null checks; closures; string interpolation;
+// try/catch; while and foreach (ranges and map (k,v)); extension methods on
+// Int (clamp, toDouble, heartRateZone, plural), Double (toInt, round1,
+// kgToLbs, lbsToKg), and String (padRight, repeat, bar ASCII chart).
+
+import { java.util.ArrayList }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def toDouble(): Double = self * 1.0
+  def heartRateZone(): String {
+    if self < 100 { return "Rest" }
+    if self < 120 { return "Warm-up" }
+    if self < 140 { return "Fat-burn" }
+    if self < 160 { return "Cardio" }
+    if self < 180 { return "Peak" }
+    return "Anaerobic"
+  }
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word }
+    return self.toString() + " " + word + "s"
+  }
+}
+
+extension Double {
+  def toInt(): Int = self as Int
+  def round1(): String {
+    val scaled: Int = (self * 10.0 + 0.5) as Int
+    val intPart = scaled / 10
+    val fracPart = scaled % 10
+    return intPart.toString() + "." + fracPart.toString()
+  }
+  def kgToLbs(): Double = self * 2.20462
+  def lbsToKg(): Double = self / 2.20462
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+  def bar(filled: Int, total: Int, width: Int): String {
+    val f = (filled.toDouble() / total.toDouble() * width.toDouble()).toInt().clamp(0, width)
+    return "█".repeat(f) + "░".repeat(width - f)
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum MuscleGroup {
+  Chest, Back, Shoulders, Arms, Core, Legs, Glutes, Cardio
+public:
+  def label(): String = select this {
+    case MuscleGroup::Chest:     "Chest"
+    case MuscleGroup::Back:      "Back"
+    case MuscleGroup::Shoulders: "Shoulders"
+    case MuscleGroup::Arms:      "Arms"
+    case MuscleGroup::Core:      "Core"
+    case MuscleGroup::Legs:      "Legs"
+    case MuscleGroup::Glutes:    "Glutes"
+    case MuscleGroup::Cardio:    "Cardio"
+  }
+}
+
+enum Intensity { Easy, Moderate, Hard, Max
+public:
+  def rpe(): Int = select this {
+    case Intensity::Easy:     4
+    case Intensity::Moderate: 6
+    case Intensity::Hard:     8
+    case Intensity::Max:      10
+  }
+  def label(): String = select this {
+    case Intensity::Easy:     "Easy"
+    case Intensity::Moderate: "Moderate"
+    case Intensity::Hard:     "Hard"
+    case Intensity::Max:      "Max"
+  }
+}
+
+// ADT enum for goal types
+enum GoalType {
+  case StrengthGoal(exercise: String, targetWeightKg: Double)
+  case EnduranceGoal(activity: String, targetMinutes: Int)
+  case FrequencyGoal(sessionsPerWeek: Int)
+  case WeightGoal(targetKg: Double, direction: String)
+public:
+  def describe(): String = select this {
+    case g is StrengthGoal:   "Lift #{g.targetWeightKg()}kg on #{g.exercise()}"
+    case g is EnduranceGoal:  "#{g.targetMinutes()} min of #{g.activity()}"
+    case g is FrequencyGoal:  "#{g.sessionsPerWeek()} sessions/week"
+    case g is WeightGoal:     "Body weight #{g.direction()} to #{g.targetKg()}kg"
+  }
+}
+
+// ADT enum for progress events (for an event-sourced history)
+enum ProgressEvent {
+  case PersonalBest(exercise: String, weightKg: Double, reps: Int, day: Int)
+  case GoalAchieved(goalDesc: String, day: Int)
+  case Milestone(description: String, day: Int)
+public:
+  def day(): Int = select this {
+    case e is PersonalBest:  e.day()
+    case e is GoalAchieved: e.day()
+    case e is Milestone:    e.day()
+  }
+  def summary(): String = select this {
+    case e is PersonalBest:  "NEW PR: #{e.exercise()} #{e.weightKg()}kg x#{e.reps()}"
+    case e is GoalAchieved: "GOAL MET: #{e.goalDesc()}"
+    case e is Milestone:    "MILESTONE: #{e.description()}"
+  }
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Printable {
+  def print(): void
+}
+
+interface Trackable {
+  def id(): Int
+  def name(): String
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Exercise(id: Int, name: String, group: MuscleGroup, isCompound: Boolean) {
+public:
+  def shortName(): String = name().substring(0, 3.clamp(0, name().length()))
+  def category(): String {
+    if isCompound() { return "Compound" }
+    return "Isolation"
+  }
+}
+
+record WorkoutSet(exerciseId: Int, weightKg: Double, reps: Int, durationSec: Int) {
+public:
+  def volume(): Double = weightKg() * reps().toDouble()
+  def isBodyweight(): Boolean = weightKg() == 0.0
+  def summary(exName: String): String {
+    if isBodyweight() {
+      return "#{exName}: #{reps()} reps"
+    }
+    return "#{exName}: #{weightKg()}kg x #{reps()} reps (vol: #{volume()})"
+  }
+}
+
+record WorkoutSession(id: Int, day: Int, label: String, intensity: Intensity, sets: ArrayList[WorkoutSet], durationMin: Int) {
+public:
+  def totalVolume(): Double {
+    var vol = 0.0
+    foreach s: WorkoutSet in sets() {
+      vol = vol + s.volume()
+    }
+    return vol
+  }
+  def totalSets(): Int = sets().size
+  def print(exercises: ArrayList[Exercise]): void {
+    IO::println("  Day #{day()} · #{label()} [#{intensity().label()}] · #{durationMin()} min")
+    IO::println("  Total volume: #{totalVolume().round1()}kg · #{totalSets().plural("set")}")
+    foreach s: WorkoutSet in sets() {
+      var exName = "Unknown"
+      foreach e: Exercise in exercises {
+        if e.id() == s.exerciseId() { exName = e.name() }
+      }
+      IO::println("    " + s.summary(exName))
+    }
+  }
+}
+
+record FitnessProfile(name: String, heightCm: Int, weightKg: Double, ageYears: Int)
+  example { new FitnessProfile("Test", 170, 70.0, 25).heightCm() > 0 }
+  example { new FitnessProfile("Test", 170, 70.0, 25).bmi() > 0.0 }
+{
+public:
+  def bmi(): Double = weightKg() / ((heightCm().toDouble() / 100.0) * (heightCm().toDouble() / 100.0))
+  def bmiCategory(): String {
+    val b = bmi()
+    if b < 18.5 { return "Underweight" }
+    if b < 25.0 { return "Normal" }
+    if b < 30.0 { return "Overweight" }
+    return "Obese"
+  }
+  def maxHR(): Int = 220 - ageYears()
+  def print(): void {
+    IO::println("Profile: #{name()} | #{ageYears()}yo | #{heightCm()}cm | #{weightKg()}kg")
+    IO::println("BMI: #{bmi().round1()} (#{bmiCategory()}) | Max HR: #{maxHR()} bpm")
+  }
+}
+
+record Goal(id: Int, goalType: GoalType, achieved: Boolean, startDay: Int) {
+public:
+  def print(): void {
+    val status = if achieved() { "✓" } else { "○" }
+    IO::println("  [#{status}] #{goalType().describe()}")
+  }
+}
+
+// ─── Main Log Class ────────────────────────────────────────────────────────────
+
+class WorkoutLog {
+  var profile: FitnessProfile
+  var exercises: ArrayList[Exercise]
+  var sessions: ArrayList[WorkoutSession]
+  var goals: ArrayList[Goal]
+  var events: ArrayList[ProgressEvent]
+  var nextSessionId: Int
+  var nextGoalId: Int
+
+public:
+  def this(profile: FitnessProfile) {
+    this.profile = profile
+    exercises = new ArrayList[Exercise]()
+    sessions = new ArrayList[WorkoutSession]()
+    goals = new ArrayList[Goal]()
+    events = new ArrayList[ProgressEvent]()
+    nextSessionId = 1
+    nextGoalId = 1
+    seedExercises()
+  }
+
+public:
+  def addSession(day: Int, label: String, intensity: Intensity, sets: ArrayList[WorkoutSet], durationMin: Int): WorkoutSession {
+    val s = new WorkoutSession(nextSessionId, day, label, intensity, sets, durationMin)
+    nextSessionId++
+    sessions.add(s)
+    detectPersonalBests(s, day)
+    return s
+  }
+
+  def addGoal(goalType: GoalType, startDay: Int): Goal {
+    val g = new Goal(nextGoalId, goalType, false, startDay)
+    nextGoalId++
+    goals.add(g)
+    return g
+  }
+
+  def addEvent(event: ProgressEvent): void {
+    events.add(event)
+  }
+
+private:
+  def seedExercises(): void {
+    exercises.add(new Exercise(1, "Bench Press",    MuscleGroup::Chest,     true))
+    exercises.add(new Exercise(2, "Squat",          MuscleGroup::Legs,      true))
+    exercises.add(new Exercise(3, "Deadlift",       MuscleGroup::Back,      true))
+    exercises.add(new Exercise(4, "Overhead Press", MuscleGroup::Shoulders, true))
+    exercises.add(new Exercise(5, "Pull-up",        MuscleGroup::Back,      true))
+    exercises.add(new Exercise(6, "Dumbbell Curl",  MuscleGroup::Arms,      false))
+    exercises.add(new Exercise(7, "Tricep Dip",     MuscleGroup::Arms,      false))
+    exercises.add(new Exercise(8, "Plank",          MuscleGroup::Core,      false))
+    exercises.add(new Exercise(9, "Lateral Raise",  MuscleGroup::Shoulders, false))
+    exercises.add(new Exercise(10,"Running",        MuscleGroup::Cardio,    false))
+  }
+
+  def detectPersonalBests(session: WorkoutSession, day: Int): void {
+    foreach s: WorkoutSet in session.sets() {
+      val exId = s.exerciseId()
+      var prevBest = 0.0
+      foreach prev: WorkoutSession in sessions {
+        if prev.id() != session.id() {
+          foreach ps: WorkoutSet in prev.sets() {
+            if ps.exerciseId() == exId && ps.volume() > prevBest {
+              prevBest = ps.volume()
+            }
+          }
+        }
+      }
+      if s.volume() > prevBest && prevBest > 0.0 {
+        var exName = "Unknown"
+        foreach e: Exercise in exercises {
+          if e.id() == exId { exName = e.name() }
+        }
+        events.add(new PersonalBest(exName, s.weightKg(), s.reps(), day))
+      }
+    }
+  }
+
+public:
+  def findExercise(id: Int): Exercise? {
+    foreach e: Exercise in exercises {
+      if e.id() == id { return e }
+    }
+    return null
+  }
+
+  def sessionsByDay(day: Int): ArrayList[WorkoutSession] {
+    val result = new ArrayList[WorkoutSession]()
+    foreach s: WorkoutSession in sessions {
+      if s.day() == day { result.add(s) }
+    }
+    return result
+  }
+
+  def totalVolumeForExercise(exerciseId: Int): Double {
+    var total = 0.0
+    foreach s: WorkoutSession in sessions {
+      foreach ws: WorkoutSet in s.sets() {
+        if ws.exerciseId() == exerciseId { total = total + ws.volume() }
+      }
+    }
+    return total
+  }
+
+  def bestSetForExercise(exerciseId: Int): WorkoutSet? {
+    var best: WorkoutSet? = null
+    foreach s: WorkoutSession in sessions {
+      foreach ws: WorkoutSet in s.sets() {
+        if ws.exerciseId() == exerciseId {
+          if best == null || ws.volume() > best.volume() {
+            best = ws
+          }
+        }
+      }
+    }
+    return best
+  }
+
+  def averageSessionDuration(): Double {
+    if sessions.size == 0 { return 0.0 }
+    var total = 0
+    foreach s: WorkoutSession in sessions { total = total + s.durationMin() }
+    return total.toDouble() / sessions.size.toDouble()
+  }
+
+  def weeklyVolume(weekStartDay: Int): Double {
+    var vol = 0.0
+    foreach s: WorkoutSession in sessions {
+      if s.day() >= weekStartDay && s.day() < weekStartDay + 7 {
+        vol = vol + s.totalVolume()
+      }
+    }
+    return vol
+  }
+
+  // ── Reporting ─────────────────────────────────────────────────────────────
+
+  def printProfile(): void {
+    IO::println("═══════════════════════════════════════")
+    IO::println("  FITNESS TRACKER — #{profile.name()}")
+    IO::println("═══════════════════════════════════════")
+    profile.print()
+    IO::println("")
+  }
+
+  def printWeekSummary(weekStartDay: Int): void {
+    IO::println("─── Week starting Day #{weekStartDay} ───────────────")
+    val vol = weeklyVolume(weekStartDay)
+    var count = 0
+    foreach s: WorkoutSession in sessions {
+      if s.day() >= weekStartDay && s.day() < weekStartDay + 7 { count++ }
+    }
+    IO::println("  Sessions: #{count} | Total volume: #{vol.round1()}kg")
+    foreach day: Int in weekStartDay..(weekStartDay + 6) {
+      val daySessions = sessionsByDay(day)
+      if daySessions.size > 0 {
+        IO::println("  [Day #{day}]")
+        foreach s: WorkoutSession in daySessions {
+          s.print(exercises)
+        }
+      }
+    }
+  }
+
+  def printMuscleGroupBreakdown(): void {
+    IO::println("─── Volume by Muscle Group ─────────────")
+    val groupVolume = new java.util.TreeMap[String, Double]()
+    foreach s: WorkoutSession in sessions {
+      foreach ws: WorkoutSet in s.sets() {
+        val ex = findExercise(ws.exerciseId())
+        if ex != null {
+          val key = ex.group().label()
+          val cur: Double = groupVolume.getOrDefault(key, 0.0) as Double
+          groupVolume.put(key, cur + ws.volume())
+        }
+      }
+    }
+    var maxVol = 0.1
+    foreach vol2: Double in groupVolume.values() {
+      if vol2 > maxVol { maxVol = vol2 }
+    }
+    foreach (group, vol) in groupVolume {
+      val bar = "".bar(vol.toInt(), maxVol.toInt(), 20)
+      IO::println("  #{group.padRight(12)} #{bar} #{vol.round1()}kg")
+    }
+  }
+
+  def printExerciseLeaderboard(): void {
+    IO::println("─── Exercise Leaderboard (best set vol) ─")
+    val rows = new ArrayList[String]()
+    foreach e: Exercise in exercises {
+      val best = bestSetForExercise(e.id())
+      if best != null {
+        rows.add("#{e.name().padRight(18)} #{best.weightKg()}kg x#{best.reps()} = #{best.volume()}kg")
+      }
+    }
+    var rank = 1
+    foreach row: String in rows {
+      IO::println("  #{rank}. #{row}")
+      rank++
+    }
+  }
+
+  def printGoals(): void {
+    IO::println("─── Goals ───────────────────────────────")
+    if goals.size == 0 {
+      IO::println("  No goals set yet.")
+      return
+    }
+    foreach g: Goal in goals { g.print() }
+  }
+
+  def printEvents(): void {
+    IO::println("─── Progress Events ──────────────────────")
+    if events.size == 0 {
+      IO::println("  No events recorded yet.")
+      return
+    }
+    foreach ev: ProgressEvent in events {
+      IO::println("  [Day #{ev.day()}] #{ev.summary()}")
+    }
+  }
+
+  def printFullReport(): void {
+    printProfile()
+    printWeekSummary(1)
+    printWeekSummary(8)
+    IO::println("")
+    printMuscleGroupBreakdown()
+    IO::println("")
+    printExerciseLeaderboard()
+    IO::println("")
+    printGoals()
+    IO::println("")
+    printEvents()
+    IO::println("")
+    IO::println("─── Overall Stats ───────────────────────")
+    IO::println("  Total sessions:      #{sessions.size}")
+    IO::println("  Avg session length:  #{averageSessionDuration().round1()} min")
+    IO::println("  Week 1 volume:       #{weeklyVolume(1).round1()}kg")
+    IO::println("  Week 2 volume:       #{weeklyVolume(8).round1()}kg")
+    val delta = weeklyVolume(8) - weeklyVolume(1)
+    val sign = if delta >= 0.0 { "+" } else { "" }
+    IO::println("  Volume trend:        #{sign}#{delta.round1()}kg")
+  }
+}
+
+// ─── Helper: build a set of WorkoutSets ───────────────────────────────────────
+
+def makeSet(exerciseId: Int, weightKg: Double, reps: Int): WorkoutSet =
+  new WorkoutSet(exerciseId, weightKg, reps, 0)
+
+def makeCardioSet(durationSec: Int): WorkoutSet =
+  new WorkoutSet(10, 0.0, 1, durationSec)
+
+// ─── Entry Point ──────────────────────────────────────────────────────────────
+
+val profile = new FitnessProfile("Alex", 178, 80.0, 30)
+val log = new WorkoutLog(profile)
+
+// Week 1 — Foundation
+val w1d1Sets = new ArrayList[WorkoutSet]()
+w1d1Sets.add(makeSet(1, 60.0, 8))   // Bench Press
+w1d1Sets.add(makeSet(1, 60.0, 8))
+w1d1Sets.add(makeSet(6, 12.5, 10))  // Dumbbell Curl
+w1d1Sets.add(makeSet(7, 0.0, 12))   // Tricep Dip
+log.addSession(1, "Upper Body A", Intensity::Moderate, w1d1Sets, 45)
+
+val w1d3Sets = new ArrayList[WorkoutSet]()
+w1d3Sets.add(makeSet(2, 80.0, 5))   // Squat
+w1d3Sets.add(makeSet(2, 80.0, 5))
+w1d3Sets.add(makeSet(3, 100.0, 5))  // Deadlift
+w1d3Sets.add(makeSet(8, 0.0, 60))   // Plank (reps=60s treated as 60 reps)
+log.addSession(3, "Lower Body A", Intensity::Hard, w1d3Sets, 55)
+
+val w1d5Sets = new ArrayList[WorkoutSet]()
+w1d5Sets.add(makeSet(4, 40.0, 8))   // OHP
+w1d5Sets.add(makeSet(4, 40.0, 8))
+w1d5Sets.add(makeSet(5, 0.0, 6))    // Pull-up
+w1d5Sets.add(makeSet(9, 8.0, 12))   // Lateral Raise
+log.addSession(5, "Push/Pull A", Intensity::Moderate, w1d5Sets, 50)
+
+val w1d7Sets = new ArrayList[WorkoutSet]()
+w1d7Sets.add(makeCardioSet(1800))    // 30-min run
+log.addSession(7, "Cardio", Intensity::Easy, w1d7Sets, 32)
+
+// Week 2 — Progression
+val w2d8Sets = new ArrayList[WorkoutSet]()
+w2d8Sets.add(makeSet(1, 65.0, 8))   // Bench Press (progressive overload)
+w2d8Sets.add(makeSet(1, 65.0, 8))
+w2d8Sets.add(makeSet(6, 15.0, 10))  // Curl up
+w2d8Sets.add(makeSet(7, 0.0, 15))
+log.addSession(8, "Upper Body B", Intensity::Moderate, w2d8Sets, 47)
+
+val w2d10Sets = new ArrayList[WorkoutSet]()
+w2d10Sets.add(makeSet(2, 85.0, 5))  // Squat progression
+w2d10Sets.add(makeSet(2, 85.0, 5))
+w2d10Sets.add(makeSet(3, 105.0, 5)) // Deadlift progression
+w2d10Sets.add(makeSet(8, 0.0, 75))
+log.addSession(10, "Lower Body B", Intensity::Hard, w2d10Sets, 58)
+
+val w2d12Sets = new ArrayList[WorkoutSet]()
+w2d12Sets.add(makeSet(4, 42.5, 8))
+w2d12Sets.add(makeSet(4, 42.5, 8))
+w2d12Sets.add(makeSet(5, 0.0, 8))   // +2 pull-ups PR
+w2d12Sets.add(makeSet(9, 10.0, 12)) // Lateral raise up
+log.addSession(12, "Push/Pull B", Intensity::Moderate, w2d12Sets, 52)
+
+val w2d14Sets = new ArrayList[WorkoutSet]()
+w2d14Sets.add(makeCardioSet(2100))   // 35-min run
+log.addSession(14, "Long Run", Intensity::Moderate, w2d14Sets, 37)
+
+// Goals
+log.addGoal(new StrengthGoal("Bench Press", 100.0), 1)
+log.addGoal(new StrengthGoal("Squat", 120.0), 1)
+log.addGoal(new StrengthGoal("Deadlift", 150.0), 1)
+log.addGoal(new FrequencyGoal(4), 1)
+log.addGoal(new EnduranceGoal("Running", 45), 1)
+
+// Manual milestone event
+log.addEvent(new Milestone("Started structured training program", 1))
+
+// Print the full report
+log.printFullReport()

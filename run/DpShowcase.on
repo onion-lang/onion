@@ -1,0 +1,341 @@
+// DpShowcase.on — Dynamic Programming algorithms showcased in one file.
+// Exercises: extension methods on Int/Long, records with methods, plain enums,
+// ADT-style enums, collection pipelines, select/pattern-match, nullable,
+// while/foreach with ranges, recursion, string interpolation.
+
+import {
+  java.util.*
+}
+
+// ---------------------------------------------------------------------------
+// Extension methods on primitive types
+// ---------------------------------------------------------------------------
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def maxWith(other: Int): Int {
+    if self > other { return self }
+    return other
+  }
+  def minWith(other: Int): Int {
+    if self < other { return self }
+    return other
+  }
+}
+
+extension Long {
+  def maxWith(other: Long): Long {
+    if self > other { return self }
+    return other
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Plain enum for algorithm families
+// ---------------------------------------------------------------------------
+
+enum AlgoKind { SEQUENCE, OPTIMISATION, NUMBER }
+
+// ---------------------------------------------------------------------------
+// Records for results
+// ---------------------------------------------------------------------------
+
+record DpResult(algo: String, kind: AlgoKind, input: String, answer: Long, steps: Int)
+
+// ---------------------------------------------------------------------------
+// Helper: format a result row
+// ---------------------------------------------------------------------------
+
+def formatResult(r: DpResult): String {
+  val kindName: String = select r.kind() {
+    case AlgoKind::SEQUENCE: "sequence"
+    case AlgoKind::OPTIMISATION: "optimisation"
+    case AlgoKind::NUMBER: "number"
+    else: "?"
+  }
+  return "  [#{kindName}] #{r.algo()}: input=#{r.input()}, answer=#{r.answer()}, steps=#{r.steps()}"
+}
+
+// ---------------------------------------------------------------------------
+// 1. Fibonacci — iterative DP, O(n) time O(1) space
+// ---------------------------------------------------------------------------
+
+class FibSolver {
+public:
+  def solve(n: Int): DpResult {
+    if n < 0 { return new DpResult("fibonacci", AlgoKind::NUMBER, "n=" + n, -1L, 0) }
+    if n == 0 { return new DpResult("fibonacci", AlgoKind::NUMBER, "n=0", 0L, 0) }
+    if n == 1 { return new DpResult("fibonacci", AlgoKind::NUMBER, "n=1", 1L, 1) }
+    var a: Long = 0L
+    var b: Long = 1L
+    var i: Int = 2
+    var steps: Int = 0
+    while i <= n {
+      val c: Long = a + b
+      a = b
+      b = c
+      i = i + 1
+      steps = steps + 1
+    }
+    return new DpResult("fibonacci", AlgoKind::NUMBER, "n=" + n, b, steps)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Coin change — minimum coins to make amount (BFS/DP table)
+// ---------------------------------------------------------------------------
+
+class CoinChangeSolver {
+public:
+  def solve(amount: Int, coins: List[Int]): DpResult {
+    // dp[i] = minimum coins to make amount i; -1 = impossible
+    val dp: Int[] = new Int[amount + 1]
+    var i: Int = 0
+    while i <= amount {
+      dp[i] = -1
+      i = i + 1
+    }
+    dp[0] = 0
+    var steps: Int = 0
+    i = 1
+    while i <= amount {
+      foreach coin: Int in coins {
+        if coin <= i {
+          val prev: Int = dp[i - coin]
+          if prev >= 0 {
+            val candidate: Int = prev + 1
+            if dp[i] < 0 || candidate < dp[i] {
+              dp[i] = candidate
+            }
+          }
+        }
+        steps = steps + 1
+      }
+      i = i + 1
+    }
+    val answer: Long = dp[amount]
+    return new DpResult(
+      "coin-change",
+      AlgoKind::OPTIMISATION,
+      "amount=" + amount,
+      answer,
+      steps
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. Longest Common Subsequence length
+// ---------------------------------------------------------------------------
+
+class LcsSolver {
+public:
+  def solve(a: String, b: String): DpResult {
+    val m: Int = a.length()
+    val n: Int = b.length()
+    // dp is a flat (m+1)*(n+1) array stored row-major
+    val dp: Int[] = new Int[(m + 1) * (n + 1)]
+    var i: Int = 0
+    while i <= m {
+      var j: Int = 0
+      while j <= n {
+        dp[i] = 0
+        j = j + 1
+      }
+      i = i + 1
+    }
+    var steps: Int = 0
+    i = 1
+    while i <= m {
+      var j: Int = 1
+      while j <= n {
+        val idx: Int = i * (n + 1) + j
+        if a.charAt(i - 1) == b.charAt(j - 1) {
+          dp[idx] = dp[(i - 1) * (n + 1) + (j - 1)] + 1
+        } else {
+          val up: Int = dp[(i - 1) * (n + 1) + j]
+          val left: Int = dp[i * (n + 1) + (j - 1)]
+          dp[idx] = up.maxWith(left)
+        }
+        steps = steps + 1
+        j = j + 1
+      }
+      i = i + 1
+    }
+    val lcsLen: Long = dp[m * (n + 1) + n]
+    return new DpResult(
+      "lcs",
+      AlgoKind::SEQUENCE,
+      "\"" + a + "\" vs \"" + b + "\"",
+      lcsLen,
+      steps
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. 0/1 Knapsack — maximum value within weight capacity
+// ---------------------------------------------------------------------------
+
+record Item(name: String, weight: Int, value: Int)
+
+class KnapsackSolver {
+public:
+  def solve(capacity: Int, items: List[Item]): DpResult {
+    val n: Int = items.size()
+    // dp[i][w] = max value using first i items with capacity w
+    // Stored flat as dp[i*(capacity+1)+w]
+    val dp: Int[] = new Int[(n + 1) * (capacity + 1)]
+    var steps: Int = 0
+    var i: Int = 1
+    while i <= n {
+      val item: Item = items.get(i - 1)
+      var w: Int = 0
+      while w <= capacity {
+        val noTake: Int = dp[(i - 1) * (capacity + 1) + w]
+        if item.weight() <= w {
+          val take: Int = dp[(i - 1) * (capacity + 1) + (w - item.weight())] + item.value()
+          dp[i * (capacity + 1) + w] = noTake.maxWith(take)
+        } else {
+          dp[i * (capacity + 1) + w] = noTake
+        }
+        steps = steps + 1
+        w = w + 1
+      }
+      i = i + 1
+    }
+    val best: Long = dp[n * (capacity + 1) + capacity]
+    return new DpResult(
+      "0/1-knapsack",
+      AlgoKind::OPTIMISATION,
+      "n=" + n + ",cap=" + capacity,
+      best,
+      steps
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main — run all solvers and print a report
+// ---------------------------------------------------------------------------
+
+def main(): void {
+  IO::println("=== Dynamic Programming Showcase ===")
+  IO::println("")
+
+  // --- Fibonacci ---
+  IO::println("-- Fibonacci numbers --")
+  val fib: FibSolver = new FibSolver()
+  foreach n: Int in [0, 1, 5, 10, 20, 40] {
+    IO::println(formatResult(fib.solve(n)))
+  }
+  IO::println("")
+
+  // --- Coin Change ---
+  IO::println("-- Coin Change (min coins) --")
+  val cc: CoinChangeSolver = new CoinChangeSolver()
+  val coins1: List[Int] = [1, 5, 10, 25]
+  foreach amount: Int in [0, 11, 30, 41, 100] {
+    IO::println(formatResult(cc.solve(amount, coins1)))
+  }
+  // Impossible case
+  val coins2: List[Int] = [3, 5]
+  IO::println(formatResult(cc.solve(7, coins2)))
+  IO::println("")
+
+  // --- LCS ---
+  IO::println("-- Longest Common Subsequence --")
+  val lcs: LcsSolver = new LcsSolver()
+  IO::println(formatResult(lcs.solve("ABCBDAB", "BDCABA")))
+  IO::println(formatResult(lcs.solve("AGGTAB", "GXTXAYB")))
+  IO::println(formatResult(lcs.solve("hello", "world")))
+  IO::println("")
+
+  // --- Knapsack ---
+  IO::println("-- 0/1 Knapsack --")
+  val knapsack: KnapsackSolver = new KnapsackSolver()
+  val items1: List[Item] = [
+    new Item("book",    2, 3),
+    new Item("laptop",  3, 4),
+    new Item("camera",  4, 5),
+    new Item("tablet",  5, 7),
+    new Item("watch",   1, 2)
+  ]
+  IO::println(formatResult(knapsack.solve(8, items1)))
+
+  val items2: List[Item] = [
+    new Item("gold",    10, 60),
+    new Item("silver",  20, 100),
+    new Item("bronze",  30, 120)
+  ]
+  IO::println(formatResult(knapsack.solve(50, items2)))
+  IO::println("")
+
+  // --- Extension method round-trip ---
+  IO::println("-- Extension Int/Long methods --")
+  val clamped: Int = 15.clamp(0, 10)
+  val biggest: Int = 7.maxWith(13)
+  IO::println("  15.clamp(0,10) = #{clamped}")
+  IO::println("  7.maxWith(13)  = #{biggest}")
+  val bigL: Long = 999L.maxWith(42L)
+  IO::println("  999L.maxWith(42L) = #{bigL}")
+  IO::println("")
+
+  // --- Collection pipeline summary ---
+  IO::println("-- Pipeline: collect all results and summarise --")
+  val allResults: List[DpResult] = [
+    fib.solve(10),
+    fib.solve(20),
+    cc.solve(11, coins1),
+    cc.solve(30, coins1),
+    lcs.solve("ABCBDAB", "BDCABA"),
+    lcs.solve("AGGTAB", "GXTXAYB"),
+    knapsack.solve(8, items1),
+    knapsack.solve(50, items2)
+  ]
+
+  // Filter: only results with answer > 10
+  val bigAnswers: List[DpResult] = allResults.filter { r -> r.answer() > 10L }
+  IO::println("  Results with answer > 10:")
+  foreach r: DpResult in bigAnswers {
+    IO::println("    #{r.algo()} #{r.input()} => #{r.answer()}")
+  }
+  IO::println("")
+
+  // Map: extract step counts
+  val stepCounts: List[Int] = allResults.map { r -> r.steps() }
+  IO::println("  Step counts: #{stepCounts}")
+
+  // Reduce: total steps across all runs
+  var totalSteps: Int = 0
+  foreach r: DpResult in allResults { totalSteps = totalSteps + r.steps() }
+  IO::println("  Total steps across all runs: #{totalSteps}")
+
+  // Filter + count: how many impossible coin-change results
+  val impossible: List[DpResult] = allResults.filter { r -> r.answer() < 0L }
+  IO::println("  Impossible results: #{impossible.size()}")
+  IO::println("")
+
+  // --- Nullable example: safe lookup in sorted Fibonacci values ---
+  IO::println("-- Nullable: first fib > threshold --")
+  val fibs: List[Long] = [0, 1, 5, 10, 20, 40].map { n -> fib.solve(n).answer() }
+  IO::println("  Fib sample: #{fibs}")
+  val threshold: Long = 100L
+  var found: Long? = null
+  foreach v: Long in fibs {
+    if found == null && v > threshold {
+      found = v
+    }
+  }
+  if found != null {
+    IO::println("  First fib sample > #{threshold}: #{found}")
+  } else {
+    IO::println("  No fib sample > #{threshold} in the list")
+  }
+  IO::println("")
+  IO::println("Done.")
+}

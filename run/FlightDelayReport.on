@@ -1,0 +1,296 @@
+// FlightDelayReport.on — Airline flight delay analysis and reporting.
+// Exercises: records, data-carrying ADT enum, classes with interface,
+// collection pipelines (groupBy/sortedBy/filter/map/fold/find/distinct),
+// extension Int/Double, foreach (k,v) on maps, nullable, string
+// interpolation, select/is patterns on ADT (including singleton cases).
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Flight(
+  id: String,
+  airline: String,
+  origin: String,
+  destination: String,
+  scheduledMin: Int,
+  actualMin: Int,
+  delayMin: Int
+)
+
+record AirlineStats(
+  name: String,
+  total: Int,
+  cancelled: Int,
+  onTime: Int,
+  minorDelay: Int,
+  majorDelay: Int,
+  avgDelay: Double,
+  maxDelay: Int
+)
+
+// ── ADT enum: delay severity ──────────────────────────────────────────────────
+
+enum DelayCategory {
+  case OnTime
+  case Minor(minutes: Int)
+  case Major(minutes: Int)
+  case Cancelled
+public:
+  def label(): String = select this {
+    case o is OnTime:    "ON TIME   "
+    case d is Minor:     "MINOR #{d.minutes()} min"
+    case d is Major:     "MAJOR #{d.minutes()} min"
+    case c is Cancelled: "CANCELLED "
+  }
+  def minutesLate(): Int = select this {
+    case o is OnTime:    0
+    case d is Minor:     d.minutes()
+    case d is Major:     d.minutes()
+    case c is Cancelled: 9999
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def printSummary(): void
+  def title(): String
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def toHHMM(): String {
+    if self < 0 { return "--:--" }
+    val h: Int = self / 60
+    val m: Int = self % 60
+    val hh: String = if h < 10 { "0" + h } else { "" + h }
+    val mm: String = if m < 10 { "0" + m } else { "" + m }
+    return hh + ":" + mm
+  }
+  def classify(): DelayCategory {
+    if self < 0   { return new Cancelled()  }
+    if self <= 5  { return new OnTime()     }
+    if self <= 30 { return new Minor(self)  }
+    return new Major(self)
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val scaled: Int = (self * 10.0) as Int
+    val whole: Int  = scaled / 10
+    val frac: Int   = scaled % 10
+    return "#{whole}.#{frac}"
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def padRight(s: String, n: Int): String {
+  var result: String = s
+  while result.length() < n { result = result + " " }
+  return result
+}
+
+def padLeft(s: String, n: Int): String {
+  var result: String = s
+  while result.length() < n { result = " " + result }
+  return result
+}
+
+def pct(n: Int, total: Int): String {
+  if total == 0 { return "0" }
+  return "" + ((n * 100) / total)
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+def loadFlights(): List[Flight] {
+  return [
+    new Flight("AA101", "AmericanAir",  "LAX", "JFK",  360,  365,   5),
+    new Flight("AA102", "AmericanAir",  "JFK", "ORD",  480,  525,  45),
+    new Flight("AA103", "AmericanAir",  "ORD", "MIA",  600,  612,  12),
+    new Flight("AA104", "AmericanAir",  "MIA", "LAX",  780,  782,   2),
+    new Flight("AA105", "AmericanAir",  "LAX", "SEA",  900,   -1,  -1),
+    new Flight("UA201", "UnitedAir",    "SFO", "JFK",  420,  440,  20),
+    new Flight("UA202", "UnitedAir",    "JFK", "LAX",  540,  595,  55),
+    new Flight("UA203", "UnitedAir",    "LAX", "ORD",  660,  663,   3),
+    new Flight("UA204", "UnitedAir",    "ORD", "DFW",  840,   -1,  -1),
+    new Flight("UA205", "UnitedAir",    "DFW", "SFO", 1020, 1028,   8),
+    new Flight("DL301", "DeltaAir",     "ATL", "JFK",  510,  515,   5),
+    new Flight("DL302", "DeltaAir",     "JFK", "LAX",  600,  690,  90),
+    new Flight("DL303", "DeltaAir",     "LAX", "SEA",  720,  730,  10),
+    new Flight("DL304", "DeltaAir",     "SEA", "ATL",  900,  925,  25),
+    new Flight("DL305", "DeltaAir",     "ATL", "MIA", 1080, 1084,   4),
+    new Flight("SW401", "SouthwestAir", "DAL", "DEN",  540,  585,  45),
+    new Flight("SW402", "SouthwestAir", "DEN", "PHX",  690,  695,   5),
+    new Flight("SW403", "SouthwestAir", "PHX", "LAS",  780,   -1,  -1),
+    new Flight("SW404", "SouthwestAir", "LAS", "DAL",  960,  975,  15),
+    new Flight("SW405", "SouthwestAir", "DAL", "SJC", 1140, 1260, 120)
+  ]
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+def buildStats(airline: String, group: List[Flight]): AirlineStats {
+  val cancelled: List[Flight] = group.filter { f: Flight -> f.delayMin() < 0 }
+  val active:    List[Flight] = group.filter { f: Flight -> f.delayMin() >= 0 }
+  val onTime:    List[Flight] = active.filter { f: Flight -> f.delayMin() <= 5 }
+  val minor:     List[Flight] = active.filter { f: Flight -> f.delayMin() > 5 && f.delayMin() <= 30 }
+  val major:     List[Flight] = active.filter { f: Flight -> f.delayMin() > 30 }
+  val sumDelay:  Int  = active.fold(0) { acc: Int, f: Flight -> acc + f.delayMin() }
+  val maxDelay:  Int  = active.fold(0) { acc: Int, f: Flight -> if f.delayMin() > acc { f.delayMin() } else { acc } }
+  val avg: Double = if active.size == 0 { 0.0 } else { (sumDelay as Double) / (active.size as Double) }
+  return new AirlineStats(airline, group.size, cancelled.size, onTime.size, minor.size, major.size, avg, maxDelay)
+}
+
+// ── Report class ──────────────────────────────────────────────────────────────
+
+class FlightReport conforms Reportable {
+  var flights: List[Flight]
+  var stats:   List[AirlineStats]
+
+public:
+  def this(flights: List[Flight]) {
+    self.flights = flights
+    val grouped = flights.groupBy { f: Flight -> f.airline() }
+    val statsList: List[AirlineStats] = []
+    foreach (airline, group) in grouped {
+      statsList.add(buildStats(airline as String, group as List[Flight]))
+    }
+    self.stats = statsList.sortedBy { s: AirlineStats -> s.name() }
+  }
+
+  def title(): String = "=== Flight Delay Report ==="
+
+  def printSummary(): void {
+    println(self.title())
+    println("Flights analysed: #{self.flights.size}")
+    val cancelled: List[Flight] = self.flights.filter { f: Flight -> f.delayMin() < 0 }
+    val active:    List[Flight] = self.flights.filter { f: Flight -> f.delayMin() >= 0 }
+    println("  Active: #{active.size}   Cancelled: #{cancelled.size}")
+    val totalDelay: Int = active.fold(0) { acc: Int, f: Flight -> acc + f.delayMin() }
+    val avg: Double = if active.size == 0 { 0.0 } else { (totalDelay as Double) / (active.size as Double) }
+    println("  Overall avg delay (active): #{avg.fmt1()} min")
+    val worst: Flight? = self.findWorstFlight()
+    if worst != null {
+      val w: Flight = worst
+      println("  Worst flight: #{w.id()} (#{w.airline()}) #{w.origin()}-#{w.destination()} +#{w.delayMin()} min")
+    }
+    println("")
+  }
+
+  def printAirlineTable(): void {
+    println("── Airline breakdown ──────────────────────────────────────────────────")
+    println("Airline           Total Cancl OnTime Minor Major AvgDly MaxDly")
+    println("──────────────────────────────────────────────────────────────────────")
+    foreach s: AirlineStats in self.stats {
+      val row: String = "#{padRight(s.name(),17)}#{padLeft(""+s.total(),5)} #{padLeft(""+s.cancelled(),5)} #{padLeft(""+s.onTime(),6)} #{padLeft(""+s.minorDelay(),5)} #{padLeft(""+s.majorDelay(),5)} #{padLeft(s.avgDelay().fmt1(),6)} #{padLeft(""+s.maxDelay(),6)}"
+      println(row)
+    }
+    println("")
+  }
+
+  def printFlightDetail(): void {
+    println("── Per-flight detail (by delay, descending) ──────────────────────────")
+    println("ID      Airline         Route       Sched  Actual  Category")
+    println("──────────────────────────────────────────────────────────────────────")
+    val sorted: List[Flight] = self.flights.sortedBy { f: Flight -> -f.delayMin() }
+    foreach f: Flight in sorted {
+      val cat: DelayCategory = f.delayMin().classify()
+      val route: String      = f.origin() + "-" + f.destination()
+      println("#{padRight(f.id(),7)} #{padRight(f.airline(),15)} #{padRight(route,11)} #{f.scheduledMin().toHHMM()}  #{f.actualMin().toHHMM()}  #{cat.label()}")
+    }
+    println("")
+  }
+
+  def printRouteAnalysis(): void {
+    println("── Top 5 most-delayed routes ──────────────────────────────────────────")
+    val delayed: List[Flight] = self.flights
+      .filter   { f: Flight -> f.delayMin() > 5 }
+      .sortedBy { f: Flight -> -f.delayMin() }
+    var rank: Int = 1
+    foreach f: Flight in delayed {
+      if rank > 5 { break }
+      println("  #{rank}. #{f.origin()}-#{f.destination()} (#{f.airline()}) +#{f.delayMin()} min")
+      rank = rank + 1
+    }
+    println("")
+  }
+
+  def printCategoryBreakdown(): void {
+    println("── Category summary ───────────────────────────────────────────────────")
+    var onTimeCnt: Int = 0; var minorCnt: Int = 0
+    var majorCnt: Int  = 0; var cancelCnt: Int = 0
+    val total: Int = self.flights.size
+    foreach f: Flight in self.flights {
+      select f.delayMin().classify() {
+        case o is OnTime:    onTimeCnt = onTimeCnt + 1
+        case d is Minor:     minorCnt  = minorCnt  + 1
+        case d is Major:     majorCnt  = majorCnt  + 1
+        case c is Cancelled: cancelCnt = cancelCnt + 1
+      }
+    }
+    println("  ON TIME:   #{padLeft(""+onTimeCnt, 2)} of #{total}  (#{pct(onTimeCnt, total)}%)")
+    println("  MINOR:     #{padLeft(""+minorCnt,  2)} of #{total}  (#{pct(minorCnt,  total)}%)")
+    println("  MAJOR:     #{padLeft(""+majorCnt,  2)} of #{total}  (#{pct(majorCnt,  total)}%)")
+    println("  CANCELLED: #{padLeft(""+cancelCnt, 2)} of #{total}  (#{pct(cancelCnt, total)}%)")
+    println("")
+  }
+
+  def printDistinctAirports(): void {
+    val airports: List[String] = []
+    foreach f: Flight in self.flights {
+      airports.add(f.origin())
+      airports.add(f.destination())
+    }
+    val unique: List[String] = airports.distinct().sortedBy { s: String -> s }
+    println("── Airports served (#{unique.size} distinct) ────────────────────────────────────")
+    var line: String = "  "
+    foreach ap: String in unique { line = line + ap + " " }
+    println(line)
+    println("")
+  }
+
+  def printRankings(): void {
+    println("── Airline rankings by average delay ──────────────────────────────────")
+    val sorted: List[AirlineStats] = self.stats.sortedBy { s: AirlineStats -> s.avgDelay() }
+    var rank: Int = 1
+    foreach s: AirlineStats in sorted {
+      val bar: String = self.buildBar(s.avgDelay())
+      println("  #{rank}. #{padRight(s.name(),15)}  avg=#{padLeft(s.avgDelay().fmt1(),6)} min  #{bar}")
+      rank = rank + 1
+    }
+    println("")
+  }
+
+private:
+  def findWorstFlight(): Flight? {
+    val active: List[Flight] = self.flights.filter { f: Flight -> f.delayMin() > 0 }
+    if active.size == 0 { return null }
+    val bySeverity: List[Flight] = active.sortedBy { f: Flight -> f.delayMin() }
+    return bySeverity.get(bySeverity.size - 1)
+  }
+
+  def buildBar(avg: Double): String {
+    val blocks: Int = (avg / 5.0) as Int
+    var bar: String = "["
+    var i: Int = 0
+    while i < blocks && i < 20 { bar = bar + "#"; i = i + 1 }
+    while i < 20               { bar = bar + "."; i = i + 1 }
+    return bar + "]"
+  }
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+val flights: List[Flight] = loadFlights()
+val report:  FlightReport = new FlightReport(flights)
+
+report.printSummary()
+report.printAirlineTable()
+report.printCategoryBreakdown()
+report.printDistinctAirports()
+report.printFlightDetail()
+report.printRouteAnalysis()
+report.printRankings()

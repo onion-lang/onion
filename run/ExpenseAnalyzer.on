@@ -1,0 +1,445 @@
+// ExpenseAnalyzer.on — personal expense tracking, category budgets, and
+// monthly reporting.
+//
+// Exercises: records, data-carrying and plain enums, classes with
+// interfaces, generics, collection pipelines (map/filter/fold/sortedBy/
+// sortedByDescending/groupBy/find/partition/take), select/pattern
+// matching on enum values, nullable types, closures, string interpolation,
+// extension methods on Double and String, foreach over ranges and Maps.
+
+import { java.util.ArrayList }
+
+// ── Category enum (data-carrying) ─────────────────────────────────────────────
+
+enum Category(label: String, budget: Double) {
+  FOOD("Food",          600.0),
+  TRANSPORT("Transport", 300.0),
+  HOUSING("Housing",   1500.0),
+  UTILITIES("Utilities", 200.0),
+  HEALTH("Health",      150.0),
+  ENTERTAINMENT("Entertainment", 200.0),
+  SAVINGS("Savings",    500.0),
+  OTHER("Other",        100.0)
+}
+
+// ── Transaction type ──────────────────────────────────────────────────────────
+
+enum TxnType { DEBIT, CREDIT }
+
+// ── Transaction record ────────────────────────────────────────────────────────
+
+record Transaction(month: Int, day: Int, description: String, amount: Double,
+                   category: Category, txnType: TxnType) {
+public:
+  def dateStr(): String = "#{month()}/#{day()}"
+  def sign(): Double = if txnType() == TxnType::DEBIT { -amount() } else { amount() }
+}
+
+// ── Category summary ──────────────────────────────────────────────────────────
+
+record CategorySummary(category: Category, spent: Double, count: Int)
+
+// ── Variance record ───────────────────────────────────────────────────────────
+
+record BudgetVariance(category: Category, budgeted: Double, spent: Double) {
+public:
+  def variance(): Double = budgeted() - spent()
+  def overBudget(): Boolean = spent() > budgeted()
+  def pct(): Double {
+    if budgeted() == 0.0 { return 0.0 }
+    return (spent() / budgeted()) * 100.0
+  }
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension Double {
+  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def fmt(): String = "#{(Math::round(self * 100.0) as Long) / 100.0}"
+  def bar(max: Double, width: Int): String {
+    if max <= 0.0 { return "" }
+    val filled: Int = Math::min((self / max * width as Double) as Int, width)
+    var s: String = ""
+    for var i: Int = 0; i < filled; i++ { s = s + "#" }
+    for var j: Int = filled; j < width; j++ { s = s + "." }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    if self.length() >= n { return self.substring(0, n) }
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    if self.length() >= n { return self.substring(self.length() - n) }
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── BudgetTracker class ───────────────────────────────────────────────────────
+
+class BudgetTracker {
+  val month_:        String
+  val income_:       Double
+  val transactions_: List[Transaction]
+
+public:
+  def this(month: String, income: Double) {
+    self.month_        = month
+    self.income_       = income
+    self.transactions_ = []
+  }
+
+  def add(txn: Transaction): void { transactions_.add(txn) }
+
+  def totalDebits(): Double =
+    transactions_.filter { t -> t.txnType() == TxnType::DEBIT }
+                 .fold(0.0) { acc, t -> acc + t.amount() }
+
+  def totalCredits(): Double =
+    transactions_.filter { t -> t.txnType() == TxnType::CREDIT }
+                 .fold(0.0) { acc, t -> acc + t.amount() }
+
+  def netFlow(): Double = income_ + totalCredits() - totalDebits()
+
+  def spentOn(cat: Category): Double =
+    transactions_.filter { t -> t.category() == cat && t.txnType() == TxnType::DEBIT }
+                 .fold(0.0) { acc, t -> acc + t.amount() }
+
+  def countFor(cat: Category): Int =
+    transactions_.filter { t -> t.category() == cat && t.txnType() == TxnType::DEBIT }.size
+
+  def summaries(): List[CategorySummary] {
+    val result: List[CategorySummary] = []
+    foreach cat: Category in Category::values() {
+      val sp = spentOn(cat)
+      if sp > 0.0 {
+        result.add(new CategorySummary(cat, sp, countFor(cat)))
+      }
+    }
+    return result
+  }
+
+  def variances(): List[BudgetVariance] {
+    val result: List[BudgetVariance] = []
+    foreach cat: Category in Category::values() {
+      result.add(new BudgetVariance(cat, cat.budget(), spentOn(cat)))
+    }
+    return result
+  }
+
+  def allTransactions(): List[Transaction] = transactions_
+
+  def topExpenses(n: Int): List[Transaction] =
+    transactions_.filter { t -> t.txnType() == TxnType::DEBIT }
+                 .sortedByDescending { t -> t.amount() }
+                 .take(n)
+
+  def largestCategory(): CategorySummary? {
+    val sums = summaries()
+    if sums.size == 0 { return null }
+    val best = sums.sortedByDescending { s -> s.spent() }
+    return best[0] as CategorySummary?
+  }
+
+  def savingsRate(): Double {
+    val totalIn = income_ + totalCredits()
+    if totalIn == 0.0 { return 0.0 }
+    return (netFlow() / totalIn) * 100.0
+  }
+}
+
+// ── Separator line helper ─────────────────────────────────────────────────────
+
+def line(ch: String, n: Int): String {
+  var s: String = ""
+  for var i: Int = 0; i < n; i++ { s = s + ch }
+  return s
+}
+
+// ── Report section: category breakdown ───────────────────────────────────────
+
+def printCategoryBreakdown(tracker: BudgetTracker): void {
+  val sums = tracker.summaries().sortedByDescending { s -> s.spent() }
+  val maxSpend = if sums.size == 0 { 1.0 } else { (sums[0] as CategorySummary).spent() }
+  println("")
+  println("  Category Breakdown")
+  println("  " + line("-", 54))
+  println("  " + "Category".padRight(16) + "Spent".padLeft(10) +
+          "  Budget".padLeft(9) + "  Txns".padLeft(6) + "  Progress")
+  println("  " + line("-", 54))
+  foreach s: CategorySummary in sums {
+    val cat  = s.category()
+    val bar  = s.spent().bar(maxSpend, 16)
+    println("  " + cat.label().padRight(16) +
+            ("$" + s.spent().fmt()).padLeft(10) +
+            ("$" + cat.budget().fmt()).padLeft(9) +
+            ("" + s.count()).padLeft(6) +
+            "  [" + bar + "]")
+  }
+}
+
+// ── Report section: budget variance ──────────────────────────────────────────
+
+def printVariances(tracker: BudgetTracker): void {
+  val vs = tracker.variances().filter { v ->
+    val bv = v as BudgetVariance
+    bv.budgeted() > 0.0 || bv.spent() > 0.0
+  }
+  println("")
+  println("  Budget vs Actual")
+  println("  " + line("-", 54))
+  println("  " + "Category".padRight(16) +
+          "Budgeted".padLeft(10) + "  Actual".padLeft(9) +
+          "  Variance".padLeft(11) + "  Status")
+  println("  " + line("-", 54))
+  foreach v: BudgetVariance in vs {
+    val status = if v.overBudget() { "OVER" } else { "ok  " }
+    val var_   = v.variance()
+    val varStr = (if var_ < 0.0 { "-$" + (0.0 - var_).round2() } else { "+$" + var_.round2() })
+    println("  " + v.category().label().padRight(16) +
+            ("$" + v.budgeted().fmt()).padLeft(10) +
+            ("$" + v.spent().fmt()).padLeft(9) +
+            varStr.padLeft(11) +
+            "  " + status)
+  }
+}
+
+// ── Report section: top expenses ─────────────────────────────────────────────
+
+def printTopExpenses(tracker: BudgetTracker, n: Int): void {
+  val top = tracker.topExpenses(n)
+  println("")
+  println("  Top #{n} Expenses")
+  println("  " + line("-", 54))
+  var rank: Int = 1
+  foreach t: Transaction in top {
+    println("  " + ("" + rank + ".").padRight(4) +
+            t.dateStr().padRight(7) +
+            t.description().padRight(25) +
+            ("$" + t.amount().fmt()).padLeft(10) +
+            "  " + t.category().label())
+    rank++
+  }
+}
+
+// ── Full monthly report ───────────────────────────────────────────────────────
+
+def printReport(tracker: BudgetTracker, monthLabel: String, income: Double): void {
+  println(line("=", 58))
+  println("  Monthly Budget Report: " + monthLabel)
+  println(line("=", 58))
+  println("")
+  println("  Income (salary + other):  $" + income.fmt())
+  println("  Total Expenses:           $" + tracker.totalDebits().fmt())
+  println("  Net Cash Flow:            $" + tracker.netFlow().fmt())
+  println("  Savings Rate:             " + tracker.savingsRate().round2() + "%")
+  val big = tracker.largestCategory()
+  if big != null {
+    println("  Largest Category:         " + (big as CategorySummary).category().label() +
+            " ($" + (big as CategorySummary).spent().fmt() + ")")
+  }
+  printCategoryBreakdown(tracker)
+  printVariances(tracker)
+  printTopExpenses(tracker, 8)
+  println("")
+  println(line("=", 58))
+}
+
+// ── Sample data factory ───────────────────────────────────────────────────────
+
+def sampleTracker(): BudgetTracker {
+  val t = new BudgetTracker("September 2026", 3800.0)
+
+  // Housing
+  t.add(new Transaction(9, 1,  "Rent",                   1400.0, Category::HOUSING,       TxnType::DEBIT))
+  t.add(new Transaction(9, 5,  "Renter's Insurance",       28.0, Category::HOUSING,       TxnType::DEBIT))
+
+  // Utilities
+  t.add(new Transaction(9, 3,  "Electric Bill",            82.0, Category::UTILITIES,     TxnType::DEBIT))
+  t.add(new Transaction(9, 8,  "Internet",                 60.0, Category::UTILITIES,     TxnType::DEBIT))
+  t.add(new Transaction(9, 12, "Water/Sewer",              45.0, Category::UTILITIES,     TxnType::DEBIT))
+
+  // Food
+  t.add(new Transaction(9, 2,  "Whole Foods",              94.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 6,  "Restaurant dinner",        58.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 9,  "Trader Joe's",             76.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 11, "Coffee shop",              18.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 14, "Lunch with colleague",     32.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 17, "Costco run",              142.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 22, "Sushi night",              65.0, Category::FOOD,          TxnType::DEBIT))
+  t.add(new Transaction(9, 28, "Farmers market",           38.0, Category::FOOD,          TxnType::DEBIT))
+
+  // Transport
+  t.add(new Transaction(9, 1,  "Monthly transit pass",     95.0, Category::TRANSPORT,     TxnType::DEBIT))
+  t.add(new Transaction(9, 7,  "Gas",                      52.0, Category::TRANSPORT,     TxnType::DEBIT))
+  t.add(new Transaction(9, 15, "Car insurance",            134.0, Category::TRANSPORT,    TxnType::DEBIT))
+  t.add(new Transaction(9, 20, "Rideshare",                24.0, Category::TRANSPORT,     TxnType::DEBIT))
+  t.add(new Transaction(9, 25, "Parking",                  15.0, Category::TRANSPORT,     TxnType::DEBIT))
+
+  // Health
+  t.add(new Transaction(9, 4,  "Gym membership",           45.0, Category::HEALTH,        TxnType::DEBIT))
+  t.add(new Transaction(9, 10, "Doctor copay",             30.0, Category::HEALTH,        TxnType::DEBIT))
+  t.add(new Transaction(9, 18, "Prescription",             22.0, Category::HEALTH,        TxnType::DEBIT))
+  t.add(new Transaction(9, 24, "Vitamins/supplements",     35.0, Category::HEALTH,        TxnType::DEBIT))
+
+  // Entertainment
+  t.add(new Transaction(9, 5,  "Streaming services",       28.0, Category::ENTERTAINMENT, TxnType::DEBIT))
+  t.add(new Transaction(9, 13, "Book purchase",            22.0, Category::ENTERTAINMENT, TxnType::DEBIT))
+  t.add(new Transaction(9, 16, "Movie tickets",            32.0, Category::ENTERTAINMENT, TxnType::DEBIT))
+  t.add(new Transaction(9, 21, "Concert tickets",          85.0, Category::ENTERTAINMENT, TxnType::DEBIT))
+  t.add(new Transaction(9, 27, "Video game",               40.0, Category::ENTERTAINMENT, TxnType::DEBIT))
+
+  // Savings (transfer)
+  t.add(new Transaction(9, 1,  "Emergency fund xfer",     300.0, Category::SAVINGS,       TxnType::DEBIT))
+  t.add(new Transaction(9, 1,  "401k contribution",       200.0, Category::SAVINGS,       TxnType::DEBIT))
+
+  // Other
+  t.add(new Transaction(9, 8,  "Haircut",                  25.0, Category::OTHER,         TxnType::DEBIT))
+  t.add(new Transaction(9, 19, "Clothing",                 89.0, Category::OTHER,         TxnType::DEBIT))
+  t.add(new Transaction(9, 26, "Household supplies",       47.0, Category::OTHER,         TxnType::DEBIT))
+
+  // Credits
+  t.add(new Transaction(9, 10, "Freelance payment",       450.0, Category::OTHER,         TxnType::CREDIT))
+  t.add(new Transaction(9, 15, "Birthday gift received",   75.0, Category::OTHER,         TxnType::CREDIT))
+
+  return t
+}
+
+// ── Trend analysis over multiple months ──────────────────────────────────────
+
+record MonthSnapshot(label: String, totalSpent: Double, savingsRate: Double,
+                     topCategory: String)
+
+def buildTrendData(): List[MonthSnapshot] {
+  val data: List[MonthSnapshot] = []
+  data.add(new MonthSnapshot("June",      3210.0, 12.5, "Housing"))
+  data.add(new MonthSnapshot("July",      3450.0,  9.2, "Food"))
+  data.add(new MonthSnapshot("August",    2980.0, 18.7, "Housing"))
+  data.add(new MonthSnapshot("September", 3043.0, 20.1, "Housing"))
+  return data
+}
+
+def printTrendAnalysis(snapshots: List[MonthSnapshot]): void {
+  println("")
+  println(line("=", 58))
+  println("  4-Month Spending Trend")
+  println(line("=", 58))
+  println("")
+
+  // Compute max spend with a loop (avoids fold-return-type ambiguity)
+  var maxSpend: Double = 0.0
+  var si: Int = 0
+  while si < snapshots.size {
+    val sn = snapshots[si] as MonthSnapshot
+    if sn.totalSpent() > maxSpend { maxSpend = sn.totalSpent() }
+    si++
+  }
+
+  println("  " + "Month".padRight(12) + "Spent".padLeft(10) +
+          "  Savings%".padLeft(10) + "  Top Category   Progress")
+  println("  " + line("-", 60))
+  foreach s: MonthSnapshot in snapshots {
+    val bar = s.totalSpent().bar(maxSpend, 14)
+    println("  " + s.label().padRight(12) +
+            ("$" + s.totalSpent().fmt()).padLeft(10) +
+            (s.savingsRate().round2() + "%").padLeft(10) +
+            "  " + s.topCategory().padRight(12) + "  [" + bar + "]")
+  }
+
+  // Compute averages with a loop
+  var sumSpend: Double = 0.0
+  var sumSav:   Double = 0.0
+  var ti: Int = 0
+  while ti < snapshots.size {
+    val sn = snapshots[ti] as MonthSnapshot
+    sumSpend = sumSpend + sn.totalSpent()
+    sumSav   = sumSav   + sn.savingsRate()
+    ti++
+  }
+  val avgSpend: Double = sumSpend / (snapshots.size as Double)
+  val avgSav:   Double = sumSav   / (snapshots.size as Double)
+  println("  " + line("-", 60))
+  println("  " + "Average".padRight(12) +
+          ("$" + avgSpend.round2().fmt()).padLeft(10) +
+          (avgSav.round2() + "%").padLeft(10))
+  println("")
+
+  // Split months into above/below average spend (partition returns List[List])
+  val parts = snapshots.partition { s -> (s as MonthSnapshot).totalSpent() > avgSpend }
+  val highMonths = parts[0] as List[Object]
+  val lowMonths  = parts[1] as List[Object]
+  println("  Above-average-spend months: " + highMonths.size)
+  println("  Below-average-spend months: " + lowMonths.size)
+}
+
+// ── Category pipeline examples ────────────────────────────────────────────────
+
+def printPipelineExamples(tracker: BudgetTracker): void {
+  val debits = tracker.allTransactions().filter { t -> t.txnType() == TxnType::DEBIT }
+
+  // Group by category label
+  val byCat = debits.groupBy { t -> (t as Transaction).category().label() }
+  println("")
+  println(line("=", 58))
+  println("  Pipeline Demos")
+  println(line("=", 58))
+  println("")
+  println("  Transactions per category:")
+  foreach (cat, txns) in byCat {
+    val total: Double = (txns as List[Transaction]).fold(0.0) { acc, t ->
+      acc + t.amount()
+    }
+    println("    " + (cat as String).padRight(18) +
+            ("" + (txns as List[Transaction]).size).padLeft(4) + " txns" +
+            "  $" + total.round2().fmt())
+  }
+
+  // Find most expensive non-housing transaction
+  val nonHousing = debits.filter { t ->
+    (t as Transaction).category() != Category::HOUSING &&
+    (t as Transaction).category() != Category::SAVINGS
+  }
+  val priciest = nonHousing.sortedByDescending { t -> (t as Transaction).amount() }
+  if priciest.size > 0 {
+    val top = priciest[0] as Transaction
+    println("")
+    println("  Most expensive non-fixed cost: " + top.description() +
+            " $" + top.amount().fmt() + " (" + top.category().label() + ")")
+  }
+
+  // Map: produce description snippets for entertainment spending
+  val entDesc: List[String] = debits
+    .filter { t -> (t as Transaction).category() == Category::ENTERTAINMENT }
+    .map { t -> "• " + (t as Transaction).description() +
+                " ($" + (t as Transaction).amount().fmt() + ")" }
+  println("")
+  println("  Entertainment breakdown:")
+  foreach s: String in entDesc {
+    println("    " + s)
+  }
+
+  // Fold: running total day by day (first 10 transactions)
+  val first10 = debits.sortedBy { t -> (t as Transaction).day() }.take(10)
+  println("")
+  println("  Running total (first 10 debits by date):")
+  var running: Double = 0.0
+  foreach t: Transaction in first10 {
+    running = running + t.amount()
+    println("    " + t.dateStr().padRight(6) + t.description().padRight(28) +
+            ("$" + t.amount().fmt()).padLeft(8) +
+            "  cumulative: $" + running.round2().fmt())
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val tracker = sampleTracker()
+printReport(tracker, "September 2026", 3800.0)
+printTrendAnalysis(buildTrendData())
+printPipelineExamples(tracker)

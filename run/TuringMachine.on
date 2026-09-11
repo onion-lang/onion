@@ -1,0 +1,370 @@
+// TuringMachine.on — Turing Machine simulator (~320 lines)
+//
+// Exercises: ADT case-enum with methods; records with from re"..." and example
+// clauses; extension methods on Int/String; collection pipelines (map/filter/
+// fold/find/any/groupBy/sortedBy); foreach, while, ranges; try-with-resources
+// (StringReader/BufferedReader); string interpolation; nullable types;
+// try/catch; the |> pipeline operator.
+//
+// Three TMs simulated end-to-end:
+//   1. Unary addition: "111+11" → five 1s
+//   2. Binary increment: "1011" → "1100"
+//   3. Palindrome over {a,b}: "abba" → ACCEPTED; "abab" → REJECTED
+
+import {
+  java.io.StringReader
+  java.io.BufferedReader
+}
+
+// ── Tape symbol ADT ────────────────────────────────────────────────────────────
+enum Sym {
+  case Blank
+  case Ch(c: String)
+public:
+  def show(): String = select this { case b is Blank: "_"; case c is Ch: c.c() }
+  def matches(s: String): Boolean = select this {
+    case b is Blank: s == "_"
+    case c is Ch:    c.c() == s
+  }
+}
+
+// ── Transition record: parseable from "state,sym->state,sym,dir" ──────────────
+// Anchored pattern: state names are alphanumeric; read/write can be any single
+// non-comma, non-dash character or "_"; direction is L or R.
+record Transition(from: String, read: String, to: String, write: String, dir: String)
+  from re"([A-Za-z0-9]+),([^,-]+|_)->([A-Za-z0-9]+),([^,]+),([LR])"
+  example {
+    val t = Transition::parse("q0,1->q1,0,L")
+    t != null && t.from() == "q0" && t.read() == "1" && t.to() == "q1"
+  }
+  example {
+    val t = Transition::parse("start,_->accept,_,R")
+    t != null && t.dir() == "R" && t.write() == "_"
+  }
+
+// ── Execution outcome ADT ─────────────────────────────────────────────────────
+enum RunResult {
+  case Accepted(steps: Int)
+  case Rejected(steps: Int)
+  case StepLimit(steps: Int)
+public:
+  def label(): String = select this {
+    case a is Accepted:  "ACCEPTED "
+    case r is Rejected:  "REJECTED "
+    case s is StepLimit: "STEP-LIM "
+  }
+  def steps(): Int = select this {
+    case a is Accepted:  a.steps()
+    case r is Rejected:  r.steps()
+    case s is StepLimit: s.steps()
+  }
+  def accepted(): Boolean = select this { case a is Accepted: true; else: false }
+}
+
+// ── Infinite Tape: backed by a List with a left-extension counter ─────────────
+class Tape {
+  var cells: List[Sym]
+  var head:  Int
+  var left:  Int    // how many blanks were prepended; actual index = head + left
+
+public:
+  def this { cells = []; head = 0; left = 0 }
+
+  def load(input: String): void {
+    cells = []; head = 0; left = 0
+    var i: Int = 0
+    while i < input.length() {
+      cells.add(new Ch(input.substring(i, i + 1)))
+      i++
+    }
+  }
+
+  def symAt(pos: Int): Sym {
+    val idx: Int = pos + left
+    if idx < 0 || idx >= cells.size { return new Blank() }
+    return cells[idx] as Sym
+  }
+
+  def writeAt(pos: Int, sym: Sym): void {
+    var idx: Int = pos + left
+    while idx < 0 { cells.add(0, new Blank()); left++; idx++ }
+    while idx >= cells.size { cells.add(new Blank()) }
+    cells[idx] = sym
+  }
+
+  def read():               Sym  = symAt(head)
+  def writeHead(sym: Sym): void { writeAt(head, sym) }
+  def moveR():             void { head++ }
+  def moveL():             void { head-- }
+
+  def show(): String {
+    val lo: Int = if head < 0 - left { head } else { 0 - left }
+    val hi: Int = if head >= cells.size - left { head } else { cells.size - left - 1 }
+    var sb: String = ""
+    var p: Int = lo
+    while p <= hi {
+      val sym = symAt(p)
+      if p == head { sb = sb + "[" + sym.show() + "]" }
+      else         { sb = sb + sym.show()              }
+      p++
+    }
+    return sb
+  }
+}
+
+// ── Turing Machine ─────────────────────────────────────────────────────────────
+class TM {
+  val name:    String
+  val accepts: List[String]
+  val rejects: List[String]
+  val rules:   List[Transition]
+
+public:
+  def this(name: String, accepts: List[String], rejects: List[String],
+           rules: List[Transition]) {
+    this.name    = name
+    this.accepts = accepts
+    this.rejects = rejects
+    this.rules   = rules
+  }
+
+  def run(input: String, maxSteps: Int): RunResult {
+    val tape  = new Tape()
+    tape.load(input)
+    var state: String = "q0"
+    var steps: Int    = 0
+
+    while steps < maxSteps {
+      if accepts.any { s -> (s as String) == state } { return new Accepted(steps) }
+      if rejects.any { s -> (s as String) == state } { return new Rejected(steps) }
+
+      val sym    = tape.read()
+      val symStr = sym.show()
+      val found: Transition? = rules.find { t ->
+        val tr = t as Transition
+        tr.from() == state && tr.read() == symStr
+      } as Transition?
+
+      if found == null { return new Rejected(steps) }
+
+      val tr: Transition = found
+      val newSym: Sym = if tr.write() == "_" { new Blank() } else { new Ch(tr.write()) }
+      tape.writeHead(newSym)
+      state = tr.to()
+      if tr.dir() == "R" { tape.moveR() } else { tape.moveL() }
+      steps++
+    }
+    return new StepLimit(steps)
+  }
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+extension Int {
+  def pad3(): String {
+    val s: String = "" + self
+    if s.length() >= 3 { return s }
+    if s.length() == 2 { return " " + s }
+    return "  " + s
+  }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ── TM builders using parseAll (each rule is one text line) ───────────────────
+
+// Unary addition: "111+11" → five 1s on tape
+// Replace + with 1, then delete one 1 from the right end
+def buildUnaryAdder(): TM {
+  val text =
+    "q0,1->q0,1,R\n" +      // skip 1s to find +
+    "q0,+->q1,1,R\n" +      // replace + with 1; scan right for end
+    "q1,1->q1,1,R\n" +      // skip remaining 1s
+    "q1,_->q2,_,L\n" +      // back from right end
+    "q2,1->qa,_,R\n"        // erase last 1; accept
+  return new TM("UnaryAdder", ["qa"], ["qr"], Transition::parseAll(text))
+}
+
+// Binary increment: moves rightward then propagates carry leftward
+def buildBinaryIncr(): TM {
+  val text =
+    "q0,0->q0,0,R\n" +      // scan right to end
+    "q0,1->q0,1,R\n" +
+    "q0,_->q1,_,L\n" +      // at end, go left
+    "q1,1->q1,0,L\n" +      // flip 1→0, carry left
+    "q1,0->qa,1,L\n" +      // flip 0→1, done
+    "q1,_->qa,1,L\n"        // overflow: write leading 1
+  return new TM("BinaryIncr", ["qa"], ["qr"], Transition::parseAll(text))
+}
+
+// Palindrome over {a,b}: marks outer pairs until all chars are marked (accept)
+// or a mismatch is found (reject).
+// x = marked-a, y = marked-b
+def buildPalindrome(): TM {
+  val text =
+    // q0: scan right over markers; accept if blank (all done); mark first real char
+    "q0,_->qa,_,R\n" +
+    "q0,x->q0,x,R\n" +
+    "q0,y->q0,y,R\n" +
+    "q0,a->sa,x,R\n" +
+    "q0,b->sb,y,R\n" +
+
+    // sa: scan right to find the rightmost real char (need to match 'a')
+    "sa,a->sa,a,R\n" +
+    "sa,b->sa,b,R\n" +
+    "sa,x->sa,x,R\n" +
+    "sa,y->sa,y,R\n" +
+    "sa,_->sa2,_,L\n" +     // hit right end: step back
+
+    // sa2: scan left past right-side markers to find last real char
+    "sa2,x->sa2,x,L\n" +
+    "sa2,y->sa2,y,L\n" +
+    "sa2,a->bk,x,L\n" +     // match: mark, return left
+    "sa2,b->qr,b,L\n" +     // mismatch: reject
+    "sa2,_->qa,_,R\n" +     // all marked (odd center): accept
+
+    // sb: scan right to find the rightmost real char (need to match 'b')
+    "sb,a->sb,a,R\n" +
+    "sb,b->sb,b,R\n" +
+    "sb,x->sb,x,R\n" +
+    "sb,y->sb,y,R\n" +
+    "sb,_->sb2,_,L\n" +
+
+    // sb2: scan left past right-side markers
+    "sb2,x->sb2,x,L\n" +
+    "sb2,y->sb2,y,L\n" +
+    "sb2,b->bk,y,L\n" +     // match
+    "sb2,a->qr,a,L\n" +     // mismatch
+    "sb2,_->qa,_,R\n" +     // all marked: accept
+
+    // bk: return to leftmost position to restart
+    "bk,a->bk,a,L\n" +
+    "bk,b->bk,b,L\n" +
+    "bk,x->bk,x,L\n" +
+    "bk,y->bk,y,L\n" +
+    "bk,_->q0,_,R\n"        // restart from left
+  return new TM("Palindrome", ["qa"], ["qr"], Transition::parseAll(text))
+}
+
+// ── Load transitions from a text source using try-with-resources ──────────────
+def loadFromText(tableText: String): List[Transition] {
+  val result: List[Transition] = []
+  try (val br = new BufferedReader(new StringReader(tableText))) {
+    var line: String? = br.readLine()
+    while line != null {
+      val trimmed = (line as String).trim()
+      if trimmed.length() > 0 && !trimmed.startsWith("//") {
+        val t: Transition? = Transition::parse(trimmed)
+        if t != null { result.add(t) }
+      }
+      line = br.readLine()
+    }
+  }
+  return result
+}
+
+// ── Batch-run record for statistics ──────────────────────────────────────────
+record RunRecord(tmName: String, input: String, accepted: Boolean, steps: Int)
+  example { new RunRecord("T", "abc", true, 5).steps() == 5 }
+  example { !new RunRecord("T", "ab", false, 3).accepted() }
+
+def runAndPrint(tm: TM, input: String): void {
+  val r   = tm.run(input, 1000)
+  val inp = ("\"" + input + "\"").rpad(10)
+  IO::println("  #{inp} → #{r.label()} (#{r.steps().pad3()} steps)")
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("=== Turing Machine Simulator ===")
+
+  // 1. Unary addition
+  IO::println("\n── Unary Addition ──────────────────────────────────────")
+  val adder = buildUnaryAdder()
+  runAndPrint(adder, "111+11")   // 3+2=5 ones
+  runAndPrint(adder, "1+1111")   // 1+4=5 ones
+  runAndPrint(adder, "1+1")      // 1+1=2 ones
+
+  // 2. Binary increment
+  IO::println("\n── Binary Increment ────────────────────────────────────")
+  val incr = buildBinaryIncr()
+  runAndPrint(incr, "1011")      // 11 → 12
+  runAndPrint(incr, "0111")      // 7  → 8
+  runAndPrint(incr, "1111")      // 15 → 16
+  runAndPrint(incr, "0000")      // 0  → 1
+
+  // 3. Palindrome checker
+  IO::println("\n── Palindrome over {a,b} ───────────────────────────────")
+  val pal = buildPalindrome()
+  runAndPrint(pal, "abba")       // ACCEPTED
+  runAndPrint(pal, "aba")        // ACCEPTED
+  runAndPrint(pal, "a")          // ACCEPTED
+  runAndPrint(pal, "aabbaa")     // ACCEPTED
+  runAndPrint(pal, "abab")       // REJECTED
+  runAndPrint(pal, "ab")         // REJECTED
+  runAndPrint(pal, "ba")         // REJECTED
+
+  // 4. Load transitions from text using try-with-resources
+  IO::println("\n── Loaded-from-text (try-with-resources) ───────────────")
+  val tableText =
+    "// Identity TM: copies input unchanged, then accepts\n" +
+    "q0,a->q0,a,R\n" +
+    "q0,b->q0,b,R\n" +
+    "q0,_->qa,_,L\n"
+  val loaded = loadFromText(tableText)
+  IO::println("  Parsed #{loaded.size} transitions from embedded text")
+  val idTm = new TM("Identity", ["qa"], ["qr"], loaded)
+  runAndPrint(idTm, "abba")
+  runAndPrint(idTm, "ab")
+
+  // 5. Batch statistics using collection pipelines
+  IO::println("\n── Batch Statistics ─────────────────────────────────────")
+  val palInputs = ["abba", "aba", "abab", "aabbaa", "ab", "a", "ba"]
+  val records: List[RunRecord] = palInputs.map { inp ->
+    val res = pal.run(inp as String, 1000)
+    new RunRecord("Palindrome", inp as String, res.accepted(), res.steps())
+  }
+
+  val acceptedCount = records.filter { r -> (r as RunRecord).accepted() }.size
+  val rejectedCount = records.size - acceptedCount
+  val totalSteps    = records.fold(0) { acc, r -> (acc as Int) + (r as RunRecord).steps() }
+  val avgSteps      = totalSteps / records.size
+
+  IO::println("  Inputs:   #{records.size}")
+  IO::println("  Accepted: #{acceptedCount}")
+  IO::println("  Rejected: #{rejectedCount}")
+  IO::println("  Total steps: #{totalSteps}")
+  IO::println("  Avg steps:   #{avgSteps}")
+
+  // Group by outcome and show step counts per group
+  val byOutcome = records.groupBy { r ->
+    if (r as RunRecord).accepted() { "ACCEPTED" } else { "REJECTED" }
+  }
+  foreach (outcome, group) in byOutcome {
+    val grp = group as List
+    val maxSteps = grp.fold(0) { acc, r -> {
+      val s = (r as RunRecord).steps()
+      val a = acc as Int
+      if s > a { s } else { a }
+    }}
+    IO::println("  #{outcome}: #{grp.size} case(s), max #{maxSteps} steps")
+  }
+
+  // Show step-sorted summary using |> pipeline
+  val sorted = records.sortedBy { r -> (r as RunRecord).steps() }
+  IO::println("\n  Steps sorted: " + sorted.map { r ->
+    val rec = r as RunRecord
+    rec.input() + "=" + rec.steps()
+  }.fold("") { acc, s ->
+    val a = acc as String
+    val item = s as String
+    if a.length() == 0 { item } else { a + ", " + item }
+  })
+
+  IO::println("\nDone.")
+}

@@ -1,0 +1,293 @@
+// SemanticVersion.on — SemVer 2.0.0 parsing, comparison, and range checks.
+// Exercises: records with methods, ADT enums, interfaces, select/pattern-matching,
+// collection pipelines (map/filter/sortedBy/partition/groupBy/find), closures,
+// nullable types, string interpolation, try/catch, recursion, foreach+while.
+
+import {
+  java.lang.Integer as JInt;
+  java.lang.NumberFormatException;
+}
+
+// ── Pre-release segment: numerics sort before alpha strings ──────────────────
+enum PreSeg {
+  case Num(num: Int)
+  case Str(str: String)
+}
+
+def parseSeg(raw: String): PreSeg {
+  try { return new Num(JInt::parseInt(raw)) }
+  catch e: NumberFormatException { return new Str(raw) }
+}
+
+def cmpSeg(a: PreSeg, b: PreSeg): Int {
+  select a {
+    case an is Num:
+      select b {
+        case bn is Num: return an.num() - bn.num()
+        else: return -1
+      }
+    case as2 is Str:
+      select b {
+        case x is Num: return 1
+        case bs is Str: return as2.str().compareTo(bs.str())
+        else: return 0
+      }
+    else: return 0
+  }
+}
+
+// Compare pre-release strings; "" means stable (greater than any pre-release).
+def comparePre(pa: String, pb: String): Int {
+  if pa == "" && pb == "" { return 0 }
+  if pa == "" { return 1 }
+  if pb == "" { return -1 }
+  val aParts: List[String] = Strings::split(pa, ".")
+  val bParts: List[String] = Strings::split(pb, ".")
+  val minLen = if aParts.size < bParts.size { aParts.size } else { bParts.size }
+  var i: Int = 0
+  while i < minLen {
+    val c = cmpSeg(parseSeg(aParts[i]), parseSeg(bParts[i]))
+    if c != 0 { return c }
+    i = i + 1
+  }
+  return aParts.size - bParts.size
+}
+
+// ── Core version record ────────────────────────────────────────────────────────
+record SemVer(major: Int, minor: Int, patch: Int, pre: String, build: String) {
+public:
+  static def stable(maj: Int, min: Int, pat: Int): SemVer =
+    new SemVer(maj, min, pat, "", "")
+
+  static def parse(s: String): SemVer? {
+    try {
+      var core: String = s
+      var bld: String = ""
+      val plusIdx = s.indexOf('+')
+      if plusIdx >= 0 {
+        core = s.substring(0, plusIdx)
+        bld  = s.substring(plusIdx + 1)
+      }
+      var vpart: String = core
+      var preR: String = ""
+      val dashIdx = core.indexOf('-')
+      if dashIdx >= 0 {
+        vpart = core.substring(0, dashIdx)
+        preR  = core.substring(dashIdx + 1)
+      }
+      val parts: List[String] = Strings::split(vpart, ".")
+      if parts.size != 3 { return null }
+      val maj = JInt::parseInt(parts[0])
+      val min = JInt::parseInt(parts[1])
+      val pat = JInt::parseInt(parts[2])
+      if maj < 0 || min < 0 || pat < 0 { return null }
+      return new SemVer(maj, min, pat, preR, bld)
+    } catch e: Exception {
+      return null
+    }
+  }
+
+  def compareTo(other: SemVer): Int {
+    var c = major() - other.major()
+    if c != 0 { return c }
+    c = minor() - other.minor()
+    if c != 0 { return c }
+    c = patch() - other.patch()
+    if c != 0 { return c }
+    return comparePre(pre(), other.pre())
+  }
+
+  def isStable(): Boolean = pre() == ""
+
+  def label(): String {
+    var s: String = "#{major()}.#{minor()}.#{patch()}"
+    if pre() != "" { s = s + "-" + pre() }
+    if build() != "" { s = s + "+" + build() }
+    return s
+  }
+}
+
+// ── Range constraints ─────────────────────────────────────────────────────────
+interface VersionConstraint {
+  def matches(v: SemVer): Boolean
+  def describe(): String
+}
+
+class GteConstraint conforms VersionConstraint {
+  val floor: SemVer
+public:
+  def this(v: SemVer) { this.floor = v }
+  def matches(v: SemVer): Boolean = v.compareTo(floor) >= 0
+  def describe(): String = ">=" + floor.label()
+}
+
+class LtConstraint conforms VersionConstraint {
+  val ceiling: SemVer
+public:
+  def this(v: SemVer) { this.ceiling = v }
+  def matches(v: SemVer): Boolean = v.compareTo(ceiling) < 0
+  def describe(): String = "<" + ceiling.label()
+}
+
+class EqConstraint conforms VersionConstraint {
+  val target: SemVer
+public:
+  def this(v: SemVer) { this.target = v }
+  def matches(v: SemVer): Boolean = v.compareTo(target) == 0
+  def describe(): String = "==" + target.label()
+}
+
+// AND of multiple constraints — all must match
+class AndConstraint conforms VersionConstraint {
+  val parts: List[VersionConstraint]
+public:
+  def this(cs: List[VersionConstraint]) { this.parts = cs }
+  def matches(v: SemVer): Boolean =
+    parts.find { c -> !(c as VersionConstraint).matches(v) } == null
+  def describe(): String =
+    parts.map { c -> (c as VersionConstraint).describe() }
+         .fold("") { acc, s -> if (acc as String) == "" { s as String } else { (acc as String) + " && " + (s as String) } } as String
+}
+
+// Parse a simple range: ">=1.2.0 <2.0.0", "==1.5.0", ">=1.0.0"
+def parseRange(expr: String): VersionConstraint? {
+  val tokens: List[String] = Strings::splitRegex(expr.trim(), "\\s+")
+  val built: List[VersionConstraint] = [] as List[VersionConstraint]
+  foreach tok: String in tokens {
+    val c: VersionConstraint? =
+      if tok.startsWith(">=") {
+        val v = SemVer::parse(tok.substring(2))
+        if v != null { new GteConstraint(v as SemVer) } else { null }
+      } else if tok.startsWith("<") {
+        val v = SemVer::parse(tok.substring(1))
+        if v != null { new LtConstraint(v as SemVer) } else { null }
+      } else if tok.startsWith("==") {
+        val v = SemVer::parse(tok.substring(2))
+        if v != null { new EqConstraint(v as SemVer) } else { null }
+      } else {
+        null
+      }
+    if c != null { built.add(c as VersionConstraint) }
+  }
+  if built.size == 0 { return null }
+  if built.size == 1 { return built[0] }
+  return new AndConstraint(built)
+}
+
+// Sort a list of SemVer values using insertion sort on compareTo.
+def sortVersions(vs: List[SemVer]): List[SemVer] {
+  val arr: List[SemVer] = [] as List[SemVer]
+  foreach v: SemVer in vs { arr.add(v) }
+  val n = arr.size
+  foreach i: Int in 1..<n {
+    val key: SemVer = arr[i] as SemVer
+    var j: Int = i - 1
+    while j >= 0 && (arr[j] as SemVer).compareTo(key) > 0 {
+      arr[j + 1] = arr[j]
+      j = j - 1
+    }
+    arr[j + 1] = key
+  }
+  return arr
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+// A version catalog with realistic release history
+val rawVersions = [
+  "0.9.0", "1.0.0-beta.1", "1.0.0-beta.2", "1.0.0",
+  "1.1.0", "1.2.0", "1.2.1", "2.0.0-alpha.1", "2.0.0-alpha.2",
+  "2.0.0-rc.1", "2.0.0", "2.1.0", "3.0.0-alpha.1", "3.0.0"
+]
+
+// Parse all versions (filter out any that fail — robustness)
+val catalog: List[SemVer] = rawVersions
+  .map    { s -> SemVer::parse(s as String) }
+  .filter { v -> v != null }
+  .map    { v -> v as SemVer }
+
+// ── Sorted release history ────────────────────────────────────────────────────
+val sorted = sortVersions(catalog)
+IO::println("=== Release history (sorted) ===")
+foreach v: SemVer in sorted {
+  IO::println("  " + v.label())
+}
+
+// ── Partition into stable vs pre-release ─────────────────────────────────────
+val stableList:    List[SemVer] = catalog.filter { v -> (v as SemVer).isStable()  } as List[SemVer]
+val prereleaseList: List[SemVer] = catalog.filter { v -> !(v as SemVer).isStable() } as List[SemVer]
+IO::println("")
+IO::println("Stable releases:     " + stableList.size)
+IO::println("Pre-releases:        " + prereleaseList.size)
+
+// ── Latest stable ─────────────────────────────────────────────────────────────
+val allSorted: List[SemVer] = sortVersions(stableList)
+val latest: SemVer = allSorted[allSorted.size - 1] as SemVer
+IO::println("Latest stable:       " + latest.label())
+
+// ── Group by major version ────────────────────────────────────────────────────
+val byMajor = stableList.groupBy { v -> "" + (v as SemVer).major() }
+IO::println("")
+IO::println("=== Stable releases by major ===")
+foreach (maj, vs) in byMajor {
+  val labels = (vs as List).map { v -> (v as SemVer).label() }
+  IO::println("  v#{maj}.x: " + Strings::join(labels as List, ", "))
+}
+
+// ── Range filtering ───────────────────────────────────────────────────────────
+val range1 = parseRange(">=1.0.0 <2.0.0") as VersionConstraint
+val range2 = parseRange(">=2.0.0")        as VersionConstraint
+val range3 = parseRange("==1.2.1")        as VersionConstraint
+
+IO::println("")
+IO::println("=== Range matching ===")
+IO::println("#{range1.describe()}:")
+foreach v: SemVer in catalog {
+  if range1.matches(v) { IO::println("  " + v.label()) }
+}
+IO::println("#{range2.describe()}:")
+foreach v: SemVer in catalog {
+  if range2.matches(v) { IO::println("  " + v.label()) }
+}
+IO::println("#{range3.describe()}:")
+foreach v: SemVer in catalog {
+  if range3.matches(v) { IO::println("  " + v.label()) }
+}
+
+// ── Nearest version to 2.0.0-alpha.1 ─────────────────────────────────────────
+val pivot = SemVer::parse("2.0.0-alpha.1") as SemVer
+val sortedAll: List[SemVer] = sortVersions(catalog)
+var lowerNeighbor: SemVer? = null
+var upperNeighbor: SemVer? = null
+foreach sv: SemVer in sortedAll {
+  val cmp = sv.compareTo(pivot)
+  if cmp < 0 { lowerNeighbor = sv }
+  if cmp > 0 && upperNeighbor == null { upperNeighbor = sv }
+}
+IO::println("")
+IO::println("Just before #{pivot.label()}: " + (if lowerNeighbor != null { (lowerNeighbor as SemVer).label() } else { "none" }))
+IO::println("Just after  #{pivot.label()}: " + (if upperNeighbor != null { (upperNeighbor as SemVer).label() } else { "none" }))
+
+// ── Invalid input handling ────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Parse edge cases ===")
+val bad = ["not-a-version", "1.2", "1.2.3.4", ""]
+foreach s: String in bad {
+  val v = SemVer::parse(s)
+  IO::println("parse(\"#{s}\"): " + (if v != null { (v as SemVer).label() } else { "null" }))
+}
+
+// ── Statistics across catalog ─────────────────────────────────────────────────
+IO::println("")
+val totalMajorSum = catalog.fold(0) { acc, v -> (acc as Int) + (v as SemVer).major() }
+IO::println("Sum of major numbers: " + totalMajorSum)
+val maxPatch = catalog.fold(0) { acc, v ->
+  val p = (v as SemVer).patch()
+  if (acc as Int) > p { acc } else { p }
+}
+IO::println("Largest patch number: " + maxPatch)
+val patchLine = catalog
+  .map    { v -> v as SemVer }
+  .filter { v -> v.patch() > 0 }
+  .map    { v -> v.label() }
+IO::println("Patch releases:       " + Strings::join(patchLine as List, ", "))

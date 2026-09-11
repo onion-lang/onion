@@ -1,0 +1,223 @@
+// LSystem.on — Lindenmayer System fractal string rewriter
+// A classic model for self-similar plant growth / fractal geometry: an axiom
+// string is rewritten in parallel using a rule map; the resulting string is
+// interpreted as turtle-graphics commands (F = forward, + = turn left,
+// - = turn right, [ = push state, ] = pop state).
+//
+// Exercises: ADT case-enum (TurtleCmd: Forward / TurnLeft / TurnRight /
+//   PushState / PopState / Noop), records (LSystem / ExpandStats / RankEntry),
+//   Map[String,String] with `[:]` literal, foreach (k,v) over Map, select/is
+//   pattern matching, extension String (charAt loop), collection pipelines
+//   (sortedBy / map / filter / fold / find / groupBy), while / foreach over
+//   ranges, string interpolation, nullable checks, try/catch.
+
+import { java.lang.StringBuilder; }
+
+// ── Turtle command ADT ────────────────────────────────────────────────────────
+enum TurtleCmd {
+  case Forward     // draw forward (symbol: F or G)
+  case TurnLeft    // rotate left  (symbol: +)
+  case TurnRight   // rotate right (symbol: -)
+  case PushState   // save turtle state (symbol: [)
+  case PopState    // restore turtle state (symbol: ])
+  case Noop        // any other symbol — ignored by turtle
+public:
+  def symbol(): String = select this {
+    case x is Forward:   "F"
+    case x is TurnLeft:  "+"
+    case x is TurnRight: "-"
+    case x is PushState: "["
+    case x is PopState:  "]"
+    case x is Noop:      "?"
+  }
+}
+
+// ── L-system definition ───────────────────────────────────────────────────────
+record LSystemDef(
+  name:  String,
+  axiom: String,
+  angle: Int,              // turning angle in degrees (integer approximation)
+  rules: Map[String, String]
+)
+
+// ── Per-iteration statistics ──────────────────────────────────────────────────
+record ExpandStats(
+  iteration:  Int,
+  length:     Int,
+  forwardCnt: Int,
+  turnCnt:    Int,
+  branchCnt:  Int
+) {
+public:
+  def show(): String =
+    "    iter #{iteration()}: len=#{length()} F=#{forwardCnt()} turns=#{turnCnt()} branches=#{branchCnt()}"
+}
+
+// ── Rank entry for summary pipeline ──────────────────────────────────────────
+record RankEntry(name: String, finalLen: Int, ratio: Int)
+
+// ── Map a symbol to its turtle command ───────────────────────────────────────
+def cmdFor(c: String): TurtleCmd {
+  if c == "F" || c == "G" { return new Forward() }
+  if c == "+"              { return new TurnLeft() }
+  if c == "-"              { return new TurnRight() }
+  if c == "["              { return new PushState() }
+  if c == "]"              { return new PopState() }
+  return new Noop()
+}
+
+// ── Apply all rules once ──────────────────────────────────────────────────────
+def applyRules(s: String, rules: Map[String, String]): String {
+  val sb = new StringBuilder()
+  var i: Int = 0
+  while i < s.length() {
+    val ch: String = "" + s.charAt(i)
+    val repl = rules.get(ch)
+    if repl != null { sb.append(repl as String) }
+    else            { sb.append(ch) }
+    i++
+  }
+  return sb.toString()
+}
+
+// ── Expand n times from the axiom ────────────────────────────────────────────
+def expand(def_: LSystemDef, n: Int): String {
+  var s: String = def_.axiom()
+  var k: Int = 0
+  while k < n { s = applyRules(s, def_.rules()); k++ }
+  return s
+}
+
+// ── Count turtle commands in a string ────────────────────────────────────────
+def countCmds(s: String, iter: Int): ExpandStats {
+  var fwd: Int = 0; var turns: Int = 0; var branches: Int = 0
+  var i: Int = 0
+  while i < s.length() {
+    val cmd: TurtleCmd = cmdFor("" + s.charAt(i))
+    select cmd {
+      case x is Forward:   fwd++
+      case x is TurnLeft:  turns++
+      case x is TurnRight: turns++
+      case x is PushState: branches++
+      case x is PopState:  {}
+      case x is Noop:      {}
+    }
+    i++
+  }
+  return new ExpandStats(iter, s.length(), fwd, turns, branches)
+}
+
+// ── Preview: first maxLen chars + ellipsis ───────────────────────────────────
+def preview(s: String, maxLen: Int): String {
+  if s.length() <= maxLen { return s }
+  val sb = new StringBuilder()
+  var i: Int = 0
+  while i < maxLen { sb.append("" + s.charAt(i)); i++ }
+  sb.append("...")
+  return sb.toString()
+}
+
+// ── Run one L-system: print rules, per-iter stats, preview ───────────────────
+def runSystem(def_: LSystemDef, maxIter: Int): ExpandStats {
+  IO::println("── #{def_.name()} (angle=#{def_.angle()}°) ──────────")
+  IO::println("  Axiom : #{def_.axiom()}")
+  IO::println("  Rules :")
+  foreach (sym, repl) in def_.rules() {
+    IO::println("    #{sym} → #{repl}")
+  }
+  IO::println("  Expansion statistics:")
+  var iter: Int = 0
+  while iter <= maxIter {
+    val s: String = expand(def_, iter)
+    IO::println(countCmds(s, iter).show())
+    iter++
+  }
+  val finalStr: String = expand(def_, maxIter)
+  IO::println("  Preview  : #{preview(finalStr, 70)}")
+  IO::println("")
+  return countCmds(finalStr, maxIter)
+}
+
+// ── Compute compression-ratio analogue: axiom len vs final len ───────────────
+def growthRatio(def_: LSystemDef, iters: Int): Int {
+  val init: Int = def_.axiom().length()
+  val final_: Int = expand(def_, iters).length()
+  if init == 0 { return 0 }
+  return final_ / init
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Main
+// ══════════════════════════════════════════════════════════════════════════════
+def main(): void {
+  IO::println("=== L-System Fractal String Rewriter ===")
+  IO::println("")
+
+  // ── Define the L-systems ──────────────────────────────────────────────────
+  val kochRules: Map[String, String]  = ["F": "F+F--F+F"]
+  val koch = new LSystemDef("Koch Snowflake", "F", 60, kochRules)
+
+  val sierpRules: Map[String, String] = ["F": "F-G+F+G-F", "G": "GG"]
+  val sierp = new LSystemDef("Sierpinski Triangle", "F-G-G", 120, sierpRules)
+
+  val dragonRules: Map[String, String] = ["X": "X+YF+", "Y": "-FX-Y"]
+  val dragon = new LSystemDef("Dragon Curve", "FX", 90, dragonRules)
+
+  val plantRules: Map[String, String] = ["X": "F+[[X]-X]-F[-FX]+X", "F": "FF"]
+  val plant = new LSystemDef("Branching Plant", "X", 25, plantRules)
+
+  val hilbertRules: Map[String, String] = ["A": "+BF-AFA-FB+", "B": "-AF+BFB+FA-"]
+  val hilbert = new LSystemDef("Hilbert Curve", "A", 90, hilbertRules)
+
+  val systems: List[LSystemDef] = [koch, sierp, dragon, plant, hilbert]
+  val maxIter: Int = 4
+
+  // ── Run each system ───────────────────────────────────────────────────────
+  val allStats: List[ExpandStats] = []
+  foreach def_: LSystemDef in systems {
+    val stats: ExpandStats = runSystem(def_, maxIter)
+    allStats.add(stats)
+  }
+
+  // ── Collection pipeline: rank systems by final string length ──────────────
+  IO::println("=== Summary — ranked by #{maxIter}-iteration length ===")
+  val rankList: List[RankEntry] = systems.map { sys ->
+    val s: LSystemDef = sys as LSystemDef
+    val len: Int  = expand(s, maxIter).length()
+    val ratio: Int = growthRatio(s, maxIter)
+    new RankEntry(s.name(), len, ratio)
+  }
+  val ranked: List[RankEntry] = rankList.sortedBy { e -> (e as RankEntry).finalLen() }
+  foreach e: RankEntry in ranked {
+    IO::println("  #{e.name()}: #{e.finalLen()} chars (growth ratio ~#{e.ratio()}×)")
+  }
+
+  // ── Aggregates via fold ────────────────────────────────────────────────────
+  IO::println("")
+  val totalForward: Int = allStats.fold(0) { acc, s -> (acc as Int) + (s as ExpandStats).forwardCnt() }
+  val totalTurns:   Int = allStats.fold(0) { acc, s -> (acc as Int) + (s as ExpandStats).turnCnt() }
+  IO::println("Total forward steps across all systems: #{totalForward}")
+  IO::println("Total turn    steps across all systems: #{totalTurns}")
+
+  // ── groupBy: categorize systems by dominant command ───────────────────────
+  val byDominant = allStats.groupBy { s ->
+    val st: ExpandStats = s as ExpandStats
+    if st.forwardCnt() > st.turnCnt() { "forward-heavy" } else { "turn-heavy" }
+  }
+  IO::println("")
+  IO::println("By dominant command type:")
+  foreach (kind, group) in byDominant {
+    IO::println("  #{kind}: #{(group as List).size} system(s)")
+  }
+
+  // ── find: which system has the most branch pairs ──────────────────────────
+  val mostBranchy = allStats.find { s -> (s as ExpandStats).branchCnt() > 0 }
+  if mostBranchy != null {
+    val mb: ExpandStats = mostBranchy as ExpandStats
+    IO::println("")
+    IO::println("First system with branches at iter #{maxIter}: #{mb.branchCnt()} branch opens")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

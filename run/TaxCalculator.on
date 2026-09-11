@@ -1,0 +1,343 @@
+// TaxCalculator.on — multi-bracket income tax estimator (~270 lines)
+//
+// Exercises: ADT case-enums with methods, records with inline methods,
+// collection pipelines (map/filter/fold/sortedBy/find/any), select/type-pattern
+// matching, nullable types and null checks, extension methods (Double/String/Int),
+// foreach (item and k,v), while loops, closures, string interpolation,
+// recursion, try/catch, mutable state, interface + class conformance.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val whole: Int  = self as Int
+    val frac:  Int  = ((self - (whole as Double)) * 100.0 + 0.5) as Int
+    val fs: String  = "" + frac
+    return "" + whole + "." + (if fs.length() < 2 { "0" + fs } else { fs })
+  }
+  def pct(): String = (self * 100.0).fmt2() + "%"
+  def usd(): String {
+    val n: Int = self as Int
+    val cents: Int = ((self - (n as Double)) * 100.0 + 0.5) as Int
+    var s: String = "" + n
+    val len: Int = s.length()
+    var out: String = ""
+    var i: Int = 0
+    while i < len {
+      if i > 0 && (len - i) % 3 == 0 { out = out + "," }
+      out = out + s.charAt(i) + ""
+      i++
+    }
+    val cs: String = "" + cents
+    return "$" + out + "." + (if cs.length() < 2 { "0" + cs } else { cs })
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum FilingStatus {
+  case Single
+  case MarriedJoint
+  case MarriedSeparate
+  case HeadOfHousehold
+public:
+  def label(): String = select this {
+    case s is Single:          "Single"
+    case s is MarriedJoint:    "Married Filing Jointly"
+    case s is MarriedSeparate: "Married Filing Separately"
+    case s is HeadOfHousehold: "Head of Household"
+  }
+  def standardDeduction(): Double = select this {
+    case s is Single:          13850.0
+    case s is MarriedJoint:    27700.0
+    case s is MarriedSeparate: 13850.0
+    case s is HeadOfHousehold: 20800.0
+  }
+}
+
+enum DeductionType {
+  case Standard
+  case ItemizedMortgage
+  case ItemizedCharity
+  case ItemizedMedical
+  case Retirement401k
+  case HSA
+public:
+  def label(): String = select this {
+    case d is Standard:          "Standard Deduction"
+    case d is ItemizedMortgage:  "Mortgage Interest"
+    case d is ItemizedCharity:   "Charitable Contributions"
+    case d is ItemizedMedical:   "Medical Expenses"
+    case d is Retirement401k:    "401(k) Contribution"
+    case d is HSA:               "HSA Contribution"
+  }
+  def aboveLine(): Boolean = select this {
+    case d is Retirement401k: true
+    case d is HSA:            true
+    else:                     false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record TaxBracket(rate: Double, floor: Double, ceiling: Double) {
+public:
+  def taxOn(income: Double): Double {
+    val taxable: Double = if income > ceiling { ceiling - floor } else { income - floor }
+    if taxable <= 0.0 { return 0.0 }
+    return taxable * rate
+  }
+  def label(): String = (rate * 100.0).fmt2() + "% on $#{floor.fmt2()} – $#{ceiling.fmt2()}"
+}
+
+record Deduction(kind: DeductionType, amount: Double) {
+public:
+  def label(): String = kind().label() + ": " + amount().usd()
+}
+
+record TaxSummary(
+  grossIncome: Double,
+  agi: Double,
+  taxableIncome: Double,
+  federalTax: Double,
+  ficaTax: Double,
+  stateTax: Double,
+  effectiveRate: Double,
+  marginalRate: Double,
+  takeHome: Double
+) {
+public:
+  def totalTax(): Double = federalTax() + ficaTax() + stateTax()
+}
+
+// ─── Taxable interface ────────────────────────────────────────────────────────
+
+interface Taxable {
+  def computeTax(income: Double): Double
+  def name(): String
+}
+
+// ─── FederalTaxSchedule ───────────────────────────────────────────────────────
+
+class FederalTaxSchedule conforms Taxable {
+  var brackets: List[TaxBracket]
+  var status:   FilingStatus
+
+public:
+  def this(status: FilingStatus) {
+    this.status   = status
+    this.brackets = buildBrackets(status)
+  }
+
+  static def buildBrackets(s: FilingStatus): List[TaxBracket] {
+    val out: List[TaxBracket] = []
+    select s {
+      case fs is Single: {
+        out.add(new TaxBracket(0.10,  0.0,      11000.0))
+        out.add(new TaxBracket(0.12,  11000.0,  44725.0))
+        out.add(new TaxBracket(0.22,  44725.0,  95375.0))
+        out.add(new TaxBracket(0.24,  95375.0,  182050.0))
+        out.add(new TaxBracket(0.32,  182050.0, 231250.0))
+        out.add(new TaxBracket(0.35,  231250.0, 578125.0))
+        out.add(new TaxBracket(0.37,  578125.0, 9999999.0))
+      }
+      case fs is MarriedJoint: {
+        out.add(new TaxBracket(0.10,  0.0,      22000.0))
+        out.add(new TaxBracket(0.12,  22000.0,  89450.0))
+        out.add(new TaxBracket(0.22,  89450.0,  190750.0))
+        out.add(new TaxBracket(0.24,  190750.0, 364200.0))
+        out.add(new TaxBracket(0.32,  364200.0, 462500.0))
+        out.add(new TaxBracket(0.35,  462500.0, 693750.0))
+        out.add(new TaxBracket(0.37,  693750.0, 9999999.0))
+      }
+      else: {
+        out.add(new TaxBracket(0.10,  0.0,      11000.0))
+        out.add(new TaxBracket(0.12,  11000.0,  44725.0))
+        out.add(new TaxBracket(0.22,  44725.0,  95375.0))
+        out.add(new TaxBracket(0.24,  95375.0,  182050.0))
+        out.add(new TaxBracket(0.32,  182050.0, 231250.0))
+        out.add(new TaxBracket(0.37,  231250.0, 9999999.0))
+      }
+    }
+    return out
+  }
+
+  def computeTax(income: Double): Double {
+    var tax: Double = 0.0
+    foreach b: TaxBracket in brackets {
+      if income > b.floor() { tax = tax + b.taxOn(income) }
+    }
+    return tax
+  }
+
+  def marginalRate(income: Double): Double {
+    var rate: Double = 0.0
+    foreach b: TaxBracket in brackets {
+      if income > b.floor() { rate = b.rate() }
+    }
+    return rate
+  }
+
+  def name(): String = "Federal Income Tax (#{status.label()})"
+}
+
+// ─── Flat-rate state tax ──────────────────────────────────────────────────────
+
+class FlatStateTax conforms Taxable {
+  var stateName: String
+  var rate:      Double
+
+public:
+  def this(n: String, r: Double) { this.stateName = n; this.rate = r }
+  def computeTax(income: Double): Double = income * rate
+  def name(): String = "#{stateName} State Tax (#{rate.pct()})"
+}
+
+// ─── FICA ─────────────────────────────────────────────────────────────────────
+
+def ficaTax(income: Double): Double {
+  val ssWage:  Double = if income < 160200.0 { income } else { 160200.0 }
+  val ssTax:   Double = ssWage * 0.062
+  val medTax:  Double = income * 0.0145
+  val addMed:  Double = if income > 200000.0 { (income - 200000.0) * 0.009 } else { 0.0 }
+  return ssTax + medTax + addMed
+}
+
+// ─── Above-the-line adjustments ───────────────────────────────────────────────
+
+def agiAdjustments(deductions: List[Deduction]): Double =
+  deductions.fold(0.0, (acc: Double, d: Deduction) -> {
+    if d.kind().aboveLine() { acc + d.amount() } else { acc }
+  })
+
+def belowLineDeductions(deductions: List[Deduction], status: FilingStatus): Double {
+  val itemized: Double = deductions.fold(0.0, (acc: Double, d: Deduction) -> {
+    if !d.kind().aboveLine() && !(d.kind() is Standard) { acc + d.amount() } else { acc }
+  })
+  val standardAmt: Double = status.standardDeduction()
+  return if itemized > standardAmt { itemized } else { standardAmt }
+}
+
+// ─── Full tax calculation ────────────────────────────────────────────────────
+
+def calculate(
+  grossIncome: Double,
+  status: FilingStatus,
+  deductions: List[Deduction],
+  stateTax: Taxable
+): TaxSummary {
+  val agi: Double          = grossIncome - agiAdjustments(deductions)
+  val deduction: Double    = belowLineDeductions(deductions, status)
+  val taxable: Double      = if agi - deduction > 0.0 { agi - deduction } else { 0.0 }
+  val federal: FederalTaxSchedule = new FederalTaxSchedule(status)
+  val fedTax: Double       = federal.computeTax(taxable)
+  val fica: Double         = ficaTax(grossIncome)
+  val state: Double        = stateTax.computeTax(taxable)
+  val totalTax: Double     = fedTax + fica + state
+  val effRate: Double      = if grossIncome > 0.0 { totalTax / grossIncome } else { 0.0 }
+  val marg: Double         = federal.marginalRate(taxable)
+  val takeHome: Double     = grossIncome - totalTax
+  return new TaxSummary(grossIncome, agi, taxable, fedTax, fica, state, effRate, marg, takeHome)
+}
+
+// ─── Report printer ──────────────────────────────────────────────────────────
+
+def printReport(label: String, s: TaxSummary, status: FilingStatus, deductions: List[Deduction]): void {
+  val line: String = "-".padRight(56)
+  println("\n" + "=".padRight(56))
+  println("  TAX ESTIMATE: #{label}")
+  println("=".padRight(56))
+  println("  Filing status:     #{status.label()}")
+  println("  Gross income:      #{s.grossIncome().usd()}")
+  println("  AGI:               #{s.agi().usd()}")
+  println("  Taxable income:    #{s.taxableIncome().usd()}")
+  println(line)
+  println("  Federal tax:       #{s.federalTax().usd()}")
+  println("  FICA tax:          #{s.ficaTax().usd()}")
+  println("  State tax:         #{s.stateTax().usd()}")
+  println("  Total tax:         #{s.totalTax().usd()}")
+  println(line)
+  println("  Effective rate:    #{s.effectiveRate().pct()}")
+  println("  Marginal rate:     #{s.marginalRate().pct()}")
+  println("  Take-home pay:     #{s.takeHome().usd()}")
+  println(line)
+  println("  Deductions applied:")
+  val stdDed: Double = status.standardDeduction()
+  val itemized: Double = deductions.fold(0.0, (acc: Double, d: Deduction) -> {
+    if !d.kind().aboveLine() && !(d.kind() is Standard) { acc + d.amount() } else { acc }
+  })
+  val useItemized: Boolean = itemized > stdDed
+  foreach d: Deduction in deductions {
+    val marker: String = if d.kind().aboveLine() { "  [above-line]" } else if useItemized { "  [itemized]  " } else { "  [n/a]       " }
+    println("    #{marker} #{d.label()}")
+  }
+  if !useItemized {
+    println("    -> Standard deduction used (#{stdDed.usd()})")
+  } else {
+    println("    -> Itemized total (#{itemized.usd()}) beats standard (#{stdDed.usd()})")
+  }
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+// Scenario A: single filer, ~$85k salary, standard deduction
+val deductionsA: List[Deduction] = [
+  new Deduction(new Retirement401k(), 22500.0),
+  new Deduction(new HSA(),             3850.0)
+]
+val summaryA: TaxSummary = calculate(85000.0, new Single(), deductionsA, new FlatStateTax("California", 0.093))
+printReport("Single, $85k, CA", summaryA, new Single(), deductionsA)
+
+// Scenario B: married joint, ~$180k, heavy mortgage interest
+val deductionsB: List[Deduction] = [
+  new Deduction(new Retirement401k(), 45000.0),
+  new Deduction(new ItemizedMortgage(), 24000.0),
+  new Deduction(new ItemizedCharity(),   6000.0),
+  new Deduction(new HSA(),              7750.0)
+]
+val summaryB: TaxSummary = calculate(180000.0, new MarriedJoint(), deductionsB, new FlatStateTax("New York", 0.0685))
+printReport("Married Joint, $180k, NY", summaryB, new MarriedJoint(), deductionsB)
+
+// Scenario C: high earner, single, no deductions
+val deductionsC: List[Deduction] = []
+val summaryC: TaxSummary = calculate(500000.0, new Single(), deductionsC, new FlatStateTax("Texas", 0.0))
+printReport("Single, $500k, TX (no state tax)", summaryC, new Single(), deductionsC)
+
+// Comparison table
+println("\n" + "=".padRight(56))
+println("  SCENARIO COMPARISON")
+println("=".padRight(56))
+val scenarios: List[TaxSummary] = [summaryA, summaryB, summaryC]
+val labels: List[String] = ["Single $85k CA", "Married $180k NY", "Single $500k TX"]
+var i: Int = 0
+while i < scenarios.size {
+  val sc: TaxSummary = scenarios[i]
+  val lb: String = (labels[i] as String)
+  println("  #{lb.padRight(20)}  eff=#{sc.effectiveRate().pct()}  take-home=#{sc.takeHome().usd()}")
+  i++
+}
+
+// Income range sensitivity analysis for Single filer in CA
+println("\n" + "=".padRight(56))
+println("  SENSITIVITY: Single Filer, CA, No Deductions")
+println("=".padRight(56))
+val incomes: List[Int] = [30000, 50000, 75000, 100000, 150000, 250000, 400000]
+foreach inc: Int in incomes {
+  val s: TaxSummary = calculate(inc as Double, new Single(), [], new FlatStateTax("California", 0.093))
+  println("  #{(inc as Double).usd().padLeft(14)}  eff #{s.effectiveRate().pct()}  marg #{s.marginalRate().pct()}")
+}

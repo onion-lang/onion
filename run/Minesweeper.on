@@ -1,0 +1,259 @@
+// Minesweeper.on — non-interactive Minesweeper demo
+// Exercises: records, ADT enum, recursive flood-fill, closures, collection
+// pipelines (map/filter/partition/groupBy/find/sortedBy/reduce), foreach with
+// ranges, while, select/pattern matching, nullable, string interpolation.
+
+record Pos(row: Int, col: Int)
+
+record Cell(hasMine: Boolean, revealed: Boolean, flagged: Boolean, adj: Int)
+
+enum GameState {
+  case Playing
+  case Won
+  case Lost
+}
+
+class Board {
+  var rows: Int
+  var cols: Int
+  var cells: List[Cell]
+  var state: GameState
+  var revealedCount: Int
+  var mineCount: Int
+
+public:
+  def getCells(): List[Cell]    = cells
+  def getState(): GameState     = state
+  def getRows(): Int            = rows
+  def getCols(): Int            = cols
+  def getMineCount(): Int       = mineCount
+  def getRevealedCount(): Int   = revealedCount
+
+  def this(rows: Int, cols: Int, mines: List[Pos]) {
+    self.rows = rows
+    self.cols = cols
+    self.mineCount = mines.size
+    self.state = new Playing()
+    self.revealedCount = 0
+    self.cells = []
+
+    // Fill with empty cells
+    foreach i: Int in 0..<(rows * cols) {
+      cells.add(new Cell(false, false, false, 0))
+    }
+
+    // Place mines at specified positions
+    foreach m: Pos in mines {
+      val idx = m.row() * cols + m.col()
+      cells[idx] = new Cell(true, false, false, 0)
+    }
+
+    // Compute adjacency counts for non-mine cells
+    foreach r: Int in 0..<rows {
+      foreach c: Int in 0..<cols {
+        val idx = r * cols + c
+        val cell = cells[idx] as Cell
+        if !cell.hasMine() {
+          var adj = 0
+          foreach dr: Int in -1..1 {
+            foreach dc: Int in -1..1 {
+              if dr != 0 || dc != 0 {
+                val nr = r + dr
+                val nc = c + dc
+                if nr >= 0 && nr < rows && nc >= 0 && nc < cols {
+                  val nb = cells[nr * cols + nc] as Cell
+                  if nb.hasMine() { adj++ }
+                }
+              }
+            }
+          }
+          cells[idx] = new Cell(false, false, false, adj)
+        }
+      }
+    }
+  }
+
+  def reveal(pos: Pos): void {
+    if !(state is Playing) { return }
+    val r = pos.row()
+    val c = pos.col()
+    if r < 0 || r >= rows || c < 0 || c >= cols { return }
+    val idx = r * cols + c
+    val cell = cells[idx]
+    if cell.revealed() || cell.flagged() { return }
+    if cell.hasMine() {
+      cells[idx] = new Cell(true, true, false, 0)
+      state = new Lost()
+      IO::println("BOOM! Hit mine at (#{r}, #{c}).")
+      return
+    }
+    floodReveal(r, c)
+    checkWin()
+  }
+
+  def flag(pos: Pos): void {
+    if !(state is Playing) { return }
+    val idx = pos.row() * cols + pos.col()
+    val cell = cells[idx]
+    if !cell.revealed() {
+      cells[idx] = new Cell(cell.hasMine(), false, !cell.flagged(), cell.adj())
+    }
+  }
+
+  def display(): void {
+    var header = "  "
+    foreach c: Int in 0..<cols {
+      header = header + c % 10
+    }
+    IO::println(header)
+    foreach r: Int in 0..<rows {
+      var line = "#{r} "
+      foreach c: Int in 0..<cols {
+        val cell = cells[r * cols + c] as Cell
+        line = line + cellChar(cell)
+      }
+      IO::println(line)
+    }
+    IO::println(stateStr())
+  }
+
+private:
+  def floodReveal(r: Int, c: Int): void {
+    if r < 0 || r >= rows || c < 0 || c >= cols { return }
+    val idx = r * cols + c
+    val cell = cells[idx]
+    if cell.revealed() || cell.flagged() || cell.hasMine() { return }
+    cells[idx] = new Cell(false, true, false, cell.adj())
+    revealedCount++
+    if cell.adj() == 0 {
+      floodReveal(r - 1, c - 1)
+      floodReveal(r - 1, c)
+      floodReveal(r - 1, c + 1)
+      floodReveal(r,     c - 1)
+      floodReveal(r,     c + 1)
+      floodReveal(r + 1, c - 1)
+      floodReveal(r + 1, c)
+      floodReveal(r + 1, c + 1)
+    }
+  }
+
+  def checkWin(): void {
+    if revealedCount >= rows * cols - mineCount {
+      state = new Won()
+    }
+  }
+
+  def cellChar(cell: Cell): String =
+    if cell.flagged() { "F" }
+    else if !cell.revealed() { "." }
+    else if cell.hasMine() { "*" }
+    else if cell.adj() == 0 { " " }
+    else { "#{cell.adj()}" }
+
+  def stateStr(): String =
+    select state {
+      case s is Playing: "Playing — #{revealedCount}/#{rows * cols - mineCount} safe cells revealed"
+      case s is Won: "WON! All safe cells revealed."
+      case s is Lost: "LOST! Hit a mine."
+    }
+}
+
+// ── Demo Part 1: build a small board and display it ──────────────────────────
+val mines = [
+  new Pos(0, 3), new Pos(1, 5), new Pos(1, 7), new Pos(2, 1),
+  new Pos(2, 6), new Pos(3, 0), new Pos(3, 4), new Pos(4, 2),
+  new Pos(4, 7), new Pos(5, 5)
+]
+val board = new Board(6, 8, mines)
+IO::println("=== Minesweeper Demo (6x8, 10 mines) ===")
+IO::println("Initial board (all hidden):")
+board.display()
+
+// ── Reveal safe cells ────────────────────────────────────────────────────────
+val safeReveal = [new Pos(0, 0), new Pos(0, 7), new Pos(5, 7), new Pos(2, 4)]
+foreach move: Pos in safeReveal {
+  IO::println("\nReveal (#{move.row()}, #{move.col()}):")
+  board.reveal(move)
+  board.display()
+}
+
+// ── Flag suspected mines ─────────────────────────────────────────────────────
+IO::println("\nFlagging suspected mines...")
+board.flag(new Pos(0, 3))
+board.flag(new Pos(1, 5))
+board.flag(new Pos(2, 6))
+board.display()
+
+// ── Try to hit a mine ────────────────────────────────────────────────────────
+IO::println("\nReveal (3, 4) — a mine!")
+board.reveal(new Pos(3, 4))
+board.display()
+
+// ── Collection pipeline analytics on final board state ───────────────────────
+IO::println("\n=== Board Analytics ===")
+val allCells: List[Cell] = board.getCells()
+
+// partition: safe cells vs mines
+val parts = allCells.partition { c -> !c.hasMine() }
+val safeCells: List[Cell] = parts[0] as List[Cell]
+val mineCells: List[Cell] = parts[1] as List[Cell]
+IO::println("Safe cells: #{safeCells.size}, Mine cells: #{mineCells.size}")
+
+// filter: revealed and flagged
+val revealedCells: List[Cell] = allCells.filter { c -> c.revealed() }
+val flaggedCells:  List[Cell] = allCells.filter { c -> c.flagged() }
+IO::println("Revealed: #{revealedCells.size}, Flagged: #{flaggedCells.size}")
+
+// find: first unrevealed safe cell
+val firstHiddenObj: Object? = (safeCells as List[Object]).find { c -> c != null && !(c as Cell).revealed() && !(c as Cell).flagged() }
+val firstHidden: Cell? = firstHiddenObj as Cell?
+if firstHidden != null {
+  IO::println("First hidden safe cell has #{firstHidden.adj()} adjacent mines")
+}
+
+// groupBy adjacency count (0–8) among revealed safe cells
+val revealedSafe: List[Cell] = safeCells.filter { c -> c.revealed() }
+val byAdj: Map[Object, List[Cell]] = revealedSafe.groupBy { c -> c.adj() }
+IO::println("Revealed safe cells grouped by adjacency count:")
+foreach (k, v) in byAdj {
+  val grp: List[Cell] = v as List[Cell]
+  IO::println("  adj=#{k}: #{grp.size} cell(s)")
+}
+
+// sortedBy adjacency (descending) for revealed cells
+val sorted: List[Cell] = revealedSafe.sortedBy { c -> -c.adj() }
+if sorted.size > 0 {
+  IO::println("Highest-adj revealed cell: #{sorted[0].adj()} adjacent mines")
+}
+
+// fold: total adjacency sum across all revealed safe cells
+val totalAdj: Int = revealedSafe.fold(0) { acc, c -> acc + c.adj() }
+IO::println("Sum of adjacency counts across revealed cells: #{totalAdj}")
+
+// ── Second board: win scenario (3x3 with 2 mines) ────────────────────────────
+IO::println("\n=== Win Scenario (3x3, 2 mines) ===")
+val mines2 = [new Pos(0, 2), new Pos(2, 0)]
+val b2 = new Board(3, 3, mines2)
+// Reveal all safe cells: (0,0), (0,1), (1,0), (1,1), (1,2), (2,1), (2,2)
+val winMoves = [
+  new Pos(0, 0), new Pos(0, 1),
+  new Pos(1, 0), new Pos(1, 1), new Pos(1, 2),
+  new Pos(2, 1), new Pos(2, 2)
+]
+foreach m: Pos in winMoves {
+  b2.reveal(m)
+}
+b2.display()
+
+// ── Scoring summary ──────────────────────────────────────────────────────────
+IO::println("\n=== Summary ===")
+val boards = [board, b2]
+foreach i: Int in 0..<boards.size {
+  val b = boards[i] as Board
+  val outcome = select b.getState() {
+    case s is Playing: "in progress"
+    case s is Won:     "WIN"
+    case s is Lost:    "LOSS"
+  }
+  IO::println("Board #{i + 1}: #{outcome}")
+}

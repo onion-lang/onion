@@ -209,5 +209,25 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("user:a") == result)
     }
+
+    it("block-wrapped lambda { x -> ... } in non-trailing position infers parameter type (regression: E0052)") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def myMapIf(f: Function1[String, String], cond: Boolean): String =
+          |    if cond { f(self) } else { self }
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "hello".myMapIf({ x -> x.toUpperCase() }, true)
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("HELLO") == result)
+    }
   }
 }

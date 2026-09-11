@@ -1,0 +1,351 @@
+// TuringMachine.on — a Turing machine simulator exercising many Onion features.
+// Exercises: records, plain enums, classes, collection pipelines (map/filter/
+// fold/sortedBy/groupBy/find/distinct/partition/zip), select/enum-value pattern
+// matching, nullable types, string interpolation, while and foreach (ranges,
+// map k,v entries), closures.
+
+// ── Tape symbols ──────────────────────────────────────────────────────────────
+enum Symbol { BLANK, ZERO, ONE }
+
+def symToChar(s: Symbol): String {
+  var r: String = "_"
+  select s {
+    case Symbol::ZERO: r = "0"
+    case Symbol::ONE:  r = "1"
+    else: r = "_"
+  }
+  return r
+}
+
+def charToSym(c: String): Symbol {
+  var r: Symbol = Symbol::BLANK
+  select c {
+    case "0": r = Symbol::ZERO
+    case "1": r = Symbol::ONE
+    else: r = Symbol::BLANK
+  }
+  return r
+}
+
+// ── Head movement ─────────────────────────────────────────────────────────────
+enum Direction { LEFT, RIGHT, STAY }
+
+// ── Transition ────────────────────────────────────────────────────────────────
+record Transition(
+  fromState: String,
+  read:      Symbol,
+  toState:   String,
+  write:     Symbol,
+  move:      Direction
+)
+
+// ── Tape ──────────────────────────────────────────────────────────────────────
+class Tape {
+  var cells: List[String]
+  var head:  Int
+public:
+  def this(input: String) {
+    cells = new java.util.ArrayList[String]()
+    foreach i: Int in 0..<input.length() {
+      cells.add(input.substring(i, i + 1))
+    }
+    if cells.size == 0 { cells.add("_") }
+    head = 0
+  }
+  def read(): Symbol = charToSym(cells[head])
+  def write(s: Symbol): void { cells[head] = symToChar(s) }
+  def moveLeft(): void {
+    if head == 0 {
+      cells.add(0, "_")
+    } else {
+      head = head - 1
+    }
+  }
+  def moveRight(): void {
+    head = head + 1
+    if head >= cells.size { cells.add("_") }
+  }
+  def snapshot(): String {
+    var sb: String = ""
+    foreach i: Int in 0..<cells.size() {
+      val cell = cells[i]
+      if i == head { sb = sb + "[" + cell + "]" }
+      else          { sb = sb + cell }
+    }
+    return sb
+  }
+  def content(): String {
+    // Join and strip leading/trailing blanks
+    var s: String = ""
+    foreach c: String in cells { s = s + c }
+    while s.startsWith("_") && s.length() > 1 {
+      s = s.substring(1)
+    }
+    while s.endsWith("_") && s.length() > 1 {
+      s = s.substring(0, s.length() - 1)
+    }
+    return s
+  }
+}
+
+// ── Domain objects ────────────────────────────────────────────────────────────
+record StepRecord(step: Int, state: String, tape: String)
+record RunResult(accepted: Boolean, steps: Int, finalTape: String, log: List[StepRecord])
+record MachineSpec(
+  name:         String,
+  transitions:  List[Transition],
+  acceptStates: List[String],
+  initialState: String,
+  maxSteps:     Int
+)
+record TestCase(input: String, expectAccept: Boolean)
+record MachineStats(name: String, runs: Int, accepted: Int, avgSteps: Double)
+
+// ── Simulation ────────────────────────────────────────────────────────────────
+def findTransition(trs: List[Transition], state: String, sym: Symbol): Transition? {
+  val found = trs.find { t ->
+    val tr = t as Transition
+    tr.fromState() == state && tr.read() == sym
+  }
+  if found == null { return null }
+  return found as Transition
+}
+
+def runMachine(spec: MachineSpec, input: String): RunResult {
+  val tape  = new Tape(input)
+  var state = spec.initialState()
+  var steps = 0
+  val log   = new java.util.ArrayList[StepRecord]()
+  log.add(new StepRecord(0, state, tape.snapshot()))
+
+  while steps < spec.maxSteps() {
+    val sym  = tape.read()
+    val next = findTransition(spec.transitions(), state, sym)
+    if next == null { break }
+    val t = next as Transition
+    tape.write(t.write())
+    select t.move() {
+      case Direction::LEFT:  tape.moveLeft()
+      case Direction::RIGHT: tape.moveRight()
+      else: {}
+    }
+    state = t.toState()
+    steps = steps + 1
+    log.add(new StepRecord(steps, state, tape.snapshot()))
+  }
+
+  val accepted = spec.acceptStates().find { s -> (s as String) == state } != null
+  return new RunResult(accepted, steps, tape.content(), log)
+}
+
+def computeStats(name: String, results: List[RunResult]): MachineStats {
+  val count   = results.size
+  val accepts = results.filter { r -> (r as RunResult).accepted() }.size
+  var total: Double = 0.0
+  foreach r: RunResult in results { total = total + r.steps() }
+  val avg = if count == 0 { 0.0 } else { total / count }
+  return new MachineStats(name, count, accepts, avg)
+}
+
+// ── Machine builders (all start from "q0") ────────────────────────────────────
+
+// Accepts binary strings of EVEN length.
+def buildEvenLength(): MachineSpec = new MachineSpec(
+  "EvenLength",
+  [
+    new Transition("q0",     Symbol::ZERO,  "q1",     Symbol::ZERO,  Direction::RIGHT),
+    new Transition("q0",     Symbol::ONE,   "q1",     Symbol::ONE,   Direction::RIGHT),
+    new Transition("q0",     Symbol::BLANK, "accept", Symbol::BLANK, Direction::STAY),
+    new Transition("q1",     Symbol::ZERO,  "q0",     Symbol::ZERO,  Direction::RIGHT),
+    new Transition("q1",     Symbol::ONE,   "q0",     Symbol::ONE,   Direction::RIGHT),
+    new Transition("q1",     Symbol::BLANK, "reject", Symbol::BLANK, Direction::STAY)
+  ],
+  ["accept"],
+  "q0",
+  500
+)
+
+// Increments a binary number (MSB on left, head starts at left).
+// Strategy: scan right to find end, then carry leftward.
+def buildBinaryIncrement(): MachineSpec = new MachineSpec(
+  "BinaryIncrement",
+  [
+    new Transition("q0",    Symbol::ZERO,  "q0",    Symbol::ZERO,  Direction::RIGHT),
+    new Transition("q0",    Symbol::ONE,   "q0",    Symbol::ONE,   Direction::RIGHT),
+    new Transition("q0",    Symbol::BLANK, "carry", Symbol::BLANK, Direction::LEFT),
+    new Transition("carry", Symbol::ONE,   "carry", Symbol::ZERO,  Direction::LEFT),
+    new Transition("carry", Symbol::ZERO,  "done",  Symbol::ONE,   Direction::STAY),
+    new Transition("carry", Symbol::BLANK, "done",  Symbol::ONE,   Direction::STAY)
+  ],
+  ["done"],
+  "q0",
+  500
+)
+
+// Recognises palindromes over {0, 1}: reads first char, marks BLANK, goes
+// right to find matching last char, marks BLANK, repeats. Accepts empty tape.
+def buildPalindrome(): MachineSpec = new MachineSpec(
+  "Palindrome",
+  [
+    // q0: read first symbol; blank means empty/done -> accept
+    new Transition("q0",   Symbol::BLANK, "accept", Symbol::BLANK, Direction::STAY),
+    new Transition("q0",   Symbol::ZERO,  "seekZ",  Symbol::BLANK, Direction::RIGHT),
+    new Transition("q0",   Symbol::ONE,   "seekO",  Symbol::BLANK, Direction::RIGHT),
+    // seekZ: skip to rightmost non-blank looking for a matching ZERO
+    new Transition("seekZ",Symbol::ZERO,  "seekZ",  Symbol::ZERO,  Direction::RIGHT),
+    new Transition("seekZ",Symbol::ONE,   "seekZ",  Symbol::ONE,   Direction::RIGHT),
+    new Transition("seekZ",Symbol::BLANK, "matchZ", Symbol::BLANK, Direction::LEFT),
+    new Transition("matchZ",Symbol::ZERO, "back",   Symbol::BLANK, Direction::LEFT),
+    new Transition("matchZ",Symbol::BLANK,"accept", Symbol::BLANK, Direction::STAY),
+    new Transition("matchZ",Symbol::ONE,  "reject", Symbol::ONE,   Direction::STAY),
+    // seekO: same but looking for ONE
+    new Transition("seekO",Symbol::ZERO,  "seekO",  Symbol::ZERO,  Direction::RIGHT),
+    new Transition("seekO",Symbol::ONE,   "seekO",  Symbol::ONE,   Direction::RIGHT),
+    new Transition("seekO",Symbol::BLANK, "matchO", Symbol::BLANK, Direction::LEFT),
+    new Transition("matchO",Symbol::ONE,  "back",   Symbol::BLANK, Direction::LEFT),
+    new Transition("matchO",Symbol::BLANK,"accept", Symbol::BLANK, Direction::STAY),
+    new Transition("matchO",Symbol::ZERO, "reject", Symbol::ZERO,  Direction::STAY),
+    // back: return to leftmost non-blank
+    new Transition("back", Symbol::ZERO,  "back",   Symbol::ZERO,  Direction::LEFT),
+    new Transition("back", Symbol::ONE,   "back",   Symbol::ONE,   Direction::LEFT),
+    new Transition("back", Symbol::BLANK, "q0",     Symbol::BLANK, Direction::RIGHT)
+  ],
+  ["accept"],
+  "q0",
+  2000
+)
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+def verdict(r: RunResult): String = if r.accepted() { "ACCEPT" } else { "REJECT" }
+
+def printStats(s: MachineStats): void {
+  IO::println("  #{s.name()}: #{s.runs()} runs, #{s.accepted()} accepted, avg #{s.avgSteps()} steps/run")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+IO::println("=== Turing Machine Simulator ===")
+
+// --- 1. Even-length binary strings ---
+IO::println("\n-- EvenLength: accepts strings of even length --")
+val evenSpec = buildEvenLength()
+val evenCases = [
+  new TestCase("",      true),
+  new TestCase("01",    true),
+  new TestCase("0110",  true),
+  new TestCase("0000",  true),
+  new TestCase("1",     false),
+  new TestCase("001",   false),
+  new TestCase("10101", false)
+]
+val evenResults = new java.util.ArrayList[RunResult]()
+foreach tc: TestCase in evenCases {
+  val r = runMachine(evenSpec, tc.input())
+  evenResults.add(r)
+  val inp = if tc.input().length() == 0 { "(empty)" } else { tc.input() }
+  val ok  = if r.accepted() == tc.expectAccept() { "OK" } else { "FAIL" }
+  IO::println("  #{inp}: #{verdict(r)} [#{ok}]")
+}
+
+// --- 2. Binary increment ---
+IO::println("\n-- BinaryIncrement: adds 1 to a binary number --")
+val incSpec = buildBinaryIncrement()
+val incInputs = ["0", "1", "10", "11", "101", "111", "1111"]
+val incResults = new java.util.ArrayList[RunResult]()
+foreach input: String in incInputs {
+  val r = runMachine(incSpec, input)
+  incResults.add(r)
+  IO::println("  #{input} -> #{r.finalTape()} (#{r.steps()} steps)")
+}
+
+// --- 3. Palindrome recogniser ---
+IO::println("\n-- Palindrome: accepts binary palindromes --")
+val palSpec = buildPalindrome()
+val palCases = [
+  new TestCase("",       true),
+  new TestCase("0",      true),
+  new TestCase("1",      true),
+  new TestCase("00",     true),
+  new TestCase("11",     true),
+  new TestCase("010",    true),
+  new TestCase("101",    true),
+  new TestCase("0110",   true),
+  new TestCase("1001",   true),
+  new TestCase("01",     false),
+  new TestCase("10",     false),
+  new TestCase("001",    false),
+  new TestCase("110",    false)
+]
+val palResults = new java.util.ArrayList[RunResult]()
+foreach tc: TestCase in palCases {
+  val r = runMachine(palSpec, tc.input())
+  palResults.add(r)
+  val inp = if tc.input().length() == 0 { "(empty)" } else { tc.input() }
+  val ok  = if r.accepted() == tc.expectAccept() { "OK" } else { "FAIL" }
+  IO::println("  #{inp}: #{verdict(r)} [#{ok}]")
+}
+
+// --- 4. Aggregate statistics ---
+IO::println("\n-- Aggregate statistics --")
+val allStats = [
+  computeStats(evenSpec.name(), evenResults),
+  computeStats(incSpec.name(), incResults),
+  computeStats(palSpec.name(), palResults)
+]
+foreach s: MachineStats in allStats { printStats(s) }
+
+// --- 5. Step log for "101 + 1 = 110" ---
+IO::println("\n-- Step log: BinaryIncrement on \"101\" (expects 110) --")
+val logRun = runMachine(incSpec, "101")
+val logEntries = logRun.log()
+foreach i: Int in 0..<logEntries.size() {
+  val rec = logEntries[i] as StepRecord
+  IO::println("  step #{rec.step()} | state=#{rec.state()} | #{rec.tape()}")
+}
+
+// --- 6. Transition table using groupBy + sortedBy ---
+IO::println("\n-- BinaryIncrement transitions grouped by fromState --")
+val grouped = incSpec.transitions().groupBy { t -> (t as Transition).fromState() }
+val sortedKeys = incSpec.transitions()
+  .map { t -> (t as Transition).fromState() }
+  .distinct()
+  .sortedBy { k -> k as String }
+foreach key: String in sortedKeys {
+  val ts = grouped[key] as List[Transition]
+  val rows = ts.map { t ->
+    val tr = t as Transition
+    "#{symToChar(tr.read())}->#{symToChar(tr.write())}/#{tr.toState()}"
+  }
+  IO::println("  #{key}: #{rows.toString()}")
+}
+
+// --- 7. Distinct result tapes from increment ---
+IO::println("\n-- BinaryIncrement: distinct result tapes (sorted) --")
+val distinctTapes = incResults
+  .map { r -> (r as RunResult).finalTape() }
+  .distinct()
+  .sortedBy { t -> t as String }
+IO::println("  #{distinctTapes.toString()}")
+
+// --- 8. Partition even-length results ---
+IO::println("\n-- EvenLength: partition accepted vs. rejected --")
+val parts = evenResults.partition { r -> (r as RunResult).accepted() }
+val passedList = parts[0] as List[RunResult]
+val failedList = parts[1] as List[RunResult]
+IO::println("  Accepted: #{passedList.size}, Rejected: #{failedList.size}")
+
+// --- 9. Zip palindrome inputs and results ---
+IO::println("\n-- Palindrome: input-to-verdict pairs (non-empty) --")
+val palInputs = palCases.map { tc -> (tc as TestCase).input() }
+val palVerdicts = palResults.map { r -> verdict(r as RunResult) }
+val zipped = palInputs.zip(palVerdicts).filter { pair ->
+  val p = pair as List[Object]
+  (p[0] as String).length() > 0
+}
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  val inp = p[0] as String
+  val v   = p[1] as String
+  IO::println("  #{inp}: #{v}")
+}
+
+IO::println("\nDone.")

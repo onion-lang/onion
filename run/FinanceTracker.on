@@ -1,0 +1,256 @@
+// FinanceTracker.on — personal finance report (corpus demo)
+// Exercises: records, data-carrying enum, ADT enum, interface, classes,
+// extension methods, generics, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/partition/distinct), select/pattern-matching,
+// nullable, closures, string interpolation, try/catch, recursion,
+// while and foreach (ranges and map k/v).
+
+// ---- Records ----
+record Expense(description: String, amount: Int, category: String, month: Int)
+record Budget(category: String, limit: Int)
+record CategorySummary(category: String, spent: Int, budget: Int)
+
+// ---- Data-carrying enum ----
+enum Category(label: String, suggested: Int) {
+  FOOD("Food", 30000),
+  TRANSPORT("Transport", 15000),
+  HOUSING("Housing", 80000),
+  ENTERTAINMENT("Entertainment", 10000),
+  HEALTH("Health", 20000)
+}
+
+// ---- ADT enum: advice level ----
+enum Advice {
+  case OnTrack(margin: Int)
+  case AtRisk(overrun: Int)
+  case Critical(overrun: Int)
+}
+
+// ---- Interface ----
+interface Summarizable {
+  def summarize(): String
+}
+
+// ---- Extension methods ----
+extension Int {
+  def toCurrency(): String = "JPY " + self
+  def abs(): Int = if self >= 0 { self } else { 0 - self }
+}
+
+extension String {
+  def repeat(n: Int): String {
+    var result = ""
+    var i = 0
+    while i < n {
+      result = result + self
+      i = i + 1
+    }
+    return result
+  }
+  def padRight(width: Int): String {
+    val pad = width - self.length()
+    if pad <= 0 { return self }
+    return self + " ".repeat(pad)
+  }
+}
+
+// ---- Generic box (exercises generics) ----
+class Box[T](val value: T) {
+public:
+  def get(): T = value
+  def map[R](f: T -> R): R = f(value)
+}
+
+// ---- Ledger class ----
+class Ledger conforms Summarizable {
+  val expenses: List[Expense]
+  val budgets: List[Budget]
+public:
+  def this(expenses: List[Expense], budgets: List[Budget]) {
+    this.expenses = expenses
+    this.budgets = budgets
+  }
+
+  def totalSpent(): Int =
+    expenses.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+
+  def spentByCategory(cat: String): Int =
+    expenses
+      .filter { e -> (e as Expense).category() == cat }
+      .fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+
+  def budgetFor(cat: String): Int? {
+    val b = budgets.find { b -> (b as Budget).category() == cat }
+    if b == null { return null }
+    return (b as Budget).limit()
+  }
+
+  def categorySummaries(): List[CategorySummary] =
+    budgets.map { b ->
+      val cat   = (b as Budget).category()
+      val lim   = (b as Budget).limit()
+      val spent = spentByCategory(cat)
+      new CategorySummary(cat, spent, lim)
+    }
+
+  def overBudgetCategories(): List[String] =
+    categorySummaries()
+      .filter { s -> (s as CategorySummary).spent() > (s as CategorySummary).budget() }
+      .map { s -> (s as CategorySummary).category() }
+
+  def advise(cat: String): Advice {
+    val spent = spentByCategory(cat)
+    val lim   = budgetFor(cat)
+    if lim == null { return new OnTrack(0) }
+    val limit = lim as Int
+    val diff  = limit - spent   // positive = under, negative = over
+    if diff > limit / 5 { return new OnTrack(diff) }   // >20% remaining: on track
+    if diff >= 0 { return new AtRisk(0) }               // within but <20% remaining
+    val over = 0 - diff
+    if over > limit / 3 { return new Critical(over) }
+    return new AtRisk(over)
+  }
+
+  def summarize(): String =
+    "Ledger[#{expenses.size} expenses, total #{totalSpent().toCurrency()}]"
+}
+
+// ---- Recursive max ----
+def maxAmount(items: List[Expense], idx: Int, cur: Int): Int {
+  if idx >= items.size { return cur }
+  val amt = items[idx].amount()
+  return maxAmount(items, idx + 1, if amt > cur { amt } else { cur })
+}
+
+// ---- Safe ratio (try/catch) ----
+def safePercent(part: Int, total: Int): String {
+  try {
+    val pct = part * 100 / total
+    return pct + "%"
+  } catch e: Exception {
+    return "N/A"
+  }
+}
+
+// ---- Data ----
+val expenses: List[Expense] = [
+  new Expense("Rent",       75001, "Housing",       1),
+  new Expense("Groceries",  25000, "Food",          1),
+  new Expense("Bus pass",   10000, "Transport",     1),
+  new Expense("Gym",         6000, "Health",        1),
+  new Expense("Netflix",     1500, "Entertainment", 1),
+  new Expense("Doctor",      8000, "Health",        1),
+  new Expense("Dining out",  4000, "Food",          1),
+  new Expense("Taxi",        3000, "Transport",     1),
+  new Expense("Concert",     9000, "Entertainment", 1),
+  new Expense("Utilities",   5000, "Housing",       1)
+]
+
+val budgets: List[Budget] = [
+  new Budget("Housing",       80000),
+  new Budget("Food",          30000),
+  new Budget("Transport",     15000),
+  new Budget("Health",        20000),
+  new Budget("Entertainment", 10000)
+]
+
+val ledger = new Ledger(expenses, budgets)
+
+// ---- Header ----
+IO::println("=".repeat(48))
+IO::println("   Personal Finance Report – Month 1")
+IO::println("=".repeat(48))
+IO::println(ledger.summarize())
+val total = ledger.totalSpent()
+IO::println("Max single expense: " + maxAmount(expenses, 0, 0).toCurrency())
+
+// ---- Spending by category ----
+IO::println("")
+IO::println("--- Spending by Category ---")
+val summaries = ledger.categorySummaries()
+foreach s0: CategorySummary in summaries {
+  val pct = safePercent(s0.spent(), total)
+  IO::println("  " + s0.category().padRight(16) + s0.spent().toCurrency().padRight(14) + "(" + pct + " of total)")
+}
+
+// ---- Over-budget ----
+IO::println("")
+IO::println("--- Budget Status ---")
+val overBudget = ledger.overBudgetCategories()
+foreach s0: CategorySummary in summaries {
+  val s    = s0
+  val diff = s.budget() - s.spent()
+  val flag = if overBudget.find { c -> (c as String) == s.category() } != null { "OVER " } else { "OK   " }
+  IO::println("  " + flag + s.category().padRight(16) + "diff: " + diff.abs().toCurrency())
+}
+
+// ---- Advice per category via ADT pattern matching ----
+IO::println("")
+IO::println("--- Advice ---")
+val categories = ["Housing", "Food", "Transport", "Health", "Entertainment"]
+foreach cat: String in categories {
+  val advice = ledger.advise(cat)
+  val msg = select advice {
+    case a is OnTrack:  "on track  (margin " + a.margin().toCurrency() + ")"
+    case a is AtRisk:   if a.overrun() == 0 { "near limit (< 20% remaining)" } else { "at risk   (over by " + a.overrun().toCurrency() + ")" }
+    case a is Critical: "CRITICAL  (over by " + a.overrun().toCurrency() + ")"
+  }
+  IO::println("  " + cat.padRight(16) + msg)
+}
+
+// ---- Top 3 expenses ----
+IO::println("")
+IO::println("--- Top 3 Expenses ---")
+val sorted = expenses.sortedBy { e -> 0 - (e as Expense).amount() }
+foreach i: Int in 0..<3 {
+  val e = sorted[i] as Expense
+  IO::println("  #{i + 1}. " + e.description().padRight(14) + e.amount().toCurrency())
+}
+
+// ---- Partition into affordable/big (partition returns List[List[T]]) ----
+val parts = expenses.partition { e -> (e as Expense).amount() < 10000 }
+val affordable = parts[0] as List
+val big        = parts[1] as List
+IO::println("")
+IO::println("Affordable expenses (<10000): " + affordable.size)
+IO::println("Large expenses (>=10000): " + big.size)
+
+// ---- Distinct categories in expense list ----
+val distinctCats = expenses.map { e -> (e as Expense).category() }.distinct()
+IO::println("Distinct categories used: " + distinctCats.size)
+
+// ---- Generic Box usage ----
+val box = new Box[Int](total)
+val totalInBox = box.get()
+IO::println("")
+IO::println("Grand total (via Box): " + totalInBox.toCurrency())
+val msgBox = box.map { t -> "Total is " + (t as Int).toCurrency() }
+IO::println(msgBox)
+
+// ---- Foreach over range with while accumulator ----
+IO::println("")
+IO::println("--- Monthly cumulative sums ---")
+var running = 0
+foreach i: Int in 1..5 {
+  running = running + total / 5
+  IO::println("  Month " + i + " cumulative: " + running.toCurrency())
+}
+
+// ---- groupBy month (all in month 1 here, but exercises the call) ----
+val byMonth = expenses.groupBy { e -> (e as Expense).month() }
+IO::println("")
+IO::println("Months covered: " + byMonth.size)
+foreach (m, items) in byMonth {
+  IO::println("  Month " + m + ": " + (items as List).size + " expense(s)")
+}
+
+// ---- Closure stored in val ----
+val discounted = (pct: Int) -> { (x: Int) -> x - x * pct / 100 }
+val afterTax90 = discounted(10)
+IO::println("")
+IO::println("Rent after 10% discount: " + afterTax90(75001).toCurrency())
+
+// ---- String interpolation ----
+val n = expenses.size
+IO::println("Report covers #{n} expenses across #{distinctCats.size} categories, grand total #{total.toCurrency()}.")
+IO::println("=".repeat(48))

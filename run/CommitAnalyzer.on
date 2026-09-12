@@ -1,0 +1,305 @@
+// CommitAnalyzer.on — git-commit log analyzer (~230 lines)
+//
+// Exercises: record...from re"..." (anchored regex parser + parseAll),
+// ADT case-enum with dispatch methods, data-carrying enum (ConvType),
+// extension methods on Int/String, collection pipelines
+// (groupBy/map/filter/fold/sortedBy/distinct/count/find/partition/any),
+// foreach (k, v) in map, range foreach, while loop, nullable types and
+// null checks, string interpolation, select/pattern matching, closures.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "  0%" }
+    val p: Int = self * 100 / total
+    if p < 10 { return "  " + p + "%" }
+    if p < 100 { return " " + p + "%" }
+    return "" + p + "%"
+  }
+  def bar(total: Int, width: Int): String {
+    if total == 0 { return "" }
+    val filled: Int = self * width / total
+    var s: String = ""
+    var i: Int = 0
+    while i < width {
+      if i < filled { s = s + "#" } else { s = s + "." }
+      i++
+    }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trimTo(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "~"
+  }
+  def repeated(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ─── Conventional-commit type (data-carrying enum) ───────────────────────────
+
+enum ConvType(label: String, marker: String) {
+  FEAT("feat",     "[+]"),
+  FIX("fix",       "[!]"),
+  DOCS("docs",     "[d]"),
+  REFACTOR("refactor", "[r]"),
+  TEST("test",     "[t]"),
+  CHORE("chore",   "[c]"),
+  PERF("perf",     "[p]"),
+  OTHER("other",   "[?]")
+}
+
+// ─── Impact size (ADT enum) ───────────────────────────────────────────────────
+
+enum Impact {
+  case Trivial
+  case Moderate(files: Int)
+  case Large(files: Int, insertions: Int)
+
+public:
+  def description(): String = select this {
+    case t is Trivial:  "trivial"
+    case m is Moderate: "#{m.files()} file(s)"
+    case l is Large:    "#{l.files()} file(s), +#{l.insertions()}"
+  }
+  def score(): Int = select this {
+    case t is Trivial:  1
+    case m is Moderate: m.files() * 2
+    case l is Large:    l.files() * 2 + l.insertions() / 10
+  }
+}
+
+// ─── Commit record with regex parser ─────────────────────────────────────────
+// Compact log format:  HASH|AUTHOR|YYYY-MM-DD|SUBJECT
+
+record Commit(hash: String, author: String, date: String, subject: String)
+  from re"([0-9a-f]{7})\|([^|]+)\|(\d{4}-\d{2}-\d{2})\|(.+)"
+
+// ─── CommitInfo: enriched commit with parsed type and impact ─────────────────
+
+record CommitInfo(commit: Commit, kind: ConvType, impact: Impact)
+
+// ─── Classifier functions ─────────────────────────────────────────────────────
+
+def classifyType(subject: String): ConvType {
+  if subject.startsWith("feat:")     { return ConvType::FEAT }
+  if subject.startsWith("fix:")      { return ConvType::FIX }
+  if subject.startsWith("docs:")     { return ConvType::DOCS }
+  if subject.startsWith("refactor:") { return ConvType::REFACTOR }
+  if subject.startsWith("test:")     { return ConvType::TEST }
+  if subject.startsWith("chore:")    { return ConvType::CHORE }
+  if subject.startsWith("perf:")     { return ConvType::PERF }
+  return ConvType::OTHER
+}
+
+def classifyImpact(hash: String): Impact {
+  val lastChar: String = hash.substring(hash.length() - 1)
+  val c: Int = lastChar.charAt(0) as Int
+  val zero: Int = "0".charAt(0) as Int
+  val aChar: Int = "a".charAt(0) as Int
+  val n: Int = if c >= zero && c <= zero + 9 {
+    c - zero
+  } else {
+    c - aChar + 10
+  }
+  if n <= 2 { return new Trivial() }
+  if n <= 7 { return new Moderate(n) }
+  return new Large(n, n * 20)
+}
+
+def enrich(c: Commit): CommitInfo {
+  val kind: ConvType = classifyType(c.subject())
+  val impact: Impact = classifyImpact(c.hash())
+  return new CommitInfo(c, kind, impact)
+}
+
+// ─── Rendering helpers ────────────────────────────────────────────────────────
+
+def ruler(width: Int): String = "-".repeated(width)
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println(ruler(title.length()))
+}
+
+def printKindRow(kind: ConvType, count: Int, total: Int): void {
+  val label: String = kind.label().padRight(10)
+  val bar: String = count.bar(total, 20)
+  val pct: String = count.pct(total)
+  IO::println("#{kind.marker()} #{label} #{bar} #{pct} (#{count})")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val LOG: String =
+  "a1b2c3d|Alice|2025-01-03|feat: add user authentication\n" +
+  "e4f5a6b|Bob|2025-01-04|fix: null pointer in login flow\n" +
+  "7c8d9e0|Alice|2025-01-05|refactor: extract AuthService class\n" +
+  "f1e2d3c|Carol|2025-01-05|docs: update API reference\n" +
+  "4b5a6f7|Bob|2025-01-06|chore: upgrade dependencies\n" +
+  "8e9d0c1|Alice|2025-01-07|feat: add OAuth2 support\n" +
+  "2a3b4c5|Carol|2025-01-07|test: add unit tests for AuthService\n" +
+  "6d7e8f9|Dave|2025-01-08|fix: session expiry race condition\n" +
+  "0f1a2b3|Bob|2025-01-09|perf: cache token validation results\n" +
+  "c4d5e6f|Alice|2025-01-09|feat: role-based access control\n" +
+  "a7b8c9d|Dave|2025-01-10|refactor: simplify permission checks\n" +
+  "e0f1a2b|Carol|2025-01-10|fix: incorrect error codes on 401\n" +
+  "3c4d5e6|Bob|2025-01-11|chore: remove deprecated auth endpoints\n" +
+  "f7a8b9c|Alice|2025-01-12|docs: write security hardening guide\n" +
+  "0d1e2f3|Dave|2025-01-13|test: integration tests for OAuth flow\n" +
+  "4a5b6c7|Carol|2025-01-13|feat: add multi-factor authentication\n" +
+  "8d9e0f1|Alice|2025-01-14|perf: reduce JWT signature overhead\n" +
+  "2b3c4d5|Bob|2025-01-15|fix: handle missing refresh tokens\n" +
+  "6e7f8a9|Dave|2025-01-15|refactor: unify error response format\n" +
+  "b0c1d2e|Carol|2025-01-16|chore: update CI pipeline config"
+
+val commits: List[Commit] = Commit::parseAll(LOG)
+IO::println("Parsed #{commits.size()} commits.")
+
+val infos: List[CommitInfo] = commits.map { c -> enrich(c as Commit) }
+val total: Int = infos.size()
+
+// ─── 1. Commit type breakdown ─────────────────────────────────────────────────
+
+printHeader("Commit Type Breakdown")
+val byKind = infos.groupBy { ci -> (ci as CommitInfo).kind().label() }
+foreach kind: ConvType in [
+  ConvType::FEAT, ConvType::FIX, ConvType::REFACTOR,
+  ConvType::DOCS, ConvType::TEST, ConvType::CHORE,
+  ConvType::PERF, ConvType::OTHER
+] {
+  val key: String = kind.label()
+  val count: Int = if byKind.containsKey(key) {
+    (byKind.get(key) as List[Object]).size()
+  } else { 0 }
+  if count > 0 {
+    printKindRow(kind, count, total)
+  }
+}
+
+// ─── 2. Author leaderboard (sorted by commit count desc) ─────────────────────
+
+printHeader("Author Leaderboard")
+val byAuthor = infos.groupBy { ci -> (ci as CommitInfo).commit().author() }
+// Collect author names and their counts, then sort by count descending
+// Use "ZZ-<name>" trick: negate count as ASCII offset from 'Z' so lex sort
+// gives descending numeric order for counts up to 25.
+val authorCountLines: List[Object] = []
+foreach (author, authorInfos) in byAuthor {
+  val count: Int = (authorInfos as List[Object]).size()
+  val key: String = "" + (90 - count) + "-" + author
+  (authorCountLines as java.util.ArrayList).add(key + "|" + count + "|" + author)
+}
+val sortedAuthors: List[Object] = authorCountLines.sortedBy { l -> l as String }
+foreach line: Object in sortedAuthors {
+  val s: String = line as String
+  val barIdx: Int = s.indexOf("|")
+  val rest: String = s.substring(barIdx + 1)
+  val secBarIdx: Int = rest.indexOf("|")
+  val count: Int = Int::parseInt(rest.substring(0, secBarIdx))
+  val name: String = rest.substring(secBarIdx + 1)
+  val bar: String = count.bar(total, 15)
+  IO::println("#{name.padRight(8)} #{bar} #{count} commits")
+}
+
+// ─── 3. Top 5 commits by impact score ────────────────────────────────────────
+
+printHeader("Top 5 Commits by Impact Score")
+val top5: List[CommitInfo] = infos.sortedBy { ci ->
+  0 - (ci as CommitInfo).impact().score()
+}.take(5)
+var rank: Int = 1
+foreach ci: CommitInfo in top5 {
+  val c: Commit = ci.commit()
+  val score: Int = ci.impact().score()
+  val desc: String = ci.impact().description()
+  IO::println("#{rank}. [#{c.hash()}] #{c.subject().trimTo(40)} (score=#{score}, #{desc})")
+  rank++
+}
+
+// ─── 4. Daily activity (sorted by date) ──────────────────────────────────────
+
+printHeader("Daily Activity")
+val byDate = infos.groupBy { ci -> (ci as CommitInfo).commit().date() }
+val dateKeys: List[Object] = []
+foreach (date, _dateInfos) in byDate {
+  (dateKeys as java.util.ArrayList).add(date)
+}
+val sortedDates: List[Object] = dateKeys.sortedBy { d -> d as String }
+foreach date: Object in sortedDates {
+  val count: Int = (byDate.get(date) as List[Object]).size()
+  IO::println("#{date}  #{count.bar(5, 10)} #{count}")
+}
+
+// ─── 5. Fix vs Feature by author (foreach k,v in map) ────────────────────────
+
+printHeader("Fix vs Feature by Author")
+foreach (author, authorInfos) in byAuthor {
+  val aInfos: List[Object] = authorInfos as List[Object]
+  val fixes: Int = aInfos.count { ci -> (ci as CommitInfo).kind().label() == "fix" }
+  val feats: Int = aInfos.count { ci -> (ci as CommitInfo).kind().label() == "feat" }
+  val name: String = (author as String).padRight(8)
+  IO::println("#{name} fixes=#{fixes} feats=#{feats}")
+}
+
+// ─── 6. Summary statistics ────────────────────────────────────────────────────
+
+printHeader("Summary")
+val totalScore: Int = infos.fold(0) { acc, ci ->
+  (acc as Int) + (ci as CommitInfo).impact().score()
+}
+val avgScore: Int = if total > 0 { totalScore / total } else { 0 }
+val fixCount: Int  = infos.count { ci -> (ci as CommitInfo).kind().label() == "fix" }
+val featCount: Int = infos.count { ci -> (ci as CommitInfo).kind().label() == "feat" }
+val hasPerf: Boolean = infos.any { ci -> (ci as CommitInfo).kind().label() == "perf" }
+val uniqueAuthors: Int = byAuthor.size()
+IO::println("Total commits:    #{total}")
+IO::println("Unique authors:   #{uniqueAuthors}")
+IO::println("Total impact:     #{totalScore}")
+IO::println("Avg impact score: #{avgScore}")
+IO::println("Features added:   #{featCount}")
+IO::println("Bugs fixed:       #{fixCount}")
+IO::println("Has perf work:    #{hasPerf}")
+IO::println("Fix ratio:        #{fixCount.pct(total)}")
+
+// ─── 7. Fix-heavy authors (fixes > features) ─────────────────────────────────
+
+printHeader("Fix-heavy Authors")
+val fixHeavy: List[Object] = []
+foreach (author, authorInfos) in byAuthor {
+  val aInfos: List[Object] = authorInfos as List[Object]
+  val fixes: Int = aInfos.count { ci -> (ci as CommitInfo).kind().label() == "fix" }
+  val feats: Int = aInfos.count { ci -> (ci as CommitInfo).kind().label() == "feat" }
+  if fixes > feats {
+    (fixHeavy as java.util.ArrayList).add(author as String)
+  }
+}
+if fixHeavy.size() == 0 {
+  IO::println("(none — no author has more fixes than features)")
+} else {
+  foreach a: Object in fixHeavy.sortedBy { x -> x as String } {
+    IO::println("  " + (a as String))
+  }
+}
+
+// ─── 8. Partitioned impact ────────────────────────────────────────────────────
+
+printHeader("Impact Partition")
+val parts = infos.partition { ci -> (ci as CommitInfo).impact().score() >= 10 }
+val highImpact: List[Object] = parts[0] as List[Object]
+val lowImpact:  List[Object] = parts[1] as List[Object]
+IO::println("High impact (score >= 10): #{highImpact.size()}")
+IO::println("Low  impact (score < 10):  #{lowImpact.size()}")

@@ -1,0 +1,261 @@
+// Minimal 2-D particle physics simulation
+// Exercises: records, ADT enum, extension methods on Double/List,
+//            collection pipelines, generics, pattern matching, foreach (k,v),
+//            string interpolation, closures, try/catch, while.
+
+record Vec2(x: Double, y: Double) {
+public:
+  def plus(other: Vec2): Vec2  = new Vec2(x() + other.x(), y() + other.y())
+  def scale(s: Double): Vec2   = new Vec2(x() * s, y() * s)
+  def magnitude(): Double      = Math::sqrt(x() * x() + y() * y())
+  def dot(other: Vec2): Double = x() * other.x() + y() * other.y()
+  def normalized(): Vec2 {
+    val m = magnitude()
+    if m < 1.0e-12 { return new Vec2(0.0, 0.0) }
+    return new Vec2(x() / m, y() / m)
+  }
+  def distanceTo(other: Vec2): Double = new Vec2(x() - other.x(), y() - other.y()).magnitude()
+  def str(): String = "(#{Format::fixed(x(), 3)},#{Format::fixed(y(), 3)})"
+}
+
+enum Force {
+  case Gravity(g: Double)
+  case Spring(k: Double, anchor: Vec2, restLength: Double)
+  case Drag(coefficient: Double)
+  case Constant(fx: Double, fy: Double)
+}
+
+record Particle(id: Int, mass: Double, pos: Vec2, vel: Vec2) {
+public:
+  def applyForce(f: Force, dt: Double): Particle {
+    val acc: Vec2 = select f {
+      case g is Gravity:
+        new Vec2(0.0, -g.g())
+      case sp is Spring:
+        val disp = new Vec2(pos().x() - sp.anchor().x(), pos().y() - sp.anchor().y())
+        val dist = disp.magnitude()
+        val ext  = dist - sp.restLength()
+        val dir  = disp.normalized()
+        new Vec2(-sp.k() * ext * dir.x() / mass(), -sp.k() * ext * dir.y() / mass())
+      case dr is Drag:
+        new Vec2(-dr.coefficient() * vel().x() / mass(), -dr.coefficient() * vel().y() / mass())
+      case c is Constant:
+        new Vec2(c.fx() / mass(), c.fy() / mass())
+    }
+    val newVel = vel().plus(acc.scale(dt))
+    val newPos = pos().plus(newVel.scale(dt))
+    return new Particle(id(), mass(), newPos, newVel)
+  }
+  def kineticEnergy(): Double = 0.5 * mass() * vel().magnitude() * vel().magnitude()
+  def str(): String = "Particle[#{id()}] pos=#{pos().str()} vel=#{vel().str()} KE=#{Format::fixed(kineticEnergy(), 4)}"
+}
+
+record SimSnapshot(step: Int, particles: List[Particle]) {
+public:
+  def totalKE(): Double {
+    var sum: Double = 0.0
+    foreach p: Particle in particles() { sum = sum + p.kineticEnergy() }
+    return sum
+  }
+  def centerOfMass(): Vec2 {
+    var totalMass: Double = 0.0
+    var cx: Double = 0.0; var cy: Double = 0.0
+    foreach p: Particle in particles() {
+      totalMass = totalMass + p.mass()
+      cx = cx + p.mass() * p.pos().x()
+      cy = cy + p.mass() * p.pos().y()
+    }
+    if totalMass < 1.0e-12 { return new Vec2(0.0, 0.0) }
+    return new Vec2(cx / totalMass, cy / totalMass)
+  }
+  def str(): String = "Step #{step()}: totalKE=#{Format::fixed(totalKE(), 5)} CoM=#{centerOfMass().str()}"
+}
+
+extension List[Particle] {
+  def step(forces: List[Force], dt: Double): List[Particle] {
+    val result: List[Particle] = []
+    foreach p: Particle in self {
+      var cur: Particle = p
+      foreach f: Force in forces { cur = cur.applyForce(f, dt) }
+      result.add(cur)
+    }
+    return result
+  }
+  def heaviest(): Particle? {
+    var best: Particle? = null
+    foreach p: Particle in self {
+      if best == null || p.mass() > best.mass() { best = p }
+    }
+    return best
+  }
+}
+
+// Bounce a particle off an axis-aligned bounding box [xMin,xMax] x [yMin,yMax].
+def bounceBox(p: Particle, xMin: Double, xMax: Double, yMin: Double, yMax: Double): Particle {
+  var vx: Double = p.vel().x(); var vy: Double = p.vel().y()
+  var px: Double = p.pos().x(); var py: Double = p.pos().y()
+  if px < xMin { px = xMin; vx = -vx }
+  if px > xMax { px = xMax; vx = -vx }
+  if py < yMin { py = yMin; vy = -vy }
+  if py > yMax { py = yMax; vy = -vy }
+  return new Particle(p.id(), p.mass(), new Vec2(px, py), new Vec2(vx, vy))
+}
+
+// Check all pairs for proximity (elastic-like impulse if within threshold).
+def resolveCollisions(particles: List[Particle], threshold: Double): List[Particle] {
+  val n = particles.size()
+  val arr: Particle[] = new Particle[n]
+  foreach i: Int in 0..<n { arr[i] = particles.get(i) }
+  foreach i: Int in 0..<n {
+    foreach j: Int in (i + 1)..<n {
+      val pi = arr[i]; val pj = arr[j]
+      if pi.pos().distanceTo(pj.pos()) < threshold {
+        // Swap velocities (equal-mass impulse approximation)
+        arr[i] = new Particle(pi.id(), pi.mass(), pi.pos(), pj.vel())
+        arr[j] = new Particle(pj.id(), pj.mass(), pj.pos(), pi.vel())
+      }
+    }
+  }
+  val result: List[Particle] = []
+  foreach i: Int in 0..<n { result.add(arr[i]) }
+  return result
+}
+
+record SimStats(minKE: Double, maxKE: Double, avgKE: Double, steps: Int) {
+public:
+  def str(): String = "KE min=#{Format::fixed(minKE(), 4)} max=#{Format::fixed(maxKE(), 4)} avg=#{Format::fixed(avgKE(), 4)} over #{steps()} snapshots"
+}
+
+extension List[SimSnapshot] {
+  def computeStats(): SimStats {
+    if self.isEmpty() { return new SimStats(0.0, 0.0, 0.0, 0) }
+    var minKE: Double = 1.0e300
+    var maxKE: Double = -1.0e300
+    var sumKE: Double = 0.0
+    foreach snap: SimSnapshot in self {
+      val ke = snap.totalKE()
+      if ke < minKE { minKE = ke }
+      if ke > maxKE { maxKE = ke }
+      sumKE = sumKE + ke
+    }
+    return new SimStats(minKE, maxKE, sumKE / self.size(), self.size())
+  }
+}
+
+def runSim(particles: List[Particle], forces: List[Force], steps: Int, dt: Double): List[SimSnapshot] {
+  val snapshots: List[SimSnapshot] = []
+  var cur: List[Particle] = particles
+  foreach i: Int in 0..<steps {
+    cur = cur.step(forces, dt)
+    if i % 5 == 0 { snapshots.add(new SimSnapshot(i, cur)) }
+  }
+  return snapshots
+}
+
+def runBounce(particles: List[Particle], forces: List[Force], steps: Int, dt: Double,
+              xMin: Double, xMax: Double, yMin: Double, yMax: Double,
+              collisionThresh: Double): List[SimSnapshot] {
+  val snapshots: List[SimSnapshot] = []
+  var cur: List[Particle] = particles
+  foreach i: Int in 0..<steps {
+    cur = cur.step(forces, dt)
+    val bounced: List[Particle] = []
+    foreach p: Particle in cur { bounced.add(bounceBox(p, xMin, xMax, yMin, yMax)) }
+    cur = resolveCollisions(bounced, collisionThresh)
+    if i % 5 == 0 { snapshots.add(new SimSnapshot(i, cur)) }
+  }
+  return snapshots
+}
+
+def main(): void {
+  val p1 = new Particle(1, 1.0, new Vec2(0.0, 10.0), new Vec2(2.0, 0.0))
+  val p2 = new Particle(2, 2.0, new Vec2(5.0,  0.0), new Vec2(0.0, 1.5))
+  val p3 = new Particle(3, 0.5, new Vec2(-3.0, 2.0), new Vec2(1.0, -0.5))
+
+  val particles: List[Particle] = [p1, p2, p3]
+
+  val gravity: Force  = new Gravity(9.81)
+  val drag: Force     = new Drag(0.1)
+  val spring: Force   = new Spring(5.0, new Vec2(0.0, 0.0), 3.0)
+  val wind: Force     = new Constant(0.2, 0.0)
+
+  val forces: List[Force] = [gravity as Force, drag as Force, wind as Force]
+
+  IO::println("=== Physics Simulation ===")
+  IO::println("Particles: #{particles.size()}")
+  val heavy = particles.heaviest()
+  if heavy != null { IO::println("Heaviest: #{heavy.str()}") }
+
+  IO::println("")
+  IO::println("--- Free-fall + drag + wind (dt=0.01, 20 steps) ---")
+  val snapshots = runSim(particles, forces, 20, 0.01)
+  foreach snap: SimSnapshot in snapshots {
+    IO::println(snap.str())
+  }
+
+  IO::println("")
+  IO::println("--- Spring + drag (dt=0.005, 30 steps) ---")
+  val springForces: List[Force] = [spring as Force, drag as Force]
+  val springSnaps = runSim(particles, springForces, 30, 0.005)
+  foreach snap: SimSnapshot in springSnaps {
+    IO::println(snap.str())
+  }
+
+  IO::println("")
+  IO::println("--- Energy per particle at final state ---")
+  val final0 = snapshots
+  if !final0.isEmpty() {
+    val last = final0.get(final0.size() - 1)
+    foreach p: Particle in last.particles() {
+      IO::println("  #{p.str()}")
+    }
+  }
+
+  // Demonstrate select pattern matching on the force types
+  IO::println("")
+  IO::println("--- Force descriptions ---")
+  foreach f: Force in forces {
+    val desc: String = select f {
+      case g is Gravity:   "Gravity g=#{Format::fixed(g.g(), 2)} m/s^2"
+      case sp is Spring:   "Spring k=#{sp.k()} anchor=#{sp.anchor().str()} rest=#{sp.restLength()}"
+      case dr is Drag:     "Drag coeff=#{dr.coefficient()}"
+      case c is Constant:  "Constant (#{c.fx()}, #{c.fy()})"
+    }
+    IO::println("  #{desc}")
+  }
+
+  // Stats across all recorded snapshots
+  IO::println("")
+  IO::println("--- Simulation statistics ---")
+  IO::println("  Free-fall: #{snapshots.computeStats().str()}")
+  IO::println("  Spring:    #{springSnaps.computeStats().str()}")
+
+  // Bounded-box simulation with collision detection
+  IO::println("")
+  IO::println("--- Bouncing box (dt=0.02, 50 steps, box 10x10, collision r=1.5) ---")
+  val boxParticles: List[Particle] = [
+    new Particle(1, 1.0, new Vec2(3.0, 3.0), new Vec2(2.0, 3.0)) as Particle,
+    new Particle(2, 1.5, new Vec2(7.0, 2.0), new Vec2(-1.5, 2.0)) as Particle,
+    new Particle(3, 0.8, new Vec2(5.0, 8.0), new Vec2(0.5, -3.0)) as Particle
+  ]
+  val boxForces: List[Force] = [new Drag(0.05) as Force]
+  val boxSnaps = runBounce(boxParticles, boxForces, 50, 0.02, 0.0, 10.0, 0.0, 10.0, 1.5)
+  foreach snap: SimSnapshot in boxSnaps {
+    IO::println("  #{snap.str()}")
+  }
+  IO::println("  Box stats: #{boxSnaps.computeStats().str()}")
+
+  // Summary: map from particle ID to final KE
+  IO::println("")
+  IO::println("--- Final KE by particle ID (free-fall sim) ---")
+  if !snapshots.isEmpty() {
+    val finalSnap = snapshots.get(snapshots.size() - 1)
+    val keMap: Map[Int, String] = [:]
+    foreach p: Particle in finalSnap.particles() {
+      keMap.put(p.id(), Format::fixed(p.kineticEnergy(), 5))
+    }
+    foreach (k, v) in keMap {
+      IO::println("  p#{k}: KE = #{v}")
+    }
+  }
+}

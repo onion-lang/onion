@@ -85,6 +85,18 @@ private[compiler] final class InstanceMethodCallSupport(
         case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i
       }.toSet
       if (closureIndices.nonEmpty) {
+        // For a primitive receiver (e.g. Int boxed to Integer), native methods
+        // cannot exist on the boxed type, so an extension is the only possible
+        // match. Try it before re-entering bidirectional inference so that a
+        // typed closure (`{ (n: Int) -> ... }`) reaches the extension lookup
+        // rather than disappearing into the bidirectional re-inference path.
+        // For reference receivers (e.g. List), bidirectional inference is
+        // left in charge: it resolves overloads like Colls.map vs Iterables.map
+        // that would incorrectly surface as ambiguous if tried with typed params.
+        if (target.`type`.isBasicType) {
+          val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
+          if (ext.isDefined) return ext
+        }
         return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
       }
       // Resolution order for an unmatched call: extension methods first (a

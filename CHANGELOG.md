@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A block-wrapped lambda (`{ x -> expr }`) passed as a non-trailing or
+  non-only argument to an extension or static method reported E0052** ("lambda
+  parameter `x` must specify a type") even when the parameter type was fully
+  determinable from the callee's signature, because `{ x -> expr }` parses as
+  a `BlockExpression` wrapping a `ClosureExpression` rather than a bare
+  `ClosureExpression`, so the untyped-closure detection used by bidirectional
+  inference never matched it. `ArgumentHelpers.isClosureWithUntypedParams`
+  (and the matching inline checks in `StaticMethodCallSupport` and
+  `ConstructionTyping`) now unwrap one level to find an untyped closure as the
+  last element of such a block. Added a regression test to
+  `ExtensionMethodSpec`.
+
 ## [0.65.0] - 2026-09-07
 
 ### Fixed

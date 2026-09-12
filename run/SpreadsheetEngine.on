@@ -1,0 +1,313 @@
+// SpreadsheetEngine.on — A minimal spreadsheet evaluator.
+// Cells hold numeric values, text, or formulas (SUM/AVG/MAX/MIN over ranges).
+// Dependency resolution uses a memoised recursive resolver with cycle detection.
+//
+// Exercises: ADT enum (CellValue cases); records (Cell, Sheet, EvalResult);
+// generics (Map[String,Cell], List[String]); collection pipelines
+// (map/filter/sortedBy); foreach (k,v) over map entries; select
+// pattern matching; nullable and null checks; closures;
+// string interpolation; recursion; while loop.
+
+// ── Cell value (ADT) ──────────────────────────────────────────────────────────
+
+enum CellValue {
+  case Num(v: Double)
+  case Text(s: String)
+  case Formula(fn: String, refs: List[String])   // fn = SUM|AVG|MAX|MIN
+  case Empty
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Cell(id: String, raw: CellValue) {
+public:
+  def isFormula(): Boolean = raw() is Formula
+}
+
+record EvalResult(cellId: String, value: Double, hasError: Boolean, errorMsg: String?) {
+public:
+  static def ok(id: String, v: Double): EvalResult = new EvalResult(id, v, false, null)
+  static def err(id: String, msg: String): EvalResult = new EvalResult(id, 0.0, true, msg)
+  def formatted(): String {
+    if hasError() {
+      return "#{cellId()}: ERROR(#{errorMsg() ?: "?"})"
+    }
+    return "#{cellId()}: #{value()}"
+  }
+}
+
+record Sheet(cells: Map[String, Cell]) {
+public:
+  def get(id: String): Cell? = cells().get(id)
+  def ids(): List[String] {
+    val out: List[String] = []
+    foreach k: String in cells().keySet() { out.add(k) }
+    return out
+  }
+}
+
+// ── Evaluator ─────────────────────────────────────────────────────────────────
+
+class Evaluator {
+  var sheet: Sheet
+  var computed: Map[String, Double]
+  var visiting: List[String]
+
+public:
+  def this(s: Sheet) {
+    self.sheet = s
+    self.computed = [:]
+    self.visiting = []
+  }
+
+  def resolve(id: String): Double? {
+    val cached: Double? = computed.get(id)
+    if cached != null { return cached }
+
+    if visiting.contains(id) { return null }   // cycle detected
+
+    val cell: Cell? = sheet.get(id)
+    if cell == null { return null }
+
+    visiting.add(id)
+    val result: Double? = evalCell(cell)
+    visiting.remove(id)
+
+    if result != null {
+      computed.put(id, result)
+    }
+    return result
+  }
+
+  def evalCell(cell: Cell): Double? {
+    select cell.raw() {
+      case n is Num:
+        return n.v()
+      case t is Text:
+        return null
+      case e is Empty:
+        return null
+      case f is Formula:
+        return applyFormula(f.fn(), f.refs())
+    }
+  }
+
+  def applyFormula(fn: String, refs: List[String]): Double? {
+    val values: List[Double] = []
+    foreach r: String in refs {
+      val v: Double? = resolve(r)
+      if v == null { return null }   // propagate cycle / missing ref
+      values.add(v)
+    }
+    if values.size == 0 { return null }
+
+    select fn {
+      case "SUM":
+        var acc = 0.0
+        foreach v: Double in values { acc = acc + v }
+        return acc
+      case "AVG":
+        var acc = 0.0
+        foreach v: Double in values { acc = acc + v }
+        return acc / (values.size as Double)
+      case "MAX":
+        var best: Double = values.get(0) as Double
+        foreach v: Double in values {
+          if v > best { best = v }
+        }
+        return best
+      case "MIN":
+        var best: Double = values.get(0) as Double
+        foreach v: Double in values {
+          if v < best { best = v }
+        }
+        return best
+      else:
+        return null
+    }
+  }
+
+  def evaluateAll(): List[EvalResult] {
+    val results: List[EvalResult] = []
+    foreach id: String in sheet.ids() {
+      val cell: Cell? = sheet.get(id)
+      if cell == null { results.add(EvalResult::err(id, "missing")); continue }
+      select cell.raw() {
+        case t is Text:
+          results.add(EvalResult::err(id, "text cell"))
+        case e is Empty:
+          results.add(EvalResult::err(id, "empty"))
+        else:
+          val v: Double? = resolve(id)
+          if v == null {
+            results.add(EvalResult::err(id, "cycle or missing ref"))
+          } else {
+            results.add(EvalResult::ok(id, v))
+          }
+      }
+    }
+    return results
+  }
+}
+
+// ── Sheet builder (fluent API) ────────────────────────────────────────────────
+
+class SheetBuilder {
+  var data: Map[String, Cell]
+
+public:
+  def this() {
+    self.data = [:]
+  }
+
+  def num(id: String, v: Double): SheetBuilder {
+    data.put(id, new Cell(id, new Num(v)))
+    return self
+  }
+
+  def text(id: String, s: String): SheetBuilder {
+    data.put(id, new Cell(id, new Text(s)))
+    return self
+  }
+
+  def formula(id: String, fn: String, refs: List[String]): SheetBuilder {
+    data.put(id, new Cell(id, new Formula(fn, refs)))
+    return self
+  }
+
+  def build(): Sheet = new Sheet(data)
+}
+
+// ── Extension: Double formatting ──────────────────────────────────────────────
+
+extension Double {
+  // Round to 2 decimal places for display.
+  def fmt2(): String {
+    val bump: Double = if self >= 0.0 { 0.5 } else { -0.5 }
+    val shifted: Double = self * 100.0 + bump
+    val scaled: Long = shifted as Long
+    val int_part: Long = scaled / 100L
+    val frac: Long = scaled - int_part * 100L
+    val frac_abs: Long = if frac < 0L { 0L - frac } else { frac }
+    val frac_str: String = if frac_abs < 10L { "0" + frac_abs } else { "" + frac_abs }
+    return "#{int_part}.#{frac_str}"
+  }
+
+  def isWholeNumber(): Boolean {
+    val asLong: Long = self as Long
+    return (asLong as Double) == self
+  }
+}
+
+// ── Summary statistics from a result list ─────────────────────────────────────
+
+def computeStats(results: List[EvalResult]): String {
+  val ok: List[EvalResult] = results.filter { r -> !r.hasError() }
+  if ok.size == 0 { return "no numeric cells" }
+  val values: List[Double] = ok.map { r -> r.value() }
+  var total = 0.0
+  foreach v: Double in values { total = total + v }
+  val avg: Double = total / (ok.size as Double)
+  val maxV: Double = values.reduce { a, b -> if (a as Double) > (b as Double) { a } else { b } } as Double
+  val minV: Double = values.reduce { a, b -> if (a as Double) < (b as Double) { a } else { b } } as Double
+  return "sum=#{total.fmt2()}, avg=#{avg.fmt2()}, max=#{maxV.fmt2()}, min=#{minV.fmt2()}"
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+def printReport(title: String, results: List[EvalResult]): void {
+  IO::println("=== #{title} ===")
+  val sorted: List[EvalResult] = results.sortedBy { r -> r.cellId() }
+  foreach r: EvalResult in sorted {
+    IO::println("  " + r.formatted())
+  }
+  val ok: List[EvalResult] = results.filter { r -> !r.hasError() }
+  val errCount = results.size() - ok.size()
+  IO::println("  stats: " + computeStats(results))
+  IO::println("  --- #{ok.size()} ok, #{errCount} errors ---")
+  IO::println("")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Example 1: Sales report — quarterly totals and grand total
+  val sales: Sheet = new SheetBuilder()
+    .num("Q1", 12500.0)
+    .num("Q2", 18300.0)
+    .num("Q3", 15750.0)
+    .num("Q4", 21000.0)
+    .formula("H1", "SUM", ["Q1", "Q2"])
+    .formula("H2", "SUM", ["Q3", "Q4"])
+    .formula("YEAR", "SUM", ["H1", "H2"])
+    .formula("AVG_Q", "AVG", ["Q1", "Q2", "Q3", "Q4"])
+    .formula("BEST_Q", "MAX", ["Q1", "Q2", "Q3", "Q4"])
+    .formula("WORST_Q", "MIN", ["Q1", "Q2", "Q3", "Q4"])
+    .build()
+
+  val salesEval: Evaluator = new Evaluator(sales)
+  val salesResults: List[EvalResult] = salesEval.evaluateAll()
+  printReport("Annual Sales ($)", salesResults)
+
+  // Example 2: Grade book — student averages and class stats
+  val grades: Sheet = new SheetBuilder()
+    .num("Alice_M1", 88.0).num("Alice_M2", 92.0).num("Alice_Final", 95.0)
+    .num("Bob_M1",   75.0).num("Bob_M2",   80.0).num("Bob_Final",   78.0)
+    .num("Carol_M1", 95.0).num("Carol_M2", 91.0).num("Carol_Final", 98.0)
+    .formula("Alice_Avg", "AVG", ["Alice_M1", "Alice_M2", "Alice_Final"])
+    .formula("Bob_Avg",   "AVG", ["Bob_M1",   "Bob_M2",   "Bob_Final"])
+    .formula("Carol_Avg", "AVG", ["Carol_M1", "Carol_M2", "Carol_Final"])
+    .formula("ClassMax",  "MAX", ["Alice_Avg", "Bob_Avg", "Carol_Avg"])
+    .formula("ClassMin",  "MIN", ["Alice_Avg", "Bob_Avg", "Carol_Avg"])
+    .formula("ClassAvg",  "AVG", ["Alice_Avg", "Bob_Avg", "Carol_Avg"])
+    .build()
+
+  val gradesEval: Evaluator = new Evaluator(grades)
+  val gradesResults: List[EvalResult] = gradesEval.evaluateAll()
+  printReport("Grade Book (scores)", gradesResults)
+
+  // Example 3: Cycle detection
+  val cyclic: Sheet = new SheetBuilder()
+    .num("A", 10.0)
+    .formula("B", "SUM", ["A", "C"])
+    .formula("C", "SUM", ["B"])   // B depends on C which depends on B: cycle
+    .build()
+
+  val cyclicEval: Evaluator = new Evaluator(cyclic)
+  val cyclicResults: List[EvalResult] = cyclicEval.evaluateAll()
+  printReport("Cycle Detection", cyclicResults)
+
+  // Example 4: Project budget — multi-level dependency chains
+  // Pre-computed costs feed rollup formulas (Labour -> Subtotal -> Grand Total).
+  // 320h * $85 = $27200 (eng); 80h * $70 = $5600 (design); 120h * $60 = $7200 (QA)
+  val sb: SheetBuilder = new SheetBuilder()
+  val budget: Sheet = sb
+    .num("Eng_Cost",    27200.0)
+    .num("Design_Cost",  5600.0)
+    .num("QA_Cost",      7200.0)
+    .num("Materials",    5400.0)
+    .num("Contingency",  2000.0)
+    .formula("Labour_Total", "SUM", ["Eng_Cost", "Design_Cost", "QA_Cost"])
+    .formula("Subtotal",     "SUM", ["Labour_Total", "Materials", "Contingency"])
+    .formula("Max_Line",     "MAX", ["Eng_Cost", "Design_Cost", "QA_Cost", "Materials", "Contingency"])
+    .formula("Min_Line",     "MIN", ["Eng_Cost", "Design_Cost", "QA_Cost", "Materials", "Contingency"])
+    .formula("Avg_Line",     "AVG", ["Eng_Cost", "Design_Cost", "QA_Cost", "Materials", "Contingency"])
+    .build()
+
+  val budgetEval: Evaluator = new Evaluator(budget)
+  val budgetResults: List[EvalResult] = budgetEval.evaluateAll()
+  printReport("Project Budget ($)", budgetResults)
+
+  // Show only the summary cells (those without underscores in parts)
+  val summaries: List[EvalResult] = budgetResults.filter { r ->
+    val id = r.cellId()
+    id == "Labour_Total" || id == "Subtotal" || id == "Max_Line" || id == "Min_Line" || id == "Avg_Line"
+  }
+  IO::println("=== Budget Summary ===")
+  foreach r: EvalResult in summaries.sortedBy { r -> r.cellId() } {
+    IO::println("  #{r.cellId()}: #{r.value().fmt2()}")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

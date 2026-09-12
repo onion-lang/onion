@@ -320,6 +320,7 @@ final class ConstructionTyping(
     // path performs for every closure argument.
     val untypedClosureIndices = node.args.zipWithIndex.collect {
       case (_: AST.ClosureExpression, i) => i
+      case (block: AST.BlockExpression, i) if block.elements.nonEmpty && block.elements.last.isInstanceOf[AST.ClosureExpression] => i
     }.toSet
     if (untypedClosureIndices.nonEmpty) {
       resolveConstructorForClosures(node, typeRef, context, untypedClosureIndices) match {

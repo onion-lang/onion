@@ -1,0 +1,347 @@
+// ProbDataStructures.on — Probabilistic data structures: Bloom Filter and
+// Count-Min Sketch. Space-efficient, approximate; fast insert + query.
+// Exercises: classes, private: sections, Int[] arrays, extension methods,
+// for loops, while loops, foreach, collection pipelines (map/filter/find),
+// string interpolation, nullable types, records, select/is, closures,
+// ADT enum (QueryResult), recursion-free hashing.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+// Multiplicative hash: mix the key with a prime seed, return a non-negative int
+extension Int {
+  def hashMix(seed: Int): Int {
+    var h: Int = self ^ seed
+    h = h ^ (h >> 16)
+    h = h * (0 - 2048144789)   // -2048144789 = 0x84222325 (prime-ish)
+    h = h ^ (h >> 13)
+    h = h * (0 - 1028477387)   // -1028477387 = 0xC2B2AE35 (prime-ish)
+    h = h ^ (h >> 16)
+    if h < 0 { return h & 2147483647 } else { return h }
+  }
+}
+
+extension String {
+  def hashCode32(): Int {
+    var h: Int = 0
+    var i: Int = 0
+    while i < self.length {
+      val c: Int = self.charAt(i) as Int
+      h = h * 31 + c
+      i = i + 1
+    }
+    if h < 0 { return h & 2147483647 } else { return h }
+  }
+
+  def hashWithSeed(seed: Int): Int = self.hashCode32().hashMix(seed)
+}
+
+// ─── Bloom Filter ─────────────────────────────────────────────────────────────
+// Space-efficient probabilistic set: may return false positives on `mightContain`,
+// never false negatives on `definitelyAbsent`.
+//
+//   k hash functions, m bits. For n expected elements:
+//   optimal k = (m/n) * ln(2)
+//   false-positive rate ≈ (1 - e^(-kn/m))^k
+
+class BloomFilter {
+  var bits:    Boolean[]
+  var k:       Int        // number of hash functions
+  var m:       Int        // number of bits
+  var inserted: Int       // approximate insert count (for reporting)
+public:
+  // m: bit-array size;  k: number of hash functions (2-7 recommended)
+  def this(m: Int, k: Int) {
+    bits = new Boolean[m]
+    for var i: Int = 0; i < m; i++ { bits[i] = false }
+    self.k = k
+    self.m = m
+    inserted = 0
+  }
+
+  def add(key: String): void {
+    for var i: Int = 0; i < k; i++ {
+      val idx: Int = key.hashWithSeed(i * (0 - 1640531535)) % m
+      bits[idx] = true
+    }
+    inserted = inserted + 1
+  }
+
+  def mightContain(key: String): Boolean {
+    for var i: Int = 0; i < k; i++ {
+      val idx: Int = key.hashWithSeed(i * (0 - 1640531535)) % m
+      if !bits[idx] { return false }
+    }
+    return true
+  }
+
+  def definitelyAbsent(key: String): Boolean = !mightContain(key)
+
+  // Estimated false-positive probability given actual insertion count
+  def fpRate(): Double {
+    val n: Double = inserted as Double
+    val mD: Double = m as Double
+    val kD: Double = k as Double
+    // (1 - e^(-k*n/m))^k — approximated with a fast power
+    val fillRatio: Double = kD * n / mD
+    val eFill: Double = approxExp(0.0 - fillRatio)
+    val base: Double  = 1.0 - eFill
+    return powDouble(base, k)
+  }
+
+  def bitsSet(): Int {
+    var count: Int = 0
+    for var i: Int = 0; i < m; i++ {
+      if bits[i] { count = count + 1 }
+    }
+    return count
+  }
+
+  def summary(): String =
+    "BloomFilter(m=" + m.toString() + " k=" + k.toString() +
+    " inserted≈" + inserted.toString() + " bitsSet=" + bitsSet().toString() + ")"
+
+private:
+  def approxExp(x: Double): Double {
+    // Taylor series: e^x ≈ 1 + x + x²/2 + x³/6 + x⁴/24 + x⁵/120
+    var result: Double = 1.0
+    var term: Double   = 1.0
+    var i: Int = 1
+    while i <= 10 {
+      term = term * x / (i as Double)
+      result = result + term
+      i = i + 1
+    }
+    if result < 0.0 { return 0.0 }
+    if result > 1.0 { return 1.0 }
+    return result
+  }
+
+  def powDouble(base: Double, exp: Int): Double {
+    var result: Double = 1.0
+    var i: Int = 0
+    while i < exp { result = result * base; i = i + 1 }
+    return result
+  }
+}
+
+// ─── Count-Min Sketch ────────────────────────────────────────────────────────
+// Point-query frequency estimator: may over-count (never under-count).
+// d hash functions, w counters each row.
+// Estimates the count of an element with probability ≥ 1 - δ, ε error factor.
+
+class CountMinSketch {
+  var counts: Int[]      // flattened d × w counter table (row r, col c → counts[r*w+c])
+  var d: Int             // depth (number of hash rows)
+  var w: Int             // width (counters per row)
+  var total: Int         // total insertions
+
+public:
+  def this(w: Int, d: Int) {
+    self.w = w
+    self.d = d
+    counts = new Int[d * w]
+    for var i: Int = 0; i < d * w; i++ { counts[i] = 0 }
+    total = 0
+  }
+
+  def add(key: String): void { addN(key, 1) }
+
+  def addN(key: String, n: Int): void {
+    for var i: Int = 0; i < d; i++ {
+      val idx: Int = key.hashWithSeed((i + 1) * 1000003) % w
+      counts[i * w + idx] = counts[i * w + idx] + n
+    }
+    total = total + n
+  }
+
+  // Point query: minimum over all hash-row estimates (never under-counts)
+  def estimate(key: String): Int {
+    var minVal: Int = 2147483647
+    for var i: Int = 0; i < d; i++ {
+      val idx: Int = key.hashWithSeed((i + 1) * 1000003) % w
+      val c: Int   = counts[i * w + idx]
+      if c < minVal { minVal = c }
+    }
+    return minVal
+  }
+
+  // Heavy hitter check: does this key account for > threshold fraction?
+  def isHeavyHitter(key: String, threshold: Double): Boolean {
+    val est: Double = estimate(key) as Double
+    val tot: Double = total as Double
+    return tot > 0.0 && (est / tot) >= threshold
+  }
+
+  def summary(): String =
+    "CountMinSketch(w=" + w.toString() + " d=" + d.toString() +
+    " total=" + total.toString() + ")"
+}
+
+// ─── ADT: query outcome ───────────────────────────────────────────────────────
+enum QueryResult {
+  case Found(key: String, count: Int)
+  case ProbablyAbsent(key: String)
+  case DefinitelyAbsent(key: String)
+public:
+  def describe(): String = select this {
+    case f  is Found:            "#{f.key()} → present, count≈#{f.count()}"
+    case pa is ProbablyAbsent:   "#{pa.key()} → might be absent (bloom says present)"
+    case da is DefinitelyAbsent: "#{da.key()} → definitely absent"
+  }
+}
+
+// ─── Word-frequency estimation demo ──────────────────────────────────────────
+
+def isAlphaChar(c: Int): Boolean = (c >= 97 && c <= 122) || (c >= 65 && c <= 90)
+
+def tokenize(text: String): List[String] {
+  val words: List[String] = []
+  var start: Int = -1
+  var i: Int = 0
+  while i <= text.length {
+    val isAlpha: Boolean = i < text.length && isAlphaChar(text.charAt(i) as Int)
+    if isAlpha && start < 0 {
+      start = i
+    } else if !isAlpha && start >= 0 {
+      val word: String = text.substring(start, i).toLowerCase()
+      if word.length > 1 { words.add(word) }
+      start = -1
+    }
+    i = i + 1
+  }
+  return words
+}
+
+def pct2(x: Double): String {
+  val scaled: Int = (x * 10000.0) as Int
+  val whole: Int  = scaled / 100
+  val frac: Int   = scaled % 100
+  return whole.toString() + "." + (if frac < 10 { "0" + frac.toString() } else { frac.toString() }) + "%"
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+IO::println("═══ Bloom Filter Demo ═══")
+IO::println("")
+
+val bf: BloomFilter = new BloomFilter(256, 4)  // 256 bits, 4 hash functions
+
+val fruits: List[String] = ["apple", "banana", "cherry", "date", "elderberry",
+                             "fig", "grape", "honeydew", "kiwi", "lemon",
+                             "mango", "nectarine", "orange", "papaya", "quince"]
+foreach fruit: String in fruits { bf.add(fruit) }
+IO::println(bf.summary())
+IO::println("Expected FP rate: " + pct2(bf.fpRate()))
+IO::println("")
+
+// Check known members and non-members
+val queries: List[String] = ["apple", "mango", "cherry",
+                              "avocado", "blueberry", "plum", "pear",
+                              "watermelon", "lemon", "peach"]
+IO::println("Member queries:")
+foreach q: String in queries {
+  val in_set: Boolean = fruits.find { f: String -> f == q } != null
+  val bloom:  Boolean = bf.mightContain(q)
+  val status: String  =
+    if in_set  && bloom   { "TRUE-POSITIVE ✓" }
+    else if !in_set && bloom  { "FALSE-POSITIVE!" }
+    else if in_set  && !bloom { "FALSE-NEGATIVE! (BUG)" }
+    else                      { "TRUE-NEGATIVE ✓" }
+  IO::println("  " + q + ": " + status)
+}
+
+// Fill to near capacity to observe FP rise
+val bf2: BloomFilter = new BloomFilter(64, 3)
+IO::println("")
+IO::println("FP rate as filter fills (64 bits, 3 hashes):")
+var fpAccum: Int = 0
+var count: Int = 0
+foreach fruit: String in fruits {
+  bf2.add(fruit)
+  count = count + 1
+  IO::println("  After " + count.toString() + " inserts: est. FP = " + pct2(bf2.fpRate()))
+}
+
+IO::println("")
+IO::println("═══ Count-Min Sketch Demo ═══")
+IO::println("")
+
+val text: String = "to be or not to be that is the question whether tis nobler in the mind to suffer the slings and arrows of outrageous fortune or to take arms against a sea of troubles and by opposing end them to die to sleep no more and by a sleep to say we end the heartache and the thousand natural shocks that flesh is heir to tis a consummation devoutly to be wished to die to sleep to sleep perchance to dream"
+
+val words: List[String] = tokenize(text)
+IO::println("Text: \"" + (if text.length > 60 { text.substring(0, 60) + "..." } else { text }) + "\"")
+IO::println("Total words: " + words.size.toString())
+
+val cms: CountMinSketch = new CountMinSketch(32, 3)  // 32 wide, 3 deep
+foreach word: String in words { cms.add(word) }
+IO::println(cms.summary())
+IO::println("")
+
+// Estimate counts for key words
+val targets: List[String] = ["to", "the", "be", "sleep", "die", "and", "a", "not", "or", "dream"]
+IO::println("Estimated word frequencies (CMS vs actual):")
+
+// Compute actual counts with a simple Map for comparison
+val actualCounts: Map[String, Int] = [:]
+foreach word: String in words {
+  val prev: Int? = actualCounts.get(word)
+  actualCounts.put(word, if prev == null { 1 } else { prev + 1 })
+}
+
+foreach target: String in targets {
+  val est: Int    = cms.estimate(target)
+  val actual: Int? = actualCounts.get(target)
+  val act: Int    = if actual == null { 0 } else { actual as Int }
+  val error: Int  = est - act
+  IO::println("  \"" + target + "\": actual=" + act.toString() + " est=" + est.toString() + " error=+" + error.toString())
+}
+
+IO::println("")
+
+// Heavy hitter detection: words accounting for > 5% of total
+IO::println("Heavy hitters (> 5% of total words):")
+val heavy: List[String] = targets.filter { t: String -> cms.isHeavyHitter(t, 0.05) }
+IO::println("  " + (if heavy.size == 0 { "(none)" } else { Strings::join(heavy, ", ") }))
+
+// Show actual percentages
+IO::println("  Actual rates:")
+foreach target: String in targets {
+  val actual: Int? = actualCounts.get(target)
+  val act: Int    = if actual == null { 0 } else { actual as Int }
+  val rate: Double = (act as Double) / (words.size as Double)
+  IO::println("    " + target + ": " + pct2(rate) + " (" + act.toString() + "/" + words.size.toString() + ")")
+}
+
+IO::println("")
+
+// Bloom + CMS integration: query pipeline
+IO::println("═══ Integrated Query Pipeline ═══")
+IO::println("")
+
+val dictBloom: BloomFilter  = new BloomFilter(512, 5)
+val freqSketch: CountMinSketch = new CountMinSketch(64, 4)
+
+foreach word: String in words {
+  dictBloom.add(word)
+  freqSketch.add(word)
+}
+
+def queryWord(word: String): QueryResult {
+  if dictBloom.definitelyAbsent(word) {
+    return new DefinitelyAbsent(word)
+  }
+  val est: Int = freqSketch.estimate(word)
+  if est == 0 {
+    return new ProbablyAbsent(word)
+  }
+  return new Found(word, est)
+}
+
+val queryTerms: List[String] = ["to", "be", "dream", "question", "sword", "hamlet", "sleep", "xyz"]
+foreach term: String in queryTerms {
+  val result: QueryResult = queryWord(term)
+  IO::println("  " + result.describe())
+}
+
+IO::println("")
+IO::println("Done.")

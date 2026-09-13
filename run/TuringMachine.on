@@ -1,0 +1,271 @@
+// TuringMachine.on — A Turing Machine simulator (~200 lines)
+// Exercises: ADT enums, records with extension methods, classes,
+// collection pipelines (map/filter/fold/sortedBy/groupBy), select/type-pattern
+// matching, string interpolation, nullable types, while loops, foreach over
+// ranges and map entries, extension methods on String and Int.
+
+// ─── String extension: repeat ─────────────────────────────────────────────────
+extension String {
+  def times(n: Int): String {
+    var r: String = ""
+    for var i: Int = 0; i < n; i++ { r = r + self }
+    return r
+  }
+  def padEnd(width: Int, ch: String): String {
+    var s: String = self
+    while s.length() < width { s = s + ch }
+    return s
+  }
+}
+
+// ─── Direction (ADT enum) ─────────────────────────────────────────────────────
+enum Direction {
+  case MoveLeft
+  case MoveRight
+  case Stay
+public:
+  def symbol(): String = select this {
+    case d is MoveLeft:  "L"
+    case d is MoveRight: "R"
+    case d is Stay:      "-"
+  }
+}
+
+// ─── Transition rule ──────────────────────────────────────────────────────────
+record Transition(fromState: String, readSym: String, writeSym: String, dir: Direction, toState: String) {
+public:
+  def describe(): String =
+    "(#{fromState()}, '#{readSym()}') -> '#{writeSym()}' #{dir().symbol()} #{toState()}"
+}
+
+// ─── Tape (string of symbols; pos = head position; blank = '_') ──────────────
+record Tape(cells: String, pos: Int) {
+public:
+  def headSym(): String = "" + cells().charAt(pos())
+
+  def render(): String {
+    val c: String = cells()
+    val p: Int = pos()
+    val left: String  = c.substring(0, p)
+    val sym: String   = "" + c.charAt(p)
+    val right: String = if p + 1 < c.length() { c.substring(p + 1) } else { "" }
+    return left + "[" + sym + "]" + right
+  }
+}
+
+extension Tape {
+  def write(sym: String): Tape {
+    val c: String = self.cells()
+    val p: Int = self.pos()
+    val after: String = if p + 1 < c.length() { c.substring(p + 1) } else { "" }
+    return new Tape(c.substring(0, p) + sym + after, p)
+  }
+
+  def moveLeft(): Tape {
+    if self.pos() == 0 { return new Tape("_" + self.cells(), 0) }
+    return new Tape(self.cells(), self.pos() - 1)
+  }
+
+  def moveRight(): Tape {
+    val newPos: Int = self.pos() + 1
+    if newPos >= self.cells().length() { return new Tape(self.cells() + "_", newPos) }
+    return new Tape(self.cells(), newPos)
+  }
+
+  def applyDir(dir: Direction): Tape = select dir {
+    case d is MoveLeft:  self.moveLeft()
+    case d is MoveRight: self.moveRight()
+    case d is Stay:      self
+  }
+}
+
+// Strip trailing blanks (keep at least one char).
+def stripBlanks(s: String): String {
+  var r: String = s
+  while r.length() > 1 && r.endsWith("_") {
+    r = r.substring(0, r.length() - 1)
+  }
+  return r
+}
+
+def sep(n: Int): String = "-".times(n)
+
+// ─── Turing Machine ───────────────────────────────────────────────────────────
+class TuringMachine {
+  var curState: String
+  var curTape: Tape
+  val transMap: Map[String, Object]   // "state|sym" -> Transition
+  val acceptSet: List[String]
+
+public:
+  def this(initState: String, tape: Tape, rules: List[Object], accepts: List[String]) {
+    curState = initState
+    curTape  = tape
+    acceptSet = accepts
+    transMap = [:]
+    foreach r: Transition in rules {
+      transMap.put(r.fromState() + "|" + r.readSym(), r)
+    }
+  }
+
+  def state(): String = curState
+  def tape(): Tape    = curTape
+
+  def isAccepted(): Boolean = acceptSet.contains(curState)
+
+  def lookup(st: String, sym: String): Transition? {
+    val key: String = st + "|" + sym
+    if !transMap.containsKey(key) { return null }
+    return transMap.get(key) as Transition
+  }
+
+  // Take one step; return false if no applicable transition (halted).
+  def step(): Boolean {
+    val sym: String = curTape.headSym()
+    val t: Transition? = lookup(curState, sym)
+    if t == null { return false }
+    curTape  = curTape.write(t.writeSym()).applyDir(t.dir())
+    curState = t.toState()
+    return true
+  }
+
+  // Run up to maxSteps steps; return step count. Print each step if verbose.
+  def run(maxSteps: Int, verbose: Boolean): Int {
+    var steps: Int = 0
+    if verbose { IO::println("  Init: #{curTape.render()}  state=#{curState}") }
+    while steps < maxSteps && step() {
+      steps++
+      if verbose { IO::println("  Step #{steps}: #{curTape.render()}  state=#{curState}") }
+    }
+    return steps
+  }
+
+  def printTable(): void {
+    IO::println("  Transition table:")
+    val keys: List[Object] = []
+    foreach k: Object in transMap.keySet() { keys.add(k) }
+    val sorted: List[Object] = keys.sortedBy { k -> k as String }
+    foreach k: String in sorted {
+      val t: Transition = transMap.get(k) as Transition
+      IO::println("    " + t.describe())
+    }
+  }
+}
+
+// ─── Machine builders ─────────────────────────────────────────────────────────
+
+// Binary increment: scan right to blank, then carry-ripple left.
+def makeBinaryIncrement(input: String): TuringMachine {
+  val rules: List[Object] = [
+    new Transition("scan", "0", "0", new MoveRight(), "scan"),
+    new Transition("scan", "1", "1", new MoveRight(), "scan"),
+    new Transition("scan", "_", "_", new MoveLeft(),  "carry"),
+    new Transition("carry", "1", "0", new MoveLeft(), "carry"),
+    new Transition("carry", "0", "1", new Stay(),     "done"),
+    new Transition("carry", "_", "1", new Stay(),     "done")
+  ]
+  return new TuringMachine("scan", new Tape(input + "_", 0), rules, ["done"])
+}
+
+// Even-ones: accept binary strings where # of '1' bits is even.
+def makeEvenOnes(input: String): TuringMachine {
+  val rules: List[Object] = [
+    new Transition("even", "0", "0", new MoveRight(), "even"),
+    new Transition("even", "1", "1", new MoveRight(), "odd"),
+    new Transition("even", "_", "_", new Stay(),      "accept"),
+    new Transition("odd",  "0", "0", new MoveRight(), "odd"),
+    new Transition("odd",  "1", "1", new MoveRight(), "even"),
+    new Transition("odd",  "_", "_", new Stay(),      "reject")
+  ]
+  return new TuringMachine("even", new Tape(input + "_", 0), rules, ["accept"])
+}
+
+// ─── Step-result record (for summary pipeline) ────────────────────────────────
+record StepResult(label: String, accepted: Boolean, steps: Int, finalTape: String) {
+public:
+  def outcome(): String = if accepted() { "ACCEPT" } else { "REJECT" }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("=== Turing Machine Simulator ===")
+  IO::println("")
+
+  // ── Binary increment ──────────────────────────────────────────────────────
+  IO::println(sep(52))
+  IO::println("  Binary Increment Machine")
+  IO::println(sep(52))
+  val incrCases: List[Object] = ["0", "1", "1011", "0000", "1111", "10111"]
+  val incrResults: List[Object] = []
+  var firstIncr: Boolean = true
+  foreach input: String in incrCases {
+    val tm: TuringMachine = makeBinaryIncrement(input)
+    if firstIncr {
+      tm.printTable()
+      IO::println("")
+      firstIncr = false
+    }
+    val steps: Int = tm.run(200, false)
+    val result: String = stripBlanks(tm.tape().cells())
+    IO::println("  #{input.padEnd(6, " ")} -> #{result}  (#{steps} steps, #{if tm.isAccepted() { "ok" } else { "FAIL" }})")
+    incrResults.add(new StepResult("incr(#{input})", tm.isAccepted(), steps, result))
+  }
+
+  // ── Even-ones recognizer ──────────────────────────────────────────────────
+  IO::println("")
+  IO::println(sep(52))
+  IO::println("  Even-Ones Recognizer")
+  IO::println(sep(52))
+  val evenCases: List[Object] = ["", "0", "1", "11", "10", "1100", "1010", "101", "11110000", "1111"]
+  val evenResults: List[Object] = []
+  var firstEven: Boolean = true
+  foreach input: String in evenCases {
+    val tm: TuringMachine = makeEvenOnes(input)
+    if firstEven {
+      tm.printTable()
+      IO::println("")
+      firstEven = false
+    }
+    val steps: Int = tm.run(200, input.length() <= 4)
+    var ones: Int = 0
+    for var ci: Int = 0; ci < input.length(); ci++ {
+      if ("" + input.charAt(ci)) == "1" { ones++ }
+    }
+    IO::println("  '#{input.padEnd(8, " ")}' -> #{tm.state().padEnd(7, " ")} (#{ones} ones, #{steps} steps)")
+    evenResults.add(new StepResult("even1s(#{input})", tm.isAccepted(), steps, input))
+  }
+
+  // ── Summary via collection pipelines ─────────────────────────────────────
+  IO::println("")
+  IO::println(sep(52))
+  IO::println("  Summary")
+  IO::println(sep(52))
+
+  val allResults: List[Object] = []
+  foreach r: StepResult in incrResults  { allResults.add(r) }
+  foreach r: StepResult in evenResults  { allResults.add(r) }
+
+  val accepted: List[Object] = allResults.filter { r -> (r as StepResult).accepted() }
+  val rejected: List[Object] = allResults.filter { r -> !(r as StepResult).accepted() }
+  IO::println("  Total: #{allResults.size}  Accepted: #{accepted.size}  Rejected: #{rejected.size}")
+
+  val avgSteps: Double =
+    (allResults.fold(0) { acc, r -> acc + (r as StepResult).steps() } as Int as Double) /
+    (allResults.size as Double)
+  IO::println("  Avg steps: #{avgSteps as Int}")
+
+  IO::println("  By step count (ascending):")
+  val bySteps: List[Object] = allResults.sortedBy { r -> (r as StepResult).steps() }
+  foreach r: StepResult in bySteps {
+    IO::println("    #{r.label().padEnd(20, " ")} #{r.outcome()}  #{r.steps()} steps")
+  }
+
+  // groupBy outcome
+  val byOutcome: Map[Object, List[Object]] = allResults.groupBy { r -> (r as StepResult).outcome() }
+  IO::println("")
+  IO::println("  Grouped by outcome:")
+  foreach (outcome, group) in byOutcome {
+    val g: List[Object] = group as List[Object]
+    IO::println("    #{outcome}: #{g.size} case(s)")
+  }
+}

@@ -1,0 +1,311 @@
+// GraphPathfinder.on - Graph algorithms: DFS, BFS, and Dijkstra
+// Exercises: records, ADT enums, classes, collection pipelines,
+// pattern matching, closures, recursion, while/foreach loops, nullable types
+
+record Vertex(id: Int, label: String)
+
+record Edge(fromId: Int, toId: Int, weight: Int)
+
+enum PathResult {
+  case Found(path: List[Int], totalCost: Int)
+  case NotReachable(fromId: Int, toId: Int)
+}
+
+// Tracks DFS progress: visited set and current path
+class DfsState {
+public:
+  var visited: Map[Int, Boolean]
+  var path: List[Int]
+  var found: Boolean
+
+  def this {
+    self.visited = [:]
+    self.path = []
+    self.found = false
+  }
+}
+
+class Graph {
+  var vertices: Map[Int, Vertex]
+  var adjacency: Map[Int, List[Edge]]
+
+public:
+  def this {
+    self.vertices = [:]
+    self.adjacency = [:]
+  }
+
+  def addVertex(v: Vertex): void {
+    self.vertices[v.id()] = v
+    if self.adjacency[v.id()] == null {
+      self.adjacency[v.id()] = []
+    }
+  }
+
+  def addEdge(e: Edge): void {
+    val neighbors: List[Edge] = self.adjacency[e.fromId()]
+    neighbors.add(e)
+  }
+
+  def addUndirectedEdge(from: Int, to: Int, weight: Int): void {
+    self.addEdge(new Edge(from, to, weight))
+    self.addEdge(new Edge(to, from, weight))
+  }
+
+  def vertexLabel(id: Int): String {
+    val v: Vertex? = self.vertices[id]
+    if v == null { return "#" + id }
+    return v.label()
+  }
+
+  def neighborsOf(id: Int): List[Edge] {
+    val nb: List[Edge]? = self.adjacency[id]
+    if nb == null { return [] }
+    return nb
+  }
+
+  def vertexCount: Int = self.vertices.size
+
+  // DFS: recursive depth-first search; returns path or empty list
+  def dfs(startId: Int, goalId: Int): List[Int] {
+    val state: DfsState = new DfsState()
+    self.dfsVisit(startId, goalId, state)
+    return if state.found { state.path } else { [] }
+  }
+
+  def dfsVisit(current: Int, goal: Int, state: DfsState): void {
+    if state.found { return }
+    state.visited[current] = true
+    state.path.add(current)
+    if current == goal {
+      state.found = true
+      return
+    }
+    foreach edge: Edge in self.neighborsOf(current) {
+      val nb: Int = edge.toId()
+      if state.visited[nb] == null && !state.found {
+        self.dfsVisit(nb, goal, state)
+      }
+    }
+    if !state.found {
+      state.path.remove(state.path.size - 1)
+    }
+  }
+
+  // BFS: breadth-first search; returns path as list of vertex IDs
+  def bfs(startId: Int, goalId: Int): List[Int] {
+    if startId == goalId { return [startId] }
+
+    val visited: Map[Int, Boolean] = [:]
+    val parent: Map[Int, Int] = [:]
+    val queue: List[Int] = [startId]
+    visited[startId] = true
+
+    while queue.size > 0 {
+      val current: Int = queue.remove(0) as Int
+      foreach edge: Edge in self.neighborsOf(current) {
+        val nb: Int = edge.toId()
+        if visited[nb] == null {
+          visited[nb] = true
+          parent[nb] = current
+          if nb == goalId {
+            val path: List[Int] = []
+            var node: Int = goalId
+            while node != startId {
+              path.add(0, node)
+              node = parent[node] as Int
+            }
+            path.add(0, startId)
+            return path
+          }
+          queue.add(nb)
+        }
+      }
+    }
+    return []
+  }
+
+  // Dijkstra: returns PathResult with shortest weighted path
+  def dijkstra(startId: Int, goalId: Int): PathResult {
+    val dist: Map[Int, Int] = [:]
+    val prev: Map[Int, Int] = [:]
+    val unvisited: List[Int] = []
+
+    // initialize distances
+    foreach id: Int in self.vertices.keySet() {
+      dist[id] = if id == startId { 0 } else { 999999 }
+      unvisited.add(id)
+    }
+
+    while unvisited.size > 0 {
+      // pick unvisited node with smallest distance
+      var bestId: Int = unvisited[0] as Int
+      var bestDist: Int = dist[bestId] as Int
+      foreach uid: Int in unvisited {
+        val d: Int = dist[uid] as Int
+        if d < bestDist {
+          bestDist = d
+          bestId = uid
+        }
+      }
+
+      if bestDist >= 999999 { break }   // remaining nodes unreachable
+      // remove by index (not by value) to avoid Java's remove(int index) ambiguity
+      unvisited.remove(unvisited.indexOf(bestId))
+
+      if bestId == goalId {
+        // reconstruct path by walking prev[] back from goal to start
+        val path: List[Int] = []
+        var node: Int = goalId
+        path.add(0, node)
+        while prev[node] != null {
+          node = prev[node] as Int
+          path.add(0, node)
+          if node == startId { break }
+        }
+        return new Found(path, bestDist)
+      }
+
+      foreach edge: Edge in self.neighborsOf(bestId) {
+        val nb: Int = edge.toId()
+        if unvisited.contains(nb) {
+          val newDist: Int = bestDist + edge.weight()
+          val oldDist: Int = dist[nb] as Int
+          if newDist < oldDist {
+            dist[nb] = newDist
+            prev[nb] = bestId
+          }
+        }
+      }
+    }
+    return new NotReachable(startId, goalId)
+  }
+}
+
+// Print a path using vertex labels
+def printPath(g: Graph, path: List[Int], label: String): void {
+  IO::print(label + ": ")
+  if path.size == 0 {
+    IO::println("(unreachable)")
+    return
+  }
+  var i: Int = 0
+  while i < path.size {
+    if i > 0 { IO::print(" -> ") }
+    IO::print(g.vertexLabel(path[i] as Int))
+    i++
+  }
+  IO::println("")
+}
+
+// Print Dijkstra result using ADT pattern matching
+def printDijkstra(g: Graph, result: PathResult, label: String): void {
+  IO::print(label + ": ")
+  select result {
+  case r is Found:
+    var i: Int = 0
+    while i < r.path().size {
+      if i > 0 { IO::print(" -> ") }
+      IO::print(g.vertexLabel(r.path()[i] as Int))
+      i++
+    }
+    IO::println(" (cost: " + r.totalCost() + ")")
+  case nr is NotReachable:
+    IO::println("no path from " + g.vertexLabel(nr.fromId()) + " to " + g.vertexLabel(nr.toId()))
+  }
+}
+
+// Build a sample city road network
+def buildCityGraph: Graph {
+  val g: Graph = new Graph()
+  val names: List[String] = ["Airport", "Downtown", "Station", "Park",
+                              "Hospital", "Market", "University"]
+  foreach id: Int in 0..<7 {
+    g.addVertex(new Vertex(id, names[id]))
+  }
+  g.addUndirectedEdge(0, 1, 10)
+  g.addUndirectedEdge(1, 2, 5)
+  g.addUndirectedEdge(1, 3, 8)
+  g.addUndirectedEdge(2, 4, 6)
+  g.addUndirectedEdge(3, 4, 12)
+  g.addUndirectedEdge(3, 5, 4)
+  g.addUndirectedEdge(4, 6, 9)
+  g.addUndirectedEdge(5, 6, 7)
+  return g
+}
+
+val g: Graph = buildCityGraph()
+IO::println("=== City Road Network (" + g.vertexCount + " locations) ===")
+IO::println("")
+
+IO::println("--- BFS (fewest hops) ---")
+printPath(g, g.bfs(0, 6), "Airport -> University")
+printPath(g, g.bfs(0, 5), "Airport -> Market")
+printPath(g, g.bfs(2, 6), "Station -> University")
+
+IO::println("")
+IO::println("--- DFS (depth-first exploration) ---")
+printPath(g, g.dfs(0, 6), "Airport -> University")
+printPath(g, g.dfs(0, 5), "Airport -> Market")
+
+IO::println("")
+IO::println("--- Dijkstra (shortest weighted path) ---")
+printDijkstra(g, g.dijkstra(0, 6), "Airport -> University")
+printDijkstra(g, g.dijkstra(0, 5), "Airport -> Market")
+printDijkstra(g, g.dijkstra(2, 5), "Station -> Market")
+printDijkstra(g, g.dijkstra(3, 4), "Park -> Hospital")
+
+// --- Shortest-distance summary using collection pipelines ---
+IO::println("")
+IO::println("--- All shortest distances from Airport ---")
+val sources: List[Int] = [1, 2, 3, 4, 5, 6]
+val results: List[String] = sources.map { target: Int ->
+  val label: String = g.vertexLabel(target)
+  val r: PathResult = g.dijkstra(0, target)
+  select r {
+  case f is Found:
+    "  " + label + ": " + f.totalCost() + " (hops: " + (f.path().size - 1) + ")"
+  case nr is NotReachable:
+    "  " + label + ": unreachable"
+  }
+}
+foreach line: String in results {
+  IO::println(line)
+}
+
+// --- Closeness centrality: total shortest distance from each node ---
+IO::println("")
+IO::println("--- Closeness by total distance (lower = more central) ---")
+val ids: List[Int] = [0, 1, 2, 3, 4, 5, 6]
+
+record CentralityEntry(name: String, total: Int)
+
+val centrality: List[CentralityEntry] = ids.map { src: Int ->
+  var total: Int = 0
+  foreach t: Int in ids {
+    if t != src {
+      val r: PathResult = g.dijkstra(src, t)
+      select r {
+      case f is Found: total = total + f.totalCost()
+      case nr is NotReachable: total = total + 999
+      }
+    }
+  }
+  new CentralityEntry(g.vertexLabel(src), total)
+}
+val sorted: List[CentralityEntry] = centrality.sortedBy { e: CentralityEntry -> e.total() }
+foreach e: CentralityEntry in sorted {
+  IO::println("  " + e.name() + ": total=" + e.total())
+}
+
+// --- Disconnected graph: two islands ---
+IO::println("")
+IO::println("--- Disconnected Graph Example ---")
+val island: Graph = new Graph()
+foreach id: Int in 0..<4 {
+  island.addVertex(new Vertex(id, ["A", "B", "C", "D"][id] as String))
+}
+island.addUndirectedEdge(0, 1, 1)
+island.addUndirectedEdge(2, 3, 1)  // B and D are on separate islands
+printDijkstra(island, island.dijkstra(0, 1), "A -> B")
+printDijkstra(island, island.dijkstra(0, 3), "A -> D")

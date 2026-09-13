@@ -1,0 +1,363 @@
+// CryptArithmetic.on — Cryptarithmetic puzzle solver
+//
+// A cryptarithmetic puzzle maps letters to unique digits 0–9 so that
+// a given arithmetic equation holds.  Leading letters are never zero.
+//   Classic: SEND + MORE = MONEY  →  9567 + 1085 = 10652
+//
+// Features exercised:
+//   record, data-carrying enum, plain enum, class, interface, generics,
+//   collection pipelines (map/filter/fold/find/groupBy/sortedBy/
+//   partition/distinct/zip), select/pattern-matching, closures,
+//   string interpolation, foreach (ranges + map entries), while, for,
+//   try/catch, recursion, nullable
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record PuzzleEntry(equation: String, category: String)
+
+record SolveResult(entry: PuzzleEntry, op: Op, solution: Map[String, Int]?,
+                   letters: List[String], elapsedMs: Long)
+
+// ── Data-carrying enum: difficulty rating ─────────────────────────────────────
+
+enum Difficulty(minLetters: Int, maxLetters: Int, label: String, stars: Int) {
+  EASY(2, 5,   "Easy",    1),
+  MEDIUM(6, 8, "Medium",  2),
+  HARD(9, 13,  "Hard",    3),
+  EXTREME(14, 26, "Extreme", 4)
+}
+
+// ── Plain enum: equation operator ─────────────────────────────────────────────
+
+enum Op { ADD, UNSUPPORTED }
+
+// ── Interface for puzzle predicates ───────────────────────────────────────────
+
+interface PuzzlePredicate {
+  def test(e: PuzzleEntry): Boolean
+}
+
+// ── Catalogue class ───────────────────────────────────────────────────────────
+
+class PuzzleCatalogue {
+  val entries: List[PuzzleEntry]
+
+public:
+  def this(entries: List[PuzzleEntry]) {
+    this.entries = entries
+  }
+
+  def size(): Int = entries.size
+
+  def getEntries(): List[PuzzleEntry] = entries
+
+  def filterBy(pred: PuzzlePredicate): List[PuzzleEntry] {
+    return entries.filter { e -> pred.test(e as PuzzleEntry) } as List[PuzzleEntry]
+  }
+
+  def byCategory(cat: String): List[PuzzleEntry] =
+    filterBy(((e: PuzzleEntry) -> e.category() == cat) as PuzzlePredicate)
+
+  def allCategories(): List[String] =
+    entries.map { e -> (e as PuzzleEntry).category() }.distinct() as List[String]
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+def charStr(s: String, i: Int): String = "" + s.charAt(i)
+
+def hr(ch: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n {
+    s = s + ch
+    i = i + 1
+  }
+  return s
+}
+
+def padRight(s: String, w: Int): String {
+  var r: String = s
+  while r.length() < w { r = r + " " }
+  return r
+}
+
+def repeat(s: String, n: Int): String {
+  var r: String = ""
+  foreach i: Int in 1..n { r = r + s }
+  return r
+}
+
+def classifyDifficulty(letterCount: Int): Difficulty {
+  if      letterCount <= 5  { return Difficulty::EASY    }
+  else if letterCount <= 8  { return Difficulty::MEDIUM  }
+  else if letterCount <= 13 { return Difficulty::HARD    }
+  else                      { return Difficulty::EXTREME }
+}
+
+def stars(d: Difficulty): String = repeat("★", d.stars()) + repeat("☆", 4 - d.stars())
+
+def detectOp(eq: String): Op =
+  if eq.contains(" + ") { Op::ADD } else { Op::UNSUPPORTED }
+
+// ── Letter / word helpers ─────────────────────────────────────────────────────
+
+def collectLetters(words: List[String]): List[String] {
+  val seen: List[String] = []
+  foreach word: String in words {
+    for var i: Int = 0; i < word.length(); i++ {
+      val c = charStr(word, i)
+      if !seen.contains(c) { seen << c }
+    }
+  }
+  return seen
+}
+
+def collectLeading(words: List[String]): List[String] {
+  val leads: List[String] = []
+  foreach word: String in words {
+    val c = charStr(word, 0)
+    if !leads.contains(c) { leads << c }
+  }
+  return leads
+}
+
+def parseWords(eq: String): List[String] {
+  val tokens: List[String] = Strings::split(eq, " ")
+  val words: List[String] = []
+  foreach t: String in tokens {
+    if t != "+" && t != "=" { words << t }
+  }
+  return words
+}
+
+def wordVal(word: String, assign: Map[String, Int]): Long {
+  var v: Long = 0L
+  for var i: Int = 0; i < word.length(); i++ {
+    v = v * 10L + (assign.get(charStr(word, i)) as Int)
+  }
+  return v
+}
+
+// ── Solver: recursive backtracking ────────────────────────────────────────────
+
+def doSolve(pos: Int, letters: List[String], leading: List[String],
+            addends: List[String], result: String,
+            assign: Map[String, Int], used: Int[]): Map[String, Int]? {
+  if pos == letters.size {
+    var sum: Long = 0L
+    foreach w: String in addends { sum = sum + wordVal(w, assign) }
+    return if sum == wordVal(result, assign) { assign } else { null }
+  }
+  val letter = letters.get(pos) as String
+  val noZero = leading.contains(letter)
+  for var d: Int = 0; d <= 9; d++ {
+    if (!noZero || d != 0) && used[d] == 0 {
+      assign.put(letter, d)
+      used[d] = 1
+      val found: Map[String, Int]? =
+        doSolve(pos + 1, letters, leading, addends, result, assign, used)
+      if found != null { return found }
+      used[d] = 0
+      assign.remove(letter)
+    }
+  }
+  return null
+}
+
+def solve(entry: PuzzleEntry): SolveResult {
+  val eq      = entry.equation()
+  val op      = detectOp(eq)
+  val words   = parseWords(eq)
+  val addends: List[String] = words.subList(0, words.size - 1) as List[String]
+  val result: String        = words.get(words.size - 1) as String
+  val letters = collectLetters(words)
+  val leading = collectLeading(words)
+
+  val assign: Map[String, Int] = [:]
+  val used: Int[]              = new Int[10]
+  val t0: Long                 = Timing::nanos()
+
+  var sol: Map[String, Int]? = null
+  if op == Op::ADD {
+    try {
+      sol = doSolve(0, letters, leading, addends, result, assign, used)
+    } catch e: Exception {
+      IO::println("[solver error] #{e.getMessage()}")
+    }
+  } else {
+    IO::println("[skip] unsupported operator in: #{eq}")
+  }
+
+  val ms: Long = (Timing::nanos() - t0) / 1000000L
+  return new SolveResult(entry, op, sol, letters, ms)
+}
+
+// ── Pretty-printing ───────────────────────────────────────────────────────────
+
+def substituted(word: String, assign: Map[String, Int]): String {
+  var s: String = ""
+  for var i: Int = 0; i < word.length(); i++ {
+    s = s + (assign.get(charStr(word, i)) as Int)
+  }
+  return s
+}
+
+def opLabel(op: Op): String = select op {
+  case Op::ADD:         "addition (+)"
+  case Op::UNSUPPORTED: "unsupported"
+  else:                 "unknown"
+}
+
+def printResult(r: SolveResult): void {
+  val eq = r.entry().equation()
+  IO::println("  Puzzle    : " + eq)
+  IO::println("  Operator  : " + opLabel(r.op()))
+  if r.solution() != null {
+    val sol  = r.solution() as Map[String, Int]
+    val words   = parseWords(eq)
+    val addends: List[String] = words.subList(0, words.size - 1) as List[String]
+    val res: String = words.get(words.size - 1) as String
+
+    val parts: List[String] = addends.map { w ->
+      (w as String) + "→" + substituted(w as String, sol)
+    } as List[String]
+    val check = Strings::join(parts, " + ") + " = " + res + "→" + substituted(res, sol)
+    IO::println("  Numeric   : " + check)
+
+    val sorted: List[String] = r.letters().sortedBy { x -> x as String }
+    val assigns: List[String] = sorted.map { x ->
+      (x as String) + "=" + (sol.get(x as String) as Int)
+    } as List[String]
+    IO::println("  Mapping   : " + Strings::join(assigns, " "))
+
+    val diff = classifyDifficulty(r.letters().size)
+    IO::println("  Difficulty: #{diff.label()} #{stars(diff)} (#{r.letters().size} letters)  #{r.elapsedMs()} ms")
+  } else {
+    IO::println("  Result    : UNSOLVABLE  (#{r.elapsedMs()} ms)")
+  }
+}
+
+// ── Catalogue ─────────────────────────────────────────────────────────────────
+
+val catalogue = new PuzzleCatalogue([
+  new PuzzleEntry("SEND + MORE = MONEY",      "classic"),
+  new PuzzleEntry("BASE + BALL = GAMES",      "classic"),
+  new PuzzleEntry("NO + NO + NO = YES",       "small"),
+  new PuzzleEntry("TWO + TWO = FOUR",         "small"),
+  new PuzzleEntry("EAT + THAT = APPLE",       "medium"),
+  new PuzzleEntry("CROSS + ROADS = DANGER",   "hard"),
+  new PuzzleEntry("DONALD + GERALD = ROBERT", "hard")
+])
+
+// ── Solve all ─────────────────────────────────────────────────────────────────
+
+IO::println(hr("═", 62))
+IO::println("  CRYPTARITHMETIC SOLVER  (#{catalogue.size()} puzzles)")
+IO::println(hr("═", 62))
+
+val results: List[SolveResult] = catalogue.getEntries().map { entry ->
+  val e = entry as PuzzleEntry
+  IO::println("\nSolving: " + e.equation() + " …")
+  solve(e)
+} as List[SolveResult]
+
+// ── Print results ─────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println(hr("─", 62))
+IO::println("  RESULTS")
+IO::println(hr("─", 62))
+
+foreach r: SolveResult in results {
+  IO::println("")
+  printResult(r)
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println(hr("─", 62))
+IO::println("  STATISTICS")
+IO::println(hr("─", 62))
+
+val solved:   List[SolveResult] = results.filter { r -> (r as SolveResult).solution() != null } as List[SolveResult]
+val unsolved: List[SolveResult] = results.filter { r -> (r as SolveResult).solution() == null } as List[SolveResult]
+val totalMs: Long = results.fold(0L) { acc, r -> (acc as Long) + (r as SolveResult).elapsedMs() } as Long
+
+IO::println("Solved   : #{solved.size} / #{results.size}")
+IO::println("Unsolved : #{unsolved.size}")
+IO::println("Total ms : #{totalMs}")
+
+// Group by difficulty and show a mini table
+val byDiff: Map[Difficulty, List[SolveResult]] =
+  results.groupBy { r ->
+    classifyDifficulty((r as SolveResult).letters().size)
+  } as Map[Difficulty, List[SolveResult]]
+
+IO::println("")
+IO::println("By difficulty:")
+foreach (diff, rs) in byDiff {
+  val d    = diff as Difficulty
+  val rlist = rs as List[SolveResult]
+  val ok   = rlist.filter { r -> (r as SolveResult).solution() != null }.size
+  IO::println("  #{stars(d)} #{padRight(d.label(), 7)}: #{ok}/#{rlist.size} solved")
+}
+
+// Fastest / slowest (using find after sorting)
+if solved.size > 0 {
+  val byTime: List[SolveResult] = solved.sortedBy { r -> (r as SolveResult).elapsedMs() } as List[SolveResult]
+  val fastest = byTime.find { r -> true } as SolveResult
+  val slowest = byTime.get(byTime.size - 1) as SolveResult
+  IO::println("")
+  IO::println("Fastest: #{fastest.entry().equation()} (#{fastest.elapsedMs()} ms)")
+  IO::println("Slowest: #{slowest.entry().equation()} (#{slowest.elapsedMs()} ms)")
+}
+
+// Partition by solvability
+val parts: List[List[SolveResult]] =
+  results.partition { r -> (r as SolveResult).solution() != null } as List[List[SolveResult]]
+val okGroup   = parts.get(0) as List[SolveResult]
+val failGroup = parts.get(1) as List[SolveResult]
+
+IO::println("")
+IO::println("Solvable (#{okGroup.size}):")
+foreach r: SolveResult in okGroup {
+  IO::println("  ✓ " + r.entry().equation())
+}
+if failGroup.size > 0 {
+  IO::println("Unsolvable (#{failGroup.size}):")
+  foreach r: SolveResult in failGroup {
+    IO::println("  ✗ " + r.entry().equation())
+  }
+}
+
+// Zip puzzle equations with their solve times for a timing table
+val eqList: List[String]  = results.map { r -> (r as SolveResult).entry().equation() } as List[String]
+val mslist: List[Long]    = results.map { r -> (r as SolveResult).elapsedMs() }        as List[Long]
+val zipped: List[List[Object]] = eqList.zip(mslist) as List[List[Object]]
+
+IO::println("")
+IO::println("Timing table:")
+foreach pair: List[Object] in zipped {
+  val eq  = pair.get(0) as String
+  val ms  = pair.get(1) as Long
+  IO::println("  #{padRight(eq, 30)} #{ms} ms")
+}
+
+// Letter-count frequency (using a range foreach)
+IO::println("")
+IO::println("Letter-count histogram:")
+foreach n: Int in 5..10 {
+  val count = results.filter { r -> (r as SolveResult).letters().size == n }.size
+  val bar   = if count > 0 { repeat("▪", count * 4) } else { "·" }
+  IO::println("  #{n} letters: #{bar} (#{count})")
+}
+
+// Categories (distinct)
+val distinctCats: List[String] = catalogue.allCategories()
+IO::println("")
+IO::println("Categories: " + Strings::join(distinctCats, ", "))
+
+IO::println("")
+IO::println(hr("═", 62))

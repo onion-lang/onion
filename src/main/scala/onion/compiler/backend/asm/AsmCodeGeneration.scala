@@ -132,7 +132,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     }
 
   private def generateClass(classDef: ClassDefinition): CompiledClass =
-    val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES)
+    val cw = new RobustClassWriter(ClassWriter.COMPUTE_FRAMES)
     
     // Generate class header
     // If class has no visibility modifiers, default to public
@@ -272,11 +272,17 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     if ctor.block != null then
       emitStatementsWithContext(gen, ctor.block.statements, className, localVars)
     else
-      // Synthetic constructor for records: assign parameters to fields
+      // Synthetic constructor for records: assign parameters to fields. Record
+      // component fields are always added before any body-declared field (see
+      // TypingOutlinePass), so they occupy the first `ctor.arguments.length`
+      // non-static slots of `fields` in argument order; a field beyond that
+      // (e.g. a `var` declared directly in the record body, with no matching
+      // constructor argument) has no argument to pull from and is left at its
+      // JVM default value instead of indexing past the argument list.
       val classType = ctor.classType.asInstanceOf[ClassDefinition]
       val fields = classType.fields
       var argIndex = 0
-      for field <- fields if (field.modifier & Modifier.STATIC) == 0 do
+      for field <- fields if (field.modifier & Modifier.STATIC) == 0 && argIndex < ctor.arguments.length do
         gen.loadThis()
         gen.loadArg(argIndex)
         gen.putField(AsmUtil.objectType(className), field.name, asmType(field.`type`))

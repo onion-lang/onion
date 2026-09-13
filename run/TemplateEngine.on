@@ -1,0 +1,299 @@
+// TemplateEngine.on — A Mustache-inspired text template renderer.
+// Features: {{ variable }}, {{ var | filter }}, {# comment #}, and
+//           a small multi-template page renderer.
+// Exercises: ADT enum, records, classes, extension String, closures,
+//            collection pipelines, pattern matching, nullable, try/catch.
+import {
+  java.lang.StringBuilder as JBuilder
+}
+
+// ── Template tokens (the lexer output) ───────────────────────────────
+enum Token {
+  case Literal(text: String)
+  case Variable(name: String, filter: String?)
+  case Comment(text: String)
+}
+
+// ── Extension helpers on String ────────────────────────────────────────
+extension String {
+  def trimmed(): String = self.trim()
+  def words(): List[String] {
+    val parts: List[String] = []
+    foreach w: String in Strings::split(self, " ") {
+      val t: String = w.trim()
+      if t.length() > 0 { parts.add(t) }
+    }
+    return parts
+  }
+  def containsStr(sub: String): Boolean = self.contains(sub)
+}
+
+// ── Lexer: source text → List[Token] ──────────────────────────────────
+def lex(source: String): List[Token] {
+  val tokens: List[Token] = []
+  var i: Int = 0
+  val n: Int = source.length()
+
+  while i < n {
+    // Look for the next tag opening: {{ or {#
+    val dbl: Int = source.indexOf("{{", i)
+    val cmt: Int = source.indexOf("{#", i)
+
+    val tagStart: Int =
+      if dbl < 0 && cmt < 0 { n }
+      else if dbl < 0         { cmt }
+      else if cmt < 0         { dbl }
+      else if dbl <= cmt      { dbl }
+      else                    { cmt }
+
+    if tagStart > i {
+      tokens.add(new Literal(source.substring(i, tagStart)))
+    }
+    if tagStart >= n { i = n }
+    else if tagStart == cmt {
+      // comment: {# ... #}
+      val end: Int = source.indexOf("#}", tagStart + 2)
+      if end < 0 {
+        tokens.add(new Literal(source.substring(tagStart)))
+        i = n
+      } else {
+        val content: String = source.substring(tagStart + 2, end).trimmed()
+        tokens.add(new Comment(content))
+        i = end + 2
+      }
+    } else {
+      // variable: {{ name }} or {{ name | filter }}
+      val end: Int = source.indexOf("}}", tagStart + 2)
+      if end < 0 {
+        tokens.add(new Literal(source.substring(tagStart)))
+        i = n
+      } else {
+        val inner: String = source.substring(tagStart + 2, end).trimmed()
+        val pipe: Int = inner.indexOf("|")
+        if pipe >= 0 {
+          val varName: String = inner.substring(0, pipe).trimmed()
+          val filter: String = inner.substring(pipe + 1).trimmed()
+          tokens.add(new Variable(varName, filter))
+        } else {
+          tokens.add(new Variable(inner, null))
+        }
+        i = end + 2
+      }
+    }
+  }
+  return tokens
+}
+
+// ── Built-in filters ───────────────────────────────────────────────────
+def applyFilter(value: String, filter: String?): String {
+  if filter == null { return value }
+  select filter {
+    case "upper":   return value.toUpperCase()
+    case "lower":   return value.toLowerCase()
+    case "length":  return "" + value.length()
+    case "title": {
+      val words2: List[String] = value.words()
+      val out: JBuilder = new JBuilder()
+      var first: Boolean = true
+      foreach w: String in words2 {
+        if !first { out.append(" ") }
+        if w.length() > 0 {
+          out.append(w.substring(0, 1).toUpperCase())
+          if w.length() > 1 { out.append(w.substring(1).toLowerCase()) }
+        }
+        first = false
+      }
+      return out.toString()
+    }
+    case "trim":    return value.trimmed()
+    case "reverse": {
+      val sb: JBuilder = new JBuilder(value)
+      return sb.reverse().toString()
+    }
+    case "quote":   return "\"" + value + "\""
+    else: return value
+  }
+}
+
+// ── Renderer ───────────────────────────────────────────────────────────
+class TemplateEngine {
+  var context: Map[String, String] = [:]
+
+public:
+  def set(key: String, value: String): TemplateEngine {
+    context[key] = value
+    return self
+  }
+  def setAll(vars: Map[String, String]): TemplateEngine {
+    foreach (k, v) in vars { context[k] = v }
+    return self
+  }
+  def render(source: String): String {
+    val tokens: List[Token] = lex(source)
+    val buf: JBuilder = new JBuilder()
+    foreach tok: Token in tokens {
+      select tok {
+        case lit is Literal:
+          buf.append(lit.text())
+        case v is Variable:
+          val raw: String? = context[v.name()]
+          val resolved: String = if raw != null { raw } else { "" }
+          buf.append(applyFilter(resolved, v.filter()))
+        case c is Comment: { }
+      }
+    }
+    return buf.toString()
+  }
+}
+
+// ── Records for a mini page model ─────────────────────────────────────
+record PageSection(title: String, body: String)
+
+record Report(title: String, author: String, sections: List[PageSection])
+
+def renderReport(r: Report): String {
+  val header: String = "== #{r.title()} ==\nBy #{r.author()}\n"
+  var body: String = ""
+  foreach s: PageSection in r.sections() {
+    body = body + "\n-- " + s.title() + " --\n" + s.body() + "\n"
+  }
+  return header + body
+}
+
+// ── Test suite ─────────────────────────────────────────────────────────
+record TestCase(label: String, template: String, context: Map[String, String], expected: String)
+
+var passed: Int = 0
+var failed: Int = 0
+
+def check(tc: TestCase): void {
+  val engine: TemplateEngine = new TemplateEngine()
+  engine.setAll(tc.context())
+  val result: String = engine.render(tc.template())
+  if result == tc.expected() {
+    passed++
+  } else {
+    failed++
+    IO::println("  FAIL [" + tc.label() + "]")
+    IO::println("    expected: " + tc.expected())
+    IO::println("    got:      " + result)
+  }
+}
+
+val tests: List[TestCase] = [
+  new TestCase("simple literal",
+    "Hello, world!", [:],
+    "Hello, world!"),
+  new TestCase("variable substitution",
+    "Hello, {{ name }}!",
+    ["name": "Alice"],
+    "Hello, Alice!"),
+  new TestCase("missing variable is empty",
+    "Hi {{ missing }}!",
+    [:],
+    "Hi !"),
+  new TestCase("filter upper",
+    "{{ greeting | upper }}",
+    ["greeting": "hello"],
+    "HELLO"),
+  new TestCase("filter lower",
+    "{{ city | lower }}",
+    ["city": "LONDON"],
+    "london"),
+  new TestCase("filter length",
+    "Length: {{ word | length }}",
+    ["word": "onion"],
+    "Length: 5"),
+  new TestCase("filter title",
+    "{{ phrase | title }}",
+    ["phrase": "the quick brown fox"],
+    "The Quick Brown Fox"),
+  new TestCase("filter reverse",
+    "{{ word | reverse }}",
+    ["word": "hello"],
+    "olleh"),
+  new TestCase("filter quote",
+    "{{ name | quote }}",
+    ["name": "Alice"],
+    "\"Alice\""),
+  new TestCase("comment stripped",
+    "before{# this is a comment #}after",
+    [:],
+    "beforeafter"),
+  new TestCase("multiple variables",
+    "{{ first }} {{ last }}",
+    ["first": "John", "last": "Doe"],
+    "John Doe"),
+  new TestCase("unknown filter passthrough",
+    "{{ x | unknown }}",
+    ["x": "value"],
+    "value"),
+  new TestCase("no tags",
+    "Plain text only.",
+    [:],
+    "Plain text only.")
+]
+
+IO::println("=== Template Engine Tests ===")
+IO::println("")
+foreach tc: TestCase in tests {
+  check(tc)
+}
+IO::println("Results: #{passed} passed, #{failed} failed out of #{tests.size} tests")
+
+// ── Demo: render a greeting card ──────────────────────────────────────
+IO::println("")
+IO::println("=== Demo: Greeting Card ===")
+val card: String =
+  "Dear {{ name | title }},\n" +
+  "\n" +
+  "Thank you for your order of {{ item | quote }} " +
+  "({{ qty }} unit(s)) totaling {{ total }}.\n" +
+  "{# Order internal note: expedite if premium #}\n" +
+  "Your reference number is {{ ref | upper }}.\n" +
+  "\n" +
+  "Best regards,\n{{ sender }}"
+
+val cardEngine: TemplateEngine = new TemplateEngine()
+cardEngine
+  .set("name", "john smith")
+  .set("item", "Onion Book Vol 1")
+  .set("qty", "2")
+  .set("total", "$49.98")
+  .set("ref", "ord-2024-0042")
+  .set("sender", "The Onion Team")
+
+IO::println(cardEngine.render(card))
+
+// ── Demo: render multiple templates with same engine ─────────────────
+IO::println("")
+IO::println("=== Demo: Report sections ===")
+
+val sections: List[PageSection] = [
+  new PageSection("Introduction",
+    "This report covers the performance of {{ product }} in Q{{ quarter }}."),
+  new PageSection("Key Metrics",
+    "Revenue: {{ revenue }}  |  Units sold: {{ units }}  |  Region: {{ region | upper }}"),
+  new PageSection("Summary",
+    "Overall, {{ product }} performed {{ rating | title }} this quarter.")
+]
+
+val reportEngine: TemplateEngine = new TemplateEngine()
+reportEngine.setAll([
+  "product":  "Onion Compiler",
+  "quarter":  "4",
+  "revenue":  "$128,000",
+  "units":    "1,024",
+  "region":   "apac",
+  "rating":   "very well"
+])
+
+IO::println("Report: Q4 Performance")
+IO::println("")
+foreach s: PageSection in sections {
+  IO::println("-- " + s.title() + " --")
+  IO::println(reportEngine.render(s.body()))
+  IO::println("")
+}
+
+IO::println("=== Done ===")

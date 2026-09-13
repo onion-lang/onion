@@ -1,0 +1,290 @@
+// PilotLogbook.on — A pilot's flight logbook with currency tracking and stats.
+// Exercises: records with body methods, plain enum, data-carrying enum,
+//   classes with mutable state, collection pipelines (groupBy/sortedBy/fold/
+//   filter/map/find/distinct/partition), foreach (range + map entry),
+//   nullable, pattern matching (select), string interpolation, try/catch,
+//   while loop, closures, extension methods.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+extension Int {
+  def padLeft(width: Int): String {
+    val s = "" + self
+    var r: String = s
+    while r.length() < width { r = "0" + r }
+    return r
+  }
+  def maxWith(other: Int): Int = if self >= other { self } else { other }
+  def minWith(other: Int): Int = if self <= other { self } else { other }
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+enum AircraftCategory {
+  SEL, MEL, SES, MES   // Single/Multi Engine Land/Sea
+public:
+  def label(): String = select this {
+    case AircraftCategory::SEL: "SE-Land"
+    case AircraftCategory::MEL: "ME-Land"
+    case AircraftCategory::SES: "SE-Sea"
+    case AircraftCategory::MES: "ME-Sea"
+  }
+  def isMultiEngine(): Boolean =
+    self == AircraftCategory::MEL || self == AircraftCategory::MES
+}
+
+enum FlightCondition {
+  VFR, IFR    // Visual / Instrument Flight Rules
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+record Airport(icao: String, name: String, country: String) {
+public:
+  def display(): String = "#{icao()} (#{name()}, #{country()})"
+}
+
+record Aircraft(reg: String, model: String, category: AircraftCategory, seats: Int) {
+public:
+  def isSingle(): Boolean = !category().isMultiEngine()
+  def summary(): String = "#{reg()} #{model()} [#{category().label()}]"
+}
+
+// FlightDate: year*10000 + month*100 + day — avoids importing java.time
+record FlightDate(encoded: Int) {
+public:
+  def year(): Int  = encoded() / 10000
+  def month(): Int = (encoded() / 100) % 100
+  def day(): Int   = encoded() % 100
+  def display(): String = "#{year()}-#{month().padLeft(2)}-#{day().padLeft(2)}"
+  def isAfter(other: FlightDate): Boolean  = encoded() > other.encoded()
+  def isBefore(other: FlightDate): Boolean = encoded() < other.encoded()
+  def isAtOrAfter(other: FlightDate): Boolean = encoded() >= other.encoded()
+}
+
+def date(year: Int, month: Int, day: Int): FlightDate =
+  new FlightDate(year * 10000 + month * 100 + day)
+
+// A single logbook entry
+record FlightEntry(
+  date: FlightDate,
+  origin: Airport,
+  dest: Airport,
+  aircraft: Aircraft,
+  durationMinutes: Int,
+  condition: FlightCondition,
+  nightMinutes: Int,
+  landings: Int,
+  remarks: String
+) {
+public:
+  def hours(): Int = durationMinutes() / 60
+  def mins(): Int  = durationMinutes() % 60
+  def durationLabel(): String = "#{hours()}:#{mins().padLeft(2)}"
+  def isNight(): Boolean = nightMinutes() > 0
+  def isCrossCountry(): Boolean = origin().icao() != dest().icao()
+  def isIFR(): Boolean = condition() == FlightCondition::IFR
+  def summary(): String =
+    "#{date().display()} #{origin().icao()}->#{dest().icao()} " +
+    "#{aircraft().reg()} #{durationLabel()} #{if isIFR() {"IFR"} else {"VFR"}}"
+}
+
+// ─── Logbook class ────────────────────────────────────────────────────────────
+class Logbook {
+  var pilotName: String
+public:
+  var entries: List[FlightEntry]
+
+  def this(name: String) {
+    self.pilotName = name
+    self.entries = []
+  }
+
+  def name(): String = pilotName
+
+  def add(e: FlightEntry): void { entries.add(e) }
+
+  def totalEntries(): Int = entries.size
+
+  def totalMinutes(): Int =
+    entries.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).durationMinutes() }
+
+  def totalHoursLabel(): String {
+    val t = totalMinutes()
+    return "#{t / 60}:#{(t % 60).padLeft(2)}"
+  }
+
+  def totalNightMinutes(): Int =
+    entries.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).nightMinutes() }
+
+  def ifrMinutes(): Int =
+    entries.filter { e -> (e as FlightEntry).isIFR() }
+          .fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).durationMinutes() }
+
+  def totalLandings(): Int =
+    entries.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).landings() }
+
+  def aircraftRegistrations(): List[Object] {
+    val seen: List[Object] = []
+    foreach e: FlightEntry in entries {
+      val reg = e.aircraft().reg()
+      if !seen.contains(reg) { seen.add(reg) }
+    }
+    return seen
+  }
+
+  // Most recent n entries sorted by date descending
+  def recent(n: Int): List[Object] {
+    val sorted = entries.sortedBy { e -> 0 - (e as FlightEntry).date().encoded() }
+    val result: List[Object] = []
+    var i: Int = 0
+    foreach item: Object in sorted {
+      if i < n { result.add(item); i = i + 1 }
+    }
+    return result
+  }
+
+  // Minutes flown at or after a cutoff date
+  def minutesSince(cutoff: FlightDate): Int =
+    entries
+      .filter { e -> (e as FlightEntry).date().isAtOrAfter(cutoff) }
+      .fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).durationMinutes() }
+
+  // Group entries by aircraft model
+  def minutesByModel(): Map[Object, List[FlightEntry]] =
+    entries.groupBy { e -> (e as FlightEntry).aircraft().model() }
+
+  // Group entries by route
+  def routeFrequency(): Map[Object, List[FlightEntry]] =
+    entries.groupBy { e ->
+      val fe = e as FlightEntry
+      fe.origin().icao() + "->" + fe.dest().icao()
+    }
+
+  // Statistics summary
+  def printStats(): void {
+    IO::println("=== Pilot Logbook: #{pilotName} ===")
+    IO::println("Entries       : #{totalEntries()}")
+    IO::println("Total time    : #{totalHoursLabel()}")
+    IO::println("Total landings: #{totalLandings()}")
+    IO::println("Night minutes : #{totalNightMinutes()}")
+    IO::println("IFR minutes   : #{ifrMinutes()}")
+
+    IO::println("")
+    IO::println("Time by model:")
+    foreach (model, flights) in minutesByModel() {
+      val mins = (flights as List[FlightEntry]).fold(0) { acc, e ->
+        (acc as Int) + (e as FlightEntry).durationMinutes()
+      }
+      val m = mins as Int
+      IO::println("  #{model}: #{m / 60}:#{(m % 60).padLeft(2)}")
+    }
+
+    IO::println("")
+    IO::println("Route frequency:")
+    foreach (route, flights) in routeFrequency() {
+      IO::println("  #{route}: #{(flights as List[FlightEntry]).size} flight(s)")
+    }
+  }
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+// Airports
+val ksfo = new Airport("KSFO", "San Francisco Intl", "USA")
+val koak = new Airport("KOAK", "Oakland Metro", "USA")
+val klax = new Airport("KLAX", "Los Angeles Intl", "USA")
+val ksjc = new Airport("KSJC", "San Jose Intl", "USA")
+val krno = new Airport("KRNO", "Reno Tahoe", "USA")
+val klas = new Airport("KLAS", "Las Vegas Harry Reid", "USA")
+
+// Aircraft
+val c172 = new Aircraft("N12345", "C172", AircraftCategory::SEL, 4)
+val pa28 = new Aircraft("N98765", "PA-28", AircraftCategory::SEL, 4)
+val be58 = new Aircraft("N55432", "BE58-Baron", AircraftCategory::MEL, 6)
+
+// Logbook
+val log = new Logbook("Alex Pilot")
+
+log.add(new FlightEntry(date(2025, 1, 15), ksfo, koak, c172, 45,  FlightCondition::VFR, 0,  2, "Local practice"))
+log.add(new FlightEntry(date(2025, 1, 22), koak, ksjc, c172, 60,  FlightCondition::VFR, 0,  2, "X-country"))
+log.add(new FlightEntry(date(2025, 2,  8), ksfo, klax, be58, 95,  FlightCondition::IFR, 30, 1, "IFR in clouds"))
+log.add(new FlightEntry(date(2025, 2, 14), klax, krno, be58, 85,  FlightCondition::IFR, 60, 1, "Night IFR return"))
+log.add(new FlightEntry(date(2025, 3,  1), ksfo, ksjc, pa28, 35,  FlightCondition::VFR, 0,  3, "Pattern work"))
+log.add(new FlightEntry(date(2025, 3, 12), ksjc, krno, c172, 110, FlightCondition::VFR, 20, 2, "Mountain X-country"))
+log.add(new FlightEntry(date(2025, 3, 20), krno, klas, be58, 60,  FlightCondition::VFR, 0,  1, "Desert tour"))
+log.add(new FlightEntry(date(2025, 4,  5), klas, ksfo, be58, 75,  FlightCondition::IFR, 40, 1, "IFR return home"))
+log.add(new FlightEntry(date(2025, 4, 18), ksfo, koak, c172, 30,  FlightCondition::VFR, 0,  4, "Currency landings"))
+log.add(new FlightEntry(date(2025, 5,  2), koak, ksfo, pa28, 25,  FlightCondition::VFR, 0,  2, "Short hop"))
+
+// Print statistics
+log.printStats()
+
+// Recent 3 flights
+IO::println("")
+IO::println("Last 3 flights:")
+foreach e: Object in log.recent(3) {
+  IO::println("  " + (e as FlightEntry).summary())
+}
+
+// Multi-engine flights
+val meFlights = log.entries.filter { e -> (e as FlightEntry).aircraft().category().isMultiEngine() }
+IO::println("")
+IO::println("Multi-engine flights : #{meFlights.size}")
+val meTotal = meFlights.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).durationMinutes() }
+IO::println("Multi-engine time    : #{(meTotal as Int) / 60}h #{((meTotal as Int) % 60)}min")
+
+// Cross-country flights
+val xcFlights = log.entries.filter { e -> (e as FlightEntry).isCrossCountry() }
+IO::println("Cross-country flights: #{xcFlights.size}")
+
+// Night flight analysis
+val nightFlights = log.entries.filter { e -> (e as FlightEntry).isNight() }
+IO::println("Night flights        : #{nightFlights.size}")
+val nightTotal = nightFlights.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).nightMinutes() }
+IO::println("Total night minutes  : #{nightTotal}")
+
+// Currency check: 3 takeoffs/landings in last 90 days (past Feb 14)
+val cutoff90 = date(2025, 2, 15)
+val recent90 = log.entries.filter { e -> (e as FlightEntry).date().isAtOrAfter(cutoff90) }
+val recentLandings = recent90.fold(0) { acc, e -> (acc as Int) + (e as FlightEntry).landings() }
+IO::println("")
+IO::println("Recent landings (90-day window): #{recentLandings}")
+IO::println("Passenger-carrying current     : #{recentLandings >= 3}")
+
+// Sorted longest flights
+IO::println("")
+IO::println("Longest flights:")
+val byDuration = log.entries.sortedBy { e -> 0 - (e as FlightEntry).durationMinutes() }
+var shown: Int = 0
+foreach fe: Object in byDuration {
+  if shown < 3 {
+    IO::println("  " + (fe as FlightEntry).summary())
+    shown = shown + 1
+  }
+}
+
+// Closure-based custom filter
+val filterIFR: Function1[FlightEntry, Boolean] = (e: FlightEntry) -> e.isIFR()
+val ifrFlights = log.entries.filter { e -> filterIFR(e as FlightEntry) }
+IO::println("")
+IO::println("IFR flights: #{ifrFlights.size}")
+
+// Aircraft diversity
+val regs = log.aircraftRegistrations()
+IO::println("Aircraft flown: #{regs.size} distinct registrations")
+
+// Minutes since a given date
+val since = date(2025, 3, 1)
+IO::println("Minutes since #{since.display()}: #{log.minutesSince(since)}")
+
+// Verify total
+val expectedTotal = 45 + 60 + 95 + 85 + 35 + 110 + 60 + 75 + 30 + 25
+IO::println("")
+IO::println("Total min: #{log.totalMinutes()} == #{expectedTotal}: #{log.totalMinutes() == expectedTotal}")
+
+// forEach over range for a hours summary per flight
+IO::println("")
+IO::println("All flights (index + duration):")
+var idx: Int = 0
+foreach fe: Object in log.entries {
+  idx = idx + 1
+  IO::println("  #{idx}. " + (fe as FlightEntry).durationLabel() + " " + (fe as FlightEntry).summary())
+}

@@ -132,7 +132,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     }
 
   private def generateClass(classDef: ClassDefinition): CompiledClass =
-    val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES)
+    val cw = new RobustClassWriter(ClassWriter.COMPUTE_FRAMES)
     
     // Generate class header
     // If class has no visibility modifiers, default to public

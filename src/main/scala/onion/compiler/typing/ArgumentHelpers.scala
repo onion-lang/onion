@@ -136,6 +136,11 @@ private[typing] object ArgumentHelpers {
   def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
     expr match {
       case closure: AST.ClosureExpression => hasUntypedParams(closure)
+      case block: AST.BlockExpression if block.elements.nonEmpty =>
+        block.elements.last match {
+          case closure: AST.ClosureExpression => hasUntypedParams(closure)
+          case _ => false
+        }
       case _ => false
     }
 }

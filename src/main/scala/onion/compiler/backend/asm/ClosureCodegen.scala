@@ -127,7 +127,7 @@ final class ClosureCodegen(
     capturedVars: Seq[ClosureLocalBinding],
     outerThisType: Option[ClassType]
   ): Array[Byte] = {
-    val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
+    val cw = new RobustClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
 
     cw.visit(
       Opcodes.V17,

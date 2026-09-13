@@ -1,0 +1,526 @@
+// FullTextSearch.on — an inverted-index full-text search engine with TF-IDF
+// scoring and boolean (AND/OR/NOT) query evaluation.
+//
+// Exercises: records, ADT case-enum, class with mutable HashMap/ArrayList state,
+// generics, collection pipelines (map/filter/fold/sortedBy/groupBy/distinct/find),
+// select + type-pattern matching, nullable types, closures, string interpolation,
+// recursion, while/foreach, extension String helpers.
+
+import {
+  java.util.HashMap;
+  java.util.ArrayList;
+  java.lang.Integer as JInteger;
+  java.lang.Double as JDouble;
+  java.lang.Math;
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension String {
+  def lower(): String = self.toLowerCase()
+  def blank(): Boolean = self.trim().length == 0
+  def truncate(n: Int): String {
+    if self.length <= n { return self }
+    return self.substring(0, n) + "..."
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length < n { s = s + " " }
+    return s
+  }
+}
+
+// ── Core Records ──────────────────────────────────────────────────────────────
+
+record Document(id: Int, title: String, body: String)
+
+record Posting(docId: Int, termFreq: Int)
+
+record ScoredDoc(docId: Int, score: Double, title: String)
+
+// ── Tokenizer ─────────────────────────────────────────────────────────────────
+
+class Tokenizer {
+public:
+  static def tokenize(text: String): ArrayList[String] {
+    val words: ArrayList[String] = new ArrayList[String]()
+    val s: String = text.lower()
+    var cur: String = ""
+    var i: Int = 0
+    while i < s.length {
+      val code: Int = s.charAt(i) as Int
+      if (code >= 97 && code <= 122) || (code >= 48 && code <= 57) {
+        cur = cur + s.substring(i, i + 1)
+      } else {
+        if !cur.blank() { words.add(cur) }
+        cur = ""
+      }
+      i++
+    }
+    if !cur.blank() { words.add(cur) }
+    return words
+  }
+
+  static def termFrequencies(text: String): HashMap[String, Int] {
+    val freqs: HashMap[String, Int] = new HashMap[String, Int]()
+    val tokens: ArrayList[String] = Tokenizer::tokenize(text)
+    var i: Int = 0
+    while i < tokens.size {
+      val token: String = tokens[i]
+      val current: Int? = freqs[token]
+      if current == null {
+        freqs[token] = 1
+      } else {
+        freqs[token] = current + 1
+      }
+      i++
+    }
+    return freqs
+  }
+}
+
+// ── Inverted Index ────────────────────────────────────────────────────────────
+
+class InvertedIndex {
+  var docs: ArrayList[Document]
+  var postingLists: HashMap[String, ArrayList[Posting]]
+  var docLengths: HashMap[Int, Int]
+
+public:
+  def this {
+    this.docs = new ArrayList[Document]()
+    this.postingLists = new HashMap[String, ArrayList[Posting]]()
+    this.docLengths = new HashMap[Int, Int]()
+  }
+
+  def addDocument(doc: Document): void {
+    this.docs.add(doc)
+    val fullText: String = doc.title + " " + doc.body
+    val freqs: HashMap[String, Int] = Tokenizer::termFrequencies(fullText)
+    val tokens: ArrayList[String] = Tokenizer::tokenize(fullText)
+    this.docLengths[doc.id] = tokens.size
+
+    val keys: ArrayList[String] = new ArrayList[String](freqs.keySet())
+    var i: Int = 0
+    while i < keys.size {
+      val term: String = keys[i]
+      val tf: Int? = freqs[term]
+      if tf != null {
+        val existing: ArrayList[Posting]? = this.postingLists[term]
+        val list: ArrayList[Posting] = if existing != null { existing } else {
+          val fresh: ArrayList[Posting] = new ArrayList[Posting]()
+          this.postingLists[term] = fresh
+          fresh
+        }
+        list.add(new Posting(doc.id, tf))
+      }
+      i++
+    }
+  }
+
+  def docCount: Int = this.docs.size
+
+  def df(term: String): Int {
+    val list: ArrayList[Posting]? = this.postingLists[term.lower()]
+    if list == null { return 0 }
+    return list.size
+  }
+
+  def postings(term: String): ArrayList[Posting] {
+    val list: ArrayList[Posting]? = this.postingLists[term.lower()]
+    if list == null { return new ArrayList[Posting]() }
+    return list
+  }
+
+  def findDoc(id: Int): Document? {
+    var i: Int = 0
+    while i < this.docs.size {
+      val d: Document = this.docs[i]
+      if d.id() == id { return d }
+      i++
+    }
+    return null
+  }
+
+  def allDocIds(): ArrayList[Int] {
+    val ids: ArrayList[Int] = new ArrayList[Int]()
+    var i: Int = 0
+    while i < this.docs.size {
+      ids.add(this.docs[i].id())
+      i++
+    }
+    return ids
+  }
+
+  def tfidf(term: String, docId: Int, termFreq: Int): Double {
+    val n: Int = this.docCount
+    val df: Int = this.df(term)
+    if df == 0 { return 0.0 }
+    val idf: Double = Math::log((n + 1) as Double / (df + 1) as Double) + 1.0
+    val docLen: Int? = this.docLengths[docId]
+    val dl: Int = if docLen == null { 1 } else { docLen }
+    val tf: Double = termFreq as Double / dl as Double
+    return tf * idf
+  }
+}
+
+// ── Boolean Query AST ─────────────────────────────────────────────────────────
+
+enum Query {
+  case Term(word: String)
+  case AndQuery(left: Query, right: Query)
+  case OrQuery(left: Query, right: Query)
+  case NotQuery(operand: Query)
+public:
+  def describe(): String = select this {
+    case t is Term:    "\"#{t.word()}\""
+    case a is AndQuery: "(#{a.left().describe()} AND #{a.right().describe()})"
+    case o is OrQuery:  "(#{o.left().describe()} OR #{o.right().describe()})"
+    case n is NotQuery: "NOT #{n.operand().describe()}"
+  }
+}
+
+// ── Query Evaluator ───────────────────────────────────────────────────────────
+
+class QueryEvaluator {
+  var index: InvertedIndex
+
+public:
+  def this(index: InvertedIndex) {
+    this.index = index
+  }
+
+  // Returns HashMap[docId -> score] for all matching documents
+  def evaluate(query: Query): HashMap[Int, Double] = select query {
+    case t is Term:
+      scoreTerm(t.word())
+    case a is AndQuery:
+      val left: HashMap[Int, Double] = evaluate(a.left())
+      val right: HashMap[Int, Double] = evaluate(a.right())
+      intersect(left, right)
+    case o is OrQuery:
+      val left: HashMap[Int, Double] = evaluate(o.left())
+      val right: HashMap[Int, Double] = evaluate(o.right())
+      union(left, right)
+    case n is NotQuery:
+      val matched: HashMap[Int, Double] = evaluate(n.operand())
+      complement(matched)
+  }
+
+  def rankedResults(query: Query, limit: Int): ArrayList[ScoredDoc] {
+    val scores: HashMap[Int, Double] = evaluate(query)
+    val result: ArrayList[ScoredDoc] = new ArrayList[ScoredDoc]()
+    val keys: ArrayList[Int] = new ArrayList[Int](scores.keySet())
+    var i: Int = 0
+    while i < keys.size {
+      val docId: Int = keys[i]
+      val score: Double? = scores[docId]
+      val d: Document? = this.index.findDoc(docId)
+      if score != null && d != null {
+        result.add(new ScoredDoc(docId, score, d.title()))
+      }
+      i++
+    }
+    result.sortedBy { r -> -(r as ScoredDoc).score() }
+    val top: ArrayList[ScoredDoc] = new ArrayList[ScoredDoc]()
+    var j: Int = 0
+    while j < result.size && j < limit {
+      top.add(result[j])
+      j++
+    }
+    return top
+  }
+
+private:
+  def scoreTerm(word: String): HashMap[Int, Double] {
+    val out: HashMap[Int, Double] = new HashMap[Int, Double]()
+    val posts: ArrayList[Posting] = this.index.postings(word)
+    var i: Int = 0
+    while i < posts.size {
+      val p: Posting = posts[i]
+      val s: Double = this.index.tfidf(word, p.docId(), p.termFreq())
+      out[p.docId()] = s
+      i++
+    }
+    return out
+  }
+
+  def intersect(a: HashMap[Int, Double], b: HashMap[Int, Double]): HashMap[Int, Double] {
+    val out: HashMap[Int, Double] = new HashMap[Int, Double]()
+    val keys: ArrayList[Int] = new ArrayList[Int](a.keySet())
+    var i: Int = 0
+    while i < keys.size {
+      val k: Int = keys[i]
+      val bScore: Double? = b[k]
+      val aScore: Double? = a[k]
+      if bScore != null && aScore != null {
+        out[k] = aScore + bScore
+      }
+      i++
+    }
+    return out
+  }
+
+  def union(a: HashMap[Int, Double], b: HashMap[Int, Double]): HashMap[Int, Double] {
+    val out: HashMap[Int, Double] = new HashMap[Int, Double]()
+    val aKeys: ArrayList[Int] = new ArrayList[Int](a.keySet())
+    var i: Int = 0
+    while i < aKeys.size {
+      val k: Int = aKeys[i]
+      val aScore: Double? = a[k]
+      if aScore != null { out[k] = aScore }
+      i++
+    }
+    val bKeys: ArrayList[Int] = new ArrayList[Int](b.keySet())
+    var j: Int = 0
+    while j < bKeys.size {
+      val k: Int = bKeys[j]
+      val bScore: Double? = b[k]
+      if bScore != null {
+        val existing: Double? = out[k]
+        if existing != null {
+          out[k] = existing + bScore
+        } else {
+          out[k] = bScore
+        }
+      }
+      j++
+    }
+    return out
+  }
+
+  def complement(matched: HashMap[Int, Double]): HashMap[Int, Double] {
+    val out: HashMap[Int, Double] = new HashMap[Int, Double]()
+    val allIds: ArrayList[Int] = this.index.allDocIds()
+    var i: Int = 0
+    while i < allIds.size {
+      val id: Int = allIds[i]
+      val s: Double? = matched[id]
+      if s == null {
+        out[id] = 1.0
+      }
+      i++
+    }
+    return out
+  }
+}
+
+// ── Simple Query Parser ───────────────────────────────────────────────────────
+// Grammar: term | term AND term | term OR term | NOT term
+// Precedence: NOT > AND > OR (left-to-right, simplified)
+
+class QueryParser {
+public:
+  // Parse a flat "word AND word OR NOT word" string (no nested parens)
+  // Strategy: split on AND/OR/NOT tokens, build left-fold tree
+  static def parse(queryStr: String): Query? {
+    val tokens: ArrayList[String] = Tokenizer::tokenize(queryStr)
+    // Rebuild token stream preserving AND/OR/NOT (they survive tokenize as lowercase)
+    if tokens.size == 0 { return null }
+    return QueryParser::buildOr(tokens, 0, tokens.size)
+  }
+
+  static def buildOr(tokens: ArrayList[String], from: Int, to: Int): Query? {
+    // Find the rightmost OR not inside a negation
+    var orPos: Int = -1
+    var i: Int = from
+    while i < to {
+      if tokens[i] == "or" { orPos = i }
+      i++
+    }
+    if orPos >= 0 {
+      val left: Query? = QueryParser::buildOr(tokens, from, orPos)
+      val right: Query? = QueryParser::buildOr(tokens, orPos + 1, to)
+      if left != null && right != null { return new OrQuery(left, right) }
+      if left != null { return left }
+      return right
+    }
+    return QueryParser::buildAnd(tokens, from, to)
+  }
+
+  static def buildAnd(tokens: ArrayList[String], from: Int, to: Int): Query? {
+    var andPos: Int = -1
+    var i: Int = from
+    while i < to {
+      if tokens[i] == "and" { andPos = i }
+      i++
+    }
+    if andPos >= 0 {
+      val left: Query? = QueryParser::buildAnd(tokens, from, andPos)
+      val right: Query? = QueryParser::buildAnd(tokens, andPos + 1, to)
+      if left != null && right != null { return new AndQuery(left, right) }
+      if left != null { return left }
+      return right
+    }
+    return QueryParser::buildAtom(tokens, from, to)
+  }
+
+  static def buildAtom(tokens: ArrayList[String], from: Int, to: Int): Query? {
+    if from >= to { return null }
+    if tokens[from] == "not" {
+      val inner: Query? = QueryParser::buildAtom(tokens, from + 1, to)
+      if inner != null { return new NotQuery(inner) }
+      return null
+    }
+    // Take all remaining non-keyword tokens as AND-chain
+    var result: Query? = null
+    var i: Int = from
+    while i < to {
+      val w: String = tokens[i]
+      if w != "and" && w != "or" && w != "not" {
+        val t: Query = new Term(w)
+        if result == null {
+          result = t
+        } else {
+          result = new AndQuery(result!!, t)
+        }
+      }
+      i++
+    }
+    return result
+  }
+}
+
+// ── Snippet Extractor ─────────────────────────────────────────────────────────
+
+class SnippetExtractor {
+public:
+  static def extractTerms(query: Query): ArrayList[String] {
+    val terms: ArrayList[String] = new ArrayList[String]()
+    SnippetExtractor::collectTerms(query, terms)
+    return terms
+  }
+
+  static def collectTerms(query: Query, out: ArrayList[String]): void {
+    select query {
+      case t is Term:     { out.add(t.word()) }
+      case a is AndQuery: {
+        SnippetExtractor::collectTerms(a.left(), out)
+        SnippetExtractor::collectTerms(a.right(), out)
+      }
+      case o is OrQuery: {
+        SnippetExtractor::collectTerms(o.left(), out)
+        SnippetExtractor::collectTerms(o.right(), out)
+      }
+      case n is NotQuery: {}
+    }
+  }
+
+  // Find first occurrence of any term word in body and return ±40 chars context
+  static def snippet(body: String, terms: ArrayList[String]): String {
+    val lower: String = body.lower()
+    var bestPos: Int = -1
+    var i: Int = 0
+    while i < terms.size {
+      val pos: Int = lower.indexOf(terms[i])
+      if pos >= 0 && (bestPos < 0 || pos < bestPos) { bestPos = pos }
+      i++
+    }
+    if bestPos < 0 { return body.truncate(80) }
+    val start: Int = if bestPos > 40 { bestPos - 40 } else { 0 }
+    val end: Int = if bestPos + 60 < body.length { bestPos + 60 } else { body.length }
+    val snip: String = body.substring(start, end).trim()
+    if start > 0 { return "..." + snip.truncate(100) }
+    return snip.truncate(103)
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def printResults(label: String, results: ArrayList[ScoredDoc], idx: InvertedIndex, terms: ArrayList[String]): void {
+  IO::println("=".repeat(60))
+  IO::println("Query: #{label}")
+  IO::println("Found #{results.size} result(s)")
+  IO::println("-".repeat(60))
+  if results.size == 0 {
+    IO::println("  (no results)")
+  } else {
+    var j: Int = 0
+    while j < results.size {
+      val r: ScoredDoc = results[j]
+      val d: Document? = idx.findDoc(r.docId())
+      val body: String = if d == null { "" } else { d.body() }
+      val snip: String = SnippetExtractor::snippet(body, terms)
+      IO::println("  #{j + 1}. #{r.title().padRight(40)} score=#{r.score()}")
+      IO::println("     #{snip}")
+      j++
+    }
+  }
+  IO::println("")
+}
+
+def main(): void {
+  val idx = new InvertedIndex()
+
+  idx.addDocument(new Document(1, "Introduction to Machine Learning",
+    "Machine learning is a subset of artificial intelligence. Training models on labeled data."))
+  idx.addDocument(new Document(2, "Deep Learning and Neural Networks",
+    "Deep learning uses neural networks with many layers. Networks learn representations from data."))
+  idx.addDocument(new Document(3, "Natural Language Processing",
+    "NLP enables machines to understand human language. It applies machine learning techniques."))
+  idx.addDocument(new Document(4, "Computer Vision Fundamentals",
+    "Computer vision lets machines interpret images and video. Deep learning drives modern vision systems."))
+  idx.addDocument(new Document(5, "Reinforcement Learning Basics",
+    "Reinforcement learning trains agents to maximize cumulative rewards in an environment."))
+  idx.addDocument(new Document(6, "Data Engineering Pipelines",
+    "Building scalable data pipelines using streaming and batch processing frameworks."))
+  idx.addDocument(new Document(7, "Statistical Learning Theory",
+    "Statistical foundations of machine learning: bias-variance tradeoff, VC dimension, PAC learning."))
+
+  val eval = new QueryEvaluator(idx)
+
+  IO::println("Index contains #{idx.docCount} documents")
+  IO::println("")
+
+  // Test structured queries
+  val structuredQueries: ArrayList[Query] = new ArrayList[Query]()
+  val labels: ArrayList[String] = new ArrayList[String]()
+
+  structuredQueries.add(new Term("learning"))
+  labels.add("learning")
+
+  structuredQueries.add(new AndQuery(new Term("deep"), new Term("learning")))
+  labels.add("deep AND learning")
+
+  structuredQueries.add(new OrQuery(new Term("neural"), new Term("vision")))
+  labels.add("neural OR vision")
+
+  structuredQueries.add(new AndQuery(new Term("machine"), new NotQuery(new Term("deep"))))
+  labels.add("machine AND NOT deep")
+
+  var i: Int = 0
+  while i < structuredQueries.size {
+    val q: Query = structuredQueries[i]
+    val terms: ArrayList[String] = SnippetExtractor::extractTerms(q)
+    val results: ArrayList[ScoredDoc] = eval.rankedResults(q, 5)
+    printResults(labels[i], results, idx, terms)
+    i++
+  }
+
+  // Test parsed queries
+  IO::println("=".repeat(60))
+  IO::println("Parsed queries:")
+  IO::println("=".repeat(60))
+  IO::println("")
+
+  val queryStrings: ArrayList[String] = new ArrayList[String]()
+  queryStrings.add("data and learning")
+  queryStrings.add("neural or vision or language")
+  queryStrings.add("learning not reinforcement")
+
+  var j: Int = 0
+  while j < queryStrings.size {
+    val qs: String = queryStrings[j]
+    val parsed: Query? = QueryParser::parse(qs)
+    if parsed != null {
+      val terms: ArrayList[String] = SnippetExtractor::extractTerms(parsed)
+      val results: ArrayList[ScoredDoc] = eval.rankedResults(parsed, 3)
+      printResults("#{qs} -> #{parsed.describe()}", results, idx, terms)
+    } else {
+      IO::println("Failed to parse: #{qs}")
+    }
+    j++
+  }
+
+  IO::println("Done.")
+}

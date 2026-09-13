@@ -1,0 +1,332 @@
+// TaxCalculator.on — progressive income-tax engine exercising records,
+// sealed-case enums, collection pipelines, nullable types, pattern matching
+// (select + `is`), foreach/ranges, and string interpolation.
+
+// ── Income categorisation ────────────────────────────────────────────────────
+enum IncomeKind {
+  case Wage
+  case Interest
+  case Dividend
+  case LongTermGain
+  case ShortTermGain
+public:
+  def label(): String = select this {
+    case x is Wage:          "Wages"
+    case x is Interest:      "Interest"
+    case x is Dividend:      "Dividends"
+    case x is LongTermGain:  "Long-term capital gain"
+    case x is ShortTermGain: "Short-term capital gain"
+  }
+  def isPreferential(): Boolean = select this {
+    case x is LongTermGain: true
+    case x is Dividend:     true
+    else:                   false
+  }
+}
+
+// ── Primitive data records ───────────────────────────────────────────────────
+record IncomeItem(description: String, kind: IncomeKind, amount: Int)
+record Deduction(description: String, amount: Int)
+record TaxBracket(floor: Int, ceiling: Int, ratePct: Int)
+  // ceiling == 0 means unbounded (top bracket)
+
+// ── Filing status ────────────────────────────────────────────────────────────
+enum FilingStatus {
+  case Single
+  case MarriedJoint
+  case MarriedSeparate
+  case HeadOfHousehold
+public:
+  def label(): String = select this {
+    case x is Single:          "Single"
+    case x is MarriedJoint:    "Married Filing Jointly"
+    case x is MarriedSeparate: "Married Filing Separately"
+    case x is HeadOfHousehold: "Head of Household"
+  }
+  def standardDeduction(): Int = select this {
+    case x is Single:          14600
+    case x is MarriedJoint:    29200
+    case x is MarriedSeparate: 14600
+    case x is HeadOfHousehold: 21900
+  }
+}
+
+// ── 2024 tax brackets ────────────────────────────────────────────────────────
+val SINGLE_BRACKETS: List[TaxBracket] = [
+  new TaxBracket(     0,  11600, 10),
+  new TaxBracket( 11600,  47150, 12),
+  new TaxBracket( 47150, 100525, 22),
+  new TaxBracket(100525, 191950, 24),
+  new TaxBracket(191950, 243725, 32),
+  new TaxBracket(243725, 609350, 35),
+  new TaxBracket(609350,      0, 37)
+]
+
+val JOINT_BRACKETS: List[TaxBracket] = [
+  new TaxBracket(     0,  23200, 10),
+  new TaxBracket( 23200,  94300, 12),
+  new TaxBracket( 94300, 201050, 22),
+  new TaxBracket(201050, 383900, 24),
+  new TaxBracket(383900, 487450, 32),
+  new TaxBracket(487450, 731200, 35),
+  new TaxBracket(731200,      0, 37)
+]
+
+// ── Bracket-level arithmetic ─────────────────────────────────────────────────
+def taxForBracket(income: Int, b: TaxBracket): Int {
+  if income <= b.floor() { return 0 }
+  val top: Int = if b.ceiling() == 0 {
+    income
+  } else {
+    if income < b.ceiling() { income } else { b.ceiling() }
+  }
+  return (top - b.floor()) * b.ratePct() / 100
+}
+
+def bracketTax(income: Int, brackets: List[TaxBracket]): Int {
+  return (brackets.fold(0) { acc, b ->
+    (acc as Int) + taxForBracket(income, b as TaxBracket)
+  } as Int)
+}
+
+// ── LTCG preferential rates ──────────────────────────────────────────────────
+def ltcgTax(gainAmt: Int, totalTaxable: Int, status: FilingStatus): Int {
+  val t0: Int = select status {
+    case x is Single:          47025
+    case x is MarriedJoint:    94050
+    case x is MarriedSeparate: 47025
+    case x is HeadOfHousehold: 63000
+  }
+  val t15: Int = select status {
+    case x is Single:          518900
+    case x is MarriedJoint:    583750
+    case x is MarriedSeparate: 291875
+    case x is HeadOfHousehold: 551350
+  }
+  if gainAmt <= 0          { return 0 }
+  if totalTaxable <= t0    { return 0 }
+  if totalTaxable <= t15   { return gainAmt * 15 / 100 }
+  return gainAmt * 20 / 100
+}
+
+// ── TaxReturn: collects line items and computes liability ─────────────────────
+class TaxReturn {
+  val _items:      List[IncomeItem]
+  val _deductions: List[Deduction]
+  val _status:     FilingStatus
+  val _year:       Int
+public:
+  def this(items: List[IncomeItem], deductions: List[Deduction], status: FilingStatus, year: Int) {
+    _items      = items
+    _deductions = deductions
+    _status     = status
+    _year       = year
+  }
+  def items():  List[IncomeItem] = _items
+  def status(): FilingStatus     = _status
+  def year():   Int              = _year
+
+  def grossIncome(): Int {
+    return (_items.fold(0) { acc, item ->
+      (acc as Int) + (item as IncomeItem).amount()
+    } as Int)
+  }
+
+  def itemizedDeduction(): Int {
+    return (_deductions.fold(0) { acc, d ->
+      (acc as Int) + (d as Deduction).amount()
+    } as Int)
+  }
+
+  def deductionAmount(): Int {
+    val itemized: Int = itemizedDeduction()
+    val std: Int = _status.standardDeduction()
+    return if itemized > std { itemized } else { std }
+  }
+
+  def preferentialAmount(): Int {
+    return (_items.filter { item ->
+      (item as IncomeItem).kind().isPreferential()
+    }.fold(0) { acc, item ->
+      (acc as Int) + (item as IncomeItem).amount()
+    } as Int)
+  }
+
+  def taxableIncome(): Int {
+    val gross: Int = grossIncome()
+    val deduct: Int = deductionAmount()
+    val raw: Int = gross - deduct
+    if raw < 0 { return 0 }
+    return raw
+  }
+
+  def ordinaryTaxableIncome(): Int {
+    val taxable: Int = taxableIncome()
+    val preferred: Int = preferentialAmount()
+    val ordinary: Int = taxable - preferred
+    if ordinary < 0 { return 0 }
+    return ordinary
+  }
+
+  def brackets(): List[TaxBracket] = select _status {
+    case x is Single:          SINGLE_BRACKETS
+    case x is MarriedSeparate: SINGLE_BRACKETS
+    case x is MarriedJoint:    JOINT_BRACKETS
+    case x is HeadOfHousehold: SINGLE_BRACKETS
+  }
+
+  def totalTax(): Int {
+    val ordinaryTax: Int = bracketTax(ordinaryTaxableIncome(), brackets())
+    val gainTax: Int = ltcgTax(preferentialAmount(), taxableIncome(), _status)
+    return ordinaryTax + gainTax
+  }
+
+  def effectiveRatePct(): Int {
+    val gross: Int = grossIncome()
+    if gross == 0 { return 0 }
+    return totalTax() * 100 / gross
+  }
+
+  def marginalBracket(): TaxBracket? {
+    val taxable: Int = ordinaryTaxableIncome()
+    val bks: List[TaxBracket] = brackets()
+    var last: TaxBracket? = null
+    foreach b: TaxBracket in bks {
+      if taxable >= b.floor() { last = b }
+    }
+    return last
+  }
+}
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+def fmt(n: Int): String {
+  var s: String = "" + n
+  var result: String = ""
+  var count: Int = 0
+  val len: Int = s.length()
+  foreach i: Int in 0..<len {
+    val pos: Int = len - 1 - i
+    val ch: String = s.substring(pos, pos + 1)
+    if count > 0 && count % 3 == 0 { result = "," + result }
+    result = ch + result
+    count = count + 1
+  }
+  return "$" + result
+}
+
+// ── Print helpers ─────────────────────────────────────────────────────────────
+def printLine(label: String, value: String): void {
+  var pad: String = ""
+  foreach i: Int in 0..<(28 - label.length()) {
+    pad = pad + " "
+  }
+  IO::println("  #{label}#{pad}#{value}")
+}
+
+def printReturn(r: TaxReturn): void {
+  IO::println("=== #{r.year()} Return — #{r.status().label()} ===")
+  IO::println("")
+  IO::println("  Income items:")
+  foreach item: IncomeItem in r.items() {
+    IO::println("    #{item.kind().label()}: #{fmt(item.amount())}")
+  }
+  IO::println("")
+  printLine("Gross income:",     fmt(r.grossIncome()))
+  printLine("Less deductions:",  fmt(r.deductionAmount()))
+  printLine("Taxable income:",   fmt(r.taxableIncome()))
+  IO::println("")
+  printLine("Federal income tax:", fmt(r.totalTax()))
+  printLine("Effective rate:",     r.effectiveRatePct() + "%")
+  val mb: TaxBracket? = r.marginalBracket()
+  if mb != null {
+    printLine("Marginal bracket:", (mb as TaxBracket).ratePct() + "%")
+  }
+  IO::println("")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+def main(): void {
+  // Scenario 1: single filer, wages + interest
+  val r1 = new TaxReturn(
+    [new IncomeItem("Day-job salary",    new Wage(),     75000),
+     new IncomeItem("Savings interest",  new Interest(),  1200)],
+    [],
+    new Single(),
+    2024
+  )
+
+  // Scenario 2: married filing jointly — high earner with itemised deductions
+  val r2 = new TaxReturn(
+    [new IncomeItem("Salary A",            new Wage(),        180000),
+     new IncomeItem("Bonus",               new Wage(),         40000),
+     new IncomeItem("Stock sale (LT)",     new LongTermGain(), 35000),
+     new IncomeItem("Qualified dividends", new Dividend(),      5000)],
+    [new Deduction("Mortgage interest", 18000),
+     new Deduction("Charitable giving",  5000),
+     new Deduction("State taxes (SALT)",  4500)],
+    new MarriedJoint(),
+    2024
+  )
+
+  // Scenario 3: head of household, low income — likely no federal tax
+  val r3 = new TaxReturn(
+    [new IncomeItem("Part-time wages", new Wage(), 22000)],
+    [],
+    new HeadOfHousehold(),
+    2024
+  )
+
+  printReturn(r1)
+  printReturn(r2)
+  printReturn(r3)
+
+  // ── Collection pipeline: rank scenarios by effective rate ────────────────
+  val scenarios: List[TaxReturn] = [r1, r2, r3]
+  val ranked = scenarios.sortedBy { r -> (r as TaxReturn).effectiveRatePct() }
+
+  IO::println("=== Scenarios ranked by effective rate ===")
+  foreach r: TaxReturn in ranked {
+    IO::println("  #{r.status().label()} — gross #{fmt(r.grossIncome())} — " +
+                "tax #{fmt(r.totalTax())} (#{r.effectiveRatePct()}%)")
+  }
+  IO::println("")
+
+  // ── Range iteration: print Single bracket summary ────────────────────────
+  IO::println("=== 2024 Tax Brackets (Single) ===")
+  var n: Int = 1
+  foreach b: TaxBracket in SINGLE_BRACKETS {
+    val ceilStr: String = if b.ceiling() == 0 {
+      "         +"
+    } else {
+      fmt(b.ceiling())
+    }
+    IO::println("  Bracket #{n}: #{fmt(b.floor())} – #{ceilStr}  @  #{b.ratePct()}%")
+    n = n + 1
+  }
+  IO::println("")
+
+  // ── Nullable exercise: look up a non-existent bracket ───────────────────
+  val lowReturn = new TaxReturn(
+    [new IncomeItem("Tiny wages", new Wage(), 5000)],
+    [],
+    new Single(),
+    2024
+  )
+  val mb: TaxBracket? = lowReturn.marginalBracket()
+  if mb != null {
+    IO::println("Marginal bracket for $5,000 income: #{(mb as TaxBracket).ratePct()}%")
+  } else {
+    IO::println("No bracket found (income below all floors).")
+  }
+
+  // ── groupBy exercise: group bracket items by rate pct ───────────────────
+  val allBrackets: List[TaxBracket] = SINGLE_BRACKETS
+  val byRate: Map[Object, List[TaxBracket]] = allBrackets.groupBy { b ->
+    "" + (b as TaxBracket).ratePct()
+  }
+  IO::println("")
+  IO::println("=== Bracket count by rate ===")
+  foreach (rate, bks) in byRate {
+    IO::println("  #{rate}%: #{bks.size} bracket(s)")
+  }
+}

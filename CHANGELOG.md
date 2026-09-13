@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `select` used as a statement whose branches yielded unrelated concrete
+  reference types could crash the compiler with `[I0000] Internal compiler
+  error in BytecodeGeneration`** instead of compiling cleanly, even though
+  the select's own value is discarded in statement position. ASM's default
+  `ClassWriter.getCommonSuperClass` (used to compute the JVM stack-map frame
+  at the join point after the branches) resolves both sides via classloader
+  reflection to find a common ancestor; when one side was a class still
+  being compiled in the same unit, that reflective load failed with a
+  `ClassNotFoundException`, which escaped as the internal error instead of a
+  diagnostic. `ClassWriter` now falls back to `java/lang/Object` — always a
+  valid common ancestor for two reference types — when the default lookup
+  can't resolve a type. Found by `MutationFuzzSpec` mutating
+  `run/SpreadsheetEngine.on`.
+
 ## [0.66.0] - 2026-09-12
 
 ### Fixed

@@ -1,0 +1,32 @@
+// A `select` used as a plain statement whose branches yield unrelated concrete
+// reference types (here: the primitive Boolean returned by List.add, and a
+// record type). The value is discarded either way, but ASM's default
+// ClassWriter.getCommonSuperClass -- used to compute the stack-map frame at
+// the join point after the branches -- tried to resolve the record's class
+// via classloader reflection to find a common ancestor, which fails because
+// the class is still being compiled in this same unit. That crashed with an
+// escaped ClassNotFoundException wrapped as [I0000] Internal compiler error
+// in BytecodeGeneration, instead of compiling cleanly (found by
+// MutationFuzzSpec mutating run/SpreadsheetEngine.on's Evaluator.evaluateAll).
+record R(v: Int)
+
+class Foo {
+public:
+  def run(): List[R] {
+    val results: List[R] = []
+    select 1 {
+      case 1:
+        (new R(2))
+      else:
+        results.add(new R(9))
+    }
+    return results
+  }
+}
+
+class Test {
+public:
+  static def main(args: String[]): void {
+    IO::println(new Foo().run().size)
+  }
+}

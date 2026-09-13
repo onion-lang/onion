@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A record whose body declared a field beyond its component list (e.g. `record Box(value: Int) { public: var extra: Int ... }`) could crash the compiler with `[I0000] Internal compiler error in BytecodeGeneration: ArrayIndexOutOfBoundsException`** instead of compiling cleanly. Record component fields are always added to the class before any body-declared field, and the record's synthetic (no explicit `def this`) constructor assigned each non-static field from the constructor argument at the same positional index with no bounds check — so a body-declared field with no matching constructor argument pushed `GeneratorAdapter.loadArg` past the actual argument count. `AsmCodeGeneration.codeConstructor` now stops assigning once it runs out of constructor arguments, leaving any such extra field at its JVM default value instead of indexing out of bounds. Found by `MutationFuzzSpec` mutating `run/PolynomialAlgebra.on`.
+
 ## [0.67.0] - 2026-09-13
 
 ### Fixed

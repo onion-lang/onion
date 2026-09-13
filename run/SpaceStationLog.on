@@ -1,0 +1,426 @@
+// SpaceStationLog.on — life-support monitoring for an orbital station.
+// Exercises: records; ADT and plain enums; classes; interfaces; collection
+// pipelines (map/filter/fold/groupBy/sortedBy/find/any/count/partition);
+// select/type-pattern matching; nullable; closures; string interpolation;
+// try/catch; recursion; while; foreach (ranges and map (k,v)).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AlertLevel {
+  case Critical
+  case Warning
+  case Info
+  case Normal
+public:
+  def label(): String = select this {
+    case x is Critical: "[CRITICAL]"
+    case x is Warning:  "[WARNING ]"
+    case x is Info:     "[INFO    ]"
+    case x is Normal:   "[OK      ]"
+  }
+  def priority(): Int = select this {
+    case x is Critical: 4
+    case x is Warning:  3
+    case x is Info:     2
+    case x is Normal:   1
+  }
+  def isUrgent(): Boolean = select this {
+    case x is Critical: true
+    case x is Warning:  true
+    else:               false
+  }
+}
+
+enum SystemZone { HABITAT, ENGINE, LAB, AIRLOCK, SOLAR }
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record SensorReading(zone: SystemZone, sensor: String, value: Double, unit: String, timestamp: Long) {
+public:
+  def describe(): String = "#{sensor()} @ #{zone()}: #{value()} #{unit()}"
+  def inRange(lo: Double, hi: Double): Boolean = value() >= lo && value() <= hi
+}
+
+record Alert(level: AlertLevel, zone: SystemZone, message: String, timestamp: Long) {
+public:
+  def describe(): String = "#{level().label()} #{zone()}: #{message()}"
+  def isUrgent(): Boolean = level().isUrgent()
+  def priority(): Int = level().priority()
+}
+
+record CrewMember(id: String, name: String, role: String, certZones: List[SystemZone]) {
+public:
+  def isCertified(zone: SystemZone): Boolean = certZones().any { z -> z == zone }
+  def describe(): String = "#{name()} (#{role()})"
+}
+
+// ─── Interface and implementations ───────────────────────────────────────────
+
+interface AlertHandler {
+  def handle(alert: Alert): void
+  def handlerName(): String
+}
+
+class LogHandler conforms AlertHandler {
+  var log: List[String]
+public:
+  def this() { log = [] }
+  def handle(alert: Alert): void { log.add(alert.describe()) }
+  def handlerName(): String = "LogHandler"
+  def dump(): void {
+    foreach line: String in log {
+      IO::println("  " + line)
+    }
+  }
+  def count(): Int = log.size
+}
+
+class CriticalAlarmHandler conforms AlertHandler {
+  var triggered: Int
+public:
+  def this() { triggered = 0 }
+  def handle(alert: Alert): void {
+    if alert.isUrgent() {
+      triggered = triggered + 1
+      IO::println("  *** ALARM: " + alert.describe())
+    }
+  }
+  def handlerName(): String = "CriticalAlarmHandler"
+  def triggeredCount(): Int = triggered
+}
+
+// ─── AlertManager ────────────────────────────────────────────────────────────
+
+class AlertManager {
+  var handlers: List[AlertHandler]
+  var history: List[Alert]
+public:
+  def this() { handlers = []; history = [] }
+  def addHandler(h: AlertHandler): void { handlers.add(h) }
+  def raise(alert: Alert): void {
+    history.add(alert)
+    foreach h: AlertHandler in handlers {
+      h.handle(alert)
+    }
+  }
+  def allAlerts(): List[Alert] = history
+  def urgentAlerts(): List[Alert] =
+    history.filter { a -> (a as Alert).isUrgent() }
+  def alertsByZone(): Map[String, List[Alert]] =
+    history.groupBy { a -> (a as Alert).zone().toString() }
+  def totalCount(): Int = history.size
+}
+
+// ─── LifeSupport system ───────────────────────────────────────────────────────
+
+class LifeSupportSystem {
+  var manager: AlertManager
+  var sensorHistory: List[SensorReading]
+  var crew: List[CrewMember]
+  var clock: Long
+public:
+  def this(mgr: AlertManager) {
+    manager = mgr
+    sensorHistory = []
+    crew = []
+    clock = 0L
+  }
+  def addCrew(m: CrewMember): void { crew.add(m) }
+  def tick(): void { clock = clock + 1L }
+
+  def recordReading(zone: SystemZone, sensor: String, value: Double, unit: String): void {
+    val reading = new SensorReading(zone, sensor, value, unit, clock)
+    if sensorHistory.size >= 200 { sensorHistory.remove(0) }
+    sensorHistory.add(reading)
+    checkThresholds(reading)
+  }
+
+  def checkThresholds(r: SensorReading): void {
+    val sensor = r.sensor()
+    val v = r.value()
+    select sensor {
+      case "O2%":
+        if v < 19.0 {
+          manager.raise(new Alert(new Critical(), r.zone(), "OXYGEN LOW #{v}%", clock))
+        } else if v < 20.5 {
+          manager.raise(new Alert(new Warning(), r.zone(), "Oxygen slightly low #{v}%", clock))
+        }
+      case "CO2ppm":
+        if v > 8000.0 {
+          manager.raise(new Alert(new Critical(), r.zone(), "CO2 CRITICAL #{v} ppm", clock))
+        } else if v > 5000.0 {
+          manager.raise(new Alert(new Warning(), r.zone(), "CO2 elevated #{v} ppm", clock))
+        }
+      case "TempC":
+        if v < 18.0 || v > 30.0 {
+          manager.raise(new Alert(new Warning(), r.zone(), "Temperature out of range #{v}C", clock))
+        }
+      case "PressureKPa":
+        if v < 90.0 {
+          manager.raise(new Alert(new Critical(), r.zone(), "PRESSURE CRITICAL #{v} kPa", clock))
+        } else if v < 95.0 {
+          manager.raise(new Alert(new Warning(), r.zone(), "Pressure low #{v} kPa", clock))
+        }
+      else:
+        manager.raise(new Alert(new Info(), r.zone(), "Sensor '#{sensor}' reading #{v}", clock))
+    }
+  }
+
+  def latestReading(sensor: String): SensorReading? {
+    val matches = sensorHistory.filter { r -> (r as SensorReading).sensor() == sensor }
+    if matches.isEmpty() { return null }
+    return matches.get(matches.size - 1) as SensorReading
+  }
+
+  def availableCrew(zone: SystemZone): List[CrewMember] =
+    crew.filter { m -> (m as CrewMember).isCertified(zone) }
+
+  def allReadings(): List[SensorReading] = sensorHistory
+  def currentTick(): Long = clock
+}
+
+// ─── Statistics helpers ───────────────────────────────────────────────────────
+
+def avgDouble(values: List[Double]): Double {
+  if values.isEmpty() { return 0.0 }
+  val sum = values.fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+  return (sum as Double) / values.size
+}
+
+def sumPriorities(alerts: List[Alert]): Int =
+  alerts.fold(0) { acc, a -> (acc as Int) + (a as Alert).priority() }
+
+def maxPriority(alerts: List[Alert]): Int {
+  if alerts.isEmpty() { return 0 }
+  return alerts.fold(0) { acc, a -> {
+    val p = (a as Alert).priority()
+    val cur = acc as Int
+    if p > cur { p } else { cur }
+  }}
+}
+
+// Recursive: count cascading failures in same zone
+def countZoneCascades(alerts: List[Alert], zone: SystemZone, depth: Int): Int {
+  if depth <= 0 || alerts.isEmpty() { return 0 }
+  val zoneAlerts = alerts.filter { a -> (a as Alert).zone() == zone }
+  val critical = zoneAlerts.filter { a -> (a as Alert).priority() == 4 }
+  if critical.isEmpty() { return 0 }
+  return critical.size + countZoneCascades(
+    zoneAlerts.filter { a -> (a as Alert).priority() < 4 }, zone, depth - 1
+  )
+}
+
+// ─── Simulation setup ─────────────────────────────────────────────────────────
+
+val logHandler = new LogHandler()
+val alarmHandler = new CriticalAlarmHandler()
+val manager = new AlertManager()
+manager.addHandler(logHandler)
+manager.addHandler(alarmHandler)
+
+val station = new LifeSupportSystem(manager)
+
+station.addCrew(new CrewMember("C1", "Aiko Tanaka",    "Commander", [SystemZone::HABITAT, SystemZone::LAB, SystemZone::AIRLOCK]))
+station.addCrew(new CrewMember("C2", "Jonas Müller",   "Engineer",  [SystemZone::ENGINE,  SystemZone::SOLAR]))
+station.addCrew(new CrewMember("C3", "Priya Sharma",   "Scientist", [SystemZone::LAB,     SystemZone::HABITAT]))
+station.addCrew(new CrewMember("C4", "Marco Reyes",    "Medic",     [SystemZone::HABITAT, SystemZone::LAB]))
+station.addCrew(new CrewMember("C5", "Sara Lindqvist", "EVA Spec.", [SystemZone::AIRLOCK, SystemZone::SOLAR, SystemZone::ENGINE]))
+
+IO::println("=== Space Station Life Support Log ===")
+IO::println("")
+
+// ─── Phase 1: Normal operations ───────────────────────────────────────────────
+
+IO::println("--- Phase 1: Normal operations ---")
+station.tick()
+station.recordReading(SystemZone::HABITAT, "O2%",          20.9, "%")
+station.recordReading(SystemZone::HABITAT, "CO2ppm",       600.0, "ppm")
+station.recordReading(SystemZone::HABITAT, "TempC",        22.0, "C")
+station.recordReading(SystemZone::HABITAT, "PressureKPa",  101.3, "kPa")
+station.recordReading(SystemZone::ENGINE,  "TempC",        28.0, "C")
+station.recordReading(SystemZone::LAB,     "O2%",          20.8, "%")
+station.recordReading(SystemZone::LAB,     "CO2ppm",       800.0, "ppm")
+
+station.tick()
+station.recordReading(SystemZone::AIRLOCK, "PressureKPa",  101.0, "kPa")
+station.recordReading(SystemZone::SOLAR,   "CustomSensor", 42.5, "V")
+
+IO::println("")
+IO::println("--- Phase 2: Developing issues ---")
+station.tick()
+station.recordReading(SystemZone::ENGINE,  "TempC",        35.0, "C")
+station.recordReading(SystemZone::HABITAT, "O2%",          20.0, "%")
+station.recordReading(SystemZone::HABITAT, "CO2ppm",       5500.0, "ppm")
+station.recordReading(SystemZone::AIRLOCK, "PressureKPa",  93.0, "kPa")
+
+IO::println("")
+IO::println("--- Phase 3: Emergency conditions ---")
+station.tick()
+station.recordReading(SystemZone::HABITAT, "O2%",          18.5, "%")
+station.recordReading(SystemZone::HABITAT, "CO2ppm",       9000.0, "ppm")
+station.recordReading(SystemZone::ENGINE,  "PressureKPa",  88.0, "kPa")
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Full Alert Log ---")
+logHandler.dump()
+
+IO::println("")
+IO::println("--- Summary Statistics ---")
+val urgents = manager.urgentAlerts()
+IO::println("Total alerts logged:      #{logHandler.count()}")
+IO::println("Urgent alerts:            #{urgents.size}")
+IO::println("Critical alarms fired:    #{alarmHandler.triggeredCount()}")
+IO::println("Sum of alert priorities:  #{sumPriorities(urgents)}")
+IO::println("Max priority in urgents:  #{maxPriority(urgents)}")
+
+// Group by zone
+IO::println("")
+IO::println("--- Alerts by zone ---")
+val byZone: Map[String, List[Alert]] = manager.alertsByZone()
+foreach (zone, alerts) in byZone {
+  IO::println("  #{zone}: #{(alerts as List[Alert]).size} alert(s)")
+}
+
+// Cascade analysis (recursive)
+IO::println("")
+IO::println("--- Cascade analysis (recursion) ---")
+val all: List[Alert] = manager.allAlerts()
+val habitatCascades = countZoneCascades(all, SystemZone::HABITAT, 3)
+val engineCascades  = countZoneCascades(all, SystemZone::ENGINE,  3)
+IO::println("HABITAT cascade depth count: #{habitatCascades}")
+IO::println("ENGINE  cascade depth count: #{engineCascades}")
+
+// Crew availability
+IO::println("")
+IO::println("--- Crew certified for HABITAT ---")
+val habitatCrew: List[CrewMember] = station.availableCrew(SystemZone::HABITAT)
+foreach m: CrewMember in habitatCrew {
+  IO::println("  " + m.describe())
+}
+
+IO::println("")
+IO::println("--- Crew certified for ENGINE ---")
+val engineCrew: List[CrewMember] = station.availableCrew(SystemZone::ENGINE)
+foreach m: CrewMember in engineCrew {
+  IO::println("  " + m.describe())
+}
+
+// Sensor value statistics
+IO::println("")
+IO::println("--- Sensor statistics ---")
+val readings: List[SensorReading] = station.allReadings()
+val o2Vals: List[Double]  = readings.filter { r -> (r as SensorReading).sensor() == "O2%" }
+              .map { r -> (r as SensorReading).value() }
+val co2Vals: List[Double] = readings.filter { r -> (r as SensorReading).sensor() == "CO2ppm" }
+              .map { r -> (r as SensorReading).value() }
+IO::println("O2  readings: #{o2Vals.size},  avg: #{avgDouble(o2Vals)}%")
+IO::println("CO2 readings: #{co2Vals.size}, avg: #{avgDouble(co2Vals)} ppm")
+
+// Partition: critical vs non-critical
+val partitioned = all.partition { a -> (a as Alert).priority() == 4 }
+val criticals = partitioned.get(0) as List[Alert]
+val warnings  = partitioned.get(1) as List[Alert]
+IO::println("")
+IO::println("Partition — Critical: #{criticals.size}, Warning-level: #{warnings.size}")
+
+// Sort urgents by priority (descending)
+val sorted: List[Alert] = all.sortedBy { a -> 0 - (a as Alert).priority() }
+IO::println("")
+IO::println("--- Alerts ranked by priority ---")
+var rank: Int = 1
+foreach a: Alert in sorted {
+  IO::println("  #{rank}. #{a.describe()}")
+  rank++
+}
+
+// Nullable lookup
+IO::println("")
+IO::println("--- Sensor lookup ---")
+val latestO2 = station.latestReading("O2%")
+if latestO2 != null {
+  IO::println("Latest O2 reading: " + (latestO2 as SensorReading).describe())
+} else {
+  IO::println("No O2 reading available")
+}
+val latestGrav = station.latestReading("GRAVITY")
+val gravDesc: String = if latestGrav == null { "sensor not installed" } else { (latestGrav as SensorReading).describe() }
+IO::println("GRAVITY reading: " + gravDesc)
+
+// Try/catch: simulated sensor failure
+IO::println("")
+IO::println("--- Try/catch: simulated fault ---")
+try {
+  val badSensor = "OVERLOAD"
+  val badVal = -999.9
+  if badVal < -100.0 {
+    throw new RuntimeException("Sensor #{badSensor} reported catastrophic value: #{badVal}")
+  }
+  IO::println("Sensor check passed.")
+} catch e: RuntimeException {
+  IO::println("Caught sensor fault: " + e.getMessage())
+  manager.raise(new Alert(new Critical(), SystemZone::ENGINE, "Sensor fault: " + e.getMessage(), station.currentTick()))
+}
+
+// Final status
+val habitatStatus: String = if habitatCascades > 0 { "COMPROMISED" } else { "NOMINAL" }
+val engineStatus: String  = if engineCascades  > 0 { "COMPROMISED" } else { "NOMINAL" }
+IO::println("")
+IO::println("=== Final Status Report ===")
+IO::println("  HABITAT: #{habitatStatus}")
+IO::println("  ENGINE:  #{engineStatus}")
+IO::println("  Total alerts: #{manager.totalCount()}, of which #{urgents.size} urgent")
+
+// Closure stored and applied
+val priorityLabel = (p: Int) -> select p {
+  case 4: "CRITICAL"
+  case 3: "WARNING"
+  case 2: "INFO"
+  else:   "OK"
+}
+IO::println("")
+IO::println("--- Priority labels (closure) ---")
+foreach p: Int in [4, 3, 2, 1] {
+  IO::println("  Priority #{p} = #{priorityLabel(p)}")
+}
+
+// Distinct alert zones
+val distinctZones: List[String] = all.map { a -> (a as Alert).zone().toString() }.distinct()
+IO::println("")
+IO::println("Distinct zones with alerts: #{distinctZones.toString()}")
+
+// Count alerts per level using count
+val criticalCount = all.count { a -> (a as Alert).priority() == 4 }
+val warnCount     = all.count { a -> (a as Alert).priority() == 3 }
+val infoCount     = all.count { a -> (a as Alert).priority() == 2 }
+IO::println("")
+IO::println("--- Alert breakdown ---")
+IO::println("  CRITICAL: #{criticalCount}")
+IO::println("  WARNING:  #{warnCount}")
+IO::println("  INFO:     #{infoCount}")
+
+val hasLifeThreat = all.any { a -> (a as Alert).priority() == 4 }
+IO::println("  Life-threatening condition active: #{hasLifeThreat}")
+
+// Foreach over index range
+IO::println("")
+IO::println("--- Timeline (last 4 ticks) ---")
+foreach tick: Int in 1..4 {
+  val tickAlerts = all.filter { a -> (a as Alert).timestamp() == tick.longValue() }
+  IO::println("  Tick #{tick}: #{tickAlerts.size} alert(s)")
+}
+
+// While loop: count readings above safe O2 threshold
+var safeO2Count: Int = 0
+var i: Int = 0
+while i < o2Vals.size {
+  val v = o2Vals.get(i) as Double
+  if v >= 20.5 { safeO2Count++ }
+  i++
+}
+IO::println("")
+IO::println("O2 readings above safe threshold (>=20.5%): #{safeO2Count} of #{o2Vals.size}")
+
+IO::println("")
+IO::println("=== End of Space Station Life Support Log ===")

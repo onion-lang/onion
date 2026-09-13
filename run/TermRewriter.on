@@ -1,0 +1,492 @@
+// TermRewriter.on — algebraic expression simplifier with rule-based rewriting
+// Exercises: ADT case-enum (Expr sealed hierarchy + exhaustiveness), records,
+// top-level functions, generics (Map[String,Double]), collection pipelines
+// (map / filter / fold / find / sortedBy), extension methods on String/Int,
+// select / type-pattern matching, string interpolation, recursion,
+// nullable, try/catch, while / foreach, Map (k,v) entry iteration.
+
+import {
+  java.util.LinkedHashMap;
+  java.util.ArrayList;
+}
+
+// ─── Extension methods ─────────────────────────────────────────────────────────
+extension Int {
+  def abs2(): Int = if self < 0 { 0 - self } else { self }
+  def sign(): Int = if self > 0 { 1 } else if self < 0 { 0 - 1 } else { 0 }
+}
+
+extension String {
+  def repeatS(n: Int): String {
+    val sb = new java.lang.StringBuilder()
+    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    return sb.toString()
+  }
+  def padR(w: Int): String {
+    var s = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── ADT enum: symbolic expression tree ───────────────────────────────────────
+// Sealed hierarchy; `select this` exhaustiveness is compile-time checked.
+enum Expr {
+  case Num(value: Double)            // numeric literal
+  case Var(name: String)             // symbolic variable
+  case Add(left: Expr, right: Expr)  // e + f
+  case Mul(left: Expr, right: Expr)  // e * f
+  case Pow(base: Expr, exp: Expr)    // e ^ f
+  case Neg(operand: Expr)            // -e
+  case Div(numer: Expr, denom: Expr) // e / f
+public:
+  // ── pretty-print ──────────────────────────────────────────────────────────
+  def show(): String = select this {
+    case n is Num:
+      val d = n.value()
+      val i = d as Int
+      if (i as Double) == d { "" + i } else { "" + d }
+    case v is Var: v.name()
+    case a is Add: "(" + a.left().show() + " + " + a.right().show() + ")"
+    case m is Mul: "(" + m.left().show() + " * " + m.right().show() + ")"
+    case p is Pow: "(" + p.base().show() + " ^ " + p.exp().show() + ")"
+    case g is Neg: "-" + g.operand().show()
+    case d is Div: "(" + d.numer().show() + " / " + d.denom().show() + ")"
+  }
+
+  // ── structural equality ────────────────────────────────────────────────────
+  def eqExpr(other: Expr): Boolean = select this {
+    case n is Num: select other {
+      case o is Num: n.value() == o.value()
+      else: false
+    }
+    case v is Var: select other {
+      case o is Var: v.name() == o.name()
+      else: false
+    }
+    case a is Add: select other {
+      case o is Add: a.left().eqExpr(o.left()) && a.right().eqExpr(o.right())
+      else: false
+    }
+    case m is Mul: select other {
+      case o is Mul: m.left().eqExpr(o.left()) && m.right().eqExpr(o.right())
+      else: false
+    }
+    case p is Pow: select other {
+      case o is Pow: p.base().eqExpr(o.base()) && p.exp().eqExpr(o.exp())
+      else: false
+    }
+    case g is Neg: select other {
+      case o is Neg: g.operand().eqExpr(o.operand())
+      else: false
+    }
+    case d is Div: select other {
+      case o is Div: d.numer().eqExpr(o.numer()) && d.denom().eqExpr(o.denom())
+      else: false
+    }
+  }
+
+  // ── check if this is a numeric literal with a specific value ───────────────
+  def isNum(v: Double): Boolean = select this {
+    case n is Num: n.value() == v
+    else: false
+  }
+
+  // ── check if this is a non-zero number ──────────────────────────────────
+  def isNonZeroNum(): Boolean = select this {
+    case n is Num: n.value() != 0.0
+    else: false
+  }
+
+  // ── evaluate with variable bindings; returns null on missing variable ──────
+  def eval(env: java.util.Map[String, Double]): Double? = select this {
+    case n is Num: n.value()
+    case v is Var:
+      val r = env.get(v.name())
+      if r == null { null } else { r as Double }
+    case a is Add:
+      val l = a.left().eval(env)
+      val r = a.right().eval(env)
+      if l == null || r == null { null } else { (l as Double) + (r as Double) }
+    case m is Mul:
+      val l = m.left().eval(env)
+      val r = m.right().eval(env)
+      if l == null || r == null { null } else { (l as Double) * (r as Double) }
+    case p is Pow:
+      val b = p.base().eval(env)
+      val e = p.exp().eval(env)
+      if b == null || e == null { null } else {
+        java.lang.Math::pow(b as Double, e as Double)
+      }
+    case g is Neg:
+      val o = g.operand().eval(env)
+      if o == null { null } else { 0.0 - (o as Double) }
+    case d is Div:
+      val n2 = d.numer().eval(env)
+      val d2 = d.denom().eval(env)
+      if n2 == null || d2 == null || (d2 as Double) == 0.0 { null } else {
+        (n2 as Double) / (d2 as Double)
+      }
+  }
+}
+
+// ─── Record: a named rewrite rule (name, before => after) ─────────────────────
+record Rule(name: String, description: String) {
+public:
+  def display(): String = "[" + name().padR(20) + "] " + description()
+}
+
+// ─── Simplification: one pass of algebraic simplification ─────────────────────
+// Applies constant-folding and algebraic identities recursively bottom-up.
+def simplify1(e: Expr): Expr = select e {
+  // ── recurse into sub-expressions first (bottom-up) ──────────────────────────
+  case a is Add:
+    val l = simplify1(a.left())
+    val r = simplify1(a.right())
+    // 0 + x => x,   x + 0 => x
+    if l.isNum(0.0) { return r }
+    if r.isNum(0.0) { return l }
+    // const + const => const
+    select l {
+      case ln is Num: select r {
+        case rn is Num: return new Num(ln.value() + rn.value())
+        else: {}
+      }
+      else: {}
+    }
+    // x + (-x) => 0  (simple case: same variable)
+    select r {
+      case rg is Neg: if l.eqExpr(rg.operand()) { return new Num(0.0) }
+      else: {}
+    }
+    new Add(l, r)
+
+  case m is Mul:
+    val l = simplify1(m.left())
+    val r = simplify1(m.right())
+    // 0 * x => 0,   x * 0 => 0
+    if l.isNum(0.0) || r.isNum(0.0) { return new Num(0.0) }
+    // 1 * x => x,   x * 1 => x
+    if l.isNum(1.0) { return r }
+    if r.isNum(1.0) { return l }
+    // const * const => const
+    select l {
+      case ln is Num: select r {
+        case rn is Num: return new Num(ln.value() * rn.value())
+        else: {}
+      }
+      else: {}
+    }
+    // (-1) * x => -x
+    select l {
+      case ln is Num:
+        if ln.value() == (0.0 - 1.0) { return new Neg(r) }
+      else: {}
+    }
+    new Mul(l, r)
+
+  case p is Pow:
+    val b = simplify1(p.base())
+    val ex = simplify1(p.exp())
+    // x^0 => 1,   x^1 => x,   0^x => 0,   1^x => 1
+    if ex.isNum(0.0) { return new Num(1.0) }
+    if ex.isNum(1.0) { return b }
+    if b.isNum(0.0) { return new Num(0.0) }
+    if b.isNum(1.0) { return new Num(1.0) }
+    // const^const => const
+    select b {
+      case bn is Num: select ex {
+        case en is Num: return new Num(java.lang.Math::pow(bn.value(), en.value()))
+        else: {}
+      }
+      else: {}
+    }
+    new Pow(b, ex)
+
+  case g is Neg:
+    val o = simplify1(g.operand())
+    // -(-x) => x
+    select o {
+      case og is Neg: return og.operand()
+      else: {}
+    }
+    // -(const) => const
+    select o {
+      case on is Num: return new Num(0.0 - on.value())
+      else: {}
+    }
+    new Neg(o)
+
+  case d is Div:
+    val n = simplify1(d.numer())
+    val dn = simplify1(d.denom())
+    // x/1 => x
+    if dn.isNum(1.0) { return n }
+    // 0/x => 0  (x != 0)
+    if n.isNum(0.0) && dn.isNonZeroNum() { return new Num(0.0) }
+    // const/const => const
+    select n {
+      case nn is Num: select dn {
+        case dn2 is Num:
+          if dn2.value() != 0.0 { return new Num(nn.value() / dn2.value()) }
+        else: {}
+      }
+      else: {}
+    }
+    new Div(n, dn)
+
+  case _n is Num: e
+  case _v is Var: e
+}
+
+// ─── Iterate simplification until a fixed point ────────────────────────────────
+def simplify(e: Expr): Expr {
+  var cur = e
+  var prev: Expr? = null
+  var steps = 0
+  while prev == null || !(cur.show() == (prev as Expr).show()) {
+    prev = cur
+    cur = simplify1(cur)
+    steps++
+    if steps > 50 { return cur }
+  }
+  return cur
+}
+
+// ─── Symbolic differentiation (d/dx) ──────────────────────────────────────────
+def differentiate(e: Expr, varName: String): Expr = select e {
+  case _n is Num:  new Num(0.0)
+  case v  is Var:  if v.name() == varName { new Num(1.0) } else { new Num(0.0) }
+  // (f+g)' = f' + g'
+  case a  is Add:
+    new Add(differentiate(a.left(), varName), differentiate(a.right(), varName))
+  // (f*g)' = f'*g + f*g'
+  case m  is Mul:
+    new Add(
+      new Mul(differentiate(m.left(), varName), m.right()),
+      new Mul(m.left(), differentiate(m.right(), varName))
+    )
+  // (f^n)' = n*f^(n-1)*f'  [simplified: only handles Num exponent]
+  case p  is Pow:
+    select p.exp() {
+      case en is Num:
+        val n = en.value()
+        new Mul(
+          new Mul(new Num(n), new Pow(p.base(), new Num(n - 1.0))),
+          differentiate(p.base(), varName)
+        )
+      else:
+        new Num(0.0)  // general case not handled here
+    }
+  // (-f)' = -f'
+  case g  is Neg: new Neg(differentiate(g.operand(), varName))
+  // (f/g)' = (f'g - fg') / g^2
+  case d  is Div:
+    new Div(
+      new Add(
+        new Mul(differentiate(d.numer(), varName), d.denom()),
+        new Neg(new Mul(d.numer(), differentiate(d.denom(), varName)))
+      ),
+      new Pow(d.denom(), new Num(2.0))
+    )
+}
+
+// ─── Record: one row in the expression report ─────────────────────────────────
+record ExprRow(label: String, original: String, simplified: String, evalResult: String) {
+public:
+  def display(): String {
+    return "  " + label().padR(18) + " | " + original().padR(24) +
+           " => " + simplified().padR(20) + " | eval=" + evalResult()
+  }
+}
+
+// ─── Evaluate to string ────────────────────────────────────────────────────────
+def evalStr(e: Expr, env: java.util.Map[String, Double]): String {
+  val r = e.eval(env)
+  if r == null { return "(undefined)" }
+  val d = r as Double
+  val i = d as Int
+  if (i as Double) == d { return "" + i }
+  return "" + d
+}
+
+// ─── Demo: simplify + differentiate + evaluate an expression ──────────────────
+def demo(label: String, e: Expr, env: java.util.Map[String, Double]): void {
+  val s = simplify(e)
+  IO::println("  " + label.padR(20) + ": " + e.show())
+  IO::println("  " + "simplified".padR(20) + ": " + s.show())
+  IO::println("  " + "eval".padR(20) + ": " + evalStr(s, env))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main program
+// ─────────────────────────────────────────────────────────────────────────────
+val env = new LinkedHashMap[String, Double]()
+env.put("x", 3.0)
+env.put("y", 2.0)
+env.put("z", 0.0)
+
+IO::println("════ TermRewriter: algebraic simplification demo ════")
+IO::println("")
+IO::println("Variable bindings: x=" + env.get("x") + ", y=" + env.get("y") + ", z=" + env.get("z"))
+IO::println("")
+
+// ── 1. Constant folding ───────────────────────────────────────────────────────
+IO::println("─── 1. Constant folding ───")
+val exprs1 = [
+  new Add(new Num(2.0), new Mul(new Num(3.0), new Num(4.0))),
+  new Mul(new Add(new Num(1.0), new Num(2.0)), new Pow(new Num(2.0), new Num(8.0))),
+  new Div(new Num(10.0), new Num(4.0))
+]
+foreach e: Expr in exprs1 {
+  val s = simplify(e)
+  IO::println("  " + e.show() + " => " + s.show())
+}
+
+// ── 2. Identity rules ─────────────────────────────────────────────────────────
+IO::println("")
+IO::println("─── 2. Identity rules ───")
+val x: Expr = new Var("x")
+val y: Expr = new Var("y")
+val zero: Expr = new Num(0.0)
+val one: Expr = new Num(1.0)
+val minOne: Expr = new Num(0.0 - 1.0)
+val two: Expr = new Num(2.0)
+
+val identityExprs = [
+  new Add(x, zero),           // x + 0 => x
+  new Mul(one, y),            // 1 * y => y
+  new Mul(zero, x),           // 0 * x => 0
+  new Pow(x, one),            // x^1 => x
+  new Pow(y, zero),           // y^0 => 1
+  new Add(x, new Neg(x)),     // x + (-x) => 0
+  new Neg(new Neg(x)),        // -(-x) => x
+  new Mul(minOne, y)          // (-1)*y => -y
+]
+foreach e: Expr in identityExprs {
+  IO::println("  " + e.show() + " => " + simplify(e).show())
+}
+
+// ── 3. Evaluation with variables ──────────────────────────────────────────────
+IO::println("")
+IO::println("─── 3. Evaluation (x=3, y=2, z=0) ───")
+val evalExprs: java.util.List[Expr] = new ArrayList[Expr]()
+evalExprs.add(new Mul(x, new Add(y, two)))            // x*(y+2) = 3*4 = 12
+evalExprs.add(new Pow(x, y))                          // x^y = 9
+evalExprs.add(new Div(new Mul(x, y), two))            // (x*y)/2 = 3
+evalExprs.add(new Add(new Mul(x, x), new Mul(y, y))) // x^2 + y^2 = 13
+evalExprs.add(new Div(one, new Var("z")))             // 1/z = undefined
+
+foreach e: Expr in evalExprs {
+  val s = simplify(e)
+  IO::println("  " + e.show().padR(30) + " => eval=" + evalStr(s, env))
+}
+
+// ── 4. Symbolic differentiation ───────────────────────────────────────────────
+IO::println("")
+IO::println("─── 4. Symbolic differentiation d/dx ───")
+
+// Define f(x) = x^3 + 2*x^2 + x + 5
+val f: Expr = new Add(
+  new Add(
+    new Add(new Pow(x, new Num(3.0)),
+            new Mul(two, new Pow(x, two))),
+    x),
+  new Num(5.0))
+
+IO::println("  f(x)  = " + f.show())
+val df = differentiate(f, "x")
+IO::println("  f'(x) = " + df.show())
+val dfSimp = simplify(df)
+IO::println("  f'(x) simplified = " + dfSimp.show())
+
+// Evaluate f'(x) at x=3: 3x^2 + 4x + 1 = 27 + 12 + 1 = 40
+IO::println("  f'(3) = " + evalStr(dfSimp, env))
+
+IO::println("")
+
+// ── 5. Collection pipeline: batch simplification ──────────────────────────────
+IO::println("─── 5. Batch simplification pipeline ───")
+val batch: java.util.List[Expr] = new ArrayList[Expr]()
+batch.add(new Add(new Mul(new Num(0.0), x), new Mul(y, new Num(1.0))))
+batch.add(new Pow(new Add(x, zero), new Num(2.0)))
+batch.add(new Mul(new Num(2.0), new Mul(new Num(3.0), new Num(4.0))))
+batch.add(new Div(new Mul(x, new Num(0.0)), y))
+batch.add(new Add(new Neg(new Neg(x)), new Neg(new Neg(y))))
+
+val results = batch.map { e ->
+  val orig  = (e as Expr).show()
+  val simp  = simplify(e as Expr).show()
+  orig.padR(28) + " => " + simp
+}
+foreach line: String in results { IO::println("  " + line) }
+
+// ── 6. Nullable: expressions with missing variables ───────────────────────────
+IO::println("")
+IO::println("─── 6. Nullable evaluation (missing variable) ───")
+val partialEnv = new LinkedHashMap[String, Double]()
+partialEnv.put("x", 5.0)
+// y is NOT in partialEnv
+
+val exprWithMissing = new Add(x, new Var("y"))
+IO::println("  Expr: " + exprWithMissing.show())
+val result = exprWithMissing.eval(partialEnv)
+if result == null {
+  IO::println("  eval with {x=5}: undefined (y not bound)")
+} else {
+  IO::println("  eval with {x=5}: " + (result as Double))
+}
+
+// ── 7. try/catch: division by zero guard ─────────────────────────────────────
+IO::println("")
+IO::println("─── 7. try/catch: division by zero ───")
+def safeEval(e: Expr, env2: java.util.Map[String, Double]): String {
+  try {
+    val r = e.eval(env2)
+    if r == null { return "undefined" }
+    return "" + (r as Double)
+  } catch ex: Exception {
+    return "ERROR: " + ex.getMessage()
+  }
+}
+
+val zeroEnv = new LinkedHashMap[String, Double]()
+zeroEnv.put("x", 0.0)
+val divExpr = new Div(new Num(1.0), new Var("x"))
+IO::println("  1/x at x=0: " + safeEval(divExpr, zeroEnv))
+
+val divExpr2 = new Div(new Num(6.0), new Var("x"))
+zeroEnv.put("x", 2.0)
+IO::println("  6/x at x=2: " + safeEval(divExpr2, zeroEnv))
+
+// ── 8. Grouping / counting expression types ──────────────────────────────────
+IO::println("")
+IO::println("─── 8. Expression type census ───")
+val allExprs: java.util.List[Expr] = new ArrayList[Expr]()
+foreach e: Expr in identityExprs { allExprs.add(e) }
+foreach e: Expr in exprs1 { allExprs.add(e) }
+foreach e: Expr in evalExprs { allExprs.add(e) }
+allExprs.add(f)
+allExprs.add(df)
+
+def exprType(e: Expr): String = select e {
+  case _n is Num: "Num"
+  case _v is Var: "Var"
+  case _a is Add: "Add"
+  case _m is Mul: "Mul"
+  case _p is Pow: "Pow"
+  case _g is Neg: "Neg"
+  case _d is Div: "Div"
+}
+
+val byType = allExprs.groupBy { e -> exprType(e as Expr) }
+val sortedTypes = ["Add", "Mul", "Pow", "Neg", "Div", "Num", "Var"]
+foreach t: String in sortedTypes {
+  val group = byType.get(t)
+  if group != null {
+    IO::println("  " + t.padR(6) + ": " + (group as java.util.List).size + " expressions")
+  }
+}
+
+IO::println("")
+IO::println("TermRewriter.on complete.")

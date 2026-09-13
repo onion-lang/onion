@@ -1,0 +1,282 @@
+// NumberFormats.on - Number format conversions and utilities
+// Exercises: extension methods on primitives, records, enums,
+// collection pipelines, pattern matching, recursion, string interpolation
+
+// --- Extension methods on primitive types ---
+
+extension Int {
+  def toRoman(): String {
+    if self <= 0 { return "(invalid)" }
+    var n: Int = self
+    var result: String = ""
+    val values: Int[] = new Int[13]
+    val symbols: String[] = new String[13]
+    values[0]  = 1000; symbols[0]  = "M"
+    values[1]  = 900;  symbols[1]  = "CM"
+    values[2]  = 500;  symbols[2]  = "D"
+    values[3]  = 400;  symbols[3]  = "CD"
+    values[4]  = 100;  symbols[4]  = "C"
+    values[5]  = 90;   symbols[5]  = "XC"
+    values[6]  = 50;   symbols[6]  = "L"
+    values[7]  = 40;   symbols[7]  = "XL"
+    values[8]  = 10;   symbols[8]  = "X"
+    values[9]  = 9;    symbols[9]  = "IX"
+    values[10] = 5;    symbols[10] = "V"
+    values[11] = 4;    symbols[11] = "IV"
+    values[12] = 1;    symbols[12] = "I"
+    for var i: Int = 0; i < 13; i++ {
+      while n >= values[i] {
+        result = result + symbols[i]
+        n = n - values[i]
+      }
+    }
+    return result
+  }
+
+  def toBinary(): String {
+    if self == 0 { return "0" }
+    var n: Int = self
+    var result: String = ""
+    while n > 0 {
+      result = "" + (n % 2) + result
+      n = n / 2
+    }
+    return result
+  }
+
+  def toHex(): String {
+    if self == 0 { return "0" }
+    val digits: String = "0123456789ABCDEF"
+    var n: Int = self
+    var result: String = ""
+    while n > 0 {
+      val idx: Int = n % 16
+      result = "" + digits.charAt(idx) + result
+      n = n / 16
+    }
+    return result
+  }
+
+  def isPrime(): Boolean {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    var i: Int = 3
+    while i * i <= self {
+      if self % i == 0 { return false }
+      i = i + 2
+    }
+    return true
+  }
+
+  def gcd(other: Int): Int {
+    var a: Int = self
+    var b: Int = other
+    while b != 0 {
+      val t: Int = b
+      b = a % b
+      a = t
+    }
+    return a
+  }
+
+  def lcm(other: Int): Int {
+    return (self / self.gcd(other)) * other
+  }
+
+  def digits(): List[Int] {
+    if self == 0 { return [0] }
+    var n: Int = self
+    val result: List[Int] = []
+    while n > 0 {
+      result.add(0, n % 10)
+      n = n / 10
+    }
+    return result
+  }
+
+  def digitSum(): Int {
+    var sum: Int = 0
+    foreach d: Int in self.digits() {
+      sum = sum + d
+    }
+    return sum
+  }
+
+  def rightPad(width: Int): String {
+    var result: String = "" + self
+    while result.length() < width {
+      result = " " + result
+    }
+    return result
+  }
+}
+
+extension Double {
+  def rounded(places: Int): Double {
+    var factor: Double = 1.0
+    for var i: Int = 0; i < places; i++ {
+      factor = factor * 10.0
+    }
+    return Math::round(self * factor) / factor
+  }
+
+  def percent(): String {
+    return "" + (self * 100.0).rounded(1) + "%"
+  }
+}
+
+extension String {
+  def padLeft(width: Int): String {
+    var result: String = self
+    while result.length() < width {
+      result = " " + result
+    }
+    return result
+  }
+
+  def fromRoman(): Int {
+    val romanValues: Map[String, Int] = ["I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000]
+    var result: Int = 0
+    var prev: Int = 0
+    for var i: Int = self.length() - 1; i >= 0; i-- {
+      val ch: String = "" + self.charAt(i)
+      val curr: Int = romanValues.get(ch) ?: 0
+      if curr < prev {
+        result = result - curr
+      } else {
+        result = result + curr
+      }
+      prev = curr
+    }
+    return result
+  }
+
+  def isPalindrome(): Boolean {
+    val n: Int = self.length()
+    for var i: Int = 0; i < n / 2; i++ {
+      if self.charAt(i) != self.charAt(n - 1 - i) {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+// --- Records and enums ---
+
+record NumberInfo(value: Int, roman: String, binary: String, hex: String, isPrime: Boolean, digitSum: Int)
+
+enum NumberClass {
+  case Prime
+  case Composite
+  case One
+  case Zero
+
+public:
+  def label(): String {
+    select this {
+      case p is Prime:     return "prime"
+      case c is Composite: return "composite"
+      case o is One:       return "unit (1)"
+      case z is Zero:      return "zero"
+    }
+  }
+}
+
+def classify(n: Int): NumberClass {
+  if n == 0 { return new Zero() }
+  if n == 1 { return new One() }
+  if n.isPrime() { return new Prime() }
+  return new Composite()
+}
+
+def analyzeNumber(n: Int): NumberInfo {
+  return new NumberInfo(
+    n,
+    n.toRoman(),
+    n.toBinary(),
+    n.toHex(),
+    n.isPrime(),
+    n.digitSum()
+  )
+}
+
+// --- Main program ---
+
+def main(): void {
+  println("=== Roman Numerals ===")
+  val romanTests: List[Int] = [1, 4, 9, 14, 40, 90, 399, 1000, 1999, 2024]
+  foreach n: Int in romanTests {
+    println("  #{n.rightPad(4)} -> #{n.toRoman()}")
+  }
+
+  println("")
+  println("=== Number Bases (1..20) ===")
+  foreach n: Int in 1..20 {
+    println("  #{n.rightPad(3)} dec | #{n.toBinary().padLeft(6)} bin | #{n.toHex().padLeft(3)} hex")
+  }
+
+  println("")
+  println("=== Primes up to 50 ===")
+  val primes: List[Int] = (1..50).filter { n: Int -> n.isPrime() }.toList()
+  println("  " + primes)
+  println("  Count: #{primes.size()}")
+
+  println("")
+  println("=== GCD / LCM examples ===")
+  val pairs: List[Int] = [12, 18, 56, 98, 100, 75]
+  for var i: Int = 0; i < pairs.size(); i = i + 2 {
+    val a: Int = (pairs.get(i) as Int)
+    val b: Int = (pairs.get(i + 1) as Int)
+    println("  gcd(#{a}, #{b}) = #{a.gcd(b)}, lcm(#{a}, #{b}) = #{a.lcm(b)}")
+  }
+
+  println("")
+  println("=== Digit sums ===")
+  val digitSumTests: List[Int] = [0, 1, 99, 123, 999, 12345]
+  foreach n: Int in digitSumTests {
+    println("  digitSum(#{n}) = #{n.digitSum()}")
+  }
+
+  println("")
+  println("=== Number classification ===")
+  foreach n: Int in 0..15 {
+    val cls: NumberClass = classify(n)
+    println("  #{n.rightPad(3)}: #{cls.label()}")
+  }
+
+  println("")
+  println("=== Palindrome check ===")
+  val words: List[String] = ["racecar", "hello", "level", "world", "noon", "onion"]
+  foreach w: String in words {
+    println("  \"#{w}\" is palindrome: #{w.isPalindrome()}")
+  }
+
+  println("")
+  println("=== Roman numeral round-trip ===")
+  val roundTrips: List[Int] = [1, 4, 40, 90, 400, 900, 1999, 2024]
+  foreach n: Int in roundTrips {
+    val roman: String = n.toRoman()
+    val back: Int = roman.fromRoman()
+    val ok: Boolean = n == back
+    println("  #{n} -> #{roman} -> #{back} [#{if ok { "OK" } else { "FAIL" }}]")
+  }
+
+  println("")
+  println("=== NumberInfo records ===")
+  foreach n: Int in [2, 7, 12, 42, 100] {
+    val info: NumberInfo = analyzeNumber(n)
+    println("  #{info.value()}: roman=#{info.roman()}, bin=#{info.binary()}, hex=#{info.hex()}, prime=#{info.isPrime()}, digitSum=#{info.digitSum()}")
+  }
+
+  println("")
+  println("=== Double extensions ===")
+  val pcts: List[Double] = [0.333, 0.5, 0.6667, 0.9999, 1.0]
+  foreach p: Double in pcts {
+    println("  #{p} -> #{p.percent()}")
+  }
+
+  println("")
+  println("Done.")
+}

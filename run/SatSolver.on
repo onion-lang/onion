@@ -1,0 +1,290 @@
+// SatSolver.on — DPLL Boolean Satisfiability Solver (~230 lines)
+// domain: logic / constraint satisfaction / combinatorics
+//
+// Features exercised:
+//   • ADT case-enum (SatResult)       • records (Clause, SolveStats)
+//   • extension Int (literal ops)     • class SatSolver with mutable state
+//   • List[T] pipelines (filter/map/fold/sortedBy)
+//   • recursive DPLL search           • select / is patterns (exhaustive)
+//   • foreach over typed List/ranges  • while loops
+//   • string interpolation            • try/catch
+//   • plain homogeneous enum (Verdict)
+
+// ── Literal helpers ───────────────────────────────────────────────────────────
+// A SAT literal is a non-zero Int: positive means the variable is true,
+// negative means it is false.  Variable index = |lit|.
+extension Int {
+  def litVar(): Int = if self >= 0 { self } else { 0 - self }
+  def litPos(): Boolean = self > 0
+  def litNeg(): Int = 0 - self
+  def litStr(): String = if self > 0 { "x#{self}" } else { "!x#{0 - self}" }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Clause(lits: List[Int])
+  example { new Clause([1, -2]).lits().size == 2 }
+
+record SolveStats(decisions: Int, propagations: Int)
+
+// ── Verdict (simple homogeneous enum, for concise display) ───────────────────
+enum Verdict { SAT, UNSAT }
+
+// ── SatResult ADT ─────────────────────────────────────────────────────────────
+enum SatResult {
+  case Unsat
+  case Sat(model: List[Int])
+public:
+  def verdict(): Verdict = select this {
+    case x is Sat:   Verdict::SAT
+    case x is Unsat: Verdict::UNSAT
+  }
+  def modelStr(): String = select this {
+    case x is Unsat: "(no model)"
+    case x is Sat: {
+      val trues: List[String] = x.model()
+        .filter  { lit: Int -> lit.litPos() }
+        .sortedBy { lit: Int -> lit.litVar() }
+        .map     { lit: Int -> lit.litStr() }
+      trues.toString()
+    }
+  }
+}
+
+// ── SatSolver class ───────────────────────────────────────────────────────────
+class SatSolver {
+  var decisionCount: Int
+  var propagationCount: Int
+
+public:
+  def this {
+    decisionCount = 0
+    propagationCount = 0
+  }
+
+  // Evaluate a literal under the current (partial) assignment.
+  //   1  = literal is satisfied
+  //  -1  = literal is falsified
+  //   0  = literal is unset
+  def evalLit(lit: Int, assign: List[Int]): Int {
+    foreach a: Int in assign {
+      if a == lit          { return 1 }
+      if a == lit.litNeg() { return -1 }
+    }
+    return 0
+  }
+
+  // Evaluate a whole clause.
+  //   1  = at least one literal is satisfied
+  //  -1  = all literals are falsified (conflict)
+  //   0  = at least one literal is unset, none satisfied
+  def evalClause(c: Clause, assign: List[Int]): Int {
+    var falseCount: Int = 0
+    foreach lit: Int in c.lits() {
+      val v: Int = evalLit(lit, assign)
+      if v == 1  { return 1 }
+      if v == -1 { falseCount++ }
+    }
+    return if falseCount == c.lits().size { -1 } else { 0 }
+  }
+
+  // If a clause has exactly one unset literal (all others false) return it; else 0.
+  def unitLit(c: Clause, assign: List[Int]): Int {
+    var unset: Int = 0
+    var unsetCount: Int = 0
+    foreach lit: Int in c.lits() {
+      val v: Int = evalLit(lit, assign)
+      if v == 1 { return 0 }      // already satisfied — not a unit clause
+      if v == 0 { unset = lit; unsetCount++ }
+    }
+    return if unsetCount == 1 { unset } else { 0 }
+  }
+
+  // Is the variable |v| already assigned?
+  def isAssigned(v: Int, assign: List[Int]): Boolean {
+    val absV: Int = v.litVar()
+    foreach a: Int in assign {
+      if a.litVar() == absV { return true }
+    }
+    return false
+  }
+
+  // Copy the current assignment list into a fresh one.
+  def copyAssign(assign: List[Int]): List[Int] {
+    val copy: List[Int] = []
+    foreach a: Int in assign { copy.add(a) }
+    return copy
+  }
+
+  // Unit propagation: repeatedly force unit clauses until fixpoint or conflict.
+  def propagate(clauses: List[Clause], assign: List[Int]): Boolean {
+    var changed: Boolean = true
+    while changed {
+      changed = false
+      foreach c: Clause in clauses {
+        val ec: Int = evalClause(c, assign)
+        if ec == -1 { return false }
+        if ec == 0 {
+          val unit: Int = unitLit(c, assign)
+          if unit != 0 && !isAssigned(unit, assign) {
+            assign.add(unit)
+            propagationCount++
+            changed = true
+          }
+        }
+      }
+    }
+    foreach c: Clause in clauses {
+      if evalClause(c, assign) == -1 { return false }
+    }
+    return true
+  }
+
+  // Are all clauses satisfied by the current assignment?
+  def allSat(clauses: List[Clause], assign: List[Int]): Boolean {
+    foreach c: Clause in clauses {
+      if evalClause(c, assign) != 1 { return false }
+    }
+    return true
+  }
+
+  // Choose the first unassigned variable from an unsatisfied clause.
+  def pickVar(clauses: List[Clause], assign: List[Int]): Int {
+    foreach c: Clause in clauses {
+      if evalClause(c, assign) == 0 {
+        foreach lit: Int in c.lits() {
+          if !isAssigned(lit, assign) { return lit.litVar() }
+        }
+      }
+    }
+    return 0
+  }
+
+  // DPLL recursive search; assign is copied before each branch.
+  def dpll(clauses: List[Clause], assign: List[Int]): SatResult {
+    if !propagate(clauses, assign) { return new Unsat() }
+    if allSat(clauses, assign)     { return new Sat(assign) }
+
+    val v: Int = pickVar(clauses, assign)
+    if v == 0 { return new Unsat() }
+    decisionCount++
+
+    // Branch: try v = true
+    val aT: List[Int] = copyAssign(assign)
+    aT.add(v)
+    select dpll(clauses, aT) {
+      case r is Sat: return r
+      else: /* try false branch */
+    }
+
+    // Branch: try v = false
+    val aF: List[Int] = copyAssign(assign)
+    aF.add(v.litNeg())
+    return dpll(clauses, aF)
+  }
+
+  def solve(clauses: List[Clause]): SatResult {
+    val assign: List[Int] = []
+    return dpll(clauses, assign)
+  }
+
+  def stats(): SolveStats = new SolveStats(decisionCount, propagationCount)
+}
+
+// ── Formula builders ──────────────────────────────────────────────────────────
+
+def cl1(a: Int): Clause = new Clause([a])
+def cl2(a: Int, b: Int): Clause = new Clause([a, b])
+def cl3(a: Int, b: Int, c: Int): Clause = new Clause([a, b, c])
+
+// ── Test helper ───────────────────────────────────────────────────────────────
+
+def showResult(label: String, solver: SatSolver, result: SatResult): void {
+  val vstr: String = select result.verdict() {
+    case Verdict::SAT:   "SAT"
+    case Verdict::UNSAT: "UNSAT"
+  }
+  val st = solver.stats()
+  IO::println("#{label}: #{vstr}  model=#{result.modelStr()}  decisions=#{st.decisions()} propagations=#{st.propagations()}")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+// Test 1: trivially satisfiable (x1)
+val s1 = new SatSolver()
+val f1: List[Clause] = [cl1(1)]
+showResult("trivialSAT", s1, s1.solve(f1))
+
+// Test 2: trivially unsatisfiable (x1 AND ¬x1)
+val s2 = new SatSolver()
+val f2: List[Clause] = [cl1(1), cl1(-1)]
+showResult("trivialUNSAT", s2, s2.solve(f2))
+
+// Test 3: (x1 ∨ x2) ∧ (¬x1 ∨ x3) ∧ (¬x2 ∨ ¬x3) — satisfiable
+val s3 = new SatSolver()
+val f3: List[Clause] = [cl2(1, 2), cl2(-1, 3), cl2(-2, -3)]
+showResult("3varSAT", s3, s3.solve(f3))
+
+// Test 4: (x1 ∨ x2) ∧ (¬x1) ∧ (¬x2) — unsatisfiable
+val s4 = new SatSolver()
+val f4: List[Clause] = [cl2(1, 2), cl1(-1), cl1(-2)]
+showResult("3clause-UNSAT", s4, s4.solve(f4))
+
+// Test 5: pigeonhole 3→2 (3 pigeons, 2 holes) — UNSAT
+// Variable p(i,j) = pigeon i in hole j; encoded as (i-1)*2 + j (values 1..6)
+def pv(pigeon: Int, hole: Int): Int = (pigeon - 1) * 2 + hole
+
+val s5 = new SatSolver()
+val f5: List[Clause] = []
+// Each pigeon must be in at least one hole
+foreach i: Int in 1..3 {
+  f5.add(cl2(pv(i, 1), pv(i, 2)))
+}
+// At most one pigeon per hole (each pair of pigeons must not share a hole)
+foreach j: Int in 1..2 {
+  f5.add(cl2(pv(1, j).litNeg(), pv(2, j).litNeg()))
+  f5.add(cl2(pv(1, j).litNeg(), pv(3, j).litNeg()))
+  f5.add(cl2(pv(2, j).litNeg(), pv(3, j).litNeg()))
+}
+showResult("pigeonhole3-2", s5, s5.solve(f5))
+
+// Test 6: 3-coloring a triangle — SAT
+// Variable cv(node,color) = node has that color; encoded as (n-1)*3 + c (1..9)
+def cv(node: Int, color: Int): Int = (node - 1) * 3 + color
+
+val s6 = new SatSolver()
+val f6: List[Clause] = []
+// Each node must have at least one color
+foreach n: Int in 1..3 {
+  f6.add(cl3(cv(n, 1), cv(n, 2), cv(n, 3)))
+}
+// Adjacent nodes must have different colors (triangle edges: 1-2, 2-3, 1-3)
+val euArr: List[Int] = [1, 2, 1]
+val evArr: List[Int] = [2, 3, 3]
+foreach ei: Int in 0..<3 {
+  val eu: Int = euArr[ei] as Int
+  val ev: Int = evArr[ei] as Int
+  foreach c: Int in 1..3 {
+    f6.add(cl2(cv(eu, c).litNeg(), cv(ev, c).litNeg()))
+  }
+}
+showResult("triangle-3color", s6, s6.solve(f6))
+
+// try/catch: empty formula is vacuously SAT
+try {
+  val sc = new SatSolver()
+  val empty: List[Clause] = []
+  val r: SatResult = sc.solve(empty)
+  val vstr: String = select r.verdict() {
+    case Verdict::SAT:   "SAT (vacuously)"
+    case Verdict::UNSAT: "UNSAT"
+  }
+  IO::println("emptyFormula: " + vstr)
+} catch e: Exception {
+  IO::println("error: " + e.getMessage())
+}
+
+// Summary across all runs
+val solvers: List[SatSolver] = [s1, s2, s3, s4, s5, s6]
+val totalDec: Int = solvers.fold(0) { acc, s -> (acc as Int) + (s as SatSolver).stats().decisions() }
+val totalProp: Int = solvers.fold(0) { acc, s -> (acc as Int) + (s as SatSolver).stats().propagations() }
+IO::println("--- Summary: #{solvers.size} benchmarks, decisions=#{totalDec}, propagations=#{totalProp} ---")

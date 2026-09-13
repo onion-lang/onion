@@ -7,6 +7,7 @@ import onion.compiler.TypedAST.*
 import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
+import ArgumentHelpers.isClosureWithUntypedParams
 
 private[compiler] final class StaticMethodCallSupport(
   typing: Typing,
@@ -61,8 +62,7 @@ private[compiler] final class StaticMethodCallSupport(
     // parameter type is known: resolve the method from the other arguments
     // first, then type the closures against the selected parameter types.
     val untypedClosureIndices = node.args.zipWithIndex.collect {
-      case (closure: AST.ClosureExpression, i)
-        if closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure) => i
+      case (arg, i) if ArgumentHelpers.isClosureWithUntypedParams(arg) => i
     }.toSet
     if (untypedClosureIndices.nonEmpty) {
       return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, untypedClosureIndices)

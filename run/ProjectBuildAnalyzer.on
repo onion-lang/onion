@@ -1,0 +1,296 @@
+// ProjectBuildAnalyzer.on — multi-module build analysis:
+// dependency resolution, topological sort, cycle detection, build reports.
+// Exercises: regular enums, case-enums, records with methods, classes,
+// interfaces, generics, collection pipelines, select/pattern matching,
+// nullable types, closures, string interpolation, recursion, while/foreach.
+
+enum DepScope { COMPILE, TEST, RUNTIME }
+enum BuildStatus { SUCCESS, FAILURE, SKIPPED }
+
+record Dependency(group: String, artifact: String, version: String, scope: DepScope) {
+public:
+  def key(): String = group() + ":" + artifact() + ":" + version()
+  def label(): String = group() + ":" + artifact()
+  def scopeLabel(): String = select scope() {
+    case DepScope::COMPILE: "compile"
+    case DepScope::TEST:    "test"
+    case DepScope::RUNTIME: "runtime"
+    else: "unknown"
+  }
+}
+
+record Module(name: String, version: String, deps: List[Dependency]) {
+public:
+  def compileDeps(): List[Dependency] = deps().filter { d -> d.scope() == DepScope::COMPILE }
+  def testDeps(): List[Dependency]    = deps().filter { d -> d.scope() == DepScope::TEST }
+  def runtimeDeps(): List[Dependency] = deps().filter { d -> d.scope() == DepScope::RUNTIME }
+}
+
+record BuildResult(moduleName: String, status: BuildStatus, durationMs: Long, warnings: Int) {
+public:
+  def ok(): Boolean = status() == BuildStatus::SUCCESS
+  def statusLabel(): String = select status() {
+    case BuildStatus::SUCCESS: "SUCCESS"
+    case BuildStatus::FAILURE: "FAILURE"
+    case BuildStatus::SKIPPED: "SKIPPED"
+    else: "UNKNOWN"
+  }
+  def summary(): String =
+    "#{moduleName()} [#{statusLabel()}] #{durationMs()}ms warnings=#{warnings()}"
+}
+
+// --- Dependency catalog helpers ---
+
+def dep(g: String, a: String, v: String, s: DepScope): Dependency =
+  new Dependency(g, a, v, s)
+
+def compileDep(g: String, a: String, v: String): Dependency =
+  dep(g, a, v, DepScope::COMPILE)
+
+def testDep(g: String, a: String, v: String): Dependency =
+  dep(g, a, v, DepScope::TEST)
+
+def runtimeDep(g: String, a: String, v: String): Dependency =
+  dep(g, a, v, DepScope::RUNTIME)
+
+// --- Topological sort (Kahn's algorithm using lists) ---
+
+def topoSort(modules: List[Module]): List[Module] {
+  // build name -> module map
+  val nameMap: Map[String, Module] = [:]
+  foreach m: Module in modules {
+    nameMap.put(m.name(), m)
+  }
+
+  // in-degree: number of internal compile dependencies each module has
+  val inDegree: Map[String, Int] = [:]
+  foreach m: Module in modules {
+    inDegree.put(m.name(), 0)
+  }
+  foreach m: Module in modules {
+    foreach d: Dependency in m.compileDeps() {
+      if nameMap.containsKey(d.artifact()) {
+        val cur: Int = inDegree.getOrDefault(m.name(), 0)
+        inDegree.put(m.name(), cur + 1)
+      }
+    }
+  }
+
+  // queue starts with modules that have no internal dependencies (can build first)
+  val queue: List[Module] = []
+  queue.addAll(modules.filter { m -> inDegree.getOrDefault(m.name(), 0) == 0 })
+  val result: List[Module] = []
+  var processed: Int = 0
+
+  while processed < queue.size {
+    val current: Module = queue[processed]
+    processed++
+    result.add(current)
+
+    // for each module that depends on current, decrement its in-degree
+    foreach m: Module in modules {
+      val depsOnCurrent: Boolean = m.compileDeps().any { d -> d.artifact() == current.name() }
+      if depsOnCurrent {
+        val deg: Int = inDegree.getOrDefault(m.name(), 0) - 1
+        inDegree.put(m.name(), deg)
+        if deg == 0 {
+          queue.add(m)
+        }
+      }
+    }
+  }
+
+  return result
+}
+
+// --- Transitive dependency collection (depth-first) ---
+
+def collectTransitive(m: Module, all: Map[String, Module], visited: List[String]): List[Dependency] {
+  val result: List[Dependency] = []
+  foreach d: Dependency in m.compileDeps() {
+    if !visited.contains(d.artifact()) {
+      visited.add(d.artifact())
+      result.add(d)
+      if all.containsKey(d.artifact()) {
+        val sub: Module = all.get(d.artifact())
+        val deeper: List[Dependency] = collectTransitive(sub, all, visited)
+        result.addAll(deeper)
+      }
+    }
+  }
+  return result
+}
+
+// --- Build simulator ---
+
+def simulateBuild(sorted: List[Module]): List[BuildResult] {
+  val results: List[BuildResult] = []
+  // Simulate: api fails, all dependents skip
+  val failed: List[String] = []
+  foreach m: Module in sorted {
+    val depFailed: Boolean = m.compileDeps().any { d -> failed.contains(d.artifact()) }
+    val result: BuildResult = if depFailed {
+      new BuildResult(m.name(), BuildStatus::SKIPPED, 0L, 0)
+    } else if m.name() == "api" {
+      failed.add("api")
+      new BuildResult(m.name(), BuildStatus::FAILURE, 312L, 0)
+    } else {
+      // pseudo-deterministic duration based on dep count
+      val dur: Long = (m.deps().size * 200 + m.name().length() * 37) as Long
+      val warns: Int = m.testDeps().size
+      new BuildResult(m.name(), BuildStatus::SUCCESS, dur, warns)
+    }
+    results.add(result)
+  }
+  return results
+}
+
+// --- Formatting helpers ---
+
+def hr(ch: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + ch; i++ }
+  return s
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println(hr("─", 50))
+  IO::println("  " + title)
+  IO::println(hr("─", 50))
+}
+
+def printDepTable(deps: List[Dependency]): void {
+  foreach d: Dependency in deps {
+    IO::println("  [#{d.scopeLabel()}] #{d.label()} #{d.version()}")
+  }
+}
+
+// --- Main ---
+
+def main(): void {
+  IO::println("╔══════════════════════════════════════════════════╗")
+  IO::println("║       Project Build Analyzer  v1.0               ║")
+  IO::println("╚══════════════════════════════════════════════════╝")
+
+  // ── Define shared dependencies ──────────────────────────────
+  val slf4jApi:     Dependency = compileDep("org.slf4j",       "slf4j-api",        "2.0.9")
+  val logback:      Dependency = runtimeDep("ch.qos.logback",  "logback-classic",  "1.4.11")
+  val guava:        Dependency = compileDep("com.google.guava", "guava",            "32.1.0")
+  val jacksonCore:  Dependency = compileDep("com.fasterxml",   "jackson-core",     "2.15.2")
+  val jacksonBind:  Dependency = compileDep("com.fasterxml",   "jackson-databind", "2.15.2")
+  val junitApi:     Dependency = testDep   ("org.junit",       "junit-jupiter-api","5.10.0")
+  val assertj:      Dependency = testDep   ("org.assertj",     "assertj-core",     "3.24.2")
+  val springCtx:    Dependency = compileDep("org.springframework","spring-context", "6.0.11")
+  val reactor:      Dependency = compileDep("io.projectreactor", "reactor-core",   "3.5.11")
+
+  // ── Define modules ───────────────────────────────────────────
+  val coreModule: Module = new Module("core", "1.0.0",
+    [slf4jApi, guava, junitApi, assertj])
+
+  val utilsModule: Module = new Module("utils", "1.0.0",
+    [compileDep("core", "core", "1.0.0"), jacksonCore, junitApi])
+
+  val apiModule: Module = new Module("api", "1.0.0",
+    [compileDep("core", "core", "1.0.0"),
+     compileDep("utils", "utils", "1.0.0"),
+     jacksonBind, springCtx, junitApi, assertj])
+
+  val serviceModule: Module = new Module("service", "1.0.0",
+    [compileDep("api", "api", "1.0.0"),
+     compileDep("core", "core", "1.0.0"),
+     reactor, logback, junitApi])
+
+  val webModule: Module = new Module("web", "1.0.0",
+    [compileDep("service", "service", "1.0.0"),
+     compileDep("api", "api", "1.0.0"),
+     slf4jApi, logback, junitApi, assertj])
+
+  val allModules: List[Module] = [coreModule, utilsModule, apiModule, serviceModule, webModule]
+
+  // ── Topological sort ─────────────────────────────────────────
+  printSection("Build Order (topological sort)")
+  val sorted: List[Module] = topoSort(allModules)
+  var order: Int = 1
+  foreach m: Module in sorted {
+    IO::println("  #{order}. #{m.name()} v#{m.version()}")
+    order++
+  }
+
+  // ── Dependency reports ───────────────────────────────────────
+  printSection("Dependency Reports")
+  val nameMap: Map[String, Module] = [:]
+  foreach m: Module in allModules { nameMap.put(m.name(), m) }
+
+  foreach m: Module in sorted {
+    IO::println("")
+    IO::println("  ● #{m.name()} — direct deps: #{m.deps().size}")
+    printDepTable(m.deps())
+
+    val transitive: List[Dependency] = collectTransitive(m, nameMap, [])
+    val extOnly: List[Dependency] = transitive.filter { d ->
+      !allModules.any { mm -> mm.name() == d.artifact() }
+    }
+    if extOnly.size > 0 {
+      IO::println("    transitive external: #{extOnly.size}")
+    }
+  }
+
+  // ── Build simulation ─────────────────────────────────────────
+  printSection("Build Simulation")
+  val results: List[BuildResult] = simulateBuild(sorted)
+  var ri: Int = 0
+  while ri < results.size {
+    val r: BuildResult = results[ri]
+    val sl: String = r.statusLabel()
+    val ms: Long = r.durationMs()
+    val ws: Int = r.warnings()
+    IO::println("  " + r.moduleName() + " [" + sl + "] " + Long::toString(ms) + "ms warnings=" + ws)
+    ri++
+  }
+
+  // ── Build statistics ─────────────────────────────────────────
+  printSection("Build Statistics")
+  val successful: List[BuildResult] = results.filter { r -> r.status() == BuildStatus::SUCCESS }
+  val failed:     List[BuildResult] = results.filter { r -> r.status() == BuildStatus::FAILURE }
+  val skipped:    List[BuildResult] = results.filter { r -> r.status() == BuildStatus::SKIPPED }
+
+  IO::println("  Total modules : " + results.size)
+  IO::println("  Successful    : " + successful.size)
+  IO::println("  Failed        : " + failed.size)
+  IO::println("  Skipped       : " + skipped.size)
+
+  val totalMs: Long = results.fold(0L) { acc, r -> acc + r.durationMs() }
+  IO::println("  Total build time: #{totalMs}ms")
+
+  val totalWarnings: Int = results.fold(0) { acc, r -> acc + r.warnings() }
+  IO::println("  Total warnings: " + totalWarnings)
+
+  // ── Dependency scope breakdown ────────────────────────────────
+  printSection("Scope Breakdown (all modules)")
+  val allDeps: List[Dependency] = []
+  foreach m: Module in allModules { allDeps.addAll(m.deps()) }
+  val compileCount: Int = allDeps.count { d -> d.scope() == DepScope::COMPILE }
+  val testCount:    Int = allDeps.count { d -> d.scope() == DepScope::TEST }
+  val runtimeCount: Int = allDeps.count { d -> d.scope() == DepScope::RUNTIME }
+  IO::println("  compile : " + compileCount)
+  IO::println("  test    : " + testCount)
+  IO::println("  runtime : " + runtimeCount)
+
+  // ── Unique artifacts across all modules ───────────────────────
+  printSection("Unique External Artifacts")
+  val uniqueArtifacts: List[String] = allDeps
+    .filter { d -> !allModules.any { m -> m.name() == d.artifact() } }
+    .map    { d -> d.label() }
+    .distinct()
+    .sortedBy { s -> s }
+  foreach a: String in uniqueArtifacts {
+    IO::println("  " + a)
+  }
+
+  IO::println("")
+  IO::println(hr("═", 50))
+  IO::println("  Analysis complete.")
+  IO::println(hr("═", 50))
+}

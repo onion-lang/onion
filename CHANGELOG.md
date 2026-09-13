@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-09-12
+
+### Fixed
+
+- **A block-wrapped lambda (`{ x -> expr }`) passed as a non-trailing or
+  non-only argument to an extension or static method reported E0052** ("lambda
+  parameter `x` must specify a type") even when the parameter type was fully
+  determinable from the callee's signature, because `{ x -> expr }` parses as
+  a `BlockExpression` wrapping a `ClosureExpression` rather than a bare
+  `ClosureExpression`, so the untyped-closure detection used by bidirectional
+  inference never matched it. `ArgumentHelpers.isClosureWithUntypedParams`
+  (and the matching inline checks in `StaticMethodCallSupport` and
+  `ConstructionTyping`) now unwrap one level to find an untyped closure as the
+  last element of such a block. Added a regression test to
+  `ExtensionMethodSpec`.
+
+- **An extension method call on a primitive receiver (e.g. `Int`) with a
+  *typed* closure argument reported E0005** ("member not found"), while the
+  same call with an untyped closure worked fine. `typeMethodCallOnObject`
+  (`InstanceMethodCallSupport.scala`) unconditionally re-entered bidirectional
+  inference whenever any closure argument was present, even one that was
+  already fully typed; for a primitive receiver (boxed to its wrapper type for
+  dispatch) that path's extension-method lookup returned `None`, since no
+  native method can ever exist on the boxed wrapper. For a `BasicType`
+  receiver, `tryExtensionMethodCall` is now tried with the already-typed
+  params before falling back to bidirectional inference; reference receivers
+  (e.g. `List`) keep using bidirectional inference first, preserving builtin
+  extension overload disambiguation (`Colls.map` vs `Iterables.map`). Added a
+  regression test to `ExtensionMethodSpec`.
+
 ## [0.65.0] - 2026-09-07
 
 ### Fixed

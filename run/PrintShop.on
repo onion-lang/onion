@@ -1,0 +1,388 @@
+// PrintShop.on — print shop order management system (~270 lines).
+// Exercises: records with methods, ADT data-carrying enums with methods,
+// classes with interface (conforms), extension methods on Int/String,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/find/partition/
+// distinct/any/count/zip), select/type-pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion (bulk discount), while and
+// foreach (ranges + map (k,v)).
+
+import { java.lang.StringBuilder }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def cents(): String {
+    val d: Int = self / 100
+    val c: Int = self % 100
+    val cs: String = if c < 10 { "0#{c}" } else { "#{c}" }
+    return "$#{d}.#{cs}"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Paper type (ADT enum) ────────────────────────────────────────────────────
+
+enum PaperType {
+  case Glossy
+  case Matte
+  case Recycled
+  case Card
+public:
+  def label(): String = select this {
+    case p is Glossy:   "Glossy"
+    case p is Matte:    "Matte"
+    case p is Recycled: "Recycled"
+    case p is Card:     "Card-stock"
+  }
+  def surcharge(): Int = select this {
+    case p is Glossy:   30
+    case p is Matte:    0
+    case p is Recycled: 10
+    case p is Card:     50
+  }
+}
+
+// ─── Color mode (ADT enum) ────────────────────────────────────────────────────
+
+enum ColorMode {
+  case FullColor
+  case Duotone
+  case BlackAndWhite
+public:
+  def label(): String = select this {
+    case c is FullColor:     "Full Color"
+    case c is Duotone:       "Duotone"
+    case c is BlackAndWhite: "B&W"
+  }
+  def costPerSheet(): Int = select this {
+    case c is FullColor:     25
+    case c is Duotone:       15
+    case c is BlackAndWhite: 5
+  }
+  def isFullColor(): Boolean = select this { case c is FullColor: true; else: false }
+  def isDuotone(): Boolean   = select this { case c is Duotone:   true; else: false }
+  def isBW(): Boolean        = select this { case c is BlackAndWhite: true; else: false }
+}
+
+// ─── Job status (ADT, data-carrying) ─────────────────────────────────────────
+
+enum JobStatus {
+  case Queued
+  case Assigned(printerId: Int)
+  case InProgress(printerId: Int, pct: Int)
+  case Completed(totalSheets: Int)
+  case Failed(reason: String)
+public:
+  def label(): String = select this {
+    case s is Queued:     "Queued"
+    case s is Assigned:   "Assigned → printer ##{s.printerId()}"
+    case s is InProgress: "Running #{s.pct()}% on ##{s.printerId()}"
+    case s is Completed:  "Done (#{s.totalSheets()} sheets)"
+    case s is Failed:     "Failed: #{s.reason()}"
+  }
+  def isFinal(): Boolean = select this {
+    case s is Completed: true
+    case s is Failed:    true
+    else:                false
+  }
+  def isActive(): Boolean = select this {
+    case s is Assigned:   true
+    case s is InProgress: true
+    else:                 false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record PrintProduct(name: String, sheets: Int, paperType: PaperType, colorMode: ColorMode) {
+public:
+  def basePrice(): Int = sheets * (colorMode.costPerSheet() + paperType.surcharge())
+  def summary(): String =
+    "#{name} [#{sheets}pp #{paperType.label()} #{colorMode.label()}]"
+}
+
+record PrintJob(id: Int, product: PrintProduct, qty: Int, customer: String, rush: Boolean) {
+public:
+  def lineTotal(): Int {
+    val base: Int = product.basePrice() * qty
+    val extra: Int = if rush { base / 5 } else { 0 }
+    return base + extra
+  }
+  def describe(): String {
+    val tag: String = if rush { " [RUSH]" } else { "" }
+    return "[##{id}] #{product.name()} ×#{qty} for #{customer}#{tag}"
+  }
+}
+
+// ─── Interface and classes ────────────────────────────────────────────────────
+
+interface Named {
+  def displayName(): String
+}
+
+class Printer conforms Named {
+  val printerId: Int
+  val printerName: String
+  val supportsColor: Boolean
+  val supportsDuotone: Boolean
+  var currentJobId: Int?
+
+public:
+  def this(id: Int, name: String, color: Boolean, duo: Boolean) {
+    printerId = id
+    printerName = name
+    supportsColor = color
+    supportsDuotone = duo
+    currentJobId = null
+  }
+
+  def displayName(): String = "Printer ##{printerId}: #{printerName}"
+
+  def canPrint(mode: ColorMode): Boolean {
+    if mode.isFullColor() { return supportsColor }
+    if mode.isDuotone()   { return supportsDuotone }
+    return true
+  }
+
+  def isIdle(): Boolean = currentJobId == null
+
+  def assign(jobId: Int): void { currentJobId = jobId }
+  def release(): void          { currentJobId = null  }
+
+  def status(): String {
+    val cj: Int? = currentJobId
+    if cj != null { return "#{printerName} → job ##{cj}" }
+    return "#{printerName} → idle"
+  }
+}
+
+// ─── Pricing engine (recursive bulk discount) ─────────────────────────────────
+
+class PricingEngine {
+public:
+  static def discountPct(qty: Int): Int {
+    if qty >= 1000 { return 20 }
+    if qty >= 500  { return 15 }
+    if qty >= 200  { return 10 }
+    if qty >= 100  { return 5  }
+    return 0
+  }
+
+  static def applyDiscount(price: Int, pct: Int): Int = price - price * pct / 100
+
+  // Recursive: each band of 100 units gets its own discount tier
+  static def tieredPrice(qty: Int, unitPrice: Int): Int {
+    if qty <= 0 { return 0 }
+    val band: Int = if qty >= 100 { 100 } else { qty }
+    val disc: Int = PricingEngine::discountPct(qty)
+    val cost: Int = PricingEngine::applyDiscount(band * unitPrice, disc)
+    return cost + PricingEngine::tieredPrice(qty - band, unitPrice)
+  }
+
+  static def quote(job: PrintJob): Int =
+    PricingEngine::applyDiscount(job.lineTotal(), PricingEngine::discountPct(job.qty()))
+}
+
+// ─── PrintShop ────────────────────────────────────────────────────────────────
+
+class PrintShop {
+  var jobs: List[PrintJob]
+  var printers: List[Printer]
+  var nextId: Int
+
+public:
+  def this {
+    jobs = []
+    printers = []
+    nextId = 1
+  }
+
+  def getJobs(): List[PrintJob] = jobs
+  def getPrinters(): List[Printer] = printers
+
+  def addPrinter(p: Printer): void { printers.add(p) }
+
+  def submitJob(product: PrintProduct, qty: Int, customer: String, rush: Boolean): PrintJob {
+    val job = new PrintJob(nextId, product, qty, customer, rush)
+    jobs.add(job)
+    nextId = nextId + 1
+    return job
+  }
+
+  def findIdlePrinter(mode: ColorMode): Printer? {
+    foreach p: Printer in printers {
+      if p.isIdle() && p.canPrint(mode) { return p }
+    }
+    return null
+  }
+
+  def dispatch(): Int {
+    var assigned: Int = 0
+    foreach job: PrintJob in jobs {
+      val p: Printer? = findIdlePrinter(job.product().colorMode())
+      if p != null {
+        (p as Printer).assign(job.id())
+        assigned = assigned + 1
+      }
+    }
+    return assigned
+  }
+
+  def totalRevenue(): Int =
+    jobs.fold(0) { acc, j -> (acc as Int) + PricingEngine::quote(j as PrintJob) }
+
+  def printReport(): void {
+    IO::println("=== Job Summary ===")
+    val sorted: List[PrintJob] = jobs.sortedBy { j -> 0 - PricingEngine::quote(j) }
+    foreach job: PrintJob in sorted {
+      val q: Int = PricingEngine::quote(job)
+      IO::println("  " + job.describe().padRight(52) + q.cents().padLeft(10))
+    }
+    IO::println("  " + "─".padRight(62))
+    IO::println("  Total:".padRight(52) + totalRevenue().cents().padLeft(10))
+  }
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val brochure   = new PrintProduct("Tri-fold Brochure",  1, new Glossy(),   new FullColor())
+val poster     = new PrintProduct("A2 Poster",           1, new Matte(),    new FullColor())
+val flyer      = new PrintProduct("A5 Flyer",            1, new Recycled(), new Duotone())
+val bcard      = new PrintProduct("Business Card",        1, new Card(),     new BlackAndWhite())
+val newsletter = new PrintProduct("Monthly Newsletter",   8, new Recycled(), new BlackAndWhite())
+
+IO::println("=== Products ===")
+foreach p: PrintProduct in [brochure, poster, flyer, bcard, newsletter] {
+  IO::println("  #{p.summary()} base=#{p.basePrice().cents()}")
+}
+
+val bwPrinter    = new Printer(1, "HP LaserJet M404",      false, false)
+val colorPrinter = new Printer(2, "Epson SureColor P9570", true,  true)
+val duoPrinter   = new Printer(3, "Canon Pixma Pro-200",   false, true)
+
+val shop = new PrintShop()
+shop.addPrinter(bwPrinter)
+shop.addPrinter(colorPrinter)
+shop.addPrinter(duoPrinter)
+
+// Interface method via Named
+IO::println("\n=== Printers ===")
+foreach p: Printer in shop.getPrinters() {
+  IO::println("  " + p.displayName())
+}
+
+// Submit jobs
+shop.submitJob(brochure,   500,  "Acme Corp",     false)
+shop.submitJob(poster,     50,   "City Museum",   true)
+shop.submitJob(flyer,      1000, "Tech Startup",  false)
+shop.submitJob(bcard,      200,  "Jane Smith",    false)
+shop.submitJob(newsletter, 300,  "Community Ctr", false)
+
+IO::println("\n=== #{shop.getJobs().size} Jobs Submitted ===")
+foreach job: PrintJob in shop.getJobs() {
+  IO::println("  " + job.describe())
+}
+
+// Filter: rush jobs
+val rushJobs: List[PrintJob] = shop.getJobs().filter { j -> j.rush() }
+IO::println("\nRush jobs: #{rushJobs.size}")
+
+// groupBy color mode
+val byColor: Map[String, List[PrintJob]] = shop.getJobs().groupBy { j -> j.product().colorMode().label() }
+IO::println("\n=== By Color Mode ===")
+foreach (mode, lst) in byColor {
+  IO::println("  #{mode}: #{lst.size} job(s)")
+}
+
+// Pricing details
+IO::println("\n=== Pricing ===")
+foreach job: PrintJob in shop.getJobs() {
+  val disc: Int = PricingEngine::discountPct(job.qty())
+  val q: Int    = PricingEngine::quote(job)
+  IO::println("  #{job.product().name().padRight(22)} qty=#{job.qty()} disc=#{disc}% → #{q.cents()}")
+}
+
+// Partition by rush
+val parts = shop.getJobs().partition { j -> j.rush() }
+val rushPart: List[Object]   = parts[0] as List[Object]
+val normalPart: List[Object] = parts[1] as List[Object]
+IO::println("\nRush: #{rushPart.size}  Normal: #{normalPart.size}")
+
+// Find most expensive via iteration
+var maxQ: Int = 0
+var priciest: PrintJob? = null
+foreach job: PrintJob in shop.getJobs() {
+  val q: Int = PricingEngine::quote(job)
+  if q > maxQ { maxQ = q; priciest = job }
+}
+if priciest != null {
+  IO::println("Most expensive: #{(priciest as PrintJob).describe()}")
+}
+
+// Dispatch to printers
+val assigned: Int = shop.dispatch()
+IO::println("\nAssigned #{assigned} job(s):")
+foreach p: Printer in shop.getPrinters() {
+  IO::println("  " + p.status())
+}
+
+// Sorted report
+IO::println("")
+shop.printReport()
+
+// Tiered-price demo for newsletter
+IO::println("\n=== Tiered-Price Demo (newsletter unit=#{newsletter.basePrice().cents()}) ===")
+foreach qty: Int in [50, 100, 200, 500, 1000] {
+  val tp: Int = PricingEngine::tieredPrice(qty, newsletter.basePrice())
+  IO::println("  qty=#{qty} → #{tp.cents()}")
+}
+
+// try/catch: safe average
+def safeAvg(total: Int, count: Int): String {
+  try {
+    return (total / count).cents()
+  } catch e: Exception {
+    return "n/a"
+  }
+}
+IO::println("\nAvg job value: " + safeAvg(shop.totalRevenue(), shop.getJobs().size))
+
+// Distinct paper types via pipeline
+val papers: List[String] =
+  shop.getJobs().map { j -> j.product().paperType().label() }.distinct()
+IO::println("Paper types used: #{papers.toString()}")
+
+// Count jobs meeting various discount thresholds
+IO::println("\n=== Discount Threshold Counts ===")
+foreach threshold: Int in [0, 5, 10, 15, 20] {
+  val cnt: Int = shop.getJobs().filter { j -> PricingEngine::discountPct(j.qty()) >= threshold }.size
+  IO::println("  ≥#{threshold}%: #{cnt} job(s)")
+}
+
+// any/count
+val hasFullColor: Boolean = shop.getJobs().any { j -> j.product().colorMode().isFullColor() }
+val bwCount: Int = shop.getJobs().filter { j -> j.product().colorMode().isBW() }.size
+IO::println("\nHas full-color jobs: #{hasFullColor}  B&W jobs: #{bwCount}")
+
+// zip: pair rank with job (using List[Object] as zip base)
+val jobRanks: List[Object] = [1, 2, 3, 4, 5]
+val zipped = jobRanks.zip(shop.getJobs())
+IO::println("\n=== Jobs by Submission Order ===")
+foreach pair: Object in zipped {
+  val p = pair as List
+  val rank: Int = p[0] as Int
+  val job: PrintJob = p[1] as PrintJob
+  IO::println("  #{rank}. #{job.product().name().padRight(22)} #{PricingEngine::quote(job).cents()}")
+}

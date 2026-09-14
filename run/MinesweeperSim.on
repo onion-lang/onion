@@ -1,0 +1,358 @@
+// MinesweeperSim.on - Minesweeper board simulator
+// Exercises: records (with body), ADT enums, Boolean/Int 2D arrays,
+//            recursion, foreach with ranges, select with guards,
+//            string interpolation, while loops, nested classes
+
+enum CellState {
+  case Hidden
+  case Revealed
+  case Flagged
+}
+
+enum GameState {
+  case Playing
+  case Won
+  case Lost
+}
+
+record Cell(mine: Boolean, adjacentMines: Int, state: CellState) {
+public:
+  def display(): String = select this.state() {
+    case s is Flagged:  "F"
+    case s is Revealed:
+      if this.mine() {
+        "*"
+      } else if this.adjacentMines() == 0 {
+        "."
+      } else {
+        "#{this.adjacentMines()}"
+      }
+    else: "#"
+  }
+  def withState(s: CellState): Cell = this.copy(state = s)
+  def withAdjacentMines(n: Int): Cell = this.copy(adjacentMines = n)
+}
+
+class Board {
+public:
+  var rows: Int
+  var cols: Int
+  var mines: Boolean[][]
+  var adjacent: Int[][]
+  var states: Int[][]   // 0=Hidden, 1=Revealed, 2=Flagged
+  var mineCount: Int
+  var revealedCount: Int
+  var gameState: GameState
+
+  static val HIDDEN: Int   = 0
+  static val REVEALED: Int = 1
+  static val FLAGGED: Int  = 2
+  def this(r: Int, c: Int, numMines: Int) {
+    self.rows = r
+    self.cols = c
+    self.mineCount = numMines
+    self.revealedCount = 0
+    self.gameState = new Playing()
+    self.mines    = new Boolean[r][c]
+    self.adjacent = new Int[r][c]
+    self.states   = new Int[r][c]
+    foreach row: Int in 0..<r {
+      foreach col: Int in 0..<c {
+        self.mines[row][col]    = false
+        self.adjacent[row][col] = 0
+        self.states[row][col]   = Board::HIDDEN
+      }
+    }
+  }
+
+  // Linear congruential generator for deterministic mine placement
+  def placeMines(seed: Long): void {
+    var placed: Int = 0
+    var rng: Long = seed
+    while placed < self.mineCount {
+      rng = (rng * 6364136223846793005L + 1442695040888963407L) & 0x7fffffffffffffffL
+      val row: Int = ((rng >> 16) % self.rows as Long) as Int
+      rng = (rng * 6364136223846793005L + 1442695040888963407L) & 0x7fffffffffffffffL
+      val col: Int = ((rng >> 16) % self.cols as Long) as Int
+      if !self.mines[row][col] {
+        self.mines[row][col] = true
+        placed = placed + 1
+      }
+    }
+    self.computeAdjacency()
+  }
+
+  def computeAdjacency(): void {
+    foreach r: Int in 0..<self.rows {
+      foreach c: Int in 0..<self.cols {
+        if !self.mines[r][c] {
+          self.adjacent[r][c] = self.countNeighborMines(r, c)
+        }
+      }
+    }
+  }
+
+  def countNeighborMines(r: Int, c: Int): Int {
+    var count: Int = 0
+    foreach dr: Int in -1..1 {
+      foreach dc: Int in -1..1 {
+        if dr == 0 && dc == 0 { continue }
+        val nr: Int = r + dr
+        val nc: Int = c + dc
+        if nr >= 0 && nr < self.rows && nc >= 0 && nc < self.cols {
+          if self.mines[nr][nc] { count = count + 1 }
+        }
+      }
+    }
+    return count
+  }
+
+  def reveal(r: Int, c: Int): void {
+    if r < 0 || r >= self.rows || c < 0 || c >= self.cols { return }
+    val st: Int = self.states[r][c]
+    if st == Board::REVEALED || st == Board::FLAGGED { return }
+    if self.mines[r][c] {
+      self.states[r][c] = Board::REVEALED
+      self.gameState = new Lost()
+      return
+    }
+    self.states[r][c] = Board::REVEALED
+    self.revealedCount = self.revealedCount + 1
+    if self.adjacent[r][c] == 0 {
+      foreach dr: Int in -1..1 {
+        foreach dc: Int in -1..1 {
+          if dr != 0 || dc != 0 {
+            self.reveal(r + dr, c + dc)
+          }
+        }
+      }
+    }
+    self.checkWin()
+  }
+
+  def toggleFlag(r: Int, c: Int): void {
+    val st: Int = self.states[r][c]
+    if st == Board::HIDDEN  { self.states[r][c] = Board::FLAGGED }
+    else if st == Board::FLAGGED { self.states[r][c] = Board::HIDDEN }
+  }
+
+  def checkWin(): void {
+    val safeCells: Int = self.rows * self.cols - self.mineCount
+    if self.revealedCount == safeCells {
+      self.gameState = new Won()
+    }
+  }
+
+  def revealAll(): void {
+    foreach r: Int in 0..<self.rows {
+      foreach c: Int in 0..<self.cols {
+        self.states[r][c] = Board::REVEALED
+      }
+    }
+  }
+
+  def cellChar(r: Int, c: Int): String {
+    val st: Int = self.states[r][c]
+    if st == Board::FLAGGED { return "F" }
+    if st == Board::HIDDEN  { return "#" }
+    if self.mines[r][c]     { return "*" }
+    val adj: Int = self.adjacent[r][c]
+    if adj == 0 { return "." }
+    return "#{adj}"
+  }
+
+  def print(): void {
+    var header: String = "   "
+    foreach c: Int in 0..<self.cols {
+      header = header + "#{c % 10}"
+    }
+    IO::println(header)
+    foreach r: Int in 0..<self.rows {
+      var line: String = if r < 10 { " #{r} " } else { "#{r} " }
+      foreach c: Int in 0..<self.cols {
+        line = line + self.cellChar(r, c)
+      }
+      IO::println(line)
+    }
+  }
+
+  def status(): String = select self.gameState {
+    case s is Won:  "WON"
+    case s is Lost: "LOST"
+    else:           "PLAYING"
+  }
+
+  def flagCount(): Int {
+    var count: Int = 0
+    foreach r: Int in 0..<self.rows {
+      foreach c: Int in 0..<self.cols {
+        if self.states[r][c] == Board::FLAGGED { count = count + 1 }
+      }
+    }
+    return count
+  }
+}
+
+class Solver {
+  var board: Board
+
+public:
+  def this(b: Board) {
+    self.board = b
+  }
+
+  // Count hidden (unrevealed, unflagged) neighbors
+  def countHiddenNeighbors(r: Int, c: Int): Int {
+    var count: Int = 0
+    foreach dr: Int in -1..1 {
+      foreach dc: Int in -1..1 {
+        if dr == 0 && dc == 0 { continue }
+        val nr: Int = r + dr
+        val nc: Int = c + dc
+        if nr >= 0 && nr < self.board.rows && nc >= 0 && nc < self.board.cols {
+          if self.board.states[nr][nc] == Board::HIDDEN { count = count + 1 }
+        }
+      }
+    }
+    return count
+  }
+
+  def countFlaggedNeighbors(r: Int, c: Int): Int {
+    var count: Int = 0
+    foreach dr: Int in -1..1 {
+      foreach dc: Int in -1..1 {
+        if dr == 0 && dc == 0 { continue }
+        val nr: Int = r + dr
+        val nc: Int = c + dc
+        if nr >= 0 && nr < self.board.rows && nc >= 0 && nc < self.board.cols {
+          if self.board.states[nr][nc] == Board::FLAGGED { count = count + 1 }
+        }
+      }
+    }
+    return count
+  }
+
+  def revealHiddenNeighbors(r: Int, c: Int): void {
+    foreach dr: Int in -1..1 {
+      foreach dc: Int in -1..1 {
+        if dr == 0 && dc == 0 { continue }
+        val nr: Int = r + dr
+        val nc: Int = c + dc
+        if nr >= 0 && nr < self.board.rows && nc >= 0 && nc < self.board.cols {
+          if self.board.states[nr][nc] == Board::HIDDEN {
+            self.board.reveal(nr, nc)
+          }
+        }
+      }
+    }
+  }
+
+  def flagHiddenNeighbors(r: Int, c: Int): void {
+    foreach dr: Int in -1..1 {
+      foreach dc: Int in -1..1 {
+        if dr == 0 && dc == 0 { continue }
+        val nr: Int = r + dr
+        val nc: Int = c + dc
+        if nr >= 0 && nr < self.board.rows && nc >= 0 && nc < self.board.cols {
+          if self.board.states[nr][nc] == Board::HIDDEN {
+            self.board.toggleFlag(nr, nc)
+          }
+        }
+      }
+    }
+  }
+
+  // One pass of constraint propagation; returns true if any progress made
+  def step(): Boolean {
+    var progress: Boolean = false
+    val b: Board = self.board
+    foreach r: Int in 0..<b.rows {
+      foreach c: Int in 0..<b.cols {
+        if b.states[r][c] != Board::REVEALED { continue }
+        val adj: Int = b.adjacent[r][c]
+        if adj == 0 { continue }
+        val hidden:  Int = self.countHiddenNeighbors(r, c)
+        val flagged: Int = self.countFlaggedNeighbors(r, c)
+        if flagged == adj && hidden > 0 {
+          // All mines flagged - safe to reveal remaining hidden neighbors
+          self.revealHiddenNeighbors(r, c)
+          progress = true
+        } else if flagged + hidden == adj && hidden > 0 {
+          // All remaining hidden must be mines - flag them
+          self.flagHiddenNeighbors(r, c)
+          progress = true
+        }
+      }
+    }
+    return progress
+  }
+
+  // Run solver until no progress or game ends; returns number of steps
+  def solve(): Int {
+    var steps: Int = 0
+    while self.board.status() == "PLAYING" {
+      val ok: Boolean = self.step()
+      if !ok { break }
+      steps = steps + 1
+      if steps > 500 { break }
+    }
+    return steps
+  }
+}
+
+def runGame(rows: Int, cols: Int, mineCount: Int, seed: Long): void {
+  val board: Board = new Board(rows, cols, mineCount)
+  board.placeMines(seed)
+  IO::println("=== Minesweeper #{rows}x#{cols} | #{mineCount} mines | seed=#{seed} ===")
+
+  // Reveal center cell to start
+  board.reveal(rows / 2, cols / 2)
+  if board.status() == "LOST" {
+    IO::println("Hit mine on first move!")
+    board.revealAll()
+    board.print()
+    IO::println("Result: #{board.status()}")
+    return
+  }
+
+  val solver: Solver = new Solver(board)
+  val steps: Int = solver.solve()
+  IO::println("Solver: #{steps} steps | Flags: #{board.flagCount()}/#{mineCount} | Revealed: #{board.revealedCount}/#{rows * cols - mineCount}")
+
+  if board.status() != "PLAYING" {
+    board.revealAll()
+  }
+  board.print()
+  IO::println("Result: #{board.status()}")
+}
+
+def main(): void {
+  // Beginner board
+  runGame(8, 10, 10, 42L)
+  IO::println("")
+
+  // Intermediate board
+  runGame(10, 12, 18, 999L)
+  IO::println("")
+
+  // Success-rate survey over 30 seeds (beginner)
+  IO::println("=== Solver survey: 8x10 board, 10 mines, seeds 1..30 ===")
+  var wins: Int = 0
+  var losses: Int = 0
+  var stalls: Int = 0
+  foreach seed: Int in 1..30 {
+    val b: Board = new Board(8, 10, 10)
+    b.placeMines(seed as Long)
+    b.reveal(3, 4)
+    if b.status() == "PLAYING" {
+      val s: Solver = new Solver(b)
+      s.solve()
+    }
+    val res: String = b.status()
+    if res == "WON"  { wins   = wins   + 1 }
+    else if res == "LOST" { losses = losses + 1 }
+    else              { stalls = stalls + 1 }
+  }
+  IO::println("Won: #{wins}  Lost: #{losses}  Stalled: #{stalls} (out of 30)")
+  IO::println("Win rate: #{wins * 100 / 30}%")
+}

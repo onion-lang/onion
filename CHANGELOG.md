@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `run/SemanticVersion.on` — a 293-line corpus sample implementing SemVer 2.0.0 parsing, comparison, sorting, and range checks, exercising ADT enums, records with static/instance methods, interface polymorphism, nullable types, and collection pipelines.
 - `run/HabitTracker.on` — a 407-line habit-tracking corpus sample exercising records, ADT enums, interfaces, collection pipelines, closures, and nullable types.
+- `run/MinesweeperSim.on` — a 358-line Minesweeper board simulator exercising ADT enums, a record with a body (`copy`-based updates), Boolean/Int 2D arrays, recursive flood fill, and a constraint-propagation solver.
 
 ## [0.68.0] - 2026-09-14
 

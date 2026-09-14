@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A record whose body declared a field beyond its component list (e.g. `record Box(value: Int) { public: var extra: Int ... }`) could crash the compiler with `[I0000] Internal compiler error in BytecodeGeneration: ArrayIndexOutOfBoundsException`** instead of compiling cleanly. Record component fields are always added to the class before any body-declared field, and the record's synthetic (no explicit `def this`) constructor assigned each non-static field from the constructor argument at the same positional index with no bounds check — so a body-declared field with no matching constructor argument pushed `GeneratorAdapter.loadArg` past the actual argument count. `AsmCodeGeneration.codeConstructor` now stops assigning once it runs out of constructor arguments, leaving any such extra field at its JVM default value instead of indexing out of bounds. Found by `MutationFuzzSpec` mutating `run/PolynomialAlgebra.on`.
+
+## [0.67.0] - 2026-09-13
+
+### Fixed
+
+- **A `select` used as a statement whose branches yielded unrelated concrete
+  reference types could crash the compiler with `[I0000] Internal compiler
+  error in BytecodeGeneration`** instead of compiling cleanly, even though
+  the select's own value is discarded in statement position. ASM's default
+  `ClassWriter.getCommonSuperClass` (used to compute the JVM stack-map frame
+  at the join point after the branches) resolves both sides via classloader
+  reflection to find a common ancestor; when one side was a class still
+  being compiled in the same unit, that reflective load failed with a
+  `ClassNotFoundException`, which escaped as the internal error instead of a
+  diagnostic. `ClassWriter` now falls back to `java/lang/Object` — always a
+  valid common ancestor for two reference types — when the default lookup
+  can't resolve a type. Found by `MutationFuzzSpec` mutating
+  `run/SpreadsheetEngine.on`.
+
+## [0.66.0] - 2026-09-12
+
+### Fixed
+
+- **A block-wrapped lambda (`{ x -> expr }`) passed as a non-trailing or
+  non-only argument to an extension or static method reported E0052** ("lambda
+  parameter `x` must specify a type") even when the parameter type was fully
+  determinable from the callee's signature, because `{ x -> expr }` parses as
+  a `BlockExpression` wrapping a `ClosureExpression` rather than a bare
+  `ClosureExpression`, so the untyped-closure detection used by bidirectional
+  inference never matched it. `ArgumentHelpers.isClosureWithUntypedParams`
+  (and the matching inline checks in `StaticMethodCallSupport` and
+  `ConstructionTyping`) now unwrap one level to find an untyped closure as the
+  last element of such a block. Added a regression test to
+  `ExtensionMethodSpec`.
+
+- **An extension method call on a primitive receiver (e.g. `Int`) with a
+  *typed* closure argument reported E0005** ("member not found"), while the
+  same call with an untyped closure worked fine. `typeMethodCallOnObject`
+  (`InstanceMethodCallSupport.scala`) unconditionally re-entered bidirectional
+  inference whenever any closure argument was present, even one that was
+  already fully typed; for a primitive receiver (boxed to its wrapper type for
+  dispatch) that path's extension-method lookup returned `None`, since no
+  native method can ever exist on the boxed wrapper. For a `BasicType`
+  receiver, `tryExtensionMethodCall` is now tried with the already-typed
+  params before falling back to bidirectional inference; reference receivers
+  (e.g. `List`) keep using bidirectional inference first, preserving builtin
+  extension overload disambiguation (`Colls.map` vs `Iterables.map`). Added a
+  regression test to `ExtensionMethodSpec`.
+
 ## [0.65.0] - 2026-09-07
 
 ### Fixed

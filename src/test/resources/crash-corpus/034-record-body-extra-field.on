@@ -1,0 +1,16 @@
+// A record body declaring a field beyond its component list used to crash
+// bytecode generation: the synthetic (block == null) record constructor maps
+// constructor arguments to `classType.fields` positionally by index, with no
+// bounds check, so an extra body-declared field pushed `loadArg` past the
+// actual argument count (ArrayIndexOutOfBoundsException in AsmCodeGeneration,
+// surfaced as I0000). Found by MutationFuzzSpec mutating run/PolynomialAlgebra.on.
+record Box(value: Int) {
+public:
+  var extra: Int
+  def show(): Int = value() + extra
+}
+
+def main(): void {
+  val b = new Box(5)
+  IO::println(b.show())
+}

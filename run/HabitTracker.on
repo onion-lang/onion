@@ -1,0 +1,407 @@
+// HabitTracker.on — daily habit tracking with streaks, analytics, and reporting.
+// Exercises: records with example clauses; data-carrying enum; plain enum; ADT enum;
+// class with mutable List fields; typed collection pipelines (filter/map/fold/
+// groupBy/sortedBy/sortedByDescending/find/any/count/distinct/zip); select/
+// pattern matching (including type patterns on ADT); nullable fields and null
+// guards; extension methods on Int and String; closures; string interpolation;
+// try/catch; recursion (longest-streak); while + foreach (list, range, map).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Frequency {
+  DAILY, WEEKDAYS, WEEKENDS, WEEKLY
+}
+
+enum DayOfWeek {
+  MON, TUE, WED, THU, FRI, SAT, SUN
+}
+
+// ADT: outcome of a single check-in
+enum CheckResult {
+  case Success(day: Int, note: String)
+  case Skipped(day: Int, reason: String)
+  case Missed(day: Int)
+
+public:
+  def day(): Int = select this {
+    case s is Success: s.day()
+    case s is Skipped: s.day()
+    case m is Missed:  m.day()
+  }
+
+  def isSuccess(): Boolean = select this {
+    case s is Success: true
+    else:              false
+  }
+
+  def label(): String = select this {
+    case s is Success: "✓ Done (#{s.note()})"
+    case s is Skipped: "~ Skip (#{s.reason()})"
+    case m is Missed:  "✗ Missed"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Habit(id: Int, name: String, description: String, frequency: Frequency, targetDays: Int)
+  example { new Habit(1, "Run", "Morning jog", Frequency::DAILY, 30).targetDays() == 30 }
+  example { new Habit(2, "Read", "30 min book", Frequency::WEEKDAYS, 20).name() == "Read" }
+
+record CheckIn(habitId: Int, result: CheckResult)
+  example { new CheckIn(1, new Success(5, "3 km")).habitId() == 1 }
+  example { new CheckIn(1, new Missed(3)).result().isSuccess() == false }
+
+record Streak(habitId: Int, start: Int, length: Int)
+  example { new Streak(1, 1, 5).length() == 5 }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def maxOf(other: Int): Int = if self >= other { self } else { other }
+  def minOf(other: Int): Int = if self <= other { self } else { other }
+  def inRange(lo: Int, hi: Int): Boolean = self >= lo && self <= hi
+}
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padStart(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "…"
+  }
+}
+
+extension Frequency {
+  def label(): String = select self {
+    case Frequency::DAILY:    "Daily"
+    case Frequency::WEEKDAYS: "Weekdays"
+    case Frequency::WEEKENDS: "Weekends"
+    case Frequency::WEEKLY:   "Weekly"
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def dayOfWeek(day: Int): DayOfWeek {
+  val n = ((day - 1) % 7 + 7) % 7
+  select n {
+    case 0: return DayOfWeek::MON
+    case 1: return DayOfWeek::TUE
+    case 2: return DayOfWeek::WED
+    case 3: return DayOfWeek::THU
+    case 4: return DayOfWeek::FRI
+    case 5: return DayOfWeek::SAT
+    else:   return DayOfWeek::SUN
+  }
+}
+
+def isWeekend(day: Int): Boolean {
+  val d = dayOfWeek(day)
+  return d == DayOfWeek::SAT || d == DayOfWeek::SUN
+}
+
+def habitAppliesOnDay(habit: Habit, day: Int): Boolean {
+  select habit.frequency() {
+    case Frequency::DAILY:    return true
+    case Frequency::WEEKDAYS: return !isWeekend(day)
+    case Frequency::WEEKENDS: return isWeekend(day)
+    case Frequency::WEEKLY:   return dayOfWeek(day) == DayOfWeek::MON
+  }
+  return false
+}
+
+// Recursive: compute longest consecutive success streak in a list of CheckResults
+def longestStreak(results: List[CheckResult], idx: Int, cur: Int, best: Int): Int {
+  if idx >= results.size { return cur.maxOf(best) }
+  val r = results[idx] as CheckResult
+  if r.isSuccess() {
+    return longestStreak(results, idx + 1, cur + 1, best)
+  } else {
+    return longestStreak(results, idx + 1, 0, cur.maxOf(best))
+  }
+}
+
+// Compute current (trailing) streak
+def currentStreak(results: List[CheckResult]): Int {
+  var streak = 0
+  var i = results.size - 1
+  while i >= 0 {
+    val r = results[i] as CheckResult
+    if r.isSuccess() { streak = streak + 1 } else { i = -1 }
+    i = i - 1
+  }
+  return streak
+}
+
+// ─── HabitTracker class ───────────────────────────────────────────────────────
+
+class HabitTracker {
+  val habits: List[Habit]
+  val checkIns: List[CheckIn]
+  var today: Int
+
+public:
+  def this() {
+    this.habits   = []
+    this.checkIns = []
+    this.today    = 1
+  }
+
+  def addHabit(h: Habit): void {
+    if habits.any { x -> (x as Habit).id() == h.id() } {
+      throw new IllegalArgumentException("Habit ###{h.id()} already exists")
+    }
+    habits.add(h)
+  }
+
+  def advance(): void { today = today + 1 }
+  def advanceTo(day: Int): void { today = day }
+
+  def logSuccess(habitId: Int, note: String): void {
+    checkIns.add(new CheckIn(habitId, new Success(today, note)))
+  }
+  def logSkip(habitId: Int, reason: String): void {
+    checkIns.add(new CheckIn(habitId, new Skipped(today, reason)))
+  }
+  def logMiss(habitId: Int): void {
+    checkIns.add(new CheckIn(habitId, new Missed(today)))
+  }
+
+  def checkInsFor(habitId: Int): List[CheckResult] {
+    return checkIns
+      .filter { ci -> (ci as CheckIn).habitId() == habitId }
+      .map { ci -> (ci as CheckIn).result() }
+  }
+
+  def successCount(habitId: Int): Int {
+    return checkInsFor(habitId).count { r -> (r as CheckResult).isSuccess() }
+  }
+
+  def completionPct(habitId: Int): Int {
+    val results = checkInsFor(habitId)
+    if results.size == 0 { return 0 }
+    return successCount(habitId) * 100 / results.size
+  }
+
+  def longestStreakFor(habitId: Int): Int {
+    return longestStreak(checkInsFor(habitId), 0, 0, 0)
+  }
+
+  def currentStreakFor(habitId: Int): Int {
+    return currentStreak(checkInsFor(habitId))
+  }
+
+  def allHabits(): List[Habit]   = habits
+  def allCheckIns(): List[CheckIn] = checkIns
+
+  def printDashboard(): void {
+    val border = "========================================================================".padEnd(72)
+    println(border)
+    println("  HABIT TRACKER — Day #{today}")
+    println(border)
+    println("  " +
+      "Habit".padEnd(20) +
+      "Freq".padEnd(12) +
+      "Done".padEnd(6) +
+      "Pct%".padEnd(6) +
+      "Streak".padEnd(8) +
+      "Best")
+    println("------------------------------------------------------------------------".padEnd(72))
+    foreach h: Habit in habits.sortedBy { h -> (h as Habit).name() } {
+      val done   = successCount(h.id())
+      val pct    = completionPct(h.id())
+      val cur    = currentStreakFor(h.id())
+      val best   = longestStreakFor(h.id())
+      val pctStr = "#{pct}%".padStart(4)
+      println("  " +
+        h.name().truncate(18).padEnd(20) +
+        h.frequency().label().padEnd(12) +
+        done.toString().padEnd(6) +
+        pctStr.padEnd(6) +
+        cur.toString().padEnd(8) +
+        best.toString())
+    }
+    println(border)
+  }
+
+  def printHabitDetail(habitId: Int): void {
+    val h = habits.find { x -> x.id() == habitId }
+    if h == null { println("Habit ###{habitId} not found."); return }
+    val habit: Habit = (h as Habit)
+    println("\n── #{habit.name()} (#{habit.description()}) ──────────────────────")
+    val results = checkInsFor(habitId)
+    if results.size == 0 { println("  No check-ins yet."); return }
+    foreach r: CheckResult in results {
+      println("  Day #{r.day().toString().padStart(3)} — #{r.label()}")
+    }
+    println("  Completion: #{completionPct(habitId)}%  |  Current streak: #{currentStreakFor(habitId)}  |  Best streak: #{longestStreakFor(habitId)}")
+  }
+
+  def overallReport(): void {
+    println("\n── Overall Analytics ─────────────────────────────────────")
+    // Group check-ins by day and print per-day summary
+    val byDay = checkIns.groupBy { ci -> (ci as CheckIn).result().day() }
+    val days: List[Int] = []
+    foreach (k, _) in byDay { days.add(k as Int) }
+    foreach d: Int in days.sortedBy { x -> x as Int } {
+      val entries = byDay.get(d) as List[CheckIn]
+      if entries == null { continue }
+      val successes = entries.count { ci -> (ci as CheckIn).result().isSuccess() }
+      println("  Day #{d.toString().padStart(3)} — #{successes}/#{entries.size} habits completed")
+    }
+
+    // Best performing habit
+    val maxPct = habits.fold(0) { a, h -> (a as Int).maxOf(completionPct((h as Habit).id())) }
+    val best = habits.find { h -> completionPct((h as Habit).id()) == maxPct }
+    if best != null {
+      println("  Best habit: #{(best as Habit).name()} (#{maxPct}%)")
+    }
+  }
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val tracker = new HabitTracker()
+
+// Register habits
+try {
+  tracker.addHabit(new Habit(1, "Morning Run",    "5 km jog before breakfast",    Frequency::DAILY,    30))
+  tracker.addHabit(new Habit(2, "Read",           "30 min non-fiction reading",   Frequency::WEEKDAYS, 20))
+  tracker.addHabit(new Habit(3, "Meditation",     "10 min mindfulness session",   Frequency::DAILY,    30))
+  tracker.addHabit(new Habit(4, "Weekend Hike",   "Trail walk in nature",         Frequency::WEEKENDS, 8))
+  tracker.addHabit(new Habit(5, "Weekly Review",  "Reflect on the week ahead",    Frequency::WEEKLY,   4))
+  // duplicate — should be rejected
+  tracker.addHabit(new Habit(1, "Duplicate Run",  "should fail",                  Frequency::DAILY,    1))
+} catch e: Exception {
+  println("Rejected duplicate: " + e.message())
+}
+
+// Simulate 14 days of habit tracking
+tracker.advanceTo(1)
+tracker.logSuccess(1, "5.2 km, felt great")
+tracker.logSuccess(2, "Finished chapter 3")
+tracker.logSuccess(3, "Calm session")
+tracker.logMiss(4)    // not a weekend
+
+tracker.advanceTo(2)
+tracker.logSuccess(1, "5.0 km")
+tracker.logSuccess(2, "Read 40 min")
+tracker.logSkip(3, "Busy morning")
+
+tracker.advanceTo(3)
+tracker.logSuccess(1, "6.1 km, new record!")
+tracker.logMiss(2)
+tracker.logSuccess(3, "15 min today")
+
+tracker.advanceTo(4)
+tracker.logMiss(1)    // skipped
+tracker.logSuccess(2, "Two chapters done")
+tracker.logSuccess(3, "Peaceful")
+
+tracker.advanceTo(5)
+tracker.logSuccess(1, "4.8 km")
+tracker.logSuccess(2, "Finished the book!")
+tracker.logSuccess(3, "Deep focus")
+
+// Day 6 = Saturday (weekend)
+tracker.advanceTo(6)
+tracker.logSuccess(1, "5.5 km")
+tracker.logSuccess(3, "Outdoor meditation")
+tracker.logSuccess(4, "10 km trail at Oak Park")
+
+// Day 7 = Sunday (weekend)
+tracker.advanceTo(7)
+tracker.logSuccess(1, "4.0 km easy run")
+tracker.logSuccess(3, "Short but focused")
+tracker.logSuccess(4, "City walk, 8 km")
+
+// Day 8 = Monday (weekly review)
+tracker.advanceTo(8)
+tracker.logSuccess(1, "5.0 km")
+tracker.logSuccess(2, "Started new book")
+tracker.logSuccess(3, "Back to routine")
+tracker.logSuccess(5, "Planned next two weeks")
+
+tracker.advanceTo(9)
+tracker.logSuccess(1, "5.3 km")
+tracker.logSkip(2, "Conference day")
+tracker.logSuccess(3, "Evening session")
+
+tracker.advanceTo(10)
+tracker.logMiss(1)
+tracker.logSuccess(2, "Caught up on reading")
+tracker.logSuccess(3, "Focused morning")
+
+tracker.advanceTo(11)
+tracker.logSuccess(1, "5.1 km comeback")
+tracker.logSuccess(2, "Great chapter")
+tracker.logSuccess(3, "Best session this week")
+
+tracker.advanceTo(12)
+tracker.logSuccess(1, "5.0 km")
+tracker.logSuccess(2, "Finished Part II")
+tracker.logSuccess(3, "Mindful walk after")
+
+tracker.advanceTo(13)  // Saturday
+tracker.logSuccess(1, "6.2 km long run")
+tracker.logSuccess(3, "Outdoor")
+tracker.logSuccess(4, "Mountain trail, 15 km!")
+
+tracker.advanceTo(14)  // Sunday
+tracker.logSuccess(1, "4.5 km recovery")
+tracker.logSuccess(3, "Rest day focus")
+tracker.logMiss(4)
+
+// Print dashboard at day 14
+tracker.printDashboard()
+
+// Detail view for Morning Run and Read
+tracker.printHabitDetail(1)
+tracker.printHabitDetail(2)
+
+tracker.overallReport()
+
+// ── Extra pipeline exercises ──────────────────────────────────────────────────
+
+println("\n── Pipeline Extras ───────────────────────────────────────────")
+
+val allHabits = tracker.allHabits()
+
+// Top habits by completion %
+val ranked = allHabits
+  .sortedByDescending { h -> tracker.completionPct((h as Habit).id()) }
+  .map { h ->
+    val hb = h as Habit
+    "#{hb.name().truncate(16).padEnd(18)} #{tracker.completionPct(hb.id())}%"
+  }
+foreach line: String in ranked {
+  println("  " + line)
+}
+
+// Habits that hit >= 70% completion
+val goodHabits = allHabits.filter { h -> tracker.completionPct((h as Habit).id()) >= 70 }
+println("Habits at >= 70%: #{goodHabits.map { h -> (h as Habit).name() }.toString()}")
+
+// Distinct days with any check-in
+val activeDays = tracker.allCheckIns()
+  .map { ci -> (ci as CheckIn).result().day() }
+  .distinct()
+  .sortedBy { d -> d as Int }
+println("Active tracking days: #{activeDays.size} (day #{activeDays[0]} to #{activeDays[activeDays.size - 1]})")
+
+// Zip habits with their best streak
+val names   = allHabits.sortedBy { h -> (h as Habit).name() }.map { h -> (h as Habit).name() }
+val streaks = allHabits.sortedBy { h -> (h as Habit).name() }.map { h -> tracker.longestStreakFor((h as Habit).id()) }
+val pairs   = names.zip(streaks)
+println("Best streaks by habit:")
+foreach pair: List[Object] in pairs {
+  println("  #{(pair[0] as String).padEnd(18)} #{pair[1]}")
+}

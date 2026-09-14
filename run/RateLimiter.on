@@ -1,0 +1,349 @@
+// RateLimiter.on — rate-limiting algorithms simulation.
+// Exercises: interface, class hierarchy (3 implementations), data-carrying
+// enum (Decision ADT), plain enum (Algorithm), records (Request, LimiterStats,
+// SimReport), collection pipelines (map/filter/fold/groupBy/sortedBy/count/
+// partition), select / pattern matching, foreach (ranges + map k,v),
+// closures, string interpolation, try/catch, nullable, while loop, extension.
+
+import {
+  java.util.LinkedList
+  java.lang.Math
+}
+
+// ── Extension: right-justify an int in a fixed-width string ─────────────────
+
+extension Int {
+  def rjust(width: Int): String {
+    val s: String = "" + self
+    if s.length() >= width { return s }
+    var pad: String = ""
+    for var i: Int = s.length(); i < width; i++ { pad = pad + " " }
+    return pad + s
+  }
+}
+
+extension String {
+  def trunc(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n)
+  }
+}
+
+// ── Domain ───────────────────────────────────────────────────────────────────
+
+record Request(id: Int, tick: Int, path: String)
+
+enum Decision {
+  case Allowed(requestId: Int, remaining: Int)
+  case Throttled(requestId: Int, retryAfter: Int)
+public:
+  def isAllowed(): Boolean = select this {
+    case a is Allowed:   true
+    case t is Throttled: false
+  }
+  def label(): String = select this {
+    case a is Allowed:   "OK   (left=#{a.remaining()})"
+    case t is Throttled: "DENY (retry+#{t.retryAfter()})"
+  }
+}
+
+record LimiterStats(name: String, total: Int, allowed: Int, throttled: Int) {
+public:
+  def rate(): Int = if total == 0 { 0 } else { allowed * 100 / total }
+  def toString(): String =
+    "#{name}: total=#{total} ok=#{allowed} deny=#{throttled} (#{rate()}% pass)"
+}
+
+enum Algorithm { TOKEN_BUCKET, FIXED_WINDOW, SLIDING_LOG }
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface RateLimiter {
+  def allow(req: Request): Decision
+  def stats(): LimiterStats
+  def reset(): void
+  def name(): String
+}
+
+// ── Token Bucket ─────────────────────────────────────────────────────────────
+// Tokens accumulate at `rate` per tick, capped at `capacity`.
+// Each request consumes 1 token; denied if bucket is empty.
+
+class TokenBucket conforms RateLimiter {
+  val capacity: Int
+  val rate: Int          // tokens added per tick
+  var tokens: Int
+  var lastTick: Int
+  var tot: Int
+  var ok: Int
+  var deny: Int
+public:
+  def this(capacity: Int, rate: Int) {
+    this.capacity = capacity
+    this.rate     = rate
+    this.tokens   = capacity
+    this.lastTick = 0
+    this.tot  = 0
+    this.ok   = 0
+    this.deny = 0
+  }
+  def name(): String = "TokenBucket(cap=#{capacity},rate=#{rate})"
+  def reset(): void {
+    tokens = capacity; lastTick = 0; tot = 0; ok = 0; deny = 0
+  }
+  def allow(req: Request): Decision {
+    // refill tokens since last tick
+    val elapsed: Int = req.tick() - lastTick
+    if elapsed > 0 {
+      val added: Int = elapsed * rate
+      tokens = Math::min(capacity, tokens + added)
+      lastTick = req.tick()
+    }
+    tot++
+    if tokens > 0 {
+      tokens--
+      ok++
+      return new Allowed(req.id(), tokens)
+    } else {
+      deny++
+      return new Throttled(req.id(), 1)
+    }
+  }
+  def stats(): LimiterStats = new LimiterStats(name(), tot, ok, deny)
+}
+
+// ── Fixed Window Counter ──────────────────────────────────────────────────────
+// Count requests in the current window; deny if count >= limit.
+// Window resets every `windowSize` ticks.
+
+class FixedWindow conforms RateLimiter {
+  val limit: Int
+  val windowSize: Int
+  var count: Int
+  var windowStart: Int
+  var tot: Int
+  var ok: Int
+  var deny: Int
+public:
+  def this(limit: Int, windowSize: Int) {
+    this.limit = limit
+    this.windowSize = windowSize
+    this.count = 0
+    this.windowStart = 0
+    this.tot  = 0
+    this.ok   = 0
+    this.deny = 0
+  }
+  def name(): String = "FixedWindow(limit=#{limit},window=#{windowSize})"
+  def reset(): void {
+    count = 0; windowStart = 0; tot = 0; ok = 0; deny = 0
+  }
+  def allow(req: Request): Decision {
+    // advance window if needed
+    if req.tick() >= windowStart + windowSize {
+      count = 0
+      windowStart = (req.tick() / windowSize) * windowSize
+    }
+    tot++
+    if count < limit {
+      count++
+      ok++
+      return new Allowed(req.id(), limit - count)
+    } else {
+      deny++
+      val nextWindow: Int = windowStart + windowSize - req.tick()
+      return new Throttled(req.id(), nextWindow)
+    }
+  }
+  def stats(): LimiterStats = new LimiterStats(name(), tot, ok, deny)
+}
+
+// ── Sliding Window Log ────────────────────────────────────────────────────────
+// Keep timestamps of recent requests; deny if too many in the last `windowSize` ticks.
+
+class SlidingWindowLog conforms RateLimiter {
+  val limit: Int
+  val windowSize: Int
+  val log: LinkedList[Int]
+  var tot: Int
+  var ok: Int
+  var deny: Int
+public:
+  def this(limit: Int, windowSize: Int) {
+    this.limit      = limit
+    this.windowSize = windowSize
+    this.log        = new LinkedList[Int]()
+    this.tot  = 0
+    this.ok   = 0
+    this.deny = 0
+  }
+  def name(): String = "SlidingLog(limit=#{limit},window=#{windowSize})"
+  def reset(): void {
+    log.clear(); tot = 0; ok = 0; deny = 0
+  }
+  def allow(req: Request): Decision {
+    val cutoff: Int = req.tick() - windowSize + 1
+    // evict old entries
+    while !log.isEmpty() && (log.peekFirst() as Int) < cutoff {
+      log.removeFirst()
+    }
+    tot++
+    if log.size() < limit {
+      log.addLast(req.tick())
+      ok++
+      return new Allowed(req.id(), limit - log.size())
+    } else {
+      deny++
+      val earliest: Int = (log.peekFirst() as Object) as Int
+      return new Throttled(req.id(), earliest - req.tick() + windowSize)
+    }
+  }
+  def stats(): LimiterStats = new LimiterStats(name(), tot, ok, deny)
+}
+
+// ── Simulator ────────────────────────────────────────────────────────────────
+
+record SimReport(limiter: String, totalTicks: Int, totalReqs: Int, stats: LimiterStats)
+
+def simulate(limiter: RateLimiter, requests: List[Request]): SimReport {
+  limiter.reset()
+  var maxTick: Int = 0
+  foreach r: Object in requests {
+    val req: Request = r as Request
+    limiter.allow(req)
+    if req.tick() > maxTick { maxTick = req.tick() }
+  }
+  return new SimReport(limiter.name(), maxTick, requests.size, limiter.stats())
+}
+
+def printReport(report: SimReport): void {
+  val s: LimiterStats = report.stats()
+  IO::println("  " + s.toString())
+}
+
+// Build a request workload: burst at tick 0-4, steady at 5-14, burst at 15-17
+def buildRequests(): List[Request] {
+  val reqs: List[Request] = []
+  var id: Int = 1
+
+  // burst: 5 requests per tick for ticks 0..4
+  foreach t: Int in 0..4 {
+    for var k: Int = 0; k < 5; k++ {
+      reqs.add(new Request(id, t, "/api/data"))
+      id++
+    }
+  }
+
+  // steady: 2 requests per tick for ticks 5..14
+  foreach t: Int in 5..14 {
+    for var k: Int = 0; k < 2; k++ {
+      reqs.add(new Request(id, t, "/api/status"))
+      id++
+    }
+  }
+
+  // burst again: 8 requests at tick 15
+  for var k: Int = 0; k < 8; k++ {
+    reqs.add(new Request(id, 15, "/api/upload"))
+    id++
+  }
+
+  return reqs
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val requests: List[Request] = buildRequests()
+IO::println("=== Rate Limiter Simulation ===")
+IO::println("Workload: #{requests.size} requests over 16 ticks")
+IO::println("")
+
+val limiters: List[RateLimiter] = [
+  new TokenBucket(10, 2),
+  new FixedWindow(8, 5),
+  new SlidingWindowLog(6, 5)
+]
+
+val reports: List[SimReport] = limiters.map { lim ->
+  val r: RateLimiter = lim as RateLimiter
+  simulate(r, requests)
+}
+
+IO::println("Results:")
+foreach rpt: Object in reports {
+  printReport(rpt as SimReport)
+}
+
+// ── Per-tick breakdown for TokenBucket ───────────────────────────────────────
+
+IO::println("")
+IO::println("=== TokenBucket per-tick breakdown ===")
+val tb: RateLimiter = new TokenBucket(10, 2)
+val byTick: Map[Object, List[Request]] = requests.groupBy { r -> "" + (r as Request).tick() }
+val ticks: List[String] = []
+foreach t: Int in 0..15 { ticks.add("" + t) }
+
+foreach t: Object in ticks {
+  val key: String = t as String
+  val group: Object? = byTick.get(key)
+  if group != null {
+    val grpReqs: List[Request] = group as List[Request]
+    var allowCount: Int = 0
+    var denyCount: Int  = 0
+    foreach gr: Object in grpReqs {
+      val dec: Decision = tb.allow(gr as Request)
+      if dec.isAllowed() { allowCount++ } else { denyCount++ }
+    }
+    IO::println("  tick #{key}: #{grpReqs.size} req -> ok=#{allowCount} deny=#{denyCount}")
+  }
+}
+
+// ── Partition allowed vs throttled decisions ─────────────────────────────────
+
+IO::println("")
+IO::println("=== Sliding-log decision log (first 20 requests) ===")
+val sl: RateLimiter = new SlidingWindowLog(6, 5)
+val slDecs: List[Decision] = requests
+  .filter { r -> (r as Request).id() <= 20 }
+  .map    { r -> sl.allow(r as Request) as Decision }
+val slParts = slDecs.partition { d -> (d as Decision).isAllowed() }
+val allowed: List[Object]   = slParts[0] as List[Object]
+val throttled: List[Object] = slParts[1] as List[Object]
+
+IO::println("  first-20 allowed : #{allowed.size}")
+IO::println("  first-20 throttled: #{throttled.size}")
+
+// ── Try/catch: bad usage guard ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Guard test ===")
+try {
+  val badLimit: Int = 0 - 1
+  if badLimit < 0 { throw new IllegalArgumentException("limit must be >= 0") }
+} catch e: Exception {
+  IO::println("  caught: " + e.getMessage())
+}
+
+// ── Recursive helper: compute max consecutive throttled run ──────────────────
+
+def maxThrottledRun(decisions: List[Decision], idx: Int, current: Int, best: Int): Int {
+  if idx >= decisions.size { return Math::max(current, best) }
+  val d: Decision = decisions.get(idx) as Decision
+  if !d.isAllowed() {
+    return maxThrottledRun(decisions, idx + 1, current + 1, best)
+  } else {
+    return maxThrottledRun(decisions, idx + 1, 0, Math::max(current, best))
+  }
+}
+
+val fw: RateLimiter = new FixedWindow(8, 5)
+val allDecs: List[Decision] = requests.map { r -> fw.allow(r as Request) as Decision }
+val maxRun: Int = maxThrottledRun(allDecs, 0, 0, 0)
+IO::println("")
+IO::println("FixedWindow max consecutive deny run: #{maxRun}")
+
+// ── Summary via fold ──────────────────────────────────────────────────────────
+
+val totalAllowed: Int = allDecs.fold(0) { acc, d -> (acc as Int) + (if (d as Decision).isAllowed() { 1 } else { 0 }) }
+val pct: Int = totalAllowed * 100 / allDecs.size
+IO::println("FixedWindow pass rate: #{totalAllowed}/#{allDecs.size} (#{pct}%)")

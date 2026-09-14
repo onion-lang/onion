@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `run/LogDispatch.on` — a 255-line corpus sample dispatching structured log lines across four formats (HTTP, DB, syslog, metric) using regex-derived typed records (`record … from re"…"`), extension methods on `Int`/`String`, `select`-based log-level markers, and collection pipelines, producing a formatted multi-section analysis report.
 
+### Fixed
+
+- **An empty list literal (`[]`) passed as a generic constructor argument whose formal type was `List[T]` (or `List[G[T]]` for some other generic record `G`, including a self-referential `List[Tree[T]]` component) was rejected with `[E0021] a constructor applicable for … is not found`**, e.g. `new Simple[Int](1, [])` against `record Simple[T](value: T, items: List[T])`, even though a matching constructor plainly existed — the same shape worked fine with a non-empty list argument, and worked fine for a plain generic function call. Constructor arguments are typed before the target constructor is known, so `[]` had no expected type to infer its element type from and defaulted to `List[Object]`, not assignable to the formal `List[Int]` under invariant generics. Constructor resolution now retypes a malleable argument (a list/map literal, or a generic static/unqualified/new-object call) against a uniquely arity-matched constructor's substituted formal types and retries, mirroring the fallback ordinary method calls already get (issue #232).
+
 ## [0.69.0] - 2026-09-14
 
 ### Added

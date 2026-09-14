@@ -1,0 +1,390 @@
+// PhysicsSim.on — 2-D particle physics simulation with collision detection.
+//
+// Exercises: records with methods and example clauses, ADT case-enum for force
+// types, extension Double/Int, collection pipelines (map/filter/fold/sortedBy/
+// any/find), do[List] for force-pair generation, foreach over Int ranges and
+// list elements, nullable safety, |> pipeline, string interpolation, while
+// loop, try/catch, pattern matching on sealed hierarchy.
+
+import {
+  java.lang.Math
+}
+
+// ─── 2-D vector ──────────────────────────────────────────────────────────────
+
+record Vec2(x: Double, y: Double)
+  example vec2_add_zero {
+    val v = new Vec2(3.0, 4.0)
+    val z = new Vec2(0.0, 0.0)
+    v.add(z).x() == 3.0 && v.add(z).y() == 4.0
+  }
+  example vec2_scale_zero {
+    val v = new Vec2(5.0, 12.0)
+    v.scale(0.0).x() == 0.0 && v.scale(0.0).y() == 0.0
+  }
+{
+public:
+  def add(other: Vec2): Vec2 = new Vec2(x() + other.x(), y() + other.y())
+  def sub(other: Vec2): Vec2 = new Vec2(x() - other.x(), y() - other.y())
+  def scale(s: Double): Vec2 = new Vec2(x() * s, y() * s)
+  def dot(other: Vec2): Double = x() * other.x() + y() * other.y()
+  def lengthSq(): Double = x() * x() + y() * y()
+  def length(): Double = Math::sqrt(lengthSq())
+  def distTo(other: Vec2): Double = sub(other).length()
+  def normalize(): Vec2 {
+    val len: Double = length()
+    if len < 1.0e-10 { return new Vec2(0.0, 0.0) }
+    return scale(1.0 / len)
+  }
+  def toString(): String = "(#{x()}, #{y()})"
+}
+
+// ─── Particle ─────────────────────────────────────────────────────────────────
+
+record Particle(id: Int, pos: Vec2, vel: Vec2, mass: Double, radius: Double) {
+public:
+  def kineticEnergy(): Double = 0.5 * mass() * vel().lengthSq()
+  def momentum(): Vec2 = vel().scale(mass())
+  def withPos(p: Vec2): Particle = new Particle(id(), p, vel(), mass(), radius())
+  def withVel(v: Vec2): Particle = new Particle(id(), pos(), v, mass(), radius())
+  def applyImpulse(impulse: Vec2): Particle = withVel(vel().add(impulse.scale(1.0 / mass())))
+  def toString(): String = "P#{id()} pos=#{pos().toString()} vel=#{vel().toString()} m=#{mass()}"
+}
+
+// ─── Force types (ADT) ───────────────────────────────────────────────────────
+
+enum ForceKind {
+  case ConstGravity(gx: Double, gy: Double)
+  case Spring(stiffness: Double, restLen: Double, aId: Int, bId: Int)
+  case Drag(coeff: Double)
+  case PointGravity(cx: Double, cy: Double, strength: Double)
+public:
+  def label(): String = select this {
+    case g is ConstGravity:    "gravity(#{g.gx()}, #{g.gy()})"
+    case s is Spring:          "spring[#{s.aId()}-#{s.bId()}] k=#{s.stiffness()}"
+    case d is Drag:            "drag coeff=#{d.coeff()}"
+    case pg is PointGravity:   "point-gravity at (#{pg.cx()},#{pg.cy()})"
+  }
+}
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+
+class Simulation {
+  var _particles: List[Particle]
+  var _forces: List[ForceKind]
+  var _time: Double
+  var _steps: Int
+public:
+  def this(ps: List[Particle], fs: List[ForceKind]) {
+    val mp: List[Particle] = []
+    foreach p: Particle in ps { mp.add(p) }
+    _particles = mp
+    val mf: List[ForceKind] = []
+    foreach f: ForceKind in fs { mf.add(f) }
+    _forces    = mf
+    _time      = 0.0
+    _steps     = 0
+  }
+
+  def getParticles(): List[Particle] = _particles
+  def getForces():    List[ForceKind] = _forces
+  def getTime():      Double = _time
+  def getStepCount(): Int    = _steps
+
+  def findById(id: Int): Particle? =
+    _particles.find { p -> (p as Particle).id() == id } as Particle?
+
+  // Compute total force on particle p from a given ForceKind.
+  def forceOn(p: Particle, fk: ForceKind): Vec2 {
+    return select fk {
+      case g is ConstGravity:
+        new Vec2(g.gx(), g.gy()).scale(p.mass())
+      case d is Drag:
+        p.vel().scale(-d.coeff())
+      case pg is PointGravity:
+        val center = new Vec2(pg.cx(), pg.cy())
+        val dir    = center.sub(p.pos()).normalize()
+        val dist   = p.pos().distTo(center)
+        if dist < 0.01 { new Vec2(0.0, 0.0) }
+        else           { dir.scale(pg.strength() * p.mass() / (dist * dist)) }
+      case s is Spring:
+        if s.aId() == p.id() || s.bId() == p.id() {
+          val otherId = if s.aId() == p.id() { s.bId() } else { s.aId() }
+          val other   = findById(otherId)
+          if other == null { new Vec2(0.0, 0.0) }
+          else {
+            val other2  = other as Particle
+            val delta   = other2.pos().sub(p.pos())
+            val dist    = delta.length()
+            val stretch = dist - s.restLen()
+            val dir     = delta.normalize()
+            dir.scale(s.stiffness() * stretch)
+          }
+        } else {
+          new Vec2(0.0, 0.0)
+        }
+    }
+  }
+
+  // Accumulate total force on particle p from all forces.
+  def totalForce(p: Particle): Vec2 {
+    var acc: Vec2 = new Vec2(0.0, 0.0)
+    foreach fk: ForceKind in _forces {
+      acc = acc.add(forceOn(p, fk))
+    }
+    return acc
+  }
+
+  // Euler integration step for a single particle.
+  def stepParticle(p: Particle, dt: Double): Particle {
+    val f   = totalForce(p)
+    val acc = f.scale(1.0 / p.mass())
+    val nv  = p.vel().add(acc.scale(dt))
+    val np  = p.pos().add(nv.scale(dt))
+    return p.withPos(np).withVel(nv)
+  }
+
+  // Detect and resolve elastic collisions between all particle pairs.
+  def resolveCollisions(): void {
+    val n: Int = _particles.size
+    foreach i: Int in 0..<n {
+      foreach j: Int in (i + 1)..<n {
+        val pi = _particles.get(i) as Particle
+        val pj = _particles.get(j) as Particle
+        val dist = pi.pos().distTo(pj.pos())
+        val minDist = pi.radius() + pj.radius()
+        if dist < minDist && dist > 1.0e-10 {
+          val normal = pj.pos().sub(pi.pos()).normalize()
+          val relVel = pi.vel().sub(pj.vel())
+          val velAlong = relVel.dot(normal)
+          if velAlong > 0.0 {
+            val impulse = velAlong * 2.0 / (1.0 / pi.mass() + 1.0 / pj.mass())
+            val di = normal.scale( impulse / pi.mass())
+            val dj = normal.scale(-impulse / pj.mass())
+            _particles.set(i, pi.withVel(pi.vel().sub(di)))
+            _particles.set(j, pj.withVel(pj.vel().add(dj)))
+          }
+        }
+      }
+    }
+  }
+
+  // Advance simulation by dt seconds.
+  def step(dt: Double): void {
+    val next: List[Particle] = []
+    foreach p: Particle in _particles {
+      next.add(stepParticle(p, dt))
+    }
+    _particles = next
+    resolveCollisions()
+    _time  = _time + dt
+    _steps = _steps + 1
+  }
+
+  def totalKE(): Double {
+    return _particles.fold(0.0) { acc, p -> (acc as Double) + (p as Particle).kineticEnergy() } as Double
+  }
+
+  def totalMomentum(): Vec2 {
+    var mx: Double = 0.0
+    var my: Double = 0.0
+    foreach p: Particle in _particles {
+      mx = mx + p.momentum().x()
+      my = my + p.momentum().y()
+    }
+    return new Vec2(mx, my)
+  }
+}
+
+// ─── ASCII canvas renderer ────────────────────────────────────────────────────
+
+def renderCanvas(sim: Simulation, cols: Int, rows: Int,
+                 xMin: Double, xMax: Double, yMin: Double, yMax: Double): String {
+  val cells: List[Object] = []
+  foreach row: Int in 0..<rows {
+    val rowCells: List[Object] = []
+    foreach col: Int in 0..<cols {
+      rowCells.add(".")
+    }
+    cells.add(rowCells)
+  }
+
+  foreach p: Particle in sim.getParticles() {
+    val px = p.pos().x()
+    val py = p.pos().y()
+    if px >= xMin && px <= xMax && py >= yMin && py <= yMax {
+      val col = ((px - xMin) / (xMax - xMin) * (cols - 1)) as Int
+      val row = rows - 1 - ((py - yMin) / (yMax - yMin) * (rows - 1)) as Int
+      val ci  = if col < 0 { 0 } else if col >= cols { cols - 1 } else { col }
+      val ri  = if row < 0 { 0 } else if row >= rows { rows - 1 } else { row }
+      val rowList = cells.get(ri) as List[Object]
+      rowList.set(ci, "#{p.id()}")
+    }
+  }
+
+  var out: String = ""
+  val border: String = "+" + "-".repeated(cols) + "+"
+  out = out + border + "\n"
+  foreach row: Object in cells {
+    var line: String = "|"
+    foreach cell: Object in (row as List[Object]) {
+      line = line + (cell as String)
+    }
+    line = line + "|"
+    out = out + line + "\n"
+  }
+  out = out + border
+  return out
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension String {
+  def repeated(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".00" }
+    val end: Int = dot + 3
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def sep(title: String): void {
+  println("─── #{title} " + "─".repeated(40 - title.length()))
+}
+
+// Scene 1: two particles orbiting under mutual gravity + drag
+sep("Scene 1: Mutual gravity + drag")
+
+val p1 = new Particle(1, new Vec2(-3.0, 0.0), new Vec2(0.0, 1.5),  2.0, 0.4)
+val p2 = new Particle(2, new Vec2( 3.0, 0.0), new Vec2(0.0, -1.5), 2.0, 0.4)
+val p3 = new Particle(3, new Vec2( 0.0, 4.0), new Vec2(-1.0, 0.0), 1.0, 0.3)
+
+val ps1: List[Particle] = [p1, p2, p3]
+val fs1: List[ForceKind] = [
+  new ConstGravity(0.0, -0.2),
+  new Drag(0.05),
+  new PointGravity(0.0, 0.0, 20.0)
+]
+
+foreach fk: ForceKind in fs1 {
+  println("  Force: #{fk.label()}")
+}
+
+val sim1 = new Simulation(ps1, fs1)
+
+println("  Initial KE : #{sim1.totalKE().fmt2()}")
+println("  Initial momentum: #{sim1.totalMomentum().toString()}")
+println("\n  Initial positions:")
+println(renderCanvas(sim1, 30, 12, -6.0, 6.0, -6.0, 6.0))
+
+val dt1: Double = 0.05
+foreach step: Int in 0..<40 {
+  sim1.step(dt1)
+}
+
+println("\n  After #{sim1.getStepCount()} steps (t=#{sim1.getTime().fmt2()}):")
+println(renderCanvas(sim1, 30, 12, -6.0, 6.0, -6.0, 6.0))
+println("  Final KE  : #{sim1.totalKE().fmt2()}")
+println("  Final momentum: #{sim1.totalMomentum().toString()}")
+
+foreach p: Particle in sim1.getParticles() {
+  println("  #{p.toString()}")
+}
+
+// Scene 2: spring-connected chain
+sep("Scene 2: Spring chain")
+
+val chain: List[Particle] = [
+  new Particle(1, new Vec2(0.0, 5.0), new Vec2(0.5, 0.0),  1.0, 0.2),
+  new Particle(2, new Vec2(0.0, 3.0), new Vec2(-0.3, 0.2), 1.0, 0.2),
+  new Particle(3, new Vec2(0.0, 1.0), new Vec2(0.2, -0.1), 1.0, 0.2),
+  new Particle(4, new Vec2(0.0, -1.0), new Vec2(0.0, 0.3), 1.0, 0.2)
+]
+
+val sprForces: List[ForceKind] = [
+  new ConstGravity(0.0, -0.5),
+  new Spring(3.0, 2.0, 1, 2),
+  new Spring(3.0, 2.0, 2, 3),
+  new Spring(3.0, 2.0, 3, 4),
+  new Drag(0.08)
+]
+
+foreach fk: ForceKind in sprForces {
+  println("  Force: #{fk.label()}")
+}
+
+val sim2 = new Simulation(chain, sprForces)
+println("\n  Initial:")
+println(renderCanvas(sim2, 20, 14, -4.0, 4.0, -4.0, 8.0))
+
+foreach step: Int in 0..<60 {
+  sim2.step(0.04)
+}
+
+println("  After #{sim2.getStepCount()} steps (t=#{sim2.getTime().fmt2()}):")
+println(renderCanvas(sim2, 20, 14, -4.0, 4.0, -4.0, 8.0))
+
+// ─── do[List]: generate force-pair interactions for reporting ─────────────────
+sep("Force × Particle interaction table")
+
+val ids: List[Object] = [1, 2, 3]
+val fLabels: List[Object] = fs1.map { fk -> (fk as ForceKind).label() }
+
+val interactions = do[List] {
+  pid  <- ids
+  flbl <- fLabels
+  ret "  P#{pid as Int} × [#{flbl as String}]"
+}
+
+foreach row: Object in interactions {
+  println(row as String)
+}
+
+// ─── Statistics summary ───────────────────────────────────────────────────────
+sep("Statistics")
+
+val energies: List[Object] = sim1.getParticles().map { p -> (p as Particle).kineticEnergy() }
+val totalE = energies.fold(0.0) { a, b -> (a as Double) + (b as Double) } as Double
+val maxE   = energies.fold(0.0) { a, b -> val av = a as Double; val bv = b as Double; if av > bv { av } else { bv } } as Double
+val minE   = energies.fold(totalE) { a, b -> val av = a as Double; val bv = b as Double; if av < bv { av } else { bv } } as Double
+
+println("  Particle count : #{sim1.getParticles().size}")
+println("  Total KE       : #{totalE.fmt2()}")
+println("  Max KE         : #{maxE.fmt2()}")
+println("  Min KE         : #{minE.fmt2()}")
+println("  Sim steps      : #{sim1.getStepCount()}")
+println("  Sim time       : #{sim1.getTime().fmt2()}")
+
+val fastest = sim1.getParticles().sortedBy { p -> -((p as Particle).vel().length()) }.get(0) as Particle
+println("  Fastest particle: P#{fastest.id()} speed=#{fastest.vel().length().fmt2()}")
+
+// |> pipeline: speed ranking printed via pipeline
+sep("|> pipeline: speed ranking")
+sim1.getParticles()
+  .sortedBy { p -> -((p as Particle).vel().length()) }
+  .map { p ->
+    val pa: Particle = p as Particle
+    "  P#{pa.id()} speed=#{pa.vel().length().fmt2()} KE=#{pa.kineticEnergy().fmt2()}"
+  }
+  |> println
+
+// |> pipeline: count fast particles and report
+sep("|> pipeline: fast particles")
+val threshold: Double = 3.0
+val fastCount: Int = sim1.getParticles()
+  .filter { p -> (p as Particle).vel().length() > threshold }
+  .size
+println("  Particles faster than #{threshold}: " + fastCount)

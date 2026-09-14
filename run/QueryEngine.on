@@ -1,0 +1,301 @@
+// QueryEngine.on — in-memory tabular query engine
+// Exercises: ADT enums, classes, generics, collection pipelines, closures,
+//   nullable handling, string interpolation, pattern matching, select expressions.
+
+// ---- Value ADT (VNum / VStr / VNil) ----
+
+enum Value {
+  case VNum(n: Double)
+  case VStr(s: String)
+  case VNil
+
+public:
+  def display(): String =
+    select this {
+    case v is VNum:
+      Format::number(v.n(), 2)
+    case v is VStr:
+      v.s()
+    else:
+      "NULL"
+    }
+
+  def numVal(): Double =
+    select this {
+    case v is VNum:
+      v.n()
+    else:
+      0.0
+    }
+
+  def strVal(): String =
+    select this {
+    case v is VStr:
+      v.s()
+    case v is VNum:
+      Format::number(v.n(), 2)
+    else:
+      ""
+    }
+
+  def eqVal(other: Value): Boolean =
+    select this {
+    case a is VNum:
+      select other {
+      case b is VNum:
+        a.n() == b.n()
+      else:
+        false
+      }
+    case a is VStr:
+      select other {
+      case b is VStr:
+        a.s() == b.s()
+      else:
+        false
+      }
+    else:
+      other is VNil
+    }
+}
+
+// ---- Row ----
+
+class Row {
+  val columns: List[String]
+  val vals:    List[Value]
+public:
+  def this(columns: List[String], vals: List[Value]) {
+    self.columns = columns
+    self.vals    = vals
+  }
+
+  def getVals(): List[Value] = vals
+
+  def get(col: String): Value {
+    val idx: Int = columns.indexOf(col)
+    if idx < 0 { return new VNil() }
+    return vals[idx]
+  }
+}
+
+// ---- Table ----
+
+class Table {
+  val name:    String
+  val columns: List[String]
+  val rows:    List[Row]
+public:
+  def this(name: String, columns: List[String]) {
+    self.name    = name
+    self.columns = columns
+    self.rows    = []
+  }
+
+  def getRows(): List[Row] = rows
+  def rowCount(): Int      = rows.size
+
+  def addRow(vs: List[Value]): void {
+    rows.add(new Row(columns, vs))
+  }
+
+  // WHERE
+  def filter(pred: Function1[Row, Boolean]): Table {
+    val t: Table = new Table(name, columns)
+    foreach r: Row in rows {
+      if pred(r) { t.addRow(r.getVals()) }
+    }
+    return t
+  }
+
+  // SELECT cols
+  def project(cols: List[String]): Table {
+    val t: Table = new Table(name, cols)
+    foreach r: Row in rows {
+      val selected: List[Value] = cols.map { c: String -> r.get(c) }
+      t.addRow(selected)
+    }
+    return t
+  }
+
+  // ORDER BY col numeric
+  def orderBy(col: String, asc: Boolean): Table {
+    val sorted: List[Row] = rows.sortedBy { r: Row ->
+      val v: Double = r.get(col).numVal()
+      if asc { v } else { 0.0 - v }
+    }
+    val t: Table = new Table(name, columns)
+    foreach r: Row in sorted { t.addRow(r.getVals()) }
+    return t
+  }
+
+  // ORDER BY col string
+  def orderByStr(col: String): Table {
+    val sorted: List[Row] = rows.sortedBy { r: Row -> r.get(col).strVal() }
+    val t: Table = new Table(name, columns)
+    foreach r: Row in sorted { t.addRow(r.getVals()) }
+    return t
+  }
+
+  // LIMIT n
+  def limit(n: Int): Table {
+    val t: Table = new Table(name, columns)
+    var i: Int = 0
+    foreach r: Row in rows {
+      if i >= n { break }
+      t.addRow(r.getVals())
+      i++
+    }
+    return t
+  }
+
+  // SUM(col)
+  def sum(col: String): Double =
+    rows.reduce(0.0) { acc: Double, r: Row -> acc + r.get(col).numVal() }
+
+  // AVG(col)
+  def avg(col: String): Double {
+    if rows.size == 0 { return 0.0 }
+    return sum(col) / (rows.size as Double)
+  }
+
+  // MAX(col)
+  def max(col: String): Double =
+    rows.reduce(0.0 - 1.0e30) { acc: Double, r: Row ->
+      val v: Double = r.get(col).numVal()
+      if v > acc { v } else { acc }
+    }
+
+  // GROUP BY col, COUNT(*)
+  def groupCount(col: String): Table {
+    val cnts: Map[String, Double] = [:]
+    foreach r: Row in rows {
+      val key: String  = r.get(col).strVal()
+      val cur: Double  = if cnts.containsKey(key) { cnts.get(key) as Double } else { 0.0 }
+      cnts.put(key, cur + 1.0)
+    }
+    val t: Table = new Table(name, [col, "count"])
+    foreach (key, cnt) in cnts {
+      t.addRow([new VStr(key), new VNum(cnt)])
+    }
+    return t
+  }
+
+  // GROUP BY groupCol, SUM(sumCol)
+  def groupSum(groupCol: String, sumCol: String): Table {
+    val sums: Map[String, Double] = [:]
+    foreach r: Row in rows {
+      val key: String = r.get(groupCol).strVal()
+      val cur: Double = if sums.containsKey(key) { sums.get(key) as Double } else { 0.0 }
+      sums.put(key, cur + r.get(sumCol).numVal())
+    }
+    val t: Table = new Table(name, [groupCol, sumCol + "_sum"])
+    foreach (key, total) in sums {
+      t.addRow([new VStr(key), new VNum(total)])
+    }
+    return t
+  }
+
+  // Print ASCII grid
+  def print(): void {
+    val widths: List[Int] = columns.map { c: String -> colWidth(c) }
+    val headerVals: List[Value] = columns.map { c: String -> (new VStr(c) as Value) }
+    val header: String = buildRow(headerVals, widths)
+    val sep:    String = widths.map { w: Int -> Strings::repeat("-", w) }.join("-+-")
+    IO::println("  " + header)
+    IO::println("  " + sep)
+    foreach r: Row in rows {
+      IO::println("  " + buildRow(r.getVals(), widths))
+    }
+    IO::println("  (" + rows.size + " rows)")
+  }
+
+private:
+  def colWidth(col: String): Int {
+    var w: Int = col.length()
+    foreach r: Row in rows {
+      val len: Int = r.get(col).display().length()
+      if len > w { w = len }
+    }
+    return w
+  }
+
+  def buildRow(vs: List[Value], widths: List[Int]): String {
+    var s: String = ""
+    var i: Int = 0
+    foreach v: Value in vs {
+      if i > 0 { s = s + " | " }
+      s = s + Strings::padRight(v.display(), widths[i], ' ')
+      i++
+    }
+    return s
+  }
+}
+
+// ---- Sample data ----
+
+def makeProducts(): Table {
+  val t: Table = new Table("products", ["id", "category", "name", "price", "stock"])
+  t.addRow([new VNum(1),  new VStr("Electronics"), new VStr("Laptop"),      new VNum(1299.0), new VNum(45.0)])
+  t.addRow([new VNum(2),  new VStr("Electronics"), new VStr("Phone"),        new VNum(799.0),  new VNum(120.0)])
+  t.addRow([new VNum(3),  new VStr("Electronics"), new VStr("Tablet"),       new VNum(599.0),  new VNum(67.0)])
+  t.addRow([new VNum(4),  new VStr("Clothing"),    new VStr("Jacket"),       new VNum(89.0),   new VNum(200.0)])
+  t.addRow([new VNum(5),  new VStr("Clothing"),    new VStr("Jeans"),        new VNum(49.0),   new VNum(350.0)])
+  t.addRow([new VNum(6),  new VStr("Clothing"),    new VStr("Shirt"),        new VNum(29.0),   new VNum(500.0)])
+  t.addRow([new VNum(7),  new VStr("Books"),       new VStr("Scala Book"),   new VNum(45.0),   new VNum(80.0)])
+  t.addRow([new VNum(8),  new VStr("Books"),       new VStr("Onion Guide"),  new VNum(35.0),   new VNum(95.0)])
+  t.addRow([new VNum(9),  new VStr("Books"),       new VStr("Algorithms"),   new VNum(65.0),   new VNum(55.0)])
+  t.addRow([new VNum(10), new VStr("Electronics"), new VStr("Headphones"),   new VNum(149.0),  new VNum(180.0)])
+  return t
+}
+
+// ---- Main ----
+
+def main(): void {
+  val p: Table = makeProducts()
+
+  IO::println("=== SELECT * FROM products ===")
+  p.print()
+
+  IO::println("")
+  IO::println("=== WHERE category = 'Electronics' ===")
+  p.filter { r: Row -> r.get("category").eqVal(new VStr("Electronics")) }.print()
+
+  IO::println("")
+  IO::println("=== WHERE price > 100 ORDER BY price DESC ===")
+  p.filter { r: Row -> r.get("price").numVal() > 100.0 }
+   .orderBy("price", false)
+   .project(["name", "category", "price"])
+   .print()
+
+  IO::println("")
+  IO::println("=== Top-3 cheapest ===")
+  p.orderBy("price", true).limit(3).project(["name", "price"]).print()
+
+  IO::println("")
+  IO::println("=== COUNT(*) GROUP BY category ORDER BY count DESC ===")
+  p.groupCount("category").orderBy("count", false).print()
+
+  IO::println("")
+  IO::println("=== SUM(price) GROUP BY category ===")
+  p.groupSum("category", "price").orderBy("price_sum", false).print()
+
+  IO::println("")
+  IO::println("=== Summary stats ===")
+  IO::println("  total rows : " + p.rowCount())
+  IO::println("  avg price  : " + Format::number(p.avg("price"), 2))
+  IO::println("  max price  : " + Format::number(p.max("price"), 2))
+  var invVal: Double = 0.0
+  foreach r: Row in p.getRows() {
+    invVal = invVal + r.get("price").numVal() * r.get("stock").numVal()
+  }
+  IO::println("  inventory$ : " + Format::number(invVal, 2))
+
+  IO::println("")
+  IO::println("=== Books under $50, alphabetical ===")
+  p.filter  { r: Row -> r.get("category").eqVal(new VStr("Books")) }
+   .filter  { r: Row -> r.get("price").numVal() < 50.0 }
+   .orderByStr("name")
+   .project (["name", "price", "stock"])
+   .print()
+}

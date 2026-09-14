@@ -1,0 +1,389 @@
+// CustomerLoyalty.on — customer loyalty points engine.
+// Exercises: plain enum with public methods (Tier), ADT case-enum (LoyaltyEvent),
+// records (Customer, Transaction), interface (Reportable), class with state
+// (Account, LoyaltyEngine), generics, collection pipelines
+// (map/filter/groupBy/sortedBy/fold/partition/find/distinct/reduce),
+// select/pattern matching on ADT cases, nullable, string interpolation,
+// closures, extension methods on Double/Int, try/catch, recursion,
+// while loop, foreach over ranges and maps (k,v).
+
+// ─── Tier: plain enum with methods ────────────────────────────────────────
+
+enum Tier {
+  BRONZE, SILVER, GOLD, PLATINUM
+public:
+  def label(): String = select this {
+    case Tier::BRONZE:   "Bronze"
+    case Tier::SILVER:   "Silver"
+    case Tier::GOLD:     "Gold"
+    case Tier::PLATINUM: "Platinum"
+    else: "?"
+  }
+  def multiplier(): Double = select this {
+    case Tier::BRONZE:   1.0
+    case Tier::SILVER:   1.5
+    case Tier::GOLD:     2.0
+    case Tier::PLATINUM: 3.0
+    else: 1.0
+  }
+  def minPoints(): Int = select this {
+    case Tier::BRONZE:    0
+    case Tier::SILVER:  500
+    case Tier::GOLD:   2000
+    case Tier::PLATINUM: 5000
+    else: 0
+  }
+  def next(): Tier? = select this {
+    case Tier::BRONZE:   Tier::SILVER
+    case Tier::SILVER:   Tier::GOLD
+    case Tier::GOLD:     Tier::PLATINUM
+    else:                null
+  }
+  def badge(): String = select this {
+    case Tier::BRONZE:   "🥉"
+    case Tier::SILVER:   "🥈"
+    case Tier::GOLD:     "🥇"
+    case Tier::PLATINUM: "💎"
+    else: "?"
+  }
+}
+
+// ─── Extension methods ─────────────────────────────────────────────────────
+
+extension Double {
+  def rounded(): Int = (self + 0.5) as Int
+}
+
+extension Int {
+  def commaSep(): String {
+    val s = "" + self
+    if s.length() <= 3 { return s }
+    val lo  = s.substring(s.length() - 3)
+    val hi  = s.substring(0, s.length() - 3)
+    return hi + "," + lo
+  }
+}
+
+extension String {
+  def padEnd(n: Int): String = String::format("%-" + n + "s", self)
+}
+
+// ─── LoyaltyEvent: ADT case-enum ──────────────────────────────────────────
+
+enum LoyaltyEvent {
+  case Purchase(amount: Double)
+  case Redeem(points: Int)
+  case Bonus(points: Int)
+public:
+  def description(): String = select this {
+    case e is Purchase: "Purchase $#{String::format("%.2f", e.amount())}"
+    case e is Redeem:   "Redeem #{e.points().commaSep()} pts"
+    case e is Bonus:    "Bonus +#{e.points().commaSep()} pts"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────
+
+record Customer(id: Int, name: String, email: String)
+
+record Transaction(customer: Customer, event: LoyaltyEvent, delta: Int) {
+public:
+  def summary(): String =
+    "  #{customer.name()}: #{event.description()} → #{if delta >= 0 { "+" } else { "" }}#{delta} pts"
+}
+
+// ─── Reportable interface ─────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── Account: per-customer state ──────────────────────────────────────────
+
+class Account conforms Reportable {
+  val customer: Customer
+  var points:   Int
+  var tier:     Tier
+  val history:  List[Transaction]
+public:
+  def this(c: Customer) {
+    this.customer = c
+    this.points   = 0
+    this.tier     = Tier::BRONZE
+    this.history  = []
+  }
+
+  def name():         String           = customer.name()
+  def pts():          Int              = points
+  def currentTier():  Tier             = tier
+  def txHistory():    List[Transaction] = history
+
+  def pointsToNextTier(): Int {
+    val next: Tier? = tier.next()
+    if next == null { return 0 }
+    val needed = (next as Tier).minPoints() - points
+    if needed < 0 { return 0 }
+    return needed
+  }
+
+  def process(event: LoyaltyEvent): void {
+    var delta: Int = 0
+    select event {
+      case e is Purchase: {
+        delta  = (e.amount() * tier.multiplier()).rounded()
+        points = points + delta
+      }
+      case e is Redeem: {
+        if e.points() > points {
+          throw new RuntimeException("Insufficient points: have #{points}, need #{e.points()}")
+        }
+        delta  = 0 - e.points()
+        points = points + delta
+      }
+      case e is Bonus: {
+        delta  = e.points()
+        points = points + delta
+      }
+    }
+    history.add(new Transaction(customer, event, delta))
+    refreshTier()
+  }
+
+  def refreshTier(): void {
+    val ordered: List[Tier] = [Tier::PLATINUM, Tier::GOLD, Tier::SILVER, Tier::BRONZE]
+    foreach t: Tier in ordered {
+      if points >= t.minPoints() { tier = t; return }
+    }
+  }
+
+  def totalSpend(): Double {
+    var total: Double = 0.0
+    foreach tx: Transaction in history {
+      select tx.event() {
+        case e is Purchase: { total = total + e.amount() }
+        else: {}
+      }
+    }
+    return total
+  }
+
+  def report(): String {
+    val prog = if pointsToNextTier() > 0 {
+      " (#{pointsToNextTier().commaSep()} to #{(tier.next() as Tier).label()})"
+    } else {
+      " (top tier)"
+    }
+    return tier.badge() + " " + customer.name().padEnd(14) + " " + tier.label().padEnd(9) + " " +
+           points.commaSep().padEnd(8) + " pts  $" + String::format("%.2f", totalSpend()) + " spend" + prog
+  }
+}
+
+// ─── LoyaltyEngine: multi-account manager ────────────────────────────────
+
+class LoyaltyEngine conforms Reportable {
+  val accounts: List[Account]
+  var nextId:   Int
+public:
+  def this() {
+    this.accounts = []
+    this.nextId   = 1
+  }
+
+  def enroll(name: String, email: String): Account {
+    val cust = new Customer(nextId, name, email)
+    nextId   = nextId + 1
+    val acct = new Account(cust)
+    accounts.add(acct)
+    return acct
+  }
+
+  def allAccounts(): List[Account] = accounts
+
+  def findByName(name: String): Account? {
+    foreach a: Account in accounts {
+      if a.name() == name { return a }
+    }
+    return null
+  }
+
+  def processFor(name: String, event: LoyaltyEvent): void {
+    val acct = findByName(name)
+    if acct != null { (acct as Account).process(event) }
+    else { IO::println("  [WARN] account not found: " + name) }
+  }
+
+  def allSortedByPoints(): List[Account] =
+    accounts.sortedBy { a -> 0 - (a as Account).pts() }
+
+  def report(): String {
+    var sb: String = "=== Loyalty Engine: #{accounts.size} member(s) ===\n"
+    foreach a: Account in allSortedByPoints() {
+      sb = sb + a.report() + "\n"
+    }
+    return sb
+  }
+
+  def tierBreakdown(): Map[Object, List[Account]] =
+    accounts.groupBy { a -> (a as Account).currentTier().label() }
+
+  def topSpenders(n: Int): List[Account] =
+    accounts.sortedBy { a -> 0 - (a as Account).totalSpend().rounded() }.take(n)
+
+  def totalPointsIssued(): Int {
+    var total: Int = 0
+    foreach a: Account in accounts { total = total + a.pts() }
+    return total
+  }
+
+  def redemptionCount(): Int {
+    var cnt: Int = 0
+    foreach a: Account in accounts {
+      foreach tx: Transaction in a.txHistory() {
+        if tx.event() is Redeem { cnt = cnt + 1 }
+      }
+    }
+    return cnt
+  }
+}
+
+// ─── Recursive: cumulative tier progression ────────────────────────────────
+
+def tierPath(tier: Tier, acc: String): String {
+  val next: Tier? = tier.next()
+  if next == null { return acc + tier.label() }
+  return tierPath(next as Tier, acc + tier.label() + " → ")
+}
+
+// ─── Main demo ────────────────────────────────────────────────────────────
+
+val engine = new LoyaltyEngine()
+
+val alice   = engine.enroll("Alice",   "alice@x.com")
+val bob     = engine.enroll("Bob",     "bob@x.com")
+val carol   = engine.enroll("Carol",   "carol@x.com")
+val dave    = engine.enroll("Dave",    "dave@x.com")
+val eve     = engine.enroll("Eve",     "eve@x.com")
+
+// Simulate activity
+engine.processFor("Alice",  new Purchase(500.0))
+engine.processFor("Alice",  new Purchase(300.0))
+engine.processFor("Alice",  new Bonus(200))
+engine.processFor("Alice",  new Purchase(1200.0))   // should push to Gold
+
+engine.processFor("Bob",    new Purchase(150.0))
+engine.processFor("Bob",    new Purchase(80.0))
+engine.processFor("Bob",    new Bonus(100))
+engine.processFor("Bob",    new Redeem(50))
+
+engine.processFor("Carol",  new Purchase(2500.0))   // big spender → Platinum?
+engine.processFor("Carol",  new Purchase(1800.0))
+engine.processFor("Carol",  new Bonus(300))
+
+engine.processFor("Dave",   new Purchase(40.0))
+engine.processFor("Dave",   new Bonus(20))
+
+engine.processFor("Eve",    new Purchase(100.0))
+engine.processFor("Eve",    new Purchase(120.0))
+engine.processFor("Eve",    new Redeem(30))
+
+// ─── Full report ──────────────────────────────────────────────────────────
+
+IO::println(engine.report())
+
+// ─── Tier breakdown via groupBy ───────────────────────────────────────────
+
+IO::println("=== Tier Distribution ===")
+val breakdown = engine.tierBreakdown()
+foreach (tierLabel, grp) in breakdown {
+  val members = (grp as List[Object])
+    .map { a -> (a as Account).name() }
+    .sortedBy { n -> n as String }
+  IO::println("  #{tierLabel}: #{members}")
+}
+
+// ─── Top spenders ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Top 3 Spenders ===")
+val top3 = engine.topSpenders(3)
+var rank: Int = 1
+foreach a: Object in top3 {
+  val acct = a as Account
+  IO::println("  #{rank}. #{acct.name()} — $#{String::format("%.2f", acct.totalSpend())}")
+  rank = rank + 1
+}
+
+// ─── Partition: premium (Gold+) vs standard ───────────────────────────────
+
+IO::println("")
+val parts = engine.allAccounts().partition { a ->
+  val t = (a as Account).currentTier()
+  t == Tier::GOLD || t == Tier::PLATINUM
+}
+val premium  = (parts[0] as List[Object])
+val standard = (parts[1] as List[Object])
+IO::println("Premium members: #{premium.map { a -> (a as Account).name() }}")
+IO::println("Standard members: #{standard.map { a -> (a as Account).name() }}")
+
+// ─── Engine stats ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Engine Stats ===")
+IO::println("Total points issued: #{engine.totalPointsIssued().commaSep()}")
+IO::println("Redemption transactions: #{engine.redemptionCount()}")
+
+// ─── Nullable lookup ─────────────────────────────────────────────────────
+
+IO::println("")
+val found = engine.findByName("Carol")
+if found != null {
+  IO::println("Found: #{(found as Account).name()} with #{(found as Account).pts().commaSep()} pts")
+}
+val notFound = engine.findByName("Zara")
+if notFound == null { IO::println("Zara: not enrolled") }
+
+// ─── Try/catch: overdraft redemption ─────────────────────────────────────
+
+IO::println("")
+try {
+  dave.process(new Redeem(9999))
+} catch e: Exception {
+  IO::println("Redemption error: " + e.getMessage())
+}
+
+// ─── Foreach over range: tier threshold table ────────────────────────────
+
+IO::println("")
+IO::println("=== Tier Thresholds ===")
+val allTiers: List[Tier] = [Tier::BRONZE, Tier::SILVER, Tier::GOLD, Tier::PLATINUM]
+foreach t: Tier in allTiers {
+  IO::println("  #{t.badge()} #{t.label().padEnd(9)}: #{t.minPoints().commaSep().padEnd(6)} pts  x#{t.multiplier()} multiplier")
+}
+
+// ─── While loop: simulate purchases until tier up ─────────────────────────
+
+IO::println("")
+IO::println("=== Tier-up Simulation for Dave ===")
+var step: Int = 0
+while dave.currentTier() == Tier::BRONZE && step < 20 {
+  dave.process(new Purchase(60.0))
+  step = step + 1
+}
+IO::println("After #{step} x $60 purchase(s): Dave is now #{dave.currentTier().label()} with #{dave.pts().commaSep()} pts")
+
+// ─── Tier path via recursion ──────────────────────────────────────────────
+
+IO::println("")
+IO::println("Tier progression: #{tierPath(Tier::BRONZE, "")}")
+
+// ─── Distinct check: unique tiers in the program ─────────────────────────
+
+IO::println("")
+val uniqueTiers = engine.allAccounts()
+  .map { a -> (a as Account).currentTier().label() }
+  .distinct()
+  .sortedBy { s -> s as String }
+IO::println("Active tiers: #{uniqueTiers}")
+
+IO::println("")
+IO::println("Done.")

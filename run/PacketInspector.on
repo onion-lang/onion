@@ -1,0 +1,338 @@
+// PacketInspector.on — simulated network-traffic analysis demonstrating:
+//   ADT enum (Protocol, ThreatLevel), records (Packet, FlowKey, AlertRecord,
+//   FlowStat, TrafficStats), class + interface (Inspector conforms Reportable),
+//   generics, collection pipelines (groupBy/sortedBy/filter/map/fold/partition/
+//   find/take/any/size), select exhaustiveness, nullable, closures, string
+//   interpolation, foreach (ranges and map k,v), try/catch, extension methods.
+
+import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap; }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def kb(): String {
+    if self >= 1024 { return "" + (self / 1024) + "KB" }
+    return "" + self + "B"
+  }
+  def abs(): Int {
+    if self < 0 { return 0 - self }
+    return self
+  }
+}
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + ".."
+  }
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ─── Protocol (plain enum) ───────────────────────────────────────────────────
+
+enum Protocol {
+  TCP, UDP, ICMP, DNS, HTTP
+}
+
+// ─── ThreatLevel (data-carrying ADT enum) ────────────────────────────────────
+
+enum ThreatLevel {
+  case Safe
+  case Suspicious(reason: String)
+  case Dangerous(reason: String, score: Int)
+public:
+  def label(): String = select this {
+    case s is Safe:       "SAFE"
+    case s is Suspicious: "WARN"
+    case d is Dangerous:  "CRIT"
+  }
+  def riskScore(): Int = select this {
+    case s is Safe:       0
+    case s is Suspicious: 5
+    case d is Dangerous:  d.score()
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record FlowKey(srcIp: String, dstIp: String, proto: Protocol) {
+public:
+  def label(): String = "#{srcIp()} -> #{dstIp()} [#{proto().name()}]"
+}
+
+record Packet(
+  id:        Int,
+  srcIp:     String,
+  dstIp:     String,
+  srcPort:   Int,
+  dstPort:   Int,
+  proto:     Protocol,
+  sizeBytes: Int,
+  payload:   String
+) {
+public:
+  def flowKey(): FlowKey = new FlowKey(srcIp(), dstIp(), proto())
+  def brief(): String =
+    "#{id().lpad(3)} #{proto().name().rpad(4)} #{srcIp().rpad(15)} :#{srcPort().lpad(5)} -> #{dstIp().rpad(15)} :#{dstPort().lpad(5)} #{sizeBytes().kb().rpad(6)}"
+}
+
+record AlertRecord(packet: Packet, level: ThreatLevel, detail: String) {
+public:
+  def describe(): String =
+    "[#{level().label()}] pkt=#{packet().id().lpad(3)} #{detail()}"
+}
+
+record FlowStat(count: Int, label: String) {
+public:
+  def display(): String = "#{count().lpad(4)}x #{label()}"
+}
+
+record TrafficStats(
+  totalPackets:   Int,
+  totalBytes:     Int,
+  alertCount:     Int,
+  dangerousCount: Int
+) {
+public:
+  def summary(): String =
+    "#{totalPackets()} pkts  #{totalBytes().kb()} total  #{alertCount()} alerts (#{dangerousCount()} critical)"
+}
+
+// ─── Interface ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): void
+}
+
+// ─── FirewallEngine ───────────────────────────────────────────────────────────
+
+class FirewallEngine {
+  var blockedPorts: List[Object]
+  var blockedIps:   List[Object]
+
+public:
+  def this() {
+    this.blockedPorts = [22, 23, 135, 445, 3389]
+    this.blockedIps   = ["10.0.0.99", "192.168.1.200", "172.16.0.5"]
+  }
+
+  def classify(p: Packet): ThreatLevel {
+    if blockedIps.contains(p.srcIp()) {
+      return new Dangerous("blocked source IP " + p.srcIp(), 90)
+    }
+    if blockedIps.contains(p.dstIp()) {
+      return new Dangerous("blocked destination IP " + p.dstIp(), 85)
+    }
+    if p.proto() == Protocol::ICMP && p.sizeBytes() > 512 {
+      return new Suspicious("oversized ICMP (" + p.sizeBytes() + "B)")
+    }
+    if p.proto() == Protocol::TCP && blockedPorts.contains(p.dstPort()) {
+      return new Dangerous("port " + p.dstPort() + " is blocked", 80)
+    }
+    if p.proto() == Protocol::DNS && p.payload().length() > 128 {
+      return new Suspicious("unusually large DNS query (" + p.payload().length() + "B)")
+    }
+    return new Safe()
+  }
+}
+
+// ─── Inspector ────────────────────────────────────────────────────────────────
+
+class Inspector conforms Reportable {
+  var packets:  List[Object]
+  var alerts:   List[Object]
+  var firewall: FirewallEngine
+
+public:
+  def this() {
+    this.packets  = []
+    this.alerts   = []
+    this.firewall = new FirewallEngine()
+  }
+
+  def ingest(p: Packet): void {
+    packets.add(p)
+    val level: ThreatLevel = firewall.classify(p)
+    if level is Suspicious {
+      val s: Suspicious = level as Suspicious
+      alerts.add(new AlertRecord(p, level, s.reason()))
+    } else if level is Dangerous {
+      val d: Dangerous = level as Dangerous
+      alerts.add(new AlertRecord(p, level, d.reason()))
+    }
+  }
+
+  def stats(): TrafficStats {
+    var totalBytes: Int = 0
+    foreach item: Object in packets { totalBytes = totalBytes + (item as Packet).sizeBytes() }
+    var dangerous: Int = 0
+    foreach a: Object in alerts {
+      if (a as AlertRecord).level().riskScore() >= 80 { dangerous = dangerous + 1 }
+    }
+    return new TrafficStats(packets.size, totalBytes, alerts.size, dangerous)
+  }
+
+  def topFlows(n: Int): List[Object] {
+    val byFlow: Map[String, List[Object]] = packets.groupBy { p -> (p as Packet).flowKey().label() }
+    val entries: List[Object] = []
+    foreach (k, v) in byFlow {
+      val flow: String = k as String
+      val cnt: List[Object] = v as List[Object]
+      entries.add(new FlowStat(cnt.size, flow))
+    }
+    return entries.sortedBy { e -> 0 - (e as FlowStat).count() }.take(n)
+  }
+
+  def protocolBreakdown(): Map[String, List[Object]] {
+    return packets.groupBy { p -> (p as Packet).proto().name() }
+  }
+
+  // Return all flows with a suspicious or dangerous packet
+  def alertedFlows(): List[Object] {
+    return alerts.map { a -> (a as AlertRecord).packet().flowKey().label() as Object }.distinct()
+  }
+
+  def allPackets(): List[Object] = packets
+  def allAlerts(): List[Object]  = alerts
+
+  def report(): void {
+    val hr: String = "─".rep(70)
+    IO::println(hr)
+    IO::println("  PACKET INSPECTOR REPORT")
+    IO::println(hr)
+
+    IO::println("")
+    IO::println("[ Captured Packets ]")
+    foreach item: Object in packets {
+      IO::println("  " + (item as Packet).brief())
+    }
+
+    IO::println("")
+    IO::println("[ Protocol Breakdown ]")
+    val breakdown: Map[String, List[Object]] = protocolBreakdown()
+    foreach (proto, pktList) in breakdown {
+      val list: List[Object] = pktList as List[Object]
+      var bytes: Int = 0
+      foreach item: Object in list { bytes = bytes + (item as Packet).sizeBytes() }
+      IO::println("  " + (proto as String).rpad(5) + " : " + list.size.lpad(3) + " pkts  " + bytes.kb().rpad(7))
+    }
+
+    IO::println("")
+    IO::println("[ Top Flows (by packet count) ]")
+    foreach entry: Object in topFlows(5) {
+      IO::println("  " + (entry as FlowStat).display())
+    }
+
+    IO::println("")
+    IO::println("[ Alerted Flows ]")
+    val af: List[Object] = alertedFlows()
+    if af.size == 0 {
+      IO::println("  (none)")
+    } else {
+      foreach f: Object in af { IO::println("  " + (f as String)) }
+    }
+
+    IO::println("")
+    IO::println("[ Alerts ]")
+    if alerts.size == 0 {
+      IO::println("  No alerts.")
+    } else {
+      // Sort alerts by risk score descending
+      val sorted: List[Object] = alerts.sortedBy { a -> 0 - (a as AlertRecord).level().riskScore() }
+      foreach a: Object in sorted {
+        IO::println("  " + (a as AlertRecord).describe())
+      }
+    }
+
+    IO::println("")
+    IO::println("[ Summary ]")
+    IO::println("  " + stats().summary())
+    IO::println(hr)
+  }
+}
+
+// ─── Helper: build a synthetic stream of packets ─────────────────────────────
+
+def makePackets(): List[Object] {
+  val pkts: List[Object] = []
+  pkts.add(new Packet( 1, "192.168.1.10",  "8.8.8.8",       45231, 53,   Protocol::DNS,  78,   "query: example.com"))
+  pkts.add(new Packet( 2, "192.168.1.10",  "8.8.8.8",       45232, 53,   Protocol::DNS,  80,   "query: openai.com"))
+  pkts.add(new Packet( 3, "192.168.1.20",  "93.184.216.34", 52001, 80,   Protocol::HTTP, 512,  "GET /index.html"))
+  pkts.add(new Packet( 4, "10.0.0.99",     "192.168.1.10",  1024,  80,   Protocol::TCP,  200,  "SYN from blocked host"))
+  pkts.add(new Packet( 5, "192.168.1.30",  "192.168.1.10",  6001,  22,   Protocol::TCP,  64,   "SSH probe"))
+  pkts.add(new Packet( 6, "192.168.1.10",  "93.184.216.34", 52002, 80,   Protocol::HTTP, 800,  "GET /api/data"))
+  pkts.add(new Packet( 7, "192.168.1.40",  "8.8.8.8",       45240, 53,   Protocol::DNS,  215,  "query: " + "A".rep(160)))
+  pkts.add(new Packet( 8, "192.168.1.50",  "172.16.255.1",  3000,  443,  Protocol::TCP,  1500, "TLS handshake"))
+  pkts.add(new Packet( 9, "172.16.0.5",    "192.168.1.10",  8080,  3389, Protocol::TCP,  300,  "RDP probe from blocked host"))
+  pkts.add(new Packet(10, "192.168.1.10",  "8.8.8.8",       45241, 53,   Protocol::DNS,  82,   "query: github.com"))
+  pkts.add(new Packet(11, "192.168.1.60",  "192.168.1.10",  9000,  23,   Protocol::TCP,  48,   "Telnet probe"))
+  pkts.add(new Packet(12, "192.168.1.10",  "93.184.216.34", 52003, 80,   Protocol::HTTP, 640,  "POST /login"))
+  pkts.add(new Packet(13, "192.168.1.20",  "8.8.4.4",       50000, 53,   Protocol::DNS,  76,   "query: test.net"))
+  pkts.add(new Packet(14, "192.168.1.10",  "192.168.1.1",   54321, 135,  Protocol::TCP,  128,  "DCOM request"))
+  pkts.add(new Packet(15, "192.168.1.70",  "192.168.1.10",  0,     0,    Protocol::ICMP, 1024, "oversized ping"))
+  pkts.add(new Packet(16, "192.168.1.10",  "8.8.8.8",       45242, 53,   Protocol::DNS,  79,   "query: reddit.com"))
+  pkts.add(new Packet(17, "192.168.1.80",  "93.184.216.34", 60000, 80,   Protocol::HTTP, 300,  "GET /favicon.ico"))
+  pkts.add(new Packet(18, "192.168.1.50",  "172.16.255.1",  3001,  443,  Protocol::TCP,  2048, "TLS data"))
+  pkts.add(new Packet(19, "192.168.1.20",  "93.184.216.34", 52010, 80,   Protocol::HTTP, 950,  "GET /large-image.jpg"))
+  pkts.add(new Packet(20, "192.168.1.10",  "1.1.1.1",       45250, 53,   Protocol::DNS,  77,   "query: cloudflare.com"))
+  return pkts
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val insp: Inspector = new Inspector()
+  foreach p: Object in makePackets() { insp.ingest(p as Packet) }
+  insp.report()
+
+  // Exercise partition to split safe vs non-safe packets
+  IO::println("\n[ Packet Partition: safe vs flagged ]")
+  val fw: FirewallEngine = new FirewallEngine()
+  val parts: List[List[Object]] = insp.allPackets().partition { p -> fw.classify(p as Packet) is Safe }
+  val safe:    List[Object] = parts.get(0)
+  val flagged: List[Object] = parts.get(1)
+  IO::println("  Safe: " + safe.size + "  Flagged: " + flagged.size)
+
+  // Exercise find: first HTTP packet
+  IO::println("\n[ Find: first HTTP packet ]")
+  val firstHttp: Object? = insp.allPackets().find { p -> (p as Packet).proto() == Protocol::HTTP }
+  if firstHttp != null {
+    IO::println("  " + (firstHttp as Packet).brief())
+  }
+
+  // Exercise any
+  val anyDangerous: Boolean = insp.allAlerts().any { a -> (a as AlertRecord).level() is Dangerous }
+  IO::println("\n[ Any dangerous alerts? " + anyDangerous + " ]")
+
+  // Exercise map + groupBy: per-subnet histogram of source IPs
+  IO::println("\n[ Source IP last-octet frequency ]")
+  val buckets: Map[String, List[Object]] = insp.allPackets()
+    .map { p ->
+      val ip: String = (p as Packet).srcIp()
+      val dot: Int   = ip.lastIndexOf(".")
+      ip.substring(dot + 1) as Object
+    }
+    .groupBy { s -> s as String }
+  var shown: Int = 0
+  foreach (octet, oList) in buckets {
+    if shown < 8 {
+      IO::println("  ." + (octet as String) + " -> " + (oList as List[Object]).size + " pkt(s)")
+      shown = shown + 1
+    }
+  }
+}

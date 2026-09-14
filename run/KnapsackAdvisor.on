@@ -1,0 +1,246 @@
+// KnapsackAdvisor.on — 0/1 knapsack equipment-loadout advisor.
+// Exercises: interface, multiple class implementations, records, plain enum,
+// arrays (Int[] DP table), collection pipelines (map/filter/sortedBy/fold),
+// select pattern matching, foreach (ranges + list), recursion (brute-force
+// cross-check), closures, string interpolation, try/catch, nullable, extension.
+
+import {
+  java.lang.Math
+}
+
+// ── Extension: right-justify an int in a fixed-width string ─────────────────
+
+extension Int {
+  def rjust(width: Int): String {
+    val s: String = "" + self
+    if s.length() >= width { return s }
+    var pad: String = ""
+    for var i: Int = s.length(); i < width; i++ { pad = pad + " " }
+    return pad + s
+  }
+}
+
+// ── Domain ───────────────────────────────────────────────────────────────────
+
+record Item(name: String, weight: Int, value: Int) {
+public:
+  def ratio(): Double = (value as Double) / (weight as Double)
+}
+
+enum Strategy { GREEDY_VALUE, GREEDY_RATIO, DYNAMIC }
+
+def strategyLabel(s: Strategy): String = select s {
+  case GREEDY_VALUE: "greedy-by-value"
+  case GREEDY_RATIO: "greedy-by-ratio"
+  case DYNAMIC:       "dynamic-programming"
+}
+
+record Loadout(strategy: Strategy, chosen: List[Item], totalWeight: Int, totalValue: Int) {
+public:
+  def toString(): String {
+    val names: List[String] = chosen.map { it -> (it as Item).name() }
+    return "#{strategyLabel(strategy)}: value=#{totalValue} weight=#{totalWeight}/#{chosen.size} items #{names}"
+  }
+}
+
+// ── Advisors ─────────────────────────────────────────────────────────────────
+
+interface Advisor {
+  def recommend(items: List[Item], capacity: Int): Loadout
+}
+
+// Greedily takes items in a given order until capacity is exhausted.
+class GreedyAdvisor conforms Advisor {
+  val strategy: Strategy
+  val byRatio: Boolean
+public:
+  def this(strategy: Strategy, byRatio: Boolean) {
+    this.strategy = strategy
+    this.byRatio  = byRatio
+  }
+  def recommend(items: List[Item], capacity: Int): Loadout {
+    val ordered: List[Item] = if byRatio {
+      items.sortedBy { it -> 0 - ((it as Item).ratio() * 1000.0) as Int }
+    } else {
+      items.sortedBy { it -> 0 - (it as Item).value() }
+    }
+    val chosen: List[Item] = []
+    var remaining: Int = capacity
+    var totalValue: Int = 0
+    foreach it: Item in ordered {
+      if it.weight() <= remaining {
+        chosen.add(it)
+        remaining = remaining - it.weight()
+        totalValue = totalValue + it.value()
+      }
+    }
+    return new Loadout(strategy, chosen, capacity - remaining, totalValue)
+  }
+}
+
+// Exact 0/1 knapsack via space-optimized dynamic programming, then a
+// backward reconstruction pass to recover which items were taken.
+class DpAdvisor conforms Advisor {
+public:
+  def recommend(items: List[Item], capacity: Int): Loadout {
+    val n: Int = items.size
+    // best[c] = best value achievable with total weight <= c, using items
+    // considered so far; kept[i][c] records whether item i was taken to
+    // reach that state, for reconstruction.
+    val best: Int[] = new Int[capacity + 1]
+    val kept: Boolean[][] = new Boolean[n][capacity + 1]
+
+    for var i: Int = 0; i < n; i++ {
+      val it: Item = items.get(i) as Item
+      var c: Int = capacity
+      while c >= it.weight() {
+        val candidate: Int = best[c - it.weight()] + it.value()
+        if candidate > best[c] {
+          best[c] = candidate
+          kept[i][c] = true
+        }
+        c--
+      }
+    }
+
+    val chosen: List[Item] = []
+    var c: Int = capacity
+    var totalWeight: Int = 0
+    for var i: Int = n - 1; i >= 0; i-- {
+      if kept[i][c] {
+        val it: Item = items.get(i) as Item
+        chosen.add(it)
+        c = c - it.weight()
+        totalWeight = totalWeight + it.weight()
+      }
+    }
+
+    return new Loadout(Strategy::DYNAMIC, chosen, totalWeight, best[capacity])
+  }
+}
+
+// ── Brute-force cross-check (small item sets only) ───────────────────────────
+// Recursive subset-sum-style search used as a law-like self-check against the
+// DP result: for a handful of items, DP's optimal value must equal the best
+// value found by trying every include/exclude combination.
+
+def bruteForceBest(items: List[Item], idx: Int, remaining: Int): Int {
+  if idx >= items.size { return 0 }
+  val it: Item = items.get(idx) as Item
+  val skip: Int = bruteForceBest(items, idx + 1, remaining)
+  if it.weight() > remaining { return skip }
+  val take: Int = it.value() + bruteForceBest(items, idx + 1, remaining - it.weight())
+  return Math::max(skip, take)
+}
+
+// ── Reporting ──────────────────────────────────────────────────────────────
+
+def printLoadout(l: Loadout): void {
+  IO::println("  " + l.toString())
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+
+val catalog: List[Item] = [
+  new Item("plate armor", 12, 60),
+  new Item("healing potion", 1, 15),
+  new Item("longsword", 4, 25),
+  new Item("shield", 6, 22),
+  new Item("gold bars", 10, 45),
+  new Item("torch", 1, 3),
+  new Item("rope (50ft)", 3, 8),
+  new Item("enchanted ring", 1, 30),
+  new Item("crossbow", 5, 20),
+  new Item("travel rations", 2, 6)
+]
+
+val capacity: Int = 20
+
+IO::println("=== Knapsack Loadout Advisor ===")
+IO::println("Catalog: #{catalog.size} items, capacity=#{capacity}")
+IO::println("")
+
+val advisors: List[Advisor] = [
+  new GreedyAdvisor(Strategy::GREEDY_VALUE, false),
+  new GreedyAdvisor(Strategy::GREEDY_RATIO, true),
+  new DpAdvisor()
+]
+
+val loadouts: List[Loadout] = advisors.map { a -> (a as Advisor).recommend(catalog, capacity) }
+
+IO::println("Results:")
+foreach l: Object in loadouts {
+  printLoadout(l as Loadout)
+}
+
+// The exact DP result must never be worse than either greedy heuristic.
+val dpValue: Int = (loadouts.get(2) as Loadout).totalValue()
+val greedyValues: List[Int] = loadouts.filter { l -> (l as Loadout).strategy() != Strategy::DYNAMIC }.map { l -> (l as Loadout).totalValue() }
+var worstGreedyOk: Boolean = true
+foreach gv: Object in greedyValues {
+  if (gv as Int) > dpValue { worstGreedyOk = false }
+}
+IO::println("")
+IO::println("DP dominates both greedy heuristics: #{worstGreedyOk}")
+
+// ── Cross-check DP against brute force on a small subset ────────────────────
+
+IO::println("")
+IO::println("=== Brute-force cross-check (first 6 items, capacity=15) ===")
+val small: List[Item] = []
+for var i: Int = 0; i < 6; i++ { small.add(catalog.get(i) as Item) }
+val smallCap: Int = 15
+
+val dp: DpAdvisor = new DpAdvisor()
+val dpSmall: Loadout = dp.recommend(small, smallCap)
+val bruteBest: Int = bruteForceBest(small, 0, smallCap)
+
+IO::println("  dp value     = #{dpSmall.totalValue()}")
+IO::println("  brute value  = #{bruteBest}")
+if dpSmall.totalValue() == bruteBest {
+  IO::println("  match: PASS")
+} else {
+  IO::println("  match: FAIL")
+}
+
+// ── Guard: invalid capacity ──────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Guard test ===")
+try {
+  val badCapacity: Int = 0 - 5
+  if badCapacity < 0 { throw new IllegalArgumentException("capacity must be >= 0") }
+} catch e: Exception {
+  IO::println("  caught: " + e.getMessage())
+}
+
+// ── Sweep capacities, look up a named item, and report a table ──────────────
+
+IO::println("")
+IO::println("=== Capacity sweep (DP) ===")
+def findByName(items: List[Item], name: String): Item? {
+  foreach it: Item in items {
+    if it.name() == name { return it }
+  }
+  return null
+}
+
+val ring: Item? = findByName(catalog, "enchanted ring")
+if ring != null {
+  IO::println("  found: #{ring.name()} (w=#{ring.weight()}, v=#{ring.value()})")
+}
+val missing: Item? = findByName(catalog, "invisibility cloak")
+IO::println("  missing lookup is null: #{missing == null}")
+
+val caps: List[Int] = [5, 10, 15, 20, 25]
+foreach cap: Int in caps {
+  val l: Loadout = dp.recommend(catalog, cap)
+  IO::println("  cap=" + cap.rjust(3) + "  value=" + l.totalValue().rjust(4) + "  weight=" + l.totalWeight().rjust(3))
+}
+
+// ── Summary via fold ──────────────────────────────────────────────────────
+
+val totalCatalogValue: Int = catalog.fold(0) { acc, it -> (acc as Int) + (it as Item).value() }
+val bestPct: Int = dpValue * 100 / totalCatalogValue
+IO::println("")
+IO::println("Best loadout captures #{bestPct}% of total catalog value (#{dpValue}/#{totalCatalogValue})")

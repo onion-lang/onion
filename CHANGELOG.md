@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.68.0] - 2026-09-14
-
 ### Added
 
 - `run/RateLimiter.on` — a 349-line corpus sample simulating three rate-limiting algorithms (token bucket, fixed window counter, sliding window log) behind a shared interface, exercising ADT enums, records, `Map`/`List` pipelines, and `LinkedList`.

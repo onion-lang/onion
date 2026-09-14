@@ -1,0 +1,199 @@
+// Kalah (Mancala variant): two-player pit-and-store seed game.
+// Board indices: 0-5 = south pits, 6 = south store, 7-12 = north pits, 13 = north store.
+// Seeds sown counter-clockwise; capture when last seed lands in own empty pit;
+// bonus turn when last seed lands in own store. Game ends when either side is empty.
+
+enum Player {
+  case South
+  case North
+public:
+  def opponent(): Player = select this {
+    case s is South: new North()
+    case n is North: new South()
+  }
+  def store(): Int = select this {
+    case s is South: 6
+    case n is North: 13
+  }
+  def ownsPit(pit: Int): Boolean = select this {
+    case s is South: pit >= 0 && pit <= 5
+    case n is North: pit >= 7 && pit <= 12
+  }
+  def name(): String = select this {
+    case s is South: "South"
+    case n is North: "North"
+  }
+}
+
+record Board(cells: Int[]) {
+public:
+  def at(i: Int): Int = cells[i]
+  def add(i: Int, n: Int): void { cells[i] = cells[i] + n }
+  def set(i: Int, n: Int): void { cells[i] = n }
+  def store(p: Player): Int = cells[p.store()]
+
+  def pitsOf(p: Player): List[Int] = select p {
+    case s is South: [0, 1, 2, 3, 4, 5]
+    case n is North: [7, 8, 9, 10, 11, 12]
+  }
+
+  def sideEmpty(p: Player): Boolean {
+    foreach pit: Int in pitsOf(p) { if cells[pit] > 0 { return false } }
+    return true
+  }
+
+  def copy(): Board {
+    val c: Int[] = new Int[14]
+    foreach i: Int in 0..<14 { c[i] = cells[i] }
+    return new Board(c)
+  }
+
+  // Move remaining pit seeds to stores when one side is cleared.
+  def collectRemaining(): void {
+    if sideEmpty(new South()) || sideEmpty(new North()) {
+      foreach pit: Int in pitsOf(new South()) { cells[6] = cells[6] + cells[pit]; cells[pit] = 0 }
+      foreach pit: Int in pitsOf(new North()) { cells[13] = cells[13] + cells[pit]; cells[pit] = 0 }
+    }
+  }
+
+  def print(): void {
+    val sep: String = "+----+----+----+----+----+----+----+"
+    IO::println(sep)
+    // North pits (displayed right-to-left: 12..7)
+    var northRow: String = "| N  |"
+    foreach pit: Int in [12, 11, 10, 9, 8, 7] {
+      northRow = northRow + Strings::padLeft("" + cells[pit], 3, ' ') + " |"
+    }
+    IO::println(northRow)
+    // Stores row
+    val sStore: String = Strings::padLeft("" + cells[6], 3, ' ')
+    val nStore: String = Strings::padLeft("" + cells[13], 3, ' ')
+    IO::println("|    |N" + nStore + "|    |    |    |    |S" + sStore + "|")
+    // South pits (left-to-right: 0..5)
+    var southRow: String = "| S  |"
+    foreach pit: Int in [0, 1, 2, 3, 4, 5] {
+      southRow = southRow + Strings::padLeft("" + cells[pit], 3, ' ') + " |"
+    }
+    IO::println(southRow)
+    IO::println(sep)
+  }
+}
+
+def newBoard(): Board {
+  val c: Int[] = new Int[14]
+  foreach i: Int in 0..<14 {
+    if i == 6 || i == 13 { c[i] = 0 } else { c[i] = 4 }
+  }
+  return new Board(c)
+}
+
+// Returns the index of the last pit sown into (pit where the last seed lands).
+def applyMove(board: Board, player: Player, pit: Int): Int {
+  val n: Int = board.at(pit)
+  board.set(pit, 0)
+  var idx: Int = pit
+  var rem: Int = n
+  val oppStore: Int = player.opponent().store()
+  while rem > 0 {
+    idx = (idx + 1) % 14
+    if idx == oppStore { idx = (idx + 1) % 14 }
+    board.add(idx, 1)
+    rem = rem - 1
+  }
+  return idx
+}
+
+// Try capture: last seed in own empty pit with seeds opposite.
+def tryCaptureAt(board: Board, player: Player, lastIdx: Int): Int {
+  if !player.ownsPit(lastIdx) { return 0 }
+  if board.at(lastIdx) != 1 { return 0 }          // exactly 1 seed (just placed)
+  val opp: Int = 12 - lastIdx
+  val oppSeeds: Int = board.at(opp)
+  if oppSeeds == 0 { return 0 }
+  val total: Int = oppSeeds + 1
+  board.add(player.store(), total)
+  board.set(lastIdx, 0)
+  board.set(opp, 0)
+  return total
+}
+
+// Greedy AI: prefer bonus turn, then maximize capture, then most seeds sown.
+def chooseMove(board: Board, player: Player): Int {
+  val pits: List[Int] = board.pitsOf(player)
+  var bestPit: Int = -1
+  var bestScore: Int = -9999
+
+  foreach pit: Int in pits {
+    if board.at(pit) == 0 { } else {
+      val sim: Board = board.copy()
+      val lastIdx: Int = applyMove(sim, player, pit)
+      val bonus: Boolean = lastIdx == player.store()
+      val captured: Int = if !bonus { tryCaptureAt(sim, player, lastIdx) } else { 0 }
+      var score: Int = captured
+      if bonus { score = score + 1000 }
+      score = score + board.at(pit)   // tie-break: most seeds moved
+      if score > bestScore { bestScore = score; bestPit = pit }
+    }
+  }
+  return bestPit
+}
+
+def pitLabel(player: Player, pit: Int): String {
+  val base: Int = select player {
+    case s is South: 0
+    case n is North: 7
+  }
+  return "" + (pit - base + 1)
+}
+
+def main(args: String[]): void {
+  val board: Board = newBoard()
+  var current: Player = new South()
+  var turnCount: Int = 0
+  val maxTurns: Int = 300
+
+  IO::println("=== Kalah (4 seeds/pit): Greedy AI vs Greedy AI ===")
+  board.print()
+  IO::println("")
+
+  while turnCount < maxTurns {
+    if board.sideEmpty(new South()) || board.sideEmpty(new North()) { turnCount = maxTurns }
+    else {
+      val pit: Int = chooseMove(board, current)
+      if pit == -1 { turnCount = maxTurns } else {
+        val n: Int = board.at(pit)
+        val lastIdx: Int = applyMove(board, current, pit)
+        val bonus: Boolean = lastIdx == current.store()
+        val captured: Int = if !bonus { tryCaptureAt(board, current, lastIdx) } else { 0 }
+
+        val bonusNote: String = if bonus { " [extra turn]" } else { "" }
+        val capNote: String = if captured > 0 { " [capture +" + captured + "]" } else { "" }
+        IO::println("Turn " + (turnCount + 1) + ": " + current.name() + " pit " + pitLabel(current, pit) + " (" + n + " seeds)" + bonusNote + capNote)
+
+        board.collectRemaining()
+        turnCount = turnCount + 1
+
+        // Print board every 10 turns or at game end
+        if board.sideEmpty(new South()) || board.sideEmpty(new North()) {
+          board.print()
+        } else if turnCount % 10 == 0 {
+          IO::println("  [South store: " + board.store(new South()) + "  North store: " + board.store(new North()) + "]")
+        }
+
+        if !bonus && !board.sideEmpty(new South()) && !board.sideEmpty(new North()) {
+          current = current.opponent()
+        }
+      }
+    }
+  }
+
+  IO::println("")
+  IO::println("=== Final position ===")
+  board.print()
+  val sScore: Int = board.store(new South())
+  val nScore: Int = board.store(new North())
+  IO::println("South: " + sScore + " | North: " + nScore)
+  if sScore > nScore { IO::println("Winner: South") }
+  else if nScore > sScore { IO::println("Winner: North") }
+  else { IO::println("Draw!") }
+}

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.71.0] - 2026-09-14
+
 ### Added
 
 - `run/KnapsackAdvisor.on` — a 246-line corpus sample implementing a 0/1 knapsack equipment-loadout advisor: space-optimized DP with backward reconstruction, two greedy heuristics (by value, by value/weight ratio) for comparison, and a recursive brute-force cross-check confirming the DP result is exact on a small item set.

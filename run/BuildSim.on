@@ -1,0 +1,390 @@
+// BuildSim.on — mini incremental build-system simulator (~260 lines).
+// Exercises: records; data-carrying enums (BuildRule, BuildEvent); plain enum
+// (TargetKind, BuildStatus); classes with interfaces; generics; collection
+// pipelines (map/filter/fold/groupBy/sortedBy/find/any/all/partition/count);
+// select / pattern matching; nullable; closures; string interpolation;
+// foreach over map (k, v); while / ranges; try/catch; recursion.
+//
+// Entry: sbt 'runScript run/BuildSim.on'
+
+import { java.util.* }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(unit: String): String = if self == 1 { "1 #{unit}" } else { "#{self} #{unit}s" }
+  def padStart(width: Int): String {
+    val s = "#{self}"
+    var r = s
+    while r.length < width { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def rep(n: Int): String {
+    var r = ""
+    var i: Int = 0
+    while i < n { r = r + self; i++ }
+    return r
+  }
+  def truncate(max: Int): String =
+    if self.length <= max { self } else { self.substring(0, max - 1) + "…" }
+}
+
+// ─── Core Data Types ─────────────────────────────────────────────────────────
+
+enum TargetKind { SOURCE, OBJECT, LIBRARY, EXECUTABLE, RESOURCE, TEST }
+
+enum BuildStatus { PENDING, UP_TO_DATE, STALE, BUILDING, SUCCESS, FAILED, SKIPPED }
+
+record BuildTarget(
+  name:     String,
+  kind:     TargetKind,
+  deps:     List[String],
+  costMs:   Int,
+  hash:     Int
+)
+
+record BuildResult(target: String, status: BuildStatus, durationMs: Int, message: String?)
+
+enum BuildRule {
+  case Compile(src: String, out: String, flags: String)
+  case Link(inputs: List[String], out: String)
+  case CopyRes(src: String, dst: String)
+  case RunTest(binary: String, filter: String?)
+  case Archive(inputs: List[String], out: String)
+}
+
+enum BuildEvent {
+  case Started(target: String, ruleKind: String, timestamp: Long)
+  case Finished(target: String, success: Boolean, durationMs: Int)
+  case CacheHit(target: String)
+  case BuildError(target: String, message: String)
+  case BuildWarn(target: String, message: String)
+}
+
+// ─── Build Graph ──────────────────────────────────────────────────────────────
+
+class BuildGraph {
+  var targets_: Map[String, Object]
+  var rules_:   Map[String, Object]
+  var cache_:   Map[String, Object]
+  var events_:  List[Object]
+
+public:
+  def this {
+    targets_ = [:]
+    rules_   = [:]
+    cache_   = [:]
+    events_  = []
+  }
+
+  def addTarget(t: BuildTarget): void {
+    targets_[t.name()] = t
+  }
+
+  def addRule(name: String, rule: Object): void {
+    rules_[name] = rule
+  }
+
+  def allTargets(): List[Object] {
+    val ts: List[Object] = []
+    foreach (_, v) in targets_ { ts.add(v) }
+    return ts
+  }
+
+  // Topological sort using DFS; returns null on cycle.
+  def topoSort(name: String): List[String]? {
+    val visited: List[String] = []
+    val path:    List[String] = []
+    return topoVisit(name, visited, path)
+  }
+
+  def topoVisit(name: String, visited: List[String], path: List[String]): List[String]? {
+    if path.any { n -> n == name } { return null }  // cycle
+    if visited.any { n -> n == name } { val e: List[String] = []; return e }
+    path.add(name)
+    val deps = depsOf(name)
+    val result: List[String] = []
+    foreach dep: String in deps {
+      val sub = topoVisit(dep, visited, path)
+      if sub == null { return null }
+      foreach s: String in sub { if !result.any { n -> n == s } { result.add(s) } }
+    }
+    result.add(name)
+    visited.add(name)
+    path.remove(path.size - 1)
+    return result
+  }
+
+  def depsOf(name: String): List[String] {
+    val t: Object? = targets_[name]
+    if t == null { return [] }
+    return (t as BuildTarget).deps()
+  }
+
+  def isCached(t: BuildTarget): Boolean {
+    val cached: Object? = cache_[t.name()]
+    if cached == null { return false }
+    return (cached as Int) == t.hash()
+  }
+
+  def emit(ev: Object): void { events_.add(ev) }
+
+  def updateCache(name: String, hash: Int): void { cache_[name] = hash }
+
+  def events(): List[Object] = events_
+}
+
+// ─── Build Runner ─────────────────────────────────────────────────────────────
+
+class BuildRunner {
+  var graph_:   BuildGraph
+  var results_: List[Object]
+  var clock_:   Long
+  var failed_:  Int
+
+public:
+  def this(g: BuildGraph) {
+    graph_   = g
+    results_ = []
+    clock_   = 1000L
+    failed_  = 0
+  }
+
+  def build(entryName: String): List[Object] {
+    val order = graph_.topoSort(entryName)
+    if order == null {
+      IO::println("ERROR: cycle detected in build graph")
+      return []
+    }
+    foreach name: String in order {
+      buildOne(name)
+    }
+    return results_
+  }
+
+  def buildOne(name: String): void {
+    val found: Object? = graph_.allTargets().find { x -> (x as BuildTarget).name() == name }
+    if found == null { return }
+    val t = found as BuildTarget
+    if graph_.isCached(t) {
+      graph_.emit(new CacheHit(name))
+      results_.add(new BuildResult(name, BuildStatus::UP_TO_DATE, 0, null))
+      return
+    }
+    graph_.emit(new Started(name, kindLabel(t.kind()), clock_))
+    clock_ = clock_ + t.costMs()
+    val success: Boolean = !name.contains("Broken")
+    if success {
+      graph_.updateCache(name, t.hash())
+      graph_.emit(new Finished(name, true, t.costMs()))
+      results_.add(new BuildResult(name, BuildStatus::SUCCESS, t.costMs(), null))
+    } else {
+      failed_++
+      graph_.emit(new BuildError(name, "Compilation error in #{name}"))
+      graph_.emit(new Finished(name, false, t.costMs()))
+      results_.add(new BuildResult(name, BuildStatus::FAILED, t.costMs(), "compilation error"))
+    }
+  }
+
+  def failedCount(): Int = failed_
+}
+
+// ─── Label helpers ───────────────────────────────────────────────────────────
+
+def kindLabel(k: TargetKind): String = select k {
+  case TargetKind::SOURCE:     "src"
+  case TargetKind::OBJECT:     "obj"
+  case TargetKind::LIBRARY:    "lib"
+  case TargetKind::EXECUTABLE: "exe"
+  case TargetKind::RESOURCE:   "res"
+  case TargetKind::TEST:       "test"
+}
+
+def statusLabel(s: BuildStatus): String = select s {
+  case BuildStatus::PENDING:    "PENDING"
+  case BuildStatus::UP_TO_DATE: "HIT"
+  case BuildStatus::STALE:      "STALE"
+  case BuildStatus::BUILDING:   "BUILD"
+  case BuildStatus::SUCCESS:    "OK"
+  case BuildStatus::FAILED:     "FAIL"
+  case BuildStatus::SKIPPED:    "SKIP"
+}
+
+// ─── Report Printer ──────────────────────────────────────────────────────────
+
+def printReport(results: List[Object]): void {
+  IO::println("")
+  IO::println("═".rep(64))
+  IO::println(" Build Report")
+  IO::println("═".rep(64))
+
+  val total     = results.count { r -> true }
+  val succeeded = results.count { r -> (r as BuildResult).status() == BuildStatus::SUCCESS }
+  val cacheHits = results.count { r -> (r as BuildResult).status() == BuildStatus::UP_TO_DATE }
+  val failed    = results.count { r -> (r as BuildResult).status() == BuildStatus::FAILED }
+  val totalMs   = results.fold(0) { acc, r -> acc + (r as BuildResult).durationMs() }
+
+  foreach r: Object in results {
+    val br = r as BuildResult
+    val tag = statusLabel(br.status())
+    val dur = if br.durationMs() > 0 { " (#{br.durationMs()}ms)" } else { "" }
+    val msg = if br.message() != null { "  ← #{br.message()}" } else { "" }
+    IO::println("  [#{tag}] #{br.target()}#{dur}#{msg}")
+  }
+
+  IO::println("─".rep(64))
+  IO::println("  Total:      #{total.plural("target")}")
+  IO::println("  Succeeded:  #{succeeded}")
+  IO::println("  Cache hits: #{cacheHits}")
+  IO::println("  Failed:     #{failed}")
+  IO::println("  Build time: #{totalMs}ms")
+  IO::println("═".rep(64))
+}
+
+def printEvents(events: List[Object]): void {
+  IO::println("")
+  IO::println("── Build Log ────────────────────────────────────────────────")
+  foreach e: Object in events {
+    select e {
+      case ev is Started:
+        IO::println("  [START ] #{ev.target()} (#{ev.ruleKind()})")
+      case ev is Finished:
+        val ok = if ev.success() { "✓" } else { "✗" }
+        IO::println("  [DONE  ] #{ok} #{ev.target()} in #{ev.durationMs()}ms")
+      case ev is CacheHit:
+        IO::println("  [CACHE ] #{ev.target()} — up to date")
+      case ev is BuildError:
+        IO::println("  [ERROR ] #{ev.target()}: #{ev.message()}")
+      case ev is BuildWarn:
+        IO::println("  [WARN  ] #{ev.target()}: #{ev.message()}")
+    }
+  }
+  IO::println("─────────────────────────────────────────────────────────────")
+}
+
+// ─── Sample build graph setup ────────────────────────────────────────────────
+
+def makeGraph(): BuildGraph {
+  val g = new BuildGraph()
+
+  // Sources
+  g.addTarget(new BuildTarget("main.c",     TargetKind::SOURCE, [],                                         10, 1001))
+  g.addTarget(new BuildTarget("utils.c",    TargetKind::SOURCE, [],                                          8, 1002))
+  g.addTarget(new BuildTarget("net.c",      TargetKind::SOURCE, [],                                         12, 1003))
+  g.addTarget(new BuildTarget("config.c",   TargetKind::SOURCE, [],                                          6, 1004))
+  g.addTarget(new BuildTarget("test_net.c", TargetKind::SOURCE, [],                                          9, 1005))
+
+  // Objects
+  g.addTarget(new BuildTarget("main.o",     TargetKind::OBJECT, ["main.c"],                                 40, 2001))
+  g.addTarget(new BuildTarget("utils.o",    TargetKind::OBJECT, ["utils.c"],                                35, 2002))
+  g.addTarget(new BuildTarget("net.o",      TargetKind::OBJECT, ["net.c", "utils.c"],                       45, 2003))
+  g.addTarget(new BuildTarget("config.o",   TargetKind::OBJECT, ["config.c", "utils.c"],                    30, 2004))
+  g.addTarget(new BuildTarget("test_net.o", TargetKind::OBJECT, ["test_net.c", "net.c"],                    38, 2005))
+
+  // Library
+  g.addTarget(new BuildTarget("libutils.a", TargetKind::LIBRARY,    ["utils.o", "config.o"],                20, 3001))
+
+  // Executable
+  g.addTarget(new BuildTarget("myapp",      TargetKind::EXECUTABLE, ["main.o", "net.o", "libutils.a"],      60, 4001))
+
+  // Test
+  g.addTarget(new BuildTarget("test_net",   TargetKind::TEST,       ["test_net.o", "libutils.a"],           50, 5001))
+
+  // Rules
+  g.addRule("main.o",    new Compile("main.c",     "main.o",     "-O2"))
+  g.addRule("utils.o",   new Compile("utils.c",    "utils.o",    "-O2"))
+  g.addRule("net.o",     new Compile("net.c",      "net.o",      "-O2 -DNET"))
+  g.addRule("config.o",  new Compile("config.c",   "config.o",   "-O2"))
+  g.addRule("test_net.o",new Compile("test_net.c", "test_net.o", "-O0 -g"))
+  g.addRule("libutils.a",new Archive(["utils.o", "config.o"], "libutils.a"))
+  g.addRule("myapp",     new Link(["main.o", "net.o", "libutils.a"], "myapp"))
+  g.addRule("test_net",  new Link(["test_net.o", "libutils.a"],      "test_net"))
+  return g
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val g1 = makeGraph()
+IO::println("Build #1 — cold (no cache)")
+val runner1 = new BuildRunner(g1)
+val res1 = runner1.build("myapp")
+printEvents(g1.events())
+printReport(res1)
+
+// Second build: warm the cache from successful results, then rebuild
+val g2 = makeGraph()
+foreach r: Object in res1 {
+  val br = r as BuildResult
+  if br.status() == BuildStatus::SUCCESS {
+    val found: Object? = g2.allTargets().find { x -> (x as BuildTarget).name() == br.target() }
+    if found != null {
+      val t = found as BuildTarget
+      g2.updateCache(t.name(), t.hash())
+    }
+  }
+}
+IO::println("")
+IO::println("Build #2 — warm (all cached)")
+val runner2 = new BuildRunner(g2)
+val res2 = runner2.build("myapp")
+printReport(res2)
+
+// Build #3: partial invalidation — net.c changed, so net.o and myapp must rebuild
+val g3 = makeGraph()
+foreach r: Object in res1 {
+  val br = r as BuildResult
+  if br.status() == BuildStatus::SUCCESS && br.target() != "net.c" && br.target() != "net.o" && br.target() != "myapp" {
+    val found: Object? = g3.allTargets().find { x -> (x as BuildTarget).name() == br.target() }
+    if found != null {
+      val t = found as BuildTarget
+      g3.updateCache(t.name(), t.hash())
+    }
+  }
+}
+IO::println("")
+IO::println("Build #3 — incremental (net.c changed)")
+val runner3 = new BuildRunner(g3)
+val res3 = runner3.build("myapp")
+printEvents(g3.events())
+printReport(res3)
+
+// Analysis: group results from cold build by status
+IO::println("")
+IO::println("── Status breakdown (cold) ───────────────────────────────────")
+val grouped: Map[String, List[Object]] = res1.groupBy { r -> statusLabel((r as BuildResult).status()) }
+foreach (status, items) in grouped {
+  IO::println("  #{status}: #{(items as List[Object]).size.plural("target")}")
+}
+
+// Analysis: group results from incremental build
+IO::println("")
+IO::println("── Status breakdown (incremental) ────────────────────────────")
+val grouped3: Map[String, List[Object]] = res3.groupBy { r -> statusLabel((r as BuildResult).status()) }
+foreach (status, items) in grouped3 {
+  IO::println("  #{status}: #{(items as List[Object]).size.plural("target")}")
+}
+
+// Analysis: 10 slowest targets from cold build
+IO::println("")
+IO::println("── Slowest targets (cold build) ──────────────────────────────")
+val slowest = res1.sortedBy { r -> -(r as BuildResult).durationMs() }
+foreach r: Object in slowest.filter { r -> (r as BuildResult).durationMs() > 0 } {
+  val br = r as BuildResult
+  IO::println("  #{br.durationMs().padStart(5)}ms  #{br.target()}")
+}
+
+// Summary comparison
+IO::println("")
+IO::println("── Build time comparison ─────────────────────────────────────")
+val coldMs  = res1.fold(0) { acc, r -> acc + (r as BuildResult).durationMs() }
+val warmMs  = res2.fold(0) { acc, r -> acc + (r as BuildResult).durationMs() }
+val incrMs  = res3.fold(0) { acc, r -> acc + (r as BuildResult).durationMs() }
+IO::println("  Cold build:        #{coldMs}ms")
+IO::println("  Warm (all cached): #{warmMs}ms")
+IO::println("  Incremental:       #{incrMs}ms")
+val saved = coldMs - incrMs
+IO::println("  Saved by cache:    #{saved}ms (#{saved * 100 / coldMs}%)")
+IO::println("─────────────────────────────────────────────────────────────")

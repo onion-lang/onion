@@ -84,6 +84,94 @@ class GenericConstructorEmptyListArgSpec extends AbstractShellSpec {
     }
   }
 
+  describe("an empty collection literal whose type parameter appears only inside the collection argument") {
+    // The constructor's substitution-blind exact match (ConstructorFinder /
+    // StandardParameterMatcher) special-cases an empty list/map literal to accept
+    // ANY parameterization of the same raw collection type
+    // (TypeRules.emptyCollectionLiteralAccepts), so it can match List[K]/Map[K, V]
+    // against the eagerly-typed List[Object]/Map[Object, Object] even when K is
+    // never pinned by another argument. That eager "match" used to short-circuit
+    // the retyping fallback above (only triggered when nothing matched at all),
+    // so the constructor's own substitution-validity guard then rejected the
+    // still-Object-typed argument with a spurious not-found error, even though
+    // `new Simple[String](1, [])` / `new Simple[String](1, [:])` are exactly the
+    // shape the retyping fallback exists to handle.
+    it("resolves List[K] when no other argument pins K, with an explicit type argument") {
+      val result = shell.run(
+        """
+          |record Simple[K](count: Int, entries: List[K])
+          |def main(args: String[]): Int {
+          |  val s: Simple[String] = new Simple[String](1, [])
+          |  return s.count() + s.entries().size
+          |}
+          |""".stripMargin,
+        "EmptyListCtorSoleTypeParamExplicit.on",
+        Array()
+      )
+      assert(Shell.Success(1) == result)
+    }
+
+    it("resolves List[K] when no other argument pins K, with the type argument inferred") {
+      val result = shell.run(
+        """
+          |record Simple[K](count: Int, entries: List[K])
+          |def main(args: String[]): Int {
+          |  val s: Simple[String] = new Simple(1, [])
+          |  return s.count() + s.entries().size
+          |}
+          |""".stripMargin,
+        "EmptyListCtorSoleTypeParamInferred.on",
+        Array()
+      )
+      assert(Shell.Success(1) == result)
+    }
+
+    it("resolves Map[K, V] when no other argument pins K/V, with an explicit type argument") {
+      val result = shell.run(
+        """
+          |record Simple[K, V](count: Int, entries: Map[K, V])
+          |def main(args: String[]): Int {
+          |  val s: Simple[String, Int] = new Simple[String, Int](1, [:])
+          |  return s.count() + s.entries().size
+          |}
+          |""".stripMargin,
+        "EmptyMapCtorSoleTypeParamExplicit.on",
+        Array()
+      )
+      assert(Shell.Success(1) == result)
+    }
+
+    it("resolves Map[K, V] when no other argument pins K/V, with the type argument inferred") {
+      val result = shell.run(
+        """
+          |record Simple[K, V](count: Int, entries: Map[K, V])
+          |def main(args: String[]): Int {
+          |  val s: Simple[String, Int] = new Simple(1, [:])
+          |  return s.count() + s.entries().size
+          |}
+          |""".stripMargin,
+        "EmptyMapCtorSoleTypeParamInferred.on",
+        Array()
+      )
+      assert(Shell.Success(1) == result)
+    }
+
+    it("still reports a genuine constructor-not-found error for this shape") {
+      val result = shell.run(
+        """
+          |record Simple[K](count: Int, entries: List[K])
+          |def main(args: String[]): Int {
+          |  val s: Simple[String] = new Simple[String](1, [], "extra")
+          |  return s.count()
+          |}
+          |""".stripMargin,
+        "EmptyListCtorSoleTypeParamGenuineNotFound.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+  }
+
   describe("existing constructor resolution is preserved") {
     it("still resolves a non-empty list argument") {
       val result = shell.run(

@@ -338,16 +338,38 @@ final class ConstructionTyping(
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
     val constructors1 = if (constructors0.nonEmpty) constructors0 else findConstructorWithBoxing(typeRef, parameters0)
-    // Nothing matched: a malleable argument (a list/map literal, or a generic
-    // static/unqualified/new-object call) may have been typed with no expected
-    // type before the constructor was known, defaulting an unconstrained type
-    // argument to Object -- e.g. `new Simple[Int](1, [])` types `[]` as
-    // List[Object], which is not assignable to the formal List[T]=List[Int].
-    // Retype those arguments against a uniquely arity-matched constructor's
-    // substituted formal types and retry, mirroring the fallback ordinary
-    // method calls already get from ArgumentExpectedTypeRetyping (#232).
+    // Guard the substitution-blind exact match: for an applied generic type the
+    // matched constructor must accept the arguments under the type-argument
+    // substitution (T -> String), not merely under the erased bound (Object).
+    // Otherwise `new Box[String](aStringBuilder)` compiled and threw a runtime
+    // ClassCastException — a type-safety hole the instance-method path does not have.
+    def substitutionValidFor(ctors: Array[TypedAST.ConstructorRef], params: Array[Term]): Boolean = typeRef match {
+      case applied: TypedAST.AppliedClassType if ctors.length == 1 =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        val formals = ctors(0).getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        // Only reject on an arity-matched signature; differing arity is handled
+        // by the vararg/default-parameter paths below, so leave it to them.
+        formals.length != params.length ||
+          formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table))
+      case _ => true
+    }
+    // Nothing matched eagerly, or it only matched via the empty-collection-literal
+    // loophole (StandardParameterMatcher/emptyCollectionLiteralAccepts accepts `[]`/
+    // `[:]` against ANY parameterization of the same raw collection -- including one
+    // whose type argument comes solely from the class's own unresolved type
+    // parameter, e.g. `entries: List[K]` with no other argument pinning K): a
+    // malleable argument (a list/map literal, or a generic static/unqualified/
+    // new-object call) may have been typed with no expected type before the
+    // constructor was known, defaulting an unconstrained type argument to Object --
+    // e.g. `new Simple[Int](1, [])` types `[]` as List[Object], which is not
+    // assignable to the formal List[T]=List[Int]. Retype those arguments against a
+    // uniquely arity-matched constructor's substituted formal types and retry,
+    // mirroring the fallback ordinary method calls already get from
+    // ArgumentExpectedTypeRetyping (#232).
     val retyped =
-      if (constructors1.isEmpty) retypeConstructorArguments(typeRef, node.args.toArray, parameters0, context)
+      if (constructors1.isEmpty || !substitutionValidFor(constructors1, parameters0))
+        retypeConstructorArguments(typeRef, node.args.toArray, parameters0, context)
       else None
     val parameters = retyped.getOrElse(parameters0)
     val constructors = retyped match {
@@ -356,23 +378,7 @@ final class ConstructionTyping(
         if (exact.nonEmpty) exact else findConstructorWithBoxing(typeRef, newParams)
       case None => constructors1
     }
-    // Guard the substitution-blind exact match: for an applied generic type the
-    // matched constructor must accept the arguments under the type-argument
-    // substitution (T -> String), not merely under the erased bound (Object).
-    // Otherwise `new Box[String](aStringBuilder)` compiled and threw a runtime
-    // ClassCastException — a type-safety hole the instance-method path does not have.
-    val substitutionValid = typeRef match {
-      case applied: TypedAST.AppliedClassType if constructors.length == 1 =>
-        val classSubst = TypeSubstitution.classSubstitution(applied)
-        val formals = constructors(0).getArgs.map(t =>
-          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-        // Only reject on an arity-matched signature; differing arity is handled
-        // by the vararg/default-parameter paths below, so leave it to them.
-        formals.length != parameters.length ||
-          formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, bodyContext.table))
-      case _ => true
-    }
-    if (!substitutionValid) {
+    if (!substitutionValidFor(constructors, parameters)) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       break(None)
     }

@@ -1,0 +1,281 @@
+// ContactBook — a realistic address-book simulation.
+// Exercises: records, data-carrying enums, classes, collection pipelines
+// (filter/map/sortedBy/groupBy/fold/find/distinct), foreach(k,v)-in-map,
+// nullable fields, closures, string interpolation, extension methods,
+// and select/pattern matching.
+
+enum Priority {
+  LOW, NORMAL, HIGH, VIP
+}
+
+record Contact(
+  name:     String,
+  email:    String,
+  phone:    String,
+  group:    Priority,
+  birthday: String,
+  tags:     List[String]
+)
+
+// Pretty-printer for a single contact
+def showContact(c: Contact): String =
+  "#{c.name()} <#{c.email()}> #{c.phone()} [#{c.group()}] bday=#{c.birthday()} tags=#{c.tags()}"
+
+// Check whether a contact's birthday falls in the given month (format "MM")
+def inMonth(c: Contact, month: String): Boolean {
+  val bd = c.birthday()
+  if bd == null { return false }
+  return bd.length() >= 5 && bd.substring(0, 2) == month
+}
+
+val book: List[Contact] = [
+  new Contact("Alice Muller",   "alice@example.com",  "+1-800-0001", Priority::VIP,    "03-15", ["friend", "colleague"] as List[String]),
+  new Contact("Bob Smith",      "bob@corp.com",        "+1-800-0002", Priority::HIGH,   "07-04", ["colleague"] as List[String]),
+  new Contact("Carol Tanaka",   "carol@uni.edu",       "+1-800-0003", Priority::NORMAL, "03-22", ["friend", "school"] as List[String]),
+  new Contact("Dave Jones",     "dave@personal.net",   "+1-800-0004", Priority::LOW,    "11-30", ["family"] as List[String]),
+  new Contact("Eve Patel",      "eve@startup.io",      "+1-800-0005", Priority::HIGH,   "07-04", ["colleague", "mentor"] as List[String]),
+  new Contact("Frank Liu",      "frank@corp.com",      "+1-800-0006", Priority::NORMAL, "01-01", ["colleague"] as List[String]),
+  new Contact("Grace Kim",      "grace@uni.edu",       "+1-800-0007", Priority::HIGH,   "03-08", ["school", "friend"] as List[String]),
+  new Contact("Hiro Suzuki",    "hiro@startup.io",     "+1-800-0008", Priority::VIP,    "12-25", ["mentor"] as List[String]),
+  new Contact("Iris Okafor",    "iris@personal.net",   "+1-800-0009", Priority::LOW,    "06-15", ["family"] as List[String]),
+  new Contact("Jack Ferrara",   "jack@example.com",    "+1-800-0010", Priority::NORMAL, "09-01", ["friend"] as List[String])
+]
+
+IO::println("=== ContactBook (#{book.size} contacts) ===")
+
+// 1. List all contacts sorted alphabetically
+val sorted = book.sortedBy { c -> (c as Contact).name() }
+IO::println("\n--- Sorted by name ---")
+foreach c: Contact in sorted {
+  IO::println("  " + showContact(c))
+}
+
+// 2. Filter: VIP and HIGH contacts only
+val important = book.filter { c -> (c as Contact).group() == Priority::VIP || (c as Contact).group() == Priority::HIGH }
+IO::println("\n--- High-priority contacts (#{important.size}) ---")
+foreach c: Contact in important {
+  IO::println("  #{c.name()} [#{c.group()}]")
+}
+
+// 3. Group contacts by priority level
+IO::println("\n--- Grouped by priority ---")
+val byPriority = book.groupBy { c -> (c as Contact).group().toString() }
+foreach (k, v) in byPriority {
+  val names = (v as List[Contact]).map { c -> (c as Contact).name() }
+  IO::println("  #{k}: #{names}")
+}
+
+// 4. All unique tags across the entire book
+val allTags = book
+  .flatMap { c -> (c as Contact).tags() }
+  .distinct()
+  .sortedBy { t -> t as String }
+IO::println("\n--- All tags ---")
+IO::println("  " + allTags.toString())
+
+// 5. Contacts tagged "colleague"
+val colleagues = book.filter { c ->
+  (c as Contact).tags().contains("colleague")
+}
+IO::println("\n--- Colleagues (#{colleagues.size}) ---")
+foreach c: Contact in colleagues {
+  IO::println("  #{c.name()} <#{c.email()}>")
+}
+
+// 6. March birthdays
+IO::println("\n--- March birthdays ---")
+val marchBdays = book.filter { c -> inMonth(c as Contact, "03") }
+foreach c: Contact in marchBdays {
+  IO::println("  #{c.name()} on #{c.birthday()}")
+}
+
+// 7. Tag frequency: how many contacts carry each tag?
+IO::println("\n--- Tag frequency ---")
+val byTag = book
+  .flatMap { c -> (c as Contact).tags() }
+  .groupBy { t -> t as String }
+foreach (tag, contacts) in byTag {
+  IO::println("  #{tag}: #{(contacts as List).size} contact(s)")
+}
+
+// ── Section 2: ContactBook class with mutable operations ──────────────────
+
+class ContactBook {
+  var contacts: List[Contact]
+  var label: String
+
+public:
+  def this(label: String, initial: List[Contact]) {
+    this.label = label
+    this.contacts = initial
+  }
+
+  def size(): Int = contacts.size
+
+  def add(c: Contact): void {
+    contacts.add(c)
+  }
+
+  def remove(name: String): Boolean {
+    val before = contacts.size
+    contacts = contacts.filter { c -> (c as Contact).name() != name } as List[Contact]
+    return contacts.size < before
+  }
+
+  // Find first contact whose name contains the search string (case-insensitive)
+  def search(query: String): Contact? {
+    val lower = query.toLowerCase()
+    val found = contacts.find { c ->
+      (c as Contact).name().toLowerCase().contains(lower)
+    }
+    if found == null { return null }
+    return found as Contact
+  }
+
+  // All contacts whose email domain matches
+  def byDomain(domain: String): List[Contact] {
+    return contacts.filter { c ->
+      (c as Contact).email().contains("@" + domain)
+    } as List[Contact]
+  }
+
+  // Top N contacts sorted by priority (VIP first) then name
+  def topN(n: Int): List[Contact] {
+    val priorityScore = (p: Priority) -> select p {
+      case Priority::VIP: 4
+      case Priority::HIGH: 3
+      case Priority::NORMAL: 2
+      case Priority::LOW: 1
+      else: 0
+    }
+    val ranked = contacts.sortedBy { c ->
+      val c2 = c as Contact
+      "" + (10 - priorityScore(c2.group())) + c2.name()
+    }
+    val result: List[Contact] = [] as List[Contact]
+    var i = 0
+    foreach c: Contact in ranked {
+      if i < n {
+        result.add(c)
+        i++
+      }
+    }
+    return result
+  }
+
+  def summary(): String =
+    "#{label}: #{contacts.size} contacts"
+}
+
+// Build a mutable book from the seed data
+val myBook = new ContactBook("Personal", book as List[Contact])
+IO::println("\n=== Mutable ContactBook: #{myBook.summary()} ===")
+
+// Add a new contact
+myBook.add(new Contact("Zara Lin", "zara@new.org", "+1-800-0011",
+    Priority::HIGH, "05-20", ["colleague", "friend"] as List[String]))
+IO::println("After add: #{myBook.summary()}")
+
+// Search
+val found = myBook.search("eve")
+if found != null {
+  IO::println("Search 'eve': #{found.name()} <#{found.email()}>")
+} else {
+  IO::println("Search 'eve': not found")
+}
+
+// By domain
+val corpPeople = myBook.byDomain("corp.com")
+IO::println("corp.com contacts: #{corpPeople.map { c -> (c as Contact).name() }}")
+
+// Top 3
+IO::println("\n--- Top 3 by priority ---")
+foreach c: Contact in myBook.topN(3) {
+  IO::println("  #{c.name()} [#{c.group()}]")
+}
+
+// Remove and verify
+val removed = myBook.remove("Frank Liu")
+IO::println("\nRemoved 'Frank Liu': #{removed}, size now #{myBook.size()}")
+
+// Remove non-existent
+val removedFake = myBook.remove("Nobody Here")
+IO::println("Removed 'Nobody Here': #{removedFake}")
+
+// ── Section 3: Extension methods on Contact ───────────────────────────────
+
+extension Contact {
+  def initials(): String {
+    val parts = self.name().split(" ")
+    var result: String = ""
+    foreach part: String in parts {
+      if part.length() > 0 {
+        result = result + part.substring(0, 1)
+      }
+    }
+    return result
+  }
+
+  def isHighValue(): Boolean =
+    self.group() == Priority::VIP || self.group() == Priority::HIGH
+
+  def domainOf(): String {
+    val email = self.email()
+    val at = email.indexOf("@")
+    if at < 0 { return "unknown" }
+    return email.substring(at + 1)
+  }
+}
+
+IO::println("\n--- Extension methods on Contact ---")
+foreach c: Contact in book.filter { c -> (c as Contact).isHighValue() } {
+  IO::println("  #{c.initials()} | #{c.name()} @ #{c.domainOf()}")
+}
+
+// ── Section 4: Statistics with fold ──────────────────────────────────────
+
+// Count VIP contacts
+val vipCount = book.fold(0) { acc, c ->
+  (acc as Int) + (if (c as Contact).group() == Priority::VIP { 1 } else { 0 })
+}
+IO::println("\nVIP count: #{vipCount}")
+
+// Longest name
+val longestName = book.fold("") { acc, c ->
+  val n = (c as Contact).name()
+  if (acc as String).length() >= n.length() { acc } else { n }
+}
+IO::println("Longest name: #{longestName}")
+
+// Average tag count per contact
+val totalTags = book.fold(0) { acc, c -> (acc as Int) + (c as Contact).tags().size }
+IO::println("Total tags: #{totalTags}, avg tags/contact: #{totalTags / book.size}")
+
+// ── Section 5: Select pattern matching ───────────────────────────────────
+
+IO::println("\n--- Priority descriptions ---")
+foreach c: Contact in book.sortedBy { c -> (c as Contact).name() } {
+  val desc = select (c as Contact).group() {
+    case Priority::VIP:    "gold-tier"
+    case Priority::HIGH:   "silver-tier"
+    case Priority::NORMAL: "standard"
+    case Priority::LOW:    "basic"
+    else: "unknown"
+  }
+  IO::println("  #{(c as Contact).name()}: #{desc}")
+}
+
+// ── Section 6: Try/catch on bad operation ────────────────────────────────
+
+IO::println("\n--- Error handling ---")
+try {
+  val c = book.find { c -> (c as Contact).name() == "NOTEXIST" }
+  if c == null {
+    throw new Exception("Contact not found")
+  }
+  IO::println("Found: " + (c as Contact).name())
+} catch e: Exception {
+  IO::println("Caught: #{e.getMessage()}")
+}
+
+IO::println("\n=== Done ===")

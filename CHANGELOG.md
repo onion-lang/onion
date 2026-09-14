@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An empty list/map literal (`[]` / `[:]`) passed as a generic constructor argument was rejected with `[E0021] a constructor applicable for … is not found` whenever the class's own type parameter appeared *only* inside that collection argument's type** (e.g. `new Simple[String](1, [])` against `record Simple[K](count: Int, entries: List[K])`, or the `Map[K, V]` equivalent with `[:]`) — even though the immediately preceding fix (0.70.0, issue #232) already covers the case where another argument also pins the type parameter (`record Simple[T](value: T, items: List[T])`). The constructor resolver's substitution-blind exact match (`ConstructorFinder`/`TypeRules.emptyCollectionLiteralAccepts`) specially accepts an empty collection literal against *any* parameterization of the same raw collection — including one whose type argument is otherwise unresolved — so it "matched" before the retyping fallback ever ran, and the retyping fallback only triggered when nothing matched at all. The constructor's own substitution-validity guard then correctly detected that the still-`Object`-typed argument didn't actually fit and reported not-found, without ever retrying against the resolved formal type. `ConstructionTyping.typeNewObject` now also retries the retyping fallback when the eager match only succeeded via that loophole (i.e. fails the substitution-validity check), not just when nothing matched eagerly, both with an explicit type argument (`new Simple[String](...)`) and with it inferred from the target type.
+
 ## [0.70.0] - 2026-09-14
 
 ### Added

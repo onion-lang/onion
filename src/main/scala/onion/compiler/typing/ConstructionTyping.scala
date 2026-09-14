@@ -337,8 +337,25 @@ final class ConstructionTyping(
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
-    val constructors = if (constructors0.nonEmpty) constructors0 else findConstructorWithBoxing(typeRef, parameters0)
-    val parameters = parameters0
+    val constructors1 = if (constructors0.nonEmpty) constructors0 else findConstructorWithBoxing(typeRef, parameters0)
+    // Nothing matched: a malleable argument (a list/map literal, or a generic
+    // static/unqualified/new-object call) may have been typed with no expected
+    // type before the constructor was known, defaulting an unconstrained type
+    // argument to Object -- e.g. `new Simple[Int](1, [])` types `[]` as
+    // List[Object], which is not assignable to the formal List[T]=List[Int].
+    // Retype those arguments against a uniquely arity-matched constructor's
+    // substituted formal types and retry, mirroring the fallback ordinary
+    // method calls already get from ArgumentExpectedTypeRetyping (#232).
+    val retyped =
+      if (constructors1.isEmpty) retypeConstructorArguments(typeRef, node.args.toArray, parameters0, context)
+      else None
+    val parameters = retyped.getOrElse(parameters0)
+    val constructors = retyped match {
+      case Some(newParams) =>
+        val exact = typeRef.findConstructor(newParams)
+        if (exact.nonEmpty) exact else findConstructorWithBoxing(typeRef, newParams)
+      case None => constructors1
+    }
     // Guard the substitution-blind exact match: for an applied generic type the
     // matched constructor must accept the arguments under the type-argument
     // substitution (T -> String), not merely under the erased bound (Object).
@@ -466,6 +483,60 @@ final class ConstructionTyping(
       formals.length == parameters.length &&
         formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
     }
+  }
+
+  /**
+   * When no constructor matched the eagerly-typed arguments, retype malleable
+   * arguments (list/map literals, and generic static/unqualified/new-object
+   * calls) against a uniquely arity-matched constructor's substituted formal
+   * types, and return the updated arguments if at least one changed type.
+   * Returns None when there is no single arity-matched candidate or nothing
+   * changed, so the caller falls back to the original not-found diagnostic.
+   */
+  private def retypeConstructorArguments(
+    typeRef: ClassType,
+    args: Array[AST.Expression],
+    params: Array[Term],
+    context: LocalContext
+  ): Option[Array[Term]] = {
+    if (params == null || params.isEmpty) return None
+    val malleableIndices = args.indices.filter(i => i < params.length && isMalleableArgument(args(i)))
+    if (malleableIndices.isEmpty) return None
+
+    val candidates = typeRef.constructors.filter(_.getArgs.length == params.length)
+    if (candidates.length != 1) return None
+
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    val formals = candidates(0).getArgs.map(t =>
+      TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+
+    var changed = false
+    val updated = params.clone()
+    for (i <- malleableIndices) {
+      val expectedType = formals(i)
+      if (expectedType != null) {
+        typing.withSuppressedReporting(typed(args(i), context, expectedType)) match {
+          case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+            updated(i) = term
+            changed = true
+          case _ =>
+        }
+      }
+    }
+    if (changed) Some(updated) else None
+  }
+
+  /** An argument whose inferred type can shift under an expected type: a
+    * generic static/unqualified/new-object call, or a collection literal
+    * (whose element/entry types are target-typed). Mirrors
+    * [[ArgumentExpectedTypeRetyping.isMalleable]] for constructor arguments. */
+  private def isMalleableArgument(expr: AST.Expression): Boolean = expr match {
+    case _: AST.StaticMethodCall => true
+    case _: AST.UnqualifiedMethodCall => true
+    case _: AST.NewObject => true
+    case _: AST.ListLiteral => true
+    case _: AST.MapLiteral => true
+    case _ => false
   }
 
   /**

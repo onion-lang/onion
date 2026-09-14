@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `run/SemanticVersion.on` — a 293-line corpus sample implementing SemVer 2.0.0 parsing, comparison, sorting, and range checks, exercising ADT enums, records with static/instance methods, interface polymorphism, nullable types, and collection pipelines.
+
 ## [0.68.0] - 2026-09-14
 
 ### Added

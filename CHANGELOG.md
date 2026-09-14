@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-09-14
+
 ### Added
 
 - `run/LogDispatch.on` — a 255-line corpus sample dispatching structured log lines across four formats (HTTP, DB, syslog, metric) using regex-derived typed records (`record … from re"…"`), extension methods on `Int`/`String`, `select`-based log-level markers, and collection pipelines, producing a formatted multi-section analysis report.

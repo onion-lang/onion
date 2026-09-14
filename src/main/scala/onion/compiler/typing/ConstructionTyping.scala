@@ -689,7 +689,7 @@ final class ConstructionTyping(
     val ctor = candidates.head.asInstanceOf[ConstructorDefinition]
 
     // Process named arguments and fill defaults
-    processNamedArgsForConstructor(node, node.args, ctor, context).map { params =>
+    processNamedArgsForConstructor(node, node.args, typeRef, ctor, context).map { params =>
       typeRef match {
         case applied: TypedAST.AppliedClassType =>
           val appliedCtor = new TypedAST.ConstructorRef {
@@ -743,16 +743,36 @@ final class ConstructionTyping(
   }
 
   /**
-   * Process named arguments: reorder and fill defaults
+   * Process named arguments: reorder and fill defaults.
+   *
+   * Every argument is typed against its (possibly class-type-substituted)
+   * formal type, mirroring the positional path in `typeNewObject`: this
+   * steers inference for a malleable argument (an empty list/map literal, a
+   * generic call), but `typed(..., expected)` still returns a term of the
+   * argument's own actual type on a mismatch rather than failing outright,
+   * and `filterConstructorsByNamedArgs` above only checked argument count and
+   * parameter names, never types. So an incompatible argument (e.g. a String
+   * literal supplied by name for an Int-bound type parameter) used to compile
+   * successfully and throw a ClassCastException at run time instead of being
+   * rejected here, mirroring what `substitutionValidFor` already guards on
+   * the positional path. The final `adaptToFormals` call is likewise needed
+   * for the same reason it is on the positional path: an argument needing
+   * ordinary boxing or numeric widening (e.g. an `Int` literal for a `Double`
+   * formal) left unconverted corrupts the JVM stack map frames and crashes
+   * `BytecodeGeneration` with an internal `I0000` error instead of compiling.
    */
   private def processNamedArgsForConstructor(
     node: AST.Node,
     args: List[AST.Expression],
+    typeRef: ClassType,
     ctor: ConstructorDefinition,
     context: LocalContext
   ): Option[Array[Term]] = {
     val argsWithDefaults = ctor.argumentsWithDefaults
     val paramNames = argsWithDefaults.map(_.name)
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    val formals = argsWithDefaults.map(a =>
+      TypeSubstitution.substituteType(a.argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
 
@@ -774,8 +794,8 @@ final class ConstructionTyping(
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)
             hasError = true
           } else {
-            // Type the value
-            typed(named.value, context) match {
+            // Type the value against its formal type
+            typed(named.value, context, formals(paramIndex)) match {
               case Some(term) =>
                 result(paramIndex) = term
                 filled(paramIndex) = true
@@ -794,7 +814,7 @@ final class ConstructionTyping(
             typed(expr, context)
             positionalIndex += 1
           } else {
-            typed(expr, context) match {
+            typed(expr, context, formals(positionalIndex)) match {
               case Some(term) =>
                 result(positionalIndex) = term
                 filled(positionalIndex) = true
@@ -817,6 +837,16 @@ final class ConstructionTyping(
       return None
     }
 
+    // Reject a supplied argument whose actual type doesn't fit its formal
+    // type -- targeting the expected type above only steers inference, it
+    // does not itself enforce assignability.
+    val suppliedIndices = argsWithDefaults.indices.filter(filled)
+    if (!suppliedIndices.forall(i => formalAccepts(formals(i), result(i)))) {
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
+        argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
+      return None
+    }
+
     // Fill missing arguments with default values
     argsWithDefaults.indices.foreach { i =>
       if (!filled(i)) {
@@ -827,7 +857,7 @@ final class ConstructionTyping(
       }
     }
 
-    Some(result)
+    Some(adaptToFormals(result, formals))
   }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =

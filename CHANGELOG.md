@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `run/RateLimiter.on` — a 349-line corpus sample simulating three rate-limiting algorithms (token bucket, fixed window counter, sliding window log) behind a shared interface, exercising ADT enums, records, `Map`/`List` pipelines, and `LinkedList`.
+- `run/FinanceTracker.on` — a 256-line personal-finance corpus sample exercising records, a data-carrying enum, an ADT enum (`Advice`), an interface, generics (`Box[T]`), extension methods, collection pipelines (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`distinct`), `select`/ADT pattern matching, nullable types, closures, and `try`/`catch`.
 
 ### Fixed
 

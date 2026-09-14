@@ -1,0 +1,243 @@
+// ExpenseTracker — a budget/expense report exercising records, data-carrying enums,
+// interfaces, generics, collection pipelines, pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, and range iteration.
+
+record Expense(id: Int, description: String, amount: Int, category: String, month: Int)
+
+enum Priority(label: String, threshold: Int) {
+  LOW("low", 500),
+  MEDIUM("medium", 2000),
+  HIGH("high", 9999)
+}
+
+def priorityOf(amount: Int): Priority {
+  if amount > 2000 { return Priority::HIGH }
+  else if amount > 500 { return Priority::MEDIUM }
+  else { return Priority::LOW }
+}
+
+val expenses = [
+  new Expense(1, "Groceries",    1500, "Food",      1),
+  new Expense(2, "Electricity",  3200, "Utilities", 1),
+  new Expense(3, "Netflix",       990, "Leisure",   1),
+  new Expense(4, "Groceries",    1800, "Food",      2),
+  new Expense(5, "Gas",          4500, "Transport", 2),
+  new Expense(6, "Books",         750, "Education", 2),
+  new Expense(7, "Gym",           600, "Health",    3),
+  new Expense(8, "Groceries",    2100, "Food",      3),
+  new Expense(9, "Insurance",    5000, "Finance",   3),
+  new Expense(10, "Concert",     3800, "Leisure",   3)
+]
+
+val total = expenses.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+IO::println("Total expenses: #{total}")
+
+val foodExpenses = expenses.filter { e -> (e as Expense).category() == "Food" }
+val foodTotal = foodExpenses.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+IO::println("Food total: #{foodTotal}")
+
+val highPriority = expenses.filter { e -> (e as Expense).amount() > 2000 }
+IO::println("High-value count: " + highPriority.size)
+
+val sorted = expenses.sortedBy { e -> 0 - (e as Expense).amount() }
+val topDesc = (sorted[0] as Expense).description()
+IO::println("Most expensive: #{topDesc}")
+
+// Group by category
+val byCategory = expenses.groupBy { e -> (e as Expense).category() }
+IO::println("Categories:")
+foreach (cat, items) in byCategory {
+  val catTotal = (items as List).fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  IO::println("  #{cat}: #{(items as List).size} item(s), total #{catTotal}")
+}
+
+// Priority distribution using pattern matching
+IO::println("Priority breakdown:")
+foreach e: Expense in expenses {
+  val p = priorityOf(e.amount())
+  select p {
+    case Priority::HIGH:   IO::println("  [HIGH]   " + e.description() + " #" + e.id())
+    case Priority::MEDIUM: IO::println("  [MEDIUM] " + e.description() + " #" + e.id())
+    else:                  IO::println("  [LOW]    " + e.description() + " #" + e.id())
+  }
+}
+
+// Monthly totals via groupBy on month
+val byMonth = expenses.groupBy { e -> (e as Expense).month() }
+IO::println("Monthly totals:")
+foreach (mo, items) in byMonth {
+  val moTotal = (items as List).fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  IO::println("  Month #{mo}: #{moTotal}")
+}
+
+// find: largest single expense
+val topAmount = (sorted[0] as Expense).amount()
+val largest = expenses.find { e -> (e as Expense).amount() == topAmount }
+if largest != null {
+  IO::println("Largest expense: #{(largest as Expense).description()} = #{(largest as Expense).amount()}")
+}
+
+// Nullable: find an expense that probably doesn't exist
+val missing = expenses.find { e -> (e as Expense).description() == "Yacht" }
+val missingLabel = if missing != null { (missing as Expense).description() } else { "none" }
+IO::println("Find Yacht: #{missingLabel}")
+
+// Partition: split into leisure vs non-leisure (partition returns a List of two Lists)
+val parts = expenses.partition { e -> (e as Expense).category() == "Leisure" }
+val leisure = parts[0] as List
+val other = parts[1] as List
+IO::println("Leisure: #{leisure.size}, Other: #{other.size}")
+
+// Closure stored in a val
+val withTax = (amount: Int) -> amount + amount / 10
+IO::println("Netflix with tax: " + withTax(990))
+
+// Recursion: compute cumulative spending for months 1..n
+def cumulativeUpTo(month: Int): Int {
+  if month <= 0 { return 0 }
+  val monthItems = expenses.filter { e -> (e as Expense).month() == month }
+  val monthTotal = monthItems.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  return (monthTotal as Int) + cumulativeUpTo(month - 1)
+}
+IO::println("Cumulative month 1: " + cumulativeUpTo(1))
+IO::println("Cumulative month 2: " + cumulativeUpTo(2))
+IO::println("Cumulative month 3: " + cumulativeUpTo(3))
+
+// while loop: count above-average expenses
+val avg = total / expenses.size
+var aboveAvg = 0
+var idx = 0
+while idx < expenses.size {
+  val e = expenses[idx] as Expense
+  if e.amount() > avg { aboveAvg = aboveAvg + 1 }
+  idx = idx + 1
+}
+IO::println("Avg expense: #{avg}, above-average count: #{aboveAvg}")
+
+// foreach over range: print monthly budget remaining (budget = 8000/month)
+val budget = 8000
+foreach month: Int in 1..3 {
+  val spent = (byMonth.get(month) as List).fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  val remaining = budget - (spent as Int)
+  IO::println("Month #{month} remaining: #{remaining}")
+}
+
+// try/catch: safely parse an amount from string
+def parseAmount(s: String): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch e: Exception {
+    return 0
+  }
+}
+IO::println("parseAmount('1234'): " + parseAmount("1234"))
+IO::println("parseAmount('bad'):  " + parseAmount("bad"))
+
+// distinct categories
+val categories = expenses.map { e -> (e as Expense).category() }.distinct()
+IO::println("Distinct categories: " + categories.size)
+
+// zip expenses with their priorities
+val prioritized = expenses.map { e ->
+  val ex = e as Expense
+  ex.description() + "=" + priorityOf(ex.amount()).label()
+}
+IO::println("Prioritized (first 3): " + prioritized[0] + ", " + prioritized[1] + ", " + prioritized[2])
+
+// --- Budget class with interface ---
+interface Reportable {
+  def report(): String
+}
+
+class Budget conforms Reportable {
+  val name: String
+  val limit: Int
+  val expenses: List[Expense]
+public:
+  def this(name: String, limit: Int, expenses: List[Expense]) {
+    this.name = name
+    this.limit = limit
+    this.expenses = expenses
+  }
+  def total(): Int = expenses.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  def remaining(): Int = limit - total()
+  def isOverBudget(): Boolean = total() > limit
+  def report(): String {
+    val tot = total()
+    val rem = remaining()
+    val status = if isOverBudget() { "OVER" } else { "OK" }
+    return "Budget[#{name}] limit=#{limit} spent=#{tot} remaining=#{rem} status=#{status}"
+  }
+  def topExpense(): Expense? {
+    val s = expenses.sortedBy { e -> 0 - (e as Expense).amount() }
+    return if s.size > 0 { s[0] as Expense } else { null }
+  }
+}
+
+val monthlyCap = 8000
+
+val m1Expenses: List[Expense] = expenses.filter { e -> (e as Expense).month() == 1 }
+val m2Expenses: List[Expense] = expenses.filter { e -> (e as Expense).month() == 2 }
+val m3Expenses: List[Expense] = expenses.filter { e -> (e as Expense).month() == 3 }
+
+val budgets = [
+  new Budget("January",  monthlyCap, m1Expenses),
+  new Budget("February", monthlyCap, m2Expenses),
+  new Budget("March",    monthlyCap, m3Expenses)
+]
+
+IO::println("")
+IO::println("=== Monthly Budget Reports ===")
+foreach b: Budget in budgets {
+  IO::println(b.report())
+  val top = b.topExpense()
+  if top != null {
+    IO::println("  Top item: #{(top as Expense).description()} = #{(top as Expense).amount()}")
+  }
+}
+
+// --- Generic summary helper ---
+def sumOf(items: List[Expense]): Int = items.fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+def avgOf(items: List[Expense]): Int {
+  if items.size == 0 { return 0 }
+  return sumOf(items) / items.size
+}
+
+IO::println("")
+IO::println("=== Quarter Summary ===")
+IO::println("Total:   " + sumOf(expenses))
+IO::println("Average: " + avgOf(expenses))
+
+// Identify months that went over budget
+var overBudgetMonths = 0
+foreach b: Budget in budgets {
+  if b.isOverBudget() { overBudgetMonths = overBudgetMonths + 1 }
+}
+IO::println("Months over budget: #{overBudgetMonths}/3")
+
+// Category spending as % of total (integer math)
+IO::println("")
+IO::println("=== Category Share (%) ===")
+foreach (cat, items) in byCategory {
+  val catAmt = (items as List).fold(0) { acc, e -> (acc as Int) + (e as Expense).amount() }
+  val pct = (catAmt as Int) * 100 / total
+  IO::println("  #{cat}: #{pct}%")
+}
+
+// Iterative Fibonacci for fun — no standard library needed
+def fib(n: Int): Int {
+  if n <= 1 { return n }
+  var a = 0
+  var b = 1
+  var k = 2
+  while k <= n {
+    val tmp = a + b
+    a = b
+    b = tmp
+    k = k + 1
+  }
+  return b
+}
+IO::println("")
+IO::println("Fibonacci check (fib 10 = 55): " + fib(10))
+

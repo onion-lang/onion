@@ -1,0 +1,398 @@
+// CronScheduler.on — cron expression evaluator and job scheduler simulation.
+// Exercises: ADT (case) enums, data-carrying enum, records with example clauses,
+//            extension methods, class inheritance, interfaces, generics,
+//            collection pipelines (map/filter/fold/groupBy/sortedBy/find/partition),
+//            select/type patterns, nullable, closures, string interpolation,
+//            try/catch, recursion, while, foreach ranges and map (k,v).
+
+import {
+  java.util.*
+}
+
+// ─── CronField: ADT for a single cron expression field ───────────────────────
+
+enum CronField {
+  case Wildcard                           // *
+  case Fixed(value: Int)                  // 5
+  case Range(from: Int, to: Int)          // 1-5
+  case Step(start: Int, step: Int)        // */5 or start/step
+}
+
+// ─── Timestamp ───────────────────────────────────────────────────────────────
+
+record Timestamp(year: Int, month: Int, day: Int, hour: Int, minute: Int) {
+public:
+  def toString(): String =
+    "#{year}-#{pad2(month)}-#{pad2(day)} #{pad2(hour)}:#{pad2(minute)}"
+  static def pad2(n: Int): String =
+    if n < 10 { "0" + n } else { "" + n }
+  def addMinutes(delta: Int): Timestamp {
+    val totalMin = hour() * 60 + minute() + delta
+    return new Timestamp(year(), month(), day(), (totalMin / 60) % 24, totalMin % 60)
+  }
+}
+
+// ─── CronExpression ──────────────────────────────────────────────────────────
+
+record CronExpression(
+  minute: CronField, hour: CronField,
+  dom: CronField, month: CronField, dow: CronField
+) {
+public:
+  def matches(ts: Timestamp): Boolean =
+    matchField(minute(), ts.minute()) &&
+    matchField(hour(), ts.hour())     &&
+    matchField(dom(), ts.day())       &&
+    matchField(month(), ts.month())
+
+  static def matchField(field: CronField, value: Int): Boolean {
+    select field {
+      case w is Wildcard: return true
+      case f is Fixed:    return f.value() == value
+      case r is Range:    return value >= r.from() && value <= r.to()
+      case s is Step:     return (value - s.start()) % s.step() == 0 && value >= s.start()
+    }
+  }
+
+  static def fieldStr(f: CronField): String {
+    select f {
+      case w is Wildcard: return "*"
+      case fi is Fixed:   return "" + fi.value()
+      case r is Range:    return "#{r.from()}-#{r.to()}"
+      case s is Step:     return "#{s.start()}/#{s.step()}"
+    }
+  }
+
+  def toString(): String =
+    "#{fieldStr(minute())} #{fieldStr(hour())} #{fieldStr(dom())} #{fieldStr(month())} #{fieldStr(dow())}"
+}
+
+// ─── JobStatus: data-carrying enum ───────────────────────────────────────────
+
+enum JobStatus(label: String, isTerminal: Boolean) {
+  Pending("pending", false),
+  Running("running", false),
+  Success("success", true),
+  Failed("failed", true),
+  Skipped("skipped", true)
+}
+
+// ─── JobRun: one execution record ────────────────────────────────────────────
+
+record JobRun(jobName: String, at: Timestamp, status: JobStatus, durationMs: Int) {
+public:
+  def summary(): String =
+    "[#{at.toString()}] #{jobName} -> #{status.label()} (#{durationMs}ms)"
+  def succeeded(): Boolean = status() == JobStatus::Success
+  def failed(): Boolean    = status() == JobStatus::Failed
+}
+  example { new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Success, 10).succeeded() }
+  example { !new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Failed, 5).succeeded() }
+
+// ─── ScheduledJob ────────────────────────────────────────────────────────────
+
+record ScheduledJob(
+  name: String, expr: CronExpression, command: String, enabled: Boolean
+) {
+public:
+  def shouldRun(ts: Timestamp): Boolean = enabled() && expr().matches(ts)
+  def describe(): String = "  #{name()} [#{expr().toString()}] => #{command()}"
+}
+
+// ─── Extension methods for Int: duration formatting ──────────────────────────
+
+extension Int {
+  def msLabel(): String {
+    if self < 1000 { return self + "ms" }
+    return (self / 1000) + "." + ((self % 1000) / 100) + "s"
+  }
+  def pct(total: Int): String {
+    if total == 0 { return "0%" }
+    return ((self * 100) / total) + "%"
+  }
+}
+
+// ─── DeterministicRunner: produces predictable results ───────────────────────
+
+class DeterministicRunner {
+  var tick: Int
+public:
+  def this { this.tick = 0 }
+  def run(job: ScheduledJob, at: Timestamp): JobRun {
+    tick = tick + 1
+    val status = if tick % 7 == 0 { JobStatus::Failed } else { JobStatus::Success }
+    val durationMs = 50 + (tick * 37) % 400
+    return new JobRun(job.name(), at, status, durationMs)
+  }
+}
+
+// ─── Scheduler ───────────────────────────────────────────────────────────────
+
+class Scheduler {
+  val jobs: List[ScheduledJob]
+  val runner: DeterministicRunner
+  val history: List[JobRun]
+public:
+  def this(runner: DeterministicRunner) {
+    this.jobs    = []
+    this.runner  = runner
+    this.history = []
+  }
+  def addJob(job: ScheduledJob): void { jobs.add(job) }
+  def getHistory(): List[JobRun] = history
+  def jobCount(): Int = jobs.size
+
+  def tick(ts: Timestamp): Int {
+    var ran = 0
+    foreach job: ScheduledJob in jobs {
+      if job.shouldRun(ts) {
+        history.add(runner.run(job, ts))
+        ran = ran + 1
+      }
+    }
+    return ran
+  }
+
+  def simulate(start: Timestamp, minutes: Int): void {
+    var m = 0
+    while m < minutes {
+      tick(start.addMinutes(m))
+      m = m + 1
+    }
+  }
+
+  def totalRuns(): Int = history.size
+
+  def successRate(): Int {
+    val n = history.size
+    if n == 0 { return 0 }
+    val ok = history.filter { r -> (r as JobRun).succeeded() }.size
+    return (ok * 100) / n
+  }
+
+  def avgDuration(): Int {
+    val n = history.size
+    if n == 0 { return 0 }
+    return history.fold(0) { acc, r -> (acc as Int) + (r as JobRun).durationMs() } / n
+  }
+
+  def jobStats(): void {
+    val byJob = history.groupBy { r -> (r as JobRun).jobName() }
+    foreach (name, runs) in byJob {
+      val jrs = runs as List[JobRun]
+      val ok   = jrs.filter { r -> (r as JobRun).succeeded() }.size
+      val fail = jrs.filter { r -> (r as JobRun).failed() }.size
+      val avg  = jrs.fold(0) { acc, r -> (acc as Int) + (r as JobRun).durationMs() } / jrs.size
+      IO::println("  #{name}: #{jrs.size} runs, #{ok} ok / #{fail} failed, avg #{avg.msLabel()}")
+    }
+  }
+
+  def recentFailures(limit: Int): List[JobRun] {
+    val failed = history.filter { r -> (r as JobRun).failed() }
+    val start = if failed.size > limit { failed.size - limit } else { 0 }
+    var i = start
+    val result: List[JobRun] = []
+    while i < failed.size {
+      result.add(failed[i] as JobRun)
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── CronExpression builder helpers ──────────────────────────────────────────
+
+def everyMinute(): CronExpression =
+  new CronExpression(new Wildcard(), new Wildcard(), new Wildcard(), new Wildcard(), new Wildcard())
+
+def everyNMinutes(n: Int): CronExpression =
+  new CronExpression(new Step(0, n), new Wildcard(), new Wildcard(), new Wildcard(), new Wildcard())
+
+def hourly(minute: Int): CronExpression =
+  new CronExpression(new Fixed(minute), new Wildcard(), new Wildcard(), new Wildcard(), new Wildcard())
+
+def daily(hour: Int, minute: Int): CronExpression =
+  new CronExpression(new Fixed(minute), new Fixed(hour), new Wildcard(), new Wildcard(), new Wildcard())
+
+def workdayMorning(hour: Int): CronExpression =
+  new CronExpression(new Fixed(0), new Fixed(hour), new Wildcard(), new Wildcard(), new Range(1, 5))
+
+// ─── Reporting helpers ────────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  IO::println("")
+  IO::println("═══ " + title + " ═══")
+}
+
+def summarizeField(label: String, f: CronField): void {
+  val s = CronExpression::fieldStr(f)
+  IO::println("  " + label + ": " + s)
+}
+
+// ─── Recursive analysis: next N trigger times ────────────────────────────────
+
+def findNextTimes(expr: CronExpression, from: Timestamp, remaining: Int, acc: List[Timestamp]): void {
+  if remaining == 0 { return }
+  if expr.matches(from) {
+    acc.add(from)
+    findNextTimes(expr, from.addMinutes(1), remaining - 1, acc)
+  } else {
+    findNextTimes(expr, from.addMinutes(1), remaining, acc)
+  }
+}
+
+def nextTriggerTimes(expr: CronExpression, from: Timestamp, count: Int): List[Timestamp] {
+  val result: List[Timestamp] = []
+  findNextTimes(expr, from, count, result)
+  return result
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+banner("Cron Scheduler Demo")
+
+val jobs = [
+  new ScheduledJob("heartbeat",  everyNMinutes(5),      "ping health endpoint",        true),
+  new ScheduledJob("cleanup",    hourly(30),             "purge temp files",            true),
+  new ScheduledJob("report",     daily(6, 0),            "generate daily report",       true),
+  new ScheduledJob("backup",     daily(2, 0),            "snapshot database",           true),
+  new ScheduledJob("standby",    workdayMorning(9),      "wake up worker pool",         false),
+  new ScheduledJob("every-min",  everyMinute(),          "metrics collector",           true)
+]
+
+banner("Registered Jobs")
+foreach job: ScheduledJob in jobs {
+  val state = if job.enabled() { "enabled" } else { "disabled" }
+  IO::println("  [#{state}] #{job.name()} => #{job.expr().toString()}")
+}
+
+banner("Expression Field Breakdown: daily(6, 0)")
+val dailyExpr = daily(6, 0)
+summarizeField("minute", dailyExpr.minute())
+summarizeField("hour",   dailyExpr.hour())
+summarizeField("dom",    dailyExpr.dom())
+summarizeField("month",  dailyExpr.month())
+summarizeField("dow",    dailyExpr.dow())
+
+banner("Next 5 Trigger Times for 'heartbeat' (every 5 min)")
+val heartbeatExpr = everyNMinutes(5)
+val start = new Timestamp(2024, 6, 14, 8, 0)
+val times = nextTriggerTimes(heartbeatExpr, start, 5)
+foreach ts: Timestamp in times {
+  IO::println("  " + ts.toString())
+}
+
+banner("Next 3 Trigger Times for daily(6, 0)")
+val dailyTimes = nextTriggerTimes(dailyExpr, start, 3)
+foreach ts: Timestamp in dailyTimes {
+  IO::println("  " + ts.toString())
+}
+
+banner("matchField examples")
+IO::println("  Fixed(5) matches 5: "     + CronExpression::matchField(new Fixed(5), 5))
+IO::println("  Fixed(5) matches 6: "     + CronExpression::matchField(new Fixed(5), 6))
+IO::println("  Range(1,5) matches 3: "   + CronExpression::matchField(new Range(1, 5), 3))
+IO::println("  Range(1,5) matches 6: "   + CronExpression::matchField(new Range(1, 5), 6))
+IO::println("  Step(0,15) matches 30: "  + CronExpression::matchField(new Step(0, 15), 30))
+IO::println("  Step(0,15) matches 7: "   + CronExpression::matchField(new Step(0, 15), 7))
+IO::println("  Wildcard matches 99: "    + CronExpression::matchField(new Wildcard(), 99))
+
+banner("Simulation: 120 minutes from 08:00")
+val scheduler = new Scheduler(new DeterministicRunner())
+foreach job: ScheduledJob in jobs {
+  if job.enabled() { scheduler.addJob(job) }
+}
+IO::println("  Active jobs: " + scheduler.jobCount())
+
+scheduler.simulate(start, 120)
+
+val total   = scheduler.totalRuns()
+val srate   = scheduler.successRate()
+val avgDur  = scheduler.avgDuration()
+IO::println("  Total runs:    " + total)
+IO::println("  Success rate:  " + srate + "%")
+IO::println("  Avg duration:  " + avgDur.msLabel())
+
+banner("Per-Job Statistics")
+scheduler.jobStats()
+
+banner("Recent Failures (last 3)")
+val failures = scheduler.recentFailures(3)
+if failures.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach run: JobRun in failures {
+    IO::println("  " + run.summary())
+  }
+}
+
+banner("Pipeline: longest-running failed jobs")
+val history = scheduler.getHistory()
+val slowFails = history
+  .filter { r -> (r as JobRun).failed() }
+  .sortedBy { r -> 0 - (r as JobRun).durationMs() }
+  .map { r -> (r as JobRun).summary() }
+if slowFails.size == 0 {
+  IO::println("  (no failures)")
+} else {
+  foreach s: String in slowFails {
+    IO::println("  " + s)
+  }
+}
+
+banner("Status enum values")
+val statuses = [JobStatus::Pending, JobStatus::Running, JobStatus::Success, JobStatus::Failed, JobStatus::Skipped]
+foreach s: JobStatus in statuses {
+  val term = if s.isTerminal() { "terminal" } else { "transient" }
+  IO::println("  #{s.label()}: #{term}")
+}
+
+banner("Partition: successes vs failures")
+val allRuns = scheduler.getHistory()
+val parts = allRuns.partition { r -> (r as JobRun).succeeded() }
+val okRuns   = parts[0] as List[JobRun]
+val badRuns  = parts[1] as List[JobRun]
+IO::println("  #{okRuns.size} succeeded, #{badRuns.size} failed")
+IO::println("  success fraction: " + okRuns.size.pct(allRuns.size))
+
+banner("Try/catch: safe field parsing")
+def parseIntOrDefault(s: String, default: Int): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch e: Exception {
+    return default
+  }
+}
+val goodParse = parseIntOrDefault("42", 0)
+val badParse  = parseIntOrDefault("not-a-number", 99)
+IO::println("  parseIntOrDefault(\"42\", 0)          = " + goodParse)
+IO::println("  parseIntOrDefault(\"not-a-number\", 99) = " + badParse)
+
+banner("Range foreach: minute-of-hour fire counts")
+var zeroToFiftyNine: List[Int] = []
+foreach m: Int in 0..59 {
+  zeroToFiftyNine.add(m)
+}
+val heartbeatMinutes = zeroToFiftyNine.filter { m -> CronExpression::matchField(heartbeatExpr.minute(), (m as Int)) }
+IO::println("  'every 5 min' fires on minutes: " + heartbeatMinutes.toString())
+
+val cleanupMinutes = zeroToFiftyNine.filter { m -> CronExpression::matchField(hourly(30).minute(), (m as Int)) }
+IO::println("  'hourly(30)' fires on minutes:  " + cleanupMinutes.toString())
+
+banner("Find: first failure in history")
+val firstFail = allRuns.find { r -> (r as JobRun).failed() }
+if firstFail != null {
+  IO::println("  " + (firstFail as JobRun).summary())
+} else {
+  IO::println("  (no failures)")
+}
+
+banner("Zip: pair first 5 runs with index")
+val indices = [0, 1, 2, 3, 4]
+val first5  = allRuns.filter { r -> true }.sortedBy { r -> (r as JobRun).at().minute() }
+foreach i: Int in 0..4 {
+  val run = first5[i] as JobRun
+  IO::println("  [#{i}] #{run.jobName()} at #{run.at().toString()} -> #{run.status().label()}")
+}
+
+banner("Done")

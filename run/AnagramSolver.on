@@ -1,0 +1,374 @@
+// AnagramSolver.on — Word-game toolkit: anagram groups, Scrabble scoring,
+// jumble solving, and letter-pattern search over a built-in word list.
+//
+// Exercises: records with example/law clauses, extension methods on String/Int,
+// do[Option] monadic chaining, |> pipeline, ADT case-enum (SearchResult),
+// collection pipelines (groupBy/sortedBy/filter/map/distinct/find/any/count/
+// fold/take/partition), foreach (list + range + map k,v), while loop,
+// select/pattern-matching, string interpolation, nullable, try/catch, recursion.
+
+import { java.util.* }
+
+// ─── Scrabble tile values ────────────────────────────────────────────────────
+
+val SCRABBLE_VALUES: Map[String, Int] = [
+  "A": 1, "E": 1, "I": 1, "O": 1, "U": 1, "L": 1, "N": 1, "S": 1, "T": 1, "R": 1,
+  "D": 2, "G": 2,
+  "B": 3, "C": 3, "M": 3, "P": 3,
+  "F": 4, "H": 4, "V": 4, "W": 4, "Y": 4,
+  "K": 5,
+  "J": 8, "X": 8,
+  "Q": 10, "Z": 10
+]
+
+// ─── Extensions on String ────────────────────────────────────────────────────
+
+extension String {
+  def anagramKey(): String {
+    val chars: List[String] = []
+    var i: Int = 0
+    while i < self.length() {
+      chars.add(self.substring(i, i + 1).toUpperCase())
+      i++
+    }
+    return chars.sortedBy { c -> c as String }.fold("") { acc, c -> acc + c }
+  }
+
+  def scrabbleScore(): Int {
+    var total: Int = 0
+    var i: Int = 0
+    while i < self.length() {
+      val ch: String = self.substring(i, i + 1).toUpperCase()
+      val v: Int? = SCRABBLE_VALUES.get(ch) as Int?
+      if v != null { total = total + v }
+      i++
+    }
+    return total
+  }
+
+  def letterCount(): Map[String, Int] {
+    val counts: Map[String, Int] = new LinkedHashMap[String, Int]()
+    var i: Int = 0
+    while i < self.length() {
+      val ch: String = self.substring(i, i + 1).toUpperCase()
+      val cur: Int? = counts.get(ch) as Int?
+      counts.put(ch, if cur == null { 1 } else { cur + 1 })
+      i++
+    }
+    return counts
+  }
+
+  def isAnagramOf(other: String): Boolean =
+    self.anagramKey() == other.anagramKey()
+
+  def containsOnlyLettersFrom(pool: String): Boolean {
+    val available: Map[String, Int] = pool.letterCount()
+    val needed: Map[String, Int] = self.letterCount()
+    foreach (ch, cnt) in needed {
+      val have: Int? = available.get(ch) as Int?
+      if have == null || have < (cnt as Int) { return false }
+    }
+    return true
+  }
+
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Extensions on Int ───────────────────────────────────────────────────────
+
+extension Int {
+  def stars(): String {
+    var s: String = ""
+    foreach i: Int in 0..<self { s = s + "*" }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def clampMax(limit: Int): Int = if self > limit { limit } else { self }
+}
+
+// ─── Search result ADT ───────────────────────────────────────────────────────
+
+enum SearchResult {
+  case Found(words: List[String])
+  case NotFound(query: String)
+public:
+  def describe(): String = select this {
+    case f is Found:    "Found #{(f.words() as List).size} word(s): " + f.words().toString()
+    case n is NotFound: "No anagrams found for \"#{n.query()}\""
+  }
+  def isEmpty(): Boolean = select this {
+    case n is NotFound: true
+    else:               false
+  }
+}
+
+// ─── WordBank record ─────────────────────────────────────────────────────────
+
+record WordScore(word: String, score: Int)
+  example { new WordScore("QUIZ", 22).score() == 22 }
+  example { new WordScore("HELLO", 8).word() == "HELLO"  }
+
+// ─── AnagramIndex class ──────────────────────────────────────────────────────
+
+class AnagramIndex {
+  val index: Map[String, List[String]]
+
+private:
+  static def buildIndex(words: List[String]): Map[String, List[String]] {
+    val idx: Map[String, List[String]] = new LinkedHashMap[String, List[String]]()
+    foreach w: Object in words {
+      val word: String = (w as String).toUpperCase()
+      val key: String = word.anagramKey()
+      val bucket: List[String]? = idx.get(key) as List[String]?
+      if bucket == null {
+        val newBucket: List[String] = new ArrayList()
+        newBucket.add(word)
+        idx.put(key, newBucket)
+      } else {
+        bucket.add(word)
+      }
+    }
+    return idx
+  }
+
+public:
+  def this(words: List[String]) {
+    this.index = buildIndex(words)
+  }
+
+  def anagramsOf(word: String): SearchResult {
+    val key: String = word.toUpperCase().anagramKey()
+    val bucket: List[String]? = index.get(key) as List[String]?
+    if bucket == null { return new NotFound(word) }
+    val others: List[String] = bucket.filter { w -> (w as String).toUpperCase() != word.toUpperCase() }
+    if others.isEmpty() { return new NotFound(word) }
+    return new Found(others)
+  }
+
+  def anagramGroups(): List[List[String]] {
+    val groups: List[List[String]] = new ArrayList()
+    foreach bucket: Object in index.values() {
+      val b: List[String] = bucket as List[String]
+      if b.size > 1 { groups.add(b) }
+    }
+    return groups
+  }
+
+  def wordsFromLetters(letters: String): List[String] {
+    val pool: String = letters.toUpperCase()
+    val result: List[String] = new ArrayList()
+    foreach bucket: Object in index.values() {
+      foreach w: Object in (bucket as List[String]) {
+        val word: String = w as String
+        if word.containsOnlyLettersFrom(pool) { result.add(word) }
+      }
+    }
+    return result.distinct().sortedBy { w -> 0 - (w as String).length() }
+  }
+
+  def topScoringWords(n: Int): List[WordScore] {
+    val all: List[String] = new ArrayList()
+    foreach bucket: Object in index.values() {
+      foreach w: Object in (bucket as List[String]) { all.add(w as String) }
+    }
+    return all
+      .map { w -> new WordScore(w as String, (w as String).scrabbleScore()) }
+      .sortedBy { ws -> 0 - (ws as WordScore).score() }
+      .take(n) as List[WordScore]
+  }
+
+  def lengthDistribution(): Map[Int, Int] {
+    val dist: Map[Int, Int] = new TreeMap[Int, Int]()
+    foreach bucket: Object in index.values() {
+      foreach w: Object in (bucket as List[String]) {
+        val len: Int = (w as String).length()
+        val cur: Int? = dist.get(len) as Int?
+        dist.put(len, if cur == null { 1 } else { cur + 1 })
+      }
+    }
+    return dist
+  }
+
+  def wordCount(): Int {
+    var total: Int = 0
+    foreach bucket: Object in index.values() {
+      total = total + (bucket as List[String]).size
+    }
+    return total
+  }
+}
+
+// ─── Word list ───────────────────────────────────────────────────────────────
+
+val WORDS: List[String] = [
+  "listen", "silent", "enlist", "inlets", "tinsel",
+  "eat", "tea", "ate", "eta",
+  "spare", "parse", "reaps", "pears", "rapes",
+  "care", "race", "acre", "acer",
+  "stop", "pots", "spot", "tops", "opts",
+  "dog", "god",
+  "tar", "rat", "art",
+  "bat", "tab", "tab",
+  "name", "mane", "amen",
+  "evil", "vile", "live", "veil",
+  "sword", "words",
+  "loop", "polo", "pool",
+  "log", "gel", "leg",
+  "now", "own", "won",
+  "quiz", "quip",
+  "jazz", "fizz",
+  "waxy", "foxy",
+  "zap", "zip",
+  "hello", "world",
+  "onion", "union", "inion",
+  "trace", "carte", "cater", "react", "crate",
+  "stone", "tones", "notes", "senot",
+  "emit", "mite", "time", "item",
+  "alters", "alerts", "artels", "estral", "laster", "slater", "staler",
+  "rescue", "secure", "ceruse",
+  "march", "charm", "march",
+  "lamb", "balm",
+  "satin", "antis", "saint"
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def showGroup(label: String, words: List[String]): void {
+  val sorted: List[String] = words.sortedBy { w -> w as String }
+  IO::println("  #{label}: #{sorted.toString()}")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val bank = new AnagramIndex(WORDS)
+
+IO::println("=== Anagram Solver & Scrabble Scorer ===")
+IO::println("Word bank: #{bank.wordCount()} words loaded")
+IO::println("")
+
+// ─── Anagram lookup ───────────────────────────────────────────────────────────
+
+IO::println("Anagram lookups:")
+val queries: List[String] = ["listen", "eat", "spare", "trace", "hello", "quiz"]
+foreach q: Object in queries {
+  val word: String = q as String
+  val result: SearchResult = bank.anagramsOf(word)
+  IO::println("  #{word.padRight(8)} -> #{result.describe()}")
+}
+
+// ─── All anagram groups ───────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Anagram groups (#{bank.anagramGroups().size} groups with 2+ members):")
+val groups: List[List[String]] = bank.anagramGroups()
+  .sortedBy { g -> 0 - (g as List[String]).size }
+  .take(8) as List[List[String]]
+foreach g: Object in groups {
+  val grp: List[String] = g as List[String]
+  val key: String = (grp.get(0) as String).anagramKey()
+  showGroup("key=#{key}", grp)
+}
+
+// ─── Top Scrabble words ───────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Top 10 Scrabble-scoring words:")
+val topWords: List[WordScore] = bank.topScoringWords(10)
+foreach i: Int in 0..<topWords.size {
+  val ws: WordScore = topWords.get(i) as WordScore
+  IO::println("  #{i + 1}. #{ws.word().padRight(12)} #{ws.score()} pts  #{ws.score().stars()}")
+}
+
+// ─── Words from letter pool ("jumble solver") ────────────────────────────────
+
+IO::println("")
+val pool: String = "AEILNRST"
+val fromPool: List[String] = bank.wordsFromLetters(pool)
+IO::println("Words using only letters from '#{pool}' (#{fromPool.size} found, longest first):")
+foreach i: Int in 0..<fromPool.size.clampMax(10) {
+  IO::println("  #{fromPool.get(i) as String}")
+}
+
+// ─── do[Option] chain: lookup → score → stars ─────────────────────────────────
+
+def toOptionStr(s: String?): Option[String] =
+  if s == null { Option::none() } else { Option::some(s as String) }
+
+IO::println("")
+IO::println("do[Option] chain (anagram lookup -> score -> render):")
+val firstAnagram: String? = {
+  val sr: SearchResult = bank.anagramsOf("listen")
+  select sr {
+    case f is Found: f.words().find { w -> true } as String?
+    else: null
+  }
+}
+val optResult: Option[String] = do[Option] {
+  w <- toOptionStr(firstAnagram)
+  ret "Best anagram of 'listen': #{w} (#{w.scrabbleScore()} pts, #{w.scrabbleScore().stars()})"
+}
+IO::println("  " + (if optResult == null { "not found" } else { optResult.get() }))
+
+// ─── |> pipeline: compute average word length ─────────────────────────────────
+
+IO::println("")
+var allLen: Int = 0
+foreach w: Object in WORDS { allLen = allLen + (w as String).length() }
+IO::println("Total letters in word bank: #{allLen}")
+IO::println("Approx average length: #{allLen / WORDS.size}")
+
+// ─── Length distribution ──────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Length distribution:")
+val dist: Map[Int, Int] = bank.lengthDistribution()
+foreach (len, cnt) in dist {
+  val bar: String = (cnt as Int).stars()
+  IO::println("  #{(len as Int).padLeft(2)} letters: #{bar} (#{cnt})")
+}
+
+// ─── Scrabble score for each query word ──────────────────────────────────────
+
+IO::println("")
+IO::println("Scrabble scores for query words:")
+foreach q: Object in queries {
+  val w: String = q as String
+  val score: Int = w.scrabbleScore()
+  IO::println("  #{w.padRight(10)} = #{score} pts")
+}
+
+// ─── Partition into high/low scorers ─────────────────────────────────────────
+
+IO::println("")
+val parts = WORDS.partition { w -> (w as String).scrabbleScore() >= 8 }
+val highScorers: List[Object] = parts[0] as List[Object]
+val lowScorers: List[Object]  = parts[1] as List[Object]
+IO::println("High scorers (>=8 pts): #{highScorers.size} words")
+IO::println("Low scorers (<8 pts):   #{lowScorers.size} words")
+
+// ─── Recursion: check if a word has any repeated letters (using recursion) ────
+
+def hasRepeatedLetters(word: String, pos: Int, seen: Set[String]): Boolean {
+  if pos >= word.length() { return false }
+  val ch: String = word.substring(pos, pos + 1).toUpperCase()
+  if seen.contains(ch) { return true }
+  seen.add(ch)
+  return hasRepeatedLetters(word, pos + 1, seen)
+}
+
+IO::println("")
+IO::println("Repeated-letter check (recursive):")
+val checkWords: List[String] = ["listen", "hello", "world", "onion", "quiz"]
+foreach cw: Object in checkWords {
+  val w: String = cw as String
+  val repeated: Boolean = hasRepeatedLetters(w, 0, new LinkedHashSet[String]())
+  IO::println("  #{w.padRight(10)} has repeated letters: #{repeated}")
+}

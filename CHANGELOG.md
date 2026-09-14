@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.72.0] - 2026-09-14
+
 ### Fixed
 
 - **A constructor call using at least one named argument (`new C(name = value, ...)`) skipped type checking for every argument, letting an incompatible value compile successfully and throw a `ClassCastException` at run time instead of being rejected with a diagnostic** — e.g. `new Box[Int](value = "wrong")` against `record Box[T](value: T)` — and separately, an argument needing ordinary numeric widening (an `Int` literal for a `Double`/`Float`/`Long` parameter, e.g. `new Game(name = "Chess", price = 99)`) left the argument term unconverted, corrupting the JVM stack map frames and crashing `BytecodeGeneration` with an internal `I0000` error. Unlike the positional-argument path (`typeNewObject`), which resolves the target constructor's substituted formal types, retypes malleable arguments against them, checks assignability, and adapts the result with boxing/widening conversions (`adaptToFormals`), the named-argument path (`processNamedArgsForConstructor`) typed every argument with no expected type and never checked the result against the formal types at all. It now types each argument against its (possibly class-type-substituted) formal type, rejects one that doesn't fit with the same `E0021` diagnostic the positional path reports, and adapts the final arguments with `adaptToFormals` before constructing the call.

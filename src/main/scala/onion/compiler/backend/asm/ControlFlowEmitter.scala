@@ -434,11 +434,25 @@ final class ControlFlowEmitter(
           // matched exception's slot as the primary so a close() failure is suppressed
           // onto it (and the catch body still runs) rather than replacing it.
           emitCloseResources(slot)
-          // A return inside the catch must also run the user finally.
+          // A return inside the catch must also run the user finally. And an exception
+          // escaping the catch body itself (a plain throw, not just return) is just as
+          // much a completion of this try statement as one from the try body or from a
+          // resource close() -- JLS 14.20.2 -- so it must run the user finally too rather
+          // than propagate straight past it; the catch body is wrapped in its own
+          // protected region for that.
+          val catchBodyStart = gen.mark()
           withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          val catchBodyEnd = gen.mark()
           // Normal catch completion: execute user finally
           emitCatchFinally()
           gen.goTo(endLabel)
+
+          gen.catchException(catchBodyStart, catchBodyEnd, AsmType.getType(classOf[Throwable]))
+          val catchExSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+          gen.storeLocal(catchExSlot)
+          emitCatchFinally()
+          gen.loadLocal(catchExSlot)
+          gen.throwException()
 
         // Catch-all handler for uncaught exceptions (finally + rethrow)
         gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
@@ -481,11 +495,25 @@ final class ControlFlowEmitter(
           gen.ifZCmp(GeneratorAdapter.NE, alreadyClosed)
           emitCloseResources(slot)
           gen.visitLabel(alreadyClosed)
-          // A return inside the catch must also run the user finally.
+          // A return inside the catch must also run the user finally. And an exception
+          // escaping the catch body itself (a plain throw, not just return) is just as
+          // much a completion of this try statement as one from the try body or from a
+          // resource close() -- JLS 14.20.2 -- so it must run the user finally too rather
+          // than propagate straight past it; the catch body is wrapped in its own
+          // protected region for that.
+          val catchBodyStart = gen.mark()
           withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          val catchBodyEnd = gen.mark()
           // Normal catch completion: execute user finally
           emitCatchFinally()
           gen.goTo(endLabel)
+
+          gen.catchException(catchBodyStart, catchBodyEnd, AsmType.getType(classOf[Throwable]))
+          val catchExSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+          gen.storeLocal(catchExSlot)
+          emitCatchFinally()
+          gen.loadLocal(catchExSlot)
+          gen.throwException()
 
         // Catch-all handler for uncaught exceptions (finally + rethrow)
         gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))

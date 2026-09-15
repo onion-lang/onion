@@ -829,6 +829,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/VirtualShell.on"))
     }
 
+    it("runs ObservatoryLog.on") {
+      assert(runSample("run/ObservatoryLog.on").isInstanceOf[Shell.Success])
+    }
+
     it("runs MiniWebService.on: it answers its own requests and stops") {
       // Binds port 0 on localhost, so this needs no fixed port and is not reachable from
       // the network. The assertions cover the regex route capturing its group, the

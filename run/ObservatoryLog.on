@@ -1,0 +1,188 @@
+// ObservatoryLog — a night's telescope observation log, parsed via a `shape`
+// clause into typed records and classified by an ADT case-enum, then rolled
+// up into a session report with Outcome/Defect separating malformed lines
+// from valid ones instead of either crashing on the first bad line or
+// silently dropping it.
+//
+// Exercises: an ADT case-enum (ObjectKind) with per-case fields and a shared
+// method, a record `shape` clause with Outcome::values/Outcome::defects error
+// handling, records with methods, a top-level `example` clause, extension
+// methods on Double, collection pipelines (groupBy/sortedBy/fold/filter),
+// select pattern matching, foreach over maps, try/catch, string
+// interpolation.
+//
+//   onion ObservatoryLog.on
+
+enum ObjectKind {
+  case Star(spectralClass: String)
+  case Planet(hasRing: Boolean)
+  case Comet(tailLengthKm: Double)
+public:
+  def label(): String = select this {
+    case s is Star: "Star (" + s.spectralClass() + ")"
+    case p is Planet: if p.hasRing() { "Planet (ringed)" } else { "Planet" }
+    case c is Comet: "Comet (tail " + Format::integer(Math::round(c.tailLengthKm())) + " km)"
+  }
+}
+
+// A raw log line: HH:MM, object name, a one-letter kind code (S/P/C), a
+// per-kind detail column (spectral class, "ring"/"none", or tail length in
+// km — always text at parse time, interpreted once the kind code is known),
+// apparent magnitude (can be negative for the brightest objects), and how
+// many minutes it was tracked. `shape line` names the boundary so a broken
+// line is reported instead of stopping the whole batch.
+record Sighting(time: String, name: String, kindCode: String, detail: String, magnitude: Double, minutes: Int)
+  shape line = re"(\d{2}:\d{2}) (\S+) (\w) (\S+) mag=(-?\d+\.\d+) (\d+)min"
+
+record Entry(sighting: Sighting, kind: ObjectKind) {
+public:
+  def describe(): String =
+    "#{sighting().time()} #{sighting().name()} -- #{kind().label()}, mag #{sighting().magnitude()}"
+}
+
+extension Double {
+  def isNakedEyeBright(): Boolean = this < 2.0
+}
+
+def toKind(code: String, detail: String): ObjectKind? =
+  select code {
+    case "S": new Star(detail)
+    case "P": new Planet(detail == "ring")
+    case "C": new Comet(Double::parseDouble(detail))
+    else: null
+  }
+
+// A quick sanity check that magnitude really does order brightness the
+// astronomical way round: smaller (even negative) numbers are brighter.
+// Checked at build time, not just asserted in a test file elsewhere.
+example brighterObjectHasLowerMagnitude {
+  val sirius = new Sighting("21:00", "Sirius", "S", "A0", -1.46, 5)
+  val rigel = new Sighting("21:05", "Rigel", "S", "B8", 0.13, 5)
+  sirius.magnitude() < rigel.magnitude()
+}
+
+// ---- synthetic log, generated in-memory so the sample runs anywhere ----
+
+def buildLog(): String {
+  val names   = ["Sirius", "Jupiter", "Halley", "Rigel", "Saturn", "Vega", "Encke"]
+  val codes   = ["S", "P", "C", "S", "P", "S", "C"]
+  val details = ["A0", "ring", "980", "B8", "none", "A0", "2200"]
+  val mags    = [-1.46, -2.94, 6.5, 0.13, 0.46, 0.03, 8.9]
+
+  val lines = new ArrayList[String]()
+  var i = 0
+  while i < 21 {
+    val idx    = i % names.size
+    val name   = names[idx] as String
+    val code   = codes[idx] as String
+    val detail = details[idx] as String
+    val mag    = mags[idx] as Double
+    val hour   = 19 + (i % 5)
+    val minute = (i * 11) % 60
+    val stamp  = (if hour < 10 { "0" + hour } else { "" + hour }) + ":" +
+                 (if minute < 10 { "0" + minute } else { "" + minute })
+    val exposure = 3 + (i % 30)
+
+    if i % 9 == 0 {
+      // malformed line: magnitude is missing its "mag=" prefix, so the whole
+      // line fails to match `Sighting::line()`'s pattern.
+      lines.add(stamp + " " + name + " " + code + " " + detail + " " + mag + " " + exposure + "min")
+    } else {
+      lines.add(stamp + " " + name + " " + code + " " + detail + " mag=" + mag + " " + exposure + "min")
+    }
+    i = i + 1
+  }
+  return Strings::join(lines, "\n")
+}
+
+// ---- run the batch ----
+
+val origin = Origin::atLine("observatory.log", 1)
+val outcomes = Sighting::line().eachLine(buildLog(), origin)
+val sightings = Outcome::values(outcomes)
+val defects = Outcome::defects(outcomes)
+
+IO::println("observatory.log")
+IO::println("  #{outcomes.size} lines, #{sightings.size} read, #{defects.size} not read")
+var shown = 0
+foreach d: Defect in defects {
+  if shown < 3 {
+    IO::println("  line #{d.origin().line()}: #{d.expected()}")
+    shown = shown + 1
+  }
+}
+IO::println("")
+
+// ---- classify every readable sighting, dropping unrecognized kind codes ----
+
+val entries = new ArrayList[Entry]()
+val unclassified = new ArrayList[Sighting]()
+foreach s: Sighting in sightings {
+  val k = toKind(s.kindCode(), s.detail())
+  if k == null { unclassified.add(s) } else { entries.add(new Entry(s, k as ObjectKind)) }
+}
+IO::println("classified #{entries.size} of #{sightings.size} readable sightings (#{unclassified.size} unrecognized)")
+IO::println("")
+
+// ---- brightest objects first, via sortedBy ----
+
+val brightest = entries.sortedBy { e -> (e as Entry).sighting().magnitude() }
+IO::println("brightest objects tonight:")
+var shownEntries = 0
+foreach e: Entry in brightest {
+  if shownEntries < 3 {
+    IO::println("  " + e.describe())
+    shownEntries = shownEntries + 1
+  }
+}
+IO::println("")
+
+// ---- naked-eye-visible tally, via filter ----
+
+val visible = entries.filter { e -> (e as Entry).sighting().magnitude().isNakedEyeBright() }
+IO::println("naked-eye visible: #{visible.size} of #{entries.size}")
+IO::println("")
+
+// ---- total exposure minutes, via fold ----
+
+val totalMinutes = entries.fold(0) { acc, e -> (acc as Int) + (e as Entry).sighting().minutes() }
+IO::println("total exposure: #{totalMinutes} minutes")
+
+// ---- exposure by object kind, via groupBy + foreach (k, v) ----
+
+val byKind = entries.groupBy { e -> (e as Entry).kind().label() }
+IO::println("")
+IO::println("exposure by kind:")
+foreach (label, kindEntries) in byKind {
+  val kindMinutes = (kindEntries as List).fold(0) { acc, e -> (acc as Int) + (e as Entry).sighting().minutes() }
+  IO::println("  #{label}: #{(kindEntries as List).size} sighting(s), #{kindMinutes} minutes")
+}
+
+// ---- try/catch: the log format rejects a non-positive exposure outright ----
+
+def requirePositiveMinutes(minutes: Int): Int {
+  if minutes <= 0 { throw new IllegalArgumentException("exposure minutes must be > 0, got " + minutes) }
+  return minutes
+}
+
+IO::println("")
+try {
+  requirePositiveMinutes(0)
+} catch e: IllegalArgumentException {
+  IO::println("rejected: #{e.getMessage()}")
+}
+
+// ---- a closer look: two lines side by side, one clean and one broken ----
+
+val sample =
+  "21:00 Sirius S A0 mag=-1.46 5min\n" +
+  "21:05 UFO X unknown 99.9 1min\n"
+IO::println("")
+IO::println("a closer look:")
+foreach o: Outcome[Sighting] in Sighting::line().eachLine(sample, origin) {
+  if o.isOk() {
+    IO::println("  ok:  " + o.get().name() + " -> " + o.get().kindCode())
+  } else {
+    IO::println("  bad: " + o.describe())
+  }
+}

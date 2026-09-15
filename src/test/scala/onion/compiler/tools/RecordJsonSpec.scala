@@ -36,9 +36,7 @@ class RecordJsonSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
 
-    // NB: a Float component is read from JSON rather than built with a `2.5f` literal —
-    // the `f`/`F` literal suffix is currently unparsed by the lexer (unrelated to derive!).
-    it("round-trips a Float component") {
+    it("round-trips a Float component read from JSON") {
       val result = shell.run(
         """
           |record F(ratio: Float) derive!(Json)
@@ -49,6 +47,27 @@ class RecordJsonSpec extends AbstractShellSpec {
           |    if v == null { return "null" }
           |    val v2 = F::fromJson(F::toJson(v))
           |    if v2 != null && v2 == v { return "ok" } else { return "ng" }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("round-trips a Float component built from a literal `f`/`F` suffix") {
+      val result = shell.run(
+        """
+          |record F(ratio: Float) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v1 = new F(2.5f)
+          |    val v2 = new F(3.5F)
+          |    val r1 = F::fromJson(F::toJson(v1))
+          |    val r2 = F::fromJson(F::toJson(v2))
+          |    if r1 != null && r1 == v1 && r2 != null && r2 == v2 { return "ok" } else { return "ng" }
           |  }
           |}
           |""".stripMargin,

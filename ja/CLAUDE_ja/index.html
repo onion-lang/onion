@@ -5807,6 +5807,14 @@
 <td><code>record Point(x: Int, y: Int)</code> - コンストラクタ形式</td>
 </tr>
 <tr>
+<td><code>data class Point(val x: Int, val y: Int)</code>（Kotlin風）</td>
+<td><code>record Point(x: Int, y: Int)</code> - コンポーネントリストに<code>val</code>/<code>var</code>は書かない</td>
+</tr>
+<tr>
+<td><code>case class Point(x: Int, y: Int)</code>（Scala風）</td>
+<td><code>record Point(x: Int, y: Int)</code> - 同じ考え方で、コンポーネントリストに<code>val</code>/<code>var</code>は書かない</td>
+</tr>
+<tr>
 <td><code>point.x</code> でレコードフィールド</td>
 <td><code>point.x()</code> - レコードフィールドはメソッド（括弧必要）</td>
 </tr>

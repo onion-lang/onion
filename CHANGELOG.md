@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A resource in `try (val r = ...) { ... }` was closed twice whenever a `return`, `break`, or `continue` inside the try body exited early and the resource's own `close()` threw** — e.g. `try (val r = new R()) { return 1 }` where `r.close()` throws called `close()` a second time from the try statement's own exception handler, after already having called it once on the early-exit path; the second call ran regardless of whether a `catch`/`finally` was present, so any resource that isn't idempotent under a repeated `close()` (releasing a lock twice, double-freeing a native handle) is affected. `ControlFlowEmitter.emitTry`'s resource-closing branches guard against a *second* close using a `closedFlag` set right before the "normal completion" close attempt emitted after the try body — but a `return`/`break`/`continue` exits early via a separate finally-stack callback (used to run enclosing `try`/`synchronized` cleanup on non-local exits) that closed the resources without ever setting that flag, so a close failure there reached the shared exception handler with the flag still unset, which then attempted the close again. Both resource-closing branches (with and without an accompanying `catch`) now set `closedFlag` in that same early-exit callback before attempting the close, so the guard reflects reality on every exit path and each resource's `close()` runs at most once, matching `java.lang.AutoCloseable`/JLS 14.20.3 semantics.
+
 ## [0.77.0] - 2026-09-15
 
 ### Fixed

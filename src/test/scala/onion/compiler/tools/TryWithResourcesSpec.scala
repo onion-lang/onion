@@ -461,5 +461,139 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       // clause on the try-with-resources statement to route the exception through.
       assert(Shell.Success("try,closing,finally,caught:closeFail") == result)
     }
+
+    it("should close a resource only once when a `return` inside the try body races a failing close() (no catch/finally)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class FailingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closing,");
+          |    throw new RuntimeException("closeFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def helper(log: StringBuilder): String {
+          |    try (val r = new FailingResource(log)) {
+          |      log.append("try,");
+          |      return "unreachable";
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      helper(log);
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // A `return` inside the try body must run the same resource-close path as
+      // normal completion -- close() must be attempted exactly once, not once on
+      // the return's own early-exit path and again when the resulting exception
+      // reaches the try's exception handler.
+      assert(Shell.Success("try,closing,caught:closeFail") == result)
+    }
+
+    it("should close a resource only once when a `return` inside the try body races a failing close() (with finally, no catch)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class FailingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closing,");
+          |    throw new RuntimeException("closeFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def helper(log: StringBuilder): String {
+          |    try (val r = new FailingResource(log)) {
+          |      log.append("try,");
+          |      return "unreachable";
+          |    } finally {
+          |      log.append("finally,");
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      helper(log);
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("try,closing,finally,caught:closeFail") == result)
+    }
+
+    it("should close a resource only once when a `return` inside the try body races a failing close() (with catch and finally)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class FailingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closing,");
+          |    throw new RuntimeException("closeFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def helper(log: StringBuilder): String {
+          |    try (val r = new FailingResource(log)) {
+          |      log.append("try,");
+          |      return "unreachable";
+          |    } catch e: IllegalStateException {
+          |      log.append("wrong-catch,");
+          |      return "wrong";
+          |    } finally {
+          |      log.append("finally,");
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      helper(log);
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // The close() failure (a RuntimeException) doesn't match the declared catch
+      // type (IllegalStateException), so it falls through to the catch-all rethrow
+      // path -- which must also only attempt the close once.
+      assert(Shell.Success("try,closing,finally,caught:closeFail") == result)
+    }
   }
 }

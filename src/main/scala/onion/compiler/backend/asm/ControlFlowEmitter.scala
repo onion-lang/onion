@@ -17,6 +17,10 @@ final class ControlFlowEmitter(
   // do it for us); each is emitted inline on the return path.
   private var finallyStack: List[() => Unit] = Nil
 
+  // Marks the argument thunk's emitted bytecode as a "hole" excluded from the
+  // enclosing try/catch/synchronized's own handler ranges; see `withFinally`.
+  private type HoleMarker = (() => Unit) => Unit
+
   private def runPendingFinallies(): Unit = runFinalliesDownTo(0)
 
   /** Emit the finally blocks entered since the finally-stack was `depth` deep
@@ -33,9 +37,58 @@ final class ControlFlowEmitter(
       remaining = remaining.tail
     finallyStack = pending
 
-  private def withFinally[A](emitFinally: () => Unit)(body: => A): A =
-    finallyStack = emitFinally :: finallyStack
-    try body finally finallyStack = finallyStack.tail
+  /** Runs `body` with `emitFinally` registered as the innermost pending finally. If a
+    * `return`/`break`/`continue` inside `body` runs it early (via `runFinalliesDownTo`),
+    * that inline invocation happens while `body` is still being emitted -- i.e. inside
+    * whatever bytecode region the caller protects with its own catch/catch-all handlers
+    * for this same try/catch/synchronized construct. `emitFinally` receives a `hole`
+    * marker it must wrap around the part of its own emission (typically just the user
+    * `finally` block, or a monitor release / resource close standing in for one) whose
+    * *own* exception must not be handed back to this same construct's handlers --
+    * misrouted into a sibling `catch`, or re-run a second time by the normal exception
+    * path, instead of propagating past it per JLS 14.20.2. Code emitted outside of
+    * `hole` (e.g. a resource close that legitimately should be caught like a body
+    * exception, per JLS 14.20.3.1) stays part of the protected region as before. Each
+    * NOP-guarded (start, end) hole is collected and returned alongside `body`'s result,
+    * for the caller to exclude from its own handler ranges with `catchExcluding`; the
+    * trailing NOP guarantees the following span (up to the next hole or to the region's
+    * end) is never zero-length, which the JVM rejects as an illegal exception table
+    * range. The region's own start must likewise never be immediately followed by a
+    * hole with nothing emitted in between -- callers guard that with their own leading
+    * NOP (as `markTryRegion` already does). */
+  private def withFinally[A](emitFinally: HoleMarker => Unit)(body: => A): (A, List[(org.objectweb.asm.Label, org.objectweb.asm.Label)]) =
+    val holes = scala.collection.mutable.ListBuffer.empty[(org.objectweb.asm.Label, org.objectweb.asm.Label)]
+    val markHole: HoleMarker = (f: () => Unit) => {
+      val holeStart = gen.mark()
+      f()
+      val holeEnd = gen.mark()
+      gen.visitInsn(Opcodes.NOP)
+      holes += ((holeStart, holeEnd))
+    }
+    val guarded: () => Unit = () => emitFinally(markHole)
+    finallyStack = guarded :: finallyStack
+    val result = try body finally finallyStack = finallyStack.tail
+    (result, holes.toList)
+
+  /** `withFinally` where the entire `emitFinally` body is the hole (the common case: a
+    * plain `finally` with no resources to close first). */
+  private def withWholeFinally[A](emitFinally: () => Unit)(body: => A): (A, List[(org.objectweb.asm.Label, org.objectweb.asm.Label)]) =
+    withFinally((hole: HoleMarker) => hole(emitFinally))(body)
+
+  /** Like `gen.catchException(start, end, tp)`, but split around any `holes` (each a
+    * (start, end) pair from `withFinally`) so an exception raised while re-running this
+    * try/catch's own finally on an early exit is not handed to this same handler. */
+  private def catchExcluding(
+    start: org.objectweb.asm.Label,
+    end: org.objectweb.asm.Label,
+    holes: List[(org.objectweb.asm.Label, org.objectweb.asm.Label)],
+    tp: AsmType
+  ): Unit =
+    var cur = start
+    for (holeStart, holeEnd) <- holes do
+      gen.catchException(cur, holeStart, tp)
+      cur = holeEnd
+    gen.catchException(cur, end, tp)
 
   def emitStatementBlock(node: StatementBlock): Unit =
     for stmt <- node.statements do
@@ -189,10 +242,13 @@ final class ControlFlowEmitter(
     gen.monitorEnter()
 
     val tryStart = gen.mark()
+    // Guard against a zero-length first segment if `emitBody`'s very first statement
+    // is the return/break/continue that runs the finally below (see markTryRegion).
+    gen.visitInsn(Opcodes.NOP)
     // Release the monitor on a non-local exit too: a `return`/`break`/`continue`
     // inside the body must run monitorExit, or the monitor leaks (and the codegen
     // throws IllegalMonitorStateException). Same mechanism as try-finally.
-    withFinally(() => { gen.loadLocal(lockSlot); gen.monitorExit() }) { emitBody }
+    val (_, holes) = withWholeFinally(() => { gen.loadLocal(lockSlot); gen.monitorExit() }) { emitBody }
     val tryEnd = gen.mark()
 
     val resultSlot = storeResultIfNeeded(resultType)
@@ -206,7 +262,7 @@ final class ControlFlowEmitter(
 
     // Exception handler: release monitor and rethrow
     // catchException creates label and registers handler at current position
-    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+    catchExcluding(tryStart, tryEnd, holes, AsmType.getType(classOf[Throwable]))
     gen.loadLocal(lockSlot)
     gen.monitorExit()
     gen.throwException()
@@ -378,7 +434,7 @@ final class ControlFlowEmitter(
     } else if (node.catchTypes.length == 0) {
       // Try-finally (with or without resources)
       if (node.resources.isEmpty) {
-        val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
+        val ((tryStart, tryEnd), holes) = withWholeFinally(() => emitFinallyWithResources()) { markTryRegion() }
 
         // Normal completion: execute finally and jump to end
         emitFinallyWithResources()
@@ -386,7 +442,7 @@ final class ControlFlowEmitter(
         gen.goTo(endLabel)
 
         // Exception handler: save exception, execute finally, rethrow
-        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        catchExcluding(tryStart, tryEnd, holes, AsmType.getType(classOf[Throwable]))
         val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
         gen.storeLocal(exSlot)
         emitFinallyWithResources(exSlot)
@@ -403,8 +459,16 @@ final class ControlFlowEmitter(
         // post-body close, so it must set closedFlag itself before attempting the
         // close -- otherwise a close() failure here lands in the exception handler
         // below with the flag still 0, and the resources get closed a second time.
-        val (tryStart, tryEnd) =
-          withFinally(() => { gen.push(1); gen.storeLocal(closedFlag); emitFinallyWithResources() }) {
+        // Only the user `finally` block itself (not the resource close) is marked as
+        // a hole: a close() failure here must still reach this try's own handler
+        // exactly like the normal-completion close path does (JLS 14.20.3.1), but the
+        // `finally` block's own throw must not (JLS 14.20.2).
+        val ((tryStart, tryEnd), holes) =
+          withFinally((hole: HoleMarker) => {
+            gen.push(1); gen.storeLocal(closedFlag)
+            emitCloseResources()
+            if (node.finallyStatement != null) then hole(() => visitStatement(node.finallyStatement))
+          }) {
             markTryRegionWithResourceClose(closedFlag)
           }
 
@@ -417,7 +481,7 @@ final class ControlFlowEmitter(
         // so close them here) and a close() exception from the normal-completion
         // attempt above (resources already closed -- closedFlag guards against
         // closing them a second time).
-        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        catchExcluding(tryStart, tryEnd, holes, AsmType.getType(classOf[Throwable]))
         val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
         gen.storeLocal(exSlot)
         val alreadyClosed = gen.newLabel()
@@ -434,7 +498,7 @@ final class ControlFlowEmitter(
     } else {
       // Try-catch-finally (with or without resources)
       if (node.resources.isEmpty) {
-        val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
+        val ((tryStart, tryEnd), holes) = withWholeFinally(() => emitFinallyWithResources()) { markTryRegion() }
 
         // Normal completion: execute finally and jump to end
         emitFinallyWithResources()
@@ -449,7 +513,7 @@ final class ControlFlowEmitter(
         for i <- node.catchTypes.indices do
           val catchType = node.catchTypes(i)
           val catchStmt = node.catchStatements(i)
-          gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+          catchExcluding(tryStart, tryEnd, holes, asmType(catchType.tp))
           val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
           gen.storeLocal(slot)
           // Close resources before catch block (Java try-with-resources spec). Pass the
@@ -463,13 +527,15 @@ final class ControlFlowEmitter(
           // than propagate straight past it; the catch body is wrapped in its own
           // protected region for that.
           val catchBodyStart = gen.mark()
-          withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          // Guard against a zero-length first segment (see markTryRegion/tryStart above).
+          gen.visitInsn(Opcodes.NOP)
+          val (_, catchHoles) = withWholeFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
           val catchBodyEnd = gen.mark()
           // Normal catch completion: execute user finally
           emitCatchFinally()
           gen.goTo(endLabel)
 
-          gen.catchException(catchBodyStart, catchBodyEnd, AsmType.getType(classOf[Throwable]))
+          catchExcluding(catchBodyStart, catchBodyEnd, catchHoles, AsmType.getType(classOf[Throwable]))
           val catchExSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
           gen.storeLocal(catchExSlot)
           emitCatchFinally()
@@ -477,7 +543,7 @@ final class ControlFlowEmitter(
           gen.throwException()
 
         // Catch-all handler for uncaught exceptions (finally + rethrow)
-        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        catchExcluding(tryStart, tryEnd, holes, AsmType.getType(classOf[Throwable]))
         val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
         gen.storeLocal(exSlot)
         emitFinallyWithResources(exSlot)
@@ -491,9 +557,14 @@ final class ControlFlowEmitter(
         gen.storeLocal(closedFlag)
         // See the no-catch resources branch above: a `return`/`break`/`continue`
         // inside the try body exits early through this finallyStack entry, so it
-        // must set closedFlag itself before attempting the close.
-        val (tryStart, tryEnd) =
-          withFinally(() => { gen.push(1); gen.storeLocal(closedFlag); emitFinallyWithResources() }) {
+        // must set closedFlag itself before attempting the close. Only the user
+        // `finally` block itself is marked as a hole, not the resource close.
+        val ((tryStart, tryEnd), holes) =
+          withFinally((hole: HoleMarker) => {
+            gen.push(1); gen.storeLocal(closedFlag)
+            emitCloseResources()
+            if (node.finallyStatement != null) then hole(() => visitStatement(node.finallyStatement))
+          }) {
             markTryRegionWithResourceClose(closedFlag)
           }
 
@@ -514,7 +585,7 @@ final class ControlFlowEmitter(
         for i <- node.catchTypes.indices do
           val catchType = node.catchTypes(i)
           val catchStmt = node.catchStatements(i)
-          gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+          catchExcluding(tryStart, tryEnd, holes, asmType(catchType.tp))
           val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
           gen.storeLocal(slot)
           val alreadyClosed = gen.newLabel()
@@ -529,13 +600,15 @@ final class ControlFlowEmitter(
           // than propagate straight past it; the catch body is wrapped in its own
           // protected region for that.
           val catchBodyStart = gen.mark()
-          withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          // Guard against a zero-length first segment (see markTryRegion/tryStart above).
+          gen.visitInsn(Opcodes.NOP)
+          val (_, catchHoles) = withWholeFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
           val catchBodyEnd = gen.mark()
           // Normal catch completion: execute user finally
           emitCatchFinally()
           gen.goTo(endLabel)
 
-          gen.catchException(catchBodyStart, catchBodyEnd, AsmType.getType(classOf[Throwable]))
+          catchExcluding(catchBodyStart, catchBodyEnd, catchHoles, AsmType.getType(classOf[Throwable]))
           val catchExSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
           gen.storeLocal(catchExSlot)
           emitCatchFinally()
@@ -543,7 +616,7 @@ final class ControlFlowEmitter(
           gen.throwException()
 
         // Catch-all handler for uncaught exceptions (finally + rethrow)
-        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        catchExcluding(tryStart, tryEnd, holes, AsmType.getType(classOf[Throwable]))
         val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
         gen.storeLocal(exSlot)
         val alreadyClosedAll = gen.newLabel()

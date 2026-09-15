@@ -156,6 +156,7 @@ final class SelectExpressionTyping(
 
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
+    var reportedNonExhaustive = false // NON_EXHAUSTIVE_PATTERN_MATCH (E0042) was just reported below
     if (node.elseBlock == null && !hasWildcardPattern) {
       // A parameterized scrutinee (`Opt[String]`) is an AppliedClassType, not a
       // ClassDefinition, so without unwrapping it here a generic sealed
@@ -185,6 +186,7 @@ final class SelectExpressionTyping(
             }
             if (missingTypes.nonEmpty) {
               bodyContext.report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missingTypes.map(_.asInstanceOf[Type]))
+              reportedNonExhaustive = true
             } else {
               isExhaustive = true
             }
@@ -207,6 +209,7 @@ final class SelectExpressionTyping(
             val missing = constantNames.filterNot(matchedNames.contains)
             if (missing.nonEmpty) {
               bodyContext.report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missing.toArray)
+              reportedNonExhaustive = true
             } else {
               isExhaustive = true
             }
@@ -220,7 +223,21 @@ final class SelectExpressionTyping(
     if (elseTerm == null) break(None)
 
     val resultType =
-      if (node.elseBlock == null && !isExhaustive) BasicType.VOID
+      if (node.elseBlock == null && !isExhaustive) {
+        // Normally a non-exhaustive select without an `else` degrades to VOID,
+        // which is correct when nothing else has flagged the gap (e.g. a plain
+        // non-sealed scrutinee): using it as a value is then rightly rejected
+        // downstream with CANNOT_RETURN_VALUE (E0020), the only diagnostic for
+        // that case. But when the exhaustiveness check just reported E0042
+        // above, forcing VOID here made an EXPRESSION-position select (a
+        // method's `= expr` body, an explicit `return`, ...) also mismatch its
+        // expected type and cascade a second, misleading E0020 for the same
+        // root cause. Falling back to the expected type instead avoids that
+        // redundant diagnostic; the program still fails to compile on E0042
+        // alone, so no invalid bytecode is ever generated for it.
+        if (reportedNonExhaustive && !asStatement && branchExpected != null) branchExpected
+        else BasicType.VOID
+      }
       else {
         // Unify the branch value types via LUB. In EXPRESSION position a failure
         // (e.g. a void branch where a value is required) is a real error and is

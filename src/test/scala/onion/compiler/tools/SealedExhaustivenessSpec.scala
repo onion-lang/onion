@@ -56,5 +56,30 @@ class SealedExhaustivenessSpec extends AbstractShellSpec {
           |""".stripMargin)
       assert(codes.contains(Some("E0042")), s"expected E0042, got: $codes")
     }
+    it("reports only E0042, not a spurious E0020, for a non-exhaustive select used as a method's expression body") {
+      val codes = errorCodes(
+        """
+          |enum Shape {
+          |  case Circle(radius: Double)
+          |  case Square(side: Double)
+          |public:
+          |  def area(): Double = select this {
+          |    case c is Circle: 3.14 * c.radius() * c.radius()
+          |  }
+          |}
+          |""".stripMargin)
+      assert(codes.contains(Some("E0042")), s"expected E0042, got: $codes")
+      assert(!codes.contains(Some("E0020")), s"did not expect a secondary E0020 alongside E0042, got: $codes")
+    }
+    it("reports only E0042, not a spurious E0020, for a non-exhaustive select in an explicit return statement") {
+      val codes = errorCodes(
+        """
+          |sealed interface Shape {}
+          |class Circle conforms Shape { public: def this { } }
+          |class Square conforms Shape { public: def this { } }
+          |def name(s: Shape): String { return select s { case c is Circle: "circle" } }
+          |""".stripMargin)
+      assert(!codes.contains(Some("E0020")), s"did not expect a secondary E0020 alongside E0042, got: $codes")
+    }
   }
 }

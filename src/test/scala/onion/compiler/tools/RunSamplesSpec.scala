@@ -845,5 +845,485 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(output.contains("/missing -> HTTP/1.1 404 Not Found | Not Found"))
       assert(output.contains("stopped"))
     }
+
+    it("runs AnagramSolver.on") {
+      assert(Shell.Success(null) == runSample("run/AnagramSolver.on"))
+    }
+
+    it("runs AntColony.on") {
+      assert(Shell.Success(null) == runSample("run/AntColony.on"))
+    }
+
+    it("runs AstronomyCatalog.on") {
+      assert(Shell.Success(null) == runSample("run/AstronomyCatalog.on"))
+    }
+
+    it("runs BattleshipSim.on") {
+      assert(Shell.Success(null) == runSample("run/BattleshipSim.on"))
+    }
+
+    it("runs BinaryHeap.on") {
+      assert(Shell.Success(null) == runSample("run/BinaryHeap.on"))
+    }
+
+    it("runs Blockchain.on") {
+      assert(Shell.Success(null) == runSample("run/Blockchain.on"))
+    }
+
+    it("runs BowlingGame.on") {
+      assert(Shell.Success(null) == runSample("run/BowlingGame.on"))
+    }
+
+    it("runs BrainFuck.on") {
+      assert(Shell.Success(null) == runSample("run/BrainFuck.on"))
+    }
+
+    it("runs BuildSim.on") {
+      assert(Shell.Success(null) == runSample("run/BuildSim.on"))
+    }
+
+    it("runs CalendarManager.on") {
+      assert(Shell.Success(null) == runSample("run/CalendarManager.on"))
+    }
+
+    it("runs CellularAutomata.on") {
+      assert(Shell.Success(null) == runSample("run/CellularAutomata.on"))
+    }
+
+    it("runs Chess.on") {
+      assert(Shell.Success(null) == runSample("run/Chess.on"))
+    }
+
+    it("runs CircuitBreakerSim.on") {
+      assert(Shell.Success(null) == runSample("run/CircuitBreakerSim.on"))
+    }
+
+    it("runs CircuitSimulator.on") {
+      assert(Shell.Success(null) == runSample("run/CircuitSimulator.on"))
+    }
+
+    it("runs ColorPalette.on") {
+      assert(Shell.Success(null) == runSample("run/ColorPalette.on"))
+    }
+
+    it("runs CommitAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/CommitAnalyzer.on"))
+    }
+
+    it("runs ConnectFour.on") {
+      assert(Shell.Success(null) == runSample("run/ConnectFour.on"))
+    }
+
+    it("runs ContactBook.on") {
+      assert(Shell.Success(null) == runSample("run/ContactBook.on"))
+    }
+
+    it("runs CpuScheduler.on") {
+      assert(Shell.Success(null) == runSample("run/CpuScheduler.on"))
+    }
+
+    it("runs CronScheduler.on") {
+      assert(Shell.Success(null) == runSample("run/CronScheduler.on"))
+    }
+
+    it("runs CryptArithmetic.on") {
+      assert(Shell.Success(null) == runSample("run/CryptArithmetic.on"))
+    }
+
+    it("runs CustomerLoyalty.on") {
+      assert(Shell.Success(null) == runSample("run/CustomerLoyalty.on"))
+    }
+
+    it("runs DNAAnalysis.on") {
+      assert(Shell.Success(null) == runSample("run/DNAAnalysis.on"))
+    }
+
+    it("runs DiscreteEventSim.on") {
+      assert(Shell.Success(null) == runSample("run/DiscreteEventSim.on"))
+    }
+
+    it("runs DpShowcase.on") {
+      assert(Shell.Success(null) == runSample("run/DpShowcase.on"))
+    }
+
+    it("runs DungeonCrawler.on") {
+      assert(Shell.Success(null) == runSample("run/DungeonCrawler.on"))
+    }
+
+    it("runs EpidemiologySim.on") {
+      assert(Shell.Success(null) == runSample("run/EpidemiologySim.on"))
+    }
+
+    it("runs ExpenseAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/ExpenseAnalyzer.on"))
+    }
+
+    it("runs ExpenseTracker.on") {
+      assert(Shell.Success(null) == runSample("run/ExpenseTracker.on"))
+    }
+
+    it("runs FamilyTree.on") {
+      assert(Shell.Success(null) == runSample("run/FamilyTree.on"))
+    }
+
+    it("runs FileSystemSim.on") {
+      assert(Shell.Success(null) == runSample("run/FileSystemSim.on"))
+    }
+
+    it("runs FinanceTracker.on") {
+      assert(Shell.Success(null) == runSample("run/FinanceTracker.on"))
+    }
+
+    it("runs FlashcardDeck.on") {
+      assert(Shell.Success(null) == runSample("run/FlashcardDeck.on"))
+    }
+
+    it("runs FlightDelayReport.on") {
+      assert(Shell.Success(null) == runSample("run/FlightDelayReport.on"))
+    }
+
+    it("runs ForthMachine.on") {
+      assert(Shell.Success(null) == runSample("run/ForthMachine.on"))
+    }
+
+    it("runs FullTextSearch.on") {
+      assert(Shell.Success(null) == runSample("run/FullTextSearch.on"))
+    }
+
+    it("runs GeneticAlgorithm.on") {
+      assert(Shell.Success(null) == runSample("run/GeneticAlgorithm.on"))
+    }
+
+    it("runs GraphPathfinder.on") {
+      assert(Shell.Success(null) == runSample("run/GraphPathfinder.on"))
+    }
+
+    it("runs HMTypeInference.on") {
+      assert(Shell.Success(null) == runSample("run/HMTypeInference.on"))
+    }
+
+    it("runs HabitTracker.on") {
+      assert(Shell.Success(null) == runSample("run/HabitTracker.on"))
+    }
+
+    it("runs HuffmanCode.on") {
+      assert(Shell.Success(null) == runSample("run/HuffmanCode.on"))
+    }
+
+    it("runs IntervalCalendar.on") {
+      assert(Shell.Success(null) == runSample("run/IntervalCalendar.on"))
+    }
+
+    it("runs Kalah.on") {
+      assert(Shell.Success(null) == runSample("run/Kalah.on"))
+    }
+
+    it("runs KnapsackAdvisor.on") {
+      assert(Shell.Success(null) == runSample("run/KnapsackAdvisor.on"))
+    }
+
+    it("runs LSystem.on") {
+      assert(Shell.Success(null) == runSample("run/LSystem.on"))
+    }
+
+    it("runs LambdaCalc.on") {
+      assert(Shell.Success(null) == runSample("run/LambdaCalc.on"))
+    }
+
+    it("runs LispInterp.on") {
+      assert(Shell.Success(null) == runSample("run/LispInterp.on"))
+    }
+
+    it("runs LogCorrelator.on") {
+      assert(Shell.Success(null) == runSample("run/LogCorrelator.on"))
+    }
+
+    it("runs LogDispatch.on") {
+      assert(Shell.Success(null) == runSample("run/LogDispatch.on"))
+    }
+
+    it("runs Mandelbrot.on") {
+      assert(Shell.Success(null) == runSample("run/Mandelbrot.on"))
+    }
+
+    it("runs MarkovText.on") {
+      assert(Shell.Success(null) == runSample("run/MarkovText.on"))
+    }
+
+    it("runs Mastermind.on") {
+      assert(Shell.Success(null) == runSample("run/Mastermind.on"))
+    }
+
+    it("runs MaxFlow.on") {
+      assert(Shell.Success(null) == runSample("run/MaxFlow.on"))
+    }
+
+    it("runs Measurements.on") {
+      assert(Shell.Success(null) == runSample("run/Measurements.on"))
+    }
+
+    it("runs Minesweeper.on") {
+      assert(Shell.Success(null) == runSample("run/Minesweeper.on"))
+    }
+
+    it("runs MinesweeperSim.on") {
+      assert(Shell.Success(null) == runSample("run/MinesweeperSim.on"))
+    }
+
+    it("runs MiniGit.on") {
+      assert(Shell.Success(null) == runSample("run/MiniGit.on"))
+    }
+
+    it("runs MiniSQL.on") {
+      assert(Shell.Success(null) == runSample("run/MiniSQL.on"))
+    }
+
+    it("runs MiniVcs.on") {
+      assert(Shell.Success(null) == runSample("run/MiniVcs.on"))
+    }
+
+    it("runs MorseCode.on") {
+      assert(Shell.Success(null) == runSample("run/MorseCode.on"))
+    }
+
+    it("runs MortgageCalc.on") {
+      assert(Shell.Success(null) == runSample("run/MortgageCalc.on"))
+    }
+
+    it("runs MusicEngine.on") {
+      assert(Shell.Success(null) == runSample("run/MusicEngine.on"))
+    }
+
+    it("runs MusicTheory.on") {
+      assert(Shell.Success(null) == runSample("run/MusicTheory.on"))
+    }
+
+    it("runs NetCidr.on") {
+      assert(Shell.Success(null) == runSample("run/NetCidr.on"))
+    }
+
+    it("runs NetFlowAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/NetFlowAnalyzer.on"))
+    }
+
+    it("runs NeuralNet.on") {
+      assert(Shell.Success(null) == runSample("run/NeuralNet.on"))
+    }
+
+    it("runs NumberFormats.on") {
+      assert(Shell.Success(null) == runSample("run/NumberFormats.on"))
+    }
+
+    it("runs NumberTheory.on") {
+      assert(Shell.Success(null) == runSample("run/NumberTheory.on"))
+    }
+
+    it("runs Othello.on") {
+      assert(Shell.Success(null) == runSample("run/Othello.on"))
+    }
+
+    it("runs PackageDelivery.on") {
+      assert(Shell.Success(null) == runSample("run/PackageDelivery.on"))
+    }
+
+    it("runs PackageInstaller.on") {
+      assert(Shell.Success(null) == runSample("run/PackageInstaller.on"))
+    }
+
+    it("runs PacketInspector.on") {
+      assert(Shell.Success(null) == runSample("run/PacketInspector.on"))
+    }
+
+    it("runs ParallelCrawler.on") {
+      assert(Shell.Success(null) == runSample("run/ParallelCrawler.on"))
+    }
+
+    it("runs ParticlePhysicsSim.on") {
+      assert(Shell.Success(null) == runSample("run/ParticlePhysicsSim.on"))
+    }
+
+    it("runs PasswordAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/PasswordAnalyzer.on"))
+    }
+
+    it("runs PaymentProcessor.on") {
+      assert(Shell.Success(null) == runSample("run/PaymentProcessor.on"))
+    }
+
+    it("runs PersonalFinance.on") {
+      assert(Shell.Success(null) == runSample("run/PersonalFinance.on"))
+    }
+
+    it("runs PetriNet.on") {
+      assert(Shell.Success(null) == runSample("run/PetriNet.on"))
+    }
+
+    it("runs PhysicsSim.on") {
+      assert(Shell.Success(null) == runSample("run/PhysicsSim.on"))
+    }
+
+    it("runs PilotLogbook.on") {
+      assert(Shell.Success(null) == runSample("run/PilotLogbook.on"))
+    }
+
+    it("runs PolyCalc.on") {
+      assert(Shell.Success(null) == runSample("run/PolyCalc.on"))
+    }
+
+    it("runs PolynomialAlgebra.on") {
+      assert(Shell.Success(null) == runSample("run/PolynomialAlgebra.on"))
+    }
+
+    it("runs PowerGrid.on") {
+      assert(Shell.Success(null) == runSample("run/PowerGrid.on"))
+    }
+
+    it("runs PrintShop.on") {
+      assert(Shell.Success(null) == runSample("run/PrintShop.on"))
+    }
+
+    it("runs ProbDataStructures.on") {
+      assert(Shell.Success(null) == runSample("run/ProbDataStructures.on"))
+    }
+
+    it("runs ProjectBuildAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/ProjectBuildAnalyzer.on"))
+    }
+
+    it("runs ProjectTracker.on") {
+      assert(Shell.Success(null) == runSample("run/ProjectTracker.on"))
+    }
+
+    it("runs PropCheck.on") {
+      assert(Shell.Success(null) == runSample("run/PropCheck.on"))
+    }
+
+    it("runs PropLogic.on") {
+      assert(Shell.Success(null) == runSample("run/PropLogic.on"))
+    }
+
+    it("runs QueryEngine.on") {
+      assert(Shell.Success(null) == runSample("run/QueryEngine.on"))
+    }
+
+    it("runs RateLimiter.on") {
+      assert(Shell.Success(null) == runSample("run/RateLimiter.on"))
+    }
+
+    it("runs RationalCalc.on") {
+      assert(Shell.Success(null) == runSample("run/RationalCalc.on"))
+    }
+
+    it("runs RideSharePool.on") {
+      assert(Shell.Success(null) == runSample("run/RideSharePool.on"))
+    }
+
+    it("runs SatSolver.on") {
+      assert(Shell.Success(null) == runSample("run/SatSolver.on"))
+    }
+
+    it("runs ScaleAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/ScaleAnalyzer.on"))
+    }
+
+    it("runs SemanticVersion.on") {
+      assert(Shell.Success(null) == runSample("run/SemanticVersion.on"))
+    }
+
+    it("runs ShiftPlanner.on") {
+      assert(Shell.Success(null) == runSample("run/ShiftPlanner.on"))
+    }
+
+    it("runs SmartHome.on") {
+      assert(Shell.Success(null) == runSample("run/SmartHome.on"))
+    }
+
+    it("runs SpaceStationLog.on") {
+      assert(Shell.Success(null) == runSample("run/SpaceStationLog.on"))
+    }
+
+    it("runs SpreadsheetCalc.on") {
+      assert(Shell.Success(null) == runSample("run/SpreadsheetCalc.on"))
+    }
+
+    it("runs SpreadsheetEngine.on") {
+      assert(Shell.Success(null) == runSample("run/SpreadsheetEngine.on"))
+    }
+
+    it("runs SymbolicMath.on") {
+      assert(Shell.Success(null) == runSample("run/SymbolicMath.on"))
+    }
+
+    it("runs TaxCalculator.on") {
+      assert(Shell.Success(null) == runSample("run/TaxCalculator.on"))
+    }
+
+    it("runs TemplateEngine.on") {
+      assert(Shell.Success(null) == runSample("run/TemplateEngine.on"))
+    }
+
+    it("runs TermRewriter.on") {
+      assert(Shell.Success(null) == runSample("run/TermRewriter.on"))
+    }
+
+    it("runs TerrainGenerator.on") {
+      assert(Shell.Success(null) == runSample("run/TerrainGenerator.on"))
+    }
+
+    it("runs TextDiff.on") {
+      assert(Shell.Success(null) == runSample("run/TextDiff.on"))
+    }
+
+    it("runs TextTransformPipeline.on") {
+      assert(Shell.Success(null) == runSample("run/TextTransformPipeline.on"))
+    }
+
+    it("runs TimeSeries.on") {
+      assert(Shell.Success(null) == runSample("run/TimeSeries.on"))
+    }
+
+    it("runs TollRoadBilling.on") {
+      assert(Shell.Success(null) == runSample("run/TollRoadBilling.on"))
+    }
+
+    it("runs TradeMatchingEngine.on") {
+      assert(Shell.Success(null) == runSample("run/TradeMatchingEngine.on"))
+    }
+
+    it("runs TrainDispatch.on") {
+      assert(Shell.Success(null) == runSample("run/TrainDispatch.on"))
+    }
+
+    it("runs TuringMachine.on") {
+      assert(Shell.Success(null) == runSample("run/TuringMachine.on"))
+    }
+
+    it("runs TuringMachineLab.on") {
+      assert(Shell.Success(null) == runSample("run/TuringMachineLab.on"))
+    }
+
+    it("runs UnionFind.on") {
+      assert(Shell.Success(null) == runSample("run/UnionFind.on"))
+    }
+
+    it("runs VendingMachine.on") {
+      assert(Shell.Success(null) == runSample("run/VendingMachine.on"))
+    }
+
+    it("runs VotingMethods.on") {
+      assert(Shell.Success(null) == runSample("run/VotingMethods.on"))
+    }
+
+    it("runs WordLadder.on") {
+      assert(Shell.Success(null) == runSample("run/WordLadder.on"))
+    }
+
+    it("runs WordSearch.on") {
+      assert(Shell.Success(null) == runSample("run/WordSearch.on"))
+    }
+
+    it("runs WorkoutLog.on") {
+      assert(Shell.Success(null) == runSample("run/WorkoutLog.on"))
+    }
   }
 }

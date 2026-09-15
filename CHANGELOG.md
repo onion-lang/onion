@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.74.0] - 2026-09-15
+
 ### Added
 
 - `run/ObservatoryLog.on` — a telescope-observation-log corpus sample exercising an ADT case-enum with per-case fields (`ObjectKind`), a record `shape` clause with `Outcome`/`Defect` error handling, records with methods, a top-level `example` clause, extension methods on `Double`, collection pipelines (`groupBy`/`sortedBy`/`fold`/`filter`), `select` pattern matching, `foreach` over maps, and `try`/`catch`.

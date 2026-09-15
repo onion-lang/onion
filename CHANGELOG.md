@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.75.0] - 2026-09-15
+
 ### Fixed
 
 - **`try (val r1 = ...; val r2 = ...) { ... }` silently leaked an earlier-declared resource whenever a later-declared resource's `close()` threw an exception** — e.g. with two resources `r1` and `r2` (closed in reverse declaration order per the language spec), `r2.close()` throwing prevented `r1.close()` from ever running, in every shape of the construct (a plain resource try, one combined with `catch`, and one combined with a resource-close failure during exception propagation from the try body). `ControlFlowEmitter.emitTry`'s `emitCloseResources` emitted a straight-line sequence of `close()` calls with no protection around each call, so a thrown exception aborted the remaining (earlier-declared) resources' closes instead of just being reported. Each `close()` call is now wrapped so every resource is still closed regardless of an earlier close failure, with a close-time exception added as a suppressed exception onto whichever exception ends up propagating (the try body's own exception when there is one, matching `java.lang.Throwable.addSuppressed` semantics) rather than replacing it outright.

@@ -241,5 +241,147 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       // Resources should be closed in reverse order: r2 first, then r1
       assert(Shell.Success("try,2,1,") == result)
     }
+
+    it("should still close an earlier-declared resource when a later resource's close() throws (normal completion)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class Resource1 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("1,");
+          |  }
+          |}
+          |class Resource2 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("2closing,");
+          |    throw new RuntimeException("boom2");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      try (val r1 = new Resource1(log); val r2 = new Resource2(log)) {
+          |        log.append("try,");
+          |      }
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // r2 closes first (and throws), but r1 must still be closed afterward instead of being leaked.
+      assert(Shell.Success("try,2closing,1,caught:boom2") == result)
+    }
+
+    it("should still close an earlier-declared resource, and keep the body's exception as primary, when both the body and a later resource's close() throw") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class Resource1 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("1,");
+          |  }
+          |}
+          |class Resource2 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("2closing,");
+          |    throw new RuntimeException("closeFail2");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      try (val r1 = new Resource1(log); val r2 = new Resource2(log)) {
+          |        log.append("try,");
+          |        throw new RuntimeException("bodyfail");
+          |      }
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // The body's exception ("bodyfail") stays the one that propagates; r1 must still be
+      // closed even though r2's close() failed first, and even though a body exception was
+      // already in flight.
+      assert(Shell.Success("try,2closing,1,caught:bodyfail") == result)
+    }
+
+    it("should still close an earlier-declared resource when a later resource's close() throws and the try itself has a catch clause") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class Resource1 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("1,");
+          |  }
+          |}
+          |class Resource2 conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("2closing,");
+          |    throw new RuntimeException("closeFail2");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try (val r1 = new Resource1(log); val r2 = new Resource2(log)) {
+          |      log.append("try,");
+          |      throw new RuntimeException("bodyfail");
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("try,2closing,1,caught:bodyfail") == result)
+    }
   }
 }

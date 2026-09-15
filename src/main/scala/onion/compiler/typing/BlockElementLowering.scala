@@ -377,14 +377,14 @@ final class BlockElementLowering(
         }
       } else if (node.result == null) {
         val expected = BasicType.VOID
-        if (returnType != expected) bodyContext.report(CANNOT_RETURN_VALUE, node)
+        if (returnType != expected) bodyContext.report(CANNOT_RETURN_VALUE, node, returnType)
         new Return(node.location, null)
       } else {
         typed(node.result, context, returnType) match {
           case None =>
             new Return(node.location, null)
           case Some(returned) if returned.`type` == BasicType.VOID =>
-            bodyContext.report(CANNOT_RETURN_VALUE, node)
+            bodyContext.report(CANNOT_RETURN_VALUE, node, returnType)
             new Return(node.location, null)
           case Some(returned) =>
             val value = processAssignable(node.result, returnType, returned)

@@ -399,6 +399,31 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, appendSuggestion(baseMessage, hint))
   }
 
+  /**
+   * Handles MISSING_RETURN with a hint when the declared return type is the
+   * capitalized `Void` class rather than Onion's value-less `void`.
+   */
+  private def reportMissingReturn(position: Location, items: Array[AnyRef]): Unit = {
+    val returnType = items(1).asInstanceOf[TypedAST.Type]
+    val baseMessage = format(message("error.semantic.missingReturn"),
+      Seq(asString(items(0)), typeName(returnType), indefiniteArticled(typeName(returnType))))
+    val hint = if (isJavaLangVoidClass(returnType)) Some(message("suggestion.voidClassReturnType")) else None
+    problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  /**
+   * Handles CANNOT_RETURN_VALUE with the same `Void`-vs-`void` hint as
+   * MISSING_RETURN, for the `return;`/`return <void-expr>` shape of the
+   * same underlying mistake.
+   */
+  private def reportCannotReturnValue(position: Location, items: Array[AnyRef]): Unit = {
+    val baseMessage = message("error.semantic.cannotReturnValue")
+    val hint =
+      if (items.nonEmpty && isJavaLangVoidClass(items(0).asInstanceOf[TypedAST.Type])) Some(message("suggestion.voidClassReturnType"))
+      else None
+    problem(position, appendSuggestion(baseMessage, hint))
+  }
+
   // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -431,6 +456,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportNonExhaustivePatternMatch(position, items)
       case SemanticError.INCOMPATIBLE_TYPE =>
         reportIncompatibleType(position, items)
+      case SemanticError.MISSING_RETURN =>
+        reportMissingReturn(position, items)
+      case SemanticError.CANNOT_RETURN_VALUE =>
+        reportCannotReturnValue(position, items)
 
       // Data-driven cases
       case _ =>
@@ -563,6 +592,15 @@ object SemanticErrorReporter {
     if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
   }
   private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
+  // Detects the easy-to-typo `Void` (capitalized) return type -- the ordinary
+  // boxed reference type `java.lang.Void`, not Onion's value-less `void` --
+  // so MISSING_RETURN/CANNOT_RETURN_VALUE can hint at the likely fix.
+  private def isJavaLangVoidClass(tp: TypedAST.Type): Boolean = tp match {
+    case null => false
+    case n: TypedAST.NullableType => isJavaLangVoidClass(n.innerType)
+    case ct: TypedAST.ClassType => ct.name == "java.lang.Void"
+    case _ => false
+  }
 
   // ========== Message formatting ==========
 

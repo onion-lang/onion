@@ -448,6 +448,63 @@ for var i: Int = 0; i < 10; i = i + 1 {
 
 Output: `1 3 5 7 9`
 
+### Labeled Break and Continue
+
+A loop can carry a label — `name: while ...`, `name: for ...`,
+`name: foreach ...`, or `name: do { ... } while ...` — and `break name` /
+`continue name` (the label must be on the same line as `break`/`continue`)
+targets that specific enclosing loop instead of the innermost one. This is
+the only way to break out of, or continue, an outer loop from inside a
+nested one. Referencing a label that isn't bound to any enclosing loop is
+`[E0058]`.
+
+`break name` exits the labeled loop entirely:
+
+```onion
+outer: for var i: Int = 0; i < 3; i = i + 1 {
+  for var j: Int = 0; j < 3; j = j + 1 {
+    if i == 1 && j == 1 {
+      break outer
+    }
+    println(i + "," + j)
+  }
+}
+```
+
+Output:
+```
+0,0
+0,1
+0,2
+1,0
+```
+
+`continue name` skips the rest of both loop bodies and goes straight to the
+labeled loop's next iteration:
+
+```onion
+outer: for var i: Int = 0; i < 3; i = i + 1 {
+  for var j: Int = 0; j < 3; j = j + 1 {
+    if j == 1 {
+      continue outer
+    }
+    println(i + "," + j)
+  }
+}
+```
+
+Output:
+```
+0,0
+1,0
+2,0
+```
+
+A labeled `break`/`continue` also unwinds correctly through any
+`synchronized` blocks and `try` (including try-with-resources) that lie
+between it and the labeled loop — monitors are exited and resources are
+closed exactly as if control had left them normally.
+
 ## Exception Handling
 
 ### Try-Catch

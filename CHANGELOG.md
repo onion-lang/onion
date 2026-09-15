@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Labeled `break`/`continue` (`outer: while ...`, `break outer`, `continue outer`) — a real, tested language feature with its own diagnostic (`[E0058]` for an unbound label) — was completely undocumented in `docs/guide/control-flow.md`, and `docs/ja/guide/control-flow.md` claimed "ラベル付きの break / continue も使えます" while showing an example with no label at all.** Added a "Labeled Break and Continue" section to the English guide with two examples (label-scoped `break` and `continue`) verified to compile and produce the shown output, a note on unwinding through `synchronized`/try-with-resources, and fixed the Japanese example to actually demonstrate the label syntax. Guarded by `ControlFlowDocLabeledLoopSpec`.
+
 ## [0.79.0] - 2026-09-15
 
 ### Fixed

@@ -67,12 +67,26 @@ sealed な階層に対しては網羅性が検査されます（漏れは E0042�
 
 ## break / continue
 
-ラベル付きの `break` / `continue` も使えます。
-
 ```onion
 while true {
   if done { break }
   if skip { continue }
+}
+```
+
+ループには `name: while ...` のようにラベルを付けられ（`for` / `foreach` /
+`do...while` も同様）、`break name` / `continue name`
+（ラベルは `break`/`continue` と同じ行に書く）で内側のループではなく
+そのラベルの付いたループを対象にできます。外側のループを内側から抜けたり
+次の周に進めたりできるのはこの形だけです。束縛されていないラベルの参照は
+`[E0058]` になります。
+
+```onion
+outer: for var i: Int = 0; i < 3; i = i + 1 {
+  for var j: Int = 0; j < 3; j = j + 1 {
+    if i == 1 && j == 1 { break outer }      // outer の for ごと抜ける
+    println(i + "," + j)
+  }
 }
 ```
 

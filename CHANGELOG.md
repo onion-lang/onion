@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/guide/control-flow.md`'s "Do Notation" section had a subsection titled "Mixing with Regular Expressions" whose lead-in claimed "You can mix bindings with regular expressions and declarations", but the example under it contains no regex at all** — it actually demonstrates mixing a `<-` bind with a local `val` declaration and a side-effecting statement (`println`). There is no do-block-bind-against-a-regex feature anywhere in the compiler (`do[...]` desugars purely to `.bind(...)`/`successful(...)` chains in `Rewriting.scala`), so this was a stale/mislabeled heading, not a missing feature. Renamed to "Mixing with Local Declarations and Side Effects" with a matching lead-in. Guarded by `DoNotationDocRegexHeadingMismatchSpec`.
+
 ## [0.81.0] - 2026-09-15
 
 ### Fixed

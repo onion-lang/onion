@@ -388,9 +388,9 @@ val pairs = do[List] {
 // [1a, 1b, 2a, 2b]
 ```
 
-### Mixing with Regular Expressions
+### Mixing with Local Declarations and Side Effects
 
-You can mix bindings with regular expressions and declarations:
+You can mix bindings with local declarations and side-effecting statements:
 
 ```onion
 val result: Option[Int] = do[Option] {

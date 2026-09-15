@@ -240,27 +240,79 @@ final class ControlFlowEmitter(
       resourceSlots(i) = slot
       gen.storeLocal(slot)
 
-    // リソースを逆順でclose()するコードを生成するヘルパー
-    def emitCloseResources(): Unit =
+    // リソースを逆順でclose()するコードを生成するヘルパー。
+    // `primarySlot` が渡された場合はそのスロットに既に伝播中の例外(primary)が
+    // 入っている前提で、close()が投げた例外は Throwable.addSuppressed で primary
+    // に付加するだけで primary 自体は変えない(Java の try-with-resources と同じ
+    // 挙動)。`primarySlot` が無い場合(通常完了パス)はこのメソッド自身が最初の
+    // close失敗を保持し、全リソースを試した後にそれを投げる。
+    // いずれの場合も、あるリソースの close() が例外を投げても残りのリソース
+    // (より前に宣言されたもの)の close() は必ず試みられる ― 1つ前の実装では
+    // close() の例外がループを直接中断させ、それより前に宣言されたリソースが
+    // close() されないままリークしていた。
+    def emitCloseResources(primarySlot: Int = -1): Unit =
+      if node.resources.isEmpty then return
+      val throwableType = AsmType.getType(classOf[Throwable])
+      val ownsPendingSlot = primarySlot < 0
+      val pendingSlot =
+        if ownsPendingSlot then
+          val s = gen.newLocal(throwableType)
+          gen.visitInsn(Opcodes.ACONST_NULL)
+          gen.storeLocal(s)
+          s
+        else primarySlot
+
       for i <- (node.resources.length - 1) to 0 by -1 do
-        val (_, _) = node.resources(i)
         val slot = resourceSlots(i)
         // if (resource != null) resource.close()
         val skipClose = gen.newLabel()
         gen.loadLocal(slot)
         gen.ifNull(skipClose)
+
+        val closeStart = gen.mark()
         gen.loadLocal(slot)
         // AutoCloseableのclose()を呼び出し
         gen.invokeInterface(
           AsmType.getType(classOf[AutoCloseable]),
           new org.objectweb.asm.commons.Method("close", "()V")
         )
+        val closeEnd = gen.mark()
+        val afterClose = gen.newLabel()
+        gen.goTo(afterClose)
+
+        // close()が例外を投げても後続(=より前に宣言された)リソースのclose()は続行する
+        gen.catchException(closeStart, closeEnd, throwableType)
+        val caughtSlot = gen.newLocal(throwableType)
+        gen.storeLocal(caughtSlot)
+        val hasPending = gen.newLabel()
+        gen.loadLocal(pendingSlot)
+        gen.ifNonNull(hasPending)
+        gen.loadLocal(caughtSlot)
+        gen.storeLocal(pendingSlot)
+        gen.goTo(afterClose)
+        gen.visitLabel(hasPending)
+        gen.loadLocal(pendingSlot)
+        gen.loadLocal(caughtSlot)
+        gen.invokeVirtual(
+          throwableType,
+          new org.objectweb.asm.commons.Method("addSuppressed", "(Ljava/lang/Throwable;)V")
+        )
+        gen.visitLabel(afterClose)
+
         gen.visitLabel(skipClose)
+
+      if ownsPendingSlot then
+        val noPending = gen.newLabel()
+        gen.loadLocal(pendingSlot)
+        gen.ifNull(noPending)
+        gen.loadLocal(pendingSlot)
+        gen.throwException()
+        gen.visitLabel(noPending)
 
     // ユーザー定義のfinallyと組み合わせ
     // Java spec: resources are closed before finally block
-    def emitFinallyWithResources(): Unit =
-      emitCloseResources()
+    def emitFinallyWithResources(primarySlot: Int = -1): Unit =
+      emitCloseResources(primarySlot)
       if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
 
     // Emit the protected region and return its [start, end) labels. A NOP is
@@ -305,7 +357,7 @@ final class ControlFlowEmitter(
       gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
       val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
       gen.storeLocal(exSlot)
-      emitFinallyWithResources()
+      emitFinallyWithResources(exSlot)
       gen.loadLocal(exSlot)
       gen.throwException()
 
@@ -330,8 +382,10 @@ final class ControlFlowEmitter(
         gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
         val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
         gen.storeLocal(slot)
-        // Close resources before catch block (Java try-with-resources spec)
-        emitCloseResources()
+        // Close resources before catch block (Java try-with-resources spec). Pass the
+        // matched exception's slot as the primary so a close() failure is suppressed
+        // onto it (and the catch body still runs) rather than replacing it.
+        emitCloseResources(slot)
         // A return inside the catch must also run the user finally.
         withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
         // Normal catch completion: execute user finally
@@ -342,7 +396,7 @@ final class ControlFlowEmitter(
       gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
       val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
       gen.storeLocal(exSlot)
-      emitFinallyWithResources()
+      emitFinallyWithResources(exSlot)
       gen.loadLocal(exSlot)
       gen.throwException()
 

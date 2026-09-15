@@ -67,7 +67,10 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     }
     if (malleableIndices.isEmpty) return None
 
-    val candidate = uniqueCandidate(sourceType, name, params.length, filter).getOrElse(return None)
+    val candidate = uniqueCandidate(sourceType, name, params.length, filter) match {
+      case Some(c) => c
+      case None => return None
+    }
 
     val classSubst =
       if (receiverType != null) TypeSubstitution.classSubstitution(receiverType)

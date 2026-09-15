@@ -1,0 +1,182 @@
+// TollRoadBilling — toll-gate log lines parsed via a `shape` clause into typed
+// records, billed per vehicle class through a data-carrying enum, with
+// Outcome/Defect separating malformed lines from valid ones instead of either
+// crashing on the first bad line or silently dropping it.
+//
+// Exercises: data-carrying enum with methods (VehicleClass), a record `shape`
+// clause with Outcome::values/Outcome::defects error handling, records with
+// methods, extension methods on Int/Double, collection pipelines
+// (groupBy/sortedBy/fold), select pattern matching, foreach over maps,
+// try/catch, string interpolation.
+//
+//   onion TollRoadBilling.on
+
+enum VehicleClass(perKm: Double, baseFee: Double) {
+  MOTORCYCLE(8.0, 80.0),
+  CAR(12.0, 150.0),
+  TRUCK(35.0, 400.0)
+public:
+  def label(): String = select this {
+    case VehicleClass::MOTORCYCLE: "Motorcycle"
+    case VehicleClass::CAR:        "Car"
+    case VehicleClass::TRUCK:      "Truck"
+    else: "?"
+  }
+}
+
+// A toll-gate log line: gate name, vehicle class name, plate, HH:MM, distance
+// in km. `shape line` names the boundary so a plain-text field can be parsed
+// and a broken line reported without stopping the whole batch.
+record TollPass(gate: String, vehicleClass: String, plate: String, hour: Int, minute: Int, km: Int)
+  shape line = re"(\S+) (\w+) (\S+) (\d{2}):(\d{2}) (\d+)"
+
+record Bill(plate: String, vehicleClass: VehicleClass, gate: String, fee: Double) {
+public:
+  def describe(): String =
+    "#{plate()} (#{vehicleClass().label()}) at #{gate()}: #{fee().asYen()}"
+}
+
+extension Int {
+  def pad2(): String = if this < 10 { "0" + this } else { "" + this }
+}
+
+extension Double {
+  def asYen(): String = "¥" + Format::integer(Math::round(this))
+}
+
+def classify(name: String): VehicleClass? =
+  select name {
+    case "CAR":        VehicleClass::CAR
+    case "MOTORCYCLE": VehicleClass::MOTORCYCLE
+    case "TRUCK":       VehicleClass::TRUCK
+    else: null
+  }
+
+// null means either an unrecognized vehicle class or a non-positive distance.
+def billFor(p: TollPass): Bill? {
+  val vc = classify(p.vehicleClass())
+  if vc == null { return null }
+  if p.km() <= 0 { return null }
+  val cls = vc as VehicleClass
+  return new Bill(p.plate(), cls, p.gate(), cls.baseFee() + cls.perKm() * p.km())
+}
+
+// ---- synthetic log, generated in-memory so the sample runs anywhere ----
+
+def buildLog(): String {
+  val gates   = ["NORTH", "SOUTH", "EAST", "WEST"]
+  val classes = ["CAR", "TRUCK", "MOTORCYCLE", "CAR", "CAR", "BUS"]  // BUS is unknown on purpose
+  val plates  = ["AB-1234", "CD-5678", "EF-9012", "GH-3456", "IJ-7890"]
+
+  val lines = new ArrayList[String]()
+  var i = 0
+  while i < 40 {
+    val gate   = gates[i % gates.size] as String
+    val cls    = classes[i % classes.size] as String
+    val plate  = plates[i % plates.size] as String
+    val hour   = 6 + (i % 16)
+    val minute = (i * 7) % 60
+    val km     = 3 + (i % 25)
+    val stamp  = hour.pad2() + ":" + minute.pad2()
+
+    if i % 13 == 0 {
+      // malformed line: the distance field is missing entirely, so the whole
+      // line fails to match `TollPass::line()`'s pattern.
+      lines.add(gate + " " + cls + " " + plate + " " + stamp)
+    } else {
+      lines.add(gate + " " + cls + " " + plate + " " + stamp + " " + km)
+    }
+    i = i + 1
+  }
+  return Strings::join(lines, "\n")
+}
+
+// ---- run the batch ----
+
+val origin = Origin::atLine("toll.log", 1)
+val outcomes = TollPass::line().eachLine(buildLog(), origin)
+val passes = Outcome::values(outcomes)
+val defects = Outcome::defects(outcomes)
+
+IO::println("toll.log")
+IO::println("  #{outcomes.size} lines, #{passes.size} read, #{defects.size} not read")
+var shown = 0
+foreach d: Defect in defects {
+  if shown < 3 {
+    IO::println("  line #{d.origin().line()}: #{d.expected()}")
+    shown = shown + 1
+  }
+}
+IO::println("")
+
+// ---- bill every valid pass, dropping the ones with an unrecognized class ----
+
+val bills = new ArrayList[Bill]()
+val unbilled = new ArrayList[TollPass]()
+foreach p: TollPass in passes {
+  val b = billFor(p)
+  if b == null { unbilled.add(p) } else { bills.add(b as Bill) }
+}
+IO::println("billed #{bills.size} of #{passes.size} readable passes (#{unbilled.size} unrecognized)")
+if unbilled.size > 0 {
+  val u = unbilled.get(0) as TollPass
+  IO::println("  e.g. gate #{u.gate()} logged an unknown class: #{u.vehicleClass()}")
+}
+IO::println("")
+
+// ---- totals via fold ----
+
+val total = bills.fold(0.0) { acc, b -> (acc as Double) + (b as Bill).fee() }
+IO::println("total revenue: #{total.asYen()}")
+
+// ---- revenue by gate, via groupBy + foreach (k, v) ----
+
+val byGate = bills.groupBy { b -> (b as Bill).gate() }
+IO::println("")
+IO::println("revenue by gate:")
+foreach (gate, gateBills) in byGate {
+  val gateTotal = (gateBills as List).fold(0.0) { acc, b -> (acc as Double) + (b as Bill).fee() }
+  IO::println("  #{gate}: #{(gateBills as List).size} pass(es), #{gateTotal.asYen()}")
+}
+
+// ---- top three most expensive individual bills, via sortedBy ----
+
+val sorted = bills.sortedBy { b -> 0.0 - (b as Bill).fee() }
+IO::println("")
+IO::println("top bills:")
+var shownBills = 0
+foreach b: Bill in sorted {
+  if shownBills < 3 {
+    IO::println("  " + b.describe())
+    shownBills = shownBills + 1
+  }
+}
+
+// ---- try/catch: a fee schedule rejects a negative distance outright ----
+
+def requireNonNegative(km: Int): Int {
+  if km < 0 { throw new IllegalArgumentException("distance in km must be >= 0, got " + km) }
+  return km
+}
+
+IO::println("")
+try {
+  requireNonNegative(0 - 5)
+} catch e: IllegalArgumentException {
+  IO::println("rejected: #{e.getMessage()}")
+}
+
+// ---- a closer look: two lines side by side, one clean and one broken ----
+
+val sample =
+  "NORTH CAR AB-1234 08:15 12\n" +
+  "SOUTH FERRY CD-5678 09:00 4\n"
+IO::println("")
+IO::println("a closer look:")
+foreach o: Outcome[TollPass] in TollPass::line().eachLine(sample, origin) {
+  if o.isOk() {
+    IO::println("  ok:  " + o.get().plate() + " -> " + o.get().vehicleClass())
+  } else {
+    IO::println("  bad: " + o.describe())
+  }
+}

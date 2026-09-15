@@ -595,5 +595,155 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       // path -- which must also only attempt the close once.
       assert(Shell.Success("try,closing,finally,caught:closeFail") == result)
     }
+
+    it("should still close an earlier resource when a later resource's own initializer throws (no catch/finally)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class LoggingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |  var name: String;
+          |public:
+          |  def this(l: StringBuilder, n: String) {
+          |    this.log = l;
+          |    this.name = n;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closed:" + this.name + ",");
+          |  }
+          |}
+          |class FailingInit {
+          |public:
+          |  static def make(log: StringBuilder): LoggingResource {
+          |    log.append("initFail,");
+          |    throw new RuntimeException("initFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def helper(log: StringBuilder): String {
+          |    try (val r1 = new LoggingResource(log, "r1"); val r2 = FailingInit::make(log)) {
+          |      log.append("unreachable,");
+          |      return "unreachable";
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      helper(log);
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // r2's own initializer throws before r2 is ever assigned, but r1 was already
+      // successfully initialized -- per JLS 14.20.3.1, resource initialization is
+      // part of the guarded region, so an already-open r1 must still be closed
+      // (in reverse declaration order) even though the exception never reaches a
+      // user-written catch/finally on this try statement.
+      assert(Shell.Success("initFail,closed:r1,caught:initFail") == result)
+    }
+
+    it("should route a resource initializer's exception through the try's own catch/finally") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class LoggingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |  var name: String;
+          |public:
+          |  def this(l: StringBuilder, n: String) {
+          |    this.log = l;
+          |    this.name = n;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closed:" + this.name + ",");
+          |  }
+          |}
+          |class FailingInit {
+          |public:
+          |  static def make(log: StringBuilder): LoggingResource {
+          |    log.append("initFail,");
+          |    throw new RuntimeException("initFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try (val r1 = new LoggingResource(log, "r1"); val r2 = FailingInit::make(log)) {
+          |      log.append("unreachable,");
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message() + ",");
+          |    } finally {
+          |      log.append("finally");
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // Unlike the previous case, this try statement has its own catch/finally --
+      // the initializer's exception must reach them exactly as a body exception
+      // would, not bypass them and propagate straight out of the method.
+      assert(Shell.Success("initFail,closed:r1,caught:initFail,finally") == result)
+    }
+
+    it("should run the try's own finally when a resource initializer throws (no catch)") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class LoggingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |  var name: String;
+          |public:
+          |  def this(l: StringBuilder, n: String) {
+          |    this.log = l;
+          |    this.name = n;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closed:" + this.name + ",");
+          |  }
+          |}
+          |class FailingInit {
+          |public:
+          |  static def make(log: StringBuilder): LoggingResource {
+          |    log.append("initFail,");
+          |    throw new RuntimeException("initFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def helper(log: StringBuilder): String {
+          |    try (val r1 = new LoggingResource(log, "r1"); val r2 = FailingInit::make(log)) {
+          |      log.append("unreachable,");
+          |      return "unreachable";
+          |    } finally {
+          |      log.append("finally,");
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      helper(log);
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("initFail,closed:r1,finally,caught:initFail") == result)
+    }
   }
 }

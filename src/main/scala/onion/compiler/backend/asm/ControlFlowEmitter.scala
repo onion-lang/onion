@@ -383,8 +383,15 @@ final class ControlFlowEmitter(
         val closedFlag = gen.newLocal(AsmType.INT_TYPE)
         gen.push(0)
         gen.storeLocal(closedFlag)
+        // A `return`/`break`/`continue` inside the try body exits early via this
+        // finallyStack entry rather than through markTryRegionWithResourceClose's own
+        // post-body close, so it must set closedFlag itself before attempting the
+        // close -- otherwise a close() failure here lands in the exception handler
+        // below with the flag still 0, and the resources get closed a second time.
         val (tryStart, tryEnd) =
-          withFinally(() => emitFinallyWithResources()) { markTryRegionWithResourceClose(closedFlag) }
+          withFinally(() => { gen.push(1); gen.storeLocal(closedFlag); emitFinallyWithResources() }) {
+            markTryRegionWithResourceClose(closedFlag)
+          }
 
         // Normal completion: resources were already closed above; just run finally.
         if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
@@ -467,8 +474,13 @@ final class ControlFlowEmitter(
         val closedFlag = gen.newLocal(AsmType.INT_TYPE)
         gen.push(0)
         gen.storeLocal(closedFlag)
+        // See the no-catch resources branch above: a `return`/`break`/`continue`
+        // inside the try body exits early through this finallyStack entry, so it
+        // must set closedFlag itself before attempting the close.
         val (tryStart, tryEnd) =
-          withFinally(() => emitFinallyWithResources()) { markTryRegionWithResourceClose(closedFlag) }
+          withFinally(() => { gen.push(1); gen.storeLocal(closedFlag); emitFinallyWithResources() }) {
+            markTryRegionWithResourceClose(closedFlag)
+          }
 
         // Normal completion: resources were already closed above; just run finally.
         if (node.finallyStatement != null) then visitStatement(node.finallyStatement)

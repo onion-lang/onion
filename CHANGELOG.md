@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.73.0] - 2026-09-15
+
 ### Added
 
 - `run/TollRoadBilling.on` — a toll-gate billing corpus sample exercising a data-carrying enum with methods (`VehicleClass`), a record `shape` clause with `Outcome`/`Defect` error handling over malformed log lines, records with methods, extension methods on `Int`/`Double`, collection pipelines (`groupBy`/`sortedBy`/`fold`), `select` pattern matching, `foreach` over maps, and `try`/`catch`.

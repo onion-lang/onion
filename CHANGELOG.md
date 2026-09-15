@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-09-15
+
 ### Fixed
 
 - **A method declared with the capitalized `(): Void` return type — the ordinary boxed reference type `java.lang.Void`, not Onion's value-less `void` — reported a confusing diagnostic with no hint that `void` (lowercase) was the likely intent**, e.g. `def bar(): Void { IO::println("hi") }` reported only `[E0067] method bar may reach the end of its body without returning a Void`, and `def bar(): Void { return; }` reported only `[E0020] this method cannot return a value.` — both technically correct (`Void` *is* a legitimate reference type for Java interop, usable via `return null`), but neither message named the likely typo, which is an easy mistake coming from Kotlin's `Unit`, C#/Java's boxed `Void` generic, or plain capitalization habit. `SemanticErrorReporter` now appends a hint to both diagnostics when the declared/expected return type resolves to `java.lang.Void`, pointing at the value-less `void` return type as the likely fix; a method that correctly declares `(): Void` and returns `null` is unaffected.

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-09-15
+
 ### Fixed
 
 - **A `finally` block (or, for a resourced `try`, the monitor-release/`finally` step run to unwind a `return`/`break`/`continue`) that itself threw was caught by that same try/synchronized statement's own `catch`/exception-handling machinery instead of propagating past it** — e.g. `try { return } catch e: RuntimeException { ... } finally { throw new RuntimeException("boom") }` misrouted the finally's own exception into the sibling `catch e: RuntimeException` clause, and `try { return } finally { throw ... }` (no catch) ran the `finally` block a second time from the exception handler, contradicting JLS 14.20.2 (a `finally` block's own abrupt completion is a completion of the whole try statement, not subject to that try's own catches, and must not be re-run). The bug: `return`/`break`/`continue` runs pending finally blocks inline via `ControlFlowEmitter.runFinalliesDownTo` while the try body is still being emitted, so that inline invocation physically lands inside the `[tryStart, tryEnd)` range protected by the same try's own handlers. `withFinally` now records a NOP-guarded "hole" span around each such early-exit invocation (excluding a resource's own `close()`, which correctly remains protected per JLS 14.20.3.1), and every catch/catch-all registration for that try (and, for `synchronized`, its monitor-release handler) excludes those holes via a new `catchExcluding` helper, so the finally's own exception now runs exactly once and propagates past its own try statement's handlers instead of being caught or re-executed by them.

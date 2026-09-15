@@ -383,5 +383,83 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("try,2closing,1,caught:bodyfail") == result)
     }
+
+    it("should route a close() exception to the try's own catch clause when the body completes normally") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class FailingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closing,");
+          |    throw new RuntimeException("closeFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try (val r = new FailingResource(log)) {
+          |      log.append("try,");
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // Per JLS 14.20.3, a close() failure on normal completion is subject to the
+      // try statement's own catch clauses, exactly like a body exception would be --
+      // it must not silently bypass them and propagate uncaught.
+      assert(Shell.Success("try,closing,caught:closeFail") == result)
+    }
+
+    it("should still run the try's own finally block when a close() exception occurs on normal completion") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class FailingResource conforms AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("closing,");
+          |    throw new RuntimeException("closeFail");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try {
+          |      try (val r = new FailingResource(log)) {
+          |        log.append("try,");
+          |      } finally {
+          |        log.append("finally,");
+          |      }
+          |    } catch e: RuntimeException {
+          |      log.append("caught:" + e.message());
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // The finally block must run even though nothing but the resource close
+      // itself failed -- it must not be skipped just because there was no catch
+      // clause on the try-with-resources statement to route the exception through.
+      assert(Shell.Success("try,closing,finally,caught:closeFail") == result)
+    }
   }
 }

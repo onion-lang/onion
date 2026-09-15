@@ -327,6 +327,22 @@ final class ControlFlowEmitter(
       val end = gen.mark()
       (start, end)
 
+    // Like markTryRegion, but additionally attempts the normal-completion resource
+    // close *inside* the protected region, so a close() failure there is subject to
+    // this try statement's own catch/finally exactly like a body exception would be
+    // (JLS 14.20.3.1) instead of silently bypassing them. `closedFlag` is set to 1
+    // right before the close attempt so the exception handler(s) below know the
+    // resources were already attempted and must not be closed a second time.
+    def markTryRegionWithResourceClose(closedFlag: Int): (org.objectweb.asm.Label, org.objectweb.asm.Label) =
+      val start = gen.mark()
+      gen.visitInsn(Opcodes.NOP)
+      visitStatement(node.tryStatement)
+      gen.push(1)
+      gen.storeLocal(closedFlag)
+      emitCloseResources()
+      val end = gen.mark()
+      (start, end)
+
     if (node.resources.isEmpty && node.finallyStatement == null) {
       // Simple try-catch without finally and resources
       val (tryStart, tryEnd) = markTryRegion()
@@ -346,60 +362,145 @@ final class ControlFlowEmitter(
       gen.visitLabel(endLabel)
     } else if (node.catchTypes.length == 0) {
       // Try-finally (with or without resources)
-      val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
+      if (node.resources.isEmpty) {
+        val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
 
-      // Normal completion: execute finally and jump to end
-      emitFinallyWithResources()
-      val endLabel = gen.newLabel()
-      gen.goTo(endLabel)
-
-      // Exception handler: save exception, execute finally, rethrow
-      gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
-      val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
-      gen.storeLocal(exSlot)
-      emitFinallyWithResources(exSlot)
-      gen.loadLocal(exSlot)
-      gen.throwException()
-
-      gen.visitLabel(endLabel)
-    } else {
-      // Try-catch-finally (with or without resources)
-      val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
-
-      // Normal completion: execute finally and jump to end
-      emitFinallyWithResources()
-      val endLabel = gen.newLabel()
-      gen.goTo(endLabel)
-
-      // The user finally (resources are already closed before a catch runs).
-      def emitCatchFinally(): Unit =
-        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
-
-      // Catch handlers for specific exceptions
-      for i <- node.catchTypes.indices do
-        val catchType = node.catchTypes(i)
-        val catchStmt = node.catchStatements(i)
-        gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
-        val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
-        gen.storeLocal(slot)
-        // Close resources before catch block (Java try-with-resources spec). Pass the
-        // matched exception's slot as the primary so a close() failure is suppressed
-        // onto it (and the catch body still runs) rather than replacing it.
-        emitCloseResources(slot)
-        // A return inside the catch must also run the user finally.
-        withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
-        // Normal catch completion: execute user finally
-        emitCatchFinally()
+        // Normal completion: execute finally and jump to end
+        emitFinallyWithResources()
+        val endLabel = gen.newLabel()
         gen.goTo(endLabel)
 
-      // Catch-all handler for uncaught exceptions (finally + rethrow)
-      gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
-      val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
-      gen.storeLocal(exSlot)
-      emitFinallyWithResources(exSlot)
-      gen.loadLocal(exSlot)
-      gen.throwException()
+        // Exception handler: save exception, execute finally, rethrow
+        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+        gen.storeLocal(exSlot)
+        emitFinallyWithResources(exSlot)
+        gen.loadLocal(exSlot)
+        gen.throwException()
 
-      gen.visitLabel(endLabel)
+        gen.visitLabel(endLabel)
+      } else {
+        val closedFlag = gen.newLocal(AsmType.INT_TYPE)
+        gen.push(0)
+        gen.storeLocal(closedFlag)
+        val (tryStart, tryEnd) =
+          withFinally(() => emitFinallyWithResources()) { markTryRegionWithResourceClose(closedFlag) }
+
+        // Normal completion: resources were already closed above; just run finally.
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+        val endLabel = gen.newLabel()
+        gen.goTo(endLabel)
+
+        // Exception handler: covers both a body exception (resources still open,
+        // so close them here) and a close() exception from the normal-completion
+        // attempt above (resources already closed -- closedFlag guards against
+        // closing them a second time).
+        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+        gen.storeLocal(exSlot)
+        val alreadyClosed = gen.newLabel()
+        gen.loadLocal(closedFlag)
+        gen.ifZCmp(GeneratorAdapter.NE, alreadyClosed)
+        emitCloseResources(exSlot)
+        gen.visitLabel(alreadyClosed)
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+        gen.loadLocal(exSlot)
+        gen.throwException()
+
+        gen.visitLabel(endLabel)
+      }
+    } else {
+      // Try-catch-finally (with or without resources)
+      if (node.resources.isEmpty) {
+        val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
+
+        // Normal completion: execute finally and jump to end
+        emitFinallyWithResources()
+        val endLabel = gen.newLabel()
+        gen.goTo(endLabel)
+
+        // The user finally (resources are already closed before a catch runs).
+        def emitCatchFinally(): Unit =
+          if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+
+        // Catch handlers for specific exceptions
+        for i <- node.catchTypes.indices do
+          val catchType = node.catchTypes(i)
+          val catchStmt = node.catchStatements(i)
+          gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+          val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
+          gen.storeLocal(slot)
+          // Close resources before catch block (Java try-with-resources spec). Pass the
+          // matched exception's slot as the primary so a close() failure is suppressed
+          // onto it (and the catch body still runs) rather than replacing it.
+          emitCloseResources(slot)
+          // A return inside the catch must also run the user finally.
+          withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          // Normal catch completion: execute user finally
+          emitCatchFinally()
+          gen.goTo(endLabel)
+
+        // Catch-all handler for uncaught exceptions (finally + rethrow)
+        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+        gen.storeLocal(exSlot)
+        emitFinallyWithResources(exSlot)
+        gen.loadLocal(exSlot)
+        gen.throwException()
+
+        gen.visitLabel(endLabel)
+      } else {
+        val closedFlag = gen.newLocal(AsmType.INT_TYPE)
+        gen.push(0)
+        gen.storeLocal(closedFlag)
+        val (tryStart, tryEnd) =
+          withFinally(() => emitFinallyWithResources()) { markTryRegionWithResourceClose(closedFlag) }
+
+        // Normal completion: resources were already closed above; just run finally.
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+        val endLabel = gen.newLabel()
+        gen.goTo(endLabel)
+
+        // The user finally (resources are already closed by this point either way).
+        def emitCatchFinally(): Unit =
+          if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+
+        // Catch handlers for specific exceptions. tryStart/tryEnd now cover both a
+        // body exception (resources still open, so close them here, matched
+        // exception as primary) and a close() exception from the normal-completion
+        // attempt above (resources already closed -- closedFlag guards against
+        // closing them a second time, and the matched exception IS the close failure).
+        for i <- node.catchTypes.indices do
+          val catchType = node.catchTypes(i)
+          val catchStmt = node.catchStatements(i)
+          gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+          val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
+          gen.storeLocal(slot)
+          val alreadyClosed = gen.newLabel()
+          gen.loadLocal(closedFlag)
+          gen.ifZCmp(GeneratorAdapter.NE, alreadyClosed)
+          emitCloseResources(slot)
+          gen.visitLabel(alreadyClosed)
+          // A return inside the catch must also run the user finally.
+          withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+          // Normal catch completion: execute user finally
+          emitCatchFinally()
+          gen.goTo(endLabel)
+
+        // Catch-all handler for uncaught exceptions (finally + rethrow)
+        gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+        val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+        gen.storeLocal(exSlot)
+        val alreadyClosedAll = gen.newLabel()
+        gen.loadLocal(closedFlag)
+        gen.ifZCmp(GeneratorAdapter.NE, alreadyClosedAll)
+        emitCloseResources(exSlot)
+        gen.visitLabel(alreadyClosedAll)
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+        gen.loadLocal(exSlot)
+        gen.throwException()
+
+        gen.visitLabel(endLabel)
+      }
     }
 }

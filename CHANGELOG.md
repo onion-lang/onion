@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `run/ObservatoryLog.on` — a telescope-observation-log corpus sample exercising an ADT case-enum with per-case fields (`ObjectKind`), a record `shape` clause with `Outcome`/`Defect` error handling, records with methods, a top-level `example` clause, extension methods on `Double`, collection pipelines (`groupBy`/`sortedBy`/`fold`/`filter`), `select` pattern matching, `foreach` over maps, and `try`/`catch`.
+
 ### Fixed
 
 - **A non-exhaustive `select` over a sealed type or enum, used as a method's expression body (`= select ...`) or in an explicit `return select ...`, reported a spurious secondary `[E0020] this method cannot return a value` alongside the real `[E0042] non-exhaustive pattern match` diagnostic** — e.g. `def area(): Double = select this { case c is Circle: ... }` over a `Shape` enum missing a `Square` case reported both errors, even though adding the missing case makes the method compile and run correctly, confirming E0020 was never an independent issue with the method's return. `SelectExpressionTyping` unconditionally typed a non-exhaustive `select` without an `else` branch as `VOID`, which is correct when nothing else flagged the gap (a plain non-sealed scrutinee), but cascaded a second, unrelated error when the exhaustiveness check had already reported E0042 and the select was used where a value was expected. The select's result type now falls back to the expected type in that case instead of `VOID`, so only E0042 is reported; the program still fails to compile on E0042 alone, so no invalid bytecode is generated either way.

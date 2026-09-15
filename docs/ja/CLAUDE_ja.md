@@ -453,6 +453,8 @@ try {
 | 誤り（Java風） | 正しい（Onion） |
 |---------------|----------------|
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - コンストラクタ形式 |
+| `data class Point(val x: Int, val y: Int)`（Kotlin風） | `record Point(x: Int, y: Int)` - コンポーネントリストに`val`/`var`は書かない |
+| `case class Point(x: Int, y: Int)`（Scala風） | `record Point(x: Int, y: Int)` - 同じ考え方で、コンポーネントリストに`val`/`var`は書かない |
 | `point.x` でレコードフィールド | `point.x()` - レコードフィールドはメソッド（括弧必要） |
 | `point.copy(y=9)` は未サポート？ | ✓ 正しい - 名前付き部分コピー、`copy()`によるクローン、位置引数のコピーいずれも動作する |
 | メソッドを持つレコード？ | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - レコードは `{ access-section* }` 本体（インスタンス/静的/演算子メソッド、privateヘルパー）を持てる。メソッドからは生成されたアクセサが見える。ジェネリックなインターフェースを実装するジェネリックレコードでも動作する（`record Foo[T](v: T) conforms Bar[T]`） |

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-09-15
+
 ### Fixed
 
 - **A `try { ... } catch e: T { ... } finally { ... }` statement's own `finally` block was silently skipped whenever the *catch* block itself completed abruptly by throwing** — e.g. `try { throw new RuntimeException("x") } catch e: RuntimeException { throw new IllegalStateException("y") } finally { cleanup() }` never ran `cleanup()` before `IllegalStateException` propagated, contradicting JLS 14.20.2 (a `finally` block executes however the try statement completes, including a catch clause exiting via an exception) — the same "any exit path must run finally" gap already fixed for `return`/`break`/`continue` and for resource `close()` failures (0.75.0/0.76.0), but for an exception raised from within the catch clause itself. `ControlFlowEmitter.emitTry` emitted each catch body outside of any bytecode region protected by the try statement's own exception handlers, so an exception thrown there was invisible to them and skipped straight past the `finally`. Each catch body is now wrapped in its own protected region whose handler runs the user `finally` before rethrowing, in both the no-resources and resources try/catch/finally shapes, and applies uniformly to multi-catch.

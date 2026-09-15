@@ -64,7 +64,7 @@ private[compiler] final class MethodCallFallbackSupport(
     expected: Type,
     untypedClosureIndices: Set[Int]
   ): Option[Term] = {
-    val args = argList.toArray
+    val args = argList
 
     // Checkpoint the error count before any (trailing-)closure body is typed.
     // If resolution later fails to match a method but the closure body itself
@@ -76,7 +76,10 @@ private[compiler] final class MethodCallFallbackSupport(
     val problemsBeforeClosures = calls.problemCount
     def closureBodyReportedError: Boolean = calls.problemCount > problemsBeforeClosures
 
-    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices).getOrElse(return None)
+    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
+      case Some(params) => params
+      case None => return None
+    }
 
     // Report the outer method-not-found only if no closure body already errored
     // (see #316): a broken closure body makes the outer report redundant.

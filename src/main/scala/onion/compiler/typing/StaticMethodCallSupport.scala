@@ -166,9 +166,12 @@ private[compiler] final class StaticMethodCallSupport(
     expected: Type,
     untypedClosureIndices: Set[Int]
   ): Option[Term] = {
-    val args = argList.toArray
+    val args = argList
 
-    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices).getOrElse(return None)
+    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
+      case Some(params) => params
+      case None => return None
+    }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-09-15
+
 ### Fixed
 
 - **A resource's own initializer expression in `try (val r1 = ...; val r2 = ...) { ... }` throwing bypassed the try statement's own `catch`/`finally` entirely and leaked any already-initialized earlier resource** — e.g. `try (val r1 = new R(); val r2 = FailingInit::make()) { ... } catch e: RuntimeException { ... }` where `FailingInit::make()` throws propagated the exception straight out of the enclosing method: `r1.close()` never ran and the `catch`/`finally` on the try statement never fired, contradicting JLS 14.20.3.1 (resource initialization is logically part of the guarded region, on par with the try body and a resource's `close()`). `ControlFlowEmitter.emitTry` evaluated every resource's initializer and stored it to its local slot in a loop that ran entirely before the protected try region was marked, so an exception there was invisible to every handler built for the body/close() cases (already fixed in 0.75.0–0.77.0). Resource slots are now allocated and null-initialized up front, and the initializers themselves are evaluated *inside* the protected region (reusing the exact `catch`/`finally`/close-suppression machinery already in place), so an initializer failure now closes any earlier-opened resource and reaches this try statement's own `catch`/`finally` exactly like a body exception would.

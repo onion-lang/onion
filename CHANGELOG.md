@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.76.0] - 2026-09-15
+
 ### Fixed
 
 - **A `try (resource) { ... }` statement's own `catch`/`finally` was silently bypassed whenever `close()` threw on the *normal-completion* path (the try body itself did not throw)** — e.g. `try (val r = new R()) { ... } catch e: RuntimeException { ... }` where `r.close()` throws left the `catch` clause never reached and the exception propagating uncaught instead, and the `finally`-only form (`try (val r = new R()) { ... } finally { ... }`) skipped the `finally` block entirely on the same kind of close failure — contradicting both `docs/guide/control-flow.md`'s documented behavior and `java.lang.AutoCloseable`/JLS 14.20.3 semantics, under which a resource's `close()` is just as much a candidate for the try statement's own `catch`/`finally` as an exception from the body. `ControlFlowEmitter.emitTry` emitted the normal-completion resource-close call *outside* the bytecode region protected by the try's `catchException` handlers, so a close-time exception there was invisible to them; the immediately preceding fix (0.75.0) only addressed leaking earlier-declared resources when a *later* resource's `close()` throws, not this separate gap. The normal-completion resource close is now emitted *inside* the protected try region (guarded by a flag so resources are never closed twice when the resulting exception is then caught), so a close() failure on normal completion is now routed through the same `catch`/`finally` a body exception would use.

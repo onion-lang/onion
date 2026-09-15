@@ -229,16 +229,30 @@ final class ControlFlowEmitter(
     gen.throwException()
 
   def emitTry(node: Try): Unit =
-    // リソースの初期化
+    // リソース用のスロットを予約し、いずれも未初期化状態(null)にしておく。実際の
+    // 初期化子(initializer)の評価は emitResourceInit で保護領域の内側に遅延する
+    // -- 初期化子自体が例外を投げた場合も、この try 文自身の catch/finally や、
+    // 既に初期化済みの前のリソースの close() が確実に実行されるようにするため
+    // (JLS 14.20.3.1: リソースの初期化も保護領域の一部)。null 初期化しておくこと
+    // で、初期化子未実行のスロットも emitCloseResources の ifNull チェックで安全
+    // にスキップされる。
     val resourceSlots = new Array[Int](node.resources.length)
     for i <- node.resources.indices do
-      val (binding, init) = node.resources(i)
-      visitTerm(init)
+      val (binding, _) = node.resources(i)
       // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
       // This allows user code in the try block to reference the resource variable
       val slot = localVars.getOrAllocateSlot(binding.index, asmType(binding.tp))
       resourceSlots(i) = slot
+      gen.visitInsn(Opcodes.ACONST_NULL)
       gen.storeLocal(slot)
+
+    // リソースの初期化子を実際に評価してスロットへ格納する。保護領域の内側
+    // (markTryRegionWithResourceClose の先頭)で呼び出される。
+    def emitResourceInit(): Unit =
+      for i <- node.resources.indices do
+        val (_, init) = node.resources(i)
+        visitTerm(init)
+        gen.storeLocal(resourceSlots(i))
 
     // リソースを逆順でclose()するコードを生成するヘルパー。
     // `primarySlot` が渡された場合はそのスロットに既に伝播中の例外(primary)が
@@ -336,6 +350,7 @@ final class ControlFlowEmitter(
     def markTryRegionWithResourceClose(closedFlag: Int): (org.objectweb.asm.Label, org.objectweb.asm.Label) =
       val start = gen.mark()
       gen.visitInsn(Opcodes.NOP)
+      emitResourceInit()
       visitStatement(node.tryStatement)
       gen.push(1)
       gen.storeLocal(closedFlag)

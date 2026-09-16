@@ -10,7 +10,7 @@ import onion.tools.Shell
  */
 class UnreachableCatchClauseSpec extends AbstractShellSpec {
 
-  private def failsWith(code: String, source: String): Unit = {
+  private def runCaptured(source: String): (Shell.Result, String) = {
     val buf = new java.io.ByteArrayOutputStream()
     val ps = new java.io.PrintStream(buf, true, "UTF-8")
     val (o, e) = (System.out, System.err)
@@ -19,7 +19,11 @@ class UnreachableCatchClauseSpec extends AbstractShellSpec {
         System.setOut(ps); System.setErr(ps)
         Console.withOut(ps) { Console.withErr(ps) { shell.run(source, "None", Array()) } }
       } finally { System.setOut(o); System.setErr(e) }
-    val out = new String(buf.toByteArray, "UTF-8")
+    (r, new String(buf.toByteArray, "UTF-8"))
+  }
+
+  private def failsWith(code: String, source: String): Unit = {
+    val (r, out) = runCaptured(source)
     assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure for $code, got $r\n$out")
     assert(out.contains(code), s"expected $code in diagnostics, got:\n$out")
   }
@@ -147,6 +151,34 @@ class UnreachableCatchClauseSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(1) == result)
+    }
+
+    it("does not also flag a legal later clause as unreachable when an earlier clause's catch type is illegal") {
+      // `catch e: Object` is illegal (E0000: not a Throwable) but happens to be a
+      // supertype of the legal `RuntimeException` clause that follows it. The
+      // reachability check must not treat an already-rejected clause as a real
+      // shadow, or it produces a second, misleading diagnostic ("move it before
+      // the Object clause") atop the real error -- Object can never be moved
+      // there since it doesn't compile as a catch type at all.
+      val (r, out) = runCaptured(
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    try {
+          |      throw new RuntimeException("x")
+          |    } catch e: Object {
+          |      IO::println("object")
+          |    } catch e: RuntimeException {
+          |      IO::println("runtime")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      )
+      assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure, got $r\n$out")
+      assert(out.contains("E0000"), s"expected E0000 in diagnostics, got:\n$out")
+      assert(!out.contains("E0083"), s"did not expect spurious E0083 in diagnostics, got:\n$out")
     }
   }
 }

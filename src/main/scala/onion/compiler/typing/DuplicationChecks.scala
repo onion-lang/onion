@@ -186,21 +186,29 @@ private[compiler] object DuplicationChecks {
    * (structurally-equal) source location instead, which `.copy` preserves. Shared by
    * both places a `try`/`catch` is typed: `TryExpressionTyping` (try-as-expression) and
    * `BlockElementLowering` (try-as-statement).
+   *
+   * `validTypes` flags which clauses actually passed the sibling "must be a Throwable"
+   * check (E0000/INCOMPATIBLE_TYPE). A clause whose own type is illegal is never a real
+   * shadow candidate (its "fix" of moving another clause after it is nonsensical, since
+   * the illegal clause itself doesn't compile), and an illegal clause's own reachability
+   * is not worth reporting on top of the type error it already has.
    */
   def checkUnreachableCatchClause(
     bodyContext: onion.compiler.typing.session.TypingBodyContext,
     recClauses: List[(AST.Argument, AST.BlockExpression)],
     catchTypes: Array[Type],
+    validTypes: Array[Boolean],
     index: Int,
     argument: AST.Argument,
     argType: Type,
     catchBody: AST.BlockExpression
   ): Unit = {
+    if (!validTypes(index)) return
     var j = 0
     var shadowedBy: Type = null
     while (j < index && shadowedBy == null) {
       val earlierBody = recClauses(j)._2
-      if (earlierBody.location != catchBody.location && TypeRules.isSuperType(catchTypes(j), argType)) {
+      if (validTypes(j) && earlierBody.location != catchBody.location && TypeRules.isSuperType(catchTypes(j), argType)) {
         shadowedBy = catchTypes(j)
       }
       j += 1

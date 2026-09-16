@@ -459,6 +459,7 @@ final class BlockElementLowering(
         val binds = new Array[ClosureLocalBinding](node.recClauses.length)
         val catchBlocks = new Array[ActionStatement](node.recClauses.length)
         val catchTypes = new Array[Type](node.recClauses.length)
+        val catchTypesValid = new Array[Boolean](node.recClauses.length)
         for (i <- 0 until node.recClauses.length) {
           val (argument, body) = node.recClauses(i)
           context.openScope {
@@ -467,8 +468,11 @@ final class BlockElementLowering(
             val expected = bodyContext.load("java.lang.Throwable")
             if (!TypeRules.isSuperType(expected, argType)) {
               bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
+              catchTypesValid(i) = false
+            } else {
+              catchTypesValid(i) = true
             }
-            DuplicationChecks.checkUnreachableCatchClause(bodyContext, node.recClauses, catchTypes, i, argument, argType, body)
+            DuplicationChecks.checkUnreachableCatchClause(bodyContext, node.recClauses, catchTypes, catchTypesValid, i, argument, argType, body)
             binds(i) = context.lookupOnlyCurrentScope(argument.name)
             catchBlocks(i) = translate(body, context)
           }

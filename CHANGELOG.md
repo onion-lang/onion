@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/guide/control-flow.md`'s "## Do記法（モナド合成）" section was two bare code snippets with no prose at all**, even though `docs/guide/control-flow.md`'s "Do Notation (Monadic Composition)" section documents (among other subsections) that a do-block short-circuits on the first failing bind ("### Error Short-Circuiting") — a real, tested behavior (`do[...]` desugars to `flatMap`/`map` chains in `Rewriting.scala`). A Japanese-only reader had no way to learn this at all. Added an equivalent "### エラーの早期終了（ショートサーキット）" subsection with a compiling example. Guarded by a new `DoNotationErrorShortCircuitingJaParitySpec`.
+
 ## [0.84.0] - 2026-09-16
 
 ### Fixed

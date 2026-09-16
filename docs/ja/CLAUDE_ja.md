@@ -344,6 +344,44 @@ do[Future] { x <- asyncOp(); ret x + 1 }
 do[Option] { a <- getA(); b <- getB(); ret a + b }
 ```
 
+**シェイプファーストスクリプティング（スキームリテラル、正規表現パターン、パイプライン、auto-CLI）:**
+```onion
+// スキームプレフィックス付きの RAW 文字列リテラル（\\ エスケープ不要。re()/file()/http() の糖衣構文）:
+val p    = re"\d+-\d+"                        // コンパイル済みの java.util.regex.Pattern
+val rows = file"data.csv".csvRows()           // 読み込み + RFC4180 パース、ヘッダー名でマッピング
+val body = http"https://api.example.com/x".get()
+// re/file/http に限らず、任意の識別子プレフィックスが使える: `prefix"raw"` は
+// `prefix("raw")` に展開されるので、その名前の関数を定義するだけで自作できる（sql"..."、
+// money"... など）。キーワードセーフ: `return"x"`（スペースなし）は `return "x"` のままで、
+// 呼び出しにはならない。
+def sql(q: String): String = "[SQL] " + q.trim()
+val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
+
+// 正規表現リテラルは select のパターンとしても第一級（ANCHORED マッチ。コンパイル時に
+// チェックされる: 不正なパターンは E0059、グループ数と束縛数の不一致は E0060）:
+select request {
+  case re"GET (\S+) HTTP/(\S+)" (path, ver): handleGet(path, ver)
+  case re"PING": pong()
+  else: bad()
+}
+
+// パターン付きレコード: `from re"..."` はシェイプから型付きパーサーを導出する。
+// `from` はソフトキーワード（正規表現リテラルの直前でのみ特別な意味を持つ）。
+// 成分ごとに1グループ対応。対応する成分型は String/Int/Long/Double/Float/Boolean/Short/Byte
+// （グループ数の不一致は E0060、不正な正規表現は E0059、非対応の成分型は E0061）。
+record Access(time: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED；マッチ失敗・変換失敗時は null
+val rows: List = Access::parseAll(logText)                  // 1行ずつパースし、null は除外される
+
+// |> パイプライン: e |> f は f(e)、e |> f(a) は f(e, a)。改行してから |> を書いても継続扱い
+xs.map { x -> x * 2 } |> println
+
+// auto-CLI: トップレベルの main のシグネチャから引数パースを自動導出
+def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+// $ onion script.on world --count 5 --loud   （エラー時は usage を自動生成）
+```
+
 **非同期プログラミング:**
 ```onion
 val future: Future[String] = Future::async { longOperation() }

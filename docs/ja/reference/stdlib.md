@@ -1991,7 +1991,7 @@ Files::stem("report.txt")              // "report"
 Files::withExtension("report.txt", "md")   // "report.md"
 ```
 
-## Resources Module
+## Resources モジュール
 
 Onionのスキームプレフィックス文字列リテラルの実体（`onion.Resources`）。デフォルトの静的
 インポート対象なので、3つのファクトリ関数はすべて非修飾で解決する——リテラル糖衣構文と

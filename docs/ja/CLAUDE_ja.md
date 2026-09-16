@@ -53,7 +53,9 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
     ↓
 [4] 末尾呼び出し最適化 → 最適化された型付きAST
     ↓
-[5] コード生成 (ASM) → JVMバイトコード
+[5] 相互再帰最適化 → 最適化された型付きAST
+    ↓
+[6] コード生成 (ASM) → JVMバイトコード
     ↓
 クラスのロードと実行
 ```
@@ -96,7 +98,14 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
    - 深い再帰（例: 10000回以上の呼び出し）でのStackOverflowErrorを防止
    - 出力: 最適化された型付きAST
 
-5. **コード生成** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`)
+5. **相互再帰最適化** (`src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala`)
+   - 末尾呼び出し最適化の後に実行される、独立したフェーズ
+   - オプトイン: 互いに呼び出し合う `@TailRecursive` 付きメソッドのグループ（強連結成分として検出される相互再帰）を、
+     単一のステートマシンメソッドに変換し、そのグループでスタックが伸び続けないようにする
+   - グループが注釈付きでも要件を満たせない場合は `W0016` で警告
+   - 出力: 最適化された型付きAST
+
+6. **コード生成** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`)
    - **パイプラインの主境界** は `TypedAstCodeGeneration` → `backend/asm/AsmBackend.scala`
    - **既存の大きい実装本体** は `src/main/scala/onion/compiler/backend/asm/AsmCodeGeneration.scala`
    - ビジターパターン: `src/main/scala/onion/compiler/backend/asm/AsmCodeGenerationVisitor.scala`
@@ -241,6 +250,7 @@ CI はどちらの影響も受けません。差分実行の状態は `target/` 
 - **メインコンパイラロジック**: `src/main/scala/onion/compiler/`
 - **最適化**: `src/main/scala/onion/compiler/optimization/`
   - `TailCallOptimization.scala` - 末尾再帰 → ループ変換
+  - `MutualRecursionOptimization.scala` - `@TailRecursive` 相互再帰グループ → ステートマシン
 - **パーサー文法**: `grammar/JJOnionParser.jj`
 - **ランタイムライブラリ**: `src/main/java/onion/` (Javaインターフェース)
 - **ツール (CLI)**: `src/main/scala/onion/tools/`

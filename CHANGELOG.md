@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/guide/null-safety.md` (English) never documented that `==` on a statically-nullable operand is null-safe *value* equality (`java.util.Objects.equals` semantics: both-null equal, one-null not-equal, otherwise `equals()`)**, even though this is a real, tested feature (`OperatorTyping.scala`'s `nullSafeEquals`, covered by `NullableEqualitySpec`) and already documented in `docs/ja/guide/null-safety.md`'s "nullableに対する `==` はnull安全な値等価" section — an English-only reader had no way to learn it, or that `===` is available for reference identity. Added the equivalent "`==` on Nullable Types Is Null-Safe Value Equality" section to the English guide. Guarded by a new `NullSafetyDocEqualityMismatchSpec`.
 - **`docs/ja/guide/control-flow.md`'s "break / continue" section was missing the note (present in the English guide's "Labeled Break and Continue" section) that a labeled `break`/`continue` correctly unwinds through any `synchronized` blocks and `try` (including try-with-resources) between it and the labeled loop** — a Japanese-only reader had no way to know this guarantee, already real and tested (`LabeledBreakContinueThroughNestedSynchronizedSpec`, `LabeledContinueThroughNestedTryWithResourcesSpec`, etc.), exists at all. Added the equivalent Japanese sentence. Guarded by a new assertion in `ControlFlowDocLabeledLoopSpec`.
 
 ## [0.82.0] - 2026-09-16

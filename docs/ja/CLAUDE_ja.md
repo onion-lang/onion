@@ -35,6 +35,10 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--dump-typed-ast` - 型付けされたASTの概要を標準エラー出力に表示
 - `--warn <off|on|error>` - 警告レベルを設定
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
+- `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）
+- `--law-seed <n>` / `--law-samples <n>` - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する
+- `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）
+- `ONION_DAEMON=1` (環境変数) - `onionc` と `onion script.on` は常駐デーモン（`onion.tools.daemon`）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。`java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` で制御できる
 
 ## 高レベルアーキテクチャ
 

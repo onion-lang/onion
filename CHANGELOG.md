@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLAUDE.md's "Compilation Pipeline" diagram and "Core Compiler Phases" list (and its Japanese translation, `docs/ja/CLAUDE_ja.md`) silently skipped the `MutualRecursionOptimization` phase**, showing only Parsing → Rewriting → Type Checking → Tail Call Optimization → Code Generation, even though `MutualRecursionOptimization` is a real, separate phase wired up between Tail Call Optimization and Code Generation in `PipelineRunner.scala` (`src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala`, converts `@TailRecursive` mutual-recursion groups into a state machine), and was already documented correctly in `docs/reference/compiler-architecture.md`. Added the missing phase (and file reference) to both CLAUDE.md and its Japanese translation. Guarded by a new `ClaudeMdPipelinePhaseParitySpec`.
+
 ## [0.83.0] - 2026-09-16
 
 ### Fixed

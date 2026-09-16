@@ -1007,10 +1007,27 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Do記法（モナド合成）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーの早期終了（ショートサーキット）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4530,10 +4547,27 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Do記法（モナド合成）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーの早期終了（ショートサーキット）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4647,10 +4681,24 @@
 </span></code></pre></div>
 <p>複数の <code>catch</code>、multi-catch（<code>catch e: IOException | SQLException</code>）、try-with-resources（<code>try (val r = open()) { ... }</code>、逆順にクローズ）も書けます。</p>
 <h2 id="do">Do記法（モナド合成）<a class="headerlink" href="#do" title="Permanent link">&para;</a></h2>
+<p><code>Option</code>・<code>Result</code>・<code>Future</code> のようなモナド型に対する操作を連鎖させるための構文です。内部的には <code>flatMap</code>/<code>map</code> 呼び出しに展開されます。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getA</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getB</span><span class="p">();</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">do</span><span class="p">[</span><span class="nc">List</span><span class="p">]</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">];</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">];</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 内包表記</span>
 </span></code></pre></div>
-<h2 id="_5">次のステップ<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h3 id="_5">エラーの早期終了（ショートサーキット）<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>途中のどれか一つが失敗すると、do ブロック全体がそこで打ち切られ、以降のバインドは実行されません：</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="w">    </span><span class="c1">// 成功</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">none</span><span class="p">()</span><span class="w">      </span><span class="c1">// ここで失敗 - 打ち切られる</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="n">z</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span><span class="w">    </span><span class="c1">// 実行されない</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">z</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">}</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nf">println</span><span class="p">(</span><span class="n">result</span><span class="p">.</span><span class="nf">isEmpty</span><span class="p">())</span>
+</span></code></pre></div>
+<p>Output:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>true
+</span></code></pre></div></p>
+<h2 id="_6">次のステップ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../functions/">関数</a> - 関数定義とラムダ</li>
 <li><a href="../null-safety/">Null安全</a> - nullable型とスマートキャスト</li>

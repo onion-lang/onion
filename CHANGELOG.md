@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-09-16
+
 ### Fixed
 
 - **`docs/ja/reference/stdlib.md`'s "## Resources Module" section heading was left untranslated**, copy-pasted verbatim from `docs/reference/stdlib.md` even though the section's own body text is fully in Japanese and every sibling module heading in the file follows the `## <Name> モジュール` convention (`## Json モジュール`, `## Csv モジュール`, `## Files モジュール`, etc.) — a Japanese-only reader hit a stray English heading in an otherwise fully translated reference page. Translated the heading to `## Resources モジュール`. Guarded by a new `StdlibDocResourcesModuleHeadingLocaleSpec`.

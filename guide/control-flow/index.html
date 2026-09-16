@@ -2989,10 +2989,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mixing-with-regular-expressions" class="md-nav__link">
+  <a href="#mixing-with-local-declarations-and-side-effects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mixing with Regular Expressions
+        Mixing with Local Declarations and Side Effects
       
     </span>
   </a>
@@ -5101,10 +5101,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#mixing-with-regular-expressions" class="md-nav__link">
+  <a href="#mixing-with-local-declarations-and-side-effects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mixing with Regular Expressions
+        Mixing with Local Declarations and Side Effects
       
     </span>
   </a>
@@ -5623,8 +5623,8 @@ comprehension:</p>
 </span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="p">}</span>
 </span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="c1">// [1a, 1b, 2a, 2b]</span>
 </span></code></pre></div>
-<h3 id="mixing-with-regular-expressions">Mixing with Regular Expressions<a class="headerlink" href="#mixing-with-regular-expressions" title="Permanent link">&para;</a></h3>
-<p>You can mix bindings with regular expressions and declarations:</p>
+<h3 id="mixing-with-local-declarations-and-side-effects">Mixing with Local Declarations and Side Effects<a class="headerlink" href="#mixing-with-local-declarations-and-side-effects" title="Permanent link">&para;</a></h3>
+<p>You can mix bindings with local declarations and side-effecting statements:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">parseNumber</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
 </span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">doubled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w">        </span><span class="c1">// Local declaration</span>

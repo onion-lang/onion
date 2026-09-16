@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`docs/ja/guide/control-flow.md`'s "## Do記法（モナド合成）" section was two bare code snippets with no prose at all**, even though `docs/guide/control-flow.md`'s "Do Notation (Monadic Composition)" section documents (among other subsections) that a do-block short-circuits on the first failing bind ("### Error Short-Circuiting") — a real, tested behavior (`do[...]` desugars to `flatMap`/`map` chains in `Rewriting.scala`). A Japanese-only reader had no way to learn this at all. Added an equivalent "### エラーの早期終了（ショートサーキット）" subsection with a compiling example. Guarded by a new `DoNotationErrorShortCircuitingJaParitySpec`.
+- **`docs/ja/guide/classes-and-objects.md`'s "## Enums" section never mentioned that enums can declare methods**, even though `docs/guide/classes-and-objects.md`'s "## Enums" section documents (with a worked `heavierThan` example) that an access section after the constant list can declare instance methods (seeing the constant's own data) and static methods (seeing `values()`), plus shows `Planet::valueOf("EARTH")` — both real, tested behaviors (`EnumMethodSpec`). The Japanese section jumped straight from the plain-constant example to the ADT-cases subsection, so a Japanese-only reader had no way to learn enums can have methods at all. Added the equivalent Japanese paragraph, example, and `valueOf` line. Guarded by a new `EnumMethodDocParitySpec`.
 
 ## [0.84.0] - 2026-09-16
 

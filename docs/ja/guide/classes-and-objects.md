@@ -370,6 +370,21 @@ println("" + Planet::EARTH.mass())
 foreach p: Planet in Planet::values() {
   println(p.name() + " = " + p.mass())
 }
+Planet::valueOf("EARTH")     // java.lang.Enum.valueOf と同様に動作します
+```
+
+Enumsは定数リストの後のアクセスセクションでメソッドを宣言できます——
+インスタンスメソッドは各定数のデータを、staticメソッドは `values()` を参照できます：
+
+```onion
+enum Planet(mass: Double) {
+  MERCURY(3.3e23),
+  EARTH(5.97e24)
+public:
+  def heavierThan(other: Planet): Boolean {
+    return this.mass() > other.mass()
+  }
+}
 ```
 
 ### 代数的データ型（`case` case）

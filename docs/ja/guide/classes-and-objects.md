@@ -181,6 +181,102 @@ class BankAccount {
 }
 ```
 
+## メソッド
+
+### インスタンスメソッド
+
+インスタンスのデータを操作するメソッド：
+
+```onion
+class Circle {
+  val radius: Double
+
+  public:
+    def this(r: Double) {
+      this.radius = r
+    }
+
+    def area: Double = 3.14159 * this.radius * this.radius
+
+    def circumference: Double = 2.0 * 3.14159 * this.radius
+}
+
+val circle: Circle = new Circle(5.0)
+println("Area: " + circle.area())
+```
+
+### メソッドのオーバーロード
+
+同じ名前で引数の異なる複数のメソッドを定義できます：
+
+```onion
+class Printer {
+  public:
+    def print(value :Int) {
+      println("Int: " + value)
+    }
+
+    def print(value :String) {
+      println("String: " + value)
+    }
+
+    def print(value :Double) {
+      println("Double: " + value)
+    }
+}
+
+val printer: Printer = new Printer
+printer.print(42)
+printer.print("Hello")
+printer.print(3.14)
+```
+
+### ゲッターとセッターメソッド
+
+```onion
+class Person {
+  var name: String
+  var age: Int
+
+  public:
+    def getName: String = this.name
+
+    def setName(name :String) {
+      this.name = name
+    }
+
+    def getAge: Int = this.age
+
+    def setAge(age :Int) {
+      if age >= 0 {
+        this.age = age
+      }
+    }
+}
+```
+
+## `self` 参照
+
+現在のインスタンスは `self` でも参照できます：
+
+```onion
+import {
+  javax.swing.JButton;
+  java.awt.event.ActionEvent;
+  java.awt.event.ActionListener;
+}
+
+class ButtonHandler conforms ActionListener {
+  public:
+    def actionPerformed(event :ActionEvent) {
+      val button: JButton = event.getSource() as JButton
+      button.addActionListener(self)  // このインスタンスへの参照
+    }
+}
+```
+
+`this` と `self` が使えるのはインスタンスのコンテキストだけです。static メソッドや static フィールドから参照することはできません。
+
 ## staticメンバー
 
 `static` キーワードでクラスレベルのメンバーを宣言します。アクセスには `::` を使います：

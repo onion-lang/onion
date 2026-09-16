@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-09-16
+
 ### Fixed
 
 - **`docs/ja/guide/classes-and-objects.md` never documented methods or the `self` reference**, even though both are real, tested features already covered by the English guide's "## Methods" section (instance methods, overloading, getter/setter methods) and "## The `self` Reference" section (`self` is a reserved-word alias for `this`, e.g. `SelfReferentialInitializerSpec`) — a Japanese-only reader had no way to learn `self` exists at all, or see a documented method-overloading example. Added the equivalent "## メソッド" and "## `self` 参照" sections. Guarded by a new `ClassesAndObjectsDocMethodsParitySpec`.

@@ -220,7 +220,81 @@ val first = xs?[0]               // xs が null なら null
 
 ## Nullable対応ジェネリクス
 
-裸の `[T]` は nullable な型引数も受け付け（`new Box[String?](...)`）、`[T extends B]` は非nullに制限します。詳細は[仕様](../reference/specification.md)を参照してください。
+型パラメータの nullability の扱いは Kotlin と同様です。
+
+### 裸の `[T]` は nullable な型も受け付ける
+
+境界を指定しない型パラメータは、型引数として `String` と `String?` の両方を受け付けます。
+
+```onion
+class Box[T] {
+  val item: T
+public:
+  def this(item: T) { this.item = item }
+  def get(): T { return this.item }
+}
+
+val maybe: String? = null
+val box = new Box[String?](maybe)   // OK: T := String?
+val out: String? = box.get()
+```
+
+`T` が nullable な型でインスタンス化される可能性があるため、ジェネリクスの本体内で `T` 型の値を直接デリファレンスすることはできません（E0057）。
+
+```onion
+def show(): String {
+  return this.item.toString()       // E0057: item may be null
+}
+```
+
+`T?` に対するのと同じ手段（セーフコール・Elvis演算子・null チェック）を使ってください。
+
+```onion
+def safe(): String? { return this.item?.toString() }
+def fallback(): String { return (this.item ?: "fb").toString() }
+def checked(): String {
+  val it = this.item
+  if it != null { return it.toString() } else { return "<null>" }
+}
+```
+
+### `[T extends B]` は T を非nullに保つ
+
+境界を指定すると、そのパラメータは非nullの型に制限されます。nullable な型引数は拒否され、本体内で `T` 型の値を自由にデリファレンスできます。
+
+```onion
+class Sorted[T extends Comparable] {
+  val item: T
+public:
+  def this(item: T) { this.item = item }
+  def show(): String { return this.item.toString() }  // OK
+}
+
+new Sorted[String]("ok")      // OK
+new Sorted[String?](maybe)    // error: String? does not satisfy the bound
+```
+
+これは `[T extends Object]` にも当てはまります。裸の `[T]` とは違い、nullable な引数を拒否します。
+
+### `[T extends B?]` は境界付きで nullable に戻す
+
+```onion
+class Cache[T extends Comparable?] { ... }   // String と String? の両方を受け付ける
+```
+
+### 推論
+
+型引数の推論は、引数側が要求する場合は nullable な型を束縛し、混在した nullability をマージします。
+
+```onion
+static def first[T](a: T, b: T): T { return a }
+
+first(maybe, "solid")   // T := String?  (String? + String がマージされる)
+```
+
+Java のクラス由来の型変数は *プラットフォーム* パラメータとして扱われます。nullability が不明なため、nullable な引数を受け付け、（他の Java の値と同様に）デリファレンス可能なままです。
+
+詳細は[仕様](../reference/specification.md)を参照してください。
 
 ## 次のステップ
 

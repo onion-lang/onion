@@ -5207,9 +5207,11 @@
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    ↓
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>[4] 末尾呼び出し最適化 → 最適化された型付きAST
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    ↓
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>[5] コード生成 (ASM) → JVMバイトコード
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>[5] 相互再帰最適化 → 最適化された型付きAST
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    ↓
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>クラスのロードと実行
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>[6] コード生成 (ASM) → JVMバイトコード
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    ↓
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>クラスのロードと実行
 </span></code></pre></div>
 <h3 id="_5">コアコンパイラフェーズ<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>すべてのフェーズは <code>Processor[A, B]</code> トレイトを継承し、<code>andThen()</code> を使って合成できます：</p>
@@ -5259,6 +5261,16 @@
 </ol>
 </li>
 <li>深い再帰（例: 10000回以上の呼び出し）でのStackOverflowErrorを防止</li>
+<li>
+<p>出力: 最適化された型付きAST</p>
+</li>
+<li>
+<p><strong>相互再帰最適化</strong> (<code>src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala</code>)</p>
+</li>
+<li>末尾呼び出し最適化の後に実行される、独立したフェーズ</li>
+<li>オプトイン: 互いに呼び出し合う <code>@TailRecursive</code> 付きメソッドのグループ（強連結成分として検出される相互再帰）を、
+     単一のステートマシンメソッドに変換し、そのグループでスタックが伸び続けないようにする</li>
+<li>グループが注釈付きでも要件を満たせない場合は <code>W0016</code> で警告</li>
 <li>
 <p>出力: 最適化された型付きAST</p>
 </li>
@@ -5389,6 +5401,7 @@
 <li><strong>メインコンパイラロジック</strong>: <code>src/main/scala/onion/compiler/</code></li>
 <li><strong>最適化</strong>: <code>src/main/scala/onion/compiler/optimization/</code></li>
 <li><code>TailCallOptimization.scala</code> - 末尾再帰 → ループ変換</li>
+<li><code>MutualRecursionOptimization.scala</code> - <code>@TailRecursive</code> 相互再帰グループ → ステートマシン</li>
 <li><strong>パーサー文法</strong>: <code>grammar/JJOnionParser.jj</code></li>
 <li><strong>ランタイムライブラリ</strong>: <code>src/main/java/onion/</code> (Javaインターフェース)</li>
 <li><strong>ツール (CLI)</strong>: <code>src/main/scala/onion/tools/</code></li>

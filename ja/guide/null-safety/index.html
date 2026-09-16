@@ -1063,10 +1063,60 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Nullable対応ジェネリクス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#t-nullable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        裸の [T] は nullable な型も受け付ける
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#t-extends-b-t-null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [T extends B] は T を非nullに保つ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#t-extends-b-nullable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [T extends B?] は境界付きで nullable に戻す
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推論
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
+  <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4698,10 +4748,60 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Nullable対応ジェネリクス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#t-nullable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        裸の [T] は nullable な型も受け付ける
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#t-extends-b-t-null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [T extends B] は T を非nullに保つ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#t-extends-b-nullable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [T extends B?] は境界付きで nullable に戻す
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推論
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
+  <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -4890,8 +4990,58 @@ null-to-non-nullable</code> で抑制も可能）。</p>
 </span></code></pre></div>
 <p><code>!!</code> は「型システムより自分が確実に分かっている」ときに使い、通常は <code>?.</code> / <code>?:</code> / null チェックを優先します。</p>
 <h2 id="nullable_2">Nullable対応ジェネリクス<a class="headerlink" href="#nullable_2" title="Permanent link">&para;</a></h2>
-<p>裸の <code>[T]</code> は nullable な型引数も受け付け（<code>new Box[String?](...)</code>）、<code>[T extends B]</code> は非nullに制限します。詳細は<a href="../../reference/specification/">仕様</a>を参照してください。</p>
-<h2 id="_3">次のステップ<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>型パラメータの nullability の扱いは Kotlin と同様です。</p>
+<h3 id="t-nullable">裸の <code>[T]</code> は nullable な型も受け付ける<a class="headerlink" href="#t-nullable" title="Permanent link">&para;</a></h3>
+<p>境界を指定しない型パラメータは、型引数として <code>String</code> と <code>String?</code> の両方を受け付けます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Box</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">get</span><span class="p">():</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="p">}</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">maybe</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">box</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Box</span><span class="p">[</span><span class="nc">String</span><span class="p">?](</span><span class="n">maybe</span><span class="p">)</span><span class="w">   </span><span class="c1">// OK: T := String?</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">out</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">box</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+</span></code></pre></div>
+<p><code>T</code> が nullable な型でインスタンス化される可能性があるため、ジェネリクスの本体内で <code>T</code> 型の値を直接デリファレンスすることはできません（E0057）。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="p">.</span><span class="nf">toString</span><span class="p">()</span><span class="w">       </span><span class="c1">// E0057: item may be null</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>T?</code> に対するのと同じ手段（セーフコール・Elvis演算子・null チェック）を使ってください。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">safe</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="o">?.</span><span class="nf">toString</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">fallback</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="s2">"fb"</span><span class="p">).</span><span class="nf">toString</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">checked</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">it</span><span class="p">.</span><span class="nf">toString</span><span class="p">()</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s2">"&lt;null&gt;"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="t-extends-b-t-null"><code>[T extends B]</code> は T を非nullに保つ<a class="headerlink" href="#t-extends-b-t-null" title="Permanent link">&para;</a></h3>
+<p>境界を指定すると、そのパラメータは非nullの型に制限されます。nullable な型引数は拒否され、本体内で <code>T</code> 型の値を自由にデリファレンスできます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Sorted</span><span class="p">[</span><span class="nc">T</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">item</span><span class="p">.</span><span class="nf">toString</span><span class="p">()</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// OK</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">}</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="k">new</span><span class="w"> </span><span class="nc">Sorted</span><span class="p">[</span><span class="nc">String</span><span class="p">](</span><span class="s2">"ok"</span><span class="p">)</span><span class="w">      </span><span class="c1">// OK</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="k">new</span><span class="w"> </span><span class="nc">Sorted</span><span class="p">[</span><span class="nc">String</span><span class="p">?](</span><span class="n">maybe</span><span class="p">)</span><span class="w">    </span><span class="c1">// error: String? does not satisfy the bound</span>
+</span></code></pre></div>
+<p>これは <code>[T extends Object]</code> にも当てはまります。裸の <code>[T]</code> とは違い、nullable な引数を拒否します。</p>
+<h3 id="t-extends-b-nullable"><code>[T extends B?]</code> は境界付きで nullable に戻す<a class="headerlink" href="#t-extends-b-nullable" title="Permanent link">&para;</a></h3>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Cache</span><span class="p">[</span><span class="nc">T</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">?]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// String と String? の両方を受け付ける</span>
+</span></code></pre></div>
+<h3 id="_3">推論<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>型引数の推論は、引数側が要求する場合は nullable な型を束縛し、混在した nullability をマージします。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">first</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="nf">first</span><span class="p">(</span><span class="n">maybe</span><span class="p">,</span><span class="w"> </span><span class="s2">"solid"</span><span class="p">)</span><span class="w">   </span><span class="c1">// T := String?  (String? + String がマージされる)</span>
+</span></code></pre></div>
+<p>Java のクラス由来の型変数は <em>プラットフォーム</em> パラメータとして扱われます。nullability が不明なため、nullable な引数を受け付け、（他の Java の値と同様に）デリファレンス可能なままです。</p>
+<p>詳細は<a href="../../reference/specification/">仕様</a>を参照してください。</p>
+<h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../basic-syntax/">基本構文</a> - 言語構文の詳細</li>
 <li><a href="../../reference/stdlib/">標準ライブラリ</a> - 組み込みモジュールとユーティリティ</li>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.86.0] - 2026-09-16
+
 ### Fixed
 
 - **`new GenericClass[T](arg, { x -> expr })` — a generic constructor call with a trailing closure argument — crashed the compiler with an internal error (`I0000`, `AST$BlockExpression cannot be cast to AST$ClosureExpression`)** in `ConstructionTyping.resolveConstructorForClosures`. The parser wraps a bare `{ param -> body }` closure argument inside a `BlockExpression` whose last element is the actual `ClosureExpression`, and the constructor candidate-filtering code blindly cast the argument to `AST.ClosureExpression` without accounting for that wrapper. Now the arity is extracted from either shape (a direct `ClosureExpression`, or the last element of a `BlockExpression` wrapper) before filtering; any other shape is treated as non-matching instead of crashing. Guarded by a new `GenericConstructorClosureArgSpec`, and exercised end-to-end by a new `run/CityPlanner.on` sample program.

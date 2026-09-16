@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/CLAUDE_ja.md`'s "### コンパイラオプション (onionc/onion用)" section was missing the last 4 of 8 bullets** that `CLAUDE.md`'s "### Compiler Options (for onionc/onion)" section documents — `--no-check-laws`, `--law-seed`/`--law-samples`, `--stacktrace`, and the `ONION_DAEMON=1` environment variable, all real, wired-up options (`src/main/scala/onion/tools/CompilerOptions.scala`, `ScriptRunner.scala`, `daemon/DaemonClient.scala`). A Japanese-only reader had no way to learn these options exist. Added the equivalent Japanese bullets. Guarded by a new `ClaudeMdCompilerOptionsParitySpec`.
 - **`docs/ja/guide/inheritance.md` was missing the entire "## Inheritance Best Practices" section** that `docs/guide/inheritance.md` documents — three subsections ("Favor Composition Over Inheritance" with a `PrefixLogger conforms Logger` + `forward val delegate: Logger` example, "Keep Hierarchies Shallow" with a good/bad hierarchy diagram, and "Override Consistently" with a Parent/Child `process` override example). The Japanese guide jumped straight from "## 抽象クラス" to "## 次のステップ", so a Japanese-only reader had no way to learn this guidance exists at all. Added the equivalent Japanese section with all three subsections. Guarded by a new `InheritanceDocBestPracticesParitySpec`.
 
 ## [0.85.0] - 2026-09-16

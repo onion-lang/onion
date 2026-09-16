@@ -267,8 +267,35 @@ println(factorial(1000))  // Works without stack overflow!
 - Performance equivalent to loops
 
 **Limitations:**
-- Only direct self-recursion is optimized (not mutual recursion)
+- Direct self-recursion is optimized automatically; mutual recursion (two or more methods calling each other in tail position) is *not* detected automatically
 - The recursive call must be in return position (no operations after the call)
+
+### Mutual Recursion
+
+Two methods that tail-call each other aren't picked up by the automatic detection above — each call targets a *different* method, so it never looks like "a method calling itself". Mark every method in the group `@TailRecursive` to opt in; the compiler merges them into a single state-machine method instead of a loop:
+
+```onion
+class Parity {
+private:
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+public:
+  def check(n: Int): Boolean = isEven(n)
+}
+
+println(new Parity().check(100000))  // true, no stack overflow
+```
+
+The group is only optimized when every member is `private`, shares the same return type and parameter types, and every tail call inside the group targets another member of the group. An annotated group that fails these requirements is not an error — the annotation is simply ineffective, and the compiler emits warning `W0016` to flag it at compile time instead of an eventual `StackOverflowError`. See [Tail Call Optimization](../compiler/tail-call-optimization.md#mutual-recursion-with-tailrecursive) for the full requirements.
 
 ## Method Overloading
 

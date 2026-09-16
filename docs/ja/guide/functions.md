@@ -78,6 +78,31 @@ def factorial(n: Int): Int = factorialTail(n, 1)
 println(factorial(1000))  // スタックオーバーフローなし
 ```
 
+自動で最適化されるのは自己再帰（メソッドが自分自身を末尾位置で呼ぶ場合）だけです。相互再帰（複数のメソッドが末尾位置で互いを呼び合う場合）は自動検出の対象外ですが、`@TailRecursive` アノテーションを付けることでオプトインできます。コンパイラはグループ全体を1つの状態機械メソッドにまとめます：
+
+```onion
+class Parity {
+private:
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+public:
+  def check(n: Int): Boolean = isEven(n)
+}
+
+println(new Parity().check(100000))  // true、スタックオーバーフローなし
+```
+
+最適化されるのは、グループの全メンバーが `private` で、戻り値の型とパラメータの型がすべて一致し、グループ内の末尾呼び出しがすべて同じグループの別メンバーを対象にしている場合だけです。条件を満たさないグループはエラーにはならず、アノテーションが単に効果を持たないだけですが、コンパイラは警告 `W0016` を出してコンパイル時に気付けるようにします。詳細は [末尾呼び出し最適化](../compiler/tail-call-optimization.md#mutual-recursion-with-tailrecursive) を参照してください。
+
 ## 高階関数
 
 関数を引数として受け取ったり返したりできます：

@@ -76,5 +76,14 @@ class ControlFlowDocLabeledLoopSpec extends AbstractShellSpec {
         "docs/ja/guide/control-flow.md's break/continue section claims labeled break/continue " +
         "but its example never shows a label (`name: while ...`) — the reader can't see the syntax")
     }
+
+    it("documents that a labeled break/continue unwinds through synchronized/try-with-resources, like the English guide does") {
+      val section = sectionUnder(read("docs/ja/guide/control-flow.md"), "## break / continue")
+      assert(section.contains("synchronized") && section.contains("try"),
+        "docs/ja/guide/control-flow.md's break/continue section is missing the note (present in " +
+        "docs/guide/control-flow.md's 'Labeled Break and Continue' section) that a labeled break/continue " +
+        "correctly unwinds through synchronized blocks and try (including try-with-resources) between it " +
+        "and the labeled loop")
+    }
   }
 }

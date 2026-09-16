@@ -90,6 +90,11 @@ outer: for var i: Int = 0; i < 3; i = i + 1 {
 }
 ```
 
+ラベル付き `break`/`continue` は、それとラベルの付いたループの間にある
+`synchronized` ブロックや `try`（try-with-resources を含む）も正しく巻き戻します
+— モニタは解放され、リソースは通常どおり制御を抜けた場合と同じようにクローズ
+されます。
+
 ## 例外処理
 
 ```onion

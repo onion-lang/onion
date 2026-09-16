@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/guide/control-flow.md`'s "break / continue" section was missing the note (present in the English guide's "Labeled Break and Continue" section) that a labeled `break`/`continue` correctly unwinds through any `synchronized` blocks and `try` (including try-with-resources) between it and the labeled loop** — a Japanese-only reader had no way to know this guarantee, already real and tested (`LabeledBreakContinueThroughNestedSynchronizedSpec`, `LabeledContinueThroughNestedTryWithResourcesSpec`, etc.), exists at all. Added the equivalent Japanese sentence. Guarded by a new assertion in `ControlFlowDocLabeledLoopSpec`.
+
 ## [0.82.0] - 2026-09-16
 
 ### Fixed

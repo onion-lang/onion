@@ -4580,7 +4580,7 @@
 <h2 id="_1">取り決め：推論はどこでも、宣言は境界だけ<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>普通の関数に効果の注釈は一切書きません。コンパイラが本体を見て、呼び出しをまたいで合流
 させながら、各関数が何をしうるかを推論します（語彙と解析の詳細は
-<a href="../../../reference/effects/">効果リファレンス</a>）。効果を宣言する場所はただ一つ ——
+<a href="../../reference/effects/">効果リファレンス</a>）。効果を宣言する場所はただ一つ ——
 <code>tool</code> の境界 —— で、検査は宣言と推論を突き合わせます：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">helper</span><span class="p">(</span><span class="n">msg</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span><span class="w">          </span><span class="c1">// 推論: console — 注釈は不要</span>

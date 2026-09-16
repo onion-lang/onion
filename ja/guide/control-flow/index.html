@@ -4632,6 +4632,10 @@
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
 </span></code></pre></div>
+<p>ラベル付き <code>break</code>/<code>continue</code> は、それとラベルの付いたループの間にある
+<code>synchronized</code> ブロックや <code>try</code>（try-with-resources を含む）も正しく巻き戻します
+— モニタは解放され、リソースは通常どおり制御を抜けた場合と同じようにクローズ
+されます。</p>
 <h2 id="_4">例外処理<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">try</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nf">riskyOperation</span><span class="p">()</span>

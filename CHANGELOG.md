@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/guide/inheritance.md` was missing the entire "## Inheritance Best Practices" section** that `docs/guide/inheritance.md` documents — three subsections ("Favor Composition Over Inheritance" with a `PrefixLogger conforms Logger` + `forward val delegate: Logger` example, "Keep Hierarchies Shallow" with a good/bad hierarchy diagram, and "Override Consistently" with a Parent/Child `process` override example). The Japanese guide jumped straight from "## 抽象クラス" to "## 次のステップ", so a Japanese-only reader had no way to learn this guidance exists at all. Added the equivalent Japanese section with all three subsections. Guarded by a new `InheritanceDocBestPracticesParitySpec`.
+
 ## [0.85.0] - 2026-09-16
 
 ### Fixed

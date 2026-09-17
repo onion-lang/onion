@@ -6,7 +6,8 @@ import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class SafeNavigationTypingSupport(
   bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  calls: MethodCallTyping,
+  fallback: MethodCallFallbackSupport
 ) {
   def typeSafeMemberSelection(node: AST.SafeMemberSelection, context: LocalContext): Option[Term] = {
     val target = calls.typed(node.target, context).getOrElse(null)
@@ -47,6 +48,8 @@ private[compiler] final class SafeNavigationTypingSupport(
     val name = node.name
     val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
+      val ext = fallback.tryExtensionSafeMethodCall(node, target, targetType, params, expected)
+      if (ext.isDefined) return ext
       calls.reportMethodNotFound(node, targetType, name, calls.types(params))
       return None
     }

@@ -261,6 +261,7 @@ class TailCallOptimization(config: CompilerConfig)
       case call: Call       => Math.max(inTerm(call.target), inTerms(call.parameters))
       case call: CallStatic => inTerms(call.parameters)
       case safeCall: SafeCall => Math.max(inTerm(safeCall.target), inTerms(safeCall.parameters))
+      case n: SafeCallStatic => Math.max(inTerm(n.receiver), inTerms(n.args))
       case superCall: CallSuper => inTerms(superCall.params)
       case bin: BinaryTerm  => Math.max(inTerm(bin.lhs), inTerm(bin.rhs))
       case un: UnaryTerm    => inTerm(un.operand)
@@ -571,6 +572,11 @@ class TailCallOptimization(config: CompilerConfig)
         val rewrittenTarget = rewriteTermRefs(safeCall.target, loopVarMapping)
         val rewrittenParams = safeCall.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
         new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
+
+      case n: SafeCallStatic =>
+        val rewrittenReceiver = rewriteTermRefs(n.receiver, loopVarMapping)
+        val rewrittenArgs = n.args.map(a => rewriteTermRefs(a, loopVarMapping))
+        new SafeCallStatic(n.location, rewrittenReceiver, n.containerClass, n.method, rewrittenArgs)
 
       case superCall: CallSuper =>
         val rewrittenParams = superCall.params.map(p => rewriteTermRefs(p, loopVarMapping))

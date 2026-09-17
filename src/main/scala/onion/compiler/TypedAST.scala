@@ -283,6 +283,21 @@ object TypedAST {
     def `type`: TypedAST.Type = method.returnType
   }
 
+  /** Safe static call for extension methods invoked via `?.`.
+   *  Null-checks `receiver` (the boxed original target) before calling the
+   *  backing static extension method; returns null when the receiver is null. */
+  class SafeCallStatic(
+    location: Location,
+    val receiver: TypedAST.Term,
+    val containerClass: TypedAST.ObjectType,
+    val method: TypedAST.Method,
+    val args: Array[TypedAST.Term]
+  ) extends Term(location) {
+    def this(receiver: TypedAST.Term, containerClass: TypedAST.ObjectType, method: TypedAST.Method, args: Array[TypedAST.Term]) =
+      this(null, receiver, containerClass, method, args)
+    def `type`: TypedAST.Type = NullableType.of(method.returnType)
+  }
+
   /**
    * @author Kota Mizushima
    */

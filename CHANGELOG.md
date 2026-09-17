@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md` never showed the message-overload form of `onion.Assert`'s six comparison/null/boolean assertions** (`equals`, `notEquals`, `notNull`, `isNull`, `isTrue`, `isFalse`), each of which accepts a trailing custom failure message — a reader following the docs alone would not know the overload exists. Added one example per overload in both languages. `AssertDocCoverageSpec` previously matched documented members by name only, blind to arity, so it couldn't catch a documented-but-incomplete signature; it now also asserts (per member, by argument count) that both docs demonstrate the message form.
+
 ## [0.81.0] - 2026-09-15
 
 ### Fixed

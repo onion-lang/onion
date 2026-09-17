@@ -1,0 +1,203 @@
+// Bloom Filter — probabilistic membership data structure.
+// Demonstrates: bit-array manipulation, hashing, extension methods,
+// records, ADT enums, collection pipelines, statistics.
+
+import {
+  java.util.*
+  java.lang.Integer as JInteger
+}
+
+// ─── Hashing helpers ─────────────────────────────────────────────────────────
+
+extension String {
+  def hash1(): Int {
+    var h: Int = 31
+    var i: Int = 0
+    while i < self.length() {
+      h = h * 31 + self.charAt(i)
+      i++
+    }
+    return if h < 0 { -h } else { h }
+  }
+
+  def hash2(): Int {
+    var h: Int = 37
+    var i: Int = 0
+    while i < self.length() {
+      h = h * 17 + self.charAt(i) * 3
+      i++
+    }
+    return if h < 0 { -h } else { h }
+  }
+
+  def hash3(): Int {
+    var h: Int = 53
+    var i: Int = 0
+    while i < self.length() {
+      h = h * 7 + self.charAt(i) * 11
+      i++
+    }
+    return if h < 0 { -h } else { h }
+  }
+}
+
+// ─── Probe result ─────────────────────────────────────────────────────────────
+
+enum ProbeResult {
+  case DefinitelyAbsent
+  case PossiblyPresent
+}
+
+// ─── Bloom filter class ───────────────────────────────────────────────────────
+
+class BloomFilter {
+public:
+  val capacity: Int
+  var bits: Int[]
+  var insertCount: Int
+
+  def this(capacity: Int) {
+    this.capacity  = capacity
+    bits           = new Int[(capacity / 32) + 1]
+    insertCount    = 0
+  }
+
+  def setBit(pos: Int): void {
+    val idx: Int  = pos / 32
+    val bit: Int  = pos % 32
+    bits[idx] = bits[idx] | (1 << bit)
+  }
+
+  def testBit(pos: Int): Boolean {
+    val idx: Int  = pos / 32
+    val bit: Int  = pos % 32
+    return (bits[idx] & (1 << bit)) != 0
+  }
+
+  def add(word: String): void {
+    setBit(word.hash1() % capacity)
+    setBit(word.hash2() % capacity)
+    setBit(word.hash3() % capacity)
+    insertCount++
+  }
+
+  def probe(word: String): ProbeResult {
+    val a: Boolean = testBit(word.hash1() % capacity)
+    val b: Boolean = testBit(word.hash2() % capacity)
+    val c: Boolean = testBit(word.hash3() % capacity)
+    if a && b && c {
+      return new PossiblyPresent() as ProbeResult
+    }
+    return new DefinitelyAbsent() as ProbeResult
+  }
+}
+
+// ─── Records for test results ─────────────────────────────────────────────────
+
+record CheckResult(word: String, inSet: Boolean, result: ProbeResult)
+
+record FilterStats(capacity: Int, insertCount: Int,
+                   truePositives: Int, falsePositives: Int,
+                   trueNegatives: Int) {
+public:
+  def total(): Int    = truePositives + falsePositives + trueNegatives
+  def fpRate(): Double =
+    if total() == 0 { 0.0 } else { (falsePositives() * 1.0) / (total() * 1.0) }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def isPossiblyPresent(r: ProbeResult): Boolean =
+  select r {
+    case x is PossiblyPresent: true
+    else: false
+  }
+
+def checkLabel(r: CheckResult): String =
+  select r.result() {
+    case x is PossiblyPresent:
+      if r.inSet() { "  ✓ TP #{r.word()}" } else { "  ! FP #{r.word()}" }
+    case x is DefinitelyAbsent:
+      if r.inSet() { "  ✗ FN #{r.word()} (impossible in Bloom)" } else { "  - TN #{r.word()}" }
+  }
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  println("=== Bloom Filter Demo ===\n")
+
+  // English dictionary sample split into "known" (to insert) and "unknown" (to probe-only)
+  val known: List[String] = [
+    "apple", "banana", "cherry", "date", "elderberry",
+    "fig", "grape", "honeydew", "kiwi", "lemon",
+    "mango", "nectarine", "orange", "papaya", "quince",
+    "raspberry", "strawberry", "tangerine", "ugli", "vanilla"
+  ]
+  val unknown: List[String] = [
+    "avocado", "blueberry", "coconut", "dragonfruit", "eggfruit",
+    "feijoa", "guava", "huckleberry", "ilama", "jackfruit"
+  ]
+
+  // Build the filter
+  val bf = new BloomFilter(256)
+  println("Inserting #{known.size} words into a #{bf.capacity}-bit filter (3 hash functions)...")
+  foreach word: String in known { bf.add(word) }
+  println("Inserted #{bf.insertCount} words.\n")
+
+  // Probe known words — should all be PossiblyPresent
+  println("--- Probing known words (expect all PossiblyPresent) ---")
+  val knownResults: List[CheckResult] = known.map { w: String ->
+    new CheckResult(w, true, bf.probe(w))
+  }
+  foreach r: CheckResult in knownResults { println(checkLabel(r)) }
+
+  // Probe unknown words — some may be false positives
+  println("\n--- Probing unknown words (DefinitelyAbsent = correct; PossiblyPresent = false positive) ---")
+  val unknownResults: List[CheckResult] = unknown.map { w: String ->
+    new CheckResult(w, false, bf.probe(w))
+  }
+  foreach r: CheckResult in unknownResults { println(checkLabel(r)) }
+
+  // Compute stats
+  val tp: Int = knownResults.filter { r: CheckResult ->   isPossiblyPresent(r.result()) }.size
+  val fn: Int = knownResults.filter { r: CheckResult -> !isPossiblyPresent(r.result()) }.size
+  val fp: Int = unknownResults.filter { r: CheckResult ->  isPossiblyPresent(r.result()) }.size
+  val tn: Int = unknownResults.filter { r: CheckResult -> !isPossiblyPresent(r.result()) }.size
+
+  val stats = new FilterStats(bf.capacity, bf.insertCount, tp, fp, tn)
+
+  println("\n=== Statistics ===")
+  println("  Capacity        : #{stats.capacity()} bits")
+  println("  Items inserted  : #{stats.insertCount()}")
+  println("  True positives  : #{stats.truePositives()}")
+  println("  False positives : #{stats.falsePositives()}")
+  println("  True negatives  : #{stats.trueNegatives()}")
+  println("  False neg (bugs): #{fn}  (must be 0)")
+  println("  FP rate         : #{stats.fpRate()}")
+
+  // Bit density
+  var setBits: Int = 0
+  foreach word: String in known {
+    // count set bits contributed (rough proxy via re-hashing)
+    val p1: Int = word.hash1() % bf.capacity
+    val p2: Int = word.hash2() % bf.capacity
+    val p3: Int = word.hash3() % bf.capacity
+    if bf.testBit(p1) { setBits++ }
+    if bf.testBit(p2) { setBits++ }
+    if bf.testBit(p3) { setBits++ }
+  }
+  println("  Probe hits (3 × n) : #{setBits} / #{known.size * 3}")
+
+  // Demonstrate scaling: larger filter → fewer false positives
+  println("\n=== FP rate vs capacity ===")
+  val capacities: List[Int] = [64, 128, 256, 512, 1024]
+  foreach cap: Int in capacities {
+    val f = new BloomFilter(cap)
+    foreach w: String in known { f.add(w) }
+    val fps: Int = unknown.filter { w: String -> isPossiblyPresent(f.probe(w)) }.size
+    val rate: Double = (fps * 1.0) / (unknown.size * 1.0)
+    println("  capacity=#{cap}  FP #{fps}/#{unknown.size}  rate=#{rate}")
+  }
+
+  println("\nDone.")
+}

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/examples/functional.md` was missing the entire "## Primitive Generics with Java Functional Interfaces" section** that `docs/examples/functional.md` documents — converting a lambda to a Java functional interface (`Comparator`, `Predicate`, `Supplier`, `Function`, ...) when the type argument is primitive (e.g. `Comparator[Int]`), with the compiler boxing the type parameter and generating the bridge method internally so `Int` parameters can be written naturally. The Japanese file jumped straight from "## 末尾ラムダ構文" ("Trailing Lambda Syntax") to "## 次のステップ" ("Next Steps"), so a Japanese-only reader had no way to learn this behavior exists. Added the equivalent Japanese section with a translated example. Guarded by a new `FunctionalExamplesPrimitiveGenericsJaParitySpec`, which also asserts the ja sample's output matches the English sample's.
+
 ## [0.86.0] - 2026-09-16
 
 ### Fixed

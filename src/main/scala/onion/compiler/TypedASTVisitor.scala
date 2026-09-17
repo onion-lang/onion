@@ -19,6 +19,7 @@ trait TypedASTVisitor[T]:
   def visitCallStatic(node: CallStatic): T
   def visitCallSuper(node: CallSuper): T
   def visitSafeCall(node: SafeCall): T
+  def visitSafeCallStatic(node: SafeCallStatic): T
   def visitSafeRefArray(node: SafeRefArray): T
   def visitNonNullAssert(node: NonNullAssert): T
   def visitSafeFieldAccess(node: SafeFieldAccess): T
@@ -70,6 +71,7 @@ trait TypedASTVisitor[T]:
     case n: RefLocal => visitRefLocal(n)
     case n: Call => visitCall(n)
     case n: CallStatic => visitCallStatic(n)
+    case n: SafeCallStatic => visitSafeCallStatic(n)
     case n: StringValue => visitStringValue(n)
     case n: IntValue => visitIntValue(n)
     case n: This => visitThis(n)
@@ -141,6 +143,7 @@ abstract class DefaultTypedASTVisitor[T] extends TypedASTVisitor[T]:
   override def visitCallStatic(node: CallStatic): T = defaultValue
   override def visitCallSuper(node: CallSuper): T = defaultValue
   override def visitSafeCall(node: SafeCall): T = defaultValue
+  override def visitSafeCallStatic(node: SafeCallStatic): T = defaultValue
   override def visitSafeRefArray(node: SafeRefArray): T = defaultValue
   override def visitNonNullAssert(node: NonNullAssert): T = defaultValue
   override def visitSafeFieldAccess(node: SafeFieldAccess): T = defaultValue

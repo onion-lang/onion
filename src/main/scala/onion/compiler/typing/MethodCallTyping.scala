@@ -20,7 +20,7 @@ final class MethodCallTyping(
   private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(this)
   private val methodCallFallbackSupport = new MethodCallFallbackSupport(typing, this)
   private val instanceMethodCallSupport = new InstanceMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
-  private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)
+  private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this, methodCallFallbackSupport)
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
   private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this, methodCallFallbackSupport, staticMethodCallSupport)
   private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this)

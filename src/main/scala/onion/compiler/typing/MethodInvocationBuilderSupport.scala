@@ -132,13 +132,15 @@ private[compiler] final class MethodInvocationBuilderSupport(
   ): Term = {
     val castType = TypeSubst.result(method.returnType, classSubst, methodSubst)
     call match {
-      case _: SafeCall | _: SafeFieldAccess =>
+      case _: SafeCall | _: SafeFieldAccess | _: SafeCallStatic =>
         // Safe navigation yields null when the target is null: keep the
         // nullable result type instead of casting back to the raw return
-        // type (which unboxes primitives and NPEs on the null path)
+        // type (which unboxes primitives and NPEs on the null path).
+        // SafeCallStatic covers the `?.` extension-method path for both
+        // primitive and reference receivers; its `type` is already NullableType.
         castType match {
           case _: NullableType | _: NullType => TypeSubst.withCast(call, castType)
-          case _: BasicType => call // SafeCall.type is already NullableType(bt)
+          case _: BasicType => call // Safe*.type is already NullableType(bt)
           case other if other eq method.returnType => call
           case other => TypeSubst.withCast(call, NullableType.of(other))
         }

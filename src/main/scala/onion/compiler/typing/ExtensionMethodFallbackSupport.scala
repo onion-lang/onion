@@ -137,6 +137,64 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
   }
 
+  /** Build a `SafeCallStatic` for `receiver?.extensionMethod(args)`.
+   *  The null check is emitted by the codegen against `boxedReceiver`; if the
+   *  backing static's first parameter is a primitive the codegen unboxes after
+   *  the null check, so we never unbox before knowing the receiver is non-null. */
+  def tryExtensionSafeMethodCall(
+    node: AST.SafeMethodCall,
+    boxedReceiver: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.NoMatch => None
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousSignature(node, first.containerClass, node.name, first.arguments,
+          second.containerClass, node.name, second.arguments)
+        None
+      case CandidateSelection.Selected(extMethod) =>
+        buildSafeExtensionCall(node, boxedReceiver, targetType, params, expected, extMethod)
+    }
+
+  private def buildSafeExtensionCall(
+    node: AST.SafeMethodCall,
+    boxedReceiver: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type,
+    extMethod: ExtensionMethodDefinition
+  ): Option[Term] = {
+    val containerClass = extMethod.containerClass
+    // For method lookup we need a term whose type is the non-null targetType so
+    // that findMethod matches the backing static's parameter type.  The nullable
+    // wrapper (e.g. NullableType(String)) on the original receiver would not
+    // resolve to the non-nullable first parameter; strip it here.
+    val lookupReceiver: Term =
+      if boxedReceiver.`type` == targetType then boxedReceiver
+      else new AsInstanceOf(boxedReceiver.location, boxedReceiver, targetType)
+    val staticArgs = Array(staticReceiver(lookupReceiver, extMethod)) ++ params
+    val staticMethods = containerClass.findMethod(node.name, staticArgs)
+
+    staticMethods match {
+      case Array() =>
+        calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+        None
+      case Array(staticMethod) =>
+        val classSubst = TypeSubstitution.classSubstitution(containerClass)
+        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+          // finalParams(0) is the (possibly unboxed) receiver used for lookup;
+          // SafeCallStatic holds the boxed receiver separately and finalParams[1..] as args.
+          finalParams => new SafeCallStatic(node.location, boxedReceiver, containerClass, staticMethod, finalParams.tail)
+        )
+      case multiple =>
+        calls.reportAmbiguousMethods(node, node.name, multiple)
+        None
+    }
+  }
+
   /**
    * Bidirectional variant for calls whose arguments contain closures with
    * untyped parameters (list.map { x => ... }): pick the extension's backing

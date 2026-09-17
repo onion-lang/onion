@@ -60,25 +60,31 @@ class AssertDocCoverageSpec extends AnyFunSpec {
       "docs/ja/reference/stdlib.md's overview table should mention Assert")
   }
 
-  // Six onion.Assert members (equals, notEquals, notNull, isNull, isTrue, isFalse) are each
-  // overloaded with a trailing `String message` parameter, but the docs only ever showed the
-  // shorter form -- documentedNames() above can't catch this because it matches by member name
-  // only, blind to arity. A reader would never learn the message overload exists.
-  private val messageOverloadMembers =
-    Set("equals", "notEquals", "notNull", "isNull", "isTrue", "isFalse")
+  // Six onion.Assert members are each overloaded with a trailing `String message` parameter,
+  // but the docs only ever showed the shorter form -- documentedNames() above can't catch this
+  // because it matches by member name only, blind to arity. A reader would never learn the
+  // message overload exists. equals/notEquals take 2 non-message args before the message;
+  // the other four take just 1.
+  private val messageOverloadArity: Map[String, Int] =
+    Map("equals" -> 3, "notEquals" -> 3, "notNull" -> 2, "isNull" -> 2, "isTrue" -> 2, "isFalse" -> 2)
 
-  private def hasThreeArgExample(doc: String, member: String): Boolean =
-    s"""Assert::$member\\([^()]*,[^()]*,[^()]*\\)""".r.findFirstIn(doc).isDefined
+  private def hasMessageOverloadExample(doc: String, member: String, arity: Int): Boolean = {
+    val commas = "," * (arity - 1)
+    val pattern = commas.map(_ => """[^()]*,""").mkString + """[^()]*"""
+    s"""Assert::$member\\($pattern\\)""".r.findFirstIn(doc).isDefined
+  }
 
   it("docs/reference/stdlib.md shows the message-overload form of every overloaded Assert member") {
-    val missing = messageOverloadMembers.filterNot(hasThreeArgExample(read("docs/reference/stdlib.md"), _))
+    val doc = read("docs/reference/stdlib.md")
+    val missing = messageOverloadArity.filterNot { case (m, n) => hasMessageOverloadExample(doc, m, n) }.keySet
     assert(missing.isEmpty,
-      s"docs/reference/stdlib.md never shows a 3-arg (message) example for: ${missing.toSeq.sorted.mkString(", ")}")
+      s"docs/reference/stdlib.md never shows a message-overload example for: ${missing.toSeq.sorted.mkString(", ")}")
   }
 
   it("docs/ja/reference/stdlib.md shows the message-overload form of every overloaded Assert member") {
-    val missing = messageOverloadMembers.filterNot(hasThreeArgExample(read("docs/ja/reference/stdlib.md"), _))
+    val doc = read("docs/ja/reference/stdlib.md")
+    val missing = messageOverloadArity.filterNot { case (m, n) => hasMessageOverloadExample(doc, m, n) }.keySet
     assert(missing.isEmpty,
-      s"docs/ja/reference/stdlib.md never shows a 3-arg (message) example for: ${missing.toSeq.sorted.mkString(", ")}")
+      s"docs/ja/reference/stdlib.md never shows a message-overload example for: ${missing.toSeq.sorted.mkString(", ")}")
   }
 }

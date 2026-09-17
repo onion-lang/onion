@@ -1,0 +1,365 @@
+// CityPlanner.on — urban planning grid with buildings, roads, and districts.
+// Exercises: records (Coords, Building, Road, District), ADT case-enum
+// (BuildingType), data-carrying enum (ZoneClass), plain enum (Direction),
+// extension methods on Int and Double, classes with interface conformance,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/find/count/partition),
+// select / type-pattern matching with sealed exhaustiveness, string
+// interpolation, nullable types, closures, try/catch, recursion, while and
+// foreach over ranges and map (k,v) entries.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def padLeft(w: Int): String {
+    val s = "" + self
+    var r = s
+    while r.length() < w { r = " " + r }
+    return r
+  }
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+extension Double {
+  def fmt2(): String {
+    val scaled = (self * 100.0) as Int
+    val ipart  = scaled / 100
+    val fpart  = (scaled % 100).abs()
+    val fs     = "" + fpart
+    val padded = if fs.length() < 2 { "0" + fs } else { fs }
+    return "" + ipart + "." + padded
+  }
+}
+
+// ─── Plain enum: compass directions ──────────────────────────────────────────
+
+enum Direction { N, S, E, W }
+
+// ─── Data-carrying enum: zone density class ───────────────────────────────────
+
+enum ZoneClass(densityLimit: Int, label: String) {
+  Low(2, "Low"),
+  Medium(8, "Mid"),
+  High(30, "High")
+}
+
+// ─── ADT case-enum: building types ───────────────────────────────────────────
+
+enum BuildingType {
+  case Residential(units: Int)
+  case Commercial(sqFt: Int)
+  case Industrial(workers: Int)
+  case Park
+public:
+  def label(): String = select this {
+    case r is Residential: "Res(#{r.units()}u)"
+    case c is Commercial:  "Com(#{c.sqFt()}sqft)"
+    case i is Industrial:  "Ind(#{i.workers()}w)"
+    case p is Park:        "Park"
+  }
+  def daytimeOccupancy(): Int = select this {
+    case r is Residential: r.units() * 2
+    case c is Commercial:  c.sqFt() / 50
+    case i is Industrial:  i.workers()
+    case p is Park:        0
+  }
+  def taxBase(): Int = select this {
+    case r is Residential: r.units() * 500
+    case c is Commercial:  c.sqFt() * 2
+    case i is Industrial:  i.workers() * 800
+    case p is Park:        0
+  }
+  def isGreenSpace(): Boolean = select this {
+    case p is Park: true
+    else: false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Coords(x: Int, y: Int) {
+public:
+  def manDist(other: Coords): Int = (x() - other.x()).abs() + (y() - other.y()).abs()
+  def show(): String = "(#{x()},#{y()})"
+}
+
+record Building(id: Int, name: String, at: Coords, floors: Int, btype: BuildingType) {
+public:
+  def zone(): ZoneClass {
+    if floors() <= 2 { return ZoneClass::Low }
+    else if floors() <= 8 { return ZoneClass::Medium }
+    else { return ZoneClass::High }
+  }
+  def isLegal(): Boolean = floors() <= zone().densityLimit()
+  def annualTax(): Int = btype().taxBase() * floors() / 10
+  def show(): String = "#{id().padLeft(3)}. #{name()} [#{btype().label()}, #{floors()}fl, #{at().show()}]"
+}
+
+record Road(fromId: Int, toId: Int, lengthM: Int, lanes: Int) {
+public:
+  def capacity(): Int = lanes() * 800
+  def show(): String = "##{fromId()}->##{toId()} #{lengthM()}m #{lanes()}L"
+}
+
+record District(name: String, origin: Coords, size: Int) {
+public:
+  def contains(at: Coords): Boolean {
+    val dx = (at.x() - origin().x()).abs()
+    val dy = (at.y() - origin().y()).abs()
+    return dx <= size() && dy <= size()
+  }
+  def label(): String = "#{name()} @#{origin().show()} r=#{size()}"
+}
+
+// ─── Stage-1 smoke test ───────────────────────────────────────────────────────
+
+val c1 = new Coords(3, 4)
+val c2 = new Coords(0, 0)
+IO::println("manDist: " + c1.manDist(c2))  // 7
+
+val tower = new Building(1, "Tower", c1, 20, new Residential(400))
+IO::println("zone: " + tower.zone().label())   // High
+IO::println("legal: " + tower.isLegal())       // true (20 <= 30)
+IO::println("tax: " + tower.annualTax())
+IO::println("bshow: " + tower.show())
+
+val factory = new Building(2, "Mill", c2, 3, new Industrial(120))
+IO::println("fzone: " + factory.zone().label()) // Mid
+IO::println("flegal: " + factory.isLegal())     // true (3 <= 8)
+
+val park = new Building(3, "City Park", new Coords(1, 1), 1, new Park())
+IO::println("green: " + park.btype().isGreenSpace())  // true
+
+IO::println("roadCap: " + new Road(1, 2, 500, 3).capacity()) // 2400
+
+val downtown = new District("Downtown", c2, 5)
+IO::println("contains c1: " + downtown.contains(c1))  // false (dist > 5)
+IO::println("contains c2: " + downtown.contains(c2))  // true
+
+IO::println("fmt2: " + 3.14159.fmt2())   // 3.14
+IO::println("(-7).abs: " + (0 - 7).abs())  // 7
+
+// ─── City dataset ─────────────────────────────────────────────────────────────
+
+val buildings: List[Building] = [
+  new Building(1,  "City Hall",       new Coords(5, 5),   8,  new Commercial(12000)),
+  new Building(2,  "Park Central",    new Coords(5, 6),   1,  new Park()),
+  new Building(3,  "Sunrise Apts",    new Coords(2, 3),   12, new Residential(200)),
+  new Building(4,  "Westgate Tower",  new Coords(1, 8),   25, new Residential(600)),
+  new Building(5,  "Ironworks",       new Coords(9, 1),   3,  new Industrial(350)),
+  new Building(6,  "Tech Hub",        new Coords(7, 7),   15, new Commercial(8000)),
+  new Building(7,  "Meadow Park",     new Coords(3, 9),   1,  new Park()),
+  new Building(8,  "Harbor Lofts",    new Coords(8, 4),   6,  new Residential(80)),
+  new Building(9,  "Eastport Mill",   new Coords(10, 2),  5,  new Industrial(200)),
+  new Building(10, "Crossroads Inn",  new Coords(6, 6),   3,  new Commercial(3000))
+]
+
+val roads: List[Road] = [
+  new Road(1, 2, 120, 2),
+  new Road(1, 10, 200, 4),
+  new Road(3, 1, 350, 2),
+  new Road(4, 1, 500, 3),
+  new Road(5, 9, 150, 2),
+  new Road(6, 10, 100, 2),
+  new Road(8, 1, 420, 2),
+  new Road(9, 6, 300, 3),
+  new Road(10, 2, 180, 2)
+]
+
+val districts: List[District] = [
+  new District("Downtown",   new Coords(5, 5),  3),
+  new District("East Port",  new Coords(9, 2),  2),
+  new District("Westside",   new Coords(2, 7),  3),
+  new District("North Park", new Coords(4, 9),  2)
+]
+
+// ─── Queryable interface ─────────────────────────────────────────────────────
+
+interface Queryable {
+  def buildingCount(): Int
+  def totalTaxRevenue(): Int
+}
+
+// ─── CityGrid class ──────────────────────────────────────────────────────────
+
+class CityGrid conforms Queryable {
+  val bldgs: List[Building]
+  val rds:   List[Road]
+  val dists: List[District]
+public:
+  def this(b: List[Building], r: List[Road], d: List[District]) {
+    bldgs = b
+    rds   = r
+    dists = d
+  }
+  def buildingCount(): Int = bldgs.size
+  def totalTaxRevenue(): Int {
+    return (bldgs.fold(0) { acc, b -> (acc as Int) + (b as Building).annualTax() }) as Int
+  }
+  def greenSpaceRatio(): Double {
+    val parks = bldgs.count { b -> (b as Building).btype().isGreenSpace() }
+    return (parks as Double) / (bldgs.size.clamp(1, 999999) as Double)
+  }
+  def tallest(): Building? = bldgs.sortedBy { b -> 0 - (b as Building).floors() }.find { b -> true } as Building?
+  def roadStats(): String {
+    val totalCap = (rds.fold(0) { acc, r -> (acc as Int) + (r as Road).capacity() }) as Int
+    val avgLanes = (rds.fold(0) { acc, r -> (acc as Int) + (r as Road).lanes() }) as Int
+    return "roads=#{rds.size} totalCapacity=#{totalCap} avgLanes=#{avgLanes / rds.size}"
+  }
+}
+
+// ─── Stage-2 pipeline tests ───────────────────────────────────────────────────
+
+val city = new CityGrid(buildings, roads, districts)
+IO::println("buildings: " + city.buildingCount())
+IO::println("taxRevenue: " + city.totalTaxRevenue())
+IO::println("greenRatio: " + city.greenSpaceRatio().fmt2())
+
+val tallest = city.tallest()
+if tallest != null {
+  IO::println("tallest: " + (tallest as Building).show())
+}
+
+// group by zone label + iterate map
+val byZone = buildings.groupBy { b -> (b as Building).zone().label() }
+foreach (zone, list) in byZone {
+  IO::println("zone #{zone}: #{(list as List).size} building(s)")
+}
+
+// filter pipeline
+val highRise = buildings.filter { b -> (b as Building).floors() > 10 }
+                        .sortedBy { b -> 0 - (b as Building).floors() }
+                        .map { b -> (b as Building).show() }
+IO::println("highrise count: " + highRise.size)
+foreach row: Object in highRise {
+  IO::println("  " + (row as String))
+}
+
+// district membership
+val dtDistrict = districts.find { d -> (d as District).name() == "Downtown" }
+if dtDistrict != null {
+  val inDt = buildings.filter { b -> (dtDistrict as District).contains((b as Building).at()) }
+  IO::println("downtown buildings: " + inDt.size)
+}
+
+// road stats
+IO::println(city.roadStats())
+
+// ─── Ranked leaderboards (sortedBy pipelines) ─────────────────────────────────
+
+// Tax-revenue ranking
+val taxRanked = buildings.sortedBy { b -> 0 - (b as Building).annualTax() }
+IO::println("taxLeader: " + (taxRanked.find { _ -> true } as Building).name())
+val topTaxers = taxRanked.map { b -> (b as Building).name() + "($" + (b as Building).annualTax() + ")" }
+IO::println("top3Tax: " + topTaxers.toString())
+
+// Daytime-occupancy ranking
+val occRanked = buildings.sortedBy { b ->
+  0 - ((b as Building).btype().daytimeOccupancy() * (b as Building).floors())
+}
+IO::println("occLeader: " + (occRanked.find { _ -> true } as Building).name())
+
+// ─── Recursive urban metrics ──────────────────────────────────────────────────
+
+def countInRadius(center: Coords, radius: Int, blist: List[Building], idx: Int): Int {
+  if idx >= blist.size { return 0 }
+  val b = blist[idx] as Building
+  val here = if b.at().manDist(center) <= radius { 1 } else { 0 }
+  return here + countInRadius(center, radius, blist, idx + 1)
+}
+
+val cityCenter = new Coords(5, 5)
+IO::println("bldgsWithin3: " + countInRadius(cityCenter, 3, buildings, 0))
+IO::println("bldgsWithin6: " + countInRadius(cityCenter, 6, buildings, 0))
+
+// ─── try/catch: safe int parse for user input ─────────────────────────────────
+
+def parseInt(s: String): Int {
+  try {
+    return JInteger::parseInt(s)
+  } catch e: Exception {
+    return 0 - 1
+  }
+}
+
+IO::println("parseInt('42'): " + parseInt("42"))
+IO::println("parseInt('bad'): " + parseInt("bad"))
+
+// ─── Foreach over ranges ─────────────────────────────────────────────────────
+
+// density histogram: floors distribution 1..5
+IO::println("floor-band histogram:")
+foreach band: Int in 1..5 {
+  val lo = (band - 1) * 5 + 1
+  val hi = band * 5
+  val count = buildings.count { b -> (b as Building).floors() >= lo && (b as Building).floors() <= hi }
+  var bar = ""
+  foreach _: Int in 1..count.clamp(0, 20) { bar = bar + "#" }
+  IO::println("  #{lo.padLeft(2)}-#{hi.padLeft(2)}: #{bar} (#{count})")
+}
+
+// ─── District summary via map iteration ───────────────────────────────────────
+
+IO::println("district summaries:")
+foreach d: Object in districts {
+  val dist = d as District
+  val inDist = buildings.filter { b -> dist.contains((b as Building).at()) }
+  val taxTotal = (inDist.fold(0) { acc, b -> (acc as Int) + (b as Building).annualTax() }) as Int
+  IO::println("  #{dist.name()}: #{inDist.size} bldgs, tax=#{taxTotal}")
+}
+
+// ─── Nullable + find + direction hint ────────────────────────────────────────
+
+def nearestPark(from: Coords, blist: List[Building]): Building? {
+  val parks = blist.filter { b -> (b as Building).btype().isGreenSpace() }
+  val sorted = parks.sortedBy { b -> (b as Building).at().manDist(from) }
+  return sorted.find { _ -> true } as Building?
+}
+
+val queryCord = new Coords(6, 3)
+val nearest = nearestPark(queryCord, buildings)
+if nearest != null {
+  val np = nearest as Building
+  IO::println("nearestPark to #{queryCord.show()}: #{np.name()} dist=#{np.at().manDist(queryCord)}")
+} else {
+  IO::println("no parks found")
+}
+
+// ─── String interpolation + partition ────────────────────────────────────────
+
+val parts = buildings.partition { b -> (b as Building).isLegal() }
+val legal = parts[0] as List[Object]
+val illegal = parts[1] as List[Object]
+IO::println("legal=#{legal.size} illegal=#{illegal.size}")
+if illegal.size > 0 {
+  IO::println("ILLEGAL buildings:")
+  foreach b: Object in illegal {
+    val bldg = b as Building
+    IO::println("  #{bldg.show()} — limit=#{bldg.zone().densityLimit()}")
+  }
+}
+
+// ─── Data-carrying enum direct access ────────────────────────────────────────
+
+IO::println("ZoneClass labels:")
+foreach zc: ZoneClass in [ZoneClass::Low, ZoneClass::Medium, ZoneClass::High] {
+  IO::println("  #{zc.label()}: max #{zc.densityLimit()} fl")
+}
+
+// ─── Direction-based road adjacency ──────────────────────────────────────────
+
+def directionFrom(a: Coords, b: Coords): Direction {
+  val dx = b.x() - a.x()
+  val dy = b.y() - a.y()
+  if dx.abs() >= dy.abs() {
+    if dx >= 0 { return Direction::E } else { return Direction::W }
+  } else {
+    if dy >= 0 { return Direction::N } else { return Direction::S }
+  }
+}
+
+// Show direction for each road endpoint pair
+val hallAt  = (buildings.find { b -> (b as Building).id() == 1 } as Building).at()
+val techAt  = (buildings.find { b -> (b as Building).id() == 6 } as Building).at()
+IO::println("Tech Hub from City Hall: " + directionFrom(hallAt, techAt).toString())

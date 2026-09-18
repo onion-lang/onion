@@ -1,0 +1,437 @@
+// SubscriptionManager.on — Subscription billing, plan management, and reporting.
+// Exercises: records (with methods), plain & data-carrying enums, ADT enum,
+// classes + inheritance + interface, extension methods on Int/Double/String,
+// collection pipelines (filter/map/fold/groupBy/sortedBy/find/partition/reduce),
+// select / type patterns, nullable, string interpolation, try/catch, recursion,
+// while & foreach (range + map (k,v)).
+
+import { java.util.ArrayList }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def daysLabel(): String = if self == 1 { "1 day" } else { "#{self} days" }
+  def centsToUsd(): String {
+    val dollars: Int = self / 100
+    val cents: Int   = self - dollars * 100
+    val cs: String   = if cents < 10 { "0" + cents } else { "" + cents }
+    return "$" + dollars + "." + cs
+  }
+  def ipad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def trunc(max: Int): String =
+    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+}
+
+extension Double {
+  def round2(): Double = ((self * 100.0 + 0.5).intValue() as Double) / 100.0
+}
+
+// ─── Plain enum: billing cycle ─────────────────────────────────────────────
+
+enum BillingCycle {
+  Monthly, Annual
+public:
+  def multiplier(): Int = select this {
+    case BillingCycle::Monthly: 1
+    case BillingCycle::Annual:  12
+    else:                       1
+  }
+  def label(): String = select this {
+    case BillingCycle::Monthly: "monthly"
+    case BillingCycle::Annual:  "annual"
+    else:                       "unknown"
+  }
+}
+
+// ─── Data-carrying enum: subscription tier ────────────────────────────────
+
+enum Tier(monthlyCents: Int, maxUsers: Int) {
+  Free(0, 1),
+  Starter(999, 5),
+  Pro(2999, 20),
+  Enterprise(9999, 200)
+public:
+  def tierName(): String = select this {
+    case Tier::Free:       "Free"
+    case Tier::Starter:    "Starter"
+    case Tier::Pro:        "Pro"
+    case Tier::Enterprise: "Enterprise"
+    else:                  "?"
+  }
+  def annualCents(): Int = monthlyCents() * 10  // 2-month discount
+  def effectiveCents(cycle: BillingCycle): Int =
+    if cycle == BillingCycle::Annual { annualCents() } else { monthlyCents() }
+}
+
+// ─── ADT enum: payment result ─────────────────────────────────────────────
+
+enum PaymentResult {
+  case TxOk(transactionId: String)
+  case TxDeclined(reason: String)
+  case TxPending(estimateDays: Int)
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Address(street: String, city: String, country: String)
+
+record Customer(id: Int, custName: String, email: String, address: Address) {
+public:
+  def display(): String = "#{id()}: #{custName()} <#{email()}>"
+}
+
+record Plan(planId: String, tier: Tier, cycle: BillingCycle) {
+public:
+  def priceLabel(): String = tier().effectiveCents(cycle()).centsToUsd() + "/" + cycle().label()
+  def yearlyValue(): Int   = tier().monthlyCents() * 12
+}
+
+record Subscription(
+  subId: Int,
+  customer: Customer,
+  plan: Plan,
+  startDayOffset: Int,
+  active: Boolean,
+  promoCode: String?
+) {
+public:
+  def discountPct(): Int =
+    if promoCode() != null {
+      select promoCode() {
+        case "SAVE10": 10
+        case "SAVE20": 20
+        case "HALF50": 50
+        else:          0
+      }
+    } else { 0 }
+
+  def effectiveCents(): Int {
+    val base: Int    = plan().tier().effectiveCents(plan().cycle())
+    val disc: Int    = base * discountPct() / 100
+    return base - disc
+  }
+
+  def invoice(): String {
+    val pct: Int = discountPct()
+    val promoLabel: String = if promoCode() != null { " [#{promoCode()}]" } else { "" }
+    val discLine: String = if pct > 0 { " (#{pct}% off)" } else { "" }
+    return "Sub##{subId()} #{customer().custName().trunc(18).rpad(18)} #{plan().tier().tierName().rpad(10)} #{effectiveCents().centsToUsd()}#{discLine}#{promoLabel}"
+  }
+}
+
+// ─── Pair record (used by billing run) ────────────────────────────────────────
+
+record BillingPair(sub: Subscription, result: PaymentResult)
+
+// ─── Interface + class hierarchy ──────────────────────────────────────────────
+
+interface BillingProcessor {
+  def charge(sub: Subscription, amountCents: Int): PaymentResult
+}
+
+class MockBillingProcessor conforms BillingProcessor {
+  var callCount: Int
+public:
+  def this { callCount = 0 }
+  def charge(sub: Subscription, amountCents: Int): PaymentResult {
+    callCount = callCount + 1
+    if amountCents == 0 {
+      return new TxOk("FREE-" + sub.subId())
+    }
+    if sub.plan().tier() == Tier::Enterprise {
+      return new TxPending(3)
+    }
+    if sub.subId() % 7 == 0 {
+      return new TxDeclined("insufficient funds")
+    }
+    return new TxOk("TXN-" + (sub.subId() * 1000 + callCount))
+  }
+}
+
+// ─── SubscriptionManager class ────────────────────────────────────────────────
+
+class SubscriptionManager {
+  var subscriptions: ArrayList[Subscription]
+  val processor: BillingProcessor
+public:
+  def this(p: BillingProcessor) {
+    subscriptions = new ArrayList[Subscription]()
+    processor = p
+  }
+  def add(s: Subscription): void { subscriptions.add(s) }
+  def size(): Int = subscriptions.size
+
+  def activeCount(): Int =
+    subscriptions
+      .filter { s -> s.active() }
+      .size
+
+  def totalMrr(): Int =
+    subscriptions
+      .filter { s -> s.active() }
+      .fold(0) { acc, s -> (acc as Int) + s.effectiveCents() }
+
+  def byTier(): Map[Object, List[Subscription]] =
+    subscriptions
+      .filter { s -> s.active() }
+      .groupBy { s -> s.plan().tier().tierName() }
+
+  def topCustomers(n: Int): List[String] =
+    subscriptions
+      .filter { s -> s.active() }
+      .sortedBy { s -> 0 - s.effectiveCents() }
+      .map { s -> s.customer().custName() }
+      .take(n) as List[String]
+
+  def runBilling(): ArrayList[BillingPair] {
+    val results: ArrayList[BillingPair] = new ArrayList[BillingPair]()
+    foreach s: Subscription in subscriptions {
+      if s.active() {
+        val result: PaymentResult = processor.charge(s, s.effectiveCents())
+        results.add(new BillingPair(s, result))
+      }
+    }
+    return results
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def compoundGrowth(base: Double, ratePct: Double, years: Int): Double =
+  if years <= 0 { base }
+  else { compoundGrowth(base * (1.0 + ratePct / 100.0), ratePct, years - 1) }
+
+def yoyLabel(current: Int, previous: Int): String {
+  if previous == 0 { return "N/A" }
+  val delta: Double = ((current - previous) as Double) / (previous as Double) * 100.0
+  val sign: String  = if delta >= 0.0 { "+" } else { "" }
+  return sign + delta.round2() + "%"
+}
+
+// ─── Data setup ───────────────────────────────────────────────────────────────
+
+val addr1 = new Address("10 Oak St",         "Springfield",    "US")
+val addr2 = new Address("55 Maple Ave",      "Shelbyville",    "US")
+val addr3 = new Address("1 Tower Rd",        "Capital City",   "UK")
+val addr4 = new Address("42 Elm Lane",       "Ogdenville",     "US")
+val addr5 = new Address("7 Bridge St",       "Brockway",       "US")
+val addr6 = new Address("99 River Blvd",     "North Haverbrook","US")
+
+val c1 = new Customer(1, "Alice Chen",      "alice@example.com",   addr1)
+val c2 = new Customer(2, "Bob Muller",      "bob@example.com",     addr2)
+val c3 = new Customer(3, "Carol Nakamura",  "carol@example.com",   addr3)
+val c4 = new Customer(4, "Dave Okonkwo",    "dave@example.com",    addr4)
+val c5 = new Customer(5, "Eve Santos",      "eve@example.com",     addr5)
+val c6 = new Customer(6, "Frank Li",        "frank@example.com",   addr6)
+
+val planFreeM    = new Plan("free-m",   Tier::Free,       BillingCycle::Monthly)
+val planStarterM = new Plan("start-m",  Tier::Starter,    BillingCycle::Monthly)
+val planStarterA = new Plan("start-a",  Tier::Starter,    BillingCycle::Annual)
+val planProM     = new Plan("pro-m",    Tier::Pro,        BillingCycle::Monthly)
+val planProA     = new Plan("pro-a",    Tier::Pro,        BillingCycle::Annual)
+val planEntA     = new Plan("ent-a",    Tier::Enterprise, BillingCycle::Annual)
+
+val subs: List[Subscription] = [
+  new Subscription(1,  c1, planProM,     100, true,  null),
+  new Subscription(2,  c2, planStarterM, 200, true,  "SAVE10"),
+  new Subscription(3,  c3, planEntA,     300, true,  null),
+  new Subscription(4,  c4, planProA,     400, true,  "SAVE20"),
+  new Subscription(5,  c5, planFreeM,    500, true,  null),
+  new Subscription(6,  c6, planStarterA, 600, false, "SAVE10"),
+  new Subscription(7,  c1, planProM,     700, true,  null),
+  new Subscription(8,  c2, planStarterM, 800, true,  "HALF50"),
+  new Subscription(9,  c3, planProA,     900, false, null),
+  new Subscription(10, c4, planEntA,     100, true,  "SAVE20"),
+  new Subscription(11, c5, planProM,     200, true,  null),
+  new Subscription(12, c6, planStarterA, 300, true,  null)
+]
+
+// ─── Populate manager ─────────────────────────────────────────────────────────
+
+val billing = new MockBillingProcessor()
+val manager = new SubscriptionManager(billing)
+foreach s: Subscription in subs { manager.add(s) }
+
+// ─── Section 1: Roster ────────────────────────────────────────────────────────
+
+IO::println("=== Subscription Roster ===")
+foreach s: Subscription in subs {
+  val status: String = if s.active() { "ACTIVE" } else { "  off " }
+  IO::println("[#{status}] " + s.invoice())
+}
+
+// ─── Section 2: Summary stats ─────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Summary ===")
+IO::println("Total subscriptions : " + manager.size())
+IO::println("Active              : " + manager.activeCount())
+IO::println("Monthly MRR (cents) : " + manager.totalMrr().centsToUsd())
+
+// ─── Section 3: By-tier breakdown ─────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Active Subscriptions by Tier ===")
+val byTier = manager.byTier()
+foreach (tier, lst) in byTier {
+  val count: Int = (lst as List).size
+  IO::println("  " + (tier as String).rpad(12) + ": " + count.ipad(3) + " sub(s)")
+}
+
+// ─── Section 4: Top customers ─────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Top Spenders (active, descending) ===")
+val tops: List[String] = manager.topCustomers(5)
+var rank: Int = 1
+foreach name: String in tops {
+  IO::println("  " + rank.ipad(2) + ". " + name)
+  rank = rank + 1
+}
+
+// ─── Section 5: Billing run ───────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Billing Run ===")
+val billingResults: ArrayList[BillingPair] = manager.runBilling()
+var okCount: Int   = 0
+var decCount: Int  = 0
+var pendCount: Int = 0
+foreach pr: BillingPair in billingResults {
+  val result: PaymentResult = pr.result()
+  select result {
+    case ok is TxOk:
+      IO::println("  OK      " + ok.transactionId() + " <- " + pr.sub().customer().custName())
+      okCount = okCount + 1
+    case dec is TxDeclined:
+      IO::println("  DECLINE " + dec.reason() + " <- " + pr.sub().customer().custName())
+      decCount = decCount + 1
+    case pend is TxPending:
+      IO::println("  PENDING " + pend.estimateDays().daysLabel() + " <- " + pr.sub().customer().custName())
+      pendCount = pendCount + 1
+  }
+}
+IO::println("Results: #{okCount} ok, #{decCount} declined, #{pendCount} pending")
+
+// ─── Section 6: Promo code analysis ───────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Promo Code Usage ===")
+val withPromo: List[Subscription] = subs.filter { s -> s.promoCode() != null }
+val promoGroups = withPromo.groupBy { s -> s.promoCode() }
+foreach (code, lst) in promoGroups {
+  val savings: Int = (lst as List).fold(0) { acc, s ->
+    val sub: Subscription = s as Subscription
+    val full: Int  = sub.plan().tier().effectiveCents(sub.plan().cycle())
+    val paid: Int  = sub.effectiveCents()
+    (acc as Int) + (full - paid)
+  }
+  IO::println("  " + (code as String).rpad(10) + " -> " + (lst as List).size + " use(s), " + savings.centsToUsd() + " saved/cycle")
+}
+
+// ─── Section 7: Revenue projection with compound growth ───────────────────────
+
+IO::println("")
+IO::println("=== Revenue Projection (10% YoY growth) ===")
+val mrrCents: Int = manager.totalMrr()
+var y: Int = 0
+while y <= 4 {
+  val projected: Double = compoundGrowth(mrrCents as Double, 10.0, y)
+  val yearLabel: String = if y == 0 { "Now  " } else { "Yr " + y + "  " }
+  IO::println("  #{yearLabel} MRR: " + projected.round2().intValue().centsToUsd())
+  y = y + 1
+}
+
+// ─── Section 8: Plan price table ──────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Plan Pricing Table ===")
+val plans: List[Plan] = [planFreeM, planStarterM, planStarterA, planProM, planProA, planEntA]
+foreach plan: Plan in plans {
+  IO::println("  " + plan.planId().rpad(10) + " " + plan.tier().tierName().rpad(12) + " " + plan.priceLabel())
+}
+
+// ─── Section 9: try/catch ─────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Error Handling Demo ===")
+def validateDiscount(pct: Int): Int {
+  if pct < 0 || pct > 100 { throw new IllegalArgumentException("Bad pct: " + pct) }
+  return pct
+}
+try {
+  IO::println("Discount: " + validateDiscount(25) + "%")
+  IO::println("Discount: " + validateDiscount(150) + "%")
+} catch e: IllegalArgumentException {
+  IO::println("Caught: " + e.getMessage())
+}
+
+// ─── Section 10: Partition active/inactive ────────────────────────────────────
+
+IO::println("")
+IO::println("=== Active vs Inactive ===")
+val parts = subs.partition { s -> s.active() }
+val activeSubs: List[Object]   = parts[0] as List[Object]
+val inactiveSubs: List[Object] = parts[1] as List[Object]
+IO::println("Active: #{activeSubs.size}  Inactive: #{inactiveSubs.size}")
+
+// ─── Section 11: Range-based foreach ─────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Monthly Billing Timeline (months 1-6) ===")
+foreach month: Int in 1..6 {
+  val label: String = select month {
+    case 1: "Jan"
+    case 2: "Feb"
+    case 3: "Mar"
+    case 4: "Apr"
+    case 5: "May"
+    case 6: "Jun"
+    else:   "???"
+  }
+  val revenue: Int = mrrCents + month * 150
+  IO::println("  #{label}: " + revenue.centsToUsd())
+}
+
+// ─── Section 12: MRR growth between tiers ────────────────────────────────────
+
+IO::println("")
+IO::println("=== Tier Upgrade Revenue Impact ===")
+val freeSubs: List[Subscription] = subs.filter { s -> s.plan().tier() == Tier::Free }
+val starterSubs: List[Subscription] = subs.filter { s -> s.plan().tier() == Tier::Starter }
+val proSubs: List[Subscription] = subs.filter { s -> s.plan().tier() == Tier::Pro }
+val entSubs: List[Subscription] = subs.filter { s -> s.plan().tier() == Tier::Enterprise }
+
+def countLabel(lst: List[Subscription], label: String): String =
+  label + ": " + lst.size + " sub(s)"
+
+IO::println("  " + countLabel(freeSubs,    "Free      "))
+IO::println("  " + countLabel(starterSubs, "Starter   "))
+IO::println("  " + countLabel(proSubs,     "Pro       "))
+IO::println("  " + countLabel(entSubs,     "Enterprise"))
+
+// ─── Section 13: Customer email index ────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Customer Email Index ===")
+val emailMap = subs
+  .map { s -> s.customer() }
+  .groupBy { c -> c.email() }
+foreach (email, custList) in emailMap {
+  IO::println("  " + (email as String).rpad(28) + " -> " + (custList as List).size + " sub(s)")
+}
+
+IO::println("")
+IO::println("Done.")

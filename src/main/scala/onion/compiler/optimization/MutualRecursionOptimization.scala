@@ -748,6 +748,66 @@ class MutualRecursionOptimization(config: CompilerConfig)
             new SetLocal(setLocal.location, setLocal.frame, setLocal.index, setLocal.`type`, rewrittenValue)
           }
 
+        case cast: AsInstanceOf =>
+          new AsInstanceOf(cast.location, rewriteTerm(cast.target), cast.destination)
+
+        case nn: NonNullAssert =>
+          new NonNullAssert(nn.location, rewriteTerm(nn.target), nn.`type`)
+
+        case sc: SafeCall =>
+          new SafeCall(sc.location, rewriteTerm(sc.target), sc.method, sc.parameters.map(rewriteTerm))
+
+        case cs: CallSuper =>
+          new CallSuper(cs.location, rewriteTerm(cs.target), cs.method, cs.params.map(rewriteTerm))
+
+        case refField: RefField =>
+          new RefField(refField.location, rewriteTerm(refField.target), refField.field)
+
+        case sfa: SafeFieldAccess =>
+          new SafeFieldAccess(sfa.location, rewriteTerm(sfa.target), sfa.field)
+
+        case setField: SetField =>
+          new SetField(setField.location, rewriteTerm(setField.target), setField.field, rewriteTerm(setField.value))
+
+        case setStatic: SetStaticField =>
+          new SetStaticField(setStatic.location, setStatic.target, setStatic.field, rewriteTerm(setStatic.value))
+
+        case inst: InstanceOf =>
+          new InstanceOf(inst.location, rewriteTerm(inst.target), inst.checked)
+
+        case arrLen: ArrayLength =>
+          new ArrayLength(arrLen.location, rewriteTerm(arrLen.target))
+
+        case refArr: RefArray =>
+          new RefArray(refArr.location, rewriteTerm(refArr.target), rewriteTerm(refArr.index))
+
+        case safeRefArr: SafeRefArray =>
+          new SafeRefArray(safeRefArr.location, rewriteTerm(safeRefArr.target), rewriteTerm(safeRefArr.index), safeRefArr.arrayType)
+
+        case setArr: SetArray =>
+          new SetArray(setArr.location, rewriteTerm(setArr.target), rewriteTerm(setArr.index), rewriteTerm(setArr.value))
+
+        case newObj: NewObject =>
+          new NewObject(newObj.location, newObj.constructor, newObj.parameters.map(rewriteTerm))
+
+        case newArr: NewArray =>
+          new NewArray(newArr.location, newArr.arrayType, newArr.parameters.map(rewriteTerm))
+
+        case newArrWithVals: NewArrayWithValues =>
+          new NewArrayWithValues(newArrWithVals.location, newArrWithVals.arrayType, newArrWithVals.values.map(rewriteTerm))
+
+        case list: ListLiteral =>
+          new ListLiteral(list.location, list.elements.map(rewriteTerm), list.`type`)
+
+        case map: MapLiteral =>
+          new MapLiteral(map.location, map.keys.map(rewriteTerm), map.values.map(rewriteTerm), map.`type`)
+
+        case begin: Begin =>
+          new Begin(begin.location, begin.terms.map(rewriteTerm))
+
+        case sync: SynchronizedTerm =>
+          new SynchronizedTerm(sync.location, rewriteTerm(sync.lock), rewriteTerm(sync.body))
+
         case _ =>
           term
       }

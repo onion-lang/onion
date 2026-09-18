@@ -1,0 +1,335 @@
+// DecisionTree.on — ID3 decision tree classifier for the "play tennis" dataset.
+//
+// Exercises: ADT case-enum (Node: Leaf/Branch) with recursive self-reference
+// through ArrayList[Object], records with example clauses, extension Double
+// (log2/pct) and extension Int (toDouble), HashMap[String, Int] iteration
+// with foreach (k,v), ArrayList[String] parallel-array lookup, nullable
+// handling, string interpolation, closures, foreach over lists and ranges,
+// mutable accumulators, select/case-is pattern matching, recursion.
+
+import {
+  java.util.HashMap;
+  java.util.ArrayList;
+  java.lang.Math;
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension Double {
+  def log2(): Double {
+    if self <= 0.0 { return 0.0 }
+    return Math::log(self) / Math::log(2.0)
+  }
+  def pct(): String = "" + (self * 100.0).intValue() + "%"
+}
+
+// ── Core Records ──────────────────────────────────────────────────────────────
+
+// An attribute (feature column): name and zero-based index in feature vector
+record Attribute(name: String, index: Int)
+  example { new Attribute("Outlook", 0).index() == 0 }
+  example { new Attribute("Wind",    3).name()  == "Wind" }
+
+// A labelled training example: parallel ArrayList of string features + label
+record Example(features: ArrayList[String], label: String)
+
+// ── Decision Tree ADT ─────────────────────────────────────────────────────────
+//
+// Branch stores children as two parallel ArrayLists (keys/nodes) rather than a
+// HashMap[String, Node] to avoid a recursive generic type that erases
+// differently on some JVM versions.
+
+enum Node {
+  case Leaf(label: String, count: Int)
+  case Branch(attr: Attribute, keys: ArrayList[String], nodes: ArrayList[Object])
+public:
+  def classify(ex: Example): String? = select this {
+    case leaf is Leaf: leaf.label()
+    case branch is Branch:
+      val idx: Int = branch.attr().index()
+      if idx >= ex.features().size() {
+        null
+      } else {
+        val value: String = ex.features().get(idx) as String
+        val pos: Int = findKey(branch.keys(), value)
+        if pos < 0 { null }
+        else { (branch.nodes().get(pos) as Node).classify(ex) }
+      }
+  }
+
+  def depth(): Int = select this {
+    case leaf is Leaf: 0
+    case branch is Branch:
+      var maxD: Int = 0
+      var i: Int = 0
+      while i < branch.nodes().size() {
+        val d: Int = (branch.nodes().get(i) as Node).depth()
+        if d > maxD { maxD = d }
+        i++
+      }
+      maxD + 1
+  }
+
+  def nodeCount(): Int = select this {
+    case leaf is Leaf: 1
+    case branch is Branch:
+      var total: Int = 1
+      var i: Int = 0
+      while i < branch.nodes().size() {
+        total = total + (branch.nodes().get(i) as Node).nodeCount()
+        i++
+      }
+      total
+  }
+
+  def printTree(indent: String): void {
+    select this {
+      case leaf is Leaf:
+        IO::println("#{indent}=> #{leaf.label()} (#{leaf.count()})")
+      case branch is Branch:
+        IO::println("#{indent}[#{branch.attr().name()}]")
+        var i: Int = 0
+        while i < branch.keys().size() {
+          val k: String = branch.keys().get(i) as String
+          IO::println("#{indent}  #{k}:")
+          (branch.nodes().get(i) as Node).printTree(indent + "    ")
+          i++
+        }
+    }
+  }
+}
+
+// Linear scan to find a key in a String ArrayList; returns -1 if not found.
+def findKey(keys: ArrayList[String], target: String): Int {
+  var i: Int = 0
+  while i < keys.size() {
+    if (keys.get(i) as String) == target { return i }
+    i++
+  }
+  return -1
+}
+
+// ── Label counting and majority vote ─────────────────────────────────────────
+
+def countLabels(examples: ArrayList[Example]): HashMap[String, Int] {
+  val counts: HashMap[String, Int] = new HashMap[String, Int]()
+  var i: Int = 0
+  while i < examples.size() {
+    val lbl: String = (examples.get(i) as Example).label()
+    val prev: Int? = counts.get(lbl) as Int?
+    counts.put(lbl, if prev == null { 1 } else { prev + 1 })
+    i++
+  }
+  return counts
+}
+
+def majorityLabel(examples: ArrayList[Example]): String {
+  val counts: HashMap[String, Int] = countLabels(examples)
+  var best: String = "?"
+  var bestN: Int = 0
+  foreach (lbl, cnt) in counts {
+    val c: Int = cnt as Int
+    if c > bestN { bestN = c; best = lbl as String }
+  }
+  return best
+}
+
+def allSameLabel(examples: ArrayList[Example]): Boolean {
+  if examples.size() == 0 { return true }
+  val first: String = (examples.get(0) as Example).label()
+  var i: Int = 1
+  while i < examples.size() {
+    if (examples.get(i) as Example).label() != first { return false }
+    i++
+  }
+  return true
+}
+
+// ── Entropy and information gain ─────────────────────────────────────────────
+
+def entropy(examples: ArrayList[Example]): Double {
+  val total: Int = examples.size()
+  if total == 0 { return 0.0 }
+  val labelCounts: HashMap[String, Int] = countLabels(examples)
+  var h: Double = 0.0
+  foreach (lbl, cnt) in labelCounts {
+    val p: Double = (cnt as Int).doubleValue() / total.doubleValue()
+    h = h - p * p.log2()
+  }
+  return h
+}
+
+def distinctValues(examples: ArrayList[Example], attrIdx: Int): ArrayList[String] {
+  val seen: HashMap[String, Boolean] = new HashMap[String, Boolean]()
+  val result: ArrayList[String] = new ArrayList[String]()
+  var i: Int = 0
+  while i < examples.size() {
+    val v: String = ((examples.get(i) as Example).features().get(attrIdx)) as String
+    if seen.get(v) == null {
+      seen.put(v, true)
+      result.add(v)
+    }
+    i++
+  }
+  return result
+}
+
+def filterByAttr(examples: ArrayList[Example], attrIdx: Int, value: String): ArrayList[Example] {
+  val result: ArrayList[Example] = new ArrayList[Example]()
+  var i: Int = 0
+  while i < examples.size() {
+    val ex: Example = examples.get(i) as Example
+    if (ex.features().get(attrIdx) as String) == value { result.add(ex) }
+    i++
+  }
+  return result
+}
+
+def infoGain(examples: ArrayList[Example], attr: Attribute): Double {
+  val total: Int = examples.size()
+  if total == 0 { return 0.0 }
+  val base: Double = entropy(examples)
+  val values: ArrayList[String] = distinctValues(examples, attr.index())
+  var weighted: Double = 0.0
+  var i: Int = 0
+  while i < values.size() {
+    val v: String = values.get(i) as String
+    val sub: ArrayList[Example] = filterByAttr(examples, attr.index(), v)
+    val w: Double = sub.size().doubleValue() / total.doubleValue()
+    weighted = weighted + w * entropy(sub)
+    i++
+  }
+  return base - weighted
+}
+
+// ── ID3 Algorithm ─────────────────────────────────────────────────────────────
+
+def buildTree(examples: ArrayList[Example], attrs: ArrayList[Attribute]): Node {
+  if allSameLabel(examples) {
+    val lbl: String = if examples.size() > 0 { (examples.get(0) as Example).label() } else { "?" }
+    return new Leaf(lbl, examples.size())
+  }
+  if attrs.size() == 0 {
+    return new Leaf(majorityLabel(examples), examples.size())
+  }
+  // Pick attribute with maximum information gain
+  var bestAttr: Attribute? = null
+  var bestGain: Double = -1.0
+  var i: Int = 0
+  while i < attrs.size() {
+    val a: Attribute = attrs.get(i) as Attribute
+    val g: Double = infoGain(examples, a)
+    if g > bestGain { bestGain = g; bestAttr = a }
+    i++
+  }
+  val chosen: Attribute = bestAttr as Attribute
+  // Build remaining attribute list (exclude chosen)
+  val remaining: ArrayList[Attribute] = new ArrayList[Attribute]()
+  i = 0
+  while i < attrs.size() {
+    val a: Attribute = attrs.get(i) as Attribute
+    if a.name() != chosen.name() { remaining.add(a) }
+    i++
+  }
+  // Recurse on each distinct value of chosen attribute
+  val values: ArrayList[String] = distinctValues(examples, chosen.index())
+  val keys: ArrayList[String] = new ArrayList[String]()
+  val nodes: ArrayList[Object] = new ArrayList[Object]()
+  i = 0
+  while i < values.size() {
+    val v: String = values.get(i) as String
+    val sub: ArrayList[Example] = filterByAttr(examples, chosen.index(), v)
+    val subtree: Node = buildTree(sub, remaining)
+    keys.add(v)
+    nodes.add(subtree)
+    i++
+  }
+  return new Branch(chosen, keys, nodes)
+}
+
+// ── Training data: the classic "play tennis" dataset ──────────────────────────
+
+def makeExample(outlook: String, temp: String, humidity: String, wind: String, label: String): Example {
+  val f: ArrayList[String] = new ArrayList[String]()
+  f.add(outlook); f.add(temp); f.add(humidity); f.add(wind)
+  return new Example(f, label)
+}
+
+def trainingSet(): ArrayList[Example] {
+  val data: ArrayList[Example] = new ArrayList[Example]()
+  data.add(makeExample("Sunny",    "Hot",  "High",   "Weak",   "No"))
+  data.add(makeExample("Sunny",    "Hot",  "High",   "Strong", "No"))
+  data.add(makeExample("Overcast", "Hot",  "High",   "Weak",   "Yes"))
+  data.add(makeExample("Rain",     "Mild", "High",   "Weak",   "Yes"))
+  data.add(makeExample("Rain",     "Cool", "Normal", "Weak",   "Yes"))
+  data.add(makeExample("Rain",     "Cool", "Normal", "Strong", "No"))
+  data.add(makeExample("Overcast", "Cool", "Normal", "Strong", "Yes"))
+  data.add(makeExample("Sunny",    "Mild", "High",   "Weak",   "No"))
+  data.add(makeExample("Sunny",    "Cool", "Normal", "Weak",   "Yes"))
+  data.add(makeExample("Rain",     "Mild", "Normal", "Weak",   "Yes"))
+  data.add(makeExample("Sunny",    "Mild", "Normal", "Strong", "Yes"))
+  data.add(makeExample("Overcast", "Mild", "High",   "Strong", "Yes"))
+  data.add(makeExample("Overcast", "Hot",  "Normal", "Weak",   "Yes"))
+  data.add(makeExample("Rain",     "Mild", "High",   "Strong", "No"))
+  return data
+}
+
+// ── Evaluation ────────────────────────────────────────────────────────────────
+
+def evaluate(tree: Node, examples: ArrayList[Example]): void {
+  var correct: Int = 0
+  val total: Int = examples.size()
+  var i: Int = 0
+  while i < total {
+    val ex: Example = examples.get(i) as Example
+    val pred: String? = tree.classify(ex)
+    if pred != null && pred == ex.label() { correct++ }
+    i++
+  }
+  val acc: Double = correct.doubleValue() / total.doubleValue()
+  IO::println("Accuracy: #{correct}/#{total} (#{acc.pct()})")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("=== ID3 Decision Tree — Play Tennis ===")
+  IO::println("")
+
+  val attributes: ArrayList[Attribute] = new ArrayList[Attribute]()
+  attributes.add(new Attribute("Outlook",     0))
+  attributes.add(new Attribute("Temperature", 1))
+  attributes.add(new Attribute("Humidity",    2))
+  attributes.add(new Attribute("Wind",        3))
+
+  val training: ArrayList[Example] = trainingSet()
+  IO::println("Training examples : #{training.size()}")
+  IO::println("Entropy of target : #{entropy(training).pct()}")
+  IO::println("")
+
+  val tree: Node = buildTree(training, attributes)
+  IO::println("Tree (#{tree.nodeCount()} nodes, depth #{tree.depth()}):")
+  tree.printTree("  ")
+  IO::println("")
+
+  IO::println("Training accuracy:")
+  evaluate(tree, training)
+  IO::println("")
+
+  IO::println("New predictions (Outlook/Temp/Humidity/Wind → label):")
+  val tests: ArrayList[Example] = new ArrayList[Example]()
+  tests.add(makeExample("Sunny",    "Cool", "Normal", "Weak",   "?"))
+  tests.add(makeExample("Rain",     "Hot",  "High",   "Strong", "?"))
+  tests.add(makeExample("Overcast", "Mild", "Normal", "Weak",   "?"))
+  tests.add(makeExample("Sunny",    "Hot",  "Normal", "Weak",   "?"))
+
+  var i: Int = 0
+  while i < tests.size() {
+    val ex: Example = tests.get(i) as Example
+    val f: ArrayList[String] = ex.features()
+    val pred: String? = tree.classify(ex)
+    val label: String = if pred == null { "?" } else { pred }
+    IO::println("  #{f.get(0) as String}/#{f.get(1) as String}/#{f.get(2) as String}/#{f.get(3) as String} → #{label}")
+    i++
+  }
+}

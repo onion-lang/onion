@@ -1,0 +1,305 @@
+// DataQualityChecker.on — CSV data validation pipeline (~220 lines)
+// Exercises: ADT enums, records with example/law, extension methods on String/Int,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/partition), do[Option],
+// pattern matching with type patterns, nullable types, string interpolation,
+// classes with mutable state, try/catch, foreach on range and map (k,v).
+
+import { java.lang.Double as JDouble; java.lang.Integer as JInt; }
+
+// ── Column type ADT ───────────────────────────────────────────────────────────
+
+enum ColType {
+  case StringCol(minLen: Int, maxLen: Int)
+  case IntCol(lo: Int, hi: Int)
+  case DoubleCol(lo: Double, hi: Double)
+  case PatternCol(pattern: String)
+public:
+  def describe(): String = select this {
+    case t is StringCol:  "String(#{t.minLen()}..#{t.maxLen()})"
+    case t is IntCol:     "Int(#{t.lo()}..#{t.hi()})"
+    case t is DoubleCol:  "Double(#{t.lo()}..#{t.hi()})"
+    case t is PatternCol: "Pattern(#{t.pattern()})"
+  }
+}
+
+// ── Severity and check result ADT ─────────────────────────────────────────────
+
+enum Severity { ERROR, WARNING, INFO }
+
+enum CheckResult {
+  case Pass
+  case Fail(severity: Severity, column: String, message: String)
+public:
+  def isOk(): Boolean = select this { case p is Pass: true; else: false }
+  def isError(): Boolean = select this {
+    case f is Fail: f.severity() == Severity::ERROR
+    else: false
+  }
+  def describe(): String = select this {
+    case p is Pass:  "OK"
+    case f is Fail: "[#{f.severity()}] #{f.column()}: #{f.message()}"
+  }
+}
+
+// ── Schema column record with example ────────────────────────────────────────
+
+record SchemaColumn(name: String, colType: ColType, required: Boolean)
+  example { new SchemaColumn("age", new IntCol(0, 150), true).required() }
+  example { new SchemaColumn("x", new StringCol(1, 50), false).colType().describe() == "String(1..50)" }
+
+// ── ColumnStats record ────────────────────────────────────────────────────────
+
+record ColumnStats(name: String, total: Int, missing: Int, errors: Int, warnings: Int)
+  example { new ColumnStats("x", 10, 0, 0, 0).errorRate() == 0.0 }
+  example { new ColumnStats("x", 0, 0, 0, 0).errorRate() == 0.0 }
+{
+public:
+  def errorRate(): Double = if self.total() == 0 { 0.0 }
+    else { (self.errors() as Double) / (self.total() as Double) * 100.0 }
+  def missingRate(): Double = if self.total() == 0 { 0.0 }
+    else { (self.missing() as Double) / (self.total() as Double) * 100.0 }
+  def summary(): String {
+    val er = self.errorRate()
+    val mr = self.missingRate()
+    return "#{self.name()}: #{self.total()} rows | missing=#{self.missing()} (#{mr}%) | errors=#{self.errors()} (#{er}%)"
+  }
+}
+
+// ── ValidationError record: one error with row number ────────────────────────
+
+record ValidationError(row: Int, column: String, severity: Severity, message: String)
+  example { new ValidationError(1, "age", Severity::ERROR, "too young").row() == 1 }
+{
+public:
+  def isError(): Boolean = self.severity() == Severity::ERROR
+  def describe(): String = "row #{self.row()} | #{self.column()} [#{self.severity()}]: #{self.message()}"
+}
+
+// ── Extension methods for value parsing ──────────────────────────────────────
+
+extension String {
+  def isBlank(): Boolean {
+    if self.length() == 0 { return true }
+    foreach i: Int in 0..<self.length() {
+      if self.charAt(i) != ' ' { return false }
+    }
+    return true
+  }
+
+  def tryParseInt(): Int? {
+    try { return JInt::parseInt(self.trim()) } catch e: Exception { return null }
+  }
+
+  def tryParseDouble(): Double? {
+    try { return JDouble::parseDouble(self.trim()) } catch e: Exception { return null }
+  }
+
+  def truncated(maxLen: Int): String {
+    if self.length() <= maxLen { return self }
+    return self.substring(0, maxLen) + "..."
+  }
+}
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "0%" }
+    val p: Int = self * 100 / total
+    return p.toString() + "%"
+  }
+}
+
+// ── Validator ─────────────────────────────────────────────────────────────────
+
+class Validator {
+public:
+  static def checkValue(value: String?, col: SchemaColumn): CheckResult {
+    val name = col.name()
+    if value == null || (value as String).isBlank() {
+      if col.required() {
+        return new Fail(Severity::ERROR, name, "required value is missing")
+      }
+      return new Pass()
+    }
+    val v: String = (value as String).trim()
+    return select col.colType() {
+      case t is StringCol: {
+        val len = v.length()
+        if len < t.minLen() {
+          new Fail(Severity::ERROR, name, "too short: #{len} chars (min #{t.minLen()})")
+        } else if len > t.maxLen() {
+          new Fail(Severity::WARNING, name, "too long: #{len} chars (max #{t.maxLen()})")
+        } else {
+          new Pass()
+        }
+      }
+      case t is IntCol: {
+        val n: Int? = v.tryParseInt()
+        if n == null {
+          new Fail(Severity::ERROR, name, "not an integer: '#{v.truncated(20)}'")
+        } else if (n as Int) < t.lo() {
+          new Fail(Severity::ERROR, name, "#{n} is below minimum #{t.lo()}")
+        } else if (n as Int) > t.hi() {
+          new Fail(Severity::ERROR, name, "#{n} is above maximum #{t.hi()}")
+        } else {
+          new Pass()
+        }
+      }
+      case t is DoubleCol: {
+        val d: Double? = v.tryParseDouble()
+        if d == null {
+          new Fail(Severity::ERROR, name, "not a number: '#{v.truncated(20)}'")
+        } else if (d as Double) < t.lo() {
+          new Fail(Severity::ERROR, name, "#{d} is below minimum #{t.lo()}")
+        } else if (d as Double) > t.hi() {
+          new Fail(Severity::ERROR, name, "#{d} is above maximum #{t.hi()}")
+        } else {
+          new Pass()
+        }
+      }
+      case t is PatternCol: {
+        if !Regex::matches(v, t.pattern()) {
+          new Fail(Severity::ERROR, name, "'#{v.truncated(30)}' does not match pattern")
+        } else {
+          new Pass()
+        }
+      }
+    }
+  }
+}
+
+// ── DataSet: accumulates rows and runs validation ─────────────────────────────
+
+class DataSet {
+  val schema: List[SchemaColumn]
+  var allErrors: List[ValidationError]
+  var rowCount: Int
+
+public:
+  def this(schema: List[SchemaColumn]) {
+    self.schema = schema
+    self.allErrors = []
+    self.rowCount = 0
+  }
+
+  def addRow(values: Map[String, String]): void {
+    self.rowCount = self.rowCount + 1
+    val rowNum = self.rowCount
+    foreach col: SchemaColumn in self.schema {
+      val raw: String? = values[col.name()] as String?
+      val result = Validator::checkValue(raw, col)
+      if !result.isOk() {
+        select result {
+          case f is Fail: {
+            self.allErrors.add(new ValidationError(rowNum, f.column(), f.severity(), f.message()))
+          }
+          else: {}
+        }
+      }
+    }
+  }
+
+  def stats(): List[ColumnStats] {
+    val errorsByCol: Map[String, List[ValidationError]] =
+      self.allErrors.groupBy { e -> (e as ValidationError).column() }
+    return self.schema.map { col ->
+      val rawErrs = errorsByCol[col.name()]
+      val colErrors: List[ValidationError] = if rawErrs == null { [] } else { rawErrs as List[ValidationError] }
+      val errs = colErrors.filter { e -> (e as ValidationError).severity() == Severity::ERROR }
+      val warns = colErrors.filter { e -> (e as ValidationError).severity() == Severity::WARNING }
+      new ColumnStats(col.name(), self.rowCount, 0, errs.size, warns.size)
+    }
+  }
+
+  def report(): String {
+    val sb = new StringBuilder()
+    sb.append("=== Data Quality Report ===\n")
+    sb.append("Schema:  #{self.schema.size()} columns | Rows: #{self.rowCount}\n")
+    sb.append("Errors:  #{self.allErrors.filter { e -> (e as ValidationError).severity() == Severity::ERROR }.size}\n")
+    sb.append("Warnings:#{self.allErrors.filter { e -> (e as ValidationError).severity() == Severity::WARNING }.size}\n\n")
+    sb.append("Column breakdown:\n")
+    foreach s: ColumnStats in self.stats() {
+      sb.append("  " + s.summary() + "\n")
+    }
+    if self.allErrors.size() > 0 {
+      sb.append("\nSample errors (first 5):\n")
+      val sample = self.allErrors
+        .filter { e -> (e as ValidationError).isError() }
+        .sortedBy { e -> (e as ValidationError).row() }
+      var shown: Int = 0
+      foreach e: ValidationError in sample {
+        if shown < 5 {
+          sb.append("  " + e.describe() + "\n")
+          shown = shown + 1
+        }
+      }
+    }
+    return sb.toString()
+  }
+}
+
+// ── Main: build schema, load data, report ─────────────────────────────────────
+
+val schema: List[SchemaColumn] = [
+  new SchemaColumn("id",    new PatternCol("[A-Z]{2}\\d{4}"),        true),
+  new SchemaColumn("name",  new StringCol(2, 50),                    true),
+  new SchemaColumn("age",   new IntCol(0, 130),                      true),
+  new SchemaColumn("score", new DoubleCol(0.0, 100.0),               false),
+  new SchemaColumn("email", new PatternCol("[^@]+@[^@]+\\.[^@]+"),   false)
+]
+
+IO::println("Schema:")
+foreach col: SchemaColumn in schema {
+  IO::println("  #{col.name()} (#{col.colType().describe()}) required=#{col.required()}")
+}
+IO::println("")
+
+val ds = new DataSet(schema)
+
+// Add valid rows
+ds.addRow(["id": "AB1234", "name": "Alice Smith", "age": "30", "score": "87.5", "email": "alice@example.com"])
+ds.addRow(["id": "CD5678", "name": "Bob Jones",   "age": "25", "score": "92.0", "email": "bob@test.org"])
+ds.addRow(["id": "EF9012", "name": "Carol Lee",   "age": "45", "score": "73.1", "email": "carol@mail.net"])
+
+// Add rows with errors
+ds.addRow(["id": "XX",     "name": "Dave",        "age": "-5",  "score": "105.0", "email": "bad-email"])
+ds.addRow(["id": "GH3456", "name": "E",           "age": "abc", "score": "88.0",  "email": ""])
+ds.addRow(["id": "IJ7890", "name": "Frank O'Brien-Walsh Jr.", "age": "200", "score": "50.0", "email": "frank@ok.com"])
+ds.addRow(["name": "Grace", "age": "28", "score": "79.0", "email": "grace@ok.com"]) // missing id
+
+IO::println(ds.report())
+
+// Pipeline analysis: partition into clean vs dirty columns
+IO::println("Analysis: column stats summary")
+val stats = ds.stats()
+val parts = stats.partition { s -> (s as ColumnStats).errors() == 0 }
+val cleanCols = parts[0] as List[Object]
+val dirtyCols = parts[1] as List[Object]
+IO::println("  Clean columns (0 errors): #{cleanCols.map { s -> (s as ColumnStats).name() }.toString()}")
+val dirtyRanked = dirtyCols.sortedByDescending { s -> (s as ColumnStats).errors() }
+IO::println("  Dirty columns (by error count): #{dirtyRanked.map { s -> (s as ColumnStats).name() + "=" + (s as ColumnStats).errors() }.toString()}")
+
+// do[Option]: look up a specific column's stats
+def findColStats(colName: String): ColumnStats? {
+  val found = stats.find { s -> (s as ColumnStats).name() == colName }
+  if found == null { return null }
+  return found as ColumnStats
+}
+
+IO::println("")
+foreach colName: String in ["age", "score", "email", "nonexistent"] {
+  val s = findColStats(colName)
+  val info: String = if s == null {
+    "column '#{colName}' not in schema"
+  } else {
+    "#{s.name()} error rate: #{s.errorRate()}%"
+  }
+  IO::println(info)
+}
+
+// |> pipeline: top error columns printed directly
+IO::println("")
+dirtyRanked
+  .filter { s -> (s as ColumnStats).errors() > 0 }
+  .map { s -> (s as ColumnStats).name() + "(#{(s as ColumnStats).errors()} errors)" }
+  .toString()
+  |> IO::println

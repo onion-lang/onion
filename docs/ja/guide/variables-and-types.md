@@ -56,6 +56,11 @@ val len = arr.length       // 配列は .length、リストは .size
 val maybe: String? = null
 ```
 
+### ボトム型（Nothing）
+
+`Nothing` はすべての型のサブタイプであり、`return`・`throw`・`break`・`continue` のような、
+決して値を返さない式に使われます。
+
 ## 型キャスト
 
 `as` 演算子を使います。メソッドチェーンには括弧が必要です。

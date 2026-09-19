@@ -376,6 +376,32 @@ non-nullable *declarations* (`val s: String = null`) — that is the shape that
 turns into a surprise NPE later — and reserve it for arguments to APIs
 documented to accept it.
 
+## `==` on Nullable Types Is Null-Safe Value Equality
+
+`==` is **value equality** (equivalent to `java.util.Objects.equals`) even when
+an operand is statically nullable. Both-null compares equal, one-null compares
+not-equal, and otherwise the operands are compared with `equals`. **No
+null-check is needed first:**
+
+```onion
+def compute(): String? = null
+
+class Test {
+public:
+  static def main(args: String[]): void {
+    val a: String? = compute()
+    if a == "expected" { println("match") } else { println("no match") }
+  }
+}
+```
+
+Output:
+```
+no match
+```
+
+Use `===` when you need reference identity instead of value equality.
+
 ## Safe Indexing (`?[]`) and Non-Null Assertion (`!!`)
 
 `xs?[i]` indexes a nullable receiver: null when `xs` is null, the element

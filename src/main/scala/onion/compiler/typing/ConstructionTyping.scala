@@ -597,9 +597,20 @@ final class ConstructionTyping(
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
-          if (closureIndices.contains(i))
-            closureCanTarget(formals(i), args(i).asInstanceOf[AST.ClosureExpression].args.length)
-          else
+          if (closureIndices.contains(i)) {
+            // The parser may wrap `{ param -> body }` in a BlockExpression whose
+            // sole element is the ClosureExpression — extract whichever we get.
+            val arity = args(i) match {
+              case c: AST.ClosureExpression => c.args.length
+              case block: AST.BlockExpression if block.elements.nonEmpty =>
+                block.elements.last match {
+                  case c: AST.ClosureExpression => c.args.length
+                  case _ => -1
+                }
+              case _ => -1
+            }
+            closureCanTarget(formals(i), arity)
+          } else
             TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }

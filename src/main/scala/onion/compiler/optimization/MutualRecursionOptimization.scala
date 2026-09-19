@@ -782,6 +782,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
         case nnAssert: NonNullAssert =>
           new NonNullAssert(nnAssert.location, rewriteTerm(nnAssert.target), nnAssert.`type`)
 
+
         case safeRefArr: SafeRefArray =>
           new SafeRefArray(safeRefArr.location, rewriteTerm(safeRefArr.target), rewriteTerm(safeRefArr.index), safeRefArr.arrayType)
 
@@ -808,6 +809,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
         case mapLit: MapLiteral =>
           new MapLiteral(mapLit.location, mapLit.keys.map(rewriteTerm), mapLit.values.map(rewriteTerm), mapLit.`type`)
+
 
         case newObj: NewObject =>
           new NewObject(newObj.location, newObj.constructor, newObj.parameters.map(rewriteTerm))

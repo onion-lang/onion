@@ -57,7 +57,9 @@ Source Files (.on)
     ↓
 [4] Tail Call Optimization → Optimized Typed AST
     ↓
-[5] Code Generation (ASM) → JVM Bytecode
+[5] Mutual Recursion Optimization → Optimized Typed AST
+    ↓
+[6] Code Generation (ASM) → JVM Bytecode
     ↓
 Class Loading & Execution
 ```
@@ -112,7 +114,15 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
    - Prevents StackOverflowError for deep recursion (e.g., 10000+ calls)
    - Output: Optimized Typed AST
 
-5. **Code Generation** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
+5. **Mutual Recursion Optimization** (`src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala`)
+   - Runs after Tail Call Optimization, as a separate phase
+   - Opt-in: converts a group of `@TailRecursive`-annotated methods that call each
+     other (mutual recursion, detected as a strongly connected component) into a
+     single state-machine method, so the group no longer grows the call stack
+   - Warns with `W0016` when a group is annotated but fails to qualify
+   - Output: Optimized Typed AST
+
+6. **Code Generation** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
    - **ASM-based bytecode generation** (current implementation)
    - Visitor pattern: `AsmCodeGenerationVisitor.scala`
    - Bytecode utilities:
@@ -258,6 +268,7 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 - **Main compiler logic**: `src/main/scala/onion/compiler/`
 - **Optimizations**: `src/main/scala/onion/compiler/optimization/`
   - `TailCallOptimization.scala` - Tail recursion → loop transformation
+  - `MutualRecursionOptimization.scala` - `@TailRecursive` mutual-recursion group → state machine
 - **Parser grammar**: `grammar/JJOnionParser.jj`
 - **Runtime library**: `src/main/java/onion/` (Java interfaces)
 - **Tools (CLI)**: `src/main/scala/onion/tools/`

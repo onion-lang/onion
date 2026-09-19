@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`maxBy`/`minBy` on a `List[T]` (non-null elements) raised a spurious `E0000` when the result was assigned to an explicitly nullable variable** (e.g. `val largest: Shape? = shapes.maxBy { ... }`), even though the same pattern worked fine with `sortedBy`. Root cause: `GenericMethodTypeArguments.collect()` unifies the formal return type against the expected context *after* argument-side unification; for `maxBy[T, R extends Number](List[T], Function1[T,R]): T`, the return-type unification step (`unify(T, Shape?)`) widened `T` itself from `Shape` to `Shape?` via `mergeNullability`, so the receiver check (`List[Shape]` vs. expected `List[Shape?]`) then failed. `sortedBy` escaped because its return type `List[T]` short-circuits the widening via an identity guard. Fixed by snapshotting `inferred` before return-type unification and reverting any binding that was only widened from `T` to `T?`, so the outer assignment site handles the nullable promotion without invalidating the receiver's type argument. Guarded by a new `MaxByNullableReturnSpec`, and exercised end-to-end by a new `run/CipherWorkbench.on` sample (classical Caesar/Vigenère/ROT13 cipher workbench).
+
 ## [0.87.0] - 2026-09-19
 
 ### Fixed

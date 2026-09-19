@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.87.0] - 2026-09-19
+
 ### Fixed
 
 - **`@TailRecursive` mutual-recursion optimization produced wrong results when a parameter reference was wrapped in `AsInstanceOf`** (e.g. an `Int` parameter widened to `Long` inside a mixed-primitive expression) — `MutualRecursionOptimization.rewriteParameterReferences`'s inner `rewriteTerm` only recursed into `RefLocal`, `Call`, `CallStatic`, `BinaryTerm`, `UnaryTerm`, and `SetLocal`, silently leaving every other `Term` subtype (including `AsInstanceOf`) unrewritten, so the nested `RefLocal` kept pointing at the original parameter slot instead of the state machine's loop-variable slot and read a stale value on every iteration. Added explicit recursive cases for the remaining `Term` subtypes (`AsInstanceOf`, `NonNullAssert`, `SafeCall`, `CallSuper`, `RefField`, `SafeFieldAccess`, `SetField`, `SetStaticField`, `InstanceOf`, `ArrayLength`, `RefArray`, `SafeRefArray`, `SetArray`, `NewObject`, `NewArray`, `NewArrayWithValues`, `ListLiteral`, `MapLiteral`, `Begin`, `SynchronizedTerm`), matching the exhaustive pattern already used by `CapturedVariableCollector.visitTerm`. Guarded by a new regression case in `TailCallOptimizationSpec` and exercised end-to-end by a new `run/NumberTheoryLab.on` sample.

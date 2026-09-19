@@ -1,0 +1,399 @@
+// MessageBoard.on — a discussion-forum simulation.
+// Exercises: ADT enums (PostStatus), data-carrying enums (Category/UserRole),
+// records with examples, classes with typed generics, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/count/any/take),
+// select/type-pattern matching with exhaustiveness, nullable types, closures,
+// string interpolation, extension methods, while/foreach (ranges + map k,v),
+// try/catch, recursion, |> pipeline.
+
+// ── UserRole (data-carrying homogeneous enum) ─────────────────────────────
+
+enum UserRole(label: String, power: Int) {
+  ADMIN("Admin", 100), MODERATOR("Mod", 50), MEMBER("Member", 10), GUEST("Guest", 0)
+}
+
+// ── PostStatus (ADT enum) ─────────────────────────────────────────────────
+
+enum PostStatus {
+  case Visible
+  case Edited(editedBy: String)
+  case Hidden(reason: String)
+public:
+  def label(): String = select this {
+    case s is Visible: "visible"
+    case s is Edited:  "edited by #{s.editedBy()}"
+    case s is Hidden:  "hidden: #{s.reason()}"
+  }
+  def isVisible(): Boolean = select this {
+    case s is Visible: true
+    case s is Edited:  true
+    else:              false
+  }
+}
+
+// ── Category (data-carrying homogeneous enum) ─────────────────────────────
+
+enum Category(label: String) {
+  GENERAL("General"), TECH("Tech"), HELP("Help"), META("Meta"), OFFTOPIC("Off-Topic")
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record User(id: Int, name: String, role: UserRole, reputation: Int)
+  example { new User(1, "alice", UserRole::ADMIN, 100).reputation() == 100 }
+
+record Tag(slug: String)
+  example { new Tag("onion-lang").slug() != null }
+
+record Post(id: Int, threadId: Int, authorId: Int, body: String,
+            upvotes: Int, downvotes: Int, status: PostStatus)
+  example { new Post(1, 1, 1, "hi", 0, 0, new Visible()).status().isVisible() == true }
+
+record Thread(id: Int, title: String, category: Category,
+              authorId: Int, views: Int, pinned: Boolean)
+  example { new Thread(1, "t", Category::TECH, 2, 0, false).pinned() == false }
+
+record SearchHit(threadId: Int, title: String, score: Int)
+
+// ── Extension methods ─────────────────────────────────────────────────────
+
+extension String {
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n) + "..." }
+
+  def padEnd(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+
+  def wordCount(): Int {
+    if self.trim().isEmpty() { return 0 }
+    return Strings::split(self.trim(), " ").size
+  }
+}
+
+extension Int {
+  def signed(): String = if self > 0 { "+" + self } else { "" + self }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────
+
+interface Summarizable { def summary(): String }
+
+// ── MessageBoard class ────────────────────────────────────────────────────
+
+class MessageBoard {
+  var nextId: Int
+public:
+  val users: List[User]
+  val threads: List[Thread]
+  val posts: List[Post]
+  val threadTags: Map[String, List[Tag]]
+
+  def this {
+    users = []
+    threads = []
+    posts = []
+    threadTags = [:]
+    nextId = 1
+  }
+
+  def addUser(name: String, role: UserRole, reputation: Int): User {
+    val u: User = new User(allocId(), name, role, reputation)
+    users.add(u)
+    return u
+  }
+
+  def addThread(title: String, cat: Category, authorId: Int, tags: List[Tag]): Thread {
+    val t: Thread = new Thread(allocId(), title, cat, authorId, 0, false)
+    threads.add(t)
+    threadTags["" + t.id()] = tags
+    return t
+  }
+
+  def addPost(threadId: Int, authorId: Int, body: String): Post {
+    val p: Post = new Post(allocId(), threadId, authorId, body, 0, 0, new Visible())
+    posts.add(p)
+    return p
+  }
+
+  def pinThread(threadId: Int): void {
+    val th: Thread? = (threads.find { t -> t.id() == threadId } as Thread?)
+    if th != null {
+      val idx: Int = threads.indexOf(th)
+      threads.set(idx, th.copy(pinned = true))
+    }
+  }
+
+  def editPost(postId: Int, editorName: String): void {
+    val p: Post? = (posts.find { x -> x.id() == postId } as Post?)
+    if p != null {
+      val idx: Int = posts.indexOf(p)
+      posts.set(idx, p.copy(status = new Edited(editorName)))
+    }
+  }
+
+  def hidePost(postId: Int, reason: String): void {
+    val p: Post? = (posts.find { x -> x.id() == postId } as Post?)
+    if p != null {
+      val idx: Int = posts.indexOf(p)
+      posts.set(idx, p.copy(status = new Hidden(reason)))
+    }
+  }
+
+  def votePost(postId: Int, upvote: Boolean): void {
+    val p: Post? = (posts.find { x -> x.id() == postId } as Post?)
+    if p != null {
+      val idx: Int = posts.indexOf(p)
+      if upvote {
+        posts.set(idx, p.copy(upvotes = p.upvotes() + 1))
+      } else {
+        posts.set(idx, p.copy(downvotes = p.downvotes() + 1))
+      }
+    }
+  }
+
+  def postsFor(threadId: Int): List[Post] =
+    posts.filter { p -> p.threadId() == threadId }
+
+  def visiblePostsFor(threadId: Int): List[Post] =
+    postsFor(threadId).filter { p -> p.status().isVisible() }
+
+  def threadsByCategory(cat: Category): List[Thread] =
+    threads.filter { t -> t.category() == cat }
+
+  def findUser(id: Int): User? =
+    (users.find { u -> u.id() == id } as User?)
+
+  def userName(id: Int): String {
+    val u: User? = findUser(id)
+    return if u != null { u.name() } else { "unknown" }
+  }
+
+  def threadScore(threadId: Int): Int =
+    postsFor(threadId).fold(0) { acc, p -> acc + p.upvotes() - p.downvotes() }
+
+  def tagsFor(threadId: Int): List[Tag] {
+    val key: String = "" + threadId
+    return if threadTags.containsKey(key) { threadTags[key] } else { [] }
+  }
+
+  def search(query: String): List[SearchHit] {
+    val lq: String = query.toLowerCase()
+    return threads
+      .filter { t -> t.title().toLowerCase().contains(lq) }
+      .map { t ->
+        val sc: Int = if t.title().toLowerCase().startsWith(lq) { 10 } else { 5 }
+        new SearchHit(t.id(), t.title(), sc)
+      }
+      .sortedBy { h -> 0 - h.score() }
+  }
+
+  def topContributors(n: Int): List[User] {
+    val counts: Map[String, Object] = [:]
+    foreach p: Post in posts {
+      val key: String = "" + p.authorId()
+      val cur: Int = if counts.containsKey(key) { (counts[key] as Int) } else { 0 }
+      counts[key] = cur + 1
+    }
+    return users
+      .sortedBy { u ->
+        val key: String = "" + u.id()
+        0 - (if counts.containsKey(key) { (counts[key] as Int) } else { 0 })
+      }
+      .take(n)
+  }
+
+  def userPostCount(userId: Int): Int =
+    posts.count { p -> p.authorId() == userId }
+
+private:
+  def allocId(): Int {
+    val id: Int = nextId
+    nextId = nextId + 1
+    return id
+  }
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────
+
+val board: MessageBoard = new MessageBoard()
+
+// Users
+val alice: User = board.addUser("alice", UserRole::ADMIN,      1250)
+val bob:   User = board.addUser("bob",   UserRole::MEMBER,      430)
+val carol: User = board.addUser("carol", UserRole::MODERATOR,   820)
+val dave:  User = board.addUser("dave",  UserRole::MEMBER,       95)
+val eve:   User = board.addUser("eve",   UserRole::MEMBER,      210)
+
+// Tags
+val tagOnion: Tag = new Tag("onion-lang")
+val tagJVM:   Tag = new Tag("jvm")
+val tagHelp:  Tag = new Tag("help")
+val tagAnn:   Tag = new Tag("announcement")
+val tagPerf:  Tag = new Tag("performance")
+val tagPat:   Tag = new Tag("pattern-matching")
+
+// Threads
+val t1: Thread = board.addThread(
+  "Onion compiler now 2x faster",         Category::TECH,    alice.id(), [tagOnion, tagJVM, tagPerf])
+val t2: Thread = board.addThread(
+  "How to iterate over maps?",            Category::HELP,    dave.id(),  [tagHelp, tagOnion])
+val t3: Thread = board.addThread(
+  "Welcome to the board!",               Category::GENERAL, carol.id(), [tagAnn])
+val t4: Thread = board.addThread(
+  "Pattern matching in Onion",            Category::TECH,    bob.id(),   [tagOnion, tagPat])
+val t5: Thread = board.addThread(
+  "Off-topic: favorite editors",          Category::OFFTOPIC, eve.id(),  [])
+val t6: Thread = board.addThread(
+  "Extension methods on primitives",      Category::TECH,    alice.id(), [tagOnion, tagJVM])
+val t7: Thread = board.addThread(
+  "Compiler crash: record copy with ADT", Category::META,    bob.id(),   [tagOnion])
+
+board.pinThread(t3.id())
+
+// Posts
+val p1:  Post = board.addPost(t1.id(), alice.id(), "We landed a major optimization to the inliner. Benchmarks show 2x speedup on large programs.")
+val p2:  Post = board.addPost(t1.id(), bob.id(),   "Amazing! Does this affect tail-call optimization too?")
+val p3:  Post = board.addPost(t1.id(), alice.id(), "Yes, tail-calls are now fully loop-converted during the outline pass.")
+val p4:  Post = board.addPost(t2.id(), dave.id(),  "I want to iterate a Map — what is the foreach syntax?")
+val p5:  Post = board.addPost(t2.id(), carol.id(), "Use: foreach (k, v) in myMap { ... } — key and value destructure automatically.")
+val p6:  Post = board.addPost(t2.id(), dave.id(),  "Perfect, worked on first try. Thank you!")
+val p7:  Post = board.addPost(t3.id(), carol.id(), "Welcome everyone! Please read the community guidelines.")
+val p8:  Post = board.addPost(t4.id(), bob.id(),   "In Onion, pattern matching uses select/case. ADT enums give exhaustiveness checking.")
+val p9:  Post = board.addPost(t4.id(), eve.id(),   "Can you pattern match on strings too?")
+val p10: Post = board.addPost(t4.id(), bob.id(),   "Yes — string values work in select cases, and so do regex patterns.")
+val p11: Post = board.addPost(t5.id(), eve.id(),   "I use Neovim with the Onion LSP plugin. Auto-completion works great!")
+val p12: Post = board.addPost(t6.id(), alice.id(), "extension Int { def double(): Int = self * 2 } — (5).double() returns 10.")
+val p13: Post = board.addPost(t7.id(), bob.id(),   "Compiler panics on record.copy(field = expr) when field is an ADT type.")
+val p14: Post = board.addPost(t7.id(), carol.id(), "Can you share a minimal repro? Use --dump-typed-ast to narrow it down.")
+val p15: Post = board.addPost(t7.id(), alice.id(), "Fixed in the latest build — was a type-substitution oversight in BodyPass.")
+
+// Votes (upvote = true, downvote = false)
+board.votePost(p1.id(),  true);  board.votePost(p1.id(), true);   board.votePost(p1.id(), true)
+board.votePost(p3.id(),  true);  board.votePost(p3.id(), true)
+board.votePost(p5.id(),  true);  board.votePost(p5.id(), true);   board.votePost(p5.id(), true)
+board.votePost(p8.id(),  true);  board.votePost(p8.id(), true);   board.votePost(p8.id(), true)
+board.votePost(p10.id(), true);  board.votePost(p10.id(), true)
+board.votePost(p12.id(), true)
+board.votePost(p9.id(),  false); board.votePost(p13.id(), false)
+
+// Post status changes
+board.editPost(p2.id(), "carol")
+board.hidePost(p13.id(), "needs more detail")
+
+// ── Reports ───────────────────────────────────────────────────────────────
+
+IO::println("=== Message Board Report ===\n")
+
+IO::println("Users   : #{board.users.size}")
+IO::println("Threads : #{board.threads.size}")
+IO::println("Posts   : #{board.posts.size}")
+val pinnedCount: Int = board.threads.count { t -> t.pinned() }
+IO::println("Pinned  : #{pinnedCount}\n")
+
+// Threads by category (groupBy)
+IO::println("── Threads by Category ───────────────────────────────────")
+val byCat: Map[String, List[Thread]] = board.threads.groupBy { t -> t.category().label() }
+foreach (cat, ts) in byCat {
+  IO::println("  #{cat.toString().padEnd(12)}: #{ts.size} thread(s)")
+}
+
+// Tech threads sorted by engagement score
+IO::println("\n── Tech Threads (by score) ───────────────────────────────")
+val techThreads: List[Thread] = board.threadsByCategory(Category::TECH)
+  .sortedBy { t -> 0 - board.threadScore(t.id()) }
+foreach t: Thread in techThreads {
+  val sc: Int = board.threadScore(t.id())
+  val pc: Int = board.postsFor(t.id()).size
+  val tags: List[Tag] = board.tagsFor(t.id())
+  val tagLine: String = tags.map { tag -> "#" + tag.slug() }.join(" ")
+  IO::println("  [#{sc.signed()}] #{t.title().truncate(38).padEnd(41)} #{pc} posts  #{tagLine}")
+}
+
+// Top contributors
+IO::println("\n── Top Contributors ──────────────────────────────────────")
+foreach u: User in board.topContributors(5) {
+  val pc: Int = board.userPostCount(u.id())
+  IO::println("  #{u.name().padEnd(10)} #{u.role().label().padEnd(10)} #{pc} posts  rep=#{u.reputation()}")
+}
+
+// Search
+IO::println("\n── Search: \"onion\" ───────────────────────────────────────")
+val hits: List[SearchHit] = board.search("onion")
+foreach h: SearchHit in hits {
+  IO::println("  [score=#{h.score()}] #{h.title()}")
+}
+IO::println("  #{hits.size} result(s)")
+
+// Partition: pinned vs normal
+IO::println("\n── Pinned / Normal ───────────────────────────────────────")
+val parts: List[List[Thread]] = board.threads.partition { t -> t.pinned() }
+val pinnedList: List[Thread] = parts[0]
+val normalList: List[Thread] = parts[1]
+foreach th: Thread in pinnedList {
+  IO::println("  [PINNED] #{th.title()} (#{th.category().label()})")
+}
+IO::println("  #{normalList.size} non-pinned thread(s)")
+
+// Post status breakdown (select on ADT enum)
+IO::println("\n── Post Status ───────────────────────────────────────────")
+val visiblePosts: Int = board.posts.count { p -> p.status() is Visible }
+val editedPosts:  Int = board.posts.count { p -> p.status() is Edited }
+val hiddenPosts:  Int = board.posts.count { p -> p.status() is Hidden }
+IO::println("  Visible: #{visiblePosts}  Edited: #{editedPosts}  Hidden: #{hiddenPosts}")
+
+// Individual post status labels
+IO::println("\n── Recent Post Statuses ──────────────────────────────────")
+foreach p: Post in board.posts.sortedBy { p -> 0 - p.id() }.take(5) {
+  IO::println("  Post ##{p.id()} (thread #{p.threadId()}): #{p.status().label()}")
+}
+
+// Content stats using wordCount extension method
+IO::println("\n── Content Stats ─────────────────────────────────────────")
+val totalWords: Int = board.posts.fold(0) { acc, p -> acc + p.body().wordCount() }
+val avgWords: Int = if board.posts.size > 0 { totalWords / board.posts.size } else { 0 }
+IO::println("  Total words across all posts: #{totalWords}")
+IO::println("  Avg words per post          : #{avgWords}")
+
+// Distinct category labels
+val catLabels: List[String] = board.threads
+  .map { t -> t.category().label() }
+  .distinct()
+  .sortedBy { s -> s }
+IO::println("  Active categories           : #{catLabels.join(", ")}")
+
+// Lurkers check (users with no posts)
+IO::println("\n── Engagement Check ──────────────────────────────────────")
+val lurkers: List[User] = board.users.filter { u -> board.userPostCount(u.id()) == 0 }
+if lurkers.size > 0 {
+  IO::println("Lurkers:")
+  foreach u: User in lurkers {
+    IO::println("  #{u.name()}")
+  }
+} else {
+  IO::println("All registered users have posted at least once.")
+}
+
+// Any high-reputation admin?
+val hasHighRepAdmin: Boolean = board.users.any { u ->
+  u.role() == UserRole::ADMIN && u.reputation() >= 1000
+}
+IO::println("High-rep admin present: #{hasHighRepAdmin}")
+
+// Thread summary with zip (pair threads with scores)
+IO::println("\n── Thread Summary Table ──────────────────────────────────")
+IO::println("  #{"ID".padEnd(4)} #{"Title".padEnd(38)} #{"Posts".padEnd(6)} Score")
+val scores: List[Int] = board.threads.map { t -> board.threadScore(t.id()) }
+val zipped = board.threads.zip(scores)
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  val th: Thread = (p[0] as Thread)
+  val sc: Int = (p[1] as Int)
+  val pc: Int = board.postsFor(th.id()).size
+  val pin: String = if th.pinned() { "*" } else { " " }
+  IO::println("  #{("" + th.id()).padEnd(4)} #{(pin + th.title()).truncate(38).padEnd(38)} #{("" + pc).padEnd(6)} #{sc.signed()}")
+}
+
+IO::println("\nDone.")

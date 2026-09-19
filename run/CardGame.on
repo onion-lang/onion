@@ -1,0 +1,411 @@
+// CardGame.on — Blackjack simulator
+// Exercises: plain enum (Suit/Rank) with methods and values(), records (Card),
+// class with ArrayList, collection pipelines (map/filter/fold/find/partition),
+// extension methods (Int/String), select/pattern-matching, nullable checks,
+// String interpolation, recursion, while/foreach, closures.
+
+import {
+  java.util.ArrayList;
+}
+
+// ─── Suit ─────────────────────────────────────────────────────────────────────
+
+enum Suit {
+  Hearts, Diamonds, Clubs, Spades
+public:
+  def symbol(): String = select this {
+    case Suit::Hearts:   "♥"
+    case Suit::Diamonds: "♦"
+    case Suit::Clubs:    "♣"
+    case Suit::Spades:   "♠"
+    else: "?"
+  }
+  def color(): String = select this {
+    case Suit::Hearts:   "red"
+    case Suit::Diamonds: "red"
+    else:                "black"
+  }
+}
+
+// ─── Rank ─────────────────────────────────────────────────────────────────────
+
+enum Rank {
+  Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten,
+  Jack, Queen, King, Ace
+public:
+  def label(): String = select this {
+    case Rank::Two:   "2"
+    case Rank::Three: "3"
+    case Rank::Four:  "4"
+    case Rank::Five:  "5"
+    case Rank::Six:   "6"
+    case Rank::Seven: "7"
+    case Rank::Eight: "8"
+    case Rank::Nine:  "9"
+    case Rank::Ten:   "10"
+    case Rank::Jack:  "J"
+    case Rank::Queen: "Q"
+    case Rank::King:  "K"
+    case Rank::Ace:   "A"
+    else: "?"
+  }
+  def hardValue(): Int = select this {
+    case Rank::Two:   2
+    case Rank::Three: 3
+    case Rank::Four:  4
+    case Rank::Five:  5
+    case Rank::Six:   6
+    case Rank::Seven: 7
+    case Rank::Eight: 8
+    case Rank::Nine:  9
+    case Rank::Ten:   10
+    case Rank::Jack:  10
+    case Rank::Queen: 10
+    case Rank::King:  10
+    case Rank::Ace:   11
+    else: 0
+  }
+  def isAce(): Boolean = select this {
+    case Rank::Ace: true
+    else: false
+  }
+  def isFaceCard(): Boolean = select this {
+    case Rank::Jack:  true
+    case Rank::Queen: true
+    case Rank::King:  true
+    else: false
+  }
+}
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+record Card(suit: Suit, rank: Rank) {
+public:
+  def display(): String = rank().label() + suit().symbol()
+  def hardValue(): Int = rank().hardValue()
+  def isAce(): Boolean = rank().isAce()
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def pad2(): String {
+    if self < 10 { return " " + self }
+    return "" + self
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Hand ─────────────────────────────────────────────────────────────────────
+
+class Hand {
+  var cards: ArrayList[Object]
+public:
+  def this {
+    this.cards = new ArrayList[Object]()
+  }
+  def add(c: Card): void { cards << c }
+  def size(): Int = cards.size()
+
+  // Best total ≤ 21; Aces start at 11 and drop to 1 as needed
+  def total(): Int {
+    var sum: Int = 0
+    var aces: Int = 0
+    var i: Int = 0
+    while i < cards.size() {
+      val c: Card = cards.get(i) as Card
+      sum = sum + c.hardValue()
+      if c.isAce() { aces = aces + 1 }
+      i = i + 1
+    }
+    while sum > 21 && aces > 0 {
+      sum = sum - 10
+      aces = aces - 1
+    }
+    return sum
+  }
+
+  def isBust(): Boolean = total() > 21
+  def isBlackjack(): Boolean = cards.size() == 2 && total() == 21
+
+  def display(hideSecond: Boolean): String {
+    var sb: String = "["
+    var i: Int = 0
+    while i < cards.size() {
+      if i == 1 && hideSecond {
+        sb = sb + "??"
+      } else {
+        sb = sb + (cards.get(i) as Card).display()
+      }
+      if i < cards.size() - 1 { sb = sb + " " }
+      i = i + 1
+    }
+    sb = sb + "]"
+    return sb
+  }
+
+  def cardList(): List[Object] {
+    val result: List[Object] = cards.map { c -> (c as Card).display() }
+    return result
+  }
+}
+
+// ─── Deck ─────────────────────────────────────────────────────────────────────
+
+class Deck {
+  var cards: ArrayList[Object]
+public:
+  def this {
+    this.cards = new ArrayList[Object]()
+    foreach suit: Object in Colls::toList(Suit::values()) {
+      foreach rank: Object in Colls::toList(Rank::values()) {
+        cards << new Card((suit as Suit), (rank as Rank))
+      }
+    }
+  }
+
+  def shuffle(): void {
+    val shuffled: ArrayList[Object] = Rand::shuffle(cards)
+    cards = shuffled
+  }
+
+  def deal(): Card {
+    val top: Card = cards.get(0) as Card
+    cards.remove(0)
+    return top
+  }
+
+  def remaining(): Int = cards.size()
+}
+
+// ─── Hand category (ADT case-enum) ───────────────────────────────────────────
+
+enum HandCategory {
+  case Bust
+  case Blackjack
+  case Strong   // 18-20
+  case Medium   // 14-17
+  case Weak     // ≤ 13
+public:
+  def label(): String = select this {
+    case _b is Bust:      "BUST"
+    case _b is Blackjack: "BJ"
+    case _b is Strong:    "Strong"
+    case _b is Medium:    "Medium"
+    case _b is Weak:      "Weak"
+  }
+}
+
+def categorize(hand: Hand): HandCategory {
+  val t: Int = hand.total()
+  if hand.isBust()        { return new Bust() }
+  if hand.isBlackjack()   { return new Blackjack() }
+  if t >= 18              { return new Strong() }
+  if t >= 14              { return new Medium() }
+  return new Weak()
+}
+
+// ─── Betting bankroll ─────────────────────────────────────────────────────────
+
+class Bankroll {
+  var chips: Int
+public:
+  def this(initial: Int) { this.chips = initial }
+  def balance(): Int = chips
+  def bet(amount: Int): Int {
+    if amount > chips { return chips }
+    return amount
+  }
+  def win(amount: Int): void { chips = chips + amount }
+  def lose(amount: Int): void { chips = chips - amount }
+  def push_result(): void { /* no change */ }
+}
+
+// ─── Stats tracking ───────────────────────────────────────────────────────────
+
+record RoundResult(round: Int, playerTotal: Int, dealerTotal: Int, outcome: String, bet: Int, chipChange: Int)
+
+// ─── Game logic ───────────────────────────────────────────────────────────────
+
+def determineWinner(player: Hand, dealer: Hand): String {
+  val pt: Int = player.total()
+  val dt: Int = dealer.total()
+  if player.isBust() { return "dealer wins (player bust)" }
+  if dealer.isBust() { return "player wins (dealer bust)" }
+  if player.isBlackjack() && !dealer.isBlackjack() { return "player wins (blackjack!)" }
+  if dealer.isBlackjack() && !player.isBlackjack() { return "dealer wins (blackjack!)" }
+  if pt > dt { return "player wins (#{pt} vs #{dt})" }
+  if dt > pt { return "dealer wins (#{dt} vs #{pt})" }
+  return "push (#{pt} == #{dt})"
+}
+
+def playerShouldHit(hand: Hand): Boolean = hand.total() < 17
+
+def dealerShouldHit(hand: Hand): Boolean = hand.total() < 17
+
+def playRound(deck: Deck, roundNum: Int, bank: Bankroll): RoundResult {
+  val BET: Int = 10
+  val betAmount: Int = bank.bet(BET)
+
+  val player: Hand = new Hand()
+  val dealer: Hand = new Hand()
+
+  // Initial deal: two cards each, alternating
+  player.add(deck.deal())
+  dealer.add(deck.deal())
+  player.add(deck.deal())
+  dealer.add(deck.deal())
+
+  IO::println("\n── Round #{roundNum} (bet: #{betAmount} chips, balance: #{bank.balance()}) ──")
+  IO::println("Player: #{player.display(false)}  (#{player.total()}) [#{categorize(player).label()}]")
+  IO::println("Dealer: #{dealer.display(true)}   [one hidden]")
+
+  // Player's turn
+  if player.isBlackjack() {
+    IO::println("Player: BLACKJACK!")
+  } else {
+    while playerShouldHit(player) && !player.isBust() {
+      val card: Card = deck.deal()
+      player.add(card)
+      IO::println("Player hits: #{card.display()} -> #{player.display(false)} (#{player.total()})")
+    }
+    if !player.isBust() {
+      IO::println("Player stands at #{player.total()} [#{categorize(player).label()}]")
+    } else {
+      IO::println("Player BUSTS at #{player.total()}!")
+    }
+  }
+
+  // Dealer's turn
+  IO::println("Dealer reveals: #{dealer.display(false)}  (#{dealer.total()})")
+  if !player.isBust() && !dealer.isBlackjack() {
+    while dealerShouldHit(dealer) && !dealer.isBust() {
+      val card: Card = deck.deal()
+      dealer.add(card)
+      IO::println("Dealer hits: #{card.display()} -> #{dealer.display(false)} (#{dealer.total()})")
+    }
+    if !dealer.isBust() {
+      IO::println("Dealer stands at #{dealer.total()}")
+    }
+  }
+
+  val outcome: String = determineWinner(player, dealer)
+  IO::println("Result: #{outcome}")
+
+  // Update bankroll
+  var chipChange: Int = 0
+  if outcome.startsWith("player") {
+    val payout: Int = if player.isBlackjack() { betAmount + (betAmount / 2) } else { betAmount }
+    bank.win(payout)
+    chipChange = payout
+    IO::println("  +#{payout} chips  (balance: #{bank.balance()})")
+  } else if outcome.startsWith("dealer") {
+    bank.lose(betAmount)
+    chipChange = 0 - betAmount
+    IO::println("  -#{betAmount} chips  (balance: #{bank.balance()})")
+  } else {
+    bank.push_result()
+    IO::println("  Push — no change  (balance: #{bank.balance()})")
+  }
+
+  return new RoundResult(roundNum, player.total(), dealer.total(), outcome, betAmount, chipChange)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val deck: Deck = new Deck()
+deck.shuffle()
+IO::println("Deck created: #{deck.remaining()} cards, shuffled.")
+
+val bank: Bankroll = new Bankroll(100)
+IO::println("Starting bankroll: #{bank.balance()} chips")
+
+val results: ArrayList[Object] = new ArrayList[Object]()
+val numRounds: Int = 5
+var round: Int = 1
+while round <= numRounds {
+  val result: RoundResult = playRound(deck, round, bank)
+  results << result
+  round = round + 1
+}
+
+// Summary statistics
+IO::println("\n══ GAME SUMMARY ══════════════════════════════")
+IO::println("Final bankroll  : #{bank.balance()} chips (started: 100)")
+IO::println("Rounds played   : #{numRounds}")
+
+val playerWins: List[Object] = results.filter { r -> (r as RoundResult).outcome().startsWith("player") }
+val dealerWins: List[Object] = results.filter { r -> (r as RoundResult).outcome().startsWith("dealer") }
+val pushes:     List[Object] = results.filter { r -> (r as RoundResult).outcome().startsWith("push") }
+
+IO::println("Player wins     : #{playerWins.size}")
+IO::println("Dealer wins     : #{dealerWins.size}")
+IO::println("Pushes          : #{pushes.size}")
+
+// Net chip change
+val netChips: Int = results.fold(0) { acc, r ->
+  (acc as Int) + (r as RoundResult).chipChange()
+} as Int
+IO::println("Net chip change : #{if netChips >= 0 { "+" + netChips } else { "" + netChips }}")
+
+// Average totals (excluding busts >21 from average)
+val validResults: List[Object] = results.filter { r ->
+  val rr: RoundResult = r as RoundResult
+  rr.playerTotal() <= 21 && rr.dealerTotal() <= 21
+}
+if validResults.size > 0 {
+  val sumPlayer: Int = validResults.fold(0) { acc, r ->
+    (acc as Int) + (r as RoundResult).playerTotal()
+  } as Int
+  val sumDealer: Int = validResults.fold(0) { acc, r ->
+    (acc as Int) + (r as RoundResult).dealerTotal()
+  } as Int
+  val n: Int = validResults.size
+  IO::println("Avg player total (non-bust): #{sumPlayer / n}")
+  IO::println("Avg dealer total (non-bust): #{sumDealer / n}")
+}
+
+// Best and worst rounds by player total
+val sortedByPlayer: List[Object] = results
+  .filter { r -> (r as RoundResult).playerTotal() <= 21 }
+  .sortedBy { r -> 0 - (r as RoundResult).playerTotal() }
+if sortedByPlayer.size > 0 {
+  val best: RoundResult = sortedByPlayer.get(0) as RoundResult
+  IO::println("Best player hand: #{best.playerTotal()} (round #{best.round()})")
+}
+
+// Partition wins vs losses
+val partition = results.partition { r -> (r as RoundResult).outcome().startsWith("player") }
+val winsPartition:  List[Object] = partition[0] as List[Object]
+val lossPartition:  List[Object] = partition[1] as List[Object]
+IO::println("Win/loss split  : #{winsPartition.size} wins, #{lossPartition.size} non-wins")
+
+// Round-by-round table with chip changes
+IO::println("\nRound  Player  Dealer  Chips  Outcome")
+IO::println("─────  ──────  ──────  ─────  ───────────────────────────")
+foreach r: Object in results {
+  val rr: RoundResult = r as RoundResult
+  val change: String = if rr.chipChange() > 0 { "+" + rr.chipChange() }
+                       else if rr.chipChange() < 0 { "" + rr.chipChange() }
+                       else { " 0" }
+  IO::println("  #{rr.round().pad2()}    #{rr.playerTotal().pad2()}      #{rr.dealerTotal().pad2()}   #{change.rpad(4)}  #{rr.outcome()}")
+}
+
+// Outcome frequency using distinct
+val outcomes = results.map { r -> (r as RoundResult).outcome() }.distinct()
+IO::println("\nDistinct outcomes seen:")
+foreach o: Object in outcomes {
+  val s: String = o as String
+  val count: Int = results.filter { r -> (r as RoundResult).outcome() == s }.size
+  IO::println("  #{s.rpad(35)} x#{count}")
+}
+
+IO::println("\nCards remaining in deck : #{deck.remaining()} / 52")
+IO::println("Cards dealt this session: #{52 - deck.remaining()}")

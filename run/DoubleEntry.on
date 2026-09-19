@@ -1,0 +1,263 @@
+// DoubleEntry.on — double-entry bookkeeping ledger simulation.
+// Exercises: ADT enum, records with methods, classes, Map/List pipelines,
+// groupBy, filter, fold, sortedBy, select/is patterns, string interpolation,
+// nullable, foreach over map entries, closures, while loop.
+
+// ── Account type ADT ──────────────────────────────────────────────────────────
+
+enum AccountType {
+  case Asset
+  case Liability
+  case Equity
+  case Revenue
+  case Expense
+public:
+  def isDebitNormal(): Boolean = select this {
+    case x is Asset:   true
+    case x is Liability: false
+    case x is Equity:  false
+    case x is Revenue: false
+    case x is Expense: true
+  }
+  def label(): String = select this {
+    case x is Asset:   "Asset"
+    case x is Liability: "Liability"
+    case x is Equity:  "Equity"
+    case x is Revenue: "Revenue"
+    case x is Expense: "Expense"
+  }
+}
+
+// ── Core records ──────────────────────────────────────────────────────────────
+
+record Account(id: String, name: String, acctType: AccountType) {
+public:
+  def header(): String = "#{id}  #{name}  [#{acctType.label()}]"
+}
+
+record JournalEntry(
+  date:     String,
+  memo:     String,
+  debitId:  String,
+  creditId: String,
+  amount:   Int
+) {
+public:
+  def display(): String =
+    "  #{date}  Dr #{debitId}  Cr #{creditId}  #{amount}  // #{memo}"
+}
+
+record AccountBalance(acct: Account, balance: Int) {
+public:
+  def normalised(): Int =
+    if acct.acctType().isDebitNormal() { balance } else { 0 - balance }
+  def sign(): String = if balance >= 0 { "Dr" } else { "Cr" }
+  def display(): String {
+    val abs = if balance < 0 { 0 - balance } else { balance }
+    return "  #{acct.header()}   #{sign()} #{abs}"
+  }
+}
+
+// ── Ledger class ──────────────────────────────────────────────────────────────
+
+class Ledger {
+  var accounts: Map[String, Account]
+  var entries:  List[JournalEntry]
+public:
+  def this() {
+    self.accounts = [:]
+    self.entries  = []
+  }
+  def addAccount(id: String, name: String, t: AccountType): void {
+    self.accounts.put(id, new Account(id, name, t))
+  }
+  def post(date: String, memo: String, debitId: String, creditId: String, amount: Int): void {
+    self.entries.add(new JournalEntry(date, memo, debitId, creditId, amount))
+  }
+  def balances(): Map[String, Int] {
+    val bal: Map[String, Int] = [:]
+    foreach (id, _) in self.accounts {
+      bal.put(id as String, 0)
+    }
+    foreach e: JournalEntry in self.entries {
+      val dr = e.debitId()
+      val cr = e.creditId()
+      val drCur = bal[dr]
+      val crCur = bal[cr]
+      if drCur != null { bal.put(dr, (drCur as Int) + e.amount()) }
+      if crCur != null { bal.put(cr, (crCur as Int) - e.amount()) }
+    }
+    return bal
+  }
+  def journalEntries(): List[JournalEntry] = self.entries
+  def trialBalance(): List[AccountBalance] {
+    val bal = self.balances()
+    val result: List[AccountBalance] = []
+    foreach (id, acct) in self.accounts {
+      val b = bal[id as String]
+      result.add(new AccountBalance(acct as Account, b ?: 0))
+    }
+    return result.sortedBy { ab -> (ab as AccountBalance).acct().id() }
+  }
+}
+
+// ── Set up chart of accounts ──────────────────────────────────────────────────
+
+val ledger = new Ledger()
+
+// Assets
+ledger.addAccount("1001", "Cash",              new Asset())
+ledger.addAccount("1100", "Accounts Receivable", new Asset())
+ledger.addAccount("1500", "Inventory",         new Asset())
+ledger.addAccount("1800", "Equipment",         new Asset())
+
+// Liabilities
+ledger.addAccount("2001", "Accounts Payable",  new Liability())
+ledger.addAccount("2100", "Loans Payable",     new Liability())
+
+// Equity
+ledger.addAccount("3001", "Owner's Capital",   new Equity())
+ledger.addAccount("3900", "Retained Earnings", new Equity())
+
+// Revenue
+ledger.addAccount("4001", "Sales Revenue",     new Revenue())
+ledger.addAccount("4100", "Service Revenue",   new Revenue())
+
+// Expenses
+ledger.addAccount("5001", "Cost of Goods Sold", new Expense())
+ledger.addAccount("5100", "Rent Expense",       new Expense())
+ledger.addAccount("5200", "Salaries Expense",   new Expense())
+ledger.addAccount("5300", "Utilities Expense",  new Expense())
+
+// ── Post journal entries ──────────────────────────────────────────────────────
+
+// Jan 1 – owner invests 50,000 cash
+ledger.post("2024-01-01", "Owner investment",    "1001", "3001", 50000)
+// Jan 5 – buy equipment on loan 20,000
+ledger.post("2024-01-05", "Buy equipment (loan)","1800", "2100", 20000)
+// Jan 10 – buy inventory on account 8,000
+ledger.post("2024-01-10", "Purchase inventory",  "1500", "2001",  8000)
+// Jan 15 – sell goods for 12,000 cash (COGS 5,000)
+ledger.post("2024-01-15", "Cash sale",           "1001", "4001", 12000)
+ledger.post("2024-01-15", "Record COGS",         "5001", "1500",  5000)
+// Jan 20 – provide services on account 4,000
+ledger.post("2024-01-20", "Service on account",  "1100", "4100",  4000)
+// Jan 25 – pay rent 1,500
+ledger.post("2024-01-25", "Pay rent",            "5100", "1001",  1500)
+// Jan 28 – pay salaries 6,000
+ledger.post("2024-01-28", "Pay salaries",        "5200", "1001",  6000)
+// Jan 30 – pay utilities 300
+ledger.post("2024-01-30", "Pay utilities",       "5300", "1001",   300)
+// Jan 31 – collect 2,000 from receivable
+ledger.post("2024-01-31", "Collect receivable",  "1001", "1100",  2000)
+
+// ── Print journal ─────────────────────────────────────────────────────────────
+
+IO::println("=== Journal (January 2024) ===")
+foreach e: JournalEntry in ledger.journalEntries() {
+  IO::println(e.display())
+}
+
+// ── Trial balance ─────────────────────────────────────────────────────────────
+
+IO::println("\n=== Trial Balance ===")
+val tb = ledger.trialBalance()
+var totalDebit  = 0
+var totalCredit = 0
+foreach ab: Object in tb {
+  val a = ab as AccountBalance
+  IO::println(a.display())
+  if a.balance() >= 0 { totalDebit  = totalDebit  + a.balance() }
+  else                 { totalCredit = totalCredit + (0 - a.balance()) }
+}
+IO::println("  " + "-".repeat(44))
+IO::println("  Totals   Dr #{totalDebit}   Cr #{totalCredit}")
+IO::println("  Balanced: " + (totalDebit == totalCredit))
+
+// ── Income statement ──────────────────────────────────────────────────────────
+
+IO::println("\n=== Income Statement (Jan 2024) ===")
+val revenues = tb.filter { ab ->
+  val a = ab as AccountBalance
+  select a.acct().acctType() {
+    case x is Revenue: true
+    else: false
+  }
+}
+val expenses = tb.filter { ab ->
+  val a = ab as AccountBalance
+  select a.acct().acctType() {
+    case x is Expense: true
+    else: false
+  }
+}
+
+var totalRev = 0
+IO::println("Revenue:")
+foreach ab: Object in revenues {
+  val a = ab as AccountBalance
+  val rev = 0 - a.balance()
+  IO::println("  #{a.acct().name()}: #{rev}")
+  totalRev = totalRev + rev
+}
+IO::println("  Total Revenue: #{totalRev}")
+
+var totalExp = 0
+IO::println("Expenses:")
+foreach ab: Object in expenses {
+  val a = ab as AccountBalance
+  IO::println("  #{a.acct().name()}: #{a.balance()}")
+  totalExp = totalExp + a.balance()
+}
+IO::println("  Total Expenses: #{totalExp}")
+val netIncome = totalRev - totalExp
+IO::println("Net Income: #{netIncome}")
+
+// ── Balance sheet summary ─────────────────────────────────────────────────────
+
+IO::println("\n=== Balance Sheet Summary ===")
+val assetTotal = tb
+  .filter { ab ->
+    select (ab as AccountBalance).acct().acctType() {
+      case x is Asset: true
+      else: false
+    }
+  }
+  .fold(0) { acc, ab -> (acc as Int) + (ab as AccountBalance).balance() }
+
+val liabTotal = tb
+  .filter { ab ->
+    select (ab as AccountBalance).acct().acctType() {
+      case x is Liability: true
+      else: false
+    }
+  }
+  .fold(0) { acc, ab -> (acc as Int) + (0 - (ab as AccountBalance).balance()) }
+
+val equityTotal = tb
+  .filter { ab ->
+    select (ab as AccountBalance).acct().acctType() {
+      case x is Equity: true
+      else: false
+    }
+  }
+  .fold(0) { acc, ab -> (acc as Int) + (0 - (ab as AccountBalance).balance()) }
+
+IO::println("Total Assets:              #{assetTotal}")
+IO::println("Total Liabilities:         #{liabTotal}")
+IO::println("Total Equity (+ retained): #{equityTotal + netIncome}")
+IO::println("Liabilities + Equity:      #{liabTotal + equityTotal + netIncome}")
+IO::println("Balance sheet balances:    " + (assetTotal == liabTotal + equityTotal + netIncome))
+
+// ── By-type summary using groupBy ─────────────────────────────────────────────
+
+IO::println("\n=== Balances by Account Type ===")
+val byType = tb.groupBy { ab -> (ab as AccountBalance).acct().acctType().label() }
+foreach (typeName, group) in byType {
+  val grpList = group as List
+  val count   = grpList.size
+  IO::println("#{typeName} (#{count} accounts):")
+  foreach ab: Object in grpList {
+    IO::println("  " + (ab as AccountBalance).acct().name())
+  }
+}

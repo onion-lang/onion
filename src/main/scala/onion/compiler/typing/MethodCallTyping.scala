@@ -332,6 +332,16 @@ final class MethodCallTyping(
   private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
     body.tryFindMethod(node, target, name, params)
 
+  /** Resolve a safe-call (?.) against extension methods, building SafeStaticExtensionCall. */
+  private[typing] def tryExtensionMethodCallForSafeNav(
+    node: AST.SafeMethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+
   /** Resolve an operator convention method via an `extension` block; None on miss. */
   private[typing] def tryExtensionOperatorMethod(
     node: AST.Node,

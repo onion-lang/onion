@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/BloomFilter.on`** — a 203-line probabilistic membership data structure sample (bit-array manipulation, string hashing via extension methods, records, ADT enums, collection pipelines, statistics), added to the `run/` corpus.
+
 ## [0.91.0] - 2026-09-20
 
 ### Fixed

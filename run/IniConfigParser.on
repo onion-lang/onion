@@ -1,0 +1,595 @@
+// IniConfigParser.on -- A realistic INI/config file parser and query engine.
+//
+// Demonstrates:
+//   @TailRecursive on a private mutual-recursion group (pure parameter-passing
+//     methods inside class Parity, no instance-field access, stack-safe at any
+//     depth),
+//   data-carrying enum (TokenKind, ConfigValue),
+//   plain enum (Severity),
+//   records with method bodies (Token, ConfigEntry, ParseError, Section),
+//   class hierarchy: INILexer, INIParser, ConfigStore, ConfigReport,
+//   interface: ConfigQuery,
+//   collection pipelines: groupBy, sortedBy, filter, map, fold, find,
+//     partition, distinct, any, count, concat,
+//   select / case-is pattern matching,
+//   nullable types and null checks,
+//   closures with inferred types,
+//   string interpolation,
+//   foreach over List and Map (k, v) entries,
+//   try/catch for parse and type-conversion errors,
+//   while loops for building output,
+//   extension methods on String and Int.
+
+import { java.util.* }
+
+// ---- Extensions ---------------------------------------------------------------
+
+extension String {
+  def trimmed(): String = self.trim()
+  def padTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var out: String = ""
+    var i: Int = 0
+    while i < n { out = out + self; i++ }
+    return out
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ---- Token ADT ----------------------------------------------------------------
+
+enum TokenKind {
+  case TSection(name: String)
+  case TIdent(text: String)
+  case TEquals
+  case TStr(value: String)
+  case TInt(value: Int)
+  case TFloat(value: Double)
+  case TBool(value: Boolean)
+  case TComment(text: String)
+  case TNewline
+  case TEof
+  case TError(msg: String)
+}
+
+record Token(kind: TokenKind, line: Int, col: Int) {
+  public:
+  def display(): String {
+    return select kind() {
+      case k is TSection: "[" + k.name() + "]"
+      case k is TIdent:   k.text()
+      case t is TEquals:  "="
+      case k is TStr:     "\"" + k.value() + "\""
+      case k is TInt:     "" + k.value()
+      case k is TFloat:   "" + k.value()
+      case k is TBool:    "" + k.value()
+      case k is TComment: "#" + k.text()
+      case t2 is TNewline: "<newline>"
+      case t3 is TEof:     "<eof>"
+      case k is TError:   "<error:" + k.msg() + ">"
+    }
+  }
+}
+
+// ---- Config value ADT ---------------------------------------------------------
+
+enum ConfigValue {
+  case CStr(v: String)
+  case CInt(v: Int)
+  case CFloat(v: Double)
+  case CBool(v: Boolean)
+}
+
+record ConfigEntry(section: String, key: String, value: ConfigValue, line: Int) {
+  public:
+  def displayValue(): String {
+    return select value() {
+      case s is CStr:   s.v()
+      case n is CInt:   "" + n.v()
+      case f is CFloat: "" + f.v()
+      case b is CBool:  "" + b.v()
+    }
+  }
+  def qualifiedKey(): String = section() + "." + key()
+}
+
+// ---- Severity enum ------------------------------------------------------------
+
+enum Severity { INFO, WARN, ERROR }
+
+record ParseError(severity: Severity, line: Int, col: Int, message: String) {
+  public:
+  def label(): String {
+    return select severity() {
+      case INFO:  "INFO"
+      case WARN:  "WARN"
+      case ERROR: "ERROR"
+    }
+  }
+  def display(): String = "[" + label() + " L" + line() + ":C" + col() + "] " + message()
+}
+
+// ---- Lexer --------------------------------------------------------------------
+
+class INILexer {
+  val src: String
+  val tokens: ArrayList[Object]
+  val errors: ArrayList[Object]
+  var tokenStart: Int
+  var curLine: Int
+  var curCol: Int
+
+public:
+  def this(source: String) {
+    src = source
+    tokens = new ArrayList()
+    errors = new ArrayList()
+    tokenStart = 0
+    curLine = 1
+    curCol = 1
+  }
+
+  def tokenize(): List[Object] {
+    scanStart(0)
+    return tokens
+  }
+
+  def parseErrors(): List[Object] = errors
+
+private:
+  def peekChar(p: Int): Char {
+    if p < src.length() { return src.charAt(p) }
+    return '\0'
+  }
+
+  def isAlpha(c: Char): Boolean {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+  }
+
+  def isAlnum(c: Char): Boolean { return isAlpha(c) || (c >= '0' && c <= '9') }
+
+  def isDigit(c: Char): Boolean { return c >= '0' && c <= '9' }
+
+  def addTok(kind: TokenKind, line: Int, col: Int): Unit {
+    tokens.add(new Token(kind, line, col))
+  }
+
+  def addErr(msg: String, line: Int, col: Int): Unit {
+    errors.add(new ParseError(Severity::ERROR, line, col, msg))
+  }
+
+  // Returns p+1, advancing line/col counters.
+  def step(p: Int): Int {
+    if p < src.length() && src.charAt(p) == '\n' {
+      curLine++
+      curCol = 1
+    } else {
+      curCol++
+    }
+    return p + 1
+  }
+
+  // Lexer states: mutually recursive, but access instance fields so we leave
+  // the @TailRecursive optimisation to the pure Parity example below.
+
+  def scanStart(p: Int): Int {
+    if p >= src.length() { addTok(new TEof(), curLine, curCol); return p }
+    val c: Char = peekChar(p)
+    if c == ' ' || c == '\t' || c == '\r' { return scanStart(step(p)) }
+    if c == '\n' { addTok(new TNewline(), curLine, curCol); return scanStart(step(p)) }
+    if c == '#' || c == ';'  { tokenStart = step(p); return scanComment(tokenStart) }
+    if c == '['              { tokenStart = step(p); return scanSection(tokenStart) }
+    if c == '='              { addTok(new TEquals(), curLine, curCol); return scanStart(step(p)) }
+    if c == '"'              { tokenStart = step(p); return scanString(tokenStart) }
+    if isAlpha(c)            { tokenStart = p; return scanIdent(p) }
+    if isDigit(c) || (c == '-' && isDigit(peekChar(p + 1))) {
+      tokenStart = p
+      return scanNumber(p)
+    }
+    addErr("unexpected character: " + ("" + c), curLine, curCol)
+    return scanStart(step(p))
+  }
+
+  def scanComment(p: Int): Int {
+    if p >= src.length() || peekChar(p) == '\n' {
+      val text: String = if p > tokenStart { src.substring(tokenStart, p) } else { "" }
+      addTok(new TComment(text), curLine, curCol)
+      return scanStart(p)
+    }
+    return scanComment(step(p))
+  }
+
+  def scanSection(p: Int): Int {
+    val c: Char = peekChar(p)
+    if p >= src.length() || c == ']' || c == '\n' {
+      val name: String = if p > tokenStart { src.substring(tokenStart, p).trimmed() } else { "" }
+      addTok(new TSection(name), curLine, curCol)
+      val next: Int = if p < src.length() && c == ']' { step(p) } else { p }
+      return scanStart(next)
+    }
+    return scanSection(step(p))
+  }
+
+  def scanIdent(p: Int): Int {
+    if p < src.length() && isAlnum(peekChar(p)) { return scanIdent(step(p)) }
+    val word: String = src.substring(tokenStart, p)
+    val tok: TokenKind =
+      if word == "true"  || word == "yes" || word == "on"  { new TBool(true)  }
+      else if word == "false" || word == "no"  || word == "off" { new TBool(false) }
+      else                                                       { new TIdent(word) }
+    addTok(tok, curLine, curCol)
+    return scanStart(p)
+  }
+
+  def scanNumber(p: Int): Int {
+    val c: Char = peekChar(p)
+    if p < src.length() && (isDigit(c) || c == '-' || c == '.') { return scanNumber(step(p)) }
+    val raw: String = src.substring(tokenStart, p)
+    try {
+      if raw.indexOf('.') >= 0 {
+        addTok(new TFloat(Double::parseDouble(raw)), curLine, curCol)
+      } else {
+        addTok(new TInt(Int::parseInt(raw)), curLine, curCol)
+      }
+    } catch e: Exception {
+      addErr("bad number literal: " + raw, curLine, curCol)
+    }
+    return scanStart(p)
+  }
+
+  def scanString(p: Int): Int {
+    if p >= src.length() || peekChar(p) == '\n' {
+      addErr("unterminated string", curLine, curCol)
+      return scanStart(p)
+    }
+    if peekChar(p) == '"' {
+      val text: String = src.substring(tokenStart, p)
+      addTok(new TStr(text), curLine, curCol)
+      return scanStart(step(p))
+    }
+    if peekChar(p) == '\\' && p + 1 < src.length() { return scanString(step(step(p))) }
+    return scanString(step(p))
+  }
+}
+
+// ---- Parser -------------------------------------------------------------------
+
+class INIParser {
+  val tokens: List[Object]
+  val entries: ArrayList[Object]
+  val errors: ArrayList[Object]
+
+public:
+  def this(tokenList: List[Object]) {
+    tokens = tokenList
+    entries = new ArrayList()
+    errors = new ArrayList()
+  }
+
+  def parse(): List[Object] {
+    var section: String = "global"
+    var i: Int = 0
+    while i < tokens.size {
+      val tok: Token = tokens[i] as Token
+      val kd: TokenKind = tok.kind()
+      if kd is TSection { section = (kd as TSection).name() }
+      if kd is TIdent {
+        val ki: TIdent = kd as TIdent
+        if i + 2 < tokens.size {
+          val eq: Token     = tokens[i + 1] as Token
+          val valTok: Token = tokens[i + 2] as Token
+          if eq.kind() is TEquals {
+            val cv: ConfigValue? = tokToValue(valTok)
+            if cv != null {
+              entries.add(new ConfigEntry(section, ki.text(), cv, tok.line()))
+              i = i + 2
+            }
+            if cv == null {
+              errors.add(new ParseError(Severity::WARN, valTok.line(), valTok.col(),
+                "unsupported value token: " + valTok.display()))
+            }
+          }
+        }
+      }
+      if kd is TError {
+        errors.add(new ParseError(Severity::ERROR, tok.line(), tok.col(), (kd as TError).msg()))
+      }
+      i++
+    }
+    return entries
+  }
+
+  def parseErrors(): List[Object] = errors
+
+private:
+  def tokToValue(tok: Token): ConfigValue? {
+    return select tok.kind() {
+      case s is TStr:   new CStr(s.value())
+      case n is TInt:   new CInt(n.value())
+      case f is TFloat: new CFloat(f.value())
+      case b is TBool:  new CBool(b.value())
+      case s is TIdent: new CStr(s.text())
+      else:             null
+    }
+  }
+}
+
+// ---- Config Store (with interface) --------------------------------------------
+
+interface ConfigQuery {
+  def getString(section: String, key: String): String?
+  def getInt(section: String, key: String): Int?
+  def getBool(section: String, key: String): Boolean?
+  def allSections(): List[Object]
+  def keysIn(section: String): List[Object]
+}
+
+class ConfigStore conforms ConfigQuery {
+public:
+  val entries: List[Object]
+  def this(entryList: List[Object]) { entries = entryList }
+
+  def getString(section: String, key: String): String? {
+    val e: ConfigEntry? = findEntry(section, key)
+    if e == null { return null }
+    return select e.value() {
+      case s is CStr: { s.v() }
+      else: { e.displayValue() }
+    }
+  }
+
+  def getInt(section: String, key: String): Int? {
+    val e: ConfigEntry? = findEntry(section, key)
+    if e == null { return null }
+    return select e.value() {
+      case n is CInt: { n.v() }
+      else: { null }
+    }
+  }
+
+  def getFloat(section: String, key: String): Double? {
+    val e: ConfigEntry? = findEntry(section, key)
+    if e == null { return null }
+    return select e.value() {
+      case f is CFloat: { f.v() }
+      case n is CInt:   { n.v() * 1.0 }
+      else: { null }
+    }
+  }
+
+  def getBool(section: String, key: String): Boolean? {
+    val e: ConfigEntry? = findEntry(section, key)
+    if e == null { return null }
+    return select e.value() {
+      case b is CBool: { b.v() }
+      else: { null }
+    }
+  }
+
+  def allSections(): List[Object] {
+    val seen: LinkedHashSet[Object] = new LinkedHashSet()
+    foreach e: Object in entries { seen.add((e as ConfigEntry).section()) }
+    return Colls::toList(seen)
+  }
+
+  def keysIn(section: String): List[Object] =
+    entries.filter { e -> (e as ConfigEntry).section() == section }
+           .map    { e -> (e as ConfigEntry).key() }
+
+  def entryCount(): Int = entries.size
+
+  def sectionCount(): Int = allSections().size
+
+  def bySection(): Map[Object, List[Object]] =
+    entries.groupBy { e -> (e as ConfigEntry).section() }
+
+private:
+  def findEntry(section: String, key: String): ConfigEntry? {
+    val found: Object? = entries.find { e ->
+      val ce: ConfigEntry = e as ConfigEntry
+      ce.section() == section && ce.key() == key
+    }
+    return if found != null { found as ConfigEntry } else { null }
+  }
+}
+
+// ---- Report -------------------------------------------------------------------
+
+class ConfigReport {
+  val store: ConfigStore
+  val errors: List[Object]
+
+public:
+  def this(configStore: ConfigStore, allErrors: List[Object]) {
+    store = configStore
+    errors = allErrors
+  }
+
+  def print(): Unit {
+    val title: String = "=== Config Report ==="
+    IO::println(title)
+    IO::println("=".repeat(title.length()))
+
+    IO::println("")
+    IO::println("Summary:")
+    IO::println("  Sections : " + store.sectionCount())
+    IO::println("  Entries  : " + store.entryCount())
+    val parts = errors.partition { e -> (e as ParseError).severity() == Severity::ERROR }
+    val errs  = parts[0] as List[Object]
+    val warns = parts[1] as List[Object]
+    IO::println("  Errors   : " + errs.size)
+    IO::println("  Warnings : " + warns.size)
+
+    IO::println("")
+    IO::println("Entries by section:")
+    val sections: List[Object] = store.allSections().sortedBy { s -> s as String }
+    foreach sec: Object in sections {
+      val sname: String = sec as String
+      IO::println("  [" + sname + "]")
+      val secEntries: List[Object] = store.entries
+        .filter  { e -> (e as ConfigEntry).section() == sname }
+        .sortedBy { e -> (e as ConfigEntry).key() }
+      foreach e: Object in secEntries {
+        val ce: ConfigEntry = e as ConfigEntry
+        IO::println("    " + ce.key().padTo(20) + " = " + ce.displayValue())
+      }
+    }
+
+    IO::println("")
+    IO::println("Value type distribution:")
+    val byType: Map[Object, List[Object]] = store.entries.groupBy { e ->
+      val ce: ConfigEntry = e as ConfigEntry
+      select ce.value() {
+        case s is CStr:   { "string" }
+        case n is CInt:   { "int"    }
+        case f is CFloat: { "float"  }
+        case b is CBool:  { "bool"   }
+      }
+    }
+    foreach (kind, group) in byType {
+      IO::println("  " + (kind as String).padTo(10) + " : " + group.size + " value(s)")
+    }
+
+    if errors.size > 0 {
+      IO::println("")
+      IO::println("Parse issues:")
+      foreach e: Object in errors {
+        IO::println("  " + (e as ParseError).display())
+      }
+    }
+
+    IO::println("")
+    IO::println("=".repeat(title.length()))
+  }
+}
+
+// ---- @TailRecursive demo (pure mutual recursion, no instance field access) -----
+//
+// MutualRecursionOptimization merges isEven/isOdd into one state-machine method,
+// so this pair handles arbitrarily large n without growing the call stack.
+
+class Parity {
+private:
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+public:
+  def check(n: Int): Boolean = isEven(n)
+}
+
+// ---- Main ---------------------------------------------------------------------
+
+def main(): void {
+  val cfg: String =
+    "[server]\n" +
+    "host = localhost\n" +
+    "port = 8080\n" +
+    "debug = true\n" +
+    "timeout = 30.5\n" +
+    "# This is a comment\n" +
+    "\n" +
+    "[database]\n" +
+    "host = db.example.com\n" +
+    "port = 5432\n" +
+    "name = myapp\n" +
+    "pool_size = 10\n" +
+    "ssl = false\n" +
+    "\n" +
+    "[cache]\n" +
+    "enabled = yes\n" +
+    "ttl = 3600\n" +
+    "max_size = 1000\n" +
+    "backend = redis\n" +
+    "\n" +
+    "[logging]\n" +
+    "level = info\n" +
+    "file = /var/log/app.log\n" +
+    "rotate = true\n" +
+    "max_bytes = 10485760\n" +
+    "backup_count = 5\n"
+
+  val lexer: INILexer = new INILexer(cfg)
+  val tokens: List[Object]    = lexer.tokenize()
+  val lexErrs: List[Object]   = lexer.parseErrors()
+
+  val parser: INIParser = new INIParser(tokens)
+  val entries: List[Object]     = parser.parse()
+  val parseErrs: List[Object]   = parser.parseErrors()
+
+  val allErrors: List[Object]   = Colls::concat(lexErrs, parseErrs)
+  val store: ConfigStore = new ConfigStore(entries)
+  val report: ConfigReport = new ConfigReport(store, allErrors)
+
+  report.print()
+
+  IO::println("")
+  IO::println("Query examples:")
+  IO::println("  server.host  = " + (store.getString("server", "host") ?: "<not set>"))
+  IO::println("  server.port  = " + (store.getInt("server", "port") ?: -1))
+  IO::println("  server.debug = " + (store.getBool("server", "debug") ?: false))
+  IO::println("  cache.ttl    = " + (store.getInt("cache", "ttl") ?: 0))
+  IO::println("  db.pool_size = " + (store.getInt("database", "pool_size") ?: 0))
+  IO::println("  server.timeout = " + (store.getFloat("server", "timeout") ?: 0.0))
+
+  // Numeric summary: collect all Int-valued entries
+  val intEntries: List[Object] = store.entries
+    .filter { e -> (e as ConfigEntry).value() is CInt }
+    .sortedBy { e -> (e as ConfigEntry).qualifiedKey() }
+
+  IO::println("")
+  IO::println("All integer-valued config entries:")
+  foreach e: Object in intEntries {
+    val ce: ConfigEntry = e as ConfigEntry
+    IO::println("  " + ce.qualifiedKey().padTo(28) + " = " + ce.displayValue())
+  }
+
+  // Cross-section summary: count entries per section
+  IO::println("")
+  IO::println("Entries per section:")
+  val bySec: Map[Object, List[Object]] = store.bySection()
+  val secNames: List[Object] = store.allSections().sortedBy { s -> s as String }
+  foreach sec: Object in secNames {
+    val sn: String = sec as String
+    val cnt: Int   = (bySec.get(sn) as List[Object]).size
+    IO::println("  " + sn.padTo(12) + " : " + cnt + " key(s)")
+  }
+
+  // Boolean flags across all sections
+  val boolEntries: List[Object] = store.entries
+    .filter { e -> (e as ConfigEntry).value() is CBool }
+    .sortedBy { e -> (e as ConfigEntry).qualifiedKey() }
+
+  IO::println("")
+  IO::println("Boolean flags:")
+  foreach e: Object in boolEntries {
+    val ce: ConfigEntry = e as ConfigEntry
+    val flag: Boolean = ((ce.value() as CBool).v())
+    IO::println("  " + ce.qualifiedKey().padTo(28) + " = " + flag)
+  }
+
+  // @TailRecursive mutual-recursion demo: Parity.isEven/isOdd optimised into
+  // one state machine -- no stack overflow even at depth 1_000_000.
+  IO::println("")
+  IO::println("@TailRecursive mutual-recursion check:")
+  val parity: Parity = new Parity()
+  IO::println("  isEven(1000000) = " + parity.check(1000000))
+  IO::println("  isEven(999999)  = " + parity.check(999999))
+}

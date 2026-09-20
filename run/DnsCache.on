@@ -1,0 +1,399 @@
+// DNS Cache and Resolver — models a multi-layer DNS resolution stack with
+// TTL-based cache eviction, upstream stub resolver, and query statistics.
+// Exercises: records with methods, ADT case-enum, data-carrying enum, interface,
+// classes, typed generics, collection pipelines (map/filter/sortedBy/find/
+// groupBy/fold), select/is pattern matching, nullable, foreach (k,v) in map,
+// extension methods on String, string interpolation, while loops, try/catch.
+
+import { java.util.ArrayList }
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record DnsRecord(name: String, recType: String, ttl: Int, value: String) {
+public:
+  def show(): String = "#{name()} #{recType()} #{ttl()}s -> #{value()}"
+  def cacheKey(): String = name() + "|" + recType()
+}
+
+record DnsQuestion(domain: String, recType: String)
+
+record DnsAnswer(domain: String, recType: String, records: List[DnsRecord], fromCache: Boolean) {
+public:
+  def show(): String = {
+    val src: String = if fromCache() { "[cache]" } else { "[upstream]" }
+    var out: String = "#{domain()} #{recType()} #{src}:\n"
+    foreach r: DnsRecord in records() {
+      out = out + "  " + r.show() + "\n"
+    }
+    return out
+  }
+  def isEmpty(): Boolean = records().isEmpty()
+}
+
+record CacheEntry(rec: DnsRecord, insertedAt: Long, recTtl: Int) {
+public:
+  def isExpired(now: Long): Boolean = (now - insertedAt()) > recTtl() * 1000L
+  def remainingTtlSec(now: Long): Int = {
+    val elapsedMs: Long = now - insertedAt()
+    val elapsedSec: Int = (elapsedMs / 1000L) as Int
+    val rem: Int = recTtl() - elapsedSec
+    if rem < 0 { return 0 }
+    return rem
+  }
+}
+
+record CacheStats(hits: Int, misses: Int, evictions: Int, size: Int) {
+public:
+  def hitRate(): Double = {
+    val total: Int = hits() + misses()
+    if total == 0 { return 0.0 }
+    return (hits() as Double) / (total as Double)
+  }
+  def show(): String = {
+    val pct: Int = (hitRate() * 100.0) as Int
+    return "hits=#{hits()} misses=#{misses()} evictions=#{evictions()} " +
+           "size=#{size()} hitRate=#{pct}%"
+  }
+}
+
+// ── ADT enum for record types ──────────────────────────────────────────────
+
+enum RecordType {
+  case A
+  case AAAA
+  case CNAME
+  case MX
+  case TXT
+  case NS
+  case Unknown(raw: String)
+public:
+  def label(): String = select this {
+    case t is A:       "A"
+    case t is AAAA:    "AAAA"
+    case t is CNAME:   "CNAME"
+    case t is MX:      "MX"
+    case t is TXT:     "TXT"
+    case t is NS:      "NS"
+    case u is Unknown: u.raw()
+  }
+  static def of(s: String): RecordType = select s {
+    case "A":     new A()
+    case "AAAA":  new AAAA()
+    case "CNAME": new CNAME()
+    case "MX":    new MX()
+    case "TXT":   new TXT()
+    case "NS":    new NS()
+    else:         new Unknown(s)
+  }
+}
+
+// ── Interface for resolvers ────────────────────────────────────────────────
+
+interface Resolver {
+  def resolve(domain: String, recType: String): DnsAnswer?
+}
+
+// ── Extension on String for domain utilities ───────────────────────────────
+
+extension String {
+  def parentDomain(): String? {
+    val idx: Int = self.indexOf(".")
+    if idx < 0 { return null }
+    return self.substring(idx + 1)
+  }
+  def normalize(): String {
+    if self.endsWith(".") { return self.substring(0, self.length() - 1) }
+    return self
+  }
+  def splitDots(): List[String] {
+    val parts: List[String] = []
+    val segs = Strings::split(self, "\\.")
+    foreach s: Object in segs { parts.add(s as String) }
+    return parts
+  }
+  def tld(): String {
+    val idx: Int = self.lastIndexOf(".")
+    if idx < 0 { return self }
+    return self.substring(idx + 1)
+  }
+}
+
+// ── DNS Cache ──────────────────────────────────────────────────────────────
+
+class DnsCache {
+  var entries: Map[String, CacheEntry] = [:]
+  var hitCount: Int = 0
+  var missCount: Int = 0
+  var evictCount: Int = 0
+
+public:
+  def store(rec: DnsRecord): void {
+    entries[rec.cacheKey()] = new CacheEntry(rec, System::currentTimeMillis(), rec.ttl())
+  }
+
+  def lookup(domain: String, recType: String): DnsRecord? {
+    val key: String = domain.normalize() + "|" + recType
+    val entry: CacheEntry? = entries[key]
+    if entry == null { missCount++; return null }
+    val now: Long = System::currentTimeMillis()
+    if entry.isExpired(now) {
+      entries.remove(key)
+      evictCount++
+      missCount++
+      return null
+    }
+    hitCount++
+    return entry.rec()
+  }
+
+  def evictExpired(): Int {
+    val now: Long = System::currentTimeMillis()
+    val keys: List[String] = new ArrayList[String](entries.keySet())
+    var removed: Int = 0
+    foreach key: String in keys {
+      val e: CacheEntry? = entries[key]
+      if e != null && e.isExpired(now) {
+        entries.remove(key)
+        evictCount++
+        removed++
+      }
+    }
+    return removed
+  }
+
+  def size(): Int = entries.size()
+  def stats(): CacheStats = new CacheStats(hitCount, missCount, evictCount, entries.size())
+
+  def dumpEntries(): void {
+    val now: Long = System::currentTimeMillis()
+    foreach (key, entry) in entries {
+      val e: CacheEntry = entry as CacheEntry
+      val rem: Int = e.remainingTtlSec(now)
+      IO::println("  #{key} ttl=#{rem}s -> #{e.rec().value()}")
+    }
+  }
+}
+
+// ── Upstream stub resolver ─────────────────────────────────────────────────
+
+class UpstreamResolver conforms Resolver {
+  var db: Map[String, List[DnsRecord]] = [:]
+
+public:
+  def this {
+    seed("example.com",      "A",    "93.184.216.34",                       3600)
+    seed("example.com",      "AAAA", "2606:2800:220:1:248:1893:25c8:1946",  3600)
+    seed("example.com",      "MX",   "mail.example.com",                    3600)
+    seed("example.com",      "TXT",  "v=spf1 -all",                         300)
+    seed("mail.example.com", "A",    "93.184.216.35",                       3600)
+    seed("ns1.example.com",  "A",    "205.251.196.1",                       86400)
+    seed("openai.com",       "A",    "13.35.64.100",                        60)
+    seed("openai.com",       "TXT",  "v=spf1 include:sendgrid.net ~all",    300)
+    seed("api.openai.com",   "A",    "13.35.64.101",                        60)
+    seed("github.com",       "A",    "140.82.112.3",                        60)
+    seed("github.com",       "AAAA", "2606:50c0:8000::153",                 60)
+    seed("github.com",       "MX",   "aspmx.l.google.com",                  3600)
+    seed("www.github.com",   "CNAME","github.com",                          300)
+  }
+
+  def seed(domain: String, recType: String, value: String, ttl: Int): void {
+    val key: String = domain.normalize() + "|" + recType
+    val existing: List[DnsRecord]? = db[key]
+    val rec = new DnsRecord(domain.normalize(), recType, ttl, value)
+    if existing == null {
+      db[key] = [rec]
+    } else {
+      existing.add(rec)
+    }
+  }
+
+  def resolve(domain: String, recType: String): DnsAnswer? {
+    val key: String = domain.normalize() + "|" + recType
+    val recs: List[DnsRecord]? = db[key]
+    if recs == null { return null }
+    return new DnsAnswer(domain.normalize(), recType, recs, false)
+  }
+}
+
+// ── Caching resolver ───────────────────────────────────────────────────────
+
+class CachingResolver conforms Resolver {
+  var cache: DnsCache
+  var upstream: Resolver
+  var queryCount: Int = 0
+  var upstreamCount: Int = 0
+
+public:
+  def this(up: Resolver) {
+    upstream = up
+    cache = new DnsCache()
+  }
+
+  def resolve(domain: String, recType: String): DnsAnswer? {
+    queryCount++
+    val cached: DnsRecord? = cache.lookup(domain, recType)
+    if cached != null {
+      return new DnsAnswer(domain, recType, [cached], true)
+    }
+    upstreamCount++
+    val answer: DnsAnswer? = upstream.resolve(domain, recType)
+    if answer == null { return null }
+    foreach rec: DnsRecord in answer.records() {
+      cache.store(rec)
+    }
+    return new DnsAnswer(domain, recType, answer.records(), false)
+  }
+
+  def prefetch(domains: List[String], recType: String): Int {
+    var loaded: Int = 0
+    foreach domain: String in domains {
+      val ans: DnsAnswer? = upstream.resolve(domain, recType)
+      if ans != null {
+        foreach rec: DnsRecord in ans.records() {
+          cache.store(rec)
+        }
+        loaded++
+      }
+    }
+    return loaded
+  }
+
+  def resolverStats(): String =
+    "queries=#{queryCount} upstream=#{upstreamCount}"
+
+  def cacheStats(): CacheStats = cache.stats()
+
+  def dumpCache(): void { cache.dumpEntries() }
+}
+
+// ── Utility functions ──────────────────────────────────────────────────────
+
+def formatAnswer(label: String, ans: DnsAnswer?): void {
+  IO::print("[#{label}] ")
+  if ans == null {
+    IO::println("NXDOMAIN")
+  } else {
+    IO::print(ans.show())
+  }
+}
+
+// ── Main simulation ────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  val upstream = new UpstreamResolver()
+  val resolver = new CachingResolver(upstream)
+
+  IO::println("=== DNS Resolver Simulation ===\n")
+
+  // Prefetch warm-up
+  val hotDomains: List[String] = ["example.com", "github.com", "openai.com"]
+  val loaded: Int = resolver.prefetch(hotDomains, "A")
+  IO::println("Prefetched #{loaded} domain(s) into cache")
+
+  // Round 1: various record types
+  IO::println("\n--- Round 1: Initial Queries ---")
+  val queries: List[DnsQuestion] = [
+    new DnsQuestion("example.com",      "A"),
+    new DnsQuestion("example.com",      "MX"),
+    new DnsQuestion("github.com",       "A"),
+    new DnsQuestion("github.com",       "AAAA"),
+    new DnsQuestion("www.github.com",   "CNAME"),
+    new DnsQuestion("openai.com",       "A"),
+    new DnsQuestion("api.openai.com",   "A"),
+    new DnsQuestion("mail.example.com", "A"),
+    new DnsQuestion("ns1.example.com",  "A"),
+    new DnsQuestion("nosuchhost.io",    "A")
+  ]
+
+  foreach q: DnsQuestion in queries {
+    val ans: DnsAnswer? = resolver.resolve(q.domain(), q.recType())
+    formatAnswer("#{q.domain()} #{q.recType()}", ans)
+  }
+
+  // Round 2: repeat queries — these hit cache
+  IO::println("--- Round 2: Cache Hits ---")
+  foreach domain: String in hotDomains {
+    val ans: DnsAnswer? = resolver.resolve(domain, "A")
+    formatAnswer("#{domain} A", ans)
+  }
+
+  // Statistics
+  IO::println("\n--- Statistics ---")
+  IO::println(resolver.resolverStats())
+  IO::println(resolver.cacheStats().show())
+
+  // Cache dump
+  IO::println("\n--- Cache Contents ---")
+  resolver.dumpCache()
+
+  // RecordType enum exercise
+  IO::println("\n--- RecordType Parsing ---")
+  val typeNames: List[String] = ["A", "AAAA", "MX", "TXT", "SPF", "NAPTR"]
+  foreach tn: String in typeNames {
+    val rt: RecordType = RecordType::of(tn)
+    IO::println("  \"#{tn}\" -> #{rt.label()}")
+  }
+
+  // Extension methods on String
+  IO::println("\n--- Domain String Extensions ---")
+  val testDomains: List[String] = ["www.api.example.com.", "github.com", "com", ""]
+  foreach d: String in testDomains {
+    val parent: String? = d.parentDomain()
+    val parentStr: String = if parent == null { "(none)" } else { parent }
+    IO::println("  \"#{d}\": normalize=\"#{d.normalize()}\" parent=#{parentStr} tld=#{d.tld()}")
+  }
+
+  // Collection pipeline analytics over known domains
+  IO::println("\n--- Domain Analytics ---")
+  val allDomains: List[String] = [
+    "example.com", "mail.example.com", "ns1.example.com",
+    "openai.com", "api.openai.com", "github.com", "www.github.com"
+  ]
+
+  // Group by TLD using extension method
+  val byTld = allDomains.groupBy { d -> (d as String).tld() }
+  IO::println("By TLD:")
+  foreach (tld, doms) in byTld {
+    IO::println("  .#{tld}: #{(doms as List[Object]).size()} domain(s)")
+  }
+
+  // Filter subdomains (more than one dot)
+  val subdomains = allDomains.filter { d ->
+    (d as String).indexOf(".") != (d as String).lastIndexOf(".")
+  }
+  IO::println("Subdomains: #{subdomains}")
+
+  // Resolve all A records and summarize
+  IO::println("\nA record summary:")
+  val aResults = allDomains.map { d ->
+    val dom: String = d as String
+    val ans: DnsAnswer? = upstream.resolve(dom, "A")
+    if ans != null && !ans.isEmpty() {
+      val rec: DnsRecord = ans.records()[0]
+      "  #{dom} -> #{rec.value()} (ttl=#{rec.ttl()}s)"
+    } else {
+      "  #{dom} -> (no A record)"
+    }
+  }
+  foreach line: Object in aResults {
+    IO::println(line as String)
+  }
+
+  // Sort alphabetically
+  val sorted = allDomains.sortedBy { d -> d as String }
+  IO::println("\nAlphabetical order:")
+  foreach d: Object in sorted {
+    IO::println("  " + (d as String))
+  }
+
+  // Try/catch for an invalid operation
+  IO::println("\n--- Error Handling ---")
+  try {
+    val ans: DnsAnswer? = resolver.resolve("", "INVALID")
+    if ans == null { IO::println("  Empty domain: resolved to null (expected)") }
+  } catch e: Exception {
+    IO::println("  Caught exception: " + e.getMessage())
+  }
+
+  IO::println("\n=== Simulation complete ===")
+}

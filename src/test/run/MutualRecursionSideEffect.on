@@ -1,0 +1,38 @@
+// Regression test: @TailRecursive mutual recursion with side effects
+// that read accumulated (string) parameters before the tail call.
+// Bug: parameters inside AsInstanceOf (from string concat valueOf wrapping)
+// were not rewritten to loop variables, so acc always read the original
+// parameter value ("") instead of the current accumulated value.
+
+class MutRec {
+  @TailRecursive
+  def stateA(n: Int, acc: String, result: List[String]): List[String] {
+    if n <= 0 {
+      result.add("A:" + acc)
+      return result
+    }
+    result.add("step-A:" + acc)
+    return stateB(n - 1, acc + "x", result)
+  }
+
+  @TailRecursive
+  def stateB(n: Int, acc: String, result: List[String]): List[String] {
+    if n <= 0 {
+      result.add("B:" + acc)
+      return result
+    }
+    result.add("step-B:" + acc)
+    return stateA(n - 1, acc + "y", result)
+  }
+
+  public:
+  def run(n: Int): List[String] = stateA(n, "", [])
+}
+
+def main(): void {
+  val m: MutRec = new MutRec()
+  val result: List[String] = m.run(4)
+  foreach s: String in result {
+    IO::println(s)
+  }
+}

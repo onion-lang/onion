@@ -1,0 +1,394 @@
+// Geometry2D.on — 2D computational geometry library and demo
+//
+// Exercises: records with methods; extension Int/Double; ADT enum;
+// generics; collection pipelines (map/filter/fold/sortedBy/zip/find);
+// nullable returns; pattern matching; closures; string interpolation;
+// while / foreach; recursion; try/catch; inheritance.
+
+import {
+  java.lang.Math
+  java.lang.Double as JDouble
+}
+
+// ── Precision helpers ─────────────────────────────────────────────────────────
+
+val EPS: Double = 1.0e-9
+
+extension Double {
+  def approxEq(other: Double): Boolean = Math::abs(self - other) < EPS
+  def sign(): Int = if self > EPS { 1 } else if self < -EPS { -1 } else { 0 }
+  def sq(): Double = self * self
+  def clamp(lo: Double, hi: Double): Double =
+    if self < lo { lo } else if self > hi { hi } else { self }
+  def fmt2(): String {
+    val scaled = (self * 100.0 + 0.5) as Long
+    val intPart = scaled / 100L
+    val fracPart = (scaled % 100L) as Int
+    return if fracPart < 10 { "#{intPart}.0#{fracPart}" } else { "#{intPart}.#{fracPart}" }
+  }
+}
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+  def sign(): Int = if self > 0 { 1 } else if self < 0 { -1 } else { 0 }
+}
+
+// ── Core types ────────────────────────────────────────────────────────────────
+
+record Point(x: Double, y: Double) {
+public:
+  def plus(o: Point): Point  = new Point(x() + o.x(), y() + o.y())
+  def minus(o: Point): Point = new Point(x() - o.x(), y() - o.y())
+  def scale(k: Double): Point = new Point(x() * k, y() * k)
+  def dot(o: Point): Double   = x() * o.x() + y() * o.y()
+  def cross(o: Point): Double = x() * o.y() - y() * o.x()
+  def norm(): Double = Math::sqrt(x().sq() + y().sq())
+  def normalize(): Point {
+    val n = norm()
+    return if n < EPS { new Point(0.0, 0.0) } else { new Point(x() / n, y() / n) }
+  }
+  def distTo(o: Point): Double = minus(o).norm()
+  def toStr(): String = "(#{x().fmt2()}, #{y().fmt2()})"
+
+  static def origin(): Point = new Point(0.0, 0.0)
+}
+
+record Segment(a: Point, b: Point) {
+public:
+  def length(): Double = a().distTo(b())
+  def dir(): Point = b().minus(a()).normalize()
+  def midpoint(): Point = new Point((a().x() + b().x()) / 2.0, (a().y() + b().y()) / 2.0)
+  // Parameter t in [0,1] for point on segment
+  def pointAt(t: Double): Point {
+    val tc = t.clamp(0.0, 1.0)
+    return a().plus(b().minus(a()).scale(tc))
+  }
+  // Signed distance from point to the LINE through the segment (positive = left)
+  def signedDist(p: Point): Double {
+    val d = b().minus(a())
+    return if d.norm() < EPS { p.distTo(a()) }
+    else {
+      val n = d.norm()
+      (p.minus(a())).cross(d) / n
+    }
+  }
+  // Minimum distance from point to the SEGMENT
+  def distToPoint(p: Point): Double {
+    val ab = b().minus(a())
+    val ap = p.minus(a())
+    val len2 = ab.dot(ab)
+    if len2 < EPS { return p.distTo(a()) }
+    val t = ap.dot(ab) / len2
+    return pointAt(t).distTo(p)
+  }
+  def toStr(): String = "[#{a().toStr()} -> #{b().toStr()}]"
+}
+
+// ── Shape ADT ─────────────────────────────────────────────────────────────────
+
+enum Shape {
+  case Circle(center: Point, radius: Double)
+  case Rect(topLeft: Point, width: Double, height: Double)
+  case Triangle(a: Point, b: Point, c: Point)
+  case Polygon(vertices: List[Point])
+public:
+  def area(): Double = select this {
+    case c is Circle:   Math::PI * c.radius().sq()
+    case r is Rect:     r.width() * r.height()
+    case t is Triangle: {
+      val ab = t.b().minus(t.a())
+      val ac = t.c().minus(t.a())
+      Math::abs(ab.cross(ac)) / 2.0
+    }
+    case p is Polygon:  shoelaceArea(p.vertices())
+  }
+
+  def perimeter(): Double = select this {
+    case c is Circle:   2.0 * Math::PI * c.radius()
+    case r is Rect:     2.0 * (r.width() + r.height())
+    case t is Triangle: t.a().distTo(t.b()) + t.b().distTo(t.c()) + t.c().distTo(t.a())
+    case p is Polygon:  polygonPerimeter(p.vertices())
+  }
+
+  def containsPoint(p: Point): Boolean = select this {
+    case c is Circle:   p.distTo(c.center()) <= c.radius() + EPS
+    case r is Rect: {
+      val tl = r.topLeft()
+      p.x() >= tl.x() - EPS && p.x() <= tl.x() + r.width() + EPS &&
+      p.y() >= tl.y() - EPS && p.y() <= tl.y() + r.height() + EPS
+    }
+    case t is Triangle: triangleContains(t.a(), t.b(), t.c(), p)
+    case p2 is Polygon: polygonContains(p2.vertices(), p)
+  }
+
+  def name(): String = select this {
+    case _c is Circle:  "Circle"
+    case _r is Rect:    "Rect"
+    case _t is Triangle:"Triangle"
+    case _p is Polygon: "Polygon"
+  }
+
+  def toStr(): String = select this {
+    case c is Circle:   "Circle(center=#{c.center().toStr()}, r=#{c.radius().fmt2()})"
+    case r is Rect:     "Rect(#{r.topLeft().toStr()}, #{r.width().fmt2()}x#{r.height().fmt2()})"
+    case t is Triangle: "Triangle(#{t.a().toStr()}, #{t.b().toStr()}, #{t.c().toStr()})"
+    case p is Polygon:  "Polygon(#{p.vertices().size} vertices)"
+  }
+}
+
+// ── Geometry utilities (stand-alone functions) ────────────────────────────────
+
+def shoelaceArea(pts: List[Point]): Double {
+  val n = pts.size
+  if n < 3 { return 0.0 }
+  var sum: Double = 0.0
+  var i = 0
+  while i < n {
+    val j = (i + 1) % n
+    sum = sum + pts[i].x() * pts[j].y() - pts[j].x() * pts[i].y()
+    i++
+  }
+  return Math::abs(sum) / 2.0
+}
+
+def polygonPerimeter(pts: List[Point]): Double {
+  val n = pts.size
+  if n < 2 { return 0.0 }
+  var total: Double = 0.0
+  var i = 0
+  while i < n {
+    total = total + pts[i].distTo(pts[(i + 1) % n])
+    i++
+  }
+  return total
+}
+
+// Ray-casting algorithm for point-in-polygon
+def polygonContains(pts: List[Point], p: Point): Boolean {
+  val n = pts.size
+  var inside = false
+  var j = n - 1
+  var i = 0
+  while i < n {
+    val xi = pts[i].x(); val yi = pts[i].y()
+    val xj = pts[j].x(); val yj = pts[j].y()
+    if ((yi > p.y()) != (yj > p.y())) &&
+       (p.x() < (xj - xi) * (p.y() - yi) / (yj - yi) + xi) {
+      inside = !inside
+    }
+    j = i
+    i++
+  }
+  return inside
+}
+
+def triangleContains(a: Point, b: Point, c: Point, p: Point): Boolean {
+  val d1 = new Segment(a, b).signedDist(p).sign()
+  val d2 = new Segment(b, c).signedDist(p).sign()
+  val d3 = new Segment(c, a).signedDist(p).sign()
+  val hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0)
+  val hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0)
+  return !(hasNeg && hasPos)
+}
+
+// Segment-segment intersection: returns null if parallel or non-intersecting
+def segmentIntersection(s1: Segment, s2: Segment): Point? {
+  val r = s1.b().minus(s1.a())
+  val s = s2.b().minus(s2.a())
+  val rxs = r.cross(s)
+  if rxs.approxEq(0.0) { return null }  // parallel
+  val t = s2.a().minus(s1.a()).cross(s) / rxs
+  val u = s2.a().minus(s1.a()).cross(r) / rxs
+  return if t >= -EPS && t <= 1.0 + EPS && u >= -EPS && u <= 1.0 + EPS {
+    s1.a().plus(r.scale(t))
+  } else {
+    null
+  }
+}
+
+// Graham scan convex hull (returns CCW ordered hull)
+def convexHull(pts: List[Point]): List[Point] {
+  val n = pts.size
+  if n < 3 { return pts }
+
+  // Find bottom-most (then left-most) pivot
+  var pivot: Point = pts[0]
+  foreach p: Point in pts {
+    if p.y() < pivot.y() || (p.y().approxEq(pivot.y()) && p.x() < pivot.x()) {
+      pivot = p
+    }
+  }
+
+  // Sort by polar angle relative to pivot (ties broken by distance)
+  val pivotRef: Point = pivot
+  val sorted = pts
+    .filter { p -> !(p.x().approxEq(pivotRef.x()) && p.y().approxEq(pivotRef.y())) }
+    .sortedBy { p: Point ->
+      val dx = p.x() - pivotRef.x()
+      val dy = p.y() - pivotRef.y()
+      val angle = Math::atan2(dy, dx)
+      // encode as long: angle (scaled) first, distance second
+      (angle * 1e9) as Long
+    }
+
+  if sorted.isEmpty { return [pivot] }
+
+  // Build hull using stack simulation with a mutable List
+  val hull: List[Point] = [pivot, sorted[0]]
+  var i = 1
+  while i < sorted.size {
+    val p = sorted[i]
+    while hull.size >= 2 {
+      val top = hull[hull.size - 1]
+      val below = hull[hull.size - 2]
+      val cross = top.minus(below).cross(p.minus(below))
+      if cross <= EPS { hull.remove(hull.size - 1) }
+      else { break }
+    }
+    hull.add(p)
+    i++
+  }
+  return hull
+}
+
+// ── Reporters ─────────────────────────────────────────────────────────────────
+
+class ShapeReport {
+  val shapes: List[Shape]
+
+public:
+  def this(shapes: List[Shape]) {
+    this.shapes = shapes
+  }
+
+  def printSummary(): void {
+    IO::println("Shape Report (#{shapes.size} shapes)")
+    IO::println("─".repeat(50))
+    foreach s: Shape in shapes {
+      IO::println("  #{s.name()}: area=#{s.area().fmt2()}, perimeter=#{s.perimeter().fmt2()}")
+      IO::println("    #{s.toStr()}")
+    }
+    val totalArea = shapes.map { s: Shape -> s.area() }.fold(0.0) { acc: Double, a: Double -> acc + a }
+    IO::println("─".repeat(50))
+    IO::println("  Total area: #{totalArea.fmt2()}")
+  }
+
+  def largestByArea(): Shape? {
+    if shapes.isEmpty { return null }
+    var best: Shape = shapes[0]
+    foreach s: Shape in shapes {
+      if s.area() > best.area() { best = s }
+    }
+    return best
+  }
+
+  def findContaining(p: Point): List[Shape] =
+    shapes.filter { s: Shape -> s.containsPoint(p) }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def sep(title: String): void {
+  IO::println("")
+  IO::println("── #{title} ──")
+}
+
+// 1. Basic point and vector arithmetic
+sep("Point & Vector Arithmetic")
+val o = Point::origin()
+val a = new Point(3.0, 4.0)
+val b = new Point(1.0, 2.0)
+IO::println("a = #{a.toStr()}")
+IO::println("b = #{b.toStr()}")
+IO::println("a + b = #{a.plus(b).toStr()}")
+IO::println("a - b = #{a.minus(b).toStr()}")
+IO::println("|a| = #{a.norm().fmt2()}")
+IO::println("a · b = #{a.dot(b).fmt2()}")
+IO::println("a × b = #{a.cross(b).fmt2()}")
+IO::println("dist(a, b) = #{a.distTo(b).fmt2()}")
+
+// 2. Segment operations
+sep("Segment Operations")
+val seg = new Segment(new Point(0.0, 0.0), new Point(4.0, 0.0))
+IO::println("seg = #{seg.toStr()}")
+IO::println("length = #{seg.length().fmt2()}")
+IO::println("midpoint = #{seg.midpoint().toStr()}")
+IO::println("point at t=0.25: #{seg.pointAt(0.25).toStr()}")
+val q = new Point(2.0, 3.0)
+IO::println("dist(seg, #{q.toStr()}) = #{seg.distToPoint(q).fmt2()}")
+
+// 3. Shapes: area and perimeter
+sep("Shape Properties")
+val circle = new Circle(new Point(0.0, 0.0), 5.0)
+val rect   = new Rect(new Point(0.0, 0.0), 4.0, 3.0)
+val tri    = new Triangle(
+  new Point(0.0, 0.0),
+  new Point(6.0, 0.0),
+  new Point(3.0, 4.0)
+)
+val hexPts: List[Point] = [0, 1, 2, 3, 4, 5].map { i: Int ->
+  val angle = Math::PI * i as Double / 3.0
+  new Point(Math::cos(angle) * 2.0, Math::sin(angle) * 2.0)
+}
+val hex = new Polygon(hexPts)
+
+val report = new ShapeReport([circle, rect, tri, hex])
+report.printSummary()
+
+// 4. Point containment
+sep("Point-in-Shape Tests")
+val center = new Point(0.0, 0.0)
+val edge   = new Point(5.0, 0.0)
+val outside = new Point(6.0, 0.0)
+foreach shape: Shape in [circle, rect, tri, hex] {
+  IO::println("  #{shape.name()} contains #{center.toStr()}? #{shape.containsPoint(center)}")
+  IO::println("  #{shape.name()} contains #{outside.toStr()}? #{shape.containsPoint(outside)}")
+}
+
+// 5. Segment intersection
+sep("Segment Intersection")
+val s1 = new Segment(new Point(0.0, 0.0), new Point(4.0, 4.0))
+val s2 = new Segment(new Point(0.0, 4.0), new Point(4.0, 0.0))
+val s3 = new Segment(new Point(5.0, 5.0), new Point(6.0, 6.0))
+val ix12: Point? = segmentIntersection(s1, s2)
+val ix13: Point? = segmentIntersection(s1, s3)
+IO::println("#{s1.toStr()} ∩ #{s2.toStr()} = #{if ix12 != null { ix12.toStr() } else { "none" }}")
+IO::println("#{s1.toStr()} ∩ #{s3.toStr()} = #{if ix13 != null { ix13.toStr() } else { "none" }}")
+
+// 6. Convex hull
+sep("Convex Hull (Graham Scan)")
+val cloud: List[Point] = [
+  new Point(1.0, 1.0), new Point(3.0, 2.0), new Point(2.0, 4.0),
+  new Point(0.0, 3.0), new Point(2.0, 2.0), new Point(4.0, 1.0),
+  new Point(1.0, 0.0), new Point(4.0, 4.0)
+]
+val hull = convexHull(cloud)
+IO::println("Input: #{cloud.size} points")
+IO::println("Hull vertices (#{hull.size}):")
+foreach p: Point in hull {
+  IO::println("  #{p.toStr()}")
+}
+
+// 7. Pipeline and statistics
+sep("Pipeline Statistics")
+val shapes2: List[Shape] = [circle, rect, tri, hex]
+val areas = shapes2.map { s: Shape -> s.area() }
+val maxArea = areas.fold(0.0) { acc: Double, a: Double -> if a > acc { a } else { acc } }
+val sumArea = areas.fold(0.0) { acc: Double, a: Double -> acc + a }
+val avgArea = sumArea / shapes2.size as Double
+IO::println("Max area: #{maxArea.fmt2()}")
+IO::println("Avg area: #{avgArea.fmt2()}")
+
+val largestOpt: Shape? = report.largestByArea()
+if largestOpt != null {
+  IO::println("Largest shape: #{largestOpt.name()} (#{largestOpt.area().fmt2()})")
+}
+
+val containing = report.findContaining(new Point(1.0, 1.0))
+val containingNames = containing.map { s: Shape -> s.name() }.fold("") { acc: String, n: String ->
+  if acc == "" { n } else { acc + ", " + n }
+}
+IO::println("Shapes containing (1,1): #{containingNames}")
+
+IO::println("")
+IO::println("Done.")

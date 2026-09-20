@@ -1,0 +1,436 @@
+// EventBus.on — A generic typed event bus demonstrating: ADT case-enums with
+// methods, extension methods on Int and String, closures as handlers, collection
+// pipelines (filter/map/fold/groupBy/sortedBy/partition/distinct/find/zip/take),
+// interface conformance, select/is pattern matching, nullable types,
+// string interpolation, while/foreach loops, try/catch, recursion.
+
+// ─── Domain: User event ADT ───────────────────────────────────────────────────
+
+enum UserEvent {
+  case Login(userId: Int, deviceType: String)
+  case Logout(userId: Int)
+  case Purchase(userId: Int, amount: Int, productId: String)
+  case Click(userId: Int, elementId: String)
+  case AppError(userId: Int, code: Int, message: String)
+public:
+  def userId(): Int = select this {
+    case e is Login:    e.userId()
+    case e is Logout:   e.userId()
+    case e is Purchase: e.userId()
+    case e is Click:    e.userId()
+    case e is AppError: e.userId()
+  }
+  def label(): String = select this {
+    case e is Login:    "LOGIN"
+    case e is Logout:   "LOGOUT"
+    case e is Purchase: "PURCHASE"
+    case e is Click:    "CLICK"
+    case e is AppError: "ERROR"
+  }
+  def isMonetary(): Boolean = select this {
+    case p is Purchase: true
+    else: false
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def zeroPad(width: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length < width { r = "0" + r }
+    return r
+  }
+
+  def cents(): String {
+    val d: Int = self / 100
+    val c: Int = self % 100
+    return "$" + d + "." + c.zeroPad(2)
+  }
+
+  def absInt(): Int = if self < 0 { 0 - self } else { self }
+
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+extension String {
+  def truncate(max: Int): String {
+    if self.length <= max { return self }
+    return self.substring(0, max) + "..."
+  }
+
+  def padRight(width: Int): String {
+    var r: String = self
+    while r.length < width { r = r + " " }
+    return r
+  }
+
+  def repeatStr(n: Int): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < n { r = r + self; i = i + 1 }
+    return r
+  }
+}
+
+// ─── Handler interface ────────────────────────────────────────────────────────
+
+interface EventHandler {
+  def matches(event: UserEvent): Boolean
+  def handle(event: UserEvent): void
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Subscription(id: Int, topic: String, handler: EventHandler, priority: Int)
+
+record EventLogEntry(seq: Int, label: String, userId: Int, detail: String)
+
+// ─── Event Bus ────────────────────────────────────────────────────────────────
+
+class EventBus {
+  var subscriptions: List[Subscription]
+  var nextId: Int
+  var log: List[EventLogEntry]
+  var seqNum: Int
+  var processed: Int
+  var dropped: Int
+
+public:
+  def this {
+    subscriptions = []
+    nextId = 1
+    log = []
+    seqNum = 0
+    processed = 0
+    dropped = 0
+  }
+
+  def subscribe(topic: String, handler: EventHandler, priority: Int): Int {
+    val id: Int = nextId
+    nextId = nextId + 1
+    subscriptions.add(new Subscription(id, topic, handler, priority))
+    return id
+  }
+
+  def unsubscribe(id: Int): Boolean {
+    val before: Int = subscriptions.size
+    subscriptions = subscriptions.filter { s ->
+      (s as Subscription).id() != id
+    }
+    return subscriptions.size < before
+  }
+
+  def publish(event: UserEvent): Int {
+    seqNum = seqNum + 1
+    val detail: String = select event {
+      case p is Purchase: "#{p.productId()} #{p.amount().cents()}"
+      case l is Login:    l.deviceType()
+      case e is AppError: "E#{e.code()}"
+      else: ""
+    }
+    log.add(new EventLogEntry(seqNum, event.label(), event.userId(), detail))
+
+    val sorted = subscriptions.sortedBy { s ->
+      0 - (s as Subscription).priority()
+    }
+    var count: Int = 0
+    foreach s: Object in sorted {
+      val sub = s as Subscription
+      if sub.handler().matches(event) {
+        try {
+          sub.handler().handle(event)
+          count = count + 1
+        } catch ex: Exception {
+          IO::println("[BUS] handler error in '#{sub.topic()}': #{ex.getMessage()}")
+        }
+      }
+    }
+    if count > 0 { processed = processed + 1 } else { dropped = dropped + 1 }
+    return count
+  }
+
+  def stats(): String =
+    "subs=#{subscriptions.size} processed=#{processed} dropped=#{dropped}"
+
+  def recentLog(n: Int): List[EventLogEntry] =
+    log.sortedBy { e -> 0 - (e as EventLogEntry).seq() }.take(n)
+}
+
+// ─── Concrete handlers ────────────────────────────────────────────────────────
+
+class AuthHandler conforms EventHandler {
+  var loginCount: Int
+  var logoutCount: Int
+
+public:
+  def this { loginCount = 0; logoutCount = 0 }
+
+  def matches(event: UserEvent): Boolean = select event {
+    case e is Login:  true
+    case e is Logout: true
+    else: false
+  }
+
+  def handle(event: UserEvent): void {
+    select event {
+      case l is Login: {
+        loginCount = loginCount + 1
+        IO::println("  [AUTH] user #{l.userId()} logged in via #{l.deviceType()}")
+      }
+      case l is Logout: {
+        logoutCount = logoutCount + 1
+        IO::println("  [AUTH] user #{l.userId()} logged out")
+      }
+      else: {}
+    }
+  }
+
+  def loginCount(): Int = loginCount
+  def logoutCount(): Int = logoutCount
+}
+
+class CommerceHandler conforms EventHandler {
+  var revenue: Int
+  var txCount: Int
+
+public:
+  def this { revenue = 0; txCount = 0 }
+
+  def matches(event: UserEvent): Boolean = select event {
+    case p is Purchase: p.amount() > 0
+    else: false
+  }
+
+  def handle(event: UserEvent): void {
+    select event {
+      case p is Purchase: {
+        revenue = revenue + p.amount()
+        txCount = txCount + 1
+        IO::println("  [COMMERCE] user #{p.userId()} bought #{p.productId()} for #{p.amount().cents()}")
+      }
+      else: {}
+    }
+  }
+
+  def revenue(): Int = revenue
+  def txCount(): Int = txCount
+  def avgOrderValue(): Int = if txCount == 0 { 0 } else { revenue / txCount }
+}
+
+class ErrorMonitor conforms EventHandler {
+  var errorCount: Int
+  var lastCode: Int
+
+public:
+  def this { errorCount = 0; lastCode = 0 }
+
+  def matches(event: UserEvent): Boolean = select event {
+    case e is AppError: true
+    else: false
+  }
+
+  def handle(event: UserEvent): void {
+    select event {
+      case e is AppError: {
+        errorCount = errorCount + 1
+        lastCode = e.code()
+        IO::println("  [MONITOR] user #{e.userId()} error #{e.code()}: #{e.message().truncate(40)}")
+      }
+      else: {}
+    }
+  }
+
+  def errorCount(): Int = errorCount
+  def lastCode(): Int = lastCode
+}
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+def analyzeEvents(events: List[UserEvent]): void {
+  val sep: String = "-".repeatStr(48)
+  IO::println("\n" + sep)
+  IO::println("Event Analytics Report")
+  IO::println(sep)
+
+  // 1. Count by event type with groupBy
+  val byLabel = events.groupBy { e -> (e as UserEvent).label() }
+  IO::println("By type:")
+  foreach (k, v) in byLabel {
+    val cnt: Int = (v as List[UserEvent]).size
+    val bar: String = "#".repeatStr(cnt.clamp(0, 20))
+    IO::println("  #{(k as String).padRight(10)} #{cnt.zeroPad(3)}  #{bar}")
+  }
+
+  // 2. Unique active users via distinct + sortedBy
+  val activeUsers = events
+    .map { e -> (e as UserEvent).userId() }
+    .distinct()
+    .sortedBy { uid -> uid as Int }
+  IO::println("\nActive users (#{activeUsers.size}): #{activeUsers}")
+
+  // 3. Revenue from purchases via filter+fold
+  val totalRev = events
+    .filter { e -> (e as UserEvent).isMonetary() }
+    .fold(0) { acc, e ->
+      val ev = e as UserEvent
+      select ev {
+        case p is Purchase: (acc as Int) + p.amount()
+        else: acc as Int
+      }
+    }
+  IO::println("Total revenue: #{(totalRev as Int).cents()}")
+
+  // 4. Partition into monetary vs non-monetary
+  val parts = events.partition { e -> (e as UserEvent).isMonetary() }
+  val monetary    = parts.get(0) as List[UserEvent]
+  val nonMonetary = parts.get(1) as List[UserEvent]
+  IO::println("Monetary events: #{monetary.size}, Others: #{nonMonetary.size}")
+
+  // 5. Most active user via map iteration
+  val actMap: Map[Int, Int] = [:]
+  foreach e: UserEvent in events {
+    val uid: Int = e.userId()
+    val cur = actMap[uid]
+    if cur == null { actMap[uid] = 1 } else { actMap[uid] = (cur as Int) + 1 }
+  }
+  var maxUid: Int = 0
+  var maxCount: Int = 0
+  foreach (k, v) in actMap {
+    if (v as Int) > maxCount { maxCount = v as Int; maxUid = k as Int }
+  }
+  IO::println("Most active user: #{maxUid} (#{maxCount} events)")
+
+  // 6. Find first high-value purchase (> $100.00)
+  val highValueEvent = events.find { e ->
+    select (e as UserEvent) {
+      case p is Purchase: p.amount() > 10000
+      else: false
+    }
+  }
+  if highValueEvent != null {
+    val ev = highValueEvent as UserEvent
+    select ev {
+      case p is Purchase: IO::println("First big purchase: #{p.productId()} #{p.amount().cents()}")
+      else: {}
+    }
+  } else {
+    IO::println("No high-value purchase found")
+  }
+
+  // 7. Zip events with 1-based sequence numbers then take first 5
+  val seqNums: List[Int] = []
+  var i: Int = 1
+  foreach e: UserEvent in events {
+    seqNums.add(i)
+    i = i + 1
+  }
+  val paired = events.zip(seqNums)
+  IO::println("\nEvent timeline (first 5):")
+  foreach pair: Object in paired.take(5) {
+    val p = pair as List[Object]
+    val ev = p[0] as UserEvent
+    val n = p[1] as Int
+    IO::println("  #{n.zeroPad(2)}. [#{ev.label().padRight(9)}] user #{ev.userId()}")
+  }
+}
+
+// ─── Recursive revenue sum ────────────────────────────────────────────────────
+
+def sumRevenue(events: List[UserEvent], idx: Int): Int {
+  if idx >= events.size { return 0 }
+  val e = events.get(idx) as UserEvent
+  val here: Int = select e {
+    case p is Purchase: p.amount()
+    else: 0
+  }
+  return here + sumRevenue(events, idx + 1)
+}
+
+// ─── Main simulation ──────────────────────────────────────────────────────────
+
+def main(): void {
+  val bus = new EventBus
+  val auth = new AuthHandler
+  val commerce = new CommerceHandler
+  val monitor = new ErrorMonitor
+
+  bus.subscribe("auth",     auth,     10)
+  bus.subscribe("commerce", commerce, 20)   // higher priority → dispatched first
+  bus.subscribe("ops",      monitor,  5)
+
+  val events: List[UserEvent] = [
+    new Login(101, "mobile"),
+    new Login(102, "desktop"),
+    new Purchase(101, 2999, "BOOK-001"),
+    new Click(101, "btn-buy"),
+    new Purchase(102, 149999, "LAPTOP-XL"),
+    new AppError(103, 404, "Resource not found"),
+    new Login(103, "tablet"),
+    new Purchase(103, 499, "STICKER-PACK"),
+    new Click(102, "nav-home"),
+    new AppError(101, 500, "Internal server error: db timeout in connection pool"),
+    new Logout(101),
+    new Logout(102)
+  ]
+
+  IO::println("=== Event Stream ===")
+  foreach event: UserEvent in events {
+    IO::println("• [#{event.label().padRight(9)}] user #{event.userId()}")
+    bus.publish(event)
+  }
+
+  IO::println("\n=== Handler Reports ===")
+  IO::println("Auth     — logins: #{auth.loginCount()}, logouts: #{auth.logoutCount()}")
+  IO::println("Commerce — txns: #{commerce.txCount()}, revenue: #{commerce.revenue().cents()}, avg: #{commerce.avgOrderValue().cents()}")
+  IO::println("Errors   — count: #{monitor.errorCount()}, last code: #{monitor.lastCode()}")
+  IO::println("Bus      — #{bus.stats()}")
+
+  val recRev = sumRevenue(events, 0)
+  IO::println("Revenue (recursive): #{recRev.cents()}")
+
+  IO::println("\nRecent log (last 4):")
+  foreach entry: EventLogEntry in bus.recentLog(4) {
+    IO::println("  ##{entry.seq().zeroPad(3)} [#{entry.label().padRight(9)}] u#{entry.userId()} #{entry.detail()}")
+  }
+
+  analyzeEvents(events)
+
+  // Test unsubscribe and new event
+  bus.unsubscribe(1)
+  IO::println("\n--- After unsubscribing auth handler ---")
+  bus.publish(new Login(104, "kiosk"))
+  IO::println("Bus stats: #{bus.stats()}")
+
+  // Range-based cumulative counter (foreach over range)
+  IO::println("\nCheckpoints:")
+  var cumulative: Int = 0
+  foreach n: Int in 1..events.size {
+    cumulative = cumulative + 1
+    if n % 4 == 0 {
+      IO::println("  After #{n} events: #{cumulative} total")
+    }
+  }
+
+  // Closure stored in val: 10% discount applied to all purchases
+  val withDiscount = (price: Int) -> price - price / 10
+  IO::println("\nDiscounted prices:")
+  foreach event: UserEvent in events {
+    select event {
+      case p is Purchase:
+        IO::println("  #{p.productId()} #{p.amount().cents()} -> #{withDiscount(p.amount()).cents()}")
+      else: {}
+    }
+  }
+
+  // While countdown
+  IO::println("\nShutdown countdown:")
+  var countdown: Int = 3
+  while countdown > 0 {
+    IO::println("  #{countdown}...")
+    countdown = countdown - 1
+  }
+  IO::println("  EventBus stopped.")
+}

@@ -109,6 +109,92 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case _ => target
     }
 
+  /**
+   * For safe-call extension lookup: the target may be NullableType-wrapped
+   * (String?) rather than the inner type (String). Wrap it in AsInstanceOf to
+   * give it the non-nullable inner type so findMethod can match the static
+   * method's receiver parameter.
+   */
+  private def nonNullableReceiverForLookup(target: Term, extMethod: ExtensionMethodDefinition): Term =
+    target.`type` match {
+      case nt: NullableType =>
+        // Reference nullable (e.g. String?) — strip the wrapper
+        nt.innerType match {
+          case objType: ObjectType => new AsInstanceOf(target, objType)
+          case _ => target
+        }
+      case _ =>
+        // Already non-nullable (primitives arrive as the boxed class type after
+        // normalizeSafeMethodCallTarget wraps them in AsInstanceOf)
+        target
+    }
+
+  /**
+   * Build a SafeStaticExtensionCall for a ?. call that resolved to an extension method.
+   * `target` is the nullable (boxed) receiver; it is stored in the node for the
+   * null-check that the codegen emits. `params` are the non-receiver user arguments.
+   */
+  private def buildSafeExtensionCall(
+    node: AST.SafeMethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type,
+    extMethod: ExtensionMethodDefinition
+  ): Option[Term] = {
+    val containerClass = extMethod.containerClass
+    val receiverBasicType: Option[BasicType] = extMethod.receiverType match {
+      case bt: BasicType => Some(bt)
+      case _ => None
+    }
+    // Build the lookup receiver with non-nullable inner type so findMethod matches
+    val lookupReceiver = staticReceiver(nonNullableReceiverForLookup(target, extMethod), extMethod)
+    val staticArgs = Array(lookupReceiver) ++ params
+
+    containerClass.findMethod(node.name, staticArgs) match {
+      case Array() =>
+        calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+        None
+      case Array(staticMethod) =>
+        val classSubst = TypeSubstitution.classSubstitution(containerClass)
+        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+          // finalParams(0) is the processed receiver; drop it — codegen handles
+          // the receiver from node.target (null-check + optional unbox)
+          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
+        )
+      case multiple =>
+        calls.reportAmbiguousMethods(node, node.name, multiple)
+        None
+    }
+  }
+
+  /**
+   * Try to resolve `node` (a safe ?. call) against the extension registry.
+   * Returns None and reports an error when not found.
+   */
+  def tryExtensionMethodCallForSafeNav(
+    node: AST.SafeMethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.NoMatch =>
+        calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+        None
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousSignature(
+          node,
+          first.containerClass, node.name, first.arguments,
+          second.containerClass, node.name, second.arguments
+        )
+        None
+      case CandidateSelection.Selected(extMethod) =>
+        buildSafeExtensionCall(node, target, targetType, params, expected, extMethod)
+    }
+
   private def buildExtensionCall(
     node: AST.MethodCall,
     target: Term,

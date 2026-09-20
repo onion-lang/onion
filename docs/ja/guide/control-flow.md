@@ -111,9 +111,30 @@ try {
 
 ## Do記法（モナド合成）
 
+`Option`・`Result`・`Future` のようなモナド型に対する操作を連鎖させるための構文です。内部的には `flatMap`/`map` 呼び出しに展開されます。
+
 ```onion
 do[Option] { a <- getA(); b <- getB(); ret a + b }
 do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }   // 内包表記
+```
+
+### エラーの早期終了（ショートサーキット）
+
+途中のどれか一つが失敗すると、do ブロック全体がそこで打ち切られ、以降のバインドは実行されません：
+
+```onion
+val result: Option[Int] = do[Option] {
+  x <- Option::some(10)    // 成功
+  y <- Option::none()      // ここで失敗 - 打ち切られる
+  z <- Option::some(30)    // 実行されない
+  ret x + y + z
+}
+println(result.isEmpty())
+```
+
+Output:
+```
+true
 ```
 
 ## 次のステップ

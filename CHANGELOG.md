@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/quality-bar.md` / `docs/ja/quality-bar.md` forced every `run/` sample-adding PR to edit the same two lines, guaranteeing merge conflicts between concurrent PRs** — `QualityBarSpec` required the sample-health and large-program rows to exactly equal the current `run/*.on` counts, and the large-program row additionally carried a full alphabetized name list that each PR had to re-splice its own sample into. Since any two PRs adding different samples both touched those exact lines, they conflicted whenever `develop` moved between them, and nobody wanted to hand-resolve a 5000+ character comma list — 29 such PRs piled up unmerged over two days as a result (#1370). `QualityBarSpec` now checks rows 2 and 3 against a tolerance band instead of exact equality (the same approach already used for row 1's test count), and the large-program row's per-sample name enumeration has been dropped from both docs. A sample addition no longer needs to touch `docs/quality-bar.md` at all; the recorded figures only need an occasional top-up once drift approaches the band.
+
 ### Added
 
 - **`run/PackageSolver.on`** — a 237-line npm-style semantic version constraint resolver sample (records, sealed enum ADTs, generics, collection pipelines, select/pattern matching, nullable types, recursion, string interpolation), added to the `run/` corpus.

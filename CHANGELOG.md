@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-09-20
+
 ### Added
 
 - **`run/MiniRouter.on`** — a 358-line tiny HTTP routing engine sample (path segments, wildcards, named parameters, method dispatch), added to the `run/` corpus.

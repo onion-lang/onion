@@ -4466,7 +4466,7 @@
 <th>#</th>
 <th>次元</th>
 <th>測定方法</th>
-<th>現在値（2026-09-14）</th>
+<th>現在値(概算; 下記の注記を参照)</th>
 <th>合格閾値</th>
 </tr>
 </thead>
@@ -4481,15 +4481,15 @@
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
-<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>(どちらも <code>run/*.on</code> 全件をコンパイル)</td>
-<td>310 / 310 compile</td>
+<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
+<td>317 / 317 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>243（AccessLogAnalyzer、AirlineReservation、AnagramSolver、AntColony、AstronomyCatalog、AuctionHouse、Automaton、BankLedger、BankSystem、BasketballStats、BattleshipSim、BinaryHeap、Blackjack、Blockchain、BoardGameAnalytics、BookClub、BowlingGame、BrainFuck、BrokenLogDemo、BudgetTracker、BugTracker、BuildSim、CacheSimulator、CalendarManager、CarRentalFleet、CellularAutomata、CensusAnalyzer、ChemCalculator、Chess、CinemaBooking、CipherSuite、CipherWorkbench、CircuitBreakerSim、CircuitSimulator、CityPlanner、ClinicRecords、CodeContest、ColorPalette、CommitAnalyzer、ConferenceSchedule、ConnectFour、ContactBook、ConwayLife、CourseRegistration、CpuScheduler、CronScheduler、CryptArithmetic、CryptoPortfolio、CustomerLoyalty、DNAAnalysis、DependencyResolver、DiscreteEventSim、DnaAnalyzer、DoctorScheduler、DpShowcase、DungeonCrawler、ElevatorDispatcher、EmployeeManager、EpidemiologySim、EspressoShop、EventTicketing、ExpenseAnalyzer、ExpenseAuditor、ExpenseTracker、ExprEval、FamilyTree、FileSystemSim、FinanceTracker、FitnessTracker、FlashcardDeck、FleetManager、FlightDelayReport、ForthMachine、FullTextSearch、GameOfLife、GameStore、GenericLeaderboard、GeneticAlgorithm、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphPathfinder、GraphSearch、HMTypeInference、HRSystem、HabitTracker、HospitalWard、HotelReservation、HuffmanCode、HuffmanCoding、InsuranceClaims、IntervalCalendar、Inventory、InventoryManager、InventoryReport、JobScheduler、Kalah、KaraokeNight、KingdomSim、KnapsackAdvisor、LSystem、LambdaCalc、LibraryCatalog、LibrarySystem、LispInterp、LogAnalytics、LogCorrelator、LogDispatch、Mandelbrot、MarkdownConverter、MarkovText、Mastermind、MathParser、MatrixCalc、MaxFlow、MazeSolver、Measurements、Minesweeper、MinesweeperSim、MiniGit、MiniRpg、MiniSQL、MiniTypeChecker、MiniVcs、MorseCode、MortgageCalc、MovieRecommender、MuseumCollection、MusicEngine、MusicFestival、MusicLibrary、MusicTheory、NationalParkTracker、NetCidr、NetFlowAnalyzer、NetworkMonitor、NeuralNet、NumberFormats、NumberTheory、NumberTheoryLab、NutritionTracker、ObservatoryLog、OrderReport、Othello、PackageDelivery、PackageInstaller、PacketInspector、ParallelCrawler、ParkingGarage、ParticlePhysicsSim、PasswordAnalyzer、PaymentProcessor、PayrollReport、PerfReview、PersonalFinance、PetShelter、PetriNet、PharmacySystem、PhysicsSim、PilotLogbook、PlantCare、PlaylistManager、PokerHands、PolyCalc、PolynomialAlgebra、PowerGrid、PrintShop、ProbDataStructures、ProjectBuildAnalyzer、ProjectTracker、PropCheck、PropLogic、PropertyManager、QueryEngine、RankedChoice、RateLimiter、RationalCalc、RecipeBook、RecipeManager、RecipeVault、RegexEngine、RestaurantOrders、RideSharePool、RuleEngine、SatSolver、ScaleAnalyzer、SchemaValidator、SemanticVersion、ShapeProcessor、ShiftPlanner、ShipmentTracker、ShoppingCart、SmartHome、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpaceStationLog、SpellCheck、SpreadsheetCalc、SpreadsheetEngine、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、SymbolicMath、TaskPlanner、TaxCalculator、TemplateEngine、TermRewriter、TerrainGenerator、TextAnalytics、TextAnalyzer、TextDiff、TextTransformPipeline、TicTacToe、TimeSeries、TimesheetTracker、TodoManager、TollRoadBilling、ToolDemo、TournamentStandings、TournamentTracker、TradeMatchingEngine、TrainDispatch、TransitPlanner、Trie、TuringMachine、TuringMachineLab、UnionFind、VendingMachine、VirtualMachine、VirtualShell、VotingMethods、WeatherReport、WordLadder、WordSearch、WorkoutLog）</td>
+<td>250(全件のアルファベット順一覧は <code>run/</code> を参照——ここでは列挙しない。下記の注記を参照)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4522,6 +4522,14 @@
 </tr>
 </tbody>
 </table>
+<p><strong>行2・行3は完全一致ではなく許容幅で検査されます</strong>(issue #1370)。以前は <code>run/</code> に
+サンプルを追加する PR は必ずこの2行の正確な件数を書き換え、さらに行3のアルファベット順一覧に
+自分のサンプル名を挿入する必要がありました——どの PR も同じ2行を触るため、1時間以内に重なった
+PR 同士は必ず競合し、それに気づかれないまま29件も未マージで積み上がる原因になりました。
+<code>QualityBarSpec</code> は、記録値が実態を上回っている(虚偽の記載)か、実態から一定幅以上遅れている
+場合にのみ失敗するようになりました——行1のテスト件数がすでに採用していたのと同じ考え方です。
+サンプルを追加するだけならこのファイルに触れる必要はなく、乖離が許容幅に近づいたときにだけ
+2つの数値をまとめて更新すれば十分です。</p>
 <p><strong><code>SBT_OPTS</code> にプロジェクト既定を下回るヒープ値を設定しないでください。</strong> <code>.jvmopts</code> は既定を
 <code>-Xmx10g</code> に固定しています（<code>run/</code> サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の
 0.10.18 を参照）。これを下回るヒープを <code>SBT_OPTS</code> に設定すると——以前の悪い例だった

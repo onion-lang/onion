@@ -4357,7 +4357,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <th>#</th>
 <th>Dimension</th>
 <th>How to measure</th>
-<th>Current (2026-09-14)</th>
+<th>Current (approx.; see note below)</th>
 <th>Pass threshold</th>
 </tr>
 </thead>
@@ -4373,14 +4373,14 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>2</td>
 <td>Sample health</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
-<td>310 / 310 compile</td>
+<td>317 / 317 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>243 (AccessLogAnalyzer,AirlineReservation,AnagramSolver,AntColony,AstronomyCatalog,AuctionHouse,Automaton,BankLedger,BankSystem,BasketballStats,BattleshipSim,BinaryHeap,Blackjack,Blockchain,BoardGameAnalytics,BookClub,BowlingGame,BrainFuck,BrokenLogDemo,BudgetTracker,BugTracker,BuildSim,CacheSimulator,CalendarManager,CarRentalFleet,CellularAutomata,CensusAnalyzer,ChemCalculator,Chess,CinemaBooking,CipherSuite,CipherWorkbench,CircuitBreakerSim,CircuitSimulator,CityPlanner,ClinicRecords,CodeContest,ColorPalette,CommitAnalyzer,ConferenceSchedule,ConnectFour,ContactBook,ConwayLife,CourseRegistration,CpuScheduler,CronScheduler,CryptArithmetic,CryptoPortfolio,CustomerLoyalty,DNAAnalysis,DependencyResolver,DiscreteEventSim,DnaAnalyzer,DoctorScheduler,DpShowcase,DungeonCrawler,ElevatorDispatcher,EmployeeManager,EpidemiologySim,EspressoShop,EventTicketing,ExpenseAnalyzer,ExpenseAuditor,ExpenseTracker,ExprEval,FamilyTree,FileSystemSim,FinanceTracker,FitnessTracker,FlashcardDeck,FleetManager,FlightDelayReport,ForthMachine,FullTextSearch,GameOfLife,GameStore,GenericLeaderboard,GeneticAlgorithm,GeneticSequencer,GradeBook,GradeReport,GraphAlgorithms,GraphPathfinder,GraphSearch,HMTypeInference,HRSystem,HabitTracker,HospitalWard,HotelReservation,HuffmanCode,HuffmanCoding,InsuranceClaims,IntervalCalendar,Inventory,InventoryManager,InventoryReport,JobScheduler,Kalah,KaraokeNight,KingdomSim,KnapsackAdvisor,LSystem,LambdaCalc,LibraryCatalog,LibrarySystem,LispInterp,LogAnalytics,LogCorrelator,LogDispatch,Mandelbrot,MarkdownConverter,MarkovText,Mastermind,MathParser,MatrixCalc,MaxFlow,MazeSolver,Measurements,Minesweeper,MinesweeperSim,MiniGit,MiniRpg,MiniSQL,MiniTypeChecker,MiniVcs,MorseCode,MortgageCalc,MovieRecommender,MuseumCollection,MusicEngine,MusicFestival,MusicLibrary,MusicTheory,NationalParkTracker,NetCidr,NetFlowAnalyzer,NetworkMonitor,NeuralNet,NumberFormats,NumberTheory,NumberTheoryLab,NutritionTracker,ObservatoryLog,OrderReport,Othello,PackageDelivery,PackageInstaller,PacketInspector,ParallelCrawler,ParkingGarage,ParticlePhysicsSim,PasswordAnalyzer,PaymentProcessor,PayrollReport,PerfReview,PersonalFinance,PetShelter,PetriNet,PharmacySystem,PhysicsSim,PilotLogbook,PlantCare,PlaylistManager,PokerHands,PolyCalc,PolynomialAlgebra,PowerGrid,PrintShop,ProbDataStructures,ProjectBuildAnalyzer,ProjectTracker,PropCheck,PropLogic,PropertyManager,QueryEngine,RankedChoice,RateLimiter,RationalCalc,RecipeBook,RecipeManager,RecipeVault,RegexEngine,RestaurantOrders,RideSharePool,RuleEngine,SatSolver,ScaleAnalyzer,SchemaValidator,SemanticVersion,ShapeProcessor,ShiftPlanner,ShipmentTracker,ShoppingCart,SmartHome,SnippetLibrary,SocialNetwork,SortAlgorithms,SortingShowcase,SpaceMission,SpaceStationLog,SpellCheck,SpreadsheetCalc,SpreadsheetEngine,SprintPlanner,StatsApp,StockPortfolio,StudentGradeBook,Sudoku,SudokuSolver,SupplyChain,SymbolicMath,TaskPlanner,TaxCalculator,TemplateEngine,TermRewriter,TerrainGenerator,TextAnalytics,TextAnalyzer,TextDiff,TextTransformPipeline,TicTacToe,TimeSeries,TimesheetTracker,TodoManager,TollRoadBilling,ToolDemo,TournamentStandings,TournamentTracker,TradeMatchingEngine,TrainDispatch,TransitPlanner,Trie,TuringMachine,TuringMachineLab,UnionFind,VendingMachine,VirtualMachine,VirtualShell,VotingMethods,WeatherReport,WordLadder,WordSearch,WorkoutLog)</td>
+<td>250 (see <code>run/</code> for the full, alphabetized list — no longer enumerated here, see note below)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4413,6 +4413,15 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 </tr>
 </tbody>
 </table>
+<p><strong>Rows 2 and 3 are checked against a tolerance band, not exact equality</strong> (issue #1370).
+Every PR that adds a sample to <code>run/</code> used to have to bump the exact counts in both rows
+<em>and</em> insert its sample's name into row 3's alphabetized list — and because every such PR
+touched the same two lines, any two of them landed within an hour of each other conflicted,
+which is exactly what let 29 of them pile up unmerged before anyone noticed. <code>QualityBarSpec</code>
+now only fails when the recorded figure is either ahead of reality (an outright lie) or has
+drifted more than a fixed band behind it, the same philosophy row 1's test count already
+used. A sample addition no longer needs to touch this file at all; only a periodic top-up
+of the two numbers does, once drift approaches the band.</p>
 <p><strong>Do not set <code>SBT_OPTS</code> to a heap below the project default.</strong> <code>.jvmopts</code> pins the
 default to <code>-Xmx10g</code> (raised from 4g as the <code>run/</code> sample corpus grew — see
 CHANGELOG 0.10.18). Any <code>SBT_OPTS</code> heap lower than that — <code>-Xmx2g</code> was one

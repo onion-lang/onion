@@ -1241,11 +1241,27 @@ Assert::equals(expected, actual)
 Assert::notEquals(a, b)
 ```
 
+Each of these also has an overload taking a custom failure message as the last argument:
+
+```onion
+Assert::isTrue(x > 0, "x must be positive")
+Assert::isFalse(hasErrors, "must not have errors")
+Assert::equals(expected, actual, "expected and actual should match")
+Assert::notEquals(a, b, "a and b should differ")
+```
+
 ### Null Assertions
 
 ```onion
 Assert::notNull(result)
 Assert::isNull(errorMessage)
+```
+
+These also accept a custom failure message:
+
+```onion
+Assert::notNull(result, "result must not be null")
+Assert::isNull(errorMessage, "errorMessage should be null")
 ```
 
 ### Explicit Failure

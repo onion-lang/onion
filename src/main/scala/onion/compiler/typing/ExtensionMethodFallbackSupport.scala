@@ -224,6 +224,45 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   }
 
   /**
+   * Try to resolve a zero-arg extension method accessed in property style (no
+   * parentheses): `expr.name` where `name` is declared as `def name: T = ...`
+   * in an `extension` block. Called from the MemberSelection typing path before
+   * it reports E0004 (field not found), so an extension zero-arg method shadows
+   * the error rather than being missed entirely.
+   */
+  def tryZeroArgExtensionAccess(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] = {
+    val params = Array.empty[Term]
+    selectApplicableExtensionMethod(targetType, name, params) match {
+      case CandidateSelection.NoMatch => None
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousSignature(
+          node,
+          first.containerClass, name, first.arguments,
+          second.containerClass, name, second.arguments
+        )
+        None
+      case CandidateSelection.Selected(extMethod) =>
+        val containerClass = extMethod.containerClass
+        val staticArgs = Array(staticReceiver(target, extMethod))
+        containerClass.findMethod(name, staticArgs) match {
+          case Array(staticMethod) =>
+            val classSubst = TypeSubstitution.classSubstitution(containerClass)
+            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected)(
+              expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+              finalParams => new CallStatic(containerClass, staticMethod, finalParams)
+            )
+          case _ => None
+        }
+    }
+  }
+
+  /**
    * Bidirectional variant for calls whose arguments contain closures with
    * untyped parameters (list.map { x => ... }): pick the extension's backing
    * static method first, then type each closure against its parameter type.

@@ -23,6 +23,16 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
+  def tryZeroArgExtensionAccess(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
+
   def tryExtensionMethodCallForSafeNav(
     node: AST.SafeMethodCall,
     target: Term,

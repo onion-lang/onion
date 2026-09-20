@@ -1,0 +1,295 @@
+// SubscriptionTracker.on — track and analyse recurring software subscriptions
+//
+// Exercises: records with law/example, ADT case-enum with methods, plain enum,
+// extension Int for currency display, class with list state, collection pipelines
+// (sortedBy/filter/map/fold/groupBy/partition/find/any/count), foreach (k,v) on Map,
+// select / type-pattern matching with exhaustiveness, nullable types, string
+// interpolation, try/catch, while, foreach over ranges and typed lists, closures.
+
+import {
+  java.util.HashMap;
+  java.lang.Math;
+}
+
+// ─── BillingCycle (ADT case-enum) ─────────────────────────────────────────────
+
+enum BillingCycle {
+  case Monthly
+  case Quarterly
+  case Annual
+public:
+  def monthsPerPeriod(): Int = select this {
+    case c is Monthly:   1
+    case c is Quarterly: 3
+    case c is Annual:    12
+  }
+  def periodsPerYear(): Int = select this {
+    case c is Monthly:   12
+    case c is Quarterly: 4
+    case c is Annual:    1
+  }
+  def label(): String = select this {
+    case c is Monthly:   "mo"
+    case c is Quarterly: "qtr"
+    case c is Annual:    "yr"
+  }
+}
+
+// ─── Category (plain enum) ────────────────────────────────────────────────────
+
+enum Category {
+  STREAMING, PRODUCTIVITY, CLOUD, GAMING, HEALTH, OTHER
+}
+
+// ─── Currency extension ────────────────────────────────────────────────────────
+
+extension Int {
+  def toDollars(): String {
+    val d: Int = self / 100
+    val c: Int = self % 100
+    if c == 0  { return "$" + d + ".00" }
+    if c < 10  { return "$" + d + ".0" + c }
+    return "$" + d + "." + c
+  }
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length < width { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Subscription(
+  id: Int,
+  name: String,
+  category: Category,
+  cycle: BillingCycle,
+  costCents: Int,
+  active: Boolean
+)
+  example { new Subscription(1, "Spotify", Category::STREAMING, new Monthly(), 999, true).id() == 1 }
+  example { new Subscription(2, "test",    Category::CLOUD,     new Annual(),  0,   false).costCents() >= 0 }
+
+record CategorySummary(
+  label: String,
+  count: Int,
+  monthlyCents: Int
+)
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def monthlyCents(s: Subscription): Int =
+  s.costCents() / s.cycle().monthsPerPeriod()
+
+def annualCents(s: Subscription): Int =
+  s.costCents() * s.cycle().periodsPerYear()
+
+def descLine(s: Subscription): String {
+  val mark:    String = if s.active() { "●" } else { "○" }
+  val cost:    String = s.costCents().toDollars() + "/" + s.cycle().label()
+  val monthly: Int    = monthlyCents(s)
+  val extra:   String = if monthly == s.costCents() { "" }
+                        else { " (~" + monthly.toDollars() + "/mo)" }
+  return "  " + mark + " [" + s.id().padLeft(2) + "] " + s.name().padRight(18) +
+         cost.padRight(14) + extra
+}
+
+def catLabel(cat: Category): String = select cat {
+  case Category::STREAMING:    "Streaming   "
+  case Category::PRODUCTIVITY: "Productivity"
+  case Category::CLOUD:        "Cloud       "
+  case Category::GAMING:       "Gaming      "
+  case Category::HEALTH:       "Health      "
+  else:                        "Other       "
+}
+
+def banner(title: String): void {
+  IO::println("\n── " + title + " " + "─".repeat(Math::max(0, 40 - title.length - 4)))
+}
+
+// ─── Tracker class ────────────────────────────────────────────────────────────
+
+class SubscriptionTracker {
+  var nextId: Int
+  val subs:   List[Subscription]
+
+public:
+  def this {
+    this.nextId = 1
+    this.subs   = []
+  }
+
+  def add(name: String, cat: Category, cycle: BillingCycle, costCents: Int): Subscription {
+    val s: Subscription = new Subscription(nextId, name, cat, cycle, costCents, true)
+    subs.add(s)
+    nextId = nextId + 1
+    return s
+  }
+
+  def cancel(id: Int): Boolean {
+    var i: Int = 0
+    while i < subs.size {
+      val s: Subscription = subs[i]
+      if s.id() == id && s.active() {
+        subs[i] = s.copy(active = false)
+        return true
+      }
+      i++
+    }
+    return false
+  }
+
+  def all(): List[Subscription] = subs
+
+  def find(id: Int): Subscription? {
+    foreach s: Subscription in subs {
+      if s.id() == id { return s }
+    }
+    return null
+  }
+
+  def active(): List[Subscription] = subs.filter { s: Subscription -> s.active() }
+
+  def count(): Int = subs.count { s -> (s as Subscription).active() }
+
+  def hasAny(cat: Category): Boolean = active().any { s -> (s as Subscription).category() == cat }
+
+  def totalMonthlyCents(): Int =
+    active().fold(0) { acc: Int, s: Subscription -> acc + monthlyCents(s) }
+
+  def totalAnnualCents(): Int =
+    active().fold(0) { acc: Int, s: Subscription -> acc + annualCents(s) }
+
+  def topByMonthly(n: Int): List[Subscription] {
+    val sorted: List[Subscription] = active().sortedBy { s: Subscription -> 0 - monthlyCents(s) }
+    val cap: Int = Math::min(n, sorted.size)
+    return sorted.subList(0, cap)
+  }
+
+  def categoryBreakdown(): List[CategorySummary] {
+    val groups = active().groupBy { s: Subscription -> catLabel(s.category()) }
+    val result: List[CategorySummary] = []
+    foreach (label, catSubs) in groups {
+      val list: List[Object] = catSubs as List[Object]
+      val totalMo: Int = list.fold(0) { acc: Int, s: Object ->
+        (acc as Int) + monthlyCents(s as Subscription)
+      } as Int
+      result.add(new CategorySummary(label as String, list.size, totalMo))
+    }
+    return result.sortedBy { b: CategorySummary -> 0 - b.monthlyCents() }
+  }
+
+  def mostExpensive(): Subscription? {
+    val act: List[Subscription] = active()
+    if act.size == 0 { return null }
+    return act.sortedBy { s: Subscription -> 0 - monthlyCents(s) }[0]
+  }
+
+  def cheapest(): Subscription? {
+    val act: List[Subscription] = active()
+    if act.size == 0 { return null }
+    return act.sortedBy { s: Subscription -> monthlyCents(s) }[0]
+  }
+
+  def activeAndCancelled(): void {
+    val parts = subs.partition { s: Subscription -> s.active() }
+    val actList:  List[Object] = parts[0] as List[Object]
+    val cancList: List[Object] = parts[1] as List[Object]
+    IO::println("  Active: " + actList.size + "   Cancelled: " + cancList.size)
+  }
+}
+
+// ─── Simulate a subscription portfolio ────────────────────────────────────────
+
+val tracker: SubscriptionTracker = new SubscriptionTracker()
+
+// Add subscriptions (costCents = dollar amount × 100)
+tracker.add("Netflix",         Category::STREAMING,    new Monthly(),    1599)
+tracker.add("Spotify",         Category::STREAMING,    new Monthly(),     999)
+tracker.add("GitHub Pro",      Category::PRODUCTIVITY, new Annual(),     4800)  // $48/yr
+tracker.add("AWS",             Category::CLOUD,        new Monthly(),    4500)
+tracker.add("Notion",          Category::PRODUCTIVITY, new Annual(),     9600)  // $96/yr
+tracker.add("Xbox Game Pass",  Category::GAMING,       new Monthly(),    1499)
+tracker.add("Hulu",            Category::STREAMING,    new Monthly(),    1799)
+tracker.add("JetBrains",       Category::PRODUCTIVITY, new Annual(),    24900)  // $249/yr
+tracker.add("iCloud 200GB",    Category::CLOUD,        new Monthly(),     299)
+tracker.add("Headspace",       Category::HEALTH,       new Annual(),     6999)  // $69.99/yr
+tracker.add("YouTube Premium", Category::STREAMING,    new Monthly(),    1399)
+tracker.add("1Password",       Category::PRODUCTIVITY, new Annual(),     3600)  // $36/yr
+
+banner("All subscriptions (" + tracker.all().size + " total)")
+foreach s: Subscription in tracker.all() {
+  IO::println(descLine(s))
+}
+
+banner("Overview (all active)")
+IO::println("  Count:          " + tracker.count())
+IO::println("  Monthly spend:  " + tracker.totalMonthlyCents().toDollars())
+IO::println("  Annual spend:   " + tracker.totalAnnualCents().toDollars())
+
+// Cancel a couple
+tracker.cancel(2)  // Spotify
+tracker.cancel(6)  // Xbox Game Pass
+IO::println("\n  (Cancelled #2 Spotify and #6 Xbox Game Pass)")
+
+banner("Active subscriptions")
+foreach s: Subscription in tracker.active() {
+  IO::println(descLine(s))
+}
+IO::println("")
+IO::println("  Active:        " + tracker.count())
+IO::println("  Monthly spend: " + tracker.totalMonthlyCents().toDollars())
+IO::println("  Annual spend:  " + tracker.totalAnnualCents().toDollars())
+
+banner("By category")
+foreach b: CategorySummary in tracker.categoryBreakdown() {
+  IO::println("  " + b.label() + "  " + b.monthlyCents().toDollars() + "/mo  (" + b.count() + " sub(s))")
+}
+
+banner("Active/cancelled split")
+tracker.activeAndCancelled()
+
+banner("Top 3 by monthly cost")
+var rank: Int = 1
+foreach s: Subscription in tracker.topByMonthly(3) {
+  IO::println("  " + rank + ". " + descLine(s).trim())
+  rank++
+}
+
+banner("Cheapest active")
+val cheapest: Subscription? = tracker.cheapest()
+if cheapest != null {
+  IO::println(descLine(cheapest as Subscription))
+}
+
+banner("Category check")
+IO::println("  Has streaming? " + tracker.hasAny(Category::STREAMING))
+IO::println("  Has gaming?    " + tracker.hasAny(Category::GAMING))
+
+banner("Individual lookup")
+var i: Int = 1
+while i <= 3 {
+  val found: Subscription? = tracker.find(i)
+  if found != null {
+    val s: Subscription = found as Subscription
+    val status: String = if s.active() { "active" } else { "cancelled" }
+    IO::println("  #" + i + " " + s.name() + " — " + status)
+  }
+  i++
+}
+
+banner("Range: annual cost per sub (active)")
+foreach s: Subscription in tracker.active() {
+  IO::println("  " + s.name().padRight(20) + annualCents(s).toDollars() + "/yr")
+}
+
+IO::println("\n── Done ──────────────────────────────────────────────────")

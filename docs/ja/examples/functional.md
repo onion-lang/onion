@@ -617,6 +617,33 @@ api.request("GET", "/users") { response ->
 }
 ```
 
+## プリミティブジェネリクスとJava関数型インターフェース
+
+Onionは型引数がプリミティブ型の場合でも、ラムダをJavaの関数型インターフェースに変換できます。
+コンパイラは内部で型引数をボックス化してブリッジメソッドを生成するため、`Int` パラメータを
+そのまま自然に書けます：
+
+```onion
+import {
+  java.util.Comparator
+  java.util.function.Predicate
+}
+
+val numbers = Colls::mutableListOf(3, 1, 4, 1, 5, 9, 2, 6)
+
+// プリミティブなIntパラメータを持つComparator[Int]
+Collections::sort(numbers, (a: Int, b: Int) -> a - b)
+println(numbers)
+
+// プリミティブなパラメータを持つPredicate[Int]
+val isEven: Predicate[Int] = (n: Int) -> n % 2 == 0
+numbers.removeIf(isEven)
+println(numbers)
+```
+
+これは `Supplier[Int]` や `Function[Int, Int]` など、他の単一抽象メソッド（SAM）
+インターフェースでも同様に動作します。
+
 ## 次のステップ
 
 - [ラムダ式ガイド](../guide/lambda-expressions.md) - ラムダの詳細

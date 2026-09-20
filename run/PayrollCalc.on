@@ -1,0 +1,303 @@
+// PayrollCalc.on — Employee payroll & tax report exercising records, ADT enums,
+// data-carrying enums, interfaces, classes, collection pipelines, pattern matching,
+// nullable types, closures, string interpolation, try/catch, recursion, and foreach.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Employee(id: Int, name: String, dept: String, annualSalary: Double)
+record Deduction(label: String, amount: Double)
+record PayStub(employee: Employee, gross: Double, net: Double, deductions: List[Deduction])
+
+// ── Data-carrying enum: employment status ────────────────────────────────────
+
+enum EmployStatus(label: String) {
+  FULL_TIME("Full-Time"),
+  PART_TIME("Part-Time"),
+  CONTRACTOR("Contractor")
+}
+
+// ── ADT enum: pay grade determines tax rate ──────────────────────────────────
+
+enum PayGrade {
+  case Junior(rate: Double)
+  case Senior(rate: Double)
+  case Manager(rate: Double)
+  case Executive(rate: Double)
+}
+
+// ── Interface for anything printable as a report line ────────────────────────
+
+interface Reportable {
+  def reportLine(): String
+}
+
+// ── Class implementing the interface ─────────────────────────────────────────
+
+class StubReport conforms Reportable {
+  val stub: PayStub
+public:
+  def this(s: PayStub) {
+    this.stub = s
+  }
+  override def reportLine(): String {
+    val emp  = stub.employee()
+    val name = emp.name()
+    val net  = stub.net()
+    return "#{name}: gross=#{stub.gross()} net=#{net}"
+  }
+}
+
+// ── Tax-rate lookup via pattern matching ─────────────────────────────────────
+
+def gradeRate(g: PayGrade): Double {
+  select g {
+    case j is Junior:   return j.rate()
+    case s is Senior:   return s.rate()
+    case m is Manager:  return m.rate()
+    case e is Executive: return e.rate()
+  }
+}
+
+// ── Recursive: progressive tax bracket helper ────────────────────────────────
+// Simulates a three-bracket system: 10% up to 50k, 22% up to 100k, 35% above.
+
+def progressiveTax(income: Double): Double {
+  if income <= 0.0 { return 0.0 }
+  if income <= 50000.0 { return income * 0.10 }
+  if income <= 100000.0 { return 5000.0 + (income - 50000.0) * 0.22 }
+  return 5000.0 + 11000.0 + (income - 100000.0) * 0.35
+}
+
+// ── Build a PayStub from an Employee and PayGrade ────────────────────────────
+
+def makeStub(emp: Employee, grade: PayGrade): PayStub {
+  val gross = emp.annualSalary() / 12.0
+  val taxAmt  = gross * gradeRate(grade)
+  val pension = gross * 0.05
+  val health  = 150.0
+  val deductions: List[Deduction] = [
+    new Deduction("Income Tax", taxAmt),
+    new Deduction("Pension",    pension),
+    new Deduction("Health",     health)
+  ]
+  val totalDed = deductions.fold(0.0) { acc, d -> (acc as Double) + (d as Deduction).amount() }
+  val net      = gross - (totalDed as Double)
+  return new PayStub(emp, gross, net, deductions)
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+val employees: List[Employee] = [
+  new Employee(1, "Alice",   "Engineering", 90000.0),
+  new Employee(2, "Bob",     "Marketing",   55000.0),
+  new Employee(3, "Carol",   "Engineering", 130000.0),
+  new Employee(4, "Dave",    "Support",     42000.0),
+  new Employee(5, "Eve",     "Engineering", 110000.0),
+  new Employee(6, "Frank",   "Marketing",   48000.0)
+]
+
+val grades: List[PayGrade] = [
+  new Senior(0.22),
+  new Junior(0.15),
+  new Manager(0.28),
+  new Junior(0.15),
+  new Senior(0.22),
+  new Junior(0.15)
+]
+
+// ── Generate all stubs using index ───────────────────────────────────────────
+
+val stubs: List[PayStub] = employees.zip(grades).map { pair ->
+  val emp   = (pair as List)[0] as Employee
+  val grade = (pair as List)[1] as PayGrade
+  makeStub(emp, grade)
+}
+
+IO::println("=== Payroll Report ===")
+IO::println("Employees: " + employees.size)
+
+// print each stub via the Reportable interface
+foreach stub: PayStub in stubs {
+  val r: Reportable = new StubReport(stub)
+  IO::println(r.reportLine())
+}
+
+// ── Collection pipelines ──────────────────────────────────────────────────────
+
+val totalPayroll = stubs.fold(0.0) { acc, s ->
+  (acc as Double) + (s as PayStub).gross()
+}
+IO::println("Total gross payroll: " + totalPayroll)
+
+val totalNet = stubs.fold(0.0) { acc, s ->
+  (acc as Double) + (s as PayStub).net()
+}
+IO::println("Total net payroll: " + totalNet)
+
+// Find the highest-paid employee
+val topStub = stubs.sortedBy { s -> 0.0 - (s as PayStub).gross() }[0] as PayStub
+IO::println("Top earner: " + topStub.employee().name() + " gross=" + topStub.gross())
+
+// Employees earning more than 5000/month gross
+val highEarners = stubs
+  .filter { s -> (s as PayStub).gross() > 5000.0 }
+  .map    { s -> (s as PayStub).employee().name() }
+IO::println("High earners (>5k/mo): " + highEarners)
+
+// Group by department
+val byDept = stubs.groupBy { s -> (s as PayStub).employee().dept() }
+IO::println("")
+IO::println("=== By Department ===")
+foreach (dept, deptStubs) in byDept {
+  val deptList = deptStubs as List
+  val deptTotal = deptList.fold(0.0) { acc, s ->
+    (acc as Double) + (s as PayStub).gross()
+  }
+  IO::println("#{dept}: #{deptList.size} employee(s), total gross=#{deptTotal}")
+}
+
+// ── Nullable: find employee by name (may return null) ────────────────────────
+
+def findStub(name: String): PayStub? {
+  return stubs.find { s -> (s as PayStub).employee().name() == name } as PayStub?
+}
+
+val found = findStub("Alice")
+if found != null {
+  IO::println("")
+  IO::println("=== Alice's Detail ===")
+  val aliceStub = found as PayStub
+  IO::println("Gross: " + aliceStub.gross())
+  foreach ded: Deduction in aliceStub.deductions() {
+    IO::println("  - " + ded.label() + ": " + ded.amount())
+  }
+}
+
+val notFound = findStub("Zara")
+IO::println("Zara found: " + (notFound != null))
+
+// ── Progressive tax comparison ────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Progressive Tax Comparison ===")
+foreach emp: Employee in employees {
+  val annual    = emp.annualSalary()
+  val progTax   = progressiveTax(annual)
+  val progRate  = progTax / annual * 100.0
+  IO::println("#{emp.name()}: annual=#{annual} prog-tax=#{progTax} eff-rate=#{progRate}%")
+}
+
+// ── Closures stored in vals ───────────────────────────────────────────────────
+
+val formatCurrency = (amt: Double) -> {
+  val cents = (amt * 100.0) as Int
+  return "$" + (cents / 100) + "." + (cents % 100)
+}
+
+IO::println("")
+IO::println("=== Formatted Payroll Summary ===")
+foreach stub: PayStub in stubs {
+  val emp  = stub.employee()
+  val line = "#{emp.name()} (#{emp.dept()}): #{formatCurrency(stub.net())}/mo"
+  IO::println(line)
+}
+
+// ── Try/catch: safe salary lookup ────────────────────────────────────────────
+
+def annualOrDefault(id: Int, default: Double): Double {
+  try {
+    val emp = employees.filter { e -> (e as Employee).id() == id }[0] as Employee
+    return emp.annualSalary()
+  } catch e: Exception {
+    return default
+  }
+}
+
+IO::println("")
+IO::println("=== Safe Lookup ===")
+IO::println("ID 3 salary: " + annualOrDefault(3, 0.0))
+IO::println("ID 99 salary: " + annualOrDefault(99, 0.0))
+
+// ── Foreach over range ────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Raise Projections (5% increments) ===")
+var baseNet = totalNet
+foreach pct: Int in 1..5 {
+  val raised = baseNet * (1.0 + pct as Double * 0.05)
+  IO::println("  +#{pct * 5}%: " + raised)
+}
+
+// ── EmployStatus labels ───────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Employment Status Labels ===")
+val statuses: List[EmployStatus] = [
+  EmployStatus::FULL_TIME,
+  EmployStatus::PART_TIME,
+  EmployStatus::CONTRACTOR
+]
+foreach st: EmployStatus in statuses {
+  IO::println(st.label())
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Summary ===")
+val avgGross = totalPayroll / (employees.size as Double)
+val avgNet   = totalNet   / (employees.size as Double)
+IO::println("Avg gross: #{avgGross}")
+IO::println("Avg net:   #{avgNet}")
+val savingsRate = (totalPayroll - totalNet) / totalPayroll * 100.0
+IO::println("Deduction rate: #{savingsRate}%")
+
+// ── Recursion: nth Fibonacci used as a bonus multiplier ──────────────────────
+
+def fib(n: Int): Int {
+  if n <= 1 { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+
+IO::println("")
+IO::println("=== Fibonacci Bonus Multipliers ===")
+foreach i: Int in 1..8 {
+  IO::println("  fib(#{i}) = #{fib(i)}")
+}
+
+// ── While loop: find how many employees are above a target net ────────────────
+
+IO::println("")
+IO::println("=== Net Threshold Walk ===")
+var target    = 3000.0
+var threshold = 0
+var idx       = 0
+while idx < stubs.size {
+  val s = stubs[idx] as PayStub
+  if s.net() >= target {
+    threshold = threshold + 1
+  }
+  idx = idx + 1
+}
+IO::println("Employees with net >= #{target}/mo: #{threshold}")
+
+// ── Partition into above/below median ────────────────────────────────────────
+
+val sortedNets: List[Double] = stubs
+  .sortedBy { s -> (s as PayStub).net() }
+  .map { s -> (s as PayStub).net() }
+val medianNet = sortedNets[stubs.size / 2] as Double
+val above = stubs.filter { s -> (s as PayStub).net() > medianNet }
+val below = stubs.filter { s -> (s as PayStub).net() <= medianNet }
+IO::println("")
+IO::println("=== Median Split ===")
+IO::println("Median net: #{medianNet}")
+IO::println("Above median: " + above.size)
+IO::println("At/below median: " + below.size)
+
+// ── Distinct departments ──────────────────────────────────────────────────────
+
+val depts = employees.map { e -> (e as Employee).dept() }.distinct()
+IO::println("")
+IO::println("=== Distinct Departments ===")
+IO::println(depts)

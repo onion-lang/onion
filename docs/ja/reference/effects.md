@@ -10,8 +10,9 @@ Report#main(java.lang.String[]): console,read
 ```
 
 このページは、語彙・事実の出どころ・解析が約束すること／しないことのリファレンスです。
-この上に載る capability 層（`tool` 宣言、`requires`、`--plan`）はガイド側で解説します。
-このデータ層が先に出荷されました。
+この上に載る capability 層（`tool` 宣言、`requires`、`--plan`）は
+[tools ガイド](../guide/tools.md)で解説しています。このデータ層が先に出荷され、
+capability 層は今それを土台にして動いています。
 
 ## 語彙
 

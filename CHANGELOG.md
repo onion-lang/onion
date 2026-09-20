@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`run/PackageSolver.on`** — a 237-line npm-style semantic version constraint resolver sample (records, sealed enum ADTs, generics, collection pipelines, select/pattern matching, nullable types, recursion, string interpolation), added to the `run/` corpus.
+- **`run/DnsCache.on`** — a 399-line multi-layer DNS resolution stack sample (TTL-based cache eviction, upstream stub resolver, query statistics, records with methods, ADT case-enum, `interface` with polymorphic dispatch, extension methods on `String`, typed generics, collection pipelines, nullable types), added to the `run/` corpus.
 
 ## [0.90.0] - 2026-09-20
 

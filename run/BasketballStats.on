@@ -1,0 +1,415 @@
+// BasketballStats.on — NBA-style basketball analytics with advanced metrics.
+//
+// Exercises: records (with methods and example clauses), data-carrying enums,
+// ADT case-enum with exhaustive pattern matching, generic record (Ranked[T]),
+// extension methods on Int and Double, collection pipelines (map/filter/fold/
+// sortedBy/groupBy/distinct/find/partition/zip/reduce/any/count), foreach over
+// map (k,v), nullable types, closures, string interpolation, try/catch,
+// recursion, while and foreach with ranges, operator overloading.
+
+import { java.lang.Math }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): Double {
+    val shifted: Double = self * 10.0
+    val truncated: Int = shifted as Int
+    return truncated.doubleValue() / 10.0
+  }
+  def pct(): String = "#{(self * 100.0).round1()}%"
+  def fmt(): String {
+    val s: String = "" + self.round1()
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    return s
+  }
+}
+
+extension Int {
+  def padL(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padR(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def trunc(w: Int): String {
+    if self.length() <= w { return self }
+    return self.substring(0, w - 1) + "."
+  }
+}
+
+// ─── Position enum (plain, data-carrying) ────────────────────────────────────
+
+enum Position(abbr: String, fullName: String) {
+  PG("PG", "Point Guard"),
+  SG("SG", "Shooting Guard"),
+  SF("SF", "Small Forward"),
+  PF("PF", "Power Forward"),
+  C("C",  "Center")
+public:
+  def label(): String = abbr()
+  def desc(): String = fullName()
+}
+
+// ─── Season award ADT ────────────────────────────────────────────────────────
+
+enum Award {
+  case MVP
+  case DPOY
+  case AllStar
+  case RookieOfYear
+  case SixthMan
+  case MostImproved
+public:
+  def label(): String = select this {
+    case a is MVP:          "Most Valuable Player"
+    case a is DPOY:         "Defensive Player of Year"
+    case a is AllStar:      "All-Star Selection"
+    case a is RookieOfYear: "Rookie of the Year"
+    case a is SixthMan:     "Sixth Man of the Year"
+    case a is MostImproved: "Most Improved Player"
+  }
+  def short(): String = select this {
+    case a is MVP:          "MVP"
+    case a is DPOY:         "DPOY"
+    case a is AllStar:      "AS"
+    case a is RookieOfYear: "ROY"
+    case a is SixthMan:     "6MAN"
+    case a is MostImproved: "MIP"
+  }
+}
+
+// ─── Player record ────────────────────────────────────────────────────────────
+
+record Player(
+  name: String,
+  team: String,
+  pos: Position,
+  age: Int,
+  games: Int,
+  minutes: Int,
+  points: Int,
+  rebounds: Int,
+  assists: Int,
+  steals: Int,
+  blocks: Int,
+  turnovers: Int,
+  fga: Int,
+  fgm: Int,
+  tpa: Int,
+  tpm: Int,
+  fta: Int,
+  ftm: Int
+)
+  example { new Player("T", "X", Position::PG, 25, 82, 3000, 2000, 400, 600, 100, 50, 250, 1500, 750, 500, 200, 400, 330).ppg() > 20.0 }
+{
+public:
+  def ppg(): Double  = if games() == 0 { 0.0 } else { points().doubleValue() / games().doubleValue() }
+  def rpg(): Double  = if games() == 0 { 0.0 } else { rebounds().doubleValue() / games().doubleValue() }
+  def apg(): Double  = if games() == 0 { 0.0 } else { assists().doubleValue() / games().doubleValue() }
+  def spg(): Double  = if games() == 0 { 0.0 } else { steals().doubleValue() / games().doubleValue() }
+  def bpg(): Double  = if games() == 0 { 0.0 } else { blocks().doubleValue() / games().doubleValue() }
+  def topg(): Double = if games() == 0 { 0.0 } else { turnovers().doubleValue() / games().doubleValue() }
+  def mpg(): Double  = if games() == 0 { 0.0 } else { minutes().doubleValue() / games().doubleValue() }
+
+  def fgPct(): Double = if fga() == 0 { 0.0 } else { fgm().doubleValue() / fga().doubleValue() }
+  def tpPct(): Double = if tpa() == 0 { 0.0 } else { tpm().doubleValue() / tpa().doubleValue() }
+  def ftPct(): Double = if fta() == 0 { 0.0 } else { ftm().doubleValue() / fta().doubleValue() }
+
+  // True Shooting % = PTS / (2 * (FGA + 0.44*FTA))
+  def tsPct(): Double {
+    val denom: Double = 2.0 * (fga().doubleValue() + 0.44 * fta().doubleValue())
+    if denom == 0.0 { return 0.0 }
+    return points().doubleValue() / denom
+  }
+
+  // Assist-to-Turnover ratio
+  def atr(): Double = if turnovers() == 0 { 999.0 } else { assists().doubleValue() / turnovers().doubleValue() }
+
+  // Simple efficiency: (PTS + REB + AST + STL + BLK - TO) / GP
+  def eff(): Double {
+    if games() == 0 { return 0.0 }
+    val raw: Int = points() + rebounds() + assists() + steals() + blocks() - turnovers()
+    return raw.doubleValue() / games().doubleValue()
+  }
+
+  def statLine(): String = "#{ppg().fmt()} / #{rpg().fmt()} / #{apg().fmt()}"
+}
+
+// ─── Ranked generic wrapper ───────────────────────────────────────────────────
+
+record Ranked[T](rank: Int, value: T, score: Double)
+
+// ─── Stat category for leaderboard selection ─────────────────────────────────
+
+enum StatCat {
+  case Scoring
+  case Rebounding
+  case Playmaking
+  case Defense
+  case Efficiency
+public:
+  def extract(p: Player): Double = select this {
+    case s is Scoring:    p.ppg()
+    case r is Rebounding: p.rpg()
+    case m is Playmaking: p.apg()
+    case d is Defense:    p.spg() + p.bpg()
+    case e is Efficiency: p.eff()
+  }
+  def label(): String = select this {
+    case s is Scoring:    "Points"
+    case r is Rebounding: "Rebounds"
+    case m is Playmaking: "Assists"
+    case d is Defense:    "Stl+Blk"
+    case e is Efficiency: "EFF"
+  }
+}
+
+// ─── Helper: rank players by a stat category ─────────────────────────────────
+
+def rankBy(players: List[Player], cat: StatCat, n: Int): List[Ranked[Player]] {
+  val sorted: List[Player] = players.sortedBy { p -> 0.0 - cat.extract(p) }
+  val result: List[Ranked[Player]] = []
+  var i: Int = 0
+  foreach p: Player in sorted {
+    if i >= n { break }
+    result.add(new Ranked[Player](i + 1, p, cat.extract(p)))
+    i++
+  }
+  return result
+}
+
+// ─── Recursive: find player by name in a list ────────────────────────────────
+
+def findPlayer(players: List[Player], name: String, idx: Int): Player? {
+  if idx >= players.size { return null }
+  val p: Player = players.get(idx)
+  if p.name() == name { return p }
+  return findPlayer(players, name, idx + 1)
+}
+
+// ─── Print a leaderboard section ─────────────────────────────────────────────
+
+def printLeaderboard(title: String, ranked: List[Ranked[Player]]): void {
+  IO::println("\n── #{title} ──")
+  foreach r: Ranked[Player] in ranked {
+    val p: Player = r.value()
+    IO::println("  #{r.rank().padL(2)}. #{p.name().padR(18)} #{p.team().padR(4)} #{r.score().fmt()}")
+  }
+}
+
+// ─── Team summary ─────────────────────────────────────────────────────────────
+
+def teamReport(players: List[Player]): void {
+  IO::println("\n── Team Totals ──")
+  val byTeam: Map[String, List[Player]] = players.groupBy { p -> p.team() }
+  foreach (team, members) in byTeam {
+    val avgPpg: Double = members.map { p -> p.ppg() }
+                               .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+    IO::println("  #{team.padR(12)} #{members.size} players  avg PPG: #{(avgPpg / members.size.doubleValue()).fmt()}")
+  }
+}
+
+// ─── Position breakdown ───────────────────────────────────────────────────────
+
+def positionBreakdown(players: List[Player]): void {
+  IO::println("\n── By Position ──")
+  val byPos: Map[String, List[Player]] = players.groupBy { p -> p.pos().label() }
+  val posOrder: List[String] = ["PG", "SG", "SF", "PF", "C"]
+  foreach pos: String in posOrder {
+    val group: List[Player]? = byPos.get(pos) as List[Player]?
+    if group == null { continue }
+    val avgEff: Double = group.map { p -> p.eff() }
+                              .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+    IO::println("  #{pos}  #{group.size} players  avg EFF: #{(avgEff / group.size.doubleValue()).fmt()}")
+  }
+}
+
+// ─── Award projections ────────────────────────────────────────────────────────
+
+def projectAwards(players: List[Player]): void {
+  IO::println("\n── Projected Awards ──")
+
+  val byPpg: List[Player] = players.sortedBy { p -> 0.0 - p.ppg() }
+  if !byPpg.isEmpty {
+    val topScorer: Player = byPpg.get(0)
+    IO::println("  #{(new MVP).label()}: #{topScorer.name()} (#{topScorer.ppg().fmt()} PPG)")
+  }
+
+  val byDef: List[Player] = players.sortedBy { p -> 0.0 - (p.spg() + p.bpg()) }
+  if !byDef.isEmpty {
+    val topDefender: Player = byDef.get(0)
+    val spgbpg: Double = topDefender.spg() + topDefender.bpg()
+    IO::println("  #{(new DPOY).label()}: #{topDefender.name()} (#{spgbpg.fmt()} Stl+Blk/g)")
+  }
+
+  // All-Stars: top 5 by efficiency overall
+  IO::println("  #{(new AllStar).label()}s:")
+  val allStars: List[Ranked[Player]] = rankBy(players, new Efficiency, 5)
+  foreach r: Ranked[Player] in allStars {
+    val p: Player = r.value()
+    IO::println("    #{p.name()} (#{p.team()}, #{p.eff().fmt()} EFF)")
+  }
+}
+
+// ─── Shooting efficiency report ───────────────────────────────────────────────
+
+def shootingReport(players: List[Player]): void {
+  IO::println("\n── Shooting Efficiency (min 300 FGA) ──")
+  val shooters: List[Player] = players.filter { p -> p.fga() >= 300 }
+                                      .sortedBy { p -> 0.0 - p.tsPct() }
+  foreach p: Player in shooters {
+    val line: String = "#{p.name().padR(18)} FG:#{p.fgPct().pct()} 3P:#{p.tpPct().pct()} FT:#{p.ftPct().pct()} TS:#{p.tsPct().pct()}"
+    IO::println("  #{line}")
+  }
+}
+
+// ─── Statistical extremes ─────────────────────────────────────────────────────
+
+def statExtremes(players: List[Player]): void {
+  IO::println("\n── Statistical Extremes ──")
+
+  val cats: List[StatCat] = [new Scoring, new Rebounding, new Playmaking, new Defense, new Efficiency]
+  foreach cat: StatCat in cats {
+    val asc: List[Player]  = players.sortedBy { p -> cat.extract(p) }
+    val desc: List[Player] = players.sortedBy { p -> 0.0 - cat.extract(p) }
+    if !asc.isEmpty && !desc.isEmpty {
+      val best: Player  = desc.get(0)
+      val worst: Player = asc.get(0)
+      IO::println("  #{cat.label().padR(10)} best: #{best.name().padR(14)} #{cat.extract(best).fmt()}" +
+                  "   worst: #{worst.name().padR(14)} #{cat.extract(worst).fmt()}")
+    }
+  }
+}
+
+// ─── Partition: starters vs. bench ───────────────────────────────────────────
+
+def startersBenchSplit(players: List[Player]): void {
+  IO::println("\n── Starters vs. Bench (cutoff: 30 mpg) ──")
+  val parts = players.partition { p -> p.mpg() >= 30.0 }
+  val starters: List[Object] = parts[0] as List[Object]
+  val bench: List[Object]    = parts[1] as List[Object]
+
+  val avgStar: Double  = starters.fold(0.0) { acc, p -> (acc as Double) + (p as Player).ppg() }
+  val avgBench: Double = bench.fold(0.0)    { acc, p -> (acc as Double) + (p as Player).ppg() }
+
+  val sppg: Double = if starters.isEmpty { 0.0 } else { avgStar / starters.size.doubleValue() }
+  val bppg: Double = if bench.isEmpty    { 0.0 } else { avgBench / bench.size.doubleValue() }
+
+  IO::println("  Starters (#{starters.size}): avg #{sppg.fmt()} PPG")
+  IO::println("  Bench    (#{bench.size}): avg #{bppg.fmt()} PPG")
+}
+
+// ─── Zip demo: pair players by scoring rank for a hypothetical matchup ────────
+
+def scoringDuel(players: List[Player]): void {
+  IO::println("\n── Scoring Duel (Top-6 vs. Bottom-6) ──")
+  val sorted: List[Player] = players.sortedBy { p -> 0.0 - p.ppg() }
+  val topSix: List[Player] = []
+  val botSix: List[Player] = []
+  var i: Int = 0
+  foreach p: Player in sorted {
+    if i < 6 { topSix.add(p) } else if i < 12 { botSix.add(p) }
+    i++
+  }
+  val pairs: List[Object] = topSix.zip(botSix) as List[Object]
+  foreach pair: Object in pairs {
+    val a: Player = (pair as List[Object]).get(0) as Player
+    val b: Player = (pair as List[Object]).get(1) as Player
+    IO::println("  #{a.name().padR(16)} #{a.ppg().fmt().padR(5)} vs #{b.ppg().fmt().padR(5)} #{b.name()}")
+  }
+}
+
+// ─── do[Option] demo: compute a player's combined score safely ────────────────
+
+def combinedScore(players: List[Player], nameA: String, nameB: String): String {
+  val a: Player? = findPlayer(players, nameA, 0)
+  val b: Player? = findPlayer(players, nameB, 0)
+  if a == null || b == null { return "one or more players not found" }
+  val combined: Double = a.eff() + b.eff()
+  return "#{nameA} + #{nameB} combined EFF: #{combined.fmt()}"
+}
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+val players: List[Player] = [
+  new Player("LeBron James",     "LAL", Position::SF, 39, 71, 2626,  1760, 602,  591, 89,  33,  270,  1224, 618, 207, 79,  432, 330),
+  new Player("Stephen Curry",    "GSW", Position::PG, 35, 74, 2527,  2040, 318,  481, 97,  16,  213,  1431, 588, 606, 270, 276, 222),
+  new Player("Nikola Jokic",     "DEN", Position::C,  28, 79, 2772,  2085, 1037, 862, 130, 68,  285,  1428, 762, 190, 70,  490, 432),
+  new Player("Giannis A.",       "MIL", Position::PF, 29, 73, 2563,  2061, 745,  416, 98,  70,  231,  1348, 788, 130, 37,  616, 468),
+  new Player("Luka Doncic",      "DAL", Position::PG, 25, 70, 2582,  2138, 674,  728, 104, 25,  290,  1524, 698, 414, 154, 508, 411),
+  new Player("Kevin Durant",     "PHX", Position::SF, 35, 75, 2670,  2011, 488,  318, 75,  80,  185,  1417, 786, 225, 82,  447, 371),
+  new Player("Joel Embiid",      "PHI", Position::C,  29, 66, 2360,  2177, 712,  257, 85, 112,  250,  1340, 757, 150, 46,  620, 505),
+  new Player("Jayson Tatum",     "BOS", Position::SF, 26, 74, 2664,  1870, 700,  409, 86,  44,  188,  1437, 680, 437, 177, 394, 322),
+  new Player("Devin Booker",     "PHX", Position::SG, 27, 68, 2440,  1762, 340,  451, 87,  22,  213,  1363, 649, 406, 160, 317, 260),
+  new Player("Damian Lillard",   "MIL", Position::PG, 33, 73, 2606,  1930, 348,  524, 93,  27,  218,  1440, 651, 561, 246, 355, 295),
+  new Player("Tyrese Haliburton","IND", Position::PG, 24, 69, 2345,  1435, 347,  754, 121, 25,  199,  1040, 498, 361, 151, 197, 162),
+  new Player("Bam Adebayo",      "MIA", Position::C,  26, 71, 2484,  1363, 786,  315, 104, 88,  187,  1044, 577,  9,   1,  404, 307),
+  new Player("Paolo Banchero",   "ORL", Position::PF, 21, 80, 2868,  1760, 664,  360, 70,  50,  214,  1360, 612, 285, 99,  468, 360),
+  new Player("Anthony Edwards",  "MIN", Position::SG, 22, 79, 2814,  1931, 494,  420, 119, 39,  225,  1555, 695, 544, 218, 340, 273),
+  new Player("Shai G.-Alexander","OKC", Position::SG, 25, 75, 2682,  1930, 408,  368, 117, 31,  213,  1419, 700, 303, 116, 502, 418)
+]
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+IO::println("═══════════════════════════════════════")
+IO::println("     NBA Analytics Dashboard 2024")
+IO::println("═══════════════════════════════════════")
+
+// Top-5 leaderboards
+printLeaderboard("Top Scorers",    rankBy(players, new Scoring,    5))
+printLeaderboard("Top Rebounders", rankBy(players, new Rebounding, 5))
+printLeaderboard("Top Playmakers", rankBy(players, new Playmaking, 5))
+printLeaderboard("Top Defenders",  rankBy(players, new Defense,    5))
+printLeaderboard("Top Efficiency", rankBy(players, new Efficiency, 5))
+
+// Team summary
+teamReport(players)
+
+// Position breakdown
+positionBreakdown(players)
+
+// Shooting efficiency
+shootingReport(players)
+
+// Statistical extremes
+statExtremes(players)
+
+// Starters vs. bench
+startersBenchSplit(players)
+
+// Scoring duel (zip demo)
+scoringDuel(players)
+
+// Award projections
+projectAwards(players)
+
+// do[Option] demo
+IO::println("\n── Combined Efficiency ──")
+IO::println("  " + combinedScore(players, "LeBron James", "Stephen Curry"))
+IO::println("  " + combinedScore(players, "Unknown", "Joel Embiid"))
+
+// Distinct teams
+val teams: List[String] = players.map { p -> p.team() }.distinct()
+IO::println("\n── Teams in dataset (#{teams.size}) ──")
+IO::println("  " + teams.fold("") { acc, t -> if (acc as String) == "" { t as String } else { (acc as String) + ", " + (t as String) } })
+
+// Try/catch: safe division demo
+IO::println("\n── Safe Division Demo ──")
+try {
+  val ratio: Double = 1.0 / 0.0
+  IO::println("  1.0/0.0 = #{ratio}")
+} catch e: Exception {
+  IO::println("  caught: #{e.message()}")
+}
+IO::println("  (Doubles don't throw on /0 in Java — produces Infinity)")
+
+IO::println("\n═══════════════════════════════════════")

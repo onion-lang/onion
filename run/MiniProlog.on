@@ -1,0 +1,411 @@
+// MiniProlog.on — a minimal Prolog interpreter (~300 lines).
+//
+// Implements: terms (atoms, variables, integers, compound), unification,
+// depth-first SLD resolution, variable renaming via fresh activation IDs.
+// Knowledge bases: family tree, list operations, arithmetic, graph reachability.
+//
+// Exercises: ADT case-enum with expression-body method, records, class with
+// mutable state (database + counter), generics (ArrayList[Object] /
+// LinkedHashMap[String,Object]), select/type-pattern matching, nullable types,
+// recursive methods, string interpolation, foreach with map destructuring,
+// multi-goal queries.
+
+import {
+  java.util.ArrayList
+  java.util.LinkedHashMap
+}
+
+// ── Term (sealed ADT) ─────────────────────────────────────────────────────────
+
+enum Term {
+  case TAtom(name: String)
+  case TVar(name: String)
+  case TNum(n: Int)
+  case TCompound(functor: String, args: ArrayList[Object])
+public:
+  def toStr(): String = select this {
+    case a is TAtom: a.name()
+    case vt is TVar: "?" + vt.name()
+    case n is TNum:  "#{n.n()}"
+    case c is TCompound: termCompStr(c)
+  }
+}
+
+def termCompStr(c: TCompound): String {
+  val f    = c.functor()
+  val args = c.args()
+  if args.size == 0 { return f }
+  if f == "." && args.size == 2 {
+    return "[" + termListStr(args[0] as Term, args[1] as Term) + "]"
+  }
+  val sb = new java.lang.StringBuilder()
+  sb.append(f + "(")
+  foreach i: Int in 0..<args.size {
+    if i > 0 { sb.append(", ") }
+    sb.append((args[i] as Term).toStr())
+  }
+  sb.append(")")
+  return sb.toString()
+}
+
+def termListStr(head: Term, tail: Term): String {
+  val hs = head.toStr()
+  if tail is TAtom && (tail as TAtom).name() == "[]" { return hs }
+  if tail is TCompound {
+    val tc = tail as TCompound
+    if tc.functor() == "." && tc.args().size == 2 {
+      return hs + ", " + termListStr(tc.args()[0] as Term, tc.args()[1] as Term)
+    }
+  }
+  return hs + "|" + tail.toStr()
+}
+
+// ── Clause record ─────────────────────────────────────────────────────────────
+
+record Clause(head: Term, body: ArrayList[Object])
+
+// ── Prolog interpreter ────────────────────────────────────────────────────────
+
+class Prolog {
+  var db: ArrayList[Object]
+  var nextId: Int
+
+public:
+  def this { db = new ArrayList[Object](); nextId = 0 }
+
+  def freshId(): Int { val id = nextId; nextId = nextId + 1; return id }
+
+  // Follow variable chains until reaching an unbound var or non-var term
+  def walk(t: Term, s: LinkedHashMap[String, Object]): Term {
+    if t is TVar {
+      val vt = t as TVar
+      val binding = s.get(vt.name())
+      if binding == null { return t }
+      return walk(binding as Term, s)
+    }
+    return t
+  }
+
+  // Return a copy of s extended with name -> t
+  def bind(s: LinkedHashMap[String, Object], name: String, t: Term): LinkedHashMap[String, Object] {
+    val copy = new LinkedHashMap[String, Object]()
+    foreach (k, val_) in s { copy.put(k, val_) }
+    copy.put(name, t)
+    return copy
+  }
+
+  // Unify parallel argument lists; returns extended substitution or null
+  def unifyArgs(a1: ArrayList[Object], a2: ArrayList[Object], s: LinkedHashMap[String, Object]): LinkedHashMap[String, Object]? {
+    if a1.size != a2.size { return null }
+    var cur: LinkedHashMap[String, Object] = s
+    foreach i: Int in 0..<a1.size {
+      val r = unify(a1[i] as Term, a2[i] as Term, cur)
+      if r != null { cur = r } else { return null }
+    }
+    return cur
+  }
+
+  // Most general unifier; returns extended substitution or null on failure
+  def unify(t1: Term, t2: Term, s: LinkedHashMap[String, Object]): LinkedHashMap[String, Object]? {
+    val s1 = walk(t1, s)
+    val s2 = walk(t2, s)
+    if s1 is TVar { return bind(s, (s1 as TVar).name(), s2) }
+    if s2 is TVar { return bind(s, (s2 as TVar).name(), s1) }
+    return select s1 {
+      case a1 is TAtom:
+        if s2 is TAtom && (s2 as TAtom).name() == a1.name() { s } else { null }
+      case n1 is TNum:
+        if s2 is TNum && (s2 as TNum).n() == n1.n() { s } else { null }
+      case c1 is TCompound:
+        if s2 is TCompound {
+          val c2_ = s2 as TCompound
+          if c1.functor() != c2_.functor() { null }
+          else { unifyArgs(c1.args(), c2_.args(), s) }
+        } else { null }
+      else: null
+    }
+  }
+
+  // Rename every variable in t with a fresh activation id (avoids clash)
+  def renameTerm(t: Term, id: Int, m: LinkedHashMap[String, String]): Term {
+    return select t {
+      case vt is TVar: {
+        if !m.containsKey(vt.name()) { m.put(vt.name(), vt.name() + "_" + id) }
+        new TVar(m.get(vt.name()) as String)
+      }
+      case c is TCompound: {
+        val newArgs = new ArrayList[Object]()
+        foreach arg: Object in c.args() { newArgs.add(renameTerm(arg as Term, id, m)) }
+        new TCompound(c.functor(), newArgs)
+      }
+      else: t
+    }
+  }
+
+  def renameClause(clause: Clause, id: Int): Clause {
+    val m = new LinkedHashMap[String, String]()
+    val newHead = renameTerm(clause.head(), id, m)
+    val newBody = new ArrayList[Object]()
+    foreach g: Object in clause.body() { newBody.add(renameTerm(g as Term, id, m)) }
+    return new Clause(newHead, newBody)
+  }
+
+  // Fully apply a substitution to a term (for displaying solutions)
+  def applySubst(t: Term, s: LinkedHashMap[String, Object]): Term {
+    val w = walk(t, s)
+    if w is TCompound {
+      val c = w as TCompound
+      val newArgs = new ArrayList[Object]()
+      foreach arg: Object in c.args() { newArgs.add(applySubst(arg as Term, s)) }
+      return new TCompound(c.functor(), newArgs)
+    }
+    return w
+  }
+
+  // Depth-first SLD resolution; returns list of all satisfying substitutions
+  def solve(goals: ArrayList[Object], s: LinkedHashMap[String, Object], depth: Int): ArrayList[Object] {
+    val results = new ArrayList[Object]()
+    if goals.size == 0 { results.add(s); return results }
+    if depth > 60 { return results }
+
+    val goal = goals[0] as Term
+    val rest = new ArrayList[Object]()
+    foreach i: Int in 1..<goals.size { rest.add(goals[i]) }
+
+    foreach c: Object in db {
+      val id     = freshId()
+      val clause = renameClause(c as Clause, id)
+      val s2     = unify(goal, clause.head(), s)
+      if s2 != null {
+        val newGoals = new ArrayList[Object]()
+        newGoals.addAll(clause.body())
+        newGoals.addAll(rest)
+        results.addAll(solve(newGoals, s2, depth + 1))
+      }
+    }
+    return results
+  }
+
+  def collectVars(t: Term, found: ArrayList[String]): void {
+    select t {
+      case vt is TVar: if !found.contains(vt.name()) { found.add(vt.name()) }
+      case c is TCompound: foreach arg: Object in c.args() { collectVars(arg as Term, found) }
+      else: {}
+    }
+  }
+
+  def fact(head: Term): void { db.add(new Clause(head, new ArrayList[Object]())) }
+  def rule(head: Term, body: ArrayList[Object]): void { db.add(new Clause(head, body)) }
+
+  // Run a query and print at most maxSols solutions
+  def query(label: String, goals: ArrayList[Object], maxSols: Int): void {
+    IO::println("?- " + label)
+    val qVars = new ArrayList[String]()
+    foreach g: Object in goals { collectVars(g as Term, qVars) }
+    val emptySubst = new LinkedHashMap[String, Object]()
+    val solutions  = solve(goals, emptySubst, 0)
+    if solutions.size == 0 {
+      IO::println("   false.")
+    } else {
+      var shown: Int = 0
+      foreach sol: Object in solutions {
+        if shown >= maxSols { IO::println("   ... (#{solutions.size - shown} more)"); break }
+        val subst = sol as LinkedHashMap[String, Object]
+        if qVars.size == 0 {
+          IO::println("   true.")
+        } else {
+          foreach varName: String in qVars {
+            val value = applySubst(new TVar(varName), subst)
+            IO::println("   #{varName} = #{value.toStr()}")
+          }
+          if shown < solutions.size - 1 { IO::println("   ;") }
+        }
+        shown++
+      }
+      if shown == solutions.size { IO::println("   (#{solutions.size} solution#{if solutions.size == 1 { "" } else { "s" }})") }
+    }
+    IO::println("")
+  }
+}
+
+// ── Term builder DSL ──────────────────────────────────────────────────────────
+
+def atom(s: String): Term = new TAtom(s)
+def v(s: String): Term    = new TVar(s)
+def num(n: Int): Term     = new TNum(n)
+
+def c1(f: String, a: Term): Term {
+  val l = new ArrayList[Object](); l.add(a); return new TCompound(f, l)
+}
+def c2(f: String, a: Term, b: Term): Term {
+  val l = new ArrayList[Object](); l.add(a); l.add(b); return new TCompound(f, l)
+}
+def c3(f: String, a: Term, b: Term, cc: Term): Term {
+  val l = new ArrayList[Object](); l.add(a); l.add(b); l.add(cc); return new TCompound(f, l)
+}
+
+def pNil(): Term = atom("[]")
+def pCons(h: Term, t: Term): Term = c2(".", h, t)
+def pList1(a: Term): Term = pCons(a, pNil())
+def pList2(a: Term, b: Term): Term = pCons(a, pCons(b, pNil()))
+def pList3(a: Term, b: Term, cc: Term): Term = pCons(a, pCons(b, pCons(cc, pNil())))
+def pList4(a: Term, b: Term, cc: Term, d: Term): Term = pCons(a, pCons(b, pCons(cc, pCons(d, pNil()))))
+
+def body0(): ArrayList[Object] = new ArrayList[Object]()
+def body1(a: Term): ArrayList[Object] { val l = new ArrayList[Object](); l.add(a); return l }
+def body2(a: Term, b: Term): ArrayList[Object] { val l = new ArrayList[Object](); l.add(a); l.add(b); return l }
+def body3(a: Term, b: Term, cc: Term): ArrayList[Object] { val l = new ArrayList[Object](); l.add(a); l.add(b); l.add(cc); return l }
+def body4(a: Term, b: Term, cc: Term, d: Term): ArrayList[Object] { val l = new ArrayList[Object](); l.add(a); l.add(b); l.add(cc); l.add(d); return l }
+
+// ── Knowledge-base builders ───────────────────────────────────────────────────
+
+def loadFamilyTree(p: Prolog): void {
+  // ─ Facts ─────────────────────────────────────────────────────────────────
+  p.fact(c2("parent", atom("tom"),  atom("bob")))
+  p.fact(c2("parent", atom("tom"),  atom("liz")))
+  p.fact(c2("parent", atom("bob"),  atom("ann")))
+  p.fact(c2("parent", atom("bob"),  atom("pat")))
+  p.fact(c2("parent", atom("pat"),  atom("jim")))
+  p.fact(c1("male",   atom("tom")))
+  p.fact(c1("male",   atom("bob")))
+  p.fact(c1("male",   atom("jim")))
+  p.fact(c1("female", atom("liz")))
+  p.fact(c1("female", atom("ann")))
+  p.fact(c1("female", atom("pat")))
+
+  // ─ Rules ─────────────────────────────────────────────────────────────────
+  // grandparent(X,Z) :- parent(X,Y), parent(Y,Z)
+  p.rule(c2("grandparent", v("X"), v("Z")),
+         body2(c2("parent", v("X"), v("Y")), c2("parent", v("Y"), v("Z"))))
+
+  // ancestor(X,Y) :- parent(X,Y)
+  p.rule(c2("ancestor", v("X"), v("Y")), body1(c2("parent", v("X"), v("Y"))))
+
+  // ancestor(X,Y) :- parent(X,Z), ancestor(Z,Y)
+  p.rule(c2("ancestor", v("X"), v("Y")),
+         body2(c2("parent", v("X"), v("Z")), c2("ancestor", v("Z"), v("Y"))))
+
+  // father(X,Y) :- parent(X,Y), male(X)
+  p.rule(c2("father", v("X"), v("Y")),
+         body2(c2("parent", v("X"), v("Y")), c1("male", v("X"))))
+
+  // mother(X,Y) :- parent(X,Y), female(X)
+  p.rule(c2("mother", v("X"), v("Y")),
+         body2(c2("parent", v("X"), v("Y")), c1("female", v("X"))))
+}
+
+def loadListPredicates(p: Prolog): void {
+  // member(X,[X|_])
+  p.rule(c2("member", v("X"), pCons(v("X"), v("_T"))), body0())
+
+  // member(X,[_|T]) :- member(X,T)
+  p.rule(c2("member", v("X"), pCons(v("_H"), v("T"))),
+         body1(c2("member", v("X"), v("T"))))
+
+  // append([],L,L)
+  p.rule(c3("append", pNil(), v("L"), v("L")), body0())
+
+  // append([H|T],L,[H|R]) :- append(T,L,R)
+  p.rule(c3("append", pCons(v("H"), v("T")), v("L"), pCons(v("H"), v("R"))),
+         body1(c3("append", v("T"), v("L"), v("R"))))
+
+  // last(X,[X])
+  p.rule(c2("last", v("X"), pList1(v("X"))), body0())
+
+  // last(X,[_|T]) :- last(X,T)
+  p.rule(c2("last", v("X"), pCons(v("_H"), v("T"))),
+         body1(c2("last", v("X"), v("T"))))
+
+  // rev_acc([],A,A)
+  p.rule(c3("rev_acc", pNil(), v("A"), v("A")), body0())
+
+  // rev_acc([H|T],A,R) :- rev_acc(T,[H|A],R)
+  p.rule(c3("rev_acc", pCons(v("H"), v("T")), v("A"), v("R")),
+         body1(c3("rev_acc", v("T"), pCons(v("H"), v("A")), v("R"))))
+
+  // reverse(L,R) :- rev_acc(L,[],R)
+  p.rule(c2("reverse", v("L"), v("R")),
+         body1(c3("rev_acc", v("L"), pNil(), v("R"))))
+
+  // length([],0)
+  p.rule(c2("length", pNil(), num(0)), body0())
+}
+
+def loadArithmetic(p: Prolog): void {
+  // Explicit plus/times facts for small integers (0..5)
+  foreach x: Int in 0..5 {
+    foreach y: Int in 0..5 {
+      p.fact(c3("plus",  num(x), num(y), num(x + y)))
+      p.fact(c3("times", num(x), num(y), num(x * y)))
+    }
+  }
+}
+
+def loadGraph(p: Prolog): void {
+  // Directed graph: edge facts
+  p.fact(c2("edge", atom("a"), atom("b")))
+  p.fact(c2("edge", atom("b"), atom("c")))
+  p.fact(c2("edge", atom("c"), atom("d")))
+  p.fact(c2("edge", atom("a"), atom("d")))
+  p.fact(c2("edge", atom("d"), atom("e")))
+
+  // path(X,X)
+  p.rule(c2("path", v("X"), v("X")), body0())
+
+  // path(X,Z) :- edge(X,Y), path(Y,Z)
+  p.rule(c2("path", v("X"), v("Z")),
+         body2(c2("edge", v("X"), v("Y")), c2("path", v("Y"), v("Z"))))
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val p = new Prolog()
+  loadFamilyTree(p)
+  loadListPredicates(p)
+  loadArithmetic(p)
+  loadGraph(p)
+
+  IO::println("=== Family Tree ===")
+  p.query("parent(tom, X)",     body1(c2("parent",     atom("tom"),  v("X"))), 10)
+  p.query("grandparent(tom, Z)", body1(c2("grandparent", atom("tom"), v("Z"))), 10)
+  p.query("ancestor(tom, Y)",   body1(c2("ancestor",   atom("tom"),  v("Y"))), 10)
+  p.query("father(F, bob)",     body1(c2("father",     v("F"),       atom("bob"))), 5)
+  p.query("mother(M, jim)",     body1(c2("mother",     v("M"),       atom("jim"))), 5)
+
+  IO::println("=== List Operations ===")
+  p.query("member(X, [a,b,c])",
+          body1(c2("member", v("X"), pList3(atom("a"), atom("b"), atom("c")))), 5)
+  p.query("append([1,2],[3,4],R)",
+          body1(c3("append", pList2(num(1), num(2)), pList2(num(3), num(4)), v("R"))), 3)
+  p.query("last(L, [p,q,r])",
+          body1(c2("last", v("L"), pList3(atom("p"), atom("q"), atom("r")))), 3)
+  p.query("reverse([1,2,3,4], R)",
+          body1(c2("reverse", pList4(num(1), num(2), num(3), num(4)), v("R"))), 3)
+
+  IO::println("=== Arithmetic ===")
+  p.query("plus(3, 4, R)",   body1(c3("plus",  num(3), num(4), v("R"))), 2)
+  p.query("plus(X, 2, 5)",   body1(c3("plus",  v("X"), num(2), num(5))), 2)
+  p.query("times(3, 4, R)",  body1(c3("times", num(3), num(4), v("R"))), 2)
+
+  IO::println("=== Graph Reachability ===")
+  p.query("path(a, Z)",  body1(c2("path", atom("a"), v("Z"))), 8)
+  p.query("path(b, e)",  body1(c2("path", atom("b"), atom("e"))), 3)
+
+  IO::println("=== Multi-goal Queries ===")
+  // father(F, C), ancestor(C, jim)
+  val q1 = body2(c2("father",   v("F"), v("C")),
+                 c2("ancestor", v("C"), atom("jim")))
+  p.query("father(F,C), ancestor(C,jim)", q1, 5)
+
+  // member(X, [ann,pat,liz]), female(X)
+  val q2 = body2(c2("member", v("X"), pList3(atom("ann"), atom("pat"), atom("liz"))),
+                 c1("female", v("X")))
+  p.query("member(X,[ann,pat,liz]), female(X)", q2, 5)
+
+  IO::println("=== Mode Queries (generate) ===")
+  // append(A, B, [1,2,3]) — generate all splits of the list
+  p.query("append(A, B, [1,2,3])",
+          body1(c3("append", v("A"), v("B"),
+                   pList3(num(1), num(2), num(3)))), 5)
+}

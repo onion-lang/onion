@@ -35,6 +35,10 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--dump-typed-ast` - 型付けされたASTの概要を標準エラー出力に表示
 - `--warn <off|on|error>` - 警告レベルを設定
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
+- `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）
+- `--law-seed <n>` / `--law-samples <n>` - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する
+- `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）
+- `ONION_DAEMON=1` (環境変数) - `onionc` と `onion script.on` は常駐デーモン（`onion.tools.daemon`）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。`java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` で制御できる
 
 ## 高レベルアーキテクチャ
 
@@ -53,7 +57,9 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
     ↓
 [4] 末尾呼び出し最適化 → 最適化された型付きAST
     ↓
-[5] コード生成 (ASM) → JVMバイトコード
+[5] 相互再帰最適化 → 最適化された型付きAST
+    ↓
+[6] コード生成 (ASM) → JVMバイトコード
     ↓
 クラスのロードと実行
 ```
@@ -96,7 +102,14 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
    - 深い再帰（例: 10000回以上の呼び出し）でのStackOverflowErrorを防止
    - 出力: 最適化された型付きAST
 
-5. **コード生成** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`)
+5. **相互再帰最適化** (`src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala`)
+   - 末尾呼び出し最適化の後に実行される、独立したフェーズ
+   - オプトイン: 互いに呼び出し合う `@TailRecursive` 付きメソッドのグループ（強連結成分として検出される相互再帰）を、
+     単一のステートマシンメソッドに変換し、そのグループでスタックが伸び続けないようにする
+   - グループが注釈付きでも要件を満たせない場合は `W0016` で警告
+   - 出力: 最適化された型付きAST
+
+6. **コード生成** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`)
    - **パイプラインの主境界** は `TypedAstCodeGeneration` → `backend/asm/AsmBackend.scala`
    - **既存の大きい実装本体** は `src/main/scala/onion/compiler/backend/asm/AsmCodeGeneration.scala`
    - ビジターパターン: `src/main/scala/onion/compiler/backend/asm/AsmCodeGenerationVisitor.scala`
@@ -241,6 +254,7 @@ CI はどちらの影響も受けません。差分実行の状態は `target/` 
 - **メインコンパイラロジック**: `src/main/scala/onion/compiler/`
 - **最適化**: `src/main/scala/onion/compiler/optimization/`
   - `TailCallOptimization.scala` - 末尾再帰 → ループ変換
+  - `MutualRecursionOptimization.scala` - `@TailRecursive` 相互再帰グループ → ステートマシン
 - **パーサー文法**: `grammar/JJOnionParser.jj`
 - **ランタイムライブラリ**: `src/main/java/onion/` (Javaインターフェース)
 - **ツール (CLI)**: `src/main/scala/onion/tools/`
@@ -332,6 +346,44 @@ Type::methodName
 ```onion
 do[Future] { x <- asyncOp(); ret x + 1 }
 do[Option] { a <- getA(); b <- getB(); ret a + b }
+```
+
+**シェイプファーストスクリプティング（スキームリテラル、正規表現パターン、パイプライン、auto-CLI）:**
+```onion
+// スキームプレフィックス付きの RAW 文字列リテラル（\\ エスケープ不要。re()/file()/http() の糖衣構文）:
+val p    = re"\d+-\d+"                        // コンパイル済みの java.util.regex.Pattern
+val rows = file"data.csv".csvRows()           // 読み込み + RFC4180 パース、ヘッダー名でマッピング
+val body = http"https://api.example.com/x".get()
+// re/file/http に限らず、任意の識別子プレフィックスが使える: `prefix"raw"` は
+// `prefix("raw")` に展開されるので、その名前の関数を定義するだけで自作できる（sql"..."、
+// money"... など）。キーワードセーフ: `return"x"`（スペースなし）は `return "x"` のままで、
+// 呼び出しにはならない。
+def sql(q: String): String = "[SQL] " + q.trim()
+val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
+
+// 正規表現リテラルは select のパターンとしても第一級（ANCHORED マッチ。コンパイル時に
+// チェックされる: 不正なパターンは E0059、グループ数と束縛数の不一致は E0060）:
+select request {
+  case re"GET (\S+) HTTP/(\S+)" (path, ver): handleGet(path, ver)
+  case re"PING": pong()
+  else: bad()
+}
+
+// パターン付きレコード: `from re"..."` はシェイプから型付きパーサーを導出する。
+// `from` はソフトキーワード（正規表現リテラルの直前でのみ特別な意味を持つ）。
+// 成分ごとに1グループ対応。対応する成分型は String/Int/Long/Double/Float/Boolean/Short/Byte
+// （グループ数の不一致は E0060、不正な正規表現は E0059、非対応の成分型は E0061）。
+record Access(time: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED；マッチ失敗・変換失敗時は null
+val rows: List = Access::parseAll(logText)                  // 1行ずつパースし、null は除外される
+
+// |> パイプライン: e |> f は f(e)、e |> f(a) は f(e, a)。改行してから |> を書いても継続扱い
+xs.map { x -> x * 2 } |> println
+
+// auto-CLI: トップレベルの main のシグネチャから引数パースを自動導出
+def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+// $ onion script.on world --count 5 --loud   （エラー時は usage を自動生成）
 ```
 
 **非同期プログラミング:**

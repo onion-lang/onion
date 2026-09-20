@@ -1,0 +1,324 @@
+// PhoneticSearch.on — phonetic name search using Soundex and Levenshtein distance
+// Exercises: extension String (soundex/editDistance/normalize), records with
+//            example clauses, ADT case-enum (SearchMode), collection pipelines
+//            (filter/map/groupBy/sortedBy/find/fold), select type patterns,
+//            foreach ranges and (k,v) on Map, string interpolation, while loops,
+//            nullable types, and closures.
+
+// ─── String extensions ────────────────────────────────────────────────────────
+
+extension String {
+
+  // Convert to uppercase and strip non-alpha characters
+  def normalize(): String {
+    val s: String = self.toUpperCase()
+    var result: String = ""
+    foreach i: Int in 0..<s.length() {
+      val code: Int = s.charAt(i) as Int
+      if code >= 65 && code <= 90 { result = result + s.substring(i, i + 1) }
+    }
+    return result
+  }
+
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+
+  // American Soundex: letter + 3 digits, rules per NIST spec
+  def soundex(): String {
+    val n: String = self.normalize()
+    if n.length() == 0 { return "0000" }
+
+    // Coding table for letters A-Z (0=ignore/vowel, 1-6=code)
+    val codes: Int[] = new Int[26]
+    codes[0] = 0   // A
+    codes[1] = 1   // B
+    codes[2] = 2   // C
+    codes[3] = 3   // D
+    codes[4] = 0   // E
+    codes[5] = 1   // F
+    codes[6] = 2   // G
+    codes[7] = 0   // H
+    codes[8] = 0   // I
+    codes[9] = 2   // J
+    codes[10] = 2  // K
+    codes[11] = 4  // L
+    codes[12] = 5  // M
+    codes[13] = 5  // N
+    codes[14] = 0  // O
+    codes[15] = 1  // P
+    codes[16] = 2  // Q
+    codes[17] = 6  // R
+    codes[18] = 2  // S
+    codes[19] = 3  // T
+    codes[20] = 0  // U
+    codes[21] = 1  // V
+    codes[22] = 0  // W
+    codes[23] = 2  // X
+    codes[24] = 0  // Y
+    codes[25] = 2  // Z
+
+    val first: String = n.substring(0, 1)
+    var digits: String = ""
+    var prev: Int = codes[(n.charAt(0) as Int) - 65]
+    var i: Int = 1
+    while i < n.length() && digits.length() < 3 {
+      val ch: Int = (n.charAt(i) as Int) - 65
+      val code: Int = codes[ch]
+      if code != 0 && code != prev {
+        digits = digits + code
+      }
+      if code != 0 { prev = code }
+      i = i + 1
+    }
+    while digits.length() < 3 { digits = digits + "0" }
+    return first + digits
+  }
+
+  // Levenshtein edit distance
+  def editDistance(other: String): Int {
+    val s: String = self
+    val t: String = other
+    val m: Int = s.length()
+    val n: Int = t.length()
+    if m == 0 { return n }
+    if n == 0 { return m }
+
+    // Use two-row rolling array
+    var prev: Int[] = new Int[n + 1]
+    var curr: Int[] = new Int[n + 1]
+    foreach j: Int in 0..n { prev[j] = j }
+
+    foreach i: Int in 1..m {
+      curr[0] = i
+      foreach j: Int in 1..n {
+        val sc: Int = if s.substring(i-1, i) == t.substring(j-1, j) { 0 } else { 1 }
+        val del: Int = prev[j] + 1
+        val ins: Int = curr[j-1] + 1
+        val sub: Int = prev[j-1] + sc
+        val mn: Int = if del < ins { del } else { ins }
+        curr[j] = if mn < sub { mn } else { sub }
+      }
+      val tmp: Int[] = prev
+      prev = curr
+      curr = tmp
+    }
+    return prev[n]
+  }
+
+  def startsWith(prefix: String): Boolean =
+    self.length() >= prefix.length() && self.substring(0, prefix.length()) == prefix
+
+}
+
+// ─── Search mode enum ────────────────────────────────────────────────────────
+
+enum SearchMode {
+  case ExactMatch
+  case SoundexMatch
+  case FuzzyMatch(maxDist: Int)
+
+  public:
+  def label(): String = select this {
+    case m is ExactMatch:  "exact"
+    case m is SoundexMatch:"soundex"
+    case m is FuzzyMatch:  "fuzzy(d≤#{(m as FuzzyMatch).maxDist()})"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Person(id: Int, name: String, city: String, occupation: String)
+  example { new Person(1, "Alice", "London", "engineer").name() == "Alice" }
+  example { new Person(2, "Bob", "Paris", "artist").city() == "Paris" }
+
+{
+public:
+  def soundexCode(): String = name().soundex()
+  def summary(): String = "#{id()}. #{name()} (#{city()}, #{occupation()}) [#{soundexCode()}]"
+}
+
+record SearchResult(person: Person, score: String)
+  example { new SearchResult(new Person(1,"A","B","C"), "exact").score() == "exact" }
+
+// ─── Database ────────────────────────────────────────────────────────────────
+
+class NameDatabase {
+  val entries: List[Person]
+
+public:
+  def this(entries: List[Person]) {
+    this.entries = entries
+  }
+
+  def search(query: String, mode: SearchMode): List[SearchResult] {
+    val results: List[SearchResult] = []
+    val qNorm: String = query.toUpperCase()
+    val qSdx: String  = query.soundex()
+
+    foreach p: Person in entries {
+      val pNorm: String = p.name().toUpperCase()
+      val matched: Boolean = select mode {
+        case m is ExactMatch:
+          pNorm == qNorm
+        case m is SoundexMatch:
+          p.soundexCode() == qSdx
+        case m is FuzzyMatch:
+          qNorm.editDistance(pNorm) <= (m as FuzzyMatch).maxDist()
+      }
+      if matched {
+        val score: String = select mode {
+          case m is ExactMatch:  "exact"
+          case m is SoundexMatch: "sdx=#{p.soundexCode()}"
+          case m is FuzzyMatch:   "dist=#{qNorm.editDistance(pNorm)}"
+        }
+        results.add(new SearchResult(p, score))
+      }
+    }
+    return results.sortedBy { r -> r.person().name() }
+  }
+
+  def groupBySoundex(): Map[Object, List[Person]] {
+    return entries.groupBy { p -> (p as Person).soundexCode() }
+  }
+
+  def size(): Int = entries.size
+}
+
+// ─── Build database ───────────────────────────────────────────────────────────
+
+val people: List[Person] = [
+  new Person(1,  "Smith",    "London",     "blacksmith"),
+  new Person(2,  "Smyth",    "Edinburgh",  "merchant"),
+  new Person(3,  "Smithe",   "Dublin",     "farmer"),
+  new Person(4,  "Schmidt",  "Berlin",     "engineer"),
+  new Person(5,  "Johnson",  "New York",   "lawyer"),
+  new Person(6,  "Jonson",   "Manchester", "playwright"),
+  new Person(7,  "Johnston", "Glasgow",    "banker"),
+  new Person(8,  "Johnstone","Aberdeen",   "sailor"),
+  new Person(9,  "Thompson", "Liverpool",  "teacher"),
+  new Person(10, "Thomson",  "Cardiff",    "doctor"),
+  new Person(11, "Tompson",  "Leeds",      "clerk"),
+  new Person(12, "Williams", "Bristol",    "musician"),
+  new Person(13, "Williamson","Oxford",    "scholar"),
+  new Person(14, "Wilson",   "York",       "farmer"),
+  new Person(15, "Brown",    "Cambridge",  "librarian"),
+  new Person(16, "Browne",   "Exeter",     "painter"),
+  new Person(17, "Braun",    "Hamburg",    "sculptor"),
+  new Person(18, "Lee",      "Birmingham", "tailor"),
+  new Person(19, "Leigh",    "Coventry",   "weaver"),
+  new Person(20, "Li",       "Sheffield",  "ironmonger"),
+  new Person(21, "Taylor",   "Norwich",    "tax collector"),
+  new Person(22, "Tailor",   "Ipswich",    "seamstress"),
+  new Person(23, "Miller",   "Portsmouth", "miller"),
+  new Person(24, "Müller",   "Munich",     "brewer"),
+  new Person(25, "Mueller",  "Vienna",     "baker")
+]
+
+val db: NameDatabase = new NameDatabase(people)
+println("=== Phonetic Name Search ===")
+println("Database: #{db.size()} entries")
+println("")
+
+// ─── 1. Soundex codes for all entries ─────────────────────────────────────────
+println("── Soundex codes ──")
+foreach p: Person in people {
+  println("  #{p.name().padRight(12)} → #{p.soundexCode()}")
+}
+println("")
+
+// ─── 2. Group by Soundex code ─────────────────────────────────────────────────
+println("── Groups sharing a Soundex code ──")
+val groups = db.groupBySoundex()
+foreach (code, members) in groups {
+  val ms = members as List
+  if ms.size > 1 {
+    val names: List[String] = ms.map { p -> (p as Person).name() }
+    println("  #{code}: #{names}")
+  }
+}
+println("")
+
+// ─── 3. Exact search ─────────────────────────────────────────────────────────
+println("── Exact search for 'Johnson' ──")
+val exactResults: List[SearchResult] = db.search("Johnson", new ExactMatch())
+foreach r: SearchResult in exactResults {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+// ─── 4. Soundex search ────────────────────────────────────────────────────────
+println("── Soundex search for 'Johnson' (finds phonetic variants) ──")
+val sdxResults: List[SearchResult] = db.search("Johnson", new SoundexMatch())
+foreach r: SearchResult in sdxResults {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+println("── Soundex search for 'Smith' ──")
+val sdxSmith: List[SearchResult] = db.search("Smith", new SoundexMatch())
+foreach r: SearchResult in sdxSmith {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+println("── Soundex search for 'Brown' ──")
+val sdxBrown: List[SearchResult] = db.search("Brown", new SoundexMatch())
+foreach r: SearchResult in sdxBrown {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+// ─── 5. Fuzzy edit-distance search ───────────────────────────────────────────
+println("── Fuzzy search for 'Smythe' (max dist 2) ──")
+val fuzzyResults: List[SearchResult] = db.search("Smythe", new FuzzyMatch(2))
+foreach r: SearchResult in fuzzyResults {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+println("── Fuzzy search for 'Wlliams' (typo, max dist 2) ──")
+val fuzzyWilliams: List[SearchResult] = db.search("Wlliams", new FuzzyMatch(2))
+foreach r: SearchResult in fuzzyWilliams {
+  println("  [#{r.score()}] #{r.person().summary()}")
+}
+println("")
+
+// ─── 6. Edit distance matrix for similar names ───────────────────────────────
+println("── Edit distance between Smith variants ──")
+val smithVariants: List[String] = ["Smith", "Smyth", "Smithe", "Schmidt"]
+foreach a: String in smithVariants {
+  foreach b: String in smithVariants {
+    if a != b {
+      println("  dist(#{a}, #{b}) = #{a.toUpperCase().editDistance(b.toUpperCase())}")
+    }
+  }
+}
+println("")
+
+// ─── 7. Search by city filter + soundex ──────────────────────────────────────
+println("── People named like 'Lee' living in cities starting with 'B' ──")
+val leeSdx: String = "Lee".soundex()
+val filtered: List[Person] = people.filter { p ->
+  (p as Person).soundexCode() == leeSdx && (p as Person).city().startsWith("B")
+}
+foreach p: Person in filtered {
+  println("  #{p.summary()}")
+}
+println("")
+
+// ─── 8. Statistics ────────────────────────────────────────────────────────────
+println("── Soundex uniqueness stats ──")
+val totalCodes: Int = groups.size()
+var shared: Int = 0
+foreach (code, members) in groups {
+  if (members as List).size > 1 { shared = shared + 1 }
+}
+println("  Total entries: #{db.size()}")
+println("  Unique Soundex codes: #{totalCodes}")
+println("  Codes shared by 2+ names: #{shared}")
+println("  Collision rate: #{(shared * 100) / totalCodes}%")
+println("")
+println("Done.")

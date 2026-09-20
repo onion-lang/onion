@@ -353,6 +353,50 @@ class AsmCodeGenerationVisitor(
     gen.visitLabel(endLabel)
 
   /**
+   * Safe static extension-method call: target?.extMethod(params)
+   * Null-checks the (boxed) target, optionally unboxes for a primitive receiver,
+   * then dispatches to the static extension container, wrapping the result as nullable.
+   */
+  override def visitSafeStaticExtensionCall(node: SafeStaticExtensionCall): Unit =
+    val nullLabel = gen.newLabel()
+    val endLabel = gen.newLabel()
+    val shape = callShape(node.method, node.containerClass.name)
+    val argTypes = shape.argTypes
+
+    // Push and null-check the boxed receiver.
+    visitTerm(node.target)
+    gen.dup()
+    gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+    // Non-null path: receiver is on stack (boxed). Adapt to the static method's first param.
+    node.receiverBasicType match
+      case Some(bt) => gen.unbox(asmType(bt))
+      case None     => // reference receiver: no adaptation needed
+
+    // Push the non-receiver arguments (argTypes(0) is the receiver; the rest match parameters).
+    emitArgumentsWithAdaptation(node.parameters, argTypes.drop(1))
+
+    if node.containerClass.isInterface then
+      gen.visitMethodInsn(Opcodes.INVOKESTATIC, shape.owner.getInternalName, node.method.name, shape.descriptor, true)
+    else
+      gen.invokeStatic(shape.owner, shape.asmMethod)
+
+    // Box primitive return type (safe call always returns nullable).
+    node.method.returnType match
+      case bt: BasicType if bt != BasicType.VOID => gen.box(asmType(bt))
+      case _ =>
+
+    gen.goTo(endLabel)
+
+    // Null path: discard the dup'd null and push null as result.
+    gen.visitLabel(nullLabel)
+    gen.pop()
+    if node.method.returnType != BasicType.VOID then
+      gen.visitInsn(Opcodes.ACONST_NULL)
+
+    gen.visitLabel(endLabel)
+
+  /**
    * Safe field access: target?.field
    * Returns null if target is null, otherwise accesses the field.
    *

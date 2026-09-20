@@ -274,6 +274,31 @@ object TypedAST {
   }
 
   /**
+   * Safe extension-method call: target?.extMethod(params)
+   * target is the nullable (boxed) receiver; if null, the call returns null.
+   * The backing static method lives on containerClass with the receiver as its first argument.
+   * When receiverBasicType is Some(bt) the receiver is unboxed (bt) before the static call.
+   */
+  class SafeStaticExtensionCall(
+    location: Location,
+    val target: TypedAST.Term,
+    val containerClass: TypedAST.ObjectType,
+    val method: TypedAST.Method,
+    val receiverBasicType: Option[BasicType],
+    val parameters: Array[TypedAST.Term]
+  ) extends Term(location) {
+    def this(
+      target: TypedAST.Term,
+      containerClass: TypedAST.ObjectType,
+      method: TypedAST.Method,
+      receiverBasicType: Option[BasicType],
+      parameters: Array[TypedAST.Term]
+    ) = this(null, target, containerClass, method, receiverBasicType, parameters)
+
+    def `type`: TypedAST.Type = NullableType.of(method.returnType)
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {

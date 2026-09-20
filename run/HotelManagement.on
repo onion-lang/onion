@@ -1,0 +1,315 @@
+// HotelManagement.on — hotel reservation and operations system
+// Exercises: records, enums, classes, collection pipelines, select, closures,
+// nullable, string interpolation, foreach/ranges, recursion, try/catch.
+
+enum RoomType { SINGLE, DOUBLE, SUITE, PENTHOUSE }
+
+enum ReservationStatus { PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED }
+
+record Guest(id: Int, name: String, email: String, loyaltyPoints: Int)
+
+record Room(number: Int, floor: Int, roomType: RoomType, pricePerNight: Int)
+
+record Reservation(
+  id: Int,
+  guest: Guest,
+  room: Room,
+  checkIn: String,
+  checkOut: String,
+  nights: Int,
+  status: ReservationStatus
+)
+
+record RoomServiceOrder(reservationId: Int, item: String, price: Int, delivered: Boolean)
+
+def roomTypeName(rt: RoomType): String {
+  if rt == RoomType::SINGLE   { return "Single" }
+  if rt == RoomType::DOUBLE   { return "Double" }
+  if rt == RoomType::SUITE    { return "Suite" }
+  return "Penthouse"
+}
+
+def nightlyRate(rt: RoomType): Int {
+  if rt == RoomType::SINGLE   { return 8000 }
+  if rt == RoomType::DOUBLE   { return 12000 }
+  if rt == RoomType::SUITE    { return 28000 }
+  return 65000
+}
+
+def statusLabel(s: ReservationStatus): String {
+  if s == ReservationStatus::PENDING     { return "Pending" }
+  if s == ReservationStatus::CONFIRMED   { return "Confirmed" }
+  if s == ReservationStatus::CHECKED_IN  { return "Checked In" }
+  if s == ReservationStatus::CHECKED_OUT { return "Checked Out" }
+  return "Cancelled"
+}
+
+class Hotel {
+  var hotelName: String
+  var rooms: List[Room]
+  var reservations: List[Reservation]
+  var roomServiceOrders: List[RoomServiceOrder]
+  var nextResId: Int
+
+public:
+  def this(n: String) {
+    this.hotelName = n
+    this.rooms = []
+    this.reservations = []
+    this.roomServiceOrders = []
+    this.nextResId = 1
+  }
+
+  def name(): String = hotelName
+  def roomCount(): Int = rooms.size
+
+  def addRoom(r: Room): void {
+    this.rooms.add(r)
+  }
+
+  def availableRooms(): List[Room] {
+    val occupied: List[Int] = reservations
+      .filter { res -> {
+        val s: ReservationStatus = (res as Reservation).status()
+        s == ReservationStatus::CHECKED_IN || s == ReservationStatus::CONFIRMED
+      }}
+      .map { res -> (res as Reservation).room().number() }
+    return rooms.filter { r ->
+      val num: Int = (r as Room).number()
+      !occupied.contains(num)
+    }
+  }
+
+  def roomsByType(rt: RoomType): List[Room] =
+    rooms.filter { r -> (r as Room).roomType() == rt }
+
+  def makeReservation(guest: Guest, roomNumber: Int, checkIn: String, checkOut: String, nights: Int): Reservation? {
+    val found: List[Room] = rooms.filter { r -> (r as Room).number() == roomNumber }
+    if found.size == 0 { return null }
+    val room: Room = found[0] as Room
+    val res: Reservation = new Reservation(
+      nextResId, guest, room, checkIn, checkOut, nights, ReservationStatus::CONFIRMED
+    )
+    this.nextResId = this.nextResId + 1
+    this.reservations.add(res)
+    return res
+  }
+
+  def checkIn(resId: Int): Boolean {
+    val matches: List[Reservation] = reservations.filter { res ->
+      val r: Reservation = res as Reservation
+      r.id() == resId && r.status() == ReservationStatus::CONFIRMED
+    }
+    if matches.size == 0 { return false }
+    val newList: List[Reservation] = []
+    foreach res: Reservation in reservations {
+      if res.id() == resId {
+        newList.add(new Reservation(res.id(), res.guest(), res.room(), res.checkIn(), res.checkOut(), res.nights(), ReservationStatus::CHECKED_IN))
+      } else {
+        newList.add(res)
+      }
+    }
+    this.reservations = newList
+    return true
+  }
+
+  def checkOut(resId: Int): Int {
+    val matches: List[Reservation] = reservations.filter { res ->
+      val r: Reservation = res as Reservation
+      r.id() == resId && r.status() == ReservationStatus::CHECKED_IN
+    }
+    if matches.size == 0 { return 0 }
+    val r: Reservation = matches[0] as Reservation
+    val roomBill: Int = r.room().pricePerNight() * r.nights()
+    val svcBill: Int = roomServiceOrders
+      .filter { o -> (o as RoomServiceOrder).reservationId() == resId }
+      .fold(0) { acc, o -> (acc as Int) + (o as RoomServiceOrder).price() }
+    val bill: Int = roomBill + svcBill
+    val newList: List[Reservation] = []
+    foreach res: Reservation in reservations {
+      if res.id() == resId {
+        newList.add(new Reservation(res.id(), res.guest(), res.room(), res.checkIn(), res.checkOut(), res.nights(), ReservationStatus::CHECKED_OUT))
+      } else {
+        newList.add(res)
+      }
+    }
+    this.reservations = newList
+    return bill
+  }
+
+  def orderRoomService(resId: Int, item: String, price: Int): void {
+    this.roomServiceOrders.add(new RoomServiceOrder(resId, item, price, false))
+  }
+
+  def guestsByLoyalty(): List[Guest] {
+    val guests: List[Guest] = reservations.map { res -> (res as Reservation).guest() }
+    return guests.sortedBy { g -> 0 - (g as Guest).loyaltyPoints() }
+  }
+
+  def revenueReport(): void {
+    IO::println("\n--- Revenue Report: #{hotelName} ---")
+    val completed: List[Reservation] = reservations.filter { res ->
+      (res as Reservation).status() == ReservationStatus::CHECKED_OUT
+    }
+    IO::println("Completed stays: #{completed.size}")
+    val roomRevenue: Int = completed.fold(0) { acc, res -> {
+      val r: Reservation = res as Reservation
+      (acc as Int) + r.room().pricePerNight() * r.nights()
+    }}
+    val svcRevenue: Int = roomServiceOrders.fold(0) { acc, o ->
+      (acc as Int) + (o as RoomServiceOrder).price()
+    }
+    IO::println("Room revenue:    #{roomRevenue} yen")
+    IO::println("Service revenue: #{svcRevenue} yen")
+    IO::println("Total revenue:   #{roomRevenue + svcRevenue} yen")
+  }
+
+  def occupancyByType(): void {
+    IO::println("\n--- Occupancy by Room Type ---")
+    val types: List[RoomType] = [RoomType::SINGLE, RoomType::DOUBLE, RoomType::SUITE, RoomType::PENTHOUSE]
+    foreach rt: RoomType in types {
+      val total: Int = roomsByType(rt).size
+      val inUse: Int = reservations
+        .filter { res -> {
+          val r: Reservation = res as Reservation
+          r.room().roomType() == rt && (
+            r.status() == ReservationStatus::CHECKED_IN ||
+            r.status() == ReservationStatus::CONFIRMED
+          )
+        }}
+        .size
+      if total > 0 {
+        IO::println("  #{roomTypeName(rt)}: #{inUse}/#{total} occupied")
+      }
+    }
+  }
+
+  def printAllReservations(): void {
+    IO::println("\n--- Reservations ---")
+    foreach res: Reservation in reservations {
+      val r: Reservation = res as Reservation
+      IO::println("  [#{r.id()}] #{r.guest().name()} | Room #{r.room().number()} | #{r.checkIn()} - #{r.checkOut()} | #{r.nights()}n | #{statusLabel(r.status())}")
+    }
+  }
+}
+
+def compound(principal: Int, ratePercent: Int, years: Int): Int {
+  if years == 0 { return principal }
+  return compound(principal + principal * ratePercent / 100, ratePercent, years - 1)
+}
+
+def loyaltyTier(points: Int): String {
+  if points >= 5000 { return "Platinum" }
+  if points >= 2000 { return "Gold" }
+  if points >= 500  { return "Silver" }
+  return "Bronze"
+}
+
+def calcPoints(nights: Int, ratePerNight: Int): Int = nights * ratePerNight / 100
+
+def main(): void {
+  val hotel: Hotel = new Hotel("Grand Onion Hotel")
+
+  // Add rooms across three floors
+  foreach n: Int in 0..1 {
+    hotel.addRoom(new Room(101 + n, 1, RoomType::SINGLE, nightlyRate(RoomType::SINGLE)))
+  }
+  foreach n: Int in 0..1 {
+    hotel.addRoom(new Room(201 + n, 2, RoomType::DOUBLE, nightlyRate(RoomType::DOUBLE)))
+  }
+  hotel.addRoom(new Room(301, 3, RoomType::SUITE,      nightlyRate(RoomType::SUITE)))
+  hotel.addRoom(new Room(401, 4, RoomType::PENTHOUSE,  nightlyRate(RoomType::PENTHOUSE)))
+
+  IO::println("=== #{hotel.name()} ===")
+  IO::println("Total rooms: #{hotel.roomCount()}")
+
+  // Print available rooms sorted by price
+  val avail: List[Room] = hotel.availableRooms().sortedBy { r -> (r as Room).pricePerNight() }
+  IO::println("\nAvailable rooms (sorted by price):")
+  foreach r: Room in avail {
+    IO::println("  Room #{r.number()} [#{roomTypeName(r.roomType())}] @ #{r.pricePerNight()} yen/night")
+  }
+
+  // Create guests
+  val alice: Guest = new Guest(1, "Alice Tanaka",   "alice@example.com", 3200)
+  val bob:   Guest = new Guest(2, "Bob Yamamoto",   "bob@example.com",   750)
+  val carol: Guest = new Guest(3, "Carol Sato",     "carol@example.com", 6100)
+  val david: Guest = new Guest(4, "David Kobayashi","david@example.com", 0)
+
+  // Make reservations
+  val r1: Reservation? = hotel.makeReservation(alice, 301, "2025-03-01", "2025-03-04", 3)
+  val r2: Reservation? = hotel.makeReservation(bob,   102, "2025-03-01", "2025-03-03", 2)
+  val r3: Reservation? = hotel.makeReservation(carol, 401, "2025-03-02", "2025-03-06", 4)
+  val r4: Reservation? = hotel.makeReservation(david, 201, "2025-03-03", "2025-03-05", 2)
+
+  hotel.printAllReservations()
+
+  // Check in and add room service
+  if r1 != null {
+    hotel.checkIn((r1 as Reservation).id())
+    hotel.orderRoomService((r1 as Reservation).id(), "Club Sandwich", 1800)
+    hotel.orderRoomService((r1 as Reservation).id(), "Sparkling Water", 600)
+  }
+  if r2 != null {
+    hotel.checkIn((r2 as Reservation).id())
+    hotel.orderRoomService((r2 as Reservation).id(), "Breakfast Set", 2500)
+  }
+  if r3 != null {
+    hotel.checkIn((r3 as Reservation).id())
+    hotel.orderRoomService((r3 as Reservation).id(), "Champagne", 8000)
+    hotel.orderRoomService((r3 as Reservation).id(), "Spa Treatment", 15000)
+  }
+
+  // Check out and print bills
+  IO::println("\n--- Checkout Bills ---")
+  if r1 != null {
+    val bill1: Int = hotel.checkOut((r1 as Reservation).id())
+    val pts: Int = calcPoints((r1 as Reservation).nights(), (r1 as Reservation).room().pricePerNight())
+    IO::println("#{alice.name()}: #{bill1} yen (earned #{pts} pts)")
+  }
+  if r2 != null {
+    val bill2: Int = hotel.checkOut((r2 as Reservation).id())
+    val pts: Int = calcPoints((r2 as Reservation).nights(), (r2 as Reservation).room().pricePerNight())
+    IO::println("#{bob.name()}: #{bill2} yen (earned #{pts} pts)")
+  }
+  if r3 != null {
+    val bill3: Int = hotel.checkOut((r3 as Reservation).id())
+    val pts: Int = calcPoints((r3 as Reservation).nights(), (r3 as Reservation).room().pricePerNight())
+    IO::println("#{carol.name()}: #{bill3} yen (earned #{pts} pts)")
+  }
+
+  hotel.printAllReservations()
+
+  // Occupancy snapshot (r4 still checked in)
+  if r4 != null {
+    hotel.checkIn((r4 as Reservation).id())
+  }
+  hotel.occupancyByType()
+
+  // Loyalty tiers for all guests
+  IO::println("\n--- Guest Loyalty Tiers ---")
+  val allGuests: List[Guest] = [alice, bob, carol, david]
+  val sorted: List[Guest] = allGuests.sortedBy { g -> 0 - (g as Guest).loyaltyPoints() }
+  foreach g: Guest in sorted {
+    IO::println("  #{g.name()} (#{g.loyaltyPoints()} pts) — #{loyaltyTier(g.loyaltyPoints())}")
+  }
+
+  hotel.revenueReport()
+
+  // Rooms by type summary
+  IO::println("\n--- Room Inventory by Type ---")
+  val types: List[RoomType] = [RoomType::SINGLE, RoomType::DOUBLE, RoomType::SUITE, RoomType::PENTHOUSE]
+  foreach rt: RoomType in types {
+    val count: Int = hotel.roomsByType(rt).size
+    IO::println("  #{roomTypeName(rt)}: #{count} room(s) @ #{nightlyRate(rt)} yen/night")
+  }
+
+  // Test nullable safety: try to book a nonexistent room
+  val bad: Reservation? = hotel.makeReservation(david, 999, "2025-04-01", "2025-04-02", 1)
+  if bad == null {
+    IO::println("\nCorrectly rejected booking for nonexistent room 999")
+  }
+
+  val bond: Int = compound(1000000, 5, 10)
+  IO::println("\n10-year hotel bond value at 5%%: #{bond} yen")
+}

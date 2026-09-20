@@ -760,6 +760,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
           val rewrittenParams = safeCall.parameters.map(rewriteTerm)
           new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
 
+        case safeExt: SafeStaticExtensionCall =>
+          val rewrittenTarget = rewriteTerm(safeExt.target)
+          val rewrittenParams = safeExt.parameters.map(rewriteTerm)
+          new SafeStaticExtensionCall(safeExt.location, rewrittenTarget, safeExt.containerClass, safeExt.method, safeExt.receiverBasicType, rewrittenParams)
+
         case callSuper: CallSuper =>
           val rewrittenTarget = rewriteTerm(callSuper.target)
           val rewrittenParams = callSuper.params.map(rewriteTerm)
@@ -776,6 +781,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
         case nnAssert: NonNullAssert =>
           new NonNullAssert(nnAssert.location, rewriteTerm(nnAssert.target), nnAssert.`type`)
+
 
         case safeRefArr: SafeRefArray =>
           new SafeRefArray(safeRefArr.location, rewriteTerm(safeRefArr.target), rewriteTerm(safeRefArr.index), safeRefArr.arrayType)
@@ -803,6 +809,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
         case mapLit: MapLiteral =>
           new MapLiteral(mapLit.location, mapLit.keys.map(rewriteTerm), mapLit.values.map(rewriteTerm), mapLit.`type`)
+
 
         case newObj: NewObject =>
           new NewObject(newObj.location, newObj.constructor, newObj.parameters.map(rewriteTerm))

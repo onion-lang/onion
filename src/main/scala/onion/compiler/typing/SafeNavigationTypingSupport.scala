@@ -47,8 +47,8 @@ private[compiler] final class SafeNavigationTypingSupport(
     val name = node.name
     val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
-      calls.reportMethodNotFound(node, targetType, name, calls.types(params))
-      return None
+      // No instance method found; fall back to extension methods before reporting an error
+      return calls.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
     }
 
     calls.selectSingleMethod(node, targetType, name, methods, calls.types(params)) match {

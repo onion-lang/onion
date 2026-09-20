@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/quality-bar.md` / `docs/ja/quality-bar.md` forced every `run/` sample-adding PR to edit the same two lines, guaranteeing merge conflicts between concurrent PRs** — `QualityBarSpec` required the sample-health and large-program rows to exactly equal the current `run/*.on` counts, and the large-program row additionally carried a full alphabetized name list that each PR had to re-splice its own sample into. Since any two PRs adding different samples both touched those exact lines, they conflicted whenever `develop` moved between them, and nobody wanted to hand-resolve a 5000+ character comma list — 29 such PRs piled up unmerged over two days as a result (#1370). `QualityBarSpec` now checks rows 2 and 3 against a tolerance band instead of exact equality (the same approach already used for row 1's test count), and the large-program row's per-sample name enumeration has been dropped from both docs. A sample addition no longer needs to touch `docs/quality-bar.md` at all; the recorded figures only need an occasional top-up once drift approaches the band.
+
+### Added
+
+- **`run/PackageSolver.on`** — a 237-line npm-style semantic version constraint resolver sample (records, sealed enum ADTs, generics, collection pipelines, select/pattern matching, nullable types, recursion, string interpolation), added to the `run/` corpus.
+
+## [0.90.0] - 2026-09-20
+
+### Added
+
+- **`run/MiniRouter.on`** — a 358-line tiny HTTP routing engine sample (path segments, wildcards, named parameters, method dispatch), added to the `run/` corpus.
+- **`run/FleetDispatcher.on`** — a 389-line fleet-dispatch-and-analytics sample (sealed case-enum vehicle kinds, records with methods, collection pipelines, `do[Option]`, extension methods on `Double`), added to the `run/` corpus.
+- **`run/PayrollCalc.on`** — a 303-line employee payroll & tax report sample (records, ADT enums, data-carrying enums, interfaces, collection pipelines, pattern matching), added to the `run/` corpus.
+
+## [0.89.0] - 2026-09-19
+
+### Fixed
+
+- **`docs/reference/stdlib.md` and `docs/ja/reference/stdlib.md` never showed the message-overload form of `onion.Assert`'s six comparison/null/boolean assertions** (`equals`, `notEquals`, `notNull`, `isNull`, `isTrue`, `isFalse`), each of which accepts a trailing custom failure message — a reader following the docs alone would not know the overload exists. Added one example per overload in both languages. `AssertDocCoverageSpec` previously matched documented members by name only, blind to arity, so it couldn't catch a documented-but-incomplete signature; it now also asserts (per member, by argument count) that both docs demonstrate the message form.
+
+## [0.88.0] - 2026-09-19
+
+### Fixed
+
+- **`maxBy`/`minBy` on a `List[T]` (non-null elements) raised a spurious `E0000` when the result was assigned to an explicitly nullable variable** (e.g. `val largest: Shape? = shapes.maxBy { ... }`), even though the same pattern worked fine with `sortedBy`. Root cause: `GenericMethodTypeArguments.collect()` unifies the formal return type against the expected context *after* argument-side unification; for `maxBy[T, R extends Number](List[T], Function1[T,R]): T`, the return-type unification step (`unify(T, Shape?)`) widened `T` itself from `Shape` to `Shape?` via `mergeNullability`, so the receiver check (`List[Shape]` vs. expected `List[Shape?]`) then failed. `sortedBy` escaped because its return type `List[T]` short-circuits the widening via an identity guard. Fixed by snapshotting `inferred` before return-type unification and reverting any binding that was only widened from `T` to `T?`, so the outer assignment site handles the nullable promotion without invalidating the receiver's type argument. Guarded by a new `MaxByNullableReturnSpec`, and exercised end-to-end by a new `run/CipherWorkbench.on` sample (classical Caesar/Vigenère/ROT13 cipher workbench).
+
+## [0.87.0] - 2026-09-19
+
+### Fixed
+
+- **`@TailRecursive` mutual-recursion optimization produced wrong results when a parameter reference was wrapped in `AsInstanceOf`** (e.g. an `Int` parameter widened to `Long` inside a mixed-primitive expression) — `MutualRecursionOptimization.rewriteParameterReferences`'s inner `rewriteTerm` only recursed into `RefLocal`, `Call`, `CallStatic`, `BinaryTerm`, `UnaryTerm`, and `SetLocal`, silently leaving every other `Term` subtype (including `AsInstanceOf`) unrewritten, so the nested `RefLocal` kept pointing at the original parameter slot instead of the state machine's loop-variable slot and read a stale value on every iteration. Added explicit recursive cases for the remaining `Term` subtypes (`AsInstanceOf`, `NonNullAssert`, `SafeCall`, `CallSuper`, `RefField`, `SafeFieldAccess`, `SetField`, `SetStaticField`, `InstanceOf`, `ArrayLength`, `RefArray`, `SafeRefArray`, `SetArray`, `NewObject`, `NewArray`, `NewArrayWithValues`, `ListLiteral`, `MapLiteral`, `Begin`, `SynchronizedTerm`), matching the exhaustive pattern already used by `CapturedVariableCollector.visitTerm`. Guarded by a new regression case in `TailCallOptimizationSpec` and exercised end-to-end by a new `run/NumberTheoryLab.on` sample.
 - **`docs/ja/examples/functional.md` was missing the entire "## Primitive Generics with Java Functional Interfaces" section** that `docs/examples/functional.md` documents — converting a lambda to a Java functional interface (`Comparator`, `Predicate`, `Supplier`, `Function`, ...) when the type argument is primitive (e.g. `Comparator[Int]`), with the compiler boxing the type parameter and generating the bridge method internally so `Int` parameters can be written naturally. The Japanese file jumped straight from "## 末尾ラムダ構文" ("Trailing Lambda Syntax") to "## 次のステップ" ("Next Steps"), so a Japanese-only reader had no way to learn this behavior exists. Added the equivalent Japanese section with a translated example. Guarded by a new `FunctionalExamplesPrimitiveGenericsJaParitySpec`, which also asserts the ja sample's output matches the English sample's.
 
 ## [0.86.0] - 2026-09-16

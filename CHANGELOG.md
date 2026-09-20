@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/PackageSolver.on`** — a 237-line npm-style semantic version constraint resolver sample (records, sealed enum ADTs, generics, collection pipelines, select/pattern matching, nullable types, recursion, string interpolation), added to the `run/` corpus.
+
 ## [0.90.0] - 2026-09-20
 
 ### Added

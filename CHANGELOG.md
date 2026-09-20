@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `docs/quality-bar.md` / `docs/ja/quality-bar.md` conflict fix from #1372 had been silently regressed** — a later merge resolving a stale conflict from an older branch restored the old exact-count-plus-full-name-enumeration format, undoing the tolerance-band fix and reintroducing the exact conflict pattern that caused the 29/30-PR backlog in #1370 (confirmed by PR #1324 hitting the identical conflict again). Re-applied the tolerance-band format (rows 2/3 now read approximate counts with no per-sample enumeration) in both language copies.
+
 ### Added
 
 - **`run/BloomFilter.on`** — a 203-line probabilistic membership data structure sample (bit-array manipulation, string hashing via extension methods, records, ADT enums, collection pipelines, statistics), added to the `run/` corpus.
+- **`run/PlanningSystem.on`** — a 300-line project scheduler sample (Kahn's topological sort, critical-path forward pass, greedy resource-aware assignment, records with body methods, data-carrying ADT enum matched via `select`), added to the `run/` corpus.
 
 ## [0.91.0] - 2026-09-20
 

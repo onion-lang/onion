@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`run/BloomFilter.on`** — a 203-line probabilistic membership data structure sample (bit-array manipulation, string hashing via extension methods, records, ADT enums, collection pipelines, statistics), added to the `run/` corpus.
 - **`run/PlanningSystem.on`** — a 300-line project scheduler sample (Kahn's topological sort, critical-path forward pass, greedy resource-aware assignment, records with body methods, data-carrying ADT enum matched via `select`), added to the `run/` corpus.
+- **`run/SubscriptionTracker.on`** — a 290-line subscription-bill tracker sample (records with `example` clauses, ADT case-enum billing cycles, plain enum categories, extension methods on `Int`/`String`, collection pipelines including `groupBy`/`partition`, nullable return types), added to the `run/` corpus.
 
 ## [0.91.0] - 2026-09-20
 

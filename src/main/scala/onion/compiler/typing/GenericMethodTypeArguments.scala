@@ -339,7 +339,19 @@ private[typing] object GenericMethodTypeArguments {
       if (expectedReturn != null) {
         val formalReturn =
           TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        // Snapshot arg-side bindings before unifying against the expected return type.
+        // Left-to-right rule: if return-type unification only widens a binding from T
+        // to T? (e.g. maxBy result assigned to Shape? widening T from Shape to Shape?),
+        // revert to the arg-side binding; the outer assignment handles the nullable
+        // promotion without invalidating the receiver type (List[Shape] vs List[Shape?]).
+        val inferredBeforeReturn = inferred.toMap
         unify(formalReturn, expectedReturn, callNode)
+        for ((name, before) <- inferredBeforeReturn) {
+          inferred.get(name).foreach { after =>
+            if ((after ne before) && (mergeNullability(before, after) eq after))
+              inferred(name) = before
+          }
+        }
       }
 
     }

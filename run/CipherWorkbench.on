@@ -1,0 +1,184 @@
+// CipherWorkbench.on - Classical cipher implementations
+// Exercises: records, extension methods, Map ops, closures, enum,
+// select/match, foreach, string interpolation, while loops, for loop.
+
+extension Int {
+  def isLetter(): Boolean = (self >= 65 && self <= 90) || (self >= 97 && self <= 122)
+  def isUpper(): Boolean = self >= 65 && self <= 90
+  def isLower(): Boolean = self >= 97 && self <= 122
+  def toUpper(): Int = if self >= 97 && self <= 122 { self - 32 } else { self }
+  def toLower(): Int = if self >= 65 && self <= 90 { self + 32 } else { self }
+  def rotateAlpha(n: Int): Int {
+    if !self.isLetter() { return self }
+    val base: Int = if self.isUpper() { 65 } else { 97 }
+    return ((self - base + n) % 26 + 26) % 26 + base
+  }
+}
+
+record CaesarKey(shift: Int) {
+public:
+  def description(): String = "Caesar(shift=#{shift()})"
+}
+
+record VigenereKey(keyword: String) {
+public:
+  def description(): String = "Vigenere(key=#{keyword()})"
+  def keyCharAt(pos: Int): Int {
+    val k: String = keyword().toLowerCase()
+    val idx: Int = pos % k.length()
+    return k.charAt(idx) - 97
+  }
+}
+
+def caesarTransform(text: String, shift: Int): String {
+  var result: String = ""
+  var i: Int = 0
+  while i < text.length() {
+    val c: Int = text.charAt(i)
+    result = result + (c.rotateAlpha(shift) as Char)
+    i++
+  }
+  return result
+}
+
+def caesarEncrypt(text: String, key: CaesarKey): String = caesarTransform(text, key.shift())
+
+def caesarDecrypt(text: String, key: CaesarKey): String =
+  caesarTransform(text, (26 - key.shift() % 26) % 26)
+
+def vigenereEncrypt(text: String, key: VigenereKey): String {
+  var result: String = ""
+  var i: Int = 0
+  var keyPos: Int = 0
+  while i < text.length() {
+    val c: Int = text.charAt(i)
+    if c.isLetter() {
+      result = result + (c.rotateAlpha(key.keyCharAt(keyPos)) as Char)
+      keyPos++
+    } else {
+      result = result + (c as Char)
+    }
+    i++
+  }
+  return result
+}
+
+def vigenereDecrypt(text: String, key: VigenereKey): String {
+  var result: String = ""
+  var i: Int = 0
+  var keyPos: Int = 0
+  while i < text.length() {
+    val c: Int = text.charAt(i)
+    if c.isLetter() {
+      val backShift: Int = (26 - key.keyCharAt(keyPos)) % 26
+      result = result + (c.rotateAlpha(backShift) as Char)
+      keyPos++
+    } else {
+      result = result + (c as Char)
+    }
+    i++
+  }
+  return result
+}
+
+def rot13(text: String): String = caesarTransform(text, 13)
+
+def letterFrequency(text: String): Map[String, Int] {
+  val freq: Map[String, Int] = [:]
+  var i: Int = 0
+  while i < text.length() {
+    val c: Int = text.charAt(i)
+    if c.isLetter() {
+      val k: String = "" + (c.toUpper() as Char)
+      val cur: Int? = freq[k]
+      freq[k] = if cur != null { cur + 1 } else { 1 }
+    }
+    i++
+  }
+  return freq
+}
+
+def sumMapValues(freq: Map[String, Int]): Int {
+  var total: Int = 0
+  foreach (_, v) in freq {
+    total = total + (v ?: 0)
+  }
+  return total
+}
+
+def printFrequency(text: String): void {
+  val freq: Map[String, Int] = letterFrequency(text)
+  val total: Int = sumMapValues(freq)
+  IO::println("Letter frequencies (#{total} letters):")
+  val keys: List[String] = Colls::toList(freq.keySet())
+  val sorted: List[String] = keys.sortedBy { k -> 0 - (freq[k] ?: 0) }
+  var shown: Int = 0
+  foreach k: String in sorted {
+    if shown < 6 {
+      val cnt: Int = freq[k] ?: 0
+      val pct: Double = if total > 0 { (cnt * 100.0) / total } else { 0.0 }
+      val pctRounded: Long = Math::round(pct * 10.0)
+      IO::println("  #{k}: #{cnt} (#{pctRounded / 10L}.#{pctRounded % 10L}%)")
+      shown++
+    }
+  }
+}
+
+def demoSection(title: String, plain: String, encrypted: String, decrypted: String): void {
+  IO::println("=== #{title} ===")
+  IO::println("  Plain:     #{plain}")
+  IO::println("  Encrypted: #{encrypted}")
+  IO::println("  Decrypted: #{decrypted}")
+  IO::println("  Round-trip ok: #{plain == decrypted}")
+}
+
+def main(): void {
+  val msg1: String = "Hello World"
+  val caesarKey: CaesarKey = new CaesarKey(3)
+  val enc1: String = caesarEncrypt(msg1, caesarKey)
+  val dec1: String = caesarDecrypt(enc1, caesarKey)
+  demoSection("Caesar Cipher - " + caesarKey.description(), msg1, enc1, dec1)
+  IO::println("")
+
+  val msg2: String = "Attack at dawn"
+  val vigKey: VigenereKey = new VigenereKey("SECRET")
+  val enc2: String = vigenereEncrypt(msg2, vigKey)
+  val dec2: String = vigenereDecrypt(enc2, vigKey)
+  demoSection("Vigenere Cipher - " + vigKey.description(), msg2, enc2, dec2)
+  IO::println("")
+
+  val msg3: String = "The Quick Brown Fox"
+  val enc3: String = rot13(msg3)
+  val dec3: String = rot13(enc3)
+  demoSection("ROT13 (self-inverse)", msg3, enc3, dec3)
+  IO::println("")
+
+  IO::println("=== Frequency Analysis on Vigenere ciphertext ===")
+  printFrequency(enc2)
+  IO::println("")
+
+  IO::println("=== Brute-force Caesar crack ===")
+  val mystery: String = caesarEncrypt("The answer is here", new CaesarKey(7))
+  IO::println("Ciphertext: #{mystery}")
+  var cracked: Boolean = false
+  for var s: Int = 0; s < 26; s++ {
+    val attempt: String = caesarDecrypt(mystery, new CaesarKey(s))
+    if attempt.toLowerCase().contains("the answer") {
+      IO::println("Cracked at shift #{s}: #{attempt}")
+      cracked = true
+    }
+  }
+  if !cracked { IO::println("Could not crack") }
+  IO::println("")
+
+  IO::println("=== Caesar cipher table (A-E with shift 1..5) ===")
+  val letters: List[String] = ["A", "B", "C", "D", "E"]
+  for var shift: Int = 1; shift <= 5; shift++ {
+    var row: String = "shift #{shift}: "
+    foreach letter: String in letters {
+      val enc: String = caesarEncrypt(letter, new CaesarKey(shift))
+      row = row + letter + "→" + enc + " "
+    }
+    IO::println(row)
+  }
+}

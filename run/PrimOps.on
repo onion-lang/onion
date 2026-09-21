@@ -1,0 +1,244 @@
+// PrimOps — extension methods on primitive types combined with records,
+// ADT enums, collection pipelines, and pattern matching.
+
+// ── Extension methods on Int ──────────────────────────────────────────────
+
+extension Int {
+  def isPrime(): Boolean {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    var d: Int = 3
+    while d * d <= self {
+      if self % d == 0 { return false }
+      d = d + 2
+    }
+    return true
+  }
+
+  def digitSum(): Int {
+    var n: Int = if self < 0 { -self } else { self }
+    var s: Int = 0
+    while n > 0 {
+      s = s + n % 10
+      n = n / 10
+    }
+    return s
+  }
+
+  def toBinary(): String {
+    if self == 0 { return "0" }
+    var n: Int = if self < 0 { -self } else { self }
+    var bits: String = ""
+    while n > 0 {
+      bits = (n % 2).toString() + bits
+      n = n / 2
+    }
+    return if self < 0 { "-" + bits } else { bits }
+  }
+
+  def gcd(other: Int): Int {
+    var a: Int = if self < 0 { -self } else { self }
+    var b: Int = if other < 0 { -other } else { other }
+    while b != 0 {
+      val t: Int = b
+      b = a % b
+      a = t
+    }
+    return a
+  }
+
+  def factorial(): Long {
+    if self <= 1 { return 1L }
+    var acc: Long = 1L
+    var i: Int = 2
+    while i <= self {
+      acc = acc * (i as Long)
+      i++
+    }
+    return acc
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────
+
+extension Double {
+  def toPercent(): String {
+    val p: Int = (self * 100.0) as Int
+    return "#{p}%"
+  }
+  def clamp(lo: Double, hi: Double): Double =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+// ── Extension methods on Boolean ─────────────────────────────────────────
+
+extension Boolean {
+  def toMark(): String = if self { "yes" } else { "no" }
+}
+
+// ── ADT enum: how a number is classified ─────────────────────────────────
+
+enum NumberClass {
+  case Prime
+  case Composite(smallestFactor: Int)
+  case One
+  case NonPositive
+}
+
+def classify(n: Int): NumberClass {
+  if n <= 0 { return new NonPositive() }
+  if n == 1 { return new One() }
+  if n.isPrime() { return new Prime() }
+  var d: Int = 2
+  while d * d <= n {
+    if n % d == 0 { return new Composite(d) }
+    d = d + 1
+  }
+  return new Composite(n)
+}
+
+def classLabel(nc: NumberClass): String =
+  select nc {
+    case nc is Prime: "prime"
+    case c is Composite: "composite(#{c.smallestFactor()})"
+    case nc is One: "one"
+    case nc is NonPositive: "non-positive"
+  }
+
+// ── Record: prime factorization summary ──────────────────────────────────
+
+record PrimeSummary(n: Int, factors: List[Int])
+
+def primeFactors(n: Int): List[Int] {
+  val result = new java.util.ArrayList[Int]()
+  var rem: Int = n
+  var d: Int = 2
+  while d * d <= rem {
+    while rem % d == 0 {
+      result.add(d)
+      rem = rem / d
+    }
+    d = d + 1
+  }
+  if rem > 1 { result.add(rem) }
+  return result
+}
+
+// ── Sample data and main logic ────────────────────────────────────────────
+
+val numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 17, 19, 20, 23, 25, 28, 29, 30]
+
+IO::println("=== Prime / Composite Classification ===")
+foreach n: Int in numbers {
+  val label: String = classLabel(classify(n))
+  IO::println("  #{n} -> #{label}")
+}
+
+IO::println("")
+IO::println("=== Primes in 2..30 ===")
+val primes = numbers.filter { n -> (n as Int).isPrime() }
+IO::println("  " + primes.toString())
+
+IO::println("")
+IO::println("=== Digit Sums ===")
+val digitSums = numbers.map { n -> "#{n}:#{(n as Int).digitSum()}" }
+IO::println("  " + digitSums.toString())
+
+IO::println("")
+IO::println("=== Binary Representations (primes only) ===")
+foreach p: Int in primes {
+  IO::println("  #{p} = #{p.toBinary()} (bin)")
+}
+
+IO::println("")
+IO::println("=== GCD Pairs ===")
+IO::println("  gcd(12, 8) = #{(12).gcd(8)}")
+IO::println("  gcd(100, 75) = #{(100).gcd(75)}")
+IO::println("  gcd(17, 13) = #{(17).gcd(13)}")
+
+IO::println("")
+IO::println("=== Factorials ===")
+foreach k: Int in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
+  IO::println("  #{k}! = #{(k as Int).factorial()}")
+}
+
+IO::println("")
+IO::println("=== Double Extensions ===")
+val ratios = [0.0, 0.25, 0.5, 0.75, 1.0]
+foreach r: Double in ratios {
+  IO::println("  #{r} -> #{r.toPercent()}, clamped(0.2,0.8)=#{r.clamp(0.2, 0.8)}")
+}
+
+IO::println("")
+IO::println("=== Boolean Extension ===")
+IO::println("  isPrime(7) -> #{(7).isPrime().toMark()}")
+IO::println("  isPrime(9) -> #{(9).isPrime().toMark()}")
+
+IO::println("")
+IO::println("=== Prime Factorizations ===")
+val composites = numbers.filter { n -> !(n as Int).isPrime() && (n as Int) > 1 }
+foreach c: Int in composites {
+  val summary = new PrimeSummary(c, primeFactors(c))
+  IO::println("  #{summary.n()} = #{summary.factors()}")
+}
+
+IO::println("")
+IO::println("=== Group numbers by class ===")
+val byClass = numbers.groupBy { n -> classLabel(classify(n as Int)) }
+foreach (k, v) in byClass {
+  IO::println("  #{k}: #{(v as List).size} number(s)")
+}
+
+IO::println("")
+IO::println("=== Sum of digit sums for primes ===")
+val primeDigitSumTotal = primes.fold(0) { acc, p -> (acc as Int) + (p as Int).digitSum() }
+IO::println("  total = #{primeDigitSumTotal}")
+
+IO::println("")
+IO::println("=== Sieve of Eratosthenes up to 50 ===")
+val limit: Int = 50
+val sieve = new Boolean[limit + 1]
+var si: Int = 0
+while si <= limit {
+  sieve[si] = true
+  si++
+}
+sieve[0] = false
+sieve[1] = false
+var p2: Int = 2
+while p2 * p2 <= limit {
+  if sieve[p2] {
+    var mul: Int = p2 * p2
+    while mul <= limit {
+      sieve[mul] = false
+      mul = mul + p2
+    }
+  }
+  p2++
+}
+var sievePrimes: String = ""
+var idx: Int = 2
+while idx <= limit {
+  if sieve[idx] { sievePrimes = sievePrimes + "#{idx} " }
+  idx++
+}
+IO::println("  " + sievePrimes.trim())
+
+IO::println("")
+IO::println("=== LCM via GCD ===")
+def lcm(a: Int, b: Int): Long = ((a as Long) * (b as Long)) / (a.gcd(b) as Long)
+IO::println("  lcm(4, 6) = #{lcm(4, 6)}")
+IO::println("  lcm(12, 18) = #{lcm(12, 18)}")
+IO::println("  lcm(7, 11) = #{lcm(7, 11)}")
+
+IO::println("")
+IO::println("=== Relative primality check ===")
+def showCoprime(a: Int, b: Int): void {
+  val coprime: Boolean = a.gcd(b) == 1
+  IO::println("  gcd(#{a},#{b})=#{a.gcd(b)} coprime=#{coprime.toMark()}")
+}
+showCoprime(3, 8)
+showCoprime(6, 9)
+showCoprime(5, 7)
+showCoprime(14, 21)

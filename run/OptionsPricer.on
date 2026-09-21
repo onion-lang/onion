@@ -1,0 +1,328 @@
+// OptionsPricer.on — Black-Scholes Options Pricing Engine (~250 lines)
+// Exercises: records, plain enums with methods, classes with static methods,
+//            collection pipelines (map/filter/sortedBy/groupBy/find),
+//            foreach loops, select/pattern matching, closures,
+//            string interpolation, Math functions, nullable types,
+//            extension Double, try/catch, while loop.
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum OptionType { CALL, PUT
+public:
+  def label(): String = select this {
+    case OptionType::CALL: "CALL"
+    case OptionType::PUT:  "PUT"
+  }
+}
+
+enum RiskLevel {
+  LOW, MEDIUM, HIGH, EXTREME
+public:
+  def label(): String = select this {
+    case RiskLevel::LOW:     "Low"
+    case RiskLevel::MEDIUM:  "Medium"
+    case RiskLevel::HIGH:    "High"
+    case RiskLevel::EXTREME: "Extreme"
+  }
+  def badge(): String = select this {
+    case RiskLevel::LOW:     "[  LOW  ]"
+    case RiskLevel::MEDIUM:  "[ MED   ]"
+    case RiskLevel::HIGH:    "[ HIGH  ]"
+    case RiskLevel::EXTREME: "[EXTREME]"
+  }
+}
+
+// ─── Extension methods on Double ─────────────────────────────────────────────
+
+extension Double {
+  def absD(): Double  = if self < 0.0 { 0.0 - self } else { self }
+  def fmt2(): String  = Format::fixed(self, 2)
+  def fmt4(): String  = Format::fixed(self, 4)
+  def fmt6(): String  = Format::fixed(self, 6)
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Underlying(ticker: String, spot: Double, vol: Double, divYield: Double)
+
+record Greeks(delta: Double, gamma: Double, theta: Double, vega: Double) {
+public:
+  def summary(): String =
+    "Δ=#{delta().fmt4()} Γ=#{gamma().fmt6()} Θ=#{theta().fmt4()} ν=#{vega().fmt4()}"
+}
+
+record OptionContract(
+  underlying: Underlying,
+  strike:     Double,
+  expiry:     Double,
+  optType:    OptionType
+) {
+public:
+  def label(): String =
+    "#{underlying().ticker()} #{optType().label()}#{(strike() as Int)}" +
+    "@T=#{expiry().fmt2()}"
+  def isCall(): Boolean = select optType() {
+    case OptionType::CALL: true
+    case OptionType::PUT:  false
+  }
+}
+
+record PricedOption(contract: OptionContract, price: Double, greeks: Greeks) {
+public:
+  def riskLevel(): RiskLevel {
+    val g: Double = greeks().gamma().absD()
+    if g > 0.05 { return RiskLevel::EXTREME }
+    if g > 0.02 { return RiskLevel::HIGH }
+    if g > 0.005 { return RiskLevel::MEDIUM }
+    return RiskLevel::LOW
+  }
+  def summary(): String =
+    "  #{contract().label()} | price=#{price().fmt4()} | #{greeks().summary()} | #{riskLevel().badge()}"
+}
+
+record Position(priced: PricedOption, quantity: Int) {
+public:
+  def marketValue(): Double =
+    priced().price() * (quantity() as Double)
+  def dollarDelta(): Double =
+    priced().greeks().delta() * (quantity() as Double) * priced().contract().underlying().spot()
+  def approxPnl(dSpot: Double): Double {
+    val d = priced().greeks().delta() * dSpot
+    val g = 0.5 * priced().greeks().gamma() * dSpot * dSpot
+    return (d + g) * (quantity() as Double)
+  }
+  def lineItem(): String =
+    "#{priced().contract().label()} x#{quantity()} MV=$#{marketValue().fmt2()}"
+}
+
+// ─── Black-Scholes Pricer ─────────────────────────────────────────────────────
+
+class BlackScholes {
+public:
+  // Abramowitz & Stegun 26.2.17 rational approximation for N(x)
+  static def ncdf(x: Double): Double {
+    val a: Double = if x >= 0.0 { x } else { 0.0 - x }
+    val t    = 1.0 / (1.0 + 0.2316419 * a)
+    val pdf  = Math::exp(-0.5 * a * a) / Math::sqrt(2.0 * Math::PI)
+    val poly = t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
+    val cdf  = 1.0 - pdf * poly
+    return if x >= 0.0 { cdf } else { 1.0 - cdf }
+  }
+
+  static def npdf(x: Double): Double =
+    Math::exp(-0.5 * x * x) / Math::sqrt(2.0 * Math::PI)
+
+  static def price(contract: OptionContract, riskFreeRate: Double): PricedOption {
+    val S     = contract.underlying().spot()
+    val K     = contract.strike()
+    val T     = contract.expiry()
+    val v     = contract.underlying().vol()
+    val q     = contract.underlying().divYield()
+    val r     = riskFreeRate
+    val sqrtT = Math::sqrt(T)
+    val vT    = v * sqrtT
+    val d1    = (Math::log(S / K) + (r - q + 0.5 * v * v) * T) / vT
+    val d2    = d1 - vT
+    val eqT   = Math::exp(-q * T)
+    val erT   = Math::exp(-r * T)
+
+    val thePrice: Double = select contract.optType() {
+      case OptionType::CALL: S * eqT * ncdf(d1) - K * erT * ncdf(d2)
+      case OptionType::PUT:  K * erT * ncdf(-d2) - S * eqT * ncdf(-d1)
+    }
+    val delta: Double = select contract.optType() {
+      case OptionType::CALL: eqT * ncdf(d1)
+      case OptionType::PUT:  eqT * (ncdf(d1) - 1.0)
+    }
+    val gamma       = eqT * npdf(d1) / (S * vT)
+    val vega        = S * eqT * npdf(d1) * sqrtT / 100.0
+    val thetaBase   = -S * eqT * npdf(d1) * v / (2.0 * sqrtT)
+    val theta: Double = select contract.optType() {
+      case OptionType::CALL: (thetaBase - r * K * erT * ncdf(d2)  + q * S * eqT * ncdf(d1))  / 365.0
+      case OptionType::PUT:  (thetaBase + r * K * erT * ncdf(-d2) - q * S * eqT * ncdf(-d1)) / 365.0
+    }
+    return new PricedOption(contract, thePrice, new Greeks(delta, gamma, theta, vega))
+  }
+}
+
+// ─── Implied-Volatility Solver (Newton-Raphson) ───────────────────────────────
+
+class IVSolver {
+public:
+  static def solve(contract: OptionContract, marketPrice: Double, r: Double): Double? {
+    var vol: Double = 0.25
+    var iter: Int = 0
+    while iter < 100 {
+      val testUnderlying = new Underlying(
+        contract.underlying().ticker(),
+        contract.underlying().spot(),
+        vol,
+        contract.underlying().divYield()
+      )
+      val testContract = new OptionContract(testUnderlying, contract.strike(), contract.expiry(), contract.optType())
+      val pd  = BlackScholes::price(testContract, r)
+      val diff  = pd.price() - marketPrice
+      val vegaRaw = pd.greeks().vega() * 100.0
+      if vegaRaw.absD() < 1.0e-10 { return null }
+      val step = diff / vegaRaw
+      vol = vol - step
+      if vol < 0.001 { vol = 0.001 }
+      if vol > 10.0  { vol = 10.0 }
+      if step.absD() < 1.0e-8 { return vol }
+      iter++
+    }
+    return null
+  }
+}
+
+// ─── Portfolio ────────────────────────────────────────────────────────────────
+
+class Portfolio {
+  var positions: List[Position] = []
+
+public:
+  def add(pos: Position): void   { positions.add(pos) }
+  def size(): Int                = positions.size
+
+  def totalValue(): Double {
+    var sum: Double = 0.0
+    foreach pos: Position in positions { sum = sum + pos.marketValue() }
+    return sum
+  }
+
+  def netDollarDelta(): Double {
+    var sum: Double = 0.0
+    foreach pos: Position in positions { sum = sum + pos.dollarDelta() }
+    return sum
+  }
+
+  def scenarioPnl(dSpot: Double): Double {
+    var sum: Double = 0.0
+    foreach pos: Position in positions { sum = sum + pos.approxPnl(dSpot) }
+    return sum
+  }
+
+  def printReport(header: String): void {
+    IO::println("--- #{header} ---")
+    foreach pos: Position in positions {
+      IO::println(pos.priced().summary() + " qty=#{pos.quantity()}")
+    }
+    IO::println("  Portfolio MV   : $#{totalValue().fmt2()}")
+    IO::println("  Net $Delta     : $#{netDollarDelta().fmt2()}")
+    IO::println("")
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def printScenarioTable(portfolio: Portfolio, shifts: List[Int]): void {
+  IO::println("--- P&L Scenario (spot moves) ---")
+  foreach dS: Int in shifts {
+    val pnl = portfolio.scenarioPnl(dS as Double)
+    val sign: String = if pnl >= 0.0 { "+" } else { "-" }
+    val barLen: Int = (pnl.absD() / 40.0 + 0.5) as Int
+    val maxBar: Int = if barLen > 24 { 24 } else { barLen }
+    var barStr: String = ""
+    var i: Int = 0
+    while i < maxBar { barStr = barStr + sign; i++ }
+    IO::println("  dS=#{dS,5}  PnL=#{Format::fixed(pnl, 6),14}  |#{barStr}")
+  }
+  IO::println("")
+}
+
+// ─── Main Program ─────────────────────────────────────────────────────────────
+
+val r: Double = 0.053   // 5.3% risk-free rate
+
+// Underlyings
+val aapl = new Underlying("AAPL", 185.0, 0.25, 0.006)
+val goog = new Underlying("GOOG", 175.0, 0.28, 0.0)
+val spy  = new Underlying("SPY",  450.0, 0.16, 0.015)
+
+// Build and price contracts
+val contracts: List[OptionContract] = [
+  new OptionContract(aapl, 185.0, 0.25,  OptionType::CALL),
+  new OptionContract(aapl, 185.0, 0.25,  OptionType::PUT),
+  new OptionContract(aapl, 190.0, 0.50,  OptionType::CALL),
+  new OptionContract(aapl, 180.0, 0.50,  OptionType::PUT),
+  new OptionContract(goog, 175.0, 0.25,  OptionType::CALL),
+  new OptionContract(goog, 170.0, 0.25,  OptionType::PUT),
+  new OptionContract(spy,  450.0, 0.083, OptionType::CALL),
+  new OptionContract(spy,  445.0, 0.083, OptionType::PUT)
+]
+
+val priced: List[PricedOption] = contracts.map { c -> BlackScholes::price(c as OptionContract, r) }
+
+// ── Print all prices ──
+IO::println("=== Black-Scholes Option Prices ===")
+IO::println("")
+foreach p: PricedOption in priced {
+  IO::println(p.summary())
+}
+IO::println("")
+
+// ── Group by underlying ticker ──
+val byTicker: Map[Object, List[PricedOption]] = priced.groupBy { p ->
+  (p as PricedOption).contract().underlying().ticker()
+}
+IO::println("=== By Underlying ===")
+foreach (ticker, group) in byTicker {
+  val callCt: Int = group.filter { p -> (p as PricedOption).contract().isCall() }.size
+  IO::println("  #{ticker}: #{group.size} options (#{callCt} calls, #{group.size - callCt} puts)")
+}
+IO::println("")
+
+// ── Risk distribution ──
+val byRisk: Map[Object, List[PricedOption]] = priced.groupBy { p ->
+  (p as PricedOption).riskLevel().label()
+}
+IO::println("=== Risk Distribution ===")
+foreach (level, group) in byRisk {
+  IO::println("  #{level}: #{group.size}")
+}
+IO::println("")
+
+// ── Calls sorted by delta descending ──
+val calls: List[PricedOption] = priced.filter { p -> (p as PricedOption).contract().isCall() }
+val sortedCalls = calls.sortedBy { p -> 0.0 - (p as PricedOption).greeks().delta() }
+IO::println("=== Calls Ranked by Delta ===")
+var rank: Int = 1
+foreach p: PricedOption in sortedCalls {
+  IO::println("  #{rank}. #{p.contract().label()}  delta=#{p.greeks().delta().fmt4()}  price=#{p.price().fmt4()}")
+  rank++
+}
+IO::println("")
+
+// ── Build a portfolio: long ATM straddle on AAPL + protective put on SPY ──
+val portfolio = new Portfolio()
+portfolio.add(new Position(priced[0] as PricedOption, 100))   // AAPL ATM Call x100
+portfolio.add(new Position(priced[1] as PricedOption, 100))   // AAPL ATM Put  x100
+portfolio.add(new Position(priced[7] as PricedOption,  50))   // SPY Put       x50
+portfolio.printReport("Portfolio: ATM Straddle (AAPL) + Hedge (SPY)")
+
+// ── Scenario table ──
+val shifts: List[Int] = [-20, -10, -5, 0, 5, 10, 20]
+printScenarioTable(portfolio, shifts)
+
+// ── Implied volatility solve ──
+val atmCall  = contracts[0]
+val ivResult: Double? = IVSolver::solve(atmCall, 7.50, r)
+IO::println("=== Implied Volatility ===")
+if ivResult != null {
+  val iv: Double = ivResult as Double
+  IO::println("  AAPL ATM CALL market price = $7.50 => IV = #{iv.fmt4()} (#{(iv * 100.0).fmt2()}%)")
+} else {
+  IO::println("  IV solver did not converge.")
+}
+IO::println("")
+
+// ── Find the cheapest OTM put among all contracts ──
+val otmPuts: List[PricedOption] = priced.filter { p ->
+  val opt: PricedOption = p as PricedOption
+  !opt.contract().isCall() && opt.contract().strike() < opt.contract().underlying().spot()
+}
+val cheapestPut: PricedOption? = otmPuts.find { p -> true } as PricedOption?
+if cheapestPut != null {
+  val cp: PricedOption = cheapestPut as PricedOption
+  IO::println("Cheapest OTM put: #{cp.contract().label()} price=#{cp.price().fmt4()}")
+}

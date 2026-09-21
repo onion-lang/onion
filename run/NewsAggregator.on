@@ -1,0 +1,341 @@
+// NewsAggregator.on -- news article categorization, filtering, and digest
+// Exercises: ADT enums with data-carrying cases and singleton case, records,
+// interfaces, extension methods on String and Double, closures, collection
+// pipelines (filter/map/fold/sortedBy/find/reduce), select/pattern matching on
+// ADTs with exhaustiveness, nullable handling, string interpolation, foreach on
+// ranges and maps, typed Map[K,V] and List[T], recursive helpers.
+
+// ── News category: ADT (sealed) enum ─────────────────────────────────────────
+enum Category {
+  case Technology(sector: String)
+  case Sports(sport: String)
+  case Politics(region: String)
+  case Science(field: String)
+  case Entertainment(medium: String)
+  case Breaking
+}
+
+// ── Sentiment: plain enum ─────────────────────────────────────────────────────
+enum Sentiment { POSITIVE, NEUTRAL, NEGATIVE }
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Source(name: String, reliability: Double)
+
+record Article(
+  title: String,
+  summary: String,
+  category: Category,
+  source: Source,
+  wordCount: Int,
+  tags: List[String],
+  sentiment: Sentiment
+)
+
+record CategoryStats(
+  label: String,
+  count: Int,
+  totalWords: Int,
+  avgReliability: Double
+) {
+public:
+  def avgWords(): Double = totalWords() * 1.0 / count()
+  def show(): String =
+    "#{label()}: #{count()} article(s), avg #{avgWords().intValue()} words, " +
+    "reliability #{avgReliability().asPercent()}"
+}
+
+record Digest(
+  title: String,
+  articles: List[Article],
+  generatedAt: String
+) {
+public:
+  def size(): Int = articles().size()
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+interface Renderable {
+  def render(): String
+}
+
+// ── Extension methods on String ───────────────────────────────────────────────
+extension String {
+  def truncate(maxLen: Int): String {
+    if self.length() <= maxLen { return self }
+    return self.substring(0, maxLen - 3) + "..."
+  }
+  def wordCount(): Int {
+    if self.trim().length() == 0 { return 0 }
+    return self.trim().split("\\s+").length
+  }
+  def capitalize(): String {
+    if self.length() == 0 { return self }
+    return self.substring(0, 1).toUpperCase() + self.substring(1)
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+extension Double {
+  def asPercent(): String = "#{(self * 100.0).intValue()}%"
+  def format2(): String {
+    val whole: Int = self.intValue()
+    val frac: Int = ((self - (whole as Double)) * 100.0).intValue()
+    val fracStr: String = if frac < 10 { "0#{frac}" } else { "#{frac}" }
+    return "#{whole}.#{fracStr}"
+  }
+}
+
+// ── Helpers: category name and tag string ─────────────────────────────────────
+def categoryLabel(cat: Category): String {
+  return select cat {
+    case t is Technology:   "Tech/#{t.sector()}"
+    case s is Sports:       "Sports/#{s.sport()}"
+    case p is Politics:     "Politics/#{p.region()}"
+    case sc is Science:     "Science/#{sc.field()}"
+    case e is Entertainment: "Ent/#{e.medium()}"
+    case b is Breaking:     "Breaking"
+  }
+}
+
+def sentimentLabel(s: Sentiment): String {
+  return select s {
+    case Sentiment::POSITIVE: "+"
+    case Sentiment::NEUTRAL:  "~"
+    case Sentiment::NEGATIVE: "-"
+  }
+}
+
+def tagsString(tags: List[String]): String {
+  if tags.size() == 0 { return "(none)" }
+  return tags.map { t -> "#" + t }.fold("") { acc, t ->
+    if acc.length() == 0 { t } else { acc + " " + t }
+  }
+}
+
+// ── Digest builder: only reliable sources, sorted by word count desc ──────────
+def buildDigest(articles: List[Article], title: String, minReliability: Double): Digest {
+  val filtered = articles
+    .filter { a -> a.source().reliability() >= minReliability }
+    .sortedBy { a -> -a.wordCount() }
+  return new Digest(title, filtered, "2024-01-15 09:00")
+}
+
+// ── Statistics builder ────────────────────────────────────────────────────────
+def buildStats(label: String, group: List[Article]): CategoryStats {
+  val count = group.size()
+  val totalWords = group.fold(0) { acc, a -> acc + a.wordCount() }
+  val totalRel = group.fold(0.0) { acc, a -> acc + a.source().reliability() }
+  val avgRel = if count > 0 { totalRel / count } else { 0.0 }
+  return new CategoryStats(label, count, totalWords, avgRel)
+}
+
+// ── Print helpers ─────────────────────────────────────────────────────────────
+def printArticle(a: Article): void {
+  val sentiment = sentimentLabel(a.sentiment())
+  IO::println("  [#{sentiment}] [#{categoryLabel(a.category())}] #{a.title().truncate(55)}")
+  IO::println("      Source: #{a.source().name()} (#{a.source().reliability().asPercent()})  " +
+              "#{a.wordCount()} words")
+  IO::println("      Tags: #{tagsString(a.tags())}")
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("--- #{title} ---")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Data: sources
+// ─────────────────────────────────────────────────────────────────────────────
+val bbc   = new Source("BBC News",          0.92)
+val tmz   = new Source("TMZ",               0.45)
+val arxiv = new Source("arXiv",             0.98)
+val espn  = new Source("ESPN",              0.85)
+val cnn   = new Source("CNN",               0.78)
+val buzzf = new Source("BuzzFeed",          0.52)
+val wired = new Source("Wired",             0.88)
+val ap    = new Source("AP",                0.95)
+val guar  = new Source("The Guardian",      0.89)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Data: articles
+// ─────────────────────────────────────────────────────────────────────────────
+val articles: List[Article] = [
+  new Article("New AI chip sets performance record",
+    "A new architecture achieves unprecedented throughput on language models.",
+    new Technology("AI"), wired, 850,
+    ["AI", "hardware", "chips"], Sentiment::POSITIVE),
+  new Article("Championship finals wrap up in overtime",
+    "The home team wins after a thrilling finish in extra time.",
+    new Sports("football"), espn, 420,
+    ["sports", "football", "championship"], Sentiment::POSITIVE),
+  new Article("Quantum entanglement demonstrated at 100km",
+    "Scientists demonstrate long-range quantum entanglement across a fiber link.",
+    new Science("quantum"), arxiv, 1200,
+    ["quantum", "physics", "research"], Sentiment::NEUTRAL),
+  new Article("Celebrity couple announces split",
+    "Entertainment news covering a high-profile separation.",
+    new Entertainment("celebrity"), tmz, 200,
+    ["celebrity", "entertainment"], Sentiment::NEGATIVE),
+  new Article("Climate summit reaches historic agreement",
+    "World leaders agree on binding emissions targets for 2030.",
+    new Politics("global"), bbc, 950,
+    ["climate", "politics", "summit"], Sentiment::POSITIVE),
+  new Article("Rust language adoption grows in enterprise",
+    "Rust's share in large systems codebases doubled in two years.",
+    new Technology("PL"), wired, 680,
+    ["rust", "programming", "systems"], Sentiment::POSITIVE),
+  new Article("Olympic qualifiers: 12 athletes advance",
+    "A clutch of athletes earn their spots at the upcoming Games.",
+    new Sports("athletics"), espn, 380,
+    ["olympics", "athletics", "qualifiers"], Sentiment::NEUTRAL),
+  new Article("Major earthquake disrupts coastal region",
+    "Search and rescue teams deployed after magnitude-7.1 quake.",
+    new Breaking(), ap, 310,
+    ["earthquake", "breaking", "emergency"], Sentiment::NEGATIVE),
+  new Article("Dark matter detector yields first results",
+    "New underground experiment publishes first data, excluding some WIMP models.",
+    new Science("cosmology"), arxiv, 1100,
+    ["dark-matter", "cosmology", "physics"], Sentiment::NEUTRAL),
+  new Article("Tech stocks rally on earnings beats",
+    "Markets surge as the largest tech firms exceed quarterly forecasts.",
+    new Technology("finance"), cnn, 560,
+    ["stocks", "finance", "tech"], Sentiment::POSITIVE),
+  new Article("Streaming giant launches exclusive blockbuster lineup",
+    "The platform's new originals debut to record subscriber growth.",
+    new Entertainment("streaming"), buzzf, 340,
+    ["streaming", "entertainment", "movies"], Sentiment::NEUTRAL),
+  new Article("Senate votes on bipartisan infrastructure deal",
+    "The measure passes 61-38, funding roads, broadband, and clean energy.",
+    new Politics("US"), cnn, 720,
+    ["senate", "budget", "politics"], Sentiment::NEUTRAL),
+  new Article("Polar expedition finds new sea-floor species",
+    "A deep-sea survey reveals three species previously unknown to science.",
+    new Science("biology"), guar, 890,
+    ["biology", "ocean", "discovery"], Sentiment::POSITIVE),
+  new Article("Electric aircraft completes 200-mile test flight",
+    "The prototype crosses a major range milestone for battery-powered aviation.",
+    new Technology("aerospace"), guar, 740,
+    ["electric", "aviation", "green"], Sentiment::POSITIVE)
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Analysis
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("=== News Aggregator ===")
+IO::println("Total articles: #{articles.size()}")
+
+// Group articles by category label
+val groupMap: Map[String, List[Article]] = [:]
+foreach a: Article in articles {
+  val lbl = categoryLabel(a.category())
+  val existing = groupMap[lbl]
+  if existing == null {
+    groupMap[lbl] = [a]
+  } else {
+    existing.add(a)
+  }
+}
+
+// Collect category stats and sort alphabetically
+val statsList: List[CategoryStats] = []
+foreach (lbl, grp) in groupMap {
+  statsList.add(buildStats(lbl, grp))
+}
+val sortedStats = statsList.sortedBy { s -> s.label() }
+
+printSection("Category Statistics")
+foreach s: CategoryStats in sortedStats {
+  IO::println("  " + s.show())
+}
+
+// Build morning digest (high-reliability sources only)
+printSection("Morning Digest (reliability >= 80%)")
+val digest = buildDigest(articles, "Morning Digest", 0.80)
+IO::println("#{digest.title()} — #{digest.size()} article(s)")
+foreach a: Article in digest.articles() {
+  printArticle(a)
+}
+
+// Breaking news
+printSection("Breaking News")
+val breaking = articles.filter { a ->
+  select a.category() {
+    case b is Breaking: true
+    else: false
+  }
+}
+if breaking.size() == 0 {
+  IO::println("  No breaking news at this time.")
+} else {
+  foreach a: Article in breaking {
+    IO::println("  BREAKING: #{a.title()} (#{a.source().name()})")
+  }
+}
+
+// Top 3 by word count
+printSection("Top 3 Longest Articles")
+val byLength = articles.sortedBy { a -> -a.wordCount() }
+var shown: Int = 0
+foreach a: Article in byLength {
+  if shown < 3 {
+    IO::println("  #{a.wordCount()} words: #{a.title()}")
+    shown++
+  }
+}
+
+// Sentiment breakdown
+printSection("Sentiment Breakdown")
+val posList = articles.filter { a -> a.sentiment() == Sentiment::POSITIVE }
+val negList = articles.filter { a -> a.sentiment() == Sentiment::NEGATIVE }
+val neuList = articles.filter { a -> a.sentiment() == Sentiment::NEUTRAL }
+IO::println("  Positive : #{posList.size()} article(s)")
+IO::println("  Neutral  : #{neuList.size()} article(s)")
+IO::println("  Negative : #{negList.size()} article(s)")
+
+// Tag frequency
+printSection("Tag Frequency (top 8)")
+val tagFreq: Map[String, Int] = [:]
+foreach a: Article in articles {
+  foreach tag: String in a.tags() {
+    val cur = tagFreq[tag]
+    if cur == null { tagFreq[tag] = 1 } else { tagFreq[tag] = (cur as Int) + 1 }
+  }
+}
+// Collect as list of "count\ttag", sort descending by count then by name
+val tagEntries: List[String] = []
+foreach (tag, cnt) in tagFreq {
+  tagEntries.add("#{cnt}\t#{tag}")
+}
+val sortedTags = tagEntries.sortedBy { e -> e }
+var tagShown: Int = 0
+foreach e: String in sortedTags {
+  if tagShown < 8 {
+    val parts = e.split("\t")
+    IO::println("  ##{parts[1]}: #{parts[0]} article(s)")
+    tagShown++
+  }
+}
+
+// Overall statistics
+printSection("Overall Statistics")
+val totalWords = articles.fold(0) { acc, a -> acc + a.wordCount() }
+val avgWords = totalWords * 1.0 / articles.size()
+IO::println("  Total articles  : #{articles.size()}")
+IO::println("  Total words     : #{totalWords}")
+IO::println("  Avg words       : #{avgWords.format2()}")
+
+// Find the most-reliable source across all articles
+val mostReliable = articles.fold(articles[0]) { best, a ->
+  if a.source().reliability() > best.source().reliability() { a } else { best }
+}
+IO::println("  Top reliability : #{mostReliable.source().name()} " +
+            "(#{mostReliable.source().reliability().asPercent()})")
+
+// Source diversity: how many distinct sources?
+val sourceNames: Map[String, Int] = [:]
+foreach a: Article in articles {
+  sourceNames[a.source().name()] = 1
+}
+var srcCount: Int = 0
+foreach (s, v) in sourceNames { srcCount++ }
+IO::println("  Distinct sources: #{srcCount}")

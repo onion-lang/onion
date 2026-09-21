@@ -11,15 +11,28 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-09-14) | Pass threshold |
+| # | Dimension | How to measure | Current (approx.; see note below) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | Test suite | `sbt shutdown && sbt -Duser.language=en testFull` (see the note below) | 5669 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 307 / 307 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 240 (AccessLogAnalyzer,AirlineReservation,AnagramSolver,AntColony,AstronomyCatalog,AuctionHouse,Automaton,BankLedger,BankSystem,BattleshipSim,BinaryHeap,Blackjack,Blockchain,BoardGameAnalytics,BookClub,BowlingGame,BrainFuck,BrokenLogDemo,BudgetTracker,BugTracker,BuildSim,CacheSimulator,CalendarManager,CarRentalFleet,CellularAutomata,CensusAnalyzer,ChemCalculator,Chess,CityPlanner,CinemaBooking,CipherSuite,CircuitBreakerSim,CircuitSimulator,ClinicRecords,CodeContest,ColorPalette,CommitAnalyzer,ConferenceSchedule,ConnectFour,ContactBook,ConwayLife,CourseRegistration,CpuScheduler,CronScheduler,CryptArithmetic,CryptoPortfolio,CustomerLoyalty,DNAAnalysis,DecisionTree,DependencyResolver,DiscreteEventSim,DnaAnalyzer,DoctorScheduler,DpShowcase,DungeonCrawler,ElevatorDispatcher,EmployeeManager,EpidemiologySim,EspressoShop,EventTicketing,ExpenseAnalyzer,ExpenseAuditor,ExpenseTracker,ExprEval,FamilyTree,FileSystemSim,FinanceTracker,FitnessTracker,FlashcardDeck,FleetManager,FlightDelayReport,ForthMachine,FullTextSearch,GameOfLife,GameStore,GenericLeaderboard,GeneticAlgorithm,GeneticSequencer,GradeBook,GradeReport,GraphAlgorithms,GraphPathfinder,GraphSearch,HMTypeInference,HRSystem,HabitTracker,HospitalWard,HotelReservation,HuffmanCode,HuffmanCoding,InsuranceClaims,IntervalCalendar,Inventory,InventoryManager,InventoryReport,JobScheduler,Kalah,KaraokeNight,KingdomSim,KnapsackAdvisor,LSystem,LambdaCalc,LibraryCatalog,LibrarySystem,LispInterp,LogAnalytics,LogCorrelator,LogDispatch,Mandelbrot,MarkdownConverter,MarkovText,Mastermind,MathParser,MatrixCalc,MaxFlow,MazeSolver,Measurements,Minesweeper,MinesweeperSim,MiniGit,MiniRpg,MiniSQL,MiniTypeChecker,MiniVcs,MorseCode,MortgageCalc,MovieRecommender,MuseumCollection,MusicEngine,MusicFestival,MusicLibrary,MusicTheory,NationalParkTracker,NetCidr,NetFlowAnalyzer,NetworkMonitor,NeuralNet,NumberFormats,NumberTheory,NutritionTracker,ObservatoryLog,OrderReport,Othello,PackageDelivery,PackageInstaller,PacketInspector,ParallelCrawler,ParkingGarage,ParticlePhysicsSim,PasswordAnalyzer,PaymentProcessor,PayrollReport,PerfReview,PersonalFinance,PetShelter,PetriNet,PharmacySystem,PhysicsSim,PilotLogbook,PlantCare,PlaylistManager,PokerHands,PolyCalc,PolynomialAlgebra,PowerGrid,PrintShop,ProbDataStructures,ProjectBuildAnalyzer,ProjectTracker,PropCheck,PropLogic,PropertyManager,QueryEngine,RankedChoice,RateLimiter,RationalCalc,RecipeBook,RecipeManager,RecipeVault,RegexEngine,RestaurantOrders,RideSharePool,RuleEngine,SatSolver,ScaleAnalyzer,SemanticVersion,ShapeProcessor,ShiftPlanner,ShipmentTracker,ShoppingCart,SmartHome,SnippetLibrary,SocialNetwork,SortAlgorithms,SortingShowcase,SpaceMission,SpaceStationLog,SpellCheck,SpreadsheetCalc,SpreadsheetEngine,SprintPlanner,StatsApp,StockPortfolio,StudentGradeBook,Sudoku,SudokuSolver,SupplyChain,SymbolicMath,TaskPlanner,TaxCalculator,TemplateEngine,TermRewriter,TerrainGenerator,TextAnalytics,TextAnalyzer,TextDiff,TextTransformPipeline,TicTacToe,TimeSeries,TimesheetTracker,TodoManager,TollRoadBilling,ToolDemo,TournamentStandings,TournamentTracker,TradeMatchingEngine,TrainDispatch,TransitPlanner,Trie,TuringMachine,TuringMachineLab,UnionFind,VendingMachine,VirtualMachine,VirtualShell,VotingMethods,WeatherReport,WordLadder,WordSearch,WorkoutLog) | ≥ 5 |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 326 / 326 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 259 (see `run/` for the full, alphabetized list — no longer enumerated here, see note below) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
 | 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 90 | every common error has a dedicated code |
+
+**Rows 2 and 3 are checked against a tolerance band, not exact equality** (issue #1370).
+Every PR that adds a sample to `run/` used to have to bump the exact counts in both rows
+*and* insert its sample's name into row 3's alphabetized list — and because every such PR
+touched the same two lines, any two of them landed within an hour of each other conflicted,
+which is exactly what let 29 of them pile up unmerged before anyone noticed. `QualityBarSpec`
+now only fails when the recorded figure is either ahead of reality (an outright lie) or has
+drifted more than a fixed band behind it, the same philosophy row 1's test count already
+used. A sample addition no longer needs to touch this file at all; only a periodic top-up
+of the two numbers does, once drift approaches the band.
+
+This fix previously shipped as #1372, then was silently reverted when a stale branch
+(#1336) was merged with an older copy of this file, which is why it needed reapplying here.
 
 **Do not set `SBT_OPTS` to a heap below the project default.** `.jvmopts` pins the
 default to `-Xmx10g` (raised from 4g as the `run/` sample corpus grew — see

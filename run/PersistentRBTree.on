@@ -1,0 +1,283 @@
+// Persistent Red-Black Tree: immutable balanced BST of Int
+// Uses Okasaki (1999) elegant 4-case rebalancing.
+// Demonstrates: homogeneous enum, ADT case-enum, deep nested pattern matching,
+//               recursion, persistent (copy-on-write) data structure semantics.
+
+// Node color as a plain enum (becomes java.lang.Enum)
+enum Color { RED, BLACK }
+
+// Tree nodes as a sealed ADT
+enum RBTree {
+  case Empty
+  case Node(color: Color, left: RBTree, value: Int, right: RBTree)
+
+  public:
+  def size: Int = select this {
+    case e is Empty: 0
+    case n is Node: 1 + n.left().size + n.right().size
+  }
+
+  def height: Int = select this {
+    case e is Empty: 0
+    case n is Node: {
+      val lh: Int = n.left().height
+      val rh: Int = n.right().height
+      1 + (if lh > rh { lh } else { rh })
+    }
+  }
+
+  def contains(v: Int): Boolean = select this {
+    case e is Empty: false
+    case n is Node:
+      if v < n.value() { n.left().contains(v) }
+      else if v > n.value() { n.right().contains(v) }
+      else { true }
+  }
+
+  def min: Int? = select this {
+    case e is Empty: null
+    case n is Node: {
+      val lmin: Int? = n.left().min
+      if lmin != null { lmin } else { n.value() as Int? }
+    }
+  }
+
+  def max: Int? = select this {
+    case e is Empty: null
+    case n is Node: {
+      val rmax: Int? = n.right().max
+      if rmax != null { rmax } else { n.value() as Int? }
+    }
+  }
+}
+
+// Collect sorted values via in-order traversal
+def toSortedList(tree: RBTree): List[Int] {
+  val acc: List[Int] = []
+  collectInOrder(tree, acc)
+  return acc
+}
+
+def collectInOrder(tree: RBTree, acc: List[Int]): void {
+  select tree {
+    case e is Empty: {}
+    case n is Node: {
+      collectInOrder(n.left(), acc)
+      acc.add(n.value())
+      collectInOrder(n.right(), acc)
+    }
+  }
+}
+
+// Verify red-black invariants; returns black-height, or -1 on violation
+def checkInvariant(tree: RBTree): Int {
+  select tree {
+    case e is Empty: return 0
+    case n is Node: {
+      val lbh: Int = checkInvariant(n.left())
+      val rbh: Int = checkInvariant(n.right())
+      if lbh < 0 || rbh < 0 { return -1 }
+      if lbh != rbh { return -1 }
+      select n.color() {
+        case Color::RED: {
+          val leftRed: Boolean = select n.left() {
+            case ln is Node: ln.color() == Color::RED
+            else: false
+          }
+          val rightRed: Boolean = select n.right() {
+            case rn is Node: rn.color() == Color::RED
+            else: false
+          }
+          if leftRed || rightRed { return -1 }
+          return lbh
+        }
+        case Color::BLACK: return lbh + 1
+        else: return -1
+      }
+    }
+  }
+  return -1
+}
+
+// Okasaki balance: fix a red-red violation inside a black node
+// Four symmetric cases; returns a (possibly red) balanced node.
+def balance(color: Color, left: RBTree, value: Int, right: RBTree): RBTree {
+  select color {
+    case Color::BLACK: {
+      // Case 1: left is red, left.left is red
+      select left {
+        case n1 is Node: {
+          if n1.color() == Color::RED {
+            select n1.left() {
+              case n2 is Node: {
+                if n2.color() == Color::RED {
+                  return new Node(Color::RED,
+                    new Node(Color::BLACK, n2.left(), n2.value(), n2.right()) as RBTree,
+                    n1.value(),
+                    new Node(Color::BLACK, n1.right(), value, right) as RBTree) as RBTree
+                }
+              }
+              else: {}
+            }
+            // Case 2: left is red, left.right is red
+            select n1.right() {
+              case n2 is Node: {
+                if n2.color() == Color::RED {
+                  return new Node(Color::RED,
+                    new Node(Color::BLACK, n1.left(), n1.value(), n2.left()) as RBTree,
+                    n2.value(),
+                    new Node(Color::BLACK, n2.right(), value, right) as RBTree) as RBTree
+                }
+              }
+              else: {}
+            }
+          }
+        }
+        else: {}
+      }
+      // Case 3: right is red, right.left is red
+      select right {
+        case n1 is Node: {
+          if n1.color() == Color::RED {
+            select n1.left() {
+              case n2 is Node: {
+                if n2.color() == Color::RED {
+                  return new Node(Color::RED,
+                    new Node(Color::BLACK, left, value, n2.left()) as RBTree,
+                    n2.value(),
+                    new Node(Color::BLACK, n2.right(), n1.value(), n1.right()) as RBTree) as RBTree
+                }
+              }
+              else: {}
+            }
+            // Case 4: right is red, right.right is red
+            select n1.right() {
+              case n2 is Node: {
+                if n2.color() == Color::RED {
+                  return new Node(Color::RED,
+                    new Node(Color::BLACK, left, value, n1.left()) as RBTree,
+                    n1.value(),
+                    new Node(Color::BLACK, n2.left(), n2.value(), n2.right()) as RBTree) as RBTree
+                }
+              }
+              else: {}
+            }
+          }
+        }
+        else: {}
+      }
+      return new Node(Color::BLACK, left, value, right) as RBTree
+    }
+    else: return new Node(color, left, value, right) as RBTree
+  }
+  return new Node(color, left, value, right) as RBTree
+}
+
+// Internal recursive insert (resulting root may be red)
+def insertRec(tree: RBTree, v: Int): RBTree {
+  return select tree {
+    case e is Empty: new Node(Color::RED,
+      new Empty() as RBTree, v, new Empty() as RBTree) as RBTree
+    case n is Node:
+      if v < n.value() {
+        balance(n.color(), insertRec(n.left(), v), n.value(), n.right())
+      } else if v > n.value() {
+        balance(n.color(), n.left(), n.value(), insertRec(n.right(), v))
+      } else {
+        tree
+      }
+  }
+}
+
+// Public insert: always blackens the root (rule 2 of RB trees)
+def insert(tree: RBTree, v: Int): RBTree {
+  val r: RBTree = insertRec(tree, v)
+  return select r {
+    case n is Node: new Node(Color::BLACK, n.left(), n.value(), n.right()) as RBTree
+    else: r
+  }
+}
+
+// Build a tree from a list of integers
+def fromList(values: List[Int]): RBTree {
+  var t: RBTree = new Empty() as RBTree
+  foreach v: Int in values { t = insert(t, v) }
+  return t
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+IO::println("=== Persistent Red-Black Tree ===")
+IO::println("")
+
+// Build from an unsorted list
+val input: List[Int] = [5, 3, 8, 1, 4, 7, 9, 2, 6, 10]
+val tree: RBTree = fromList(input)
+
+IO::println("Input:   " + input)
+IO::println("Sorted:  " + toSortedList(tree))
+IO::println("Size:    " + tree.size)
+IO::println("Height:  " + tree.height)
+IO::println("Min:     " + tree.min)
+IO::println("Max:     " + tree.max)
+IO::println("Valid?   " + (checkInvariant(tree) > 0))
+IO::println("")
+
+// Lookup tests
+foreach v: Int in [1, 5, 6, 11, 0] {
+  IO::println("contains(" + v + ") = " + tree.contains(v))
+}
+IO::println("")
+
+// Persistence: inserting gives a new tree; originals unchanged
+val tree2: RBTree = insert(tree, 11)
+val tree3: RBTree = insert(tree2, 0)
+
+IO::println("After inserting 11 then 0:")
+IO::println("  original size:  " + tree.size)   // still 10
+IO::println("  tree3 size:     " + tree3.size)  // 12
+IO::println("  tree3 sorted:   " + toSortedList(tree3))
+IO::println("  tree3 valid?    " + (checkInvariant(tree3) > 0))
+IO::println("")
+
+// Stress: insert 0..99 and verify invariants
+var big: RBTree = new Empty() as RBTree
+foreach i: Int in 0..100 { big = insert(big, i) }
+IO::println("Ascending insert (0..99):")
+IO::println("  size:    " + big.size)
+IO::println("  height:  " + big.height)
+IO::println("  valid?   " + (checkInvariant(big) > 0))
+IO::println("")
+
+// Worst case for naive BSTs: descending order
+var revTree: RBTree = new Empty() as RBTree
+var j: Int = 99
+while j >= 0 {
+  revTree = insert(revTree, j)
+  j--
+}
+IO::println("Descending insert (99..0):")
+IO::println("  size:    " + revTree.size)
+IO::println("  height:  " + revTree.height)
+IO::println("  valid?   " + (checkInvariant(revTree) > 0))
+IO::println("")
+
+// Duplicate values must be idempotent
+val tDup: RBTree = fromList([3, 3, 3, 3, 5])
+IO::println("Duplicates [3,3,3,3,5]:")
+IO::println("  size:    " + tDup.size)   // 2
+IO::println("  sorted:  " + toSortedList(tDup))
+IO::println("")
+
+// Build tree from shuffled sequence to test balance
+val shuffled: List[Int] = [42, 7, 19, 55, 3, 88, 1, 66, 31, 47,
+                            90, 14, 73, 28, 51, 8, 62, 37, 80, 25]
+val tShuffle: RBTree = fromList(shuffled)
+IO::println("Shuffled insert (20 values):")
+IO::println("  size:    " + tShuffle.size)
+IO::println("  height:  " + tShuffle.height)
+IO::println("  valid?   " + (checkInvariant(tShuffle) > 0))
+IO::println("  sorted:  " + toSortedList(tShuffle))
+IO::println("")
+
+IO::println("Done.")

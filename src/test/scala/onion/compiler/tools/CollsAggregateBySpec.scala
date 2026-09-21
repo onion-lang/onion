@@ -46,6 +46,20 @@ class CollsAggregateBySpec extends AbstractShellSpec {
         "return ps.filter { p -> (p as Person).age() > 20 }.sumBy((p) -> p.age()) as Int",
         Shell.Success(75)) // 30 + 45
     }
+
+    it("sumBy/averageBy/maxBy/minBy honor their documented empty-list contract") {
+      // Colls.java's doc comments promise 0.0 for sumBy/averageBy and null for
+      // maxBy/minBy when the list is empty (never an exception or NPE).
+      runStr(
+        person,
+        "val ps: List[Person] = []\n" +
+        "val sumOk = Colls::sumBy(ps, (p) -> p.age()) == 0.0\n" +
+        "val avgOk = ps.averageBy((p) -> p.age()) == 0.0\n" +
+        "val maxNull = ps.maxBy((p) -> p.age()) == null\n" +
+        "val minNull = ps.minBy((p) -> p.age()) == null\n" +
+        "return if sumOk && avgOk && maxNull && minNull { \"ok\" } else { \"fail\" }",
+        Shell.Success("ok"))
+    }
   }
 
   describe("Rand::sample") {

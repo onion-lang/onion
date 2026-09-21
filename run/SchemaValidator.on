@@ -1,0 +1,467 @@
+// SchemaValidator.on — a runtime data-schema validator.
+// Exercises: ADT case-enum; records with expression-body methods; sealed
+// hierarchy + exhaustive select; generics; collection pipelines
+// (map/filter/fold/find/partition); closures; nullable types and null checks;
+// string interpolation; try/catch; foreach; while; recursion; map (k,v) iteration.
+
+import {
+  java.util.*
+}
+
+// ─── Primitive value type ────────────────────────────────────────────────────
+
+enum Value {
+  case Str(text: String)
+  case Num(n: Double)
+  case Bool(flag: Boolean)
+  case Nil
+public:
+  def asString(): String? = select this {
+    case v is Str: v.text()
+    else: null
+  }
+  def asNumber(): Double? = select this {
+    case v is Num: v.n()
+    else: null
+  }
+  def isNil(): Boolean = select this { case v is Nil: true; else: false }
+  def typeName(): String = select this {
+    case v is Str:  "string"
+    case v is Num:  "number"
+    case v is Bool: "boolean"
+    case v is Nil:  "null"
+  }
+  def display(): String = select this {
+    case v is Str:  "\"#{v.text()}\""
+    case v is Num:  "#{v.n()}"
+    case v is Bool: "#{v.flag()}"
+    case v is Nil:  "null"
+  }
+}
+
+// ─── Validation severity ─────────────────────────────────────────────────────
+
+enum Severity {
+  case SevError
+  case SevWarning
+  case SevInfo
+public:
+  def label(): String = select this {
+    case s is SevError:   "[ERROR]"
+    case s is SevWarning: "[WARN] "
+    case s is SevInfo:    "[INFO] "
+  }
+  def isError(): Boolean = select this { case s is SevError: true; else: false }
+  def isWarning(): Boolean = select this { case s is SevWarning: true; else: false }
+}
+
+// ─── Violation record ────────────────────────────────────────────────────────
+
+record Violation(field: String, message: String, severity: Severity, value: Value) {
+public:
+  def format(): String =
+    "#{severity().label()} #{field()}: #{message()} (got #{value().display()})"
+}
+
+// ─── Validation result ───────────────────────────────────────────────────────
+
+record ValidationResult(violations: List[Violation], rowId: Int) {
+public:
+  def isValid(): Boolean {
+    foreach v: Violation in violations() {
+      if v.severity().isError() { return false }
+    }
+    return true
+  }
+  def errorCount(): Int {
+    var n: Int = 0
+    foreach v: Violation in violations() {
+      if v.severity().isError() { n++ }
+    }
+    return n
+  }
+  def warningCount(): Int {
+    var n: Int = 0
+    foreach v: Violation in violations() {
+      if v.severity().isWarning() { n++ }
+    }
+    return n
+  }
+  def summary(): String = "row #{rowId()}: #{errorCount()} error(s), #{warningCount()} warning(s)"
+}
+
+// ─── Rule ADT ────────────────────────────────────────────────────────────────
+
+enum Rule {
+  case Required
+  case TypeCheck(expected: String)
+  case MinLength(min: Int)
+  case MaxLength(max: Int)
+  case MinValue(min: Double)
+  case MaxValue(max: Double)
+  case Regex(pattern: String)
+  case OneOf(choices: List[String])
+  case Custom(name: String, predicate: Function1[Value, Boolean])
+public:
+  def describe(): String = select this {
+    case r is Required:  "required"
+    case r is TypeCheck: "type=#{r.expected()}"
+    case r is MinLength: "minLength=#{r.min()}"
+    case r is MaxLength: "maxLength=#{r.max()}"
+    case r is MinValue:  "minValue=#{r.min()}"
+    case r is MaxValue:  "maxValue=#{r.max()}"
+    case r is Regex:     "pattern=#{r.pattern()}"
+    case r is OneOf:     "oneOf=#{r.choices().size} values"
+    case r is Custom:    "custom:#{r.name()}"
+  }
+}
+
+// ─── Rule checking ───────────────────────────────────────────────────────────
+
+def checkRequired(value: Value): String? {
+  if value.isNil() { return "field is required" }
+  return null
+}
+
+def checkTypeCheck(r: TypeCheck, value: Value): String? {
+  val tn = value.typeName()
+  if tn != r.expected() && tn != "null" {
+    return "expected type #{r.expected()}, got #{tn}"
+  }
+  return null
+}
+
+def checkMinLength(r: MinLength, value: Value): String? {
+  val s: String? = value.asString()
+  if s == null { return null }
+  if s.length() < r.min() { return "string too short (min=#{r.min()}, got=#{s.length()})" }
+  return null
+}
+
+def checkMaxLength(r: MaxLength, value: Value): String? {
+  val s: String? = value.asString()
+  if s == null { return null }
+  if s.length() > r.max() { return "string too long (max=#{r.max()}, got=#{s.length()})" }
+  return null
+}
+
+def checkMinValue(r: MinValue, value: Value): String? {
+  val n: Double? = value.asNumber()
+  if n == null { return null }
+  if n < r.min() { return "number too small (min=#{r.min()}, got=#{n})" }
+  return null
+}
+
+def checkMaxValue(r: MaxValue, value: Value): String? {
+  val n: Double? = value.asNumber()
+  if n == null { return null }
+  if n > r.max() { return "number too large (max=#{r.max()}, got=#{n})" }
+  return null
+}
+
+def checkRegex(r: Regex, value: Value): String? {
+  val s: String? = value.asString()
+  if s == null { return null }
+  if !s.matches(r.pattern()) { return "does not match pattern #{r.pattern()}" }
+  return null
+}
+
+def checkOneOf(r: OneOf, value: Value): String? {
+  val s: String? = value.asString()
+  if s == null { return null }
+  var found: Boolean = false
+  foreach c: String in r.choices() {
+    if c == s { found = true }
+  }
+  if !found { return "value '#{s}' not in allowed set" }
+  return null
+}
+
+def checkCustom(r: Custom, value: Value): String? {
+  val pred = r.predicate()
+  if !pred(value) { return "custom rule '#{r.name()}' failed" }
+  return null
+}
+
+def checkRule(rule: Rule, value: Value): String? = select rule {
+  case r is Required:  checkRequired(value)
+  case r is TypeCheck: checkTypeCheck(r, value)
+  case r is MinLength: checkMinLength(r, value)
+  case r is MaxLength: checkMaxLength(r, value)
+  case r is MinValue:  checkMinValue(r, value)
+  case r is MaxValue:  checkMaxValue(r, value)
+  case r is Regex:     checkRegex(r, value)
+  case r is OneOf:     checkOneOf(r, value)
+  case r is Custom:    checkCustom(r, value)
+}
+
+// ─── Field schema ────────────────────────────────────────────────────────────
+
+record FieldSchema(name: String, rules: List[Rule], nullable: Boolean, severity: Severity) {
+public:
+  def validate(value: Value): List[Violation] {
+    if nullable() && value.isNil() { return [] }
+    val violations: List[Violation] = []
+    foreach rule: Rule in rules() {
+      val msg: String? = checkRule(rule, value)
+      if msg != null {
+        violations.add(new Violation(name(), msg, severity(), value))
+      }
+    }
+    return violations
+  }
+}
+
+// ─── Schema ──────────────────────────────────────────────────────────────────
+
+class Schema {
+  val schemaName: String
+  val fields: List[FieldSchema]
+
+public:
+  def this(n: String, fs: List[FieldSchema]) {
+    schemaName = n
+    fields = fs
+  }
+
+  def validate(row: Map[String, Value], rowId: Int): ValidationResult {
+    val violations: List[Violation] = []
+    foreach field: FieldSchema in fields {
+      val rawVal: Object = row.get(field.name())
+      val value: Value =
+        if rawVal == null { new Nil() }
+        else { rawVal as Value }
+      violations.addAll(field.validate(value))
+    }
+    return new ValidationResult(violations, rowId)
+  }
+
+  def validateAll(rows: List[Map[String, Value]]): List[ValidationResult] {
+    val results: List[ValidationResult] = []
+    var idx: Int = 1
+    foreach row: Map[String, Value] in rows {
+      results.add(validate(row, idx))
+      idx++
+    }
+    return results
+  }
+}
+
+// ─── Report printer ──────────────────────────────────────────────────────────
+
+def printReport(name: String, results: List[ValidationResult]): void {
+  var total:    Int = results.size
+  var valid:    Int = 0
+  var allErrs:  Int = 0
+  var allWarns: Int = 0
+
+  foreach r: ValidationResult in results {
+    if r.isValid() { valid++ }
+    allErrs  = allErrs  + r.errorCount()
+    allWarns = allWarns + r.warningCount()
+  }
+
+  IO::println("═══════════════════════════════════════════")
+  IO::println(" Schema: #{name}")
+  IO::println("═══════════════════════════════════════════")
+  IO::println(" Rows:     #{total}")
+  IO::println(" Valid:    #{valid}")
+  IO::println(" Invalid:  #{total - valid}")
+  IO::println(" Errors:   #{allErrs}")
+  IO::println(" Warnings: #{allWarns}")
+  IO::println("───────────────────────────────────────────")
+
+  foreach result: ValidationResult in results {
+    if !result.isValid() || result.warningCount() > 0 {
+      IO::println(result.summary())
+      foreach v: Violation in result.violations() {
+        IO::println("  #{v.format()}")
+      }
+    }
+  }
+  IO::println("═══════════════════════════════════════════")
+}
+
+// ─── Violation count by field ────────────────────────────────────────────────
+
+def countByField(results: List[ValidationResult]): Map[String, Object] {
+  val counts: Map[String, Object] = new LinkedHashMap[String, Object]()
+  foreach result: ValidationResult in results {
+    foreach v: Violation in result.violations() {
+      val key = v.field()
+      val prev: Object = counts.get(key)
+      val n: Int = if prev == null { 0 } else { prev as Int }
+      counts.put(key, n + 1)
+    }
+  }
+  return counts
+}
+
+def printFieldStats(label: String, counts: Map[String, Object]): void {
+  IO::println("  #{label} violation counts by field:")
+  foreach (k, v) in counts {
+    IO::println("    #{k}: #{v}")
+  }
+}
+
+// ─── Schema definitions ──────────────────────────────────────────────────────
+
+def buildPersonSchema(): Schema {
+  val nameField = new FieldSchema(
+    "name",
+    [new Required(), new TypeCheck("string"),
+     new MinLength(2), new MaxLength(50)],
+    false, new SevError()
+  )
+  val emailField = new FieldSchema(
+    "email",
+    [new Required(), new TypeCheck("string"),
+     new Regex(".*@.*\\..*"), new MaxLength(100)],
+    false, new SevError()
+  )
+  val ageField = new FieldSchema(
+    "age",
+    [new TypeCheck("number"), new MinValue(0.0), new MaxValue(150.0)],
+    true, new SevWarning()
+  )
+  val roleField = new FieldSchema(
+    "role",
+    [new Required(), new TypeCheck("string"),
+     new OneOf(["admin", "user", "guest"])],
+    false, new SevError()
+  )
+  val scoreField = new FieldSchema(
+    "score",
+    [new TypeCheck("number"), new MinValue(0.0), new MaxValue(100.0)],
+    true, new SevWarning()
+  )
+  return new Schema("Person", [nameField, emailField, ageField, roleField, scoreField])
+}
+
+def buildProductSchema(): Schema {
+  val skuField = new FieldSchema(
+    "sku",
+    [new Required(), new TypeCheck("string"),
+     new Regex("[A-Z]{2,4}-[0-9]{4,6}")],
+    false, new SevError()
+  )
+  val priceField = new FieldSchema(
+    "price",
+    [new Required(), new TypeCheck("number"),
+     new MinValue(0.0), new MaxValue(999999.99)],
+    false, new SevError()
+  )
+  val stockField = new FieldSchema(
+    "stock",
+    [new TypeCheck("number"), new MinValue(0.0)],
+    true, new SevWarning()
+  )
+  val categoryField = new FieldSchema(
+    "category",
+    [new Required(), new TypeCheck("string"),
+     new OneOf(["electronics", "clothing", "food", "books", "other"])],
+    false, new SevError()
+  )
+  return new Schema("Product", [skuField, priceField, stockField, categoryField])
+}
+
+// ─── Sample data helpers ─────────────────────────────────────────────────────
+
+def personRow(name: String, email: String, age: Double?, role: String, score: Double?): Map[String, Value] {
+  val m: Map[String, Value] = new LinkedHashMap[String, Value]()
+  m.put("name",  new Str(name))
+  m.put("email", new Str(email))
+  m.put("age",   if age == null { new Nil() } else { new Num(age) })
+  m.put("role",  new Str(role))
+  m.put("score", if score == null { new Nil() } else { new Num(score) })
+  return m
+}
+
+def productRow(sku: String, price: Double, stock: Double?, category: String): Map[String, Value] {
+  val m: Map[String, Value] = new LinkedHashMap[String, Value]()
+  m.put("sku",      new Str(sku))
+  m.put("price",    new Num(price))
+  m.put("stock",    if stock == null { new Nil() } else { new Num(stock) })
+  m.put("category", new Str(category))
+  return m
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val personSchema  = buildPersonSchema()
+val productSchema = buildProductSchema()
+
+val personRows: List[Map[String, Value]] = [
+  personRow("Alice",  "alice@example.com",  32.0,  "admin", 95.0),
+  personRow("Bob",    "bob@example.com",    null,  "user",  null),
+  personRow("C",      "not-an-email",       -5.0,  "owner", 101.0),
+  personRow("Diana",  "diana@corp.io",      29.0,  "guest", 88.0),
+  personRow("",       "eve@x.co",           25.0,  "user",  75.0),
+  personRow("Frank",  "frank.at.work",      40.0,  "admin", null),
+  personRow("Grace",  "grace@domain.net",   null,  "user",  0.0),
+  personRow("Heidi",  "heidi@test.org",     55.0,  "guest", 50.0)
+]
+
+val personResults: List[ValidationResult] = personSchema.validateAll(personRows)
+printReport("Person", personResults)
+
+val personFieldCounts: Map[String, Object] = countByField(personResults)
+printFieldStats("Person", personFieldCounts)
+
+val productRows: List[Map[String, Value]] = [
+  productRow("EL-1234",   29.99,  100.0, "electronics"),
+  productRow("cl-999",    15.50,  50.0,  "clothing"),
+  productRow("BOOK-12",   9.99,   null,  "books"),
+  productRow("FOO-01",   -5.0,    0.0,   "food"),
+  productRow("EL-9999",   0.0,    null,  "gadgets"),
+  productRow("",         150.0,   20.0,  "other"),
+  productRow("CLO-0501",  49.99,  200.0, "clothing")
+]
+
+val productResults: List[ValidationResult] = productSchema.validateAll(productRows)
+IO::println("")
+printReport("Product", productResults)
+
+val productFieldCounts: Map[String, Object] = countByField(productResults)
+printFieldStats("Product", productFieldCounts)
+
+// Global summary
+val allResults: List[ValidationResult] = []
+allResults.addAll(personResults)
+allResults.addAll(productResults)
+
+var totalValid:  Int = 0
+var totalErrors: Int = 0
+foreach r: ValidationResult in allResults {
+  if r.isValid() { totalValid++ }
+  totalErrors = totalErrors + r.errorCount()
+}
+
+IO::println("")
+IO::println("GLOBAL SUMMARY")
+IO::println("  Total rows:   #{allResults.size}")
+IO::println("  Valid rows:   #{totalValid}")
+IO::println("  Invalid rows: #{allResults.size - totalValid}")
+IO::println("  Total errors: #{totalErrors}")
+
+// Top violated fields
+val allCounts: Map[String, Object] = new LinkedHashMap[String, Object]()
+foreach (k, v) in personFieldCounts {
+  allCounts.put((k as String) + " (person)", v)
+}
+foreach (k, v) in productFieldCounts {
+  allCounts.put((k as String) + " (product)", v)
+}
+
+IO::println("")
+IO::println("Top violated fields:")
+val allEntries: List[Map.Entry[String, Object]] = Colls::toList(allCounts.entrySet())
+val sorted: List[Map.Entry[String, Object]] = allEntries.sortedBy { e ->
+  -((e.getValue()) as Int)
+}
+var rank: Int = 1
+foreach entry: Map.Entry[String, Object] in sorted {
+  if rank > 5 { break }
+  IO::println("  ##{rank}: #{entry.getKey()} — #{entry.getValue()} violation(s)")
+  rank++
+}

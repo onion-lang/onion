@@ -1,274 +1,474 @@
-// MusicLibrary.on — 200+ line corpus sample.
-// Exercises: simple enum, records, generic class, extension methods on Int/String,
-// collection pipelines (fold, filter, map, groupBy, sortedBy, sortedByDescending,
-// distinct), nullable types, select/enum patterns, string interpolation,
-// foreach over maps and typed lists, try/catch.
+// MusicLibrary.on — A music collection manager and playlist system.
+//
+// Exercises: homogeneous enum with methods, ADT enum (PlaybackState), records
+// with computed methods, interface, class with mutable state, generic typed
+// collections (List[Song], List[Album], Map[Object,List[Song]]), collection
+// pipelines (filter/map/fold/sortedBy/sortedByDescending/groupBy/find/
+// partition/distinct/any/all/count/sumBy/maxBy/minBy/concat/zip),
+// select/pattern matching, nullable types, closures, string interpolation,
+// recursion, while and foreach loops, try/catch.
 
-import { onion.Maps; }
+import { java.util.ArrayList }
 
-// ── Types ──────────────────────────────────────────────────────────────
+// ── Genre enum ──────────────────────────────────────────────────────────────
 
 enum Genre {
-  ROCK, JAZZ, CLASSICAL, POP, ELECTRONIC, FOLK
+  ROCK, POP, JAZZ, CLASSICAL, ELECTRONIC, HIP_HOP, FOLK, METAL, AMBIENT
+public:
+  def label(): String = select this {
+    case Genre::ROCK:       "Rock"
+    case Genre::POP:        "Pop"
+    case Genre::JAZZ:       "Jazz"
+    case Genre::CLASSICAL:  "Classical"
+    case Genre::ELECTRONIC: "Electronic"
+    case Genre::HIP_HOP:    "Hip-Hop"
+    case Genre::FOLK:       "Folk"
+    case Genre::METAL:      "Metal"
+    case Genre::AMBIENT:    "Ambient"
+    else: "Unknown"
+  }
+  def isElectronic(): Boolean = this == Genre::ELECTRONIC || this == Genre::HIP_HOP
+  def isAcoustic(): Boolean   = this == Genre::FOLK || this == Genre::CLASSICAL || this == Genre::JAZZ
 }
 
-record Song(title: String, artist: String, durationSecs: Int, year: Int, genre: Genre)
+// ── PlaybackMode enum ───────────────────────────────────────────────────────
 
-record Rating(stars: Int, note: String)
+enum PlaybackMode { SEQUENTIAL, REPEAT_ONE, REPEAT_ALL }
 
-record Entry(song: Song, rating: Rating?)
+// ── Song record ─────────────────────────────────────────────────────────────
 
-// ── Extension methods on Int ───────────────────────────────────────────
-
-extension Int {
-  def toMMSS(): String {
-    val mins: Int = self / 60
-    val secs: Int = self % 60
-    val pad: String = if secs < 10 { "0" } else { "" }
-    return "" + mins + ":" + pad + secs
+record Song(title: String, artist: String, genre: Genre, durationSec: Int, year: Int) {
+public:
+  def durationStr(): String {
+    val mins: Int = durationSec() / 60
+    val secs: Int = durationSec() % 60
+    return mins + ":" + (if secs < 10 { "0" + secs } else { "" + secs })
   }
-  def starsText(): String {
-    var s: String = ""
-    var i: Int = 0
-    while i < self {
-      s = s + "*"
-      i = i + 1
-    }
-    return s
+  def show(): String = "\"#{title()}\" - #{artist()} [#{genre().label()}, #{durationStr()}, #{year()}]"
+  def isRecent(): Boolean = year() >= 2020
+  def isLong():   Boolean = durationSec() > 300
+}
+
+// ── Album record ─────────────────────────────────────────────────────────────
+
+record Album(title: String, artist: String, year: Int, tracks: List[Song]) {
+public:
+  def totalDurationSec(): Int =
+    tracks().fold(0) { acc, s -> (acc as Int) + s.durationSec() }
+  def trackCount(): Int = tracks().size
+  def totalDurationStr(): String {
+    val total: Int = totalDurationSec()
+    return (total / 60) + ":" + (if total % 60 < 10 { "0" + total % 60 } else { "" + total % 60 })
+  }
+  def show(): String =
+    "\"#{title()}\" (#{artist()}, #{year()}) — #{trackCount()} tracks, #{totalDurationStr()}"
+}
+
+// ── PlaybackState (ADT enum) ─────────────────────────────────────────────────
+
+enum PlaybackState {
+  case Playing(song: Song, positionSec: Int)
+  case Paused(song: Song, positionSec: Int)
+  case Stopped
+public:
+  def describe(): String = select this {
+    case s is Playing: "▶ Playing:  \"#{s.song().title()}\" by #{s.song().artist()} @ #{s.positionSec()}s"
+    case s is Paused:  "⏸ Paused:   \"#{s.song().title()}\" by #{s.song().artist()} @ #{s.positionSec()}s"
+    case st is Stopped: "⏹ Stopped"
+  }
+  def isActive(): Boolean = select this {
+    case p is Playing: true
+    case p is Paused:  true
+    else:              false
   }
 }
 
-// ── Extension methods on String ────────────────────────────────────────
+// ── Searchable interface ──────────────────────────────────────────────────────
 
-extension String {
-  def padRight(width: Int): String {
-    var s: String = self
-    while s.length() < width {
-      s = s + " "
-    }
-    return s
-  }
-  def truncate(max: Int): String {
-    if self.length() <= max { return self }
-    return self.substring(0, max - 3) + "..."
-  }
+interface Searchable {
+  def matchesQuery(q: String): Boolean
 }
 
-// ── Genre helpers ──────────────────────────────────────────────────────
+// ── MusicLibrary class ───────────────────────────────────────────────────────
 
-def genreLabel(g: Genre): String = select g {
-  case Genre::ROCK:       "Rock"
-  case Genre::JAZZ:       "Jazz"
-  case Genre::CLASSICAL:  "Classical"
-  case Genre::POP:        "Pop"
-  case Genre::ELECTRONIC: "Electronic"
-  case Genre::FOLK:       "Folk"
-  else: "Other"
-}
+class MusicLibrary {
+  var songs:  List[Song]
+  var albums: List[Album]
 
-// ── Generic Catalog class ──────────────────────────────────────────────
-
-class Catalog[T extends Object] {
-  var items: List[Object]
 public:
   def this {
-    this.items = []
+    songs  = new ArrayList[Song]()
+    albums = new ArrayList[Album]()
   }
-  def add(item: T): void {
-    this.items.add(item)
+
+  def addSong(s: Song): void  { songs.add(s) }
+
+  def addAlbum(a: Album): void {
+    albums.add(a)
+    foreach s: Song in a.tracks() { songs.add(s) }
   }
-  def size: Int {
-    return this.items.size
+
+  def songCount():  Int = songs.size
+  def albumCount(): Int = albums.size
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+
+  def byGenre(g: Genre): List[Song]     = songs.filter { s -> s.genre() == g }
+  def byArtist(name: String): List[Song] = songs.filter { s -> s.artist() == name }
+  def recentSongs(): List[Song]          = songs.filter { s -> s.isRecent() }
+  def longSongs():   List[Song]          = songs.filter { s -> s.isLong() }
+
+  // ── Aggregates ──────────────────────────────────────────────────────────
+
+  def totalDurationSec(): Int =
+    songs.fold(0) { acc, s -> (acc as Int) + s.durationSec() }
+
+  def averageDurationSec(): Double =
+    if songs.size == 0 { 0.0 }
+    else { songs.sumBy { s -> s.durationSec() } / songs.size }
+
+  // ── Sorts ────────────────────────────────────────────────────────────────
+
+  def topByDuration(n: Int): List[Song] =
+    songs.sortedByDescending { s -> s.durationSec() }.take(n)
+
+  def topByYear(n: Int): List[Song] =
+    songs.sortedByDescending { s -> s.year() }.take(n)
+
+  // ── Distinct artists ─────────────────────────────────────────────────────
+
+  def allArtists(): List[Object] =
+    songs.map { s -> s.artist() as Object }.distinct()
+
+  // ── Group / partition ────────────────────────────────────────────────────
+
+  def genreBreakdown(): Map[Object, List[Song]] =
+    songs.groupBy { s -> s.genre().label() as Object }
+
+  def partitionByLength(): List[List[Song]] =
+    songs.partition { s -> s.isLong() }
+
+  // ── Find ─────────────────────────────────────────────────────────────────
+
+  def longestSong(): Song? {
+    if songs.size == 0 { return null }
+    var bestSec: Int = -1
+    var best: Song?  = null
+    foreach s: Song in songs {
+      if s.durationSec() > bestSec { bestSec = s.durationSec(); best = s }
+    }
+    return best
   }
-  def all: List[Object] {
-    return this.items
+
+  def shortestSong(): Song? {
+    if songs.size == 0 { return null }
+    var bestSec: Int = 2147483647
+    var best: Song?  = null
+    foreach s: Song in songs {
+      if s.durationSec() < bestSec { bestSec = s.durationSec(); best = s }
+    }
+    return best
   }
-  def findFirst(pred: Function1[T, Boolean]): T? {
-    foreach item: Object in this.items {
-      val t: T = item as T
-      if pred(t) { return t }
+
+  def findByTitle(title: String): Song? {
+    foreach s: Song in songs {
+      if s.title().toLowerCase() == title.toLowerCase() { return s }
     }
     return null
   }
-  def countWhere(pred: Function1[T, Boolean]): Int {
-    var n: Int = 0
-    foreach item: Object in this.items {
-      if pred(item as T) { n = n + 1 }
+
+  // ── Checks ───────────────────────────────────────────────────────────────
+
+  def hasGenre(g: Genre): Boolean = songs.any  { s -> s.genre() == g }
+  def allByYear(y: Int):  Boolean = songs.all  { s -> s.year() == y }
+  def countByGenre(g: Genre): Int = songs.count { s -> s.genre() == g }
+}
+
+// ── Playlist class ───────────────────────────────────────────────────────────
+
+class Playlist {
+  val name: String
+  var songs: List[Song]
+  var mode: PlaybackMode
+  var cursor: Int
+
+public:
+  def this(n: String) {
+    name   = n
+    songs  = new ArrayList[Song]()
+    mode   = PlaybackMode::SEQUENTIAL
+    cursor = 0
+  }
+
+  def addSong(s: Song):    void { songs.add(s) }
+  def setMode(m: PlaybackMode): void { mode = m }
+  def songCount(): Int = songs.size
+  def getSongs():  List[Song] = songs
+  def getName():   String     = name
+
+  def totalDurationSec(): Int =
+    songs.fold(0) { acc, s -> (acc as Int) + s.durationSec() }
+
+  def totalDurationStr(): String {
+    val total: Int = totalDurationSec()
+    return (total / 60) + ":" + (if total % 60 < 10 { "0" + total % 60 } else { "" + total % 60 })
+  }
+
+  def currentSong(): Song? {
+    if songs.size == 0 { return null }
+    return songs.get(cursor)
+  }
+
+  def advance(): Boolean = select mode {
+    case PlaybackMode::SEQUENTIAL: {
+      if cursor < songs.size - 1 { cursor = cursor + 1; return true }
+      return false
     }
-    return n
+    case PlaybackMode::REPEAT_ALL: {
+      cursor = (cursor + 1) % songs.size
+      return true
+    }
+    case PlaybackMode::REPEAT_ONE: true
+    else: false
+  }
+
+  def sortByDuration(): void {
+    val sorted: List[Song] = songs.sortedBy { s -> s.durationSec() }
+    songs = new ArrayList[Song]()
+    foreach s: Song in sorted { songs.add(s) }
+  }
+
+  def print(): void {
+    IO::println("┌─────────────────────────────────────────────────────────")
+    IO::println("│ Playlist: #{name} | #{songCount()} songs | #{totalDurationStr()} | #{mode.name()}")
+    IO::println("├─────────────────────────────────────────────────────────")
+    var i: Int = 0
+    foreach s: Song in songs {
+      val marker: String = if i == cursor { " ▶" } else { "  " }
+      IO::println("│#{marker} #{i + 1}. #{s.show()}")
+      i = i + 1
+    }
+    IO::println("└─────────────────────────────────────────────────────────")
   }
 }
 
-// ── Data builders ──────────────────────────────────────────────────────
+// ── Helper: formatted duration string ────────────────────────────────────────
 
-def buildSongs(): List[Song] {
-  val s: List[Song] = []
-  s.add(new Song("Stairway to Heaven",  "Led Zeppelin",    482, 1971, Genre::valueOf("ROCK")))
-  s.add(new Song("Bohemian Rhapsody",   "Queen",           354, 1975, Genre::valueOf("ROCK")))
-  s.add(new Song("Hotel California",    "Eagles",          391, 1977, Genre::valueOf("ROCK")))
-  s.add(new Song("Imagine",             "John Lennon",     187, 1971, Genre::valueOf("POP")))
-  s.add(new Song("Thriller",            "Michael Jackson", 358, 1982, Genre::valueOf("POP")))
-  s.add(new Song("Billie Jean",         "Michael Jackson", 294, 1983, Genre::valueOf("POP")))
-  s.add(new Song("So What",             "Miles Davis",     562, 1959, Genre::valueOf("JAZZ")))
-  s.add(new Song("Take Five",           "Dave Brubeck",    324, 1959, Genre::valueOf("JAZZ")))
-  s.add(new Song("Autumn Leaves",       "Bill Evans",      270, 1962, Genre::valueOf("JAZZ")))
-  s.add(new Song("Fur Elise",           "Beethoven",       175, 1810, Genre::valueOf("CLASSICAL")))
-  s.add(new Song("Symphony No 5",       "Beethoven",      1980, 1808, Genre::valueOf("CLASSICAL")))
-  s.add(new Song("Around the World",    "Daft Punk",       428, 1997, Genre::valueOf("ELECTRONIC")))
-  s.add(new Song("Losing My Religion",  "R.E.M.",          269, 1991, Genre::valueOf("FOLK")))
-  s.add(new Song("Purple Rain",         "Prince",          519, 1984, Genre::valueOf("ROCK")))
-  return s
+def fmtDuration(totalSec: Int): String {
+  val mins: Int = totalSec / 60
+  val secs: Int = totalSec % 60
+  return mins + " min " + secs + " sec"
 }
 
-def buildEntries(songs: List[Song]): List[Entry] {
-  val es: List[Entry] = []
-  es.add(new Entry(songs.get(0) as Song,  new Rating(5, "epic guitar solo")))
-  es.add(new Entry(songs.get(1) as Song,  new Rating(5, "timeless classic")))
-  es.add(new Entry(songs.get(2) as Song,  new Rating(4, "great vibes")))
-  es.add(new Entry(songs.get(3) as Song,  new Rating(4, "peaceful")))
-  es.add(new Entry(songs.get(4) as Song,  null))
-  es.add(new Entry(songs.get(5) as Song,  new Rating(5, "iconic")))
-  es.add(new Entry(songs.get(6) as Song,  new Rating(3, "complex")))
-  es.add(new Entry(songs.get(7) as Song,  new Rating(5, "smooth")))
-  es.add(new Entry(songs.get(8) as Song,  new Rating(4, "melancholy")))
-  es.add(new Entry(songs.get(9) as Song,  new Rating(3, "gentle")))
-  es.add(new Entry(songs.get(10) as Song, new Rating(5, "monumental")))
-  es.add(new Entry(songs.get(11) as Song, new Rating(4, "funky")))
-  es.add(new Entry(songs.get(12) as Song, new Rating(2, "not my style")))
-  es.add(new Entry(songs.get(13) as Song, new Rating(5, "legendary")))
-  return es
+// ── Helper: print section header ─────────────────────────────────────────────
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("══════════════════════════════════════════════════════════")
+  IO::println("  " + title)
+  IO::println("══════════════════════════════════════════════════════════")
 }
 
-// ── Report helpers ─────────────────────────────────────────────────────
+// ── Recursive duration sum (demonstrates recursion with typed generic arg) ────
 
-def hr(): void {
-  IO::println("──────────────────────────────────────────────")
+def sumDuration(songs: List[Song], idx: Int): Int {
+  if idx >= songs.size { return 0 }
+  return songs.get(idx).durationSec() + sumDuration(songs, idx + 1)
 }
 
-def totalDuration(songs: List[Song]): Int =
-  songs.fold(0) { acc, s -> (acc as Int) + (s as Song).durationSecs() }
-
-def topRatedEntries(entries: List[Entry], min: Int): List[Entry] =
-  entries.filter { e ->
-    val r: Rating? = (e as Entry).rating()
-    r != null && r.stars() >= min
-  }
-
-// ── Main ───────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(): void {
-  val songs: List[Song]    = buildSongs()
-  val entries: List[Entry] = buildEntries(songs)
+  val library: MusicLibrary = new MusicLibrary()
 
-  val catalog: Catalog[Song] = new Catalog[Song]()
-  foreach s: Object in songs { catalog.add(s as Song) }
+  // ── Seed with songs ───────────────────────────────────────────────────────
 
-  // ── Overview ────────────────────────────────────────────────────────
-  IO::println("MUSIC LIBRARY REPORT")
-  hr()
-  val totalSecs: Int = totalDuration(songs)
-  IO::println("Total songs : #{catalog.size}")
-  IO::println("Total time  : #{totalSecs.toMMSS()}")
-  val uniqueArtists = songs.map { s -> (s as Song).artist() }.distinct()
-  IO::println("Artists     : #{uniqueArtists.size}")
-  IO::println("")
+  val seed: List[Song] = [
+    new Song("Bohemian Rhapsody",       "Queen",              Genre::ROCK,       354, 1975),
+    new Song("Stairway to Heaven",      "Led Zeppelin",       Genre::ROCK,       480, 1971),
+    new Song("Enter Sandman",           "Metallica",          Genre::METAL,      331, 1991),
+    new Song("Thriller",                "Michael Jackson",    Genre::POP,        358, 1982),
+    new Song("Shape of You",            "Ed Sheeran",         Genre::POP,        234, 2017),
+    new Song("Drivers License",         "Olivia Rodrigo",     Genre::POP,        242, 2021),
+    new Song("Anti-Hero",               "Taylor Swift",       Genre::POP,        200, 2022),
+    new Song("So What",                 "Miles Davis",        Genre::JAZZ,       548, 1959),
+    new Song("Take Five",               "Dave Brubeck",       Genre::JAZZ,       324, 1959),
+    new Song("Blue in Green",           "Miles Davis",        Genre::JAZZ,       337, 1959),
+    new Song("Eine kleine Nachtmusik",  "Mozart",             Genre::CLASSICAL,  392, 1787),
+    new Song("Moonlight Sonata",        "Beethoven",          Genre::CLASSICAL,  375, 1802),
+    new Song("Sandstorm",               "Darude",             Genre::ELECTRONIC, 227, 1999),
+    new Song("Strobe",                  "deadmau5",           Genre::ELECTRONIC, 594, 2009),
+    new Song("HUMBLE.",                 "Kendrick Lamar",     Genre::HIP_HOP,    177, 2017),
+    new Song("God's Plan",              "Drake",              Genre::HIP_HOP,    198, 2018),
+    new Song("The Sound of Silence",    "Simon & Garfunkel",  Genre::FOLK,       185, 1964),
+    new Song("Blowin' in the Wind",     "Bob Dylan",          Genre::FOLK,       168, 1963),
+    new Song("Weightless",              "Marconi Union",      Genre::AMBIENT,    489, 2011),
+    new Song("Music for Airports 1/1",  "Brian Eno",          Genre::AMBIENT,    977, 1978)
+  ]
 
-  // ── Songs grouped by genre ─────────────────────────────────────────
-  IO::println("By genre:")
-  val byGenre = songs.groupBy { s -> genreLabel((s as Song).genre()) }
-  foreach (genreName, genreSongs) in byGenre {
-    val gn: String = genreName as String
-    val gs: List[Song] = genreSongs as List[Song]
-    val secs: Int = gs.fold(0) { acc, s -> (acc as Int) + s.durationSecs() }
-    IO::println("  #{gn.padRight(12)}: #{gs.size} song(s), #{secs.toMMSS()}")
+  foreach s: Song in seed { library.addSong(s) }
+
+  // ── Albums ────────────────────────────────────────────────────────────────
+
+  val kind_of_blue: Album = new Album(
+    "Kind of Blue", "Miles Davis", 1959,
+    [
+      new Song("So What",        "Miles Davis", Genre::JAZZ, 548, 1959),
+      new Song("Freddie Freeloader", "Miles Davis", Genre::JAZZ, 583, 1959),
+      new Song("Blue in Green",  "Miles Davis", Genre::JAZZ, 337, 1959),
+      new Song("All Blues",      "Miles Davis", Genre::JAZZ, 693, 1959),
+      new Song("Flamenco Sketches", "Miles Davis", Genre::JAZZ, 566, 1959)
+    ]
+  )
+
+  section("Music Library — #{library.songCount()} songs loaded")
+
+  // ── Library stats ─────────────────────────────────────────────────────────
+
+  val totalSec: Int = library.totalDurationSec()
+  IO::println("  Total duration:   #{fmtDuration(totalSec)}")
+  val avgSec: Int = library.averageDurationSec() as Int
+  IO::println("  Average length:   #{fmtDuration(avgSec)}")
+  IO::println("  Unique artists:   #{library.allArtists().size}")
+
+  // ── Genre breakdown ───────────────────────────────────────────────────────
+
+  section("Songs by Genre")
+  val byGenre: Map[Object, List[Song]] = library.genreBreakdown()
+  foreach genre: Object in byGenre.keys().sortedBy { k -> k as String } {
+    val gs: List[Song] = byGenre.get(genre as String)
+    val genreTotalSec: Int = gs.fold(0) { acc, s -> (acc as Int) + s.durationSec() }
+    IO::println("  #{genre} (#{gs.size}): #{fmtDuration(genreTotalSec)}")
   }
-  IO::println("")
 
-  // ── Longest songs (top 5) ──────────────────────────────────────────
-  IO::println("Longest songs (top 5):")
-  val byDuration: List[Song] = songs.sortedByDescending { s -> (s as Song).durationSecs() }
+  // ── Top songs by duration ─────────────────────────────────────────────────
+
+  section("Top 5 Longest Songs")
+  val top5: List[Song] = library.topByDuration(5)
   var rank: Int = 1
-  foreach s: Object in byDuration {
-    if rank > 5 { break }
-    val song: Song = s as Song
-    IO::println("  #{rank}. #{song.title().padRight(28)} #{song.durationSecs().toMMSS()} — #{song.artist()}")
+  foreach s: Song in top5 {
+    IO::println("  #{rank}. #{s.show()}")
     rank = rank + 1
   }
-  IO::println("")
 
-  // ── Chronological listing ──────────────────────────────────────────
-  IO::println("Chronological (oldest first):")
-  val byYear: List[Song] = songs.sortedBy { s -> (s as Song).year() }
-  foreach s: Object in byYear {
-    val song: Song = s as Song
-    IO::println("  #{song.year()} #{song.title().truncate(25)} [#{genreLabel(song.genre())}]")
-  }
-  IO::println("")
+  // ── Recent songs ──────────────────────────────────────────────────────────
 
-  // ── Top-rated entries ──────────────────────────────────────────────
-  IO::println("Top-rated (5 stars):")
-  val top5: List[Entry] = topRatedEntries(entries, 5)
-  foreach e: Object in top5 {
-    val entry: Entry = e as Entry
-    val r: Rating = entry.rating() as Rating
-    IO::println("  #{r.stars().starsText()} #{entry.song().title()} — #{r.note()}")
+  section("Recent Songs (2020+)")
+  val recent: List[Song] = library.recentSongs()
+  foreach s: Song in recent {
+    IO::println("  • #{s.show()}")
   }
-  IO::println("")
 
-  // ── Unrated songs ──────────────────────────────────────────────────
-  val unrated: List[Entry] = entries.filter { e -> (e as Entry).rating() == null }
-  IO::println("Unrated songs: #{unrated.size}")
-  foreach e: Object in unrated {
-    IO::println("  - #{(e as Entry).song().title()}")
-  }
-  IO::println("")
+  // ── Partition: long vs short ──────────────────────────────────────────────
 
-  // ── Catalog search ─────────────────────────────────────────────────
-  IO::println("Catalog search:")
-  val found: Song? = catalog.findFirst { s -> s.artist() == "Queen" }
-  if found != null {
-    IO::println("  Queen: #{found.title()} (#{found.year()}, #{genreLabel(found.genre())})")
-  } else {
-    IO::println("  Queen: not found")
+  section("Long (>5 min) vs Short Songs")
+  val parts: List[List[Song]] = library.partitionByLength()
+  val longSongs:  List[Song]  = parts.get(0)
+  val shortSongs: List[Song]  = parts.get(1)
+  IO::println("  Long songs  (#{longSongs.size}):")
+  foreach s: Song in longSongs {
+    IO::println("    #{s.show()}")
   }
-  val jazzCount: Int = catalog.countWhere { s -> s.genre() == Genre::valueOf("JAZZ") }
-  IO::println("  Jazz: #{jazzCount} song(s) in catalog")
-  IO::println("")
+  IO::println("  Short songs (#{shortSongs.size}): first 3 →")
+  foreach s: Song in shortSongs.take(3) {
+    IO::println("    #{s.show()}")
+  }
 
-  // ── Average duration by genre ──────────────────────────────────────
-  IO::println("Average duration by genre:")
-  foreach (gl, gs) in byGenre {
-    val label: String = gl as String
-    val glist: List[Song] = gs as List[Song]
-    val tot: Int = glist.fold(0) { acc, s -> (acc as Int) + s.durationSecs() }
-    val avg: Int = tot / glist.size
-    IO::println("  #{label.padRight(12)}: #{avg.toMMSS()} avg")
-  }
-  IO::println("")
+  // ── Artist spotlight ──────────────────────────────────────────────────────
 
-  // ── Songs from the 1970s ───────────────────────────────────────────
-  IO::println("1970s songs:")
-  val seventies: List[Song] = songs.filter { s ->
-    val y: Int = (s as Song).year()
-    y >= 1970 && y < 1980
+  section("Artist Spotlight")
+  val artists: List[Object] = library.allArtists().sortedBy { a -> a as String }
+  foreach a: Object in artists {
+    val artistSongs: List[Song] = library.byArtist(a as String)
+    val totalMin: Int = artistSongs.sumBy { s -> s.durationSec() } as Int / 60
+    IO::println("  #{a}: #{artistSongs.size} song(s), #{totalMin} min total")
   }
-  foreach s: Object in seventies {
-    val song: Song = s as Song
-    IO::println("  #{song.year()}: #{song.title()} — #{song.artist()}")
-  }
-  IO::println("")
 
-  // ── Rating distribution ────────────────────────────────────────────
-  IO::println("Rating distribution:")
-  var star: Int = 5
-  while star >= 1 {
-    val ratedCount: Int = entries.filter { e ->
-      val r: Rating? = (e as Entry).rating()
-      r != null && r.stars() == star
-    }.size
-    IO::println("  #{star.starsText()} (#{star}/5): #{ratedCount} song(s)")
-    star = star - 1
+  // ── Genre queries ─────────────────────────────────────────────────────────
+
+  section("Genre Queries")
+  IO::println("  Has metal:         #{library.hasGenre(Genre::METAL)}")
+  IO::println("  Has classical:     #{library.hasGenre(Genre::CLASSICAL)}")
+  IO::println("  Rock song count:   #{library.countByGenre(Genre::ROCK)}")
+  IO::println("  Jazz song count:   #{library.countByGenre(Genre::JAZZ)}")
+
+  val longest: Song? = library.longestSong()
+  val shortest: Song? = library.shortestSong()
+  if longest != null  { IO::println("  Longest song:      #{longest.show()}") }
+  if shortest != null { IO::println("  Shortest song:     #{shortest.show()}") }
+
+  // ── Zip: title + duration pairs ───────────────────────────────────────────
+
+  section("Title / Duration Pairs (top 5)")
+  val titles:    List[Object] = top5.map { s -> s.title() as Object }
+  val durations: List[Object] = top5.map { s -> s.durationStr() as Object }
+  val pairs: List[List[Object]] = titles.zip(durations)
+  foreach pair: List[Object] in pairs {
+    IO::println("  #{pair.get(0)} — #{pair.get(1)}")
   }
-  hr()
-  IO::println("Done.")
+
+  // ── Playlist ──────────────────────────────────────────────────────────────
+
+  section("Chill Evening Playlist")
+  val playlist: Playlist = new Playlist("Chill Evening")
+  foreach s: Song in library.byGenre(Genre::JAZZ)  { playlist.addSong(s) }
+  foreach s: Song in library.byGenre(Genre::AMBIENT) { playlist.addSong(s) }
+  playlist.sortByDuration()
+  playlist.print()
+
+  // ── Playback simulation ───────────────────────────────────────────────────
+
+  section("Playback Simulation")
+  var current: Song? = playlist.currentSong()
+  if current != null {
+    var state: PlaybackState = new Playing((current as Song), 0)
+    IO::println("  " + state.describe())
+    playlist.advance()
+    current = playlist.currentSong()
+    if current != null {
+      state = new Playing((current as Song), 0)
+      IO::println("  " + state.describe())
+      val paused: PlaybackState = new Paused((current as Song), 83)
+      IO::println("  " + paused.describe())
+    }
+  }
+  val stopped: PlaybackState = new Stopped()
+  IO::println("  " + stopped.describe())
+
+  // ── Album stats ──────────────────────────────────────────────────────────
+
+  section("Album: Kind of Blue")
+  IO::println("  #{kind_of_blue.show()}")
+  IO::println("  Tracks:")
+  foreach s: Song in kind_of_blue.tracks() {
+    IO::println("    • #{s.show()}")
+  }
+
+  // ── Recursive total-duration countdown ────────────────────────────────────
+
+  section("Playlist Duration Breakdown (recursive sum)")
+  val playlistTotal: Int = sumDuration(playlist.getSongs(), 0)
+  IO::println("  Recursive total: #{fmtDuration(playlistTotal)}")
+  IO::println("  Iterative total: #{fmtDuration(playlist.totalDurationSec())}")
+
+  // ── Try/catch: safe find ──────────────────────────────────────────────────
+
+  section("Safe Song Lookup")
+  val titles2: List[String] = ["Weightless", "Nonexistent Song", "Strobe"]
+  foreach title: String in titles2 {
+    try {
+      val found: Song? = library.findByTitle(title)
+      if found != null {
+        IO::println("  ✓ Found: #{found.show()}")
+      } else {
+        IO::println("  ✗ Not found: \"#{title}\"")
+      }
+    } catch e: Exception {
+      IO::println("  ! Error looking up \"#{title}\": " + e.getMessage())
+    }
+  }
+
+  section("Done")
+  IO::println("  #{library.songCount()} songs in library | #{library.albumCount()} albums")
+  IO::println("  #{playlist.songCount()} songs in playlist \"#{playlist.getName()}\"")
 }

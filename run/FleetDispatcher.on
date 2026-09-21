@@ -1,0 +1,389 @@
+// Fleet Dispatcher - a vehicle-dispatch and trip-analytics system.
+// Exercises: sealed case-enums; records with methods; classes; generics;
+// collection pipelines (map/filter/fold/groupBy/sortedBy/partition/find);
+// select / pattern-matching with `is` type patterns; do[Option] monad;
+// try/catch; extension methods on Double; string interpolation; recursion;
+// foreach over ranges and Map entries; nullable types; while loops.
+
+// ─── Vehicle kind ADT ─────────────────────────────────────────────────────────
+
+enum VehicleKind {
+  case Car(seats: Int, mpg: Double)
+  case Truck(payloadTons: Double, mpg: Double)
+  case Van(cargoM3: Double, mpg: Double)
+  case Motorcycle(mpg: Double)
+public:
+  def mpg(): Double = select this {
+    case c is Car:        c.mpg()
+    case t is Truck:      t.mpg()
+    case v is Van:        v.mpg()
+    case m is Motorcycle: m.mpg()
+  }
+  def label(): String = select this {
+    case c is Car:        "Car(#{c.seats()}pax)"
+    case t is Truck:      "Truck(#{t.payloadTons()}t)"
+    case v is Van:        "Van(#{v.cargoM3()}m³)"
+    case m is Motorcycle: "Moto"
+  }
+  def maxCargoTons(): Double = select this {
+    case c is Car:        0.1 * c.seats().doubleValue()
+    case t is Truck:      t.payloadTons()
+    case v is Van:        v.cargoM3() * 0.5
+    case m is Motorcycle: 0.05
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Vehicle(id: Int, plate: String, kind: VehicleKind, region: String) {
+public:
+  def mpg(): Double   = kind().mpg()
+  def label(): String = "#{plate()} #{kind().label()} [#{region()}]"
+}
+
+record Driver(
+  id:           Int,
+  name:         String,
+  licenseClass: String,
+  region:       String,
+  rating:       Double
+) {
+public:
+  def canDriveTruck(): Boolean = licenseClass() == "C" || licenseClass() == "CE"
+  def summary(): String = "#{name()} (#{licenseClass()}) ★#{rating()}"
+}
+
+record Trip(
+  id:          Int,
+  vehicle:     Vehicle,
+  driver:      Driver,
+  origin:      String,
+  destination: String,
+  miles:       Double,
+  cargoTons:   Double,
+  ratePerMile: Double
+) {
+public:
+  def revenue(): Double = miles() * ratePerMile()
+  def fuelGallons(): Double = miles() / vehicle().mpg()
+  def fuelCost(): Double = fuelGallons() * 4.25
+  def profit(): Double = revenue() - fuelCost()
+  def summary(): String =
+    "Trip##{id()} #{origin()}->#{ destination()} #{miles()}mi " +
+    "cargo=#{cargoTons()}t $#{revenue().intValue()} (fuel $#{fuelCost().intValue()})"
+}
+
+// ─── Extension on Double ──────────────────────────────────────────────────────
+
+extension Double {
+  def usd(): String = "$#{(self * 100.0).intValue().doubleValue() / 100.0}"
+  def pct(): String = "#{(self * 1000.0).intValue().doubleValue() / 10.0}%"
+}
+
+// ─── Assignment record ────────────────────────────────────────────────────────
+
+record Assignment(vehicle: Vehicle, driver: Driver) {
+public:
+  def describe(): String = "#{driver().name()} drives #{vehicle().plate()}"
+}
+
+// ─── TripStats ────────────────────────────────────────────────────────────────
+
+record TripStats(
+  driverName:  String,
+  tripCount:   Int,
+  totalMiles:  Double,
+  totalRev:    Double,
+  totalFuel:   Double
+) {
+public:
+  def profit(): Double = totalRev() - totalFuel()
+  def avgMiles(): Double =
+    if tripCount() == 0 { 0.0 } else { totalMiles() / tripCount().doubleValue() }
+  def utilRate(): Double =
+    if totalRev() == 0.0 { 0.0 } else { profit() / totalRev() }
+  def report(): String =
+    "  #{driverName()} | #{tripCount()} trips #{totalMiles().intValue()}mi " +
+    "rev=#{totalRev().usd()} fuel=#{totalFuel().usd()} profit=#{profit().usd()} " +
+    "margin=#{utilRate().pct()}"
+}
+
+// ─── FleetDispatcher class ────────────────────────────────────────────────────
+
+class FleetDispatcher {
+  var vehicles:    List[Vehicle]    = []
+  var drivers:     List[Driver]     = []
+  var trips:       List[Trip]       = []
+  var assignments: Map[Int, Int]    = [:]   // vehicleId -> driverId
+  var nextTripId:  Int              = 1
+
+public:
+  def addVehicle(v: Vehicle): void { vehicles.add(v) }
+  def addDriver(d: Driver):   void { drivers.add(d) }
+  def allVehicles(): List[Vehicle] = vehicles
+  def allDrivers():  List[Driver]  = drivers
+  def allTrips():    List[Trip]    = trips
+  def assignedDriverId(vehicleId: Int): Int? = assignments[vehicleId]
+
+  def assign(vehicleId: Int, driverId: Int): Boolean {
+    val v = findVehicle(vehicleId)
+    val d = findDriver(driverId)
+    if v == null || d == null { return false }
+    val vk = (v as Vehicle).kind()
+    val canDrive = select vk {
+      case t is Truck: (d as Driver).canDriveTruck()
+      else: true
+    }
+    if !canDrive { return false }
+    assignments[vehicleId] = driverId
+    return true
+  }
+
+  def dispatch(vehicleId: Int, origin: String, dest: String, miles: Double, cargo: Double, rate: Double): Trip? {
+    val v = findVehicle(vehicleId)
+    if v == null { return null }
+    val vv = v as Vehicle
+    val driverId = assignments[vehicleId]
+    if driverId == null { return null }
+    val d = findDriver(driverId as Int)
+    if d == null { return null }
+    if cargo > vv.kind().maxCargoTons() { return null }
+    val trip = new Trip(nextTripId, vv, d as Driver, origin, dest, miles, cargo, rate)
+    trips.add(trip)
+    nextTripId++
+    return trip
+  }
+
+  def findVehicle(id: Int): Vehicle? {
+    foreach v: Vehicle in vehicles {
+      if v.id() == id { return v }
+    }
+    return null
+  }
+
+  def findDriver(id: Int): Driver? {
+    foreach d: Driver in drivers {
+      if d.id() == id { return d }
+    }
+    return null
+  }
+
+  def activeAssignments(): List[Assignment] {
+    val result: List[Assignment] = []
+    foreach (vid, did) in assignments {
+      val v = findVehicle(vid as Int)
+      val d = findDriver(did as Int)
+      if v != null && d != null {
+        result.add(new Assignment(v as Vehicle, d as Driver))
+      }
+    }
+    return result
+  }
+
+  def tripsByRegion(): Map[String, List[Trip]] =
+    trips.groupBy { t -> t.vehicle().region() }
+
+  def statsPerDriver(): List[TripStats] {
+    val byDriver: Map[String, List[Trip]] = trips.groupBy { t -> t.driver().name() }
+    val result: List[TripStats] = []
+    foreach (name, ts) in byDriver {
+      val tripList = ts as List[Trip]
+      val cnt   = tripList.size
+      val miles = tripList.fold(0.0) { acc, t -> acc + t.miles() }
+      val rev   = tripList.fold(0.0) { acc, t -> acc + t.revenue() }
+      val fuel  = tripList.fold(0.0) { acc, t -> acc + t.fuelCost() }
+      result.add(new TripStats(name as String, cnt, miles, rev, fuel))
+    }
+    return result.sortedBy { st -> 0.0 - st.profit() }
+  }
+
+  def topVehicleByRevenue(): Vehicle? {
+    if trips.isEmpty() { return null }
+    val byVehicle: Map[String, List[Trip]] = trips.groupBy { t -> t.vehicle().plate() }
+    var bestPlate: String = ""
+    var bestRev: Double = 0.0
+    foreach (plate, ts) in byVehicle {
+      val vtrips: List[Trip] = ts as List[Trip]
+      var rev: Double = 0.0
+      foreach tr: Trip in vtrips { rev = rev + tr.revenue() }
+      if rev > bestRev { bestRev = rev; bestPlate = plate as String }
+    }
+    foreach v: Vehicle in vehicles {
+      if v.plate() == bestPlate { return v }
+    }
+    return null
+  }
+
+  def totalStats(): String {
+    val totalRev  = trips.fold(0.0) { acc, t -> acc + t.revenue() }
+    val totalFuel = trips.fold(0.0) { acc, t -> acc + t.fuelCost() }
+    val totalMi   = trips.fold(0.0) { acc, t -> acc + t.miles() }
+    val margin    = if totalRev == 0.0 { 0.0 } else { (totalRev - totalFuel) / totalRev }
+    return "Trips: #{trips.size} | Miles: #{totalMi.intValue()} | " +
+           "Revenue: #{totalRev.usd()} | Fuel: #{totalFuel.usd()} | Margin: #{margin.pct()}"
+  }
+}
+
+// ─── do[Option] helper for finding a preferred assignment ────────────────────
+
+def preferredAssignment(
+  fd: FleetDispatcher, vehicleId: Int
+): Option[Assignment] {
+  val v: Vehicle? = fd.findVehicle(vehicleId)
+  if v == null { return Option::none() }
+  val driverId: Int? = fd.assignedDriverId(vehicleId)
+  if driverId == null { return Option::none() }
+  val d: Driver? = fd.findDriver(driverId as Int)
+  if d == null { return Option::none() }
+  return Option::some(new Assignment(v as Vehicle, d as Driver))
+}
+
+// ─── Demo / Main ──────────────────────────────────────────────────────────────
+
+val fd = new FleetDispatcher()
+
+// -- Vehicles (id, plate, kind, region)
+fd.addVehicle(new Vehicle(1, "ABC-101", new Car(5, 32.0),         "North"))
+fd.addVehicle(new Vehicle(2, "DEF-202", new Truck(5.0, 18.0),     "North"))
+fd.addVehicle(new Vehicle(3, "GHI-303", new Van(12.0, 24.0),      "South"))
+fd.addVehicle(new Vehicle(4, "JKL-404", new Car(4, 35.0),         "South"))
+fd.addVehicle(new Vehicle(5, "MNO-505", new Motorcycle(55.0),     "East"))
+fd.addVehicle(new Vehicle(6, "PQR-606", new Truck(10.0, 15.0),    "West"))
+fd.addVehicle(new Vehicle(7, "STU-707", new Van(8.0, 26.0),       "East"))
+fd.addVehicle(new Vehicle(8, "VWX-808", new Car(5, 30.0),         "West"))
+
+// -- Drivers (id, name, licenseClass, region, rating)
+fd.addDriver(new Driver(1, "Alice Turner",  "B",  "North", 4.9))
+fd.addDriver(new Driver(2, "Bob Chen",      "CE", "North", 4.7))
+fd.addDriver(new Driver(3, "Carla Ruiz",    "B",  "South", 4.8))
+fd.addDriver(new Driver(4, "David Kim",     "C",  "South", 4.6))
+fd.addDriver(new Driver(5, "Eva Müller",    "A",  "East",  4.5))
+fd.addDriver(new Driver(6, "Frank Osei",    "CE", "West",  4.8))
+fd.addDriver(new Driver(7, "Grace Tanaka",  "B",  "East",  4.7))
+
+// -- Assignments (vehicleId -> driverId)
+fd.assign(1, 1)   // Alice -> Car ABC-101
+fd.assign(2, 2)   // Bob   -> Truck DEF-202
+fd.assign(3, 3)   // Carla -> Van GHI-303
+fd.assign(4, 4)   // David -> Car JKL-404
+fd.assign(5, 5)   // Eva   -> Motorcycle MNO-505
+fd.assign(6, 6)   // Frank -> Truck PQR-606
+fd.assign(7, 7)   // Grace -> Van STU-707
+fd.assign(8, 1)   // Alice also covers Car VWX-808 (same driver, two vehicles)
+
+// -- Trips
+fd.dispatch(1, "Hub-N", "City-A",  120.0, 0.2, 2.80)
+fd.dispatch(1, "City-A", "Hub-N",  120.0, 0.1, 2.80)
+fd.dispatch(2, "Hub-N", "Port-1",  350.0, 4.5, 3.50)
+fd.dispatch(2, "Port-1", "Hub-N",  350.0, 0.0, 3.50)
+fd.dispatch(3, "Hub-S", "City-B",  200.0, 5.0, 3.10)
+fd.dispatch(3, "City-B", "Town-X", 80.0,  2.0, 3.10)
+fd.dispatch(4, "Hub-S", "Beach",   90.0,  0.1, 2.60)
+fd.dispatch(4, "Beach",  "Hub-S",  90.0,  0.0, 2.60)
+fd.dispatch(5, "Hub-E", "Town-Y",  40.0,  0.04,1.90)
+fd.dispatch(5, "Town-Y", "Town-Z", 25.0,  0.02,1.90)
+fd.dispatch(6, "Hub-W", "Mine-1",  500.0, 9.5, 4.20)
+fd.dispatch(7, "Hub-E", "Depot-2", 160.0, 3.5, 2.95)
+fd.dispatch(8, "Hub-W", "City-C",  110.0, 0.2, 2.70)
+fd.dispatch(8, "City-C", "Hub-W",  110.0, 0.0, 2.70)
+
+println("╔══════════════════════════════════════════════════════╗")
+println("║          FLEET DISPATCHER — ANALYTICS REPORT         ║")
+println("╚══════════════════════════════════════════════════════╝")
+println("")
+
+// Active assignments via do[Option]
+println("── Active Assignments ──────────────────────────────────")
+foreach i: Int in 1..8 {
+  val opt: Option[Assignment] = preferredAssignment(fd, i)
+  if !opt.isEmpty() {
+    println("  " + opt.get().describe())
+  }
+}
+println("")
+
+// All trips
+println("── Trip Log ────────────────────────────────────────────")
+foreach t: Trip in fd.allTrips() {
+  println("  " + t.summary())
+}
+println("")
+
+// Stats per driver
+println("── Driver Performance ──────────────────────────────────")
+foreach st: TripStats in fd.statsPerDriver() {
+  println(st.report())
+}
+println("")
+
+// Trips by region with sub-totals
+println("── Revenue by Region ───────────────────────────────────")
+val byRegion: Map[String, List[Trip]] = fd.tripsByRegion()
+foreach (region, ts) in byRegion {
+  val tripList = ts as List[Trip]
+  val rev  = tripList.fold(0.0) { acc, t -> acc + t.revenue() }
+  val cnt  = tripList.size
+  println("  #{region}: #{cnt} trips  #{rev.usd()}")
+}
+println("")
+
+// Vehicle utilisation: find the busiest vehicle
+println("── Top Vehicle by Revenue ──────────────────────────────")
+val topV: Vehicle? = fd.topVehicleByRevenue()
+if topV != null {
+  val tv = topV as Vehicle
+  println("  #{tv.label()}")
+}
+println("")
+
+// Try/catch: dispatch with overloaded cargo (should return null, no throw, but
+// wrap the check in a try block to exercise try/catch paths)
+println("── Overload Check ──────────────────────────────────────")
+try {
+  val overloaded: Trip? = fd.dispatch(5, "Hub-E", "Far-Town", 300.0, 50.0, 1.90)
+  if overloaded == null {
+    println("  Rejected: cargo exceeds vehicle capacity (correct)")
+  } else {
+    println("  ERROR: overloaded trip was accepted!")
+  }
+} catch e: Exception {
+  println("  Exception: #{e.message()}")
+}
+println("")
+
+// License check: attempt to assign car driver to a truck (should return false)
+println("── License Check ───────────────────────────────────────")
+val reassignOk = fd.assign(6, 5)   // Eva (class A) -> Truck PQR-606
+println("  Eva (A) drives Truck: #{reassignOk} (expected false)")
+val reassignOk2 = fd.assign(6, 4)  // David (class C) -> Truck PQR-606
+println("  David (C) drives Truck: #{reassignOk2} (expected true)")
+println("")
+
+// Vehicle breakdown by type using pattern matching
+println("── Fleet Composition ───────────────────────────────────")
+var cars: Int = 0; var trucks: Int = 0; var vans: Int = 0; var motos: Int = 0
+foreach v: Vehicle in fd.allVehicles() {
+  select v.kind() {
+    case c is Car:        cars++
+    case t is Truck:      trucks++
+    case va is Van:       vans++
+    case m is Motorcycle: motos++
+  }
+}
+println("  Cars: #{cars}  Trucks: #{trucks}  Vans: #{vans}  Motorcycles: #{motos}")
+println("")
+
+// Recursive helper: compute nth Fibonacci to exercise recursion
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+println("── Recursion Smoke Test (fib 10) ───────────────────────")
+foreach i: Int in 0..10 {
+  print("#{fib(i)} ")
+}
+println("")
+println("")
+
+// Overall summary
+println("── Fleet Summary ───────────────────────────────────────")
+println("  " + fd.totalStats())
+println("")
+println("Done.")

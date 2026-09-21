@@ -51,7 +51,8 @@ private[compiler] final class MemberSelectionResolutionSupport(
   def resolveMemberSelection(
     node: AST.Node,
     targetType: ObjectType,
-    name: String
+    name: String,
+    reportErrorIfMissing: Boolean = true
   ): Option[ResolvedMemberSelection] = {
     if (targetType.isArrayType) {
       if (name == MethodNames.LENGTH || name == MethodNames.SIZE) Some(ResolvedArrayLengthSelection)
@@ -60,7 +61,7 @@ private[compiler] final class MemberSelectionResolutionSupport(
         // it (like the non-array branch below) instead of returning a silent None,
         // which let the selection type-check as a bad term and miscompile into
         // invalid bytecode (a VerifyError). (found by the mutation fuzzer)
-        bodyContext.report(FIELD_NOT_FOUND, node, targetType, name)
+        if (reportErrorIfMissing) bodyContext.report(FIELD_NOT_FOUND, node, targetType, name)
         None
       }
     } else {
@@ -76,14 +77,16 @@ private[compiler] final class MemberSelectionResolutionSupport(
             case Right(method) =>
               return Some(ResolvedGetterSelection(method))
             case Left(false) =>
-              return None
+              return None  // ambiguity already reported; stop here
             case Left(true) =>
           }
           methodIndex += 1
         }
 
-        if (field == null) bodyContext.report(FIELD_NOT_FOUND, node, targetType, name)
-        else bodyContext.report(FIELD_NOT_ACCESSIBLE, node, targetType, name, bodyContext.definition)
+        if (reportErrorIfMissing) {
+          if (field == null) bodyContext.report(FIELD_NOT_FOUND, node, targetType, name)
+          else bodyContext.report(FIELD_NOT_ACCESSIBLE, node, targetType, name, bodyContext.definition)
+        }
         None
       }
     }

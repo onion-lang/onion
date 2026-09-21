@@ -1,0 +1,371 @@
+// PackageResolver.on — a package dependency resolver and installation planner.
+// Exercises: ADT case-enum (Resolution), data-carrying enum (Constraint),
+// plain enum (PackageStatus), records with methods (Package, Dep), classes
+// (Registry, Resolver), collection pipelines (filter/map/fold/groupBy/sortedBy/
+// find/count/partition), select/type-pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, while and foreach (ranges, map k/v).
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def fmtVer(): String {
+    val major = self / 10000
+    val minor = (self % 10000) / 100
+    val patch = self % 100
+    return "#{major}.#{minor}.#{patch}"
+  }
+  def lpad(w: Int): String {
+    var s = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Plain enum: lifecycle status ─────────────────────────────────────────────
+
+enum PackageStatus { Available, Installed, Broken }
+
+// ─── Data-carrying enum: version constraint ───────────────────────────────────
+
+enum Constraint(symbol: String) {
+  AnyVersion("*"),
+  ExactVersion("="),
+  MinVersion(">="),
+  MaxVersion("<=")
+}
+
+// ─── ADT case-enum: resolution result ─────────────────────────────────────────
+
+enum Resolution {
+  case Solved(count: Int, order: String)
+  case CycleDetected(chain: String)
+  case MissingPackage(pkgName: String)
+  case VersionConflict(pkgA: String, pkgB: String)
+public:
+  def ok(): Boolean = select this { case r is Solved: true; else: false }
+  def summary(): String = select this {
+    case r is Solved:         "OK  [#{r.count()} packages] #{r.order()}"
+    case r is CycleDetected:  "ERR cycle: #{r.chain()}"
+    case r is MissingPackage: "ERR missing: #{r.pkgName()}"
+    case r is VersionConflict: "ERR conflict: #{r.pkgA()} vs #{r.pkgB()}"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Package(name: String, version: Int, status: PackageStatus) {
+public:
+  def id(): String = "#{name()}@#{version().fmtVer()}"
+  def available(): Boolean = status() == PackageStatus::Available ||
+                             status() == PackageStatus::Installed
+  def statusLabel(): String = select status() {
+    case PackageStatus::Available: "avail"
+    case PackageStatus::Installed: "inst "
+    case PackageStatus::Broken:    "broke"
+    else: "?"
+  }
+  def summary(): String = "[#{statusLabel()}] #{id()}"
+}
+
+record Dep(from: String, to: String, constraint: Constraint, targetVer: Int) {
+public:
+  def satisfied(v: Int): Boolean = select constraint() {
+    case Constraint::AnyVersion:   true
+    case Constraint::ExactVersion: v == targetVer()
+    case Constraint::MinVersion:   v >= targetVer()
+    case Constraint::MaxVersion:   v <= targetVer()
+    else: false
+  }
+  def label(): String =
+    "#{from()} -> #{to()} #{constraint().symbol()}#{targetVer().fmtVer()}"
+}
+
+// ─── Registry class ───────────────────────────────────────────────────────────
+
+class Registry {
+  var pkgs: List[Package] = []
+  var deps: List[Dep]     = []
+
+public:
+  def addPackage(p: Package): void { pkgs.add(p) }
+  def addDep(d: Dep): void         { deps.add(d) }
+
+  def find(name: String): Package? {
+    foreach p: Package in pkgs {
+      if p.name() == name { return p }
+    }
+    return null
+  }
+
+  def depsOf(name: String): List[Dep] =
+    deps.filter { d -> (d as Dep).from() == name }
+
+  def dependents(name: String): List[Package] {
+    val result: List[Package] = []
+    foreach d: Dep in deps {
+      if d.to() == name {
+        val p = find(d.from())
+        if p != null { result.add(p) }
+      }
+    }
+    return result
+  }
+
+  def allAvailable(): List[Package] =
+    pkgs.filter { p -> (p as Package).available() }
+
+  def sortedByVersion(): List[Package] =
+    pkgs.sortedBy { p -> 0 - (p as Package).version() }
+
+  def printReport(): void {
+    println("=== Registry Report ===")
+    println("  Packages : #{pkgs.size}")
+    println("  Deps     : #{deps.size}")
+    println("  Available: #{allAvailable().size}")
+    println("")
+    println("  By status:")
+    val grouped = pkgs.groupBy { p -> (p as Package).statusLabel() }
+    foreach (label, list) in grouped {
+      println("    #{label}: #{(list as List).size}")
+    }
+    println("")
+    println("  Sorted by version (newest first):")
+    foreach p: Package in sortedByVersion() {
+      println("    #{p.summary()}")
+    }
+  }
+}
+
+// ─── DependencyResolver ───────────────────────────────────────────────────────
+
+class DependencyResolver {
+  val registry: Registry
+
+public:
+  def this(r: Registry) { registry = r }
+
+  def resolve(rootName: String): Resolution {
+    val p = registry.find(rootName)
+    if p == null { return new MissingPackage(rootName) }
+    val visited: List[String] = []
+    val stack:   List[String] = []
+    val order:   List[String] = []
+    return visit(rootName, stack, visited, order)
+  }
+
+  def visit(name: String, stack: List[String], visited: List[String], order: List[String]): Resolution {
+    if containsStr(stack, name) {
+      val chain = buildChain(stack, name)
+      return new CycleDetected(chain)
+    }
+    if containsStr(visited, name) { return new Solved(order.size, "") }
+
+    val pkg = registry.find(name)
+    if pkg == null { return new MissingPackage(name) }
+
+    stack.add(name)
+    foreach d: Dep in registry.depsOf(name) {
+      val depPkg = registry.find(d.to())
+      if depPkg == null { return new MissingPackage(d.to()) }
+      if !d.satisfied(depPkg.version()) {
+        return new VersionConflict(name, d.to())
+      }
+      val sub = visit(d.to(), stack, visited, order)
+      if !sub.ok() { return sub }
+    }
+    stack.remove(name)
+    if !containsStr(visited, name) {
+      visited.add(name)
+      order.add(name)
+    }
+    return new Solved(order.size, joinList(order))
+  }
+}
+
+def containsStr(list: List[String], s: String): Boolean {
+  foreach x: String in list {
+    if x == s { return true }
+  }
+  return false
+}
+
+def buildChain(stack: List[String], target: String): String {
+  var found: Boolean = false
+  var chain: String = ""
+  foreach x: String in stack {
+    if x == target { found = true }
+    if found { chain = if chain == "" { x } else { chain + " -> " + x } }
+  }
+  return chain + " -> " + target
+}
+
+def joinList(list: List[String]): String {
+  var s: String = ""
+  foreach x: String in list {
+    s = if s == "" { x } else { s + ", " + x }
+  }
+  return s
+}
+
+// ─── Reportable interface ─────────────────────────────────────────────────────
+
+interface Reportable {
+  def printReport(): void
+  def title(): String
+}
+
+// ─── InstallPlan class ────────────────────────────────────────────────────────
+
+class InstallPlan conforms Reportable {
+  val target: String
+  val resolution: Resolution
+  val depCount: Int
+
+public:
+  def this(t: String, res: Resolution, dc: Int) {
+    target = t; resolution = res; depCount = dc
+  }
+
+  def title(): String = "Install plan for '#{target}'"
+
+  def printReport(): void {
+    println("  [#{target}] #{resolution.summary()}")
+    if resolution.ok() {
+      println("    deps to install: #{depCount}")
+    }
+  }
+
+  def succeeded(): Boolean = resolution.ok()
+}
+
+// ─── AnalysisSummary: uses fold/partition/zip ─────────────────────────────────
+
+def analyzeRegistry(r: Registry, resolver: DependencyResolver): void {
+  println("=== Dependency Analysis ===")
+
+  val allPkgs = r.sortedByVersion()
+  val parts   = allPkgs.partition { p -> (p as Package).available() }
+  val healthy = parts[0] as List[Package]
+  val broken  = parts[1] as List[Package]
+
+  println("  Total    : #{allPkgs.size}")
+  println("  Healthy  : #{healthy.size}")
+  println("  Broken   : #{broken.size}")
+  println("")
+
+  val totalVer = (allPkgs.fold(0) { acc, p ->
+    (acc as Int) + (p as Package).version()
+  }) as Int
+  val avgVer = if allPkgs.size > 0 { totalVer / allPkgs.size } else { 0 }
+  println("  Avg ver# : #{avgVer.fmtVer()}")
+  println("")
+
+  println("  Dependents of lodash:")
+  foreach p: Package in r.dependents("lodash") {
+    println("    -> #{p.id()}")
+  }
+  println("")
+
+  val plans: List[InstallPlan] = []
+  foreach p: Package in allPkgs {
+    val res = resolver.resolve(p.name())
+    val depCount = select res {
+      case s is Solved: s.count() - 1
+      else: 0
+    }
+    plans.add(new InstallPlan(p.name(), res, depCount))
+  }
+
+  println("  Install plan results:")
+  foreach plan: InstallPlan in plans {
+    plan.printReport()
+  }
+
+  val successes = plans.count { pl -> (pl as InstallPlan).succeeded() }
+  val failures  = plans.size - successes
+  println("")
+  println("  Plans: #{successes} OK, #{failures} failed")
+}
+
+// ─── Try/catch demo ───────────────────────────────────────────────────────────
+
+def safeSummary(r: Registry, name: String): String {
+  try {
+    val p = r.find(name)
+    if p == null { throw new RuntimeException("not found: " + name) }
+    return p.summary()
+  } catch e: Exception {
+    return "[error] #{e.message()}"
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val r = new Registry()
+  r.addPackage(new Package("lodash",   40200, PackageStatus::Available))
+  r.addPackage(new Package("react",   180300, PackageStatus::Available))
+  r.addPackage(new Package("axios",    10600, PackageStatus::Installed))
+  r.addPackage(new Package("webpack",  50900, PackageStatus::Available))
+  r.addPackage(new Package("babel",    70001, PackageStatus::Available))
+  r.addPackage(new Package("core-js",  30600, PackageStatus::Available))
+  r.addPackage(new Package("moment",   20900, PackageStatus::Installed))
+  r.addPackage(new Package("dayjs",    10803, PackageStatus::Available))
+  r.addDep(new Dep("react",   "lodash",   Constraint::MinVersion,  40000))
+  r.addDep(new Dep("react",   "core-js",  Constraint::MinVersion,  30000))
+  r.addDep(new Dep("webpack", "babel",    Constraint::MinVersion,  70000))
+  r.addDep(new Dep("webpack", "lodash",   Constraint::AnyVersion,  0))
+  r.addDep(new Dep("axios",   "lodash",   Constraint::MinVersion,  40000))
+  r.addDep(new Dep("babel",   "core-js",  Constraint::MinVersion,  30000))
+  r.addDep(new Dep("moment",  "core-js",  Constraint::MinVersion,  30000))
+  r.addDep(new Dep("dayjs",   "core-js",  Constraint::MinVersion,  30000))
+
+  r.printReport()
+  println("")
+
+  val resolver = new DependencyResolver(r)
+
+  println("=== Resolution Results ===")
+  foreach name: String in ["react", "webpack", "axios", "lodash", "moment", "missing-pkg"] {
+    val res = resolver.resolve(name)
+    println("  resolve(#{name.rpad(12)}): #{res.summary()}")
+  }
+  println("")
+
+  println("=== Cycle Detection ===")
+  val cycleReg = new Registry()
+  cycleReg.addPackage(new Package("a", 10000, PackageStatus::Available))
+  cycleReg.addPackage(new Package("b", 10000, PackageStatus::Available))
+  cycleReg.addPackage(new Package("c", 10000, PackageStatus::Available))
+  cycleReg.addDep(new Dep("a", "b", Constraint::AnyVersion, 0))
+  cycleReg.addDep(new Dep("b", "c", Constraint::AnyVersion, 0))
+  cycleReg.addDep(new Dep("c", "a", Constraint::AnyVersion, 0))
+  val cycleRes = new DependencyResolver(cycleReg).resolve("a")
+  println("  a->b->c->a: #{cycleRes.summary()}")
+  println("")
+
+  println("=== Version Conflict ===")
+  val conflictReg = new Registry()
+  conflictReg.addPackage(new Package("app",   10000, PackageStatus::Available))
+  conflictReg.addPackage(new Package("lib",   20000, PackageStatus::Available))
+  conflictReg.addDep(new Dep("app", "lib", Constraint::MinVersion, 30000))
+  val conflictRes = new DependencyResolver(conflictReg).resolve("app")
+  println("  app needs lib>=3.0.0 but has 2.0.0: #{conflictRes.summary()}")
+  println("")
+
+  println("=== Safe Lookup ===")
+  foreach n: String in ["lodash", "react", "nosuchpkg"] {
+    println("  #{safeSummary(r, n)}")
+  }
+  println("")
+
+  analyzeRegistry(r, resolver)
+}

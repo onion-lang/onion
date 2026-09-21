@@ -1,0 +1,238 @@
+// PriceCompare.on — A multi-store price comparison engine (~200 lines)
+// Exercises: ADT enum (Discount), data-carrying enum (StoreCategory), records
+// with examples, classes with generics, extension Int/Double methods, collection
+// pipelines (filter/map/sortedBy/groupBy/fold/find/partition/distinct),
+// foreach (k,v) on Map, select/pattern matching, closures, string interpolation,
+// nullable, try/catch, recursion, while/foreach (ranges and list).
+
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+}
+
+// ── Store categories ──────────────────────────────────────────────────────────
+
+enum StoreCategory(label: String) {
+  ONLINE("Online"),
+  RETAIL("Retail"),
+  WHOLESALE("Wholesale")
+}
+
+// ── Discount types (ADT enum) ─────────────────────────────────────────────────
+
+enum Discount {
+  case None
+  case Flat(cents: Int)
+  case Percent(pct: Int)
+  case Combo(first: Discount, second: Discount)
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Store(id: Int, name: String, category: StoreCategory)
+  example { new Store(1, "MegaMart", StoreCategory::RETAIL).category() == StoreCategory::RETAIL }
+
+record Product(sku: String, name: String, basePrice: Int)
+  example { new Product("P001", "Widget", 1000).basePrice() > 0 }
+
+record Listing(store: Store, product: Product, price: Int, discount: Discount)
+  example { new Listing(new Store(1,"S",StoreCategory::ONLINE), new Product("X","Y",100), 999, new None()).price() == 999 }
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def cents(): String {
+    val dollars: Int = self / 100
+    val cents: Int   = self % 100
+    if cents < 10 { return "$" + dollars + ".0" + cents }
+    return "$" + dollars + "." + cents
+  }
+  def abs(): Int { if self < 0 { return 0 - self } return self }
+}
+
+extension Double {
+  def pct(): String = "" + self + "%"
+  def roundInt(): Int = (self + 0.5) as Int
+}
+
+// ── Discount resolver ─────────────────────────────────────────────────────────
+
+def applyDiscount(price: Int, discount: Discount): Int {
+  select discount {
+    case d is None:
+      return price
+    case d is Flat:
+      val after: Int = price - d.cents()
+      return if after < 0 { 0 } else { after }
+    case d is Percent:
+      val off: Int = (price * d.pct() / 100)
+      return price - off
+    case d is Combo:
+      val after1: Int = applyDiscount(price, d.first())
+      return applyDiscount(after1, d.second())
+  }
+}
+
+def discountLabel(d: Discount): String {
+  select d {
+    case x is None:    return "no discount"
+    case x is Flat:    return "flat " + x.cents().cents()
+    case x is Percent: return x.pct() + "% off"
+    case x is Combo:   return discountLabel(x.first()) + " + " + discountLabel(x.second())
+  }
+}
+
+// ── Price comparison engine ───────────────────────────────────────────────────
+
+class PriceEngine {
+  val listings: List[Listing]
+
+public:
+  def this(listings: List[Listing]) {
+    this.listings = listings
+  }
+
+  def cheapestFor(sku: String): Listing? {
+    val matched = listings.filter { l -> l.product().sku() == sku }
+    if matched.size == 0 { return null }
+    val sorted = matched.sortedBy { l -> applyDiscount(l.price(), l.discount()) }
+    return sorted[0] as Listing
+  }
+
+  def byStore(storeId: Int): List[Listing] {
+    return listings.filter { l -> l.store().id() == storeId }
+  }
+
+  def priceRange(sku: String): List[Int] {
+    val effective = listings
+      .filter { l -> l.product().sku() == sku }
+      .map    { l -> applyDiscount(l.price(), l.discount()) }
+    if effective.size == 0 { return [] }
+    val lo: Int = effective.fold(999999) { acc, p -> if (acc as Int) < (p as Int) { acc } else { p } } as Int
+    val hi: Int = effective.fold(0)      { acc, p -> if (acc as Int) > (p as Int) { acc } else { p } } as Int
+    return [lo, hi]
+  }
+
+  def groupByCategory(): Object {
+    return listings.groupBy { l -> l.store().category().label() }
+  }
+
+  def savingsReport(): List[String] {
+    return listings.map { l ->
+      val orig: Int  = l.price()
+      val eff:  Int  = applyDiscount(orig, l.discount())
+      val saved: Int = orig - eff
+      l.store().name() + "/" + l.product().name() +
+        ": " + orig.cents() + " -> " + eff.cents() + " (saved " + saved.cents() + ")"
+    }
+  }
+}
+
+// ── Demo data ─────────────────────────────────────────────────────────────────
+
+val storeMM   = new Store(1, "MegaMart",   StoreCategory::RETAIL)
+val storeQB   = new Store(2, "QuickBuy",   StoreCategory::ONLINE)
+val storeBW   = new Store(3, "BulkWorld",  StoreCategory::WHOLESALE)
+
+val prodWidget = new Product("P001", "Widget",    2000)
+val prodGadget = new Product("P002", "Gadget",    4500)
+val prodDoodad = new Product("P003", "Doodad",    800)
+
+val listings: List[Listing] = [
+  new Listing(storeMM, prodWidget, 2000, new None()),
+  new Listing(storeQB, prodWidget, 1900, new Percent(5)),
+  new Listing(storeBW, prodWidget, 1700, new Flat(50)),
+  new Listing(storeMM, prodGadget, 4500, new Percent(10)),
+  new Listing(storeQB, prodGadget, 4200, new Combo(new Percent(5), new Flat(100))),
+  new Listing(storeBW, prodGadget, 3900, new None()),
+  new Listing(storeMM, prodDoodad, 800,  new None()),
+  new Listing(storeQB, prodDoodad, 750,  new Percent(2)),
+  new Listing(storeBW, prodDoodad, 700,  new Flat(20))
+]
+
+val engine = new PriceEngine(listings)
+
+// ── Cheapest per SKU ──────────────────────────────────────────────────────────
+
+IO::println("=== Cheapest per SKU ===")
+foreach sku: String in ["P001", "P002", "P003"] {
+  val best: Listing? = engine.cheapestFor(sku)
+  if best != null {
+    val eff: Int = applyDiscount(best.price(), best.discount())
+    IO::println("  #{sku}: #{best.store().name()} @ #{eff.cents()} (#{discountLabel(best.discount())})")
+  }
+}
+
+// ── Price ranges ─────────────────────────────────────────────────────────────
+
+IO::println("\n=== Price ranges ===")
+foreach sku: String in ["P001", "P002", "P003"] {
+  val rng: List[Int] = engine.priceRange(sku)
+  if rng.size == 2 {
+    IO::println("  #{sku}: #{(rng[0] as Int).cents()} – #{(rng[1] as Int).cents()}")
+  }
+}
+
+// ── Savings report ────────────────────────────────────────────────────────────
+
+IO::println("\n=== Savings report ===")
+foreach line: String in engine.savingsReport() {
+  IO::println("  " + line)
+}
+
+// ── Group by category ─────────────────────────────────────────────────────────
+
+IO::println("\n=== Listings by store category ===")
+val byCategory: Object = engine.groupByCategory()
+foreach (cat, items) in (byCategory as java.util.Map) {
+  IO::println("  " + cat + ": " + (items as List).size + " listing(s)")
+}
+
+// ── Store-level summary (BulkWorld) ──────────────────────────────────────────
+
+IO::println("\n=== BulkWorld listings ===")
+foreach l: Listing in engine.byStore(3) {
+  val eff: Int = applyDiscount(l.price(), l.discount())
+  IO::println("  " + l.product().name() + ": " + eff.cents())
+}
+
+// ── Recursive compound discount demo ─────────────────────────────────────────
+
+IO::println("\n=== Compound discount demo ===")
+val base: Int = 10000
+val d1: Discount = new Percent(10)
+val d2: Discount = new Flat(200)
+val d3: Discount = new Combo(d1, d2)
+val d4: Discount = new Combo(d3, new Percent(5))
+IO::println("  base: #{base.cents()}")
+IO::println("  after #{discountLabel(d1)}: #{applyDiscount(base, d1).cents()}")
+IO::println("  after #{discountLabel(d3)}: #{applyDiscount(base, d3).cents()}")
+IO::println("  after #{discountLabel(d4)}: #{applyDiscount(base, d4).cents()}")
+
+// ── Try/catch: invalid index guard ───────────────────────────────────────────
+
+IO::println("\n=== Out-of-range guard ===")
+def safeGet(list: List[Listing], i: Int): Object? {
+  try {
+    return list[i]
+  } catch e: Exception {
+    return null
+  }
+}
+val got: Object? = safeGet(listings, 99)
+val gotMsg: String = if got == null { "not found" } else { "found" }
+IO::println("  index 99: " + gotMsg)
+
+// ── Partition: expensive vs affordable ───────────────────────────────────────
+
+IO::println("\n=== Partition by affordability (< $20) ===")
+val parts       = listings.partition { l -> applyDiscount(l.price(), l.discount()) < 2000 }
+val affordable: List[Object] = parts[0] as List[Object]
+val expensive:  List[Object] = parts[1] as List[Object]
+IO::println("  affordable: " + affordable.size)
+IO::println("  expensive:  " + expensive.size)
+
+// ── Distinct SKUs in catalogue ────────────────────────────────────────────────
+
+val skus = listings.map { l -> l.product().sku() }.distinct()
+IO::println("\n  distinct SKUs: " + skus.size)

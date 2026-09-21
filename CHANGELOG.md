@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A zero-arg extension method accessed property-style (no parentheses) through the safe-call operator (`opt?.name`) reported a spurious `E0004` (field not found) instead of resolving the extension**, even though the equivalent plain access `expr.name` already worked (fixed for that path in #1352/v0.92.0) and the parenthesized safe call `opt?.name()` also already worked. `SafeNavigationTypingSupport.typeSafeMemberSelection` never consulted the extension-method registry as a fallback before reporting the error. Fixed by adding `ExtensionMethodFallbackSupport.tryZeroArgExtensionAccessForSafeNav`, a safe-nav-aware sibling of the existing `tryZeroArgExtensionAccess` that wraps the resolved call as a `SafeStaticExtensionCall` so a null receiver still short-circuits to `null` at runtime instead of being dereferenced, and consulting it (after real fields/getters, before reporting `E0004`) the same way the plain member-selection path already does. Guarded by two new regression tests in `SafeCallExtensionMethodSpec`.
+
 ## [0.93.0] - 2026-09-21
 
 ### Added

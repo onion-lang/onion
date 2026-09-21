@@ -108,5 +108,57 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("null") == result)
     }
+
+    it("calls a zero-arg extension method accessed property-style (no parens) on a nullable String and returns result when non-null") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def shout: String = self.toUpperCase() + "!"
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def getStr(flag: Boolean): String? {
+          |    if flag { return "hello" }
+          |    return null
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    val opt: String? = getStr(true)
+          |    return "" + opt?.shout
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("HELLO!") == result)
+    }
+
+    it("calls a zero-arg extension method accessed property-style (no parens) on a nullable String and returns null when null") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def shout: String = self.toUpperCase() + "!"
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def getStr(flag: Boolean): String? {
+          |    if flag { return "hello" }
+          |    return null
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    val opt: String? = getStr(false)
+          |    return "" + opt?.shout
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
   }
 }

@@ -42,6 +42,16 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
 
+  /** Safe-nav variant of `tryZeroArgExtensionAccess`: `expr?.name` resolves `def name: T` in an extension block. */
+  def tryZeroArgExtensionAccessForSafeNav(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, expected)
+
   /** Extension-method resolution for the operator-overloading path (`a + b`). */
   def tryExtensionOperatorMethod(
     node: AST.Node,

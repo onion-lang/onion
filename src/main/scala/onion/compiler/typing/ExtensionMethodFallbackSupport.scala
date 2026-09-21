@@ -195,6 +195,52 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         buildSafeExtensionCall(node, target, targetType, params, expected, extMethod)
     }
 
+  /**
+   * Safe-nav variant of `tryZeroArgExtensionAccess`: `expr?.name` resolves a
+   * zero-arg extension method (`def name: T` in an `extension` block) accessed
+   * in property style (no parentheses), wrapping the result as a
+   * SafeStaticExtensionCall so a null receiver short-circuits to null at
+   * runtime instead of being dereferenced. Called from the SafeMemberSelection
+   * typing path before it reports E0004, mirroring how tryZeroArgExtensionAccess
+   * shadows E0004 on the plain (non-null-safe) member-selection path.
+   */
+  def tryZeroArgExtensionAccessForSafeNav(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] = {
+    val params = Array.empty[Term]
+    selectApplicableExtensionMethod(targetType, name, params) match {
+      case CandidateSelection.NoMatch => None
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousSignature(
+          node,
+          first.containerClass, name, first.arguments,
+          second.containerClass, name, second.arguments
+        )
+        None
+      case CandidateSelection.Selected(extMethod) =>
+        val containerClass = extMethod.containerClass
+        val receiverBasicType: Option[BasicType] = extMethod.receiverType match {
+          case bt: BasicType => Some(bt)
+          case _ => None
+        }
+        val lookupReceiver = staticReceiver(nonNullableReceiverForLookup(target, extMethod), extMethod)
+        val staticArgs = Array(lookupReceiver)
+        containerClass.findMethod(name, staticArgs) match {
+          case Array(staticMethod) =>
+            val classSubst = TypeSubstitution.classSubstitution(containerClass)
+            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected)(
+              expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+              finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
+            )
+          case _ => None
+        }
+    }
+  }
+
   private def buildExtensionCall(
     node: AST.MethodCall,
     target: Term,

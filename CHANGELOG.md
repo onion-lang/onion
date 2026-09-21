@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/TimeTracker.on`** — a 272-line time-entry log analyzer sample (a `TimeEntry` record derived via `from re"..."` pattern parsing, an ADT enum for priority, extension methods on `Int`/`String`, collection pipelines including `sortedBy`/`groupBy`/`fold`/`distinct`, `do[List]` comprehension, `foreach` over maps and ranges, nullable maps, try/catch), added to the `run/` corpus (part of the backlog described in #1370; resolved by keeping develop's tolerance-band `docs/quality-bar.md` rows unchanged since the addition stays well within the drift band).
+
 ## [0.92.0] - 2026-09-21
 
 ### Fixed

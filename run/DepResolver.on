@@ -1,0 +1,387 @@
+// DepResolver.on — Semantic-versioning package dependency resolver.
+// Exercises: ADT case-enum, records with methods, classes, extension methods on
+// Int and String, collection pipelines (map/filter/fold/sortedBy/find/any/
+// groupBy), select / type-pattern matching, sealed exhaustiveness, nullable
+// types, closures, string interpolation, try/catch, while/foreach over ranges
+// and map (k,v), recursion, explicit return discipline.
+
+// ─── SemVer ───────────────────────────────────────────────────────────────────
+
+record SemVer(major: Int, minor: Int, patch: Int) {
+public:
+  def compareTo(other: SemVer): Int {
+    if self.major() != other.major() { return self.major() - other.major() }
+    if self.minor() != other.minor() { return self.minor() - other.minor() }
+    return self.patch() - other.patch()
+  }
+  def isSameMajor(other: SemVer): Boolean = self.major() == other.major()
+  def isAtLeast(other: SemVer): Boolean = self.compareTo(other) >= 0
+  def render(): String = "#{self.major()}.#{self.minor()}.#{self.patch()}"
+  def sortKey(): Int = self.major() * 10000 + self.minor() * 100 + self.patch()
+}
+
+extension String {
+  def toSemVer(): SemVer? {
+    val parts: List[String] = Strings::split(self, ".")
+    if parts.size != 3 { return null }
+    try {
+      val maj: Int = Integer::parseInt(parts[0])
+      val min: Int = Integer::parseInt(parts[1])
+      val pat: Int = Integer::parseInt(parts[2])
+      return new SemVer(maj, min, pat)
+    } catch e: Exception {
+      return null
+    }
+  }
+}
+
+def sv(s: String): SemVer {
+  val v: SemVer? = s.toSemVer()
+  if v == null { throw new RuntimeException("bad semver: " + s) }
+  return v
+}
+
+// ─── Version Constraint ADT ──────────────────────────────────────────────────
+
+enum VersionConstraint {
+  case Exact(version: SemVer)
+  case AtLeast(min: SemVer)
+  case Compatible(base: SemVer)
+  case InRange(lo: SemVer, hi: SemVer)
+  case Any
+public:
+  def isSatisfiedBy(v: SemVer): Boolean = select this {
+    case e is Exact:      e.version().compareTo(v) == 0
+    case a is AtLeast:    v.isAtLeast(a.min())
+    case c is Compatible: v.isSameMajor(c.base()) && v.isAtLeast(c.base())
+    case r is InRange:    v.isAtLeast(r.lo()) && v.compareTo(r.hi()) < 0
+    case x is Any:        true
+  }
+  def render(): String = select this {
+    case e is Exact:      "=#{e.version().render()}"
+    case a is AtLeast:    ">=#{a.min().render()}"
+    case c is Compatible: "~=#{c.base().render()}"
+    case r is InRange:    ">=#{r.lo().render()} <#{r.hi().render()}"
+    case x is Any:        "*"
+  }
+}
+
+// ─── Package Records ──────────────────────────────────────────────────────────
+
+record Dep(name: String, constraint: VersionConstraint) {
+public:
+  def render(): String = "#{self.name()} #{self.constraint().render()}"
+}
+
+record Pkg(name: String, version: SemVer, deps: List[Dep]) {
+public:
+  def id(): String = "#{self.name()}@#{self.version().render()}"
+  def depCount(): Int = self.deps().size
+}
+
+// ─── Resolution ADT ──────────────────────────────────────────────────────────
+
+enum Resolution {
+  case Success(pkgs: List[Pkg])
+  case NotFound(pkgName: String, constraint: VersionConstraint)
+  case Conflict(pkgName: String, wanted: Pkg, have: Pkg)
+public:
+  def isOk(): Boolean = select this {
+    case s is Success: true
+    else: false
+  }
+  def resolved(): List[Pkg] = select this {
+    case s is Success: s.pkgs()
+    else: []
+  }
+  def summary(): String = select this {
+    case s is Success: {
+      val ids: String = s.pkgs()
+        .sortedBy { p -> (p as Pkg).name() }
+        .map { p -> "  " + (p as Pkg).id() }
+        .fold("") { acc, line -> if (acc as String).length() == 0 { line } else { acc + "\n" + line } }
+      "Resolved:\n#{ids}"
+    }
+    case n is NotFound:
+      "Not found: #{n.pkgName()} #{n.constraint().render()}"
+    case c is Conflict:
+      "Conflict: #{c.pkgName()} needs #{c.wanted().id()} but #{c.have().id()} is pinned"
+  }
+}
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+class Registry {
+  var entries: List[Pkg] = []
+
+public:
+  def register(p: Pkg): void {
+    entries.add(p)
+  }
+  def total(): Int = entries.size
+  def all(): List[Pkg] = entries
+  def versionsOf(name: String): List[Pkg] {
+    return entries.filter { p -> (p as Pkg).name() == name }
+  }
+  def satisfying(name: String, c: VersionConstraint): List[Pkg] {
+    return self.versionsOf(name).filter { p -> c.isSatisfiedBy((p as Pkg).version()) }
+  }
+  def bestMatch(name: String, c: VersionConstraint): Pkg? {
+    val candidates: List[Pkg] = self.satisfying(name, c)
+    if candidates.size == 0 { return null }
+    val sorted: List[Pkg] = candidates.sortedBy { p -> (p as Pkg).version().sortKey() }
+    return sorted[sorted.size - 1] as Pkg
+  }
+}
+
+// ─── Resolver ────────────────────────────────────────────────────────────────
+
+class Resolver {
+  var registry: Registry
+  var pinned:   List[Pkg]    = []
+  var visiting: List[String] = []
+
+public:
+  def this(reg: Registry) {
+    self.registry = reg
+  }
+
+  def resolve(name: String, c: VersionConstraint): Resolution {
+    val key: String = "#{name}@#{c.render()}"
+    if visiting.any { k -> k == key } {
+      return new Success(pinned)
+    }
+    visiting.add(key)
+
+    // Check already pinned
+    val existingFound = pinned.find { p -> (p as Pkg).name() == name }
+    if existingFound != null {
+      val existing: Pkg = existingFound as Pkg
+      if !c.isSatisfiedBy(existing.version()) {
+        val wantedObj: Pkg? = registry.bestMatch(name, c)
+        if wantedObj != null {
+          return new Conflict(name, wantedObj, existing)
+        }
+      }
+      return new Success(pinned)
+    }
+
+    // Find best matching version
+    val bestObj: Pkg? = registry.bestMatch(name, c)
+    if bestObj == null { return new NotFound(name, c) }
+    val pkg: Pkg = bestObj
+    pinned.add(pkg)
+
+    // Resolve transitive deps
+    foreach dep: Dep in pkg.deps() {
+      val sub: Resolution = self.resolve(dep.name(), dep.constraint())
+      if !sub.isOk() { return sub }
+    }
+
+    return new Success(pinned)
+  }
+
+  def result(): List[Pkg] = pinned
+}
+
+// ─── Tree Printer ─────────────────────────────────────────────────────────────
+
+class TreePrinter {
+  var registry: Registry
+  var shown: List[String] = []
+
+public:
+  def this(reg: Registry) {
+    self.registry = reg
+  }
+
+  def printTree(pkg: Pkg, depth: Int): void {
+    val alreadySeen: Boolean = shown.any { s -> s == pkg.id() }
+    val indent: String = self.indent(depth)
+    if alreadySeen {
+      IO::println("#{indent}#{pkg.id()}  (↑ dedup)")
+      return
+    }
+    shown.add(pkg.id())
+    IO::println("#{indent}#{pkg.id()}")
+    foreach dep: Dep in pkg.deps() {
+      val f: Pkg? = registry.bestMatch(dep.name(), dep.constraint())
+      if f != null {
+        self.printTree(f, depth + 2)
+      } else {
+        IO::println("#{indent}  #{dep.name()} (MISSING)")
+      }
+    }
+  }
+
+  def indent(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + " "; i++ }
+    return s
+  }
+}
+
+// ─── Constraint helpers ───────────────────────────────────────────────────────
+
+extension Int {
+  def dotZero(): String = "" + self + ".0"
+}
+
+// ─── Registry builder ────────────────────────────────────────────────────────
+
+def buildRegistry(): Registry {
+  val reg: Registry = new Registry()
+
+  // core
+  reg.register(new Pkg("core", sv("1.0.0"), []))
+  reg.register(new Pkg("core", sv("2.0.0"), []))
+  reg.register(new Pkg("core", sv("2.1.0"), []))
+  reg.register(new Pkg("core", sv("3.0.0"), []))
+
+  // utils — depends on core
+  reg.register(new Pkg("utils", sv("1.0.0"),
+    [new Dep("core", new AtLeast(sv("1.0.0")))]))
+  reg.register(new Pkg("utils", sv("1.5.0"),
+    [new Dep("core", new Compatible(sv("2.0.0")))]))
+  reg.register(new Pkg("utils", sv("2.0.0"),
+    [new Dep("core", new Compatible(sv("2.0.0")))]))
+  reg.register(new Pkg("utils", sv("3.0.0"),
+    [new Dep("core", new Compatible(sv("3.0.0")))]))
+
+  // logging — depends on utils
+  reg.register(new Pkg("logging", sv("1.0.0"),
+    [new Dep("utils", new AtLeast(sv("1.0.0")))]))
+  reg.register(new Pkg("logging", sv("1.2.0"),
+    [new Dep("utils", new Compatible(sv("1.5.0")))]))
+  reg.register(new Pkg("logging", sv("2.0.0"),
+    [new Dep("utils", new Compatible(sv("2.0.0")))]))
+
+  // http
+  reg.register(new Pkg("http", sv("1.0.0"), [
+    new Dep("utils", new Compatible(sv("1.5.0"))),
+    new Dep("core",  new Compatible(sv("2.0.0")))
+  ]))
+  reg.register(new Pkg("http", sv("2.0.0"), [
+    new Dep("utils", new Compatible(sv("2.0.0"))),
+    new Dep("core",  new Compatible(sv("2.0.0")))
+  ]))
+
+  // app
+  reg.register(new Pkg("app", sv("1.0.0"), [
+    new Dep("http",    new Compatible(sv("1.0.0"))),
+    new Dep("logging", new Compatible(sv("1.0.0")))
+  ]))
+  reg.register(new Pkg("app", sv("2.0.0"), [
+    new Dep("http",    new Compatible(sv("2.0.0"))),
+    new Dep("logging", new Compatible(sv("2.0.0")))
+  ]))
+
+  // legacy — requires exact core 1.0.0 (causes conflict with app 2.x)
+  reg.register(new Pkg("legacy", sv("1.0.0"),
+    [new Dep("core", new Exact(sv("1.0.0")))]))
+
+  return reg
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+def printStats(pkgs: List[Pkg]): void {
+  IO::println("\n  Stats:")
+  IO::println("  · #{pkgs.size} packages selected")
+
+  val leafs: List[Pkg] = pkgs.filter { p -> (p as Pkg).depCount() == 0 }
+  val leafNames: String = leafs
+    .map { p -> (p as Pkg).name() }
+    .fold("") { acc, n -> if (acc as String).length() == 0 { n } else { acc + ", " + n } }
+  IO::println("  · Leaf packages: #{leafNames}")
+
+  val heaviest: List[Pkg] = pkgs.sortedBy { p -> 0 - (p as Pkg).depCount() }
+  if heaviest.size > 0 {
+    val top: Pkg = heaviest[0] as Pkg
+    IO::println("  · Most deps: #{top.id()} (#{top.depCount()} direct)")
+  }
+
+  val byMajor: Map[Object, List[Pkg]] = pkgs
+    .groupBy { p -> "" + (p as Pkg).version().major() }
+  IO::println("  · By major version:")
+  foreach (maj, mpkgs) in byMajor {
+    val names: String = mpkgs
+      .map { p -> (p as Pkg).name() }
+      .fold("") { acc, n -> if (acc as String).length() == 0 { n } else { acc + ", " + n } }
+    IO::println("    v#{maj}.x → #{names}")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val reg: Registry = buildRegistry()
+  IO::println("Registry: #{reg.total()} package versions")
+
+  // ── Scenario 1: app 1.0.0
+  IO::println("\n══ Scenario 1: resolve app 1.0.0 ══════════════════════════════")
+  val r1: Resolver = new Resolver(reg)
+  val res1: Resolution = r1.resolve("app", new Exact(sv("1.0.0")))
+  IO::println(res1.summary())
+  if res1.isOk() {
+    val tp1: TreePrinter = new TreePrinter(reg)
+    val root1: Pkg? = reg.bestMatch("app", new Exact(sv("1.0.0")))
+    if root1 != null {
+      IO::println("\n  Dependency tree:")
+      tp1.printTree(root1, 2)
+    }
+    printStats(res1.resolved())
+  }
+
+  // ── Scenario 2: app 2.0.0
+  IO::println("\n══ Scenario 2: resolve app 2.0.0 ══════════════════════════════")
+  val r2: Resolver = new Resolver(reg)
+  val res2: Resolution = r2.resolve("app", new Exact(sv("2.0.0")))
+  IO::println(res2.summary())
+  if res2.isOk() {
+    val tp2: TreePrinter = new TreePrinter(reg)
+    val root2: Pkg? = reg.bestMatch("app", new Exact(sv("2.0.0")))
+    if root2 != null {
+      IO::println("\n  Dependency tree:")
+      tp2.printTree(root2, 2)
+    }
+    printStats(res2.resolved())
+  }
+
+  // ── Scenario 3: latest http >=1.0.0
+  IO::println("\n══ Scenario 3: resolve http >=1.0.0 ════════════════════════════")
+  val r3: Resolver = new Resolver(reg)
+  val res3: Resolution = r3.resolve("http", new AtLeast(sv("1.0.0")))
+  IO::println(res3.summary())
+
+  // ── Scenario 4: missing package
+  IO::println("\n══ Scenario 4: resolve nosuchpkg >=1.0.0 ═══════════════════════")
+  val r4: Resolver = new Resolver(reg)
+  val res4: Resolution = r4.resolve("nosuchpkg", new AtLeast(sv("1.0.0")))
+  IO::println(res4.summary())
+
+  // ── Scenario 5: conflict
+  IO::println("\n══ Scenario 5: conflict demo (app 2.0.0 + legacy 1.0.0) ════════")
+  val r5: Resolver = new Resolver(reg)
+  val res5a: Resolution = r5.resolve("app", new Exact(sv("2.0.0")))
+  if res5a.isOk() {
+    val res5b: Resolution = r5.resolve("legacy", new Exact(sv("1.0.0")))
+    IO::println("app 2.0.0: ok (pinned: #{r5.result().size} pkgs)")
+    IO::println("legacy 1.0.0: " + res5b.summary())
+  }
+
+  // ── Scenario 6: catalog listing
+  IO::println("\n══ Scenario 6: registry catalog ════════════════════════════════")
+  val byPkg: Map[Object, List[Pkg]] = reg.all()
+    .groupBy { p -> (p as Pkg).name() }
+  foreach (pkgName, versions) in byPkg {
+    val vStrs: String = versions
+      .sortedBy { p -> (p as Pkg).version().sortKey() }
+      .map { p -> (p as Pkg).version().render() }
+      .fold("") { acc, v -> if (acc as String).length() == 0 { v } else { acc + ", " + v } }
+    IO::println("  #{pkgName}: [#{vStrs}]")
+  }
+
+  IO::println("\n── Done ──────────────────────────────────────────────────────")
+}

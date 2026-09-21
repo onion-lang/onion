@@ -1,0 +1,265 @@
+// AsciiViz.on — ASCII chart renderer and statistical analyser for numeric data series
+// ~185 lines
+//
+// Exercises: record...from re"..." (parseAll); ADT case-enum with dispatch methods;
+// extension methods on String; collection pipelines (fold/map/filter/sortedBy/
+// partition/windowed/groupBy/find/any/count/take/distinct/zip); select/is patterns;
+// closures; string interpolation; foreach/while; nullable; Java interop (Math, StringBuilder).
+
+import {
+  java.lang.Math;
+  java.lang.StringBuilder;
+}
+
+// ─── Data point: each "LABEL VALUE" line becomes one DataPoint ───────────────
+
+record DataPoint(label: String, value: Double)
+  from re"(\S+) ([-\d.]+)"
+
+// ─── Statistics summary ────────────────────────────────────────────────────────
+
+record Stats(count: Int, min: Double, max: Double, mean: Double,
+             median: Double, stdDev: Double, q1: Double, q3: Double) {
+public:
+  def range(): Double  = max() - min()
+  def iqr():   Double  = q3() - q1()
+  def spread(): String = fmt1(min()) + ".." + fmt1(max())
+}
+
+// ─── Chart style (ADT case-enum with dispatch) ────────────────────────────────
+
+enum ChartStyle {
+  case HBar(barWidth: Int)
+  case Sparkline
+  case Table
+public:
+  def label(): String = select this {
+    case s  is HBar:      "HBar(#{s.barWidth()})"
+    case sp is Sparkline: "Sparkline"
+    case tb is Table:     "Table"
+  }
+}
+
+// ─── String padding/repeat extension methods ─────────────────────────────────
+
+extension String {
+  def padR(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padL(n: Int): String {
+    var s = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var r = ""
+    var i = 0
+    while i < n { r = r + self; i = i + 1 }
+    return r
+  }
+}
+
+// ─── Number formatting: 1 decimal place ──────────────────────────────────────
+
+def fmt1(v: Double): String {
+  val sign  = if v < 0.0 { "-" } else { "" }
+  val a     = Math::abs(v)
+  val whole = a as Int
+  val frac  = ((a - (whole as Double)) * 10.0 + 0.5) as Int
+  val f     = if frac >= 10 { 0 } else { frac }
+  return "#{sign}#{whole}.#{f}"
+}
+
+// ─── Statistics computation ───────────────────────────────────────────────────
+
+def computeStats(pts: List[DataPoint]): Stats {
+  val n = pts.size()
+  if n == 0 { return new Stats(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) }
+
+  var total = 0.0
+  var minV  = 0.0
+  var maxV  = 0.0
+  var first = true
+  foreach pt: DataPoint in pts {
+    val v = pt.value()
+    total = total + v
+    if first {
+      minV  = v
+      maxV  = v
+      first = false
+    } else {
+      if v < minV { minV = v }
+      if v > maxV { maxV = v }
+    }
+  }
+  val mean = total / (n as Double)
+
+  var sumSq = 0.0
+  foreach pt: DataPoint in pts {
+    val d = pt.value() - mean
+    sumSq = sumSq + d * d
+  }
+  val sd = Math::sqrt(sumSq / (n as Double))
+
+  val sorted = pts.sortedBy { pt: DataPoint -> pt.value() }
+  val med: Double = if n % 2 == 0 {
+    ((sorted.get(n / 2 - 1) as DataPoint).value() +
+     (sorted.get(n / 2)     as DataPoint).value()) / 2.0
+  } else {
+    (sorted.get(n / 2) as DataPoint).value()
+  }
+  val q1 = (sorted.get(n / 4)     as DataPoint).value()
+  val q3 = (sorted.get(3 * n / 4) as DataPoint).value()
+
+  return new Stats(n, minV, maxV, mean, med, sd, q1, q3)
+}
+
+// ─── Horizontal bar chart ─────────────────────────────────────────────────────
+
+def renderHBar(pts: List[DataPoint], barW: Int, title: String): String {
+  val s  = computeStats(pts)
+  val sb = new StringBuilder()
+  sb.append("══ #{title} ══\n")
+
+  val labelW: Int = pts.fold(0) { acc: Int, pt: DataPoint ->
+    if pt.label().length() > acc { pt.label().length() } else { acc }
+  } as Int
+
+  foreach pt: DataPoint in pts {
+    val barLen = if s.range() > 0.0 {
+      ((pt.value() - s.min()) / s.range() * (barW as Double)) as Int
+    } else { barW / 2 }
+    val bar = "█".rep(barLen)
+    val gap = " ".rep(barW - barLen)
+    sb.append("  #{pt.label().padR(labelW)} #{bar}#{gap} #{fmt1(pt.value())}\n")
+  }
+
+  sb.append("  n=#{s.count()}  range=#{s.spread()}  mean=#{fmt1(s.mean())}")
+  sb.append("  σ=#{fmt1(s.stdDev())}\n")
+  return sb.toString()
+}
+
+// ─── Sparkline using Unicode block elements ───────────────────────────────────
+
+val SPARKS: List[String] = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+
+def renderSparkline(pts: List[DataPoint], title: String): String {
+  val s = computeStats(pts)
+  var line = ""
+  foreach pt: DataPoint in pts {
+    val idx = if s.range() > 0.0 {
+      ((pt.value() - s.min()) / s.range() * 8.0 + 0.5) as Int
+    } else { 4 }
+    val i = if idx < 0 { 0 } else if idx > 8 { 8 } else { idx }
+    line = line + (SPARKS.get(i) as String)
+  }
+  return "#{title}: #{line}  [#{s.spread()}]\n"
+}
+
+// ─── ASCII table ──────────────────────────────────────────────────────────────
+
+def renderTable(pts: List[DataPoint], title: String): String {
+  val sb = new StringBuilder()
+  sb.append("  ─── #{title} ───\n")
+  sb.append("  ┌──────────────┬─────────────┐\n")
+  sb.append("  │  Label       │  Value      │\n")
+  sb.append("  ├──────────────┼─────────────┤\n")
+  foreach pt: DataPoint in pts {
+    val lbl    = pt.label().padR(12)
+    val valStr = fmt1(pt.value()).padL(9)
+    sb.append("  │  #{lbl}  │  #{valStr}  │\n")
+  }
+  sb.append("  └──────────────┴─────────────┘\n")
+  return sb.toString()
+}
+
+// ─── Dispatch by chart style ──────────────────────────────────────────────────
+
+def render(pts: List[DataPoint], style: ChartStyle, title: String): String =
+  select style {
+    case s  is HBar:      renderHBar(pts, s.barWidth(), title)
+    case sp is Sparkline: renderSparkline(pts, title)
+    case tb is Table:     renderTable(pts, title)
+  }
+
+// ─── Pipeline showcase ────────────────────────────────────────────────────────
+
+def showPipelines(pts: List[DataPoint], name: String): void {
+  val s = computeStats(pts)
+  IO::println("  ── #{name} pipelines ──")
+
+  // partition: above vs below mean
+  val halves = pts.partition { pt: DataPoint -> pt.value() > s.mean() }
+  val above  = halves[0] as List[Object]
+  val below  = halves[1] as List[Object]
+  IO::println("  above-mean: #{above.size()}  below-mean: #{below.size()}")
+
+  // top 3 by value (sortedBy + take + map + distinct)
+  val sorted3 = pts.sortedBy { pt: DataPoint -> -(pt.value()) }
+  val top3    = sorted3.take(3)
+  var top3str = ""
+  foreach pt: DataPoint in top3 { top3str = top3str + pt.label() + " " }
+  IO::println("  top-3: #{top3str}")
+
+  // distinct label count
+  val allLabels = pts.map { pt: DataPoint -> pt.label() }.distinct()
+  IO::println("  distinct labels: #{allLabels.size()}")
+
+  // 3-point sliding window count
+  val windows = pts.windowed(3)
+  IO::println("  windowed(3) count: #{windows.size()}")
+
+  // any / count / find
+  val hasBig   = pts.any   { pt: DataPoint -> pt.value() > s.mean() + s.stdDev() }
+  val smallCnt = pts.count { pt: DataPoint -> pt.value() < s.mean() - s.stdDev() }
+  var minPt: DataPoint? = null
+  foreach pt: DataPoint in pts { if pt.value() == s.min() { minPt = pt } }
+  IO::println("  >mean+σ: #{hasBig}  <mean-σ count: #{smallCnt}" +
+    "  min-label: #{if minPt != null { minPt.label() } else { "?" }}\n")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val SALES =
+    "Jan 425\nFeb 583\nMar 712\nApr 658\nMay 889\nJun 952\n" +
+    "Jul 1024\nAug 987\nSep 873\nOct 756\nNov 634\nDec 1105"
+
+  val TEMPS =
+    "Mon 22.5\nTue 24.1\nWed 26.8\nThu 23.4\nFri 21.9\nSat 28.3\nSun 25.6"
+
+  val BENCH =
+    "ArrayList 92.7\nLinkedList 387.4\nTreeMap 178.9\nHashMap 45.3\n" +
+    "PriorityQ 134.6\nSkipList 221.3\nBitmap 67.8"
+
+  val sales: List[DataPoint] = DataPoint::parseAll(SALES)
+  val temps: List[DataPoint] = DataPoint::parseAll(TEMPS)
+  val bench: List[DataPoint] = DataPoint::parseAll(BENCH)
+
+  IO::println(render(sales, new HBar(38), "Monthly Sales ($00s)"))
+  IO::println(render(temps, new Sparkline(), "Daily Temperature (°C)"))
+  IO::println(render(bench, new Table(),    "Benchmark Results (ms)"))
+
+  showPipelines(sales, "Sales")
+  showPipelines(bench, "Benchmarks")
+
+  // groupBy: first character of label
+  IO::println("  ── Bench grouped by initial letter ──")
+  val grouped = bench.groupBy { pt: DataPoint -> pt.label().substring(0, 1) }
+  foreach (key, grp) in grouped {
+    val gpts = grp as List[DataPoint]
+    val avg  = computeStats(gpts).mean()
+    IO::println("  #{key as String}: #{gpts.size()} item(s)  avg=#{fmt1(avg)}")
+  }
+
+  // zip: pair labels with formatted values (first 3)
+  IO::println("\n  ── Sales zip (first 3) ──")
+  val labels = sales.map { pt: DataPoint -> pt.label() }
+  val values = sales.map { pt: DataPoint -> fmt1(pt.value()) }
+  val zipped = labels.zip(values).take(3)
+  foreach pair: List in zipped {
+    IO::println("  #{pair.get(0) as String} => #{pair.get(1) as String}")
+  }
+}

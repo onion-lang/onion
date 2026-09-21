@@ -1,0 +1,255 @@
+// Board Game Analytics - session tracker with Elo ratings, streaks, and
+// leaderboards. Exercises: sealed ADT case-enum, records with methods, generics,
+// collection pipelines (sortedBy/filter/map), do[Option] monad, extension method
+// on Double, pattern matching with `is` type patterns, nullable types, string
+// interpolation, while/foreach loops, and explicit return discipline.
+
+// ─── Outcome ADT ─────────────────────────────────────────────────────────────
+
+enum Outcome {
+  case Win(points: Int)
+  case Loss(points: Int)
+  case Draw
+public:
+  def isWin(): Boolean = select this {
+    case o is Win: true
+    else: false
+  }
+  def isLoss(): Boolean = select this {
+    case o is Loss: true
+    else: false
+  }
+  def pointValue(): Int = select this {
+    case w is Win:  w.points()
+    case l is Loss: 0
+    case d is Draw: 1
+  }
+  def label(): String = select this {
+    case w is Win:  "W"
+    case l is Loss: "L"
+    case d is Draw: "D"
+  }
+  def winScore(): Double = select this {
+    case o is Win:  1.0
+    case o is Loss: 0.0
+    case o is Draw: 0.5
+  }
+  def inverseScore(): Double = select this {
+    case o is Win:  0.0
+    case o is Loss: 1.0
+    case o is Draw: 0.5
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Player(id: Int, name: String, initialElo: Int)
+
+record GameSession(
+  sessionId: Int,
+  player1: Player,
+  player2: Player,
+  outcome: Outcome,
+  rounds: Int
+)
+
+record PlayerStats(
+  player: Player,
+  wins: Int,
+  losses: Int,
+  draws: Int,
+  totalPoints: Int,
+  elo: Double
+) {
+public:
+  def games(): Int = wins + losses + draws
+  def winRate(): Double =
+    if games() == 0 { 0.0 } else { wins.doubleValue() / games().doubleValue() }
+  def summary(): String =
+    "#{player.name()} | ELO:#{elo.intValue()} W/L/D:#{wins}/#{losses}/#{draws} WR:#{(winRate()*100.0).intValue()}%"
+}
+
+// ─── Extension method ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): Double = (self * 100.0).intValue().doubleValue() / 100.0
+}
+
+// ─── Elo helpers ─────────────────────────────────────────────────────────────
+
+def expectedScore(rA: Double, rB: Double): Double =
+  1.0 / (1.0 + Math::pow(10.0, (rB - rA) / 400.0))
+
+def updatedElo(rating: Double, expected: Double, actual: Double): Double =
+  rating + 32.0 * (actual - expected)
+
+// ─── GameAnalytics class ─────────────────────────────────────────────────────
+
+class GameAnalytics {
+  var sessions: List[GameSession] = []
+  var players:  List[Player] = []
+  var statsMap: Map[Int, PlayerStats] = [:]
+
+public:
+  def addPlayer(p: Player): void {
+    players.add(p)
+    statsMap[p.id()] = new PlayerStats(p, 0, 0, 0, 0, p.initialElo().doubleValue())
+  }
+
+  def recordSession(s: GameSession): void {
+    sessions.add(s)
+    applySession(s)
+  }
+
+  def applySession(s: GameSession): void {
+    val p1  = s.player1()
+    val p2  = s.player2()
+    val st1 = statsMap[p1.id()]
+    val st2 = statsMap[p2.id()]
+    if st1 == null || st2 == null { return }
+    val s1: PlayerStats = st1 as PlayerStats
+    val s2: PlayerStats = st2 as PlayerStats
+    val exp1 = expectedScore(s1.elo(), s2.elo())
+    val exp2 = 1.0 - exp1
+    val out  = s.outcome()
+    val act1 = out.winScore()
+    val act2 = out.inverseScore()
+    val pts1 = s1.totalPoints() + out.pointValue()
+    val pts2Bonus = select out {
+      case o is Loss: 2
+      case o is Win:  0
+      case o is Draw: 1
+    }
+    val pts2 = s2.totalPoints() + pts2Bonus
+    statsMap[p1.id()] = new PlayerStats(p1,
+      s1.wins()   + (if out.isWin()  { 1 } else { 0 }),
+      s1.losses() + (if out.isLoss() { 1 } else { 0 }),
+      s1.draws()  + (if !out.isWin() && !out.isLoss() { 1 } else { 0 }),
+      pts1, updatedElo(s1.elo(), exp1, act1))
+    statsMap[p2.id()] = new PlayerStats(p2,
+      s2.wins()   + (if out.isLoss() { 1 } else { 0 }),
+      s2.losses() + (if out.isWin()  { 1 } else { 0 }),
+      s2.draws()  + (if !out.isWin() && !out.isLoss() { 1 } else { 0 }),
+      pts2, updatedElo(s2.elo(), exp2, act2))
+  }
+
+  def leaderboard(): List[PlayerStats] {
+    val list: List[PlayerStats] = []
+    foreach p: Player in players {
+      val st = statsMap[p.id()]
+      if st != null { list.add(st as PlayerStats) }
+    }
+    return list.sortedBy { st -> 0.0 - st.elo() }
+  }
+
+  def findStats(name: String): PlayerStats? {
+    foreach p: Player in players {
+      if p.name() == name {
+        val st = statsMap[p.id()]
+        if st != null { return st as PlayerStats }
+      }
+    }
+    return null
+  }
+
+  def recentSessions(n: Int): List[GameSession] {
+    val total = sessions.size
+    val start = if total > n { total - n } else { 0 }
+    val result: List[GameSession] = []
+    var i: Int = start
+    while i < total {
+      result.add(sessions[i])
+      i++
+    }
+    return result
+  }
+
+  def winStreak(playerName: String): Int {
+    var streak: Int = 0
+    var best: Int = 0
+    foreach s: GameSession in sessions {
+      val isP1 = s.player1().name() == playerName
+      val isP2 = s.player2().name() == playerName
+      val won = (isP1 && s.outcome().isWin()) || (isP2 && s.outcome().isLoss())
+      if won { streak++ } else { streak = 0 }
+      if streak > best { best = streak }
+    }
+    return best
+  }
+
+  def sessionCount(): Int = sessions.size
+}
+
+// ─── do[Option] helpers ───────────────────────────────────────────────────────
+
+def toOpt(st: PlayerStats?): Option[PlayerStats] {
+  if st == null { return Option::none() }
+  return Option::some(st as PlayerStats)
+}
+
+def eloGapStr(ga: GameAnalytics, nameA: String, nameB: String): Option[String] =
+  do[Option] {
+    sa <- toOpt(ga.findStats(nameA))
+    sb <- toOpt(ga.findStats(nameB))
+    ret "#{nameA} vs #{nameB}: gap = #{(sa.elo() - sb.elo()).fmt2()} ELO"
+  }
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+val alice = new Player(1, "Alice", 1200)
+val bob   = new Player(2, "Bob",   1100)
+val carol = new Player(3, "Carol", 1150)
+val dave  = new Player(4, "Dave",  1050)
+
+val ga = new GameAnalytics()
+ga.addPlayer(alice)
+ga.addPlayer(bob)
+ga.addPlayer(carol)
+ga.addPlayer(dave)
+
+ga.recordSession(new GameSession(1,  alice, bob,   new Win(3),  5))
+ga.recordSession(new GameSession(2,  carol, dave,  new Win(3),  7))
+ga.recordSession(new GameSession(3,  alice, carol, new Draw(),  4))
+ga.recordSession(new GameSession(4,  bob,   dave,  new Win(3),  6))
+ga.recordSession(new GameSession(5,  alice, dave,  new Win(3),  3))
+ga.recordSession(new GameSession(6,  carol, bob,   new Loss(0), 8))
+ga.recordSession(new GameSession(7,  alice, carol, new Win(3),  5))
+ga.recordSession(new GameSession(8,  bob,   dave,  new Draw(),  4))
+ga.recordSession(new GameSession(9,  dave,  carol, new Win(3),  6))
+ga.recordSession(new GameSession(10, alice, bob,   new Loss(0), 7))
+
+println("=== BOARD GAME ANALYTICS REPORT ===")
+println("")
+
+println("--- Leaderboard ---")
+var rank: Int = 1
+foreach st: PlayerStats in ga.leaderboard() {
+  println("  #{rank}. #{st.summary()}")
+  rank++
+}
+
+println("")
+println("--- Recent Sessions (last 5) ---")
+foreach s: GameSession in ga.recentSessions(5) {
+  println("  ##{s.sessionId()}: #{s.player1().name()} vs #{s.player2().name()} -> #{s.outcome().label()} (#{s.rounds()} rounds)")
+}
+
+println("")
+println("--- Win Streaks ---")
+foreach p: Player in [alice, bob, carol, dave] {
+  println("  #{p.name()}: best streak = #{ga.winStreak(p.name())}")
+}
+
+println("")
+println("--- ELO Gaps (do[Option]) ---")
+val gap1 = eloGapStr(ga, "Alice", "Bob")
+val gap2 = eloGapStr(ga, "Carol", "Dave")
+if !gap1.isEmpty() { println("  " + gap1.get()) }
+if !gap2.isEmpty() { println("  " + gap2.get()) }
+
+val top = ga.leaderboard()[0]
+println("")
+println("--- Champion: #{top.player().name()} ---")
+println("  ELO:    #{top.elo().fmt2()}")
+println("  WinRate:#{(top.winRate() * 100.0).intValue()}%")
+println("  Points: #{top.totalPoints()}")

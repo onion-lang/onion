@@ -1,0 +1,253 @@
+// NumberTheoryLab — exercises @TailRecursive mutual recursion, ADT enums,
+// records with examples, extension methods on primitives, and collection pipelines.
+
+// ─── ADT: integer classification ────────────────────────────────────────────
+
+enum IntClass {
+  case IsPrime
+  case IsComposite(smallestFactor: Int)
+  case IsOne
+  case IsZero
+  case IsNegative
+public:
+  def label(): String = select this {
+    case z is IsPrime:     "prime"
+    case c is IsComposite: "composite (÷" + c.smallestFactor() + ")"
+    case z is IsOne:       "one"
+    case z is IsZero:      "zero"
+    case z is IsNegative:  "negative"
+  }
+}
+
+// ─── Records with examples ───────────────────────────────────────────────────
+
+record GcdResult(a: Int, b: Int, result: Int)
+  example { new GcdResult(12, 8, 4).result() == 4 }
+
+record PrimeRange(lo: Int, hi: Int, count: Int)
+  example { new PrimeRange(1, 10, 4).count() >= 0 }
+
+// ─── Extension methods on Int ────────────────────────────────────────────────
+
+extension Int {
+  def isNeg(): Boolean = self < 0
+  def isPos(): Boolean = self > 0
+  def squared(): Int = self * self
+  def cubed(): Int = self * self * self
+}
+
+// ─── GCD / LCM (iterative) ───────────────────────────────────────────────────
+
+def gcd(a: Int, b: Int): Int {
+  var x: Int = a
+  var y: Int = b
+  while y != 0 {
+    val t: Int = y
+    y = x % y
+    x = t
+  }
+  return x
+}
+
+def lcm(a: Int, b: Int): Int {
+  val g: Int = gcd(a, b)
+  if g == 0 { return 0 }
+  return (a / g) * b
+}
+
+// ─── Primality and factorisation ─────────────────────────────────────────────
+
+def classify(n: Int): IntClass {
+  if n < 0 { return new IsNegative() }
+  if n == 0 { return new IsZero() }
+  if n == 1 { return new IsOne() }
+  var d: Int = 2
+  while d * d <= n {
+    if n % d == 0 { return new IsComposite(d) }
+    d = d + 1
+  }
+  return new IsPrime()
+}
+
+def isPrime(n: Int): Boolean = classify(n) is IsPrime
+
+def primeFactors(n: Int): List[Int] {
+  val result: List[Int] = []
+  var remaining: Int = n
+  var d: Int = 2
+  while d * d <= remaining {
+    while remaining % d == 0 {
+      result.add(d)
+      remaining = remaining / d
+    }
+    d = d + 1
+  }
+  if remaining > 1 { result.add(remaining) }
+  return result
+}
+
+def primesUpTo(limit: Int): List[Int] {
+  if limit < 2 { return [] }
+  val sieve: Boolean[] = new Boolean[limit + 1]
+  var i: Int = 2
+  while i <= limit {
+    sieve[i] = true
+    i = i + 1
+  }
+  i = 2
+  while i * i <= limit {
+    if sieve[i] {
+      var j: Int = i * i
+      while j <= limit {
+        sieve[j] = false
+        j = j + i
+      }
+    }
+    i = i + 1
+  }
+  val ps: List[Int] = []
+  i = 2
+  while i <= limit {
+    if sieve[i] { ps.add(i) }
+    i = i + 1
+  }
+  return ps
+}
+
+// ─── @TailRecursive mutual recursion ─────────────────────────────────────────
+// AlternatingSum: 1 - 2 + 3 - 4 + ... + (-1)^(n+1)*n  via mutual recursion.
+// Without the optimizer this would stack-overflow for n > ~10 000.
+
+class AlternatingAccumulator {
+private:
+  @TailRecursive
+  def addOdd(k: Int, acc: Long): Long {
+    if k <= 0 { return acc }
+    return addEven(k - 1, acc + k)
+  }
+  @TailRecursive
+  def addEven(k: Int, acc: Long): Long {
+    if k <= 0 { return acc }
+    return addOdd(k - 1, acc - k)
+  }
+public:
+  def compute(n: Int): Long = addOdd(n, 0L)
+}
+
+// ─── Collatz sequence length ──────────────────────────────────────────────────
+
+def collatzLen(n: Int): Int {
+  var x: Int = n
+  var steps: Int = 0
+  while x != 1 {
+    if x % 2 == 0 { x = x / 2 } else { x = 3 * x + 1 }
+    steps = steps + 1
+  }
+  return steps
+}
+
+// ─── Euler's totient ─────────────────────────────────────────────────────────
+
+def eulerTotient(n: Int): Int {
+  var count: Int = 0
+  var k: Int = 1
+  while k <= n {
+    if gcd(k, n) == 1 { count = count + 1 }
+    k = k + 1
+  }
+  return count
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+IO::println("=== NumberTheoryLab ===")
+IO::println("")
+
+// Integer classification via ADT enum
+IO::println("-- Integer classification --")
+foreach n: Int in [0, 1, 2, 3, 4, 12, 13, 97, 100] {
+  IO::println("  classify(" + n + ") = " + classify(n).label())
+}
+
+// GCD / LCM
+IO::println("")
+IO::println("-- GCD / LCM --")
+IO::println("gcd(48, 18)  = " + gcd(48, 18))
+IO::println("lcm(4, 6)    = " + lcm(4, 6))
+IO::println("gcd(100, 75) = " + gcd(100, 75))
+IO::println("lcm(12, 18)  = " + lcm(12, 18))
+
+val gr = new GcdResult(48, 18, gcd(48, 18))
+IO::println("GcdResult: a=" + gr.a() + " b=" + gr.b() + " gcd=" + gr.result())
+
+// Prime factors
+IO::println("")
+IO::println("-- Prime factors --")
+foreach n: Int in [12, 30, 97, 360, 1024] {
+  IO::println("  factors(" + n + ") = " + primeFactors(n).toString())
+}
+
+// Sieve of Eratosthenes
+IO::println("")
+IO::println("-- Sieve of Eratosthenes (primes ≤ 50) --")
+val ps50 = primesUpTo(50)
+IO::println("  primes: " + ps50.toString())
+IO::println("  count:  " + ps50.size)
+
+val pr = new PrimeRange(1, 50, ps50.size)
+IO::println("  PrimeRange [1..50]: " + pr.count() + " primes")
+
+// Extension methods on Int
+IO::println("")
+IO::println("-- Extension methods on Int --")
+IO::println("  7.squared() = " + (7).squared())
+IO::println("  3.cubed()   = " + (3).cubed())
+IO::println("  (-3).isNeg()  = " + (-3).isNeg())
+IO::println("  (5).isPos()   = " + (5).isPos())
+
+// @TailRecursive mutual recursion — 100 000 deep without stack overflow
+IO::println("")
+IO::println("-- @TailRecursive alternating sum --")
+val altAcc = new AlternatingAccumulator()
+IO::println("  alternatingSum(10)     = " + altAcc.compute(10))
+IO::println("  alternatingSum(100)    = " + altAcc.compute(100))
+IO::println("  alternatingSum(100000) = " + altAcc.compute(100000))
+
+// Collatz
+IO::println("")
+IO::println("-- Collatz sequence lengths --")
+val cNums: List[Int] = [1, 6, 27, 97]
+val cLens: List[Int] = cNums.map { n -> collatzLen(n) }
+IO::println("  lengths for [1,6,27,97] = " + cLens.toString())
+
+// Collection pipeline: top-3 primes ≤ 50 by Collatz length
+val sortedByCollatz = primesUpTo(50).sortedBy { p -> 0 - collatzLen(p) }
+IO::println("  top-3 primes by Collatz len:")
+var topIdx: Int = 0
+foreach p: Int in sortedByCollatz {
+  if topIdx < 3 {
+    IO::println("    p=" + p + " len=" + collatzLen(p))
+    topIdx = topIdx + 1
+  }
+}
+
+// Euler's totient
+IO::println("")
+IO::println("-- Euler's totient φ(n) --")
+foreach n: Int in [1, 2, 6, 10, 12, 30] {
+  IO::println("  φ(" + n + ") = " + eulerTotient(n))
+}
+
+// Prime density by decade
+IO::println("")
+IO::println("-- Prime density by decade (1..100) --")
+val allPrimes100 = primesUpTo(100)
+foreach d: Int in 1..10 {
+  val lo: Int = (d - 1) * 10 + 1
+  val hi: Int = d * 10
+  val cnt: Int = allPrimes100.filter { p -> p >= lo && p <= hi }.size
+  IO::println("  [" + lo + "-" + hi + "]: " + cnt + " primes")
+}
+
+IO::println("")
+IO::println("Done.")

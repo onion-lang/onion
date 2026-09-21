@@ -1,0 +1,241 @@
+// ASCII Ray Tracer — renders a lit 3-D scene to the terminal using ASCII shading.
+// Exercises: records with methods; ADT enum; collection pipelines (map/filter/fold/
+// find/sortedBy); nullable types; arithmetic on Doubles; while/foreach loops;
+// select / pattern matching; string building; extension methods.
+//
+// Scene: three coloured spheres on a grey ground plane, two point-lights.
+// Phong shading model: ambient + diffuse (Lambertian) + specular (Blinn-Phong).
+// Shadow rays determine whether a point is directly lit.
+// Camera looks along −Z; image is 70×24 chars (aspect-corrected).
+
+import {
+  java.lang.Math
+  java.lang.StringBuilder as SB
+}
+
+// ── Vec3 ─────────────────────────────────────────────────────────────────────
+
+record Vec3(x: Double, y: Double, z: Double) {
+public:
+  def plus(b: Vec3): Vec3   = new Vec3(x() + b.x(), y() + b.y(), z() + b.z())
+  def minus(b: Vec3): Vec3  = new Vec3(x() - b.x(), y() - b.y(), z() - b.z())
+  def scale(s: Double): Vec3 = new Vec3(x() * s, y() * s, z() * s)
+  def dot(b: Vec3): Double  = x() * b.x() + y() * b.y() + z() * b.z()
+  def lengthSq(): Double    = dot(self)
+  def length(): Double      = Math::sqrt(lengthSq())
+  def normalize(): Vec3 {
+    val len: Double = length()
+    if len < 1.0e-15 { return self }
+    return scale(1.0 / len)
+  }
+  def reflect(n: Vec3): Vec3 = minus(n.scale(2.0 * dot(n)))
+}
+
+// ── Material ─────────────────────────────────────────────────────────────────
+
+enum MaterialKind { DIFFUSE, SPECULAR }
+
+record Material(kind: MaterialKind, color: Vec3, shininess: Double)
+
+// ── Sphere ────────────────────────────────────────────────────────────────────
+
+record Sphere(name: String, center: Vec3, radius: Double, mat: Material) {
+public:
+  def description(): String = "#{name()} r=#{radius()}"
+}
+
+// ── Light ─────────────────────────────────────────────────────────────────────
+
+record Light(pos: Vec3, intensity: Double)
+
+// ── HitRecord ─────────────────────────────────────────────────────────────────
+
+record HitRecord(t: Double, point: Vec3, normal: Vec3, sphere: Sphere)
+
+// ── Intersection ──────────────────────────────────────────────────────────────
+
+def intersect(origin: Vec3, dir: Vec3, s: Sphere): HitRecord? {
+  val oc: Vec3 = origin.minus(s.center())
+  val a: Double = dir.dot(dir)
+  val b: Double = 2.0 * oc.dot(dir)
+  val c: Double = oc.dot(oc) - s.radius() * s.radius()
+  val disc: Double = b * b - 4.0 * a * c
+  if disc < 0.0 { return null }
+  val sqrtD: Double = Math::sqrt(disc)
+  var t: Double = (-b - sqrtD) / (2.0 * a)
+  if t < 1.0e-4 {
+    t = (-b + sqrtD) / (2.0 * a)
+    if t < 1.0e-4 { return null }
+  }
+  val pt: Vec3 = origin.plus(dir.scale(t))
+  val n: Vec3 = pt.minus(s.center()).scale(1.0 / s.radius())
+  return new HitRecord(t, pt, n, s)
+}
+
+def closestHit(origin: Vec3, dir: Vec3, spheres: List[Sphere]): HitRecord? {
+  var best: HitRecord? = null
+  foreach s: Sphere in spheres {
+    val h: HitRecord? = intersect(origin, dir, s)
+    if h != null {
+      if best == null || h.t() < best!!.t() {
+        best = h
+      }
+    }
+  }
+  return best
+}
+
+// ── Shadow test ───────────────────────────────────────────────────────────────
+
+def inShadow(pt: Vec3, toLight: Vec3, dist: Double, spheres: List[Sphere]): Boolean {
+  foreach s: Sphere in spheres {
+    val h: HitRecord? = intersect(pt, toLight, s)
+    if h != null && h.t() < dist - 1.0e-4 { return true }
+  }
+  return false
+}
+
+// ── Scene ─────────────────────────────────────────────────────────────────────
+
+val matOrange: Material = new Material(MaterialKind::DIFFUSE, new Vec3(0.9, 0.4, 0.1), 0.0)
+val matBlue:   Material = new Material(MaterialKind::SPECULAR, new Vec3(0.2, 0.5, 0.9), 64.0)
+val matGreen:  Material = new Material(MaterialKind::DIFFUSE, new Vec3(0.2, 0.8, 0.3), 0.0)
+val matGround: Material = new Material(MaterialKind::DIFFUSE, new Vec3(0.55, 0.55, 0.55), 0.0)
+
+val spheres: List[Sphere] = [
+  new Sphere("Orange", new Vec3( 0.0,  0.0, -4.0), 1.0, matOrange),
+  new Sphere("Blue",   new Vec3(-2.4,  0.4, -5.2), 0.9, matBlue),
+  new Sphere("Green",  new Vec3( 2.2, -0.2, -4.6), 0.7, matGreen),
+  new Sphere("Ground", new Vec3( 0.0, -101.0, -4.0), 100.0, matGround)
+]
+
+val lights: List[Light] = [
+  new Light(new Vec3(-3.0, 5.0, -1.0), 0.75),
+  new Light(new Vec3( 4.0, 3.0, -2.0), 0.40)
+]
+
+val AMBIENT: Double = 0.08
+
+// ── Shading ───────────────────────────────────────────────────────────────────
+
+def phong(h: HitRecord, viewDir: Vec3): Double {
+  var total: Double = AMBIENT
+  val mat: Material = h.sphere().mat()
+
+  foreach lgt: Light in lights {
+    val toL: Vec3 = lgt.pos().minus(h.point())
+    val dist: Double = toL.length()
+    val toUnit: Vec3 = toL.scale(1.0 / dist)
+
+    if !inShadow(h.point(), toUnit, dist, spheres) {
+      // diffuse
+      var diff: Double = h.normal().dot(toUnit)
+      if diff < 0.0 { diff = 0.0 }
+      total = total + diff * lgt.intensity()
+
+      // specular (Blinn-Phong)
+      if mat.kind() == MaterialKind::SPECULAR && mat.shininess() > 0.0 {
+        val halfVec: Vec3 = toUnit.plus(viewDir.scale(-1.0)).normalize()
+        var spec: Double = h.normal().dot(halfVec)
+        if spec < 0.0 { spec = 0.0 }
+        total = total + Math::pow(spec, mat.shininess()) * lgt.intensity() * 0.5
+      }
+    }
+  }
+
+  if total > 1.0 { total = 1.0 }
+  return total
+}
+
+// ── ASCII palette ─────────────────────────────────────────────────────────────
+
+val SHADES: String = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
+val SLEN: Int = SHADES.length
+
+def toChar(brightness: Double): String {
+  var b: Double = brightness
+  if b < 0.0 { b = 0.0 }
+  if b > 1.0 { b = 1.0 }
+  val idx: Int = (b * (SLEN - 1 as Double) + 0.5) as Int
+  return SHADES.substring(idx, idx + 1)
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+val WIDTH: Int  = 70
+val HEIGHT: Int = 24
+val ASPECT: Double = WIDTH as Double / (HEIGHT as Double * 2.0)
+
+val camOrigin: Vec3 = new Vec3(0.0, 0.8, 2.0)
+
+var hitCount: Int  = 0
+var missCount: Int = 0
+
+val startNs: Long = Timing::nanos()
+val sb: SB = new SB()
+var row: Int = 0
+while row < HEIGHT {
+  var col: Int = 0
+  while col < WIDTH {
+    val u: Double = (col as Double + 0.5) / WIDTH as Double * 2.0 - 1.0
+    val v: Double = 1.0 - (row as Double + 0.5) / HEIGHT as Double * 2.0
+    val dir: Vec3 = new Vec3(u * ASPECT, v * 0.7, -1.8).normalize()
+
+    val h: HitRecord? = closestHit(camOrigin, dir, spheres)
+    if h == null {
+      sb.append(" ")
+      missCount++
+    } else {
+      val brightness: Double = phong(h!!, dir)
+      sb.append(toChar(brightness))
+      hitCount++
+    }
+    col++
+  }
+  sb.append("\n")
+  row++
+}
+
+val elapsedMs: Long = (Timing::nanos() - startNs) / 1000000L
+
+IO::println(sb.toString())
+
+// ── Summary & sphere listing ──────────────────────────────────────────────────
+
+IO::println("Rendered #{WIDTH}×#{HEIGHT} in #{elapsedMs} ms")
+IO::println("Pixels: #{hitCount} hits / #{missCount} background")
+IO::println("Lights: #{lights.size}  Spheres: #{spheres.size}")
+
+// ── Collection pipelines for scene statistics ────────────────────────────────
+
+val diffuseSpheres: List[Sphere] = spheres.filter { s -> (s as Sphere).mat().kind() == MaterialKind::DIFFUSE }
+val specularSpheres: List[Sphere] = spheres.filter { s -> (s as Sphere).mat().kind() == MaterialKind::SPECULAR }
+IO::println("Materials: #{diffuseSpheres.size} diffuse  #{specularSpheres.size} specular")
+
+var totalIntensity: Double = 0.0
+foreach lgt: Light in lights { totalIntensity = totalIntensity + lgt.intensity() }
+IO::println("Total light intensity: #{totalIntensity}")
+
+var largestSphere: Sphere? = null
+foreach s: Sphere in spheres {
+  if s.name() != "Ground" && s.radius() >= 1.0 {
+    if largestSphere == null || s.radius() > largestSphere!!.radius() {
+      largestSphere = s
+    }
+  }
+}
+if largestSphere != null {
+  IO::println("Largest named sphere: #{largestSphere!!.name()} r=#{largestSphere!!.radius()}")
+}
+
+val byRadius: List[Sphere] = spheres
+  .filter { s -> (s as Sphere).name() != "Ground" }
+  .sortedBy { s -> 0.0 - (s as Sphere).radius() }
+val names: List[String] = byRadius.map { s -> (s as Sphere).name() }
+IO::println("Spheres by radius desc: #{names}")
+
+IO::println("")
+IO::println("Sphere details:")
+foreach s: Sphere in spheres {
+  IO::println("  • #{s.description()}  mat=#{s.mat().kind()}")
+}

@@ -1,0 +1,272 @@
+// TimeTracker — a time-entry log analyzer
+// Features exercised:
+//   record with from re"..." pattern parser
+//   ADT enum for priority
+//   extension methods on Int/String
+//   collection pipelines: sortedBy, map, filter, fold, distinct, groupBy
+//   do[List] (list comprehension)
+//   foreach over maps, ranges
+//   string interpolation  #{}
+//   null safety / Elvis / nullable maps
+//   while loop / recursion
+//   try/catch
+//   select / type pattern matching
+
+import {
+  java.util.*
+}
+
+// ─── Domain records ───────────────────────────────────────────────────────────
+
+record TimeEntry(date: String, project: String, task: String, minutes: Int)
+  from re"(\d{4}-\d{2}-\d{2})\s+(\S+)\s+([^|]+?)\s*\|\s*(\d+)"
+
+record ProjectSummary(project: String, totalMinutes: Int, entryCount: Int) {
+public:
+  def hoursFormatted(): String {
+    val h: Int = totalMinutes / 60
+    val m: Int = totalMinutes % 60
+    return h + "h " + m + "m"
+  }
+  def avgMinutes(): Int = if entryCount > 0 { totalMinutes / entryCount } else { 0 }
+}
+
+enum Priority {
+  case High
+  case Medium
+  case Low
+public:
+  def label(): String = select this {
+    case h is High:   "[HIGH]"
+    case m is Medium: "[MED] "
+    case l is Low:    "[LOW] "
+  }
+  def weight(): Int = select this {
+    case h is High:   3
+    case m is Medium: 2
+    case l is Low:    1
+  }
+}
+
+record Task(name: String, priority: Priority, estimatedMinutes: Int) {
+public:
+  def score(): Int = priority.weight() * estimatedMinutes
+  def label(): String = priority.label() + "  " + name
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def toHhMm(): String {
+    val h: Int = self / 60
+    val m: Int = self % 60
+    val mm: String = if m < 10 { "0" + m } else { "" + m }
+    return h + ":" + mm
+  }
+  def minutesToHours(): String {
+    val h: Int = self / 60
+    val tenths: Int = (self % 60) * 10 / 60
+    return h + "." + tenths
+  }
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def bar(maxVal: Int, width: Int): String {
+    val filled: Int = if maxVal > 0 { (self * width / maxVal).clamp(0, width) } else { 0 }
+    var out: String = ""
+    foreach i: Int in 0..<width {
+      out = out + (if i < filled { "█" } else { "░" })
+    }
+    return out
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+  def lcFirst(): String = if self.length() == 0 { self } else { self.substring(0, 1).toLowerCase() + self.substring(1) }
+}
+
+// ─── Parsing helpers ──────────────────────────────────────────────────────────
+
+def parseEntries(log: String): List[TimeEntry] {
+  val lines: List[String] = log.lines().toList()
+  val result: List[TimeEntry] = []
+  foreach line: String in lines {
+    val trimmed: String = line.trim()
+    if trimmed.length() > 0 && !trimmed.startsWith("#") {
+      val entry: TimeEntry? = TimeEntry::parse(trimmed)
+      if entry != null { result.add(entry) }
+    }
+  }
+  return result
+}
+
+def summarizeByProject(entries: List[TimeEntry]): List[ProjectSummary] {
+  val totals: Map[String, Int] = [:]
+  val counts: Map[String, Int] = [:]
+  foreach e: TimeEntry in entries {
+    val prev: Int? = totals.get(e.project())
+    val cnt:  Int? = counts.get(e.project())
+    totals.put(e.project(), (if prev == null { 0 } else { prev as Int }) + e.minutes())
+    counts.put(e.project(), (if cnt  == null { 0 } else { cnt  as Int }) + 1)
+  }
+  val summaries: List[ProjectSummary] = []
+  foreach (proj, total) in totals {
+    val cnt: Int? = counts.get(proj)
+    summaries.add(new ProjectSummary(proj, total as Int, if cnt == null { 0 } else { cnt as Int }))
+  }
+  return summaries.sortedBy { s -> 0 - s.totalMinutes() }
+}
+
+def padLine(label: String, value: String): String =
+  "  " + label.padRight(16) + value
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val logData: String = """
+# Time log — October 2024
+2024-10-01  backend   API auth refactor           | 90
+2024-10-01  frontend  Dashboard CSS fixes         | 45
+2024-10-02  backend   Database query optimization | 120
+2024-10-02  devops    CI pipeline setup           | 60
+2024-10-03  frontend  Responsive layout           | 75
+2024-10-03  backend   Unit test coverage          | 105
+2024-10-04  devops    Docker containerization     | 90
+2024-10-04  frontend  Component library           | 60
+2024-10-07  backend   API versioning              | 80
+2024-10-07  frontend  Dark mode implementation    | 100
+2024-10-08  devops    Kubernetes config           | 135
+2024-10-08  backend   Cache layer                 | 70
+2024-10-09  frontend  Accessibility audit         | 55
+2024-10-09  backend   GraphQL schema              | 115
+2024-10-10  devops    Monitoring setup            | 80
+"""
+
+val entries: List[TimeEntry] = parseEntries(logData)
+val summaries: List[ProjectSummary] = summarizeByProject(entries)
+val totalMinutes: Int = entries.fold(0) { acc, e -> acc + e.minutes() }
+
+IO::println("╔════════════════════════════════════════════════════╗")
+IO::println("║          TIME TRACKER — October 2024               ║")
+IO::println("╚════════════════════════════════════════════════════╝")
+IO::println("")
+IO::println(padLine("Total entries:", "" + entries.size))
+IO::println(padLine("Total time:",    totalMinutes.toHhMm() + " (" + totalMinutes.minutesToHours() + "h)"))
+IO::println(padLine("Working days:",  "" + entries.map { e -> e.date() }.distinct().size))
+IO::println("")
+
+// ── Project breakdown ─────────────────────────────────────────────────────────
+IO::println("── Project Breakdown ─────────────────────────────────")
+val maxMin: Int = if summaries.size > 0 { summaries.get(0).totalMinutes() } else { 1 }
+foreach s: ProjectSummary in summaries {
+  val pct: Int = s.totalMinutes() * 100 / totalMinutes
+  IO::println("  " + s.project().padRight(10) + s.totalMinutes().bar(maxMin, 20) + " " + s.hoursFormatted().padRight(8) + " " + pct + "%  avg=" + s.avgMinutes() + "m")
+}
+
+// ── Daily load ────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── Daily Load ────────────────────────────────────────")
+val dailyTotals: Map[String, Int] = [:]
+foreach e: TimeEntry in entries {
+  val prev: Int? = dailyTotals.get(e.date())
+  dailyTotals.put(e.date(), (if prev == null { 0 } else { prev as Int }) + e.minutes())
+}
+val sortedDays: List[String] = []
+foreach (day, mins) in dailyTotals { sortedDays.add(day) }
+sortedDays.sort(null)
+foreach day: String in sortedDays {
+  val rawMins: Object? = dailyTotals.get(day)
+  val m: Int = if rawMins == null { 0 } else { rawMins as Int }
+  IO::println("  " + day + "  " + m.bar(400, 15) + "  " + m.toHhMm())
+}
+
+// ── Project stats ─────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── Project Stats ─────────────────────────────────────")
+val byAvg: List[ProjectSummary] = summaries.sortedBy { s -> 0 - s.avgMinutes() }
+if byAvg.size > 0 {
+  val maxAvgProject: ProjectSummary = byAvg.get(0)
+  IO::println("  Highest avg session:  " + maxAvgProject.project() + " at " + maxAvgProject.avgMinutes() + "m avg")
+}
+val byTotal: List[ProjectSummary] = summaries.sortedBy { s -> s.totalMinutes() }
+if byTotal.size > 0 {
+  val minProject: ProjectSummary = byTotal.get(0)
+  IO::println("  Least time spent:     " + minProject.project() + " (" + minProject.hoursFormatted() + ")")
+}
+
+// ── Task backlog ──────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── Upcoming Tasks (sorted by priority × estimate) ────")
+val backlog: List[Task] = [
+  new Task("API rate limiting",      new High(),   120),
+  new Task("E2E test suite",         new Medium(),  90),
+  new Task("Update documentation",   new Low(),     45),
+  new Task("Security audit",         new High(),   180),
+  new Task("Performance profiling",  new Medium(), 100),
+  new Task("Code review guidelines", new Low(),     30),
+  new Task("Load balancer config",   new High(),    75)
+]
+val ranked: List[Task] = backlog.sortedBy { t -> 0 - t.score() }
+foreach t: Task in ranked {
+  IO::println("  " + t.priority().label() + "  " + t.name().padRight(30) + t.estimatedMinutes() + "m")
+}
+
+// Total estimated backlog time
+val backlogTotal: Int = ranked.fold(0) { acc, t -> acc + t.estimatedMinutes() }
+IO::println("  ─────────────────────────────────────────────────")
+IO::println("  Backlog total: " + backlogTotal + "m = " + backlogTotal.toHhMm())
+
+// ── Find largest high-priority task ──────────────────────────────────────────
+IO::println("")
+val criticalLong: List[Task] = ranked.filter { t -> t.priority().weight() == 3 && t.estimatedMinutes() > 100 }
+if criticalLong.size > 0 {
+  val bigTask: Task = criticalLong.get(0)
+  IO::println("Largest critical task: " + bigTask.name() + " (" + bigTask.estimatedMinutes() + "m)")
+}
+
+// ── do[List] — cross-project task assignments ─────────────────────────────────
+IO::println("")
+IO::println("── Cross-project label examples ──────────────────────")
+val projects: List[String] = ["backend", "frontend", "devops"]
+val weeks:    List[Int]    = [1, 2, 3]
+val assignments: List[String] = do[List] {
+  proj <- projects
+  week <- weeks
+  ret "Week " + week + " [" + proj + "]"
+}
+foreach a: String in assignments.take(6) {
+  IO::println("  " + a)
+}
+IO::println("  ... (" + assignments.size + " assignments total)")
+
+// ── String interpolation & select ────────────────────────────────────────────
+IO::println("")
+IO::println("── Session quality check ─────────────────────────────")
+foreach s: ProjectSummary in summaries {
+  val quality: String = select s.avgMinutes() {
+    case n when n >= 100: "deep work"
+    case n when n >= 60:  "focused"
+    case n when n >= 30:  "short burst"
+    else:                 "micro-session"
+  }
+  IO::println("  #{s.project()} → #{s.entryCount()} sessions, avg #{s.avgMinutes()}m (#{quality})")
+}
+
+// ── Recursive: cumulative minutes at each entry ───────────────────────────────
+IO::println("")
+IO::println("── Cumulative time (first 5 entries) ─────────────────")
+def cumulativeAt(entries: List[TimeEntry], idx: Int, acc: Int): Int =
+  if idx >= entries.size { acc }
+  else { cumulativeAt(entries, idx + 1, acc + entries.get(idx).minutes()) }
+
+var cum: Int = 0
+foreach i: Int in 0..<entries.size.clamp(0, 5) {
+  cum = cum + entries.get(i).minutes()
+  IO::println("  Entry " + (i + 1) + ": +" + entries.get(i).minutes() + "m  cumulative=" + cum.toHhMm())
+}
+
+IO::println("")
+IO::println("Report done. #{entries.size} entries, #{totalMinutes}m logged across #{summaries.size} projects.")

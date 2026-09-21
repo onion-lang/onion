@@ -231,6 +231,47 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       assert(Shell.Success("user:a") == result)
     }
 
+    it("zero-arg extension method on String accessed without parentheses (property-style)") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def rev: String = new StringBuilder(self).reverse().toString()
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "hello".rev
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("olleh") == result)
+    }
+
+    it("zero-arg extension method on Int accessed without parentheses (property-style)") {
+      val result = shell.run(
+        """
+          |extension Int {
+          |  def tripled: Int = self * 3
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val n: Int = 4
+          |    return "" + n.tripled
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("12") == result)
+    }
+
     it("block-wrapped lambda { x -> ... } in non-trailing position infers parameter type (regression: E0052)") {
       val result = shell.run(
         """

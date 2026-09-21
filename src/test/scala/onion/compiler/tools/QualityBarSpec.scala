@@ -65,19 +65,32 @@ class QualityBarSpec extends AnyFunSpec {
     """\d+""".r.findFirstIn(s).map(_.toInt)
       .getOrElse(fail(s"no number in quality-bar cell: $s"))
 
+  // Rows 2 and 3 used to require exact equality with run/*.on, which meant every PR
+  // adding a sample had to hand-edit these same two lines (row 3's cell also carried a
+  // full alphabetized name list). Since every such PR touched the same lines, any two
+  // landing within the same hour conflicted — 29 of them piled up unmerged before anyone
+  // noticed (issue #1370). These are now checked against a tolerance band instead, the
+  // same philosophy already used below for row 1's test count: a sample addition no
+  // longer needs to touch this file, and the recorded figure only needs a top-up once
+  // drift approaches the band, not on every single addition.
+  private val sampleCountBand = 20
+
   describe("docs/quality-bar.md matches what is actually there") {
-    it("row 2: the sample count equals the number of run/*.on files") {
-      assert(firstInt(en(2)) == runSamples.size,
-        s"quality-bar says ${en(2)}, run/ holds ${runSamples.size} samples")
+    it("row 2: the sample count tracks the number of run/*.on files") {
+      val actual = runSamples.size
+      val recorded = firstInt(en(2))
+      assert(recorded <= actual, s"quality-bar claims $recorded samples but run/ only holds $actual")
+      assert(actual - recorded <= sampleCountBand,
+        s"quality-bar says $recorded samples, run/ holds $actual — drift exceeds $sampleCountBand, please re-measure")
     }
 
-    it("row 3: the large-program count equals run/*.on with >= 100 lines") {
-      val large = runSamples.filter(p =>
-        java.nio.file.Files.readAllLines(p).size >= 100).map(_.getFileName.toString.dropRight(3)).sorted
-      assert(firstInt(en(3)) == large.size,
-        s"quality-bar says ${en(3)}, actual large programs are ${large.mkString(", ")}")
-      // the parenthesised list must name them, so it cannot rot separately from the count
-      large.foreach(n => assert(en(3).contains(n), s"quality-bar row 3 does not name $n: ${en(3)}"))
+    it("row 3: the large-program count tracks run/*.on with >= 100 lines") {
+      val large = runSamples.filter(p => java.nio.file.Files.readAllLines(p).size >= 100)
+      val actual = large.size
+      val recorded = firstInt(en(3))
+      assert(recorded <= actual, s"quality-bar claims $recorded large programs but run/ only holds $actual")
+      assert(actual - recorded <= sampleCountBand,
+        s"quality-bar says $recorded large programs, run/ holds $actual — drift exceeds $sampleCountBand, please re-measure")
     }
 
     it("row 6: docs parity equals the guide file counts, and they are equal") {

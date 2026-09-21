@@ -138,6 +138,41 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(6) == result)
     }
 
+    it("correctly computes @TailRecursive mutual recursion with a Long accumulator parameter") {
+      // Regression: rewriteParameterReferences.rewriteTerm fell through to `case _ => term`
+      // for AsInstanceOf nodes, so widening Int k to Long inside `acc + k` left the original
+      // k parameter slot unrewritten. The state machine read k from slot 0 (original param)
+      // instead of the loop variable slot, giving wrong results.
+      val result = shell.run(
+        """
+          |class AltAcc {
+          |private:
+          |  @TailRecursive
+          |  def addOdd(k: Int, acc: Long): Long {
+          |    if k <= 0 { return acc }
+          |    return addEven(k - 1, acc + k)
+          |  }
+          |  @TailRecursive
+          |  def addEven(k: Int, acc: Long): Long {
+          |    if k <= 0 { return acc }
+          |    return addOdd(k - 1, acc - k)
+          |  }
+          |public:
+          |  def compute(n: Int): Long = addOdd(n, 0L)
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Long = new AltAcc().compute(3)
+          |}
+          |""".stripMargin,
+        "MutualTCOLongAcc.on",
+        Array()
+      )
+      // alternatingSum(3) = 3 - 2 + 1 = 2
+      assert(Shell.Success(2L) == result)
+    }
+
     it("optimizes a zero-argument static method without crashing") {
       val result = shell.run(
         """

@@ -8,15 +8,27 @@
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-09-14） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値(概算; 下記の注記を参照) | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | テストスイート | `sbt shutdown && sbt -Duser.language=en testFull`(下記の注記を参照) | 5669 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`(どちらも `run/*.on` 全件をコンパイル) | 305 / 305 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 238（AccessLogAnalyzer、AirlineReservation、AnagramSolver、AntColony、AstronomyCatalog、AuctionHouse、Automaton、BankLedger、BankSystem、BattleshipSim、BinaryHeap、Blackjack、Blockchain、BookClub、BowlingGame、BrainFuck、BrokenLogDemo、BudgetTracker、BugTracker、BuildSim、CacheSimulator、CalendarManager、CarRentalFleet、CardGame、CellularAutomata、CensusAnalyzer、ChemCalculator、Chess、CinemaBooking、CipherSuite、CircuitBreakerSim、CircuitSimulator、ClinicRecords、CodeContest、ColorPalette、CommitAnalyzer、ConferenceSchedule、ConnectFour、ContactBook、ConwayLife、CourseRegistration、CpuScheduler、CronScheduler、CryptArithmetic、CryptoPortfolio、CustomerLoyalty、DNAAnalysis、DependencyResolver、DiscreteEventSim、DnaAnalyzer、DoctorScheduler、DpShowcase、DungeonCrawler、ElevatorDispatcher、EmployeeManager、EpidemiologySim、EspressoShop、EventTicketing、ExpenseAnalyzer、ExpenseAuditor、ExpenseTracker、ExprEval、FamilyTree、FileSystemSim、FinanceTracker、FitnessTracker、FlashcardDeck、FleetManager、FlightDelayReport、ForthMachine、FullTextSearch、GameOfLife、GameStore、GenericLeaderboard、GeneticAlgorithm、GeneticSequencer、GradeBook、GradeReport、GraphAlgorithms、GraphPathfinder、GraphSearch、HMTypeInference、HRSystem、HabitTracker、HospitalWard、HotelReservation、HuffmanCode、HuffmanCoding、InsuranceClaims、IntervalCalendar、Inventory、InventoryManager、InventoryReport、JobScheduler、Kalah、KaraokeNight、KingdomSim、KnapsackAdvisor、LSystem、LambdaCalc、LibraryCatalog、LibrarySystem、LispInterp、LogAnalytics、LogCorrelator、LogDispatch、Mandelbrot、MarkdownConverter、MarkovText、Mastermind、MathParser、MatrixCalc、MaxFlow、MazeSolver、Measurements、Minesweeper、MinesweeperSim、MiniGit、MiniRpg、MiniSQL、MiniTypeChecker、MiniVcs、MorseCode、MortgageCalc、MovieRecommender、MuseumCollection、MusicEngine、MusicFestival、MusicLibrary、MusicTheory、NationalParkTracker、NetCidr、NetFlowAnalyzer、NetworkMonitor、NeuralNet、NumberFormats、NumberTheory、NutritionTracker、ObservatoryLog、OrderReport、Othello、PackageDelivery、PackageInstaller、PacketInspector、ParallelCrawler、ParkingGarage、ParticlePhysicsSim、PasswordAnalyzer、PaymentProcessor、PayrollReport、PerfReview、PersonalFinance、PetShelter、PetriNet、PharmacySystem、PhysicsSim、PilotLogbook、PlantCare、PlaylistManager、PokerHands、PolyCalc、PolynomialAlgebra、PowerGrid、PrintShop、ProbDataStructures、ProjectBuildAnalyzer、ProjectTracker、PropCheck、PropLogic、PropertyManager、QueryEngine、RankedChoice、RateLimiter、RationalCalc、RecipeBook、RecipeManager、RecipeVault、RegexEngine、RestaurantOrders、RideSharePool、RuleEngine、SatSolver、ScaleAnalyzer、SemanticVersion、ShapeProcessor、ShiftPlanner、ShipmentTracker、ShoppingCart、SmartHome、SnippetLibrary、SocialNetwork、SortAlgorithms、SortingShowcase、SpaceMission、SpaceStationLog、SpellCheck、SpreadsheetCalc、SpreadsheetEngine、SprintPlanner、StatsApp、StockPortfolio、StudentGradeBook、Sudoku、SudokuSolver、SupplyChain、SymbolicMath、TaskPlanner、TaxCalculator、TemplateEngine、TermRewriter、TerrainGenerator、TextAnalytics、TextAnalyzer、TextDiff、TextTransformPipeline、TicTacToe、TimeSeries、TimesheetTracker、TodoManager、TollRoadBilling、ToolDemo、TournamentStandings、TournamentTracker、TradeMatchingEngine、TrainDispatch、TransitPlanner、Trie、TuringMachine、TuringMachineLab、UnionFind、VendingMachine、VirtualMachine、VirtualShell、VotingMethods、WeatherReport、WordLadder、WordSearch、WorkoutLog） | ≥ 5 |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`(どちらも `run/*.on` 全件をコンパイル) | 326 / 326 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 259(全件のアルファベット順一覧は `run/` を参照——ここでは列挙しない。下記の注記を参照) | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
 | 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 90 | よくあるエラーごとに専用コード |
+
+**行2・行3は完全一致ではなく許容幅で検査されます**(issue #1370)。以前は `run/` に
+サンプルを追加する PR は必ずこの2行の正確な件数を書き換え、さらに行3のアルファベット順一覧に
+自分のサンプル名を挿入する必要がありました——どの PR も同じ2行を触るため、1時間以内に重なった
+PR 同士は必ず競合し、それに気づかれないまま29件も未マージで積み上がる原因になりました。
+`QualityBarSpec` は、記録値が実態を上回っている(虚偽の記載)か、実態から一定幅以上遅れている
+場合にのみ失敗するようになりました——行1のテスト件数がすでに採用していたのと同じ考え方です。
+サンプルを追加するだけならこのファイルに触れる必要はなく、乖離が許容幅に近づいたときにだけ
+2つの数値をまとめて更新すれば十分です。
+
+この修正はかつて #1372 として一度取り込まれましたが、古いブランチ(#1336)がこのファイルの
+古い版のままマージされたことで静かに巻き戻され、ここで再適用する必要がありました。
 
 **`SBT_OPTS` にプロジェクト既定を下回るヒープ値を設定しないでください。** `.jvmopts` は既定を
 `-Xmx10g` に固定しています（`run/` サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の

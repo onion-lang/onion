@@ -4373,14 +4373,14 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>2</td>
 <td>Sample health</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
-<td>317 / 317 compile</td>
+<td>326 / 326 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>250 (see <code>run/</code> for the full, alphabetized list — no longer enumerated here, see note below)</td>
+<td>259 (see <code>run/</code> for the full, alphabetized list — no longer enumerated here, see note below)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4422,6 +4422,8 @@ now only fails when the recorded figure is either ahead of reality (an outright 
 drifted more than a fixed band behind it, the same philosophy row 1's test count already
 used. A sample addition no longer needs to touch this file at all; only a periodic top-up
 of the two numbers does, once drift approaches the band.</p>
+<p>This fix previously shipped as #1372, then was silently reverted when a stale branch
+(#1336) was merged with an older copy of this file, which is why it needed reapplying here.</p>
 <p><strong>Do not set <code>SBT_OPTS</code> to a heap below the project default.</strong> <code>.jvmopts</code> pins the
 default to <code>-Xmx10g</code> (raised from 4g as the <code>run/</code> sample corpus grew — see
 CHANGELOG 0.10.18). Any <code>SBT_OPTS</code> heap lower than that — <code>-Xmx2g</code> was one

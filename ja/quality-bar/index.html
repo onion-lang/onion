@@ -4481,15 +4481,15 @@
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
-<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
-<td>317 / 317 compile</td>
+<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>(どちらも <code>run/*.on</code> 全件をコンパイル)</td>
+<td>326 / 326 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>250(全件のアルファベット順一覧は <code>run/</code> を参照——ここでは列挙しない。下記の注記を参照)</td>
+<td>259(全件のアルファベット順一覧は <code>run/</code> を参照——ここでは列挙しない。下記の注記を参照)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4530,6 +4530,8 @@ PR 同士は必ず競合し、それに気づかれないまま29件も未マー
 場合にのみ失敗するようになりました——行1のテスト件数がすでに採用していたのと同じ考え方です。
 サンプルを追加するだけならこのファイルに触れる必要はなく、乖離が許容幅に近づいたときにだけ
 2つの数値をまとめて更新すれば十分です。</p>
+<p>この修正はかつて #1372 として一度取り込まれましたが、古いブランチ(#1336)がこのファイルの
+古い版のままマージされたことで静かに巻き戻され、ここで再適用する必要がありました。</p>
 <p><strong><code>SBT_OPTS</code> にプロジェクト既定を下回るヒープ値を設定しないでください。</strong> <code>.jvmopts</code> は既定を
 <code>-Xmx10g</code> に固定しています（<code>run/</code> サンプル群の増加に伴い 4g から引き上げ済み。CHANGELOG の
 0.10.18 を参照）。これを下回るヒープを <code>SBT_OPTS</code> に設定すると——以前の悪い例だった

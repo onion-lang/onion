@@ -1,6 +1,8 @@
 package onion.compiler.tools
 
+import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
 import onion.tools.Shell
+import java.io.StringReader
 
 /**
  * Regression tests for issue #249: a compound assignment on an indexed target
@@ -9,6 +11,14 @@ import onion.tools.Shell
  * duplicated, so a side-effecting index/receiver ran twice.
  */
 class CompoundAssignIndexSpec extends AbstractShellSpec {
+  private def errors(src: String): Seq[(Option[String], String)] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errs) => errs.map(e => (e.errorCode, e.message))
+      case _ => Seq.empty
+    }
+  }
+
   describe("Compound assignment on an indexed target (#249)") {
     it("evaluates a side-effecting array index exactly once") {
       val result = shell.run(
@@ -150,6 +160,23 @@ class CompoundAssignIndexSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(12) == result)
+    }
+
+    it("reports the non-indexable-target error exactly once for `n[0] += 1` on a primitive") {
+      val results = errors(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    var n: Int = 5;
+          |    n[0] += 1;
+          |    return n;
+          |  }
+          |}
+          |""".stripMargin
+      )
+      val e0000s = results.filter(_._1 == Some("E0000"))
+      assert(e0000s.size == 1)
     }
   }
 }

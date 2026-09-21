@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-09-21
+
 ### Added
 
 - **`run/MessageBoard.on`** — a 399-line discussion-forum simulation (ADT enum `PostStatus` with `Visible`/`Edited`/`Hidden` cases, data-carrying homogeneous enums `UserRole`/`Category`, records with `example` clauses, typed generics including `Map[String, List[Tag]]`, a class with `public:`/`private:` sections, collection pipelines including `groupBy`/`sortedBy`/`partition`/`zip`, exhaustive `select` on the ADT, nullable types, record named `copy`, `|>` pipeline), added to the `run/` corpus (merged via #1368, part of the backlog described in #1370).

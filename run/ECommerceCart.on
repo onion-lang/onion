@@ -1,0 +1,470 @@
+// ECommerceCart.on — E-commerce shopping cart and order management system.
+// Exercises: records; ADT and plain enums; classes with public section;
+// generics (typed List[T], Map[K,V]); collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/partition/distinct); select/pattern-matching with
+// exhaustiveness; nullable/Elvis; closures; string interpolation; try/catch;
+// foreach (range, list, map k,v); extension methods on Double/Int/String;
+// while loops.
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
+    val totalCents: Int = (self * 100.0 + 0.5).intValue()
+    val whole: Int = totalCents / 100
+    val frac: Int  = totalCents % 100
+    val cs: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "" + whole + "." + cs
+  }
+}
+
+extension Int {
+  def plural(w: String): String = if self == 1 { "1 " + w } else { "" + self + " " + w + "s" }
+  def padLeft(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+}
+
+// ─── Product category (ADT enum) ─────────────────────────────────────────────
+
+enum Category {
+  case Electronics
+  case Clothing
+  case Books
+  case HomeGoods
+  case Food
+public:
+  def label(): String = select this {
+    case e is Electronics: "Electronics"
+    case c is Clothing:    "Clothing"
+    case b is Books:       "Books"
+    case h is HomeGoods:   "Home Goods"
+    case f is Food:        "Food & Grocery"
+  }
+  def taxRate(): Double = select this {
+    case f is Food:  0.0
+    case b is Books: 0.0
+    else:            0.08
+  }
+}
+
+// ─── Order status (ADT enum, data-carrying cases) ────────────────────────────
+
+enum OrderStatus {
+  case Pending
+  case Processing
+  case Shipped(trackingId: String)
+  case Delivered
+  case Cancelled(reason: String)
+public:
+  def label(): String = select this {
+    case p is Pending:    "Pending"
+    case p is Processing: "Processing"
+    case s is Shipped:    "Shipped [#{ s.trackingId() }]"
+    case d is Delivered:  "Delivered"
+    case c is Cancelled:  "Cancelled: #{ c.reason() }"
+  }
+  def isActive(): Boolean = select this {
+    case x is Delivered: false
+    case x is Cancelled: false
+    else:                true
+  }
+  def statusKey(): String = select this {
+    case x is Pending:    "Pending"
+    case x is Processing: "Processing"
+    case x is Shipped:    "Shipped"
+    case x is Delivered:  "Delivered"
+    case x is Cancelled:  "Cancelled"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Product(id: String, name: String, price: Double, category: Category, stock: Int)
+
+record CartItem(product: Product, qty: Int) {
+public:
+  def subtotal(): Double = product().price() * (qty() as Double)
+  def canFulfil(): Boolean = qty() <= product().stock()
+}
+
+record Discount(code: String, description: String, rate: Double, minOrderValue: Double) {
+public:
+  def applies(total: Double): Boolean = total >= minOrderValue()
+  def apply(total: Double): Double = total * (1.0 - rate())
+}
+
+record ShippingTier(name: String, minDays: Int, maxDays: Int, cost: Double) {
+public:
+  def deliveryWindow(): String =
+    if minDays() == maxDays() { "" + minDays() + " day" }
+    else { "#{ minDays() }–#{ maxDays() } days" }
+}
+
+record Order(id: String, items: List[CartItem], discount: Discount?, shipping: ShippingTier, status: OrderStatus) {
+public:
+  def itemsSubtotal(): Double {
+    var total: Double = 0.0
+    foreach item: CartItem in items() { total = total + item.subtotal() }
+    return total
+  }
+  def taxAmount(): Double {
+    var tax: Double = 0.0
+    foreach item: CartItem in items() {
+      tax = tax + item.subtotal() * item.product().category().taxRate()
+    }
+    return tax
+  }
+  def discountAmount(): Double {
+    val sub: Double = itemsSubtotal()
+    val d: Discount? = discount()
+    if d == null { return 0.0 }
+    return if d.applies(sub) { sub - d.apply(sub) } else { 0.0 }
+  }
+  def grandTotal(): Double = itemsSubtotal() - discountAmount() + taxAmount() + shipping().cost()
+}
+
+// ─── Cart ─────────────────────────────────────────────────────────────────────
+
+class Cart {
+public:
+  var items: List[CartItem]
+  var appliedDiscount: Discount?
+
+  def this {
+    this.items = []
+    this.appliedDiscount = null
+  }
+
+  def addItem(product: Product, qty: Int): Boolean {
+    if qty <= 0 { return false }
+    var found: Boolean = false
+    val newItems: List[CartItem] = []
+    foreach existing: CartItem in items {
+      if existing.product().id() == product.id() {
+        newItems.add(new CartItem(product, existing.qty() + qty))
+        found = true
+      } else {
+        newItems.add(existing)
+      }
+    }
+    if !found { newItems.add(new CartItem(product, qty)) }
+    items = newItems
+    return true
+  }
+
+  def removeItem(productId: String): Boolean {
+    val before: Int = items.size()
+    val kept: List[CartItem] = []
+    foreach ci: CartItem in items {
+      if ci.product().id() != productId { kept.add(ci) }
+    }
+    items = kept
+    return items.size() < before
+  }
+
+  def applyDiscount(d: Discount): String {
+    val sub: Double = subtotal()
+    if d.applies(sub) {
+      appliedDiscount = d
+      return "Discount #{ d.code() } applied — saving $#{ (sub - d.apply(sub)).fmt2() }"
+    }
+    return "Minimum order $#{ d.minOrderValue().fmt2() } not met (cart is $#{ sub.fmt2() })"
+  }
+
+  def subtotal(): Double {
+    var total: Double = 0.0
+    foreach item: CartItem in items { total = total + item.subtotal() }
+    return total
+  }
+
+  def itemCount(): Int {
+    var count: Int = 0
+    foreach item: CartItem in items { count = count + item.qty() }
+    return count
+  }
+
+  def hasUnfulfillable(): Boolean {
+    foreach ci: CartItem in items { if !ci.canFulfil() { return true } }
+    return false
+  }
+
+  def unfulfillable(): List[CartItem] {
+    val result: List[CartItem] = []
+    foreach ci: CartItem in items { if !ci.canFulfil() { result.add(ci) } }
+    return result
+  }
+
+  def size(): Int = items.size()
+}
+
+// ─── Shop ─────────────────────────────────────────────────────────────────────
+
+class Shop {
+public:
+  var products: List[Product]
+  var orders: List[Order]
+  var nextOrderId: Int
+
+  def this {
+    this.products = []
+    this.orders = []
+    this.nextOrderId = 1001
+  }
+
+  def addProduct(p: Product): void { products.add(p) }
+
+  def findProduct(id: String): Product? {
+    foreach p: Product in products {
+      if p.id() == id { return p }
+    }
+    return null
+  }
+
+  def checkout(cart: Cart, shipping: ShippingTier): Order? {
+    if cart.size() == 0 { return null }
+    val id: String = "ORD-#{ nextOrderId }"
+    nextOrderId = nextOrderId + 1
+    val order: Order = new Order(id, cart.items, cart.appliedDiscount, shipping, new Pending())
+    orders.add(order)
+    return order
+  }
+
+  def updateStatus(orderId: String, status: OrderStatus): Boolean {
+    var found: Boolean = false
+    val newOrders: List[Order] = []
+    foreach o: Order in orders {
+      if o.id() == orderId {
+        newOrders.add(new Order(o.id(), o.items(), o.discount(), o.shipping(), status))
+        found = true
+      } else {
+        newOrders.add(o)
+      }
+    }
+    orders = newOrders
+    return found
+  }
+
+  def ordersByStatus(): Map[Object, List[Order]] = orders.groupBy { o -> (o as Order).status().statusKey() }
+
+  def salesByCategory(): Map[String, Double] {
+    val totals: Map[String, Double] = [:]
+    foreach o: Order in orders {
+      foreach item: CartItem in o.items() {
+        val cat: String = item.product().category().label()
+        val prev: Double? = totals.get(cat) as Double?
+        totals.put(cat, (prev ?: 0.0) + item.subtotal())
+      }
+    }
+    return totals
+  }
+
+  def topProducts(n: Int): List[Product] {
+    val qtys: Map[String, Int] = [:]
+    foreach o: Order in orders {
+      foreach item: CartItem in o.items() {
+        val pid: String = item.product().id()
+        val prev: Int? = qtys.get(pid) as Int?
+        qtys.put(pid, (prev ?: 0) + item.qty())
+      }
+    }
+    val sorted: List[Product] = products.sortedBy { p ->
+      val pid: String = (p as Product).id()
+      val q: Int? = qtys.get(pid) as Int?
+      0 - (q ?: 0)
+    }
+    val result: List[Product] = []
+    var i: Int = 0
+    while i < sorted.size() && i < n {
+      result.add(sorted.get(i))
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def printSeparator(title: String): void {
+  IO::println("")
+  IO::println("═══ #{ title } ═══")
+}
+
+def printCart(cart: Cart): void {
+  IO::println("  #{ cart.itemCount().plural("item") }  subtotal=$#{ cart.subtotal().fmt2() }")
+  foreach ci: CartItem in cart.items {
+    val status: String = if ci.canFulfil() { "ok" } else { "OUT-OF-STOCK" }
+    IO::println("    #{ ci.product().name().truncate(28).padRight(30) }  x#{ ci.qty() }  $#{ ci.subtotal().fmt2() }  [#{ status }]")
+  }
+}
+
+def printOrderLine(o: Order): void {
+  IO::println("  #{ o.id() }  #{ o.status().label().padRight(28) }  $#{ o.grandTotal().fmt2() }  (#{ o.items().size().plural("item") })")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val shop: Shop = new Shop()
+
+  // ── Catalogue ──────────────────────────────────────────────────────────────
+  shop.addProduct(new Product("P001", "Wireless Headphones",     79.99, new Electronics(), 50))
+  shop.addProduct(new Product("P002", "Mechanical Keyboard",    129.00, new Electronics(), 30))
+  shop.addProduct(new Product("P003", "Ergonomic Mouse",         45.50, new Electronics(), 75))
+  shop.addProduct(new Product("P004", "Linen T-Shirt (M)",       22.00, new Clothing(),   200))
+  shop.addProduct(new Product("P005", "Running Shorts",          35.00, new Clothing(),   150))
+  shop.addProduct(new Product("P006", "Design Patterns (book)",  49.00, new Books(),       40))
+  shop.addProduct(new Product("P007", "Clean Code (book)",       39.00, new Books(),       55))
+  shop.addProduct(new Product("P008", "Bamboo Cutting Board",    28.00, new HomeGoods(),   60))
+  shop.addProduct(new Product("P009", "Organic Coffee 500g",     18.50, new Food(),        80))
+  shop.addProduct(new Product("P010", "Steel Water Bottle",       0.01, new HomeGoods(),    3))
+
+  val discounts: List[Discount] = [
+    new Discount("SAVE10",  "10% off orders over $50",  0.10,  50.0),
+    new Discount("MEGA20",  "20% off orders over $150", 0.20, 150.0),
+    new Discount("BOOKS15", "15% off any order",        0.15,   0.0)
+  ]
+
+  val standard:  ShippingTier = new ShippingTier("Standard",  5, 7,  0.00)
+  val express:   ShippingTier = new ShippingTier("Express",   2, 3,  9.99)
+  val overnight: ShippingTier = new ShippingTier("Overnight", 1, 1, 24.99)
+
+  // ── Cart 1: tech bundle ────────────────────────────────────────────────────
+  printSeparator("Cart 1: Tech Bundle")
+  val cart1: Cart = new Cart()
+  cart1.addItem((shop.findProduct("P001") as Product), 1)
+  cart1.addItem((shop.findProduct("P002") as Product), 1)
+  cart1.addItem((shop.findProduct("P003") as Product), 2)
+  printCart(cart1)
+  IO::println("  Apply SAVE10 : " + cart1.applyDiscount(discounts.get(0)))
+  IO::println("  Apply MEGA20 : " + cart1.applyDiscount(discounts.get(1)))
+  val order1: Order = (shop.checkout(cart1, express) as Order)
+  IO::println("  → #{ order1.id() }  sub=$#{ order1.itemsSubtotal().fmt2() }  disc=$#{ order1.discountAmount().fmt2() }  tax=$#{ order1.taxAmount().fmt2() }  ship=$#{ order1.shipping().cost().fmt2() }  TOTAL=$#{ order1.grandTotal().fmt2() }")
+
+  // ── Cart 2: books + food ───────────────────────────────────────────────────
+  printSeparator("Cart 2: Books & Groceries")
+  val cart2: Cart = new Cart()
+  cart2.addItem((shop.findProduct("P006") as Product), 1)
+  cart2.addItem((shop.findProduct("P007") as Product), 1)
+  cart2.addItem((shop.findProduct("P009") as Product), 3)
+  printCart(cart2)
+  IO::println("  Apply BOOKS15: " + cart2.applyDiscount(discounts.get(2)))
+  val order2: Order = (shop.checkout(cart2, standard) as Order)
+  IO::println("  → #{ order2.id() }  sub=$#{ order2.itemsSubtotal().fmt2() }  disc=$#{ order2.discountAmount().fmt2() }  tax=$#{ order2.taxAmount().fmt2() }  ship=$#{ order2.shipping().cost().fmt2() }  TOTAL=$#{ order2.grandTotal().fmt2() }")
+
+  // ── Cart 3: includes stock issue ────────────────────────────────────────────
+  printSeparator("Cart 3: Mixed (stock issue)")
+  val cart3: Cart = new Cart()
+  cart3.addItem((shop.findProduct("P004") as Product), 2)
+  cart3.addItem((shop.findProduct("P010") as Product), 5)
+  cart3.addItem((shop.findProduct("P008") as Product), 1)
+  printCart(cart3)
+  if cart3.hasUnfulfillable() {
+    IO::println("  ⚠ Unfulfillable items:")
+    foreach ci: CartItem in cart3.unfulfillable() {
+      IO::println("    #{ ci.product().name() } — wanted #{ ci.qty() }, available #{ ci.product().stock() }")
+    }
+    cart3.removeItem("P010")
+    IO::println("  Removed P010; updated cart:")
+    printCart(cart3)
+  }
+  val order3: Order = (shop.checkout(cart3, overnight) as Order)
+  IO::println("  → #{ order3.id() }  TOTAL=$#{ order3.grandTotal().fmt2() }")
+
+  // ── Advance statuses ────────────────────────────────────────────────────────
+  shop.updateStatus(order1.id(), new Processing())
+  shop.updateStatus(order2.id(), new Processing())
+  shop.updateStatus(order1.id(), new Shipped("TRK-9182736"))
+  shop.updateStatus(order2.id(), new Delivered())
+  shop.updateStatus(order3.id(), new Cancelled("Customer request"))
+
+  // ── Order status report ─────────────────────────────────────────────────────
+  printSeparator("Order Status Report")
+  val groups: Map[Object, List[Order]] = shop.ordersByStatus()
+  foreach (statusKey, oList) in groups {
+    IO::println("  #{ statusKey } (#{ oList.size() }):")
+    foreach o: Order in oList {
+      printOrderLine(o)
+    }
+  }
+
+  // ── Sales by category ──────────────────────────────────────────────────────
+  printSeparator("Sales by Category")
+  val sales: Map[String, Double] = shop.salesByCategory()
+  foreach (cat, total) in sales {
+    IO::println("  #{ cat.padRight(16) }  $#{ total.fmt2() }")
+  }
+
+  // ── Top products by units sold ─────────────────────────────────────────────
+  printSeparator("Top Products by Units Sold")
+  val top: List[Product] = shop.topProducts(5)
+  var rank: Int = 1
+  foreach p: Product in top {
+    IO::println("  #{ rank.padLeft(2) }. #{ p.name().truncate(30).padRight(32) }  $#{ p.price().fmt2() }  [#{ p.category().label() }]")
+    rank = rank + 1
+  }
+
+  // ── Catalogue by category (pipeline: groupBy → stats) ──────────────────────
+  printSeparator("Catalogue by Category")
+  val byCat: Map[Object, List[Product]] = shop.products.groupBy { p -> (p as Product).category().label() }
+  foreach (cat, prods) in byCat {
+    var catTotal: Double = 0.0
+    foreach p: Product in prods { catTotal = catTotal + p.price() }
+    val avg: Double = catTotal / (prods.size() as Double)
+    IO::println("  #{ (cat as String).padRight(16) }  #{ prods.size().plural("product") }  avg price $#{ avg.fmt2() }")
+  }
+
+  // ── Discount applicability check (pipeline) ──────────────────────────────────
+  printSeparator("Discount Eligibility at Current Cart Sizes")
+  val checkAmounts: List[Double] = [40.0, 75.0, 160.0]
+  foreach amount: Double in checkAmounts {
+    val applicable: List[Discount] = discounts.filter { d: Discount -> d.applies(amount) }
+    val codes: List[String] = applicable.map { d: Discount -> d.code() }
+    val list: String = if codes.size() == 0 { "(none)" } else {
+      var s: String = ""
+      foreach code: String in codes {
+        if s.length() > 0 { s = s + ", " }
+        s = s + code
+      }
+      s
+    }
+    IO::println("  Cart $#{ amount.fmt2() }  →  #{ list }")
+  }
+
+  // ── Summary ──────────────────────────────────────────────────────────────────
+  printSeparator("Summary")
+  var revenue: Double = 0.0
+  var activeCount: Int = 0
+  foreach o: Order in shop.orders {
+    if o.status().isActive() { activeCount = activeCount + 1 }
+    select o.status() {
+    case d is Delivered:
+      revenue = revenue + o.grandTotal()
+    else:
+    }
+  }
+  IO::println("  Orders placed      : #{ shop.orders.size() }")
+  IO::println("  Active orders      : #{ activeCount }")
+  IO::println("  Revenue (delivered): $#{ revenue.fmt2() }")
+  IO::println("  Catalogue          : #{ shop.products.size().plural("product") }")
+
+  // ── Shipping options table ────────────────────────────────────────────────────
+  printSeparator("Shipping Options")
+  val tiers: List[ShippingTier] = [standard, express, overnight]
+  foreach t: ShippingTier in tiers {
+    val costStr: String = if t.cost() == 0.0 { "FREE" } else { "$#{ t.cost().fmt2() }" }
+    IO::println("  #{ t.name().padRight(12) }  #{ t.deliveryWindow().padRight(16) }  #{ costStr }")
+  }
+}

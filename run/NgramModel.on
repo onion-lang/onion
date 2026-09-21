@@ -1,0 +1,355 @@
+// NgramModel.on -- N-gram language model: tokenisation, frequency analysis,
+// bigram collocations, and Markov-style text prediction.
+//
+// Exercises: sealed ADT case-enum (NgramOrder) with methods, records with
+// methods (TokenPair, FreqEntry, ModelStats), extension methods on String and
+// Int, collection pipelines (map / filter / fold / groupBy / sortedBy /
+// distinct / find / zip / partition), select / pattern-match on types,
+// nullable types, do[Option] monadic chaining, closures, string interpolation,
+// foreach over ranges and (k,v) maps, try/catch, while/for loops, recursion.
+
+// ---- Helpers defined up-front (used by top-level statements below) ----------
+
+def fmt1(d: Double): String {
+  val i: Int = d as Int
+  val f: Int = ((d - (i as Double)) * 10.0) as Int
+  return "" + i + "." + f
+}
+
+// ---- Extension helpers ------------------------------------------------------
+
+extension String {
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def lpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def tokenize(): List[String] {
+    val raw: List[String] = Strings::splitRegex(self, "\\s+")
+    val result: List[String] = []
+    foreach w: Object in raw {
+      val cleaned: String = Strings::lower(Strings::replaceRegex(w as String, "[^a-zA-Z']", ""))
+      if cleaned.length() > 0 { result.add(cleaned) }
+    }
+    return result
+  }
+}
+
+extension Int {
+  def bar(max: Int, width: Int): String {
+    if max <= 0 { return "".rpad(width) }
+    val filled: Int = self * width / max
+    var b: String = ""
+    for var i: Int = 0; i < filled; i++ { b = b + "#" }
+    while b.length() < width { b = b + "." }
+    return b
+  }
+  def pct(total: Int): String {
+    if total <= 0 { return " 0.0%" }
+    val p: Double = (self as Double) * 100.0 / (total as Double)
+    val pi: Int = p as Int
+    val pd: Int = ((p - (pi as Double)) * 10.0) as Int
+    return (" " + pi + "." + pd + "%").lpad(6)
+  }
+}
+
+// ---- ADT enum: n-gram order -------------------------------------------------
+
+enum NgramOrder {
+  case Unigram
+  case Bigram
+  case Trigram
+public:
+  def label(): String = select this {
+    case x is Unigram: "unigram"
+    case x is Bigram:  "bigram"
+    case x is Trigram: "trigram"
+  }
+  def n(): Int = select this {
+    case x is Unigram: 1
+    case x is Bigram:  2
+    case x is Trigram: 3
+  }
+}
+
+// ---- Records ----------------------------------------------------------------
+
+record TokenPair(first: String, second: String) {
+public:
+  def key(): String = first() + " " + second()
+}
+
+record TokenTriple(a: String, b: String, c: String) {
+public:
+  def key(): String = a() + " " + b() + " " + c()
+}
+
+record FreqEntry(key: String, count: Int) {
+public:
+  def pctOf(total: Int): String = count().pct(total)
+  def bar20(maxCount: Int): String = count().bar(maxCount, 20)
+}
+
+record ModelStats(
+  tokenCount: Int,
+  typeCount: Int,
+  sentenceCount: Int,
+  totalCharLen: Int
+) {
+public:
+  def ttr(): Double = (typeCount() as Double) / (tokenCount() as Double)
+  def avgTps(): Double = (tokenCount() as Double) / (sentenceCount() as Double)
+  def avgLen(): Double = (totalCharLen() as Double) / (tokenCount() as Double)
+}
+
+// ---- Corpus -----------------------------------------------------------------
+
+val CORPUS: List[String] = [
+  "To be or not to be that is the question",
+  "Whether tis nobler in the mind to suffer",
+  "The slings and arrows of outrageous fortune",
+  "Or to take arms against a sea of troubles",
+  "And by opposing end them to die to sleep",
+  "No more and by a sleep to say we end",
+  "The heartache and the thousand natural shocks",
+  "That flesh is heir to tis a consummation",
+  "Devoutly to be wished to die to sleep",
+  "To sleep perchance to dream ay there's the rub",
+  "For in that sleep of death what dreams may come",
+  "When we have shuffled off this mortal coil",
+  "Must give us pause there's the respect",
+  "That makes calamity of so long life",
+  "The undiscovered country from whose bourn",
+  "No traveller returns puzzles the will",
+  "And makes us rather bear those ills we have",
+  "Than fly to others that we know not of",
+  "Thus conscience does make cowards of us all",
+  "And thus the native hue of resolution"
+]
+
+// ---- Tokenisation -----------------------------------------------------------
+
+def buildTokens(sentences: List[String]): List[String] {
+  val all: List[String] = []
+  foreach s: Object in sentences {
+    foreach w: Object in (s as String).tokenize() { all.add(w as String) }
+  }
+  return all
+}
+
+def buildBigramKeys(tokens: List[String]): List[String] {
+  val pairs: List[String] = []
+  var i: Int = 0
+  while i < tokens.size - 1 {
+    pairs.add(new TokenPair(tokens.get(i) as String, tokens.get(i + 1) as String).key())
+    i = i + 1
+  }
+  return pairs
+}
+
+def buildTrigramKeys(tokens: List[String]): List[String] {
+  val triples: List[String] = []
+  var i: Int = 0
+  while i < tokens.size - 2 {
+    triples.add(new TokenTriple(
+      tokens.get(i) as String,
+      tokens.get(i + 1) as String,
+      tokens.get(i + 2) as String
+    ).key())
+    i = i + 1
+  }
+  return triples
+}
+
+// ---- Frequency analysis -----------------------------------------------------
+
+def topN(keys: List[String], n: Int): List[FreqEntry] {
+  val grouped: Map[Object, List[String]] = keys.groupBy { k -> k }
+  val entries: List[FreqEntry] = []
+  foreach (k, v) in grouped {
+    entries.add(new FreqEntry(k as String, v.size))
+  }
+  val sorted: List[FreqEntry] = entries.sortedBy { e -> -((e as FreqEntry).count()) }
+  val top: List[FreqEntry] = []
+  var i: Int = 0
+  while i < n && i < sorted.size {
+    top.add(sorted.get(i) as FreqEntry)
+    i = i + 1
+  }
+  return top
+}
+
+def computeStats(tokens: List[String], sentences: List[String]): ModelStats {
+  val types: List[String] = tokens.distinct()
+  val totalLen: Int = tokens.fold(0) { acc, t -> (acc as Int) + (t as String).length() }
+  return new ModelStats(tokens.size, types.size, sentences.size, totalLen as Int)
+}
+
+// ---- Prediction: most likely next word (bigram model) -----------------------
+
+def predictNext(tokens: List[String], word: String): String? {
+  val following: List[String] = []
+  var i: Int = 0
+  while i < tokens.size - 1 {
+    if (tokens.get(i) as String) == word { following.add(tokens.get(i + 1) as String) }
+    i = i + 1
+  }
+  if following.size == 0 { return null }
+  val grouped: Map[Object, List[String]] = following.groupBy { w -> w }
+  var bestWord: String? = null
+  var bestCount: Int = 0
+  foreach (w, ws) in grouped {
+    val c: Int = ws.size
+    if c > bestCount { bestWord = w as String; bestCount = c }
+  }
+  return bestWord
+}
+
+// ---- Recursive chain generation ---------------------------------------------
+
+def generateChain(tokens: List[String], start: String, maxLen: Int): String {
+  if maxLen <= 0 { return "" }
+  val next: String? = predictNext(tokens, start)
+  if next == null { return start }
+  return start + " " + generateChain(tokens, next, maxLen - 1)
+}
+
+// ---- do[Option] helper ------------------------------------------------------
+
+def toOpt(w: String?): Option[String] {
+  if w == null { return Option::none() }
+  return Option::some(w as String)
+}
+
+// ---- Section header helper --------------------------------------------------
+
+def section(title: String): void {
+  val dashes: String = Strings::repeat("-", 56 - title.length())
+  IO::println("")
+  IO::println("-- " + title + " " + dashes)
+}
+
+def hbar(ch: String, n: Int): String = Strings::repeat(ch, n)
+
+// ---- Frequency table display ------------------------------------------------
+
+def printFreqTable(title: String, entries: List[FreqEntry], total: Int): void {
+  section(title)
+  val maxC: Int = if entries.size > 0 { (entries.get(0) as FreqEntry).count() } else { 1 }
+  foreach e: Object in entries {
+    val fe: FreqEntry = e as FreqEntry
+    IO::println("  " + fe.key().rpad(22) + fe.pctOf(total) + " " + fe.bar20(maxC) + " " + fe.count())
+  }
+}
+
+// ---- Main -------------------------------------------------------------------
+
+val tokens: List[String] = buildTokens(CORPUS)
+val stats: ModelStats    = computeStats(tokens, CORPUS)
+
+IO::println(hbar("=", 60))
+IO::println("  NgramModel -- Hamlet soliloquy (Shakespeare)")
+IO::println(hbar("=", 60))
+IO::println("  tokens: #{stats.tokenCount()}  unique: #{stats.typeCount()}  sentences: #{stats.sentenceCount()}")
+IO::println("  TTR: #{fmt1(stats.ttr())}  avg tokens/sentence: #{fmt1(stats.avgTps())}  avg word len: #{fmt1(stats.avgLen())}")
+
+// 1. Top-10 unigrams
+val top10w: List[FreqEntry] = topN(tokens, 10)
+printFreqTable("Top-10 Unigrams", top10w, tokens.size)
+
+// 2. Top-10 bigrams
+val bigramKeys: List[String]  = buildBigramKeys(tokens)
+val top10b: List[FreqEntry]   = topN(bigramKeys, 10)
+printFreqTable("Top-10 Bigrams", top10b, bigramKeys.size)
+
+// 3. Top-8 trigrams
+val trigramKeys: List[String] = buildTrigramKeys(tokens)
+val top8t: List[FreqEntry]    = topN(trigramKeys, 8)
+printFreqTable("Top-8 Trigrams", top8t, trigramKeys.size)
+
+// 4. Enum methods (NgramOrder ADT)
+section("N-gram order enum")
+foreach o: Object in [new Unigram(), new Bigram(), new Trigram()] {
+  val ord: NgramOrder = o as NgramOrder
+  IO::println("  #{ord.label()} (n=#{ord.n()})")
+}
+
+// 5. Prediction chain
+section("Markov-chain prediction from 'to'")
+IO::println("  " + generateChain(tokens, "to", 8))
+
+// 6. do[Option]: two-step prediction
+val step1Opt: Option[String] = toOpt(predictNext(tokens, "the"))
+val step2Opt: Option[String] = do[Option] {
+  w1 <- step1Opt
+  w2 <- toOpt(predictNext(tokens, w1))
+  ret "the -> #{w1} -> #{w2}"
+}
+section("do[Option] two-step prediction from 'the'")
+val step2Msg: String = if step2Opt == null { "(no two-step chain)" } else { step2Opt.get() }
+IO::println("  " + step2Msg)
+
+// 7. Word-length distribution (exercises groupBy + foreach (k,v))
+section("Word-length distribution")
+val lenDist: Map[Object, List[String]] = tokens.groupBy { t -> t.length() }
+var maxLenCnt: Int = 0
+foreach (k, v) in lenDist {
+  val c: Int = v.size
+  if c > maxLenCnt { maxLenCnt = c }
+}
+foreach (k, v) in lenDist {
+  val len: Int = k as Int
+  val cnt: Int = v.size
+  IO::println("  len " + ("" + len).lpad(2) + ": " + cnt.bar(maxLenCnt, 20) + " " + cnt)
+}
+
+// 8. Partition top-10 words by length >= 4 vs < 4
+section("Partition: long words vs short words (top-10)")
+val parts: List[List[FreqEntry]] = top10w.partition { e -> (e as FreqEntry).key().length() >= 4 }
+val longW: List[FreqEntry]  = parts.get(0) as List[FreqEntry]
+val shortW: List[FreqEntry] = parts.get(1) as List[FreqEntry]
+IO::println("  len>=4: " + longW.map { e -> e.key() }.toString())
+IO::println("  len<4:  " + shortW.map { e -> e.key() }.toString())
+
+// 9. Zip unigrams with bigrams (top 5)
+section("Zip: unigram-bigram pairs (top 5)")
+val top5w: List[FreqEntry] = topN(tokens, 5)
+val top5b: List[FreqEntry] = topN(bigramKeys, 5)
+val zipped: List[List[Object]] = top5w.zip(top5b)
+foreach z: List[Object] in zipped {
+  val pair: List[Object] = z
+  val fw: FreqEntry = pair.get(0) as FreqEntry
+  val fb: FreqEntry = pair.get(1) as FreqEntry
+  IO::println("  [" + fw.key().rpad(10) + "] + [" + fb.key() + "]")
+}
+
+// 10. Filter: words that appear in both unigram and bigram top-10 (by first token)
+section("Find: first bigram top-10 word in unigram top-10")
+val top10wKeys: List[String] = top10w.map { e -> e.key() }
+val found: FreqEntry? = top10b.find { e ->
+  val fb: FreqEntry = e as FreqEntry
+  val firstToken: String = Strings::split(fb.key(), " ").get(0) as String
+  top10wKeys.contains(firstToken)
+} as FreqEntry?
+if found != null {
+  IO::println("  First bigram whose head is a top-10 word: '#{(found as FreqEntry).key()}'")
+} else {
+  IO::println("  (none found)")
+}
+
+// 11. try/catch: deliberate out-of-bounds access
+section("try/catch demonstration")
+try {
+  val bad: Object = tokens.get(tokens.size + 99)
+  IO::println("  Should not reach here: " + bad)
+} catch e: Exception {
+  IO::println("  Caught expected error: " + e.getClass().getSimpleName())
+}
+
+IO::println("")
+IO::println(hbar("=", 60))

@@ -1,0 +1,361 @@
+// MovieRental.on — a video-rental-store simulator
+// Exercises: ADT enum, plain enum, records with body methods, classes,
+// collection pipelines (filter/map/fold/groupBy/sortedBy/partition/
+// distinct/find/any), select / type-pattern matching, nullable types,
+// string interpolation, closures, recursion, while loop, foreach
+// over ranges and over map (k,v).
+
+import {
+  java.util.*
+}
+
+// ── Plain enums ───────────────────────────────────────────────────────────────
+
+enum Genre { ACTION, COMEDY, DRAMA, HORROR, SCIFI, DOCUMENTARY }
+
+enum MemberTier { STANDARD, SILVER, GOLD, DIAMOND }
+
+// ── ADT enum for copy status ──────────────────────────────────────────────────
+
+enum CopyStatus {
+  case Available
+  case CheckedOut(memberId: String, checkoutDay: Int, dueDay: Int)
+  case Reserved(memberId: String)
+public:
+  def label(): String = select this {
+    case s is Available:  "Available"
+    case s is CheckedOut: "Out:#{s.memberId()}/due#{s.dueDay()}"
+    case s is Reserved:   "Reserved:#{s.memberId()}"
+  }
+  def isAvailable(): Boolean = select this {
+    case s is Available: true
+    else: false
+  }
+  def isCheckedOut(): Boolean = select this {
+    case s is CheckedOut: true
+    else: false
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Movie(id: String, title: String, genre: Genre, year: Int, dailyRate: Double)
+
+record Member(id: String, name: String, tier: MemberTier)
+
+record RentalRecord(copyId: String, movieId: String, memberId: String, checkoutDay: Int, returnDay: Int, fee: Double)
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def genreLabel(g: Genre): String = select g {
+  case Genre::ACTION:      "Action"
+  case Genre::COMEDY:      "Comedy"
+  case Genre::DRAMA:       "Drama"
+  case Genre::HORROR:      "Horror"
+  case Genre::SCIFI:       "Sci-Fi"
+  case Genre::DOCUMENTARY: "Documentary"
+}
+
+def tierLabel(t: MemberTier): String = select t {
+  case MemberTier::STANDARD: "Standard"
+  case MemberTier::SILVER:   "Silver"
+  case MemberTier::GOLD:     "Gold"
+  case MemberTier::DIAMOND:  "Diamond"
+}
+
+def tierDays(t: MemberTier): Int = select t {
+  case MemberTier::STANDARD: 3
+  case MemberTier::SILVER:   5
+  case MemberTier::GOLD:     7
+  case MemberTier::DIAMOND:  14
+}
+
+def tierDiscount(t: MemberTier): Double = select t {
+  case MemberTier::STANDARD: 0.0d
+  case MemberTier::SILVER:   0.10d
+  case MemberTier::GOLD:     0.20d
+  case MemberTier::DIAMOND:  0.35d
+}
+
+// Late fee: daily rate per extra day, recursive
+def lateFee(extraDays: Int, dailyRate: Double): Double =
+  if extraDays <= 0 { 0.0d }
+  else { dailyRate + lateFee(extraDays - 1, dailyRate) }
+
+def computeFee(member: Member, movie: Movie, days: Int): Double = {
+  val allowed  = tierDays(member.tier())
+  val billed   = (if days < allowed { days } else { allowed }) as Double
+  val base     = movie.dailyRate() * billed
+  val disc     = base * (1.0d - tierDiscount(member.tier()))
+  val late     = lateFee(days - allowed, movie.dailyRate())
+  return disc + late
+}
+
+// ── RentalStore class ─────────────────────────────────────────────────────────
+
+class RentalStore {
+  val movies:     List[Movie]
+  val members:    List[Member]
+  val statuses:   Map[Object, Object]  // copyId -> CopyStatus
+  val copyMovies: Map[Object, Object]  // copyId -> movieId
+  val history:    List[RentalRecord]
+  var nextCopyN:  Int
+
+public:
+  def this() {
+    this.movies     = new ArrayList[Movie]()
+    this.members    = new ArrayList[Member]()
+    this.statuses   = [:]
+    this.copyMovies = [:]
+    this.history    = new ArrayList[RentalRecord]()
+    this.nextCopyN  = 1
+  }
+
+  def addMovie(m: Movie): void   { movies.add(m) }
+  def addMember(mb: Member): void { members.add(mb) }
+
+  def addCopies(movieId: String, count: Int): void {
+    foreach i: Int in 1..count {
+      val cid = "C#{nextCopyN}"
+      statuses[cid]   = new Available()
+      copyMovies[cid] = movieId
+      nextCopyN++
+    }
+  }
+
+  def findMovie(movieId: String): Movie? =
+    movies.find { m -> m.id() == movieId } as Movie?
+
+  def findMember(memberId: String): Member? =
+    members.find { mb -> mb.id() == memberId } as Member?
+
+  def availableCopies(movieId: String): List[String] {
+    val result: List[String] = new ArrayList[String]()
+    foreach (cid, mid) in copyMovies {
+      if (mid as String) == movieId {
+        val st = statuses[cid]
+        if st != null && (st as CopyStatus).isAvailable() {
+          result.add(cid as String)
+        }
+      }
+    }
+    return result
+  }
+
+  def checkedOutCount(): Int {
+    var count: Int = 0
+    foreach st: Object in statuses.values() {
+      if (st as CopyStatus).isCheckedOut() { count++ }
+    }
+    return count
+  }
+
+  def checkout(movieId: String, memberId: String, day: Int): String? {
+    val avail = availableCopies(movieId)
+    if avail.size == 0 { return null }
+    val cid    = avail[0] as String
+    val member = findMember(memberId)
+    val days   = tierDays(if member != null { member.tier() } else { MemberTier::STANDARD })
+    statuses[cid] = new CheckedOut(memberId, day, day + days)
+    return cid
+  }
+
+  def returnCopy(copyId: String, day: Int): Double {
+    val st = statuses[copyId]
+    if st == null { return 0.0d }
+    select (st as CopyStatus) {
+      case co is CheckedOut:
+        val member = findMember(co.memberId())
+        val mid    = copyMovies[copyId] as String
+        val movie  = findMovie(mid)
+        if member != null && movie != null {
+          val days = day - co.checkoutDay()
+          val fee  = computeFee(member, movie, days)
+          history.add(new RentalRecord(copyId, mid, co.memberId(), co.checkoutDay(), day, fee))
+          statuses[copyId] = new Available()
+          return fee
+        }
+        return 0.0d
+      else: return 0.0d
+    }
+  }
+
+  def totalRevenue(): Double =
+    history.fold(0.0d) { acc, r -> (acc as Double) + r.fee() } as Double
+
+  def rentalsByMember(memberId: String): List[RentalRecord] =
+    history.filter { r -> r.memberId() == memberId }
+
+  def revenueByGenre(): Map[Object, Object] {
+    val result: Map[Object, Object] = [:]
+    foreach r: RentalRecord in history {
+      val movie = findMovie(r.movieId())
+      if movie != null {
+        val g   = genreLabel(movie.genre())
+        val cur = result[g]
+        result[g] = if cur == null { r.fee() } else { (cur as Double) + r.fee() }
+      }
+    }
+    return result
+  }
+
+  def topMoviesByRevenue(): List[Object] {
+    val byMovie: Map[String, List[RentalRecord]] =
+      history.groupBy { r -> r.movieId() }
+    val pairs: List[Object] = new ArrayList[Object]()
+    foreach (mid, rentals) in byMovie {
+      val rev: Double = (rentals as List[RentalRecord]).fold(0.0d) { acc, r ->
+        (acc as Double) + r.fee()
+      } as Double
+      val movie = findMovie(mid as String)
+      val label = if movie != null { movie.title() } else { mid as String }
+      pairs.add([label, rev])
+    }
+    return pairs.sortedBy { p -> 0.0d - ((p as List)[1] as Double) }
+  }
+
+  def allMovies(): List[Movie]   = movies
+  def allMembers(): List[Member] = members
+  def allRentals(): List[RentalRecord] = history
+  def copyCount(): Int = statuses.size
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+val store = new RentalStore()
+
+// Catalogue
+store.addMovie(new Movie("M001", "The Matrix",       Genre::SCIFI,        1999, 3.99d))
+store.addMovie(new Movie("M002", "Shrek",            Genre::COMEDY,       2001, 2.99d))
+store.addMovie(new Movie("M003", "The Dark Knight",  Genre::ACTION,       2008, 3.99d))
+store.addMovie(new Movie("M004", "Interstellar",     Genre::SCIFI,        2014, 4.99d))
+store.addMovie(new Movie("M005", "Spirited Away",    Genre::DRAMA,        2001, 3.49d))
+store.addMovie(new Movie("M006", "Get Out",          Genre::HORROR,       2017, 3.99d))
+
+// Members
+store.addMember(new Member("MB001", "Alice",   MemberTier::GOLD))
+store.addMember(new Member("MB002", "Bob",     MemberTier::STANDARD))
+store.addMember(new Member("MB003", "Carol",   MemberTier::DIAMOND))
+store.addMember(new Member("MB004", "Dave",    MemberTier::SILVER))
+store.addMember(new Member("MB005", "Eve",     MemberTier::STANDARD))
+
+// Stock copies
+store.addCopies("M001", 2)
+store.addCopies("M002", 3)
+store.addCopies("M003", 2)
+store.addCopies("M004", 1)
+store.addCopies("M005", 2)
+store.addCopies("M006", 2)
+
+IO::println("=== Blockbuster-Style Rental Store ===")
+IO::println("Movies: #{store.allMovies().size}, Copies: #{store.copyCount()}")
+IO::println("")
+
+// ── Rental simulation ─────────────────────────────────────────────────────────
+
+val c1 = store.checkout("M001", "MB001", 1)   // Alice / Gold  / 7 days
+val c2 = store.checkout("M002", "MB002", 1)   // Bob   / Std   / 3 days
+val c3 = store.checkout("M003", "MB003", 2)   // Carol / Diam  / 14 days
+val c4 = store.checkout("M001", "MB004", 3)   // Dave  / Silver/ 5 days
+val c5 = store.checkout("M004", "MB001", 4)   // Alice / Gold  / 7 days
+val c6 = store.checkout("M006", "MB005", 5)   // Eve   / Std   / 3 days
+
+IO::println("Checked-out copies: #{store.checkedOutCount()}")
+IO::println("Matrix available: #{store.availableCopies("M001").size}")
+IO::println("Shrek available:  #{store.availableCopies("M002").size}")
+IO::println("")
+
+// Returns (various days — some late)
+val returns: List[Object] = [
+  [c1, 6],   // Alice returns Matrix day 6 (within 7)
+  [c2, 7],   // Bob returns Shrek day 7 (3+4 late)
+  [c3, 5],   // Carol returns DK day 5 (within 14)
+  [c4, 10],  // Dave returns Matrix day 10 (5+2 late)
+  [c5, 11],  // Alice returns Interstellar day 11 (within 7 from day 4)
+  [c6, 9]    // Eve returns Get Out day 9 (3+1 late)
+]
+
+foreach entry: Object in returns {
+  val pair   = entry as List
+  val copyId = pair[0]
+  val retDay = pair[1] as Int
+  if copyId != null {
+    val fee = store.returnCopy(copyId as String, retDay)
+    IO::println("  Returned #{copyId} on day #{retDay}: $#{"%.2f".formatted(fee)}")
+  }
+}
+
+IO::println("")
+
+// ── Revenue analysis ──────────────────────────────────────────────────────────
+
+IO::println("--- Revenue Analysis ---")
+IO::println("Total revenue: $#{"%.2f".formatted(store.totalRevenue())}")
+IO::println("")
+
+// Alice's rentals
+val aliceRentals = store.rentalsByMember("MB001")
+IO::println("Alice's rental count: #{aliceRentals.size}")
+val aliceTotal = aliceRentals.fold(0.0d) { acc, r -> (acc as Double) + r.fee() } as Double
+IO::println("Alice's total spend: $#{"%.2f".formatted(aliceTotal)}")
+IO::println("")
+
+// Revenue by genre
+IO::println("Revenue by genre:")
+val genreRevs = store.revenueByGenre()
+foreach (genre, rev) in genreRevs {
+  IO::println("  #{genre}: $#{"%.2f".formatted(rev as Double)}")
+}
+IO::println("")
+
+// Top movies
+IO::println("Top movies by revenue:")
+val topMovies = store.topMoviesByRevenue()
+foreach item: Object in topMovies {
+  val pair = item as List
+  IO::println("  #{pair[0]}: $#{"%.2f".formatted((pair[1] as Double))}")
+}
+IO::println("")
+
+// ── Collection pipeline showcase ─────────────────────────────────────────────
+
+val history = store.allRentals()
+
+// Partition into high-fee (>=5) and low-fee rentals
+val parts    = history.partition { r -> r.fee() >= 5.0d }
+val highFee  = parts[0] as List[RentalRecord]
+val lowFee   = parts[1] as List[RentalRecord]
+IO::println("High-fee rentals (>=$5): #{highFee.size}")
+IO::println("Low-fee rentals (<$5):   #{lowFee.size}")
+
+// Distinct members who rented
+val renterIds: List[String] = history.map { r -> r.memberId() }.distinct()
+IO::println("Unique renters: #{renterIds.size}")
+
+// Average fee
+val avgFee = store.totalRevenue() / history.size
+IO::println("Average fee: $#{"%.2f".formatted(avgFee)}")
+
+// Any rental over $10?
+val hasHighRental = history.any { r -> r.fee() > 10.0d }
+IO::println("Any rental >$10: #{hasHighRental}")
+
+// ── Member tier summary ────────────────────────────────────────────────────────
+IO::println("")
+IO::println("--- Member Tier Summary ---")
+val byTier: Map[String, List[Member]] = store.allMembers().groupBy { m -> tierLabel(m.tier()) }
+foreach (tier, ms) in byTier {
+  val tierMembers = ms as List[Member]
+  val names = tierMembers.map { m -> m.name() }.fold("") { acc, n ->
+    if (acc as String) == "" { n as String } else { (acc as String) + ", " + (n as String) }
+  }
+  IO::println("  #{tier} (#{tierMembers.size}): #{names}")
+}
+
+// ── Availability summary ──────────────────────────────────────────────────────
+IO::println("")
+IO::println("--- Final Inventory ---")
+foreach m: Movie in store.allMovies() {
+  val avail = store.availableCopies(m.id()).size
+  IO::println("  #{m.title()} (#{genreLabel(m.genre())}): #{avail} available")
+}

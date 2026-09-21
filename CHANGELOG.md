@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-09-21
+
 ### Fixed
 
 - **A compound assignment on a non-indexable target (e.g. `n[0] += 1` where `n: Int`) reported the same `E0000` diagnostic twice, at two different caret positions**, even though the equivalent plain read (`n[0]`) and plain assignment (`n[0] = 1`) each reported it exactly once. `SimpleExpressionTypingSupport.typeBinaryAssignment` lowers `a[i] op= v` by first binding the receiver/index to temps and delegating to `typeBinaryAssignmentIndexing`, falling back to re-typing the original, non-rewritten target on any `None` — but that fallback didn't distinguish "the receiver/index itself never typed" (nothing reported yet, so falling back is correct) from "the receiver/index typed fine but the delegated, temp-rewritten lowering itself failed and already reported the error" (falling back re-typed the original target and reported the same diagnostic again). Fixed by replacing the `Option[Term]` return of `typeBinaryAssignmentIndexing` with a three-way `IndexingAssignOutcome` (`Success`/`Failed`/`NotApplicable`) so the caller only falls back to the plain lowering when nothing has been reported yet. Guarded by a new regression test in `CompoundAssignIndexSpec`.

@@ -8,6 +8,14 @@ import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
+/** Outcome of attempting to lower `a[i] op= v` via temp-bound receiver/index. */
+private sealed trait IndexingAssignOutcome
+private object IndexingAssignOutcome {
+  case class Success(term: Term) extends IndexingAssignOutcome
+  case object Failed extends IndexingAssignOutcome
+  case object NotApplicable extends IndexingAssignOutcome
+}
+
 private[compiler] final class SimpleExpressionTypingSupport(
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
@@ -126,8 +134,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // binary-op / assignment / narrowing logic is reused unchanged on the
         // rewritten (temp-indexed) target.
         typeBinaryAssignmentIndexing(node, indexing, rhs, binaryKind, context) match {
-          case Some(term) => return Some(term)
-          case None => // fall through to the plain lowering (e.g. typing failed)
+          case IndexingAssignOutcome.Success(term) => return Some(term)
+          case IndexingAssignOutcome.Failed => return None // already reported by the delegated lowering below; don't re-report
+          case IndexingAssignOutcome.NotApplicable => // receiver/index itself never typed; fall through to the plain lowering, which will report
         }
       case _ =>
     }
@@ -137,8 +146,10 @@ private[compiler] final class SimpleExpressionTypingSupport(
   /**
    * Lower `a[i] op= v` without duplicating the receiver/index sub-expressions:
    * bind `a` and `i` to temps (evaluated once), then reuse the normal lowering on
-   * `tmpArr[tmpIdx] op= v`. Returns None when typing the receiver or index fails,
-   * so the caller can fall back to the plain path (which will re-report).
+   * `tmpArr[tmpIdx] op= v`. `NotApplicable` means typing the receiver or index
+   * itself never got far enough to report anything, so the caller may fall back
+   * to the plain path; `Failed` means the delegated lowering already reported a
+   * diagnostic and the caller must not retype (and thus re-report) the original.
    */
   private def typeBinaryAssignmentIndexing(
     node: AST.Expression,
@@ -146,11 +157,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
     rhs: AST.Expression,
     binaryKind: BinaryKind,
     context: LocalContext
-  ): Option[Term] = {
+  ): IndexingAssignOutcome = {
     val target = typed(indexing.lhs, context, null).getOrElse(null)
-    if (target == null) return None
+    if (target == null) return IndexingAssignOutcome.NotApplicable
     val index = typed(indexing.rhs, context, null).getOrElse(null)
-    if (index == null) return None
+    if (index == null) return IndexingAssignOutcome.NotApplicable
 
     val arrName = context.newName
     val arrVar = context.add(arrName, target.`type`)
@@ -164,12 +175,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     typeBinaryAssignmentSimple(node, rewritten, rhs, binaryKind, context) match {
       case Some(assign) =>
-        Some(new Begin(Array[Term](
+        IndexingAssignOutcome.Success(new Begin(Array[Term](
           new SetLocal(0, arrVar, target.`type`, target),
           new SetLocal(0, idxVar, index.`type`, index),
           assign
         )))
-      case None => None
+      case None => IndexingAssignOutcome.Failed
     }
   }
 

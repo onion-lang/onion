@@ -91,4 +91,6 @@ cancelled の1件は `-Donion.dist.path` で切られている配布物 smoke �
 3. **定数ナローイングがコンストラクタ引数位置に届かない。** `val b: Byte = 100` はナローイング
    されますが、`Short` 成分に対する `new R(..., -3)` は `E0021`（「constructor applicable for
    R(..., Int) is not found」）になり、`(-3 as Short)` が必要でした。コンストラクタでは修正済み
-   （[#374](https://github.com/onion-lang/onion/issues/374)）。同時に見つかり、あわせて修正しました — どちらも `ConstantNarrowing` ヘルパーを共有します。
+   （[#374](https://github.com/onion-lang/onion/issues/374)）。同じ抜け穴が通常のメソッド/関数の
+   オーバーロード解決（`Short` 引数に対する `takesShort(-3)` が `E0005` になる）にもあることが
+   同時に見つかり、あわせて修正しました — どちらも `ConstantNarrowing` ヘルパーを共有します。

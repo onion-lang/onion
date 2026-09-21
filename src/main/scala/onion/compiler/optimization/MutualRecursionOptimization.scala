@@ -748,6 +748,84 @@ class MutualRecursionOptimization(config: CompilerConfig)
             new SetLocal(setLocal.location, setLocal.frame, setLocal.index, setLocal.`type`, rewrittenValue)
           }
 
+        // String concatenation wraps every operand in AsInstanceOf(term, Object) before
+        // passing it to String.valueOf — without this case those inner RefLocals are never
+        // rewritten, so side effects before a tail call always read the original parameter
+        // slot instead of the current loop-variable value.
+        case castTerm: AsInstanceOf =>
+          new AsInstanceOf(castTerm.location, rewriteTerm(castTerm.target), castTerm.destination)
+
+        case safeCall: SafeCall =>
+          val rewrittenTarget = rewriteTerm(safeCall.target)
+          val rewrittenParams = safeCall.parameters.map(rewriteTerm)
+          new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
+
+        case safeExt: SafeStaticExtensionCall =>
+          val rewrittenTarget = rewriteTerm(safeExt.target)
+          val rewrittenParams = safeExt.parameters.map(rewriteTerm)
+          new SafeStaticExtensionCall(safeExt.location, rewrittenTarget, safeExt.containerClass, safeExt.method, safeExt.receiverBasicType, rewrittenParams)
+
+        case callSuper: CallSuper =>
+          val rewrittenTarget = rewriteTerm(callSuper.target)
+          val rewrittenParams = callSuper.params.map(rewriteTerm)
+          new CallSuper(callSuper.location, rewrittenTarget, callSuper.method, rewrittenParams)
+
+        case begin: Begin =>
+          new Begin(begin.location, begin.terms.map(rewriteTerm))
+
+        case arrLen: ArrayLength =>
+          new ArrayLength(arrLen.location, rewriteTerm(arrLen.target))
+
+        case refArr: RefArray =>
+          new RefArray(refArr.location, rewriteTerm(refArr.target), rewriteTerm(refArr.index))
+
+        case nnAssert: NonNullAssert =>
+          new NonNullAssert(nnAssert.location, rewriteTerm(nnAssert.target), nnAssert.`type`)
+
+
+        case safeRefArr: SafeRefArray =>
+          new SafeRefArray(safeRefArr.location, rewriteTerm(safeRefArr.target), rewriteTerm(safeRefArr.index), safeRefArr.arrayType)
+
+        case setArr: SetArray =>
+          new SetArray(setArr.location, rewriteTerm(setArr.target), rewriteTerm(setArr.index), rewriteTerm(setArr.value))
+
+        case syncTerm: SynchronizedTerm =>
+          new SynchronizedTerm(syncTerm.location, rewriteTerm(syncTerm.lock), rewriteTerm(syncTerm.body))
+
+        case refField: RefField =>
+          new RefField(refField.location, rewriteTerm(refField.target), refField.field)
+
+        case safeField: SafeFieldAccess =>
+          new SafeFieldAccess(safeField.location, rewriteTerm(safeField.target), safeField.field)
+
+        case setField: SetField =>
+          new SetField(setField.location, rewriteTerm(setField.target), setField.field, rewriteTerm(setField.value))
+
+        case instOf: InstanceOf =>
+          new InstanceOf(instOf.location, rewriteTerm(instOf.target), instOf.checked)
+
+        case listLit: ListLiteral =>
+          new ListLiteral(listLit.location, listLit.elements.map(rewriteTerm), listLit.`type`)
+
+        case mapLit: MapLiteral =>
+          new MapLiteral(mapLit.location, mapLit.keys.map(rewriteTerm), mapLit.values.map(rewriteTerm), mapLit.`type`)
+
+
+        case newObj: NewObject =>
+          new NewObject(newObj.location, newObj.constructor, newObj.parameters.map(rewriteTerm))
+
+        case newArr: NewArray =>
+          new NewArray(newArr.location, newArr.arrayType, newArr.parameters.map(rewriteTerm))
+
+        case newArrVals: NewArrayWithValues =>
+          new NewArrayWithValues(newArrVals.location, newArrVals.arrayType, newArrVals.values.map(rewriteTerm))
+
+        case setStatic: SetStaticField =>
+          new SetStaticField(setStatic.location, setStatic.target, setStatic.field, rewriteTerm(setStatic.value))
+
+        case stmtTerm: StatementTerm =>
+          new StatementTerm(stmtTerm.location, rewriteStatement(stmtTerm.statement), stmtTerm.termType)
+
         case _ =>
           term
       }

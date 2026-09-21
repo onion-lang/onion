@@ -1,0 +1,278 @@
+// EventBroker.on — a publish-subscribe message broker simulation (~240 lines).
+// Exercises: homogeneous enum with methods; ADT case-enum with data and methods;
+// records with examples; classes; collection pipelines (filter/map/fold/groupBy/
+// sortedBy/find/partition); foreach on ranges and Map (k,v); nullable types;
+// closures; string interpolation; select with type patterns and data cases;
+// extension methods; try/catch; while loop.
+
+import {
+  java.util.*
+}
+
+// ─── Priority ────────────────────────────────────────────────────────────────
+
+enum Priority {
+  LOW, NORMAL, HIGH, CRITICAL
+public:
+  def level(): Int = select this {
+    case Priority::LOW:      0
+    case Priority::NORMAL:   1
+    case Priority::HIGH:     2
+    case Priority::CRITICAL: 3
+  }
+  def label(): String = select this {
+    case Priority::LOW:      "low "
+    case Priority::NORMAL:   "norm"
+    case Priority::HIGH:     "HIGH"
+    case Priority::CRITICAL: "CRIT"
+  }
+}
+
+// ─── TopicInfo ───────────────────────────────────────────────────────────────
+
+record TopicInfo(name: String, maxHistory: Int)
+  example { new TopicInfo("payments", 10).name() == "payments" }
+  example { new TopicInfo("x", 5).maxHistory() == 5 }
+
+// ─── Message ADT ─────────────────────────────────────────────────────────────
+
+enum Message {
+  case TextMessage(topic: String, payload: String, priority: Priority, sender: String)
+  case BinaryMessage(topic: String, sizeBytes: Int, sender: String)
+  case ControlMessage(command: String, target: String)
+public:
+  def topic(): String = select this {
+    case m is TextMessage:    m.topic()
+    case m is BinaryMessage:  m.topic()
+    case m is ControlMessage: m.target()
+  }
+  def sender(): String = select this {
+    case m is TextMessage:    m.sender()
+    case m is BinaryMessage:  m.sender()
+    case m is ControlMessage: "system"
+  }
+  def priority(): Priority = select this {
+    case m is TextMessage:    m.priority()
+    case m is BinaryMessage:  Priority::NORMAL
+    case m is ControlMessage: Priority::HIGH
+  }
+  def isControl(): Boolean = select this {
+    case m is ControlMessage: true
+    else:                     false
+  }
+  def summary(): String = select this {
+    case m is TextMessage:
+      "[#{m.topic()}] #{m.priority().label()} #{m.payload()} (#{m.sender()})"
+    case m is BinaryMessage:
+      "[#{m.topic()}] BIN #{m.sizeBytes()}b (#{m.sender()})"
+    case m is ControlMessage:
+      "CTRL #{m.command()} -> #{m.target()}"
+  }
+}
+
+// ─── Subscription ────────────────────────────────────────────────────────────
+
+record Subscription(id: Int, pattern: String, minLevel: Int, name: String) {
+public:
+  def matches(msg: Message): Boolean {
+    val topicOk: Boolean = pattern == "*" || msg.topic() == pattern
+    return topicOk && msg.priority().level() >= minLevel
+  }
+}
+
+// ─── DeadLetter ──────────────────────────────────────────────────────────────
+
+record DeadLetter(msg: Message, reason: String)
+  example { new DeadLetter(new ControlMessage("x","y"), "test").reason() == "test" }
+
+// ─── MatchEvent ──────────────────────────────────────────────────────────────
+
+record MatchEvent(subName: String, msg: Message)
+
+// ─── Extension: Int formatting ───────────────────────────────────────────────
+
+extension Int {
+  def plural(unit: String): String {
+    val p: String =
+      if unit.endsWith("y") && unit.length() > 1 {
+        unit.substring(0, unit.length() - 1) + "ies"
+      } else {
+        unit + "s"
+      }
+    return if self == 1 { "1 #{unit}" } else { "#{self} #{p}" }
+  }
+  def pct(total: Int): String =
+    if total == 0 { "0%" } else { "#{self * 100 / total}%" }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def binSizeOf(ev: Object): Int = select (ev as MatchEvent).msg() {
+  case b is BinaryMessage: b.sizeBytes()
+  else: 0
+}
+
+def isBinMsg(ev: Object): Boolean = select (ev as MatchEvent).msg() {
+  case b is BinaryMessage: true
+  else: false
+}
+
+// ─── Broker ──────────────────────────────────────────────────────────────────
+
+class Broker {
+  var nextId: Int                 = 1
+  var topics: Map[String, Object] = new LinkedHashMap[String, Object]()
+  var subs: List[Object]          = []
+  var log: List[Object]           = []
+  var dead: List[Object]          = []
+  var msgCount: Int               = 0
+
+public:
+  def registerTopic(info: TopicInfo): void {
+    topics.put(info.name(), info)
+    IO::println("  registered: #{info.name()} (maxHistory=#{info.maxHistory()})")
+  }
+
+  def subscribe(pattern: String, minPriority: Priority, name: String): Int {
+    val id: Int = nextId
+    nextId = nextId + 1
+    subs.add(new Subscription(id, pattern, minPriority.level(), name))
+    IO::println("  sub ##{id} '#{name}': topic='#{pattern}' minLevel=#{minPriority.level()}")
+    return id
+  }
+
+  def publish(msg: Message): Int {
+    msgCount = msgCount + 1
+    if !msg.isControl() && topics.get(msg.topic()) == null {
+      dead.add(new DeadLetter(msg, "unknown topic '#{msg.topic()}'"))
+      return 0
+    }
+    var delivered: Int = 0
+    foreach sub: Object in subs {
+      val s = sub as Subscription
+      if s.matches(msg) {
+        log.add(new MatchEvent(s.name(), msg))
+        delivered = delivered + 1
+      }
+    }
+    if delivered == 0 && !msg.isControl() {
+      dead.add(new DeadLetter(msg, "no subscribers matched"))
+    }
+    return delivered
+  }
+
+  def printReport(): void {
+    IO::println("\n── Delivery log (#{log.size.plural("event")}) ───────────────────────────────")
+    foreach ev: Object in log {
+      val e = ev as MatchEvent
+      IO::println("  [#{e.subName()}] #{e.msg().summary()}")
+    }
+
+    IO::println("\n── Dead letters (#{dead.size}) ────────────────────────────────────────────")
+    foreach dl: Object in dead {
+      val d = dl as DeadLetter
+      IO::println("  DEAD #{d.reason()}: #{d.msg().summary()}")
+    }
+
+    val byTopic = log.groupBy { ev -> (ev as MatchEvent).msg().topic() }
+    IO::println("\n── Deliveries by topic ────────────────────────────────────────────────")
+    foreach (topic, events) in byTopic {
+      IO::println("  #{topic}: #{(events as List).size.plural("delivery")}")
+    }
+
+    IO::println("\n── Subscription hit counts ────────────────────────────────────────────")
+    foreach sub: Object in subs {
+      val s = sub as Subscription
+      val hits: Int = log.filter { ev -> (ev as MatchEvent).subName() == s.name() }.size
+      IO::println("  '#{s.name()}' (##{s.id()}): #{hits.plural("hit")}")
+    }
+
+    val byPriority = log.groupBy { ev -> (ev as MatchEvent).msg().priority().label() }
+    IO::println("\n── Deliveries by priority ─────────────────────────────────────────────")
+    foreach (prio, events) in byPriority {
+      IO::println("  #{prio}: #{(events as List).size.plural("delivery")}")
+    }
+
+    IO::println("\n── Binary message stats ───────────────────────────────────────────────")
+    val binMsgs = log.filter { ev -> isBinMsg(ev) }
+    if binMsgs.size > 0 {
+      var totalBytes: Int = 0
+      foreach bev: Object in binMsgs { totalBytes = totalBytes + binSizeOf(bev) }
+      IO::println("  #{binMsgs.size.plural("binary msg")}, #{totalBytes} total bytes, avg #{totalBytes / binMsgs.size}b")
+    } else {
+      IO::println("  (none delivered)")
+    }
+
+    IO::println("\n── Top senders (by delivery count) ────────────────────────────────────")
+    val senders: List[String] = log.map { ev -> (ev as MatchEvent).msg().sender() }.distinct() as List[String]
+    val seen: List[Object] = []
+    var shown: Int = 0
+    while shown < 3 && shown < senders.size {
+      var bestName: String = ""
+      var bestCount: Int = -1
+      foreach name: String in senders {
+        if !seen.contains(name) {
+          val c: Int = log.filter { ev -> (ev as MatchEvent).msg().sender() == name }.size
+          if c > bestCount { bestCount = c; bestName = name }
+        }
+      }
+      if bestCount < 0 { break }
+      IO::println("  #{bestName}: #{bestCount.plural("delivery")}")
+      seen.add(bestName)
+      shown = shown + 1
+    }
+
+    IO::println("\n── Summary ────────────────────────────────────────────────────────────")
+    IO::println("  Published:  #{msgCount.plural("message")}")
+    IO::println("  Delivered:  #{log.size.plural("event")}")
+    IO::println("  Dead:       #{dead.size.plural("letter")}")
+    IO::println("  Hit rate:   #{log.size.pct(msgCount)}")
+  }
+}
+
+// ─── main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== EventBroker Simulation ===\n")
+  val broker = new Broker()
+
+  IO::println("── Topics ───────────────────────────────────────────────────────────")
+  broker.registerTopic(new TopicInfo("payments", 100))
+  broker.registerTopic(new TopicInfo("alerts",   50))
+  broker.registerTopic(new TopicInfo("audit",    200))
+  broker.registerTopic(new TopicInfo("metrics",  500))
+
+  IO::println("\n── Subscriptions ────────────────────────────────────────────────────")
+  broker.subscribe("payments", Priority::NORMAL,   "payment-handler")
+  broker.subscribe("alerts",   Priority::HIGH,     "alert-pager")
+  broker.subscribe("*",        Priority::LOW,      "audit-logger")
+  broker.subscribe("metrics",  Priority::LOW,      "metrics-store")
+  broker.subscribe("*",        Priority::CRITICAL, "ops-on-call")
+
+  IO::println("\n── Publishing ───────────────────────────────────────────────────────")
+  val msgs: List[Object] = [
+    new TextMessage("payments",  "tx-001 approved",  Priority::NORMAL,   "payment-svc"),
+    new TextMessage("payments",  "tx-002 declined",  Priority::HIGH,     "fraud-engine"),
+    new TextMessage("alerts",    "disk 95% full",    Priority::HIGH,     "monitor"),
+    new TextMessage("alerts",    "CPU spike 99%",    Priority::CRITICAL, "monitor"),
+    new BinaryMessage("metrics", 4096,               "metrics-agent"),
+    new BinaryMessage("metrics", 512,                "metrics-agent"),
+    new TextMessage("audit",     "login admin",      Priority::LOW,      "auth-svc"),
+    new TextMessage("unknown",   "orphan msg",       Priority::NORMAL,   "stray-svc"),
+    new ControlMessage("reload", "payment-handler"),
+    new TextMessage("payments",  "tx-003 pending",   Priority::LOW,      "payment-svc"),
+    new TextMessage("alerts",    "memory low 10%",   Priority::HIGH,     "monitor"),
+    new TextMessage("audit",     "logout user7",     Priority::LOW,      "auth-svc"),
+    new BinaryMessage("metrics", 8192,               "metrics-agent"),
+    new TextMessage("alerts",    "service down!",    Priority::CRITICAL, "health-check"),
+    new TextMessage("payments",  "tx-004 refund",    Priority::NORMAL,   "refund-svc")
+  ]
+
+  foreach msg: Object in msgs {
+    val m = msg as Message
+    val n: Int = broker.publish(m)
+    IO::println("  #{m.summary()} -> #{n.plural("sub")}")
+  }
+
+  broker.printReport()
+}

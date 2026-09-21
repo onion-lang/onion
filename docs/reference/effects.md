@@ -11,8 +11,9 @@ Report#main(java.lang.String[]): console,read
 
 This page is the reference for the vocabulary, where the facts come from, and exactly
 what the analysis does and does not promise. The capability layer built on top of it
-(`tool` declarations, `requires`, `--plan`) is described in the guide once it lands;
-this data layer shipped first.
+(`tool` declarations, `requires`, `--plan`) is described in the
+[tools guide](../guide/tools.md); this data layer shipped first, and the capability
+layer now builds on it.
 
 ## The vocabulary
 

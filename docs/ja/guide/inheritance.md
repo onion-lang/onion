@@ -253,6 +253,77 @@ class Circle extends Shape {
 }
 ```
 
+## 継承のベストプラクティス
+
+### 継承よりコンポジションを優先する
+
+可能な場合は委譲を使いましょう：
+
+```onion
+interface Logger {
+  def log(message: String): void
+  def count(): Int
+}
+
+// 具象クラス BasicLogger を継承するのではなく…
+// class PrefixLogger extends BasicLogger { ... }
+
+// …Logger インターフェースへの委譲を優先します。
+class PrefixLogger conforms Logger {
+  forward val delegate: Logger
+
+  public:
+    def this(delegate: Logger) {
+      this.delegate = delegate
+    }
+}
+```
+
+### 階層は浅く保つ
+
+深い継承チェーンは避けましょう：
+
+```text
+// 良い例: 浅い階層
+Animal
+  ├─ Dog
+  └─ Cat
+
+// 悪い例: 深い階層
+Vehicle
+  └─ MotorVehicle
+      └─ Car
+          └─ Sedan
+              └─ LuxurySedan
+```
+
+### オーバーライドは一貫性を保つ
+
+メソッドをオーバーライドするときは、親の契約を維持しましょう：
+
+```onion
+class Parent {
+  public:
+    def process(value :Int) :Int {
+      if value < 0 {
+        return 0
+      }
+      return value * 2
+    }
+}
+
+class Child extends Parent {
+  public:
+    def process(value :Int) :Int {
+      // 親の振る舞いを維持する
+      if value < 0 {
+        return 0
+      }
+      return value * 3  // 実装は異なるが契約は同じ
+    }
+}
+```
+
 ## 次のステップ
 
 - [Javaとの相互運用](java-interop.md) - Javaクラスの拡張

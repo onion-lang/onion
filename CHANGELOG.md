@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Assigning to a nonexistent member on a primitive-typed target (e.g. `n.bogus = 5` where `n: Int`) reported the wrong error code with the caret on the wrong token** — `E0000` ("type Object is expected, but type Int is used. Consider a cast or check return type.", caret on the receiver `n`) instead of the correct `E0004` ("field Int.bogus is not found", caret on `bogus`), even though the equivalent read (`n.bogus`) and the equivalent assignment on a reference-typed target (`s.bogus = 5` where `s: String`) both already reported `E0004` correctly. `AssignmentTyping.processMemberAssign` bailed out immediately for any `BasicType` assignment target with a generic `INCOMPATIBLE_TYPE` report against the receiver, instead of boxing the primitive first like the read path (`MemberSelectionResolutionSupport.normalizeTarget`) already does. Fixed by boxing a non-`VOID` primitive target before field/setter lookup, mirroring the read path, so lookup falls through to the normal `FIELD_NOT_FOUND`/`FIELD_NOT_ACCESSIBLE` diagnostics with the correct position. Also fixes the same wrong diagnostic for compound assignment (`n.bogus += 1`). Guarded by four new regression tests in `PrimitiveMemberAssignmentSpec`.
+
 ## [0.94.0] - 2026-09-21
 
 ### Fixed

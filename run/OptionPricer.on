@@ -1,0 +1,374 @@
+// OptionPricer.on — Black-Scholes option pricing engine.
+// Exercises: extension Double (formatting/rounding), extension Int (repeat),
+// records with examples, ADT enum (OptionType Call/Put), plain enum (Greek),
+// class with ArrayList-backed portfolio, collection pipelines (map/filter/
+// fold/sortedBy/groupBy/partition/find/any/count), select/type-patterns,
+// nullable, string interpolation, try/catch, foreach (ranges and maps),
+// while loop, recursion (bisection for implied volatility), Java Math interop.
+
+import { java.util.ArrayList }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def round2(): Double {
+    val factor = 100.0
+    return java.lang.Math::round(self * factor) as Double / factor
+  }
+  def round4(): Double {
+    val factor = 10000.0
+    return java.lang.Math::round(self * factor) as Double / factor
+  }
+  def fmt2(): String {
+    val r = self.round2()
+    if r < 0.0 { return "-" + (0.0 - r).fmt2() }
+    val whole: Long  = r as Long
+    val fracRaw: Int = ((r - (whole as Double)) * 100.0 + 0.5) as Int
+    val frac: Int    = if fracRaw >= 100 { 99 } else { fracRaw }
+    if frac < 10 { return "" + whole + ".0" + frac }
+    return "" + whole + "." + frac
+  }
+  def fmt4(): String = "" + self.round4()
+  def absD(): Double { if self < 0.0 { return 0.0 - self } else { return self } }
+}
+
+extension Int {
+  def rep(s: String): String {
+    var out = ""
+    var i   = 0
+    while i < self { out = out + s; i = i + 1 }
+    return out
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Greek {
+  DELTA, GAMMA, VEGA, THETA, RHO
+public:
+  def label(): String = select this {
+    case Greek::DELTA: "Delta"
+    case Greek::GAMMA: "Gamma"
+    case Greek::VEGA:  "Vega"
+    case Greek::THETA: "Theta"
+    case Greek::RHO:   "Rho"
+    else: "?"
+  }
+}
+
+enum OptionType {
+  case Call
+  case Put
+public:
+  def label(): String = select this { case _c is Call: "Call"; case _p is Put: "Put" }
+  def sign():  Int    = select this { case _c is Call: 1;      case _p is Put: -1 }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Market(spot: Double, vol: Double, rate: Double)
+  example { new Market(100.0, 0.2, 0.05).spot() == 100.0 }
+  example { new Market(100.0, 0.2, 0.05).vol()  == 0.2   }
+
+record OptionSpec(kind: OptionType, strike: Double, expiry: Double)
+  example { new OptionSpec(new Call(), 100.0, 1.0).strike() == 100.0 }
+
+record GreekResult(greek: Greek, value: Double) {
+public:
+  def describe(): String = "#{greek().label()}: #{value().fmt4()}"
+}
+
+record PriceResult(spec: OptionSpec, market: Market,
+                   price: Double, greeks: List[GreekResult]) {
+public:
+  def header(): String {
+    val t = spec()
+    val m = market()
+    return "#{t.kind().label()} K=#{t.strike().fmt2()} T=#{t.expiry().fmt4()} " +
+           "S=#{m.spot().fmt2()} v=#{m.vol().fmt4()} r=#{m.rate().fmt4()}"
+  }
+  def summary(): String {
+    var gs = ""
+    foreach g: GreekResult in greeks() {
+      if gs == "" { gs = g.describe() } else { gs = gs + ", " + g.describe() }
+    }
+    return "Price=#{price().fmt4()}  [#{gs}]"
+  }
+}
+
+// ─── Black-Scholes math ───────────────────────────────────────────────────────
+
+// Standard normal PDF φ(x) = (1/√(2π)) exp(-x²/2)
+def normPdf(x: Double): Double =
+  java.lang.Math::exp(0.0 - x * x / 2.0) / java.lang.Math::sqrt(2.0 * 3.141592653589793)
+
+// Standard normal CDF — Abramowitz & Stegun 26.2.17 (max error 7.5e-8)
+// 1 - Φ(x) ≈ φ(x) · (a1·t + a2·t² + a3·t³ + a4·t⁴ + a5·t⁵)
+// where t = 1 / (1 + p·x), p = 0.2316419
+def normCdf(x: Double): Double {
+  val a1 =  0.319381530
+  val a2 = -0.356563782
+  val a3 =  1.781477937
+  val a4 = -1.821255978
+  val a5 =  1.330274429
+  val p  =  0.2316419
+  val xAbs = x.absD()
+  val t  = 1.0 / (1.0 + p * xAbs)
+  val y  = 1.0 - normPdf(xAbs) * ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t
+  return if x >= 0.0 { y } else { 1.0 - y }
+}
+
+def calcD1(m: Market, spec: OptionSpec): Double {
+  val s  = m.spot();  val k = spec.strike(); val t = spec.expiry()
+  val v  = m.vol();   val r = m.rate()
+  return (java.lang.Math::log(s / k) + (r + v * v / 2.0) * t) /
+         (v * java.lang.Math::sqrt(t))
+}
+
+def calcD2(m: Market, spec: OptionSpec): Double =
+  calcD1(m, spec) - m.vol() * java.lang.Math::sqrt(spec.expiry())
+
+def bsPrice(m: Market, spec: OptionSpec): Double {
+  val s  = m.spot(); val k = spec.strike(); val t = spec.expiry()
+  val r  = m.rate()
+  val d1 = calcD1(m, spec)
+  val d2 = calcD2(m, spec)
+  val df = java.lang.Math::exp(0.0 - r * t)
+  return select spec.kind() {
+    case _c is Call: s * normCdf(d1) - k * df * normCdf(d2)
+    case _p is Put:  k * df * normCdf(0.0 - d2) - s * normCdf(0.0 - d1)
+  }
+}
+
+def bsGreeks(m: Market, spec: OptionSpec): List[GreekResult] {
+  val s     = m.spot(); val k = spec.strike(); val t = spec.expiry()
+  val v     = m.vol();  val r = m.rate()
+  val d1    = calcD1(m, spec)
+  val d2    = calcD2(m, spec)
+  val df    = java.lang.Math::exp(0.0 - r * t)
+  val nd1   = normCdf(d1);  val nd2 = normCdf(d2)
+  val pd1   = normPdf(d1)
+  val sqrtT = java.lang.Math::sqrt(t)
+
+  val delta: Double = select spec.kind() {
+    case _c is Call: nd1
+    case _p is Put:  nd1 - 1.0
+  }
+  val gamma: Double = pd1 / (s * v * sqrtT)
+  val vega:  Double = s * pd1 * sqrtT / 100.0      // per 1% vol move
+  val theta: Double = select spec.kind() {
+    case _c is Call:
+      (0.0 - s * pd1 * v / (2.0 * sqrtT) - r * k * df * nd2) / 365.0
+    case _p is Put:
+      (0.0 - s * pd1 * v / (2.0 * sqrtT) + r * k * df * normCdf(0.0 - d2)) / 365.0
+  }
+  val rho: Double = select spec.kind() {
+    case _c is Call: k * t * df * nd2 / 100.0
+    case _p is Put:  0.0 - k * t * df * normCdf(0.0 - d2) / 100.0
+  }
+  return [
+    new GreekResult(Greek::DELTA, delta),
+    new GreekResult(Greek::GAMMA, gamma),
+    new GreekResult(Greek::VEGA,  vega),
+    new GreekResult(Greek::THETA, theta),
+    new GreekResult(Greek::RHO,   rho)
+  ]
+}
+
+def priceOption(m: Market, spec: OptionSpec): PriceResult =
+  new PriceResult(spec, m, bsPrice(m, spec), bsGreeks(m, spec))
+
+// ─── Implied volatility via bisection ────────────────────────────────────────
+
+def impliedVol(m: Market, spec: OptionSpec, target: Double): Double? {
+  var lo = 0.001
+  var hi = 5.0
+  var iter = 0
+  while iter < 100 {
+    val mid  = (lo + hi) / 2.0
+    val testM = new Market(m.spot(), mid, m.rate())
+    val p    = bsPrice(testM, spec)
+    if (p - target).absD() < 0.0001 { return mid }
+    if p < target { lo = mid } else { hi = mid }
+    iter = iter + 1
+  }
+  return null
+}
+
+// ─── Portfolio class ──────────────────────────────────────────────────────────
+
+class Portfolio {
+  val name: String
+  val entries: ArrayList[PriceResult]
+
+public:
+  def this(name: String) {
+    self.name = name
+    entries = new ArrayList[PriceResult]()
+  }
+
+  def add(r: PriceResult): void { entries.add(r) }
+
+  def size(): Int = entries.size()
+
+  def results(): List[PriceResult] {
+    var out: List[PriceResult] = []
+    var i = 0
+    while i < entries.size() {
+      out.add(entries.get(i) as PriceResult)
+      i = i + 1
+    }
+    return out
+  }
+
+  def totalValue(): Double =
+    results().fold(0.0) { acc, r -> (acc as Double) + r.price() }
+
+  def calls(): List[PriceResult] =
+    results().filter { r -> r.spec().kind() is Call }
+
+  def puts(): List[PriceResult] =
+    results().filter { r -> r.spec().kind() is Put }
+
+  def itmOptions(): List[PriceResult] =
+    results().filter { r ->
+      val s = r.market().spot()
+      val k = r.spec().strike()
+      select r.spec().kind() {
+        case _c is Call: s > k
+        case _p is Put:  s < k
+      }
+    }
+
+  def netDelta(): Double {
+    var total = 0.0
+    foreach r: PriceResult in results() {
+      val d = r.greeks().find { g -> g.greek() == Greek::DELTA }
+      if d != null { total = total + (d as GreekResult).value() }
+    }
+    return total
+  }
+
+  def print(): void {
+    IO::println(60.rep("="))
+    IO::println("Portfolio: #{name}  (#{size()} positions)")
+    IO::println(60.rep("="))
+    foreach r: PriceResult in results() {
+      IO::println("  " + r.header())
+      IO::println("  " + r.summary())
+      IO::println("  " + 56.rep("-"))
+    }
+    IO::println("Total value : #{totalValue().fmt4()}")
+    IO::println("Net delta   : #{netDelta().fmt4()}")
+    IO::println("Calls / Puts: #{calls().size()} / #{puts().size()}")
+    IO::println("ITM options : #{itmOptions().size()}")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val mkt = new Market(100.0, 0.20, 0.05)   // S=100, vol=20%, r=5%
+
+val strikes = [90.0, 95.0, 100.0, 105.0, 110.0]
+val expiries = [0.25, 0.5, 1.0]           // 3m, 6m, 1y
+
+val port = new Portfolio("Sample BS Portfolio")
+
+foreach strike: Double in strikes {
+  foreach expiry: Double in expiries {
+    port.add(priceOption(mkt, new OptionSpec(new Call(), strike, expiry)))
+    port.add(priceOption(mkt, new OptionSpec(new Put(),  strike, expiry)))
+  }
+}
+
+port.print()
+
+// ─── Implied volatility demo ──────────────────────────────────────────────────
+
+IO::println("")
+IO::println(60.rep("="))
+IO::println("Implied Volatility Recovery")
+IO::println(60.rep("="))
+
+val atmCall   = new OptionSpec(new Call(), 100.0, 1.0)
+val knownPrice = bsPrice(mkt, atmCall)
+IO::println("ATM call price at vol=0.20 : #{knownPrice.fmt4()}")
+
+val iv = impliedVol(mkt, atmCall, knownPrice)
+if iv != null {
+  IO::println("Recovered IV               : #{(iv as Double).fmt4()}")
+} else {
+  IO::println("IV not found")
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println(60.rep("="))
+IO::println("Analytics")
+IO::println(60.rep("="))
+
+val allR = port.results()
+
+// Top 3 most expensive
+IO::println("Top-3 most expensive options:")
+var shown = 0
+foreach r: PriceResult in allR.sortedBy { r -> 0.0 - r.price() } {
+  if shown < 3 {
+    IO::println("  " + r.header() + " -> " + r.price().fmt4())
+    shown = shown + 1
+  }
+}
+
+// Partition calls/puts
+val parts     = allR.partition { r -> r.spec().kind() is Call }
+val callCount = parts[0].size()
+val putCount  = parts[1].size()
+IO::println("Calls: #{callCount},  Puts: #{putCount}")
+
+val avgCall = parts[0].fold(0.0) { acc, r -> (acc as Double) + (r as PriceResult).price() } /
+             (callCount as Double)
+val avgPut  = parts[1].fold(0.0) { acc, r -> (acc as Double) + (r as PriceResult).price() } /
+             (putCount as Double)
+IO::println("Avg call price: #{avgCall.fmt4()},  Avg put price: #{avgPut.fmt4()}")
+
+// GroupBy expiry
+IO::println("Positions grouped by expiry:")
+val byExp = allR.groupBy { r -> r.spec().expiry() }
+foreach (exp, lst) in byExp {
+  IO::println("  T=#{exp}: #{lst.size()} options")
+}
+
+// Put-call parity check  (C - P = S - K*e^-rT for ATM, T=1y)
+IO::println("")
+IO::println("Put-Call Parity (K=100, T=1y):")
+val cPrice = bsPrice(mkt, new OptionSpec(new Call(), 100.0, 1.0))
+val pPrice = bsPrice(mkt, new OptionSpec(new Put(),  100.0, 1.0))
+val lhs    = cPrice - pPrice
+val rhs    = 100.0 - 100.0 * java.lang.Math::exp(0.0 - 0.05)
+IO::println("  C - P          = #{lhs.fmt4()}")
+IO::println("  S - K*e^(-rT)  = #{rhs.fmt4()}")
+IO::println("  |diff|         = #{(lhs - rhs).absD().fmt4()}  (should be ~0)")
+
+// Moneyness count
+val itmCount = allR.count { r ->
+  val s = r.market().spot(); val k = r.spec().strike()
+  select r.spec().kind() {
+    case _c is Call: s > k
+    case _p is Put:  s < k
+  }
+}
+val otmCount = allR.count { r ->
+  val s = r.market().spot(); val k = r.spec().strike()
+  select r.spec().kind() {
+    case _c is Call: s < k
+    case _p is Put:  s > k
+  }
+}
+val atmCount = allR.size - itmCount - otmCount
+IO::println("")
+IO::println("Moneyness: ITM=#{itmCount}  ATM=#{atmCount}  OTM=#{otmCount}")
+
+// Any deeply OTM option (price < 0.1)?
+val hasDeepOtm = allR.any { r -> r.price() < 0.1 }
+IO::println("Has deep-OTM option (price < 0.10): #{hasDeepOtm}")

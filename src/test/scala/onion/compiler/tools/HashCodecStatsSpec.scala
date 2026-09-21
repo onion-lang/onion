@@ -115,5 +115,21 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         "return Double::toString(Stats::average(ds))",
         Shell.Success("2.5"))
     }
+
+    it("returns 0.0 from every aggregate over an empty list, per the documented contract") {
+      // Stats.java's class doc promises 0.0 (never NaN/exception) for sum, average,
+      // min, max, median, variance and stddev when the list is empty.
+      runStr(
+        "import { onion.Stats }",
+        "val xs: List[Double] = []\n" +
+        "return Double::toString(Stats::sum(xs)) + \"|\" +" +
+        " Double::toString(Stats::average(xs)) + \"|\" +" +
+        " Double::toString(Stats::min(xs)) + \"|\" +" +
+        " Double::toString(Stats::max(xs)) + \"|\" +" +
+        " Double::toString(Stats::median(xs)) + \"|\" +" +
+        " Double::toString(Stats::variance(xs)) + \"|\" +" +
+        " Double::toString(Stats::stddev(xs))",
+        Shell.Success("0.0|0.0|0.0|0.0|0.0|0.0|0.0"))
+    }
   }
 }

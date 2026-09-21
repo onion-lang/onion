@@ -1,0 +1,237 @@
+// Package Version Solver: npm-style semantic version constraint resolution.
+// Exercises: records, sealed enum ADTs, generics, collection pipelines,
+// select/pattern matching, nullable types, recursion, string interpolation.
+
+record Version(major: Int, minor: Int, patch: Int) {
+public:
+  static def parse(s: String): Version? {
+    val parts: List[String] = Strings::split(s, ".")
+    if parts.size != 3 { return null }
+    try {
+      val ma: Int = Integer::parseInt(parts[0])
+      val mi: Int = Integer::parseInt(parts[1])
+      val pa: Int = Integer::parseInt(parts[2])
+      return new Version(ma, mi, pa)
+    } catch e: Exception {
+      return null
+    }
+  }
+  def compareTo(other: Version): Int {
+    if major() != other.major() { return major() - other.major() }
+    if minor() != other.minor() { return minor() - other.minor() }
+    return patch() - other.patch()
+  }
+  def isCompatibleWith(other: Version): Boolean =
+    major() == other.major() && compareTo(other) >= 0
+  def display(): String = "#{major()}.#{minor()}.#{patch()}"
+}
+
+enum Constraint {
+  case Exact(required: Version)
+  case AtLeast(minimum: Version)
+  case Compatible(baseline: Version)
+  case Any
+public:
+  def isSatisfiedBy(v: Version): Boolean = select this {
+    case e is Exact: e.required().compareTo(v) == 0
+    case a is AtLeast: v.compareTo(a.minimum()) >= 0
+    case c is Compatible: v.isCompatibleWith(c.baseline())
+    case x is Any: true
+  }
+  def description(): String = select this {
+    case e is Exact: "=#{e.required().display()}"
+    case a is AtLeast: ">=#{a.minimum().display()}"
+    case c is Compatible: "^#{c.baseline().display()}"
+    case x is Any: "*"
+  }
+  static def parse(s: String): Constraint? {
+    if s == "*" { return new Any() }
+    if Strings::startsWith(s, ">=") {
+      val v: Version? = Version::parse(Strings::substring(s, 2))
+      if v == null { return null }
+      return new AtLeast(v)
+    }
+    if Strings::startsWith(s, "=") {
+      val v: Version? = Version::parse(Strings::substring(s, 1))
+      if v == null { return null }
+      return new Exact(v)
+    }
+    if Strings::startsWith(s, "^") {
+      val v: Version? = Version::parse(Strings::substring(s, 1))
+      if v == null { return null }
+      return new Compatible(v)
+    }
+    val v: Version? = Version::parse(s)
+    if v == null { return null }
+    return new Exact(v)
+  }
+}
+
+record Dependency(name: String, constraint: Constraint)
+
+record PackageVersion(pkgName: String, version: Version, deps: List[Dependency]) {
+public:
+  def display(): String = "#{pkgName()}@#{version().display()}"
+}
+
+class Registry {
+  var packages: Map[String, List[PackageVersion]]
+public:
+  def this { packages = [:] }
+  def publish(pkg: PackageVersion): void {
+    val key: String = pkg.pkgName()
+    if !packages.containsKey(key) { packages[key] = [] }
+    (packages[key] as List[PackageVersion]).add(pkg)
+  }
+  def versionsOf(pkgName: String): List[PackageVersion] {
+    val list: List[PackageVersion]? = packages[pkgName]
+    if list == null { return [] }
+    return list
+  }
+  def bestMatch(pkgName: String, constraint: Constraint): PackageVersion? {
+    val all: List[PackageVersion] = versionsOf(pkgName)
+    var best: PackageVersion? = null
+    foreach pv: PackageVersion in all {
+      if constraint.isSatisfiedBy(pv.version()) {
+        if best == null || pv.version().compareTo(best.version()) > 0 {
+          best = pv
+        }
+      }
+    }
+    return best
+  }
+}
+
+enum SolveResult {
+  case Resolved(selected: List[PackageVersion])
+  case Conflict(reason: String)
+}
+
+class Solver {
+  var registry: Registry
+public:
+  def this(r: Registry) { registry = r }
+
+  def solve(deps: List[Dependency]): SolveResult {
+    val plan: List[PackageVersion] = []
+    if !resolveAll(deps, plan) {
+      return new Conflict("Dependency resolution failed")
+    }
+    return new Resolved(plan)
+  }
+
+  def resolveAll(deps: List[Dependency], plan: List[PackageVersion]): Boolean {
+    foreach dep: Dependency in deps {
+      if !resolveOne(dep, plan) { return false }
+    }
+    return true
+  }
+
+  def resolveOne(dep: Dependency, plan: List[PackageVersion]): Boolean {
+    val existing: PackageVersion? = findInPlan(plan, dep.name())
+    if existing != null {
+      if !dep.constraint().isSatisfiedBy(existing.version()) {
+        IO::println("  CONFLICT: #{dep.name()} already at #{existing.version().display()} but #{dep.constraint().description()} required")
+        return false
+      }
+      return true
+    }
+    val match: PackageVersion? = registry.bestMatch(dep.name(), dep.constraint())
+    if match == null {
+      IO::println("  NOT FOUND: #{dep.name()} #{dep.constraint().description()}")
+      return false
+    }
+    plan.add(match)
+    IO::println("  + #{match.display()}")
+    return resolveAll(match.deps(), plan)
+  }
+
+  def findInPlan(plan: List[PackageVersion], pkgName: String): PackageVersion? {
+    foreach pv: PackageVersion in plan {
+      if pv.pkgName() == pkgName { return pv }
+    }
+    return null
+  }
+}
+
+def makeVersion(s: String): Version = (Version::parse(s) as Version)
+def makeConstraint(s: String): Constraint = (Constraint::parse(s) as Constraint)
+def makeDep(name: String, c: String): Dependency = new Dependency(name, makeConstraint(c))
+
+def printResult(r: SolveResult): void {
+  select r {
+    case ok is Resolved:
+      IO::println("Resolved #{ok.selected().size} packages:")
+      foreach pv: PackageVersion in ok.selected() {
+        IO::println("  #{pv.display()}")
+      }
+    case err is Conflict:
+      IO::println("Conflict: #{err.reason()}")
+  }
+}
+
+def main(): void {
+  val reg: Registry = new Registry()
+
+  // Publish lodash versions
+  reg.publish(new PackageVersion("lodash", makeVersion("4.17.20"), []))
+  reg.publish(new PackageVersion("lodash", makeVersion("4.17.21"), []))
+  reg.publish(new PackageVersion("lodash", makeVersion("3.10.0"), []))
+
+  // Publish express with deps on lodash + qs
+  val expressDeps: List[Dependency] = [makeDep("lodash", "^4.17.0"), makeDep("qs", "^6.0.0")]
+  reg.publish(new PackageVersion("express", makeVersion("4.18.0"), expressDeps))
+  reg.publish(new PackageVersion("express", makeVersion("4.18.2"), expressDeps))
+  reg.publish(new PackageVersion("express", makeVersion("5.0.0"), [makeDep("lodash", "^4.0.0")]))
+
+  // qs - no runtime deps
+  reg.publish(new PackageVersion("qs", makeVersion("6.11.0"), []))
+  reg.publish(new PackageVersion("qs", makeVersion("6.12.0"), []))
+  reg.publish(new PackageVersion("qs", makeVersion("7.0.0"), []))
+
+  // chalk + colorspace
+  reg.publish(new PackageVersion("chalk", makeVersion("4.1.0"), [makeDep("colorspace", ">=1.0.0")]))
+  reg.publish(new PackageVersion("chalk", makeVersion("5.3.0"), [makeDep("colorspace", ">=2.0.0")]))
+  reg.publish(new PackageVersion("colorspace", makeVersion("1.5.0"), []))
+  reg.publish(new PackageVersion("colorspace", makeVersion("2.0.0"), []))
+  reg.publish(new PackageVersion("colorspace", makeVersion("2.1.0"), []))
+
+  IO::println("=== Scenario 1: express ^4.18.0 ===")
+  printResult(new Solver(reg).solve([makeDep("express", "^4.18.0")]))
+
+  IO::println("")
+  IO::println("=== Scenario 2: express ^4.18.0 + lodash =3.10.0 (conflict) ===")
+  printResult(new Solver(reg).solve([makeDep("express", "^4.18.0"), makeDep("lodash", "=3.10.0")]))
+
+  IO::println("")
+  IO::println("=== Scenario 3: chalk ^5.0.0 ===")
+  printResult(new Solver(reg).solve([makeDep("chalk", "^5.0.0")]))
+
+  IO::println("")
+  IO::println("=== Scenario 4: express =5.0.0 ===")
+  printResult(new Solver(reg).solve([makeDep("express", "=5.0.0")]))
+
+  IO::println("")
+  IO::println("=== Scenario 5: nonexistent ^1.0.0 ===")
+  printResult(new Solver(reg).solve([makeDep("nonexistent", "^1.0.0")]))
+
+  IO::println("")
+  IO::println("=== Registry summary ===")
+  val names: List[String] = ["lodash", "express", "qs", "chalk", "colorspace"]
+  foreach name: String in names {
+    val versions: List[PackageVersion] = reg.versionsOf(name)
+    val vStrs: List[String] = versions.map { pv -> (pv as PackageVersion).version().display() }
+    IO::println("  #{name}: #{Strings::join(vStrs, ", ")}")
+  }
+
+  IO::println("")
+  IO::println("=== Constraint parsing demo ===")
+  val specs: List[String] = ["*", "=4.17.21", ">=4.0.0", "^4.17.0", "5.0.0"]
+  foreach spec: String in specs {
+    val c: Constraint? = Constraint::parse(spec)
+    if c != null {
+      val sat: Boolean = c.isSatisfiedBy(makeVersion("4.17.21"))
+      IO::println("  #{spec} -> #{c.description()} | satisfies 4.17.21? #{sat}")
+    }
+  }
+}

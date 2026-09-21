@@ -227,9 +227,10 @@ final class MethodCallTyping(
   private[typing] def resolveMemberSelection(
     node: AST.Node,
     targetType: ObjectType,
-    name: String
+    name: String,
+    reportErrorIfMissing: Boolean = true
   ): Option[ResolvedMemberSelection] =
-    memberSelectionResolutionSupport.resolveMemberSelection(node, targetType, name)
+    memberSelectionResolutionSupport.resolveMemberSelection(node, targetType, name, reportErrorIfMissing)
 
   private[typing] def reportMethodNotFound(
     node: AST.Node,
@@ -331,6 +332,26 @@ final class MethodCallTyping(
 
   private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
     body.tryFindMethod(node, target, name, params)
+
+  /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
+  private[typing] def tryZeroArgExtensionAccess(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] =
+    methodCallFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
+
+  /** Resolve a safe-call (?.) against extension methods, building SafeStaticExtensionCall. */
+  private[typing] def tryExtensionMethodCallForSafeNav(
+    node: AST.SafeMethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
 
   /** Resolve an operator convention method via an `extension` block; None on miss. */
   private[typing] def tryExtensionOperatorMethod(

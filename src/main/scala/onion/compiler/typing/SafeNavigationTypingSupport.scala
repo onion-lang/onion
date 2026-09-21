@@ -13,7 +13,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     if (target == null) return None
 
     calls.normalizeSafeMemberSelectionTarget(node, target).flatMap { resolved =>
-      calls.resolveMemberSelection(node, resolved.targetType, node.name).map {
+      def buildResolved(r: ResolvedMemberSelection): Term = r match {
         case ResolvedArrayLengthSelection =>
           val lengthField = new FieldDefinition(node.location, 0, null, "length", BasicType.INT)
           new SafeFieldAccess(node.location, resolved.term, lengthField)
@@ -21,6 +21,17 @@ private[compiler] final class SafeNavigationTypingSupport(
           new SafeFieldAccess(node.location, resolved.term, field)
         case ResolvedGetterSelection(method) =>
           new SafeCall(node.location, resolved.term, method, Array.empty)
+      }
+      // Resolution order mirrors the plain (non-null-safe) member-selection path
+      // (MemberSelectionTypingSupport): (1) regular field/getter lookup; (2)
+      // zero-arg extension method (property-style `def name: T`); (3) report error.
+      calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = false) match {
+        case Some(r) => Some(buildResolved(r))
+        case None =>
+          calls.tryZeroArgExtensionAccessForSafeNav(node, node.name, resolved.term, resolved.targetType, null).orElse {
+            calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = true)
+              .map(buildResolved)
+          }
       }
     }
   }

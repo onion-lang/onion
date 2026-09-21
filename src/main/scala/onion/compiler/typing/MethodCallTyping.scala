@@ -343,6 +343,16 @@ final class MethodCallTyping(
   ): Option[Term] =
     methodCallFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
 
+  /** Safe-nav variant of `tryZeroArgExtensionAccess`: `expr?.name` resolves `def name: T` in an extension block. */
+  private[typing] def tryZeroArgExtensionAccessForSafeNav(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] =
+    methodCallFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, expected)
+
   /** Resolve a safe-call (?.) against extension methods, building SafeStaticExtensionCall. */
   private[typing] def tryExtensionMethodCallForSafeNav(
     node: AST.SafeMethodCall,

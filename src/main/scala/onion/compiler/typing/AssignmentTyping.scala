@@ -105,11 +105,23 @@ final class AssignmentTyping(
     node match {
       case AST.Assignment(_, selection@AST.MemberSelection(_, _, _), expression) =>
         val contextClass = bodyContext.definition
-        val target = typed(selection.target, context).getOrElse(null)
-        if (target == null) return null
-        if (target.`type`.isBasicType || target.`type`.isNullType) {
-          bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target.`type`)
+        val target0 = typed(selection.target, context).getOrElse(null)
+        if (target0 == null) return null
+        if (target0.`type`.isNullType) {
+          bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target0.`type`)
           return null
+        }
+        // A primitive target (e.g. `n.bogus = 5` where n: Int) is boxed first,
+        // mirroring the read path (MemberSelectionResolutionSupport.normalizeTarget),
+        // so lookup below can report FIELD_NOT_FOUND/FIELD_NOT_ACCESSIBLE with the
+        // caret on the member name instead of a generic INCOMPATIBLE_TYPE on the
+        // receiver.
+        val target = target0.`type` match {
+          case basicType: BasicType if basicType == BasicType.VOID =>
+            bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, basicType)
+            return null
+          case _: BasicType => Boxing.boxing(bodyContext.table, target0)
+          case _ => target0
         }
         val targetType = target.`type` match {
           case objType: ObjectType => objType

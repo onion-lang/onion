@@ -873,11 +873,27 @@ Assert::equals(expected, actual)
 Assert::notEquals(a, b)
 ```
 
+いずれも最後の引数にカスタムの失敗メッセージを渡すオーバーロードがある：
+
+```onion
+Assert::isTrue(x > 0, "xは正の値である必要があります")
+Assert::isFalse(hasErrors, "エラーがあってはいけません")
+Assert::equals(expected, actual, "expectedとactualが一致していません")
+Assert::notEquals(a, b, "aとbが異なっている必要があります")
+```
+
 ### Nullアサーション
 
 ```onion
 Assert::notNull(result)
 Assert::isNull(errorMessage)
+```
+
+こちらもカスタムの失敗メッセージを渡せる：
+
+```onion
+Assert::notNull(result, "resultはnullであってはいけません")
+Assert::isNull(errorMessage, "errorMessageはnullである必要があります")
 ```
 
 ### 明示的な失敗

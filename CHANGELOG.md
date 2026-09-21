@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`run/TimeTracker.on`** — a 272-line time-entry log analyzer sample (a `TimeEntry` record derived via `from re"..."` pattern parsing, an ADT enum for priority, extension methods on `Int`/`String`, collection pipelines including `sortedBy`/`groupBy`/`fold`/`distinct`, `do[List]` comprehension, `foreach` over maps and ranges, nullable maps, try/catch), added to the `run/` corpus (part of the backlog described in #1370; resolved by keeping develop's tolerance-band `docs/quality-bar.md` rows unchanged since the addition stays well within the drift band).
+- **`run/PrimOps.on`** — a 244-line primitive-type extension showcase (`extension Int`/`extension Double`/`extension Boolean`, an ADT enum `NumberClass` matched exhaustively via `select`, a `PrimeSummary` record, Sieve of Eratosthenes, collection pipelines), added to the `run/` corpus (merged via #1353, the oldest of the `docs/quality-bar.md` conflict backlog from #1370; resolved by keeping develop's tolerance-band rows unchanged, no doc count bump needed).
 
 ## [0.92.0] - 2026-09-21
 

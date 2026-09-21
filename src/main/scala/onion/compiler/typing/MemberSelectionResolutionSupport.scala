@@ -32,21 +32,19 @@ private[compiler] final class MemberSelectionResolutionSupport(
         bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, node, tv.displayName)
         None
       case _ =>
-        normalizeTarget(node.target, target, target.`type`)
+        normalizeTarget(node.target, target, target.`type`, isNullablePrimitive = false)
     }
 
   def normalizeSafeMemberSelectionTarget(
     node: AST.SafeMemberSelection,
     target: Term
-  ): Option[ResolvedMemberSelectionTarget] =
-    normalizeTarget(
-      node.target,
-      target,
-      target.`type` match {
-        case nullableType: NullableType => nullableType.innerType
-        case other => other
-      }
-    )
+  ): Option[ResolvedMemberSelectionTarget] = {
+    val (targetType, isNullablePrimitive) = target.`type` match {
+      case nullableType: NullableType => (nullableType.innerType, true)
+      case other => (other, false)
+    }
+    normalizeTarget(node.target, target, targetType, isNullablePrimitive)
+  }
 
   def resolveMemberSelection(
     node: AST.Node,
@@ -95,7 +93,8 @@ private[compiler] final class MemberSelectionResolutionSupport(
   private def normalizeTarget(
     targetNode: AST.Expression,
     target: Term,
-    targetType: Type
+    targetType: Type,
+    isNullablePrimitive: Boolean
   ): Option[ResolvedMemberSelectionTarget] =
     targetType match {
       case nullType if nullType.isNullType =>
@@ -106,7 +105,16 @@ private[compiler] final class MemberSelectionResolutionSupport(
           bodyContext.report(INCOMPATIBLE_TYPE, targetNode, bodyContext.rootClass, basicType)
           None
         } else {
-          val boxed = Boxing.boxing(bodyContext.table, target)
+          val boxed =
+            if (isNullablePrimitive) {
+              // A nullable primitive (e.g. Int?) is already a boxed value at runtime,
+              // so retype the target to the boxed class instead of boxing it again
+              // (boxing a NullableType-typed term crashes: "not a boxable type").
+              val boxedType = Boxing.boxedType(bodyContext.table, basicType).asInstanceOf[ObjectType]
+              new AsInstanceOf(target, boxedType)
+            } else {
+              Boxing.boxing(bodyContext.table, target)
+            }
           val boxedType = boxed.`type`.asInstanceOf[ObjectType]
           if (MemberAccess.ensureTypeAccessible(typing, targetNode, boxedType, bodyContext.definition))
             Some(ResolvedMemberSelectionTarget(boxed, boxedType))

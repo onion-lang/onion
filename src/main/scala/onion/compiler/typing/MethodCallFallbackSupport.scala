@@ -23,6 +23,25 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
+  def tryZeroArgExtensionAccess(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
+
+  def tryExtensionMethodCallForSafeNav(
+    node: AST.SafeMethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+
   /** Extension-method resolution for the operator-overloading path (`a + b`). */
   def tryExtensionOperatorMethod(
     node: AST.Node,

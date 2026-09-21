@@ -1,0 +1,358 @@
+// MiniRouter.on — a tiny HTTP routing engine that exercises ADT case-enum
+// exhaustiveness, sealed-case pattern matching, records with static factories
+// and instance methods, generics (Map[String,String]), closures as stored
+// Function1 handler values, collection pipelines (filter/map/find/fold),
+// nullable safe navigation, string interpolation, try/catch, foreach over
+// map entries and lists, while loops, and path-segment matching.
+
+// ─── HTTP Method ADT ─────────────────────────────────────────────────────────
+
+enum HttpMethod {
+  case GET
+  case POST
+  case PUT
+  case DELETE
+  case PATCH
+public:
+  def label(): String = select this {
+    case m is GET:    "GET"
+    case m is POST:   "POST"
+    case m is PUT:    "PUT"
+    case m is DELETE: "DELETE"
+    case m is PATCH:  "PATCH"
+  }
+  def isMutating(): Boolean = select this {
+    case m is GET: false
+    else:          true
+  }
+  def sameAs(other: HttpMethod): Boolean = this.label() == other.label()
+}
+
+// ─── Route Segment ADT ───────────────────────────────────────────────────────
+
+enum Segment {
+  case Static(value: String)
+  case Param(name: String)
+  case Wild
+public:
+  def matches(part: String): Boolean = select this {
+    case s is Static: s.value() == part
+    case p is Param:  true
+    case w is Wild:   true
+  }
+  def paramName(): String? = select this {
+    case p is Param: p.name()
+    else:            null
+  }
+  def label(): String = select this {
+    case s is Static: s.value()
+    case p is Param:  ":#{p.name()}"
+    case w is Wild:   "*"
+  }
+}
+
+// ─── Request / Response ──────────────────────────────────────────────────────
+
+record Request(
+  method: HttpMethod,
+  rawPath: String,
+  body: String,
+  headers: Map[String, String]
+) {
+public:
+  def pathParts(): List[String] =
+    Strings::split(rawPath(), "/").filter { s -> s.length() > 0 }
+  def header(name: String): String? = headers()[name]
+  def summary(): String = "#{method().label()} #{rawPath()}"
+}
+
+record Response(
+  status: Int,
+  body: String,
+  contentType: String
+) {
+public:
+  static def ok(body: String): Response = new Response(200, body, "text/plain")
+  static def json(body: String): Response = new Response(200, body, "application/json")
+  static def notFound(): Response = new Response(404, "Not Found", "text/plain")
+  static def badRequest(msg: String): Response = new Response(400, msg, "text/plain")
+  static def serverError(msg: String): Response = new Response(500, msg, "text/plain")
+  static def created(body: String): Response = new Response(201, body, "application/json")
+  def isSuccess(): Boolean = status() >= 200 && status() < 300
+  def statusClass(): String = select status() / 100 {
+    case 2: "2xx"
+    case 3: "3xx"
+    case 4: "4xx"
+    case 5: "5xx"
+    else:   "???"
+  }
+  def summary(): String = "[#{status()} #{statusClass()}] #{body()}"
+}
+
+// ─── Matched Request (bundles original request + extracted path params) ───────
+
+record MatchedRequest(inner: Request, params: Map[String, String]) {
+public:
+  def method(): HttpMethod   = inner().method()
+  def body(): String         = inner().body()
+  def rawPath(): String      = inner().rawPath()
+  def param(n: String): String? = params()[n]
+  def header(n: String): String? = inner().header(n)
+}
+
+// ─── Segment parsing ─────────────────────────────────────────────────────────
+
+def parseSegments(path: String): List[Object] {
+  return Strings::split(path, "/").filter { s ->
+    (s as String).length() > 0
+  }.map { part ->
+    val p: String = part as String
+    if p.startsWith(":") {
+      new Param(p.substring(1))
+    } else if p == "*" {
+      new Wild()
+    } else {
+      new Static(p)
+    }
+  }
+}
+
+// ─── Route record ────────────────────────────────────────────────────────────
+
+record Route(
+  method: HttpMethod,
+  pattern: String,
+  segments: List[Object],
+  handler: Function1[MatchedRequest, Response]
+) {
+public:
+  def matchesRequest(req: Request): Boolean {
+    val parts = req.pathParts()
+    if parts.size != segments().size { return false }
+    var i: Int = 0
+    var ok: Boolean = true
+    while ok && i < segments().size {
+      if !(segments()[i] as Segment).matches(parts[i] as String) { ok = false }
+      i++
+    }
+    return ok
+  }
+  def extractParams(req: Request): Map[String, String] {
+    val result: Map[String, String] = [:]
+    val parts = req.pathParts()
+    var i: Int = 0
+    while i < segments().size {
+      val name = (segments()[i] as Segment).paramName()
+      if name != null { result[name] = (parts[i] as String) }
+      i++
+    }
+    return result
+  }
+  def dispatch(req: Request): Response {
+    val matched = new MatchedRequest(req, extractParams(req))
+    val h = handler()
+    return h(matched)
+  }
+  def describe(): String = "#{method().label()} #{pattern()}"
+}
+
+// ─── Router class ────────────────────────────────────────────────────────────
+
+class Router {
+  val routes: List[Object]
+  val log: List[String]
+  var requestCount: Int
+  var errorCount: Int
+  var notFoundCount: Int
+public:
+  def this {
+    this.routes = Colls::mutableListOf[Object]()
+    this.log = Colls::mutableListOf[String]()
+    this.requestCount = 0
+    this.errorCount = 0
+    this.notFoundCount = 0
+  }
+  def addRoute(method: HttpMethod, path: String, h: Function1[MatchedRequest, Response]): void {
+    routes.add(new Route(method, path, parseSegments(path), h))
+  }
+  def get(path: String, h: Function1[MatchedRequest, Response]): void {
+    addRoute(new GET(), path, h)
+  }
+  def post(path: String, h: Function1[MatchedRequest, Response]): void {
+    addRoute(new POST(), path, h)
+  }
+  def put(path: String, h: Function1[MatchedRequest, Response]): void {
+    addRoute(new PUT(), path, h)
+  }
+  def delete(path: String, h: Function1[MatchedRequest, Response]): void {
+    addRoute(new DELETE(), path, h)
+  }
+  def dispatch(req: Request): Response {
+    requestCount++
+    val method = req.method()
+    val matching = routes.filter { r ->
+      val route = r as Route
+      route.method().sameAs(method) && route.matchesRequest(req)
+    }
+    if matching.isEmpty() {
+      notFoundCount++
+      log.add("404 " + req.summary())
+      return Response::notFound()
+    }
+    val route = matching[0] as Route
+    try {
+      val resp = route.dispatch(req)
+      log.add("#{resp.status()} #{req.summary()}")
+      return resp
+    } catch e: Exception {
+      errorCount++
+      log.add("500 #{req.summary()}: #{e.getMessage()}")
+      return Response::serverError(e.getMessage())
+    }
+  }
+  def printRoutes(): void {
+    IO::println("Routes (#{routes.size}):")
+    foreach route: Object in routes {
+      IO::println("  " + (route as Route).describe())
+    }
+  }
+  def printLog(): void {
+    IO::println("Log (#{log.size} entries):")
+    foreach entry: String in log {
+      IO::println("  " + entry)
+    }
+  }
+  def routeCount(): Int = routes.size
+  def stats(): String =
+    "Total:#{requestCount} OK:#{requestCount - errorCount - notFoundCount} Errors:#{errorCount} NotFound:#{notFoundCount}"
+}
+
+// ─── Application state ───────────────────────────────────────────────────────
+
+val users: Map[String, String] = ["1": "Alice", "2": "Bob", "3": "Charlie"]
+var nextId: Int = 4
+
+val router = new Router()
+
+// Root
+router.get("/", (mreq: MatchedRequest) -> Response::ok("Welcome to MiniRouter v1.0"))
+
+// Health check
+router.get("/health", (mreq: MatchedRequest) ->
+  Response::json("{\"status\":\"ok\",\"routes\":#{router.routeCount()}}"))
+
+// List all users (uses map iteration inside trailing lambda)
+router.get("/users") { mreq: MatchedRequest ->
+  var sb: String = "["
+  var first: Boolean = true
+  foreach (id, name) in users {
+    if !first { sb = sb + "," }
+    sb = sb + "{\"id\":\"#{id}\",\"name\":\"#{name}\"}"
+    first = false
+  }
+  sb = sb + "]"
+  return Response::json(sb)
+}
+
+// User count (registered before :id so static segment takes priority)
+router.get("/users/count", (mreq: MatchedRequest) ->
+  Response::json("{\"count\":#{users.size}}"))
+
+// Get single user
+router.get("/users/:id") { mreq: MatchedRequest ->
+  val id = mreq.param("id") ?: "unknown"
+  val name = users[id]
+  if name != null {
+    Response::json("{\"id\":\"#{id}\",\"name\":\"#{name}\"}")
+  } else {
+    Response::notFound()
+  }
+}
+
+// Create user
+router.post("/users") { mreq: MatchedRequest ->
+  val name = mreq.body()
+  if name == null || (name as String).length() == 0 {
+    return Response::badRequest("name required")
+  }
+  val id: String = "" + nextId
+  users[id] = name
+  nextId++
+  return Response::created("{\"id\":\"#{id}\",\"name\":\"#{name}\"}")
+}
+
+// Update user
+router.put("/users/:id") { mreq: MatchedRequest ->
+  val id = mreq.param("id") ?: "unknown"
+  val newName = mreq.body()
+  if users[id] == null { return Response::notFound() }
+  users[id] = newName
+  return Response::json("{\"id\":\"#{id}\",\"name\":\"#{newName}\",\"updated\":true}")
+}
+
+// Delete user
+router.delete("/users/:id") { mreq: MatchedRequest ->
+  val id = mreq.param("id") ?: "unknown"
+  val existed = users[id] != null
+  if !existed { return Response::notFound() }
+  users.remove(id)
+  return Response::ok("Deleted user #{id}")
+}
+
+// User search (by prefix in body)
+router.post("/users/search") { mreq: MatchedRequest ->
+  val prefix = mreq.body()
+  var sb: String = "["
+  var first: Boolean = true
+  foreach (id, name) in users {
+    if (name as String).startsWith(prefix) {
+      if !first { sb = sb + "," }
+      sb = sb + "{\"id\":\"#{id}\",\"name\":\"#{name}\"}"
+      first = false
+    }
+  }
+  sb = sb + "]"
+  return Response::json(sb)
+}
+
+// ─── Helper: build a test request ────────────────────────────────────────────
+
+def req(method: HttpMethod, path: String, body: String): Request =
+  new Request(method, path, body, ["Accept": "application/json"])
+
+// ─── Run requests ────────────────────────────────────────────────────────────
+
+IO::println("=== MiniRouter Demo ===")
+router.printRoutes()
+IO::println("")
+
+val tests: List[Object] = [
+  req(new GET(), "/", ""),
+  req(new GET(), "/health", ""),
+  req(new GET(), "/users", ""),
+  req(new GET(), "/users/1", ""),
+  req(new GET(), "/users/99", ""),
+  req(new POST(), "/users", "Dave"),
+  req(new POST(), "/users", ""),
+  req(new GET(), "/users/4", ""),
+  req(new PUT(), "/users/1", "Alicia"),
+  req(new GET(), "/users/1", ""),
+  req(new DELETE(), "/users/2", ""),
+  req(new DELETE(), "/users/99", ""),
+  req(new GET(), "/users", ""),
+  req(new GET(), "/users/count", ""),
+  req(new POST(), "/users/search", "A"),
+  req(new GET(), "/notfound", "")
+]
+
+foreach t: Object in tests {
+  val request = t as Request
+  val resp = router.dispatch(request)
+  IO::println("#{request.summary()} -> #{resp.summary()}")
+}
+
+IO::println("")
+IO::println("=== Stats ===")
+IO::println(router.stats())
+IO::println("")
+router.printLog()

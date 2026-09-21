@@ -1,0 +1,471 @@
+// SpreadsheetEngine.on — a reactive spreadsheet with formula evaluation.
+// Exercises: records, ADT case-enum (CellValue/Formula) with sealed
+// exhaustiveness, extension methods on Int/Double/String, collection
+// pipelines (map/filter/fold/sortedBy/find/zip), select/type-pattern
+// matching, nullable types, closures, string interpolation, try/catch,
+// recursion, while and foreach (ranges and map k,v), generics.
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+extension Int {
+  def toColLetter(): String {
+    var result: String = ""
+    var n: Int = self
+    while n >= 0 {
+      result = ("" + (((n % 26) + 65) as Char)) + result
+      n = n / 26 - 1
+    }
+    return result
+  }
+}
+
+extension Double {
+  def fmt(): String {
+    val asLong: Long = self as Long
+    if self == (asLong as Double) { return "" + asLong }
+    var s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot >= 0 && s.length() > dot + 4 { s = s.substring(0, dot + 4) }
+    return s
+  }
+  def round1(): Double = ((self * 10.0 + 0.5) as Long) as Double / 10.0
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── CellRef record ────────────────────────────────────────────────────────────
+record CellRef(col: Int, row: Int) {
+public:
+  def label(): String = (col).toColLetter() + "" + (row + 1)
+  static def parse(s: String): CellRef? {
+    if s.length() < 2 { return null }
+    var colPart: Int = 0
+    var i: Int = 0
+    while i < s.length() {
+      val ch: Int = s.charAt(i)
+      if ch < 65 || ch > 90 { break }
+      colPart = colPart * 26 + (ch - 65)
+      i++
+    }
+    if i == 0 || i >= s.length() { return null }
+    var row: Int = 0
+    var j: Int = i
+    while j < s.length() {
+      val ch: Int = s.charAt(j)
+      if ch < 48 || ch > 57 { return null }
+      row = row * 10 + (ch - 48)
+      j++
+    }
+    return new CellRef(colPart, row - 1)
+  }
+}
+
+// ── CellValue ADT ─────────────────────────────────────────────────────────────
+enum CellValue {
+  case NumVal(v: Double)
+  case TextVal(text: String)
+  case ErrVal(msg: String)
+  case EmptyVal
+public:
+  def display(): String = select this {
+    case n is NumVal:   n.v().fmt()
+    case t is TextVal:  t.text()
+    case e is ErrVal:   "#" + e.msg()
+    case x is EmptyVal: ""
+  }
+  def numValue(): Double = select this {
+    case n is NumVal: n.v()
+    else: 0.0
+  }
+  def isError(): Boolean = select this {
+    case e is ErrVal: true
+    else: false
+  }
+  def isNum(): Boolean = select this {
+    case n is NumVal: true
+    else: false
+  }
+}
+
+// ── Formula ADT ───────────────────────────────────────────────────────────────
+enum Formula {
+  case Lit(value: Double)
+  case Txt(text: String)
+  case Ref(addr: CellRef)
+  case Sum(refs: List[CellRef])
+  case Avg(refs: List[CellRef])
+  case Min2(refs: List[CellRef])
+  case Max2(refs: List[CellRef])
+  case Add(left: Formula, right: Formula)
+  case Sub(left: Formula, right: Formula)
+  case Mul(left: Formula, right: Formula)
+  case Div(left: Formula, right: Formula)
+  case Pct(value: Formula, total: Formula)
+  case IfGt(left: Formula, right: Formula, thenF: Formula, elsF: Formula)
+}
+
+// ── Sheet class ───────────────────────────────────────────────────────────────
+class Sheet {
+  var cells: Map[String, Formula] = [:]
+  var cache: Map[String, CellValue] = [:]
+
+public:
+  def set(ref: String, formula: Formula): void {
+    cells.put(ref, formula)
+    cache.remove(ref)
+  }
+
+  def get(ref: String): CellValue {
+    val cached: CellValue? = cache.get(ref) as CellValue?
+    if cached != null { return cached as CellValue }
+    val formula: Formula? = cells.get(ref) as Formula?
+    if formula == null { return new EmptyVal() }
+    val visiting: List[String] = [ref]
+    val result: CellValue = eval(formula as Formula, visiting)
+    cache.put(ref, result)
+    return result
+  }
+
+  def evalRef(key: String, visiting: List[String]): CellValue {
+    if visiting.any { v -> (v as String) == key } { return new ErrVal("CIRC") }
+    val cached: CellValue? = cache.get(key) as CellValue?
+    if cached != null { return cached as CellValue }
+    val formula: Formula? = cells.get(key) as Formula?
+    if formula == null { return new EmptyVal() }
+    val nextVisit: List[String] = []
+    foreach s: String in visiting { nextVisit.add(s) }
+    nextVisit.add(key)
+    val v: CellValue = eval(formula as Formula, nextVisit)
+    cache.put(key, v)
+    return v
+  }
+
+  def eval(f: Formula, visiting: List[String]): CellValue {
+    return select f {
+      case l is Lit:  new NumVal(l.value())
+      case t is Txt:  new TextVal(t.text())
+      case r is Ref:  evalRef(r.addr().label(), visiting)
+      case s is Sum: {
+        var total: Double = 0.0
+        foreach ref: CellRef in s.refs() {
+          total = total + evalRef(ref.label(), visiting).numValue()
+        }
+        return new NumVal(total)
+      }
+      case a is Avg: {
+        var total: Double = 0.0
+        var cnt: Int = 0
+        foreach ref: CellRef in a.refs() {
+          val v: CellValue = evalRef(ref.label(), visiting)
+          if v.isNum() { total = total + v.numValue(); cnt++ }
+        }
+        if cnt == 0 { return new ErrVal("DIV/0") }
+        return new NumVal(total / (cnt as Double))
+      }
+      case m is Min2: {
+        var best: Double? = null
+        foreach ref: CellRef in m.refs() {
+          val v: CellValue = evalRef(ref.label(), visiting)
+          if v.isNum() {
+            val d: Double = v.numValue()
+            if best == null { best = d }
+            else if d < (best as Double) { best = d }
+          }
+        }
+        if best == null { return new ErrVal("EMPTY") }
+        return new NumVal(best as Double)
+      }
+      case m is Max2: {
+        var best: Double? = null
+        foreach ref: CellRef in m.refs() {
+          val v: CellValue = evalRef(ref.label(), visiting)
+          if v.isNum() {
+            val d: Double = v.numValue()
+            if best == null { best = d }
+            else if d > (best as Double) { best = d }
+          }
+        }
+        if best == null { return new ErrVal("EMPTY") }
+        return new NumVal(best as Double)
+      }
+      case a is Add: {
+        val lv: CellValue = eval(a.left(), visiting)
+        val rv: CellValue = eval(a.right(), visiting)
+        if lv.isError() { return lv }
+        if rv.isError() { return rv }
+        return new NumVal(lv.numValue() + rv.numValue())
+      }
+      case s is Sub: {
+        val lv: CellValue = eval(s.left(), visiting)
+        val rv: CellValue = eval(s.right(), visiting)
+        if lv.isError() { return lv }
+        if rv.isError() { return rv }
+        return new NumVal(lv.numValue() - rv.numValue())
+      }
+      case m is Mul: {
+        val lv: CellValue = eval(m.left(), visiting)
+        val rv: CellValue = eval(m.right(), visiting)
+        if lv.isError() { return lv }
+        if rv.isError() { return rv }
+        return new NumVal(lv.numValue() * rv.numValue())
+      }
+      case d is Div: {
+        val lv: CellValue = eval(d.left(), visiting)
+        val rv: CellValue = eval(d.right(), visiting)
+        if lv.isError() { return lv }
+        if rv.isError() { return rv }
+        if rv.numValue() == 0.0 { return new ErrVal("DIV/0") }
+        return new NumVal(lv.numValue() / rv.numValue())
+      }
+      case p is Pct: {
+        val vv: CellValue = eval(p.value(), visiting)
+        val tv: CellValue = eval(p.total(), visiting)
+        if vv.isError() { return vv }
+        if tv.isError() { return tv }
+        if tv.numValue() == 0.0 { return new ErrVal("DIV/0") }
+        return new NumVal((vv.numValue() / tv.numValue() * 100.0).round1())
+      }
+      case i is IfGt: {
+        val lv: CellValue = eval(i.left(), visiting)
+        val rv: CellValue = eval(i.right(), visiting)
+        if lv.isError() { return lv }
+        if rv.isError() { return rv }
+        if lv.numValue() > rv.numValue() {
+          return eval(i.thenF(), visiting)
+        } else {
+          return eval(i.elsF(), visiting)
+        }
+      }
+    }
+  }
+
+  def render(cols: Int, rows: Int, colWidth: Int): void {
+    var header: String = "    "
+    foreach col: Int in 0..<cols {
+      header = header + col.toColLetter().padRight(colWidth)
+    }
+    println(header)
+    println("    " + "-".padRight(cols * colWidth + 1))
+    foreach row: Int in 0..<rows {
+      var line: String = "" + (row + 1)
+      while line.length() < 3 { line = " " + line }
+      line = line + " |"
+      foreach col: Int in 0..<cols {
+        val ref: String = col.toColLetter() + "" + (row + 1)
+        val formula: Formula? = cells.get(ref) as Formula?
+        val display: String = if formula == null { "" } else { get(ref).display() }
+        line = line + display.padRight(colWidth)
+      }
+      println(line)
+    }
+  }
+}
+
+// ── Range helpers ─────────────────────────────────────────────────────────────
+def colRange(col: Int, rowStart: Int, rowEnd: Int): List[CellRef] {
+  val result: List[CellRef] = []
+  foreach row: Int in rowStart..<rowEnd { result.add(new CellRef(col, row)) }
+  return result
+}
+
+def rowRange(row: Int, colStart: Int, colEnd: Int): List[CellRef] {
+  val result: List[CellRef] = []
+  foreach col: Int in colStart..<colEnd { result.add(new CellRef(col, row)) }
+  return result
+}
+
+def cr(s: String): CellRef {
+  val parsed: CellRef? = CellRef::parse(s)
+  return if parsed != null { parsed as CellRef } else { new CellRef(0, 0) }
+}
+
+// ── Build Q1 Budget Spreadsheet ───────────────────────────────────────────────
+var sheet: Sheet = new Sheet()
+
+// Headers
+sheet.set("A1", new Txt("Category"))
+sheet.set("B1", new Txt("January"))
+sheet.set("C1", new Txt("February"))
+sheet.set("D1", new Txt("March"))
+sheet.set("E1", new Txt("Q1 Total"))
+sheet.set("F1", new Txt("% of Cat"))
+
+// Income rows (display rows 2-4 = indices 1-3)
+sheet.set("A2", new Txt("Salary"))
+sheet.set("B2", new Lit(5000.0))
+sheet.set("C2", new Lit(5000.0))
+sheet.set("D2", new Lit(5500.0))
+sheet.set("E2", new Sum(rowRange(1, 1, 4)))   // B2+C2+D2
+
+sheet.set("A3", new Txt("Bonus"))
+sheet.set("B3", new Lit(0.0))
+sheet.set("C3", new Lit(500.0))
+sheet.set("D3", new Lit(0.0))
+sheet.set("E3", new Sum(rowRange(2, 1, 4)))   // B3+C3+D3
+
+sheet.set("A4", new Txt("TOTAL INCOME"))
+sheet.set("B4", new Add(new Ref(cr("B2")), new Ref(cr("B3"))))
+sheet.set("C4", new Add(new Ref(cr("C2")), new Ref(cr("C3"))))
+sheet.set("D4", new Add(new Ref(cr("D2")), new Ref(cr("D3"))))
+sheet.set("E4", new Sum(rowRange(3, 1, 4)))   // B4+C4+D4
+
+// Expense rows (display rows 5-8 = indices 4-7)
+sheet.set("A5", new Txt("Rent"))
+sheet.set("B5", new Lit(1500.0))
+sheet.set("C5", new Lit(1500.0))
+sheet.set("D5", new Lit(1500.0))
+sheet.set("E5", new Sum(rowRange(4, 1, 4)))
+
+sheet.set("A6", new Txt("Food"))
+sheet.set("B6", new Lit(400.0))
+sheet.set("C6", new Lit(420.0))
+sheet.set("D6", new Lit(380.0))
+sheet.set("E6", new Sum(rowRange(5, 1, 4)))
+
+sheet.set("A7", new Txt("Transport"))
+sheet.set("B7", new Lit(150.0))
+sheet.set("C7", new Lit(150.0))
+sheet.set("D7", new Lit(200.0))
+sheet.set("E7", new Sum(rowRange(6, 1, 4)))
+
+sheet.set("A8", new Txt("Utilities"))
+sheet.set("B8", new Lit(100.0))
+sheet.set("C8", new Lit(110.0))
+sheet.set("D8", new Lit(95.0))
+sheet.set("E8", new Sum(rowRange(7, 1, 4)))
+
+// Total expenses (row 9 = index 8): sum expense rows 5..8 = indices 4..7
+sheet.set("A9", new Txt("TOTAL EXPENSES"))
+sheet.set("B9", new Sum(colRange(1, 4, 8)))
+sheet.set("C9", new Sum(colRange(2, 4, 8)))
+sheet.set("D9", new Sum(colRange(3, 4, 8)))
+sheet.set("E9", new Sum(colRange(4, 4, 8)))
+
+// Net savings (row 10 = index 9)
+sheet.set("A10", new Txt("NET SAVINGS"))
+sheet.set("B10", new Sub(new Ref(cr("B4")), new Ref(cr("B9"))))
+sheet.set("C10", new Sub(new Ref(cr("C4")), new Ref(cr("C9"))))
+sheet.set("D10", new Sub(new Ref(cr("D4")), new Ref(cr("D9"))))
+sheet.set("E10", new Sub(new Ref(cr("E4")), new Ref(cr("E9"))))
+
+// Statistics (row 11 = index 10): analyse monthly net
+sheet.set("A11", new Txt("Avg / Min / Max"))
+sheet.set("B11", new Avg([cr("B10"), cr("C10"), cr("D10")]))
+sheet.set("C11", new Min2([cr("B10"), cr("C10"), cr("D10")]))
+sheet.set("D11", new Max2([cr("B10"), cr("C10"), cr("D10")]))
+
+// Savings rate (row 12 = index 11)
+sheet.set("A12", new Txt("Savings rate %"))
+sheet.set("B12", new Pct(new Ref(cr("B10")), new Ref(cr("B4"))))
+sheet.set("C12", new Pct(new Ref(cr("C10")), new Ref(cr("C4"))))
+sheet.set("D12", new Pct(new Ref(cr("D10")), new Ref(cr("D4"))))
+sheet.set("E12", new Pct(new Ref(cr("E10")), new Ref(cr("E4"))))
+
+// % of total column (row 2-3 income share, rows 5-8 expense share)
+sheet.set("F2", new Pct(new Ref(cr("E2")), new Ref(cr("E4"))))
+sheet.set("F3", new Pct(new Ref(cr("E3")), new Ref(cr("E4"))))
+sheet.set("F5", new Pct(new Ref(cr("E5")), new Ref(cr("E9"))))
+sheet.set("F6", new Pct(new Ref(cr("E6")), new Ref(cr("E9"))))
+sheet.set("F7", new Pct(new Ref(cr("E7")), new Ref(cr("E9"))))
+sheet.set("F8", new Pct(new Ref(cr("E8")), new Ref(cr("E9"))))
+
+// ── Render ────────────────────────────────────────────────────────────────────
+println("╔══════════════════════════════════════════════════════════════╗")
+println("║          Q1 2024  PERSONAL BUDGET SPREADSHEET               ║")
+println("╚══════════════════════════════════════════════════════════════╝")
+println("")
+sheet.render(6, 12, 12)
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+println("")
+println("── Summary ─────────────────────────────────────────────────")
+println("Q1 Total income   (E4):  " + sheet.get("E4").display())
+println("Q1 Total expenses (E9):  " + sheet.get("E9").display())
+println("Q1 Net savings   (E10):  " + sheet.get("E10").display())
+println("Q1 Savings rate  (E12):  " + sheet.get("E12").display() + "%")
+println("Average monthly net:     " + sheet.get("B11").display())
+println("Best month net:          " + sheet.get("D11").display())
+println("Worst month net:         " + sheet.get("C11").display())
+
+// ── Monthly breakdown via collection pipelines ────────────────────────────────
+println("")
+println("── Monthly breakdown ───────────────────────────────────────")
+val monthCols: List[String] = ["B", "C", "D"]
+val monthNames: List[String] = ["January ", "February", "March   "]
+val zipped = monthCols.zip(monthNames)
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  val col: String  = p.get(0) as String
+  val name: String = p.get(1) as String
+  val income: String  = sheet.get(col + "4").display()
+  val expense: String = sheet.get(col + "9").display()
+  val net: String     = sheet.get(col + "10").display()
+  val rate: String    = sheet.get(col + "12").display()
+  println("  #{name}: income=#{income.padLeft(6)}  expenses=#{expense.padLeft(6)}  net=#{net.padLeft(5)}  savings=#{rate}%")
+}
+
+// ── Sort months by net savings ────────────────────────────────────────────────
+println("")
+println("── Months ranked by net savings ───────────────────────────")
+val ranked = zipped.sortedBy { pair ->
+  val p = pair as List[Object]
+  val col: String = p.get(0) as String
+  -(sheet.get(col + "10").numValue())
+}
+var rank: Int = 1
+foreach pair: Object in ranked {
+  val p = pair as List[Object]
+  val col: String  = p.get(0) as String
+  val name: String = p.get(1) as String
+  println("  #{rank}. #{name.trim()}: #{sheet.get(col + "10").display()}")
+  rank++
+}
+
+// ── Expense analysis ─────────────────────────────────────────────────────────
+println("")
+println("── Expense breakdown (Q1 totals) ──────────────────────────")
+val expenseRows: List[Int] = [5, 6, 7, 8]
+val expenseData = expenseRows.map { rowNum ->
+  val n: Int = rowNum as Int
+  val label: String = sheet.get("A" + n).display()
+  val total: Double = sheet.get("E" + n).numValue()
+  val pct: String   = sheet.get("F" + n).display()
+  [label, total, pct]
+}
+val sortedExp = expenseData.sortedBy { row ->
+  val r = row as List[Object]
+  -(r.get(1) as Double)
+}
+foreach row: Object in sortedExp {
+  val r = row as List[Object]
+  val label: String = (r.get(0) as String).padRight(14)
+  val total: String = (r.get(1) as Double).fmt().padLeft(6)
+  val pct: String   = r.get(2) as String
+  println("  #{label} #{total}  (#{pct}% of expenses)")
+}
+
+// ── Circular reference detection ─────────────────────────────────────────────
+println("")
+println("── Circular reference test ─────────────────────────────────")
+sheet.set("X1", new Ref(cr("X2")))
+sheet.set("X2", new Ref(cr("X1")))
+val circResult: CellValue = sheet.get("X1")
+println("X1 (circular) = " + circResult.display())
+println("Is error: " + circResult.isError())
+
+// ── Division by zero test ────────────────────────────────────────────────────
+sheet.set("Y1", new Lit(10.0))
+sheet.set("Y2", new Lit(0.0))
+sheet.set("Y3", new Div(new Ref(cr("Y1")), new Ref(cr("Y2"))))
+val divResult: CellValue = sheet.get("Y3")
+println("Y3 (div/0) = " + divResult.display())

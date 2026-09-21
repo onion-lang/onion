@@ -1,0 +1,449 @@
+// ParserCombinator.on — A parser combinator library and JSON-like demo
+//
+// Exercises: generic ADT enum (ParseResult[T]), generic class (Parser[T]) with
+// closures, extension methods on Int/String, collection pipelines (map/filter/fold),
+// while/foreach, pattern matching via select, nullable types, string interpolation,
+// recursion.
+//
+// Architecture:
+//   ParseResult[T] — sealed ADT: Ok(value: T, rest: String) | Err(msg, at)
+//   Parser[T]      — generic class wrapping (String -> ParseResult[T])
+//   Combinators    — static factory methods; imperative helpers (with var/while)
+//                    called from single-expression lambdas (lambdas can't have
+//                    var/val; full bodies are fine in regular methods)
+//
+// Parsing target: a subset of JSON — null, bool, int, string, array.
+
+// ── Parse result ADT ──────────────────────────────────────────────────────────
+
+enum ParseResult[T] {
+  case Ok(value: T, rest: String)
+  case Err(msg: String, at: String)
+public:
+  def isOk(): Boolean = select this {
+    case x is Ok:  true
+    case e is Err: false
+  }
+  def show(): String = select this {
+    case o is Ok:  "Ok(rest=" + o.rest().length() + ")"
+    case e is Err: "Err(" + e.msg() + ")"
+  }
+}
+
+// ── Parser class ──────────────────────────────────────────────────────────────
+
+class Parser[T] {
+  val fn: Function1[String, ParseResult[T]];
+public:
+  def this(fn: Function1[String, ParseResult[T]]) {
+    self.fn = fn
+  }
+  def parse(input: String): ParseResult[T] = fn(input)
+}
+
+// ── Whitespace helper ─────────────────────────────────────────────────────────
+
+static def skipSpaces(input: String): String {
+  var r: String = input
+  while r.length() > 0 && (r.charAt(0) == 32 || r.charAt(0) == 9 ||
+                             r.charAt(0) == 10 || r.charAt(0) == 13) {
+    r = r.substring(1)
+  }
+  return r
+}
+
+// ── Character predicates (kept as named methods so satisfy() fits one line) ───
+
+static def isDigitChar(ch: String): Boolean = ch.charAt(0) >= 48 && ch.charAt(0) <= 57
+static def isLetterChar(ch: String): Boolean =
+  (ch.charAt(0) >= 65 && ch.charAt(0) <= 90) || (ch.charAt(0) >= 97 && ch.charAt(0) <= 122)
+static def isAlphaNumChar(ch: String): Boolean = isDigitChar(ch) || isLetterChar(ch)
+static def isNonQuoteChar(ch: String): Boolean = ch.charAt(0) != 34
+
+// ── Primitive parsers ─────────────────────────────────────────────────────────
+
+// Match an exact prefix; does not skip leading spaces
+static def literal(s: String): Parser[String] =
+  new Parser[String]((input: String) ->
+    if input.startsWith(s) {
+      new Ok[String](s, input.substring(s.length()))
+    } else {
+      new Err[String]("expected \"" + s + "\"", input)
+    }
+  )
+
+// Match a single char satisfying pred; ch is passed as a 1-char String
+static def satisfy(pred: Function1[String, Boolean], label: String): Parser[String] =
+  new Parser[String]((input: String) ->
+    if input.length() > 0 {
+      if pred(input.substring(0, 1)) {
+        new Ok[String](input.substring(0, 1), input.substring(1))
+      } else {
+        new Err[String]("expected " + label + " got '" + input.substring(0, 1) + "'", input)
+      }
+    } else {
+      new Err[String]("expected " + label + " but EOF", "")
+    }
+  )
+
+static def digit(): Parser[String] = satisfy((ch: String) -> isDigitChar(ch), "digit")
+static def letter(): Parser[String] = satisfy((ch: String) -> isLetterChar(ch), "letter")
+static def alphaNum(): Parser[String] = satisfy((ch: String) -> isAlphaNumChar(ch), "alphanumeric")
+static def nonQuote(): Parser[String] = satisfy((ch: String) -> isNonQuoteChar(ch), "non-quote")
+
+// ── Combinator helpers (regular methods can use var/while/val) ──────────────
+
+// Run p zero or more times, accumulating matched strings
+static def manyStrRun(p: Parser[String], input: String): ParseResult[String] {
+  var acc: String = ""
+  var rest: String = input
+  var go: Boolean = true
+  while go {
+    select p.parse(rest) {
+      case o is Ok: acc = acc + o.value(); rest = o.rest()
+      case e is Err: go = false
+    }
+  }
+  return new Ok[String](acc, rest)
+}
+
+// Run p one or more times
+static def manyStr1Run(p: Parser[String], input: String): ParseResult[String] {
+  select p.parse(input) {
+    case first is Ok:
+      select manyStrRun(p, first.rest()) {
+        case more is Ok: return new Ok[String](first.value() + more.value(), more.rest())
+        case e is Err:   return new Ok[String](first.value(), first.rest())
+      }
+    case e is Err:
+      return (e as ParseResult[String])
+  }
+  return new Err[String]("manyStr1: no match", input)
+}
+
+// ── Combinator wrappers — thin lambdas that close over the helper calls ────────
+
+static def manyStr(p: Parser[String]): Parser[String] =
+  new Parser[String]((input: String) -> manyStrRun(p, input))
+
+static def manyStr1(p: Parser[String]): Parser[String] =
+  new Parser[String]((input: String) -> manyStr1Run(p, input))
+
+// ── Compound parsers (use helper methods to allow var/select statements) ───────
+
+static def integerRun(input: String): ParseResult[String] {
+  val trimmed: String = skipSpaces(input)
+  var start: String = trimmed
+  var prefix: String = ""
+  if start.startsWith("-") { prefix = "-"; start = start.substring(1) }
+  select manyStr1Run(digit(), start) {
+    case d is Ok:  return new Ok[String](prefix + d.value(), d.rest())
+    case e is Err: return new Err[String]("expected integer", trimmed)
+  }
+  return new Err[String]("expected integer", trimmed)
+}
+
+static def integer(): Parser[String] =
+  new Parser[String]((input: String) -> integerRun(input))
+
+static def identifierRun(input: String): ParseResult[String] {
+  val trimmed: String = skipSpaces(input)
+  select letter().parse(trimmed) {
+    case f is Ok:
+      select manyStrRun(alphaNum(), f.rest()) {
+        case r is Ok:  return new Ok[String](f.value() + r.value(), r.rest())
+        case e is Err: return new Ok[String](f.value(), f.rest())
+      }
+    case e is Err: return new Err[String]("expected identifier", trimmed)
+  }
+  return new Err[String]("expected identifier", trimmed)
+}
+
+static def identifier(): Parser[String] =
+  new Parser[String]((input: String) -> identifierRun(input))
+
+static def quotedStringRun(input: String): ParseResult[String] {
+  val trimmed: String = skipSpaces(input)
+  select literal("\"").parse(trimmed) {
+    case o is Ok:
+      select manyStrRun(nonQuote(), o.rest()) {
+        case body is Ok:
+          select literal("\"").parse(body.rest()) {
+            case c is Ok:  return new Ok[String](body.value(), c.rest())
+            case e is Err: return new Err[String]("unterminated string", body.rest())
+          }
+        case e is Err: return new Err[String]("bad string body", o.rest())
+      }
+    case e is Err: return new Err[String]("expected '\"'", trimmed)
+  }
+  return new Err[String]("expected '\"'", trimmed)
+}
+
+static def quotedString(): Parser[String] =
+  new Parser[String]((input: String) -> quotedStringRun(input))
+
+// ── JSON-like value ADT ───────────────────────────────────────────────────────
+
+enum JValue {
+  case JNull
+  case JBool(flag: Boolean)
+  case JNum(n: Int)
+  case JStr(s: String)
+  case JArr(items: List[JValue])
+public:
+  def typeName(): String = select this {
+    case j is JNull: "null"
+    case b is JBool: "bool"
+    case n is JNum:  "num"
+    case s is JStr:  "string"
+    case a is JArr:  "array"
+  }
+}
+
+// ── Render helpers (avoid circular inline calls inside ADT enum) ──────────────
+
+static def renderJValue(v: JValue): String = select v {
+  case j is JNull: "null"
+  case b is JBool: if b.flag() { "true" } else { "false" }
+  case n is JNum:  "" + n.n()
+  case s is JStr:  "\"" + s.s() + "\""
+  case a is JArr:  "[" + joinJValues(a.items()) + "]"
+}
+
+static def joinJValues(items: List[JValue]): String {
+  var result: String = ""
+  var first: Boolean = true
+  foreach item: JValue in items {
+    if !first { result = result + ", " }
+    result = result + renderJValue(item)
+    first = false
+  }
+  return result
+}
+
+// ── JSON-like value parser ────────────────────────────────────────────────────
+
+static def parseJNull(r: String): ParseResult[JValue] {
+  select literal("null").parse(r) {
+    case o is Ok:  return new Ok[JValue](new JNull(), o.rest())
+    case e is Err: return new Err[JValue]("expected null", r)
+  }
+  return new Err[JValue]("expected null", r)
+}
+
+static def parseJBool(r: String): ParseResult[JValue] {
+  select literal("true").parse(r) {
+    case o is Ok: return new Ok[JValue](new JBool(true), o.rest())
+    case e is Err: {}
+  }
+  select literal("false").parse(r) {
+    case o is Ok: return new Ok[JValue](new JBool(false), o.rest())
+    case e is Err: {}
+  }
+  return new Err[JValue]("expected bool", r)
+}
+
+static def parseJNum(r: String): ParseResult[JValue] {
+  select integerRun(r) {
+    case o is Ok:  return new Ok[JValue](new JNum(Integer::parseInt(o.value())), o.rest())
+    case e is Err: return new Err[JValue](e.msg(), e.at())
+  }
+  return new Err[JValue]("expected number", r)
+}
+
+static def parseJStr(r: String): ParseResult[JValue] {
+  select quotedStringRun(r) {
+    case o is Ok:  return new Ok[JValue](new JStr(o.value()), o.rest())
+    case e is Err: return new Err[JValue](e.msg(), e.at())
+  }
+  return new Err[JValue]("expected string", r)
+}
+
+// Parses any JSON-like value; parseJArr calls back here (mutual recursion)
+static def parseJValue(input: String): ParseResult[JValue] {
+  val r: String = skipSpaces(input)
+  if r.length() == 0             { return new Err[JValue]("unexpected EOF", "") }
+  if r.startsWith("null")        { return parseJNull(r) }
+  if r.startsWith("true")        { return parseJBool(r) }
+  if r.startsWith("false")       { return parseJBool(r) }
+  if r.startsWith("[")           { return parseJArr(r) }
+  if r.startsWith("\"")          { return parseJStr(r) }
+  if r.charAt(0) >= 48 && r.charAt(0) <= 57 { return parseJNum(r) }
+  if r.startsWith("-")           { return parseJNum(r) }
+  return new Err[JValue]("unexpected: " + r.substring(0, 1), r)
+}
+
+static def parseJArr(input: String): ParseResult[JValue] {
+  val r0: String = skipSpaces(input)
+  select literal("[").parse(r0) {
+    case open is Ok: {
+      var rest: String = skipSpaces(open.rest())
+      val items: List[JValue] = []
+      while !rest.startsWith("]") {
+        if rest.length() == 0 { return new Err[JValue]("unterminated array", rest) }
+        select parseJValue(rest) {
+          case v is Ok:
+            items.add(v.value())
+            rest = skipSpaces(v.rest())
+            if rest.startsWith(",") { rest = skipSpaces(rest.substring(1)) }
+          case e is Err:
+            return new Err[JValue](e.msg(), e.at())
+        }
+      }
+      return new Ok[JValue](new JArr(items), rest.substring(1))
+    }
+    case e is Err: return new Err[JValue]("expected '['", r0)
+  }
+  return new Err[JValue]("expected '['", r0)
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def padLeft(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def truncate(n: Int): String =
+    if self.length() > n { self.substring(0, n) + "..." } else { self }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ── Main demo ─────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("=== Parser Combinator Demo ===\n")
+
+  // ── Section 1: Primitive parsers ───────────────────────────────────────────
+  IO::println("-- 1. Primitive parsers --")
+
+  IO::println("  digit '5'         -> " + digit().parse("5abc").show())
+  IO::println("  digit 'z'         -> " + digit().parse("z123").show())
+  IO::println("  letter 'a'        -> " + letter().parse("abc").show())
+  IO::println("  letter '0'        -> " + letter().parse("0abc").show())
+  IO::println("  literal 'hi'      -> " + literal("hi").parse("hi there").show())
+  IO::println("  literal 'hi' fail -> " + literal("hi").parse("goodbye").show())
+
+  // ── Section 2: Combinators ─────────────────────────────────────────────────
+  IO::println("\n-- 2. Combinators (identifier, integer, quotedString) --")
+
+  val idInputs: List[String] = ["hello123", "abc", "123start", "  foo", "_bad"]
+  foreach s: String in idInputs {
+    val label: String = ("id(\"" + s + "\")").padRight(18)
+    IO::println("  " + label + " -> " + identifier().parse(s).show())
+  }
+
+  val numInputs: List[String] = ["42 rest", "  100done", "-7abc", "abc"]
+  foreach s: String in numInputs {
+    val label: String = ("int(\"" + s + "\")").padRight(18)
+    IO::println("  " + label + " -> " + integer().parse(s).show())
+  }
+
+  val strInputs: List[String] = ["\"hello\"", "\"foo bar\"", "\"unclosed", "not-a-string"]
+  foreach s: String in strInputs {
+    val label: String = ("str(" + s.truncate(10) + ")").padRight(18)
+    IO::println("  " + label + " -> " + quotedString().parse(s).show())
+  }
+
+  // ── Section 3: JSON-like parser ────────────────────────────────────────────
+  IO::println("\n-- 3. JSON-like value parser --")
+
+  val jsonInputs: List[String] = [
+    "null",
+    "true",
+    "false",
+    "42",
+    "-7",
+    "\"hello world\"",
+    "[1, 2, 3]",
+    "[true, false, null]",
+    "[\"a\", \"bb\", \"ccc\"]",
+    "[ 10, 20, [ 30, 40 ] ]",
+    "invalid!"
+  ]
+  foreach src: String in jsonInputs {
+    val label: String = src.truncate(22).padRight(24)
+    select parseJValue(src) {
+      case ok is Ok: {
+        val v: JValue = ok.value() as JValue
+        IO::println("  " + label + " -> " + v.typeName().padRight(8) + " " + renderJValue(v))
+      }
+      case err is Err:
+        IO::println("  " + label + " -> ERROR: " + err.msg())
+    }
+  }
+
+  // ── Section 4: Pipeline over parsed numbers ────────────────────────────────
+  IO::println("\n-- 4. Collection pipeline over parsed values --")
+
+  val rawNums: List[String] = ["-5", "3", "12", "-1", "7", "0", "42", "8", "-3", "15"]
+  val parsed: List[JValue] = rawNums.map { s: String ->
+    select parseJNum(s) {
+      case ok is Ok: ok.value() as JValue
+      case e is Err: new JNull()
+    }
+  }
+
+  val nums: List[Int] = parsed.filter { v: JValue -> v is JNum }
+                              .map    { v: JValue -> (v as JNum).n() }
+  val positives: List[Int] = nums.filter { n: Int -> n > 0 }
+  val negatives: List[Int] = nums.filter { n: Int -> n < 0 }
+  val evens: List[Int]     = nums.filter { n: Int -> n % 2 == 0 }
+  val sumAll: Int     = nums.fold(0) { acc: Int, n: Int -> acc + n }
+  val sumPos: Int     = positives.fold(0) { acc: Int, n: Int -> acc + n }
+  val sumNeg: Int     = negatives.fold(0) { acc: Int, n: Int -> acc + n }
+
+  IO::println("  All:        " + nums)
+  IO::println("  Positives:  " + positives)
+  IO::println("  Negatives:  " + negatives)
+  IO::println("  Evens:      " + evens)
+  IO::println("  Sum all:    " + sumAll)
+  IO::println("  Sum pos:    " + sumPos)
+  IO::println("  Sum neg:    " + sumNeg)
+
+  // ── Section 5: Expression tokenizer ───────────────────────────────────────
+  IO::println("\n-- 5. Expression tokenizer --")
+
+  val expressions: List[String] = [
+    "42 + foo - 7",
+    "x * y + 100",
+    "result - count * 3"
+  ]
+
+  foreach expr: String in expressions {
+    val tokens: List[String] = []
+    var src: String = skipSpaces(expr)
+    while src.length() > 0 {
+      if src.startsWith("+") || src.startsWith("-") || src.startsWith("*") {
+        tokens.add(src.substring(0, 1))
+        src = skipSpaces(src.substring(1))
+      } else {
+        select integerRun(src) {
+          case ok is Ok:
+            tokens.add("INT(" + ok.value() + ")")
+            src = skipSpaces(ok.rest())
+          case e is Err:
+            select identifierRun(src) {
+              case ok is Ok:
+                tokens.add("ID(" + ok.value() + ")")
+                src = skipSpaces(ok.rest())
+              case e2 is Err:
+                tokens.add("?")
+                src = skipSpaces(src.substring(1))
+            }
+        }
+      }
+    }
+    IO::println("  \"" + expr + "\" -> " + tokens)
+  }
+
+  IO::println("\nDone.")
+}

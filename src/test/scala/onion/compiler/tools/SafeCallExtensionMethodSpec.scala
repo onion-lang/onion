@@ -160,5 +160,57 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("null") == result)
     }
+
+    it("calls a zero-arg extension method accessed property-style (no parens) on a nullable Int and returns result when non-null") {
+      val result = shell.run(
+        """
+          |extension Int {
+          |  def tripled: Int = self * 3
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def getOpt(flag: Boolean): Int? {
+          |    if flag { return 7 }
+          |    return null
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    val opt: Int? = getOpt(true)
+          |    return "" + opt?.tripled
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("21") == result)
+    }
+
+    it("calls a zero-arg extension method accessed property-style (no parens) on a nullable Int and returns null when null") {
+      val result = shell.run(
+        """
+          |extension Int {
+          |  def tripled: Int = self * 3
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def getOpt(flag: Boolean): Int? {
+          |    if flag { return 7 }
+          |    return null
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    val opt: Int? = getOpt(false)
+          |    return "" + opt?.tripled
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
   }
 }

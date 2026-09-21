@@ -1,0 +1,300 @@
+// PlanningSystem — project planning with dependency resolution and critical path analysis.
+// Exercises: records with body methods; data-carrying enum cases; generic ADT enum;
+// collection pipelines (filter/map/fold/sortedBy/groupBy/find/partition);
+// foreach (k,v) in map; pattern matching with select + type patterns; closures;
+// string interpolation; try/catch; nullable; while; recursion.
+
+// ── Priority levels ─────────────────────────────────────────────────────────
+enum Priority {
+  LOW, MEDIUM, HIGH, CRITICAL
+}
+
+// ── Task status ──────────────────────────────────────────────────────────────
+enum Status {
+  TODO, IN_PROGRESS, DONE, BLOCKED
+}
+
+// ── Task dependency kinds ────────────────────────────────────────────────────
+enum DepKind {
+  FINISH_TO_START, START_TO_START, FINISH_TO_FINISH
+}
+
+// ── Core records ─────────────────────────────────────────────────────────────
+record Task(id: String, name: String, durationDays: Int, priority: Priority, status: Status) {
+public:
+  def isBlocking(): Boolean = priority() == Priority::CRITICAL || priority() == Priority::HIGH
+  def displayPriority(): String = select priority() {
+    case Priority::CRITICAL: "CRIT"
+    case Priority::HIGH:     "HIGH"
+    case Priority::MEDIUM:   "MED "
+    case Priority::LOW:      "LOW "
+    else: "????"
+  }
+  def toString(): String = "[#{id()}] #{name()} (#{durationDays()}d, #{displayPriority()})"
+}
+
+record Dependency(fromId: String, toId: String, kind: DepKind)
+
+record Person(name: String, dailyCapacity: Int) {
+public:
+  def canHandle(task: Task): Boolean = dailyCapacity() >= task.durationDays()
+}
+
+record Assignment(person: Person, task: Task, startDay: Int) {
+public:
+  def endDay(): Int = startDay() + task.durationDays() - 1
+  def toString(): String = "#{person().name()} -> #{task().name()} (day #{startDay()}..#{endDay()})"
+}
+
+// ── Scheduling result ADT ────────────────────────────────────────────────────
+enum ScheduleResult {
+  case Success(assignments: List[Assignment], totalDays: Int)
+  case Failed(reason: String)
+}
+
+// ── Planner class ────────────────────────────────────────────────────────────
+class Planner {
+  val tasks: List[Task]
+  val deps: List[Dependency]
+  val team: List[Person]
+public:
+  def this(tasks: List[Task], deps: List[Dependency], team: List[Person]) {
+    this.tasks = tasks
+    this.deps = deps
+    this.team = team
+  }
+
+  // Compute predecessors for a given task id
+  def predecessors(taskId: String): List[String] =
+    deps.filter { d -> d.toId() == taskId }.map { d -> d.fromId() }
+
+  // Topological sort (Kahn's algorithm)
+  def topoSort(): List[String] {
+    // count in-degrees
+    val inDegree: Map[String, Int] = [:]
+    foreach t: Task in tasks {
+      inDegree[t.id()] = 0
+    }
+    foreach d: Dependency in deps {
+      val prev: Int = inDegree[d.toId()] as Int
+      inDegree[d.toId()] = prev + 1
+    }
+
+    // start with zero-in-degree tasks
+    val queue: List[String] = []
+    foreach t: Task in tasks {
+      if (inDegree[t.id()] as Int) == 0 {
+        queue.add(t.id())
+      }
+    }
+
+    val order: List[String] = []
+    while queue.size > 0 {
+      val current: String = queue.remove(0) as String
+      order.add(current)
+      foreach d: Dependency in deps {
+        if d.fromId() == current {
+          val newDeg: Int = (inDegree[d.toId()] as Int) - 1
+          inDegree[d.toId()] = newDeg
+          if newDeg == 0 {
+            queue.add(d.toId())
+          }
+        }
+      }
+    }
+    return order
+  }
+
+  // Compute earliest start day for each task (critical path forward pass)
+  def computeEarliestStart(): Map[String, Int] {
+    val order: List[String] = topoSort()
+    val earliest: Map[String, Int] = [:]
+    foreach id: String in order {
+      val preds: List[String] = predecessors(id)
+      if preds.size == 0 {
+        earliest[id] = 1
+      } else {
+        // max of (earliest[pred] + pred.duration - 1)
+        val taskById: Map[Object, List[Task]] = tasks.groupBy { t -> t.id() }
+        var maxEnd: Int = 0
+        foreach pred: String in preds {
+          val predTasks: List[Task] = taskById[pred] as List[Task]
+          if predTasks != null && predTasks.size > 0 {
+            val predTask: Task = predTasks[0] as Task
+            val predEnd: Int = (earliest[pred] as Int) + predTask.durationDays() - 1
+            if predEnd > maxEnd {
+              maxEnd = predEnd
+            }
+          }
+        }
+        earliest[id] = maxEnd + 1
+      }
+    }
+    return earliest
+  }
+
+  // Schedule tasks greedily, respecting person availability
+  def schedule(): ScheduleResult {
+    val order: List[String] = topoSort()
+    if order.size != tasks.size {
+      return new Failed("Cycle detected in dependencies")
+    }
+
+    val earliest: Map[String, Int] = computeEarliestStart()
+    val assignments: List[Assignment] = []
+    // track next free day for each person (name -> day)
+    val freeFrom: Map[String, Int] = [:]
+    foreach p: Person in team {
+      freeFrom[p.name()] = 1
+    }
+
+    val taskById: Map[Object, List[Task]] = tasks.groupBy { t -> t.id() }
+    foreach id: String in order {
+      val candidates: List[Task] = taskById[id] as List[Task]
+      if candidates == null || candidates.size == 0 { continue }
+      val task: Task = candidates[0] as Task
+      val earliestStart: Int = earliest[id] as Int
+
+      // pick team member who can handle capacity AND is free earliest
+      var bestPerson: Person? = null
+      var bestStart: Int = 999999
+      foreach p: Person in team {
+        if (p as Person).canHandle(task) {
+          val free: Int = freeFrom[p.name()] as Int
+          val actualStart: Int = if free > earliestStart { free } else { earliestStart }
+          if actualStart < bestStart {
+            bestStart = actualStart
+            bestPerson = p as Person?
+          }
+        }
+      }
+      if bestPerson == null {
+        return new Failed("No team member can handle task: " + task.name())
+      }
+      val chosen: Person = bestPerson as Person
+      assignments.add(new Assignment(chosen, task, bestStart))
+      freeFrom[chosen.name()] = bestStart + task.durationDays()
+    }
+
+    // total project duration = max endDay across all assignments
+    val maxDay: Int = assignments.fold(0) { acc, a ->
+      val end: Int = (a as Assignment).endDay()
+      if end > (acc as Int) { end } else { acc as Int }
+    } as Int
+
+    return new Success(assignments, maxDay)
+  }
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+def priorityReport(tasks: List[Task]): void {
+  IO::println("\n── Tasks by priority ─────────────────────────────")
+  val grouped: Map[Object, List[Task]] = tasks.groupBy { t -> t.displayPriority() }
+  foreach (label, group) in grouped {
+    IO::println("  #{label}: #{(group as List[Task]).size} task(s)")
+  }
+}
+
+def criticalTasks(tasks: List[Task]): List[Task] =
+  tasks.filter { t -> (t as Task).isBlocking() }
+
+// ── Main program ───────────────────────────────────────────────────────────
+def main(): void {
+  val tasks: List[Task] = [
+    new Task("T1", "Requirements Analysis",  5, Priority::CRITICAL,  Status::DONE),
+    new Task("T2", "Architecture Design",    8, Priority::HIGH,       Status::IN_PROGRESS),
+    new Task("T3", "Database Schema",        4, Priority::HIGH,       Status::TODO),
+    new Task("T4", "API Layer",             10, Priority::HIGH,       Status::TODO),
+    new Task("T5", "Frontend Components",   12, Priority::MEDIUM,     Status::TODO),
+    new Task("T6", "Integration Tests",      6, Priority::HIGH,       Status::TODO),
+    new Task("T7", "Performance Tuning",     4, Priority::MEDIUM,     Status::TODO),
+    new Task("T8", "Documentation",          3, Priority::LOW,        Status::TODO),
+    new Task("T9", "Security Audit",         5, Priority::CRITICAL,   Status::TODO),
+    new Task("T10","Deployment",             2, Priority::HIGH,       Status::TODO)
+  ]
+
+  val deps: List[Dependency] = [
+    new Dependency("T1", "T2", DepKind::FINISH_TO_START),
+    new Dependency("T1", "T3", DepKind::FINISH_TO_START),
+    new Dependency("T2", "T4", DepKind::FINISH_TO_START),
+    new Dependency("T3", "T4", DepKind::FINISH_TO_START),
+    new Dependency("T2", "T5", DepKind::FINISH_TO_START),
+    new Dependency("T4", "T6", DepKind::FINISH_TO_START),
+    new Dependency("T5", "T6", DepKind::FINISH_TO_START),
+    new Dependency("T6", "T7", DepKind::FINISH_TO_START),
+    new Dependency("T6", "T9", DepKind::FINISH_TO_START),
+    new Dependency("T4", "T8", DepKind::FINISH_TO_START),
+    new Dependency("T7", "T10", DepKind::FINISH_TO_START),
+    new Dependency("T9", "T10", DepKind::FINISH_TO_START),
+    new Dependency("T8", "T10", DepKind::FINISH_TO_START)
+  ]
+
+  val team: List[Person] = [
+    new Person("Alice",   15),
+    new Person("Bob",     10),
+    new Person("Carol",   12),
+    new Person("Dave",     8)
+  ]
+
+  IO::println("=== Project Planning System ===")
+  IO::println("Tasks: #{tasks.size}, Dependencies: #{deps.size}, Team: #{team.size}")
+
+  // Summary statistics
+  val totalWork: Int = tasks.fold(0) { acc, t -> (acc as Int) + (t as Task).durationDays() } as Int
+  IO::println("Total person-days of work: " + totalWork)
+
+  val critical: List[Task] = criticalTasks(tasks)
+  IO::println("Critical/High priority tasks: " + critical.size)
+  foreach t: Task in critical {
+    IO::println("  " + t.toString())
+  }
+
+  priorityReport(tasks)
+
+  // Run scheduler
+  val planner: Planner = new Planner(tasks, deps, team)
+  val result: ScheduleResult = planner.schedule()
+
+  IO::println("\n── Schedule Result ───────────────────────────────")
+  select result {
+    case s is Success: {
+      IO::println("Project completes in #{s.totalDays()} days")
+      IO::println("Assignments:")
+      foreach a: Assignment in s.assignments() {
+        IO::println("  " + a.toString())
+      }
+    }
+    case f is Failed: {
+      IO::println("Scheduling failed: " + f.reason())
+    }
+    else: IO::println("Unknown result")
+  }
+
+  // Tasks per status
+  IO::println("\n── Status Breakdown ──────────────────────────────")
+  val byStatus: Map[Object, List[Task]] = tasks.groupBy { t -> select t.status() {
+    case Status::DONE: "done"
+    case Status::IN_PROGRESS: "in-progress"
+    case Status::TODO: "todo"
+    case Status::BLOCKED: "blocked"
+    else: "unknown"
+  }}
+  foreach (status, group) in byStatus {
+    IO::println("  #{status}: #{(group as List[Task]).size}")
+  }
+
+  // Longest task
+  val longest: Task? = tasks.sortedBy { t -> 0 - (t as Task).durationDays() }.find { _ -> true } as Task?
+  if longest != null {
+    IO::println("\nLongest task: #{longest.name()} (#{longest.durationDays()} days)")
+  }
+
+  // Average duration
+  val avgDuration: Int = totalWork / tasks.size
+  IO::println("Average task duration: #{avgDuration} days")
+
+  // Done vs todo ratio
+  val done: List[Task] = tasks.filter { t -> (t as Task).status() == Status::DONE }
+  val remaining: List[Task] = tasks.filter { t -> (t as Task).status() != Status::DONE }
+  IO::println("Done: #{done.size}, Remaining: #{remaining.size}")
+}

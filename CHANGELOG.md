@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.0] - 2026-09-22
+
 ### Fixed
 
 - **Assigning through safe navigation (`obj?.field = value`, or the compound form `obj?.field += value`) reported the same generic "an lvalue is required" (`E0028`) diagnostic as any other non-assignable expression** (e.g. `null = expr`), with no indication that the read form (`obj?.field`) is fine and only the write form is rejected -- `?.` short-circuits to null on a null receiver, which has no sensible meaning as an assignment target, but that reasoning wasn't visible in the message. Fixed by special-casing a `SafeMemberSelection` assignment target in `AssignmentTyping.typeAssignment` and adding a matching hint in `SemanticErrorReporter.reportLvalueRequired` that suggests a null check on the receiver or dropping the `?.`; the generic message is unchanged for every other non-lvalue. Guarded by four new regression tests in `SafeNavigationAssignmentTargetSpec`.

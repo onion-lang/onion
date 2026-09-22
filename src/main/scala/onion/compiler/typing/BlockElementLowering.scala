@@ -105,6 +105,17 @@ final class BlockElementLowering(
         } else if (collection.isBasicType || collection.isNullType) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
           new NOP(node.location)
+        } else if (collection.`type`.isInstanceOf[NullableType]) {
+          // `foreach x in b` where `b: List[Int]?`: iterating dereferences the
+          // receiver just like `b.field`/`b[i]` do, so it gets the same
+          // null-safety error (E0070) instead of falling through to the
+          // generic array/map/iterator dispatch below, where the iterator
+          // branch's `collection.`type`.asInstanceOf[ObjectType]` crashes with
+          // a ClassCastException on a NullableType -- mirrors the indexing
+          // read path (ConstructionTyping.typeIndexing).
+          val nullable = collection.`type`.asInstanceOf[NullableType]
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node.collection, nullable.displayName)
+          new NOP(node.location)
         } else {
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
           if (elementVar == null) {

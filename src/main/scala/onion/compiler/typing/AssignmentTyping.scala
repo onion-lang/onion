@@ -208,6 +208,13 @@ final class AssignmentTyping(
         // its own hint instead of the generic message.
         bodyContext.report(LVALUE_REQUIRED, node, java.lang.Boolean.TRUE)
         None
+      case _: AST.SafeIndexing =>
+        // `obj?[index] = value`: same reasoning as `obj?.field = value`
+        // above -- `?[]` short-circuits to null on a null receiver, so this
+        // can't be an assignment target either. Same hint, worded for the
+        // indexing form (the read form `obj?[index]` is valid).
+        bodyContext.report(LVALUE_REQUIRED, node, "indexing")
+        None
       case _ =>
         // e.g. (null = expr): not an assignable target; report instead of
         // silently dropping (a silent None leaves zero errors and a null

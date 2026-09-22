@@ -902,6 +902,7 @@ nullable な型（`T?`）の値が、間に null チェックを挟まないま�
 - **条件式** — `if` / `while` / `do-while` / `for` の条件や `select` ガードの `when` に nullable な `Boolean?` を直接使用。
 - **`foreach` のコレクション** — `foreach x: T in expr` で `expr` が nullable な型を持つ場合。
 - **分解代入** — `val (a, b) = expr` で `expr` が nullable なレコードの場合。
+- **配列サイズ** — `new T[n]` で次元 `n` が nullable な型（`n: Int?`）を持つ場合。
 
 ```onion
 class Test {

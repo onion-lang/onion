@@ -908,6 +908,7 @@ several forms, sharing the same fix:
 - **Condition** — a nullable `Boolean?` used directly as an `if` / `while` / `do-while` / `for` condition, or a `select` guard's `when`.
 - **`foreach` collection** — `foreach x: T in expr` where `expr` has nullable type.
 - **Destructuring** — `val (a, b) = expr` where `expr` is a nullable record.
+- **Array size** — `new T[n]` where a dimension `n` has nullable type (`n: Int?`).
 
 ```onion
 class Test {

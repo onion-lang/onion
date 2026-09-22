@@ -20,8 +20,22 @@ final class BlockElementLowering(
       case None => null
       case Some(term) =>
         TypeCheckingHelpers.ensureBoolean(bodyContext.table, node, term,
-          (n, actual) => bodyContext.report(INCOMPATIBLE_TYPE, n, BasicType.BOOLEAN, actual))
+          (n, actual) => reportNonBooleanCondition(n, actual))
     }
+
+  /**
+   * A nullable condition (e.g. `while b { }` where `b: Boolean?`) unboxes it
+   * exactly like a nullable operand in a unary/binary operator does, so it
+   * gets the same null-safety diagnostic (E0070) those already report,
+   * instead of the generic "type Boolean is expected" (E0000) a genuinely
+   * incompatible, non-nullable type gets.
+   */
+  private def reportNonBooleanCondition(node: AST.Node, actual: Type): Unit = actual match {
+    case nullable: NullableType =>
+      bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "condition")
+    case _ =>
+      bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, actual)
+  }
 
   /**
    * Checks if a statement is "terminating" (never falls through to the next statement).

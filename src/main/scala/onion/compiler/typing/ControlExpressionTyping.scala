@@ -197,7 +197,21 @@ final class ControlExpressionTyping(
   /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed). */
   private[typing] def ensureBoolean(node: AST.Node, term: Term): Term =
     TypeCheckingHelpers.ensureBoolean(bodyContext.table, node, term,
-      (n, actual) => bodyContext.report(INCOMPATIBLE_TYPE, n, BasicType.BOOLEAN, actual))
+      (n, actual) => reportNonBooleanCondition(n, actual))
+
+  /**
+   * A nullable condition (e.g. `if b { }` where `b: Boolean?`) unboxes it
+   * exactly like a nullable operand in a unary/binary operator does, so it
+   * gets the same null-safety diagnostic (E0070) those already report,
+   * instead of the generic "type Boolean is expected" (E0000) a genuinely
+   * incompatible, non-nullable type gets.
+   */
+  private def reportNonBooleanCondition(node: AST.Node, actual: Type): Unit = actual match {
+    case nullable: NullableType =>
+      bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "condition")
+    case _ =>
+      bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, actual)
+  }
 
   private[typing] def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case stmtTerm: StatementTerm => stmtTerm.statement

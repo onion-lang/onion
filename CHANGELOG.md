@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.96.0] - 2026-09-22
+
 ### Fixed
 
 - **Indexing a genuinely nullable (non-safe-indexing) receiver (`b[i]` / `b[i] = v` / `b[i] += v` where `b: List[Int]?`) reported the generic `E0041` ("type List[Int]? is not a valid method call target") instead of the specific, actionable `E0070` (`NULLABLE_MEMBER_ACCESS`)**, even though the equivalent member access (`b.field` / `b.field = v`) already reports `E0070` with its hint to use `?.`/`?[`, `?:`, `!!`, or a null check. Neither `ConstructionTyping.typeIndexing` (the read path) nor `AssignmentTyping.processArrayAssign` (the write path, which also covers compound assignment via desugaring) special-cased a `NullableType` target before falling into the generic `INVALID_METHOD_CALL_TARGET` catch-all — unlike the safe-indexing form (`b?[i]`), which already unwraps nullability correctly, and unlike the member-access paths fixed previously. Fixed by reporting `NULLABLE_MEMBER_ACCESS` for a `NullableType` indexing target in both paths, with wording specific to indexing (`?[` rather than `?.`) via a new `error.semantic.nullableIndexingAccess` message key (en/ja). Guarded by six new regression tests in `NullableIndexingAccessSpec`; the pre-existing `InvalidMethodCallTargetSpec` case documenting the old `E0041` behavior was updated to assert the corrected `E0070`.

@@ -50,11 +50,15 @@ final class TryExpressionTyping(
                 val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
 
                 // AutoCloseableを実装しているか確認
-                if (!TypeRules.isSuperType(autoCloseable, resourceType)) {
-                  bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
-                  resourceFailed = true
-                } else {
-                  resourceBindings += ((binding, init))
+                resourceType match {
+                  case nullable: NullableType =>
+                    bodyContext.report(NULLABLE_MEMBER_ACCESS, resource, nullable.displayName, "resource")
+                    resourceFailed = true
+                  case _ if !TypeRules.isSuperType(autoCloseable, resourceType) =>
+                    bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+                    resourceFailed = true
+                  case _ =>
+                    resourceBindings += ((binding, init))
                 }
               case None =>
                 resourceFailed = true

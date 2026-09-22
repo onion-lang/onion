@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.97.0] - 2026-09-22
+
 ### Fixed
 
 - **`foreach x: T in expr` crashed the compiler with an uncaught `ClassCastException` (`I0000`) instead of reporting a diagnostic when `expr` had a nullable type (e.g. `List[Int]?`)**, violating the project's no-crash quality bar. `BlockElementLowering.translate` for `AST.ForeachExpression` only special-cased `isBasicType`/`isNullType` collections before falling into the generic array/map/iterator dispatch; a nullable, non-array, non-map collection (the common case) fell through to the iterator branch's `collection.type.asInstanceOf[ObjectType]`, but `NullableType` is not an `ObjectType`, so the cast crashed. Fixed by special-casing a `NullableType` collection up front and reporting the same null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that the equivalent indexing/member-access forms already report, mirroring `ConstructionTyping.typeIndexing`. Guarded by three new regression tests in `ForeachNullableCollectionSpec`.

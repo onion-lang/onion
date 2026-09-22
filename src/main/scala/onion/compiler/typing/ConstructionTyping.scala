@@ -119,6 +119,12 @@ final class ConstructionTyping(
     val untypedArgs = node.args.toArray
     val parameters = typedTerms(untypedArgs, context)
     if (typeRefOpt.isEmpty || parameters == null) return None
+    val nullableIndex = parameters.indexWhere(_.`type`.isInstanceOf[NullableType])
+    if (nullableIndex >= 0) {
+      val nullable = parameters(nullableIndex).`type`.asInstanceOf[NullableType]
+      bodyContext.report(NULLABLE_MEMBER_ACCESS, untypedArgs(nullableIndex), nullable.displayName, "arraySize")
+      return None
+    }
     val sizes = parameters.map(Boxing.tryUnboxToInteger(bodyContext.table, _))
     val badIndex = sizes.indexWhere(size => !(size.isBasicType && size.`type`.asInstanceOf[BasicType].isInteger))
     if (badIndex >= 0) {

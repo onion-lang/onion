@@ -107,6 +107,7 @@ final class OperatorTyping(
     // Unbox wrapper operands first; non-unboxable objects (e.g. List << elem) keep the method-call path
     left = Boxing.tryUnboxToInteger(bodyContext.table, left)
     right = Boxing.tryUnboxToInteger(bodyContext.table, right)
+    if (reportNullableOperandIfPresent(node, left, right)) return null
     if (!left.`type`.isBasicType) {
       left.`type` match {
         case target: ObjectType =>

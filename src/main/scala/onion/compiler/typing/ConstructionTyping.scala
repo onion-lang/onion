@@ -338,9 +338,36 @@ final class ConstructionTyping(
       }
     }
 
-    // Existing positional argument handling
-    val parameters0 = typedTerms(node.args.toArray, context)
-    if (parameters0 == null) break(None)
+    // Existing positional argument handling. A malleable argument (a
+    // list/map literal, or a generic static/unqualified/new-object call --
+    // see isMalleableArgument) can fail outright when typed with no expected
+    // type, e.g. `new Leaf()` for a zero-field generic case with nothing of
+    // its own to pin its type parameter from. That failure is fatal to
+    // typedTerms (it returns null for the whole array on any single
+    // argument failure), which previously skipped the expected-type retry
+    // machinery below entirely (retypeConstructorArguments only recovers an
+    // argument that typed to the *wrong* type, not one that failed to type
+    // at all). Suppress reporting for the initial attempt when a malleable
+    // argument is present, and fall back to resolveConstructorForMalleableArgs
+    // -- which types the non-malleable arguments first, narrows to a unique
+    // constructor candidate, and retypes the malleable ones against its
+    // resolved parameter types -- before giving up (#1399).
+    val malleableIndices = node.args.zipWithIndex.collect {
+      case (expr, i) if isMalleableArgument(expr) && !untypedClosureIndices.contains(i) => i
+    }.toSet
+    val parameters0 =
+      if (malleableIndices.nonEmpty) typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
+      else typedTerms(node.args.toArray, context)
+    if (parameters0 == null) {
+      if (malleableIndices.nonEmpty) {
+        resolveConstructorForMalleableArgs(node, typeRef, context, malleableIndices) match {
+          case Some(term) => break(Some(term))
+          case None => // unresolved: fall through and re-type without suppression to report the real diagnostic
+        }
+      }
+      typedTerms(node.args.toArray, context)
+      break(None)
+    }
 
     val constructors0 = typeRef.findConstructor(parameters0)
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
@@ -552,6 +579,77 @@ final class ConstructionTyping(
     case _: AST.ListLiteral => true
     case _: AST.MapLiteral => true
     case _ => false
+  }
+
+  /**
+   * Resolve a constructor when one or more arguments are malleable (see
+   * isMalleableArgument) and typing them with no expected type fails
+   * outright -- e.g. `new Leaf()` for a zero-field generic case with
+   * nothing of its own to pin its type parameter from. Types the
+   * non-malleable arguments first, narrows to a uniquely arity- and
+   * type-matched constructor candidate from those, then retypes the
+   * malleable arguments against that candidate's resolved parameter types.
+   * Returns None (to fall back to the eager path, which reports the
+   * original diagnostic) when a non-malleable argument itself fails to
+   * type, no candidate uniquely matches, or a malleable argument still
+   * fails to type against the resolved expected type. Mirrors
+   * resolveConstructorForClosures for a malleable, non-closure argument.
+   */
+  private def resolveConstructorForMalleableArgs(
+    node: AST.NewObject,
+    typeRef: ClassType,
+    context: LocalContext,
+    malleableIndices: Set[Int]
+  ): Option[Term] = boundary {
+    val args = node.args.toArray
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    def substitutedArgs(c: ConstructorRef): Array[Type] =
+      c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+
+    val prelim = new Array[Term](args.length)
+    for (i <- args.indices if !malleableIndices.contains(i)) {
+      typing.withSuppressedReporting(typed(args(i), context)) match {
+        case Some(t) => prelim(i) = t
+        case None => break(None)
+      }
+    }
+
+    val candidates = typeRef.constructors.filter { c =>
+      val formals = substitutedArgs(c)
+      formals.length == args.length &&
+        args.indices.forall { i =>
+          malleableIndices.contains(i) || TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+        }
+    }
+    if (candidates.length != 1) break(None)
+
+    val ctor = candidates(0)
+    val formals = substitutedArgs(ctor)
+    val finalParams = new Array[Term](args.length)
+    for (i <- args.indices) {
+      if (malleableIndices.contains(i)) {
+        typing.withSuppressedReporting(typed(args(i), context, formals(i))) match {
+          case Some(t) => finalParams(i) = t
+          case None => break(None)
+        }
+      } else {
+        val p = prelim(i)
+        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p) else p
+      }
+    }
+
+    typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val appliedCtor = new TypedAST.ConstructorRef {
+          def modifier: Int = ctor.modifier
+          def affiliation: TypedAST.ClassType = applied
+          def name: String = ctor.name
+          def getArgs: Array[TypedAST.Type] = ctor.getArgs
+        }
+        Some(new NewObject(appliedCtor, finalParams))
+      case _ =>
+        Some(new NewObject(ctor, finalParams))
+    }
   }
 
   /**

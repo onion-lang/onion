@@ -60,10 +60,17 @@ private[typing] class AdditionTyping(
     if (isString(left) || isString(right)) {
       typeStringConcatenation(node, left, right)
     } else {
-      bodyContext.report(
-        SemanticError.INCOMPATIBLE_OPERAND_TYPE, node, node.symbol,
-        Array[Type](left.`type`, right.`type`)
-      )
+      // A nullable, non-string operand (e.g. `n: Int?` or `v: Vec?` with no
+      // matching `+`) would otherwise fall into the generic
+      // INCOMPATIBLE_OPERAND_TYPE below; report the specific null-safety
+      // diagnostic instead, mirroring the numeric/comparable/bitwise binary
+      // operators in OperatorTyping.
+      if (!body.operatorTyping.reportNullableOperandIfPresent(node, left, right)) {
+        bodyContext.report(
+          SemanticError.INCOMPATIBLE_OPERAND_TYPE, node, node.symbol,
+          Array[Type](left.`type`, right.`type`)
+        )
+      }
       None
     }
   }

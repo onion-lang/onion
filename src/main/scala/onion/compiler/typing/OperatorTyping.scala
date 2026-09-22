@@ -155,7 +155,8 @@ final class OperatorTyping(
     val leftType = left.`type`
     val rightType = right.`type`
     if ((!numeric(leftType)) || (!numeric(rightType))) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      if (!reportNullableOperandIfPresent(node, left, right))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       null
     } else {
       val resultType = promote(leftType, rightType)
@@ -172,7 +173,8 @@ final class OperatorTyping(
     val left = tryUnboxAny(leftRaw)
     val right = tryUnboxAny(rightRaw)
     if ((!left.isBasicType) || (!right.isBasicType)) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      if (!reportNullableOperandIfPresent(node, left, right))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
     }
     val leftType = left.`type`.asInstanceOf[BasicType]
@@ -315,6 +317,31 @@ final class OperatorTyping(
           }
         case _ => None
       }
+    }
+
+  /**
+   * A nullable operand (e.g. `n: Int?`) in an arithmetic, comparison, or
+   * bitwise binary operator unboxes/dereferences it exactly like member
+   * access (`b.field`) or indexing (`b[i]`) does, so it gets the same
+   * null-safety diagnostic (E0070) those already-fixed forms report, instead
+   * of the generic "operator X is not applicable" (E0001) a genuinely
+   * incompatible type gets. Checks the left operand first (mirroring
+   * `tryOperatorMethod`, which only ever dispatches off the left operand),
+   * then the right. Returns true when it reported, so the caller can skip
+   * its own generic report.
+   */
+  private[typing] def reportNullableOperandIfPresent(node: AST.BinaryExpression, left: Term, right: Term): Boolean =
+    left.`type` match {
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.lhs, nullable.displayName, "operator")
+        true
+      case _ =>
+        right.`type` match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, node.rhs, nullable.displayName, "operator")
+            true
+          case _ => false
+        }
     }
 
   def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
@@ -469,7 +496,8 @@ final class OperatorTyping(
 
   def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
     if ((!hasNumericType(lt)) || (!hasNumericType(rt))) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
+      if (!reportNullableOperandIfPresent(node, lt, rt))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
       return null
     }
     val resultType = promote(lt.`type`, rt.`type`)

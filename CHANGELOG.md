@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`foreach x: T in expr` crashed the compiler with an uncaught `ClassCastException` (`I0000`) instead of reporting a diagnostic when `expr` had a nullable type (e.g. `List[Int]?`)**, violating the project's no-crash quality bar. `BlockElementLowering.translate` for `AST.ForeachExpression` only special-cased `isBasicType`/`isNullType` collections before falling into the generic array/map/iterator dispatch; a nullable, non-array, non-map collection (the common case) fell through to the iterator branch's `collection.type.asInstanceOf[ObjectType]`, but `NullableType` is not an `ObjectType`, so the cast crashed. Fixed by special-casing a `NullableType` collection up front and reporting the same null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that the equivalent indexing/member-access forms already report, mirroring `ConstructionTyping.typeIndexing`. Guarded by three new regression tests in `ForeachNullableCollectionSpec`.
+
 ### Added
 
 - **`run/GreenhouseController.on`** — a 237-line multi-zone greenhouse climate simulation (a `Reading` record derived via `from re"..."` pattern parsing, an ADT case-enum `ClimateAction` with a rule engine dispatched via `select`/`is`, extension methods on `Double`/`Int`/`String`, collection pipelines including `filter`/`sortedBy`/`fold`/`partition`/`map`/`distinct`, `do[List]` comprehension, `foreach` over ranges and maps, nullable lookups with `?:`, try/catch around malformed log lines, and recursion for a longest-urgent-streak scan), added to the `run/` corpus.

@@ -470,11 +470,14 @@ final class BlockElementLowering(
               val index = context.add(resource.name, resourceType, isMutable = false)
               val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
 
-              if (TypeRules.isSuperType(autoCloseable, resourceType)) {
-                resourceBindings += ((binding, init))
-              } else {
-                // Report error but still allow the variable to be used
-                bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+              resourceType match {
+                case nullable: NullableType =>
+                  bodyContext.report(NULLABLE_MEMBER_ACCESS, resource, nullable.displayName, "resource")
+                case _ if TypeRules.isSuperType(autoCloseable, resourceType) =>
+                  resourceBindings += ((binding, init))
+                case _ =>
+                  // Report error but still allow the variable to be used
+                  bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
               }
             }
           }

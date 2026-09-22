@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.96.0] - 2026-09-22
-
 ### Fixed
 
 - **Assigning through a genuinely nullable (non-safe-nav) receiver (`b.field = value` where `b: Box?`) reported the generic `E0041` ("type Box? is not a valid method call target") instead of the specific, actionable `E0070` (`NULLABLE_MEMBER_ACCESS`)**, even though the equivalent read (`b.field`) and the equivalent plain method call on the same receiver (`b.method()`) both already reported `E0070` with its hint to use `?.`, `?:`, `!!`, or a null check. This is distinct from the already-fixed `obj?.field = value` case below — here there is no `?.` at all, the receiver itself is simply typed as nullable. `AssignmentTyping.processMemberAssign` never special-cased a `NullableType` assignment target before falling into the generic `INVALID_METHOD_CALL_TARGET` catch-all, unlike the read path (`MemberSelectionResolutionSupport.normalizeTarget`) and the method-call path (`MethodTargetTypingSupport.normalizeMethodCallTarget`), which both already special-case it. Fixed by reporting `NULLABLE_MEMBER_ACCESS` for a `NullableType` assignment target before the generic fallback, mirroring both existing paths; this also fixes the same wrong diagnostic for compound assignment (`b.field += v`). Guarded by five new regression tests in `NullableMemberAssignmentTargetSpec`.

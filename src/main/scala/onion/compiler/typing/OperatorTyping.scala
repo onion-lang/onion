@@ -373,6 +373,24 @@ final class OperatorTyping(
   def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
     val operand = typed(termNode, context).getOrElse(null)
     if (operand == null) return None
+    termNode match {
+      case _: AST.SafeMemberSelection =>
+        // `obj?.field++`/`obj?.field--`: safe navigation short-circuits to
+        // null at runtime, which has no sensible meaning as an update
+        // target -- same reasoning as `obj?.field = value` in
+        // AssignmentTyping, which already gets this hint. Without this
+        // check, the nullable-wrapped read type (e.g. `Int?`) falls into the
+        // generic numeric-operand check below and reports a confusing
+        // "operator ++ is not applicable for type Int?" instead.
+        bodyContext.report(LVALUE_REQUIRED, node, java.lang.Boolean.TRUE)
+        return None
+      case _: AST.SafeIndexing =>
+        // `obj?[index]++`/`obj?[index]--`: same reasoning as above, worded
+        // for the indexing form (mirrors `obj?[index] = value`).
+        bodyContext.report(LVALUE_REQUIRED, node, "indexing")
+        return None
+      case _ =>
+    }
     if ((!operand.isBasicType) || !hasNumericType(operand)) {
       bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
       return None

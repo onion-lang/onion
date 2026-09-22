@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-09-22
+
 ### Fixed
 
 - **A nullable array-size dimension (`new T[n]` where `n: Int?`) reported the generic `E0000` ("type Int is expected, but type Int? is used") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that every other dereference-like use of a nullable value (member access, indexing, operators, conditions, `foreach`, destructuring) already reports.** `ConstructionTyping.typeNewArray` unboxed each size argument with `Boxing.tryUnboxToInteger` and, on failure, fell straight into a generic `INCOMPATIBLE_TYPE` report against the original (still-nullable) type, unlike `typeIndexing` right above it in the same file, which already special-cases `NullableType` before its own generic indexing-target report. Fixed by special-casing a `NullableType` size argument up front, before attempting to unbox it, and reporting `NULLABLE_MEMBER_ACCESS` with wording specific to an array size (`error.semantic.nullableArraySize`, en/ja). Guarded by four new regression tests in `NullableArraySizeSpec`.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A named-argument method call through safe navigation (`obj?.method(b = 1, a = 2)`) failed to resolve at all**, reporting a spurious "method not found" against the wrong (positionally-matched) signature, even though the identical named-argument call on a non-null-checked receiver (`obj.method(b = 1, a = 2)`) already worked — including the record `copy` sugar, where both the zero-arg full clone (`p?.copy()`) and the partial named-argument copy (`p?.copy(y = 9)`) failed the same way. `SafeNavigationTypingSupport.typeSafeMethodCall` never checked for named arguments or record-copy sugar before falling straight into positional `MethodResolution.findMethods`, unlike the equivalent plain-call path in `InstanceMethodCallSupport`. Fixed by extracting the record-copy handling shared between both paths into `RecordCopySupport` (parameterized over how the resolved call is wrapped, `Call` vs `SafeCall`, so a null receiver still short-circuits to `null` at runtime instead of being dereferenced) and adding the same named-argument resolution path to safe navigation. Guarded by seven new regression tests in `SafeNavigationNamedArgumentsSpec`.
+
 ## [0.95.0] - 2026-09-21
 
 ### Fixed

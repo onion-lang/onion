@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GreenhouseController.on`** — a 237-line multi-zone greenhouse climate simulation (a `Reading` record derived via `from re"..."` pattern parsing, an ADT case-enum `ClimateAction` with a rule engine dispatched via `select`/`is`, extension methods on `Double`/`Int`/`String`, collection pipelines including `filter`/`sortedBy`/`fold`/`partition`/`map`/`distinct`, `do[List]` comprehension, `foreach` over ranges and maps, nullable lookups with `?:`, try/catch around malformed log lines, and recursion for a longest-urgent-streak scan), added to the `run/` corpus.
+
 ## [0.96.0] - 2026-09-22
 
 ### Fixed

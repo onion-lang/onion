@@ -424,6 +424,36 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, appendSuggestion(baseMessage, hint))
   }
 
+  /**
+   * Handles LVALUE_REQUIRED with a hint when the rejected target is a safe
+   * navigation (`obj?.field = value` or `obj?[index] = value`), a mistake
+   * distinct enough from the generic non-lvalue case (e.g. `null = expr`) to
+   * earn its own guidance.
+   */
+  private def reportLvalueRequired(position: Location, items: Array[AnyRef]): Unit = {
+    val baseMessage = message("error.semantic.lValueRequired")
+    val hint = items.headOption match {
+      case Some(java.lang.Boolean.TRUE) => Some(message("suggestion.safeNavAssignmentTarget"))
+      case Some("indexing") => Some(message("suggestion.safeNavIndexingAssignmentTarget"))
+      case _ => None
+    }
+    problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  /**
+   * Handles NULLABLE_MEMBER_ACCESS with wording that matches how the
+   * receiver was dereferenced: dot access (`b.field`/`b.method()`) hints at
+   * `?.`, indexing (`b[i]`) hints at `?[` instead -- `?.` would be the wrong
+   * operator to suggest for the indexing form.
+   */
+  private def reportNullableMemberAccess(position: Location, items: Array[AnyRef]): Unit = {
+    val typeName = asString(items(0))
+    val key =
+      if (items.length > 1 && items(1) == "indexing") "error.semantic.nullableIndexingAccess"
+      else "error.semantic.nullableMemberAccess"
+    problem(position, format(message(key), Seq(typeName)))
+  }
+
   // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -460,6 +490,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportMissingReturn(position, items)
       case SemanticError.CANNOT_RETURN_VALUE =>
         reportCannotReturnValue(position, items)
+      case SemanticError.LVALUE_REQUIRED =>
+        reportLvalueRequired(position, items)
+      case SemanticError.NULLABLE_MEMBER_ACCESS =>
+        reportNullableMemberAccess(position, items)
 
       // Data-driven cases
       case _ =>
@@ -648,10 +682,6 @@ object SemanticErrorReporter {
     SemanticError.INCOMPATIBLE_OPERAND_TYPE -> ErrorDef(
       "error.semantic.incompatibleOperandType",
       Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.LVALUE_REQUIRED -> ErrorDef(
-      "error.semantic.lValueRequired",
-      Seq()
     ),
     SemanticError.CANNOT_ASSIGN_TO_VAL -> ErrorDef(
       "error.semantic.cannotAssignToVal",
@@ -892,10 +922,6 @@ object SemanticErrorReporter {
     ),
     SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
       "error.semantic.typeParameterMayBeNull",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.NULLABLE_MEMBER_ACCESS -> ErrorDef(
-      "error.semantic.nullableMemberAccess",
       Seq(items => asString(items(0)))
     ),
     SemanticError.STATIC_CALL_ON_INSTANCE -> ErrorDef(

@@ -19,6 +19,7 @@ final class MethodCallTyping(
   private val memberSelectionResolutionSupport = new MemberSelectionResolutionSupport(typing, bodyContext, this)
   private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(this)
   private val methodCallFallbackSupport = new MethodCallFallbackSupport(typing, this)
+  private val recordCopySupport = new RecordCopySupport(this)
   private val instanceMethodCallSupport = new InstanceMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
   private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
@@ -397,6 +398,23 @@ final class MethodCallTyping(
     context: LocalContext
   ): Option[Array[Term]] =
     callArgumentTypingSupport.processNamedArguments(node, args, method, context)
+
+  /**
+   * Record `copy` sugar: `p.copy()` (full clone, zero args) and
+   * `p.copy(y = 9)` (partial copy via named arguments). `buildRawCall` wraps
+   * the resolved `copy` method + final args into the caller's call term
+   * (`Call` for a plain access, `SafeCall` for a `?.` access).
+   */
+  private[typing] def tryRecordCopy(
+    node: AST.Node,
+    name: String,
+    args: List[AST.Expression],
+    typeArgs: List[AST.TypeNode],
+    context: LocalContext,
+    target: Term,
+    targetType: ObjectType
+  )(buildRawCall: (Method, Array[Term]) => Term): Option[Term] =
+    recordCopySupport.tryRecordCopy(node, name, args, typeArgs, context, target, targetType)(buildRawCall)
 
   // hasNamedArguments delegated to ArgumentHelpers object
 

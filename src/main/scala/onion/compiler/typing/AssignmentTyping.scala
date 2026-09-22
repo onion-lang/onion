@@ -93,6 +93,14 @@ final class AssignmentTyping(
                   if (value.`type`.isBottomType) value else null
               }
           }
+        case nullable: NullableType =>
+          // `b[i] = v` where `b: List[Int]?`: same reasoning as the read path
+          // in ConstructionTyping.typeIndexing -- indexing dereferences the
+          // receiver, so this gets the same null-safety error (E0070) as
+          // `b.field = v` instead of the generic INVALID_METHOD_CALL_TARGET
+          // (E0041) below.
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, indexing.lhs, nullable.displayName, "indexing")
+          null
         case other =>
           // e.g. assigning through a nullable receiver: unwrap it first
           bodyContext.report(INVALID_METHOD_CALL_TARGET, indexing.lhs, other)
@@ -105,11 +113,38 @@ final class AssignmentTyping(
     node match {
       case AST.Assignment(_, selection@AST.MemberSelection(_, _, _), expression) =>
         val contextClass = bodyContext.definition
-        val target = typed(selection.target, context).getOrElse(null)
-        if (target == null) return null
-        if (target.`type`.isBasicType || target.`type`.isNullType) {
-          bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target.`type`)
+        val target0 = typed(selection.target, context).getOrElse(null)
+        if (target0 == null) return null
+        if (target0.`type`.isNullType) {
+          bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target0.`type`)
           return null
+        }
+        // A nullable receiver (`b.field = v` where b: Box?) cannot be dereferenced
+        // without a null check, mirroring the read path
+        // (MemberSelectionResolutionSupport.normalizeTarget) and the method-call path
+        // (MethodTargetTypingSupport.normalizeMethodCallTarget), both of which already
+        // report NULLABLE_MEMBER_ACCESS here. Previously this fell through to the
+        // generic INVALID_METHOD_CALL_TARGET below (the same message a genuinely
+        // invalid target like a type parameter gets), giving no hint that `?.`, `?:`,
+        // `!!`, or a null check would fix it -- even though the equivalent read
+        // (`b.field`) already gave that hint.
+        target0.`type` match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, selection.target, nullable.displayName)
+            return null
+          case _ =>
+        }
+        // A primitive target (e.g. `n.bogus = 5` where n: Int) is boxed first,
+        // mirroring the read path (MemberSelectionResolutionSupport.normalizeTarget),
+        // so lookup below can report FIELD_NOT_FOUND/FIELD_NOT_ACCESSIBLE with the
+        // caret on the member name instead of a generic INCOMPATIBLE_TYPE on the
+        // receiver.
+        val target = target0.`type` match {
+          case basicType: BasicType if basicType == BasicType.VOID =>
+            bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, basicType)
+            return null
+          case _: BasicType => Boxing.boxing(bodyContext.table, target0)
+          case _ => target0
         }
         val targetType = target.`type` match {
           case objType: ObjectType => objType
@@ -188,6 +223,21 @@ final class AssignmentTyping(
         Option(processMemberAssign(node, context))
       case _: AST.StaticMemberSelection =>
         Option(processStaticFieldAssign(node, context))
+      case _: AST.SafeMemberSelection =>
+        // `obj?.field = value`: safe navigation short-circuits to null at
+        // runtime, which has no sensible meaning as an assignment target, so
+        // this is rejected the same as any other non-lvalue -- but it's a
+        // common enough mistake (the read form `obj?.field` is valid) to earn
+        // its own hint instead of the generic message.
+        bodyContext.report(LVALUE_REQUIRED, node, java.lang.Boolean.TRUE)
+        None
+      case _: AST.SafeIndexing =>
+        // `obj?[index] = value`: same reasoning as `obj?.field = value`
+        // above -- `?[]` short-circuits to null on a null receiver, so this
+        // can't be an assignment target either. Same hint, worded for the
+        // indexing form (the read form `obj?[index]` is valid).
+        bodyContext.report(LVALUE_REQUIRED, node, "indexing")
+        None
       case _ =>
         // e.g. (null = expr): not an assignable target; report instead of
         // silently dropping (a silent None leaves zero errors and a null

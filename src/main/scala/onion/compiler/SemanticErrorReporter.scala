@@ -450,6 +450,7 @@ class SemanticErrorReporter(threshold: Int) {
     val typeName = asString(items(0))
     val key =
       if (items.length > 1 && items(1) == "indexing") "error.semantic.nullableIndexingAccess"
+      else if (items.length > 1 && items(1) == "operator") "error.semantic.nullableOperatorOperand"
       else "error.semantic.nullableMemberAccess"
     problem(position, format(message(key), Seq(typeName)))
   }

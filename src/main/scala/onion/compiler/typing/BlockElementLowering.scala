@@ -714,6 +714,19 @@ final class BlockElementLowering(
       case _ => None
     }
 
+    initType match {
+      case nullable: NullableType =>
+        // A nullable initializer (`Point?`, never null-checked) cannot be
+        // destructured directly. Report the same null-safety error the
+        // equivalent member access (`p.x`) and indexing (`b[i]`) already
+        // report, mirroring MemberSelectionResolutionSupport.normalizeTarget
+        // and ConstructionTyping.typeIndexing, instead of letting it fall
+        // through accessors() into the misleading NOT_A_RECORD_TYPE below.
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.init, nullable.displayName)
+        return new NOP(node.location)
+      case _ =>
+    }
+
     accessors(initType) match {
       case None =>
         bodyContext.report(NOT_A_RECORD_TYPE, node.init, initType.displayName)

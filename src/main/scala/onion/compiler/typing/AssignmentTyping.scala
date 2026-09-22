@@ -111,6 +111,21 @@ final class AssignmentTyping(
           bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target0.`type`)
           return null
         }
+        // A nullable receiver (`b.field = v` where b: Box?) cannot be dereferenced
+        // without a null check, mirroring the read path
+        // (MemberSelectionResolutionSupport.normalizeTarget) and the method-call path
+        // (MethodTargetTypingSupport.normalizeMethodCallTarget), both of which already
+        // report NULLABLE_MEMBER_ACCESS here. Previously this fell through to the
+        // generic INVALID_METHOD_CALL_TARGET below (the same message a genuinely
+        // invalid target like a type parameter gets), giving no hint that `?.`, `?:`,
+        // `!!`, or a null check would fix it -- even though the equivalent read
+        // (`b.field`) already gave that hint.
+        target0.`type` match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, selection.target, nullable.displayName)
+            return null
+          case _ =>
+        }
         // A primitive target (e.g. `n.bogus = 5` where n: Int) is boxed first,
         // mirroring the read path (MemberSelectionResolutionSupport.normalizeTarget),
         // so lookup below can report FIELD_NOT_FOUND/FIELD_NOT_ACCESSIBLE with the

@@ -424,6 +424,19 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, appendSuggestion(baseMessage, hint))
   }
 
+  /**
+   * Handles LVALUE_REQUIRED with a hint when the rejected target is a safe
+   * navigation (`obj?.field = value`), a mistake distinct enough from the
+   * generic non-lvalue case (e.g. `null = expr`) to earn its own guidance.
+   */
+  private def reportLvalueRequired(position: Location, items: Array[AnyRef]): Unit = {
+    val baseMessage = message("error.semantic.lValueRequired")
+    val hint =
+      if (items.nonEmpty && items(0) == java.lang.Boolean.TRUE) Some(message("suggestion.safeNavAssignmentTarget"))
+      else None
+    problem(position, appendSuggestion(baseMessage, hint))
+  }
+
   // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -460,6 +473,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportMissingReturn(position, items)
       case SemanticError.CANNOT_RETURN_VALUE =>
         reportCannotReturnValue(position, items)
+      case SemanticError.LVALUE_REQUIRED =>
+        reportLvalueRequired(position, items)
 
       // Data-driven cases
       case _ =>
@@ -648,10 +663,6 @@ object SemanticErrorReporter {
     SemanticError.INCOMPATIBLE_OPERAND_TYPE -> ErrorDef(
       "error.semantic.incompatibleOperandType",
       Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
-    SemanticError.LVALUE_REQUIRED -> ErrorDef(
-      "error.semantic.lValueRequired",
-      Seq()
     ),
     SemanticError.CANNOT_ASSIGN_TO_VAL -> ErrorDef(
       "error.semantic.cannotAssignToVal",

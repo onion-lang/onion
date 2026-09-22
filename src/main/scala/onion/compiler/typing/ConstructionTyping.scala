@@ -50,6 +50,15 @@ final class ConstructionTyping(
                   val elementType = TypeSubst.withClassOnly(method.returnType, target.`type`)
                   Some(TypeSubst.withCast(new Call(target, method, params), elementType))
               }
+            case nullable: NullableType =>
+              // `b[i]` where `b: List[Int]?`: indexing dereferences the
+              // receiver just like `b.field` does, so it gets the same
+              // null-safety error (E0070) instead of the generic
+              // INVALID_METHOD_CALL_TARGET (E0041) a genuinely invalid
+              // target (e.g. a type parameter) gets -- mirrors the member
+              // access path (MemberSelectionResolutionSupport.normalizeTarget).
+              bodyContext.report(NULLABLE_MEMBER_ACCESS, node.lhs, nullable.displayName, "indexing")
+              None
             case other =>
               // e.g. indexing a nullable receiver: xs[i] needs a definite
               // object type; nullable values must be unwrapped first

@@ -93,6 +93,14 @@ final class AssignmentTyping(
                   if (value.`type`.isBottomType) value else null
               }
           }
+        case nullable: NullableType =>
+          // `b[i] = v` where `b: List[Int]?`: same reasoning as the read path
+          // in ConstructionTyping.typeIndexing -- indexing dereferences the
+          // receiver, so this gets the same null-safety error (E0070) as
+          // `b.field = v` instead of the generic INVALID_METHOD_CALL_TARGET
+          // (E0041) below.
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, indexing.lhs, nullable.displayName, "indexing")
+          null
         case other =>
           // e.g. assigning through a nullable receiver: unwrap it first
           bodyContext.report(INVALID_METHOD_CALL_TARGET, indexing.lhs, other)

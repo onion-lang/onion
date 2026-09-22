@@ -200,6 +200,14 @@ final class AssignmentTyping(
         Option(processMemberAssign(node, context))
       case _: AST.StaticMemberSelection =>
         Option(processStaticFieldAssign(node, context))
+      case _: AST.SafeMemberSelection =>
+        // `obj?.field = value`: safe navigation short-circuits to null at
+        // runtime, which has no sensible meaning as an assignment target, so
+        // this is rejected the same as any other non-lvalue -- but it's a
+        // common enough mistake (the read form `obj?.field` is valid) to earn
+        // its own hint instead of the generic message.
+        bodyContext.report(LVALUE_REQUIRED, node, java.lang.Boolean.TRUE)
+        None
       case _ =>
         // e.g. (null = expr): not an assignable target; report instead of
         // silently dropping (a silent None leaves zero errors and a null

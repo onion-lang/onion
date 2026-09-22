@@ -358,7 +358,8 @@ final class OperatorTyping(
     typed(node.term, context).flatMap { termRaw =>
       val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
       if (!hasNumericType(term)) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        if (!reportNullableUnaryOperandIfPresent(node, term))
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, term.`type`, term))
     }
@@ -373,7 +374,8 @@ final class OperatorTyping(
         case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
           Some(new UnaryTerm(kind, BasicType.INT, new AsInstanceOf(term, BasicType.INT)))
         case other =>
-          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
+          if (!reportNullableUnaryOperandIfPresent(node, term))
+            bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
           None
       }
     }
@@ -382,9 +384,27 @@ final class OperatorTyping(
     typed(node.term, context).flatMap { termRaw =>
       val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)
       if (term.`type` != BasicType.BOOLEAN) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        if (!reportNullableUnaryOperandIfPresent(node, term))
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
+    }
+
+  /**
+   * A nullable operand (e.g. `n: Int?`) in a unary operator (`-x`, `+x`,
+   * `~x`, `!x`) unboxes/dereferences it exactly like the equivalent binary
+   * operators do (see `reportNullableOperandIfPresent` above), so it gets
+   * the same null-safety diagnostic (E0070) those already report, instead
+   * of the generic "operator X is not applicable" (E0001) a genuinely
+   * incompatible type gets. Returns true when it reported, so the caller
+   * can skip its own generic report.
+   */
+  private[typing] def reportNullableUnaryOperandIfPresent(node: AST.UnaryExpression, term: Term): Boolean =
+    term.`type` match {
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.term, nullable.displayName, "operator")
+        true
+      case _ => false
     }
 
   /** The literal `1` in the operand's own type, so `x++` on a Long/Double/Float

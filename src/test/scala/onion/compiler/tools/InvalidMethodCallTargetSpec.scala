@@ -18,7 +18,12 @@ class InvalidMethodCallTargetSpec extends AbstractShellSpec {
   }
 
   describe("indexing a value whose type isn't a usable receiver") {
-    it("reports E0041 when indexing a nullable class-typed value") {
+    it("reports E0070, not E0041, when indexing a nullable class-typed value") {
+      // Indexing a nullable receiver (`b[0]` where `b: Box?`) dereferences it
+      // just like `b.field` does, so it gets the same null-safety diagnostic
+      // (E0070, with the ?[ / ?: / !! / null-check hint) as member access,
+      // not the generic "not a valid method call target" (E0041) a genuinely
+      // invalid target (e.g. a type parameter) gets.
       val results = errors(
         """
           |class Box {
@@ -35,7 +40,8 @@ class InvalidMethodCallTargetSpec extends AbstractShellSpec {
           |}
           |""".stripMargin
       )
-      assert(results.map(_._1).contains(Some("E0041")))
+      assert(results.map(_._1).contains(Some("E0070")))
+      assert(!results.map(_._1).contains(Some("E0041")))
     }
 
     it("does not report E0041 when indexing a non-null class-typed value with a get method") {

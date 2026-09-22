@@ -440,6 +440,20 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, appendSuggestion(baseMessage, hint))
   }
 
+  /**
+   * Handles NULLABLE_MEMBER_ACCESS with wording that matches how the
+   * receiver was dereferenced: dot access (`b.field`/`b.method()`) hints at
+   * `?.`, indexing (`b[i]`) hints at `?[` instead -- `?.` would be the wrong
+   * operator to suggest for the indexing form.
+   */
+  private def reportNullableMemberAccess(position: Location, items: Array[AnyRef]): Unit = {
+    val typeName = asString(items(0))
+    val key =
+      if (items.length > 1 && items(1) == "indexing") "error.semantic.nullableIndexingAccess"
+      else "error.semantic.nullableMemberAccess"
+    problem(position, format(message(key), Seq(typeName)))
+  }
+
   // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -478,6 +492,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportCannotReturnValue(position, items)
       case SemanticError.LVALUE_REQUIRED =>
         reportLvalueRequired(position, items)
+      case SemanticError.NULLABLE_MEMBER_ACCESS =>
+        reportNullableMemberAccess(position, items)
 
       // Data-driven cases
       case _ =>
@@ -906,10 +922,6 @@ object SemanticErrorReporter {
     ),
     SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
       "error.semantic.typeParameterMayBeNull",
-      Seq(items => asString(items(0)))
-    ),
-    SemanticError.NULLABLE_MEMBER_ACCESS -> ErrorDef(
-      "error.semantic.nullableMemberAccess",
       Seq(items => asString(items(0)))
     ),
     SemanticError.STATIC_CALL_ON_INSTANCE -> ErrorDef(

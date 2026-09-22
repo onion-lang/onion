@@ -426,14 +426,17 @@ class SemanticErrorReporter(threshold: Int) {
 
   /**
    * Handles LVALUE_REQUIRED with a hint when the rejected target is a safe
-   * navigation (`obj?.field = value`), a mistake distinct enough from the
-   * generic non-lvalue case (e.g. `null = expr`) to earn its own guidance.
+   * navigation (`obj?.field = value` or `obj?[index] = value`), a mistake
+   * distinct enough from the generic non-lvalue case (e.g. `null = expr`) to
+   * earn its own guidance.
    */
   private def reportLvalueRequired(position: Location, items: Array[AnyRef]): Unit = {
     val baseMessage = message("error.semantic.lValueRequired")
-    val hint =
-      if (items.nonEmpty && items(0) == java.lang.Boolean.TRUE) Some(message("suggestion.safeNavAssignmentTarget"))
-      else None
+    val hint = items.headOption match {
+      case Some(java.lang.Boolean.TRUE) => Some(message("suggestion.safeNavAssignmentTarget"))
+      case Some("indexing") => Some(message("suggestion.safeNavIndexingAssignmentTarget"))
+      case _ => None
+    }
     problem(position, appendSuggestion(baseMessage, hint))
   }
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-09-22
+
 ### Fixed
 
 - **A nullable operand in a shift operator (`n << 1`, `n >> 1`, or `n >>> 1` where `n: Int?`) reported the generic `E0001` ("operator X is not applicable for type ...") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that every sibling binary operator (`+ - * / %`, `< > <= >=`, `& | ^`, fixed in v0.97.0) already reports on a nullable operand.** `OperatorTyping.processShiftExpression` never consulted `reportNullableOperandIfPresent` before falling into the generic `INCOMPATIBLE_OPERAND_TYPE` report, unlike `processBitExpression` right next to it, which already does — the two were meant to be fixed together (the v0.97.0 changelog entry and `NullableOperatorOperandSpec`'s own docstring already claimed shift was covered), but the actual call site was missed. Fixed by adding the same early `reportNullableOperandIfPresent` guard. Guarded by seven new regression tests in `NullableShiftOperandSpec`.

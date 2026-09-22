@@ -439,7 +439,11 @@ final class OperatorTyping(
       case _ =>
     }
     if ((!operand.isBasicType) || !hasNumericType(operand)) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+      node match {
+        case unary: AST.UnaryExpression if reportNullableUnaryOperandIfPresent(unary, operand) =>
+        case _ =>
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+      }
       return None
     }
     Option(operand match {

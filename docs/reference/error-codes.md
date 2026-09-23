@@ -911,6 +911,7 @@ several forms, sharing the same fix:
 - **Array size** — `new T[n]` where a dimension `n` has nullable type (`n: Int?`).
 - **`try`-with-resources initializer** — `try (val r = res) { }` where `res` has nullable type.
 - **`throw` operand** — `throw expr` where `expr` has nullable type.
+- **`select` scrutinee** — `select s { ... }` where `s` has nullable type (only when there's neither an `else` clause nor an unconditional wildcard pattern -- either one already handles a `null` scrutinee correctly).
 
 ```onion
 class Test {

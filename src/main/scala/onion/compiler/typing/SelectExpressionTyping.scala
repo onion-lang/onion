@@ -157,13 +157,26 @@ final class SelectExpressionTyping(
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
     var reportedNonExhaustive = false // NON_EXHAUSTIVE_PATTERN_MATCH (E0042) was just reported below
-    if (node.elseBlock == null && !hasWildcardPattern) {
+    if (node.elseBlock == null && !hasWildcardPattern) condition.`type` match {
+      // A nullable scrutinee can never be truly exhaustive here: none of the
+      // type/destructuring patterns above match `null` itself, and neither
+      // `else` nor a bare wildcard is present to catch it. Previously this
+      // fell through the AppliedClassType-only unwrap below into the
+      // underlying sealed/enum check, silently skipping it -- reporting
+      // nothing, and (in expression position) surfacing the misleading E0020
+      // ("this method cannot return a value") once the missing null case
+      // fell through to VOID below, instead of the null-safety error (E0070)
+      // every other dereference-like use of a nullable value already gets.
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.condition, nullable.displayName, "select")
+        reportedNonExhaustive = true
+      case conditionRawType =>
       // A parameterized scrutinee (`Opt[String]`) is an AppliedClassType, not a
       // ClassDefinition, so without unwrapping it here a generic sealed
       // hierarchy silently skipped the exhaustiveness check -- and a select
       // that covered every case was then not treated as exhaustive, which
       // surfaced as E0020 "this method cannot return value" (#311).
-      val conditionClass: Type = condition.`type` match {
+      val conditionClass: Type = conditionRawType match {
         case applied: AppliedClassType => applied.raw
         case other => other
       }

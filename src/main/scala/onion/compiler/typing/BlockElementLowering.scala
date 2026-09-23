@@ -447,8 +447,12 @@ final class BlockElementLowering(
       for (expression <- expressionOpt) {
         val expected = bodyContext.load("java.lang.Throwable")
         val detected = expression.`type`
-        if (!TypeRules.isSuperType(expected, detected)) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+        detected match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "throw")
+          case _ if !TypeRules.isSuperType(expected, detected) =>
+            bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+          case _ =>
         }
       }
       new Throw(node.location, expressionOpt.getOrElse(null))

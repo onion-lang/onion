@@ -454,6 +454,7 @@ class SemanticErrorReporter(threshold: Int) {
       else if (items.length > 1 && items(1) == "condition") "error.semantic.nullableCondition"
       else if (items.length > 1 && items(1) == "arraySize") "error.semantic.nullableArraySize"
       else if (items.length > 1 && items(1) == "resource") "error.semantic.nullableTryResource"
+      else if (items.length > 1 && items(1) == "throw") "error.semantic.nullableThrow"
       else "error.semantic.nullableMemberAccess"
     problem(position, format(message(key), Seq(typeName)))
   }

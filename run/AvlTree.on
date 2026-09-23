@@ -1,0 +1,296 @@
+// AvlTree.on — immutable self-balancing AVL binary search tree for Int keys.
+// Exercises: record (AvlNode, with nullable recursive fields and copy()),
+// ADT case-enum (Rotation), classes (AvlTree wrapping a nullable root),
+// extension methods on Int/String, collection pipelines (filter/map/fold),
+// select / type-pattern matching, nullable references (AvlNode?),
+// recursion, string interpolation, foreach on List, while loop, try/catch.
+
+// ─────────────────────── AvlNode record (immutable) ─────────────────────────
+
+record AvlNode(key: Int, height: Int, left: AvlNode?, right: AvlNode?) {
+public:
+  static def leaf(key: Int): AvlNode = new AvlNode(key, 1, null, null)
+
+  def leftH(): Int = if left != null { left!!.height() } else { 0 }
+  def rightH(): Int = if right != null { right!!.height() } else { 0 }
+  def balance(): Int = leftH() - rightH()
+
+  def withLeft(l: AvlNode?): AvlNode = new AvlNode(key(), AvlNode::calcHeight(l, right()), l, right())
+  def withRight(r: AvlNode?): AvlNode = new AvlNode(key(), AvlNode::calcHeight(left(), r), left(), r)
+  def withKey(k: Int): AvlNode = new AvlNode(k, height(), left(), right())
+
+  static def calcHeight(l: AvlNode?, r: AvlNode?): Int {
+    val lh: Int = if l != null { l!!.height() } else { 0 }
+    val rh: Int = if r != null { r!!.height() } else { 0 }
+    return (if lh > rh { lh } else { rh }) + 1
+  }
+}
+
+// ─────────────────────── Rotation enum ──────────────────────────────────────
+
+enum Rotation {
+  case LL   // right rotation
+  case RR   // left rotation
+  case LR   // left-right double rotation
+  case RL   // right-left double rotation
+  case None
+public:
+  def label(): String = select this {
+    case r is LL:   "LL (right-rotate)"
+    case r is RR:   "RR (left-rotate)"
+    case r is LR:   "LR (left-right)"
+    case r is RL:   "RL (right-left)"
+    case r is None: "none"
+  }
+
+  static def of(node: AvlNode): Rotation {
+    val bf: Int = node.balance()
+    if bf > 1 {
+      val left: AvlNode = node.left()!!
+      return if left.balance() >= 0 { new LL() } else { new LR() }
+    } else if bf < -1 {
+      val right: AvlNode = node.right()!!
+      return if right.balance() <= 0 { new RR() } else { new RL() }
+    } else {
+      return new None()
+    }
+  }
+}
+
+// ─────────────────────── tree operations ─────────────────────────────────────
+
+def avlHeight(n: AvlNode?): Int = if n != null { n!!.height() } else { 0 }
+
+def avlRotateRight(n: AvlNode): AvlNode {
+  val l: AvlNode = n.left()!!
+  val newN: AvlNode = n.withLeft(l.right())
+  return l.withRight(newN)
+}
+
+def avlRotateLeft(n: AvlNode): AvlNode {
+  val r: AvlNode = n.right()!!
+  val newN: AvlNode = n.withRight(r.left())
+  return r.withLeft(newN)
+}
+
+def avlBalance(n: AvlNode): AvlNode {
+  val rot: Rotation = Rotation::of(n)
+  select rot {
+    case r is LL:
+      return avlRotateRight(n)
+    case r is RR:
+      return avlRotateLeft(n)
+    case r is LR:
+      val newLeft: AvlNode = avlRotateLeft(n.left()!!)
+      return avlRotateRight(n.withLeft(newLeft))
+    case r is RL:
+      val newRight: AvlNode = avlRotateRight(n.right()!!)
+      return avlRotateLeft(n.withRight(newRight))
+    else:
+      return n
+  }
+}
+
+def avlInsert(node: AvlNode?, key: Int): AvlNode {
+  if node == null { return AvlNode::leaf(key) }
+  val n: AvlNode = node!!
+  if key < n.key() {
+    return avlBalance(n.withLeft(avlInsert(n.left(), key)))
+  } else if key > n.key() {
+    return avlBalance(n.withRight(avlInsert(n.right(), key)))
+  } else {
+    return n  // duplicate key: no-op
+  }
+}
+
+def avlMin(n: AvlNode): AvlNode {
+  if n.left() == null { return n }
+  return avlMin(n.left()!!)
+}
+
+def avlDelete(node: AvlNode?, key: Int): AvlNode? {
+  if node == null { return null }
+  val n: AvlNode = node!!
+  if key < n.key() {
+    return avlBalance(n.withLeft(avlDelete(n.left(), key)))
+  } else if key > n.key() {
+    return avlBalance(n.withRight(avlDelete(n.right(), key)))
+  } else {
+    // Delete this node
+    if n.left() == null { return n.right() }
+    if n.right() == null { return n.left() }
+    // Two children: replace with in-order successor
+    val successor: AvlNode = avlMin(n.right()!!)
+    val newRight: AvlNode? = avlDelete(n.right(), successor.key())
+    return avlBalance(n.withKey(successor.key()).withRight(newRight))
+  }
+}
+
+def avlSearch(node: AvlNode?, key: Int): Boolean {
+  if node == null { return false }
+  val n: AvlNode = node!!
+  if key == n.key() { return true }
+  if key < n.key() { return avlSearch(n.left(), key) }
+  return avlSearch(n.right(), key)
+}
+
+// In-order traversal → sorted list
+def avlInorder(node: AvlNode?, result: List[Int]): void {
+  if node == null { return }
+  val n: AvlNode = node!!
+  avlInorder(n.left(), result)
+  result.add(n.key())
+  avlInorder(n.right(), result)
+}
+
+// Print tree structure as indented ASCII
+def avlPrint(node: AvlNode?, indent: String, label: String): void {
+  if node == null {
+    IO::println("#{indent}#{label}[null]")
+    return
+  }
+  val n: AvlNode = node!!
+  IO::println("#{indent}#{label}#{n.key()} (h=#{n.height()}, bal=#{n.balance()})")
+  if n.left() != null || n.right() != null {
+    avlPrint(n.left(), indent + "  ", "L: ")
+    avlPrint(n.right(), indent + "  ", "R: ")
+  }
+}
+
+// ─────────────────────── AvlTree class ──────────────────────────────────────
+
+class AvlTree {
+  var root: AvlNode?
+
+public:
+  def this { root = null }
+
+  def insert(key: Int): void {
+    root = avlInsert(root, key)
+  }
+
+  def delete(key: Int): void {
+    root = avlDelete(root, key)
+  }
+
+  def contains(key: Int): Boolean = avlSearch(root, key)
+
+  def size(): Int {
+    val list: List[Int] = []
+    avlInorder(root, list)
+    return list.size
+  }
+
+  def height(): Int = avlHeight(root)
+
+  def toSortedList(): List[Int] {
+    val list: List[Int] = []
+    avlInorder(root, list)
+    return list
+  }
+
+  def printTree(): void {
+    avlPrint(root, "", "root: ")
+  }
+
+  def isEmpty(): Boolean = root == null
+}
+
+// ─────────────────────── extension helpers ──────────────────────────────────
+
+extension Int {
+  def padLeft(n: Int): String {
+    var s: String = self + ""
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def repeat(n: Int): String {
+    var s: String = ""
+    foreach i: Int in 0..<n { s = s + self }
+    return s
+  }
+}
+
+// ─────────────────────── main ────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== AVL Self-Balancing BST Demo ===")
+  IO::println("")
+
+  val tree: AvlTree = new AvlTree()
+
+  // Insert values that trigger rotations
+  val keys: List[Int] = [10, 20, 30, 40, 50, 25, 15, 5, 35, 45]
+  IO::println("Inserting: #{keys}")
+  foreach k: Object in keys {
+    tree.insert(k as Int)
+  }
+
+  IO::println("Height after insertions: #{tree.height()}")
+  IO::println("Size: #{tree.size()}")
+  IO::println("")
+
+  IO::println("In-order (should be sorted): #{tree.toSortedList()}")
+  IO::println("")
+
+  IO::println("=== Tree structure ===")
+  tree.printTree()
+  IO::println("")
+
+  IO::println("=== Search tests ===")
+  val searchKeys: List[Int] = [25, 35, 7, 50, 99]
+  foreach k: Object in searchKeys {
+    val key: Int = k as Int
+    IO::println("contains(#{key.padLeft(2)}) = #{tree.contains(key)}")
+  }
+  IO::println("")
+
+  IO::println("=== Deletion tests ===")
+  val deleteKeys: List[Int] = [10, 30, 50]
+  foreach k: Object in deleteKeys {
+    val key: Int = k as Int
+    tree.delete(key)
+    IO::println("After delete(#{key.padLeft(2)}): sorted=#{tree.toSortedList()}, height=#{tree.height()}")
+  }
+  IO::println("")
+
+  IO::println("=== Statistics on sorted output ===")
+  val sorted: List[Int] = tree.toSortedList()
+  val sum: Int = sorted.fold(0) { acc, v -> (acc as Int) + (v as Int) } as Int
+  IO::println("Sum = #{sum}")
+  val minVal: Int = sorted.get(0) as Int
+  val maxVal: Int = sorted.get(sorted.size - 1) as Int
+  IO::println("Min = #{minVal}, Max = #{maxVal}")
+
+  IO::println("")
+  IO::println("=== Rotation labels ===")
+  val rotations: List[Rotation] = [new LL(), new RR(), new LR(), new RL(), new None()]
+  foreach r: Rotation in rotations {
+    IO::println("  #{r.label()}")
+  }
+
+  IO::println("")
+  IO::println("=== try/catch: invalid ops ===")
+  try {
+    val emptyTree: AvlTree = new AvlTree()
+    val result: Boolean = emptyTree.contains(42)
+    IO::println("empty tree contains(42) = #{result}")
+    // Force an operation on a guaranteed-empty tree - size should be 0
+    IO::println("empty tree size = #{emptyTree.size()}")
+  } catch e: Exception {
+    IO::println("error: #{e.message()}")
+  }
+
+  IO::println("")
+  IO::println("=== Insert sequential keys (worst case for non-balanced tree) ===")
+  val seq: AvlTree = new AvlTree()
+  foreach i: Int in 1..15 { seq.insert(i) }
+  IO::println("sequential 1..15: height=#{seq.height()}, size=#{seq.size()}")
+  IO::println("balanced height bound: ceil(log2(16)) ≈ 4")
+
+  IO::println("")
+  IO::println("=== Done ===")
+}

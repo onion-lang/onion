@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CombinatoricsLab.on`** — a 308-line combinatorics showcase, a new domain for the `run/` corpus (extension methods on `Int`/`String` — `factorial()`, `choose(k)`, `isPrime()`, `repeatStr(n)`, `padLeft(width)`; an ADT case-enum `FactorResult` (`PrimeNum`/`Composite`) with `select`/`case is` dispatch; a `record Triple` with a `show()` method; typed `List[Int]`/`List[List[Int]]` throughout; recursive N-Queens backtracking, permutations, and combinations; Pascal's triangle via `choose`; a prime-factorization chain using nullable `Int?`; triple-nested `foreach` over inclusive ranges for Pythagorean triples; and string interpolation), added to the `run/` corpus (merged via #1447).
+
 ## [0.103.0] - 2026-09-23
 
 ### Added

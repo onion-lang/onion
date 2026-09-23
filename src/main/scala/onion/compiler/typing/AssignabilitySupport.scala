@@ -170,7 +170,26 @@ private[compiler] final class AssignabilitySupport(
       else TypeRelations.isAssignableWithBoxing(expected, actual.`type`, bodyContext.table)
 
     if (!isCompatible) {
-      bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
+      actual.`type` match {
+        // A nullable value (`g: Foo?`, never null-checked) that failed the
+        // compatibility check above precisely because it's nullable -- the
+        // check already accepts it wherever the language means to (widening
+        // to `Object`, a bare/platform type parameter's upper bound, ...) --
+        // gets the null-safety diagnostic (E0070) that every other
+        // dereference-like use of a nullable value already reports, instead
+        // of the generic INCOMPATIBLE_TYPE (E0000) below, which hides that
+        // the only problem is a missing null check. Covers a `val`/`var`
+        // declaration's initializer, a `return` value, a plain reassignment,
+        // and a field initializer, all of which share this helper -- mirrors
+        // the sibling receiver-nullability checks (MethodTargetTypingSupport.
+        // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
+        // normalizeMemberSelectionTarget), which already special-case
+        // NullableType up front for their own (dereference-target) cases.
+        case nullable: NullableType =>
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
+        case _ =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
+      }
       return null
     }
     new AsInstanceOf(node.location, actual, expected)

@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.98.0] - 2026-09-23
-
 ### Fixed
 
 - **`throw expr` where `expr: E?` (a nullable exception type, never null-checked) reported the generic `E0000` ("type java.lang.Throwable is expected, but type E? is used") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that every other dereference-like use of a nullable value (member access, indexing, operators, conditions, array size, try-with-resources, foreach, destructuring) already reports.** `BlockElementLowering.translate`'s `AST.ThrowExpression` case checked `TypeRules.isSuperType(expected, detected)` directly and, on failure, fell straight into a generic `INCOMPATIBLE_TYPE` report against the original (still-nullable) detected type — `isSuperType` always returns `false` when the right-hand side is a bare `NullableType`, so a nullable throw operand could never pass the check, even when its inner type does extend `Throwable`. Fixed by special-casing a `NullableType` operand up front, before the `isSuperType` check, and reporting `NULLABLE_MEMBER_ACCESS` with wording specific to a throw operand (`error.semantic.nullableThrow`, en/ja). Guarded by four new regression tests in `NullableThrowSpec`. Also documented the previously-undocumented try-with-resources form of `E0070` (`docs/reference/error-codes.md`, `docs/ja/reference/error-codes.md`) alongside this new one.

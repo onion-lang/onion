@@ -1,0 +1,308 @@
+// CombinatoricsLab.on — combinatorics algorithms exercising extension methods on
+// primitives, records, ADT enums, typed collection pipelines, and recursion.
+
+import {
+  java.util.ArrayList
+}
+
+// ── Extension methods on Int ──────────────────────────────────────────────────
+
+extension Int {
+  def factorial(): Long {
+    if self <= 1 { return 1L }
+    var result: Long = 1L
+    var i: Int = 2
+    while i <= self {
+      result = result * (i as Long)
+      i++
+    }
+    return result
+  }
+
+  def choose(k: Int): Long {
+    if k < 0 || k > self { return 0L }
+    if k == 0 || k == self { return 1L }
+    val kk: Int = if k > self - k { self - k } else { k }
+    var result: Long = 1L
+    var i: Int = 0
+    while i < kk {
+      result = result * ((self - i) as Long) / ((i + 1) as Long)
+      i++
+    }
+    return result
+  }
+
+  def isPrime(): Boolean {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    var d: Int = 3
+    while d * d <= self {
+      if self % d == 0 { return false }
+      d = d + 2
+    }
+    return true
+  }
+}
+
+extension String {
+  def repeatStr(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n {
+      s = s + self
+      i++
+    }
+    return s
+  }
+
+  def padLeft(width: Int): String {
+    val pad: Int = width - self.length
+    if pad <= 0 { return self }
+    return " ".repeatStr(pad) + self
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Triple(a: Int, b: Int, c: Int) {
+public:
+  def show(): String = "(#{a()}, #{b()}, #{c()})"
+}
+
+// ── ADT enum for factorization ────────────────────────────────────────────────
+
+enum FactorResult {
+  case PrimeNum(n: Int)
+  case Composite(n: Int, factors: List[Int])
+
+public:
+  def show(): String = select this {
+    case p is PrimeNum:   "#{p.n()} (prime)"
+    case c is Composite: {
+      var s: String = "#{c.n()} = "
+      var first: Boolean = true
+      foreach f: Int in c.factors() {
+        if !first { s = s + " × " }
+        s = s + f
+        first = false
+      }
+      return s
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def intListShow(items: List[Int]): String {
+  var s: String = "["
+  foreach item: Int in items {
+    if s != "[" { s = s + ", " }
+    s = s + item
+  }
+  return s + "]"
+}
+
+def copyIntList(src: List[Int]): List[Int] {
+  val dst: List[Int] = []
+  foreach x: Int in src { dst.add(x) }
+  return dst
+}
+
+// ── N-Queens solver ───────────────────────────────────────────────────────────
+
+def isSafe(queens: List[Int], row: Int, col: Int): Boolean {
+  var idx: Int = 0
+  foreach qcol: Int in queens {
+    if qcol == col { return false }
+    if (qcol - col == idx - row) || (qcol - col == row - idx) { return false }
+    idx++
+  }
+  return true
+}
+
+def queensStep(n: Int, placed: List[Int], row: Int): List[List[Int]] {
+  if row == n {
+    return [copyIntList(placed)]
+  }
+  val results: List[List[Int]] = []
+  foreach col: Int in 0..<n {
+    if isSafe(placed, row, col) {
+      val next: List[Int] = copyIntList(placed)
+      next.add(col)
+      val sub: List[List[Int]] = queensStep(n, next, row + 1)
+      foreach s: List[Int] in sub { results.add(s) }
+    }
+  }
+  return results
+}
+
+def solveNQueens(n: Int): List[List[Int]] = queensStep(n, [], 0)
+
+def formatBoard(queens: List[Int], n: Int): String {
+  var board: String = ""
+  foreach col: Int in queens {
+    var row: String = ""
+    foreach c: Int in 0..<n {
+      if c == col { row = row + "Q " } else { row = row + ". " }
+    }
+    board = board + row.trim() + "\n"
+  }
+  return board
+}
+
+// ── Permutations ──────────────────────────────────────────────────────────────
+
+def permutations(items: List[Int]): List[List[Int]] {
+  if items.size == 0 { return [[]] }
+  val result: List[List[Int]] = []
+  foreach idx: Int in 0..<items.size {
+    val chosen: Int = items[idx] as Int
+    val rest: List[Int] = []
+    foreach i: Int in 0..<items.size {
+      if i != idx { rest.add(items[i]) }
+    }
+    val subPerms: List[List[Int]] = permutations(rest)
+    foreach perm: List[Int] in subPerms {
+      val full: List[Int] = [chosen]
+      foreach x: Int in perm { full.add(x) }
+      result.add(full)
+    }
+  }
+  return result
+}
+
+// ── Combinations ──────────────────────────────────────────────────────────────
+
+def combinations(items: List[Int], k: Int): List[List[Int]] {
+  if k == 0 { return [[]] }
+  if items.size < k { return [] }
+  val result: List[List[Int]] = []
+  foreach start: Int in 0..(items.size - k) {
+    val head: Int = items[start] as Int
+    val tail: List[Int] = []
+    foreach i: Int in (start + 1)..<items.size { tail.add(items[i]) }
+    val subCombos: List[List[Int]] = combinations(tail, k - 1)
+    foreach combo: List[Int] in subCombos {
+      val full: List[Int] = [head]
+      foreach x: Int in combo { full.add(x) }
+      result.add(full)
+    }
+  }
+  return result
+}
+
+// ── Prime factorization ───────────────────────────────────────────────────────
+
+def smallestFactor(n: Int): Int? {
+  if n % 2 == 0 { return 2 }
+  var d: Int = 3
+  while d * d <= n {
+    if n % d == 0 { return d }
+    d = d + 2
+  }
+  return null
+}
+
+def factorize(n: Int): FactorResult {
+  if n.isPrime() { return new PrimeNum(n) }
+  val factors: List[Int] = []
+  var rem: Int = n
+  while rem > 1 {
+    val pf: Int? = smallestFactor(rem)
+    if pf == null { factors.add(rem); rem = 1 }
+    else          { factors.add(pf); rem = rem / pf }
+  }
+  return new Composite(n, factors)
+}
+
+// ── Pascal's triangle ─────────────────────────────────────────────────────────
+
+def printPascal(rows: Int): void {
+  foreach n: Int in 0..<rows {
+    var line: String = ""
+    foreach k: Int in 0..n {
+      line = line + (n.choose(k) + "").padLeft(5)
+    }
+    val maxW: Int = rows * 5
+    val indent: String = " ".repeatStr((maxW - line.length) / 2)
+    IO::println(indent + line.trim())
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+IO::println("=== Combinatorics Lab ===\n")
+
+// Factorials 0..12
+IO::println("Factorials:")
+foreach n: Int in 0..12 {
+  IO::println("  #{n}! = #{n.factorial()}")
+}
+
+// Binomial coefficients C(8,k)
+IO::println("\nBinomial C(8,k) for k=0..8:")
+foreach k: Int in 0..8 {
+  IO::println("  C(8,#{k}) = #{8.choose(k)}")
+}
+
+// Pascal's triangle
+IO::println("\nPascal's Triangle (9 rows):")
+printPascal(9)
+
+// Permutations of [1,2,3]
+val items3: List[Int] = [1, 2, 3]
+val perms: List[List[Int]] = permutations(items3)
+IO::println("\nPermutations of [1,2,3] — #{perms.size} total:")
+foreach perm: List[Int] in perms {
+  IO::println("  " + intListShow(perm))
+}
+
+// Combinations of 5 items choose 3
+val items5: List[Int] = [1, 2, 3, 4, 5]
+val combos: List[List[Int]] = combinations(items5, 3)
+IO::println("\nCombinations C([1..5], 3) — #{combos.size} total:")
+foreach combo: List[Int] in combos {
+  IO::println("  " + intListShow(combo))
+}
+
+// N-Queens
+IO::println("\nN-Queens solutions:")
+foreach n: Int in 4..7 {
+  val sols: List[List[Int]] = solveNQueens(n)
+  IO::println("#{n}-Queens: #{sols.size} solution(s)")
+  if sols.size > 0 {
+    val first: List[Int] = sols[0]
+    IO::println("First solution: " + intListShow(first))
+    IO::println(formatBoard(first, n))
+  }
+}
+
+// Primality via extension method
+IO::println("Primes up to 50:")
+var primeStr: String = "  "
+foreach n: Int in 2..50 {
+  if n.isPrime() { primeStr = primeStr + n + " " }
+}
+IO::println(primeStr)
+
+// Prime factorizations
+IO::println("\nFactorizations:")
+val nums: List[Int] = [12, 30, 97, 100, 360, 997, 1024, 2310]
+foreach n: Int in nums {
+  IO::println("  " + factorize(n).show())
+}
+
+// Pythagorean triples
+IO::println("\nPythagorean triples a²+b²=c² (a≤b≤c≤25):")
+foreach a: Int in 1..25 {
+  foreach b: Int in a..25 {
+    foreach c: Int in b..25 {
+      if a * a + b * b == c * c {
+        IO::println("  " + new Triple(a, b, c).show())
+      }
+    }
+  }
+}
+
+IO::println("\nDone.")

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.103.0] - 2026-09-23
+
 ### Added
 
 - **`run/FormulaRacing.on`** — a 337-line Formula 1 race simulation, a new domain for the `run/` corpus (`record LapTime from re"…"` line parsing; a plain enum `TyreCompound` (`SOFT`/`MEDIUM`/`HARD`) with value-matching `select` dispatch; an ADT case-enum `RaceEvent` (`SafetyCar`/`FastestLap`/`Retirement`/`PenaltyTime`) with type-pattern matching; extension methods on `Int`/`String` (`toRaceTime`, `gapTo`, `padRight`, `padLeft`); collection pipelines (`groupBy`/`sortedBy`/`filter`/`fold`/`map`); `foreach` over lists, ranges, and `Map` `(k, v)` entries; nullable lookups with null checks; `try`/`catch`; closures as predicates and sort keys; and top-level statements as the entry point), added to the `run/` corpus (merged via #1442).

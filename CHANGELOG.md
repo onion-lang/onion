@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.102.0] - 2026-09-23
+
 ### Added
 
 - **`run/WildlifeSim.on`** — a 294-line Lotka-Volterra predator-prey ecosystem simulation, a new domain for the `run/` corpus (`extension Double`/`extension Int` helpers; a data-carrying enum `Season` with `select`-based `growthMult()`/`label()` dispatch; an ADT case-enum `InteractionType` (`Predation`/`Competition`/`Mutualism`); records with `example` clauses and `{ public: ... }` bodies (`Species`, `PopSnapshot`); an interface `Reporter` implemented by `ConsoleReporter`; a class `EcoSystem` with mutable `List[Object]` history and `Option`-returning lookups; `do[Option]` monadic chaining; the `|>` pipeline operator; collection pipelines (`map`/`filter`/`fold`/`sortedBy`/`groupBy`/`find`/`partition`/`take`/`drop`/`distinct`/`zip`/`any`/`count`/`forEach`); `foreach` over `Int` ranges and `Map` `(k, v)` entries; and `while` loops, closures, `try`/`catch`, string interpolation, and nullable types throughout), added to the `run/` corpus (merged via #1433).

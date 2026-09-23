@@ -1,0 +1,319 @@
+// StatDistributions.on — Probability Distribution Suite
+//
+// Features exercised:
+//   ADT case-enum (Distribution — 5 cases with typed fields)
+//   record with methods (DistStats)
+//   collection pipelines: fold, sortedBy, groupBy, partition, find, filter, zip, map
+//   closures / lambdas
+//   select / type-pattern matching on Distribution cases
+//   recursion (factorial for Poisson PMF display)
+//   string interpolation #{}
+//   foreach over ranges, typed lists, and maps (k, v)
+//   nullable handling: find() result with null check
+//   try/catch for edge-case guard
+
+import { java.util.* }
+
+val PI: Double = 3.14159265358979
+
+// ─── ADT: Distribution types ───────────────────────────────────────────────────
+
+enum Distribution {
+  case Normal(mu: Double, sigma: Double)
+  case Poisson(lambda: Double)
+  case Binomial(trials: Int, prob: Double)
+  case Exponential(rate: Double)
+  case Uniform(lo: Double, hi: Double)
+}
+
+// ─── Summary record with computed accessors ────────────────────────────────────
+
+record DistStats(
+  name: String,
+  sampleSize: Int,
+  mean: Double,
+  variance: Double,
+  minimum: Double,
+  maximum: Double
+) {
+public:
+  def stddev(): Double = Math::sqrt(variance())
+  def range(): Double = maximum() - minimum()
+  def cv(): Double =
+    if Math::abs(mean()) > 1.0e-9 { stddev() / Math::abs(mean()) * 100.0 } else { 0.0 }
+  def summary(): String =
+    "  mean=#{fmt(mean())}, sd=#{fmt(stddev())}, cv=#{fmt(cv())}%, " +
+    "min=#{fmt(minimum())}, max=#{fmt(maximum())}"
+}
+
+// ─── Formatting helper ────────────────────────────────────────────────────────
+
+def fmt(x: Double): String {
+  if x < 0.0 { return "-" + fmt(-x) }
+  val r: Long = Math::round(x * 100.0)
+  val ip: Long = r / 100L
+  val fp: Long = r % 100L
+  return ip + "." + (if fp < 10L { "0" + fp } else { "" + fp })
+}
+
+// ─── Recursive factorial (Poisson PMF) ────────────────────────────────────────
+
+def factorial(n: Int): Long {
+  if n <= 1 { return 1L }
+  return (n as Long) * factorial(n - 1)
+}
+
+// ─── Draw one value from a distribution (Box-Muller / Knuth / inverse CDF) ───
+
+def sample(dist: Distribution): Double {
+  var result: Double = 0.0
+  select dist {
+    case n is Normal:
+      val u1: Double = Math::max(1.0e-15, Rand::nextDouble())
+      val u2: Double = Rand::nextDouble()
+      result = n.mu() + n.sigma() * Math::sqrt(-2.0 * Math::log(u1)) * Math::cos(2.0 * PI * u2)
+    case p is Poisson:
+      val L: Double = Math::exp(-(p.lambda()))
+      var k: Int = 0
+      var pr: Double = 1.0
+      while pr > L {
+        k = k + 1
+        pr = pr * Rand::nextDouble()
+      }
+      result = (k - 1) as Double
+    case b is Binomial:
+      var hits: Int = 0
+      foreach _: Int in 0..<b.trials() {
+        if Rand::nextDouble() < b.prob() { hits = hits + 1 }
+      }
+      result = hits as Double
+    case e is Exponential:
+      result = -Math::log(Math::max(1.0e-15, Rand::nextDouble())) / e.rate()
+    case u is Uniform:
+      result = u.lo() + (u.hi() - u.lo()) * Rand::nextDouble()
+  }
+  return result
+}
+
+// ─── Generate N samples ────────────────────────────────────────────────────────
+
+def generateSamples(dist: Distribution, n: Int): List[Double] {
+  val out: List[Double] = []
+  foreach _: Int in 0..<n { out.add(sample(dist)) }
+  return out
+}
+
+// ─── Descriptive statistics from a Double list ────────────────────────────────
+
+def computeStats(name: String, samples: List[Double]): DistStats {
+  val n: Int = samples.size
+  if n == 0 { return new DistStats(name, 0, 0.0, 0.0, 0.0, 0.0) }
+  val total: Double = samples.fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+  val mean: Double = total / (n as Double)
+  val varSum: Double = samples.fold(0.0) { acc, v ->
+    val d: Double = (v as Double) - mean
+    (acc as Double) + d * d
+  }
+  val sorted = samples.sortedBy { v: Double -> v }
+  val mn: Double = sorted.get(0) as Double
+  val mx: Double = sorted.get(n - 1) as Double
+  return new DistStats(name, n, mean, varSum / (n as Double), mn, mx)
+}
+
+// ─── Text histogram ────────────────────────────────────────────────────────────
+
+def histogram(samples: List[Double], bins: Int, barWidth: Int): void {
+  val sorted = samples.sortedBy { v: Double -> v }
+  val lo: Double = sorted.get(0) as Double
+  val hi: Double = sorted.get(sorted.size - 1) as Double
+  val rng: Double = hi - lo
+  if rng <= 0.0 { IO::println("  (all values equal)"); return }
+  val w: Double = rng / (bins as Double)
+  val counts: List[Int] = []
+  foreach _: Int in 0..<bins { counts.add(0) }
+  foreach sv: Double in samples {
+    var b: Int = ((sv - lo) / w) as Int
+    if b >= bins { b = bins - 1 }
+    counts.set(b, (counts.get(b) as Int) + 1)
+  }
+  var maxC: Int = 0
+  foreach cnt: Int in counts { if cnt > maxC { maxC = cnt } }
+  foreach i: Int in 0..<bins {
+    val loB: Double = lo + (i as Double) * w
+    val cnt: Int = counts.get(i) as Int
+    val bar: Int = if maxC == 0 { 0 } else { cnt * barWidth / maxC }
+    var barS: String = ""
+    foreach _: Int in 0..<bar { barS = barS + "#" }
+    IO::println("  [#{fmt(loB)},#{fmt(loB + w)}): #{barS} (#{cnt})")
+  }
+}
+
+// ─── Distribution metadata helpers ───────────────────────────────────────────
+
+def distName(dist: Distribution): String {
+  var s: String = ""
+  select dist {
+    case n is Normal:      s = "Normal(mu=#{fmt(n.mu())}, sigma=#{fmt(n.sigma())})"
+    case p is Poisson:     s = "Poisson(lambda=#{fmt(p.lambda())})"
+    case b is Binomial:    s = "Binomial(n=#{b.trials()}, p=#{fmt(b.prob())})"
+    case e is Exponential: s = "Exponential(rate=#{fmt(e.rate())})"
+    case u is Uniform:     s = "Uniform(#{fmt(u.lo())}, #{fmt(u.hi())})"
+  }
+  return s
+}
+
+def theoreticalMean(dist: Distribution): Double {
+  var m: Double = 0.0
+  select dist {
+    case n is Normal:      m = n.mu()
+    case p is Poisson:     m = p.lambda()
+    case b is Binomial:    m = (b.trials() as Double) * b.prob()
+    case e is Exponential: m = 1.0 / e.rate()
+    case u is Uniform:     m = (u.lo() + u.hi()) / 2.0
+  }
+  return m
+}
+
+def theoreticalVariance(dist: Distribution): Double {
+  var v: Double = 0.0
+  select dist {
+    case n is Normal:      v = n.sigma() * n.sigma()
+    case p is Poisson:     v = p.lambda()
+    case b is Binomial:    v = (b.trials() as Double) * b.prob() * (1.0 - b.prob())
+    case e is Exponential: v = 1.0 / (e.rate() * e.rate())
+    case u is Uniform:
+      val r: Double = u.hi() - u.lo()
+      v = r * r / 12.0
+  }
+  return v
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val SAMPLES: Int = 300
+
+val dists: List[Object] = [
+  new Normal(0.0, 1.0),
+  new Normal(5.0, 2.0),
+  new Poisson(3.0),
+  new Binomial(10, 0.4),
+  new Exponential(0.5),
+  new Uniform(-1.0, 1.0)
+]
+
+IO::println("=== Probability Distribution Suite ===")
+IO::println("Samples per distribution: #{SAMPLES}")
+IO::println("")
+
+val allStats: List[DistStats] = []
+
+foreach dist: Distribution in dists {
+  val name: String = distName(dist)
+  IO::println("── #{name} ──")
+  val samples: List[Double] = generateSamples(dist, SAMPLES)
+  val st: DistStats = computeStats(name, samples)
+  IO::println(st.summary())
+  val thMean: Double = theoreticalMean(dist)
+  val thSd: Double = Math::sqrt(theoreticalVariance(dist))
+  IO::println("  theoretical: mean=#{fmt(thMean)}, sd=#{fmt(thSd)}")
+  IO::println("  histogram (8 bins):")
+  histogram(samples, 8, 20)
+  IO::println("")
+  allStats.add(st)
+}
+
+// ─── Cross-distribution analysis ─────────────────────────────────────────────
+
+IO::println("=== Cross-Distribution Comparison ===")
+
+// Sort by mean ascending
+val byMean = allStats.sortedBy { s: DistStats -> s.mean() }
+IO::println("Sorted by mean (asc):")
+foreach s: DistStats in byMean {
+  IO::println("  #{s.name()} -> #{fmt(s.mean())}")
+}
+IO::println("")
+
+// Partition into high-variance vs low-variance
+val parts = allStats.partition { s: DistStats -> s.variance() > 1.0 }
+val highVar: List[Object] = parts[0] as List[Object]
+val lowVar:  List[Object] = parts[1] as List[Object]
+IO::println("High variance (>1.0): #{highVar.size()}")
+IO::println("Low variance  (<=1.0): #{lowVar.size()}")
+IO::println("")
+
+// Group by mean magnitude
+val byGroup = allStats.groupBy { s: DistStats ->
+  if s.mean() < 0.0 { "negative" } else if s.mean() < 2.0 { "near-zero" } else { "positive" }
+}
+IO::println("Grouped by mean magnitude:")
+foreach (grp, members) in byGroup {
+  IO::println("  #{grp}: #{(members as List).size} distribution(s)")
+}
+IO::println("")
+
+// Filter: high relative dispersion (CV > 50%)
+val dispersed = allStats.filter { s: DistStats -> s.cv() > 50.0 }
+IO::println("Highly dispersed (CV > 50%):")
+foreach s: DistStats in dispersed {
+  IO::println("  #{s.name()}")
+}
+IO::println("")
+
+// Find first distribution with sample range > 10
+val wideOpt = allStats.find { s: DistStats -> s.range() > 10.0 }
+if wideOpt != null {
+  val wide: DistStats = wideOpt as DistStats
+  IO::println("First with sample range > 10: #{wide.name()} (range=#{fmt(wide.range())})")
+} else {
+  IO::println("No distribution has range > 10 in this run")
+}
+IO::println("")
+
+// Fold: total sample count
+val totalN: Int = allStats.fold(0) { acc, s -> (acc as Int) + (s as DistStats).sampleSize() } as Int
+IO::println("Total samples across all distributions: #{totalN}")
+IO::println("")
+
+// Map to name strings
+val names: List[String] = allStats.map { s: DistStats -> s.name() } as List[String]
+IO::println("All distributions: #{names}")
+IO::println("")
+
+// ─── Poisson PMF demo ─────────────────────────────────────────────────────────
+
+IO::println("=== Poisson(lambda=3.0) PMF for k=0..8 ===")
+val lam: Double = 3.0
+foreach k: Int in 0..8 {
+  val pmf: Double = Math::exp(-lam) * Math::pow(lam, k as Double) / (factorial(k) as Double)
+  IO::println("  P(X=#{k}) = #{fmt(pmf)}")
+}
+IO::println("")
+
+// ─── Paired comparison via zip ────────────────────────────────────────────────
+
+IO::println("=== Paired N(0,1) vs Exp(1.0) — first 6 samples ===")
+val normSamp: List[Double] = generateSamples(new Normal(0.0, 1.0), 6)
+val expSamp:  List[Double] = generateSamples(new Exponential(1.0), 6)
+val zipped = normSamp.zip(expSamp)
+foreach pair: Object in zipped {
+  val p = pair as List
+  val a: Double = p.get(0) as Double
+  val b: Double = p.get(1) as Double
+  IO::println("  N=#{fmt(a)}, E=#{fmt(b)}, diff=#{fmt(a - b)}")
+}
+IO::println("")
+
+// ─── Guard: degenerate empty input ────────────────────────────────────────────
+
+IO::println("=== Edge-case: empty sample set ===")
+try {
+  val empty: List[Double] = []
+  val st2: DistStats = computeStats("empty", empty)
+  IO::println("  mean=#{fmt(st2.mean())}, sd=#{fmt(st2.stddev())}")
+} catch ex: Exception {
+  IO::println("  Unexpected error: #{ex.message()}")
+}
+IO::println("")
+
+IO::println("Done.")

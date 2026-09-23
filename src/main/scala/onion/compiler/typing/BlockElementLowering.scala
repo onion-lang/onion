@@ -498,11 +498,15 @@ final class BlockElementLowering(
             val argType = addArgument(argument, context)
             catchTypes(i) = argType
             val expected = bodyContext.load("java.lang.Throwable")
-            if (!TypeRules.isSuperType(expected, argType)) {
-              bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
-              catchTypesValid(i) = false
-            } else {
-              catchTypesValid(i) = true
+            argType match {
+              case nullable: NullableType =>
+                bodyContext.report(NULLABLE_MEMBER_ACCESS, argument, nullable.displayName, "catchType")
+                catchTypesValid(i) = false
+              case _ if !TypeRules.isSuperType(expected, argType) =>
+                bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
+                catchTypesValid(i) = false
+              case _ =>
+                catchTypesValid(i) = true
             }
             DuplicationChecks.checkUnreachableCatchClause(bodyContext, node.recClauses, catchTypes, catchTypesValid, i, argument, argType, body)
             binds(i) = context.lookupOnlyCurrentScope(argument.name)

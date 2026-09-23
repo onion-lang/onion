@@ -913,6 +913,8 @@ several forms, sharing the same fix:
 - **`throw` operand** — `throw expr` where `expr` has nullable type.
 - **`select` scrutinee** — `select s { ... }` where `s` has nullable type (only when there's neither an `else` clause nor an unconditional wildcard pattern -- either one already handles a `null` scrutinee correctly).
 - **Range bound** — `a..b` / `a..<b` where `a` or `b` has nullable type (these desugar to a `Range` constructor call, so a nullable bound is rejected the same way as any other dereference-like use).
+- **Assignment / declaration** — a nullable value assigned where a non-null type is expected: a `val`/`var` declaration's initializer, a `return` value, a plain reassignment, or a field initializer (a target that itself accepts null -- a nullable-typed declaration, or a bare/platform type parameter -- is unaffected).
+- **`catch` clause type** — `catch e: E?` where the declared exception type is nullable. Unlike the forms above, there is no value to null-check here -- a caught exception is never null, so the fix is to drop the `?` from the catch clause's declared type.
 
 ```onion
 class Test {

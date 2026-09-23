@@ -1,0 +1,351 @@
+// TrafficNetworkController.on — multi-intersection adaptive traffic signal simulation
+//
+// Features exercised:
+//   record with from re"..." pattern parser
+//   ADT case-enum for signal phase, direction, congestion tier
+//   extension methods on Double/Int/String
+//   collection pipelines: groupBy, sortedBy, fold, filter, partition, map, distinct, zip
+//   do[List] (list comprehension)
+//   foreach over maps and ranges
+//   string interpolation #{}
+//   null safety / Elvis / !! assertion
+//   select / type-pattern matching with guards
+//   try/catch
+//   recursion (optimal green-time finder)
+
+import {
+  java.util.*
+}
+
+// ─── Domain records ───────────────────────────────────────────────────────────
+
+record SensorReading(intersection: String, dir: String, count: Int, speed: Double)
+  from re"([A-Za-z]+)\s+([NSEW])\s+(\d+)\s+([\d.]+)"
+
+record IntersectionConfig(
+  name: String,
+  minGreen: Int,
+  maxGreen: Int,
+  yellowDuration: Int,
+  peakHour: Boolean
+)
+
+// ─── ADT enums ────────────────────────────────────────────────────────────────
+
+enum CongestionTier {
+  case Free
+  case Moderate
+  case Heavy
+  case Gridlock
+public:
+  def label(): String = select this {
+    case f is Free:     "FREE    "
+    case m is Moderate: "MODERATE"
+    case h is Heavy:    "HEAVY   "
+    case g is Gridlock: "GRIDLOCK"
+  }
+  def multiplier(): Double = select this {
+    case f is Free:     1.0
+    case m is Moderate: 1.3
+    case h is Heavy:    1.7
+    case g is Gridlock: 2.2
+  }
+  def urgent(): Boolean = select this {
+    case h is Heavy:    true
+    case g is Gridlock: true
+    else: false
+  }
+}
+
+enum SignalPhase {
+  case NorthSouth
+  case EastWest
+  case AllRed
+  case FlashingYellow
+public:
+  def axes(): String = select this {
+    case ns is NorthSouth:     "N/S"
+    case ew is EastWest:       "E/W"
+    case ar is AllRed:         "ALL"
+    case fy is FlashingYellow: "FLY"
+  }
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): String {
+    val scaled: Int = ((self * 10.0) + 0.5) as Int
+    val whole: Int = scaled / 10
+    val frac: Int = scaled % 10
+    return whole + "." + frac
+  }
+  def round0(): Int = (self + 0.5) as Int
+  def clamp(lo: Double, hi: Double): Double = if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+extension Int {
+  def padLeft(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def bar(maxVal: Int, width: Int): String {
+    val filled: Int = if maxVal > 0 { (self * width / maxVal).clamp(0, width) } else { 0 }
+    var out: String = ""
+    foreach i: Int in 0..<width {
+      out = out + (if i < filled { "█" } else { "░" })
+    }
+    return out
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def center(n: Int): String {
+    var s: String = self
+    var left: Boolean = true
+    while s.length() < n {
+      if left { s = " " + s } else { s = s + " " }
+      left = !left
+    }
+    return s
+  }
+}
+
+// ─── Congestion classification ────────────────────────────────────────────────
+
+def classifyCount(count: Int, speedKmh: Double, peakHour: Boolean): CongestionTier {
+  val peakFactor: Double = if peakHour { 0.8 } else { 1.0 }
+  val speedPenalty: Double = if speedKmh < 20.0 { 1.5 } else if speedKmh < 40.0 { 1.2 } else { 1.0 }
+  val adjusted: Double = count as Double * speedPenalty / peakFactor
+  if adjusted < 10.0 { return new Free() }
+  if adjusted < 25.0 { return new Moderate() }
+  if adjusted < 40.0 { return new Heavy() }
+  return new Gridlock()
+}
+
+def greenTimeFor(tier: CongestionTier, base: Int, minG: Int, maxG: Int): Int {
+  val raw: Int = (base as Double * tier.multiplier()).round0()
+  return raw.clamp(minG, maxG)
+}
+
+// ─── Recursive optimal cycle length ──────────────────────────────────────────
+// Webster's formula approximation: C = (1.5*L + 5) / (1 - Y)
+// where L = lost time, Y = sum of critical flow ratios.
+// We search in range [30, 120] for the best C using recursion.
+
+def saturationFlow(count: Int): Double = {
+  val sat: Double = 1800.0   // typical saturation flow (veh/h)
+  return (count as Double) / sat
+}
+
+def findOptimalCycle(y: Double, lo: Int, hi: Int): Int {
+  if lo >= hi { return lo }
+  val mid: Int = (lo + hi) / 2
+  val lostTime: Double = 4.0
+  val cHere: Double = (1.5 * lostTime + 5.0) / (1.0 - y.clamp(0.1, 0.95) as Double)
+  if mid as Double >= cHere { return mid }
+  return findOptimalCycle(y, mid + 1, hi)
+}
+
+// ─── Data parsing ─────────────────────────────────────────────────────────────
+
+def parseReadings(raw: String): List[SensorReading] {
+  val result: List[SensorReading] = []
+  foreach line: String in raw.lines().toList() {
+    val trimmed: String = line.trim()
+    if trimmed.length() > 0 && !trimmed.startsWith("#") {
+      try {
+        val r: SensorReading? = SensorReading::parse(trimmed)
+        if r != null { result.add(r) }
+      } catch e: Exception {
+        IO::println("  ! skipped: #{trimmed}")
+      }
+    }
+  }
+  return result
+}
+
+// ─── Per-intersection analysis ───────────────────────────────────────────────
+
+def analyzeIntersection(name: String, readings: List[SensorReading], cfg: IntersectionConfig): void {
+  IO::println("")
+  IO::println("  ┌─────────────────────────────────────────┐")
+  IO::println("  │ " + ("Intersection: " + name).center(41) + " │")
+  IO::println("  └─────────────────────────────────────────┘")
+
+  val dirOrder: List[String] = ["N", "S", "E", "W"]
+  var maxCount: Int = 1
+  foreach r: SensorReading in readings {
+    if r.count() > maxCount { maxCount = r.count() }
+  }
+
+  var nsCount: Int = 0
+  var ewCount: Int = 0
+
+  foreach dir: String in dirOrder {
+    val maybeR: SensorReading? = readings.find { r -> r.dir() == dir }
+    if maybeR != null {
+      val r: SensorReading = maybeR!!
+      val tier: CongestionTier = classifyCount(r.count(), r.speed(), cfg.peakHour())
+      val greenTime: Int = greenTimeFor(tier, 30, cfg.minGreen(), cfg.maxGreen())
+      val flag: String = if tier.urgent() { " !!!" } else { "    " }
+      IO::println("    " + dir + "  " + r.count().padLeft(3) + " veh  " +
+                  r.speed().round1() + " km/h  " + tier.label() + "  green=#{greenTime}s" + flag)
+      IO::println("       " + r.count().bar(maxCount, 28))
+      if dir == "N" || dir == "S" { nsCount = nsCount + r.count() }
+      if dir == "E" || dir == "W" { ewCount = ewCount + r.count() }
+    }
+  }
+
+  val nsFrac: Double = nsCount as Double / 1800.0
+  val ewFrac: Double = ewCount as Double / 1800.0
+  val critY: Double = (if nsFrac > ewFrac { nsFrac } else { ewFrac }).clamp(0.1, 0.95) as Double
+  val optCycle: Int = findOptimalCycle(critY, 30, 120)
+
+  val nsGreen: Int = (optCycle as Double * nsFrac / (nsFrac + ewFrac + 0.01)).round0().clamp(cfg.minGreen(), cfg.maxGreen())
+  val ewGreen: Int = (optCycle as Double * ewFrac / (nsFrac + ewFrac + 0.01)).round0().clamp(cfg.minGreen(), cfg.maxGreen())
+
+  IO::println("    N/S total: #{nsCount} veh, E/W total: #{ewCount} veh")
+  IO::println("    Optimal cycle: #{optCycle}s  →  N/S green #{nsGreen}s, E/W green #{ewGreen}s, yellow #{cfg.yellowDuration()}s each")
+  IO::println("    Peak-hour mode: #{cfg.peakHour()}")
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val sensorLog: String = """
+# Traffic sensor readings: intersection direction count(veh/5min) speed(km/h)
+Downtown  N 28 38.2
+Downtown  S 31 35.7
+Downtown  E 14 52.1
+Downtown  W 11 55.3
+Midtown   N 42 22.5
+Midtown   S 45 20.1
+Midtown   E 38 24.8
+Midtown   W 35 28.3
+Uptown    N  7 61.4
+Uptown    S  9 58.9
+Uptown    E  5 67.2
+Uptown    W  6 65.0
+this line is garbage
+Riverside N 55 15.3
+Riverside S 58 14.1
+Riverside E 12 48.7
+Riverside W 15 44.2
+"""
+
+val configs: Map[String, IntersectionConfig] = [
+  "Downtown":  new IntersectionConfig("Downtown",  15, 60, 5, true),
+  "Midtown":   new IntersectionConfig("Midtown",   20, 70, 5, true),
+  "Uptown":    new IntersectionConfig("Uptown",    10, 45, 4, false),
+  "Riverside": new IntersectionConfig("Riverside", 20, 75, 5, true)
+]
+
+val readings: List[SensorReading] = parseReadings(sensorLog)
+
+IO::println("══════════════════════════════════════════════════════")
+IO::println("      ADAPTIVE TRAFFIC NETWORK CONTROLLER REPORT")
+IO::println("══════════════════════════════════════════════════════")
+IO::println("Parsed #{readings.size} sensor readings across #{readings.map { r -> r.intersection() }.distinct().size} intersections.")
+
+// ── Per-intersection breakdown ────────────────────────────────────────────────
+val byIntersection: Map[String, List[SensorReading]] = readings.groupBy { r -> r.intersection() }
+val intersectionNames: List[String] = []
+foreach (k, _) in byIntersection { intersectionNames.add(k) }
+intersectionNames.sort(null)
+
+foreach name: String in intersectionNames {
+  val iReadings: List[SensorReading] = byIntersection.get(name) ?: []
+  val cfg: IntersectionConfig? = configs.get(name)
+  val safeCfg: IntersectionConfig = cfg ?: new IntersectionConfig(name, 15, 60, 5, false)
+  analyzeIntersection(name, iReadings, safeCfg)
+}
+
+// ── Network-wide tally using do[List] ─────────────────────────────────────────
+IO::println("")
+IO::println("── Network congestion tally ─────────────────────────────")
+val allTiers: List[CongestionTier] = do[List] {
+  r <- readings
+  cfg <- [configs.get(r.intersection()) ?: new IntersectionConfig(r.intersection(), 15, 60, 5, false)]
+  ret classifyCount(r.count(), r.speed(), cfg.peakHour())
+}
+val tierGroups: Map[String, List[CongestionTier]] = allTiers.groupBy { t -> t.label().trim() }
+val tierKeys: List[String] = []
+foreach (k, _) in tierGroups { tierKeys.add(k) }
+tierKeys.sort(null)
+var maxTierCount: Int = 1
+foreach k: String in tierKeys {
+  val group: List[CongestionTier]? = tierGroups.get(k)
+  val cnt: Int = if group != null { group.size } else { 0 }
+  if cnt > maxTierCount { maxTierCount = cnt }
+}
+foreach k: String in tierKeys {
+  val group: List[CongestionTier]? = tierGroups.get(k)
+  val cnt: Int = if group != null { group.size } else { 0 }
+  IO::println("  " + k.padRight(10) + cnt.bar(maxTierCount, 20) + " #{cnt}")
+}
+
+// ── Urgency summary ───────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── Urgent-attention sensors ─────────────────────────────")
+val urgentReadings: List[SensorReading] = readings.filter { r ->
+  val cfg: IntersectionConfig = configs.get(r.intersection()) ?: new IntersectionConfig(r.intersection(), 15, 60, 5, false)
+  classifyCount(r.count(), r.speed(), cfg.peakHour()).urgent()
+}
+if urgentReadings.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach r: SensorReading in urgentReadings.sortedBy { r -> r.count() * -1 } {
+    IO::println("  #{r.intersection()} #{r.dir()} — #{r.count()} veh @ #{r.speed().round1()} km/h")
+  }
+}
+
+// ── Fastest and slowest approaches via partition and fold ─────────────────────
+IO::println("")
+IO::println("── Speed range across all sensors ───────────────────────")
+val parts = readings.partition { r -> r.speed() >= 50.0 }
+val fastObjs: List[Object] = parts[0] as List[Object]
+val slowObjs: List[Object] = parts[1] as List[Object]
+val fast: List[SensorReading] = fastObjs.map { o -> o as SensorReading }
+val slow: List[SensorReading] = slowObjs.map { o -> o as SensorReading }
+IO::println("  Fast (≥50 km/h): #{fast.size} sensors — avg #{fast.fold(0.0) { acc, r -> acc + r.speed() / fast.size as Double }.round1()} km/h")
+IO::println("  Slow (<50 km/h): #{slow.size} sensors — avg #{slow.fold(0.0) { acc, r -> acc + r.speed() / slow.size as Double }.round1()} km/h")
+val fastest: SensorReading? = readings.find { r -> r.speed() == readings.fold(0.0) { acc, rx -> if rx.speed() > acc { rx.speed() } else { acc } } }
+val slowest: SensorReading? = readings.find { r -> r.speed() == readings.fold(999.0) { acc, rx -> if rx.speed() < acc { rx.speed() } else { acc } } }
+if fastest != null {
+  val fst: SensorReading = fastest!!
+  IO::println("  Fastest: #{fst.intersection()} #{fst.dir()} @ #{fst.speed().round1()} km/h")
+}
+if slowest != null {
+  val slw: SensorReading = slowest!!
+  IO::println("  Slowest: #{slw.intersection()} #{slw.dir()} @ #{slw.speed().round1()} km/h")
+}
+
+// ── Cross-product: each intersection paired with each possible phase ──────────
+IO::println("")
+IO::println("── Phase assignment matrix (N/S vs E/W dominant) ────────")
+val phases: List[SignalPhase] = [new NorthSouth(), new EastWest()]
+val crossProduct: List[String] = do[List] {
+  name <- intersectionNames
+  phase <- phases
+  nsVol <- [readings.filter { r -> r.intersection() == name && (r.dir() == "N" || r.dir() == "S") }
+                    .fold(0) { acc, r -> acc + r.count() }]
+  ewVol <- [readings.filter { r -> r.intersection() == name && (r.dir() == "E" || r.dir() == "W") }
+                    .fold(0) { acc, r -> acc + r.count() }]
+  ret (name + "/" + phase.axes() + "(ns=" + nsVol + ",ew=" + ewVol + ")")
+}
+foreach item: String in crossProduct {
+  IO::println("  " + item)
+}
+
+IO::println("")
+val urgentCount: Int = urgentReadings.size
+IO::println("══════════════════════════════════════════════════════")
+IO::println("Report complete: #{readings.size} sensors, #{urgentCount} urgent, #{intersectionNames.size} intersections analysed.")
+IO::println("══════════════════════════════════════════════════════")

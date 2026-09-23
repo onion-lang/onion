@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`run/SpatialIndex.on`** — a 323-line quadtree-based 2D spatial index, a new domain for the `run/` corpus (`record Point from re"…"` line parsing with `parseAll`; an ADT enum `QueryResult` with `Hits`/`Miss` dispatch; a data-carrying enum `Tier` with a `forCount` classifier; a recursive `QuadNode` class with private `subdivide`/`tryChildren` and public `insert`/`query`/`countAll`/`maxDepth`; a `QuadTree` facade using `try`/`catch` to reject out-of-bounds points; extension methods on `Double`/`Int`/`String`; nullable child-node fields null-guarded before recursion; and `select`-pattern dispatch), added to the `run/` corpus (merged via #1431).
 
+- **`run/AvlTree.on`** — a 296-line immutable AVL self-balancing binary search tree for `Int` keys, a new domain for the `run/` corpus (`record AvlNode(key: Int, height: Int, left: AvlNode?, right: AvlNode?)` with nullable recursive fields and internal `withLeft`/`withRight`/`withKey`/`calcHeight`/`balance` methods; an ADT case-enum `Rotation` (`LL`/`RR`/`LR`/`RL`/`None`) with `select`-pattern dispatch; a `class AvlTree` wrapping a nullable root with `insert`/`delete`/`contains`/`toSortedList`/`printTree`; top-level recursive `def`s for insert/delete/balance/rotate/inorder/print; extension methods on `Int`/`String` (`padLeft`, `repeat`); nullable `T?`/`!!`/`?.`/`?:` throughout traversal; `fold` over `List[Int]`; string interpolation; `foreach` over `List` and an inclusive range; `while` loops; and a `try`/`catch` empty-tree block), added to the `run/` corpus (merged via #1435).
+
 ## [0.101.0] - 2026-09-23
 
 ### Added

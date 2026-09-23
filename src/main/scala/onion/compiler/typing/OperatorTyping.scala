@@ -344,6 +344,16 @@ final class OperatorTyping(
         }
     }
 
+  /** Single-operand sibling of the above, for unary operators (`-x`, `+x`, `~x`, `!x`),
+    * which unbox/dereference their operand exactly the same way. */
+  private[typing] def reportNullableOperandIfPresent(node: AST.UnaryExpression, operand: Term): Boolean =
+    operand.`type` match {
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.term, nullable.displayName, "operator")
+        true
+      case _ => false
+    }
+
   def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processLogicalExpression(node, context)
     if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
@@ -356,35 +366,44 @@ final class OperatorTyping(
 
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
-      if (!hasNumericType(term)) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
-        None
-      } else Some(new UnaryTerm(kind, term.`type`, term))
+      if (reportNullableOperandIfPresent(node, termRaw)) None
+      else {
+        val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
+        if (!hasNumericType(term)) {
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+          None
+        } else Some(new UnaryTerm(kind, term.`type`, term))
+      }
     }
 
   /** ~x — integral operands only; byte/short/char promote to int like Java. */
   def typeUnaryIntegral(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
-      term.`type` match {
-        case BasicType.INT | BasicType.LONG =>
-          Some(new UnaryTerm(kind, term.`type`, term))
-        case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
-          Some(new UnaryTerm(kind, BasicType.INT, new AsInstanceOf(term, BasicType.INT)))
-        case other =>
-          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
-          None
+      if (reportNullableOperandIfPresent(node, termRaw)) None
+      else {
+        val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
+        term.`type` match {
+          case BasicType.INT | BasicType.LONG =>
+            Some(new UnaryTerm(kind, term.`type`, term))
+          case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
+            Some(new UnaryTerm(kind, BasicType.INT, new AsInstanceOf(term, BasicType.INT)))
+          case other =>
+            bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
+            None
+        }
       }
     }
 
   def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)
-      if (term.`type` != BasicType.BOOLEAN) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
-        None
-      } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
+      if (reportNullableOperandIfPresent(node, termRaw)) None
+      else {
+        val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)
+        if (term.`type` != BasicType.BOOLEAN) {
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+          None
+        } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
+      }
     }
 
   /** The literal `1` in the operand's own type, so `x++` on a Long/Double/Float

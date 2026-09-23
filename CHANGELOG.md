@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A nullable operand in a unary operator (`-n`/`+n` where `n: Int?`, `~n`, or `!b` where `b: Boolean?`) reported the generic `E0001` ("operator X is not applicable for type ...") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that the equivalent binary operator (`n - 1` where `n: Int?`) already reports** — every unary operator unboxes/dereferences its operand exactly like the binary operators fixed in v0.97.0. None of `OperatorTyping.typeUnaryNumeric` (`-`/`+`), `.typeUnaryIntegral` (`~`), or `.typeUnaryBoolean` (`!`) special-cased a `NullableType` operand before falling into the generic `INCOMPATIBLE_OPERAND_TYPE` report. Fixed by reusing the existing `reportNullableOperandIfPresent` helper via a new single-operand overload, consulted up front at each of the three unary report sites. Guarded by seven new regression tests in `NullableUnaryOperatorOperandSpec`.
+
 ## [0.97.0] - 2026-09-22
 
 ### Fixed

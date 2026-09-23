@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-09-23
+
 ### Fixed
 
 - **A nullable `select` scrutinee (`select s { ... }` where `s: T?`), with neither an `else` branch nor a bare wildcard pattern to catch `null`, either reported the misleading `E0020` ("this method cannot return a value") in expression position, or compiled with no diagnostic at all in statement position — a genuine silent miscompile: every case's type check fails against a `null` scrutinee, so the whole select body silently does nothing at runtime, instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that every other dereference-like use of a nullable value (member access, indexing, operators, conditions, `foreach`, destructuring, array size, `throw`, try-with-resources) already reports.** `SelectExpressionTyping.typeSelectExpression`'s exhaustiveness check unwrapped `AppliedClassType` but not `NullableType` when computing `conditionClass`, so a nullable scrutinee's raw class never matched the sealed/enum lookup and the whole exhaustiveness block — and with it, any diagnostic — was silently skipped, even though no pattern form can ever match `null`. A `select` that already has an `else` or a bare wildcard pattern is unaffected (those already handle a `null` scrutinee). Fixed by reporting `NULLABLE_MEMBER_ACCESS` up front for a nullable scrutinee in that exact gap, reusing the existing `E0042`-cascade-prevention flag so it doesn't also trigger the misleading `E0020`. Guarded by four new regression tests in `NullableSelectScrutineeSpec`.

@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.104.0] - 2026-09-23
-
 ### Added
 
 - **`run/CoffeeRoastery.on`** — a 409-line coffee roasting and wholesale business simulator, a new domain for the `run/` corpus (a data-carrying enum `RoastProfile` (`Light`/`Medium`/`Dark`/`Espresso` cases carrying temp and time/pressure); plain enums `Grade`, `Origin`; a class `Inventory conforms Reportable`; records with methods — `Bean.grade()`/`gradeLabel()`, `RoastBatch.weightLossPct()`/`revenueAt()`; `select`-pattern dispatch over the sealed `RoastProfile`; collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`distinct`/`find`/`partition`/`zip`); a tail-recursive `bestBlendCandidate` scan; nullable `Bean?`; string interpolation; `foreach` over typed `ArrayList`/`LinkedHashMap` entries; and explicit `return` in block-body methods), added to the `run/` corpus (merged via #1453).

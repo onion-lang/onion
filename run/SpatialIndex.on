@@ -1,0 +1,323 @@
+// SpatialIndex.on — quadtree-based 2D spatial index (~240 lines).
+//
+// Exercises: record...from re"..." (parseAll), ADT enum (QueryResult) with
+// dispatch methods, data-carrying enum (Tier) with classify helper, class with
+// mutable state and private sections (QuadNode / QuadTree), recursive insert /
+// query / depth methods, extension methods on Double/Int, collection pipelines
+// (filter/sortedBy/fold/map), nullable child-node pattern, select pattern
+// matching, try/catch, while/foreach loops, and string interpolation.
+
+import {
+  java.util.ArrayList;
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val s = "" + self
+    val dot = s.indexOf(".")
+    if dot < 0 { return s + ".00" }
+    val frac = s.substring(dot + 1)
+    if frac.length() == 1 { return s + "0" }
+    if frac.length() > 2  { return s.substring(0, dot + 3) }
+    return s
+  }
+  def absd(): Double = if self < 0.0 { -self } else { self }
+}
+
+extension Int {
+  def maxWith(other: Int): Int = if self > other { self } else { other }
+  def bar(cap: Int, width: Int): String {
+    if cap == 0 { return "[" + " ".repeatI(width) + "]" }
+    val filled = self * width / cap
+    return "[" + "#".repeatI(filled) + " ".repeatI(width - filled) + "]"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def repeatI(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ── Point record ──────────────────────────────────────────────────────────────
+// Line format: "<x> <y> <label>"  e.g. "10.5 20.3 tower-A"
+
+record Point(x: Double, y: Double, label: String)
+  from re"(-?\d+\.?\d*) (-?\d+\.?\d*) (\S+)"
+
+// ── Query result (ADT enum) ───────────────────────────────────────────────────
+
+enum QueryResult {
+  case Hits(found: List[Point], queryMs: Int)
+  case Miss(region: String)
+public:
+  def describe(): String = select this {
+    case r is Hits: "#{r.found().size} point(s) [#{r.queryMs()}ms]"
+    case r is Miss: "no points in #{r.region()}"
+  }
+  def isEmpty(): Boolean = select this {
+    case r is Hits: r.found().size == 0
+    case r is Miss: true
+  }
+  def hitList(): List[Point] = select this {
+    case r is Hits: r.found()
+    case r is Miss: new ArrayList[Point]()
+  }
+}
+
+// ── Point-density tier (data-carrying enum) ───────────────────────────────────
+
+enum Tier(label: String, threshold: Int) {
+  SPARSE(  "sparse",   0),
+  MODERATE("moderate", 5),
+  DENSE(   "dense",   15),
+  CLUSTER( "cluster", 30)
+public:
+  def badge(): String = "[" + label() + "]"
+  static def forCount(n: Int): Tier {
+    if n >= 30 { return Tier::CLUSTER }
+    if n >= 15 { return Tier::DENSE }
+    if n >= 5  { return Tier::MODERATE }
+    return Tier::SPARSE
+  }
+}
+
+// ── QuadNode — recursive quadrant ────────────────────────────────────────────
+
+class QuadNode {
+  val cx: Double        // centre x
+  val cy: Double        // centre y
+  val hw: Double        // half-width
+  val hh: Double        // half-height
+  val cap: Int          // max points before subdivision
+  var pts: List[Point]
+  var nw: QuadNode? = null
+  var ne: QuadNode? = null
+  var sw: QuadNode? = null
+  var se: QuadNode? = null
+  var isLeaf: Boolean = true
+private:
+  def tryChildren(p: Point): Boolean {
+    val a = nw; val b = ne; val c = sw; val d = se
+    if a != null && a.insert(p) { return true }
+    if b != null && b.insert(p) { return true }
+    if c != null && c.insert(p) { return true }
+    if d != null && d.insert(p) { return true }
+    return false
+  }
+  def subdivide(): void {
+    val qw = hw / 2.0
+    val qh = hh / 2.0
+    nw = new QuadNode(cx - qw, cy + qh, qw, qh, cap)
+    ne = new QuadNode(cx + qw, cy + qh, qw, qh, cap)
+    sw = new QuadNode(cx - qw, cy - qh, qw, qh, cap)
+    se = new QuadNode(cx + qw, cy - qh, qw, qh, cap)
+    val old = pts
+    pts = new ArrayList[Point]()
+    isLeaf = false
+    foreach p: Point in old { tryChildren(p) }
+  }
+public:
+  def this(cx: Double, cy: Double, hw: Double, hh: Double, cap: Int) {
+    this.cx = cx; this.cy = cy; this.hw = hw; this.hh = hh; this.cap = cap
+    this.pts = new ArrayList[Point]()
+  }
+  def contains(x: Double, y: Double): Boolean {
+    return x >= cx - hw && x <= cx + hw && y >= cy - hh && y <= cy + hh
+  }
+  def intersects(x1: Double, y1: Double, x2: Double, y2: Double): Boolean {
+    return !(x2 < cx - hw || x1 > cx + hw || y2 < cy - hh || y1 > cy + hh)
+  }
+  def insert(p: Point): Boolean {
+    if !contains(p.x(), p.y()) { return false }
+    if isLeaf {
+      if pts.size < cap { pts.add(p); return true }
+      subdivide()
+    }
+    return tryChildren(p)
+  }
+  def query(x1: Double, y1: Double, x2: Double, y2: Double, out: List[Point]): void {
+    if !intersects(x1, y1, x2, y2) { return }
+    if isLeaf {
+      foreach p: Point in pts {
+        if p.x() >= x1 && p.x() <= x2 && p.y() >= y1 && p.y() <= y2 { out.add(p) }
+      }
+    } else {
+      val a = nw; val b = ne; val c = sw; val d = se
+      if a != null { a.query(x1, y1, x2, y2, out) }
+      if b != null { b.query(x1, y1, x2, y2, out) }
+      if c != null { c.query(x1, y1, x2, y2, out) }
+      if d != null { d.query(x1, y1, x2, y2, out) }
+    }
+  }
+  def countAll(): Int {
+    if isLeaf { return pts.size }
+    val a = nw; val b = ne; val c = sw; val d = se
+    val n1 = if a != null { a.countAll() } else { 0 }
+    val n2 = if b != null { b.countAll() } else { 0 }
+    val n3 = if c != null { c.countAll() } else { 0 }
+    val n4 = if d != null { d.countAll() } else { 0 }
+    return n1 + n2 + n3 + n4
+  }
+  def maxDepth(): Int {
+    if isLeaf { return 0 }
+    val a = nw; val b = ne; val c = sw; val d = se
+    val d1 = if a != null { a.maxDepth() } else { 0 }
+    val d2 = if b != null { b.maxDepth() } else { 0 }
+    val d3 = if c != null { c.maxDepth() } else { 0 }
+    val d4 = if d != null { d.maxDepth() } else { 0 }
+    return 1 + d1.maxWith(d2).maxWith(d3).maxWith(d4)
+  }
+}
+
+// ── QuadTree — public facade ──────────────────────────────────────────────────
+
+class QuadTree {
+  val root: QuadNode
+  var inserted: Int = 0
+  var rejected: Int = 0
+  var queries: Int = 0
+public:
+  def this(cx: Double, cy: Double, hw: Double, hh: Double, cap: Int) {
+    root = new QuadNode(cx, cy, hw, hh, cap)
+  }
+  def insertSafe(p: Point): void {
+    try {
+      if !root.insert(p) { throw new Exception("#{p.label()} at (#{p.x().fmt2()},#{p.y().fmt2()}) out of bounds") }
+      inserted = inserted + 1
+    } catch e: Exception {
+      IO::println("  [skip] " + e.getMessage())
+      rejected = rejected + 1
+    }
+  }
+  def query(x1: Double, y1: Double, x2: Double, y2: Double): QueryResult {
+    val out: List[Point] = new ArrayList[Point]()
+    root.query(x1, y1, x2, y2, out)
+    queries = queries + 1
+    if out.size == 0 {
+      val reg = "(#{x1.fmt2()},#{y1.fmt2()})-(#{x2.fmt2()},#{y2.fmt2()})"
+      return new Miss(reg)
+    }
+    return new Hits(out, 0)
+  }
+  def size(): Int   = root.countAll()
+  def depth(): Int  = root.maxDepth()
+  def getInserted(): Int = inserted
+  def getRejected(): Int = rejected
+  def getQueries(): Int  = queries
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val text = [
+    "10.0 10.0 alpha",    "30.0 10.0 beta",    "10.0 30.0 gamma",
+    "30.0 30.0 delta",    "20.0 20.0 centre",  "15.0 25.0 zeta",
+    "25.0 15.0 eta",      "12.0 18.0 theta",   "28.0 22.0 iota",
+    "18.0 12.0 kappa",    "22.0 28.0 lambda",  "5.0 5.0 mu",
+    "35.0 35.0 nu",       "5.0 35.0 xi",       "35.0 5.0 omicron",
+    "50.0 50.0 out-of-bounds",   // should be rejected (tree covers 0-40)
+    "BADLINE",
+    "20.0 20.0 pi",       "19.0 21.0 rho",     "21.0 19.0 sigma"
+  ].fold("") { acc, s -> acc + s + "\n" }
+
+  val pts: List[Point] = Point::parseAll(text)
+  IO::println("Parsed #{pts.size} points from #{20} lines (#{20 - pts.size} skipped).\n")
+
+  // Build quadtree centred at (20, 20), half-extents 20×20, capacity 4
+  val qt = new QuadTree(20.0, 20.0, 20.0, 20.0, 4)
+  foreach p: Point in pts { qt.insertSafe(p) }
+  IO::println("Tree: #{qt.size()} points stored, #{qt.getRejected()} rejected, depth=#{qt.depth()}\n")
+
+  // ── Range queries ───────────────────────────────────────────────────────────
+  IO::println("-----------------------------")
+  IO::println("  Range Queries")
+  IO::println("-----------------------------")
+  val queries = [
+    [0.0, 0.0, 20.0, 20.0],    // SW quadrant
+    [20.0, 20.0, 40.0, 40.0],  // NE quadrant
+    [14.0, 14.0, 26.0, 26.0],  // central 12x12 region
+    [0.0, 0.0, 10.0, 10.0]     // far corner
+  ]
+  foreach q: List in queries {
+    val x1 = q[0] as Double; val y1 = q[1] as Double
+    val x2 = q[2] as Double; val y2 = q[3] as Double
+    val result = qt.query(x1, y1, x2, y2)
+    IO::println("  (#{x1.fmt2()},#{y1.fmt2()})-(#{x2.fmt2()},#{y2.fmt2()}): " + result.describe())
+    if !result.isEmpty() {
+      val hits = result.hitList()
+      val sorted = hits.sortedBy { p -> (p as Point).label() }
+      foreach p: Point in sorted {
+        IO::println("    " + p.label().padRight(12) + " (" + p.x().fmt2() + ", " + p.y().fmt2() + ")")
+      }
+    }
+  }
+
+  // ── Density tiers ───────────────────────────────────────────────────────────
+  IO::println("")
+  IO::println("-----------------------------")
+  IO::println("  Quadrant Density")
+  IO::println("-----------------------------")
+  val quadrants = [
+    ["SW", 0.0, 0.0, 20.0, 20.0],
+    ["NW", 0.0, 20.0, 20.0, 40.0],
+    ["NE", 20.0, 20.0, 40.0, 40.0],
+    ["SE", 20.0, 0.0, 40.0, 20.0]
+  ]
+  var maxHits = 0
+  val hitCounts: List[Int] = new ArrayList[Int]()
+  foreach qd: List in quadrants {
+    val x1 = qd[1] as Double; val y1 = qd[2] as Double
+    val x2 = qd[3] as Double; val y2 = qd[4] as Double
+    val r = qt.query(x1, y1, x2, y2)
+    val n = r.hitList().size
+    hitCounts.add(n)
+    if n > maxHits { maxHits = n }
+  }
+  var qi = 0
+  while qi < quadrants.size {
+    val qd = quadrants[qi] as List
+    val n = hitCounts[qi] as Int
+    val tier = Tier::forCount(n)
+    IO::println(
+      "  " + (qd[0] as String).padRight(4) +
+      n.bar(maxHits, 15) + " " + ("" + n).padLeft(2) + " pts  " + tier.badge()
+    )
+    qi = qi + 1
+  }
+
+  // ── Stats summary ───────────────────────────────────────────────────────────
+  IO::println("")
+  val allPts = qt.query(0.0, 0.0, 40.0, 40.0).hitList()
+  val gcx: Double = allPts.fold(0.0) { acc, p -> acc + (p as Point).x() } / (allPts.size as Double)
+  val gcy: Double = allPts.fold(0.0) { acc, p -> acc + (p as Point).y() } / (allPts.size as Double)
+  val labels = allPts.map { p -> (p as Point).label() }
+  val longest: String? = labels.fold(null) { acc, s ->
+    val cur = s as String
+    if acc == null { cur } else if cur.length() > (acc as String).length() { cur } else { acc as String }
+  }
+  IO::println("-----------------------------")
+  IO::println(
+    "#{qt.size()} points | centroid (#{gcx.fmt2()}, #{gcy.fmt2()}) | " +
+    "depth=#{qt.depth()} | #{qt.getQueries()} queries"
+  )
+  if longest != null {
+    IO::println("Longest label: " + (longest as String))
+  }
+  IO::println("-----------------------------")
+}

@@ -95,9 +95,11 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           None
         case MethodFallbackLookup.NotFound =>
           callableValueCallSupport.resolveCallableValue(node, params, context, expected) match {
-            case Some(term) =>
+            case MethodFallbackLookup.Found(term) =>
               Some(term)
-            case None =>
+            case MethodFallbackLookup.Error =>
+              None
+            case MethodFallbackLookup.NotFound =>
               resolveTopLevelStaticCall(node, params, expected) match {
                 case Some(term) => Some(term)
                 case None =>
@@ -190,8 +192,9 @@ private[compiler] final class UnqualifiedMethodCallSupport(
             None
           case MethodFallbackLookup.NotFound =>
             callableValueCallSupport.resolveCallableValue(node, params0, context, expected) match {
-              case some @ Some(_) => some
-              case None =>
+              case MethodFallbackLookup.Found(term) => Some(term)
+              case MethodFallbackLookup.Error => None
+              case MethodFallbackLookup.NotFound =>
                 calls.reportMethodNotFound(node, targetType, name, calls.types(params0), isUnqualifiedCall = true)
                 None
             }

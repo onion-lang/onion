@@ -1,0 +1,370 @@
+// FantasyLeague.on — Fantasy American-football league tracker (~240 lines).
+//
+// Exercises: plain enum (Position), ADT case-enum (PlayerStatus), records
+//   with derive!(Json) (Standing, MatchResult), extension methods on Double
+//   and String, classes with primary constructors and typed mutable lists,
+//   collection pipelines (filter/map/fold/flatMap/groupBy/sortedBy/find/
+//   partition/forEach/any/count), select+type-pattern matching, nullable,
+//   string interpolation, do[Option], |> pipeline, while/foreach loops
+//   (ranges, typed lists, map k,v entries), closures.
+//
+//   onion FantasyLeague.on
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def pts(): String {
+    val neg: Boolean = self < 0.0
+    val abs: Double  = if neg { -self } else { self }
+    val v: Int = (abs * 10.0 + 0.05).intValue()
+    val s: String = "" + (v / 10) + "." + (v % 10)
+    return if neg { "-" + s } else { s }
+  }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""; var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ─── Position (plain enum) ────────────────────────────────────────────────────
+
+enum Position {
+  QB, RB, WR, TE, K, DEF
+public:
+  def abbr(): String = select this {
+    case Position::QB:  "QB"
+    case Position::RB:  "RB"
+    case Position::WR:  "WR"
+    case Position::TE:  "TE"
+    case Position::K:   "K"
+    case Position::DEF: "DST"
+    else:               "?"
+  }
+  def slots(): Int = select this {
+    case Position::QB:  1
+    case Position::RB:  2
+    case Position::WR:  3
+    case Position::TE:  1
+    case Position::K:   1
+    case Position::DEF: 1
+    else:               0
+  }
+}
+
+// ─── PlayerStatus (ADT case-enum) ────────────────────────────────────────────
+
+enum PlayerStatus {
+  case Active
+  case Injured(detail: String)
+  case OnBye
+  case Suspended(weeks: Int)
+public:
+  def badge(): String = select this {
+    case a is Active:    "  "
+    case i is Injured:   "IR"
+    case b is OnBye:     "BY"
+    case s is Suspended: "SU"
+  }
+  def note(): String = select this {
+    case a is Active:    ""
+    case i is Injured:   " [#{i.detail()}]"
+    case b is OnBye:     " [bye]"
+    case s is Suspended: " [susp #{s.weeks()}w]"
+  }
+  def isActive(): Boolean = select this {
+    case a is Active: true
+    else:             false
+  }
+  def isInjured(): Boolean = select this {
+    case i is Injured: true
+    else:              false
+  }
+}
+
+// ─── Records with derive!(Json) ──────────────────────────────────────────────
+
+record Standing(teamName: String, wins: Int, losses: Int, pf: Double, pa: Double)
+  derive!(Json)
+
+record MatchResult(home: String, away: String, homeScore: Double, awayScore: Double)
+  derive!(Json)
+
+// ─── Player ──────────────────────────────────────────────────────────────────
+
+class Player(val name: String, val pos: Position, val nflTeam: String,
+             val points: Double, val status: PlayerStatus) {
+public:
+  def available(): Boolean = status.isActive()
+  def injured():   Boolean = status.isInjured()
+
+  def line(): String {
+    val b: String = "[#{status.badge()}]"
+    return "#{b} #{pos.abbr().rpad(3)} #{name.rpad(20)} #{nflTeam.rpad(4)} #{points.pts().lpad(6)}#{status.note()}"
+  }
+}
+
+// ─── FantasyTeam ─────────────────────────────────────────────────────────────
+
+class FantasyTeam {
+public:
+  val name:   String
+  val owner:  String
+  var roster: List[Player]
+  def this(n: String, o: String) {
+    this.name   = n
+    this.owner  = o
+    this.roster = []
+  }
+
+  def add(p: Player): void { roster.add(p) }
+
+  def starters(): List[Player] = roster.filter { p -> p.available() }
+
+  def totalPoints(): Double =
+    starters().fold(0.0) { acc, p -> acc + p.points }
+
+  def topScorer(): Player? {
+    val avail: List[Player] = starters()
+    if avail.size == 0 { return null }
+    var best: Player = avail[0]
+    foreach p: Player in avail {
+      if p.points > best.points { best = p }
+    }
+    return best
+  }
+
+  def byPosition(): Map[String, List[Player]] =
+    starters().groupBy { p -> p.pos.abbr() }
+
+  def hasInjuries(): Boolean =
+    roster.any { p -> p.injured() }
+
+  def injuredPlayers(): List[Player] =
+    roster.filter { p -> p.injured() }
+
+  def positionCount(pos: Position): Int =
+    starters().count { p -> p.pos == pos }
+}
+
+// ─── League ──────────────────────────────────────────────────────────────────
+
+class League {
+public:
+  val name:    String
+  var teams:   List[FantasyTeam]
+  var results: List[MatchResult]
+  var week:    Int
+  def this(n: String) {
+    this.name    = n
+    this.teams   = []
+    this.results = []
+    this.week    = 0
+  }
+
+  def addTeam(t: FantasyTeam): void { teams.add(t) }
+
+  def recordMatchup(home: FantasyTeam, away: FantasyTeam): void {
+    val r: MatchResult = new MatchResult(
+      home.name, away.name,
+      home.totalPoints(), away.totalPoints()
+    )
+    results.add(r)
+    week = week + 1
+    val w: String = if r.homeScore() > r.awayScore() { home.name } else { away.name }
+    IO::println("  W#{week} #{home.name.rpad(24)} #{r.homeScore().pts().lpad(6)} v #{r.awayScore().pts().lpad(6)} #{away.name.rpad(24)} → #{w}")
+  }
+
+  def standingsFor(teamName: String): Standing? {
+    var w: Int = 0; var l: Int = 0
+    var pf: Double = 0.0; var pa: Double = 0.0
+    foreach r: MatchResult in results {
+      if r.home() == teamName {
+        pf = pf + r.homeScore(); pa = pa + r.awayScore()
+        if r.homeScore() > r.awayScore() { w = w + 1 } else { l = l + 1 }
+      } else if r.away() == teamName {
+        pf = pf + r.awayScore(); pa = pa + r.homeScore()
+        if r.awayScore() > r.homeScore() { w = w + 1 } else { l = l + 1 }
+      }
+    }
+    if w + l == 0 { return null }
+    return new Standing(teamName, w, l, pf, pa)
+  }
+
+  def allStandings(): List[Standing] {
+    val raw: List[Standing?] = teams.map { t -> standingsFor(t.name) }
+    val out: List[Standing]  = []
+    foreach s: Standing? in raw {
+      if s != null { out.add(s as Standing) }
+    }
+    return out.sortedBy { s -> -(s.wins() * 10000 + (s.pf() * 10.0).intValue()) }
+  }
+
+  def printStandings(): void {
+    IO::println("")
+    IO::println("  ══════════ #{name} — Week #{week} Standings ══════════")
+    IO::println("  " + "Team".rpad(24) + "  W  L     PF      PA    Diff")
+    IO::println("  " + "-".rep(58))
+    foreach s: Standing in allStandings() {
+      val diff: Double = s.pf() - s.pa()
+      val sign: String = if diff >= 0.0 { "+" } else { "" }
+      IO::println("  " + s.teamName().rpad(24) +
+                  "  " + ("" + s.wins()).lpad(2) +
+                  "  " + ("" + s.losses()).lpad(2) +
+                  "  " + s.pf().pts().lpad(7) +
+                  "  " + s.pa().pts().lpad(7) +
+                  "  " + (sign + diff.pts()).lpad(7))
+    }
+  }
+
+  def printRosters(): void {
+    foreach t: FantasyTeam in teams {
+      IO::println("")
+      IO::println("  ── #{t.name} (#{t.owner}) ─── #{t.totalPoints().pts()} pts ──")
+      foreach p: Player in t.roster {
+        IO::println("    " + p.line())
+      }
+    }
+  }
+}
+
+// ─── do[Option] helper ───────────────────────────────────────────────────────
+
+def playerOpt(p: Player?): Option[Player] =
+  if p == null { Option::none() } else { Option::some(p as Player) }
+
+def topScorerInfo(team: FantasyTeam): Option[String] = do[Option] {
+  top <- playerOpt(team.topScorer())
+  ret "#{top.name} #{top.points.pts()} pts (#{top.pos.abbr()}, #{top.nflTeam})"
+}
+
+// ─── Build league ─────────────────────────────────────────────────────────────
+
+val league: League = new League("Onion Fantasy League S1")
+
+val roto: FantasyTeam = new FantasyTeam("RotoNerds",       "Alice")
+roto.add(new Player("P. Mahomes",   Position::QB,  "KC",   28.4, new Active()))
+roto.add(new Player("D. Henry",     Position::RB,  "TEN",  22.1, new Active()))
+roto.add(new Player("J. Jefferson", Position::WR,  "MIN",  24.7, new Active()))
+roto.add(new Player("T. Kelce",     Position::TE,  "KC",   18.9, new Active()))
+roto.add(new Player("T. Bass",      Position::K,   "BUF",   9.0, new Active()))
+roto.add(new Player("SF Defense",   Position::DEF, "SF",   12.0, new Active()))
+roto.add(new Player("L. Murray",    Position::RB,  "ARI",  11.3, new Injured("hamstring")))
+roto.add(new Player("S. Diggs",     Position::WR,  "BUF",  13.2, new Active()))
+roto.add(new Player("C. Lamb",      Position::WR,  "DAL",  15.8, new Active()))
+league.addTeam(roto)
+
+val guru: FantasyTeam = new FantasyTeam("Gridiron Gurus",  "Bob")
+guru.add(new Player("J. Hurts",     Position::QB,  "PHI",  31.2, new Active()))
+guru.add(new Player("C. McCaffrey", Position::RB,  "SF",   26.5, new Active()))
+guru.add(new Player("T. Hill",      Position::WR,  "MIA",  21.4, new Active()))
+guru.add(new Player("M. Andrews",   Position::TE,  "BAL",  16.7, new Active()))
+guru.add(new Player("E. McPherson", Position::K,   "CIN",  11.0, new Active()))
+guru.add(new Player("DAL Defense",  Position::DEF, "DAL",   8.5, new Active()))
+guru.add(new Player("A. Jones",     Position::RB,  "GB",    9.8, new OnBye()))
+guru.add(new Player("J. Chase",     Position::WR,  "CIN",  19.3, new Active()))
+guru.add(new Player("S. Lamb",      Position::WR,  "LAR",  14.1, new Suspended(2)))
+league.addTeam(guru)
+
+val blitz: FantasyTeam = new FantasyTeam("Blitz Krieg",    "Carol")
+blitz.add(new Player("D. Prescott", Position::QB,  "DAL",  22.1, new Active()))
+blitz.add(new Player("J. Taylor",   Position::RB,  "IND",  18.5, new Injured("knee")))
+blitz.add(new Player("D. Adams",    Position::WR,  "LV",   17.2, new Active()))
+blitz.add(new Player("D. Waller",   Position::TE,  "LV",   14.8, new Active()))
+blitz.add(new Player("J. Tucker",   Position::K,   "BAL",  10.0, new Active()))
+blitz.add(new Player("NE Defense",  Position::DEF, "NE",    7.0, new Active()))
+blitz.add(new Player("N. Chubb",    Position::RB,  "CLE",  20.4, new Active()))
+blitz.add(new Player("S. Higgins",  Position::WR,  "CIN",  12.1, new Active()))
+blitz.add(new Player("C. Kupp",     Position::WR,  "LAR",  16.9, new Active()))
+league.addTeam(blitz)
+
+// ─── Week results ─────────────────────────────────────────────────────────────
+
+IO::println("\n  ── Week Matchups ──────────────────────────────────────────────────")
+league.recordMatchup(roto,  guru)
+league.recordMatchup(blitz, roto)
+league.recordMatchup(guru,  blitz)
+
+// ─── Standings ────────────────────────────────────────────────────────────────
+
+league.printStandings()
+
+// ─── Roster display ───────────────────────────────────────────────────────────
+
+league.printRosters()
+
+// ─── Top scorers (do[Option]) ────────────────────────────────────────────────
+
+IO::println("\n  ── Top Scorers per Team ──────────────────────────────────────────")
+league.teams.forEach { t: FantasyTeam ->
+  val info: String = topScorerInfo(t).getOrElse("(no available players)")
+  IO::println("  #{t.name.rpad(26)}: #{info}")
+}
+
+// ─── Injury report (flatMap) ─────────────────────────────────────────────────
+
+IO::println("\n  ── Injury Report ─────────────────────────────────────────────────")
+val injured: List[Player] = league.teams.flatMap { t -> t.injuredPlayers() }
+if injured.size == 0 {
+  IO::println("  No injuries reported.")
+} else {
+  injured.forEach { p: Player -> IO::println("  " + p.line()) }
+}
+
+// ─── Position breakdown (groupBy + foreach (k,v) in map) ─────────────────────
+
+IO::println("\n  ── Gridiron Gurus starters by position ──────────────────────────")
+foreach (pos, players) in guru.byPosition() {
+  val ps: List[Player] = players as List[Player]
+  val names: String = ps.fold("") { acc: String, p ->
+    if acc == "" { p.name } else { acc + ", " + p.name }
+  }
+  IO::println("  #{(pos as String).rpad(4)}: #{names}")
+}
+
+// ─── Standings JSON (derive!(Json)) ───────────────────────────────────────────
+
+IO::println("\n  ── Standings JSON ────────────────────────────────────────────────")
+league.allStandings().forEach { s: Standing ->
+  IO::println("  " + Standing::toJson(s))
+}
+
+// ─── Quick stats: partition, any, count, zip, range foreach ──────────────────
+
+IO::println("\n  ── League Quick Stats ────────────────────────────────────────────")
+val winners: List[Standing] = league.allStandings().filter { s -> s.wins() > 0 }
+val losers:  List[Standing] = league.allStandings().filter { s -> s.wins() == 0 }
+IO::println("  Teams winning: #{winners.size}  /  losing: #{losers.size}")
+
+IO::println("")
+IO::println("  Total roster scoring potential:")
+foreach t: FantasyTeam in league.teams {
+  IO::println("    #{t.name.rpad(26)} #{t.totalPoints().pts()} pts")
+}
+
+IO::println("")
+val anyInjured: Boolean = league.teams.any { t -> t.hasInjuries() }
+IO::println("  Any team reports injuries : #{anyInjured}")
+
+val rotoQbs: Int = roto.positionCount(Position::QB)
+IO::println("  RotoNerds starting QBs   : #{rotoQbs}")
+
+IO::println("")
+IO::println("  Match results (range foreach):")
+foreach i: Int in 1..league.week {
+  val r: MatchResult = league.results[i - 1]
+  IO::println("    Wk #{i}: #{r.home().rpad(24)} #{r.homeScore().pts()} — #{r.awayScore().pts()} #{r.away()}")
+}

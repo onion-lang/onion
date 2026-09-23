@@ -1,0 +1,297 @@
+// Adventure.on — a small text-adventure game engine
+// Features: records, data-carrying enums, classes, interfaces,
+// generics, collection pipelines, select/pattern matching,
+// nullable checks, closures, string interpolation, try/catch,
+// recursion, while + foreach + ranges, map (k,v) iteration.
+
+import {
+  java.util.LinkedHashMap as LHMap;
+  java.util.ArrayList;
+}
+
+// ── direction enum ─────────────────────────────────────────────────────────────
+enum Direction {
+  case North; case South; case East; case West; case Up; case Down
+public:
+  def abbrev(): String = select this {
+    case d is North: "n"; case d is South: "s"
+    case d is East:  "e"; case d is West:  "w"
+    case d is Up:    "u"; case d is Down:  "d"
+  }
+  def opposite(): Direction = select this {
+    case d is North: new South(); case d is South: new North()
+    case d is East:  new West();  case d is West:  new East()
+    case d is Up:    new Down();  case d is Down:  new Up()
+  }
+}
+
+// ── describable interface ──────────────────────────────────────────────────────
+interface Describable {
+  def describe(): String
+}
+
+// ── achievement record ─────────────────────────────────────────────────────────
+record Achievement(name: String, description: String)
+
+// ── item record ────────────────────────────────────────────────────────────────
+record Item(name: String, description: String, weight: Int) conforms Describable {
+public:
+  def describe(): String = "#{name}: #{description}"
+  def label(): String = "#{name} (#{weight}g)"
+}
+
+// ── room ───────────────────────────────────────────────────────────────────────
+class Room {
+  val name: String
+  val description: String
+  val exits: LHMap[String, Room]
+  val items: java.util.List[Item]
+public:
+  def this(n: String, d: String) {
+    name = n
+    description = d
+    exits = new LHMap[String, Room]()
+    items = new java.util.ArrayList[Item]()
+  }
+  def name(): String = name
+  def exits(): LHMap[String, Room] = exits
+  def items(): java.util.List[Item] = items
+  def addExit(dir: Direction, room: Room): void {
+    exits.put(dir.abbrev(), room)
+  }
+  def addItem(item: Item): void { items.add(item) }
+  def removeItem(itemName: String): Item? {
+    foreach i: Int in 0..<items.size {
+      val item: Item = items[i]
+      if item.name() == itemName {
+        items.remove(i)
+        return item
+      }
+    }
+    return null
+  }
+  def look(): String {
+    var sb: String = "=== #{name} ===\n#{description}\n"
+    if !items.isEmpty {
+      val labels: java.util.List[String] = items.map { it: Item -> it.label() }
+      sb = sb + "Items here: " + labels.reduce { a: String, b: String -> a + ", " + b } + "\n"
+    }
+    if !exits.isEmpty() {
+      val exitList: java.util.List[String] = []
+      foreach k: String in exits.keySet() { exitList.add(k) }
+      sb = sb + "Exits: " + exitList.reduce { a: String, b: String -> a + " " + b } + "\n"
+    }
+    return sb
+  }
+}
+
+// ── player ─────────────────────────────────────────────────────────────────────
+class Player {
+  var currentRoom: Room
+  val inventory: java.util.List[Item]
+  val achievements: java.util.List[Achievement]
+  var moves: Int
+public:
+  def this(startRoom: Room) {
+    currentRoom = startRoom
+    inventory = new java.util.ArrayList[Item]()
+    achievements = new java.util.ArrayList[Achievement]()
+    moves = 0
+  }
+  def currentRoom(): Room = currentRoom
+  def moves(): Int = moves
+  def inventory(): java.util.List[Item] = inventory
+  def achievements(): java.util.List[Achievement] = achievements
+  def award(a: Achievement): void {
+    if !achievements.contains(a) { achievements.add(a) }
+  }
+  def achievementsStr(): String {
+    if achievements.isEmpty { return "No achievements yet." }
+    val lines: java.util.List[String] = achievements.map { a: Achievement ->
+      "  [#{a.name()}] #{a.description()}"
+    }
+    return "Achievements (#{achievements.size}):\n" +
+           lines.reduce { x: String, y: String -> x + "\n" + y }
+  }
+  def go(dirAbbrev: String): String {
+    val next: Room? = currentRoom.exits().get(dirAbbrev)
+    if next == null {
+      return "You can't go that way."
+    }
+    currentRoom = next
+    moves++
+    return currentRoom.look()
+  }
+  def take(itemName: String): String {
+    val item: Item? = currentRoom.removeItem(itemName)
+    if item == null {
+      return "There is no #{itemName} here."
+    }
+    inventory.add(item)
+    return "You pick up the #{item.name()}."
+  }
+  def drop(itemName: String): String {
+    foreach i: Int in 0..<inventory.size {
+      val item: Item = inventory[i]
+      if item.name() == itemName {
+        inventory.remove(i)
+        currentRoom.addItem(item)
+        return "You drop the #{item.name()}."
+      }
+    }
+    return "You're not carrying a #{itemName}."
+  }
+  def inventoryStr(): String {
+    if inventory.isEmpty {
+      return "You're not carrying anything."
+    }
+    val lines: java.util.List[String] = inventory.map { it: Item -> "  #{it.label()}" }
+    return "You are carrying:\n" + lines.reduce { a: String, b: String -> a + "\n" + b }
+  }
+  def totalWeight(): Int {
+    var total: Int = 0
+    foreach item: Item in inventory { total = total + item.weight() }
+    return total
+  }
+  def status(): String = "Moves: #{moves}  Carried weight: #{totalWeight()}g"
+}
+
+// ── generic describe helper ────────────────────────────────────────────────────
+def describeAll[T extends Describable](label: String, things: java.util.List[T]): String {
+  if things.isEmpty { return "#{label}: (none)" }
+  val lines: java.util.List[String] = things.map { t: T -> "  " + t.describe() }
+  return label + ":\n" + lines.reduce { a: String, b: String -> a + "\n" + b }
+}
+
+// ── find item in current room or inventory ─────────────────────────────────────
+def findItem(player: Player, name: String): Item {
+  foreach item: Item in player.currentRoom().items() {
+    if item.name() == name { return item }
+  }
+  foreach item: Item in player.inventory() {
+    if item.name() == name { return item }
+  }
+  throw new java.lang.IllegalArgumentException("No item named '#{name}'")
+}
+
+// ── check and award achievements ───────────────────────────────────────────────
+def checkAchievements(player: Player): void {
+  if player.inventory().size >= 3 {
+    player.award(new Achievement("Hoarder", "Carried 3 or more items at once."))
+  }
+  if player.moves() >= 5 {
+    player.award(new Achievement("Explorer", "Made 5 or more moves."))
+  }
+  val names: java.util.List[String] = player.inventory().map { it: Item -> it.name() }
+  if names.contains("key") && names.contains("crystal") {
+    player.award(new Achievement("Treasure Hunter", "Carrying both the key and the crystal."))
+  }
+}
+
+// ── world builder ──────────────────────────────────────────────────────────────
+def buildWorld(): Room {
+  val cave:    Room = new Room("Cave Entrance",    "A damp cave. Torchlight flickers on wet stone.")
+  val passage: Room = new Room("Dark Passage",     "A narrow corridor, stones slick with moisture.")
+  val chamber: Room = new Room("Grand Chamber",    "A vast underground hall. Stalactites hang above.")
+  val pool:    Room = new Room("Underground Pool", "Still water reflects a faint glow from below.")
+  val exit:    Room = new Room("Side Exit",        "Daylight filters through a crack. Fresh air!")
+
+  cave.addExit(new North(), passage)
+  passage.addExit(new South(), cave)
+  passage.addExit(new North(), chamber)
+  chamber.addExit(new South(), passage)
+  chamber.addExit(new East(), pool)
+  chamber.addExit(new West(), exit)
+  pool.addExit(new West(), chamber)
+  exit.addExit(new East(), chamber)
+
+  cave.addItem(new Item("torch",   "A wooden torch, still lit.",             200))
+  passage.addItem(new Item("key",  "An old iron key.",                        50))
+  chamber.addItem(new Item("chest","A heavy wooden chest.",                 5000))
+  chamber.addItem(new Item("coin", "A gold coin stamped with a king's face.", 10))
+  pool.addItem(new Item("crystal", "A glowing blue crystal.",                300))
+
+  return cave
+}
+
+// ── command processor ──────────────────────────────────────────────────────────
+def handleCommand(cmd: String, player: Player): String? {
+  val parts: java.util.List[String] = Strings::split(cmd.trim().toLowerCase(), " ")
+  if parts.isEmpty { return "" }
+  val verb: String = parts[0]
+  val arg: String? = if parts.size > 1 { parts[1] } else { null }
+
+  return select verb {
+  case "look", "l":
+    player.currentRoom().look()
+  case "go": {
+    if arg == null { "Go where?" }
+    else { player.go(arg) }
+  }
+  case "n", "s", "e", "w", "u", "d":
+    player.go(verb)
+  case "take", "get": {
+    if arg == null { "Take what?" }
+    else { player.take(arg) }
+  }
+  case "drop": {
+    if arg == null { "Drop what?" }
+    else { player.drop(arg) }
+  }
+  case "inventory", "inv", "i":
+    player.inventoryStr()
+  case "status":
+    player.status()
+  case "examine", "x": {
+    if arg == null { "Examine what?" }
+    else {
+      try {
+        val item: Item = findItem(player, arg)
+        item.describe()
+      } catch e: java.lang.IllegalArgumentException {
+        e.getMessage()
+      }
+    }
+  }
+  case "achievements", "ach":
+    player.achievementsStr()
+  case "describe": {
+    val roomItems: java.util.List[Item] = player.currentRoom().items()
+    describeAll("Room items", roomItems)
+  }
+  case "help":
+    "Commands: look, go <dir>, n/s/e/w/u/d, take <item>, drop <item>,\n" +
+    "          examine <item>, inventory, achievements, status, quit"
+  case "quit", "exit":
+    null
+  else:
+    "Unknown command '#{verb}'. Type 'help' for a list."
+  }
+}
+
+// ── main (scripted session) ────────────────────────────────────────────────────
+def main(): void {
+  val player: Player = new Player(buildWorld())
+  IO::println(player.currentRoom().look())
+
+  val commands: java.util.List[String] = [
+    "examine torch", "n", "take key", "examine key",
+    "n", "look", "take coin",
+    "e", "take crystal", "examine crystal",
+    "w", "inventory", "achievements",
+    "describe", "status",
+    "s", "s", "achievements", "quit"
+  ]
+
+  foreach cmd: String in commands {
+    IO::println("> " + cmd)
+    val result: String? = handleCommand(cmd, player)
+    if result == null {
+      IO::println("Goodbye! You explored in #{player.moves()} moves.")
+      IO::println(player.achievementsStr())
+      return
+    }
+    IO::println(result)
+    checkAchievements(player)
+  }
+}

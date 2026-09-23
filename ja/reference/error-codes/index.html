@@ -2675,10 +2675,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0070-nullable" class="md-nav__link">
+  <a href="#e0070-null-nullable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0070 — nullable なメンバへのアクセス
+        E0070 — null チェックなしで nullable な値を使用
       
     </span>
   </a>
@@ -6318,10 +6318,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0070-nullable" class="md-nav__link">
+  <a href="#e0070-null-nullable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0070 — nullable なメンバへのアクセス
+        E0070 — null チェックなしで nullable な値を使用
       
     </span>
   </a>
@@ -7492,9 +7492,22 @@ Double is used」として表面化し、修正方法を何も示しませんで
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
 - 非 null 制限を宣言: <code>class Box[T extends Object]</code>。</p>
-<h3 id="e0070-nullable"><code>E0070</code> — nullable なメンバへのアクセス<a class="headerlink" href="#e0070-nullable" title="Permanent link">&para;</a></h3>
-<p>nullable な型（<code>T?</code>）の値に対して、フィールド（メソッドではない）が直接アクセス
-されました。この時点で値は null である可能性があります。</p>
+<h3 id="e0070-null-nullable"><code>E0070</code> — null チェックなしで nullable な値を使用<a class="headerlink" href="#e0070-null-nullable" title="Permanent link">&para;</a></h3>
+<p>nullable な型（<code>T?</code>）の値が、間に null チェックを挟まないまま、非 null が
+前提の箇所で使われました。このコードは以下のような複数の形をまとめて
+カバーしており、対処方法はどれも共通です:</p>
+<ul>
+<li><strong>メンバアクセス</strong> — フィールド（メソッドではない）を nullable な受け手に直接アクセス（<code>x: String?</code> に対する <code>x.length</code>）。</li>
+<li><strong>添字アクセス</strong> — nullable な配列・<code>List</code>・<code>Map</code>（<code>b: List[Int]?</code>）に対する <code>b[i]</code> / <code>b[i] = v</code> / <code>b[i] += v</code>。</li>
+<li><strong>演算子</strong> — 単項（<code>-n</code>、<code>+n</code>、<code>~n</code>、<code>!b</code>）、二項（<code>+ - * / % &lt; &gt; &lt;= &gt;= &amp; | ^</code>）、シフト（<code>&lt;&lt; &gt;&gt; &gt;&gt;&gt;</code>）、後置インクリメント/デクリメント（<code>n++</code> / <code>n--</code>）、複合代入（<code>n += 1</code>、<code>n &lt;&lt;= 1</code> など）の各演算子に対する nullable なオペランド。</li>
+<li><strong>条件式</strong> — <code>if</code> / <code>while</code> / <code>do-while</code> / <code>for</code> の条件や <code>select</code> ガードの <code>when</code> に nullable な <code>Boolean?</code> を直接使用。</li>
+<li><strong><code>foreach</code> のコレクション</strong> — <code>foreach x: T in expr</code> で <code>expr</code> が nullable な型を持つ場合。</li>
+<li><strong>分解代入</strong> — <code>val (a, b) = expr</code> で <code>expr</code> が nullable なレコードの場合。</li>
+<li><strong>配列サイズ</strong> — <code>new T[n]</code> で次元 <code>n</code> が nullable な型（<code>n: Int?</code>）を持つ場合。</li>
+<li><strong><code>try</code>-with-resources の初期化子</strong> — <code>try (val r = res) { }</code> で <code>res</code> が nullable な型の場合。</li>
+<li><strong><code>throw</code> のオペランド</strong> — <code>throw expr</code> で <code>expr</code> が nullable な型の場合。</li>
+<li><strong><code>select</code> のスクルーティニー</strong> — <code>select s { ... }</code> で <code>s</code> が nullable な型の場合（<code>else</code> 節や無条件のワイルドカードパターンがない場合に限る。どちらかがあれば <code>null</code> は正しく処理される）。</li>
+</ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a><span class="kd">public</span><span class="p">:</span>
 </span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
@@ -7503,7 +7516,7 @@ Double is used」として表面化し、修正方法を何も示しませんで
 </span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>対処: 安全にアクセスするには <code>?.</code>、デフォルト値を与えるには <code>?:</code>、非 null を
+<p>対処: 安全にアクセスするには <code>?.</code> / <code>?[</code>、デフォルト値を与えるには <code>?:</code>、非 null を
 断言するには <code>!!</code>、または先に null チェック（<code>if x != null { ... }</code>）を行って
 ください。</p>
 <h3 id="e0081-tool"><code>E0081</code> — tool のパラメータがコマンドラインから読めない<a class="headerlink" href="#e0081-tool" title="Permanent link">&para;</a></h3>

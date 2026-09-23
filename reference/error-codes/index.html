@@ -4475,10 +4475,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0070-nullable-member-access" class="md-nav__link">
+  <a href="#e0070-nullable-value-used-without-a-null-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0070 — Nullable member access
+        E0070 — Nullable value used without a null check
       
     </span>
   </a>
@@ -6300,10 +6300,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0070-nullable-member-access" class="md-nav__link">
+  <a href="#e0070-nullable-value-used-without-a-null-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0070 — Nullable member access
+        E0070 — Nullable value used without a null check
       
     </span>
   </a>
@@ -7480,9 +7480,22 @@ the tool's parameters.</p>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
 - Declare a non-null bound: <code>class Box[T extends Object]</code>.</p>
-<h3 id="e0070-nullable-member-access"><code>E0070</code> — Nullable member access<a class="headerlink" href="#e0070-nullable-member-access" title="Permanent link">&para;</a></h3>
-<p>A field (not method) was accessed directly on a value of nullable type
-(<code>T?</code>), which may be null at that point.</p>
+<h3 id="e0070-nullable-value-used-without-a-null-check"><code>E0070</code> — Nullable value used without a null check<a class="headerlink" href="#e0070-nullable-value-used-without-a-null-check" title="Permanent link">&para;</a></h3>
+<p>A value of nullable type (<code>T?</code>) was used somewhere that requires it to be
+definitely non-null, with no null-check in between. This one code covers
+several forms, sharing the same fix:</p>
+<ul>
+<li><strong>Member access</strong> — a field (not method) accessed directly on a nullable receiver (<code>x.length</code> where <code>x: String?</code>).</li>
+<li><strong>Indexing</strong> — <code>b[i]</code> / <code>b[i] = v</code> / <code>b[i] += v</code> on a nullable array, <code>List</code>, or <code>Map</code> (<code>b: List[Int]?</code>).</li>
+<li><strong>Operators</strong> — a nullable operand of a unary (<code>-n</code>, <code>+n</code>, <code>~n</code>, <code>!b</code>), binary (<code>+ - * / % &lt; &gt; &lt;= &gt;= &amp; | ^</code>), shift (<code>&lt;&lt; &gt;&gt; &gt;&gt;&gt;</code>), post-increment/decrement (<code>n++</code> / <code>n--</code>), or compound-assignment (<code>n += 1</code>, <code>n &lt;&lt;= 1</code>, ...) operator.</li>
+<li><strong>Condition</strong> — a nullable <code>Boolean?</code> used directly as an <code>if</code> / <code>while</code> / <code>do-while</code> / <code>for</code> condition, or a <code>select</code> guard's <code>when</code>.</li>
+<li><strong><code>foreach</code> collection</strong> — <code>foreach x: T in expr</code> where <code>expr</code> has nullable type.</li>
+<li><strong>Destructuring</strong> — <code>val (a, b) = expr</code> where <code>expr</code> is a nullable record.</li>
+<li><strong>Array size</strong> — <code>new T[n]</code> where a dimension <code>n</code> has nullable type (<code>n: Int?</code>).</li>
+<li><strong><code>try</code>-with-resources initializer</strong> — <code>try (val r = res) { }</code> where <code>res</code> has nullable type.</li>
+<li><strong><code>throw</code> operand</strong> — <code>throw expr</code> where <code>expr</code> has nullable type.</li>
+<li><strong><code>select</code> scrutinee</strong> — <code>select s { ... }</code> where <code>s</code> has nullable type (only when there's neither an <code>else</code> clause nor an unconditional wildcard pattern -- either one already handles a <code>null</code> scrutinee correctly).</li>
+</ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a><span class="kd">public</span><span class="p">:</span>
 </span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
@@ -7491,8 +7504,8 @@ the tool's parameters.</p>
 </span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a><span class="w">  </span><span class="p">}</span>
 </span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>Fix: use <code>?.</code> to access it safely, <code>?:</code> to supply a default, <code>!!</code> to assert
-non-null, or check for null first (<code>if x != null { ... }</code>).</p>
+<p>Fix: use <code>?.</code> / <code>?[</code> to access it safely, <code>?:</code> to supply a default, <code>!!</code> to
+assert non-null, or check for null first (<code>if x != null { ... }</code>).</p>
 <h3 id="e0081-tool-parameter-cannot-be-read-from-the-command-line"><code>E0081</code> — Tool parameter cannot be read from the command line<a class="headerlink" href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" title="Permanent link">&para;</a></h3>
 <p>A <code>tool</code>'s parameters must all be readable from a command-line argument, since the CLI
 is derived from them.</p>

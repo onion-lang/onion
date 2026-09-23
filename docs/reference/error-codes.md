@@ -912,6 +912,7 @@ several forms, sharing the same fix:
 - **`try`-with-resources initializer** — `try (val r = res) { }` where `res` has nullable type.
 - **`throw` operand** — `throw expr` where `expr` has nullable type.
 - **`select` scrutinee** — `select s { ... }` where `s` has nullable type (only when there's neither an `else` clause nor an unconditional wildcard pattern -- either one already handles a `null` scrutinee correctly).
+- **Range bound** — `a..b` / `a..<b` where `a` or `b` has nullable type (these desugar to a `Range` constructor call, so a nullable bound is rejected the same way as any other dereference-like use).
 
 ```onion
 class Test {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Calling a nullable callable value directly (`f(x)` where `f: Function1[A, B]?`, never null-checked) reported the generic `E0005` ("a method applicable for ...f(...) is not found. Check spelling and argument types.") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that the equivalent explicit call (`f.call(x)`) already reports on a nullable receiver.** `CallableValueCallSupport.resolveCallableValue` matched a local's or field's type against `case targetType: ObjectType => ...` and fell straight to `case _ => None` for anything else, including a `NullableType` wrapping a perfectly callable inner type — `NullableType` is not an `ObjectType`. Returning `None` let `UnqualifiedMethodCallSupport` fall through to its final `reportMethodNotFound`, which reports the misleading `E0005` instead, hiding that `f` is in scope and callable and the only problem is that it may be null. Fixed by special-casing a `NullableType` local/field whose inner type has a `call` method up front and reporting `NULLABLE_MEMBER_ACCESS`, mirroring `MethodTargetTypingSupport.normalizeMethodCallTarget`'s handling of the same case for the explicit `f.call(x)` form. Guarded by five new regression tests in `NullableCallableValueSpec`.
+
 ## [0.99.0] - 2026-09-23
 
 ### Fixed

@@ -1,0 +1,347 @@
+// SportsLeague.on — league standings, match analytics and award picks
+// Exercises: data-carrying enum (MatchResult), records with methods (Match,
+// TeamStats, Award), extension methods on Int/String, class (League), generics,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/partition/zip/distinct),
+// select/pattern matching, nullable and null checks, closures with captures,
+// string interpolation, try/catch, recursion, foreach over ranges and map entries.
+
+import {
+  java.lang.Integer as JInt;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+def line(n: Int): String {
+  var s: String = ""
+  for var i: Int = 0; i < n; i++ { s = s + "-" }
+  return s
+}
+
+// ─── Match result (data-carrying enum) ────────────────────────────────────────
+
+enum MatchOutcome {
+  case HomeWin
+  case AwayWin
+  case Draw
+public:
+  def label(): String = select this {
+    case o is HomeWin: "H"
+    case o is AwayWin: "A"
+    case o is Draw:    "D"
+  }
+  def homePoints(): Int = select this {
+    case o is HomeWin: 3
+    case o is AwayWin: 0
+    case o is Draw:    1
+  }
+  def awayPoints(): Int = select this {
+    case o is HomeWin: 0
+    case o is AwayWin: 3
+    case o is Draw:    1
+  }
+}
+
+// ─── Match record ──────────────────────────────────────────────────────────────
+
+record Match(round: Int, home: String, away: String, hg: Int, ag: Int) {
+public:
+  def outcome(): MatchOutcome {
+    if hg() > ag() { return new HomeWin() }
+    if hg() < ag() { return new AwayWin() }
+    return new Draw()
+  }
+  def goalsFor(team: String): Int {
+    if team == home() { return hg() }
+    if team == away() { return ag() }
+    return 0
+  }
+  def goalsAgainst(team: String): Int {
+    if team == home() { return ag() }
+    if team == away() { return hg() }
+    return 0
+  }
+  def points(team: String): Int {
+    if team == home() { return outcome().homePoints() }
+    if team == away() { return outcome().awayPoints() }
+    return 0
+  }
+  def involves(team: String): Boolean = team == home() || team == away()
+  def total(): Int = hg() + ag()
+  def summary(): String = "#{home()} #{hg()}-#{ag()} #{away()}"
+}
+
+// ─── Team stats record ─────────────────────────────────────────────────────────
+
+record TeamStats(name: String, pl: Int, w: Int, d: Int, l: Int, gf: Int, ga: Int) {
+public:
+  def pts(): Int = w() * 3 + d()
+  def gd(): Int  = gf() - ga()
+  def gdStr(): String = if gd() >= 0 { "+#{gd()}" } else { "#{gd()}" }
+}
+
+// Sort key: pts desc, gd desc, gf desc (all negative so sortedBy ascending works)
+extension TeamStats {
+  def sortKey(): Int = -(self.pts() * 100000 + self.gd() * 1000 + self.gf())
+}
+
+// ─── Award record ─────────────────────────────────────────────────────────────
+
+record Award(category: String, winner: String, value: String)
+
+// ─── League class ──────────────────────────────────────────────────────────────
+
+class League {
+  var _name: String
+  var _matches: List[Object]
+
+public:
+  def this(n: String) {
+    _name = n
+    _matches = []
+  }
+
+  def name(): String = _name
+
+  def allMatches(): List[Object] = _matches
+
+  def add(m: Match): void {
+    _matches.add(m)
+  }
+
+  def teams(): List[Object] {
+    val seen: List[Object] = []
+    foreach m: Match in _matches {
+      if !seen.contains(m.home()) { seen.add(m.home()) }
+      if !seen.contains(m.away()) { seen.add(m.away()) }
+    }
+    return seen.sortedBy { t -> t as String }
+  }
+
+  def statsFor(team: String): TeamStats {
+    val teamMatches: List[Object] = _matches.filter { m -> (m as Match).involves(team) }
+    var w: Int = 0; var d: Int = 0; var l: Int = 0
+    var gf: Int = 0; var ga: Int = 0
+    foreach m: Match in teamMatches {
+      val pts: Int = m.points(team)
+      if pts == 3 { w++ }
+      else if pts == 1 { d++ }
+      else { l++ }
+      gf = gf + m.goalsFor(team)
+      ga = ga + m.goalsAgainst(team)
+    }
+    return new TeamStats(team, teamMatches.size, w, d, l, gf, ga)
+  }
+
+  def table(): List[Object] {
+    val stats: List[Object] = []
+    foreach t: String in teams() {
+      stats.add(statsFor(t))
+    }
+    return stats.sortedBy { s -> (s as TeamStats).sortKey() }
+  }
+
+  def roundMatches(round: Int): List[Object] {
+    return _matches.filter { m -> (m as Match).round() == round }
+  }
+
+  def allRounds(): List[Object] {
+    return _matches.map { m -> (m as Match).round() as Object }
+      .distinct()
+      .sortedBy { r -> r as Int }
+  }
+}
+
+// ─── Analytics helpers ─────────────────────────────────────────────────────────
+
+def topScorer(league: League): String? {
+  var best: String? = null
+  var bestGf: Int = -1
+  foreach t: String in league.teams() {
+    val gf: Int = league.statsFor(t).gf()
+    if gf > bestGf { bestGf = gf; best = t }
+  }
+  return best
+}
+
+def computeAwards(league: League, allMatches: List[Object]): List[Object] {
+  val stats: List[Object] = league.table()
+  val sorted: List[Object] = stats  // already sorted
+
+  // Champion
+  val champion: TeamStats = sorted[0] as TeamStats
+  // Worst defence (most GA)
+  val worstDef: TeamStats = stats.sortedBy { s -> -(s as TeamStats).ga() }[0] as TeamStats
+  // Highest-scoring match
+  val topGame: Match = allMatches.sortedBy { m -> -(m as Match).total() }[0] as Match
+  // Best home record: wins at home
+  val homeWins: Map[Object, List[Object]] = allMatches
+    .filter { m -> (m as Match).outcome() is HomeWin }
+    .groupBy { m -> (m as Match).home() }
+  var bestHome: String = ""
+  var bestHomeW: Int = -1
+  foreach (team, wins) in homeWins {
+    val t: String = team as String
+    val n: Int = (wins as List[Object]).size
+    if n > bestHomeW { bestHomeW = n; bestHome = t }
+  }
+
+  return [
+    new Award("Champion",       champion.name(),    "#{champion.pts()} pts"),
+    new Award("Top Attack",     topScorer(league) ?: "?", "#{champion.gf()} gf"),
+    new Award("Worst Defence",  worstDef.name(),    "#{worstDef.ga()} ga"),
+    new Award("Best Home Side", bestHome,           "#{bestHomeW} home wins"),
+    new Award("Classic Match",  topGame.summary(),  "#{topGame.total()} goals")
+  ]
+}
+
+// ─── Printing ──────────────────────────────────────────────────────────────────
+
+def printTable(league: League): void {
+  IO::println("\n  League Table — #{league.name()}")
+  IO::println("  " + line(58))
+  val hdr: String = "  " + "Team".padRight(18) + "Pl".padLeft(3) +
+    " W".padLeft(3) + " D".padLeft(3) + " L".padLeft(3) +
+    "  GF".padLeft(4) + "  GA".padLeft(4) + "  GD".padLeft(4) + "  Pts".padLeft(5)
+  IO::println(hdr)
+  IO::println("  " + line(58))
+  var pos: Int = 1
+  foreach s: TeamStats in league.table() {
+    val row: String = ("  " + pos + ". ").padRight(6) +
+      s.name().padRight(16) +
+      ("" + s.pl()).padLeft(3) +
+      ("" + s.w()).padLeft(3) +
+      ("" + s.d()).padLeft(3) +
+      ("" + s.l()).padLeft(3) +
+      ("" + s.gf()).padLeft(4) +
+      ("" + s.ga()).padLeft(4) +
+      s.gdStr().padLeft(4) +
+      ("" + s.pts()).padLeft(5)
+    IO::println(row)
+    pos++
+  }
+  IO::println("  " + line(58))
+}
+
+def printRoundResults(league: League): void {
+  IO::println("\n  Match Results by Round")
+  foreach r: Int in league.allRounds() {
+    IO::println("  Round #{r}:")
+    foreach m: Match in league.roundMatches(r) {
+      IO::println("    #{m.summary()}  [#{m.outcome().label()}]")
+    }
+  }
+}
+
+def printAwards(awards: List[Object]): void {
+  IO::println("\n  Season Awards")
+  IO::println("  " + line(42))
+  foreach a: Award in awards {
+    IO::println("  #{a.category().padRight(16)}  #{a.winner().padRight(16)}  #{a.value()}")
+  }
+  IO::println("  " + line(42))
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val league: League = new League("Onion Premier League")
+
+  // Round 1
+  league.add(new Match(1, "Aces",    "Bolts",   3, 1))
+  league.add(new Match(1, "Comets",  "Dragons", 0, 0))
+  league.add(new Match(1, "Eagles",  "Falcons", 2, 2))
+  league.add(new Match(1, "Giants",  "Hawks",   1, 3))
+  // Round 2
+  league.add(new Match(2, "Bolts",   "Comets",  2, 0))
+  league.add(new Match(2, "Dragons", "Aces",    1, 2))
+  league.add(new Match(2, "Falcons", "Giants",  3, 0))
+  league.add(new Match(2, "Hawks",   "Eagles",  1, 1))
+  // Round 3
+  league.add(new Match(3, "Aces",    "Comets",  1, 1))
+  league.add(new Match(3, "Bolts",   "Eagles",  2, 1))
+  league.add(new Match(3, "Dragons", "Falcons", 0, 2))
+  league.add(new Match(3, "Giants",  "Hawks",   2, 2))
+  // Round 4
+  league.add(new Match(4, "Comets",  "Eagles",  3, 2))
+  league.add(new Match(4, "Falcons", "Aces",    1, 4))
+  league.add(new Match(4, "Hawks",   "Bolts",   2, 0))
+  league.add(new Match(4, "Giants",  "Dragons", 1, 1))
+  // Round 5
+  league.add(new Match(5, "Eagles",  "Aces",    0, 3))
+  league.add(new Match(5, "Bolts",   "Falcons", 2, 2))
+  league.add(new Match(5, "Comets",  "Giants",  1, 0))
+  league.add(new Match(5, "Hawks",   "Dragons", 3, 0))
+
+  IO::println("=================================================")
+  IO::println("  #{league.name()}  —  Season Report")
+  IO::println("=================================================")
+
+  printTable(league)
+  printRoundResults(league)
+
+  // ── Pipeline analytics ──────────────────────────────────────────────────────
+  val allMatches: List[Object] = league.allMatches()
+  IO::println("\n  Match Statistics")
+  IO::println("  " + line(42))
+
+  val totalGoals: Int = (allMatches.fold(0) { acc, m -> acc + (m as Match).total() }) as Int
+  IO::println("  Total goals scored   : #{totalGoals}")
+  IO::println("  Matches played       : #{allMatches.size}")
+  val avgGoals: Double = totalGoals as Double / allMatches.size as Double
+  IO::println("  Average goals/match  : #{(avgGoals * 10.0) as Int as Double / 10.0}")
+
+  // Partition into decisive vs draws (filter twice since destructuring partition isn't directly usable)
+  val decisive: List[Object] = allMatches.filter { m -> !((m as Match).outcome() is Draw) }
+  val draws: List[Object]    = allMatches.filter { m ->   (m as Match).outcome() is Draw  }
+  IO::println("  Decisive results     : #{decisive.size}")
+  IO::println("  Draws                : #{draws.size}")
+
+  // Highest-scoring round (zip rounds with goal totals)
+  val rounds: List[Object] = league.allRounds()
+  val roundGoals: List[Object] = rounds.map { r ->
+    val rMatches: List[Object] = league.roundMatches(r as Int)
+    rMatches.fold(0) { acc, m -> acc + (m as Match).total() } as Object
+  }
+  val roundPairs: List[List[Object]] = rounds.zip(roundGoals)
+  IO::println("\n  Goals per round:")
+  foreach pair: List[Object] in roundPairs {
+    val r: Int = pair[0] as Int
+    val g: Int = pair[1] as Int
+    IO::println("    Round #{r}  :  #{g} goals")
+  }
+
+  // Team goal totals sorted descending
+  IO::println("\n  Goals scored (descending):")
+  val goalsByTeam: List[Object] = league.table()
+    .sortedBy { s -> -(s as TeamStats).gf() }
+  foreach s: TeamStats in goalsByTeam {
+    IO::println("    #{s.name().padRight(10)}  #{s.gf()} gf  #{s.ga()} ga")
+  }
+
+  // groupBy outcome label
+  val byOutcome: Map[Object, List[Object]] = allMatches.groupBy { m -> (m as Match).outcome().label() }
+  IO::println("\n  Results by type:")
+  foreach (label, group) in byOutcome {
+    IO::println("    #{label} : #{(group as List[Object]).size} match(es)")
+  }
+
+  printAwards(computeAwards(league, allMatches))
+  IO::println("=================================================")
+}

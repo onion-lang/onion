@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.101.0] - 2026-09-23
+
 ### Added
 
 - **`run/TrafficNetworkController.on`** — a 351-line adaptive traffic-signal network simulation, a new domain for the `run/` corpus (`record … from re"…"` sensor-log parsing, ADT case-enums `CongestionTier`/`SignalPhase` with dispatch methods, extension methods on `Double`/`Int`/`String`, collection pipelines including `groupBy`/`sortedBy`/`fold`/`partition`/`distinct`, `do[List]` phase×intersection cross-product, `foreach (k, v) in map`, null-safety operators, `try`/`catch` around malformed sensor lines, and a binary-search Webster's-formula recursion), added to the `run/` corpus (merged via #1426).

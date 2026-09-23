@@ -107,6 +107,7 @@ final class OperatorTyping(
     // Unbox wrapper operands first; non-unboxable objects (e.g. List << elem) keep the method-call path
     left = Boxing.tryUnboxToInteger(bodyContext.table, left)
     right = Boxing.tryUnboxToInteger(bodyContext.table, right)
+    if (reportNullableOperandIfPresent(node, left, right)) return null
     if (!left.`type`.isBasicType) {
       left.`type` match {
         case target: ObjectType =>
@@ -155,7 +156,8 @@ final class OperatorTyping(
     val leftType = left.`type`
     val rightType = right.`type`
     if ((!numeric(leftType)) || (!numeric(rightType))) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      if (!reportNullableOperandIfPresent(node, left, right))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       null
     } else {
       val resultType = promote(leftType, rightType)
@@ -172,7 +174,8 @@ final class OperatorTyping(
     val left = tryUnboxAny(leftRaw)
     val right = tryUnboxAny(rightRaw)
     if ((!left.isBasicType) || (!right.isBasicType)) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      if (!reportNullableOperandIfPresent(node, left, right))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
     }
     val leftType = left.`type`.asInstanceOf[BasicType]
@@ -317,6 +320,31 @@ final class OperatorTyping(
       }
     }
 
+  /**
+   * A nullable operand (e.g. `n: Int?`) in an arithmetic, comparison, or
+   * bitwise binary operator unboxes/dereferences it exactly like member
+   * access (`b.field`) or indexing (`b[i]`) does, so it gets the same
+   * null-safety diagnostic (E0070) those already-fixed forms report, instead
+   * of the generic "operator X is not applicable" (E0001) a genuinely
+   * incompatible type gets. Checks the left operand first (mirroring
+   * `tryOperatorMethod`, which only ever dispatches off the left operand),
+   * then the right. Returns true when it reported, so the caller can skip
+   * its own generic report.
+   */
+  private[typing] def reportNullableOperandIfPresent(node: AST.BinaryExpression, left: Term, right: Term): Boolean =
+    left.`type` match {
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.lhs, nullable.displayName, "operator")
+        true
+      case _ =>
+        right.`type` match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, node.rhs, nullable.displayName, "operator")
+            true
+          case _ => false
+        }
+    }
+
   def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processLogicalExpression(node, context)
     if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
@@ -331,7 +359,8 @@ final class OperatorTyping(
     typed(node.term, context).flatMap { termRaw =>
       val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
       if (!hasNumericType(term)) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        if (!reportNullableUnaryOperandIfPresent(node, term))
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, term.`type`, term))
     }
@@ -346,7 +375,8 @@ final class OperatorTyping(
         case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
           Some(new UnaryTerm(kind, BasicType.INT, new AsInstanceOf(term, BasicType.INT)))
         case other =>
-          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
+          if (!reportNullableUnaryOperandIfPresent(node, term))
+            bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
           None
       }
     }
@@ -355,9 +385,27 @@ final class OperatorTyping(
     typed(node.term, context).flatMap { termRaw =>
       val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)
       if (term.`type` != BasicType.BOOLEAN) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        if (!reportNullableUnaryOperandIfPresent(node, term))
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
+    }
+
+  /**
+   * A nullable operand (e.g. `n: Int?`) in a unary operator (`-x`, `+x`,
+   * `~x`, `!x`) unboxes/dereferences it exactly like the equivalent binary
+   * operators do (see `reportNullableOperandIfPresent` above), so it gets
+   * the same null-safety diagnostic (E0070) those already report, instead
+   * of the generic "operator X is not applicable" (E0001) a genuinely
+   * incompatible type gets. Returns true when it reported, so the caller
+   * can skip its own generic report.
+   */
+  private[typing] def reportNullableUnaryOperandIfPresent(node: AST.UnaryExpression, term: Term): Boolean =
+    term.`type` match {
+      case nullable: NullableType =>
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.term, nullable.displayName, "operator")
+        true
+      case _ => false
     }
 
   /** The literal `1` in the operand's own type, so `x++` on a Long/Double/Float
@@ -392,7 +440,11 @@ final class OperatorTyping(
       case _ =>
     }
     if ((!operand.isBasicType) || !hasNumericType(operand)) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+      node match {
+        case unary: AST.UnaryExpression if reportNullableUnaryOperandIfPresent(unary, operand) =>
+        case _ =>
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+      }
       return None
     }
     Option(operand match {
@@ -469,7 +521,8 @@ final class OperatorTyping(
 
   def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
     if ((!hasNumericType(lt)) || (!hasNumericType(rt))) {
-      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
+      if (!reportNullableOperandIfPresent(node, lt, rt))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
       return null
     }
     val resultType = promote(lt.`type`, rt.`type`)

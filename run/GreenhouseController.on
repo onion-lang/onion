@@ -1,0 +1,237 @@
+// GreenhouseController — a multi-zone greenhouse climate simulation
+// Features exercised:
+//   record with from re"..." pattern parser
+//   ADT case-enum for climate actions
+//   extension methods on Double/Int/String
+//   collection pipelines: groupBy, sortedBy, fold, filter, partition, map, distinct
+//   do[List] (list comprehension)
+//   foreach over maps, ranges
+//   string interpolation #{}
+//   null safety / Elvis / !! assertion
+//   select / type-pattern matching, guards
+//   try/catch
+//   recursion
+
+import {
+  java.util.*
+}
+
+// ─── Domain records ────────────────────────────────────────────────────────
+
+record Reading(zone: String, hour: Int, tempC: Double, humidity: Int, soil: Int)
+  from re"(\w+)\s+(\d+):00\s+([\d.]+)C\s+(\d+)%\s+soil=(\d+)"
+
+record ZoneThresholds(zone: String, minTemp: Double, maxTemp: Double, minHumidity: Int, minSoil: Int)
+
+enum ClimateAction {
+  case Heat
+  case Cool
+  case Vent
+  case Mist
+  case Irrigate
+  case Idle
+public:
+  def label(): String = select this {
+    case h is Heat:     "HEAT    "
+    case c is Cool:     "COOL    "
+    case v is Vent:     "VENT    "
+    case m is Mist:     "MIST    "
+    case i is Irrigate: "IRRIGATE"
+    case d is Idle:     "idle    "
+  }
+  def urgent(): Boolean = select this {
+    case h is Heat: true
+    case c is Cool: true
+    else: false
+  }
+}
+
+// ─── Extensions ─────────────────────────────────────────────────────────────
+
+extension Double {
+  def toF(): Double = self * 9.0 / 5.0 + 32.0
+  def round1(): String {
+    val scaled: Int = ((self * 10.0) + 0.5) as Int
+    val whole: Int = scaled / 10
+    val frac: Int = scaled % 10
+    return whole + "." + frac
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def bar(maxVal: Int, width: Int): String {
+    val filled: Int = if maxVal > 0 { (self * width / maxVal).clamp(0, width) } else { 0 }
+    var out: String = ""
+    foreach i: Int in 0..<width {
+      out = out + (if i < filled { "#" } else { "." })
+    }
+    return out
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Rule engine ────────────────────────────────────────────────────────────
+
+def decideAction(r: Reading, cfg: ZoneThresholds): ClimateAction {
+  if r.tempC() > cfg.maxTemp() { return new Cool() }
+  if r.tempC() < cfg.minTemp() { return new Heat() }
+  if r.humidity() > 85 { return new Vent() }
+  if r.soil() < cfg.minSoil() { return new Irrigate() }
+  if r.humidity() < cfg.minHumidity() { return new Mist() }
+  return new Idle()
+}
+
+def parseReadings(log: String): List[Reading] {
+  val result: List[Reading] = []
+  foreach line: String in log.lines().toList() {
+    val trimmed: String = line.trim()
+    if trimmed.length() > 0 && !trimmed.startsWith("#") {
+      try {
+        val r: Reading? = Reading::parse(trimmed)
+        if r != null { result.add(r) }
+      } catch e: Exception {
+        IO::println("  ! skipped malformed line: " + trimmed)
+      }
+    }
+  }
+  return result
+}
+
+def thresholdsFor(zone: String, table: Map[String, ZoneThresholds]): ZoneThresholds {
+  val found: ZoneThresholds? = table.get(zone)
+  return found ?: new ZoneThresholds(zone, 15.0, 30.0, 40, 25)
+}
+
+// ─── Main ───────────────────────────────────────────────────────────────────
+
+val log: String = """
+# Greenhouse sensor log — one line per zone per hour
+greenhouseA 6:00  14.0C 55% soil=38
+greenhouseA 9:00  19.5C 58% soil=33
+greenhouseA 12:00 27.5C 50% soil=22
+greenhouseA 15:00 31.0C 47% soil=18
+greenhouseA 18:00 22.0C 65% soil=28
+greenhouseB 6:00  16.5C 70% soil=45
+greenhouseB 9:00  20.0C 88% soil=42
+greenhouseB 12:00 24.0C 90% soil=40
+greenhouseB 15:00 26.5C 35% soil=15
+greenhouseB 18:00 21.0C 60% soil=30
+this line is garbage and should be skipped
+greenhouseC 6:00  12.0C 45% soil=50
+greenhouseC 9:00  15.5C 48% soil=48
+greenhouseC 12:00 18.0C 52% soil=44
+"""
+
+val thresholds: Map[String, ZoneThresholds] = [
+  "greenhouseA": new ZoneThresholds("greenhouseA", 15.0, 28.0, 45, 20),
+  "greenhouseB": new ZoneThresholds("greenhouseB", 15.0, 26.0, 50, 25),
+  "greenhouseC": new ZoneThresholds("greenhouseC", 14.0, 24.0, 40, 30)
+]
+val zoneNames: List[String] = ["greenhouseA", "greenhouseB", "greenhouseC"]
+
+val readings: List[Reading] = parseReadings(log)
+
+IO::println("========================================================")
+IO::println("   GREENHOUSE CLIMATE CONTROLLER — daily run report")
+IO::println("========================================================")
+IO::println("")
+IO::println("Parsed #{readings.size} readings across #{readings.map { r -> r.zone() }.distinct().size} zones.")
+IO::println("")
+
+// ── Per-reading decisions ─────────────────────────────────────────────────
+IO::println("── Zone activity log ─────────────────────────────────")
+var totalActions: Int = 0
+var urgentActions: Int = 0
+foreach zone: String in zoneNames {
+  val cfg: ZoneThresholds = thresholdsFor(zone, thresholds)
+  val zoneReadings: List[Reading] = readings.filter { r -> r.zone() == zone }
+  IO::println("  Zone #{zone} (target #{cfg.minTemp().round1()}C-#{cfg.maxTemp().round1()}C):")
+  foreach r: Reading in zoneReadings.sortedBy { r -> r.hour() } {
+    val action: ClimateAction = decideAction(r, cfg)
+    totalActions = totalActions + 1
+    if action.urgent() { urgentActions = urgentActions + 1 }
+    val flag: String = if action.urgent() { " <<<" } else { "" }
+    IO::println("    " + ("" + r.hour()).padRight(3) + ":00  " + r.tempC().round1() + "C  " + r.humidity() + "%  soil=" + r.soil() + "  -> " + action.label() + flag)
+  }
+}
+
+// ── Action tally ──────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── Action tally ──────────────────────────────────────")
+val allActions: List[ClimateAction] = do[List] {
+  r <- readings
+  cfg <- [thresholdsFor(r.zone(), thresholds)]
+  ret decideAction(r, cfg)
+}
+val tally: Map[String, Int] = [:]
+foreach a: ClimateAction in allActions {
+  val key: String = a.label().trim()
+  val prev: Int? = tally.get(key)
+  tally.put(key, (prev ?: 0) + 1)
+}
+val tallyKeys: List[String] = []
+foreach (k, _) in tally { tallyKeys.add(k) }
+tallyKeys.sort(null)
+var maxTally: Int = 1
+foreach k: String in tallyKeys {
+  val v: Int = tally.get(k) ?: 0
+  if v > maxTally { maxTally = v }
+}
+foreach k: String in tallyKeys {
+  val v: Int = tally.get(k) ?: 0
+  IO::println("  " + k.padRight(10) + v.bar(maxTally, 20) + " " + v)
+}
+
+// ── Hottest / coolest reading per zone ───────────────────────────────────
+IO::println("")
+IO::println("── Extremes ───────────────────────────────────────────")
+foreach zone: String in zoneNames {
+  val zoneReadings: List[Reading] = readings.filter { r -> r.zone() == zone }
+  if zoneReadings.size > 0 {
+    val hottest: Reading = zoneReadings.fold(zoneReadings.get(0)) { acc, r -> if r.tempC() > acc.tempC() { r } else { acc } }
+    val coolest: Reading = zoneReadings.fold(zoneReadings.get(0)) { acc, r -> if r.tempC() < acc.tempC() { r } else { acc } }
+    IO::println("  #{zone}: hottest #{hottest.tempC().round1()}C at #{hottest.hour()}:00 (#{hottest.tempC().toF().round1()}F), coolest #{coolest.tempC().round1()}C at #{coolest.hour()}:00")
+  }
+}
+
+// ── Soil moisture triage, via partition ──────────────────────────────────
+IO::println("")
+IO::println("── Soil moisture triage ───────────────────────────────")
+val parts = readings.partition { r -> r.soil() < thresholdsFor(r.zone(), thresholds).minSoil() }
+val dryObjs: List[Object] = parts[0] as List[Object]
+val okObjs:  List[Object] = parts[1] as List[Object]
+val dry: List[Reading] = dryObjs.map { o -> o as Reading }
+IO::println("  #{dry.size} readings below the irrigation threshold, #{okObjs.size} within range.")
+foreach r: Reading in dry.sortedBy { r -> r.soil() } {
+  IO::println("    #{r.zone()} @ #{r.hour()}:00 — soil=#{r.soil()} (needs irrigation)")
+}
+
+// ── Recursive helper: longest run of consecutive urgent hours in a zone ──
+def longestUrgentRun(actions: List[ClimateAction], idx: Int, current: Int, best: Int): Int {
+  if idx >= actions.size { return if current > best { current } else { best } }
+  val a: ClimateAction = actions.get(idx)
+  val next: Int = if a.urgent() { current + 1 } else { 0 }
+  val nextBest: Int = if next > best { next } else { best }
+  return longestUrgentRun(actions, idx + 1, next, nextBest)
+}
+
+IO::println("")
+IO::println("── Longest urgent streak per zone ────────────────────")
+foreach zone: String in zoneNames {
+  val cfg: ZoneThresholds = thresholdsFor(zone, thresholds)
+  val ordered: List[Reading] = readings.filter { r -> r.zone() == zone }.sortedBy { r -> r.hour() }
+  val acts: List[ClimateAction] = ordered.map { r -> decideAction(r, cfg) }
+  val streak: Int = longestUrgentRun(acts, 0, 0, 0)
+  IO::println("  #{zone}: #{streak} consecutive urgent hour(s)")
+}
+
+IO::println("")
+IO::println("Run complete: #{totalActions} decisions made, #{urgentActions} urgent, across #{zoneNames.size} zones.")

@@ -20,8 +20,22 @@ final class BlockElementLowering(
       case None => null
       case Some(term) =>
         TypeCheckingHelpers.ensureBoolean(bodyContext.table, node, term,
-          (n, actual) => bodyContext.report(INCOMPATIBLE_TYPE, n, BasicType.BOOLEAN, actual))
+          (n, actual) => reportNonBooleanCondition(n, actual))
     }
+
+  /**
+   * A nullable condition (e.g. `while b { }` where `b: Boolean?`) unboxes it
+   * exactly like a nullable operand in a unary/binary operator does, so it
+   * gets the same null-safety diagnostic (E0070) those already report,
+   * instead of the generic "type Boolean is expected" (E0000) a genuinely
+   * incompatible, non-nullable type gets.
+   */
+  private def reportNonBooleanCondition(node: AST.Node, actual: Type): Unit = actual match {
+    case nullable: NullableType =>
+      bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "condition")
+    case _ =>
+      bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, actual)
+  }
 
   /**
    * Checks if a statement is "terminating" (never falls through to the next statement).
@@ -104,6 +118,17 @@ final class BlockElementLowering(
           new NOP(node.location)
         } else if (collection.isBasicType || collection.isNullType) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
+          new NOP(node.location)
+        } else if (collection.`type`.isInstanceOf[NullableType]) {
+          // `foreach x in b` where `b: List[Int]?`: iterating dereferences the
+          // receiver just like `b.field`/`b[i]` do, so it gets the same
+          // null-safety error (E0070) instead of falling through to the
+          // generic array/map/iterator dispatch below, where the iterator
+          // branch's `collection.`type`.asInstanceOf[ObjectType]` crashes with
+          // a ClassCastException on a NullableType -- mirrors the indexing
+          // read path (ConstructionTyping.typeIndexing).
+          val nullable = collection.`type`.asInstanceOf[NullableType]
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node.collection, nullable.displayName)
           new NOP(node.location)
         } else {
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
@@ -422,8 +447,12 @@ final class BlockElementLowering(
       for (expression <- expressionOpt) {
         val expected = bodyContext.load("java.lang.Throwable")
         val detected = expression.`type`
-        if (!TypeRules.isSuperType(expected, detected)) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+        detected match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "throw")
+          case _ if !TypeRules.isSuperType(expected, detected) =>
+            bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+          case _ =>
         }
       }
       new Throw(node.location, expressionOpt.getOrElse(null))
@@ -445,11 +474,14 @@ final class BlockElementLowering(
               val index = context.add(resource.name, resourceType, isMutable = false)
               val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
 
-              if (TypeRules.isSuperType(autoCloseable, resourceType)) {
-                resourceBindings += ((binding, init))
-              } else {
-                // Report error but still allow the variable to be used
-                bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+              resourceType match {
+                case nullable: NullableType =>
+                  bodyContext.report(NULLABLE_MEMBER_ACCESS, resource, nullable.displayName, "resource")
+                case _ if TypeRules.isSuperType(autoCloseable, resourceType) =>
+                  resourceBindings += ((binding, init))
+                case _ =>
+                  // Report error but still allow the variable to be used
+                  bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
               }
             }
           }
@@ -701,6 +733,19 @@ final class BlockElementLowering(
             }
         }
       case _ => None
+    }
+
+    initType match {
+      case nullable: NullableType =>
+        // A nullable initializer (`Point?`, never null-checked) cannot be
+        // destructured directly. Report the same null-safety error the
+        // equivalent member access (`p.x`) and indexing (`b[i]`) already
+        // report, mirroring MemberSelectionResolutionSupport.normalizeTarget
+        // and ConstructionTyping.typeIndexing, instead of letting it fall
+        // through accessors() into the misleading NOT_A_RECORD_TYPE below.
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.init, nullable.displayName)
+        return new NOP(node.location)
+      case _ =>
     }
 
     accessors(initType) match {

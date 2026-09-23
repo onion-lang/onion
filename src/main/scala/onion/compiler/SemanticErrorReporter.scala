@@ -450,6 +450,12 @@ class SemanticErrorReporter(threshold: Int) {
     val typeName = asString(items(0))
     val key =
       if (items.length > 1 && items(1) == "indexing") "error.semantic.nullableIndexingAccess"
+      else if (items.length > 1 && items(1) == "operator") "error.semantic.nullableOperatorOperand"
+      else if (items.length > 1 && items(1) == "condition") "error.semantic.nullableCondition"
+      else if (items.length > 1 && items(1) == "arraySize") "error.semantic.nullableArraySize"
+      else if (items.length > 1 && items(1) == "resource") "error.semantic.nullableTryResource"
+      else if (items.length > 1 && items(1) == "throw") "error.semantic.nullableThrow"
+      else if (items.length > 1 && items(1) == "select") "error.semantic.nullableSelectScrutinee"
       else "error.semantic.nullableMemberAccess"
     problem(position, format(message(key), Seq(typeName)))
   }

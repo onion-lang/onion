@@ -890,10 +890,22 @@ public:
 - `?.` / `?:` / `if x != null` を使う。
 - 非 null 制限を宣言: `class Box[T extends Object]`。
 
-### `E0070` — nullable なメンバへのアクセス
+### `E0070` — null チェックなしで nullable な値を使用
 
-nullable な型（`T?`）の値に対して、フィールド（メソッドではない）が直接アクセス
-されました。この時点で値は null である可能性があります。
+nullable な型（`T?`）の値が、間に null チェックを挟まないまま、非 null が
+前提の箇所で使われました。このコードは以下のような複数の形をまとめて
+カバーしており、対処方法はどれも共通です:
+
+- **メンバアクセス** — フィールド（メソッドではない）を nullable な受け手に直接アクセス（`x: String?` に対する `x.length`）。
+- **添字アクセス** — nullable な配列・`List`・`Map`（`b: List[Int]?`）に対する `b[i]` / `b[i] = v` / `b[i] += v`。
+- **演算子** — 単項（`-n`、`+n`、`~n`、`!b`）、二項（`+ - * / % < > <= >= & | ^`）、シフト（`<< >> >>>`）、後置インクリメント/デクリメント（`n++` / `n--`）、複合代入（`n += 1`、`n <<= 1` など）の各演算子に対する nullable なオペランド。
+- **条件式** — `if` / `while` / `do-while` / `for` の条件や `select` ガードの `when` に nullable な `Boolean?` を直接使用。
+- **`foreach` のコレクション** — `foreach x: T in expr` で `expr` が nullable な型を持つ場合。
+- **分解代入** — `val (a, b) = expr` で `expr` が nullable なレコードの場合。
+- **配列サイズ** — `new T[n]` で次元 `n` が nullable な型（`n: Int?`）を持つ場合。
+- **`try`-with-resources の初期化子** — `try (val r = res) { }` で `res` が nullable な型の場合。
+- **`throw` のオペランド** — `throw expr` で `expr` が nullable な型の場合。
+- **`select` のスクルーティニー** — `select s { ... }` で `s` が nullable な型の場合（`else` 節や無条件のワイルドカードパターンがない場合に限る。どちらかがあれば `null` は正しく処理される）。
 
 ```onion
 class Test {
@@ -905,7 +917,7 @@ public:
 }
 ```
 
-対処: 安全にアクセスするには `?.`、デフォルト値を与えるには `?:`、非 null を
+対処: 安全にアクセスするには `?.` / `?[`、デフォルト値を与えるには `?:`、非 null を
 断言するには `!!`、または先に null チェック（`if x != null { ... }`）を行って
 ください。
 

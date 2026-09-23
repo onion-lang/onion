@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.0] - 2026-09-23
+
 ### Fixed
 
 - **A nullable range bound (`a..b` / `a..<b` where `a` or `b: Int?`, never null-checked) reported the generic `E0021` ("a constructor applicable for Range(Int?, Int, Boolean) is not found") instead of the null-safety error (`E0070`, `NULLABLE_MEMBER_ACCESS`) that every other dereference-like use of a nullable value (member access, indexing, operators, conditions, array size, `foreach`, destructuring, `throw`, try-with-resources) already reports.** `a..b`/`a..<b` desugars at parse time to `new onion.Range(a, b, inclusive)` (`OnionParser.rangeNew` / the JavaCC grammar's equivalent production), so a nullable bound never dereferences anything directly -- it just fails `ConstructionTyping.typeNewObject`'s ordinary constructor-overload resolution, which reported the generic constructor-not-found error and leaked the "Range" implementation-detail class name the user never wrote. Fixed by special-casing a `NullableType` start/end argument for the `onion.Range` constructor up front, before overload resolution, mirroring `typeNewArray`'s nullable-array-size check right above it in the same file, and reporting `NULLABLE_MEMBER_ACCESS` with wording specific to a range bound (`error.semantic.nullableRangeBound`, en/ja). Guarded by six new regression tests in `NullableRangeBoundSpec`.

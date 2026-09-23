@@ -1,0 +1,383 @@
+// LogBatch — batch log processing with resource lifecycle management
+// Features exercised:
+//   try-with-resources (multiple closeable resources, closed in reverse order)
+//   record with from re"..." parser; ADT case-enum; plain enum with value methods
+//   extension methods on Int/String; @TailRecursive; select (value + type patterns)
+//   collection pipelines (groupBy/sortedBy/fold/filter/map)
+//   foreach over map entries; string interpolation; nullable / null-safety
+
+import {
+  java.lang.AutoCloseable
+  java.util.*
+}
+
+// ─── Domain records ──────────────────────────────────────────────────────────
+
+record LogEntry(level: String, component: String, message: String, durationMs: Int)
+  from re"(\w+)\s+\[(\w+)\]\s+(.*)\s+\((\d+)ms\)"
+
+record ComponentStat(component: String, count: Int, errors: Int, avgMs: Int)
+
+// ─── Plain enum: log severity ─────────────────────────────────────────────────
+
+enum LogLevel {
+  DEBUG, INFO, WARN, ERROR
+public:
+  def severity(): Int = select this {
+    case LogLevel::DEBUG: 0
+    case LogLevel::INFO:  1
+    case LogLevel::WARN:  2
+    case LogLevel::ERROR: 3
+  }
+  def badge(): String = select this {
+    case LogLevel::DEBUG: "DBG"
+    case LogLevel::INFO:  "INF"
+    case LogLevel::WARN:  "WRN"
+    case LogLevel::ERROR: "ERR"
+  }
+}
+
+// ─── ADT case-enum: batch result ─────────────────────────────────────────────
+
+enum BatchResult {
+  case BatchOk(processed: Int, skipped: Int)
+  case BatchWarn(processed: Int, issues: Int)
+  case BatchFailed(reason: String)
+public:
+  def isOk(): Boolean = select this {
+    case ok is BatchOk:   true
+    case bw is BatchWarn: true
+    else: false
+  }
+  def describe(): String = select this {
+    case ok is BatchOk:    "OK:   #{ok.processed()} processed, #{ok.skipped()} skipped"
+    case bw is BatchWarn:  "WARN: #{bw.processed()} processed, #{bw.issues()} issue(s)"
+    case bf is BatchFailed: "FAIL: #{bf.reason()}"
+  }
+}
+
+// ─── Closeable resource: log reader ──────────────────────────────────────────
+
+class LogReader conforms AutoCloseable {
+  val sourceName: String
+  val rawLines: List[String]
+  var pos: Int
+  var closed: Boolean
+public:
+  def this(name: String, lines: List[String]) {
+    this.sourceName = name
+    this.rawLines = lines
+    this.pos = 0
+    this.closed = false
+    IO::println("  [open ] LogReader(#{name})")
+  }
+  def hasNext(): Boolean = !closed && pos < rawLines.size
+  def nextLine(): String? {
+    if closed || pos >= rawLines.size { return null }
+    val line: String = rawLines[pos] as String
+    pos = pos + 1
+    return line
+  }
+  def linesRead(): Int = pos
+  def close(): void {
+    if !closed {
+      IO::println("  [close] LogReader(#{sourceName}) — #{pos} line(s) read")
+      closed = true
+    }
+  }
+}
+
+// ─── Closeable resource: report writer ───────────────────────────────────────
+
+class ReportWriter conforms AutoCloseable {
+  val destName: String
+  val lines: List[String]
+  var closed: Boolean
+  var count: Int
+public:
+  def this(name: String) {
+    this.destName = name
+    this.lines = []
+    this.closed = false
+    this.count = 0
+    IO::println("  [open ] ReportWriter(#{name})")
+  }
+  def write(line: String): void {
+    if !closed {
+      lines.add(line)
+      count = count + 1
+    }
+  }
+  def snapshot(): List[String] = lines
+  def linesWritten(): Int = count
+  def close(): void {
+    if !closed {
+      IO::println("  [close] ReportWriter(#{destName}) — #{count} line(s) written")
+      closed = true
+    }
+  }
+}
+
+// ─── Extension methods ───────────────────────────────────────────────────────
+
+extension Int {
+  def msLabel(): String {
+    if self < 1000 { return "" + self + "ms" }
+    val s: Int = self / 1000
+    val ms: Int = self % 1000
+    val msStr: String = if ms < 100 { if ms < 10 { "00" + ms } else { "0" + ms } } else { "" + ms }
+    return "" + s + "." + msStr + "s"
+  }
+  def barOf(maxVal: Int, width: Int): String {
+    val n: Int = if maxVal > 0 { self * width / maxVal } else { 0 }
+    val clamped: Int = if n > width { width } else { n }
+    var b: String = ""
+    var i: Int = 0
+    while i < clamped { b = b + "█"; i = i + 1 }
+    while i < width   { b = b + "░"; i = i + 1 }
+    return b
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "…"
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def levelOf(entry: LogEntry): LogLevel {
+  select entry.level() {
+    case "DEBUG": return LogLevel::DEBUG
+    case "WARN":  return LogLevel::WARN
+    case "ERROR": return LogLevel::ERROR
+    else:         return LogLevel::INFO
+  }
+}
+
+def isError(e: LogEntry): Boolean = levelOf(e).severity() >= 3
+def isWarn(e: LogEntry): Boolean  = levelOf(e).severity() == 2
+
+def countBy(entries: List[LogEntry], pred: (LogEntry) -> Boolean): Int {
+  var n: Int = 0
+  foreach e: LogEntry in entries { if pred(e) { n = n + 1 } }
+  return n
+}
+
+def sumMs(entries: List[LogEntry]): Int {
+  var total: Int = 0
+  foreach e: LogEntry in entries { total = total + e.durationMs() }
+  return total
+}
+
+// ─── @TailRecursive: find index of slowest entry ─────────────────────────────
+
+class SlowFinder {
+private:
+  @TailRecursive
+  def search(entries: List[LogEntry], idx: Int, bestMs: Int, bestIdx: Int): Int {
+    if idx >= entries.size { return bestIdx }
+    val e: LogEntry = entries[idx] as LogEntry
+    if e.durationMs() > bestMs {
+      return search(entries, idx + 1, e.durationMs(), idx)
+    }
+    return search(entries, idx + 1, bestMs, bestIdx)
+  }
+public:
+  def find(entries: List[LogEntry]): Int? {
+    if entries.size == 0 { return null }
+    return search(entries, 0, -1, 0)
+  }
+}
+
+// ─── Core pipeline (try-with-resources) ──────────────────────────────────────
+
+def runBatch(name: String, lines: List[String]): BatchResult {
+  val parsed: List[LogEntry] = []
+  val skipped: List[String]  = []
+
+  try (val reader = new LogReader(name, lines); val writer = new ReportWriter(name + ".rpt")) {
+    while reader.hasNext() {
+      val raw: String? = reader.nextLine()
+      if raw == null { continue }
+      val trimmed: String = raw.trim()
+      if trimmed.length() == 0 { continue }
+
+      val entry: LogEntry? = LogEntry::parse(trimmed)
+      if entry == null {
+        skipped.add(trimmed)
+        writer.write("SKIP  " + trimmed.truncate(70))
+      } else {
+        parsed.add(entry)
+        if isError(entry) {
+          writer.write("ERROR [#{entry.component()}] #{entry.message().truncate(60)}")
+        } else if isWarn(entry) {
+          writer.write("WARN  [#{entry.component()}] #{entry.message().truncate(60)}")
+        }
+      }
+    }
+  }
+  // Both writer and reader are now closed (writer first, reader second)
+
+  val errCount: Int = countBy(parsed, { e -> isError(e as LogEntry) })
+  if errCount > 0 {
+    return new BatchWarn(parsed.size, errCount + countBy(parsed, { e -> isWarn(e as LogEntry) }))
+  }
+  return new BatchOk(parsed.size, skipped.size)
+}
+
+// ─── Sample log data ─────────────────────────────────────────────────────────
+
+val batch1: List[String] = [
+  "INFO  [auth]     User login succeeded (12ms)",
+  "DEBUG [cache]    Cache hit key=user_42 (2ms)",
+  "INFO  [db]       Query executed SELECT orders (145ms)",
+  "WARN  [db]       Slow query detected (1250ms)",
+  "ERROR [payment]  Payment gateway timeout (3000ms)",
+  "INFO  [auth]     Token refreshed (8ms)",
+  "DEBUG [cache]    Cache miss key=product_7 (1ms)",
+  "INFO  [api]      GET /orders processed (160ms)",
+  "WARN  [api]      Rate limit approaching client_99 (5ms)",
+  "INFO  [db]       Transaction committed (22ms)",
+  "ERROR [auth]     Invalid credentials user@example.com (6ms)",
+  "INFO  [payment]  Payment processed txn_abc123 (950ms)",
+  "DEBUG [cache]    Cache eviction 42 entries removed (11ms)",
+  "INFO  [api]      POST /checkout processed (1100ms)",
+  "WARN  [db]       Connection pool at 80 percent capacity (3ms)"
+]
+
+val batch2: List[String] = [
+  "INFO  [scheduler] Job_1001 started (1ms)",
+  "INFO  [worker]    Processing item 1 of 50 (45ms)",
+  "INFO  [worker]    Processing item 10 of 50 (38ms)",
+  "WARN  [worker]    Item 23 skipped invalid format (2ms)",
+  "ERROR [worker]    Item 31 failed NullPointerException (500ms)",
+  "INFO  [worker]    Processing item 50 of 50 (41ms)",
+  "INFO  [scheduler] Job_1001 completed 48 success 2 fail (2100ms)",
+  "INFO  [mailer]    Digest sent to 12 recipients (300ms)",
+  "WARN  [mailer]    3 bounced addresses removed (5ms)"
+]
+
+// ─── Run batches ─────────────────────────────────────────────────────────────
+
+IO::println("══════════════════════════════════════════════════════")
+IO::println("           LOG BATCH PROCESSOR — demo run            ")
+IO::println("══════════════════════════════════════════════════════")
+
+IO::println("\n── Batch 1: api-server ───────────────────────────────")
+val r1: BatchResult = runBatch("api-server", batch1)
+IO::println("  result: #{r1.describe()}")
+
+IO::println("\n── Batch 2: job-scheduler ────────────────────────────")
+val r2: BatchResult = runBatch("job-scheduler", batch2)
+IO::println("  result: #{r2.describe()}")
+
+// ─── Combined analysis ────────────────────────────────────────────────────────
+
+IO::println("\n── Combined statistics ───────────────────────────────")
+val allEntries: List[LogEntry] = []
+foreach line: String in batch1 {
+  val e: LogEntry? = LogEntry::parse(line.trim())
+  if e != null { allEntries.add(e) }
+}
+foreach line: String in batch2 {
+  val e: LogEntry? = LogEntry::parse(line.trim())
+  if e != null { allEntries.add(e) }
+}
+
+val total: Int   = allEntries.size
+val errors: Int  = countBy(allEntries, { e -> isError(e as LogEntry) })
+val warnings: Int = countBy(allEntries, { e -> isWarn(e as LogEntry) })
+val avgMs: Int   = if total > 0 { sumMs(allEntries) / total } else { 0 }
+var maxMs: Int = 0
+foreach e: LogEntry in allEntries { if e.durationMs() > maxMs { maxMs = e.durationMs() } }
+
+IO::println("  Total entries : #{total}")
+IO::println("  Errors        : #{errors}")
+IO::println("  Warnings      : #{warnings}")
+IO::println("  Avg latency   : #{avgMs.msLabel()}")
+IO::println("  Max latency   : #{maxMs.msLabel()}")
+
+// ─── Per-component breakdown ──────────────────────────────────────────────────
+
+IO::println("\n── Component breakdown ───────────────────────────────")
+val byComp = allEntries.groupBy { e -> (e as LogEntry).component() }
+val stats: List[ComponentStat] = []
+foreach (comp, grp) in byComp {
+  val es: List[LogEntry] = grp as List[LogEntry]
+  val cnt: Int  = es.size
+  val errs: Int = countBy(es, { e -> isError(e as LogEntry) })
+  val avg: Int  = if cnt > 0 { sumMs(es) / cnt } else { 0 }
+  stats.add(new ComponentStat(comp, cnt, errs, avg))
+}
+
+val sorted = stats.sortedBy { s -> -(s as ComponentStat).count() }
+IO::println("  " + "COMPONENT".padRight(12) + "CNT".padLeft(5) + "  ERR".padLeft(5) + "  AVG".padLeft(10))
+IO::println("  " + "─".padRight(12) + "─".padLeft(5) + "  " + "─".padLeft(4) + "  " + "─".padLeft(9))
+foreach s: ComponentStat in sorted {
+  val mark: String = if s.errors() > 0 { " !" } else { "  " }
+  IO::println("  " + s.component().padRight(12) +
+    ("" + s.count()).padLeft(5) + "  " +
+    ("" + s.errors()).padLeft(4) + "  " +
+    s.avgMs().msLabel().padLeft(9) + mark)
+}
+
+// ─── Slowest entry (via @TailRecursive recursion) ────────────────────────────
+
+IO::println("\n── Slowest entry ─────────────────────────────────────")
+val finder: SlowFinder = new SlowFinder()
+val slowIdx: Int? = finder.find(allEntries)
+if slowIdx != null {
+  val se: LogEntry = allEntries[slowIdx as Int] as LogEntry
+  IO::println("  [#{se.level()}] #{se.component()} — #{se.message().truncate(55)} (#{se.durationMs().msLabel()})")
+}
+
+// ─── Log-level histogram ─────────────────────────────────────────────────────
+
+IO::println("\n── Log-level histogram ───────────────────────────────")
+val byLevel = allEntries.groupBy { e -> (e as LogEntry).level() }
+val levels: List[String] = ["DEBUG", "INFO", "WARN", "ERROR"]
+var maxCnt: Int = 1
+foreach lvl: String in levels {
+  val g = byLevel.get(lvl)
+  if g != null { val n: Int = (g as List[LogEntry]).size; if n > maxCnt { maxCnt = n } }
+}
+foreach lvl: String in levels {
+  val g = byLevel.get(lvl)
+  val cnt: Int = if g != null { (g as List[LogEntry]).size } else { 0 }
+  val lv: LogLevel = select lvl {
+    case "DEBUG": LogLevel::DEBUG
+    case "WARN":  LogLevel::WARN
+    case "ERROR": LogLevel::ERROR
+    else:         LogLevel::INFO
+  }
+  IO::println("  " + lv.badge() + "  " + cnt.barOf(maxCnt, 20) + "  " + cnt)
+}
+
+// ─── Batch result summary ─────────────────────────────────────────────────────
+
+IO::println("\n── Batch summary ─────────────────────────────────────")
+val results: List[BatchResult] = [r1, r2]
+val names: List[String] = ["api-server", "job-scheduler"]
+var idx: Int = 0
+foreach res: BatchResult in results {
+  val bname: String = names[idx] as String
+  val icon: String = if res.isOk() { "✓" } else { "✗" }
+  IO::println("  #{icon} #{bname.padRight(14)} #{res.describe()}")
+  idx = idx + 1
+}
+
+IO::println("")
+IO::println("══════════════════════════════════════════════════════")

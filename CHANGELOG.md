@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`run/MealPlanner.on`** — a 323-line nutrition-aware meal planner, a new domain for the `run/` corpus (sealed ADT case-enums `DietaryFlag` (7 cases) and `MealTime` (4 cases) with `select`-pattern dispatch; records with methods — `Nutrient`, `Ingredient`, `RecipeComponent`, `Recipe`, `DayPlan`; an `extension Double` formatter using `as Int` conversion; `List[Object]`/`Map[Object,Object]` typed generics throughout; `foreach (_, v) in map` destructuring in `DayPlan.totalNutrients`; nullable `Recipe?` from `pickRecipe` with null checks; multi-pass collection counting per meal-time/dietary-flag; and an 18-ingredient catalogue with 11 recipes across vegan 3-day and gluten-free 4-day meal plans), added to the `run/` corpus (merged via #1458).
 
+- **`run/ConcordanceIndex.on`** — a 350-line full-text concordance builder with frequency and linguistic analysis, a new domain for the `run/` corpus (an ADT enum `WordClass` (`HapaxLegomenon`/`RareWord`/`CommonWord`/`FrequentWord`) with `select`/`is`-pattern dispatch; extension methods on `String` (`centred`/`padRight`/`truncate`/`trimLower`) and `Int` (`repeatChar`); a mutable class `WordEntry` over `List[Occurrence]`/`Map[String, WordEntry]`; collection pipelines (`sortedBy`/`filter`/`map`); `foreach` over ranges, maps, and iterables; nullable `WordEntry?` lookups with null guards; `try`/`catch`; records `Occurrence`/`CorpusStats`; and string interpolation), added to the `run/` corpus (merged via #1461).
+
 ## [0.104.0] - 2026-09-23
 
 ### Added

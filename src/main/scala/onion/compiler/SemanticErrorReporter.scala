@@ -458,6 +458,7 @@ class SemanticErrorReporter(threshold: Int) {
       else if (items.length > 1 && items(1) == "select") "error.semantic.nullableSelectScrutinee"
       else if (items.length > 1 && items(1) == "rangeBound") "error.semantic.nullableRangeBound"
       else if (items.length > 1 && items(1) == "assignment") "error.semantic.nullableAssignment"
+      else if (items.length > 1 && items(1) == "catchType") "error.semantic.nullableCatchType"
       else "error.semantic.nullableMemberAccess"
     problem(position, format(message(key), Seq(typeName)))
   }

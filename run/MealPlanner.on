@@ -1,0 +1,323 @@
+import {
+  java.lang.Math as JMath
+}
+
+// ── Dietary flag ADT ──────────────────────────────────────────────────────────
+
+enum DietaryFlag {
+  case Vegan
+  case Vegetarian
+  case GlutenFree
+  case DairyFree
+  case NutFree
+  case LowCarb
+  case LowFat
+public:
+  def label(): String = select this {
+    case f is Vegan:       "Vegan"
+    case f is Vegetarian:  "Vegetarian"
+    case f is GlutenFree:  "Gluten-Free"
+    case f is DairyFree:   "Dairy-Free"
+    case f is NutFree:     "Nut-Free"
+    case f is LowCarb:     "Low-Carb"
+    case f is LowFat:      "Low-Fat"
+  }
+}
+
+// ── Meal time ADT ─────────────────────────────────────────────────────────────
+
+enum MealTime {
+  case Breakfast
+  case Lunch
+  case Dinner
+  case Snack
+public:
+  def label(): String = select this {
+    case t is Breakfast: "Breakfast"
+    case t is Lunch:     "Lunch"
+    case t is Dinner:    "Dinner"
+    case t is Snack:     "Snack"
+  }
+}
+
+// ── Numeric formatting helpers (defined before records that use them) ─────────
+
+def fmt1(d: Double): String = {
+  val i = (d * 10.0 + 0.5) as Int
+  "#{i / 10}.#{JMath::abs(i % 10)}"
+}
+
+// ── Nutrient record ───────────────────────────────────────────────────────────
+
+record Nutrient(calories: Double, protein: Double, carbs: Double, fat: Double, fiber: Double) {
+public:
+  def scaled(factor: Double): Nutrient =
+    new Nutrient(calories() * factor, protein() * factor,
+                 carbs() * factor, fat() * factor, fiber() * factor)
+
+  def plus(other: Nutrient): Nutrient =
+    new Nutrient(calories() + other.calories(), protein() + other.protein(),
+                 carbs() + other.carbs(), fat() + other.fat(), fiber() + other.fiber())
+
+  def summary(): String = {
+    val c  = fmt1(calories())
+    val p  = fmt1(protein())
+    val cb = fmt1(carbs())
+    val f  = fmt1(fat())
+    val fi = fmt1(fiber())
+    "#{c}kcal  P:#{p}g  C:#{cb}g  F:#{f}g  Fiber:#{fi}g"
+  }
+}
+
+// ── Ingredient and recipe records ─────────────────────────────────────────────
+
+record Ingredient(name: String, flags: List[Object], nutrientPer100g: Nutrient) {
+public:
+  def hasFlag(flag: DietaryFlag): Boolean = flags().contains(flag)
+  def nutrientForGrams(g: Double): Nutrient = nutrientPer100g().scaled(g / 100.0)
+}
+
+record RecipeComponent(ingredient: Ingredient, grams: Double) {
+public:
+  def nutrients(): Nutrient = ingredient().nutrientForGrams(grams())
+}
+
+record Recipe(name: String, mealTime: MealTime, components: List[Object]) {
+public:
+  def totalNutrients(): Nutrient = {
+    var acc = new Nutrient(0.0, 0.0, 0.0, 0.0, 0.0)
+    foreach c: RecipeComponent in components() { acc = acc.plus(c.nutrients()) }
+    acc
+  }
+
+  def hasFlag(flag: DietaryFlag): Boolean = {
+    foreach c: RecipeComponent in components() {
+      if !c.ingredient().hasFlag(flag) { return false }
+    }
+    true
+  }
+
+  def suitableFor(required: List[Object]): Boolean = {
+    foreach f: DietaryFlag in required {
+      if !hasFlag(f) { return false }
+    }
+    true
+  }
+}
+
+// ── Day plan ──────────────────────────────────────────────────────────────────
+
+record DayPlan(date: String, meals: Map[Object, Object]) {
+public:
+  def totalNutrients(): Nutrient = {
+    var acc = new Nutrient(0.0, 0.0, 0.0, 0.0, 0.0)
+    foreach (_, recipe) in meals() {
+      acc = acc.plus((recipe as Recipe).totalNutrients())
+    }
+    acc
+  }
+  def mealCount(): Int = meals().size()
+}
+
+// ── Ingredient catalogue ──────────────────────────────────────────────────────
+
+val V  = new Vegan()
+val Ve = new Vegetarian()
+val GF = new GlutenFree()
+val DF = new DairyFree()
+val NF = new NutFree()
+val LC = new LowCarb()
+
+def fi(v: Boolean, ve: Boolean, gf: Boolean, df: Boolean, nf: Boolean): List[Object] = {
+  val out: List[Object] = []
+  if v  { out.add(V)  }
+  if ve { out.add(Ve) }
+  if gf { out.add(GF) }
+  if df { out.add(DF) }
+  if nf { out.add(NF) }
+  out
+}
+
+def makeIngredients(): List[Object] = [
+  new Ingredient("oats",              fi(true, true, false, true, true),  new Nutrient(389.0, 17.0, 66.0,  7.0, 11.0)),
+  new Ingredient("banana",            fi(true, true, true,  true, true),  new Nutrient( 89.0,  1.1, 23.0,  0.3,  2.6)),
+  new Ingredient("eggs",              fi(false,true, true,  true, true),  new Nutrient(155.0, 13.0,  1.1, 11.0,  0.0)),
+  new Ingredient("chicken breast",    fi(false,false,true,  true, true),  new Nutrient(165.0, 31.0,  0.0,  3.6,  0.0)),
+  new Ingredient("brown rice",        fi(true, true, true,  true, true),  new Nutrient(216.0,  4.5, 45.0,  1.8,  3.5)),
+  new Ingredient("broccoli",          fi(true, true, true,  true, true),  new Nutrient( 34.0,  2.8,  7.0,  0.4,  2.6)),
+  new Ingredient("salmon",            fi(false,false,true,  true, true),  new Nutrient(208.0, 20.0,  0.0, 13.0,  0.0)),
+  new Ingredient("quinoa",            fi(true, true, true,  true, true),  new Nutrient(120.0,  4.4, 21.0,  1.9,  2.8)),
+  new Ingredient("spinach",           fi(true, true, true,  true, true),  new Nutrient( 23.0,  2.9,  3.6,  0.4,  2.2)),
+  new Ingredient("olive oil",         fi(true, true, true,  true, true),  new Nutrient(884.0,  0.0,  0.0,100.0,  0.0)),
+  new Ingredient("almonds",           fi(true, true, true,  true,false),  new Nutrient(579.0, 21.0, 22.0, 50.0, 12.5)),
+  new Ingredient("whole milk",        fi(false,true, true,  false,true),  new Nutrient( 61.0,  3.2,  4.8,  3.3,  0.0)),
+  new Ingredient("tofu",              fi(true, true, true,  true, true),  new Nutrient( 76.0,  8.0,  1.9,  4.8,  0.3)),
+  new Ingredient("sweet potato",      fi(true, true, true,  true, true),  new Nutrient( 86.0,  1.6, 20.0,  0.1,  3.0)),
+  new Ingredient("greek yogurt",      fi(false,true, true,  false,true),  new Nutrient( 59.0, 10.0,  3.6,  0.4,  0.0)),
+  new Ingredient("lentils",           fi(true, true, true,  true, true),  new Nutrient(116.0,  9.0, 20.0,  0.4,  7.9)),
+  new Ingredient("avocado",           fi(true, true, true,  true, true),  new Nutrient(160.0,  2.0,  9.0, 15.0,  6.7)),
+  new Ingredient("whole wheat bread", fi(true, true, false, true, true),  new Nutrient(247.0, 13.0, 41.0,  3.4,  6.0))
+]
+
+def buildIndex(ingredients: List[Object]): Map[Object, Object] = {
+  val m: Map[Object, Object] = [:]
+  foreach i: Ingredient in ingredients { m.put(i.name(), i) }
+  m
+}
+
+def rc(idx: Map[Object, Object], name: String, g: Double): RecipeComponent =
+  new RecipeComponent(idx.get(name) as Ingredient, g)
+
+// ── Recipe catalogue ──────────────────────────────────────────────────────────
+
+def makeRecipes(idx: Map[Object, Object]): List[Object] = [
+  new Recipe("Oatmeal with Banana",        new Breakfast(),
+             [rc(idx,"oats",80.0),     rc(idx,"banana",100.0),  rc(idx,"whole milk",150.0)]),
+
+  new Recipe("Scrambled Eggs & Spinach",   new Breakfast(),
+             [rc(idx,"eggs",120.0),    rc(idx,"spinach",60.0),  rc(idx,"olive oil",8.0)]),
+
+  new Recipe("Vegan Smoothie Bowl",        new Breakfast(),
+             [rc(idx,"banana",120.0),  rc(idx,"spinach",40.0),  rc(idx,"almonds",20.0)]),
+
+  new Recipe("Quinoa Salad",               new Lunch(),
+             [rc(idx,"quinoa",100.0),  rc(idx,"broccoli",120.0), rc(idx,"tofu",100.0), rc(idx,"olive oil",10.0)]),
+
+  new Recipe("Chicken & Brown Rice",       new Lunch(),
+             [rc(idx,"chicken breast",150.0), rc(idx,"brown rice",120.0), rc(idx,"broccoli",100.0)]),
+
+  new Recipe("Lentil Soup",                new Lunch(),
+             [rc(idx,"lentils",150.0), rc(idx,"sweet potato",100.0), rc(idx,"spinach",60.0), rc(idx,"olive oil",8.0)]),
+
+  new Recipe("Salmon with Sweet Potato",   new Dinner(),
+             [rc(idx,"salmon",180.0),  rc(idx,"sweet potato",150.0), rc(idx,"spinach",80.0), rc(idx,"olive oil",10.0)]),
+
+  new Recipe("Lentil Stew",                new Dinner(),
+             [rc(idx,"lentils",150.0), rc(idx,"sweet potato",120.0), rc(idx,"spinach",60.0), rc(idx,"olive oil",8.0)]),
+
+  new Recipe("Tofu Stir-Fry",              new Dinner(),
+             [rc(idx,"tofu",150.0),    rc(idx,"broccoli",150.0), rc(idx,"brown rice",100.0), rc(idx,"olive oil",12.0)]),
+
+  new Recipe("Greek Yogurt & Almonds",     new Snack(),
+             [rc(idx,"greek yogurt",150.0), rc(idx,"almonds",25.0), rc(idx,"banana",60.0)]),
+
+  new Recipe("Avocado & Egg Toast",        new Breakfast(),
+             [rc(idx,"whole wheat bread",60.0), rc(idx,"eggs",100.0), rc(idx,"avocado",80.0)])
+]
+
+// ── Planner logic ─────────────────────────────────────────────────────────────
+
+def pickRecipe(recipes: List[Object], mt: MealTime, required: List[Object]): Recipe? = {
+  foreach r: Recipe in recipes {
+    if r.mealTime() == mt && r.suitableFor(required) { return r }
+  }
+  null
+}
+
+def buildDayPlan(date: String, recipes: List[Object], required: List[Object]): DayPlan = {
+  val meals: Map[Object, Object] = [:]
+  val times: List[Object] = [new Breakfast(), new Lunch(), new Dinner(), new Snack()]
+  foreach t: MealTime in times {
+    val r: Recipe? = pickRecipe(recipes, t, required)
+    if r != null { meals.put(t, r) }
+  }
+  new DayPlan(date, meals)
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+
+def printDayPlan(plan: DayPlan): void {
+  IO::println("=== #{plan.date()} ===")
+  val timeOrder: List[Object] = [new Breakfast(), new Lunch(), new Dinner(), new Snack()]
+  foreach t: MealTime in timeOrder {
+    val r: Recipe? = plan.meals().get(t) as Recipe?
+    if r != null {
+      val n = r.totalNutrients()
+      IO::println("  [#{t.label()}] #{r.name()}")
+      IO::println("    #{n.summary()}")
+      foreach c: RecipeComponent in r.components() {
+        val cn = c.nutrients()
+        IO::println("      - #{c.ingredient().name()} #{fmt1(c.grams())}g  (#{cn.summary()})")
+      }
+    }
+  }
+  val tot = plan.totalNutrients()
+  IO::println("  DAILY TOTAL: #{tot.summary()}")
+  IO::println("")
+}
+
+def printWeekSummary(plans: List[Object], title: String): void {
+  IO::println("════════════════════════════════════")
+  IO::println("  #{title} — #{plans.size()}-day summary")
+  IO::println("════════════════════════════════════")
+  var totCal = 0.0; var totP = 0.0; var totC = 0.0; var totF = 0.0; var totFib = 0.0
+  foreach p: DayPlan in plans {
+    val n = p.totalNutrients()
+    totCal = totCal + n.calories()
+    totP   = totP   + n.protein()
+    totC   = totC   + n.carbs()
+    totF   = totF   + n.fat()
+    totFib = totFib + n.fiber()
+  }
+  val d = plans.size() * 1.0
+  IO::println("  Avg Calories : #{fmt1(totCal / d)} kcal")
+  IO::println("  Avg Protein  : #{fmt1(totP   / d)} g")
+  IO::println("  Avg Carbs    : #{fmt1(totC   / d)} g")
+  IO::println("  Avg Fat      : #{fmt1(totF   / d)} g")
+  IO::println("  Avg Fiber    : #{fmt1(totFib / d)} g")
+  IO::println("")
+}
+
+def printCatalogStats(recipes: List[Object], ingredients: List[Object]): void {
+  IO::println("════════════════════════════════════")
+  IO::println("  Recipe Catalogue Statistics")
+  IO::println("════════════════════════════════════")
+  IO::println("  Total recipes    : #{recipes.size()}")
+  IO::println("  Total ingredients: #{ingredients.size()}")
+  val timeOrder: List[Object] = [new Breakfast(), new Lunch(), new Dinner(), new Snack()]
+  foreach t: MealTime in timeOrder {
+    var cnt = 0
+    foreach r: Recipe in recipes { if r.mealTime() == t { cnt = cnt + 1 } }
+    IO::println("    #{t.label()} recipes: #{cnt}")
+  }
+  IO::println("  Ingredients per flag:")
+  val flagOrder: List[Object] = [new Vegan(), new Vegetarian(), new GlutenFree(), new DairyFree(), new NutFree(), new LowCarb()]
+  foreach f: DietaryFlag in flagOrder {
+    var cnt = 0
+    foreach i: Ingredient in ingredients { if i.hasFlag(f) { cnt = cnt + 1 } }
+    IO::println("    #{f.label()}: #{cnt}")
+  }
+  IO::println("")
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+val ingredients = makeIngredients()
+val idx         = buildIndex(ingredients)
+val allRecipes  = makeRecipes(idx)
+
+printCatalogStats(allRecipes, ingredients)
+
+// Vegan 3-day plan
+IO::println("──────────── VEGAN MEAL PLAN ────────────")
+val veganReq: List[Object] = [new Vegan()]
+val veganDays: List[Object] = ["Monday", "Tuesday", "Wednesday"]
+val veganPlans: List[Object] = []
+foreach day: String in veganDays {
+  val plan = buildDayPlan(day, allRecipes, veganReq)
+  veganPlans.add(plan)
+  printDayPlan(plan)
+}
+printWeekSummary(veganPlans, "Vegan")
+
+// Gluten-free 4-day plan
+IO::println("──────────── GLUTEN-FREE MEAL PLAN ────────────")
+val gfReq: List[Object] = [new GlutenFree()]
+val gfDays: List[Object] = ["Thursday", "Friday", "Saturday", "Sunday"]
+val gfPlans: List[Object] = []
+foreach day: String in gfDays {
+  val plan = buildDayPlan(day, allRecipes, gfReq)
+  gfPlans.add(plan)
+  printDayPlan(plan)
+}
+printWeekSummary(gfPlans, "Gluten-Free")

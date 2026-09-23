@@ -7507,6 +7507,7 @@ Double is used」として表面化し、修正方法を何も示しませんで
 <li><strong><code>try</code>-with-resources の初期化子</strong> — <code>try (val r = res) { }</code> で <code>res</code> が nullable な型の場合。</li>
 <li><strong><code>throw</code> のオペランド</strong> — <code>throw expr</code> で <code>expr</code> が nullable な型の場合。</li>
 <li><strong><code>select</code> のスクルーティニー</strong> — <code>select s { ... }</code> で <code>s</code> が nullable な型の場合（<code>else</code> 節や無条件のワイルドカードパターンがない場合に限る。どちらかがあれば <code>null</code> は正しく処理される）。</li>
+<li><strong>範囲の境界値</strong> — <code>a..b</code> / <code>a..&lt;b</code> で <code>a</code> または <code>b</code> が nullable な型の場合（この構文は <code>Range</code> のコンストラクタ呼び出しに脱糖されるため、nullable な境界値は他の直接参照と同様に拒否される）。</li>
 </ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a><span class="kd">public</span><span class="p">:</span>

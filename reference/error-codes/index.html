@@ -7495,6 +7495,7 @@ several forms, sharing the same fix:</p>
 <li><strong><code>try</code>-with-resources initializer</strong> — <code>try (val r = res) { }</code> where <code>res</code> has nullable type.</li>
 <li><strong><code>throw</code> operand</strong> — <code>throw expr</code> where <code>expr</code> has nullable type.</li>
 <li><strong><code>select</code> scrutinee</strong> — <code>select s { ... }</code> where <code>s</code> has nullable type (only when there's neither an <code>else</code> clause nor an unconditional wildcard pattern -- either one already handles a <code>null</code> scrutinee correctly).</li>
+<li><strong>Range bound</strong> — <code>a..b</code> / <code>a..&lt;b</code> where <code>a</code> or <code>b</code> has nullable type (these desugar to a <code>Range</code> constructor call, so a nullable bound is rejected the same way as any other dereference-like use).</li>
 </ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a><span class="kd">public</span><span class="p">:</span>

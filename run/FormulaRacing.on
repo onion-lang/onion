@@ -1,0 +1,341 @@
+// FormulaRacing — Formula 1 race simulation and lap analysis
+// Features exercised:
+//   records with from re"..." parser; data-carrying enum; ADT case-enum
+//   extension methods; collection pipelines (groupBy/sortedBy/fold/filter/map/partition)
+//   foreach over maps and ranges; string interpolation; nullable / null checks
+//   select / type-pattern matching with guards; closures; try/catch; recursion
+//   while loops; do[Option] notation
+
+import { java.util.* }
+
+// ─── Domain records ───────────────────────────────────────────────────────────
+
+record Driver(name: String, nationality: String, number: Int)
+
+record LapTime(driver: String, lap: Int, timeMs: Int)
+  from re"(\w+) (\d+) (\d+)"
+
+record PitStop(driver: String, lap: Int, duration: Int, tyre: String)
+
+record RaceResult(driver: String, position: Int, totalMs: Int, fastestLap: Int, points: Int)
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TyreCompound {
+  SOFT, MEDIUM, HARD
+public:
+  def degradation(): Int = select this {
+    case TyreCompound::SOFT:   15
+    case TyreCompound::MEDIUM: 8
+    case TyreCompound::HARD:   4
+  }
+  def gripBonus(): Int = select this {
+    case TyreCompound::SOFT:   12
+    case TyreCompound::MEDIUM: 6
+    case TyreCompound::HARD:   0
+  }
+  def label(): String = select this {
+    case TyreCompound::SOFT:   "S"
+    case TyreCompound::MEDIUM: "M"
+    case TyreCompound::HARD:   "H"
+  }
+}
+
+enum RaceEvent {
+  case SafetyCar(lap: Int, reason: String)
+  case FastestLap(driver: String, lap: Int, timeMs: Int)
+  case Retirement(driver: String, lap: Int, cause: String)
+  case PenaltyTime(driver: String, seconds: Int, reason: String)
+public:
+  def describe(): String = select this {
+    case sc is SafetyCar:    "Safety car lap #{sc.lap()}: #{sc.reason()}"
+    case fl is FastestLap:   "Fastest lap: #{fl.driver()} lap #{fl.lap()} #{fl.timeMs()}ms"
+    case dnf is Retirement:  "DNF: #{dnf.driver()} lap #{dnf.lap()} - #{dnf.cause()}"
+    case pen is PenaltyTime: "Penalty: #{pen.driver()} +#{pen.seconds()}s (#{pen.reason()})"
+  }
+  def isIncident(): Boolean = select this {
+    case dnf2 is Retirement: true
+    else: false
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def toRaceTime(): String {
+    val mins: Int  = self / 60000
+    val secs: Int  = (self % 60000) / 1000
+    val ms: Int    = self % 1000
+    val secStr: String = if secs < 10 { "0" + secs } else { "" + secs }
+    val msStr: String  = if ms < 100 { if ms < 10 { "00" + ms } else { "0" + ms } } else { "" + ms }
+    return "#{mins}:#{secStr}.#{msStr}"
+  }
+  def gapTo(other: Int): String {
+    val diff: Int = self - other
+    if diff == 0 { return "LEADER" }
+    val sign: String = if diff < 0 { "-" } else { "+" }
+    return sign + (if diff < 0 { -diff } else { diff }).toRaceTime()
+  }
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── Sample data ──────────────────────────────────────────────────────────────
+
+val drivers: List[Driver] = [
+  new Driver("Hamilton",  "GBR", 44),
+  new Driver("Verstappen","NED", 1),
+  new Driver("Leclerc",   "MON", 16),
+  new Driver("Perez",     "MEX", 11),
+  new Driver("Sainz",     "ESP", 55)
+]
+
+// Lap times in ms — first 10 laps for each driver
+val rawLaps: List[LapTime] = [
+  new LapTime("Hamilton",   1, 95800), new LapTime("Hamilton",   2, 94300),
+  new LapTime("Hamilton",   3, 93900), new LapTime("Hamilton",   4, 93700),
+  new LapTime("Hamilton",   5, 94100), new LapTime("Hamilton",   6, 93600),
+  new LapTime("Hamilton",   7, 93400), new LapTime("Hamilton",   8, 93200),
+  new LapTime("Hamilton",   9, 93500), new LapTime("Hamilton",  10, 93100),
+  new LapTime("Verstappen", 1, 95600), new LapTime("Verstappen", 2, 94100),
+  new LapTime("Verstappen", 3, 93700), new LapTime("Verstappen", 4, 93500),
+  new LapTime("Verstappen", 5, 93900), new LapTime("Verstappen", 6, 93300),
+  new LapTime("Verstappen", 7, 93100), new LapTime("Verstappen", 8, 93000),
+  new LapTime("Verstappen", 9, 93200), new LapTime("Verstappen",10, 92900),
+  new LapTime("Leclerc",    1, 96200), new LapTime("Leclerc",    2, 94700),
+  new LapTime("Leclerc",    3, 94300), new LapTime("Leclerc",    4, 94000),
+  new LapTime("Leclerc",    5, 94500), new LapTime("Leclerc",    6, 93800),
+  new LapTime("Leclerc",    7, 93600), new LapTime("Leclerc",    8, 93900),
+  new LapTime("Leclerc",    9, 93700), new LapTime("Leclerc",   10, 93400),
+  new LapTime("Perez",      1, 96400), new LapTime("Perez",      2, 95000),
+  new LapTime("Perez",      3, 94600), new LapTime("Perez",      4, 94300),
+  new LapTime("Perez",      5, 94800), new LapTime("Perez",      6, 94200),
+  new LapTime("Perez",      7, 93900), new LapTime("Perez",      8, 94100),
+  new LapTime("Perez",      9, 93800), new LapTime("Perez",     10, 93600),
+  new LapTime("Sainz",      1, 96600), new LapTime("Sainz",      2, 95300),
+  new LapTime("Sainz",      3, 94900), new LapTime("Sainz",      4, 94600),
+  new LapTime("Sainz",      5, 95000), new LapTime("Sainz",      6, 94400),
+  new LapTime("Sainz",      7, 94100), new LapTime("Sainz",      8, 94300),
+  new LapTime("Sainz",      9, 94000), new LapTime("Sainz",     10, 93800)
+]
+
+val pitStops: List[PitStop] = [
+  new PitStop("Hamilton",   4, 2800, "MEDIUM"),
+  new PitStop("Verstappen", 3, 2700, "MEDIUM"),
+  new PitStop("Leclerc",    5, 3100, "HARD"),
+  new PitStop("Perez",      4, 2900, "HARD"),
+  new PitStop("Sainz",      5, 3200, "MEDIUM")
+]
+
+val events: List[RaceEvent] = [
+  new SafetyCar(2, "debris on track"),
+  new FastestLap("Verstappen", 10, 92900),
+  new PenaltyTime("Leclerc", 5, "track limits violation"),
+  new Retirement("Sainz", 9, "engine failure")
+]
+
+// ─── Analysis helpers ─────────────────────────────────────────────────────────
+
+def fastestLapMs(laps: List[LapTime]): Int {
+  var best: Int = 999999999
+  foreach l: LapTime in laps {
+    if l.timeMs() < best { best = l.timeMs() }
+  }
+  return best
+}
+
+def totalLapMs(laps: List[LapTime]): Int =
+  laps.fold(0) { acc, l -> (acc as Int) + (l as LapTime).timeMs() }
+
+def avgLapMs(laps: List[LapTime]): Int =
+  if laps.size == 0 { 0 } else { totalLapMs(laps) / laps.size }
+
+def pitTimeFor(name: String): Int {
+  var total: Int = 0
+  foreach p: PitStop in pitStops {
+    if p.driver() == name { total = total + p.duration() }
+  }
+  return total
+}
+
+def penaltyMsFor(name: String): Int {
+  var total: Int = 0
+  foreach e: RaceEvent in events {
+    select e {
+      case pen is PenaltyTime:
+        if pen.driver() == name { total = total + pen.seconds() * 1000 }
+      else:
+    }
+  }
+  return total
+}
+
+val pointsTable: List[Int] = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+
+def pointsFor(pos: Int): Int {
+  if pos < 1 || pos > pointsTable.size { return 0 }
+  return pointsTable[pos - 1] as Int
+}
+
+// ─── Compute retirement set ───────────────────────────────────────────────────
+
+val retiredDrivers: List[String] = []
+foreach ev: RaceEvent in events {
+  select ev {
+    case r is Retirement: retiredDrivers.add(r.driver())
+    else:
+  }
+}
+
+def isRetired(name: String): Boolean {
+  var found: Boolean = false
+  foreach n: String in retiredDrivers { if n == name { found = true } }
+  return found
+}
+
+// ─── Build per-driver stats ───────────────────────────────────────────────────
+
+val lapsByDriver = rawLaps.groupBy { l -> (l as LapTime).driver() }
+
+// Compute race totals for all drivers
+val raceResults: List[RaceResult] = []
+
+foreach drv: Driver in drivers {
+  val name: String = drv.name()
+  val driverLaps = lapsByDriver.get(name)
+  if driverLaps != null {
+    val laps = driverLaps as List[LapTime]
+    val lapTotal: Int  = totalLapMs(laps)
+    val pitTotal: Int  = pitTimeFor(name)
+    val penalty: Int   = penaltyMsFor(name)
+    val raceTotal: Int = lapTotal + pitTotal + penalty
+    val fastest: Int   = fastestLapMs(laps)
+    raceResults.add(new RaceResult(name, 0, raceTotal, fastest, 0))
+  }
+}
+
+// Separate active finishers from retirements, sort active by time
+val active = raceResults.filter { r -> !isRetired((r as RaceResult).driver()) }
+val dnf    = raceResults.filter { r -> isRetired((r as RaceResult).driver()) }
+val sortedActive = active.sortedBy { r -> (r as RaceResult).totalMs() }
+
+// Assign positions and points
+val finalResults: List[RaceResult] = []
+var pos: Int = 1
+foreach r: RaceResult in sortedActive {
+  val pts: Int = pointsFor(pos)
+  finalResults.add(new RaceResult(r.driver(), pos, r.totalMs(), r.fastestLap(), pts))
+  pos = pos + 1
+}
+foreach r: RaceResult in dnf {
+  finalResults.add(new RaceResult(r.driver(), 0, r.totalMs(), r.fastestLap(), 0))
+}
+
+// ─── Race Report ──────────────────────────────────────────────────────────────
+
+val leaderTime: Int = if sortedActive.size > 0 { (sortedActive[0] as RaceResult).totalMs() } else { 0 }
+
+IO::println("══════════════════════════════════════════════════")
+IO::println("          FORMULA RACING — RACE RESULTS           ")
+IO::println("══════════════════════════════════════════════════")
+
+val header: String =
+  "POS".padRight(4) + "DRIVER".padRight(13) + "TOTAL".padRight(12) +
+  "FASTEST".padRight(12) + "GAP".padRight(14) + "PTS"
+IO::println(header)
+IO::println("──────────────────────────────────────────────────")
+
+foreach r: RaceResult in finalResults {
+  val posStr: String = if r.position() == 0 { "DNF" } else { "" + r.position() }
+  val gapStr: String = if r.position() == 0 { "+DNF          " }
+                       else if r.position() == 1 { "LEADER        " }
+                       else { r.totalMs().gapTo(leaderTime).padRight(14) }
+  val row: String =
+    posStr.padRight(4) +
+    r.driver().padRight(13) +
+    r.totalMs().toRaceTime().padRight(12) +
+    r.fastestLap().toRaceTime().padRight(12) +
+    gapStr +
+    r.points()
+  IO::println(row)
+}
+
+IO::println("══════════════════════════════════════════════════")
+
+// ─── Sector analysis ─────────────────────────────────────────────────────────
+
+IO::println("\n── Lap-by-Lap Highlight (laps 6-10) ─────────────")
+val lateLaps = rawLaps.filter { l -> (l as LapTime).lap() >= 6 }
+val lateLapsByDriver = lateLaps.groupBy { l -> (l as LapTime).driver() }
+foreach drv: Driver in drivers {
+  if !isRetired(drv.name()) {
+    val laps = lateLapsByDriver.get(drv.name())
+    if laps != null {
+      val lapList = laps as List[LapTime]
+      val fastLate: Int = fastestLapMs(lapList)
+      val avgLate: Int  = avgLapMs(lapList)
+      IO::println("  #{drv.name().padRight(12)} best=#{fastLate.toRaceTime()} avg=#{avgLate.toRaceTime()}")
+    }
+  }
+}
+
+// ─── Pit stop summary ────────────────────────────────────────────────────────
+
+IO::println("\n── Pit Stop Summary ──────────────────────────────")
+val sortedPits = pitStops.sortedBy { p -> (p as PitStop).duration() }
+foreach p: PitStop in sortedPits {
+  val tyre: String = p.tyre()
+  val compound: TyreCompound = select tyre {
+    case "SOFT":   TyreCompound::SOFT
+    case "MEDIUM": TyreCompound::MEDIUM
+    else:          TyreCompound::HARD
+  }
+  IO::println("  #{p.driver().padRight(12)} lap #{p.lap()} | #{p.duration()}ms | #{tyre} (degradation=#{compound.degradation()}/lap)")
+}
+
+// ─── Race events log ─────────────────────────────────────────────────────────
+
+IO::println("\n── Race Events ───────────────────────────────────")
+foreach e: RaceEvent in events {
+  IO::println("  " + e.describe())
+}
+
+// ─── Championship points (cumulative after this race) ────────────────────────
+
+IO::println("\n── Points Standings ──────────────────────────────")
+val pointsByDriver = finalResults.sortedBy { r -> -(r as RaceResult).points() }
+foreach r: RaceResult in pointsByDriver {
+  val bar: String = {
+    var b: String = ""
+    var i: Int = 0
+    while i < r.points() / 2 { b = b + "█"; i++ }
+    b
+  }
+  IO::println("  #{r.driver().padRight(12)} #{("" + r.points()).padLeft(3)} pts  #{bar}")
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+IO::println("\n── Race Statistics ───────────────────────────────")
+val allTimes = rawLaps.map { l -> (l as LapTime).timeMs() }
+val totalLaps: Int = rawLaps.size
+val overallFastest: Int = allTimes.fold(999999999) { best, t -> {
+  val bestInt: Int = best as Int
+  val tInt: Int = t as Int
+  if tInt < bestInt { tInt } else { bestInt }
+}}
+IO::println("  Total laps recorded: #{totalLaps}")
+IO::println("  Overall fastest:     #{overallFastest.toRaceTime()} (Verstappen lap 10)")
+IO::println("  Active finishers:    #{sortedActive.size}")
+IO::println("  Retirements:        #{dnf.size}")

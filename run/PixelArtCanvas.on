@@ -1,0 +1,476 @@
+// PixelArtCanvas.on — multi-layer pixel-art canvas with flood-fill, line,
+// rect, circle tools, a 16-colour ANSI palette, and undo/redo.
+//
+// Exercises: classes with mutable state; ADT case-enum (Tool); homogeneous
+// enum (PaletteColor); records (Pos); collection pipelines (sortedBy/filter/
+// map/groupBy/fold/find/any/count); foreach (ranges + list); select / pattern
+// matching; closures; extension Int methods; string interpolation; nullable
+// types; while loops; recursion; 2-D array manipulation.
+
+import {
+  java.util.*
+}
+
+// ─── Palette ─────────────────────────────────────────────────────────────────
+
+enum PaletteColor {
+  Blank, Black, Red, Green, Blue, Yellow, Cyan, Magenta,
+  White, DarkRed, DarkGreen, DarkBlue, Orange, Pink, Teal, Gray
+public:
+  def ansiCell(): String = select this {
+    case PaletteColor::Blank:     "  "
+    case PaletteColor::Black:     "\u001b[40m  \u001b[0m"
+    case PaletteColor::Red:       "\u001b[41m  \u001b[0m"
+    case PaletteColor::Green:     "\u001b[42m  \u001b[0m"
+    case PaletteColor::Blue:      "\u001b[44m  \u001b[0m"
+    case PaletteColor::Yellow:    "\u001b[43m  \u001b[0m"
+    case PaletteColor::Cyan:      "\u001b[46m  \u001b[0m"
+    case PaletteColor::Magenta:   "\u001b[45m  \u001b[0m"
+    case PaletteColor::White:     "\u001b[47m  \u001b[0m"
+    case PaletteColor::DarkRed:   "\u001b[31m##\u001b[0m"
+    case PaletteColor::DarkGreen: "\u001b[32m##\u001b[0m"
+    case PaletteColor::DarkBlue:  "\u001b[34m##\u001b[0m"
+    case PaletteColor::Orange:    "\u001b[33m::\u001b[0m"
+    case PaletteColor::Pink:      "\u001b[35m::\u001b[0m"
+    case PaletteColor::Teal:      "\u001b[36m..\u001b[0m"
+    case PaletteColor::Gray:      "\u001b[37m..\u001b[0m"
+  }
+  def idx(): Int = select this {
+    case PaletteColor::Blank:     0
+    case PaletteColor::Black:     1
+    case PaletteColor::Red:       2
+    case PaletteColor::Green:     3
+    case PaletteColor::Blue:      4
+    case PaletteColor::Yellow:    5
+    case PaletteColor::Cyan:      6
+    case PaletteColor::Magenta:   7
+    case PaletteColor::White:     8
+    case PaletteColor::DarkRed:   9
+    case PaletteColor::DarkGreen: 10
+    case PaletteColor::DarkBlue:  11
+    case PaletteColor::Orange:    12
+    case PaletteColor::Pink:      13
+    case PaletteColor::Teal:      14
+    case PaletteColor::Gray:      15
+  }
+  static def fromIdx(i: Int): PaletteColor = select i {
+    case 1:  PaletteColor::Black
+    case 2:  PaletteColor::Red
+    case 3:  PaletteColor::Green
+    case 4:  PaletteColor::Blue
+    case 5:  PaletteColor::Yellow
+    case 6:  PaletteColor::Cyan
+    case 7:  PaletteColor::Magenta
+    case 8:  PaletteColor::White
+    case 9:  PaletteColor::DarkRed
+    case 10: PaletteColor::DarkGreen
+    case 11: PaletteColor::DarkBlue
+    case 12: PaletteColor::Orange
+    case 13: PaletteColor::Pink
+    case 14: PaletteColor::Teal
+    case 15: PaletteColor::Gray
+    else:    PaletteColor::Blank
+  }
+}
+
+// ─── Drawing Tool (ADT case-enum) ─────────────────────────────────────────────
+
+enum Tool {
+  case Pencil(color: PaletteColor);
+  case Eraser;
+  case Fill(color: PaletteColor);
+  case Line(color: PaletteColor);
+  case Rect(color: PaletteColor, filled: Boolean);
+  case Circle(color: PaletteColor, filled: Boolean);
+public:
+  def label(): String = select this {
+    case t is Pencil: "Pencil[#{t.color().name()}]"
+    case e is Eraser: "Eraser"
+    case t is Fill:   "Fill[#{t.color().name()}]"
+    case t is Line:   "Line[#{t.color().name()}]"
+    case t is Rect:   "Rect[#{t.color().name()},filled=#{t.filled()}]"
+    case t is Circle: "Circle[#{t.color().name()},filled=#{t.filled()}]"
+  }
+  def colorOf(): PaletteColor? = select this {
+    case t is Pencil: t.color()
+    case e is Eraser: null
+    case t is Fill:   t.color()
+    case t is Line:   t.color()
+    case t is Rect:   t.color()
+    case t is Circle: t.color()
+  }
+}
+
+// ─── Position ────────────────────────────────────────────────────────────────
+
+record Pos(col: Int, row: Int)
+
+// ─── Canvas Layer ─────────────────────────────────────────────────────────────
+
+class Layer {
+  val lname: String
+  val lw: Int
+  val lh: Int
+  var lvisible: Boolean
+  var pixels: Int[][]
+
+public:
+  def this(name: String, width: Int, height: Int) {
+    lname = name
+    lw = width
+    lh = height
+    lvisible = true
+    pixels = new Int[height][width]
+    foreach r: Int in 0..<height {
+      foreach c: Int in 0..<width {
+        pixels[r][c] = 0
+      }
+    }
+  }
+
+  def name(): String = lname
+  def width(): Int = lw
+  def height(): Int = lh
+  def isVisible(): Boolean = lvisible
+  def setVisible(v: Boolean): void { lvisible = v }
+
+  def get(col: Int, row: Int): Int {
+    if col < 0 || col >= lw || row < 0 || row >= lh { return 0 }
+    return pixels[row][col]
+  }
+  def set(col: Int, row: Int, color: Int): void {
+    if col < 0 || col >= lw || row < 0 || row >= lh { return }
+    pixels[row][col] = color
+  }
+  def clear(): void {
+    foreach r: Int in 0..<lh {
+      foreach c: Int in 0..<lw {
+        pixels[r][c] = 0
+      }
+    }
+  }
+
+  def snapshot(): List[Int] {
+    val flat: List[Int] = []
+    foreach r: Int in 0..<lh {
+      foreach c: Int in 0..<lw {
+        flat.add(pixels[r][c])
+      }
+    }
+    return flat
+  }
+  def restore(flat: List[Int]): void {
+    var i: Int = 0
+    foreach r: Int in 0..<lh {
+      foreach c: Int in 0..<lw {
+        pixels[r][c] = flat.get(i) as Int
+        i++
+      }
+    }
+  }
+}
+
+// ─── Canvas ───────────────────────────────────────────────────────────────────
+
+class Canvas {
+  val cw: Int
+  val ch: Int
+  var layers: List[Layer]
+  var activeIdx: Int
+  var undoStack: List[Object]
+  var redoStack: List[Object]
+
+public:
+  def this(width: Int, height: Int) {
+    cw = width
+    ch = height
+    layers = []
+    layers.add(new Layer("Background", width, height))
+    activeIdx = 0
+    undoStack = []
+    redoStack = []
+  }
+
+  def width(): Int = cw
+  def height(): Int = ch
+  def layerCount(): Int = layers.size
+
+  def addLayer(name: String): void {
+    layers.add(new Layer(name, cw, ch))
+  }
+  def setActiveLayer(idx: Int): void {
+    if idx >= 0 && idx < layers.size { activeIdx = idx }
+  }
+  def activeLayer(): Layer = layers.get(activeIdx) as Layer
+  def layer(idx: Int): Layer = layers.get(idx)
+
+  def checkpoint(): void {
+    val snaps: List[Object] = []
+    foreach i: Int in 0..<layers.size {
+      snaps.add(layers.get(i).snapshot())
+    }
+    undoStack.add(snaps)
+    redoStack = []
+  }
+
+  def undo(): Boolean {
+    if undoStack.size == 0 { return false }
+    val redoSnaps: List[Object] = []
+    foreach i: Int in 0..<layers.size {
+      redoSnaps.add(layers.get(i).snapshot())
+    }
+    redoStack.add(redoSnaps)
+    val prev: List[Object] = undoStack.get(undoStack.size - 1) as List[Object]
+    undoStack.remove(undoStack.size - 1)
+    foreach i: Int in 0..<layers.size {
+      layers.get(i).restore(prev.get(i) as List[Int])
+    }
+    return true
+  }
+
+  def redo(): Boolean {
+    if redoStack.size == 0 { return false }
+    val undoSnaps: List[Object] = []
+    foreach i: Int in 0..<layers.size {
+      undoSnaps.add(layers.get(i).snapshot())
+    }
+    undoStack.add(undoSnaps)
+    val nxt: List[Object] = redoStack.get(redoStack.size - 1) as List[Object]
+    redoStack.remove(redoStack.size - 1)
+    foreach i: Int in 0..<layers.size {
+      layers.get(i).restore(nxt.get(i) as List[Int])
+    }
+    return true
+  }
+
+  // ─── Drawing primitives ─────────────────────────────────────────────────
+
+  def pencil(col: Int, row: Int, color: PaletteColor): void {
+    activeLayer().set(col, row, color.idx())
+  }
+
+  def erase(col: Int, row: Int): void {
+    activeLayer().set(col, row, 0)
+  }
+
+  def fill(startCol: Int, startRow: Int, color: PaletteColor): void {
+    val target: Int = activeLayer().get(startCol, startRow)
+    val fillIdx: Int = color.idx()
+    if target == fillIdx { return }
+    floodFill(activeLayer(), startCol, startRow, target, fillIdx)
+  }
+
+  def drawLine(c0: Int, r0: Int, c1: Int, r1: Int, color: PaletteColor): void {
+    val cidx: Int = color.idx()
+    val dc: Int = Math::abs(c1 - c0)
+    val dr: Int = Math::abs(r1 - r0)
+    val sc: Int = if c0 < c1 { 1 } else { -1 }
+    val sr: Int = if r0 < r1 { 1 } else { -1 }
+    var err: Int = dc - dr
+    var cc: Int = c0
+    var cr: Int = r0
+    var going: Boolean = true
+    while going {
+      activeLayer().set(cc, cr, cidx)
+      if cc == c1 && cr == r1 { going = false }
+      else {
+        val e2: Int = err * 2
+        if e2 > -dr { err = err - dr; cc = cc + sc }
+        if e2 < dc  { err = err + dc; cr = cr + sr }
+      }
+    }
+  }
+
+  def drawRect(c0: Int, r0: Int, c1: Int, r1: Int, color: PaletteColor, filled: Boolean): void {
+    val cidx: Int = color.idx()
+    val minC: Int = if c0 < c1 { c0 } else { c1 }
+    val maxC: Int = if c0 > c1 { c0 } else { c1 }
+    val minR: Int = if r0 < r1 { r0 } else { r1 }
+    val maxR: Int = if r0 > r1 { r0 } else { r1 }
+    foreach r: Int in minR..maxR {
+      foreach c: Int in minC..maxC {
+        if filled || c == minC || c == maxC || r == minR || r == maxR {
+          activeLayer().set(c, r, cidx)
+        }
+      }
+    }
+  }
+
+  def drawCircle(ccol: Int, crow: Int, radius: Int, color: PaletteColor, filled: Boolean): void {
+    val cidx: Int = color.idx()
+    val r2: Int = radius * radius
+    foreach r: Int in (crow - radius)..(crow + radius) {
+      foreach c: Int in (ccol - radius)..(ccol + radius) {
+        val dc: Int = c - ccol
+        val dr: Int = r - crow
+        val dist2: Int = dc * dc + dr * dr
+        if filled {
+          if dist2 <= r2 { activeLayer().set(c, r, cidx) }
+        } else {
+          if dist2 >= r2 - radius && dist2 <= r2 + radius {
+            activeLayer().set(c, r, cidx)
+          }
+        }
+      }
+    }
+  }
+
+  // ─── Rendering ──────────────────────────────────────────────────────────
+
+  def composite(col: Int, row: Int): Int {
+    var result: Int = 0
+    foreach i: Int in 0..<layers.size {
+      val lyr: Layer = layers.get(i)
+      if lyr.isVisible() {
+        val px: Int = lyr.get(col, row)
+        if px != 0 { result = px }
+      }
+    }
+    return result
+  }
+
+  def render(): String {
+    var sb: String = ""
+    foreach r: Int in 0..<ch {
+      foreach c: Int in 0..<cw {
+        sb = sb + PaletteColor::fromIdx(composite(c, r)).ansiCell()
+      }
+      sb = sb + "\n"
+    }
+    return sb
+  }
+
+  def colorStats(layerIdx: Int): Map[String, Int] {
+    val lyr: Layer = layers.get(layerIdx)
+    val counts: Map[String, Int] = [:]
+    foreach r: Int in 0..<ch {
+      foreach c: Int in 0..<cw {
+        val cidx: Int = lyr.get(c, r)
+        val key: String = PaletteColor::fromIdx(cidx).name()
+        val prev: Int = if counts.containsKey(key) { counts.get(key) as Int } else { 0 }
+        counts.put(key, prev + 1)
+      }
+    }
+    return counts
+  }
+
+private:
+  def floodFill(layer: Layer, col: Int, row: Int, target: Int, fill: Int): void {
+    if col < 0 || col >= cw || row < 0 || row >= ch { return }
+    if layer.get(col, row) != target { return }
+    layer.set(col, row, fill)
+    floodFill(layer, col + 1, row, target, fill)
+    floodFill(layer, col - 1, row, target, fill)
+    floodFill(layer, col, row + 1, target, fill)
+    floodFill(layer, col, row - 1, target, fill)
+  }
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def bar(maxVal: Int, width: Int): String {
+    val filled: Int = if maxVal == 0 { 0 } else { (self * width / maxVal).clamp(0, width) }
+    var s: String = "["
+    foreach i: Int in 0..<width {
+      s = s + (if i < filled { "#" } else { " " })
+    }
+    return s + "] " + self
+  }
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val W: Int = 20
+  val H: Int = 10
+  val canvas: Canvas = new Canvas(W, H)
+
+  // Layer 0: coloured horizontal bands
+  canvas.checkpoint()
+  canvas.drawRect(0, 0, W - 1, 3,     PaletteColor::DarkBlue,  true)
+  canvas.drawRect(0, 4, W - 1, 6,     PaletteColor::DarkGreen, true)
+  canvas.drawRect(0, 7, W - 1, H - 1, PaletteColor::DarkRed,   true)
+
+  // Layer 1: shapes
+  canvas.addLayer("Shapes")
+  canvas.setActiveLayer(1)
+  canvas.checkpoint()
+  canvas.drawRect(1, 1, 5, 4, PaletteColor::Yellow, false)
+  canvas.drawCircle(14, 5, 3, PaletteColor::Cyan, true)
+  canvas.drawLine(0, H - 1, W - 1, 0, PaletteColor::White)
+
+  // Layer 2: accent marks
+  canvas.addLayer("Marks")
+  canvas.setActiveLayer(2)
+  canvas.checkpoint()
+  foreach c: Int in 8..11 {
+    canvas.pencil(c, 0, PaletteColor::Magenta)
+  }
+  canvas.pencil(8, 1, PaletteColor::Magenta)
+  canvas.pencil(8, 2, PaletteColor::Magenta)
+
+  IO::println("=== PixelArtCanvas Demo (#{W}x#{H}, 3 layers) ===")
+  IO::println(canvas.render())
+
+  // Color distribution on shapes layer
+  IO::println("Shapes layer color distribution:")
+  val stats: Map[String, Int] = canvas.colorStats(1)
+  val total: Int = W * H
+  val keys: List[String] = Colls::toList(stats.keySet())
+  val sorted: List[String] = keys.sortedBy { k -> -(stats.get(k as String) as Int) }
+  foreach k: String in sorted {
+    val n: Int = stats.get(k) as Int
+    if n > 0 {
+      IO::println("  #{k}: #{n.bar(total, 16)}")
+    }
+  }
+
+  // Undo removes marks layer content
+  IO::println("\n--- Undo (removes Marks content) ---")
+  canvas.undo()
+  IO::println(canvas.render())
+
+  // Redo restores marks
+  IO::println("--- Redo (restores Marks) ---")
+  canvas.redo()
+
+  // Flood-fill on background layer
+  canvas.setActiveLayer(0)
+  canvas.checkpoint()
+  canvas.fill(10, 5, PaletteColor::Orange)
+  IO::println("--- After flood-fill (orange patch on background) ---")
+  IO::println(canvas.render())
+
+  // Tool showcase
+  IO::println("Available tools:")
+  val tools: List[Object] = [
+    new Pencil(PaletteColor::Red),
+    new Eraser(),
+    new Fill(PaletteColor::Blue),
+    new Line(PaletteColor::Green),
+    new Rect(PaletteColor::Yellow, false),
+    new Circle(PaletteColor::Cyan, true)
+  ]
+  foreach t: Object in tools {
+    val tool: Tool = t as Tool
+    val c: PaletteColor? = tool.colorOf()
+    val colorName: String = if c != null { (c as PaletteColor).name() } else { "none" }
+    IO::println("  #{tool.label()} -> color=#{colorName}")
+  }
+
+  // Layer composition stats
+  IO::println("\nLayer summary:")
+  foreach i: Int in 0..<canvas.layerCount() {
+    val lyr: Layer = canvas.layer(i)
+    val st: Map[String, Int] = canvas.colorStats(i)
+    val blankCount: Int = if st.containsKey("Blank") { st.get("Blank") as Int } else { 0 }
+    val nonBlank: Int = (lyr.width() * lyr.height()) - blankCount
+    IO::println("  [#{i}] #{lyr.name()} (#{nonBlank} coloured pixels, visible=#{lyr.isVisible()})")
+  }
+}

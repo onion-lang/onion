@@ -1,0 +1,337 @@
+// WildlifeCensus.on — wildlife observation and population census system
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Season { Spring, Summer, Autumn, Winter }
+
+enum ConservationStatus(code: String, priority: Int) {
+  Extinct("EX", 6),
+  Endangered("EN", 5),
+  Vulnerable("VU", 4),
+  NearThreatened("NT", 3),
+  LeastConcern("LC", 1)
+}
+
+// ─── ADT: TrendResult ─────────────────────────────────────────────────────────
+
+enum TrendResult {
+  case Increasing(pct: Double)
+  case Decreasing(pct: Double)
+  case Stable
+public:
+  def label(): String = select this {
+    case r is Increasing: "▲ +" + r.pct() + "%"
+    case r is Decreasing: "▼ -" + r.pct() + "%"
+    case s is Stable:     "→ stable"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Species(
+  name:   String,
+  latin:  String,
+  status: ConservationStatus,
+  habitat: String
+) {
+public:
+  def label(): String = "#{name()} (#{latin()}) [#{status().code()}]"
+  def isAtRisk(): Boolean =
+    status().priority() >= ConservationStatus::Vulnerable.priority()
+}
+
+record Sighting(
+  stationId: String,
+  speciesName: String,
+  count: Int,
+  season: Season,
+  year: Int
+) {
+public:
+  def key(): String = "#{year()}/#{seasonCode()}/#{speciesName()}"
+  def seasonCode(): String = select season() {
+    case Season::Spring: "SPR"
+    case Season::Summer: "SUM"
+    case Season::Autumn: "AUT"
+    case Season::Winter: "WIN"
+    else: "UNK"
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def round1(): Double {
+    return ((self * 10.0 + 0.5) as Int) * 1.0 / 10.0
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+  def lineCount(): Int
+}
+
+// ─── CensusStation ────────────────────────────────────────────────────────────
+
+class CensusStation conforms Summarizable {
+  val id:       String
+  val location: String
+  val sightings: List[Sighting]
+
+public:
+  def this(id: String, loc: String) {
+    this.id       = id
+    this.location = loc
+    this.sightings = []
+  }
+
+  def getId(): String = id
+  def getLocation(): String = location
+
+  def addSighting(s: Sighting): void { sightings.add(s) }
+
+  def totalSightings(): Int = sightings.size
+
+  def totalIndividuals(): Int =
+    sightings.fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() }
+
+  def speciesObserved(): List[String] =
+    sightings.map { s -> (s as Sighting).speciesName() }.distinct()
+
+  def countForSpecies(name: String): Int =
+    sightings.filter { s -> (s as Sighting).speciesName() == name }
+             .fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() }
+
+  def getSightings(): List[Sighting] = sightings
+
+  def summary(): String =
+    "Station #{id} (#{location}): #{totalSightings()} sightings, #{speciesObserved().size} species"
+
+  def lineCount(): Int = totalSightings()
+}
+
+// ─── Sample data ──────────────────────────────────────────────────────────────
+
+val species: List[Species] = [
+  new Species("Grey Wolf",         "Canis lupus",           ConservationStatus::LeastConcern,    "Forest/Tundra"),
+  new Species("Snow Leopard",      "Panthera uncia",        ConservationStatus::Vulnerable,      "Mountain"),
+  new Species("African Elephant",  "Loxodonta africana",    ConservationStatus::Vulnerable,      "Savanna"),
+  new Species("Amur Leopard",      "Panthera pardus orientalis", ConservationStatus::Endangered, "Temperate Forest"),
+  new Species("Black Rhinoceros",  "Diceros bicornis",      ConservationStatus::Endangered,      "Savanna/Bush"),
+  new Species("Common Sparrow",    "Passer domesticus",     ConservationStatus::LeastConcern,    "Urban/Rural"),
+  new Species("Red Fox",           "Vulpes vulpes",         ConservationStatus::LeastConcern,    "Mixed"),
+  new Species("Giant Panda",       "Ailuropoda melanoleuca", ConservationStatus::Vulnerable,     "Bamboo Forest")
+]
+
+val stationNorth = new CensusStation("STN-01", "Northern Reserve")
+val stationSouth = new CensusStation("STN-02", "Southern Wetlands")
+val stationMtn   = new CensusStation("STN-03", "Mountain Corridor")
+
+// populate stationNorth
+foreach s: Sighting in [
+  new Sighting("STN-01", "Grey Wolf",        3, Season::Spring, 2022),
+  new Sighting("STN-01", "Grey Wolf",        5, Season::Winter, 2022),
+  new Sighting("STN-01", "Red Fox",          8, Season::Summer, 2022),
+  new Sighting("STN-01", "Grey Wolf",        4, Season::Spring, 2023),
+  new Sighting("STN-01", "Common Sparrow",  12, Season::Summer, 2023),
+  new Sighting("STN-01", "Red Fox",          6, Season::Autumn, 2023)
+] { stationNorth.addSighting(s) }
+
+// populate stationSouth
+foreach s: Sighting in [
+  new Sighting("STN-02", "African Elephant", 7, Season::Autumn, 2022),
+  new Sighting("STN-02", "Black Rhinoceros", 2, Season::Autumn, 2022),
+  new Sighting("STN-02", "African Elephant", 9, Season::Spring, 2023),
+  new Sighting("STN-02", "Common Sparrow",  15, Season::Summer, 2023),
+  new Sighting("STN-02", "Black Rhinoceros", 3, Season::Winter, 2023)
+] { stationSouth.addSighting(s) }
+
+// populate stationMtn
+foreach s: Sighting in [
+  new Sighting("STN-03", "Snow Leopard",     1, Season::Summer, 2022),
+  new Sighting("STN-03", "Grey Wolf",        2, Season::Winter, 2022),
+  new Sighting("STN-03", "Amur Leopard",     1, Season::Spring, 2023),
+  new Sighting("STN-03", "Snow Leopard",     2, Season::Summer, 2023),
+  new Sighting("STN-03", "Giant Panda",      1, Season::Spring, 2023)
+] { stationMtn.addSighting(s) }
+
+val stations: List[CensusStation] = [stationNorth, stationSouth, stationMtn]
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  IO::println(s)
+}
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+// ─── Station summaries ────────────────────────────────────────────────────────
+
+printHeader("=== Station Overview ===")
+foreach st: CensusStation in stations {
+  IO::println("  " + st.summary())
+}
+
+// ─── Species catalog ──────────────────────────────────────────────────────────
+
+printHeader("=== Species Catalog ===")
+val atRisk = species.filter { s -> (s as Species).isAtRisk() }
+val safe   = species.filter { s -> !(s as Species).isAtRisk() }
+IO::println("  At-risk: " + atRisk.size + " | Low-concern: " + safe.size)
+foreach sp: Species in species.sortedBy { s -> 0 - (s as Species).status().priority() } {
+  IO::println("  " + sp.label() + "  — " + sp.habitat())
+}
+
+// ─── All sightings combined ───────────────────────────────────────────────────
+
+val allSightings: List[Sighting] = []
+foreach st: CensusStation in stations {
+  foreach s: Sighting in st.getSightings() { allSightings.add(s) }
+}
+
+// ─── Population by species ────────────────────────────────────────────────────
+
+printHeader("=== Total Individuals by Species ===")
+val bySpecies = allSightings.groupBy { s -> (s as Sighting).speciesName() }
+val speciesSorted = bySpecies.keys().sortedBy { k ->
+  0 - (bySpecies.get(k as String) as List[Sighting])
+       .fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() }
+}
+foreach name: String in speciesSorted {
+  val cnt = (bySpecies.get(name) as List[Sighting])
+              .fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() }
+  IO::println("  " + name.rpad(22) + cnt.lpad(4) + " individuals")
+}
+
+// ─── Year-over-year trend for Grey Wolf ───────────────────────────────────────
+
+printHeader("=== Year-over-Year Trend: Grey Wolf ===")
+def wolfTrend(speciesName: String): TrendResult {
+  val wolfSightings = allSightings.filter { s -> (s as Sighting).speciesName() == speciesName }
+  val byYear = wolfSightings.groupBy { s -> "" + (s as Sighting).year() }
+  val raw22 = byYear.get("2022")
+  val raw23 = byYear.get("2023")
+  if raw22 == null || raw23 == null { return new Stable() }
+  val cnt22 = (raw22 as List[Sighting]).fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() } as Int
+  val cnt23 = (raw23 as List[Sighting]).fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() } as Int
+  if cnt22 == 0 { return new Stable() }
+  val diff = cnt23 - cnt22
+  val pct = ((diff * 1.0) / (cnt22 * 1.0) * 100.0).round1()
+  if pct > 5.0 { return new Increasing(pct) }
+  if pct < -5.0 { return new Decreasing(0.0 - pct) }
+  return new Stable()
+}
+
+val wolfResult = wolfTrend("Grey Wolf")
+IO::println("  Grey Wolf: " + wolfResult.label())
+val snowResult = wolfTrend("Snow Leopard")
+IO::println("  Snow Leopard: " + snowResult.label())
+val rhiResult = wolfTrend("Black Rhinoceros")
+IO::println("  Black Rhinoceros: " + rhiResult.label())
+
+// ─── Seasonal distribution ────────────────────────────────────────────────────
+
+printHeader("=== Seasonal Activity (all stations) ===")
+val bySeason = allSightings.groupBy { s -> (s as Sighting).seasonCode() }
+foreach (code, slist) in bySeason {
+  val total = (slist as List[Sighting]).fold(0) { acc, s -> (acc as Int) + (s as Sighting).count() }
+  val numEvents = (slist as List[Sighting]).size
+  IO::println("  " + code + ": " + numEvents + " events, " + total + " individuals")
+}
+
+// ─── At-risk species sightings ────────────────────────────────────────────────
+
+printHeader("=== At-Risk Species Observations ===")
+val atRiskNames = atRisk.map { s -> (s as Species).name() }
+val atRiskSightings = allSightings.filter { s ->
+  atRiskNames.find { n -> n == (s as Sighting).speciesName() } != null
+}
+val rare     = atRiskSightings.filter { s -> (s as Sighting).count() >= 2 }
+val veryRare = atRiskSightings.filter { s -> (s as Sighting).count() < 2 }
+IO::println("  Sightings with >=2 individuals: " + rare.size)
+IO::println("  Solitary sightings (count=1):   " + veryRare.size)
+foreach s: Sighting in atRiskSightings.sortedBy { s -> (s as Sighting).speciesName() } {
+  IO::println("  " + s.seasonCode() + "/" + s.year() + "  " +
+              s.speciesName().rpad(18) + " x" + s.count() + "  @" + s.stationId())
+}
+
+// ─── try/catch: safe species lookup ───────────────────────────────────────────
+
+printHeader("=== Safe Species Lookup ===")
+def lookupSpecies(name: String): String {
+  try {
+    val sp = species.find { s -> (s as Species).name() == name }
+    if sp == null { throw new Exception("Not found: " + name) }
+    return (sp as Species).label()
+  } catch e: Exception {
+    return "ERROR: " + e.getMessage()
+  }
+}
+IO::println("  " + lookupSpecies("Snow Leopard"))
+IO::println("  " + lookupSpecies("Phantom Tiger"))
+
+// ─── Recursion: longest food-chain depth (simulated via nesting count) ─────────
+
+printHeader("=== Recursive Census Count ===")
+def sumCounts(sightings: List[Sighting], idx: Int): Int {
+  if idx >= sightings.size { return 0 }
+  return (sightings.get(idx) as Sighting).count() + sumCounts(sightings, idx + 1)
+}
+val recursiveTotal = sumCounts(allSightings, 0)
+IO::println("  Total individuals (recursive sum): " + recursiveTotal)
+
+// ─── Top species per station ──────────────────────────────────────────────────
+
+printHeader("=== Top Species per Station ===")
+def topSpeciesForStation(st: CensusStation): String {
+  val observed = st.speciesObserved()
+  if observed.size == 0 { return "none" }
+  return observed.sortedBy { n -> 0 - st.countForSpecies(n as String) }.get(0) as String
+}
+foreach st: CensusStation in stations {
+  val top = topSpeciesForStation(st)
+  val total = st.countForSpecies(top)
+  IO::println("  " + st.getId() + " (" + st.getLocation() + "): " + top + " (" + total + " individuals)")
+}
+
+// ─── Final summary ────────────────────────────────────────────────────────────
+
+printHeader("=== Final Census Summary ===")
+val totalIndividuals = stations.fold(0) { acc, st -> (acc as Int) + (st as CensusStation).totalIndividuals() }
+val totalEvents = allSightings.size
+val uniqueSpecies = allSightings.map { s -> (s as Sighting).speciesName() }.distinct().size
+IO::println("  Total observation events: " + totalEvents)
+IO::println("  Total individuals counted: " + totalIndividuals)
+IO::println("  Unique species observed: " + uniqueSpecies)
+IO::println("  At-risk species observed: " +
+  allSightings.map { s -> (s as Sighting).speciesName() }.distinct()
+    .filter { n -> atRiskNames.find { a -> a == (n as String) } != null }.size)
+IO::println("")

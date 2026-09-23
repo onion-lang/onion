@@ -905,6 +905,7 @@ nullable な型（`T?`）の値が、間に null チェックを挟まないま�
 - **配列サイズ** — `new T[n]` で次元 `n` が nullable な型（`n: Int?`）を持つ場合。
 - **`try`-with-resources の初期化子** — `try (val r = res) { }` で `res` が nullable な型の場合。
 - **`throw` のオペランド** — `throw expr` で `expr` が nullable な型の場合。
+- **`select` のスクルーティニー** — `select s { ... }` で `s` が nullable な型の場合（`else` 節や無条件のワイルドカードパターンがない場合に限る。どちらかがあれば `null` は正しく処理される）。
 
 ```onion
 class Test {

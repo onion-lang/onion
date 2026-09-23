@@ -903,6 +903,8 @@ nullable な型（`T?`）の値が、間に null チェックを挟まないま�
 - **`foreach` のコレクション** — `foreach x: T in expr` で `expr` が nullable な型を持つ場合。
 - **分解代入** — `val (a, b) = expr` で `expr` が nullable なレコードの場合。
 - **配列サイズ** — `new T[n]` で次元 `n` が nullable な型（`n: Int?`）を持つ場合。
+- **`try`-with-resources の初期化子** — `try (val r = res) { }` で `res` が nullable な型の場合。
+- **`throw` のオペランド** — `throw expr` で `expr` が nullable な型の場合。
 
 ```onion
 class Test {

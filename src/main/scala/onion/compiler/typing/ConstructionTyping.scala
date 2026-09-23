@@ -119,6 +119,12 @@ final class ConstructionTyping(
     val untypedArgs = node.args.toArray
     val parameters = typedTerms(untypedArgs, context)
     if (typeRefOpt.isEmpty || parameters == null) return None
+    val nullableIndex = parameters.indexWhere(_.`type`.isInstanceOf[NullableType])
+    if (nullableIndex >= 0) {
+      val nullable = parameters(nullableIndex).`type`.asInstanceOf[NullableType]
+      bodyContext.report(NULLABLE_MEMBER_ACCESS, untypedArgs(nullableIndex), nullable.displayName, "arraySize")
+      return None
+    }
     val sizes = parameters.map(Boxing.tryUnboxToInteger(bodyContext.table, _))
     val badIndex = sizes.indexWhere(size => !(size.isBasicType && size.`type`.asInstanceOf[BasicType].isInteger))
     if (badIndex >= 0) {
@@ -367,6 +373,25 @@ final class ConstructionTyping(
       }
       typedTerms(node.args.toArray, context)
       break(None)
+    }
+
+    // `a..b`/`a..<b` desugars to `new onion.Range(a, b, inclusive)` at parse
+    // time (OnionParser.rangeNew / the JavaCC grammar's equivalent
+    // production), so a nullable bound never dereferences anything directly
+    // -- it just fails ordinary constructor-overload resolution below and
+    // reports the generic constructor-not-found error, leaking the "Range"
+    // implementation-detail class name the user never wrote. Special-case it
+    // up front, mirroring typeNewArray's nullable-array-size check.
+    if (typeRef.name == "onion.Range" && parameters0.length >= 2) {
+      val nullableBoundIndex =
+        if (parameters0(0).`type`.isInstanceOf[NullableType]) 0
+        else if (parameters0(1).`type`.isInstanceOf[NullableType]) 1
+        else -1
+      if (nullableBoundIndex >= 0) {
+        val nullable = parameters0(nullableBoundIndex).`type`.asInstanceOf[NullableType]
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, node.args(nullableBoundIndex), nullable.displayName, "rangeBound")
+        break(None)
+      }
     }
 
     val constructors0 = typeRef.findConstructor(parameters0)

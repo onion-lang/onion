@@ -896,10 +896,25 @@ Fixes:
 - Use `?.` / `?:` / `if x != null`.
 - Declare a non-null bound: `class Box[T extends Object]`.
 
-### `E0070` — Nullable member access
+### `E0070` — Nullable value used without a null check
 
-A field (not method) was accessed directly on a value of nullable type
-(`T?`), which may be null at that point.
+A value of nullable type (`T?`) was used somewhere that requires it to be
+definitely non-null, with no null-check in between. This one code covers
+several forms, sharing the same fix:
+
+- **Member access** — a field (not method) accessed directly on a nullable receiver (`x.length` where `x: String?`).
+- **Indexing** — `b[i]` / `b[i] = v` / `b[i] += v` on a nullable array, `List`, or `Map` (`b: List[Int]?`).
+- **Operators** — a nullable operand of a unary (`-n`, `+n`, `~n`, `!b`), binary (`+ - * / % < > <= >= & | ^`), shift (`<< >> >>>`), post-increment/decrement (`n++` / `n--`), or compound-assignment (`n += 1`, `n <<= 1`, ...) operator.
+- **Condition** — a nullable `Boolean?` used directly as an `if` / `while` / `do-while` / `for` condition, or a `select` guard's `when`.
+- **`foreach` collection** — `foreach x: T in expr` where `expr` has nullable type.
+- **Destructuring** — `val (a, b) = expr` where `expr` is a nullable record.
+- **Array size** — `new T[n]` where a dimension `n` has nullable type (`n: Int?`).
+- **`try`-with-resources initializer** — `try (val r = res) { }` where `res` has nullable type.
+- **`throw` operand** — `throw expr` where `expr` has nullable type.
+- **`select` scrutinee** — `select s { ... }` where `s` has nullable type (only when there's neither an `else` clause nor an unconditional wildcard pattern -- either one already handles a `null` scrutinee correctly).
+- **Range bound** — `a..b` / `a..<b` where `a` or `b` has nullable type (these desugar to a `Range` constructor call, so a nullable bound is rejected the same way as any other dereference-like use).
+- **Assignment / declaration** — a nullable value assigned where a non-null type is expected: a `val`/`var` declaration's initializer, a `return` value, a plain reassignment, or a field initializer (a target that itself accepts null -- a nullable-typed declaration, or a bare/platform type parameter -- is unaffected).
+- **`catch` clause type** — `catch e: E?` where the declared exception type is nullable. Unlike the forms above, there is no value to null-check here -- a caught exception is never null, so the fix is to drop the `?` from the catch clause's declared type.
 
 ```onion
 class Test {
@@ -911,8 +926,8 @@ public:
 }
 ```
 
-Fix: use `?.` to access it safely, `?:` to supply a default, `!!` to assert
-non-null, or check for null first (`if x != null { ... }`).
+Fix: use `?.` / `?[` to access it safely, `?:` to supply a default, `!!` to
+assert non-null, or check for null first (`if x != null { ... }`).
 
 ### `E0081` — Tool parameter cannot be read from the command line
 

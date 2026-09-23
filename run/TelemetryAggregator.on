@@ -1,0 +1,326 @@
+// TelemetryAggregator.on — IoT sensor-telemetry collector and analyzer (~220 lines).
+//
+// Exercises: record...from re"..." (anchored regex parser + parseAll),
+// data-carrying ADT enum with dispatch methods, plain data-carrying enum for
+// sensor kinds, interface conformance, class with mutable state and private
+// sections, extension methods on Double/String/Int, collection pipelines
+// (groupBy/map/filter/fold/sortedBy/find/partition/zip/count), foreach (k,v)
+// in map, |> pipeline, nullable types and null checks, string interpolation,
+// select pattern matching, try/catch, while and foreach loops with ranges,
+// and recursive aggregation helpers.
+
+import {
+  java.lang.Double as JDouble;
+  java.util.ArrayList;
+  java.util.LinkedHashMap;
+}
+
+// ── Formatting extensions ─────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val s = "" + self
+    val dot = s.indexOf(".")
+    if dot < 0 { return s + ".00" }
+    val frac = s.substring(dot + 1)
+    if frac.length() == 1 { return s + "0" }
+    if frac.length() > 2 { return s.substring(0, dot + 3) }
+    return s
+  }
+  def abs(): Double = if self < 0.0 { -self } else { self }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def repeatStr(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+extension Int {
+  def bar(max: Int, width: Int): String {
+    if max == 0 { return "[" + " ".repeatStr(width) + "]" }
+    val filled = self * width / max
+    val rest = width - filled
+    return "[" + "#".repeatStr(filled) + " ".repeatStr(rest) + "]"
+  }
+}
+
+// ── Raw telemetry line format ─────────────────────────────────────────────────
+// Format: <sensorId> <kind> <value> <unit>
+// e.g.   "shed-01 temp 22.5 C"  or  "pump-02 pressure 101.3 kPa"
+
+record Reading(sensorId: String, kind: String, value: Double, unit: String)
+  from re"(\S+) (\w+) (-?\d+\.?\d*) (\S+)"
+
+// ── Alert levels (ADT enum) ───────────────────────────────────────────────────
+
+enum Alert {
+  case OK
+  case Warn(msg: String)
+  case Critical(msg: String)
+public:
+  def label(): String = select this {
+    case a is OK:       "ok  "
+    case a is Warn:     "WARN"
+    case a is Critical: "CRIT"
+  }
+  def message(): String = select this {
+    case a is OK:       ""
+    case a is Warn:     a.msg()
+    case a is Critical: a.msg()
+  }
+  def isOk(): Boolean = select this { case a is OK: true; else: false }
+  def isCritical(): Boolean = select this { case a is Critical: true; else: false }
+  def isWarn(): Boolean = select this { case a is Warn: true; else: false }
+}
+
+// ── Sensor kinds and thresholds ───────────────────────────────────────────────
+
+enum SensorKind(lo: Double, hi: Double, warnLo: Double, warnHi: Double) {
+  TEMP(    -40.0, 125.0,  0.0, 60.0),
+  HUMIDITY(  0.0, 100.0, 20.0, 80.0),
+  PRESSURE(  0.0, 200.0, 80.0,120.0),
+  VOLTAGE(   0.0,  60.0, 11.5, 15.0),
+  UNKNOWN(-999.0, 999.0,-999.0,999.0)
+public:
+  def classify(v: Double): Alert {
+    if v < lo() || v > hi() {
+      return new Critical("#{v.fmt2()} out of hard range [#{lo().fmt2()}, #{hi().fmt2()}]")
+    }
+    if v < warnLo() || v > warnHi() {
+      return new Warn("#{v.fmt2()} outside nominal [#{warnLo().fmt2()}, #{warnHi().fmt2()}]")
+    }
+    return new OK()
+  }
+  static def fromKind(s: String): SensorKind = select s {
+    case "temp":     SensorKind::TEMP
+    case "humidity": SensorKind::HUMIDITY
+    case "pressure": SensorKind::PRESSURE
+    case "voltage":  SensorKind::VOLTAGE
+    else:            SensorKind::UNKNOWN
+  }
+}
+
+// ── Per-sensor statistics accumulator ────────────────────────────────────────
+
+class SensorStats {
+  val sensorId: String
+  var count: Int = 0
+  var sum: Double = 0.0
+  var sumSq: Double = 0.0
+  var minVal: Double = JDouble::MAX_VALUE
+  var maxVal: Double = -JDouble::MAX_VALUE
+  var warnCount: Int = 0
+  var critCount: Int = 0
+private:
+  def recordAlert(a: Alert): void {
+    select a {
+      case x is Warn:     warnCount = warnCount + 1
+      case x is Critical: critCount = critCount + 1
+      else:
+    }
+  }
+public:
+  def this(id: String) { sensorId = id }
+
+  def add(r: Reading): void {
+    count = count + 1
+    sum = sum + r.value()
+    sumSq = sumSq + r.value() * r.value()
+    if r.value() < minVal { minVal = r.value() }
+    if r.value() > maxVal { maxVal = r.value() }
+    recordAlert(SensorKind::fromKind(r.kind()).classify(r.value()))
+  }
+
+  def mean(): Double = if count == 0 { 0.0 } else { sum / (count as Double) }
+
+  def stdDev(): Double {
+    if count < 2 { return 0.0 }
+    val n: Double = count as Double
+    val variance: Double = (sumSq - sum * sum / n) / (n - 1.0)
+    if variance <= 0.0 { return 0.0 }
+    // Newton–Raphson sqrt (no Math import needed)
+    var x: Double = variance
+    var i = 0
+    while i < 20 {
+      val next: Double = (x + variance / x) / 2.0
+      if (x - next).abs() < 0.0001 { x = next; i = 20 } else { x = next; i++ }
+    }
+    return x
+  }
+
+  def getId(): String = sensorId
+  def getCount(): Int = count
+  def getMinVal(): Double = minVal
+  def getMaxVal(): Double = maxVal
+  def getWarnCount(): Int = warnCount
+  def getCritCount(): Int = critCount
+
+  def alertSummary(): String {
+    if critCount > 0 { return "(#{critCount} CRIT, #{warnCount} warn)" }
+    if warnCount > 0 { return "(#{warnCount} warn)" }
+    return "(ok)"
+  }
+}
+
+// ── Pretty-print helpers ──────────────────────────────────────────────────────
+
+def rule(w: Int): String = "-".repeatStr(w)
+
+def printHeader(title: String): void {
+  IO::println(rule(title.length() + 4))
+  IO::println("  " + title)
+  IO::println(rule(title.length() + 4))
+}
+
+// ── Report sections ───────────────────────────────────────────────────────────
+
+def reportStats(statsList: List[SensorStats]): void {
+  printHeader("Sensor Summary")
+  val h = "SENSOR".padRight(16) + "N".padLeft(4) + "MEAN".padLeft(8) +
+          "  MIN".padLeft(7) + "  MAX".padLeft(7) + " STDEV".padLeft(8) + "  ALERTS"
+  IO::println(h)
+  IO::println(rule(h.length()))
+  val sorted = statsList.sortedBy { s -> (s as SensorStats).getId() }
+  foreach s: SensorStats in sorted {
+    IO::println(
+      s.getId().padRight(16) +
+      ("" + s.getCount()).padLeft(4) +
+      s.mean().fmt2().padLeft(8) +
+      s.getMinVal().fmt2().padLeft(7) +
+      s.getMaxVal().fmt2().padLeft(7) +
+      s.stdDev().fmt2().padLeft(8) +
+      "  " + s.alertSummary()
+    )
+  }
+}
+
+def reportAlerts(readings: List[Reading]): void {
+  printHeader("Alert Details")
+  var found = 0
+  foreach r: Reading in readings {
+    val kind = SensorKind::fromKind(r.kind())
+    val alert = kind.classify(r.value())
+    if !alert.isOk() {
+      IO::println(
+        "[" + alert.label() + "] " +
+        r.sensorId().padRight(12) + r.kind().padRight(10) +
+        r.value().fmt2().padLeft(7) + " " + r.unit().padRight(5) +
+        " — " + alert.message()
+      )
+      found = found + 1
+    }
+  }
+  if found == 0 { IO::println("  (no alerts)") }
+}
+
+def reportDistribution(readings: List[Reading]): void {
+  printHeader("Readings by Kind")
+  val counts: LinkedHashMap[String, Int] = new LinkedHashMap[String, Int]()
+  foreach r: Reading in readings {
+    val k = r.kind()
+    val cur = counts[k]
+    if cur == null { counts[k] = 1 } else { counts[k] = (cur as Int) + 1 }
+  }
+  val total = readings.size
+  foreach (kind, cnt) in counts {
+    val c = (cnt as Int)
+    val pct: Double = if total == 0 { 0.0 } else { (c * 100) as Double / (total as Double) }
+    IO::println(
+      "  " + (kind as String).padRight(10) +
+      c.bar(total, 20) + " " +
+      ("" + c).padLeft(3) + " (" + pct.fmt2() + "%)"
+    )
+  }
+}
+
+def reportTopAlerts(statsList: List[SensorStats], n: Int): void {
+  printHeader("Sensors by Alert Count")
+  val byAlerts = statsList.sortedBy { s ->
+    val st = s as SensorStats
+    -(st.getCritCount() * 10 + st.getWarnCount())
+  }
+  var shown = 0
+  foreach s: SensorStats in byAlerts {
+    if shown >= n { break }
+    if s.getWarnCount() > 0 || s.getCritCount() > 0 {
+      IO::println(
+        "  " + s.getId().padRight(14) +
+        " crit=" + s.getCritCount() + " warn=" + s.getWarnCount()
+      )
+      shown = shown + 1
+    }
+  }
+  if shown == 0 { IO::println("  (no alerts at all)") }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val lines: List[String] = [
+    "shed-01 temp 22.5 C",        "shed-01 temp 24.1 C",
+    "shed-01 temp 62.0 C",        "shed-01 temp -45.0 C",
+    "shed-01 humidity 55.0 pct",  "shed-01 humidity 85.5 pct",
+    "pump-02 pressure 101.3 kPa", "pump-02 pressure 79.5 kPa",
+    "pump-02 pressure 130.0 kPa", "pump-02 voltage 12.1 V",
+    "pump-02 voltage 11.0 V",     "pump-02 voltage 55.0 V",
+    "roof-03 temp 38.0 C",        "roof-03 temp -5.2 C",
+    "roof-03 humidity 30.0 pct",  "roof-03 humidity 92.0 pct",
+    "tank-04 pressure 95.0 kPa",  "tank-04 pressure 88.0 kPa",
+    "tank-04 voltage 14.8 V",     "tank-04 voltage 15.5 V",
+    "BADLINE"
+  ]
+
+  val text = lines.fold("") { acc, s -> acc + s + "\n" }
+  val readings: List[Reading] = Reading::parseAll(text)
+  IO::println("Parsed #{readings.size} of #{lines.size} telemetry lines (#{lines.size - readings.size} skipped).\n")
+
+  // Build per-sensor stats
+  val statsMap: LinkedHashMap[String, SensorStats] = new LinkedHashMap[String, SensorStats]()
+  foreach r: Reading in readings {
+    val sid = r.sensorId()
+    if statsMap[sid] == null { statsMap[sid] = new SensorStats(sid) }
+    val s: SensorStats? = statsMap[sid]
+    if s != null { s.add(r) }
+  }
+
+  val statsList: List[SensorStats] = new ArrayList[SensorStats]()
+  foreach st: SensorStats in statsMap.values() { statsList.add(st) }
+
+  reportStats(statsList)
+  IO::println("")
+  reportAlerts(readings)
+  IO::println("")
+  reportDistribution(readings)
+  IO::println("")
+  reportTopAlerts(statsList, 5)
+
+  // Summary using collection pipelines + |> pipeline
+  IO::println("")
+  val criticals = readings.filter { r ->
+    SensorKind::fromKind((r as Reading).kind()).classify((r as Reading).value()).isCritical()
+  }
+  val warns = readings.filter { r ->
+    SensorKind::fromKind((r as Reading).kind()).classify((r as Reading).value()).isWarn()
+  }
+  val totalAlerts = criticals.size + warns.size
+  IO::println(
+    rule(55) + "\n" +
+    "#{statsMap.size} sensors | #{readings.size} readings | " +
+    "#{criticals.size} critical | #{warns.size} warnings | #{totalAlerts} total alerts" +
+    "\n" + rule(55)
+  )
+}

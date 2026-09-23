@@ -76,6 +76,14 @@ final class AssignmentTyping(
       new SetArray(target, index, value)
     } else {
       target.`type` match {
+        case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+          // A bare [T] ranges over nullable types: indexed assignment
+          // dereferences the receiver just like the read path
+          // (ConstructionTyping.typeIndexing) already special-cases, so this
+          // needs the same null check first instead of being treated as an
+          // ordinary ObjectType target below.
+          bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, indexing.lhs, tv.displayName)
+          null
         case objType: ObjectType =>
           val params = Array[Term](index, value)
           // List/array-list style containers expose set(index, value); Map-style
@@ -129,6 +137,16 @@ final class AssignmentTyping(
         // `!!`, or a null check would fix it -- even though the equivalent read
         // (`b.field`) already gave that hint.
         target0.`type` match {
+          case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+            // A bare [T] ranges over nullable types, mirroring the read path
+            // (MemberSelectionResolutionSupport.normalizeMemberSelectionTarget)
+            // and the method-call path (MethodTargetTypingSupport.
+            // normalizeMethodCallTarget), both of which already report this --
+            // TypeVariableType is itself an ObjectType, so without this case
+            // `this.item.field = v` on a nullable T fell straight into the
+            // ordinary field-assignment path below with no diagnostic at all.
+            bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, selection.target, tv.displayName)
+            return null
           case nullable: NullableType =>
             bodyContext.report(NULLABLE_MEMBER_ACCESS, selection.target, nullable.displayName)
             return null

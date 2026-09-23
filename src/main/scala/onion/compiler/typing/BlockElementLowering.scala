@@ -447,8 +447,12 @@ final class BlockElementLowering(
       for (expression <- expressionOpt) {
         val expected = bodyContext.load("java.lang.Throwable")
         val detected = expression.`type`
-        if (!TypeRules.isSuperType(expected, detected)) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+        detected match {
+          case nullable: NullableType =>
+            bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "throw")
+          case _ if !TypeRules.isSuperType(expected, detected) =>
+            bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
+          case _ =>
         }
       }
       new Throw(node.location, expressionOpt.getOrElse(null))
@@ -470,11 +474,14 @@ final class BlockElementLowering(
               val index = context.add(resource.name, resourceType, isMutable = false)
               val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
 
-              if (TypeRules.isSuperType(autoCloseable, resourceType)) {
-                resourceBindings += ((binding, init))
-              } else {
-                // Report error but still allow the variable to be used
-                bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+              resourceType match {
+                case nullable: NullableType =>
+                  bodyContext.report(NULLABLE_MEMBER_ACCESS, resource, nullable.displayName, "resource")
+                case _ if TypeRules.isSuperType(autoCloseable, resourceType) =>
+                  resourceBindings += ((binding, init))
+                case _ =>
+                  // Report error but still allow the variable to be used
+                  bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
               }
             }
           }
@@ -491,11 +498,15 @@ final class BlockElementLowering(
             val argType = addArgument(argument, context)
             catchTypes(i) = argType
             val expected = bodyContext.load("java.lang.Throwable")
-            if (!TypeRules.isSuperType(expected, argType)) {
-              bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
-              catchTypesValid(i) = false
-            } else {
-              catchTypesValid(i) = true
+            argType match {
+              case nullable: NullableType =>
+                bodyContext.report(NULLABLE_MEMBER_ACCESS, argument, nullable.displayName, "catchType")
+                catchTypesValid(i) = false
+              case _ if !TypeRules.isSuperType(expected, argType) =>
+                bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
+                catchTypesValid(i) = false
+              case _ =>
+                catchTypesValid(i) = true
             }
             DuplicationChecks.checkUnreachableCatchClause(bodyContext, node.recClauses, catchTypes, catchTypesValid, i, argument, argType, body)
             binds(i) = context.lookupOnlyCurrentScope(argument.name)

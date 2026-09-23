@@ -456,6 +456,7 @@ class SemanticErrorReporter(threshold: Int) {
       else if (items.length > 1 && items(1) == "resource") "error.semantic.nullableTryResource"
       else if (items.length > 1 && items(1) == "throw") "error.semantic.nullableThrow"
       else if (items.length > 1 && items(1) == "select") "error.semantic.nullableSelectScrutinee"
+      else if (items.length > 1 && items(1) == "rangeBound") "error.semantic.nullableRangeBound"
       else "error.semantic.nullableMemberAccess"
     problem(position, format(message(key), Seq(typeName)))
   }

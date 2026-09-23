@@ -906,6 +906,7 @@ nullable な型（`T?`）の値が、間に null チェックを挟まないま�
 - **`try`-with-resources の初期化子** — `try (val r = res) { }` で `res` が nullable な型の場合。
 - **`throw` のオペランド** — `throw expr` で `expr` が nullable な型の場合。
 - **`select` のスクルーティニー** — `select s { ... }` で `s` が nullable な型の場合（`else` 節や無条件のワイルドカードパターンがない場合に限る。どちらかがあれば `null` は正しく処理される）。
+- **範囲の境界値** — `a..b` / `a..<b` で `a` または `b` が nullable な型の場合（この構文は `Range` のコンストラクタ呼び出しに脱糖されるため、nullable な境界値は他の直接参照と同様に拒否される）。
 
 ```onion
 class Test {

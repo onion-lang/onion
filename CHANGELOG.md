@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/StatDistributions.on`** — a 319-line probability-distribution suite, a new domain for the `run/` corpus (an ADT case-enum `Distribution` with 5 typed cases — `Normal`, `Poisson`, `Binomial`, `Exponential`, `Uniform` — sampling and theoretical mean/variance dispatch; a `record` `DistStats` with computed `stddev()`/`range()`/`cv()`/`summary()` methods; collection pipelines (`fold`, `sortedBy`, `groupBy`, `partition`, `find`, `filter`, `zip`, `map`) over `List[Double]`/`List[DistStats]`; recursion for a Poisson-PMF `factorial`; closures with explicit casts; nullable-`find` null-checking; and a `try`/`catch` empty-input guard), added to the `run/` corpus (merged via #1430).
+
+- **`run/SpatialIndex.on`** — a 323-line quadtree-based 2D spatial index, a new domain for the `run/` corpus (`record Point from re"…"` line parsing with `parseAll`; an ADT enum `QueryResult` with `Hits`/`Miss` dispatch; a data-carrying enum `Tier` with a `forCount` classifier; a recursive `QuadNode` class with private `subdivide`/`tryChildren` and public `insert`/`query`/`countAll`/`maxDepth`; a `QuadTree` facade using `try`/`catch` to reject out-of-bounds points; extension methods on `Double`/`Int`/`String`; nullable child-node fields null-guarded before recursion; and `select`-pattern dispatch), added to the `run/` corpus (merged via #1431).
+
 ## [0.101.0] - 2026-09-23
 
 ### Added

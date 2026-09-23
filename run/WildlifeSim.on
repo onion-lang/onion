@@ -1,0 +1,294 @@
+// WildlifeSim.on — Lotka-Volterra predator-prey ecosystem simulation (~210 lines).
+//
+// Exercises: extension Double (clamp/fmt), extension Int (toD), data-carrying
+// enum (Season with growthMult/label), ADT case-enum (InteractionType:
+// Predation/Competition/Mutualism), records with example clauses (Species,
+// PopSnapshot), interface (Reporter), class (EcoSystem) with mutable
+// List[Object] history, do[Option] chaining, |> pipeline, collection pipelines
+// (map/filter/fold/sortedBy/groupBy/find/partition/take/drop/distinct/zip/
+// any/count/forEach), foreach over Int ranges and Map (k,v) entries, while
+// loop, closures, string interpolation, try/catch, and nullable.
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def clamp(lo: Double, hi: Double): Double =
+    if self < lo { lo } else if self > hi { hi } else { self }
+
+  def fmt(d: Int): String {
+    val neg: Boolean = self < 0.0
+    val abs: Double  = if neg { 0.0 - self } else { self }
+    val factor: Long = Math::pow(10.0, d as Double) as Long
+    val scaled: Long = (abs * (factor as Double) + 0.5) as Long
+    val ip: Long     = scaled / factor
+    val fp: Long     = scaled % factor
+    var fs: String   = Long::toString(fp)
+    while fs.length() < d { fs = "0" + fs }
+    return (if neg { "-" } else { "" }) + Long::toString(ip) + "." + fs
+  }
+}
+
+extension Int {
+  def toD(): Double = self as Double
+}
+
+// ─── Season: data-carrying enum ───────────────────────────────────────────────
+
+enum Season(startMonth: Int) {
+  SPRING(3), SUMMER(6), AUTUMN(9), WINTER(12)
+public:
+  def growthMult(): Double = select this {
+    case Season::SPRING: 1.3
+    case Season::SUMMER: 1.1
+    case Season::AUTUMN: 0.9
+    case Season::WINTER: 0.7
+    else: 1.0
+  }
+  def label(): String = select this {
+    case Season::SPRING: "Spring"
+    case Season::SUMMER: "Summer"
+    case Season::AUTUMN: "Autumn"
+    case Season::WINTER: "Winter"
+    else: "???"
+  }
+}
+
+// ─── InteractionType: ADT case-enum ──────────────────────────────────────────
+
+enum InteractionType {
+  case Predation(catchRate: Double, efficiency: Double)
+  case Competition(overlap: Double)
+  case Mutualism(benefit: Double)
+public:
+  def label(): String = select this {
+    case i is Predation:   "Predation(catch=#{i.catchRate().fmt(3)} eff=#{i.efficiency().fmt(3)})"
+    case i is Competition: "Competition(overlap=#{i.overlap().fmt(2)})"
+    case i is Mutualism:   "Mutualism(benefit=#{i.benefit().fmt(2)})"
+  }
+  def catchRateOrDefault(): Double = select this {
+    case i is Predation: i.catchRate()
+    else: 0.05
+  }
+  def efficiencyOrDefault(): Double = select this {
+    case i is Predation: i.efficiency()
+    else: 0.02
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Species(name: String, symbol: String, initPop: Int, birthRate: Double, deathRate: Double)
+  example { new Species("Rabbit", "R", 100, 1.2, 0.1).initPop() == 100 }
+  example { new Species("Fox",    "F",  20, 0.4, 0.3).name() == "Fox" }
+{
+public:
+  def isViable(): Boolean = initPop() > 0 && birthRate() > deathRate()
+  def summary(): String   = "#{name()} (init=#{initPop()} birth=#{birthRate()} death=#{deathRate()})"
+}
+
+record PopSnapshot(step: Int, preyPop: Double, predPop: Double, season: Season)
+  example { new PopSnapshot(0, 100.0, 20.0, Season::SPRING).step() == 0 }
+  example { new PopSnapshot(1, 50.0, 5.0, Season::AUTUMN).preyPop() == 50.0 }
+{
+public:
+  def ratio(): Double =
+    if predPop() < 0.01 { 99999.0 } else { preyPop() / predPop() }
+  def summary(): String =
+    "t=#{step()} prey=#{preyPop().fmt(1)} pred=#{predPop().fmt(1)} [#{season().label()}]"
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reporter {
+  def report(snapshots: List[Object]): void
+}
+
+// ─── EcoSystem ────────────────────────────────────────────────────────────────
+
+class EcoSystem {
+  val prey:        Species
+  val predator:    Species
+  val interaction: InteractionType
+  var snapshots:   List[Object]
+  var stepCount:   Int
+public:
+  def this(prey: Species, predator: Species, interaction: InteractionType) {
+    this.prey        = prey
+    this.predator    = predator
+    this.interaction = interaction
+    this.snapshots   = []
+    this.stepCount   = 0
+    snapshots.add(new PopSnapshot(0, prey.initPop().toD(), predator.initPop().toD(), Season::SPRING))
+  }
+
+  def last(): PopSnapshot = snapshots.get(snapshots.size - 1) as PopSnapshot
+
+  def seasonAt(step: Int): Season {
+    val phase: Int = step % 4
+    if phase == 0 { return Season::SPRING }
+    else if phase == 1 { return Season::SUMMER }
+    else if phase == 2 { return Season::AUTUMN }
+    else { return Season::WINTER }
+  }
+
+  def step(dt: Double): void {
+    stepCount = stepCount + 1
+    val season = seasonAt(stepCount)
+    val sm     = season.growthMult()
+    val x      = last().preyPop()
+    val y      = last().predPop()
+    val alpha  = prey.birthRate() * sm
+    val beta   = interaction.catchRateOrDefault()
+    val delta  = interaction.efficiencyOrDefault()
+    val gamma  = predator.deathRate()
+    val dx     = (alpha * x - beta * x * y) * dt
+    val dy     = (delta * x * y - gamma * y) * dt
+    val newX   = (x + dx).clamp(0.01, 1000000.0)
+    val newY   = (y + dy).clamp(0.01, 1000000.0)
+    snapshots.add(new PopSnapshot(stepCount, newX, newY, season))
+  }
+
+  def findEquilibrium(targetRatio: Double, tol: Double): Option[PopSnapshot] {
+    val found: PopSnapshot = snapshots.find { s ->
+      val sn: PopSnapshot = s as PopSnapshot
+      val diff: Double    = sn.ratio() - targetRatio
+      val abs: Double     = if diff < 0.0 { 0.0 - diff } else { diff }
+      abs < tol
+    } as PopSnapshot
+    if found != null { return Option::some(found) }
+    return Option::none()
+  }
+
+  def history(): List[Object] = snapshots
+  def steps():   Int          = stepCount
+}
+
+// ─── ConsoleReporter ─────────────────────────────────────────────────────────
+
+class ConsoleReporter conforms Reporter {
+public:
+  def report(snapshots: List[Object]): void {
+    if snapshots.isEmpty() { IO::println("(no data)"); return }
+    val preyVals = snapshots.map { s -> (s as PopSnapshot).preyPop() }
+    val predVals = snapshots.map { s -> (s as PopSnapshot).predPop() }
+    val maxPrey  = preyVals.fold(0.0)   { acc, v -> if (v as Double) > (acc as Double) { v } else { acc } } as Double
+    val minPrey  = preyVals.fold(1.0e9) { acc, v -> if (v as Double) < (acc as Double) { v } else { acc } } as Double
+    val maxPred  = predVals.fold(0.0)   { acc, v -> if (v as Double) > (acc as Double) { v } else { acc } } as Double
+    val minPred  = predVals.fold(1.0e9) { acc, v -> if (v as Double) < (acc as Double) { v } else { acc } } as Double
+    val sumPrey  = preyVals.fold(0.0)   { acc, v -> (acc as Double) + (v as Double) } as Double
+    val sumPred  = predVals.fold(0.0)   { acc, v -> (acc as Double) + (v as Double) } as Double
+    val n        = snapshots.size.toD()
+    IO::println("Prey  max=#{maxPrey.fmt(1)} min=#{minPrey.fmt(1)} avg=#{(sumPrey / n).fmt(1)}")
+    IO::println("Pred  max=#{maxPred.fmt(1)} min=#{minPred.fmt(1)} avg=#{(sumPred / n).fmt(1)}")
+    val bySeason = snapshots.groupBy { s -> (s as PopSnapshot).season().label() }
+    foreach (k, v) in bySeason {
+      val ss: List[Object] = v as List[Object]
+      val sumR: Double = ss.fold(0.0) { acc, s -> (acc as Double) + (s as PopSnapshot).ratio() } as Double
+      val avgR: Double = sumR / ss.size.toD()
+      IO::println("  #{k}: #{ss.size} step(s), avg prey/pred=#{avgR.fmt(1)}")
+    }
+  }
+}
+
+// ─── do[Option] helper ────────────────────────────────────────────────────────
+
+def describeEq(eco: EcoSystem): Option[String] {
+  return do[Option] {
+    snap <- eco.findEquilibrium(4.0, 1.5)
+    ret "Equilibrium at " + snap.summary()
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val rabbit: Species         = new Species("Rabbit", "R",  80, 1.2, 0.1)
+val fox:    Species         = new Species("Fox",    "F",  20, 0.4, 0.3)
+val hunt:   InteractionType = new Predation(0.015, 0.008)
+
+IO::println("=== WildlifeSim: Predator-Prey Simulation ===")
+IO::println("Prey: #{rabbit.summary()}")
+IO::println("Pred: #{fox.summary()}")
+IO::println("Interaction: #{hunt.label()}")
+IO::println("Both viable: #{rabbit.isViable() && fox.isViable()}")
+IO::println("")
+
+val eco = new EcoSystem(rabbit, fox, hunt)
+
+foreach step: Int in 1..40 {
+  try {
+    eco.step(0.5)
+  } catch e: Exception {
+    IO::println("step #{step} error: " + e.message())
+  }
+}
+
+IO::println("── First 5 snapshots ─────────────────────────────────")
+foreach i: Int in 0..4 {
+  IO::println("  " + (eco.history().get(i) as PopSnapshot).summary())
+}
+
+IO::println("── Last 5 snapshots ──────────────────────────────────")
+val tail5 = eco.history().drop(eco.steps() - 4)
+foreach s: Object in tail5 {
+  IO::println("  " + (s as PopSnapshot).summary())
+}
+
+IO::println("")
+IO::println("── Statistics ────────────────────────────────────────")
+val reporter: Reporter = new ConsoleReporter()
+reporter.report(eco.history())
+
+IO::println("")
+IO::println("── Equilibrium search (do[Option]) ───────────────────")
+val eqOpt = describeEq(eco)
+if !eqOpt.isEmpty() {
+  IO::println(eqOpt.get())
+} else {
+  IO::println("No equilibrium found within tolerance")
+}
+
+IO::println("")
+IO::println("── Top 5 steps by prey population ───────────────────")
+val top5 = eco.history()
+  .sortedBy { s -> 0.0 - (s as PopSnapshot).preyPop() }
+  .take(5)
+top5.forEach { s -> IO::println("  " + (s as PopSnapshot).summary()) }
+
+IO::println("")
+IO::println("── Predator load partition ───────────────────────────")
+val parts    = eco.history().partition { s -> (s as PopSnapshot).predPop() > 30.0 }
+val heavy: List[Object] = parts.get(0) as List[Object]
+val light: List[Object] = parts.get(1) as List[Object]
+IO::println("Steps with pred>30: #{heavy.size}")
+IO::println("Steps with pred≤30: #{light.size}")
+IO::println("Any step prey>500? #{eco.history().any { s -> (s as PopSnapshot).preyPop() > 500.0 }}")
+IO::println("Count prey<10 steps: #{eco.history().count { s -> (s as PopSnapshot).preyPop() < 10.0 }}")
+
+IO::println("")
+IO::println("── Average ratio via |> pipeline ────────────────────")
+val ratioSum = eco.history().map { s -> (s as PopSnapshot).ratio() }.fold(0.0) { acc, r -> (acc as Double) + (r as Double) } as Double
+val avgRatio = ratioSum / eco.history().size.toD()
+"Overall avg prey/pred ratio: #{avgRatio.fmt(2)}" |> IO::println
+
+IO::println("")
+IO::println("── Seasons observed (distinct) ──────────────────────")
+val seasons = eco.history().map { s -> (s as PopSnapshot).season().label() }.distinct()
+IO::println("Seasons: " + seasons.toString())
+
+IO::println("")
+IO::println("── Zip first/second half (trend check) ──────────────")
+val half   = eco.history().size / 2
+val first  = eco.history().take(half)
+val second = eco.history().drop(half)
+val zipped = first.zip(second)
+IO::println("Paired steps: #{zipped.size}")
+val growing = zipped.count { pair ->
+  val p = pair as List[Object]
+  val a = (p[0] as PopSnapshot).preyPop()
+  val b = (p[1] as PopSnapshot).preyPop()
+  b > a
+}
+IO::println("Steps where prey grew from first→second half: #{growing}")
+
+IO::println("")
+IO::println("Simulation complete. #{eco.steps()} steps run.")

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/FantasyLeague.on`** — a ~250-line fantasy American-football league tracker, a new domain for the `run/` corpus (a plain enum `Position` with `abbr()`/`slots()` dispatch via `select`; an ADT case-enum `PlayerStatus` (`Active`/`Injured`/`OnBye`/`Suspended`) with type-pattern matching; records with `derive!(Json)` — `Standing`, `MatchResult`; extension methods on `Double`/`String`; classes with public val/var fields and explicit constructors; collection pipelines (`filter`/`map`/`fold`/`flatMap`/`groupBy`/`sortedBy`/`any`/`count`/`forEach`); nullable `Player?`, `do[Option]` monadic composition, the `|>` pipeline; string interpolation; `while`/`foreach` loops; and closures with inferred and explicit parameter types), added to the `run/` corpus (merged via #1439).
+
 ## [0.102.0] - 2026-09-23
 
 ### Added

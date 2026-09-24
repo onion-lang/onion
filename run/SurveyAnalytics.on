@@ -1,0 +1,364 @@
+// SurveyAnalytics.on — Survey Analytics Engine
+//
+// Processes structured survey data: validates answers, aggregates statistics,
+// and exports a JSON report.
+//
+// Features exercised: ADT case-enums (Question) with a shared accessor via
+// select/type-pattern matching; records with example clauses; derive!(Json)
+// for JSON export; do[Result] for validation chains; extension Double/Int for
+// formatting helpers; collection pipelines (filter/count/fold/forEach/any);
+// closures; string interpolation; foreach over map (k,v) and list; nullable
+// handling; try/catch; recursion.
+
+import {
+  java.lang.Integer as JInteger
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension Double {
+  def toInt(): Int = (self as Int)
+  def pct(): String {
+    val p: Int = ((self * 100.0) as Int)
+    return "#{p}%"
+  }
+  def r2(): Double {
+    val i: Int = ((self * 100.0 + 0.5) as Int)
+    return (i as Double) / 100.0
+  }
+  def bar20(): String {
+    val filled: Int = ((self * 20.0 + 0.5) as Int)
+    var s: String = ""
+    var i: Int = 0
+    while i < 20 {
+      if i < filled { s = s + "▓" } else { s = s + "░" }
+      i = i + 1
+    }
+    return s
+  }
+}
+
+extension Int {
+  def toDouble(): Double = self * 1.0
+  def ratio(total: Int): Double {
+    if total == 0 { return 0.0 }
+    return self.toDouble() / total.toDouble()
+  }
+}
+
+// ── Question types (ADT enum) ─────────────────────────────────────────────
+
+enum Question {
+  case Rating(key: String, label: String, lo: Int, hi: Int)
+  case YesNo(key: String, label: String)
+  case Choice(key: String, label: String, opts: String) // comma-separated options
+  case Open(key: String, label: String)
+
+public:
+  def key(): String = select this {
+    case q is Rating: q.key()
+    case q is YesNo:  q.key()
+    case q is Choice: q.key()
+    case q is Open:   q.key()
+  }
+  def label(): String = select this {
+    case q is Rating: q.label()
+    case q is YesNo:  q.label()
+    case q is Choice: q.label()
+    case q is Open:   q.label()
+  }
+  def kindTag(): String = select this {
+    case r  is Rating: "rating"
+    case yn is YesNo:  "yesno"
+    case ch is Choice: "choice"
+    case op is Open:   "open"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record SurveyResponse(questionKey: String, answer: String)
+  example { new SurveyResponse("q1", "5").questionKey() == "q1" }
+  example { new SurveyResponse("q2", "yes").answer() == "yes" }
+
+// Summary records (scalar fields only, so derive!(Json) works)
+
+record RatingSummary(key: String, label: String, count: Int, avg: Double, lo: Int, hi: Int)
+  derive!(Json)
+  example { new RatingSummary("q1", "Overall", 10, 4.2, 1, 5).count() == 10 }
+
+record YesNoSummary(key: String, label: String, total: Int, yesCount: Int)
+  derive!(Json)
+  example { new YesNoSummary("q2", "Helpful?", 20, 15).total() == 20 }
+
+record ChoiceSummary(key: String, label: String, total: Int, topChoice: String, topCount: Int)
+  derive!(Json)
+  example { new ChoiceSummary("q3", "Freq", 30, "Daily", 12).total() == 30 }
+
+record OpenSummary(key: String, label: String, filled: Int, total: Int)
+  derive!(Json)
+  example { new OpenSummary("q4", "Comments", 18, 20).filled() <= new OpenSummary("q4", "Comments", 18, 20).total() }
+
+// ── Validation helpers ────────────────────────────────────────────────────
+
+def parseIntSafe(raw: String): Result[Int, String] {
+  try {
+    return Result::ok(JInteger::parseInt(raw.trim()))
+  } catch e: NumberFormatException {
+    return Result::err("not a number: '#{raw}'")
+  }
+}
+
+def validateRating(key: String, raw: String, lo: Int, hi: Int): Result[Int, String] {
+  val r: Result[Int, String] = parseIntSafe(raw)
+  if !r.isOk() { return r }
+  val n: Int = r.get() as Int
+  if n >= lo && n <= hi { return Result::ok(n) }
+  return Result::err("#{key}: '#{raw}' out of range #{lo}..#{hi}")
+}
+
+def validateYesNo(key: String, raw: String): Result[Boolean, String] {
+  val s: String = raw.trim().toLowerCase()
+  select s {
+  case "yes", "y", "true", "1": return Result::ok(true)
+  case "no",  "n", "false", "0": return Result::ok(false)
+  else: return Result::err("#{key}: expected yes/no, got '#{raw}'")
+  }
+}
+
+// ── Analytics computation ─────────────────────────────────────────────────
+
+def computeRatingSummary(q: Rating, responses: List[SurveyResponse]): RatingSummary {
+  var count: Int = 0
+  var sum:   Int = 0
+  foreach r: SurveyResponse in responses {
+    if r.questionKey() == q.key() {
+      val v: Result[Int, String] = validateRating(q.key(), r.answer(), q.lo(), q.hi())
+      if v.isOk() {
+        count = count + 1
+        sum   = sum + (v.get() as Int)
+      }
+    }
+  }
+  val avg: Double = if count == 0 { 0.0 } else { (sum as Double) / (count as Double) }
+  return new RatingSummary(q.key(), q.label(), count, avg, q.lo(), q.hi())
+}
+
+def computeYesNoSummary(q: YesNo, responses: List[SurveyResponse]): YesNoSummary {
+  var total:    Int = 0
+  var yesCount: Int = 0
+  foreach r: SurveyResponse in responses {
+    if r.questionKey() == q.key() {
+      total = total + 1
+      val v: Result[Boolean, String] = validateYesNo(q.key(), r.answer())
+      if v.isOk() && (v.get() as Boolean) { yesCount = yesCount + 1 }
+    }
+  }
+  return new YesNoSummary(q.key(), q.label(), total, yesCount)
+}
+
+def computeChoiceSummary(q: Choice, responses: List[SurveyResponse]): ChoiceSummary {
+  val counts: Map[String, Int] = [:]
+  var total: Int = 0
+  foreach r: SurveyResponse in responses {
+    if r.questionKey() == q.key() {
+      total = total + 1
+      val s: String = r.answer().trim()
+      val prev = counts[s]
+      if prev == null { counts[s] = 1 } else { counts[s] = (prev as Int) + 1 }
+    }
+  }
+  var topChoice: String = "(none)"
+  var topCount:  Int    = 0
+  foreach (opt, cnt) in counts {
+    if (cnt as Int) > topCount {
+      topCount  = cnt as Int
+      topChoice = opt as String
+    }
+  }
+  return new ChoiceSummary(q.key(), q.label(), total, topChoice, topCount)
+}
+
+def computeOpenSummary(q: Open, responses: List[SurveyResponse]): OpenSummary {
+  var filled: Int = 0
+  var total:  Int = 0
+  foreach r: SurveyResponse in responses {
+    if r.questionKey() == q.key() {
+      total = total + 1
+      if r.answer().trim().length() > 0 { filled = filled + 1 }
+    }
+  }
+  return new OpenSummary(q.key(), q.label(), filled, total)
+}
+
+// ── Report printing ───────────────────────────────────────────────────────
+
+def printRatingSummary(s: RatingSummary): void {
+  IO::println("  ▸ #{s.label()}")
+  val pct: Double = if s.hi() == 0 { 0.0 } else { s.avg() / (s.hi() as Double) }
+  IO::println("    responses : #{s.count()}")
+  IO::println("    avg       : #{s.avg().r2()} / #{s.hi()}  [#{pct.bar20()}]")
+}
+
+def printYesNoSummary(s: YesNoSummary): void {
+  IO::println("  ▸ #{s.label()}")
+  IO::println("    responses : #{s.total()}")
+  val noPct:  String = (s.total() - s.yesCount()).ratio(s.total()).pct()
+  val yesPct: String = s.yesCount().ratio(s.total()).pct()
+  IO::println("    yes / no  : #{s.yesCount()} (#{yesPct}) / #{s.total() - s.yesCount()} (#{noPct})")
+}
+
+def printChoiceSummary(s: ChoiceSummary): void {
+  IO::println("  ▸ #{s.label()}")
+  IO::println("    responses : #{s.total()}")
+  IO::println("    top pick  : #{s.topChoice()} (#{s.topCount()} votes)")
+}
+
+def printOpenSummary(s: OpenSummary): void {
+  IO::println("  ▸ #{s.label()}")
+  val fillPct: String = s.filled().ratio(s.total()).pct()
+  IO::println("    response rate: #{s.filled()} / #{s.total()} (#{fillPct})")
+}
+
+// ── do[Result] chain demo ─────────────────────────────────────────────────
+
+def validateBoth(rawRating: String, rawYesNo: String): Result[String, String] {
+  return do[Result] {
+    r <- validateRating("overall", rawRating, 1, 5)
+    b <- validateYesNo("recommend", rawYesNo)
+    ret "rating=#{r}, recommend=#{b}"
+  }
+}
+
+// ── Sample survey data ────────────────────────────────────────────────────
+
+val questions: List[Question] = [
+  new Rating("overall",   "Overall satisfaction (1-5)", 1, 5),
+  new Rating("quality",   "Content quality (1-10)",     1, 10),
+  new YesNo("recommend",  "Would you recommend?"),
+  new YesNo("willreturn", "Will you return?"),
+  new Choice("frequency", "Usage frequency", "Daily,Weekly,Monthly,Rarely"),
+  new Open("comments",    "Additional comments")
+]
+
+val responses: List[SurveyResponse] = [
+  // respondent 1
+  new SurveyResponse("overall",   "5"), new SurveyResponse("quality",   "9"),
+  new SurveyResponse("recommend", "yes"), new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Daily"),  new SurveyResponse("comments", "Love it!"),
+  // respondent 2
+  new SurveyResponse("overall",   "4"), new SurveyResponse("quality",   "8"),
+  new SurveyResponse("recommend", "yes"), new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Weekly"), new SurveyResponse("comments", "Great service"),
+  // respondent 3
+  new SurveyResponse("overall",   "3"), new SurveyResponse("quality",   "7"),
+  new SurveyResponse("recommend", "no"),  new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Monthly"), new SurveyResponse("comments", ""),
+  // respondent 4
+  new SurveyResponse("overall",   "5"), new SurveyResponse("quality",   "10"),
+  new SurveyResponse("recommend", "yes"), new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Daily"),  new SurveyResponse("comments", "Excellent"),
+  // respondent 5
+  new SurveyResponse("overall",   "2"), new SurveyResponse("quality",   "6"),
+  new SurveyResponse("recommend", "no"),  new SurveyResponse("willreturn", "no"),
+  new SurveyResponse("frequency", "Rarely"), new SurveyResponse("comments", "Needs work"),
+  // respondent 6
+  new SurveyResponse("overall",   "4"), new SurveyResponse("quality",   "8"),
+  new SurveyResponse("recommend", "yes"), new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Weekly"), new SurveyResponse("comments", ""),
+  // respondent 7
+  new SurveyResponse("overall",   "5"), new SurveyResponse("quality",   "9"),
+  new SurveyResponse("recommend", "yes"), new SurveyResponse("willreturn", "yes"),
+  new SurveyResponse("frequency", "Daily"),  new SurveyResponse("comments", "Perfect"),
+  // respondent 8 — deliberately bad data to exercise validation
+  new SurveyResponse("overall",   "abc"), new SurveyResponse("quality",   "11"),
+  new SurveyResponse("recommend", "maybe"), new SurveyResponse("willreturn", "1"),
+  new SurveyResponse("frequency", "Sometimes"), new SurveyResponse("comments", "")
+]
+
+// ── Main ──────────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════╗")
+IO::println("║         Survey Analytics Report                  ║")
+IO::println("╚══════════════════════════════════════════════════╝")
+IO::println("")
+
+val ratingResults:  List[RatingSummary]  = []
+val yesnoResults:   List[YesNoSummary]   = []
+val choiceResults:  List[ChoiceSummary]  = []
+val openResults:    List[OpenSummary]    = []
+
+IO::println("── Results by Question ────────────────────────────")
+foreach q: Question in questions {
+  IO::println("")
+  IO::println("[#{q.kindTag().toUpperCase()}] #{q.key()}")
+  select q {
+  case r is Rating:
+    val s: RatingSummary = computeRatingSummary(r, responses)
+    ratingResults.add(s)
+    printRatingSummary(s)
+  case yn is YesNo:
+    val s: YesNoSummary = computeYesNoSummary(yn, responses)
+    yesnoResults.add(s)
+    printYesNoSummary(s)
+  case ch is Choice:
+    val s: ChoiceSummary = computeChoiceSummary(ch, responses)
+    choiceResults.add(s)
+    printChoiceSummary(s)
+  case op is Open:
+    val s: OpenSummary = computeOpenSummary(op, responses)
+    openResults.add(s)
+    printOpenSummary(s)
+  }
+}
+
+IO::println("")
+IO::println("── JSON Export (first rating question) ────────────")
+if ratingResults.size > 0 {
+  IO::println(RatingSummary::toJson(ratingResults[0] as RatingSummary))
+}
+
+IO::println("")
+IO::println("── Overall Stats ───────────────────────────────────")
+val totalRespondents: Int = responses.size / questions.size
+IO::println("Respondents : #{totalRespondents}")
+IO::println("Questions   : #{questions.size}")
+
+var ratingSum: Double = 0.0
+foreach s: RatingSummary in ratingResults {
+  ratingSum = ratingSum + s.avg() / (s.hi() as Double)
+}
+val allRatingPct: Double = if ratingResults.size > 0 {
+  ratingSum / ratingResults.size.toDouble()
+} else { 0.0 }
+IO::println("Avg rating  : #{(allRatingPct * 100.0).toInt()}% of max")
+
+IO::println("")
+IO::println("── do[Result] Validation Demo ──────────────────────")
+val chain1: Result[String, String] = validateBoth("4",   "yes")
+val chain2: Result[String, String] = validateBoth("abc", "yes")
+val chain3: Result[String, String] = validateBoth("4",   "maybe")
+IO::println("both valid : ok=#{chain1.isOk()}, value=#{chain1.getOrElse("?")}")
+IO::println("bad rating : ok=#{chain2.isOk()}, error=#{chain2.getError()}")
+IO::println("bad yesno  : ok=#{chain3.isOk()}, error=#{chain3.getError()}")
+
+IO::println("")
+IO::println("── Validation Stats ────────────────────────────────")
+var validCount: Int   = 0
+var invalidCount: Int = 0
+foreach r: SurveyResponse in responses {
+  val isRating: Boolean = r.questionKey() == "overall" || r.questionKey() == "quality"
+  val isYesNo:  Boolean = r.questionKey() == "recommend" || r.questionKey() == "willreturn"
+  if isRating {
+    val lo: Int = if r.questionKey() == "overall" { 1 } else { 1 }
+    val hi: Int = if r.questionKey() == "overall" { 5 } else { 10 }
+    val v: Result[Int, String] = validateRating(r.questionKey(), r.answer(), lo, hi)
+    if v.isOk() { validCount = validCount + 1 } else { invalidCount = invalidCount + 1 }
+  } else if isYesNo {
+    val v: Result[Boolean, String] = validateYesNo(r.questionKey(), r.answer())
+    if v.isOk() { validCount = validCount + 1 } else { invalidCount = invalidCount + 1 }
+  }
+}
+IO::println("Valid answers   : #{validCount}")
+IO::println("Invalid answers : #{invalidCount}")
+IO::println("(bad data from respondent 8 counted above)")

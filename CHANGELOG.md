@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.105.0] - 2026-09-24
+
 ### Added
 
 - **`run/ActuarialCalc.on`** — a 310-line life insurance premium calculator, a new domain for the `run/` corpus (a data-carrying enum `RiskClass` (`label`/`multiplier`, 3 cases: Preferred/Standard/Substandard); an ADT case-enum `PolicyType` (`TermLife`/`WholeLife`/`Endowment`/`LifeAnnuity`) with `select`-based `label()`/`horizon()`/`isInsurance()`; a `record PremiumResult` with `grossPremium()`/`loadingAmount()` methods; a class `LifeTable` doing linear-interpolated/exponentially-extrapolated mortality (`qxAt`); extension methods on `Double` (`fmt2`/`pct`/`fmt5`) and `String` (`padR`/`padL`/`rep`); collection pipelines (`map`/`filter`/`fold`/`sortedBy`/`groupBy`); `foreach` with `(k, v)` map-entry destructuring; nullable types, `try`/`catch`, `while`, and string interpolation computing NSP, annuity-due, and gross premium loading across four policy types and three risk classes), added to the `run/` corpus (merged via #1474).

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/MolecularWeight.on`** — a 332-line chemistry toolkit, a new domain for the `run/` corpus (a data-carrying enum `Element` (symbol, atomic number, atomic weight, group, period, category; 30 elements H–Hg) with instance methods `isMetal`/`isHalogen`/`isNobleGas`/`isNonmetal`; records with methods `Component`/`Molecule` — `molarMass()`/`percentComposition()`/`hasElement()`/`atomCount()`/`elementCount()`; collection pipelines (`sortedBy`/`filter`/`groupBy`/`map`/`forEach`) over `List[Object]`; `foreach (k, v) in Map` destructuring; a recursive `gcd`/`empiricalGcd` for empirical-formula reduction; nullable `Element?` accumulator in `heaviestElement`; a stoichiometry section balancing glucose combustion; `molesToGrams`/`gramsToMoles` unit converters; and assertions verifying molar masses and atom counts), added to the `run/` corpus (merged via #1485).
+
 ## [0.106.0] - 2026-09-24
 
 ### Fixed

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.107.0] - 2026-09-24
+
 ### Added
 
 - **`run/GardenPlanner.on`** — a 431-line companion-planting garden advisor, a new domain for the `run/` corpus (data-carrying enums `Season`/`WaterNeeds`/`SunExposure` with methods; an ADT case-enum `CompanionEffect` (`Beneficial`/`Neutral`/`Harmful`) with `select`/`is`-pattern dispatch; records with methods `Plant`/`Bed`/`PlantingSlot`/`CompanionPair`; an interface `Describable` implemented by `Plant` and `PlantingSlot`; classes with mutable state `PlantCatalogue`/`GardenManager`; extension methods on `String` (`padRight`/`center`/`times`) and `Int` (`stars`); collection pipelines (`map`/`filter`/`groupBy`/`sortedBy`/`sortedByDescending`/`partition`/`zip`/`fold`/`find`); `foreach` over lists, ranges, and `Map` `(k, v)` entries; nullable `Plant?` from `findByName` with null guards; and string interpolation throughout — rendering seasonal availability, companion-planting compatibility checks, and a 14-week water budget), added to the `run/` corpus (merged via #1492).

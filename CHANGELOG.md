@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Explicit generic type arguments failed for primitive types (e.g. `f[Int](xs)`), even though the same call compiled when the type argument was inferred.** `explicitFromMappedArgs` in `GenericMethodTypeArguments.scala` stored explicit type arguments verbatim from the AST (`BasicType.INT` for `Int`), so substituting into a `List[T]` parameter produced `List[int]`, and the invariant type-argument check then rejected an `ArrayList[Integer]` argument as a mismatch. The inference path already boxes primitives before storing them (`Constraints.unify` produces `Integer`, not `int`), so inference accepted the identical call. Fixed by applying the same `boxedTypeArg` boxing to explicit type arguments, mirroring the inference path; a no-op for reference types, so no other behavior changes. Covered by three new regression tests in `ExplicitTypeArgPrimitiveSpec` (merged via #1496).
+
 ## [0.107.0] - 2026-09-24
 
 ### Added

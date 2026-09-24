@@ -1,0 +1,356 @@
+// CurrencyExchange.on — currency exchange engine with rate graphs,
+// multi-hop conversion chains, and arbitrage detection.
+// Exercises: records with body methods, data-carrying enums, ADT enums,
+// classes, interfaces, generics, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/distinct/find/partition/zip), select/pattern matching,
+// nullable types, closures, string interpolation, try/catch, recursion,
+// while, foreach.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Region(label: String) {
+  Americas("Americas"),
+  Europe("Europe"),
+  AsiaPacific("Asia-Pacific"),
+  MiddleEast("Middle East"),
+  Africa("Africa")
+}
+
+enum RiskTier { Low, Medium, High, Restricted }
+
+// ─── ADT: ConversionStep ──────────────────────────────────────────────────────
+
+enum ConversionStep {
+  case Direct(from: String, to: String, rate: Double)
+  case Chained(from: String, via: String, to: String, rate: Double)
+  case Unavailable(from: String, to: String)
+public:
+  def describe(): String = select this {
+    case s is Direct:     "#{s.from()} → #{s.to()} @ #{fmt(s.rate())}"
+    case s is Chained:    "#{s.from()} → #{s.via()} → #{s.to()} @ #{fmt(s.rate())}"
+    case s is Unavailable: "#{s.from()} → #{s.to()}: no path"
+  }
+}
+
+def fmt(d: Double): String {
+  val i: Int = (d * 10000.0 + 0.5) as Int
+  val whole: Int = i / 10000
+  val frac: Int = i - whole * 10000
+  var fs: String = "" + frac
+  while fs.length() < 4 { fs = "0" + fs }
+  return whole + "." + fs
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Currency(
+  code:   String,
+  name:   String,
+  region: Region,
+  risk:   RiskTier
+) {
+public:
+  def label(): String = "#{code()} (#{name()})"
+  def isHighRisk(): Boolean = select risk() {
+    case RiskTier::High:       true
+    case RiskTier::Restricted: true
+    else:                      false
+  }
+}
+
+record ExchangeRate(
+  from:   String,
+  to:     String,
+  rate:   Double,
+  spread: Double
+) {
+public:
+  def bidRate(): Double = rate() - spread() / 2.0
+  def askRate(): Double = rate() + spread() / 2.0
+  def midRate(): Double = rate()
+  def inverse(): ExchangeRate = new ExchangeRate(to(), from(), 1.0 / rate(), spread() / (rate() * rate()))
+  def label(): String = "#{from()}/#{to()} mid=#{fmt(rate())} spread=#{fmt(spread())}"
+}
+
+record ConversionResult(
+  fromCcy:   String,
+  toCcy:     String,
+  amount:    Double,
+  converted: Double,
+  path:      String,
+  hops:      Int
+) {
+public:
+  def effectiveRate(): Double = if amount() > 0.0 { converted() / amount() } else { 0.0 }
+  def summary(): String =
+    "#{fmt(amount())} #{fromCcy()} → #{fmt(converted())} #{toCcy()} (via #{path()}, rate #{fmt(effectiveRate())})"
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+extension Double {
+  def round4(): Double {
+    val i: Int = (self * 10000.0 + 0.5) as Int
+    return i * 1.0 / 10000.0
+  }
+}
+
+// ─── ExchangeGraph ────────────────────────────────────────────────────────────
+
+class ExchangeGraph {
+  val rates:      List[ExchangeRate]
+  val currencies: List[Currency]
+
+public:
+  def this(ccys: List[Currency], rs: List[ExchangeRate]) {
+    this.currencies = ccys
+    this.rates      = rs
+  }
+
+  def findCurrency(code: String): Currency? =
+    currencies.find { c -> (c as Currency).code() == code } as Currency?
+
+  def directRate(from: String, to: String): ExchangeRate? {
+    if from == to {
+      return new ExchangeRate(from, to, 1.0, 0.0)
+    }
+    val fwd: ExchangeRate? = rates.find { r ->
+      val er: ExchangeRate = r as ExchangeRate
+      er.from() == from && er.to() == to
+    } as ExchangeRate?
+    if fwd != null { return fwd }
+    val inv: ExchangeRate? = rates.find { r ->
+      val er: ExchangeRate = r as ExchangeRate
+      er.from() == to && er.to() == from
+    } as ExchangeRate?
+    if inv != null { return (inv as ExchangeRate).inverse() }
+    return null
+  }
+
+  def convert(from: String, to: String, amount: Double): ConversionResult {
+    val direct: ExchangeRate? = directRate(from, to)
+    if direct != null {
+      val r: ExchangeRate = direct as ExchangeRate
+      return new ConversionResult(from, to, amount, (amount * r.midRate()).round4(), from + "→" + to, 1)
+    }
+    val codes: List[String] = currencies.map { c -> (c as Currency).code() } as List[String]
+    foreach via: String in codes {
+      if via != from && via != to {
+        val r1: ExchangeRate? = directRate(from, via)
+        val r2: ExchangeRate? = directRate(via, to)
+        if r1 != null && r2 != null {
+          val rate: Double = (r1 as ExchangeRate).midRate() * (r2 as ExchangeRate).midRate()
+          val out: Double = (amount * rate).round4()
+          return new ConversionResult(from, to, amount, out, from + "→" + via + "→" + to, 2)
+        }
+      }
+    }
+    return new ConversionResult(from, to, amount, 0.0, "none", 0)
+  }
+
+  def step(from: String, to: String): ConversionStep {
+    val direct: ExchangeRate? = directRate(from, to)
+    if direct != null {
+      return new Direct(from, to, (direct as ExchangeRate).midRate())
+    }
+    val codes: List[String] = currencies.map { c -> (c as Currency).code() } as List[String]
+    foreach via: String in codes {
+      if via != from && via != to {
+        val r1: ExchangeRate? = directRate(from, via)
+        val r2: ExchangeRate? = directRate(via, to)
+        if r1 != null && r2 != null {
+          val combinedRate: Double = (r1 as ExchangeRate).midRate() * (r2 as ExchangeRate).midRate()
+          return new Chained(from, via, to, combinedRate)
+        }
+      }
+    }
+    return new Unavailable(from, to)
+  }
+
+  def detectArbitrage(base: String, amount: Double): List[String] {
+    val results: List[String] = []
+    val codes: List[String] = currencies.map { c -> (c as Currency).code() } as List[String]
+    foreach a: String in codes {
+      if a == base { } else {
+        foreach b: String in codes {
+          if b != base && b != a {
+            val r1: ExchangeRate? = directRate(base, a)
+            val r2: ExchangeRate? = directRate(a, b)
+            val r3: ExchangeRate? = directRate(b, base)
+            if r1 != null && r2 != null && r3 != null {
+              val r: Double = (r1 as ExchangeRate).midRate() * (r2 as ExchangeRate).midRate() * (r3 as ExchangeRate).midRate()
+              if r > 1.001 {
+                val profit: Double = ((r - 1.0) * amount).round4()
+                results.add("#{base}→#{a}→#{b}→#{base}: factor=#{fmt(r)} profit=#{fmt(profit)}")
+              }
+            }
+          }
+        }
+      }
+    }
+    return results
+  }
+
+  def rateMatrix(): List[String] {
+    val codes: List[String] = currencies.map { c -> (c as Currency).code() } as List[String]
+    val rows: List[String] = []
+    var header: String = "     ".padRight(6)
+    foreach code: String in codes { header = header + code.padRight(10) }
+    rows.add(header)
+    foreach from: String in codes {
+      var row: String = from.padRight(6)
+      foreach to: String in codes {
+        val er: ExchangeRate? = directRate(from, to)
+        val cell: String = if er != null { fmt((er as ExchangeRate).midRate()) } else { "  N/A  " }
+        row = row + cell.padRight(10)
+      }
+      rows.add(row)
+    }
+    return rows
+  }
+}
+
+// ─── Setup ────────────────────────────────────────────────────────────────────
+
+val ccys: List[Currency] = [
+  new Currency("USD", "US Dollar",       Region::Americas,    RiskTier::Low),
+  new Currency("EUR", "Euro",            Region::Europe,      RiskTier::Low),
+  new Currency("GBP", "British Pound",   Region::Europe,      RiskTier::Low),
+  new Currency("JPY", "Japanese Yen",    Region::AsiaPacific, RiskTier::Low),
+  new Currency("CHF", "Swiss Franc",     Region::Europe,      RiskTier::Low),
+  new Currency("AUD", "Australian Dol.", Region::AsiaPacific, RiskTier::Medium),
+  new Currency("BRL", "Brazilian Real",  Region::Americas,    RiskTier::High)
+]
+
+val rawRates: List[ExchangeRate] = [
+  new ExchangeRate("USD", "EUR", 0.9200, 0.0004),
+  new ExchangeRate("USD", "GBP", 0.7850, 0.0005),
+  new ExchangeRate("USD", "JPY", 149.80, 0.0500),
+  new ExchangeRate("USD", "CHF", 0.8950, 0.0003),
+  new ExchangeRate("USD", "AUD", 1.5380, 0.0008),
+  new ExchangeRate("EUR", "GBP", 0.8532, 0.0004),
+  new ExchangeRate("EUR", "CHF", 0.9720, 0.0003),
+  new ExchangeRate("GBP", "JPY", 190.80, 0.0600),
+  new ExchangeRate("AUD", "BRL", 3.5000, 0.0200)
+]
+
+val graph: ExchangeGraph = new ExchangeGraph(ccys, rawRates)
+
+// ─── Section 1: Currency catalogue ───────────────────────────────────────────
+
+IO::println("=== Currency Catalogue ===")
+foreach c: Currency in ccys {
+  val risk: String = select c.risk() {
+    case RiskTier::Low:        "●"
+    case RiskTier::Medium:     "◑"
+    case RiskTier::High:       "○"
+    case RiskTier::Restricted: "✕"
+  }
+  IO::println("  #{risk} #{c.label().padRight(32)} #{c.region().label()}")
+}
+
+// ─── Section 2: Rate matrix ───────────────────────────────────────────────────
+
+IO::println("\n=== Rate Matrix (direct only) ===")
+foreach row: String in graph.rateMatrix() { IO::println(row) }
+
+// ─── Section 3: Conversions ───────────────────────────────────────────────────
+
+IO::println("\n=== Conversions ===")
+val queries: List[Object] = [
+  ["USD", "EUR",  1000.0],
+  ["GBP", "JPY",  500.0],
+  ["AUD", "USD",  250.0],
+  ["USD", "BRL",  100.0],
+  ["EUR", "BRL",  100.0],
+  ["JPY", "GBP",  50000.0]
+]
+foreach q: Object in queries {
+  val qList: List[Object] = q as List[Object]
+  val from: String = qList[0] as String
+  val to: String   = qList[1] as String
+  val amt: Double  = qList[2] as Double
+  val res: ConversionResult = graph.convert(from, to, amt)
+  val hops: String = if res.hops() == 0 { "no path" } else { res.hops() + "-hop" }
+  IO::println("  [#{hops}] #{res.summary()}")
+}
+
+// ─── Section 4: ConversionStep ADT demo ──────────────────────────────────────
+
+IO::println("\n=== Conversion Steps ===")
+val pairs: List[Object] = [
+  ["USD", "EUR"], ["USD", "BRL"], ["EUR", "JPY"], ["GBP", "AUD"], ["JPY", "BRL"]
+]
+foreach p: Object in pairs {
+  val pList: List[Object] = p as List[Object]
+  val s: ConversionStep = graph.step(pList[0] as String, pList[1] as String)
+  IO::println("  " + s.describe())
+}
+
+// ─── Section 5: Pipeline analytics ───────────────────────────────────────────
+
+IO::println("\n=== Analytics ===")
+
+val byRegion = ccys.groupBy { c -> (c as Currency).region().label() }
+foreach (region, group) in byRegion {
+  IO::println("  #{region}: #{(group as List).size} currencies")
+}
+
+val highRiskCodes: List[String] = (ccys.filter { c -> (c as Currency).isHighRisk() }.map { c -> (c as Currency).code() }) as List[String]
+IO::println("  High-risk: #{highRiskCodes.toString()}")
+
+val topRates: List[ExchangeRate] = (rawRates.filter { r -> (r as ExchangeRate).spread() < 0.0005 }.sortedBy { r -> (r as ExchangeRate).spread() }) as List[ExchangeRate]
+IO::println("  Tightest spreads:")
+foreach er: ExchangeRate in topRates {
+  IO::println("    #{er.label()}")
+}
+
+val totalSpread: Double = (rawRates.fold(0.0) { acc, r -> (acc as Double) + (r as ExchangeRate).spread() }) as Double
+val avgSpread: Double = (totalSpread / rawRates.size).round4()
+IO::println("  Average spread: #{fmt(avgSpread)}")
+
+// ─── Section 6: Arbitrage scan ───────────────────────────────────────────────
+
+IO::println("\n=== Arbitrage Scan (base=USD, amount=10000) ===")
+val arbs: List[String] = graph.detectArbitrage("USD", 10000.0)
+if arbs.size > 0 {
+  foreach a: String in arbs { IO::println("  ARBI: " + a) }
+} else {
+  IO::println("  No arbitrage opportunities found.")
+}
+
+// ─── Section 7: Risk partitioning ────────────────────────────────────────────
+
+IO::println("\n=== Risk Partitioning ===")
+val parts = ccys.partition { c -> (c as Currency).isHighRisk() }
+val risky: List[Object] = parts[0] as List[Object]
+val safe: List[Object]  = parts[1] as List[Object]
+val riskyCodes: List[String] = risky.map { c -> (c as Currency).code() } as List[String]
+val safeCodes: List[String]  = safe.map  { c -> (c as Currency).code() } as List[String]
+IO::println("  Risky : #{riskyCodes.toString()}")
+IO::println("  Safe  : #{safeCodes.toString()}")
+
+// ─── Section 8: Error handling ───────────────────────────────────────────────
+
+IO::println("\n=== Edge Cases ===")
+def safeConvert(from: String, to: String, amt: Double): String {
+  try {
+    val r: ConversionResult = graph.convert(from, to, amt)
+    return if r.hops() == 0 { "no path" } else { r.summary() }
+  } catch e: Exception {
+    return "error: " + e.getMessage()
+  }
+}
+IO::println("  USD→USD: " + safeConvert("USD", "USD", 500.0))
+IO::println("  USD→ZZZ: " + safeConvert("USD", "ZZZ", 500.0))
+IO::println("  BRL→JPY: " + safeConvert("BRL", "JPY", 1000.0))
+
+IO::println("\nDone.")

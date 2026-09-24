@@ -9,6 +9,7 @@ package onion.compiler.optimization
 
 import onion.compiler._
 import onion.compiler.TypedAST._
+import onion.compiler.TermWalk
 import scala.collection.mutable
 import scala.util.boundary, boundary.break
 
@@ -226,6 +227,20 @@ class MutualRecursionOptimization(config: CompilerConfig)
   }
 
   /**
+   * Whether `body` still touches the enclosing instance -- directly as `this`/the
+   * outer-class `this` of a nested class, or (via TermWalk's normal descent into every
+   * term's children) as the implicit receiver of a field access or instance method call.
+   * Used to catch, before it reaches BytecodeGeneration, a state-machine body that would
+   * need a receiver despite being emitted as a static method.
+   */
+  private def referencesThis(body: StatementBlock): Boolean =
+    TermWalk.existsIn(body) {
+      case _: TypedAST.This      => true
+      case _: TypedAST.OuterThis => true
+      case _                     => false
+    }
+
+  /**
    * Check if method is private
    */
   private def isPrivate(method: MethodDefinition): Boolean = {
@@ -269,6 +284,28 @@ class MutualRecursionOptimization(config: CompilerConfig)
       paramTypes,
       returnType
     )
+
+    // Guard: the state machine method is always emitted `private static` (it has no
+    // enclosing instance -- the whole point is a flat loop with no call-stack growth).
+    // transformMethodBodyForStateMachine only rewrites *tail* calls to other members of
+    // the group; anything else in the original bodies -- a field read, `this` passed as
+    // a value, or a call to another instance method, whether reached in tail position or
+    // not -- survives verbatim into the generated body still expecting a receiver. With
+    // no receiver on a static method, that used to crash BytecodeGeneration with
+    // "no 'this' pointer within static method" (an I0000 internal error) instead of
+    // compiling or reporting a normal diagnostic. Detect any leftover `this` in the
+    // generated body up front and fall back to the ordinary (non-tail-optimized)
+    // methods, the same degraded-but-safe path the other validateGroup checks use.
+    if (referencesThis(stateMachineMethod.getBlock)) {
+      reportIneffective(
+        classDef,
+        group,
+        "the group reads instance state (a field, or a call to another instance method, " +
+          "via an implicit or explicit `this`), which the generated state machine method " +
+          "-- always `private static` -- cannot access"
+      )
+      return
+    }
 
     // Step 4: Add state machine method to class
     classDef.methods_.add(stateMachineMethod)

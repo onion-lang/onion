@@ -1,0 +1,431 @@
+// GardenPlanner.on — companion-planting garden advisor.
+// Exercises: data-carrying enums (Season, WaterNeeds, SunExposure),
+//            ADT enums (CompanionEffect), records with methods (Plant, Bed,
+//            PlantingSlot), interfaces (Plantable, Describable), classes,
+//            collection pipelines (map/filter/groupBy/sortedBy/partition/zip/
+//            fold/reduce/distinct/find), foreach (ranges, List, Map k/v),
+//            select/is pattern matching, closures, string interpolation #{},
+//            nullable types, try/catch, extension methods, generics.
+
+import { java.util.List; java.util.Map }
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def center(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = " " + s
+      if s.length() < width { s = s + " " }
+    }
+    return s
+  }
+  def times(n: Int): String {
+    var result: String = ""
+    var i: Int = 0
+    while i < n { result = result + self; i++ }
+    return result
+  }
+}
+
+extension Int {
+  def stars(): String {
+    var out: String = ""
+    foreach _i: Int in 0..<self { out = out + "*" }
+    return out
+  }
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Season { SPRING, SUMMER, AUTUMN, WINTER }
+
+enum SunExposure {
+  FULL_SUN, PARTIAL_SHADE, FULL_SHADE
+public:
+  def label(): String = select this {
+    case SunExposure::FULL_SUN:      "Full Sun"
+    case SunExposure::PARTIAL_SHADE: "Partial Shade"
+    case SunExposure::FULL_SHADE:    "Full Shade"
+    else: "Unknown"
+  }
+  def hoursPerDay(): Int = select this {
+    case SunExposure::FULL_SUN:      8
+    case SunExposure::PARTIAL_SHADE: 4
+    case SunExposure::FULL_SHADE:    2
+    else: 0
+  }
+}
+
+enum WaterNeeds {
+  LOW, MODERATE, HIGH
+public:
+  def litersPerWeek(): Double = select this {
+    case WaterNeeds::LOW:      1.5
+    case WaterNeeds::MODERATE: 3.0
+    case WaterNeeds::HIGH:     6.0
+    else: 0.0
+  }
+  def label(): String = select this {
+    case WaterNeeds::LOW:      "Low"
+    case WaterNeeds::MODERATE: "Moderate"
+    case WaterNeeds::HIGH:     "High"
+    else: "?"
+  }
+}
+
+enum CompanionEffect {
+  case Beneficial(reason: String)
+  case Neutral
+  case Harmful(reason: String)
+public:
+  def symbol(): String = select this {
+    case c is Beneficial: "✓"
+    case n is Neutral:    "~"
+    case h is Harmful:    "✗"
+    else: "?"
+  }
+  def description(): String = select this {
+    case c is Beneficial: "Beneficial: #{c.reason()}"
+    case n is Neutral:    "Neutral companions"
+    case h is Harmful:    "Harmful: #{h.reason()}"
+    else: "Unknown"
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Describable {
+  def describe(): String
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Plant(
+  name: String,
+  family: String,
+  sun: SunExposure,
+  water: WaterNeeds,
+  seasons: List[Season],
+  spacingCm: Int,
+  heightCm: Int
+) conforms Describable {
+public:
+  def describe(): String =
+    "#{name()} (#{family()}) — #{sun().label()}, #{water().label()} water, #{spacingCm()}cm spacing"
+
+  def isInSeason(s: Season): Boolean = seasons().contains(s)
+
+  def annualWaterLiters(weeks: Int): Double = water().litersPerWeek() * weeks as Double
+}
+
+record Bed(
+  id: String,
+  widthM: Double,
+  lengthM: Double,
+  sun: SunExposure
+) {
+public:
+  def areaM2(): Double = widthM() * lengthM()
+  def capacityFor(spacingCm: Int): Int {
+    val wSlots: Int = (widthM() * 100.0) as Int / spacingCm
+    val lSlots: Int = (lengthM() * 100.0) as Int / spacingCm
+    return wSlots * lSlots
+  }
+}
+
+record PlantingSlot(bed: Bed, plant: Plant, quantity: Int) conforms Describable {
+public:
+  def describe(): String =
+    "#{quantity()}x #{plant().name()} in bed #{bed().id()}"
+  def weeklyWater(): Double = plant().water().litersPerWeek() * (quantity() as Double)
+}
+
+record CompanionPair(a: Plant, b: Plant, effect: CompanionEffect) {
+public:
+  def summary(): String =
+    "#{a().name()} + #{b().name()}: #{effect().description()}"
+}
+
+// ── Catalogue ─────────────────────────────────────────────────────────────────
+
+class PlantCatalogue {
+  var plants_: List[Plant]
+public:
+  def this { plants_ = [] }
+
+  def add(p: Plant): void { plants_.add(p) }
+
+  def all(): List[Plant] = plants_
+
+  def findByName(name: String): Plant? =
+    plants_.find { p -> (p as Plant).name() == name }
+
+  def forSun(sun: SunExposure): List[Plant] =
+    plants_.filter { p -> (p as Plant).sun() == sun }
+
+  def forSeason(season: Season): List[Plant] =
+    plants_.filter { p -> (p as Plant).isInSeason(season) }
+
+  def byFamily(): Map[String, List[Plant]] =
+    plants_.groupBy { p -> (p as Plant).family() }
+
+  def partitionByWater(): List[List[Plant]] =
+    plants_.partition { p ->
+      select (p as Plant).water() {
+        case WaterNeeds::HIGH: true
+        else: false
+      }
+    }
+
+  def tallestFirst(): List[Plant] =
+    plants_.sortedByDescending { p -> (p as Plant).heightCm() }
+}
+
+// ── Garden Manager ────────────────────────────────────────────────────────────
+
+class GardenManager {
+  var beds_: List[Bed]
+  var slots_: List[PlantingSlot]
+  var companions_: List[CompanionPair]
+  var catalogue_: PlantCatalogue
+public:
+  def this(catalogue: PlantCatalogue) {
+    catalogue_ = catalogue
+    beds_ = []
+    slots_ = []
+    companions_ = []
+  }
+
+  def addBed(b: Bed): void { beds_.add(b) }
+
+  def plant(bedId: String, plantName: String, qty: Int): void {
+    val bed: Bed? = beds_.find { b -> (b as Bed).id() == bedId }
+    val plant: Plant? = catalogue_.findByName(plantName)
+    if bed != null && plant != null {
+      val cap: Int = bed.capacityFor(plant.spacingCm())
+      if qty <= cap {
+        slots_.add(new PlantingSlot(bed, plant, qty))
+      } else {
+        IO::println("Warning: bed #{bedId} can only hold #{cap} #{plantName}(s), planting #{cap}")
+        slots_.add(new PlantingSlot(bed, plant, cap))
+      }
+    } else {
+      IO::println("Error: bed '#{bedId}' or plant '#{plantName}' not found")
+    }
+  }
+
+  def addCompanion(pair: CompanionPair): void { companions_.add(pair) }
+
+  def companionEffect(nameA: String, nameB: String): CompanionEffect? {
+    val found = companions_.find { p ->
+      val cp = p as CompanionPair
+      (cp.a().name() == nameA && cp.b().name() == nameB) ||
+      (cp.a().name() == nameB && cp.b().name() == nameA)
+    }
+    if found != null { return (found as CompanionPair).effect() }
+    return null
+  }
+
+  def weeklyWaterTotal(): Double {
+    return slots_.fold(0.0) { acc, s -> (acc as Double) + (s as PlantingSlot).weeklyWater() }
+  }
+
+  def slotsByBed(): Map[String, List[PlantingSlot]] =
+    slots_.groupBy { s -> (s as PlantingSlot).bed().id() }
+
+  def plantCountByFamily(): Map[String, Int] {
+    val families: Map[String, List[PlantingSlot]] =
+      slots_.groupBy { s -> (s as PlantingSlot).plant().family() }
+    val result: Map[String, Int] = [:]
+    foreach (fam, list) in families {
+      var total: Int = 0
+      foreach slot: PlantingSlot in list { total = total + slot.quantity() }
+      result[fam as String] = total
+    }
+    return result
+  }
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  val line: String = "─".times(title.length() + 4)
+  IO::println("\n┌#{line}┐")
+  IO::println("│  #{title}  │")
+  IO::println("└#{line}┘")
+}
+
+def collectPlantedNames(mgr: GardenManager): List[String] {
+  val all: List[String] = []
+  val byBed = mgr.slotsByBed()
+  foreach (bedId, slots) in byBed {
+    foreach slot: PlantingSlot in slots {
+      val name: String = slot.plant().name()
+      if !all.contains(name) { all.add(name) }
+    }
+  }
+  return all
+}
+
+def printCompanionCheck(mgr: GardenManager): void {
+  printHeader("Companion Planting Check")
+  val names: List[String] = collectPlantedNames(mgr)
+
+  var checks: Int = 0
+  foreach i: Int in 0..<names.size() {
+    foreach j: Int in (i + 1)..<names.size() {
+      val a: String = names.get(i) as String
+      val b: String = names.get(j) as String
+      val effect = mgr.companionEffect(a, b)
+      if effect != null {
+        IO::println("  #{effect.symbol()} #{a.padRight(14)} ↔ #{b.padRight(14)} : #{effect.description()}")
+        checks++
+      }
+    }
+  }
+  if checks == 0 { IO::println("  (no companion data for current planting)") }
+}
+
+def printBedSummary(mgr: GardenManager): void {
+  printHeader("Bed-by-Bed Summary")
+  val byBed = mgr.slotsByBed()
+  foreach (bedId, slots) in byBed {
+    IO::println("  Bed #{bedId}:")
+    foreach slot: PlantingSlot in slots {
+      IO::println("    • #{slot.describe()}  (#{slot.weeklyWater()}L/wk)")
+    }
+  }
+}
+
+def printFamilyDistribution(mgr: GardenManager, catalogue: PlantCatalogue): void {
+  printHeader("Plant Family Distribution")
+  val counts: Map[String, Int] = mgr.plantCountByFamily()
+  // Sort families by descending plant count
+  val keys: List[String] = []
+  foreach (fam, n) in counts { keys.add(fam as String) }
+  val sortedKeys: List[String] = keys.sortedByDescending { k -> counts.get(k as String) as Int }
+  foreach fam: String in sortedKeys {
+    val n: Int = counts.get(fam) as Int
+    IO::println("  #{fam.padRight(16)} #{n.stars().padRight(12)} #{n}")
+  }
+}
+
+def printWaterBudget(mgr: GardenManager, weeks: Int): void {
+  printHeader("Water Budget (#{weeks} weeks)")
+  val weekly: Double = mgr.weeklyWaterTotal()
+  val total: Double = weekly * (weeks as Double)
+  IO::println("  Weekly total : #{weekly} L")
+  IO::println("  Season total : #{total} L  (over #{weeks} weeks)")
+}
+
+def printHighWaterPlants(catalogue: PlantCatalogue): void {
+  printHeader("High vs Low Water Needs")
+  val parts: List[List[Plant]] = catalogue.partitionByWater()
+  val high: List[Plant] = parts.get(0) as List[Plant]
+  val low:  List[Plant] = parts.get(1) as List[Plant]
+  IO::println("  High water (#{high.size()} plants): #{high.map { p -> (p as Plant).name() }.join(", ")}")
+  IO::println("  Low/moderate (#{low.size()} plants): #{low.map { p -> (p as Plant).name() }.join(", ")}")
+}
+
+def printSeasonalAvailability(catalogue: PlantCatalogue): void {
+  printHeader("Seasonal Availability")
+  val seasons: List[Season] = [Season::SPRING, Season::SUMMER, Season::AUTUMN, Season::WINTER]
+  val labels: List[String] = ["Spring", "Summer", "Autumn", "Winter"]
+  val pairs = seasons.zip(labels)
+  foreach pair: List in pairs {
+    val season = pair.get(0) as Season
+    val label  = pair.get(1) as String
+    val names: List[String] = catalogue.forSeason(season).map { pl -> (pl as Plant).name() }
+    IO::println("  #{label.padRight(8)}: #{names.join(", ")}")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+// Build catalogue
+val cat = new PlantCatalogue()
+
+cat.add(new Plant("Tomato",    "Solanaceae",  SunExposure::FULL_SUN,      WaterNeeds::HIGH,     [Season::SUMMER],                   50, 150))
+cat.add(new Plant("Basil",     "Lamiaceae",   SunExposure::FULL_SUN,      WaterNeeds::MODERATE, [Season::SPRING, Season::SUMMER],   30,  50))
+cat.add(new Plant("Carrot",    "Apiaceae",    SunExposure::FULL_SUN,      WaterNeeds::MODERATE, [Season::SPRING, Season::AUTUMN],   10,  30))
+cat.add(new Plant("Mint",      "Lamiaceae",   SunExposure::PARTIAL_SHADE, WaterNeeds::MODERATE, [Season::SPRING, Season::SUMMER],   30,  60))
+cat.add(new Plant("Spinach",   "Amaranthaceae",SunExposure::PARTIAL_SHADE, WaterNeeds::HIGH,    [Season::SPRING, Season::AUTUMN],   20,  30))
+cat.add(new Plant("Rosemary",  "Lamiaceae",   SunExposure::FULL_SUN,      WaterNeeds::LOW,      [Season::SPRING, Season::SUMMER, Season::AUTUMN], 40, 80))
+cat.add(new Plant("Lavender",  "Lamiaceae",   SunExposure::FULL_SUN,      WaterNeeds::LOW,      [Season::SUMMER, Season::AUTUMN],  45,  60))
+cat.add(new Plant("Kale",      "Brassicaceae",SunExposure::PARTIAL_SHADE, WaterNeeds::MODERATE, [Season::AUTUMN, Season::WINTER],  45,  60))
+cat.add(new Plant("Fennel",    "Apiaceae",    SunExposure::FULL_SUN,      WaterNeeds::LOW,      [Season::SUMMER],                   40, 150))
+cat.add(new Plant("Marigold",  "Asteraceae",  SunExposure::FULL_SUN,      WaterNeeds::LOW,      [Season::SPRING, Season::SUMMER],  25,  40))
+
+// Set up garden beds
+val mgr = new GardenManager(cat)
+
+mgr.addBed(new Bed("A1", 2.0, 4.0, SunExposure::FULL_SUN))
+mgr.addBed(new Bed("A2", 1.5, 3.0, SunExposure::FULL_SUN))
+mgr.addBed(new Bed("B1", 2.0, 2.0, SunExposure::PARTIAL_SHADE))
+
+// Plant the garden
+mgr.plant("A1", "Tomato",   4)
+mgr.plant("A1", "Basil",    8)
+mgr.plant("A1", "Marigold", 6)
+mgr.plant("A2", "Carrot",  18)
+mgr.plant("A2", "Rosemary", 3)
+mgr.plant("B1", "Spinach",  8)
+mgr.plant("B1", "Kale",     4)
+mgr.plant("B1", "Mint",     4)
+
+// Register companion relationships
+def addPair(mgr: GardenManager, cat: PlantCatalogue, nameA: String, nameB: String, effect: CompanionEffect): void {
+  val a: Plant? = cat.findByName(nameA)
+  val b: Plant? = cat.findByName(nameB)
+  if a != null && b != null {
+    mgr.addCompanion(new CompanionPair(a, b, effect))
+  }
+}
+
+addPair(mgr, cat, "Tomato",  "Basil",    new Beneficial("Basil repels aphids and whiteflies"))
+addPair(mgr, cat, "Tomato",  "Marigold", new Beneficial("Marigolds deter nematodes"))
+addPair(mgr, cat, "Carrot",  "Rosemary", new Beneficial("Rosemary deters carrot fly"))
+addPair(mgr, cat, "Spinach", "Kale",     new Neutral())
+addPair(mgr, cat, "Fennel",  "Tomato",   new Harmful("Fennel stunts tomato growth"))
+addPair(mgr, cat, "Mint",    "Kale",     new Beneficial("Mint deters cabbage moth"))
+
+// Print family distribution of catalogue
+printHeader("Plant Catalogue")
+foreach pl: Plant in cat.tallestFirst() {
+  IO::println("  #{pl.name().padRight(12)} #{pl.describe()}")
+}
+
+printHighWaterPlants(cat)
+printSeasonalAvailability(cat)
+printBedSummary(mgr)
+printCompanionCheck(mgr)
+printFamilyDistribution(mgr, cat)
+printWaterBudget(mgr, 14)
+
+// Full sun stats
+printHeader("Full-Sun Plant Stats")
+val fullSunPlants: List[Plant] = cat.forSun(SunExposure::FULL_SUN)
+val avgSpacing: Int = fullSunPlants.map { p -> (p as Plant).spacingCm() }
+  .reduce { a, b -> (a as Int) + (b as Int) } as Int / fullSunPlants.size()
+val tallest = cat.tallestFirst().get(0) as Plant
+IO::println("  Full-sun plants  : #{fullSunPlants.size()}")
+IO::println("  Avg spacing      : #{avgSpacing} cm")
+IO::println("  Tallest plant    : #{tallest.name()} (#{tallest.heightCm()} cm)")
+
+// Zip spacing with height for ratio analysis
+printHeader("Spacing-to-Height Ratio")
+val spacings: List[Int] = fullSunPlants.map { p -> (p as Plant).spacingCm() }
+val heights:  List[Int] = fullSunPlants.map { p -> (p as Plant).heightCm() }
+val pairs2 = spacings.zip(heights)
+foreach pair2: List in pairs2 {
+  val spacing: Int = pair2.get(0) as Int
+  val height:  Int = pair2.get(1) as Int
+  val ratio: Double = height as Double / spacing as Double
+  IO::println("  #{spacing}cm spacing / #{height}cm height → ratio #{ratio}")
+}

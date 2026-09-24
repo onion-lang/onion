@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/FlightPlanner.on`** — a 390-line airline flight planning and operations analytics program, a new domain for the `run/` corpus (an ADT case-enum `AircraftClass` (`NarrowBody`/`WideBody`/`RegionalJet`/`TurboProp`) with `select`-pattern dispatch; a `record FlightResult` with `profit()`/`loadFactor()`/`profitStr()` methods; a class `FlightPlanner` with a `public:` section over typed generic fields (`List[Airport]`, `List[Aircraft]`, `Map[String,Int]`, `Map[String,Double]`); an extension method on `Int` (`toHHMM`) for duration formatting; collection pipelines (`filter`/`sortedBy`) with closures; nullable types with the Elvis (`?:`) operator; `Format::number`/`Format::integer` for locale-independent output; `foreach` over typed lists and a `while` loop for ASCII bar-chart rendering; and string interpolation throughout, computing per-flight P&L, fleet utilization, revenue-by-aircraft-class, load-factor, and range-utilization reports across ten flight plans), added to the `run/` corpus (merged via #1476).
+
 ## [0.105.0] - 2026-09-24
 
 ### Added

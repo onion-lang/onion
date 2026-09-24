@@ -1,0 +1,360 @@
+// NumericalMethods.on — classic numerical algorithms demonstrated on concrete problems.
+// Covers: bisection, Newton-Raphson, Euler ODE, Runge-Kutta 4, Simpson integration,
+//         gradient descent, secant method, fixed-point iteration.
+
+// ── tiny vector helpers ────────────────────────────────────────────────────────
+record Vec2(x: Double, y: Double) {
+public:
+  def plus(o: Vec2): Vec2 = new Vec2(x() + o.x(), y() + o.y())
+  def scale(s: Double): Vec2 = new Vec2(x() * s, y() * s)
+  def norm(): Double = Math::sqrt(x() * x() + y() * y())
+  def str(): String = "(#{Format::fixed(x(), 6)}, #{Format::fixed(y(), 6)})"
+}
+
+// ── result records ─────────────────────────────────────────────────────────────
+record RootResult(root: Double, iters: Int, converged: Boolean)
+record IntegralResult(value: Double, subintervals: Int)
+record OdeStep(t: Double, y: Double)
+
+// ── bisection ─────────────────────────────────────────────────────────────────
+def bisect(f: Double -> Double, lo: Double, hi: Double, tol: Double): RootResult {
+  var a: Double = lo
+  var b: Double = hi
+  var iter: Int = 0
+  var mid: Double = (a + b) / 2.0
+  while (b - a) > tol && iter < 200 {
+    mid = (a + b) / 2.0
+    if f(a) * f(mid) <= 0.0 {
+      b = mid
+    } else {
+      a = mid
+    }
+    iter++
+  }
+  return new RootResult((a + b) / 2.0, iter, (b - a) <= tol)
+}
+
+// ── Newton-Raphson ─────────────────────────────────────────────────────────────
+def newton(f: Double -> Double, df: Double -> Double, x0: Double, tol: Double): RootResult {
+  var x: Double = x0
+  var iter: Int = 0
+  var converged: Boolean = false
+  while iter < 200 && !converged {
+    val fx: Double = f(x)
+    val dfx: Double = df(x)
+    if Math::abs(dfx) < 1e-15 { iter = 200 } else {
+      val xnew: Double = x - fx / dfx
+      if Math::abs(xnew - x) < tol { converged = true }
+      x = xnew
+      iter++
+    }
+  }
+  return new RootResult(x, iter, converged)
+}
+
+// ── secant method ─────────────────────────────────────────────────────────────
+def secant(f: Double -> Double, x0: Double, x1: Double, tol: Double): RootResult {
+  var xp: Double = x0
+  var xc: Double = x1
+  var iter: Int = 0
+  var converged: Boolean = false
+  while iter < 200 && !converged {
+    val fp: Double = f(xp)
+    val fc: Double = f(xc)
+    if Math::abs(fc - fp) < 1e-15 { iter = 200 } else {
+      val xn: Double = xc - fc * (xc - xp) / (fc - fp)
+      if Math::abs(xn - xc) < tol { converged = true }
+      xp = xc
+      xc = xn
+      iter++
+    }
+  }
+  return new RootResult(xc, iter, converged)
+}
+
+println("=== NumericalMethods.on ===")
+println("")
+
+// ── 1. Roots: find sqrt(2) via f(x)=x^2-2 ────────────────────────────────────
+println("--- 1. Root-finding: x^2 - 2 = 0  (root = sqrt(2) ~ 1.41421356) ---")
+val f1: Double -> Double = (x: Double) -> x * x - 2.0
+val df1: Double -> Double = (x: Double) -> 2.0 * x
+
+val rb = bisect(f1, 1.0, 2.0, 1e-10)
+println("Bisection:      root=#{Format::fixed(rb.root(), 10)}, iters=#{rb.iters()}, ok=#{rb.converged()}")
+
+val rn = newton(f1, df1, 1.5, 1e-14)
+println("Newton-Raphson: root=#{Format::fixed(rn.root(), 10)}, iters=#{rn.iters()}, ok=#{rn.converged()}")
+
+val rs = secant(f1, 1.0, 2.0, 1e-14)
+println("Secant:         root=#{Format::fixed(rs.root(), 10)}, iters=#{rs.iters()}, ok=#{rs.converged()}")
+
+println("")
+
+// ── 2. Roots: find cbrt(7) via f(x)=x^3-7 ────────────────────────────────────
+println("--- 2. Root-finding: x^3 - 7 = 0  (root = cbrt(7) ~ 1.91293) ---")
+val f2: Double -> Double = (x: Double) -> x * x * x - 7.0
+val df2: Double -> Double = (x: Double) -> 3.0 * x * x
+val rb2 = bisect(f2, 1.0, 2.0, 1e-10)
+val rn2 = newton(f2, df2, 1.5, 1e-14)
+println("Bisection:      root=#{Format::fixed(rb2.root(), 8)}, iters=#{rb2.iters()}")
+println("Newton-Raphson: root=#{Format::fixed(rn2.root(), 8)}, iters=#{rn2.iters()}")
+
+println("")
+
+// ── 3. Simpson integration ────────────────────────────────────────────────────
+println("--- 3. Numerical integration (Simpson 1/3 rule) ---")
+
+def simpson(f: Double -> Double, a: Double, b: Double, n: Int): Double {
+  var h: Double = (b - a) / (n as Double)
+  var sum: Double = f(a) + f(b)
+  var i: Int = 1
+  while i < n {
+    val xi: Double = a + (i as Double) * h
+    if i % 2 == 0 { sum = sum + 2.0 * f(xi) } else { sum = sum + 4.0 * f(xi) }
+    i++
+  }
+  return (h / 3.0) * sum
+}
+
+// integral of x^2 from 0..1 = 1/3
+val i1 = simpson((x: Double) -> x * x, 0.0, 1.0, 100)
+println("integral(x^2, 0..1)      = #{Format::fixed(i1, 8)}  (exact=0.33333333)")
+
+// integral of sin(x) from 0..pi = 2
+val i2 = simpson((x: Double) -> Math::sin(x), 0.0, Math::PI, 100)
+println("integral(sin(x), 0..pi)  = #{Format::fixed(i2, 8)}  (exact=2.00000000)")
+
+// integral of e^x from 0..1 = e-1
+val i3 = simpson((x: Double) -> Math::exp(x), 0.0, 1.0, 100)
+println("integral(e^x, 0..1)      = #{Format::fixed(i3, 8)}  (exact=#{Format::fixed(Math::E - 1.0, 8)})")
+
+println("")
+
+// ── 4. Euler ODE solver ────────────────────────────────────────────────────────
+println("--- 4. Euler method: y' = y, y(0)=1  (solution: y=e^t) ---")
+
+def eulerFinal(dydt: (Double, Double) -> Double, y0: Double, t0: Double, t1: Double, steps: Int): Double {
+  val h: Double = (t1 - t0) / (steps as Double)
+  var t: Double = t0
+  var y: Double = y0
+  var i: Int = 0
+  while i < steps {
+    y = y + h * dydt(t, y)
+    t = t + h
+    i++
+  }
+  return y
+}
+
+val yDot: (Double, Double) -> Double = (t: Double, y: Double) -> y
+val ef10 = eulerFinal(yDot, 1.0, 0.0, 1.0, 10)
+println("Euler (10 steps): y(1.0) = #{Format::fixed(ef10, 6)}  (exact e=#{Format::fixed(Math::E, 6)})")
+
+val ef100 = eulerFinal(yDot, 1.0, 0.0, 1.0, 100)
+println("Euler (100 steps): y(1.0)= #{Format::fixed(ef100, 6)}  (exact e=#{Format::fixed(Math::E, 6)})")
+
+println("")
+
+// ── 5. Runge-Kutta 4 ──────────────────────────────────────────────────────────
+println("--- 5. Runge-Kutta 4: y' = y, y(0)=1  (solution: y=e^t) ---")
+
+def rk4Final(dydt: (Double, Double) -> Double, y0: Double, t0: Double, t1: Double, steps: Int): Double {
+  val h: Double = (t1 - t0) / (steps as Double)
+  var t: Double = t0
+  var y: Double = y0
+  var i: Int = 0
+  while i < steps {
+    val k1: Double = dydt(t, y)
+    val k2: Double = dydt(t + h / 2.0, y + h * k1 / 2.0)
+    val k3: Double = dydt(t + h / 2.0, y + h * k2 / 2.0)
+    val k4: Double = dydt(t + h, y + h * k3)
+    y = y + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    t = t + h
+    i++
+  }
+  return y
+}
+
+val rk4_10 = rk4Final(yDot, 1.0, 0.0, 1.0, 10)
+println("RK4 (10 steps): y(1.0) = #{Format::fixed(rk4_10, 8)}  (exact e=#{Format::fixed(Math::E, 8)})")
+
+// ODE: y' = -2ty, y(0)=1 → solution y=e^(-t^2)
+val yDot2: (Double, Double) -> Double = (t: Double, y: Double) -> -2.0 * t * y
+val rk4_yt: Double = rk4Final(yDot2, 1.0, 0.0, 1.0, 50)
+val exact_yt: Double = Math::exp(-1.0)
+println("RK4 y'=-2ty, y(1.0) = #{Format::fixed(rk4_yt, 8)}  (exact=#{Format::fixed(exact_yt, 8)})")
+
+println("")
+
+// ── 6. Gradient descent ───────────────────────────────────────────────────────
+println("--- 6. Gradient descent: minimise f(x)=(x-3)^2, grad=2(x-3) ---")
+
+def gradDescent(grad: Double -> Double, x0: Double, lr: Double, maxIter: Int, tol: Double): RootResult {
+  var x: Double = x0
+  var iter: Int = 0
+  var done: Boolean = false
+  while iter < maxIter && !done {
+    val g: Double = grad(x)
+    val xnew: Double = x - lr * g
+    if Math::abs(xnew - x) < tol { done = true }
+    x = xnew
+    iter++
+  }
+  return new RootResult(x, iter, done)
+}
+
+val grad1: Double -> Double = (x: Double) -> 2.0 * (x - 3.0)
+val gd1 = gradDescent(grad1, 0.0, 0.1, 1000, 1e-10)
+println("GD from x=0: min at x=#{Format::fixed(gd1.root(), 8)}, iters=#{gd1.iters()}, ok=#{gd1.converged()}")
+
+// minimise f(x)=x^4-4x^2+3, grad=4x^3-8x  (two minima: x≈-√2, x≈+√2)
+val grad2: Double -> Double = (x: Double) -> 4.0 * x * x * x - 8.0 * x
+val gd2a = gradDescent(grad2, 2.0, 0.01, 5000, 1e-10)
+val gd2b = gradDescent(grad2, -2.0, 0.01, 5000, 1e-10)
+println("GD x^4-4x^2+3 from +2: min=#{Format::fixed(gd2a.root(), 6)} (expect +sqrt(2)=#{Format::fixed(Math::sqrt(2.0), 6)})")
+println("GD x^4-4x^2+3 from -2: min=#{Format::fixed(gd2b.root(), 6)} (expect -sqrt(2)=#{Format::fixed(-Math::sqrt(2.0), 6)})")
+
+println("")
+
+// ── 7. Fixed-point iteration ──────────────────────────────────────────────────
+println("--- 7. Fixed-point: x = cos(x)  (Dottie number ~ 0.739085) ---")
+
+def fixedPoint(g: Double -> Double, x0: Double, tol: Double): RootResult {
+  var x: Double = x0
+  var iter: Int = 0
+  var done: Boolean = false
+  while iter < 1000 && !done {
+    val xnew: Double = g(x)
+    if Math::abs(xnew - x) < tol { done = true }
+    x = xnew
+    iter++
+  }
+  return new RootResult(x, iter, done)
+}
+
+val fp1 = fixedPoint((x: Double) -> Math::cos(x), 1.0, 1e-12)
+println("Fixed-point x=cos(x): #{Format::fixed(fp1.root(), 10)}, iters=#{fp1.iters()}, ok=#{fp1.converged()}")
+
+// sqrt(a) via x = (x + a/x)/2  (Babylonian / Heron's method)
+val sqrtOf5: RootResult = fixedPoint((x: Double) -> (x + 5.0 / x) / 2.0, 2.0, 1e-14)
+println("Heron sqrt(5): #{Format::fixed(sqrtOf5.root(), 10)}, iters=#{sqrtOf5.iters()} (exact=#{Format::fixed(Math::sqrt(5.0), 10)})")
+
+println("")
+
+// ── 8. Trapezoidal rule + convergence comparison ───────────────────────────────
+println("--- 8. Integration convergence: trapezoid vs Simpson for sin(x) on [0,pi] ---")
+println("  (exact = 2.0)")
+println("")
+
+def trapezoid(f: Double -> Double, a: Double, b: Double, n: Int): Double {
+  val h: Double = (b - a) / (n as Double)
+  var sum: Double = (f(a) + f(b)) / 2.0
+  var i: Int = 1
+  while i < n {
+    sum = sum + f(a + (i as Double) * h)
+    i++
+  }
+  return h * sum
+}
+
+val exact2: Double = 2.0
+val fSin: Double -> Double = (x: Double) -> Math::sin(x)
+val nsArr: List[Int] = [4, 8, 16, 32, 64, 128]
+foreach nn: Int in nsArr {
+  val trap: Double = trapezoid(fSin, 0.0, Math::PI, nn)
+  val simp: Double = simpson(fSin, 0.0, Math::PI, nn)
+  val errT: Double = Math::abs(trap - exact2)
+  val errS: Double = Math::abs(simp - exact2)
+  println("  n=#{nn}: trap_err=#{String::format("%.2e", errT)}, simp_err=#{String::format("%.2e", errS)}")
+}
+
+println("")
+
+// ── 9. 2-D Newton's method: solve F(x,y)=0 ───────────────────────────────────
+println("--- 9. 2D Newton: x^2+y^2=1, x-y=0  (solution (1/sqrt2, 1/sqrt2)) ---")
+
+def newton2d(
+    f1: (Double, Double) -> Double,
+    f2: (Double, Double) -> Double,
+    j11: (Double, Double) -> Double, j12: (Double, Double) -> Double,
+    j21: (Double, Double) -> Double, j22: (Double, Double) -> Double,
+    x0: Double, y0: Double, tol: Double
+): Vec2 {
+  var x: Double = x0
+  var y: Double = y0
+  var iter: Int = 0
+  while iter < 100 {
+    val fx: Double = f1(x, y)
+    val fy: Double = f2(x, y)
+    if Math::sqrt(fx * fx + fy * fy) < tol { iter = 100 } else {
+      val a11: Double = j11(x, y)
+      val a12: Double = j12(x, y)
+      val a21: Double = j21(x, y)
+      val a22: Double = j22(x, y)
+      val det: Double = a11 * a22 - a12 * a21
+      val dx: Double = -(a22 * fx - a12 * fy) / det
+      val dy: Double = -(a11 * fy - a21 * fx) / det
+      x = x + dx
+      y = y + dy
+      iter++
+    }
+  }
+  return new Vec2(x, y)
+}
+
+val sol = newton2d(
+  (x: Double, y: Double) -> x * x + y * y - 1.0,
+  (x: Double, y: Double) -> x - y,
+  (x: Double, y: Double) -> 2.0 * x, (x: Double, y: Double) -> 2.0 * y,
+  (x: Double, y: Double) -> 1.0,     (x: Double, y: Double) -> -1.0,
+  0.9, 0.1, 1e-12
+)
+val expected: Double = 1.0 / Math::sqrt(2.0)
+println("Solution: #{sol.str()}")
+println("Expected: (#{Format::fixed(expected, 6)}, #{Format::fixed(expected, 6)})")
+println("Residual: #{String::format("%.3e", Math::abs(sol.x() - expected))}")
+
+println("")
+println("=== All sections complete ===")
+println("")
+
+// ── 10. Feature showcase: enum for method category ────────────────────────────
+enum AlgoKind {
+  case RootFinding
+  case Integration
+  case OdeSolver
+  case Optimization
+  case FixedPoint
+}
+
+record AlgoSummary(name: String, kind: AlgoKind, orderStr: String, note: String) {
+public:
+  def print(): void {
+    val tag: String = select kind() {
+      case k is RootFinding: "[root]"
+      case k is Integration: "[integ]"
+      case k is OdeSolver:   "[ode]  "
+      case k is Optimization:"[optim]"
+      case k is FixedPoint:  "[fixed]"
+    }
+    println("  #{tag} #{name} — O(#{orderStr}) — #{note}")
+  }
+}
+
+println("--- Algorithm catalogue ---")
+val algos: List[AlgoSummary] = [
+  new AlgoSummary("Bisection",        new RootFinding(), "log n",  "robust, slow convergence"),
+  new AlgoSummary("Newton-Raphson",   new RootFinding(), "n^2",    "fast, needs derivative"),
+  new AlgoSummary("Secant",           new RootFinding(), "phi",    "superlinear, no derivative"),
+  new AlgoSummary("Fixed-point",      new FixedPoint(),  "linear", "converges if |g'(x)|<1"),
+  new AlgoSummary("Trapezoid rule",   new Integration(), "h^2",    "low order"),
+  new AlgoSummary("Simpson 1/3",      new Integration(), "h^4",    "composite, exact on cubics"),
+  new AlgoSummary("Euler method",     new OdeSolver(),   "h",      "first order, simple"),
+  new AlgoSummary("Runge-Kutta 4",    new OdeSolver(),   "h^4",    "workhorse of ODE solving"),
+  new AlgoSummary("Gradient descent", new Optimization(),"1/L",    "needs step-size tuning")
+]
+foreach algo: AlgoSummary in algos {
+  algo.print()
+}
+println("")

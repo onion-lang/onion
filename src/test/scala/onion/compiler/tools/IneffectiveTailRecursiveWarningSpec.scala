@@ -94,6 +94,44 @@ class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
       assert(w16.forall(_.message.contains("parameter")))
     }
 
+    it("warns instead of crashing when the group reads an instance field via `this`") {
+      // Regression test (I0000): a private @TailRecursive group is otherwise eligible
+      // for the state-machine rewrite (all private, same return type, same parameter
+      // list, tail-calls only within the group) but reads an instance field. The
+      // generated state machine method is always `private static`, so the field access
+      // that survives verbatim into its body used to crash BytecodeGeneration with
+      // "no 'this' pointer within static method" instead of compiling. It must now fall
+      // back to the ordinary (non-tail-optimized) methods and report W0016 instead.
+      val result = compileWarnings(
+        """
+          |class Accumulator {
+          |private:
+          |  val base: Int
+          |public:
+          |  def this(base: Int) { this.base = base }
+          |private:
+          |  @TailRecursive
+          |  def stateA(n: Int, acc: Int): Int {
+          |    if n <= 0 { return acc }
+          |    return stateB(n - 1, acc + this.base)
+          |  }
+          |  @TailRecursive
+          |  def stateB(n: Int, acc: Int): Int {
+          |    if n <= 0 { return acc }
+          |    return stateA(n - 1, acc - this.base)
+          |  }
+          |public:
+          |  def run(n: Int): Int = stateA(n, 0)
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors, s"expected a clean compile, got: ${result.allErrors.map(_.message)}")
+      assert(result.diagnostics.errors.filter(_.code.contains("I0000")).isEmpty,
+        "must not crash with an internal compiler error (I0000)")
+      val w16 = result.diagnostics.warnings.filter(_.category.code == "W0016")
+      assert(w16.length == 2, s"expected 2 W0016 (one per method), got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w16.forall(_.message.contains("this")))
+    }
+
     it("fails compilation under warnings-as-errors") {
       val result = compileWarnings(
         """

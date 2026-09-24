@@ -207,6 +207,21 @@ class MutualRecursionOptimization(config: CompilerConfig)
       }
     }
 
+    // Check 6: No member may declare a local variable beyond its parameter list.
+    // rewriteParameterReferences only redirects RefLocal/SetLocal references with
+    // index < paramCount to the merged state machine's loop-variable slots; a local
+    // declared in the body (e.g. `val next: Box = ...`) keeps its original slot index,
+    // which collides with the loop/state/temp variable slots the merged method
+    // introduces starting at exactly that index once every member's body is spliced
+    // into one shared frame -- producing invalid bytecode (a JVM VerifyError at
+    // class-load time) instead of either compiling correctly or failing to compile.
+    val paramCountForLocals = group.head.arguments.length
+    val declaresExtraLocal = group.find(m => referencesLocalBeyondParams(m.getBlock, paramCountForLocals))
+    declaresExtraLocal.foreach { method =>
+      break(Some(s"method ${method.name} declares a local variable beyond its parameter list, " +
+        "which the generated state machine method cannot give a non-overlapping slot"))
+    }
+
     validationError
   }
 
@@ -238,6 +253,20 @@ class MutualRecursionOptimization(config: CompilerConfig)
       case _: TypedAST.This      => true
       case _: TypedAST.OuterThis => true
       case _                     => false
+    }
+
+  /**
+   * Whether `body` reads or writes a local-variable slot beyond the method's own
+   * `paramCount` parameters -- i.e. an ordinary `val`/`var` declared in the body (or any
+   * other local the method's own frame allocated past its parameters). See Check 6 in
+   * `validateGroup` for why such a local cannot safely share the merged state machine's
+   * frame.
+   */
+  private def referencesLocalBeyondParams(body: StatementBlock, paramCount: Int): Boolean =
+    TermWalk.existsIn(body) {
+      case ref: TypedAST.RefLocal => ref.frame == 0 && ref.index >= paramCount
+      case set: TypedAST.SetLocal => set.frame == 0 && set.index >= paramCount
+      case _                      => false
     }
 
   /**

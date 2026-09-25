@@ -1,0 +1,314 @@
+// SkipList.on — probabilistic skip list: ordered Int→String key-value store.
+// Exercises: class with T?[] nullable-element arrays, mutable class fields,
+//   Rand::nextDouble(), extension Int/String, string interpolation, while loops,
+//   nested loops, nullable types, as-cast, collection pipelines (map/filter/
+//   sortedBy/fold), records, ADT enum, static constants, foreach on ranges.
+
+import { java.lang.Integer as JInt; }
+
+// ── Extension helpers ──────────────────────────────────────────────────────────
+
+extension Int {
+  def padLeft(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n) + "~" }
+}
+
+// ── SkipNode ───────────────────────────────────────────────────────────────────
+//
+// Each node holds a key, a value, and an array of successor pointers (one per
+// level).  `nexts[i]` is the next node at level i, or null if this is the
+// last node at that level.
+class SkipNode {
+public:
+  val key: Int
+  var value: String
+  var nexts: SkipNode?[]    // nexts[i] = successor at level i
+
+  def this(k: Int, v: String, levels: Int) {
+    key   = k
+    value = v
+    nexts = new SkipNode?[levels]
+  }
+}
+
+// ── SkipList ───────────────────────────────────────────────────────────────────
+class SkipList {
+  static val MAX_LEVEL: Int = 8    // number of levels (indices 0..7)
+  static val PROB: Double   = 0.5d // probability of promoting a node one level
+public:
+  var maxLevel: Int       // highest level currently in use (0 = flat list)
+  val head: SkipNode      // sentinel: key=INT_MIN, never exposed to callers
+  var count: Int          // number of stored key-value entries
+
+  def this() {
+    maxLevel = 0
+    head     = new SkipNode(JInt::MIN_VALUE, "<head>", SkipList::MAX_LEVEL)
+    count    = 0
+  }
+
+  // Returns a random level in [0, MAX_LEVEL) via geometric distribution.
+  def randomLevel(): Int {
+    var lvl: Int = 0
+    while Rand::nextDouble() < SkipList::PROB && lvl < SkipList::MAX_LEVEL - 1 {
+      lvl++
+    }
+    return lvl
+  }
+
+  // Insert or update the entry with the given key.
+  def insert(key: Int, value: String): void {
+    val update: SkipNode?[] = new SkipNode?[SkipList::MAX_LEVEL]
+    var curr: SkipNode = head
+    var i: Int = maxLevel
+    while i >= 0 {
+      var fwd: SkipNode? = curr.nexts[i]
+      while fwd != null && (fwd as SkipNode).key < key {
+        curr = fwd as SkipNode
+        fwd  = curr.nexts[i]
+      }
+      update[i] = curr
+      i--
+    }
+    // Check whether key already exists at level 0.
+    val fwd0: SkipNode? = curr.nexts[0]
+    if fwd0 != null && (fwd0 as SkipNode).key == key {
+      (fwd0 as SkipNode).value = value   // update in place
+      return
+    }
+    val newLvl: Int = randomLevel()
+    if newLvl > maxLevel {
+      var j: Int = maxLevel + 1
+      while j <= newLvl { update[j] = head; j++ }
+      maxLevel = newLvl
+    }
+    val node: SkipNode = new SkipNode(key, value, SkipList::MAX_LEVEL)
+    var l: Int = 0
+    while l <= newLvl {
+      val upd: SkipNode = update[l] as SkipNode
+      node.nexts[l] = upd.nexts[l]
+      upd.nexts[l]  = node
+      l++
+    }
+    count++
+  }
+
+  // Returns the value for key, or null if not found.
+  def search(key: Int): String? {
+    var curr: SkipNode = head
+    var i: Int = maxLevel
+    while i >= 0 {
+      var fwd: SkipNode? = curr.nexts[i]
+      while fwd != null && (fwd as SkipNode).key < key {
+        curr = fwd as SkipNode
+        fwd  = curr.nexts[i]
+      }
+      i--
+    }
+    val candidate: SkipNode? = curr.nexts[0]
+    if candidate != null && (candidate as SkipNode).key == key {
+      return (candidate as SkipNode).value
+    }
+    return null
+  }
+
+  // Returns true if the key was present and has been removed.
+  def delete(key: Int): Boolean {
+    val update: SkipNode?[] = new SkipNode?[SkipList::MAX_LEVEL]
+    var curr: SkipNode = head
+    var i: Int = maxLevel
+    while i >= 0 {
+      var fwd: SkipNode? = curr.nexts[i]
+      while fwd != null && (fwd as SkipNode).key < key {
+        curr = fwd as SkipNode
+        fwd  = curr.nexts[i]
+      }
+      update[i] = curr
+      i--
+    }
+    val target: SkipNode? = curr.nexts[0]
+    if target == null || (target as SkipNode).key != key { return false }
+    val t: SkipNode = target as SkipNode
+    var l: Int = 0
+    while l <= maxLevel {
+      val upd: SkipNode = update[l] as SkipNode
+      if upd.nexts[l] == t { upd.nexts[l] = t.nexts[l] }
+      l++
+    }
+    while maxLevel > 0 && head.nexts[maxLevel] == null { maxLevel-- }
+    count--
+    return true
+  }
+
+  // Returns "key=value" strings in ascending key order.
+  def toSortedList(): List[String] {
+    val result: List[String] = []
+    var curr: SkipNode? = head.nexts[0]
+    while curr != null {
+      val node: SkipNode = curr as SkipNode
+      result.add("#{node.key}=#{node.value}")
+      curr = node.nexts[0]
+    }
+    return result
+  }
+
+  // Returns all entries as Entry records in ascending key order.
+  def entries(): List[Object] {
+    val result: List[Object] = []
+    var curr: SkipNode? = head.nexts[0]
+    while curr != null {
+      val node: SkipNode = curr as SkipNode
+      result.add(new Entry(node.key, node.value))
+      curr = node.nexts[0]
+    }
+    return result
+  }
+
+  def size(): Int = count
+
+  // Diagnostic: print the multi-level pointer structure.
+  def debugPrint(): void {
+    IO::println("SkipList [levels=#{maxLevel + 1}, size=#{count}]")
+    var lvl: Int = maxLevel
+    while lvl >= 0 {
+      var line: String = "  L" + lvl + ":"
+      var curr: SkipNode? = head.nexts[lvl]
+      while curr != null {
+        val node: SkipNode = curr as SkipNode
+        line = line + " " + node.key.padLeft(4)
+        curr = node.nexts[lvl]
+      }
+      IO::println(line)
+      lvl--
+    }
+  }
+}
+
+// ── Entry record (key-value pair snapshot) ─────────────────────────────────────
+record Entry(key: Int, value: String)
+
+// ── Priority classification ────────────────────────────────────────────────────
+enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
+
+def priorityOf(score: Int): Priority =
+  if score >= 90      { Priority::CRITICAL }
+  else if score >= 70 { Priority::HIGH }
+  else if score >= 50 { Priority::MEDIUM }
+  else                { Priority::LOW }
+
+def priorityLabel(p: Priority): String = select p {
+  case Priority::CRITICAL: "CRIT"
+  case Priority::HIGH:     "HIGH"
+  case Priority::MEDIUM:   "MED "
+  case Priority::LOW:      "LOW "
+}
+
+// ── Demo ───────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // 1. Insert items ─────────────────────────────────────────────────────────────
+  val sl: SkipList = new SkipList()
+  val names: List[String] = [
+    "alpha", "bravo", "charlie", "delta", "echo",
+    "foxtrot", "golf", "hotel", "india", "juliet",
+    "kilo", "lima", "mike", "november", "oscar"
+  ]
+  val rawScores: List[Object] = [42, 87, 63, 95, 71, 58, 34, 78, 91, 55,
+                                  67, 82, 44, 76, 89]
+  var idx: Int = 0
+  foreach name: String in names {
+    val score: Int = rawScores[idx] as Int
+    sl.insert(score, name)
+    idx++
+  }
+
+  IO::println("=== After inserting #{sl.size()} entries ===")
+  sl.debugPrint()
+  IO::println("")
+
+  // 2. Search ───────────────────────────────────────────────────────────────────
+  IO::println("=== Search results ===")
+  val probes: List[Object] = [34, 71, 95, 100, 42]
+  foreach raw: Object in probes {
+    val k: Int = raw as Int
+    val found: String? = sl.search(k)
+    if found != null {
+      IO::println("  search(#{k.padLeft(3)}) → \"#{found as String}\"")
+    } else {
+      IO::println("  search(#{k.padLeft(3)}) → <not found>")
+    }
+  }
+  IO::println("")
+
+  // 3. Delete some keys ─────────────────────────────────────────────────────────
+  val toDelete: List[Object] = [34, 91, 55]
+  IO::println("=== Deleting keys #{toDelete} ===")
+  foreach raw: Object in toDelete {
+    val k: Int = raw as Int
+    val ok: Boolean = sl.delete(k)
+    IO::println("  delete(#{k.padLeft(3)}) → #{ok}")
+  }
+  IO::println("  size after: #{sl.size()}")
+  IO::println("")
+
+  // 4. Sorted listing ───────────────────────────────────────────────────────────
+  IO::println("=== Sorted entries (score → name) ===")
+  foreach pair: Object in sl.toSortedList() {
+    IO::println("  #{pair as String}")
+  }
+  IO::println("")
+
+  // 5. Analytics with collection pipelines ─────────────────────────────────────
+  IO::println("=== Analytics ===")
+  val allEntries: List[Object] = sl.entries()
+  var total: Int = 0
+  foreach raw: Object in allEntries { total = total + (raw as Entry).key() }
+  val avg: Double = total as Double / allEntries.size() as Double
+  IO::println("  count : #{allEntries.size()}")
+  IO::println("  sum   : #{total}")
+  IO::println("  avg   : #{avg}")
+
+  val highScorers: List[Object] = allEntries.filter { e -> (e as Entry).key() >= 70 }
+  IO::println("  >=70  : #{highScorers.size()} entries")
+
+  val topNames: List[Object] = highScorers
+    .sortedBy { e -> 0 - (e as Entry).key() }
+    .map { e -> (e as Entry).value() }
+  IO::println("  top (desc): #{topNames}")
+  IO::println("")
+
+  // 6. Priority breakdown ───────────────────────────────────────────────────────
+  IO::println("=== Priority breakdown ===")
+  IO::println("  " + "KEY".padRight(5) + "NAME         ".padRight(14) + "PRIO")
+  IO::println("  " + "---".padRight(5) + "-------------".padRight(14) + "----")
+  foreach raw: Object in allEntries.sortedBy { e -> 0 - (e as Entry).key() } {
+    val e: Entry = raw as Entry
+    val pLabel: String = priorityLabel(priorityOf(e.key()))
+    IO::println("  " + e.key().padLeft(4) + " " + e.value().truncate(12).padRight(13) + " " + pLabel)
+  }
+  IO::println("")
+
+  // 7. Update an existing key ───────────────────────────────────────────────────
+  IO::println("=== Update key 63 (charlie -> CHARLIE) ===")
+  sl.insert(63, "CHARLIE")
+  IO::println("  search(63) = #{sl.search(63) ?: "<missing>"}")
+  IO::println("")
+
+  // 8. Final structure ──────────────────────────────────────────────────────────
+  IO::println("=== Final structure ===")
+  sl.debugPrint()
+}

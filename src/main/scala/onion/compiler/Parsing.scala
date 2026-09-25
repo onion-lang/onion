@@ -113,6 +113,11 @@ class Parsing(config: CompilerConfig) extends AnyRef
     } catch {
       case _: IOException =>
         problems += CompileError(null, null, Message("error.parsing.read_error", source.name))
+      case e: Error if !e.isInstanceOf[VirtualMachineError] =>
+        // The lexer throws java.lang.Error for invalid source (e.g. a truncated \uXXXX
+        // escape). Catch it here so it surfaces as a parse error instead of I0000.
+        val msg = if (e.getMessage != null) e.getMessage else "invalid source"
+        problems += CompileError(source.name, new Location(1, 1), msg)
     }
   }
 

@@ -1,0 +1,284 @@
+// BTree.on — B-tree of minimum degree t=2 (a.k.a. 2-3-4 tree).
+// Each node holds 1..3 keys; internal nodes hold 2..4 children.
+// Exercises: classes with public: sections, nullable arrays, recursion,
+// mutable Int[] manipulation, while/foreach/for loops, string interpolation,
+// ArrayList, pattern-free structural algorithms, typed List[Int] pipelines.
+
+// ── Extension: string repetition ─────────────────────────────────────────────
+
+extension String {
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ── BTreeNode ─────────────────────────────────────────────────────────────────
+
+class BTreeNode {
+  var t_: Int
+  var keys_: Int[]
+  var children_: BTreeNode[]
+  var n_: Int
+  var leaf_: Boolean
+
+public:
+  def this(t: Int, isLeaf: Boolean) {
+    t_ = t
+    leaf_ = isLeaf
+    n_ = 0
+    keys_ = new Int[2 * t - 1]
+    children_ = new BTreeNode[2 * t]
+  }
+
+  def t(): Int = t_
+  def n(): Int = n_
+  def leaf(): Boolean = leaf_
+  def keys(): Int[] = keys_
+  def children(): BTreeNode[] = children_
+
+  def setN(v: Int): void { n_ = v }
+  def setLeaf(v: Boolean): void { leaf_ = v }
+
+  // Find the first index i such that keys_[i] >= key
+  def findPos(key: Int): Int {
+    var i: Int = 0
+    while i < n_ && keys_[i] < key { i++ }
+    return i
+  }
+}
+
+// ── BTree ─────────────────────────────────────────────────────────────────────
+
+class BTree {
+  var root_: BTreeNode?
+  val t_: Int
+
+public:
+  def this(t: Int) {
+    t_ = t
+    root_ = null
+  }
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+
+  def search(key: Int): Boolean = searchNode(root_, key)
+
+  def searchNode(node: BTreeNode?, key: Int): Boolean {
+    if node == null { return false }
+    val nd: BTreeNode = (node as BTreeNode)
+    val i: Int = nd.findPos(key)
+    if i < nd.n() && nd.keys()[i] == key { return true }
+    if nd.leaf() { return false }
+    return searchNode(nd.children()[i], key)
+  }
+
+  // ── Insertion ──────────────────────────────────────────────────────────────
+
+  def insert(key: Int): void {
+    if root_ == null {
+      val r: BTreeNode = new BTreeNode(t_, true)
+      r.keys()[0] = key
+      r.setN(1)
+      root_ = r
+      return
+    }
+    val r: BTreeNode = (root_ as BTreeNode)
+    if r.n() == 2 * t_ - 1 {
+      // Root is full — grow the tree upward
+      val s: BTreeNode = new BTreeNode(t_, false)
+      s.children()[0] = r
+      splitChild(s, 0, r)
+      val idx: Int = if s.keys()[0] < key { 1 } else { 0 }
+      insertNonFull(s.children()[idx], key)
+      root_ = s
+    } else {
+      insertNonFull(r, key)
+    }
+  }
+
+  // Insert into a guaranteed-non-full node
+  def insertNonFull(node: BTreeNode, key: Int): void {
+    var i: Int = node.n() - 1
+    if node.leaf() {
+      while i >= 0 && node.keys()[i] > key {
+        node.keys()[i + 1] = node.keys()[i]
+        i--
+      }
+      node.keys()[i + 1] = key
+      node.setN(node.n() + 1)
+    } else {
+      while i >= 0 && node.keys()[i] > key { i-- }
+      i++
+      val child: BTreeNode = node.children()[i]
+      if child.n() == 2 * t_ - 1 {
+        splitChild(node, i, child)
+        if node.keys()[i] < key { i++ }
+      }
+      insertNonFull(node.children()[i], key)
+    }
+  }
+
+  // Split the i-th full child of parent
+  def splitChild(parent: BTreeNode, i: Int, child: BTreeNode): void {
+    val z: BTreeNode = new BTreeNode(t_, child.leaf())
+    z.setN(t_ - 1)
+    // Copy right half of child's keys → z
+    for var j: Int = 0; j < t_ - 1; j++ {
+      z.keys()[j] = child.keys()[j + t_]
+    }
+    // Copy right half of child's children (if not leaf) → z
+    if !child.leaf() {
+      for var j: Int = 0; j < t_; j++ {
+        z.children()[j] = child.children()[j + t_]
+      }
+    }
+    child.setN(t_ - 1)
+    // Shift parent's children right
+    for var j: Int = parent.n(); j >= i + 1; j-- {
+      parent.children()[j + 1] = parent.children()[j]
+    }
+    parent.children()[i + 1] = z
+    // Shift parent's keys right and place median
+    for var j: Int = parent.n() - 1; j >= i; j-- {
+      parent.keys()[j + 1] = parent.keys()[j]
+    }
+    parent.keys()[i] = child.keys()[t_ - 1]
+    parent.setN(parent.n() + 1)
+  }
+
+  // ── Traversals ─────────────────────────────────────────────────────────────
+
+  def inorder(): List[Int] {
+    val result: List[Int] = []
+    inorderNode(root_, result)
+    return result
+  }
+
+  def inorderNode(node: BTreeNode?, result: List[Int]): void {
+    if node == null { return }
+    val nd: BTreeNode = (node as BTreeNode)
+    for var i: Int = 0; i < nd.n(); i++ {
+      if !nd.leaf() { inorderNode(nd.children()[i], result) }
+      result.add(nd.keys()[i])
+    }
+    if !nd.leaf() { inorderNode(nd.children()[nd.n()], result) }
+  }
+
+  // ── Range Query ────────────────────────────────────────────────────────────
+
+  // Simple implementation: full inorder traversal then filter
+  def range(lo: Int, hi: Int): List[Int] {
+    return inorder().filter { x -> (x as Int) >= lo && (x as Int) <= hi }
+  }
+
+  // ── Tree Metrics ───────────────────────────────────────────────────────────
+
+  def height(): Int = heightNode(root_)
+
+  def heightNode(node: BTreeNode?): Int {
+    if node == null { return 0 }
+    val nd: BTreeNode = (node as BTreeNode)
+    if nd.leaf() { return 1 }
+    return 1 + heightNode(nd.children()[0])
+  }
+
+  def size(): Int = sizeNode(root_)
+
+  def sizeNode(node: BTreeNode?): Int {
+    if node == null { return 0 }
+    val nd: BTreeNode = (node as BTreeNode)
+    var count: Int = nd.n()
+    if !nd.leaf() {
+      for var i: Int = 0; i <= nd.n(); i++ {
+        count = count + sizeNode(nd.children()[i])
+      }
+    }
+    return count
+  }
+
+  // ── Pretty Print ───────────────────────────────────────────────────────────
+
+  def print(): void { printNode(root_, 0) }
+
+  def printNode(node: BTreeNode?, depth: Int): void {
+    if node == null { return }
+    val nd: BTreeNode = (node as BTreeNode)
+    val indent: String = "  ".repeat(depth)
+    val leaf: String = if nd.leaf() { " (leaf)" } else { "" }
+    IO::println("#{indent}[#{keysStr(nd)}]#{leaf}")
+    if !nd.leaf() {
+      for var i: Int = 0; i <= nd.n(); i++ {
+        printNode(nd.children()[i], depth + 1)
+      }
+    }
+  }
+
+  def keysStr(nd: BTreeNode): String {
+    var s: String = ""
+    for var i: Int = 0; i < nd.n(); i++ {
+      if i > 0 { s = s + ", " }
+      s = s + nd.keys()[i]
+    }
+    return s
+  }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val bt: BTree = new BTree(2)
+
+  // Insert in shuffled order to exercise splits
+  val values: List[Int] = [10, 20, 5, 6, 12, 30, 7, 17, 3, 2, 15, 25, 35, 22, 19, 1, 8, 11, 14, 27]
+  IO::println("=== Inserting #{values.size()} values ===")
+  foreach v: Int in values { bt.insert(v) }
+
+  IO::println("\nTree structure (height=#{bt.height()}, size=#{bt.size()}):")
+  bt.print()
+
+  IO::println("\nIn-order traversal:")
+  val sorted: List[Int] = bt.inorder()
+  IO::println(sorted.toString())
+
+  IO::println("\nRange query [10, 20]:")
+  val inRange: List[Int] = bt.range(10, 20)
+  IO::println(inRange.toString())
+
+  IO::println("\nSearch tests:")
+  val queries: List[Int] = [1, 5, 15, 21, 30, 35, 99]
+  foreach q: Int in queries {
+    IO::println("  search(#{q}) = #{bt.search(q)}")
+  }
+
+  // Verify sorted order
+  IO::println("\nVerification: #{sorted.size()} keys, ascending?")
+  var ok: Boolean = true
+  for var i: Int = 0; i < sorted.size() - 1; i++ {
+    if (sorted[i] as Int) >= (sorted[i + 1] as Int) { ok = false }
+  }
+  IO::println("  Order correct: #{ok}")
+  IO::println("  Min: #{sorted[0]},  Max: #{sorted[sorted.size() - 1]}")
+
+  // ── Stress test ───────────────────────────────────────────────────────────
+  IO::println("\n=== Stress test: 500 sequential inserts ===")
+  val big: BTree = new BTree(2)
+  for var i: Int = 1; i <= 500; i++ { big.insert(i) }
+  IO::println("Height: #{big.height()},  Size: #{big.size()}")
+  val all: List[Int] = big.inorder()
+  IO::println("First 5: #{all.subList(0, 5)}")
+  IO::println("Last 5:  #{all.subList(495, 500)}")
+  val mid: List[Int] = big.range(245, 255)
+  IO::println("Range [245,255] (#{mid.size()} keys): #{mid}")
+
+  // ── Reverse insert test ───────────────────────────────────────────────────
+  IO::println("\n=== Reverse insert: 100..1 ===")
+  val rev: BTree = new BTree(2)
+  for var i: Int = 100; i >= 1; i-- { rev.insert(i) }
+  IO::println("Height: #{rev.height()},  Size: #{rev.size()}")
+  val revSorted: List[Int] = rev.inorder()
+  IO::println("First 5: #{revSorted.subList(0, 5)}")
+  IO::println("In order? #{(revSorted[0] as Int) == 1 && (revSorted[99] as Int) == 100}")
+}

@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A source file containing a truncated `\uXXXX` Unicode escape (e.g. `\u0e` with fewer than 4 hex digits) crashed the compiler with an internal error (`I0000`) instead of reporting a clean parse error.** `OnionLexer.decode()` throws `java.lang.Error` on this input, which `Parsing.parseFile()`'s `catch` block did not handle (only `IOException` was caught), so it propagated up to `PipelineRunner`'s `NonFatal` handler and surfaced as `I0000`. Added a second `catch` arm in `Parsing.parseFile()` for any non-fatal `Error` (excluding `VirtualMachineError`), converting it into a regular `CompileError` for both the fast-path (`OnionParser`) and JavaCC-fallback parsers (merged via #1525).
+
 ### Added
+
+- **`run/NQueens.on`** — a 334-line N-Queens puzzle solver with solution analytics, a new domain for the `run/` corpus (records with methods `Solution`/`Queen` (`boardLines`/`signature`/`reflected`/`rotated90`/`reflectedV`/`symmetryType`); a data-carrying enum `SymmetryType`; an ADT case-enum `SolveResult` (`Solved`/`NoSolution`) dispatched via `select`; a class `NQueensSolver conforms Summarizable` implementing backtracking search (`backtrack`/`isSafe`); collection pipelines `filter`/`find`/`partition`/`take`/`map`/`fold`; `foreach` over ranges (`0..<n`) and typed lists; nullable `Solution?` return type; extension methods on `Int`/`String` (`lpad`/`rpad`); and string interpolation — verified against OEIS A000170 (N=4..8 solution counts), rendering solution counts, board visualizations, symmetry classification, and column-frequency analysis), added to the `run/` corpus (merged via #1525).
 
 - **`run/CrosswordBuilder.on`** — a 468-line self-contained "Programming Languages" crossword puzzle builder and validator, a new domain for the `run/` corpus (an ADT enum `Direction` (`Across`/`Down`) dispatched via `select`; a data-carrying enum `WordRating` with `stars`/`desc` fields; records with methods `ClueEntry`/`PuzzleStats`; a class managing a 2D `List[List[String]]` grid (`canPlace`/`place`/`fillBlacks`); five DOWN words engineered to cross the anchor word SYNTAX at every letter position (5 verified intersections, 17/17 placements succeed deterministically); collection pipelines `map`/`filter`/`fold`/`sortedBy`/`distinct`/`groupBy`/`find`/`partition`; extension methods on `Int`/`String`/`Double` (`lpad`/`rpad`/`ch`/`round1`); closures, nullable `String?`, the Elvis operator; `try`/`catch`; string interpolation; and recursion — rendering the puzzle grid, a clue list, and placement/fill statistics), added to the `run/` corpus (merged via #1520).
 

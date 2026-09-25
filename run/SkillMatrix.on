@@ -1,0 +1,405 @@
+// SkillMatrix.on — team competency matrix and project staffing advisor
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/sortedByDescending/
+// find/take/distinct), select/pattern matching, nullable, closures,
+// string interpolation, extension methods, while/foreach/ranges.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ProficiencyLevel(score: Int, label: String) {
+  Novice(1, "Novice"),
+  Beginner(2, "Beginner"),
+  Intermediate(3, "Intermediate"),
+  Advanced(4, "Advanced"),
+  Expert(5, "Expert")
+}
+
+enum ProjectStatus { Planning, Active, OnHold, Done }
+
+// ─── ADT: Training recommendation ─────────────────────────────────────────────
+
+enum Recommendation {
+  case SelfStudy(topic: String, hours: Int)
+  case Mentorship(topic: String, mentor: String)
+  case FormalTraining(topic: String, course: String)
+  case AlreadyProficient
+public:
+  def describe(): String = select this {
+    case r is SelfStudy:       "Self-study '#{r.topic()}' (~#{r.hours()}h)"
+    case r is Mentorship:      "Mentorship on '#{r.topic()}' by #{r.mentor()}"
+    case r is FormalTraining:  "Formal training: #{r.course()} (#{r.topic()})"
+    case a is AlreadyProficient: "No training needed"
+  }
+  def isNeeded(): Boolean = select this {
+    case a is AlreadyProficient: false
+    else: true
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record SkillRating(skill: String, level: ProficiencyLevel)
+
+record Engineer(id: Int, name: String, team: String, ratings: List[SkillRating]) {
+public:
+  def proficiency(skill: String): ProficiencyLevel? {
+    val found = ratings().find { sr -> (sr as SkillRating).skill() == skill }
+    return if found == null { null } else { (found as SkillRating).level() }
+  }
+  def score(skill: String): Int {
+    val lv = proficiency(skill)
+    return if lv == null { 0 } else { (lv as ProficiencyLevel).score() }
+  }
+  def knownSkills(): List[String] =
+    ratings().map { sr -> (sr as SkillRating).skill() }
+}
+
+record ProjectRequirement(skill: String, minLevel: ProficiencyLevel) {
+public:
+  def label(): String = "#{skill()} >= #{minLevel().label()}"
+}
+
+record Project(id: Int, name: String, status: ProjectStatus,
+               requirements: List[ProjectRequirement]) {
+public:
+  def isActive(): Boolean = select status() {
+    case ProjectStatus::Active:   true
+    case ProjectStatus::Planning: true
+    else:                         false
+  }
+}
+
+record EngineScore(engineer: Engineer, score: Int)
+
+record Assignment(engineer: Engineer, requirement: ProjectRequirement) {
+public:
+  def label(): String = "#{engineer().name()} → #{requirement().skill()}"
+}
+
+record SkillGap(requirement: ProjectRequirement, bestCandidate: Engineer?) {
+public:
+  def describe(): String {
+    val bc = bestCandidate()
+    val cname = if bc == null { "none available" } else { (bc as Engineer).name() + " (partial)" }
+    return "MISSING #{requirement().label()} — best: #{cname}"
+  }
+}
+
+record StaffingResult(project: Project, assignments: List[Assignment],
+                      gaps: List[SkillGap]) {
+public:
+  def isFullyStaffed(): Boolean = gaps().size == 0
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "*"; i = i + 1 }
+    return s
+  }
+  def bar(ch: String): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + ch; i = i + 1 }
+    return s
+  }
+}
+
+extension String {
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Core logic ───────────────────────────────────────────────────────────────
+
+def recommend(eng: Engineer, skill: String, expertName: String): Recommendation {
+  val lv = eng.proficiency(skill)
+  if lv == null {
+    return new FormalTraining(skill, "Intro to " + skill)
+  }
+  return select (lv as ProficiencyLevel) {
+    case ProficiencyLevel::Novice:       new Mentorship(skill, expertName)
+    case ProficiencyLevel::Beginner:     new SelfStudy(skill, 20)
+    case ProficiencyLevel::Intermediate: new SelfStudy(skill, 10)
+    else:                                new AlreadyProficient()
+  }
+}
+
+def staffProject(project: Project, engineers: List[Engineer]): StaffingResult {
+  val assignments: List[Assignment] = []
+  val gaps: List[SkillGap] = []
+  foreach req: ProjectRequirement in project.requirements() {
+    val skill = req.skill()
+    val minScore = req.minLevel().score()
+    val candidates = engineers
+      .filter { e -> (e as Engineer).score(skill) >= minScore }
+      .sortedByDescending { e -> (e as Engineer).score(skill) }
+    if (candidates as List[Engineer]).size > 0 {
+      val eng = (candidates as List[Engineer]).get(0) as Engineer
+      assignments.add(new Assignment(eng, req))
+    } else {
+      val partials = engineers
+        .filter { e -> (e as Engineer).score(skill) > 0 }
+        .sortedByDescending { e -> (e as Engineer).score(skill) }
+      val best: Engineer? = if (partials as List[Engineer]).size > 0 {
+        (partials as List[Engineer]).get(0) as Engineer
+      } else { null }
+      gaps.add(new SkillGap(req, best))
+    }
+  }
+  return new StaffingResult(project, assignments, gaps)
+}
+
+def overallScore(eng: Engineer, skills: List[String]): Int {
+  var total: Int = 0
+  foreach sk: String in skills { total = total + eng.score(sk) }
+  return total
+}
+
+def printDivider(n: Int): void {
+  var s: String = ""
+  foreach i: Int in 1..n { s = s + "─" }
+  IO::println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // ── Sample data ────────────────────────────────────────────────────────────
+
+  val engineers: List[Engineer] = [
+    new Engineer(1, "Alice", "Platform",
+      [new SkillRating("Scala",      ProficiencyLevel::Expert),
+       new SkillRating("Java",       ProficiencyLevel::Advanced),
+       new SkillRating("Kafka",      ProficiencyLevel::Intermediate),
+       new SkillRating("Docker",     ProficiencyLevel::Beginner),
+       new SkillRating("Kubernetes", ProficiencyLevel::Novice)]),
+    new Engineer(2, "Bob", "Platform",
+      [new SkillRating("Java",       ProficiencyLevel::Expert),
+       new SkillRating("Spring",     ProficiencyLevel::Advanced),
+       new SkillRating("Docker",     ProficiencyLevel::Advanced),
+       new SkillRating("Kubernetes", ProficiencyLevel::Intermediate),
+       new SkillRating("Scala",      ProficiencyLevel::Beginner)]),
+    new Engineer(3, "Carol", "Data",
+      [new SkillRating("Python",     ProficiencyLevel::Expert),
+       new SkillRating("Spark",      ProficiencyLevel::Advanced),
+       new SkillRating("Scala",      ProficiencyLevel::Intermediate),
+       new SkillRating("Kafka",      ProficiencyLevel::Advanced),
+       new SkillRating("Docker",     ProficiencyLevel::Intermediate)]),
+    new Engineer(4, "Dave", "Data",
+      [new SkillRating("Python",     ProficiencyLevel::Intermediate),
+       new SkillRating("Spark",      ProficiencyLevel::Intermediate),
+       new SkillRating("Java",       ProficiencyLevel::Beginner),
+       new SkillRating("Docker",     ProficiencyLevel::Novice),
+       new SkillRating("Kafka",      ProficiencyLevel::Beginner)]),
+    new Engineer(5, "Eve", "Frontend",
+      [new SkillRating("React",      ProficiencyLevel::Expert),
+       new SkillRating("TypeScript", ProficiencyLevel::Expert),
+       new SkillRating("Docker",     ProficiencyLevel::Intermediate),
+       new SkillRating("Java",       ProficiencyLevel::Novice),
+       new SkillRating("Python",     ProficiencyLevel::Beginner)])
+  ]
+
+  val projects: List[Project] = [
+    new Project(1, "Data Pipeline v2", ProjectStatus::Active,
+      [new ProjectRequirement("Scala",      ProficiencyLevel::Intermediate),
+       new ProjectRequirement("Kafka",      ProficiencyLevel::Advanced),
+       new ProjectRequirement("Docker",     ProficiencyLevel::Intermediate),
+       new ProjectRequirement("Kubernetes", ProficiencyLevel::Intermediate)]),
+    new Project(2, "API Gateway", ProjectStatus::Planning,
+      [new ProjectRequirement("Java",       ProficiencyLevel::Advanced),
+       new ProjectRequirement("Spring",     ProficiencyLevel::Advanced),
+       new ProjectRequirement("Docker",     ProficiencyLevel::Advanced)]),
+    new Project(3, "ML Platform", ProjectStatus::Active,
+      [new ProjectRequirement("Python",     ProficiencyLevel::Advanced),
+       new ProjectRequirement("Spark",      ProficiencyLevel::Advanced),
+       new ProjectRequirement("Rust",       ProficiencyLevel::Intermediate)]),
+    new Project(4, "Legacy Cleanup", ProjectStatus::OnHold,
+      [new ProjectRequirement("Java",       ProficiencyLevel::Expert)])
+  ]
+
+  val allSkills: List[String] = [
+    "Scala", "Java", "Kafka", "Docker", "Kubernetes",
+    "Python", "Spark", "Spring", "React", "TypeScript"
+  ]
+
+  val coreSkills: List[String] = ["Scala", "Java", "Docker", "Kafka", "Python"]
+
+  // ── Report 1: Skill Matrix ─────────────────────────────────────────────────
+
+  IO::println("╔════════════════════════════════════════════════════╗")
+  IO::println("║           TEAM SKILL MATRIX REPORT                ║")
+  IO::println("╚════════════════════════════════════════════════════╝")
+  IO::println("")
+  IO::println("* = Novice  ** = Beginner  *** = Intermediate")
+  IO::println("**** = Advanced  ***** = Expert   (blank = unknown)")
+  IO::println("")
+
+  var header: String = "Engineer         Team      "
+  foreach sk: String in coreSkills {
+    header = header + sk.rpad(8)
+  }
+  IO::println(header)
+  printDivider(header.length())
+
+  foreach eng: Engineer in engineers {
+    var row: String = eng.name().rpad(17) + eng.team().rpad(10)
+    foreach sk: String in coreSkills {
+      val score = eng.score(sk)
+      row = row + score.stars().rpad(8)
+    }
+    IO::println(row)
+  }
+  IO::println("")
+
+  // ── Report 2: Project Staffing ─────────────────────────────────────────────
+
+  IO::println("=== PROJECT STAFFING ANALYSIS ===")
+  IO::println("")
+
+  foreach proj: Project in projects {
+    if proj.isActive() {
+      val result = staffProject(proj, engineers)
+      val statusStr = select proj.status() {
+        case ProjectStatus::Active:   "[ACTIVE]"
+        case ProjectStatus::Planning: "[PLANNING]"
+        else:                         "[OTHER]"
+      }
+      IO::println("Project: #{proj.name()} #{statusStr}")
+
+      foreach a: Assignment in result.assignments() {
+        IO::println("  ✓ #{a.label()}")
+      }
+      if result.isFullyStaffed() {
+        IO::println("  → Fully staffed!")
+      } else {
+        foreach gap: SkillGap in result.gaps() {
+          IO::println("  ✗ #{gap.describe()}")
+        }
+      }
+      IO::println("")
+    }
+  }
+
+  // ── Report 3: Top Performers ───────────────────────────────────────────────
+
+  IO::println("=== TOP PERFORMERS (all skills combined) ===")
+  IO::println("")
+
+  val ranked = engineers
+    .map { e -> new EngineScore(e as Engineer, overallScore(e as Engineer, allSkills)) }
+    .sortedByDescending { es -> (es as EngineScore).score() }
+    .take(5)
+
+  var rank: Int = 1
+  foreach es: EngineScore in ranked {
+    val eng = es.engineer()
+    val total = es.score()
+    IO::println("  ##{rank}. #{eng.name().rpad(8)} (#{eng.team().rpad(9)}) score=#{total}  #{total.bar("█")}")
+    rank = rank + 1
+  }
+  IO::println("")
+
+  // ── Report 4: Skill Coverage ───────────────────────────────────────────────
+
+  IO::println("=== SKILL COVERAGE (Intermediate+) ===")
+  IO::println("")
+
+  val threshold = ProficiencyLevel::Intermediate.score()
+  foreach sk: String in allSkills {
+    val proficient = engineers.filter { e -> (e as Engineer).score(sk) >= threshold }
+    val count = (proficient as List[Engineer]).size
+    val total = engineers.size
+    IO::println("  #{sk.rpad(12)} #{count.bar("■")}#{(total - count).bar("□")} #{count}/#{total}")
+  }
+  IO::println("")
+
+  // ── Report 5: Training Recommendations ────────────────────────────────────
+
+  IO::println("=== TRAINING RECOMMENDATIONS ===")
+  IO::println("")
+
+  val criticalSkills: List[String] = ["Docker", "Kafka", "Scala", "Kubernetes"]
+  val expertEng = engineers.find { e -> (e as Engineer).name() == "Alice" }
+  val expertName = if expertEng == null { "senior engineer" } else { (expertEng as Engineer).name() }
+
+  foreach eng: Engineer in engineers {
+    val recs = criticalSkills
+      .map { sk -> recommend(eng, sk as String, expertName as String) }
+      .filter { r -> (r as Recommendation).isNeeded() }
+    if (recs as List[Recommendation]).size > 0 {
+      IO::println("  #{eng.name()} (#{eng.team()}):")
+      foreach rec: Recommendation in recs {
+        IO::println("    • #{rec.describe()}")
+      }
+    }
+  }
+  IO::println("")
+
+  // ── Report 6: Team Distribution ───────────────────────────────────────────
+
+  IO::println("=== TEAM DISTRIBUTION ===")
+  IO::println("")
+
+  val byTeam = engineers.groupBy { e -> (e as Engineer).team() }
+  foreach (team, members) in byTeam {
+    val memberList = members as List[Engineer]
+    IO::println("  Team #{team}: #{memberList.size} engineer(s)")
+    val totalScore = memberList.fold(0) { acc, e ->
+      (acc as Int) + overallScore(e as Engineer, coreSkills)
+    }
+    val avg = if memberList.size == 0 { 0 } else { (totalScore as Int) / memberList.size }
+    IO::println("    avg core-skill score: #{avg} / #{5 * coreSkills.size}")
+  }
+  IO::println("")
+
+  // ── Report 7: Skill Diversity ──────────────────────────────────────────────
+
+  IO::println("=== SKILL DIVERSITY ===")
+  IO::println("")
+
+  val allKnownSkills: List[String] = []
+  foreach eng: Engineer in engineers {
+    foreach sk: String in eng.knownSkills() {
+      if !allKnownSkills.contains(sk) { allKnownSkills.add(sk) }
+    }
+  }
+  val sortedSkills = allKnownSkills.sortedBy { s -> s as String }
+  IO::println("  Total distinct skills: #{allKnownSkills.size}")
+  IO::println("  Skills: #{sortedSkills.toString()}")
+  IO::println("")
+
+  // ── Report 8: Year-over-Year plan (synthetic, exercises ranges) ────────────
+
+  IO::println("=== HIRING PLAN (projected, Intermediate+ threshold) ===")
+  IO::println("")
+
+  val targetCoverage = 4
+  foreach sk: String in coreSkills {
+    val current = engineers.filter { e -> (e as Engineer).score(sk) >= threshold }
+    val gap = targetCoverage - (current as List[Engineer]).size
+    if gap > 0 {
+      IO::println("  #{sk.rpad(12)} need #{gap} more Intermediate+ hire(s)")
+    } else {
+      IO::println("  #{sk.rpad(12)} coverage OK (#{(current as List[Engineer]).size}/#{targetCoverage})")
+    }
+  }
+  IO::println("")
+
+  // ── Summary ────────────────────────────────────────────────────────────────
+
+  IO::println("=== SUMMARY ===")
+  val activeProjects = projects.filter { p -> (p as Project).isActive() }
+  val fullyStaffed = activeProjects
+    .filter { p -> staffProject(p as Project, engineers).isFullyStaffed() }
+  IO::println("  Engineers: #{engineers.size} across #{byTeam.size()} teams")
+  IO::println("  Active projects: #{(activeProjects as List[Project]).size} (#{(fullyStaffed as List[Project]).size} fully staffed)")
+  IO::println("  Skills tracked: #{allKnownSkills.size}")
+}

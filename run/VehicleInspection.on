@@ -1,0 +1,274 @@
+// VehicleInspection.on — vehicle inspection and maintenance tracking.
+// Exercises: records, ADT enums, plain enums, interfaces, classes,
+// collection pipelines (filter/map/sortedBy/partition), select with
+// type-pattern exhaustiveness, nullable, string interpolation, foreach,
+// closures, and Format for aligned output.
+
+import {
+  onion.Format
+}
+
+// ── enums ──────────────────────────────────────────────────────────────────
+
+enum VehicleType { CAR, TRUCK, MOTORCYCLE, BUS }
+
+enum Severity { LOW, MEDIUM, HIGH, CRITICAL }
+
+// ADT enum: inspection outcome (sealed hierarchy)
+enum InspectionStatus {
+  case Pass
+  case Advisory(message: String)
+  case Fail(reason: String)
+}
+
+// ── records ────────────────────────────────────────────────────────────────
+
+record Vehicle(
+  id: String,
+  make: String,
+  model: String,
+  year: Int,
+  vehicleType: VehicleType
+)
+
+record Defect(description: String, severity: Severity)
+
+record Inspection(
+  vehicle: Vehicle,
+  inspector: String,
+  mileage: Int,
+  defects: List[Defect],
+  status: InspectionStatus
+)
+
+// ── label helpers ──────────────────────────────────────────────────────────
+
+def typeLabel(t: VehicleType): String =
+  select t {
+    case VehicleType::CAR:        "Car"
+    case VehicleType::TRUCK:      "Truck"
+    case VehicleType::MOTORCYCLE: "Moto"
+    case VehicleType::BUS:        "Bus"
+  }
+
+def severityLabel(s: Severity): String =
+  select s {
+    case Severity::LOW:      "LOW"
+    case Severity::MEDIUM:   "MED"
+    case Severity::HIGH:     "HIGH"
+    case Severity::CRITICAL: "CRIT"
+  }
+
+def statusLabel(s: InspectionStatus): String =
+  select s {
+    case p is Pass:     "PASS"
+    case a is Advisory: "ADVS"
+    case f is Fail:     "FAIL"
+  }
+
+def statusDetail(s: InspectionStatus): String =
+  select s {
+    case p is Pass:     "(no issues)"
+    case a is Advisory: a.message()
+    case f is Fail:     f.reason()
+  }
+
+def pad(s: String, w: Int): String {
+  val n: Int = w - s.length()
+  if n <= 0 { return s }
+  var r: String = s
+  for var i: Int = 0; i < n; i++ { r = r + " " }
+  return r
+}
+
+// ── interfaces and classes ─────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class DefectSummary conforms Reportable {
+  val vehicleId: String
+  val defects: List[Defect]
+public:
+  def this(vehicleId: String, defects: List[Defect]) {
+    self.vehicleId = vehicleId
+    self.defects = defects
+  }
+  def report(): String {
+    if defects.isEmpty {
+      return "#{vehicleId}: no defects"
+    }
+    val critCount: Int = defects.filter { d -> d.severity() == Severity::CRITICAL }.size
+    return "#{vehicleId}: #{defects.size} defect(s), #{critCount} critical"
+  }
+  def hasCritical(): Boolean =
+    defects.find { d -> d.severity() == Severity::CRITICAL } != null
+  def mostSevere(): Severity? {
+    if defects.isEmpty { return null }
+    if defects.find { d -> d.severity() == Severity::CRITICAL } != null { return Severity::CRITICAL }
+    if defects.find { d -> d.severity() == Severity::HIGH }     != null { return Severity::HIGH }
+    if defects.find { d -> d.severity() == Severity::MEDIUM }   != null { return Severity::MEDIUM }
+    return Severity::LOW
+  }
+}
+
+class FleetStats {
+public:
+  val inspections: List[Inspection]
+  def this(inspections: List[Inspection]) {
+    self.inspections = inspections
+  }
+  def passCount(): Int = inspections.filter { i ->
+    select i.status() { case p is Pass: true; else: false }
+  }.size
+  def failCount(): Int = inspections.filter { i ->
+    select i.status() { case f is Fail: true; else: false }
+  }.size
+  def advisoryCount(): Int = inspections.filter { i ->
+    select i.status() { case a is Advisory: true; else: false }
+  }.size
+  def passRate(): Double {
+    if inspections.isEmpty { return 0.0d }
+    return (passCount() as Double) / (inspections.size as Double) * 100.0d
+  }
+  def avgMileage(): Double {
+    if inspections.isEmpty { return 0.0d }
+    var total: Int = 0
+    foreach insp: Inspection in inspections { total = total + insp.mileage() }
+    return (total as Double) / (inspections.size as Double)
+  }
+  def byType(t: VehicleType): List[Inspection] =
+    inspections.filter { i -> i.vehicle().vehicleType() == t }
+}
+
+// ── data ───────────────────────────────────────────────────────────────────
+
+val vehicles: List[Vehicle] = [
+  new Vehicle("V001", "Toyota",   "Camry",    2018, VehicleType::CAR),
+  new Vehicle("V002", "Ford",     "F-150",    2020, VehicleType::TRUCK),
+  new Vehicle("V003", "Honda",    "CBR600",   2019, VehicleType::MOTORCYCLE),
+  new Vehicle("V004", "Mercedes", "Sprinter", 2017, VehicleType::BUS),
+  new Vehicle("V005", "Hyundai",  "Elantra",  2021, VehicleType::CAR)
+]
+
+val inspections: List[Inspection] = [
+  new Inspection(vehicles[0], "Smith", 45200, [
+    new Defect("Worn brake pads",    Severity::HIGH),
+    new Defect("Cracked windshield", Severity::MEDIUM)
+  ], new Fail("Brakes below minimum thickness")),
+
+  new Inspection(vehicles[1], "Jones", 82400, [
+    new Defect("Rear tire tread low", Severity::MEDIUM)
+  ], new Advisory("Replace rear tires within 3000 km")),
+
+  new Inspection(vehicles[2], "Smith", 12800, [], new Pass()),
+
+  new Inspection(vehicles[3], "Brown", 198000, [
+    new Defect("Oil leak (minor)",  Severity::LOW),
+    new Defect("ABS sensor fault",  Severity::CRITICAL),
+    new Defect("Exhaust noise",     Severity::MEDIUM)
+  ], new Fail("ABS failure — vehicle unsafe")),
+
+  new Inspection(vehicles[4], "Jones", 31500, [
+    new Defect("Headlight alignment", Severity::LOW)
+  ], new Advisory("Adjust headlights before night driving"))
+]
+
+// ── reporting ───────────────────────────────────────────────────────────────
+
+def printSep(): void {
+  IO::println("+" + "-".repeat(6) + "+" + "-".repeat(20) + "+" + "-".repeat(7) + "+" + "-".repeat(12) + "+" + "-".repeat(8) + "+")
+}
+
+def printInspectionTable(): void {
+  IO::println("--- Inspection Summary ---")
+  printSep()
+  IO::println("| #{pad("ID", 4)} | #{pad("Vehicle", 18)} | #{pad("Type", 5)} | #{pad("Mileage", 10)} | #{pad("Status", 6)} |")
+  printSep()
+  foreach insp: Inspection in inspections {
+    val v: Vehicle = insp.vehicle()
+    val label: String = "#{v.make()} #{v.model()}"
+    val km: String = Format::number(insp.mileage() as Double, 0) + " km"
+    IO::println("| #{pad(v.id(), 4)} | #{pad(label, 18)} | #{pad(typeLabel(v.vehicleType()), 5)} | #{pad(km, 10)} | #{pad(statusLabel(insp.status()), 6)} |")
+  }
+  printSep()
+}
+
+def printDefectDetails(): void {
+  IO::println("")
+  IO::println("--- Defect Details ---")
+  foreach insp: Inspection in inspections {
+    if insp.defects().isEmpty { }
+    else {
+      val v: Vehicle = insp.vehicle()
+      IO::println("  #{v.id()} #{v.make()} #{v.model()} (#{v.year()}):")
+      foreach d: Defect in insp.defects() {
+        IO::println("    [#{severityLabel(d.severity())}] #{d.description()}")
+      }
+      val ds = new DefectSummary(v.id(), insp.defects())
+      val ms: Severity? = ds.mostSevere()
+      if ms != null {
+        IO::println("    Highest severity: #{severityLabel(ms)}")
+      }
+    }
+  }
+}
+
+def printStats(stats: FleetStats): void {
+  IO::println("")
+  IO::println("--- Fleet Statistics ---")
+  IO::println("  Total:       #{stats.inspections.size}")
+  IO::println("  Passed:      #{stats.passCount()}")
+  IO::println("  Advisories:  #{stats.advisoryCount()}")
+  IO::println("  Failed:      #{stats.failCount()}")
+  IO::println("  Pass rate:   #{Format::fixed(stats.passRate(), 1)}%")
+  IO::println("  Avg mileage: #{Format::number(stats.avgMileage(), 0)} km")
+  IO::println("")
+  IO::println("  By vehicle type:")
+  val types: List[VehicleType] = [VehicleType::CAR, VehicleType::TRUCK, VehicleType::MOTORCYCLE, VehicleType::BUS]
+  foreach t: VehicleType in types {
+    val grp: List[Inspection] = stats.byType(t)
+    if !grp.isEmpty {
+      IO::println("    #{pad(typeLabel(t), 12)} #{grp.size} inspection(s)")
+    }
+  }
+}
+
+def printCriticalAlerts(): void {
+  IO::println("")
+  IO::println("--- Critical Alerts ---")
+  var found: Boolean = false
+  foreach insp: Inspection in inspections {
+    val ds = new DefectSummary(insp.vehicle().id(), insp.defects())
+    if ds.hasCritical() {
+      val v: Vehicle = insp.vehicle()
+      IO::println("  !! #{v.id()} #{v.make()} #{v.model()} (#{v.year()}) — CRITICAL defect — REMOVE FROM SERVICE")
+      found = true
+    }
+  }
+  if !found { IO::println("  (none)") }
+}
+
+def printSorted(): void {
+  IO::println("")
+  IO::println("--- Inspections by Mileage (descending) ---")
+  val sorted: List[Inspection] = inspections.sortedBy { i -> 0 - i.mileage() }
+  foreach insp: Inspection in sorted {
+    val v: Vehicle = insp.vehicle()
+    IO::println("  #{Format::number(insp.mileage() as Double, 0)} km — #{v.id()} #{v.make()} #{v.model()}: #{statusDetail(insp.status())}")
+  }
+}
+
+def main(): void {
+  IO::println("=== Vehicle Inspection Management System ===")
+  IO::println("")
+  printInspectionTable()
+  printDefectDetails()
+  val stats = new FleetStats(inspections)
+  printStats(stats)
+  printCriticalAlerts()
+  printSorted()
+  IO::println("")
+  IO::println("Report complete.")
+}

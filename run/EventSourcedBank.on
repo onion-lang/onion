@@ -1,0 +1,338 @@
+// EventSourcedBank.on — event-sourced bank account system
+import {
+  java.lang.Math
+}
+
+// ── Domain events (ADT enum) ──────────────────────────────────────────────────
+
+enum BankEvent {
+  case AccountOpened(accountId: String, owner: String, initialBalance: Double)
+  case MoneyDeposited(accountId: String, amount: Double, description: String)
+  case MoneyWithdrawn(accountId: String, amount: Double, description: String)
+  case TransferSent(fromId: String, toId: String, amount: Double)
+  case AccountClosed(accountId: String, reason: String)
+
+  public:
+  def accountId(): String = select this {
+    case e is AccountOpened:  e.accountId()
+    case e is MoneyDeposited: e.accountId()
+    case e is MoneyWithdrawn: e.accountId()
+    case e is TransferSent:   e.fromId()
+    case e is AccountClosed:  e.accountId()
+  }
+
+  def eventName(): String = select this {
+    case e is AccountOpened:  "AccountOpened"
+    case e is MoneyDeposited: "MoneyDeposited"
+    case e is MoneyWithdrawn: "MoneyWithdrawn"
+    case e is TransferSent:   "TransferSent"
+    case e is AccountClosed:  "AccountClosed"
+  }
+}
+
+// ── Account state snapshot ────────────────────────────────────────────────────
+
+record AccountSnapshot(
+  accountId: String, owner: String,
+  balance: Double, isOpen: Boolean, txCount: Int
+)
+
+// ── Extension: Double → money string ─────────────────────────────────────────
+
+extension Double {
+  def fmtMoney(): String {
+    val sign: String  = if self < 0.0d { "-" } else { "" }
+    val abs: Double   = if self < 0.0d { 0.0d - self } else { self }
+    val whole: Long   = abs.longValue()
+    val fracRaw: Long = ((abs - whole.doubleValue()) * 100.0d).longValue()
+    val frac: String  = if fracRaw < 10L { "0" + fracRaw } else { "" + fracRaw }
+    return sign + "$" + whole + "." + frac
+  }
+}
+
+// ── EventStore ────────────────────────────────────────────────────────────────
+
+class EventStore {
+  var log: List[BankEvent]
+  var seqCounter: Int
+  public:
+  def this() {
+    this.log        = []
+    this.seqCounter = 0
+  }
+  def append(ev: BankEvent): void {
+    log.add(ev)
+    seqCounter = seqCounter + 1
+  }
+  def eventsFor(id: String): List[BankEvent] =
+    log.filter { e: BankEvent -> e.accountId() == id }
+  def allEvents(): List[BankEvent] = log
+  def size(): Int = log.size
+}
+
+// ── Account projection (replays events → snapshot) ───────────────────────────
+
+class AccountProjection {
+  public:
+  def project(events: List[BankEvent]): AccountSnapshot? {
+    if events.size == 0 { return null }
+    var snap: AccountSnapshot? = null
+    foreach ev: BankEvent in events {
+      select ev {
+        case e is AccountOpened: {
+          snap = new AccountSnapshot(e.accountId(), e.owner(), e.initialBalance(), true, 1)
+        }
+        case e is MoneyDeposited: {
+          if snap != null {
+            val s: AccountSnapshot = snap!!
+            snap = new AccountSnapshot(s.accountId(), s.owner(),
+              s.balance() + e.amount(), s.isOpen(), s.txCount() + 1)
+          }
+        }
+        case e is MoneyWithdrawn: {
+          if snap != null {
+            val s: AccountSnapshot = snap!!
+            snap = new AccountSnapshot(s.accountId(), s.owner(),
+              s.balance() - e.amount(), s.isOpen(), s.txCount() + 1)
+          }
+        }
+        case e is TransferSent: {
+          if snap != null {
+            val s: AccountSnapshot = snap!!
+            snap = new AccountSnapshot(s.accountId(), s.owner(),
+              s.balance() - e.amount(), s.isOpen(), s.txCount() + 1)
+          }
+        }
+        case e is AccountClosed: {
+          if snap != null {
+            val s: AccountSnapshot = snap!!
+            snap = new AccountSnapshot(s.accountId(), s.owner(),
+              s.balance(), false, s.txCount() + 1)
+          }
+        }
+      }
+    }
+    return snap
+  }
+}
+
+// ── Command functions ────────────────────────────────────────────────────────
+
+def openAccount(store: EventStore, id: String, owner: String, initial: Double): void {
+  store.append(new AccountOpened(id, owner, initial))
+  IO::println("  [cmd] Opened account #{id} for #{owner} with #{initial.fmtMoney()}")
+}
+
+def deposit(store: EventStore, id: String, amount: Double, desc: String): void {
+  store.append(new MoneyDeposited(id, amount, desc))
+  IO::println("  [cmd] Deposit #{amount.fmtMoney()} → #{id}: #{desc}")
+}
+
+def withdraw(store: EventStore, proj: AccountProjection, id: String, amount: Double, desc: String): Boolean {
+  val snap: AccountSnapshot? = proj.project(store.eventsFor(id))
+  if snap == null { IO::println("  [cmd] FAIL: account #{id} not found"); return false }
+  val s: AccountSnapshot = snap!!
+  if !s.isOpen() { IO::println("  [cmd] FAIL: account #{id} is closed"); return false }
+  if s.balance() < amount {
+    IO::println("  [cmd] FAIL: insufficient funds in #{id} (#{s.balance().fmtMoney()} < #{amount.fmtMoney()})")
+    return false
+  }
+  store.append(new MoneyWithdrawn(id, amount, desc))
+  IO::println("  [cmd] Withdraw #{amount.fmtMoney()} ← #{id}: #{desc}")
+  return true
+}
+
+def transfer(store: EventStore, proj: AccountProjection, fromId: String, toId: String, amount: Double): Boolean {
+  val fromSnap: AccountSnapshot? = proj.project(store.eventsFor(fromId))
+  val toSnap: AccountSnapshot?   = proj.project(store.eventsFor(toId))
+  if fromSnap == null { IO::println("  [cmd] FAIL: source #{fromId} not found"); return false }
+  if toSnap == null   { IO::println("  [cmd] FAIL: dest #{toId} not found"); return false }
+  val from: AccountSnapshot = fromSnap!!
+  if from.balance() < amount {
+    IO::println("  [cmd] FAIL: insufficient funds for transfer (#{from.balance().fmtMoney()} < #{amount.fmtMoney()})")
+    return false
+  }
+  store.append(new TransferSent(fromId, toId, amount))
+  store.append(new MoneyDeposited(toId, amount, "Transfer from #{fromId}"))
+  IO::println("  [cmd] Transfer #{amount.fmtMoney()} from #{fromId} to #{toId}")
+  return true
+}
+
+def closeAccount(store: EventStore, id: String, reason: String): void {
+  store.append(new AccountClosed(id, reason))
+  IO::println("  [cmd] Closed account #{id}: #{reason}")
+}
+
+// ── Reporting helpers ────────────────────────────────────────────────────────
+
+def printSnapshot(proj: AccountProjection, store: EventStore, id: String): void {
+  val snap: AccountSnapshot? = proj.project(store.eventsFor(id))
+  if snap == null {
+    IO::println("  Account #{id}: NOT FOUND")
+    return
+  }
+  val s: AccountSnapshot = snap!!
+  val status: String = if s.isOpen() { "OPEN" } else { "CLOSED" }
+  IO::println("  Account #{s.accountId()} (#{s.owner()}) — #{status}")
+  IO::println("    Balance: #{s.balance().fmtMoney()}  TxCount: #{s.txCount()}")
+}
+
+def printEventLog(store: EventStore, id: String): void {
+  val events: List[BankEvent] = store.eventsFor(id)
+  IO::println("  Event log for #{id} (#{events.size} events):")
+  var seq: Int = 0
+  foreach ev: BankEvent in events {
+    seq = seq + 1
+    val detail: String = select ev {
+      case e is AccountOpened:  "opened, initial=#{e.initialBalance().fmtMoney()}"
+      case e is MoneyDeposited: "+#{e.amount().fmtMoney()} (#{e.description()})"
+      case e is MoneyWithdrawn: "-#{e.amount().fmtMoney()} (#{e.description()})"
+      case e is TransferSent:   "transfer -#{e.amount().fmtMoney()} to #{e.toId()}"
+      case e is AccountClosed:  "closed: #{e.reason()}"
+    }
+    IO::println("    [#{seq}] #{ev.eventName()}: #{detail}")
+  }
+}
+
+// ── Report: account summary table ────────────────────────────────────────────
+
+record AccountRow(id: String, owner: String, balance: Double, txCount: Int, status: String)
+
+def buildSummary(proj: AccountProjection, store: EventStore, ids: List[String]): List[AccountRow] {
+  val rows: List[AccountRow] = []
+  foreach id: String in ids {
+    val snap: AccountSnapshot? = proj.project(store.eventsFor(id))
+    if snap != null {
+      val s: AccountSnapshot = snap!!
+      val status: String = if s.isOpen() { "OPEN" } else { "CLOSED" }
+      rows.add(new AccountRow(s.accountId(), s.owner(), s.balance(), s.txCount(), status))
+    }
+  }
+  return rows
+}
+
+def printSummaryTable(rows: List[AccountRow]): void {
+  IO::println("")
+  IO::println("  ┌────────────┬──────────────────────┬─────────────┬──────┬────────┐")
+  IO::println("  │ Account    │ Owner                │ Balance     │ Txns │ Status │")
+  IO::println("  ├────────────┼──────────────────────┼─────────────┼──────┼────────┤")
+  foreach row: AccountRow in rows {
+    val idPad: String    = row.id()
+    val ownerPad: String = row.owner()
+    val balStr: String   = row.balance().fmtMoney()
+    val txStr: String    = "" + row.txCount()
+    IO::println("  │ #{idPad}    │ #{ownerPad}           │ #{balStr}      │ #{txStr}   │ #{row.status()} │")
+  }
+  IO::println("  └────────────┴──────────────────────┴─────────────┴──────┴────────┘")
+}
+
+// ── Analytics: total deposits, withdrawals, net flow ────────────────────────
+
+record FlowStats(totalDeposited: Double, totalWithdrawn: Double, transfersOut: Double) {
+  public:
+  def netFlow(): Double = totalDeposited() - totalWithdrawn() - transfersOut()
+}
+
+def computeFlow(store: EventStore, id: String): FlowStats {
+  val events: List[BankEvent] = store.eventsFor(id)
+  var deposited: Double  = 0.0d
+  var withdrawn: Double  = 0.0d
+  var transferred: Double = 0.0d
+  foreach ev: BankEvent in events {
+    select ev {
+      case e is MoneyDeposited: { deposited  = deposited  + e.amount() }
+      case e is MoneyWithdrawn: { withdrawn  = withdrawn  + e.amount() }
+      case e is TransferSent:   { transferred = transferred + e.amount() }
+      else: { }
+    }
+  }
+  return new FlowStats(deposited, withdrawn, transferred)
+}
+
+// ── Main scenario ────────────────────────────────────────────────────────────
+
+val store: EventStore          = new EventStore()
+val proj: AccountProjection    = new AccountProjection()
+
+IO::println("=== EventSourced Bank Demo ===")
+IO::println("")
+IO::println("--- Opening accounts ---")
+openAccount(store, "ACC001", "Alice Kim",   5000.0d)
+openAccount(store, "ACC002", "Bob Chen",    3200.0d)
+openAccount(store, "ACC003", "Carol Davis", 8750.0d)
+
+IO::println("")
+IO::println("--- Deposits ---")
+deposit(store, "ACC001", 1200.0d, "Paycheck")
+deposit(store, "ACC002",  450.0d, "Freelance")
+deposit(store, "ACC003", 2500.0d, "Bonus")
+deposit(store, "ACC001",  300.0d, "Tax refund")
+
+IO::println("")
+IO::println("--- Withdrawals ---")
+withdraw(store, proj, "ACC001", 800.0d, "Rent")
+withdraw(store, proj, "ACC002", 600.0d, "Car repair")
+withdraw(store, proj, "ACC002", 5000.0d, "Vacation")  // should fail: insufficient funds
+withdraw(store, proj, "ACC003", 1500.0d, "Investment")
+
+IO::println("")
+IO::println("--- Transfers ---")
+transfer(store, proj, "ACC003", "ACC001", 1000.0d)
+transfer(store, proj, "ACC002", "ACC003", 3000.0d)  // should fail: insufficient
+transfer(store, proj, "ACC001", "ACC002",  250.0d)
+
+IO::println("")
+IO::println("--- Close an account ---")
+closeAccount(store, "ACC004", "Non-existent")   // no-op (no events to close)
+closeAccount(store, "ACC002", "Switching banks")
+
+IO::println("")
+IO::println("--- Snapshots ---")
+val ids: List[String] = ["ACC001", "ACC002", "ACC003"]
+foreach id: String in ids {
+  printSnapshot(proj, store, id)
+}
+
+IO::println("")
+IO::println("--- Event logs ---")
+printEventLog(store, "ACC001")
+printEventLog(store, "ACC002")
+
+IO::println("")
+IO::println("--- Summary table ---")
+val summaryRows: List[AccountRow] = buildSummary(proj, store, ids)
+printSummaryTable(summaryRows)
+
+IO::println("")
+IO::println("--- Flow analytics ---")
+foreach id: String in ids {
+  val flow: FlowStats = computeFlow(store, id)
+  IO::println("  #{id}: in=#{flow.totalDeposited().fmtMoney()} out=#{flow.totalWithdrawn().fmtMoney()} xfer=#{flow.transfersOut().fmtMoney()} net=#{flow.netFlow().fmtMoney()}")
+}
+
+IO::println("")
+IO::println("--- Event store total events: " + store.size() + " ---")
+
+// ── Pipeline analytics: accounts with balance > 3000 ────────────────────────
+
+val richAccounts: List[AccountRow] = summaryRows
+  .filter { r: AccountRow -> r.balance() > 3000.0d }
+  .sortedBy { r: AccountRow -> 0.0d - r.balance() }
+
+IO::println("")
+IO::println("--- Accounts with balance > $3000 ---")
+foreach r: AccountRow in richAccounts {
+  IO::println("  #{r.id()} (#{r.owner()}): #{r.balance().fmtMoney()}")
+}
+
+// ── Distinct event names across the log ─────────────────────────────────────
+
+val allEventNames: List[String] = store.allEvents()
+  .map { ev: BankEvent -> ev.eventName() }
+  .distinct()
+  .sortedBy { s: String -> s }
+
+IO::println("")
+IO::println("Event types seen: " + allEventNames.toString())
+IO::println("")
+IO::println("Done.")

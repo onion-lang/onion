@@ -17,7 +17,7 @@ private[compiler] final class TopLevelTypingSupport(
   processEnumDeclaration: (AST.EnumDeclaration, LocalContext) => Unit,
   processExtensionDeclaration: AST.ExtensionDeclaration => Unit,
   processFunctionDeclaration: (AST.FunctionDeclaration, LocalContext) => Unit,
-  processGlobalVariableDeclaration: (AST.GlobalVariableDeclaration, LocalContext) => Unit,
+  processGlobalVariableDeclaration: (AST.GlobalVariableDeclaration, LocalContext) => Option[ActionStatement],
   processTopLevelVarDeclaration: (AST.LocalVariableDeclaration, ClassDefinition, LocalContext) => Option[ActionStatement]
 ) {
   final case class PreparedUnit(
@@ -88,8 +88,14 @@ private[compiler] final class TopLevelTypingSupport(
           processExtensionDeclaration(node)
         case node: AST.FunctionDeclaration =>
           processFunctionDeclaration(node, prepared.context)
-        case node: AST.GlobalVariableDeclaration =>
-          processGlobalVariableDeclaration(node, prepared.context)
+        case node: AST.GlobalVariableDeclaration if prepared.klass != null =>
+          prepared.context.setMethod(prepared.startMethod)
+          processGlobalVariableDeclaration(node, prepared.context) match {
+            case Some(stmt) =>
+              prepared.statements += stmt
+              prepared.fieldInitStatements += stmt
+            case None =>
+          }
         case _ =>
       }
     }

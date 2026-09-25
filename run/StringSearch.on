@@ -1,0 +1,317 @@
+// StringSearch.on — classic string-search algorithm showcase
+// Implements and compares three foundational algorithms:
+//   Naive O(nm), KMP (Knuth-Morris-Pratt) O(n+m), Rabin-Karp O(n+m avg).
+//
+// Exercises: interface + 3 implementing classes, records with method bodies,
+//   extension String, typed List[Int], while / foreach / for, Char arithmetic,
+//   collection pipelines (map / sortedBy / fold / filter / distinct),
+//   string interpolation, nullable types, select.
+
+// ── String extensions ─────────────────────────────────────────────────────────
+
+extension String {
+  def clip(maxLen: Int): String {
+    if self.length() <= maxLen { return self }
+    return self.substring(0, maxLen) + "..."
+  }
+  def times(n: Int): String {
+    var out = ""
+    foreach i: Int in 0..<n { out = out + self }
+    return out
+  }
+  def padR(w: Int): String {
+    var s = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padL(w: Int): String {
+    var s = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ── Record: summarises one algorithm's results on one (text, pattern) pair ────
+
+record HitSummary(algo: String, pattern: String,
+                  textLen: Int, positions: List[Int]) {
+public:
+  def count(): Int   = positions().size
+  def firstN(n: Int): String {
+    val lst = positions()
+    val lim = if lst.size < n { lst.size } else { n }
+    var s = "["
+    foreach i: Int in 0..<lim {
+      if i > 0 { s = s + ", " }
+      s = s + lst[i]
+    }
+    if lst.size > n { s = s + ", ..." }
+    return s + "]"
+  }
+  def report(): String =
+    "#{algo().padR(12)} '#{pattern().padR(10)}' #{count().toString().padL(4)} hit(s)  #{firstN(5)}"
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface StringSearcher {
+  def algoName(): String
+  def findAll(text: String, pat: String): List[Int]
+}
+
+// ── Naive O(nm) ───────────────────────────────────────────────────────────────
+
+class NaiveSearch conforms StringSearcher {
+public:
+  def algoName(): String = "Naive"
+  def findAll(text: String, pat: String): List[Int] {
+    var hits: List[Int] = []
+    val n = text.length()
+    val m = pat.length()
+    if m == 0 || m > n { return hits }
+    var i = 0
+    while i <= n - m {
+      var j = 0
+      while j < m && text.charAt(i + j) == pat.charAt(j) { j++ }
+      if j == m { hits.add(i) }
+      i++
+    }
+    return hits
+  }
+}
+
+// ── KMP prefix function ───────────────────────────────────────────────────────
+// pi[i] = length of the longest proper prefix of pat[0..i] that is also a suffix
+
+def buildPrefixTable(pat: String): List[Int] {
+  val m = pat.length()
+  var pi: List[Int] = []
+  foreach idx: Int in 0..<m { pi.add(0) }
+  var k = 0
+  var i = 1
+  while i < m {
+    while k > 0 && pat.charAt(i) != pat.charAt(k) { k = pi[k - 1] }
+    if pat.charAt(i) == pat.charAt(k) { k++ }
+    pi[i] = k
+    i++
+  }
+  return pi
+}
+
+class KmpSearch conforms StringSearcher {
+public:
+  def algoName(): String = "KMP"
+  def findAll(text: String, pat: String): List[Int] {
+    var hits: List[Int] = []
+    val n = text.length()
+    val m = pat.length()
+    if m == 0 || m > n { return hits }
+    val pi = buildPrefixTable(pat)
+    var k = 0
+    var i = 0
+    while i < n {
+      while k > 0 && text.charAt(i) != pat.charAt(k) { k = pi[k - 1] }
+      if text.charAt(i) == pat.charAt(k) { k++ }
+      if k == m {
+        hits.add(i - m + 1)
+        k = pi[m - 1]
+      }
+      i++
+    }
+    return hits
+  }
+}
+
+// ── Rabin-Karp rolling-hash O(n+m) avg ───────────────────────────────────────
+// Uses a polynomial rolling hash mod 100003; collision → fallback char-by-char verify.
+
+class RabinKarpSearch conforms StringSearcher {
+public:
+  def algoName(): String = "Rabin-Karp"
+  def findAll(text: String, pat: String): List[Int] {
+    var hits: List[Int] = []
+    val n = text.length()
+    val m = pat.length()
+    if m == 0 || m > n { return hits }
+    val BASE = 31
+    val MOD  = 100003
+    // Compute BASE^(m-1) mod MOD
+    var power = 1
+    foreach dummy: Int in 1..<m { power = (power * BASE) % MOD }
+    // Initial hash of pattern and first window
+    var pH = 0
+    var wH = 0
+    foreach j: Int in 0..<m {
+      pH = (pH * BASE + (pat.charAt(j)  as Int)) % MOD
+      wH = (wH * BASE + (text.charAt(j) as Int)) % MOD
+    }
+    var i = 0
+    while i <= n - m {
+      if wH == pH {
+        // Hash match — verify (handles any collision)
+        var j = 0
+        while j < m && text.charAt(i + j) == pat.charAt(j) { j++ }
+        if j == m { hits.add(i) }
+      }
+      if i < n - m {
+        // Slide the window: remove leftmost char, add new rightmost char
+        wH = (wH - (text.charAt(i)     as Int) * power % MOD + MOD) % MOD
+        wH = (wH * BASE + (text.charAt(i + m) as Int)) % MOD
+      }
+      i++
+    }
+    return hits
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def run(searcher: StringSearcher, text: String, pat: String): HitSummary =
+  new HitSummary(searcher.algoName(), pat, text.length(), searcher.findAll(text, pat))
+
+def allAgree(algo1: StringSearcher, algo2: StringSearcher, algo3: StringSearcher,
+             text: String, pat: String): Boolean {
+  val c1 = algo1.findAll(text, pat).size
+  val c2 = algo2.findAll(text, pat).size
+  val c3 = algo3.findAll(text, pat).size
+  return c1 == c2 && c2 == c3
+}
+
+def divider(): void { IO::println("─".times(60)) }
+
+// ── Main program ─────────────────────────────────────────────────────────────
+
+val naive = new NaiveSearch()
+val kmp   = new KmpSearch()
+val rk    = new RabinKarpSearch()
+
+// Build test corpora
+val sentence = "the quick brown fox jumps over the lazy dog the end"
+val dna      = "ATCGATCGATCGATCGGCTATCGATCGATCGTTTATCG"
+
+var periodic = ""
+foreach i: Int in 0..<20 { periodic = periodic + "ab" }
+
+val corpus =
+  ("Onion is a statically-typed language compiling to the JVM. " +
+   "It supports records, enums, generics, and type inference. " +
+   "The Onion language features pattern matching and closures. " +
+   "Onion programs run on any JVM platform with no runtime overhead. ").times(4)
+
+IO::println("╔══════════════════════════════════════════════════════════╗")
+IO::println("║       String-Search Algorithm Showcase                   ║")
+IO::println("║  Naive · KMP (Knuth-Morris-Pratt) · Rabin-Karp          ║")
+IO::println("╚══════════════════════════════════════════════════════════╝")
+
+// ── Section 1: Classic English sentence ──────────────────────────────────────
+IO::println("")
+IO::println("1. English sentence (#{sentence.length()} chars)")
+IO::println("   \"#{sentence}\"")
+IO::println("")
+val pats1: List[String] = ["the", "fox", "dog", "quick", "xyz", "o"]
+foreach pat: String in pats1 {
+  IO::println("  #{run(naive, sentence, pat).report()}")
+  IO::println("  #{run(kmp,   sentence, pat).report()}")
+  IO::println("  #{run(rk,    sentence, pat).report()}")
+  IO::println("")
+}
+
+// ── Section 2: DNA sequence ───────────────────────────────────────────────────
+divider()
+IO::println("")
+IO::println("2. DNA sequence (#{dna.length()} chars)")
+IO::println("   \"#{dna}\"")
+IO::println("")
+val dnaPats: List[String] = ["ATC", "ATCG", "GCTATCG", "TTT", "ATCGATCG"]
+foreach pat: String in dnaPats {
+  val s1 = run(naive, dna, pat)
+  val s2 = run(kmp,   dna, pat)
+  val s3 = run(rk,    dna, pat)
+  IO::println("  Pattern '#{pat.padR(10)}' → Naive #{s1.count()}, KMP #{s2.count()}, RK #{s3.count()}")
+  IO::println("    positions: #{s1.firstN(8)}")
+}
+IO::println("")
+
+// ── Section 3: Periodic string ────────────────────────────────────────────────
+divider()
+IO::println("")
+IO::println("3. Periodic string ('ab' × 20 = #{periodic.length()} chars)")
+IO::println("   \"#{periodic.clip(40)}\"")
+IO::println("")
+val perPats: List[String] = ["a", "ab", "ba", "abab", "ababab", "b"]
+foreach pat: String in perPats {
+  val h = run(kmp, periodic, pat)
+  IO::println("  '#{pat.padR(8)}' : #{h.count().toString().padL(3)} hit(s)  #{h.firstN(6)}")
+}
+IO::println("")
+
+// ── Section 4: Correctness verification ──────────────────────────────────────
+divider()
+IO::println("")
+IO::println("4. Correctness — all three algorithms must agree on every (text, pattern)")
+IO::println("")
+val verifPats: List[String] = ["the", "ATC", "ab", "abab", "xyz", "Onion", "on", "a", "ATCGATCG"]
+var allPass = true
+foreach p: String in verifPats {
+  val ok = allAgree(naive, kmp, rk, sentence, p) &&
+           allAgree(naive, kmp, rk, dna,      p) &&
+           allAgree(naive, kmp, rk, periodic, p) &&
+           allAgree(naive, kmp, rk, corpus,   p)
+  val mark = if ok { "✓" } else { "✗" }
+  IO::println("  #{mark}  '#{p}'")
+  if !ok { allPass = false }
+}
+IO::println(if allPass { "\n  All checks passed — algorithms are consistent." }
+            else        { "\n  *** MISMATCH DETECTED ***" })
+
+// ── Section 5: Corpus frequency analysis (KMP) ───────────────────────────────
+IO::println("")
+divider()
+IO::println("")
+IO::println("5. Word-frequency analysis in corpus (#{corpus.length()} chars, KMP)")
+IO::println("")
+val wordPats: List[String] = ["Onion", "language", "the", "and", "type", "record", "JVM", "run"]
+var results: List[HitSummary] = []
+foreach wp: String in wordPats { results.add(run(kmp, corpus, wp)) }
+
+val ranked = results.sortedBy { r -> 0 - (r as HitSummary).count() }
+IO::println("  " + "Pattern".padR(12) + "  Occurrences")
+IO::println("  " + "─".times(26))
+foreach entry: Object in ranked {
+  val r = entry as HitSummary
+  IO::println("  '#{r.pattern().padR(10)}'       #{r.count()}")
+}
+
+val totalHits = results.fold(0) { acc, r -> (acc as Int) + (r as HitSummary).count() }
+var maxCount = 0
+var maxPatName = ""
+foreach entry2: Object in results {
+  val r2 = entry2 as HitSummary
+  if r2.count() > maxCount { maxCount = r2.count(); maxPatName = r2.pattern() }
+}
+IO::println("")
+IO::println("  Total hits across all patterns: #{totalHits}")
+IO::println("  Most frequent: '#{maxPatName}' with #{maxCount} occurrences")
+
+// ── Section 6: Pattern statistics ────────────────────────────────────────────
+IO::println("")
+divider()
+IO::println("")
+IO::println("6. Prefix-table inspection (KMP internal structure)")
+IO::println("")
+val inspectPats: List[String] = ["abcabc", "aababaa", "aaaa", "abcd"]
+foreach ip: String in inspectPats {
+  val pi = buildPrefixTable(ip)
+  IO::println("  Pattern : \"#{ip}\"")
+  var piStr = "["
+  foreach k: Int in 0..<ip.length() {
+    if k > 0 { piStr = piStr + ", " }
+    piStr = piStr + pi[k]
+  }
+  IO::println("  Prefix  : #{piStr}]")
+  IO::println("")
+}
+
+IO::println("╔══════════════════════════════════════════════════════════╗")
+IO::println("║  Done.                                                   ║")
+IO::println("╚══════════════════════════════════════════════════════════╝")

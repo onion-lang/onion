@@ -1,0 +1,276 @@
+// BrewingCalc.on — Home-brew recipe analyser
+// Exercises: data-carrying enum (FermentableType: ppg/lovibond), ADT case-enum
+//            (HopUse: boilMinutes/label), records with example, extension Double
+//            and String, do[Option]+getOrElse, collection pipelines (map/fold/
+//            filter/sortedBy/groupBy/flatMap), foreach (k,v) in Map, nullable,
+//            try/catch, while, string interpolation.
+
+import { java.lang.Math as JMath }
+
+// ── Fermentable grain types ───────────────────────────────────────────────────
+// ppg = points per pound per gallon; lovibond = colour rating
+enum FermentableType(ppg: Double, lovibond: Double) {
+  PilsnerMalt   (37.0,   1.5),
+  PaleMalt      (36.0,   2.0),
+  MunichMalt    (34.0,   9.0),
+  Crystal60     (22.0,  60.0),
+  Crystal120    (22.0, 120.0),
+  RoastedBarley (22.0, 300.0),
+  WheatMalt     (38.0,   2.5),
+  OatFlakes     (33.0,   2.0)
+}
+
+// ── Hop addition timing ───────────────────────────────────────────────────────
+enum HopUse {
+  case Bittering    // 60-min boil
+  case Flavor       // 15-min boil
+  case Aroma        //  5-min / flameout
+  case DryHop       // cold-side, contributes no IBU
+public:
+  def boilMinutes(): Int = select this {
+    case b is Bittering: 60
+    case f is Flavor:    15
+    case a is Aroma:      5
+    case d is DryHop:     0
+  }
+  def label(): String = select this {
+    case b is Bittering: "Bittering"
+    case f is Flavor:    "Flavor"
+    case a is Aroma:     "Aroma"
+    case d is DryHop:    "Dry Hop"
+  }
+}
+
+// ── Fermentable grain addition ────────────────────────────────────────────────
+record Fermentable(name: String, ftype: FermentableType, lbs: Double) {
+public:
+  def gravityPoints(eff: Double): Double = ftype().ppg() * lbs() * eff / 100.0
+  def mcu(gals: Double): Double          = ftype().lovibond() * lbs() / gals
+}
+example { new Fermentable("Pale", FermentableType::PaleMalt, 10.0).gravityPoints(75.0) == 270.0 }
+example { new Fermentable("Crystal60", FermentableType::Crystal60, 0.5).gravityPoints(100.0) == 11.0 }
+
+// ── Hop addition ──────────────────────────────────────────────────────────────
+record Hop(name: String, alphaPct: Double, oz: Double, use: HopUse)
+
+// ── Tinseth IBU formula (one hop addition) ────────────────────────────────────
+def hopIbu(hop: Hop, og: Double, gals: Double): Double = {
+  if hop.use().boilMinutes() == 0 { return 0.0 }
+  val bigness: Double = 1.65 * JMath::pow(0.000125, og - 1.0)
+  val t: Double       = hop.use().boilMinutes() * 1.0
+  val btf: Double     = (1.0 - JMath::exp(-0.04 * t)) / 4.15
+  val mgAlpha: Double = hop.alphaPct() / 100.0 * hop.oz() * 28350.0
+  mgAlpha / (gals * 3.785) * bigness * btf * 0.749
+}
+
+// Mosher SRM colour: SRM = 1.4922 * MCU^0.6859
+def srmFromMcu(mcu: Double): Double = 1.4922 * JMath::pow(mcu, 0.6859)
+
+// ── Recipe class ──────────────────────────────────────────────────────────────
+class Recipe {
+  var rname: String
+  var ferms: List[Fermentable]
+  var hops:  List[Hop]
+  var gals:  Double
+  var attn:  Double   // yeast apparent attenuation %
+  var eff:   Double   // mash efficiency %
+
+public:
+  def this(n: String, fs: List[Fermentable], hs: List[Hop],
+           g: Double, a: Double, e: Double) {
+    rname = n; ferms = fs; hops = hs; gals = g; attn = a; eff = e
+  }
+  def rname(): String            = rname
+  def ferms(): List[Fermentable] = ferms
+  def hops():  List[Hop]         = hops
+  def gals():  Double            = gals
+
+  def totalLbs(): Double =
+    ferms.map { f -> (f as Fermentable).lbs() }.fold(0.0) { acc, v -> acc + v }
+
+  def og(): Double = {
+    val pts: Double = ferms.map { f -> (f as Fermentable).gravityPoints(eff) }
+                           .fold(0.0) { acc, v -> acc + v }
+    1.0 + pts / (gals * 1000.0)
+  }
+
+  def fg(): Double = {
+    val o: Double = og()
+    o - (o - 1.0) * (attn / 100.0)
+  }
+
+  def abv(): Double = (og() - fg()) * 131.25
+
+  def ibu(): Double = {
+    val o: Double = og()
+    hops.map { h -> hopIbu(h as Hop, o, gals) }.fold(0.0) { acc, v -> acc + v }
+  }
+
+  def srm(): Double = {
+    val mcu: Double = ferms.map { f -> (f as Fermentable).mcu(gals) }
+                           .fold(0.0) { acc, v -> acc + v }
+    srmFromMcu(mcu)
+  }
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+extension Double {
+  def fmt2(): String = {
+    val r: Long  = JMath::round(self * 100.0)
+    val i: Long  = r / 100L
+    val fr: Long = r - i * 100L
+    if fr < 10L { "#{i}.0#{fr}" } else { "#{i}.#{fr}" }
+  }
+}
+extension String {
+  def padR(w: Int): String = {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    s
+  }
+}
+
+// do[Option] safe recipe lookup
+def lookupRecipe(key: String, cat: Map[String, Recipe]): Option[Recipe] = {
+  val r: Recipe? = cat[key] as Recipe?
+  if r == null { Option::none() } else { Option::some(r) }
+}
+
+// ── Single recipe report ──────────────────────────────────────────────────────
+def printRecipe(r: Recipe): void {
+  val ibuRounded: Long = JMath::round(r.ibu())
+  IO::println("  #{r.rname()}")
+  IO::println("  OG #{r.og().fmt2()}  FG #{r.fg().fmt2()}  ABV #{r.abv().fmt2()}%  IBU #{ibuRounded}  SRM #{r.srm().fmt2()}")
+  IO::println("  Grain: #{r.totalLbs().fmt2()} lbs  |  Hops:")
+  foreach h: Hop in r.hops() {
+    IO::println("    #{(h as Hop).name().padR(12)} #{(h as Hop).alphaPct().fmt2()}% AA  #{(h as Hop).oz().fmt2()} oz  #{(h as Hop).use().label()}")
+  }
+  IO::println("")
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
+def main(): void {
+  val apa: Recipe = new Recipe(
+    "American Pale Ale",
+    [ new Fermentable("2-Row Pale",  FermentableType::PaleMalt,  9.0),
+      new Fermentable("Crystal 60",  FermentableType::Crystal60, 0.75),
+      new Fermentable("Munich",      FermentableType::MunichMalt, 0.5)
+    ] as List[Fermentable],
+    [ new Hop("Magnum",  14.0, 0.75, new Bittering()),
+      new Hop("Cascade",  6.5, 0.5,  new Flavor()),
+      new Hop("Citra",   12.0, 0.75, new Aroma()),
+      new Hop("Citra",   12.0, 1.0,  new DryHop())
+    ] as List[Hop],
+    5.5, 75.0, 75.0
+  )
+
+  val stout: Recipe = new Recipe(
+    "Oatmeal Stout",
+    [ new Fermentable("Pale Malt",      FermentableType::PaleMalt,      8.0),
+      new Fermentable("Roasted Barley", FermentableType::RoastedBarley, 0.75),
+      new Fermentable("Crystal 120",    FermentableType::Crystal120,    0.5),
+      new Fermentable("Flaked Oats",    FermentableType::OatFlakes,     1.0)
+    ] as List[Fermentable],
+    [ new Hop("Fuggle", 4.5, 1.5, new Bittering()),
+      new Hop("EKG",    5.0, 0.5, new Flavor())
+    ] as List[Hop],
+    5.5, 70.0, 72.0
+  )
+
+  val hefe: Recipe = new Recipe(
+    "Hefeweizen",
+    [ new Fermentable("Wheat Malt",  FermentableType::WheatMalt,   6.0),
+      new Fermentable("Pilsner",     FermentableType::PilsnerMalt, 4.0)
+    ] as List[Fermentable],
+    [ new Hop("Hallertau", 4.0, 0.75, new Bittering()),
+      new Hop("Tettnang",  4.5, 0.25, new Flavor())
+    ] as List[Hop],
+    5.5, 73.0, 76.0
+  )
+
+  val catalog: Map[String, Recipe] = [
+    "apa":   apa,
+    "stout": stout,
+    "hefe":  hefe
+  ] as Map[String, Recipe]
+
+  IO::println("╔══════════════════════════════════════════════╗")
+  IO::println("║    H O M E   B R E W   A N A L Y Z E R      ║")
+  IO::println("╚══════════════════════════════════════════════╝")
+  IO::println("")
+
+  // Full reports for every recipe
+  foreach (key, r) in catalog {
+    printRecipe(r as Recipe)
+  }
+
+  // Comparison table
+  IO::println("  ────────────────────────────────────────────────────────────")
+  IO::println("  Style                │  OG    │  FG    │  ABV   │ IBU │ SRM")
+  IO::println("  ─────────────────────┼────────┼────────┼────────┼─────┼─────")
+  foreach (key, r) in catalog {
+    val rec: Recipe   = r as Recipe
+    val ibu: Long     = JMath::round(rec.ibu())
+    IO::println("  #{rec.rname().padR(20)} │ #{rec.og().fmt2()} │ #{rec.fg().fmt2()} │ #{rec.abv().fmt2()}%  │ #{ibu}  │ #{rec.srm().fmt2()}")
+  }
+  IO::println("")
+
+  // Sorted by ABV descending
+  val recipes: List[Recipe] = [apa, stout, hefe] as List[Recipe]
+  val byAbvDesc: List[Recipe] = recipes.sortedBy { r -> 0.0 - (r as Recipe).abv() } as List[Recipe]
+  IO::println("  Ranked by ABV (highest first):")
+  foreach r: Recipe in byAbvDesc {
+    IO::println("    #{(r as Recipe).abv().fmt2()}%  —  #{(r as Recipe).rname()}")
+  }
+  IO::println("")
+
+  // Group hop additions by use type across all recipes
+  val allHops: List[Hop] = recipes.flatMap { r -> (r as Recipe).hops() } as List[Hop]
+  val byUse: Map[String, List[Hop]] = allHops.groupBy { h -> (h as Hop).use().label() } as Map[String, List[Hop]]
+  IO::println("  Hop additions by use type (all recipes):")
+  foreach (useLabel, hopList) in byUse {
+    val hl: List[Hop] = hopList as List[Hop]
+    val totalOz: Double = hl.map { h -> (h as Hop).oz() }.fold(0.0) { acc, v -> acc + v }
+    IO::println("    #{useLabel.padR(10)}  #{hl.size} addition(s)  #{totalOz.fmt2()} oz total")
+  }
+  IO::println("")
+
+  // do[Option] look-ups with .getOrElse()
+  IO::println("  Recipe look-ups (do[Option]):")
+  val targets: List[String] = ["apa", "hefe", "ipa"] as List[String]
+  foreach k: String in targets {
+    val opt: Option[String] = do[Option] {
+      r <- lookupRecipe(k, catalog)
+      ret "#{r.rname()}: #{r.abv().fmt2()}% ABV, #{JMath::round(r.ibu())} IBU"
+    }
+    IO::println("    #{k}: #{opt.getOrElse("not in catalog")}")
+  }
+  IO::println("")
+
+  // Balance: bitterness-to-strength ratio
+  IO::println("  Balance ratios (IBU / ABV — higher = more bitter):")
+  foreach (key, r) in catalog {
+    val rec: Recipe  = r as Recipe
+    val ratio: Double = if rec.abv() > 0.0 { rec.ibu() / rec.abv() } else { 0.0 }
+    IO::println("    #{rec.rname().padR(22)}  #{ratio.fmt2()}")
+  }
+  IO::println("")
+
+  // try/catch: graceful handling of an empty-grain recipe
+  IO::println("  Edge case — recipe with no grain bill:")
+  try {
+    val water: Recipe = new Recipe("Plain Water",
+      [] as List[Fermentable], [] as List[Hop], 5.5, 75.0, 75.0)
+    IO::println("    OG=#{water.og().fmt2()}  IBU=#{JMath::round(water.ibu())}  SRM=#{water.srm().fmt2()}  (no crash)")
+  } catch e: Exception {
+    IO::println("    Caught: #{e.message()}")
+  }
+
+  // Average ABV across the catalog
+  val sumAbv: Double = recipes.map { r -> (r as Recipe).abv() }.fold(0.0) { acc, v -> acc + v }
+  val avgAbv: Double = sumAbv / (recipes.size * 1.0)
+  IO::println("")
+  IO::println("  Average ABV across #{recipes.size} styles: #{avgAbv.fmt2()}%")
+  IO::println("")
+  IO::println("Analysis complete.")
+}

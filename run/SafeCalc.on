@@ -1,0 +1,296 @@
+// SafeCalc.on — a safe-arithmetic library using a generic ADT Result type.
+// Exercises: generic ADT enums (enum Result[T] { case Ok(value: T); case Err }),
+//            records with body methods, extension methods, classes, interface,
+//            collection pipelines (map/filter/fold), closures, nullable types,
+//            string interpolation, select with type-pattern exhaustiveness,
+//            recursion, try/catch, and foreach over ranges.
+
+// ─── generic ADT result type ──────────────────────────────────────────────────
+
+enum Result[T] {
+  case Ok(value: T)
+  case Err(reason: String)
+public:
+  def isOk(): Boolean = select this {
+    case o is Ok: true
+    else:         false
+  }
+  def isErr(): Boolean = select this {
+    case e is Err: true
+    else:          false
+  }
+  def getOrElse(fallback: T): T = select this {
+    case o is Ok: o.value()
+    else:         fallback
+  }
+  def reason(): String = select this {
+    case e is Err: e.reason()
+    else:          ""
+  }
+  def describe(): String = select this {
+    case o is Ok:  "Ok(#{o.value()})"
+    case e is Err: "Err(#{e.reason()})"
+  }
+}
+
+// ─── safe arithmetic operations ───────────────────────────────────────────────
+
+def safeDiv(a: Int, b: Int): Result[Int] {
+  if b == 0 { return new Err("division by zero") }
+  return new Ok(a / b)
+}
+
+def safeMod(a: Int, b: Int): Result[Int] {
+  if b == 0 { return new Err("modulo by zero") }
+  return new Ok(a - (a / b) * b)
+}
+
+def safeSqrt(x: Double): Result[Double] {
+  if x < 0.0d { return new Err("sqrt of negative: #{x}") }
+  // Newton-Raphson approximation
+  var guess: Double = x / 2.0d
+  if x == 0.0d { return new Ok(0.0d) }
+  var i: Int = 0
+  while i < 20 {
+    guess = (guess + x / guess) / 2.0d
+    i = i + 1
+  }
+  return new Ok(guess)
+}
+
+def safeLog(x: Double): Result[Double] {
+  if x <= 0.0d { return new Err("log of non-positive: #{x}") }
+  // ln(x) via series: only accurate near 1; use identity ln(x) = ln(2)*n + ln(x/2^n)
+  var v: Double = x
+  var n: Int = 0
+  while v > 2.0d { v = v / 2.0d; n = n + 1 }
+  while v < 0.5d { v = v * 2.0d; n = n - 1 }
+  // Padé approximant for ln(t) near 1, t in [0.5, 2]:
+  val t: Double = (v - 1.0d) / (v + 1.0d)
+  val t2: Double = t * t
+  val ln_v: Double = 2.0d * t * (1.0d + t2 / 3.0d + t2 * t2 / 5.0d + t2 * t2 * t2 / 7.0d)
+  val ln2: Double = 0.6931471805599453d
+  return new Ok(ln_v + (n as Double) * ln2)
+}
+
+// ─── expression tree using ADT enum ──────────────────────────────────────────
+
+enum Expr {
+  case Lit(value: Double)
+  case Add(left: Expr, right: Expr)
+  case Sub(left: Expr, right: Expr)
+  case Mul(left: Expr, right: Expr)
+  case Div(left: Expr, right: Expr)
+  case Sqrt(operand: Expr)
+  case Log(operand: Expr)
+public:
+  def eval(): Result[Double] = select this {
+    case n is Lit:
+      new Ok(n.value())
+    case a is Add:
+      val l = a.left().eval()
+      val r = a.right().eval()
+      select l {
+        case lo is Ok: select r {
+          case ro is Ok: new Ok(lo.value() + ro.value())
+          case re is Err: new Err(re.reason())
+        }
+        case le is Err: new Err(le.reason())
+      }
+    case s is Sub:
+      val l = s.left().eval()
+      val r = s.right().eval()
+      select l {
+        case lo is Ok: select r {
+          case ro is Ok: new Ok(lo.value() - ro.value())
+          case re is Err: new Err(re.reason())
+        }
+        case le is Err: new Err(le.reason())
+      }
+    case m is Mul:
+      val l = m.left().eval()
+      val r = m.right().eval()
+      select l {
+        case lo is Ok: select r {
+          case ro is Ok: new Ok(lo.value() * ro.value())
+          case re is Err: new Err(re.reason())
+        }
+        case le is Err: new Err(le.reason())
+      }
+    case d is Div:
+      val l = d.left().eval()
+      val r = d.right().eval()
+      select l {
+        case lo is Ok: select r {
+          case ro is Ok:
+            if ro.value() == 0.0d { new Err("division by zero") }
+            else { new Ok(lo.value() / ro.value()) }
+          case re is Err: new Err(re.reason())
+        }
+        case le is Err: new Err(le.reason())
+      }
+    case sq is Sqrt:
+      val inner = sq.operand().eval()
+      select inner {
+        case o is Ok: safeSqrt(o.value())
+        case e is Err: new Err(e.reason())
+      }
+    case lg is Log:
+      val inner = lg.operand().eval()
+      select inner {
+        case o is Ok: safeLog(o.value())
+        case e is Err: new Err(e.reason())
+      }
+  }
+
+  def show(): String = select this {
+    case n is Lit:  "" + n.value()
+    case a is Add:  "(#{a.left().show()} + #{a.right().show()})"
+    case s is Sub:  "(#{s.left().show()} - #{s.right().show()})"
+    case m is Mul:  "(#{m.left().show()} × #{m.right().show()})"
+    case d is Div:  "(#{d.left().show()} ÷ #{d.right().show()})"
+    case sq is Sqrt: "sqrt(#{sq.operand().show()})"
+    case lg is Log:  "ln(#{lg.operand().show()})"
+  }
+}
+
+// ─── calculator session ────────────────────────────────────────────────────────
+
+interface Evaluatable {
+  def evaluate(): String
+}
+
+record Calculation(label: String, expr: Expr) conforms Evaluatable {
+public:
+  def evaluate(): String {
+    val r = self.expr().eval()
+    return "#{self.label()}: #{self.expr().show()} = #{r.describe()}"
+  }
+}
+
+// ─── statistics over result lists ─────────────────────────────────────────────
+
+def countOk(results: List[Object]): Int {
+  return results.filter { r -> (r as Result[Double]).isOk() }.size
+}
+
+def countErr(results: List[Object]): Int {
+  return results.filter { r -> (r as Result[Double]).isErr() }.size
+}
+
+def sumOkValues(results: List[Object]): Double {
+  val total = results
+    .filter { r -> (r as Result[Double]).isOk() }
+    .fold(0.0d) { acc, r -> (acc as Double) + (r as Result[Double]).getOrElse(0.0d) }
+  return total as Double
+}
+
+// ─── recursive Fibonacci using Result ────────────────────────────────────────
+
+def safeFib(n: Int): Result[Long] {
+  if n < 0  { return new Err("negative index: #{n}") }
+  if n == 0 { return new Ok(0L) }
+  if n == 1 { return new Ok(1L) }
+  var a: Long = 0L
+  var b: Long = 1L
+  var i: Int = 2
+  while i <= n {
+    val tmp: Long = a + b
+    a = b
+    b = tmp
+    i = i + 1
+  }
+  return new Ok(b)
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+IO::println("══════════════════════════════════════════════════════════")
+IO::println("  SafeCalc — safe arithmetic with generic Result[T]")
+IO::println("══════════════════════════════════════════════════════════")
+IO::println("")
+
+// Basic safe division
+IO::println("── Basic safeDiv / safeMod ──────────────────────────────")
+val d1 = safeDiv(10, 3)
+val d2 = safeDiv(7, 0)
+val m1 = safeMod(17, 5)
+val m2 = safeMod(9, 0)
+IO::println("  10 / 3 = #{d1.describe()}")
+IO::println("   7 / 0 = #{d2.describe()}")
+IO::println("  17 % 5 = #{m1.describe()}")
+IO::println("   9 % 0 = #{m2.describe()}")
+IO::println("")
+
+// Safe sqrt
+IO::println("── safeSqrt ──────────────────────────────────────────────")
+foreach n: Int in [4, 9, 25, 0, -1] {
+  val r = safeSqrt(n as Double)
+  IO::println("  sqrt(#{n}) = #{r.describe()}")
+}
+IO::println("")
+
+// Safe log
+IO::println("── safeLog ───────────────────────────────────────────────")
+foreach n: Int in [1, 10, 0, -5] {
+  val r = safeLog(n as Double)
+  IO::println("  ln(#{n}) = #{r.describe()}")
+}
+IO::println("")
+
+// Expression tree
+IO::println("── Expression tree evaluation ────────────────────────────")
+val calcs: List[Object] = [
+  new Calculation("simple add",     new Add(new Lit(3.0d), new Lit(4.0d))),
+  new Calculation("nested mul",     new Mul(new Add(new Lit(2.0d), new Lit(3.0d)), new Lit(4.0d))),
+  new Calculation("sqrt(16)",       new Sqrt(new Lit(16.0d))),
+  new Calculation("ln(e≈2.718)",    new Log(new Lit(2.718281828d))),
+  new Calculation("div by zero",    new Div(new Lit(5.0d), new Lit(0.0d))),
+  new Calculation("sqrt(-4)",       new Sqrt(new Lit(-4.0d))),
+  new Calculation("sqrt(2+14)",     new Sqrt(new Add(new Lit(2.0d), new Lit(14.0d)))),
+  new Calculation("(10-4) / 2",     new Div(new Sub(new Lit(10.0d), new Lit(4.0d)), new Lit(2.0d)))
+]
+
+foreach item: Object in calcs {
+  val c = item as Calculation
+  IO::println("  " + c.evaluate())
+}
+IO::println("")
+
+// Aggregate statistics
+IO::println("── Aggregate stats ───────────────────────────────────────")
+val results: List[Object] = calcs.map { c -> (c as Calculation).expr().eval() }
+IO::println("  total calculations: #{calcs.size}")
+IO::println("  ok:  #{countOk(results)}")
+IO::println("  err: #{countErr(results)}")
+IO::println("  sum of ok values: #{sumOkValues(results)}")
+IO::println("")
+
+// Fibonacci using generic Result
+IO::println("── Fibonacci (Result[Long]) ──────────────────────────────")
+foreach n: Int in [0, 1, 5, 10, 20, -1] {
+  val r = safeFib(n)
+  IO::println("  fib(#{n}) = #{r.describe()}")
+}
+IO::println("")
+
+// getOrElse with fallback
+IO::println("── getOrElse / chained ops ──────────────────────────────")
+val badDiv = safeDiv(10, 0)
+val fallback = badDiv.getOrElse(-1)
+IO::println("  safeDiv(10,0).getOrElse(-1) = #{fallback}")
+val goodDiv = safeDiv(42, 7)
+val value = goodDiv.getOrElse(0)
+IO::println("  safeDiv(42,7).getOrElse(0) = #{value}")
+
+// Map-like transformation via explicit loop
+IO::println("")
+IO::println("── Squaring a range with safeDiv check ──────────────────")
+var i: Int = 1
+while i <= 6 {
+  val r = safeDiv(100, i)
+  IO::println("  100 / #{i} = #{r.describe()}")
+  i = i + 1
+}
+
+IO::println("══════════════════════════════════════════════════════════")

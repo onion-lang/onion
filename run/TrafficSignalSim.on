@@ -1,0 +1,213 @@
+// TrafficSignalSim — an intersection traffic-signal controller simulator, a new
+// domain for the run/ corpus, centered on @TailRecursive mutual recursion (the
+// least-exercised optimization phase in the run/ corpus): a Red/Yellow/Green
+// signal cycle is driven by three private methods that call each other in tail
+// position, run for a large number of ticks (well past the JVM's default stack
+// depth) to prove the mutual-recursion state-machine optimization keeps the
+// call stack flat.
+//
+// Also exercises: ADT case-enum with select/is dispatch; a record with an
+// example clause and a { public: ... } body; extension methods on Int/String;
+// try/catch around config validation; collection pipelines (map/filter/fold);
+// foreach over typed lists and ranges; a while loop; and string interpolation
+// throughout.
+
+// ─── ADT: signal phase ────────────────────────────────────────────────────────
+
+enum Signal {
+  case Red
+  case Yellow
+  case Green
+public:
+  def label(): String = select this {
+    case s is Red:    "RED"
+    case s is Yellow: "YELLOW"
+    case s is Green:  "GREEN"
+  }
+  def next(): Signal = select this {
+    case s is Red:    new Green()
+    case s is Yellow: new Red()
+    case s is Green:  new Yellow()
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def clampMin(lo: Int): Int = if self < lo { lo } else { self }
+  def asSeconds(): String = self + "s"
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── record with examples and a body ─────────────────────────────────────────
+
+record CycleStats(redTicks: Int, yellowTicks: Int, greenTicks: Int, cycles: Int)
+  example totalMatches { new CycleStats(3, 1, 5, 1).totalTicks() == 9 }
+{
+public:
+  def totalTicks(): Int = self.redTicks() + self.yellowTicks() + self.greenTicks()
+
+  def greenRatioPct(): Int {
+    val total: Int = self.totalTicks()
+    if total == 0 { return 0 }
+    return (self.greenTicks() * 100) / total
+  }
+
+  def combine(other: CycleStats): CycleStats =
+    new CycleStats(
+      self.redTicks() + other.redTicks(),
+      self.yellowTicks() + other.yellowTicks(),
+      self.greenTicks() + other.greenTicks(),
+      self.cycles() + other.cycles()
+    )
+}
+
+// ─── Config with validation ───────────────────────────────────────────────────
+
+record SignalConfig(name: String, redDur: Int, yellowDur: Int, greenDur: Int, pedestrianCall: Boolean)
+
+def validate(cfg: SignalConfig): SignalConfig {
+  if cfg.redDur() <= 0 || cfg.yellowDur() <= 0 || cfg.greenDur() <= 0 {
+    throw new Exception("intersection " + cfg.name() + " has a non-positive phase duration")
+  }
+  return cfg
+}
+
+// ─── The controller: @TailRecursive mutual recursion across phases ───────────
+// A pedestrian call shortens the following Green phase by up to 2 ticks
+// (clamped at 1), modeling a walk-request cutting the cycle short.
+//
+// The three phase methods thread every config value through as a parameter
+// instead of reading `this` — the mutual-recursion optimizer collapses a
+// @TailRecursive group into a single flat loop, but only when the group never
+// needs an instance to run on. Reading a field or calling another instance
+// method from inside the group falls back to plain (non-tail-optimized)
+// recursion instead, which is exactly what would stack-overflow at the tick
+// counts used below.
+
+class IntersectionController {
+private:
+  val cfg: SignalConfig
+  val totalTicks: Int
+
+  @TailRecursive
+  def runRed(ticksLeft: Int, phaseLeft: Int, redDur: Int, yellowDur: Int, greenDur: Int, pedCall: Boolean, stats: CycleStats): CycleStats {
+    if ticksLeft <= 0 { return stats }
+    if phaseLeft <= 0 {
+      return runGreen(ticksLeft, (if pedCall { (greenDur - 2).clampMin(1) } else { greenDur }),
+        redDur, yellowDur, greenDur, pedCall, stats)
+    }
+    return runRed(ticksLeft - 1, phaseLeft - 1, redDur, yellowDur, greenDur, pedCall,
+      new CycleStats(stats.redTicks() + 1, stats.yellowTicks(), stats.greenTicks(), stats.cycles()))
+  }
+
+  @TailRecursive
+  def runGreen(ticksLeft: Int, phaseLeft: Int, redDur: Int, yellowDur: Int, greenDur: Int, pedCall: Boolean, stats: CycleStats): CycleStats {
+    if ticksLeft <= 0 { return stats }
+    if phaseLeft <= 0 { return runYellow(ticksLeft, yellowDur, redDur, yellowDur, greenDur, pedCall, stats) }
+    return runGreen(ticksLeft - 1, phaseLeft - 1, redDur, yellowDur, greenDur, pedCall,
+      new CycleStats(stats.redTicks(), stats.yellowTicks(), stats.greenTicks() + 1, stats.cycles()))
+  }
+
+  @TailRecursive
+  def runYellow(ticksLeft: Int, phaseLeft: Int, redDur: Int, yellowDur: Int, greenDur: Int, pedCall: Boolean, stats: CycleStats): CycleStats {
+    if ticksLeft <= 0 { return stats }
+    if phaseLeft <= 0 {
+      return runRed(ticksLeft, redDur, redDur, yellowDur, greenDur, pedCall,
+        new CycleStats(stats.redTicks(), stats.yellowTicks(), stats.greenTicks(), stats.cycles() + 1))
+    }
+    return runYellow(ticksLeft - 1, phaseLeft - 1, redDur, yellowDur, greenDur, pedCall,
+      new CycleStats(stats.redTicks(), stats.yellowTicks() + 1, stats.greenTicks(), stats.cycles()))
+  }
+
+public:
+  def this(cfg: SignalConfig, totalTicks: Int) {
+    this.cfg = cfg
+    this.totalTicks = totalTicks
+  }
+
+  def simulate(): CycleStats =
+    runRed(this.totalTicks, this.cfg.redDur(), this.cfg.redDur(), this.cfg.yellowDur(),
+      this.cfg.greenDur(), this.cfg.pedestrianCall(), new CycleStats(0, 0, 0, 0))
+
+  def name(): String = this.cfg.name()
+}
+
+// ─── Reporting ─────────────────────────────────────────────────────────────
+
+def reportLine(name: String, stats: CycleStats): String {
+  val label: String = name.padRight(14)
+  return "  " + label + " cycles=" + stats.cycles() + "  R=" + stats.redTicks().asSeconds() +
+    " Y=" + stats.yellowTicks().asSeconds() + " G=" + stats.greenTicks().asSeconds() +
+    "  green%=" + stats.greenRatioPct()
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Traffic Signal Simulator ===")
+IO::println("")
+
+IO::println("-- Phase cycle (ADT case-enum dispatch) --")
+var phase: Signal = new Red()
+foreach _: Int in 0..<4 {
+  IO::println("  " + phase.label())
+  phase = phase.next()
+}
+
+IO::println("")
+val configs: List[SignalConfig] = [
+  new SignalConfig("MainSt/1st", 30, 5, 25, false),
+  new SignalConfig("MainSt/2nd", 20, 4, 40, true),
+  new SignalConfig("Highway/Exit9", 15, 3, 60, false),
+  new SignalConfig("SchoolZone", 25, 6, 15, true)
+]
+
+// Deep enough to overflow the JVM's default call stack without the
+// @TailRecursive mutual-recursion optimization collapsing the three
+// phase methods into a single flat loop.
+val ticksPerIntersection: Int = 200000
+
+val validated: List[SignalConfig] = configs.map { c -> validate(c) }
+
+val controllers: List[IntersectionController] =
+  validated.map { c -> new IntersectionController(c, ticksPerIntersection) }
+
+IO::println("-- Per-intersection results (" + ticksPerIntersection + " ticks each) --")
+val results: List[CycleStats] = controllers.map { ctrl -> ctrl.simulate() }
+foreach i: Int in 0..<controllers.size {
+  IO::println(reportLine(controllers[i].name(), results[i]))
+}
+
+val grandTotal: CycleStats = results.fold(new CycleStats(0, 0, 0, 0)) { acc, s -> acc.combine(s) }
+IO::println("")
+IO::println("-- Fleet totals --")
+IO::println(reportLine("ALL", grandTotal))
+IO::println("  total ticks simulated = " + grandTotal.totalTicks())
+
+val busiest: List[CycleStats] = results.filter { s -> s.greenRatioPct() >= 50 }
+IO::println("")
+IO::println("-- Intersections with green% >= 50 --")
+foreach s: CycleStats in busiest {
+  IO::println("  cycles=" + s.cycles() + " green%=" + s.greenRatioPct())
+}
+
+// A negative duration must be rejected before simulation ever starts.
+IO::println("")
+IO::println("-- Config validation --")
+try {
+  validate(new SignalConfig("Broken", 0, 5, 10, false))
+  IO::println("  (unexpected: should have thrown)")
+} catch e: Exception {
+  IO::println("  rejected: " + e.message())
+}
+
+IO::println("")
+IO::println("Done — " + configs.size + " intersections, " +
+  (ticksPerIntersection * configs.size) + " total ticks, no stack overflow.")

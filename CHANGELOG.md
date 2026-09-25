@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.112.0] - 2026-09-25
+
 ### Fixed
 
 - **`select b { case true: X; case false: Y }` over a `Boolean` scrutinee with no `else` clause was assigned type `void` instead of the LUB of `X` and `Y`, causing a spurious `E0020` ("this method cannot return a value") at every use site.** The exhaustiveness checker in `SelectExpressionTyping.scala` handled only sealed class hierarchies and enum constants and fell through to `case _ =>` for `BasicType.BOOLEAN`, leaving `isExhaustive = false`; the non-exhaustive path degrades the result type to `void`. Added a `BasicType.BOOLEAN` arm that recognizes the case where both `case true:` and `case false:` literals are present as exhaustive. The `else:` workaround continues to work unchanged. Covered by `BooleanSelectExhaustiveSpec` (merged via #1554).

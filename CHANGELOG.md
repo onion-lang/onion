@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.111.0] - 2026-09-25
+
+### Added
+
+- **`run/RailNetwork.on`** — a 382-line rail network operations showcase, a new domain for the `run/` corpus (data-carrying enums `TrainClass(label, priceMultiplier)`/`ServiceStatus(code)` matched via `select`; an ADT case-enum `Disruption` with four cases (`TrackFault`/`WeatherAlert`/`StaffShortage`/`Clear`) dispatched via `case f is TrackFault:` type patterns; records with inline methods `Route.baseFare()`/`Passenger.canAfford()`/`TrainRun.isOperational()`; extension methods on `Int` (`.pct`/`.stars`) and `String` (`.truncate`/`.padRight`); an interface `Reportable` implemented by `StationReport`/`RouteReport`; collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`find`/`contains`; nullable returns; recursive path-finding over a route graph; string interpolation; `while`/`foreach` loops; and `try`/`catch` — rendering a train status board, route statistics, passenger bookings, station zone analysis, a disruption log, network highlights, and a route path finder), added to the `run/` corpus (merged via #1540).
+
+- **`run/ZooManagement.on`** — a 379-line zoo management system, a new domain for the `run/` corpus (plain enums `DietType`/`HealthStatus`/`EnclosureKind`; records with methods `Animal`/`Enclosure`/`VetVisit`/`FeedingEntry` (label/classification helpers via `select`); a class `Zoo` with typed `List[T]` fields and explicit constructors; collection pipelines `filter`/`fold`/`map`/`sortedBy`/`groupBy`/`find`/`distinct`/`any`; `foreach (k, v) in map`; `select` pattern matching with exhaustiveness; nullable types and null checks; closures; string interpolation; `while`/`foreach` loops; and recursion — tracking animals, enclosures, vet visits, and feeding schedules), added to the `run/` corpus (merged via #1538).
+
+- **`run/ClimateAnalyzer.on`** — a 252-line climate station analytics program, a new domain for the `run/` corpus (`record ... from re"..."` parsing 36 station-month records via `Measurement::parseAll`; plain homogeneous enums `Season`/`AirQuality`; a data-carrying ADT case-enum `ClimateZone` (`Arid`/`Temperate`/`Tropical`/`Polar`) dispatched via `select`; records with fields `StationReport`/`Measurement`; collection pipelines `map`/`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`zip`; `foreach (k, v) in map`; string interpolation and formatting — rendering per-station summaries, temperature/precipitation rankings, seasonal and humidity analysis, and zone classification), added to the `run/` corpus (merged via #1529).
+
+- **`run/UniversityEnrollment.on`** — a 329-line university course registration and academic analytics system, a new domain for the `run/` corpus (records with methods `Student`/`Course`/`Enrollment`/`GradeResult`; plain enums `Department`/`Semester`; a data-carrying enum `Grade(points, symbol)`; an ADT case-enum `Standing` (`GoodStanding`/`Probation`/`Suspended`) dispatched via `select`; a class hierarchy `RegistryBase(instName)` → `AcademicRegistry` with a primary-constructor `extends` and `override` via `conforms Summarizable`; extension methods on `Int`/`Double`; collection pipelines `map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`/`partition`; nullable `Student?` returns; closures; string interpolation; `try`/`catch`; tail recursion; a `while` loop; `foreach` over a range and over `(k, v) in map` — rendering per-student GPAs, a top-students ranking, and a senior standing report), added to the `run/` corpus (merged via #1532).
+
 ## [0.110.0] - 2026-09-25
 
 ### Fixed

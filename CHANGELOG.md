@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CrosswordBuilder.on`** — a 468-line self-contained "Programming Languages" crossword puzzle builder and validator, a new domain for the `run/` corpus (an ADT enum `Direction` (`Across`/`Down`) dispatched via `select`; a data-carrying enum `WordRating` with `stars`/`desc` fields; records with methods `ClueEntry`/`PuzzleStats`; a class managing a 2D `List[List[String]]` grid (`canPlace`/`place`/`fillBlacks`); five DOWN words engineered to cross the anchor word SYNTAX at every letter position (5 verified intersections, 17/17 placements succeed deterministically); collection pipelines `map`/`filter`/`fold`/`sortedBy`/`distinct`/`groupBy`/`find`/`partition`; extension methods on `Int`/`String`/`Double` (`lpad`/`rpad`/`ch`/`round1`); closures, nullable `String?`, the Elvis operator; `try`/`catch`; string interpolation; and recursion — rendering the puzzle grid, a clue list, and placement/fill statistics), added to the `run/` corpus (merged via #1520).
+
 ## [0.109.0] - 2026-09-25
 
 ### Added

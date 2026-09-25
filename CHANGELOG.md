@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.109.0] - 2026-09-25
+
 ### Added
 
 - **`run/GraphDatabase.on`** — a 412-line in-memory toy graph database, a new domain for the `run/` corpus (ADT case-enums, plain enums, records, an interface implemented by a class implementing two interfaces, typed generics (`Map[Int, Node]`, `List[Node]`, ...), collection pipelines (`filter`/`map`/`groupBy`/`distinct`/`fold`), `select`/pattern-match dispatch on ADT cases, BFS shortest-path with nullable returns, DFS recursion, `forEach` over ranges and maps, closures stored in `val`s, `try`/`catch`, and string interpolation), added to the `run/` corpus (merged via #1509).

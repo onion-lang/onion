@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GraphDatabase.on`** — a 412-line in-memory toy graph database, a new domain for the `run/` corpus (ADT case-enums, plain enums, records, an interface implemented by a class implementing two interfaces, typed generics (`Map[Int, Node]`, `List[Node]`, ...), collection pipelines (`filter`/`map`/`groupBy`/`distinct`/`fold`), `select`/pattern-match dispatch on ADT cases, BFS shortest-path with nullable returns, DFS recursion, `forEach` over ranges and maps, closures stored in `val`s, `try`/`catch`, and string interpolation), added to the `run/` corpus (merged via #1509).
+
+- **`run/JsonExpr.on`** — a 275-line JSON value algebraic data type implemented from scratch, a new domain for the `run/` corpus (an ADT enum `JVal` with 6 case records and public instance methods; a class with a forward reference (`JField` <-> `JVal`); recursive types (`JArr` holds `List[JVal]`, `JObj` holds `List[JField]`); `select this` pattern matching on ADT cases; collection pipelines `map`/`filter`/`fold`/`find`/`flatMap`/`sortedBy`; closures; nullable `JVal?` path-query/accessor methods with chained safe-call (`?.`) navigation; `Colls::concat`; the `|>` pipeline operator; string interpolation; and a recursive pretty-printer with configurable indent), added to the `run/` corpus (merged via #1511).
+
+- **`run/PersonalBudget.on`** — a 297-line personal budget tracker, a new domain for the `run/` corpus (a data-carrying ADT case-enum `Category` with 8 cases dispatched via `select this`; a zero-field ADT enum `TxType` (`Income`/`Expense`); extension methods on `Double`/`Int`/`String`; typed generic lists (`List[Transaction]`, `List[BudgetSummary]`, ...); a class with private/public sections; collection pipelines `filter`/`sortedBy`/`size`/`foreach`; and records with computed methods `BudgetSummary`/`MonthlySummary` — rendering a monthly summary, category breakdown, and top-expenses report), added to the `run/` corpus (merged via #1512).
+
 ## [0.108.0] - 2026-09-24
 
 ### Fixed

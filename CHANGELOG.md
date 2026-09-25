@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ClimateAnalyzer.on`** — a 252-line climate station analytics program, a new domain for the `run/` corpus (`record ... from re"..."` parsing 36 station-month records via `Measurement::parseAll`; plain homogeneous enums `Season`/`AirQuality`; a data-carrying ADT case-enum `ClimateZone` (`Arid`/`Temperate`/`Tropical`/`Polar`) dispatched via `select`; records with fields `StationReport`/`Measurement`; collection pipelines `map`/`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`zip`; `foreach (k, v) in map`; string interpolation and formatting — rendering per-station summaries, temperature/precipitation rankings, seasonal and humidity analysis, and zone classification), added to the `run/` corpus (merged via #1529).
+
 ## [0.110.0] - 2026-09-25
 
 ### Fixed

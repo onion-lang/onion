@@ -1,0 +1,379 @@
+// ZooManagement.on — zoo management system: animals, enclosures, health, feeding
+// Exercises: ADT case-enums with methods, records with methods, classes with
+// typed List fields and explicit constructors, collection pipelines (filter/fold/
+// map/sortedBy/groupBy/find/distinct/any), foreach (k,v) over Map, select pattern
+// matching with exhaustiveness, nullable types and null checks, closures,
+// string interpolation, while/foreach loops, recursion.
+
+// ─── ADT Enums ───────────────────────────────────────────────────────────────
+
+enum DietType {
+  case Herbivore
+  case Carnivore
+  case Omnivore
+}
+
+enum HealthStatus {
+  case Healthy
+  case UnderObservation
+  case Ill
+  case Quarantined
+}
+
+enum EnclosureKind {
+  case Indoor
+  case Outdoor
+  case Aquatic
+  case Aviary
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Animal(
+  id: Int,
+  name: String,
+  species: String,
+  area: String,
+  ageYears: Int,
+  weightKg: Double,
+  diet: DietType,
+  status: HealthStatus
+) {
+public:
+  def dietLabel(): String = select diet {
+    case d is Herbivore: "Herbivore"
+    case d is Carnivore: "Carnivore"
+    case d is Omnivore:  "Omnivore"
+  }
+  def statusLabel(): String = select status {
+    case s is Healthy:          "Healthy"
+    case s is UnderObservation: "Observation"
+    case s is Ill:              "ILL"
+    case s is Quarantined:      "QUARANTINED"
+  }
+  def isCritical(): Boolean = status is Ill || status is Quarantined
+  def isHerbivore(): Boolean = diet is Herbivore
+  def isCarnivore(): Boolean = diet is Carnivore
+  def isOmnivore(): Boolean  = diet is Omnivore
+  def dailyRationKg(): Double = weightKg * 0.04
+}
+
+record Enclosure(
+  id: Int,
+  label: String,
+  area: String,
+  kind: EnclosureKind,
+  capacity: Int
+) {
+public:
+  def kindLabel(): String = select kind {
+    case k is Indoor:  "Indoor"
+    case k is Outdoor: "Outdoor"
+    case k is Aquatic: "Aquatic"
+    case k is Aviary:  "Aviary"
+  }
+}
+
+record VetVisit(
+  animalId: Int,
+  date: String,
+  diagnosis: String,
+  newStatus: HealthStatus
+)
+
+record FeedingEntry(
+  animalId: Int,
+  timeSlot: String,
+  foodKg: Double,
+  keeper: String
+)
+
+// ─── Zoo class ───────────────────────────────────────────────────────────────
+
+class Zoo {
+  val animals:    List[Animal]
+  val enclosures: List[Enclosure]
+  val vetVisits:  List[VetVisit]
+  val feedings:   List[FeedingEntry]
+  val name:       String
+
+public:
+  def this(name: String) {
+    this.name       = name
+    this.animals    = []
+    this.enclosures = []
+    this.vetVisits  = []
+    this.feedings   = []
+  }
+
+  def addAnimal(a: Animal): void        { animals.add(a) }
+  def addEnclosure(e: Enclosure): void  { enclosures.add(e) }
+  def addVetVisit(v: VetVisit): void    { vetVisits.add(v) }
+  def addFeeding(f: FeedingEntry): void { feedings.add(f) }
+
+  def animalCount(): Int    = animals.size
+  def enclosureCount(): Int = enclosures.size
+
+  def animalsInArea(area: String): List[Animal] =
+    animals.filter { a -> (a as Animal).area == area }
+
+  def herbivores(): List[Animal] = animals.filter { a -> (a as Animal).isHerbivore() }
+  def carnivores(): List[Animal] = animals.filter { a -> (a as Animal).isCarnivore() }
+  def omnivores(): List[Animal]  = animals.filter { a -> (a as Animal).isOmnivore() }
+
+  def criticalAnimals(): List[Animal] = animals.filter { a -> (a as Animal).isCritical() }
+  def healthyAnimals(): List[Animal]  = animals.filter { a -> (a as Animal).status is Healthy }
+  def underObservation(): List[Animal] = animals.filter { a -> (a as Animal).status is UnderObservation }
+
+  def averageWeight(): Double = {
+    if animals.size == 0 { return 0.0 }
+    val total = animals.fold(0.0) { acc, a -> (acc as Double) + (a as Animal).weightKg }
+    (total as Double) / (animals.size as Double)
+  }
+
+  def heaviestAnimal(): Animal? = {
+    if animals.size == 0 { return null }
+    var best = animals.get(0) as Animal
+    foreach a: Animal in animals {
+      if a.weightKg > best.weightKg { best = a }
+    }
+    best
+  }
+
+  def lightestAnimal(): Animal? = {
+    if animals.size == 0 { return null }
+    var best = animals.get(0) as Animal
+    foreach a: Animal in animals {
+      if a.weightKg < best.weightKg { best = a }
+    }
+    best
+  }
+
+  def totalDailyRation(): Double =
+    animals.fold(0.0) { acc, a -> (acc as Double) + (a as Animal).dailyRationKg() }
+
+  def herbivoreRation(): Double =
+    herbivores().fold(0.0) { acc, a -> (acc as Double) + (a as Animal).dailyRationKg() }
+
+  def carnivoreRation(): Double =
+    carnivores().fold(0.0) { acc, a -> (acc as Double) + (a as Animal).dailyRationKg() }
+
+  def omnivoreRation(): Double =
+    omnivores().fold(0.0) { acc, a -> (acc as Double) + (a as Animal).dailyRationKg() }
+
+  def speciesCounts(): Map[Object, List[Animal]] =
+    animals.groupBy { a -> (a as Animal).species }
+
+  def recentVetVisitFor(animalId: Int): VetVisit? = {
+    var found: VetVisit? = null
+    foreach v: VetVisit in vetVisits {
+      if v.animalId == animalId { found = v }
+    }
+    found
+  }
+
+  def findAnimalById(id: Int): Animal? = {
+    var found: Animal? = null
+    foreach a: Animal in animals {
+      if a.id == id { found = a }
+    }
+    found
+  }
+
+  def enclosureInArea(area: String): Enclosure? = {
+    var found: Enclosure? = null
+    foreach e: Enclosure in enclosures {
+      if e.area == area { found = e }
+    }
+    found
+  }
+
+  // ─── Reports ─────────────────────────────────────────────────────────────
+
+  def printHeader(): void {
+    IO::println("╔══════════════════════════════════════════════════╗")
+    IO::println("  " + name + " — Daily Management Report")
+    IO::println("╚══════════════════════════════════════════════════╝")
+  }
+
+  def printRoster(): void {
+    IO::println("")
+    IO::println("── Animal Roster (" + animals.size + " animals) ──")
+    foreach a: Animal in animals.sortedBy { x -> (x as Animal).area } {
+      val line = "  [" + a.id + "] " + a.name + " (" + a.species + ")  area=" + a.area + "  age=" + a.ageYears + "yr  " + a.weightKg + "kg  " + a.dietLabel() + "  " + a.statusLabel()
+      IO::println(line)
+    }
+  }
+
+  def printHealthReport(): void {
+    IO::println("")
+    IO::println("── Health Report ──")
+    val critical = criticalAnimals()
+    val healthy  = healthyAnimals()
+    val obs      = underObservation()
+    IO::println("  Total: " + animalCount() + "  Healthy: " + healthy.size + "  Under observation: " + obs.size + "  Critical: " + critical.size)
+    if critical.size > 0 {
+      IO::println("  Critical animals:")
+      foreach a: Animal in critical {
+        val visit = recentVetVisitFor(a.id)
+        val note = if visit != null { visit.diagnosis } else { "no recent vet record" }
+        IO::println("    [!] " + a.name + " (" + a.species + ") — " + note)
+      }
+    }
+    if obs.size > 0 {
+      IO::println("  Under observation:")
+      foreach a: Animal in obs {
+        val visit = recentVetVisitFor(a.id)
+        val note = if visit != null { visit.diagnosis } else { "monitoring in progress" }
+        IO::println("    [~] " + a.name + " (" + a.species + ") — " + note)
+      }
+    }
+  }
+
+  def printFeedingPlan(): void {
+    IO::println("")
+    IO::println("── Daily Feeding Plan ──")
+    val hKg   = herbivoreRation()
+    val cKg   = carnivoreRation()
+    val oKg   = omnivoreRation()
+    val total = totalDailyRation()
+    IO::println("  Herbivores (" + herbivores().size + " animals): " + hKg + " kg")
+    IO::println("  Carnivores (" + carnivores().size + " animals): " + cKg + " kg")
+    IO::println("  Omnivores  (" + omnivores().size  + " animals): " + oKg + " kg")
+    IO::println("  Grand total: " + total + " kg/day")
+    IO::println("")
+    IO::println("  Scheduled feedings today:")
+    foreach f: FeedingEntry in feedings.sortedBy { x -> (x as FeedingEntry).timeSlot } {
+      val a = findAnimalById(f.animalId)
+      val aName = if a != null { a.name } else { "unknown" }
+      IO::println("    " + f.timeSlot + "  " + aName + "  " + f.foodKg + " kg  (keeper: " + f.keeper + ")")
+    }
+  }
+
+  def printSpeciesCensus(): void {
+    IO::println("")
+    IO::println("── Species Census ──")
+    val bySpecies = speciesCounts()
+    val keys = bySpecies.keys().sortedBy { k -> k as String }
+    foreach key: Object in keys {
+      val grp = bySpecies[key] as List[Animal]
+      IO::println("  " + key + ": " + grp.size)
+    }
+  }
+
+  def printAreaSummary(): void {
+    IO::println("")
+    IO::println("── Area Summary ──")
+    val areas = ["Africa", "Asia", "Americas", "Aquarium", "Aviary"]
+    foreach areaName: String in areas {
+      val list = animalsInArea(areaName)
+      if list.size > 0 {
+        val enc = enclosureInArea(areaName)
+        val encInfo = if enc != null { enc.label + " (" + enc.kindLabel() + ", cap " + enc.capacity + ")" } else { "no enclosure" }
+        IO::println("  " + areaName + " — " + encInfo + " — " + list.size + " animals:")
+        foreach a: Animal in list {
+          IO::println("    • " + a.name + " (" + a.species + ", " + a.weightKg + " kg, " + a.statusLabel() + ")")
+        }
+      }
+    }
+  }
+
+  def printEnclosureReport(): void {
+    IO::println("")
+    IO::println("── Enclosure Report ──")
+    foreach e: Enclosure in enclosures {
+      val count = animalsInArea(e.area).size
+      val pct: Int = if e.capacity > 0 { count * 100 / e.capacity } else { 0 }
+      val encLine = "  [" + e.id + "] " + e.label + "  type=" + e.kindLabel() + "  capacity=" + e.capacity + "  occupancy=" + count + " (" + pct + "%)"
+      IO::println(encLine)
+    }
+  }
+
+  def printWeightStats(): void {
+    IO::println("")
+    IO::println("── Weight Statistics ──")
+    val avg = averageWeight()
+    val heaviest = heaviestAnimal()
+    val lightest = lightestAnimal()
+    IO::println("  Average weight : " + avg + " kg")
+    if heaviest != null {
+      IO::println("  Heaviest       : " + heaviest.name + " (" + heaviest.species + ") " + heaviest.weightKg + " kg")
+    }
+    if lightest != null {
+      IO::println("  Lightest       : " + lightest.name + " (" + lightest.species + ") " + lightest.weightKg + " kg")
+    }
+    val overTonne = animals.filter { a -> (a as Animal).weightKg >= 1000.0 }
+    IO::println("  >= 1 tonne: " + overTonne.size)
+    foreach a: Animal in overTonne.sortedBy { x -> 0.0 - (x as Animal).weightKg } {
+      IO::println("    " + a.name + " (" + a.species + "): " + a.weightKg + " kg")
+    }
+  }
+
+  def printAgeStats(): void {
+    IO::println("")
+    IO::println("── Age Statistics ──")
+    if animals.size == 0 { return }
+    val sorted = animals.sortedBy { a -> (a as Animal).ageYears }
+    val youngest = sorted.get(0) as Animal
+    val oldest   = sorted.get(sorted.size - 1) as Animal
+    val totalAge = animals.fold(0) { acc, a -> (acc as Int) + (a as Animal).ageYears }
+    val avgAge: Double = (totalAge as Int) * 1.0 / animals.size
+    IO::println("  Youngest: " + youngest.name + " (" + youngest.species + ") " + youngest.ageYears + " yr")
+    IO::println("  Oldest  : " + oldest.name   + " (" + oldest.species   + ") " + oldest.ageYears + " yr")
+    IO::println("  Average : " + avgAge + " yr")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val zoo = new Zoo("Riverside Wildlife Park")
+
+  // ── Enclosures ──
+  zoo.addEnclosure(new Enclosure(1, "Savanna Paddock",    "Africa",   new Outdoor(), 12))
+  zoo.addEnclosure(new Enclosure(2, "Jungle House",       "Asia",     new Indoor(),   8))
+  zoo.addEnclosure(new Enclosure(3, "Rainforest Habitat", "Americas", new Outdoor(), 10))
+  zoo.addEnclosure(new Enclosure(4, "Deep Sea Tank",      "Aquarium", new Aquatic(),  6))
+  zoo.addEnclosure(new Enclosure(5, "Bird Dome",          "Aviary",   new Aviary(),  20))
+
+  // ── Animals ──
+  zoo.addAnimal(new Animal(1,  "Zara",   "African Elephant",   "Africa",    12, 4200.0, new Herbivore(), new Healthy()))
+  zoo.addAnimal(new Animal(2,  "Leo",    "Lion",               "Africa",     6,  190.0, new Carnivore(), new Healthy()))
+  zoo.addAnimal(new Animal(3,  "Dottie", "Giraffe",            "Africa",     9, 1100.0, new Herbivore(), new UnderObservation()))
+  zoo.addAnimal(new Animal(4,  "Kibo",   "Zebra",              "Africa",     4,  380.0, new Herbivore(), new Healthy()))
+  zoo.addAnimal(new Animal(5,  "Raja",   "Bengal Tiger",       "Asia",       8,  230.0, new Carnivore(), new Healthy()))
+  zoo.addAnimal(new Animal(6,  "Bao",    "Giant Panda",        "Asia",       5,   90.0, new Herbivore(), new Healthy()))
+  zoo.addAnimal(new Animal(7,  "Indra",  "Asian Elephant",     "Asia",      15, 3800.0, new Herbivore(), new Ill()))
+  zoo.addAnimal(new Animal(8,  "Mango",  "Orangutan",          "Asia",      11,   70.0, new Omnivore(),  new Healthy()))
+  zoo.addAnimal(new Animal(9,  "Blaze",  "Jaguar",             "Americas",   4,   95.0, new Carnivore(), new Healthy()))
+  zoo.addAnimal(new Animal(10, "Coco",   "Capybara",           "Americas",   3,   60.0, new Herbivore(), new Healthy()))
+  zoo.addAnimal(new Animal(11, "Nemo",   "Bottlenose Dolphin", "Aquarium",   7,  200.0, new Carnivore(), new Healthy()))
+  zoo.addAnimal(new Animal(12, "Splash", "Sea Lion",           "Aquarium",   5,  270.0, new Carnivore(), new Quarantined()))
+  zoo.addAnimal(new Animal(13, "Rio",    "Macaw",              "Aviary",     3,    1.5, new Omnivore(),  new Healthy()))
+  zoo.addAnimal(new Animal(14, "Snow",   "Snowy Owl",          "Aviary",     6,    2.0, new Carnivore(), new Healthy()))
+  zoo.addAnimal(new Animal(15, "Herbie", "Galapagos Tortoise", "Americas",  80,  200.0, new Herbivore(), new Healthy()))
+
+  // ── Vet visits ──
+  zoo.addVetVisit(new VetVisit(3,  "2026-09-20", "Leg inflammation, monitoring required",       new UnderObservation()))
+  zoo.addVetVisit(new VetVisit(7,  "2026-09-22", "Respiratory infection, treatment in progress", new Ill()))
+  zoo.addVetVisit(new VetVisit(12, "2026-09-23", "Suspected viral exposure, isolation ordered",  new Quarantined()))
+
+  // ── Feedings ──
+  zoo.addFeeding(new FeedingEntry(1,  "08:00", 50.0, "Alex"))
+  zoo.addFeeding(new FeedingEntry(2,  "08:30",  8.0, "Sam"))
+  zoo.addFeeding(new FeedingEntry(5,  "09:00", 10.0, "Sam"))
+  zoo.addFeeding(new FeedingEntry(8,  "09:30",  3.0, "Alex"))
+  zoo.addFeeding(new FeedingEntry(11, "10:00",  7.0, "Jordan"))
+  zoo.addFeeding(new FeedingEntry(13, "10:30",  0.1, "Jordan"))
+
+  // ── Run all reports ──
+  zoo.printHeader()
+  zoo.printRoster()
+  zoo.printHealthReport()
+  zoo.printFeedingPlan()
+  zoo.printSpeciesCensus()
+  zoo.printAreaSummary()
+  zoo.printEnclosureReport()
+  zoo.printWeightStats()
+  zoo.printAgeStats()
+}

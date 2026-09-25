@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`run/PersonalBudget.on`** — a 297-line personal budget tracker, a new domain for the `run/` corpus (a data-carrying ADT case-enum `Category` with 8 cases dispatched via `select this`; a zero-field ADT enum `TxType` (`Income`/`Expense`); extension methods on `Double`/`Int`/`String`; typed generic lists (`List[Transaction]`, `List[BudgetSummary]`, ...); a class with private/public sections; collection pipelines `filter`/`sortedBy`/`size`/`foreach`; and records with computed methods `BudgetSummary`/`MonthlySummary` — rendering a monthly summary, category breakdown, and top-expenses report), added to the `run/` corpus (merged via #1512).
 
+- **`run/ContainerRegistry.on`** — a 419-line OCI-compatible container image registry simulation, a new domain for the `run/` corpus (a plain enum `ScanSeverity`; a data-carrying ADT case-enum `PushResult` dispatched via `select`; records with `example` clauses (`Digest`/`Layer`/`ManifestRef`); an interface `Reportable` implemented by `Repository`; classes with private fields and public getters (`BlobStore`/`TagIndex`/`Repository`/`Registry`/`Scanner`); typed generics (`Map[K, V]`, `List[T]`); collection pipelines `filter`/`map`/`sortedBy`/`distinct`/`flatMap`; `select`/`is` type-pattern matching; nullable checks in pull/gc/scanImage; closures; string interpolation; `while`/`foreach` over ranges and `Map` `(k, v)` entries; and extension methods on `Long`/`Int` (`humanSize()`/`plural()`) — rendering a registry catalog, a pull test, security scan reports, push-result analysis, and a pipeline showcase), added to the `run/` corpus (merged via #1514).
+
 ## [0.108.0] - 2026-09-24
 
 ### Fixed

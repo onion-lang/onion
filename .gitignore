@@ -10,6 +10,7 @@ project/project
 
 src/main/parser/onion
 target/
+onion.jar
 .idea/
 .idea_modules/
 .cache

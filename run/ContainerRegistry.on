@@ -1,0 +1,419 @@
+// ContainerRegistry.on — a simulated OCI-compatible container image registry.
+// Exercises: plain and data-carrying ADT enums, records with example/law,
+// classes, inheritance, interfaces, generics, collection pipelines
+// (filter/map/fold/groupBy/sortedBy/distinct/find/partition/zip/reduce),
+// select/type-pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while/foreach (ranges and map (k,v)),
+// extension methods on Long and Int, |> pipeline.
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum ContentType {
+  CONFIG, MANIFEST, LAYER, INDEX
+}
+
+enum PushResult {
+  case Created(digest: String, size: Long)
+  case AlreadyExists(digest: String)
+  case Rejected(reason: String)
+}
+
+enum ScanSeverity {
+  CRITICAL, HIGH, MEDIUM, LOW, INFO
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Digest(algorithm: String, hex: String)
+  example { new Digest("sha256", "abc123").algorithm() == "sha256" }
+  example { new Digest("sha256", "abc123").hex() == "abc123" } {
+public:
+  def full(): String = "#{algorithm()}:#{hex()}"
+  def short(): String {
+    if hex().length() <= 12 { return full() }
+    return "#{algorithm()}:#{hex().substring(0, 7)}..."
+  }
+}
+
+record Layer(digest: Digest, size: Long, mediaType: String)
+  example { new Layer(new Digest("sha256", "dead"), 4096L, "application/octet-stream").size() == 4096L }
+
+record Vulnerability(id: String, severity: ScanSeverity, description: String, fixable: Boolean)
+
+record ScanReport(imageDigest: Digest, vulnerabilities: List[Vulnerability], scannedAt: String) {
+public:
+  def countSeverity(sev: ScanSeverity): Int =
+    vulnerabilities.filter { v -> (v as Vulnerability).severity() == sev }.size
+  def critical(): Int = countSeverity(ScanSeverity::CRITICAL)
+  def high():     Int = countSeverity(ScanSeverity::HIGH)
+  def fixable():  Int = vulnerabilities.filter { v -> (v as Vulnerability).fixable() }.size
+  def passed():   Boolean = critical() == 0
+}
+
+record ManifestRef(repo: String, tag: String, digest: Digest, totalSize: Long, layers: List[Layer])
+  example { new ManifestRef("lib/nginx", "latest", new Digest("sha256", "cafe"), 102400L, []).repo() == "lib/nginx" }
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Long {
+  def humanSize(): String {
+    if self < 1024L { return "#{self} B" }
+    if self < 1048576L { return "#{self / 1024L} KiB" }
+    if self < 1073741824L { return "#{self / 1048576L} MiB" }
+    return "#{self / 1073741824L} GiB"
+  }
+}
+
+extension Int {
+  def plural(word: String): String = if self == 1 { "#{self} #{word}" } else { "#{self} #{word}s" }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def summaryLine(): String
+}
+
+// ── BlobStore — content-addressable storage ───────────────────────────────────
+
+class BlobStore {
+  val blobs: Map[String, Long]
+  var totalBytes: Long
+
+public:
+  def this() {
+    blobs      = [:]
+    totalBytes = 0L
+  }
+
+  def push(digest: Digest, size: Long): PushResult {
+    val key = digest.full()
+    if blobs.get(key) != null {
+      return new AlreadyExists(key)
+    }
+    blobs.put(key, size)
+    totalBytes = totalBytes + size
+    return new Created(key, size)
+  }
+
+  def has(digest: Digest): Boolean = blobs.get(digest.full()) != null
+
+  def sizeOf(digest: Digest): Long {
+    val raw = blobs.get(digest.full())
+    if raw == null { return -1L }
+    return (raw as Long)
+  }
+
+  def blobCount(): Int = blobs.size
+  def getTotalBytes(): Long = totalBytes
+
+  def gc(reachable: List[String]): Int {
+    val toRemove: List[String] = []
+    foreach k: Object in blobs.keySet() {
+      val key = k as String
+      if !reachable.contains(key) { toRemove.add(key) }
+    }
+    foreach d: String in toRemove {
+      val sz = blobs.get(d)
+      if sz != null { totalBytes = totalBytes - (sz as Long) }
+      blobs.remove(d)
+    }
+    return toRemove.size
+  }
+}
+
+// ── TagIndex — tag → manifest digest mapping ──────────────────────────────────
+
+class TagIndex {
+  val tags: Map[String, String]
+
+public:
+  def this() { tags = [:] }
+
+  def set(tag: String, digest: Digest): void {
+    tags.put(tag, digest.full())
+  }
+
+  def resolve(tag: String): String? {
+    val raw = tags.get(tag)
+    if raw == null { return null }
+    return (raw as String)
+  }
+
+  def allTags(): List[String] {
+    val result: List[String] = []
+    foreach k: Object in tags.keySet() { result.add(k as String) }
+    return result
+  }
+
+  def tagCount(): Int = tags.size
+}
+
+// ── Repository — a named image repository ────────────────────────────────────
+
+class Repository conforms Reportable {
+  val name:      String
+  val blobs:     BlobStore
+  val tags:      TagIndex
+  val manifests: Map[String, ManifestRef]
+  var pullCount: Int
+  var pushCount: Int
+
+public:
+  def this(repoName: String) {
+    name      = repoName
+    blobs     = new BlobStore()
+    tags      = new TagIndex()
+    manifests = [:]
+    pullCount = 0
+    pushCount = 0
+  }
+
+  def pushLayer(digest: Digest, size: Long): PushResult = blobs.push(digest, size)
+
+  def pushManifest(tag: String, manifest: ManifestRef): void {
+    manifests.put(manifest.digest().full(), manifest)
+    tags.set(tag, manifest.digest())
+    pushCount = pushCount + 1
+  }
+
+  def pull(tag: String): ManifestRef? {
+    val digestStr = tags.resolve(tag)
+    if digestStr == null { return null }
+    pullCount = pullCount + 1
+    return (manifests.get(digestStr as String) as ManifestRef)
+  }
+
+  def allManifests(): List[Object] {
+    val result: List[Object] = []
+    foreach (_, v) in manifests { result.add(v as ManifestRef) }
+    return result
+  }
+
+  def getName(): String = name
+  def getTotalBytes(): Long = blobs.getTotalBytes()
+
+  def summaryLine(): String =
+    "#{name}  #{tags.tagCount().plural("tag")}  #{blobs.getTotalBytes().humanSize()}  ↑#{pushCount} ↓#{pullCount}"
+}
+
+// ── Vulnerability scanner (simulated) ────────────────────────────────────────
+
+class Scanner {
+  val db: List[Vulnerability]
+
+public:
+  def this() {
+    db = [
+      new Vulnerability("CVE-2023-0001", ScanSeverity::CRITICAL, "Remote code execution in libssl", true),
+      new Vulnerability("CVE-2023-0002", ScanSeverity::HIGH,     "Privilege escalation in libc",   true),
+      new Vulnerability("CVE-2023-0003", ScanSeverity::MEDIUM,   "Info leak in zlib",              false),
+      new Vulnerability("CVE-2023-0004", ScanSeverity::LOW,      "Non-critical timing issue",      false),
+      new Vulnerability("CVE-2023-0005", ScanSeverity::CRITICAL, "Buffer overflow in libpng",      true),
+      new Vulnerability("CVE-2023-0006", ScanSeverity::INFO,     "Informational only",             false)
+    ]
+  }
+
+  def scan(digest: Digest, layerCount: Int, timestamp: String): ScanReport {
+    val found: List[Vulnerability] = db.filter { v ->
+      val idx = db.indexOf(v)
+      idx < layerCount + 1
+    }
+    return new ScanReport(digest, found, timestamp)
+  }
+}
+
+// ── Registry — top-level orchestrator ────────────────────────────────────────
+
+class Registry {
+  val repos:   Map[String, Repository]
+  val scanner: Scanner
+
+public:
+  def this() {
+    repos   = [:]
+    scanner = new Scanner()
+  }
+
+  def getOrCreate(repoName: String): Repository {
+    val raw = repos.get(repoName)
+    if raw != null { return (raw as Repository) }
+    val repo = new Repository(repoName)
+    repos.put(repoName, repo)
+    return repo
+  }
+
+  def push(repoName: String, tag: String, layers: List[Layer], manifest: ManifestRef): List[PushResult] {
+    val repo = getOrCreate(repoName)
+    val results: List[PushResult] = layers.map { l ->
+      val layer = l as Layer
+      repo.pushLayer(layer.digest(), layer.size())
+    }
+    repo.pushManifest(tag, manifest)
+    return results
+  }
+
+  def pull(repoName: String, tag: String): ManifestRef? {
+    val raw = repos.get(repoName)
+    if raw == null { return null }
+    return (raw as Repository).pull(tag)
+  }
+
+  def totalRepos(): Int = repos.size
+
+  def allRepos(): List[Repository] {
+    val result: List[Repository] = []
+    foreach (_, v) in repos { result.add(v as Repository) }
+    return result
+  }
+
+  def printCatalog(): void {
+    IO::println("═══════════════════════════════════════════════════════")
+    IO::println(" Container Registry Catalog")
+    IO::println("═══════════════════════════════════════════════════════")
+    val sorted: List[Repository] = allRepos().sortedBy { r -> (r as Repository).getName() }
+    foreach r: Repository in sorted {
+      IO::println("  " + r.summaryLine())
+    }
+    IO::println("─────────────────────────────────────────────────────")
+    var totalSize: Long = 0L
+    foreach r: Repository in allRepos() { totalSize = totalSize + r.getTotalBytes() }
+    IO::println("  Total repos: #{totalRepos()}   Total stored: #{totalSize.humanSize()}")
+    IO::println("═══════════════════════════════════════════════════════")
+  }
+
+  def scanImage(repoName: String, tag: String, timestamp: String): ScanReport? {
+    val m = pull(repoName, tag)
+    if m == null { return null }
+    return scanner.scan(m.digest(), m.layers().size, timestamp)
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def makeDigest(suffix: String): Digest = new Digest("sha256", "000000000000" + suffix)
+
+def buildImage(layerSuffix: String, nLayers: Int): List[Layer] {
+  val layers: List[Layer] = []
+  foreach i: Int in 1..nLayers {
+    layers.add(new Layer(
+      makeDigest(layerSuffix + i),
+      (i * 2048L),
+      "application/vnd.oci.image.layer.v1.tar+gzip"
+    ))
+  }
+  return layers
+}
+
+def totalImageSize(layers: List[Layer]): Long {
+  var total: Long = 0L
+  foreach l: Layer in layers { total = total + l.size() }
+  return total
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val registry = new Registry()
+
+// Push several images into different repos
+val nginxLayers = buildImage("nginx", 3)
+val nginxDigest = makeDigest("manifest-nginx-125")
+val nginxManifest = new ManifestRef("library/nginx", "1.25", nginxDigest, totalImageSize(nginxLayers), nginxLayers)
+registry.push("library/nginx", "1.25",    nginxLayers, nginxManifest)
+registry.push("library/nginx", "latest",  nginxLayers, nginxManifest)
+
+val alpineLayers = buildImage("alpine", 1)
+val alpineDigest = makeDigest("manifest-alpine-318")
+val alpineManifest = new ManifestRef("library/alpine", "3.18", alpineDigest, totalImageSize(alpineLayers), alpineLayers)
+registry.push("library/alpine", "3.18",   alpineLayers, alpineManifest)
+registry.push("library/alpine", "latest", alpineLayers, alpineManifest)
+
+val appLayers = buildImage("myapp", 4)
+val appDigest = makeDigest("manifest-myapp-v2")
+val appManifest = new ManifestRef("myorg/myapp", "v2", appDigest, totalImageSize(appLayers), appLayers)
+registry.push("myorg/myapp", "v2",     appLayers, appManifest)
+registry.push("myorg/myapp", "latest", appLayers, appManifest)
+
+// Print the catalog
+registry.printCatalog()
+
+// Pull and inspect an image
+IO::println("")
+IO::println("── Pull test ─────────────────────────────────────────")
+val pulled = registry.pull("library/nginx", "latest")
+if pulled != null {
+  val m = pulled as ManifestRef
+  IO::println("Pulled: #{m.repo()}:#{m.tag()}")
+  IO::println("Digest: #{m.digest().short()}")
+  IO::println("Size:   #{m.totalSize().humanSize()}")
+  IO::println("Layers: #{m.layers().size.plural("layer")}")
+} else {
+  IO::println("Not found")
+}
+
+// Scan images and report vulnerabilities
+IO::println("")
+IO::println("── Security scan ─────────────────────────────────────")
+val scanTargets: List[List[String]] = [
+  ["library/nginx", "latest"] as List[String],
+  ["library/alpine", "latest"] as List[String],
+  ["myorg/myapp", "v2"] as List[String]
+]
+foreach pair: List[String] in scanTargets {
+  val repo = pair[0] as String
+  val tag  = pair[1] as String
+  val report = registry.scanImage(repo, tag, "2024-01-15T10:00:00Z")
+  if report != null {
+    val r = report as ScanReport
+    val status = if r.passed() { "✓ PASS" } else { "✗ FAIL" }
+    IO::println("#{status}  #{repo}:#{tag}  CRIT=#{r.critical()} HIGH=#{r.high()} fixable=#{r.fixable()}")
+  }
+}
+
+// Push-result analysis using select/pattern matching
+IO::println("")
+IO::println("── Push result analysis ──────────────────────────────")
+val repo = registry.getOrCreate("library/nginx")
+val newDigest = makeDigest("new-patch-layer")
+val r1 = repo.pushLayer(newDigest, 4096L)
+val r2 = repo.pushLayer(newDigest, 4096L)
+foreach result: PushResult in [r1, r2] {
+  select result {
+    case c   is Created:       IO::println("  CREATED  #{c.digest()} (#{c.size().humanSize()})")
+    case a   is AlreadyExists: IO::println("  EXISTS   #{a.digest()}")
+    case rej is Rejected:      IO::println("  REJECTED #{rej.reason()}")
+  }
+}
+
+// Collection pipeline showcase
+IO::println("")
+IO::println("── Pipeline showcase ─────────────────────────────────")
+val allMans: List[Object] = (registry.allRepos()
+  .flatMap { r -> (r as Repository).allManifests() } as List[Object])
+val largeImages: List[String] = allMans
+  .filter { m -> (m as ManifestRef).totalSize() > 4096L }
+  .sortedBy { m -> 0L - (m as ManifestRef).totalSize() }
+  .map { m -> "#{(m as ManifestRef).repo()}:#{(m as ManifestRef).tag()} (#{(m as ManifestRef).totalSize().humanSize()})" }
+IO::println("Images > 4 KiB (largest first):")
+foreach line: String in largeImages { IO::println("  #{line}") }
+
+// Distinct repos by namespace
+IO::println("")
+IO::println("── Namespaces ────────────────────────────────────────")
+val namespaces: List[String] = registry.allRepos()
+  .map { r -> {
+    val name = (r as Repository).getName()
+    val slash = name.indexOf("/")
+    if slash < 0 { name } else { name.substring(0, slash) }
+  }}
+  .distinct()
+  .sortedBy { s -> s as String }
+IO::println("Namespaces: #{namespaces.toString()}")
+
+// Total storage across all repos
+var grandTotal: Long = 0L
+foreach gr: Repository in registry.allRepos() { grandTotal = grandTotal + gr.getTotalBytes() }
+IO::println("")
+IO::println("Grand total stored: #{grandTotal.humanSize()}")
+IO::println("Total repos:        #{registry.totalRepos()}")
+IO::println("Done.")

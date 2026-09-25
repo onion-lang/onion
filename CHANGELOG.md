@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.110.0] - 2026-09-25
-
 ### Fixed
 
 - **A source file containing a truncated `\uXXXX` Unicode escape (e.g. `\u0e` with fewer than 4 hex digits) crashed the compiler with an internal error (`I0000`) instead of reporting a clean parse error.** `OnionLexer.decode()` throws `java.lang.Error` on this input, which `Parsing.parseFile()`'s `catch` block did not handle (only `IOException` was caught), so it propagated up to `PipelineRunner`'s `NonFatal` handler and surfaced as `I0000`. Added a second `catch` arm in `Parsing.parseFile()` for any non-fatal `Error` (excluding `VirtualMachineError`), converting it into a regular `CompileError` for both the fast-path (`OnionParser`) and JavaCC-fallback parsers (merged via #1525).

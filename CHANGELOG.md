@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CustomerSurvey.on`** — a 346-line customer feedback survey system, a new domain for the `run/` corpus (a plain enum `SurveyCategory`; a data-carrying enum `Sentiment(score, stars)` (`Excellent`/`Good`/`Neutral`/`Poor`/`Terrible`); an ADT case-enum `FeedbackStatus` (`Open`/`InProgress(assignee)`/`Resolved(resolution)`/`Dismissed(reason)`) with `label()`/`isOpen()` via `select this`; records with methods `FeedbackEntry`/`CustomerProfile`; an interface `Summarizable` implemented by a class `SurveyRound`; a class `FeedbackRepository`; extension methods on `Double`/`Int`/`String` (`round1()`/`fmt1()`/`pct()`/`rpad()`); collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`find`/`distinct`/`partition`; nullable `CustomerProfile?` lookup wrapped in `try`/`catch`; closures; string interpolation; recursion; `while`/`foreach` over ranges and map entries — rendering per-round survey summaries and a ticket status overview), added to the `run/` corpus (merged via #1543).
+
 ## [0.111.0] - 2026-09-25
 
 ### Added

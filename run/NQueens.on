@@ -1,0 +1,334 @@
+// NQueens.on — N-Queens puzzle solver with backtracking, solution analytics,
+// board display, and solution symmetry classification.
+//
+// Exercises: records with methods, data-carrying enum, ADT enum, classes,
+// interfaces, collection pipelines (map/filter/fold/sortedBy/distinct/
+// find/partition/zip), select/pattern matching, nullable, closures, string
+// interpolation, recursion, while, foreach (ranges and over collections).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SymmetryType(label: String) {
+  RotSym90("90° rot"),
+  RotSym180("180° rot"),
+  ReflHoriz("H-reflect"),
+  ReflVert("V-reflect"),
+  ReflDiag("Diag-reflect"),
+  NoSymmetry("none")
+}
+
+// ─── ADT: SolveResult ─────────────────────────────────────────────────────────
+
+enum SolveResult {
+  case Solved(queens: List[Int])
+  case NoSolution(n: Int)
+public:
+  def isSolved(): Boolean = select this {
+    case r is Solved: true
+    case r is NoSolution: false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Queen(row: Int, col: Int) {
+public:
+  def label(): String = "(#{row()},#{col()})"
+}
+
+record Solution(n: Int, queens: List[Int], id: Int) {
+public:
+  def queen(row: Int): Int = queens().get(row) as Int
+
+  def isValid(): Boolean {
+    foreach r1: Int in 0..<n() {
+      val c1: Int = queen(r1)
+      foreach r2: Int in (r1 + 1)..<n() {
+        val c2: Int = queen(r2)
+        if c1 == c2 { return false }
+        if (c1 - c2) == (r1 - r2) { return false }
+        if (c1 - c2) == (r2 - r1) { return false }
+      }
+    }
+    return true
+  }
+
+  def boardLines(): List[String] {
+    val lines: List[String] = []
+    val border: String = "+" + repeat("-", n() * 2 + 1) + "+"
+    lines.add(border)
+    foreach r: Int in 0..<n() {
+      var line: String = "| "
+      foreach c: Int in 0..<n() {
+        if c == queen(r) { line = line + "Q " } else { line = line + ". " }
+      }
+      lines.add(line + "|")
+    }
+    lines.add(border)
+    return lines
+  }
+
+  def signature(): String {
+    var s: String = ""
+    foreach r: Int in 0..<n() { s = s + queen(r) }
+    return s
+  }
+
+  def rotated90(): List[Int] {
+    val result: List[Int] = []
+    foreach r: Int in 0..<n() {
+      foreach c: Int in 0..<n() {
+        if queen(c) == n() - 1 - r { result.add(c) }
+      }
+    }
+    return result
+  }
+
+  def reflected(): List[Int] {
+    val result: List[Int] = []
+    foreach r: Int in 0..<n() { result.add(n() - 1 - queen(r)) }
+    return result
+  }
+
+  def symmetryType(): SymmetryType {
+    if listEq(queens(), reflected()) { return SymmetryType::ReflVert }
+    if listEq(queens(), reflectedV()) { return SymmetryType::ReflHoriz }
+    return SymmetryType::NoSymmetry
+  }
+
+  def reflectedV(): List[Int] {
+    val result: List[Int] = []
+    var r: Int = n() - 1
+    while r >= 0 { result.add(queen(r)); r-- }
+    return result
+  }
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
+
+def repeat(s: String, n: Int): String {
+  var result: String = ""
+  foreach _: Int in 1..n { result = result + s }
+  return result
+}
+
+def listEq(a: List[Int], b: List[Int]): Boolean {
+  if a.size != b.size { return false }
+  foreach i: Int in 0..<a.size {
+    val ai: Int = a.get(i) as Int
+    val bi: Int = b.get(i) as Int
+    if ai != bi { return false }
+  }
+  return true
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summarize(): String
+}
+
+// ─── Solver ───────────────────────────────────────────────────────────────────
+
+class NQueensSolver conforms Summarizable {
+  val n:         Int
+  val solutions: List[Solution]
+  var solveCount: Int
+
+public:
+  def this(n: Int) {
+    this.n         = n
+    this.solutions = []
+    this.solveCount = 0
+  }
+
+  def getN(): Int = n
+  def count(): Int = solutions.size
+  def getSolutions(): List[Solution] = solutions
+
+  def solve(): void {
+    val cols: List[Int] = []
+    foreach _: Int in 0..<n { cols.add(-1) }
+    backtrack(cols, 0)
+  }
+
+  def backtrack(cols: List[Int], row: Int): void {
+    if row == n {
+      val solCols: List[Int] = []
+      foreach i: Int in 0..<n { solCols.add(cols.get(i) as Int) }
+      solveCount++
+      solutions.add(new Solution(n, solCols, solveCount))
+      return
+    }
+    foreach col: Int in 0..<n {
+      if isSafe(cols, row, col) {
+        cols.set(row, col)
+        backtrack(cols, row + 1)
+        cols.set(row, -1)
+      }
+    }
+  }
+
+  def isSafe(cols: List[Int], row: Int, col: Int): Boolean {
+    foreach r: Int in 0..<row {
+      val c: Int = cols.get(r) as Int
+      if c == col { return false }
+      if (c - col) == (r - row) { return false }
+      if (c - col) == (row - r) { return false }
+    }
+    return true
+  }
+
+  def firstSolution(): Solution? {
+    if solutions.size == 0 { return null }
+    return solutions.get(0) as Solution
+  }
+
+  def solutionById(id: Int): Solution? {
+    val found = solutions.find { s -> (s as Solution).id() == id }
+    if found == null { return null }
+    return found as Solution
+  }
+
+  def summarize(): String =
+    "NQueens(n=#{n}): #{solutions.size} solutions found"
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  IO::println(s)
+}
+
+def section(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+def printBoard(sol: Solution): void {
+  foreach line: String in sol.boardLines() { IO::println("  " + line) }
+}
+
+// ─── Main logic ───────────────────────────────────────────────────────────────
+
+IO::println("╔═══════════════════════════════════════════════╗")
+IO::println("║        N-QUEENS PUZZLE SOLVER REPORT          ║")
+IO::println("╚═══════════════════════════════════════════════╝")
+
+// Solve for various board sizes
+val boardSizes: List[Int] = [4, 5, 6, 7, 8]
+val solvers: List[NQueensSolver] = []
+foreach n: Int in boardSizes {
+  val solver = new NQueensSolver(n)
+  solver.solve()
+  solvers.add(solver)
+}
+
+// Section 1: Solution counts
+section("1. SOLUTION COUNTS BY BOARD SIZE")
+IO::println("  N  |  Solutions  | Verified")
+IO::println("  ---+-------------+---------")
+foreach solver: NQueensSolver in solvers {
+  val n: Int = solver.getN()
+  val cnt: Int = solver.count()
+  val valid: Int = solver.getSolutions().filter { s -> (s as Solution).isValid() }.size
+  IO::println("  #{n.lpad(2)} |  #{cnt.lpad(9)}  |  #{valid.lpad(5)}")
+}
+
+// Section 2: First solution for 8-Queens
+section("2. FIRST SOLUTION FOR 8-QUEENS")
+val solver8 = solvers.get(4) as NQueensSolver
+val first: Solution? = solver8.firstSolution()
+if first != null {
+  IO::println("  Solution #1, queens at columns: #{first.queens()}")
+  IO::println("  Signature: #{first.signature()}")
+  IO::println("")
+  printBoard(first)
+}
+
+// Section 3: All solutions for 4-Queens (small board, fully enumerable)
+section("3. ALL SOLUTIONS FOR 4-QUEENS")
+val solver4 = solvers.get(0) as NQueensSolver
+foreach sol: Solution in solver4.getSolutions() {
+  IO::println("  Solution ##{sol.id()}: #{sol.queens()}")
+  foreach line: String in sol.boardLines() { IO::println("    " + line) }
+  IO::println("")
+}
+
+// Section 4: Symmetry analysis on 6-Queens
+section("4. SYMMETRY ANALYSIS (6-QUEENS)")
+val solver6 = solvers.get(2) as NQueensSolver
+val partitioned = solver6.getSolutions().partition { s -> (s as Solution).symmetryType() == SymmetryType::NoSymmetry }
+val noSym: List[Object]   = partitioned[0] as List[Object]
+val hasSym: List[Object]  = partitioned[1] as List[Object]
+IO::println("  Total 6-Queens solutions : #{solver6.count()}")
+IO::println("  Asymmetric solutions     : #{noSym.size}")
+IO::println("  Symmetric solutions      : #{hasSym.size}")
+foreach s: Object in hasSym {
+  val sol: Solution = s as Solution
+  IO::println("    Solution ##{sol.id()}: #{sol.queens()} [#{sol.symmetryType().label()}]")
+}
+
+// Section 5: Column frequency analysis for 8-Queens
+section("5. COLUMN FREQUENCY ANALYSIS (8-QUEENS)")
+IO::println("  For each (row, col) pair: how many of the 92 solutions place")
+IO::println("  a queen in that column for that row?")
+IO::println("")
+foreach row: Int in 0..<8 {
+  var line: String = "  row #{row}: "
+  foreach col: Int in 0..<8 {
+    val count: Int = solver8.getSolutions().filter { s -> (s as Solution).queen(row) == col }.size
+    line = line + count.lpad(3)
+  }
+  IO::println(line)
+}
+
+// Section 6: Solution signatures and uniqueness
+section("6. SOLUTION SIGNATURES (first 10 of 8-Queens)")
+val top10: List[Solution] = solver8.getSolutions().take(10)
+foreach sol: Solution in top10 {
+  IO::println("  ##{sol.id().lpad(2)}: #{sol.signature()}  queens: #{sol.queens()}")
+}
+
+// Section 7: Reflected/rotated solutions (find pairs)
+section("7. REFLECTION PAIRS IN 5-QUEENS")
+val solver5 = solvers.get(1) as NQueensSolver
+IO::println("  For each solution, show its vertical reflection:")
+var shown5: Int = 0
+foreach sol: Solution in solver5.getSolutions() {
+  if shown5 < 5 {
+    val ref: List[Int] = sol.reflected()
+    IO::println("  ##{sol.id().lpad(2)}: #{sol.queens()}  →reflect→  #{ref}")
+    shown5++
+  }
+}
+
+// Section 8: Summary
+section("8. SUMMARY TABLE")
+foreach solver: NQueensSolver in solvers {
+  IO::println("  #{solver.summarize()}")
+}
+
+IO::println("")
+IO::println("── End of Report ──")

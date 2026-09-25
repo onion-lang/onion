@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.111.0] - 2026-09-25
+
 ### Added
 
 - **`run/RailNetwork.on`** — a 382-line rail network operations showcase, a new domain for the `run/` corpus (data-carrying enums `TrainClass(label, priceMultiplier)`/`ServiceStatus(code)` matched via `select`; an ADT case-enum `Disruption` with four cases (`TrackFault`/`WeatherAlert`/`StaffShortage`/`Clear`) dispatched via `case f is TrackFault:` type patterns; records with inline methods `Route.baseFare()`/`Passenger.canAfford()`/`TrainRun.isOperational()`; extension methods on `Int` (`.pct`/`.stars`) and `String` (`.truncate`/`.padRight`); an interface `Reportable` implemented by `StationReport`/`RouteReport`; collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`find`/`contains`; nullable returns; recursive path-finding over a route graph; string interpolation; `while`/`foreach` loops; and `try`/`catch` — rendering a train status board, route statistics, passenger bookings, station zone analysis, a disruption log, network highlights, and a route path finder), added to the `run/` corpus (merged via #1540).

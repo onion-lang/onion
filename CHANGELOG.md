@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/HotelBooking.on`** — a 325-line hotel reservation and reporting system, a new domain for the `run/` corpus (data-carrying enums `RoomKind`/`MealPlan`; an ADT case-enum `BookingStatus` (`Pending`/`Confirmed`/`CheckedIn`/`CheckedOut`/`Cancelled`) with `label()`/`isActive()`; records with methods `Room`/`Guest`/`Booking`; an interface `PricingStrategy` with a class hierarchy `StandardPricing`/`MemberPricing extends StandardPricing`; collection pipelines `map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`/`partition`/`zip`/`take`; nullable `Booking?`/`Room?` with null checks; closures and trailing lambdas; string interpolation; `while`/`foreach` over ranges, lists, and map entries; extension methods on `Int` (`.usd()`/`.nts()`); a static method `Hotel::overlaps` — rendering current bookings, occupancy and availability, a revenue report, a pricing-strategy comparison, and booking statistics), added to the `run/` corpus (merged via #1599).
+
+- **`run/OrienteeringEvent.on`** — a 330-line orienteering competition management system, a new domain for the `run/` corpus (extension methods on `Int` (`toTimeStr`/`lpad`), `String` (`rpad`), `Double` (`fmt1`); a plain enum `StartMethod`; a data-carrying enum `CourseClass(shortName, lengthKm, climbM)`; an ADT enum with a singleton case `CompetitorResult` (`Finished(totalSeconds, controlsVisited)`/`DidNotFinish(lastControl)`/`DidNotStart`) dispatched via `select`/`is` type patterns; records with `example` clauses `Control`/`EntryRecord`; a class `OEvent conforms Summarizable` with private fields and explicit getters; a recursive helper `sumFinishSeconds`; collection pipelines `filter`/`map`/`sortedBy`/`groupBy`/`partition`/`zip`; `foreach (k, v) in map` over a `groupBy` result — rendering 16 sample entries across 11 report sections, including a finish-rate breakdown and aggregate finish time), added to the `run/` corpus (merged via #1600).
+
 ## [0.117.0] - 2026-09-26
 
 ### Added

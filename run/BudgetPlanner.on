@@ -1,4 +1,4 @@
-// PersonalBudget.on — personal budget and expense tracking system
+// BudgetPlanner.on — personal budget and expense tracking system
 // Exercises: records with methods, data-carrying enums, ADT enums, classes,
 // interfaces, generics, collection pipelines (map/filter/fold/groupBy/
 // sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,

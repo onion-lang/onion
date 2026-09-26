@@ -1,0 +1,339 @@
+// CPUScheduler.on — CPU process scheduling simulation
+// Implements FCFS, SJF, Round-Robin (q=2), and Priority (non-preemptive).
+// Prints a Gantt timeline and per-process stats, then compares averages.
+//
+// Features: records, data-carrying enum, classes + interface,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/partition/zip),
+// select/pattern matching, nullable, closures, string interpolation,
+// try/catch, while, foreach over list and map (k,v).
+
+import {
+  java.util.ArrayList as AList
+}
+
+// ── data model ────────────────────────────────────────────────────────────
+
+record Process(pid: Int, arrival: Int, burst: Int, priority: Int)
+
+record GanttSlot(pid: Int, from: Int, to: Int)
+
+record SimResult(pid: Int, arrivalTime: Int, burstTime: Int,
+                 startTime: Int, finishTime: Int) {
+public:
+  def waitTime(): Int   = startTime - arrivalTime
+  def turnaround(): Int = finishTime - arrivalTime
+}
+
+// Algorithm tag — name() dispatches here to keep select inside the enum
+enum AlgoKind {
+  case FCFS; case SJF; case RR; case PRIO
+public:
+  def name(): String = select this {
+    case c is FCFS: "FCFS"
+    case c is SJF:  "SJF"
+    case c is RR:   "RR(q=2)"
+    case c is PRIO: "Priority"
+  }
+}
+
+// ── interface ─────────────────────────────────────────────────────────────
+
+interface Scheduler {
+  def schedule(procs: List[Process]): List[SimResult]
+  def kind(): AlgoKind
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────
+
+// Build SimResult list from original processes + GanttSlot list.
+// For RR a pid may appear in multiple slots; take first start, last end.
+def buildResults(procs: List[Process], slots: List[GanttSlot]): List[SimResult] {
+  return procs.map { p: Process ->
+    val mine: List[GanttSlot] = slots.filter { s: GanttSlot -> s.pid() == p.pid() }
+    if mine.size == 0 {
+      new SimResult(p.pid(), p.arrival(), p.burst(), 0, 0)
+    } else {
+      val first: GanttSlot = mine[0]
+      val last: GanttSlot  = mine[mine.size - 1]
+      new SimResult(p.pid(), p.arrival(), p.burst(), first.from(), last.to())
+    }
+  }
+}
+
+// Convert an AList[GanttSlot] (java.util.ArrayList) to an Onion List via array
+def slotsToList(al: AList[GanttSlot]): List[GanttSlot] {
+  val arr = new GanttSlot[al.size]
+  for var i: Int = 0; i < al.size; i++ {
+    arr[i] = al.get(i)
+  }
+  return Colls::toList(arr)
+}
+
+// ── FCFS ──────────────────────────────────────────────────────────────────
+
+class FCFSScheduler conforms Scheduler {
+public:
+  def kind(): AlgoKind = new FCFS()
+
+  def schedule(procs: List[Process]): List[SimResult] {
+    val sorted: List[Process] = procs.sortedBy { p: Process -> p.arrival() }
+    val al: AList[GanttSlot] = new AList[GanttSlot]()
+    var clock: Int = 0
+    foreach p: Process in sorted {
+      if clock < p.arrival() { clock = p.arrival() }
+      al.add(new GanttSlot(p.pid(), clock, clock + p.burst()))
+      clock = clock + p.burst()
+    }
+    return buildResults(procs, slotsToList(al))
+  }
+}
+
+// ── SJF (non-preemptive) ──────────────────────────────────────────────────
+
+class SJFScheduler conforms Scheduler {
+public:
+  def kind(): AlgoKind = new SJF()
+
+  def schedule(procs: List[Process]): List[SimResult] {
+    val remaining: AList[Process] = new AList[Process]()
+    foreach p: Process in procs { remaining.add(p) }
+    val al: AList[GanttSlot] = new AList[GanttSlot]()
+    var clock: Int = 0
+    while remaining.size > 0 {
+      val rmArr = new Process[remaining.size]
+      for var i: Int = 0; i < remaining.size; i++ { rmArr[i] = remaining.get(i) }
+      val all: List[Process] = Colls::toList(rmArr)
+      val ready: List[Process] = all.filter { p: Process -> p.arrival() <= clock }
+      if ready.size == 0 {
+        val nxt: Process = all.sortedBy { p: Process -> p.arrival() }[0]
+        clock = nxt.arrival()
+      } else {
+        val chosen: Process = ready.sortedBy { p: Process -> p.burst() }[0]
+        remaining.remove(chosen)
+        al.add(new GanttSlot(chosen.pid(), clock, clock + chosen.burst()))
+        clock = clock + chosen.burst()
+      }
+    }
+    return buildResults(procs, slotsToList(al))
+  }
+}
+
+// ── Round Robin (quantum = 2) ─────────────────────────────────────────────
+
+class RRScheduler conforms Scheduler {
+public:
+  def kind(): AlgoKind = new RR()
+
+  def schedule(procs: List[Process]): List[SimResult] {
+    val quantum: Int = 2
+    val sorted: List[Process] = procs.sortedBy { p: Process -> p.arrival() }
+    val maxPid: Int = procs.fold(0) { acc: Int, p: Process ->
+      if p.pid() > acc { p.pid() } else { acc }
+    }
+    val remBurst = new Int[maxPid + 1]
+    foreach p: Process in procs { remBurst[p.pid()] = p.burst() }
+
+    val queue: AList[Process]   = new AList[Process]()
+    val al: AList[GanttSlot]    = new AList[GanttSlot]()
+    var clock: Int = 0
+    var idx: Int   = 0
+
+    while idx < sorted.size && sorted[idx].arrival() <= clock {
+      queue.add(sorted[idx])
+      idx = idx + 1
+    }
+
+    while queue.size > 0 {
+      val p: Process = queue.remove(0)
+      val run: Int = if remBurst[p.pid()] < quantum { remBurst[p.pid()] } else { quantum }
+      al.add(new GanttSlot(p.pid(), clock, clock + run))
+      clock = clock + run
+      remBurst[p.pid()] = remBurst[p.pid()] - run
+      while idx < sorted.size && sorted[idx].arrival() <= clock {
+        queue.add(sorted[idx])
+        idx = idx + 1
+      }
+      if remBurst[p.pid()] > 0 { queue.add(p) }
+    }
+    return buildResults(procs, slotsToList(al))
+  }
+}
+
+// ── Priority (non-preemptive, lower number = higher priority) ─────────────
+
+class PrioScheduler conforms Scheduler {
+public:
+  def kind(): AlgoKind = new PRIO()
+
+  def schedule(procs: List[Process]): List[SimResult] {
+    val remaining: AList[Process] = new AList[Process]()
+    foreach p: Process in procs { remaining.add(p) }
+    val al: AList[GanttSlot] = new AList[GanttSlot]()
+    var clock: Int = 0
+    while remaining.size > 0 {
+      val rmArr = new Process[remaining.size]
+      for var i: Int = 0; i < remaining.size; i++ { rmArr[i] = remaining.get(i) }
+      val all: List[Process] = Colls::toList(rmArr)
+      val ready: List[Process] = all.filter { p: Process -> p.arrival() <= clock }
+      if ready.size == 0 {
+        val nxt: Process = all.sortedBy { p: Process -> p.arrival() }[0]
+        clock = nxt.arrival()
+      } else {
+        val chosen: Process = ready.sortedBy { p: Process -> p.priority() }[0]
+        remaining.remove(chosen)
+        al.add(new GanttSlot(chosen.pid(), clock, clock + chosen.burst()))
+        clock = clock + chosen.burst()
+      }
+    }
+    return buildResults(procs, slotsToList(al))
+  }
+}
+
+// ── display helpers ───────────────────────────────────────────────────────
+
+def pad(s: String, w: Int): String {
+  var r: String = s
+  while r.length < w { r = r + " " }
+  return r
+}
+
+def fmt1(d: Double): String {
+  val i: Int   = d as Int
+  val frac: Int = ((d - (i as Double)) * 10.0) as Int
+  return "" + i + "." + frac
+}
+
+def printGantt(name: String, slots: List[GanttSlot]): void {
+  IO::println("  " + name + " Gantt:")
+  IO::print("  |")
+  foreach s: GanttSlot in slots {
+    var label: String = "P" + s.pid()
+    val width: Int = s.to() - s.from()
+    foreach i: Int in 0..<width { label = label + "-" }
+    IO::print(label + "|")
+  }
+  IO::println("")
+  IO::print("  0")
+  foreach s: GanttSlot in slots {
+    IO::print(pad("", s.to() - s.from()) + s.to())
+  }
+  IO::println("")
+}
+
+def printTable(name: String, results: List[SimResult]): void {
+  IO::println("  " + name + " results:")
+  IO::println("  " + pad("PID", 6) + pad("Arrival", 10) +
+              pad("Burst", 8) + pad("Start", 8) + pad("Finish", 9) +
+              pad("Wait", 7) + "Turnaround")
+  foreach r: SimResult in results {
+    IO::println("  " + pad("P" + r.pid(), 6) +
+                pad("" + r.arrivalTime(), 10) +
+                pad("" + r.burstTime(), 8) +
+                pad("" + r.startTime(), 8) +
+                pad("" + r.finishTime(), 9) +
+                pad("" + r.waitTime(), 7) +
+                "" + r.turnaround())
+  }
+  val sumW: Int  = results.fold(0) { a: Int, r: SimResult -> a + r.waitTime() }
+  val sumT: Int  = results.fold(0) { a: Int, r: SimResult -> a + r.turnaround() }
+  val n: Int     = results.size
+  IO::println("  avg wait=#{fmt1(sumW * 1.0 / n)}  avg turnaround=#{fmt1(sumT * 1.0 / n)}")
+  IO::println("")
+}
+
+// ── main ──────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val procs: List[Process] = [
+    new Process(1, 0, 6, 2),
+    new Process(2, 1, 4, 1),
+    new Process(3, 2, 2, 3),
+    new Process(4, 3, 5, 2),
+    new Process(5, 4, 3, 1)
+  ]
+
+  IO::println("=== CPU Scheduling Simulation ===")
+  IO::println("Processes:")
+  IO::println("  " + pad("PID", 6) + pad("Arrival", 10) +
+              pad("Burst", 8) + "Priority")
+  foreach p: Process in procs {
+    IO::println("  " + pad("P" + p.pid(), 6) +
+                pad("" + p.arrival(), 10) +
+                pad("" + p.burst(), 8) +
+                "" + p.priority())
+  }
+  IO::println("")
+
+  // groupBy: processes grouped by priority level
+  IO::println("Processes by priority level:")
+  val byPrio = procs.groupBy { p: Process -> p.priority() }
+  foreach (prio, grp) in byPrio {
+    val pids: List[String] = (grp as List[Process]).map { p: Process -> "P" + p.pid() }
+    val pidStr: String = pids.fold("") { acc: String, s: String ->
+      if acc == "" { s } else { acc + ", " + s }
+    }
+    IO::println("  priority #{prio}: #{pidStr}")
+  }
+  IO::println("")
+
+  // partition: short (<= 4 burst) vs long processes
+  val parts = procs.partition { p: Process -> p.burst() <= 4 }
+  val shortProcs: List[Process] = parts[0] as List[Process]
+  val longProcs: List[Process]  = parts[1] as List[Process]
+  val shortPids: String = shortProcs.map { p: Process -> "P" + p.pid() }
+    .fold("") { a: String, s: String -> if a == "" { s } else { a + "," + s } }
+  val longPids: String  = longProcs.map { p: Process -> "P" + p.pid() }
+    .fold("") { a: String, s: String -> if a == "" { s } else { a + "," + s } }
+  IO::println("Short processes (burst<=4): #{shortPids}")
+  IO::println("Long  processes (burst >4): #{longPids}")
+  IO::println("")
+
+  val schedulers: List[Scheduler] = [
+    new FCFSScheduler() as Scheduler,
+    new SJFScheduler()  as Scheduler,
+    new RRScheduler()   as Scheduler,
+    new PrioScheduler() as Scheduler
+  ]
+
+  // Run all schedulers, collect results
+  val allResults: List[List[SimResult]] = schedulers.map { sched: Scheduler ->
+    sched.schedule(procs)
+  }
+
+  // Print Gantt charts and tables for each algorithm
+  foreach i: Int in 0..<schedulers.size {
+    val sched: Scheduler         = schedulers[i]
+    val results: List[SimResult] = allResults[i]
+    val nm: String               = sched.kind().name()
+    val fakeSlots: List[GanttSlot] = results.map { r: SimResult ->
+      new GanttSlot(r.pid(), r.startTime(), r.finishTime())
+    }.sortedBy { s: GanttSlot -> s.from() }
+    printGantt(nm, fakeSlots)
+    printTable(nm, results.sortedBy { r: SimResult -> r.pid() })
+  }
+
+  // Comparison table via zip of names and result lists
+  IO::println("=== Algorithm Comparison ===")
+  IO::println(pad("Algorithm", 14) + pad("Avg Wait", 12) + "Avg Turnaround")
+  val names: List[String]           = schedulers.map { sched: Scheduler -> sched.kind().name() }
+  val zipped                          = names.zip(allResults)
+  foreach pair: List[Object] in zipped {
+    val algoNm: String       = pair[0] as String
+    val res: List[SimResult] = pair[1] as List[SimResult]
+    val sumW: Int = res.fold(0) { a: Int, r: SimResult -> a + r.waitTime() }
+    val sumT: Int = res.fold(0) { a: Int, r: SimResult -> a + r.turnaround() }
+    val n: Int    = res.size
+    IO::println(pad(algoNm, 14) + pad(fmt1(sumW * 1.0 / n), 12) + fmt1(sumT * 1.0 / n))
+  }
+  IO::println("")
+
+  // try/catch: validate burst > 0
+  try {
+    val bad = new Process(99, 0, 0, 1)
+    if bad.burst() <= 0 { throw new Exception("burst must be positive") }
+  } catch e: Exception {
+    IO::println("Validation: caught expected error: " + e.getMessage())
+  }
+
+  IO::println("Done.")
+}

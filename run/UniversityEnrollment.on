@@ -1,0 +1,329 @@
+// UniversityEnrollment.on — course registration and academic analytics
+// Exercises: records with methods, plain/data-carrying/ADT enums, classes +
+// inheritance + interface, generics, extension methods on Int,
+// collection pipelines (map/filter/fold/reduce/groupBy/sortedBy/distinct/
+// find/partition/zip), select/pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, while, foreach (ranges + map).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Department { CS, Math, Physics, Biology, Chemistry }
+
+enum Grade(points: Double, symbol: String) {
+  A(4.0, "A"),
+  B(3.0, "B"),
+  C(2.0, "C"),
+  D(1.0, "D"),
+  F(0.0, "F")
+}
+
+enum Semester { Fall, Spring, Summer }
+
+// ADT: status of a student's academic standing
+enum Standing {
+  case GoodStanding
+  case Probation(reason: String)
+  case Suspended(terms: Int)
+public:
+  def label(): String = select this {
+    case g is GoodStanding: "Good Standing"
+    case p is Probation:    "Probation — #{p.reason()}"
+    case s is Suspended:    "Suspended (#{s.terms()} term(s))"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Student(id: String, name: String, year: Int, dept: Department) {
+public:
+  def label(): String = "[#{id()}] #{name()} (Yr #{year()}, #{dept()})"
+  def isSenior(): Boolean = year() >= 4
+}
+
+record Course(code: String, title: String, credits: Int, dept: Department, cap: Int) {
+public:
+  def label(): String = "#{code()} — #{title()} (#{credits()} cr)"
+}
+
+record Enrollment(studentId: String, courseCode: String, sem: Semester, year: Int) {
+public:
+  def key(): String = "#{studentId()}-#{courseCode()}-#{year()}"
+}
+
+record GradeResult(studentId: String, courseCode: String, grade: Grade)
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def creditLabel(): String = if self == 1 { "1 credit" } else { "#{self} credits" }
+}
+
+extension Double {
+  def roundTo2(): String {
+    val shifted = self * 100.0
+    val truncated = shifted as Int
+    val whole = truncated / 100
+    val frac = truncated % 100
+    val fracStr = if frac < 10 { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr
+  }
+}
+
+// ─── Base registry class ──────────────────────────────────────────────────────
+
+class RegistryBase(val institutionName: String) {
+public:
+  def header(): String = "=== #{institutionName} Academic Registry ==="
+}
+
+// ─── AcademicRegistry class ───────────────────────────────────────────────────
+
+class AcademicRegistry(instName: String, val students: List[Student],
+    val courses: List[Course], val results: List[GradeResult])
+    extends RegistryBase(instName) conforms Summarizable {
+public:
+  def summary(): String =
+    "#{students.size} students, #{courses.size} courses, #{results.size} grade records"
+  def gpaOf(studentId: String): Double {
+    val rs = results.filter { r -> (r as GradeResult).studentId() == studentId }
+    if rs.size == 0 { return 0.0 }
+    val total = rs.fold(0.0) { acc, r -> (acc as Double) + (r as GradeResult).grade().points() }
+    return (total as Double) / rs.size
+  }
+  def coursesByDept(dept: Department): List[Course] =
+    courses.filter { c -> (c as Course).dept() == dept }
+  def topStudents(): List[Student] =
+    students.sortedBy { s -> 0.0 - gpaOf((s as Student).id()) }
+      .filter { s -> gpaOf((s as Student).id()) > 0.0 }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def standingOf(gpa: Double): Standing =
+  if gpa >= 2.0 { new GoodStanding() }
+  else if gpa >= 1.0 { new Probation("GPA below 2.0") }
+  else { new Suspended(1) }
+
+// Recursive: sum of credit hours over course codes
+def totalCredits(codes: List[String], courses: List[Course], idx: Int): Int {
+  if idx >= codes.size { return 0 }
+  val code = codes.get(idx) as String
+  val found = courses.find { c -> (c as Course).code() == code }
+  val cr = if found != null { (found as Course).credits() } else { 0 }
+  return cr + totalCredits(codes, courses, idx + 1)
+}
+
+// Safe GPA parse with try/catch
+def safeGpa(s: String): Double {
+  try {
+    return Double::parseDouble(s)
+  } catch e: Exception {
+    return 0.0
+  }
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+val students: List[Student] = [
+  new Student("S001", "Alice Chen",    4, Department::CS),
+  new Student("S002", "Bob Johnson",   2, Department::Math),
+  new Student("S003", "Carol White",   3, Department::Physics),
+  new Student("S004", "Dan Lee",       1, Department::CS),
+  new Student("S005", "Eva Martinez",  4, Department::Biology),
+  new Student("S006", "Frank Kim",     2, Department::Chemistry),
+  new Student("S007", "Grace Park",    3, Department::CS),
+  new Student("S008", "Henry Brown",   1, Department::Math),
+  new Student("S009", "Iris Tanaka",   4, Department::Physics),
+  new Student("S010", "Jake Wilson",   2, Department::Biology)
+]
+
+val courses: List[Course] = [
+  new Course("CS101", "Intro to CS",         3, Department::CS,      30),
+  new Course("CS201", "Data Structures",     4, Department::CS,      25),
+  new Course("CS301", "Algorithms",          4, Department::CS,      20),
+  new Course("MA101", "Calculus I",          4, Department::Math,    35),
+  new Course("MA201", "Linear Algebra",      3, Department::Math,    30),
+  new Course("PH101", "General Physics",     4, Department::Physics, 28),
+  new Course("BI101", "Intro Biology",       3, Department::Biology, 32),
+  new Course("CH101", "General Chemistry",   3, Department::Chemistry, 30)
+]
+
+val results: List[GradeResult] = [
+  new GradeResult("S001", "CS101", Grade::A),
+  new GradeResult("S001", "CS201", Grade::A),
+  new GradeResult("S001", "MA101", Grade::B),
+  new GradeResult("S002", "MA101", Grade::B),
+  new GradeResult("S002", "MA201", Grade::A),
+  new GradeResult("S003", "PH101", Grade::A),
+  new GradeResult("S003", "MA101", Grade::B),
+  new GradeResult("S004", "CS101", Grade::C),
+  new GradeResult("S005", "BI101", Grade::A),
+  new GradeResult("S005", "CH101", Grade::B),
+  new GradeResult("S006", "CH101", Grade::B),
+  new GradeResult("S006", "MA101", Grade::D),
+  new GradeResult("S007", "CS101", Grade::A),
+  new GradeResult("S007", "CS201", Grade::B),
+  new GradeResult("S007", "CS301", Grade::A),
+  new GradeResult("S008", "MA101", Grade::C),
+  new GradeResult("S009", "PH101", Grade::A),
+  new GradeResult("S009", "MA101", Grade::A),
+  new GradeResult("S010", "BI101", Grade::F),
+  new GradeResult("S010", "CH101", Grade::D)
+]
+
+val reg = new AcademicRegistry("State University", students, courses, results)
+
+// ─── Main Analysis ────────────────────────────────────────────────────────────
+
+IO::println(reg.header())
+IO::println(reg.summary())
+IO::println("")
+
+// 1. List all students with their GPA and standing
+IO::println("── Student GPAs ──")
+foreach s: Student in students {
+  val gpa = reg.gpaOf(s.id())
+  val standing = standingOf(gpa)
+  IO::println("  #{s.label()} | GPA: #{gpa.roundTo2()} | #{standing.label()}")
+}
+IO::println("")
+
+// 2. Top students
+IO::println("── Top Students ──")
+val top = reg.topStudents()
+var rank = 1
+foreach s: Student in top {
+  val gpa = reg.gpaOf(s.id())
+  IO::println("  ##{rank}. #{s.name()} — GPA #{gpa.roundTo2()}")
+  rank = rank + 1
+}
+IO::println("")
+
+// 3. Courses per department (groupBy + map(k,v))
+IO::println("── Courses by Department ──")
+val byDept = courses.groupBy { c -> "" + (c as Course).dept() }
+foreach (dept, cs) in byDept {
+  val courseList = cs as List
+  IO::println("  #{dept}: #{courseList.size} course(s)")
+  foreach c: Course in courseList {
+    IO::println("    · #{c.label()}")
+  }
+}
+IO::println("")
+
+// 4. Total credits each student has taken (using recursion)
+IO::println("── Credit Hours Taken ──")
+foreach s: Student in students {
+  val myCodes = results
+    .filter { r -> (r as GradeResult).studentId() == s.id() }
+    .map    { r -> (r as GradeResult).courseCode() }
+  val creds = totalCredits(myCodes, courses, 0)
+  IO::println("  #{s.name()}: #{creds.creditLabel()}")
+}
+IO::println("")
+
+// 5. Partition students into passing / at-risk
+IO::println("── Academic Standing ──")
+val parts   = students.partition { s -> reg.gpaOf((s as Student).id()) >= 2.0 }
+val passing = parts.get(0) as List
+val atRisk  = parts.get(1) as List
+IO::println("  Passing:  #{passing.size} students")
+IO::println("  At-risk:  #{atRisk.size} students")
+IO::println("")
+
+// 6. Distinct departments represented in results
+IO::println("── Active Departments ──")
+val activeDepts = results
+  .map { r ->
+    val code = (r as GradeResult).courseCode()
+    val c = courses.find { x -> (x as Course).code() == code }
+    if c != null { "" + (c as Course).dept() } else { "?" }
+  }
+  .distinct()
+  .sortedBy { d -> d as String }
+IO::println("  " + activeDepts.toString())
+IO::println("")
+
+// 7. Grade distribution (fold/reduce)
+IO::println("── Grade Distribution ──")
+val gradeGroups = results.groupBy { r -> (r as GradeResult).grade().symbol() }
+foreach (sym, rs) in gradeGroups {
+  IO::println("  #{sym}: #{(rs as List).size}")
+}
+IO::println("")
+
+// 8. Zip courses with their enrollment counts
+IO::println("── Enrollment Counts per Course ──")
+val enrollCounts = courses.map { c ->
+  val code = (c as Course).code()
+  val n = results.filter { r -> (r as GradeResult).courseCode() == code }.size
+  code + " → " + n + " enrolled"
+}
+foreach line: String in enrollCounts {
+  IO::println("  " + line)
+}
+IO::println("")
+
+// 9. Find a student by ID (nullable)
+IO::println("── Student Lookup ──")
+val found = students.find { s -> (s as Student).id() == "S007" }
+if found != null {
+  IO::println("  Found: " + (found as Student).label())
+} else {
+  IO::println("  Not found")
+}
+val notFound = students.find { s -> (s as Student).id() == "S999" }
+IO::println("  S999: " + (if notFound != null { (notFound as Student).name() } else { "not found" }))
+IO::println("")
+
+// 10. While loop: count how many CS courses have > 3 credits
+IO::println("── CS Courses with > 3 Credits ──")
+val csCourses = reg.coursesByDept(Department::CS)
+var i = 0
+var heavyCount = 0
+while i < csCourses.size {
+  val c = csCourses.get(i) as Course
+  if c.credits() > 3 {
+    heavyCount = heavyCount + 1
+    IO::println("  " + c.label())
+  }
+  i = i + 1
+}
+IO::println("  Total: #{heavyCount}")
+IO::println("")
+
+// 11. Foreach over range: print a GPA scale
+IO::println("── GPA Scale ──")
+foreach pt: Int in 0..4 {
+  val gpa = pt as Double
+  val standing = standingOf(gpa)
+  IO::println("  #{pt}.0 → #{standing.label()}")
+}
+IO::println("")
+
+// 12. Safe parse demo
+IO::println("── safeGpa tests ──")
+IO::println("  '3.75' → " + safeGpa("3.75"))
+IO::println("  'bad'  → " + safeGpa("bad"))
+IO::println("")
+
+// 13. Senior report using ADT pattern match
+IO::println("── Senior Report ──")
+val seniors = students.filter { s -> (s as Student).isSenior() }
+foreach s: Student in seniors {
+  val gpa = reg.gpaOf(s.id())
+  val st = standingOf(gpa)
+  val flag = select st {
+    case x is GoodStanding: "✓"
+    case x is Probation:    "⚠"
+    case x is Suspended:    "✗"
+  }
+  IO::println("  #{flag} #{s.name()} (GPA: #{gpa.roundTo2()})")
+}
+

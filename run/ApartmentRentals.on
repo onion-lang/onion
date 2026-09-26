@@ -1,0 +1,375 @@
+// ApartmentRentals.on — apartment property management system
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, collection pipelines (map/filter/fold/groupBy/sortedBy/find/
+// partition/zip/distinct), select/pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, while, foreach, extensions.
+
+// ── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def asDollars(): String = "$" + self
+  def pad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ── Data-carrying enum: unit type ───────────────────────────────────────────
+
+enum UnitType(beds: Int, baths: Int, label: String) {
+  Studio(0, 1, "Studio"),
+  OneBed(1, 1, "1BR"),
+  TwoBed(2, 1, "2BR"),
+  TwoBedTwoBath(2, 2, "2BR/2BA"),
+  ThreeBed(3, 2, "3BR/2BA")
+}
+
+// ── ADT enum: lease status ──────────────────────────────────────────────────
+
+enum LeaseStatus {
+  case Active(monthsLeft: Int)
+  case Expired
+  case Terminated(reason: String)
+public:
+  def isLive(): Boolean = select this {
+    case a is Active: true
+    else: false
+  }
+  def label(): String = select this {
+    case a is Active:     "Active (#{a.monthsLeft()} mo left)"
+    case e is Expired:    "Expired"
+    case t is Terminated: "Terminated: #{t.reason()}"
+  }
+}
+
+// ── Plain enum: maintenance priority ────────────────────────────────────────
+
+enum MaintenancePriority { Low, Medium, High, Emergency }
+
+// ── Records ─────────────────────────────────────────────────────────────────
+
+record Building(id: String, name: String, address: String, floors: Int) {
+public:
+  def label(): String = "#{name()} @ #{address()} (#{floors()} floors)"
+}
+
+record Apartment(
+  id: String, buildingId: String, floor: Int, unitNum: String,
+  unitType: UnitType, monthlyRent: Int
+) {
+public:
+  def fullId(): String = "#{buildingId()}-#{unitNum()}"
+  def label(): String =
+    "Unit #{unitNum()} F#{floor()} #{unitType().label()} #{monthlyRent().asDollars()}/mo"
+  def isVacant(leases: List[Lease]): Boolean =
+    leases.find { l -> l.apartmentId() == id() && l.status().isLive() } == null
+}
+
+record Tenant(id: String, name: String, email: String) {
+public:
+  def label(): String = "#{name()} <#{email()}>"
+}
+
+record Lease(
+  id: String, apartmentId: String, tenantId: String,
+  startMonth: Int, durationMonths: Int, status: LeaseStatus
+) {
+public:
+  def endMonth(): Int = startMonth() + durationMonths()
+}
+
+record Payment(leaseId: String, month: Int, amount: Int, late: Boolean) {
+public:
+  def label(): String {
+    val tag = if late() { " [LATE]" } else { "" }
+    return "Month #{month()}: #{amount().asDollars()}#{tag}"
+  }
+}
+
+record MaintenanceReq(
+  id: String, apartmentId: String, description: String,
+  priority: MaintenancePriority, resolved: Boolean
+) {
+public:
+  def priorityLabel(): String = select priority() {
+    case MaintenancePriority::Emergency: "EMERGENCY"
+    case MaintenancePriority::High:      "HIGH"
+    case MaintenancePriority::Medium:    "MEDIUM"
+    case MaintenancePriority::Low:       "LOW"
+    else: "?"
+  }
+  def statusLine(): String {
+    val state = if resolved() { "[done]" } else { "[open]" }
+    return "#{id()} #{priorityLabel()} #{state}: #{description()}"
+  }
+}
+
+// ── Interface ────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ── Class: PropertyManager ───────────────────────────────────────────────────
+
+class PropertyManager conforms Summarizable {
+  val buildings:  List[Building]
+  val apartments: List[Apartment]
+  val tenants:    List[Tenant]
+  val leases:     List[Lease]
+  val payments:   List[Payment]
+  val requests:   List[MaintenanceReq]
+public:
+  def this(
+    buildings:  List[Building],
+    apartments: List[Apartment],
+    tenants:    List[Tenant],
+    leases:     List[Lease],
+    payments:   List[Payment],
+    requests:   List[MaintenanceReq]
+  ) {
+    this.buildings  = buildings
+    this.apartments = apartments
+    this.tenants    = tenants
+    this.leases     = leases
+    this.payments   = payments
+    this.requests   = requests
+  }
+
+  def vacantUnits(): List[Apartment] =
+    apartments.filter { a -> a.isVacant(leases) }
+
+  def occupiedUnits(): List[Apartment] =
+    apartments.filter { a -> !a.isVacant(leases) }
+
+  def totalMonthlyRevenue(): Int =
+    occupiedUnits().fold(0) { acc, a -> (acc as Int) + a.monthlyRent() }
+
+  def openRequests(): List[MaintenanceReq] =
+    requests.filter { r -> !r.resolved() }
+
+  def isEmergency(r: MaintenanceReq): Boolean = select r.priority() {
+    case MaintenancePriority::Emergency: true
+    else: false
+  }
+
+  def emergencyRequests(): List[MaintenanceReq] =
+    requests.filter { r -> !r.resolved() && isEmergency(r) }
+
+  def paymentsForLease(leaseId: String): List[Payment] =
+    payments.filter { p -> p.leaseId() == leaseId }
+
+  def latePaymentCount(): Int =
+    payments.filter { p -> p.late() }.size
+
+  def tenantForLease(lease: Lease): Tenant? =
+    tenants.find { t -> t.id() == lease.tenantId() }
+
+  def unitsByBuilding(): Map[String, List[Apartment]] =
+    apartments.groupBy { a -> a.buildingId() }
+
+  def summary(): String {
+    val total = apartments.size
+    val vacant = vacantUnits().size
+    val occupied = total - vacant
+    val revenue = totalMonthlyRevenue()
+    return "#{total} units (#{occupied} occupied, #{vacant} vacant), " +
+           "revenue: #{revenue.asDollars()}/mo"
+  }
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+
+val buildings = [
+  new Building("B1", "Maple Grove",    "101 Maple St",  5),
+  new Building("B2", "River View",     "45 River Rd",   8),
+  new Building("B3", "The Pines",      "9 Pine Ave",    3)
+]
+
+val apartments = [
+  new Apartment("A101", "B1", 1, "101", UnitType::Studio,       950),
+  new Apartment("A102", "B1", 1, "102", UnitType::OneBed,       1250),
+  new Apartment("A201", "B1", 2, "201", UnitType::TwoBed,       1650),
+  new Apartment("A202", "B1", 2, "202", UnitType::TwoBedTwoBath, 1800),
+  new Apartment("A301", "B1", 3, "301", UnitType::ThreeBed,     2200),
+  new Apartment("B101", "B2", 1, "101", UnitType::Studio,       1050),
+  new Apartment("B201", "B2", 2, "201", UnitType::OneBed,       1350),
+  new Apartment("B301", "B2", 3, "301", UnitType::TwoBed,       1750),
+  new Apartment("B401", "B2", 4, "401", UnitType::TwoBedTwoBath, 1900),
+  new Apartment("C101", "B3", 1, "101", UnitType::OneBed,       1100),
+  new Apartment("C201", "B3", 2, "201", UnitType::TwoBed,       1500)
+]
+
+val tenants = [
+  new Tenant("T1", "Alice Chen",   "alice@example.com"),
+  new Tenant("T2", "Bob Martinez", "bob@example.com"),
+  new Tenant("T3", "Carol Smith",  "carol@example.com"),
+  new Tenant("T4", "David Lee",    "david@example.com"),
+  new Tenant("T5", "Eva Brown",    "eva@example.com"),
+  new Tenant("T6", "Frank Park",   "frank@example.com")
+]
+
+val leases = [
+  new Lease("L1", "A101", "T1", 1,  12, new Active(4)),
+  new Lease("L2", "A102", "T2", 1,  12, new Active(7)),
+  new Lease("L3", "A201", "T3", 3,   6, new Expired()),
+  new Lease("L4", "A202", "T4", 2,  12, new Active(2)),
+  new Lease("L5", "B101", "T5", 4,  12, new Active(9)),
+  new Lease("L6", "B201", "T6", 1,  24, new Active(14)),
+  new Lease("L7", "B301", "T1", 6,   6, new Terminated("relocated")),
+  new Lease("L8", "C101", "T2", 5,  12, new Active(8))
+]
+
+val payments = [
+  new Payment("L1", 1, 950,  false),
+  new Payment("L1", 2, 950,  false),
+  new Payment("L1", 3, 950,  true),
+  new Payment("L2", 1, 1250, false),
+  new Payment("L2", 2, 1250, false),
+  new Payment("L4", 1, 1800, false),
+  new Payment("L4", 2, 1800, true),
+  new Payment("L5", 1, 1050, false),
+  new Payment("L6", 1, 1350, false),
+  new Payment("L8", 1, 1100, false),
+  new Payment("L8", 2, 1100, true)
+]
+
+val requests = [
+  new MaintenanceReq("R1", "A101", "Leaking faucet",       MaintenancePriority::Medium,    true),
+  new MaintenanceReq("R2", "A201", "Broken heater",        MaintenancePriority::High,      false),
+  new MaintenanceReq("R3", "B101", "Pest infestation",     MaintenancePriority::Emergency, false),
+  new MaintenanceReq("R4", "B201", "Cracked window",       MaintenancePriority::Low,       false),
+  new MaintenanceReq("R5", "C101", "Smoke detector beep",  MaintenancePriority::High,      true),
+  new MaintenanceReq("R6", "A202", "Noisy AC unit",        MaintenancePriority::Medium,    false),
+  new MaintenanceReq("R7", "B401", "Water damage ceiling", MaintenancePriority::Emergency, false)
+]
+
+val mgr = new PropertyManager(buildings, apartments, tenants, leases, payments, requests)
+
+// ── Report ───────────────────────────────────────────────────────────────────
+
+IO::println("=== Apartment Rentals Report ===")
+IO::println(mgr.summary())
+IO::println("")
+
+// Vacant units
+val vacant = mgr.vacantUnits()
+IO::println("--- Vacant Units (#{vacant.size}) ---")
+foreach a: Apartment in vacant {
+  IO::println("  " + a.fullId() + " " + a.label())
+}
+IO::println("")
+
+// Revenue by building
+IO::println("--- Occupied Units by Building ---")
+val byBuilding = mgr.unitsByBuilding()
+foreach (bid, units) in byBuilding {
+  val occupied = (units as List[Apartment]).filter { a -> !a.isVacant(leases) }
+  val bName = buildings.find { b -> b.id() == bid }
+  val label = if bName == null { bid as String } else { (bName as Building).name() }
+  val bRev = occupied.fold(0) { acc, a -> (acc as Int) + a.monthlyRent() }
+  IO::println("  #{label}: #{occupied.size} occupied, revenue #{bRev.asDollars()}/mo")
+}
+IO::println("")
+
+// Active leases with tenant names
+IO::println("--- Active Leases ---")
+val activeLeases = leases.filter { l -> l.status().isLive() }
+foreach l: Lease in activeLeases {
+  val tenant = mgr.tenantForLease(l)
+  val tName = if tenant == null { "unknown" } else { tenant.name() }
+  val apt = apartments.find { a -> a.id() == l.apartmentId() }
+  val aptLabel = if apt == null { l.apartmentId() } else { (apt as Apartment).label() }
+  IO::println("  #{l.id()} #{tName} -> #{aptLabel} [#{l.status().label()}]")
+}
+IO::println("")
+
+// Payment summary
+IO::println("--- Payment Summary ---")
+IO::println("  Total payments: #{payments.size}")
+IO::println("  Late payments:  #{mgr.latePaymentCount()}")
+val totalCollected = payments.fold(0) { acc, p -> (acc as Int) + p.amount() }
+IO::println("  Total collected: #{totalCollected.asDollars()}")
+IO::println("")
+
+// Maintenance requests
+IO::println("--- Maintenance Requests ---")
+IO::println("  Open: #{mgr.openRequests().size}")
+IO::println("  Emergencies: #{mgr.emergencyRequests().size}")
+foreach r: MaintenanceReq in mgr.emergencyRequests() {
+  IO::println("  !! " + r.statusLine())
+}
+IO::println("")
+
+// Unit type breakdown
+IO::println("--- Unit Type Breakdown ---")
+val byType = apartments.groupBy { a -> a.unitType().label() }
+foreach (typeName, units) in byType {
+  val count = (units as List[Apartment]).size
+  val avgRent = (units as List[Apartment]).fold(0) { acc, a -> (acc as Int) + a.monthlyRent() } / count
+  IO::println("  #{typeName}: #{count} units, avg rent #{avgRent.asDollars()}/mo")
+}
+IO::println("")
+
+// Top earners by rent descending
+IO::println("--- Top 5 Units by Monthly Rent ---")
+val top5 = apartments.sortedBy { a -> 0 - a.monthlyRent() }
+var rank = 1
+foreach a: Apartment in top5 {
+  if rank <= 5 {
+    IO::println("  #{rank.pad(2)}. #{a.fullId()} #{a.unitType().label()} #{a.monthlyRent().asDollars()}/mo")
+    rank = rank + 1
+  }
+}
+IO::println("")
+
+// Recursive: count active leases expiring within N months
+def expiringWithin(ls: List[Lease], months: Int, idx: Int, count: Int): Int {
+  if idx >= ls.size { return count }
+  val l = ls[idx] as Lease
+  val more = select l.status() {
+    case a is Active: if a.monthsLeft() <= months { 1 } else { 0 }
+    else: 0
+  }
+  return expiringWithin(ls, months, idx + 1, count + more)
+}
+val expiring3 = expiringWithin(activeLeases, 3, 0, 0)
+IO::println("--- Leases expiring within 3 months: #{expiring3} ---")
+IO::println("")
+
+// Partition: high-priority vs other open requests
+def isHighPriority(r: MaintenanceReq): Boolean = select r.priority() {
+  case MaintenancePriority::Emergency: true
+  case MaintenancePriority::High:      true
+  else: false
+}
+val highPri  = mgr.openRequests().filter { r -> isHighPriority(r) }
+val otherPri = mgr.openRequests().filter { r -> !isHighPriority(r) }
+IO::println("--- Open Requests: #{highPri.size} high-priority, #{otherPri.size} other ---")
+foreach r: MaintenanceReq in highPri {
+  IO::println("  -> " + r.statusLine())
+}
+IO::println("")
+
+// Try/catch: safe division for average
+def safeAvg(total: Int, count: Int): String {
+  try {
+    return "" + (total / count) + "/mo avg"
+  } catch e: Exception {
+    return "n/a"
+  }
+}
+val occupied = mgr.occupiedUnits()
+val occRev = mgr.totalMonthlyRevenue()
+IO::println("--- Occupied Revenue ---")
+IO::println("  " + safeAvg(occRev, occupied.size))
+
+// String interpolation with multiple values
+val totalUnits = apartments.size
+val vacantCount = vacant.size
+val occupancyPct = if totalUnits > 0 { (totalUnits - vacantCount) * 100 / totalUnits } else { 0 }
+IO::println("")
+IO::println("=== Summary ===")
+IO::println("Buildings: #{buildings.size}, Units: #{totalUnits}, Occupancy: #{occupancyPct}%")
+IO::println("Monthly revenue: #{occRev.asDollars()}, Late payments: #{mgr.latePaymentCount()}")

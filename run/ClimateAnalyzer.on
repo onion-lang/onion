@@ -1,0 +1,252 @@
+record Measurement(
+  station: String,
+  month: Int,
+  tempC: Double,
+  humidity: Int,
+  precipMm: Double
+) from re"(\w+) (\d+) (-?\d+\.\d+) (\d+) (\d+\.\d+)"
+
+enum Season { SPRING, SUMMER, AUTUMN, WINTER }
+
+enum AirQuality { GOOD, MODERATE, POOR, HAZARDOUS }
+
+enum ClimateZone {
+  case Arid(annualRainMm: Double)
+  case Temperate(avgTempC: Double)
+  case Tropical(minTempC: Double)
+  case Polar(maxTempC: Double)
+
+  public:
+    def name(): String = select this {
+      case a is Arid:      "Arid"
+      case t is Temperate: "Temperate"
+      case tr is Tropical: "Tropical"
+      case p is Polar:     "Polar"
+    }
+
+    def describe(): String = select this {
+      case a is Arid:      "Annual rainfall " + a.annualRainMm() + "mm"
+      case t is Temperate: "Average temp " + t.avgTempC() + "C"
+      case tr is Tropical: "Min temp " + tr.minTempC() + "C"
+      case p is Polar:     "Max temp " + p.maxTempC() + "C"
+    }
+}
+
+record StationReport(
+  name: String,
+  yearlyAvgTemp: Double,
+  yearlyPrecip: Double,
+  hotMonths: Int,
+  coldMonths: Int,
+  zone: ClimateZone
+)
+
+def toSeason(month: Int): Season = select month {
+  case 3, 4, 5: Season::SPRING
+  case 6, 7, 8: Season::SUMMER
+  case 9, 10, 11: Season::AUTUMN
+  else: Season::WINTER
+}
+
+def seasonName(s: Season): String = select s {
+  case Season::SPRING: "Spring"
+  case Season::SUMMER: "Summer"
+  case Season::AUTUMN: "Autumn"
+  case Season::WINTER: "Winter"
+}
+
+def qualityName(q: AirQuality): String = select q {
+  case AirQuality::GOOD:      "Good"
+  case AirQuality::MODERATE:  "Moderate"
+  case AirQuality::POOR:      "Poor"
+  case AirQuality::HAZARDOUS: "Hazardous"
+}
+
+def humidityQuality(pct: Int): AirQuality {
+  if pct < 60 { return AirQuality::GOOD }
+  if pct < 70 { return AirQuality::MODERATE }
+  if pct < 80 { return AirQuality::POOR }
+  return AirQuality::HAZARDOUS
+}
+
+def classifyZone(avgTemp: Double, totalPrecip: Double): ClimateZone {
+  if totalPrecip < 300.0 { return new Arid(totalPrecip) }
+  if avgTemp > 20.0      { return new Tropical(avgTemp - 5.0) }
+  if avgTemp < 5.0       { return new Polar(avgTemp + 8.0) }
+  return new Temperate(avgTemp)
+}
+
+def round2(d: Double): String {
+  val s = "" + d
+  val dot = s.indexOf(".")
+  if dot < 0 { return s + ".00" }
+  val tail = s.length - dot - 1
+  if tail == 1 { return s + "0" }
+  if tail <= 2  { return s }
+  return s.substring(0, dot + 3)
+}
+
+def bar(value: Double, max: Double, width: Int): String {
+  val filled = (value / max * (width as Double)) as Int
+  var b = ""
+  var i = 0
+  while i < width {
+    if i < filled { b = b + "#" } else { b = b + "." }
+    i++
+  }
+  return b
+}
+
+def analyzeStation(station: String, readings: List[Measurement]): StationReport {
+  val avgTemp  = (readings.fold(0.0) { acc, m -> (acc as Double) + (m as Measurement).tempC() } as Double) / readings.size
+  val totPrec  = readings.fold(0.0) { acc, m -> (acc as Double) + (m as Measurement).precipMm() } as Double
+  val hot      = readings.filter { m -> (m as Measurement).tempC() > 20.0 }.size
+  val cold     = readings.filter { m -> (m as Measurement).tempC() < 5.0 }.size
+  val zone     = classifyZone(avgTemp, totPrec)
+  return new StationReport(station, avgTemp, totPrec, hot, cold, zone)
+}
+
+def printReport(r: StationReport): void {
+  println("Station: " + r.name())
+  println("  Zone:              " + r.zone().name() + " — " + r.zone().describe())
+  println("  Yearly avg temp:   " + round2(r.yearlyAvgTemp()) + "C")
+  println("  Total precip:      " + round2(r.yearlyPrecip()) + " mm")
+  println("  Hot months (>20C): " + r.hotMonths())
+  println("  Cold months (<5C): " + r.coldMonths())
+}
+
+def main(): void {
+  val raw =
+    "NORTH 1 -3.2 65 45.5\n" +
+    "NORTH 2 -1.1 62 38.2\n" +
+    "NORTH 3 4.5 58 52.1\n" +
+    "NORTH 4 10.2 55 48.8\n" +
+    "NORTH 5 16.3 52 55.2\n" +
+    "NORTH 6 21.8 50 42.1\n" +
+    "NORTH 7 24.2 53 38.5\n" +
+    "NORTH 8 23.1 56 41.2\n" +
+    "NORTH 9 17.4 61 58.9\n" +
+    "NORTH 10 11.2 64 62.5\n" +
+    "NORTH 11 5.3 67 55.8\n" +
+    "NORTH 12 0.1 69 50.2\n" +
+    "SOUTH 1 22.5 78 185.3\n" +
+    "SOUTH 2 23.1 76 165.8\n" +
+    "SOUTH 3 22.8 74 145.2\n" +
+    "SOUTH 4 21.5 72 98.5\n" +
+    "SOUTH 5 19.2 70 55.4\n" +
+    "SOUTH 6 17.8 68 28.1\n" +
+    "SOUTH 7 18.1 65 22.5\n" +
+    "SOUTH 8 19.5 67 35.8\n" +
+    "SOUTH 9 20.8 71 65.2\n" +
+    "SOUTH 10 21.9 73 115.6\n" +
+    "SOUTH 11 22.4 76 152.3\n" +
+    "SOUTH 12 22.8 78 178.9\n" +
+    "ARCTIC 1 -28.5 82 12.3\n" +
+    "ARCTIC 2 -25.2 80 10.5\n" +
+    "ARCTIC 3 -18.4 75 15.2\n" +
+    "ARCTIC 4 -8.2 72 22.5\n" +
+    "ARCTIC 5 2.1 68 35.8\n" +
+    "ARCTIC 6 8.5 65 48.2\n" +
+    "ARCTIC 7 12.2 62 52.1\n" +
+    "ARCTIC 8 10.8 64 48.5\n" +
+    "ARCTIC 9 3.5 70 38.2\n" +
+    "ARCTIC 10 -5.8 74 25.5\n" +
+    "ARCTIC 11 -16.2 78 15.8\n" +
+    "ARCTIC 12 -24.8 82 11.2"
+
+  val measurements = Measurement::parseAll(raw)
+  println("=== Climate Analysis Report ===")
+  println("Loaded " + measurements.size + " station-month records")
+  println("")
+
+  val byStation = measurements.groupBy { m -> (m as Measurement).station() }
+
+  val northReads = byStation["NORTH"] as List[Measurement]
+  val southReads = byStation["SOUTH"] as List[Measurement]
+  val arcticReads = byStation["ARCTIC"] as List[Measurement]
+
+  val northReport  = analyzeStation("NORTH",  northReads)
+  val southReport  = analyzeStation("SOUTH",  southReads)
+  val arcticReport = analyzeStation("ARCTIC", arcticReads)
+
+  val reports = [northReport, southReport, arcticReport]
+
+  println("--- Station Summaries ---")
+  foreach r: StationReport in reports {
+    printReport(r)
+    println("")
+  }
+
+  println("--- Temperature Rankings (warmest first) ---")
+  val byTemp = reports.sortedBy { r -> -(r as StationReport).yearlyAvgTemp() }
+  var rank = 1
+  foreach r: StationReport in byTemp {
+    println(rank + ". " + r.name() + ": " + round2(r.yearlyAvgTemp()) + "C")
+    rank++
+  }
+  println("")
+
+  println("--- Precipitation Rankings ---")
+  val maxPrecip = 1300.0
+  val byPrecip = reports.sortedBy { r -> -(r as StationReport).yearlyPrecip() }
+  var rank2 = 1
+  foreach r: StationReport in byPrecip {
+    val b = bar(r.yearlyPrecip(), maxPrecip, 20)
+    println(rank2 + ". " + r.name() + " [" + b + "] " + round2(r.yearlyPrecip()) + " mm")
+    rank2++
+  }
+  println("")
+
+  println("--- Seasonal Analysis (NORTH station) ---")
+  val bySeason = northReads.groupBy { m -> seasonName(toSeason((m as Measurement).month())) }
+  foreach (season, meas) in bySeason {
+    val meaList = meas as List[Measurement]
+    val avg = (meaList.fold(0.0) { acc, m -> (acc as Double) + (m as Measurement).tempC() } as Double) / meaList.size
+    println("  " + season + ": avg " + round2(avg) + "C over " + meaList.size + " months")
+  }
+  println("")
+
+  println("--- Humidity Analysis (SOUTH station) ---")
+  val parts = southReads.partition { m -> (m as Measurement).humidity() < 70 }
+  val comfy = parts.get(0) as List[Measurement]
+  val humid = parts.get(1) as List[Measurement]
+  println("  Comfortable months (humidity < 70%): " + comfy.size)
+  println("  Humid months (humidity >= 70%):       " + humid.size)
+
+  val veryHumid = southReads.filter { m -> (m as Measurement).humidity() >= 74 }
+  if veryHumid.size > 0 {
+    println("  Very humid months (>=74%):")
+    foreach m: Measurement in veryHumid {
+      println("    Month " + m.month() + ": " + m.humidity() + "% — " + qualityName(humidityQuality(m.humidity())))
+    }
+  }
+  println("")
+
+  println("--- Temp vs Precip Pairing (NORTH) ---")
+  val northTemps  = northReads.map  { m -> (m as Measurement).tempC() }
+  val northPrecip = northReads.map  { m -> (m as Measurement).precipMm() }
+  val pairs = northTemps.zip(northPrecip)
+  val warmWet = pairs.filter { p ->
+    val pair = p as List[Object]
+    (pair[0] as Double) > 10.0 && (pair[1] as Double) > 50.0
+  }
+  println("  Warm(>10C) AND wet(>50mm) months in NORTH: " + warmWet.size + " of " + pairs.size)
+  println("")
+
+  println("--- Zone Classification ---")
+  val zones = reports.groupBy { r -> (r as StationReport).zone().name() }
+  foreach (zone, stns) in zones {
+    val names = (stns as List[StationReport]).map { r -> (r as StationReport).name() }
+    println("  " + zone + ": " + names)
+  }
+  println("")
+
+  println("--- Annual Totals ---")
+  val totalPrecip = reports.fold(0.0) { acc, r -> (acc as Double) + (r as StationReport).yearlyPrecip() } as Double
+  val avgTempAll  = (reports.fold(0.0) { acc, r -> (acc as Double) + (r as StationReport).yearlyAvgTemp() } as Double) / reports.size
+  println("  Combined annual precipitation: " + round2(totalPrecip) + " mm")
+  println("  Grand average temperature:     " + round2(avgTempAll) + "C")
+
+  println("")
+  println("=== Analysis Complete ===")
+}

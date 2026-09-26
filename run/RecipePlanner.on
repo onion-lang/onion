@@ -1,0 +1,419 @@
+// RecipePlanner.on — recipe catalog and weekly meal planner (~280 lines)
+//
+// Exercises: extension methods (Int/Double/String), data-carrying enums,
+// ADT case enums with methods, records with methods and operator overloading,
+// class with mutable state, collection pipelines (groupBy/map/filter/fold/
+// sortedBy/find/take/count/any), foreach (list + map + range), select/
+// pattern matching, nullable types, string interpolation, try/catch, closures.
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def kcalStr(): String = "#{self} kcal"
+}
+
+extension Double {
+  def pct(): String {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0%" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s + "%" }
+    return s.substring(0, end) + "%"
+  }
+}
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def cap(): String {
+    if self.length() == 0 { return self }
+    return self.substring(0, 1).toUpperCase() + self.substring(1)
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+// Data-carrying: each meal category has a display label and recommended meals/day
+enum MealCategory(label: String, slotsPerDay: Int) {
+  Breakfast ("Breakfast", 1),
+  Lunch     ("Lunch",     1),
+  Dinner    ("Dinner",    1),
+  Snack     ("Snack",     2),
+  Dessert   ("Dessert",   1)
+}
+
+// ADT enum for dietary tag
+enum DietaryTag {
+  case Vegan
+  case Vegetarian
+  case GlutenFree
+  case DairyFree
+  case HighProtein
+  case LowCarb
+  case Keto
+public:
+  def label(): String = select this {
+    case t is Vegan:       "Vegan"
+    case t is Vegetarian:  "Vegetarian"
+    case t is GlutenFree:  "Gluten-free"
+    case t is DairyFree:   "Dairy-free"
+    case t is HighProtein: "High-protein"
+    case t is LowCarb:     "Low-carb"
+    case t is Keto:        "Keto"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Ingredient(name: String, grams: Int, caloriesPerGram: Double) {
+public:
+  def calories(): Int = (grams() as Double * caloriesPerGram()) as Int
+  override def toString(): String = "#{name()} #{grams()}g (#{calories().kcalStr()})"
+}
+
+record NutritionFacts(calories: Int, carbsG: Int, proteinG: Int, fatG: Int) {
+public:
+  def plus(o: NutritionFacts): NutritionFacts =
+    new NutritionFacts(calories() + o.calories(), carbsG() + o.carbsG(),
+                       proteinG() + o.proteinG(), fatG() + o.fatG())
+  override def toString(): String =
+    "#{calories()} kcal | carbs #{carbsG()}g | protein #{proteinG()}g | fat #{fatG()}g"
+}
+
+record Recipe(
+  name: String,
+  category: MealCategory,
+  tags: List[DietaryTag],
+  ingredients: List[Ingredient],
+  nutrition: NutritionFacts,
+  prepMins: Int,
+  servings: Int
+) {
+public:
+  def caloriesPerServing(): Int = nutrition().calories() / servings()
+  def isTagged(tag: DietaryTag): Boolean =
+    tags().any { t -> (t as DietaryTag) == tag }
+  def totalPrepInfo(): String =
+    if prepMins() < 60 { "#{prepMins()} min" }
+    else { "#{prepMins() / 60}h #{prepMins() % 60}min" }
+  override def toString(): String =
+    "#{name().padEnd(32)} [#{category().label().padEnd(10)}] #{caloriesPerServing().kcalStr().padEnd(12)} #{totalPrepInfo()}"
+}
+
+record MealSlot(day: String, meal: MealCategory, recipe: Recipe)
+
+// ─── RecipeBook class ─────────────────────────────────────────────────────────
+
+class RecipeBook {
+  var _recipes: List[Recipe]
+
+public:
+  def this { _recipes = [] }
+
+  def add(r: Recipe): void { _recipes << r }
+
+  def size(): Int = _recipes.size
+
+  def find(name: String): Recipe? =
+    _recipes.find { r -> (r as Recipe).name() == name }
+
+  def byCategory(cat: MealCategory): List[Recipe] =
+    _recipes.filter { r -> (r as Recipe).category() == cat }
+
+  def byTag(tag: DietaryTag): List[Recipe] =
+    _recipes.filter { r -> (r as Recipe).isTagged(tag) }
+
+  def quickMeals(maxMinutes: Int): List[Recipe] =
+    _recipes.filter { r -> (r as Recipe).prepMins() <= maxMinutes }
+             .sortedBy { r -> (r as Recipe).prepMins() }
+
+  def lowCalorie(maxKcal: Int): List[Recipe] =
+    _recipes.filter { r -> (r as Recipe).caloriesPerServing() <= maxKcal }
+             .sortedBy { r -> (r as Recipe).caloriesPerServing() }
+
+  def byCategoryBreakdown(): Map[Object, List[Recipe]] =
+    _recipes.groupBy { r -> (r as Recipe).category().label() }
+
+  def avgCalories(): Double {
+    if _recipes.size == 0 { return 0.0 }
+    val total: Int = _recipes.fold(0) { acc, r -> acc + (r as Recipe).caloriesPerServing() }
+    return total as Double / _recipes.size as Double
+  }
+
+  def allTags(): List[String] {
+    var seen: List[String] = []
+    foreach r: Recipe in _recipes {
+      foreach t: DietaryTag in r.tags() {
+        val lbl: String = t.label()
+        if !(seen.any { s -> (s as String) == lbl }) {
+          seen << lbl
+        }
+      }
+    }
+    return seen.sortedBy { s -> s as String }
+  }
+}
+
+// ─── MealPlanner class ────────────────────────────────────────────────────────
+
+class MealPlanner {
+  var _slots: List[MealSlot]
+  val days: List[String]
+
+public:
+  def this {
+    _slots = []
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+  }
+
+  def plan(day: String, meal: MealCategory, recipe: Recipe): void {
+    _slots << new MealSlot(day, meal, recipe)
+  }
+
+  def weeklyCalories(): Int =
+    _slots.fold(0) { acc, s -> acc + (s as MealSlot).recipe().caloriesPerServing() }
+
+  def dailyCalories(day: String): Int =
+    _slots.filter { s -> (s as MealSlot).day() == day }
+          .fold(0) { acc, s -> acc + (s as MealSlot).recipe().caloriesPerServing() }
+
+  def printWeeklyPlan(): void {
+    println("  Day          Meal        Recipe")
+    println("  " + "-".repeat(60))
+    foreach slot: MealSlot in _slots.sortedBy { s ->
+      val d: MealSlot = s as MealSlot
+      val dayIdx: Int = days.indexOf(d.day())
+      dayIdx * 10 + d.meal().ordinal()
+    } {
+      val dayStr: String = slot.day().padEnd(12)
+      val mealStr: String = slot.meal().label().padEnd(11)
+      println("  #{dayStr} #{mealStr} #{slot.recipe().name()}")
+    }
+  }
+
+  def nutritionSummary(): NutritionFacts {
+    var total = new NutritionFacts(0, 0, 0, 0)
+    foreach slot: MealSlot in _slots {
+      total = total + slot.recipe().nutrition()
+    }
+    return total
+  }
+}
+
+// ─── Recipe data ──────────────────────────────────────────────────────────────
+
+val book = new RecipeBook()
+
+// Breakfast recipes
+book.add(new Recipe(
+  "Overnight Oats", MealCategory::Breakfast,
+  [new Vegan(), new GlutenFree()],
+  [new Ingredient("rolled oats", 80, 3.8), new Ingredient("almond milk", 200, 0.5),
+   new Ingredient("banana", 100, 0.9), new Ingredient("honey", 20, 3.0)],
+  new NutritionFacts(420, 72, 12, 8), 5, 1))
+
+book.add(new Recipe(
+  "Avocado Toast", MealCategory::Breakfast,
+  [new Vegan(), new DairyFree()],
+  [new Ingredient("sourdough bread", 100, 2.5), new Ingredient("avocado", 100, 1.6),
+   new Ingredient("cherry tomatoes", 60, 0.2)],
+  new NutritionFacts(380, 44, 10, 18), 10, 1))
+
+book.add(new Recipe(
+  "Greek Yogurt Parfait", MealCategory::Breakfast,
+  [new Vegetarian(), new HighProtein()],
+  [new Ingredient("Greek yogurt", 200, 0.6), new Ingredient("granola", 40, 4.7),
+   new Ingredient("mixed berries", 80, 0.5), new Ingredient("honey", 15, 3.0)],
+  new NutritionFacts(390, 52, 24, 8), 5, 1))
+
+// Lunch recipes
+book.add(new Recipe(
+  "Quinoa Buddha Bowl", MealCategory::Lunch,
+  [new Vegan(), new GlutenFree(), new HighProtein()],
+  [new Ingredient("quinoa", 150, 1.2), new Ingredient("chickpeas", 100, 1.6),
+   new Ingredient("cucumber", 80, 0.15), new Ingredient("tahini", 30, 6.0)],
+  new NutritionFacts(520, 68, 22, 16), 25, 1))
+
+book.add(new Recipe(
+  "Chicken Caesar Salad", MealCategory::Lunch,
+  [new HighProtein(), new GlutenFree()],
+  [new Ingredient("chicken breast", 150, 1.65), new Ingredient("romaine lettuce", 100, 0.17),
+   new Ingredient("parmesan", 30, 4.3), new Ingredient("Caesar dressing", 40, 4.5)],
+  new NutritionFacts(480, 8, 45, 28), 20, 1))
+
+book.add(new Recipe(
+  "Lentil Soup", MealCategory::Lunch,
+  [new Vegan(), new GlutenFree(), new HighProtein()],
+  [new Ingredient("red lentils", 200, 1.16), new Ingredient("onion", 80, 0.4),
+   new Ingredient("carrots", 100, 0.41), new Ingredient("vegetable broth", 500, 0.05)],
+  new NutritionFacts(380, 60, 24, 4), 35, 2))
+
+// Dinner recipes
+book.add(new Recipe(
+  "Grilled Salmon", MealCategory::Dinner,
+  [new GlutenFree(), new HighProtein(), new LowCarb()],
+  [new Ingredient("salmon fillet", 200, 2.08), new Ingredient("asparagus", 150, 0.2),
+   new Ingredient("olive oil", 20, 8.8), new Ingredient("lemon", 30, 0.3)],
+  new NutritionFacts(520, 10, 46, 32), 25, 1))
+
+book.add(new Recipe(
+  "Pasta Primavera", MealCategory::Dinner,
+  [new Vegetarian()],
+  [new Ingredient("penne pasta", 200, 1.3), new Ingredient("zucchini", 100, 0.17),
+   new Ingredient("cherry tomatoes", 100, 0.18), new Ingredient("parmesan", 40, 4.3)],
+  new NutritionFacts(560, 88, 20, 12), 30, 1))
+
+book.add(new Recipe(
+  "Beef Stir-fry", MealCategory::Dinner,
+  [new LowCarb()],
+  [new Ingredient("beef strips", 200, 2.5), new Ingredient("bell pepper", 100, 0.31),
+   new Ingredient("broccoli", 150, 0.35), new Ingredient("soy sauce", 30, 0.6)],
+  new NutritionFacts(480, 18, 42, 26), 20, 1))
+
+book.add(new Recipe(
+  "Mushroom Risotto", MealCategory::Dinner,
+  [new Vegetarian(), new GlutenFree()],
+  [new Ingredient("arborio rice", 200, 1.5), new Ingredient("mushrooms", 200, 0.22),
+   new Ingredient("white wine", 100, 0.82), new Ingredient("parmesan", 50, 4.3)],
+  new NutritionFacts(580, 80, 16, 18), 45, 2))
+
+// Snacks
+book.add(new Recipe(
+  "Hummus & Veggies", MealCategory::Snack,
+  [new Vegan(), new GlutenFree()],
+  [new Ingredient("hummus", 80, 1.66), new Ingredient("carrots", 60, 0.41),
+   new Ingredient("celery", 40, 0.14), new Ingredient("cucumber", 60, 0.15)],
+  new NutritionFacts(180, 24, 7, 7), 5, 1))
+
+book.add(new Recipe(
+  "Protein Smoothie", MealCategory::Snack,
+  [new Vegetarian(), new HighProtein(), new GlutenFree()],
+  [new Ingredient("whey protein", 30, 3.7), new Ingredient("banana", 100, 0.9),
+   new Ingredient("almond milk", 250, 0.5), new Ingredient("peanut butter", 20, 5.9)],
+  new NutritionFacts(340, 38, 28, 10), 5, 1))
+
+// Desserts
+book.add(new Recipe(
+  "Chia Pudding", MealCategory::Dessert,
+  [new Vegan(), new GlutenFree()],
+  [new Ingredient("chia seeds", 40, 4.8), new Ingredient("coconut milk", 200, 2.3),
+   new Ingredient("mango", 100, 0.6), new Ingredient("maple syrup", 20, 2.6)],
+  new NutritionFacts(380, 48, 9, 18), 10, 1))
+
+// ─── Main demo ────────────────────────────────────────────────────────────────
+
+println("=== Recipe Planner Demo ===")
+IO::println("")
+println("Total recipes: #{book.size()}")
+println("Average calories/serving: #{book.avgCalories()} kcal")
+IO::println("")
+
+// All recipes by category
+println("── All Recipes by Category ──────────────────────────────────────────────")
+val grouped: Map[Object, List[Recipe]] = book.byCategoryBreakdown()
+foreach (cat, catRecipes) in grouped {
+  println("  #{(cat as String).cap()}:")
+  foreach r: Recipe in catRecipes.sortedBy { x -> (x as Recipe).name() } {
+    println("    #{r}")
+  }
+}
+IO::println("")
+
+// Quick meals
+println("── Quick Meals (≤15 min) ────────────────────────────────────────────────")
+foreach r: Recipe in book.quickMeals(15) {
+  println("  #{r}")
+}
+IO::println("")
+
+// Low calorie options
+println("── Low-calorie Dinners (≤500 kcal) ─────────────────────────────────────")
+foreach r: Recipe in book.byCategory(MealCategory::Dinner).filter { r ->
+  (r as Recipe).caloriesPerServing() <= 500
+} {
+  println("  #{r}")
+}
+IO::println("")
+
+// Vegan options
+val veganRecipes: List[Recipe] = book.byTag(new Vegan())
+println("── Vegan Recipes (#{veganRecipes.size}) ──────────────────────────────────────────────")
+foreach r: Recipe in veganRecipes.sortedBy { r -> (r as Recipe).name() } {
+  println("  #{r}")
+}
+IO::println("")
+
+// High-protein meals
+println("── High-Protein Options ─────────────────────────────────────────────────")
+val highProtein: List[Recipe] = book.byTag(new HighProtein())
+foreach r: Recipe in highProtein.sortedBy { r -> -((r as Recipe).caloriesPerServing()) } {
+  println("  #{r}")
+}
+IO::println("")
+
+// Dietary tags in catalog
+println("── Dietary Tags in Catalog: #{book.allTags()}")
+IO::println("")
+
+// Weekly meal plan
+println("── Weekly Meal Plan ─────────────────────────────────────────────────────")
+val planner = new MealPlanner()
+
+val overnightOats: Recipe? = book.find("Overnight Oats")
+val avocadoToast: Recipe?  = book.find("Avocado Toast")
+val gYogurt: Recipe?       = book.find("Greek Yogurt Parfait")
+val buddhaB: Recipe?       = book.find("Quinoa Buddha Bowl")
+val chicken: Recipe?       = book.find("Chicken Caesar Salad")
+val lentilS: Recipe?       = book.find("Lentil Soup")
+val salmon: Recipe?        = book.find("Grilled Salmon")
+val pasta: Recipe?         = book.find("Pasta Primavera")
+val beef: Recipe?          = book.find("Beef Stir-fry")
+val risotto: Recipe?       = book.find("Mushroom Risotto")
+val hummus: Recipe?        = book.find("Hummus & Veggies")
+
+if overnightOats != null { planner.plan("Monday",    MealCategory::Breakfast, overnightOats) }
+if buddhaB       != null { planner.plan("Monday",    MealCategory::Lunch,     buddhaB)       }
+if salmon        != null { planner.plan("Monday",    MealCategory::Dinner,    salmon)        }
+if avocadoToast  != null { planner.plan("Tuesday",   MealCategory::Breakfast, avocadoToast)  }
+if chicken       != null { planner.plan("Tuesday",   MealCategory::Lunch,     chicken)       }
+if pasta         != null { planner.plan("Tuesday",   MealCategory::Dinner,    pasta)         }
+if gYogurt       != null { planner.plan("Wednesday", MealCategory::Breakfast, gYogurt)       }
+if lentilS       != null { planner.plan("Wednesday", MealCategory::Lunch,     lentilS)       }
+if beef          != null { planner.plan("Wednesday", MealCategory::Dinner,    beef)          }
+if overnightOats != null { planner.plan("Thursday",  MealCategory::Breakfast, overnightOats) }
+if buddhaB       != null { planner.plan("Thursday",  MealCategory::Lunch,     buddhaB)       }
+if risotto       != null { planner.plan("Thursday",  MealCategory::Dinner,    risotto)       }
+if avocadoToast  != null { planner.plan("Friday",    MealCategory::Breakfast, avocadoToast)  }
+if chicken       != null { planner.plan("Friday",    MealCategory::Lunch,     chicken)       }
+if salmon        != null { planner.plan("Friday",    MealCategory::Dinner,    salmon)        }
+if hummus        != null { planner.plan("Monday",    MealCategory::Snack,     hummus)        }
+if hummus        != null { planner.plan("Wednesday", MealCategory::Snack,     hummus)        }
+
+planner.printWeeklyPlan()
+IO::println("")
+
+// Daily calorie totals
+println("── Daily Calorie Totals ─────────────────────────────────────────────────")
+foreach day: String in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] {
+  val cal: Int = planner.dailyCalories(day)
+  val bar: String = "|".repeat(cal / 100)
+  println("  #{day.padEnd(11)} #{cal.kcalStr().padEnd(12)} #{bar}")
+}
+IO::println("")
+
+// Weekly nutrition
+println("── Weekly Nutrition (all planned meals) ─────────────────────────────────")
+val weekNutrition: NutritionFacts = planner.nutritionSummary()
+println("  #{weekNutrition}")
+IO::println("")
+
+// find / nullable demo
+val missing: Recipe? = book.find("Flying Saucer Soup")
+println("Search 'Flying Saucer Soup': #{if missing == null { "not found" } else { "found" }}")
+IO::println("")
+
+println("Done.")

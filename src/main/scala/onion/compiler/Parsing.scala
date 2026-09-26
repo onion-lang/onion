@@ -10,6 +10,7 @@ import _root_.onion.compiler.parser.{
   OnionParser,
   ExpectedTokenFormatter,
   JJOnionParser,
+  JJOnionParserConstants,
   ParseException,
   SourceContext,
   SyntaxHint,
@@ -75,15 +76,26 @@ class Parsing(config: CompilerConfig) extends AnyRef
 
       // Fast path: the handwritten parser. It produces the same AST as the JavaCC parser
       // for every program the latter accepts, and gives up (Fail) on anything else, in which
-      // case the JavaCC parser below re-parses the file and owns the diagnostics.
+      // case a second, recovery-mode pass of the same parser owns the diagnostics: it
+      // collects every syntax error (resynchronizing at top-level declarations between
+      // them) instead of stopping at the first.
       if (!Parsing.forceJavaCC) {
         val fast = try OnionParser.parse(sourceText) catch { case _: OnionParser.Fail => null }
         if (fast != null) {
           units += fast.copy(sourceFile = source.name)
           return
         }
+
+        val parser = new OnionParser(sourceText)
+        parser.enableErrorRecovery(maxErrorsPerFile)
+        val unit = parser.unit().copy(sourceFile = source.name)
+        if (parser.hasErrors) collectFastParseErrors(parser, source.name, sourceText, problems)
+        else units += unit // the first pass's give-up was spurious; keep the good parse
+        return
       }
 
+      // -Donion.parser.javacc=true: the old all-JavaCC flow, kept as a kill-switch and as
+      // the differential-testing oracle for the recovery port above.
       val parser = new JJOnionParser(new OnionLexer(sourceText))
 
       // Enable error recovery mode to collect multiple errors
@@ -118,6 +130,36 @@ class Parsing(config: CompilerConfig) extends AnyRef
         // escape). Catch it here so it surfaces as a parse error instead of I0000.
         val msg = if (e.getMessage != null) e.getMessage else "invalid source"
         problems += CompileError(source.name, new Location(1, 1), msg)
+    }
+  }
+
+  /**
+   * Collect errors from the handwritten parser's error recovery buffer. The expected-kind
+   * sets render through the same token-image table and formatter as the JavaCC path, so the
+   * message text and the hint classification are identical for the same diagnostic.
+   */
+  private def collectFastParseErrors(
+    parser: OnionParser,
+    fileName: String,
+    sourceText: String,
+    problems: ArrayBuffer[CompileError]
+  ): Unit = {
+    val images = JJOnionParserConstants.tokenImage
+    for (error <- parser.getCollectedErrors) {
+      val expected = ExpectedTokenFormatter.formatKinds(error.expectedKinds, images)
+      val expectedAll = ExpectedTokenFormatter.formatAllKinds(error.expectedKinds, images)
+      val sourceContext = SourceContext.at(sourceText, error.line, error.column)
+      problems += CompileError(
+        fileName,
+        new Location(error.line, error.column),
+        syntaxErrorMessage(
+          error.found,
+          expected,
+          sourceContext.context,
+          sourceContext.sourceLine,
+          expectedAll
+        )
+      )
     }
   }
 

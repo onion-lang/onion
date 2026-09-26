@@ -34,10 +34,22 @@ object OnionParser {
   /** Raised when the fast parser gives up; the caller falls back to the JavaCC parser. */
   class Fail(msg: String) extends RuntimeException(msg, null, false, false)
 
+  /**
+   * One syntax error collected during a recovery-mode parse: where, what was found, and the
+   * token kinds (JJOnionParserConstants values, indexes into `tokenImage`) that would have been
+   * accepted at the deepest point this failure reached. `expectedKinds` may be empty when the
+   * failure site had no token expectation to record (a literal-overflow check, say).
+   */
+  final case class CollectedError(line: Int, column: Int, found: String, expectedKinds: List[Int])
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 
   def parse(text: String): AST.CompilationUnit = new OnionParser(text).unit()
+
+  private def isDeclarationStartImage(img: String): Boolean =
+    img == "class" || img == "interface" || img == "record" || img == "enum" ||
+      img == "extension" || img == "type" || img == "trait" || img == "instance"
 
   private val boxedNames: Map[String, String] = Map(
     "Int" -> "java.lang.Integer", "Long" -> "java.lang.Long", "Double" -> "java.lang.Double",
@@ -191,6 +203,148 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private var cur: Token = null       // the next visible token, when already determined
   private val modeStack = new ArrayBuffer[Boolean](16)
 
+  // ------------------------------------------------------------- diagnostics
+
+  /** >0 while inside a `looksLike` speculative attempt; `recordExpected` is a no-op then, so a
+   *  deep-but-wrong speculative dead end can never out-rank the real error's shallower position
+   *  (mirrors JavaCC's own `jj_rescan`/`jj_add_error_token` guard). */
+  private var speculating = 0
+
+  private var furthestPos = -1        // buffer index of the deepest failure seen so far
+  private var furthestLine = -1       // beginLine/beginColumn/image of the token at furthestPos,
+  private var furthestColumn = -1     // raw (un-adjusted by lineBase/colBase) -- see deepestFailure()
+  private var furthestFoundImage: String = null
+  private val expectedKinds = new java.util.LinkedHashSet[Integer]()
+
+  /** Record that token kind `k` would have been accepted here; keeps only the deepest position
+   *  reached across every attempt (successful or abandoned), like JavaCC's generated parser. */
+  private def recordExpected(k: Int): Unit = {
+    if (speculating > 0) return
+    if (pos > furthestPos) {
+      val t = peek(1)
+      furthestPos = pos
+      furthestLine = t.beginLine
+      furthestColumn = t.beginColumn
+      furthestFoundImage = t.image
+      expectedKinds.clear()
+      expectedKinds.add(k)
+    } else if (pos == furthestPos) {
+      expectedKinds.add(k)
+    }
+  }
+
+  private def recordExpectedAll(ks: Int*): Unit = ks.foreach(recordExpected)
+
+  /** The (lineBase/colBase-adjusted) position, found-token image, and expected-kind set of the
+   *  deepest failure this parser instance reached, if it ever called `recordExpected`. Used to
+   *  propagate a string-interpolation sub-parser's diagnostic into the enclosing parser's own
+   *  failure state, since the sub-parser's line numbers start fresh at 1 (see `p()`). */
+  private[parser] def deepestFailure(): Option[(Location, String, java.util.LinkedHashSet[Integer])] =
+    if (furthestFoundImage == null) None
+    else {
+      val loc =
+        if (lineBase == 0 && colBase == 0) Location(furthestLine, furthestColumn)
+        else {
+          val bc = if (furthestLine == 1) furthestColumn + colBase else furthestColumn
+          Location(furthestLine + lineBase, bc)
+        }
+      Some((loc, furthestFoundImage, expectedKinds))
+    }
+
+  /** Force a specific diagnostic as this parser's furthest failure, position comparison aside:
+   *  the caller knows better than the deepest-reach heuristic — a string-interpolation
+   *  sub-parser's own diagnostic, or a slip reported at an already-consumed token (the
+   *  no-arrow trailing-lambda cases are anchored to their `{`, as the grammar does). */
+  private def adoptFailure(loc: Location, foundImage: String, kinds: java.util.LinkedHashSet[Integer]): Unit = {
+    if (speculating > 0) return
+    furthestPos = pos
+    furthestLine = loc.line
+    furthestColumn = loc.column
+    furthestFoundImage = foundImage
+    expectedKinds.clear()
+    expectedKinds.addAll(kinds)
+  }
+
+  private def adoptFailureAt(t: Token, ks: Int*): Unit = {
+    val kinds = new java.util.LinkedHashSet[Integer]()
+    ks.foreach(k => kinds.add(k))
+    adoptFailure(p(t), t.image, kinds)
+  }
+
+  // --------------------------------------------------------------- recovery
+
+  private var errorRecoveryMode = false
+  private var maxErrors = 10
+  private val collectedErrors = new ArrayBuffer[CollectedError]()
+
+  /** Collect several syntax errors per file instead of failing on the first: `unit()` then
+   *  resynchronizes at the next top-level declaration after each error, and returns a partial
+   *  unit (never throws) once at least one error is collected. Mirrors JJOnionParser's API. */
+  def enableErrorRecovery(maxErrors: Int): Unit = {
+    errorRecoveryMode = true
+    this.maxErrors = maxErrors
+    collectedErrors.clear()
+  }
+
+  def hasErrors: Boolean = collectedErrors.nonEmpty
+
+  def getCollectedErrors: List[CollectedError] = collectedErrors.toList
+
+  /** Turn the deepest failure reached (or, failing that, the next unconsumed token) into a
+   *  CollectedError, and clear the furthest-failure state for the next recovery round. */
+  private def snapshotError(): Unit = {
+    if (furthestFoundImage != null)
+      collectedErrors += CollectedError(furthestLine, furthestColumn, furthestFoundImage,
+        expectedKinds.toArray(new Array[Integer](0)).toList.map(_.intValue))
+    else {
+      val t = peek(1)
+      collectedErrors += CollectedError(t.beginLine, t.beginColumn, t.image, Nil)
+    }
+    furthestPos = -1
+    furthestLine = -1
+    furthestColumn = -1
+    furthestFoundImage = null
+    expectedKinds.clear()
+  }
+
+  /**
+   * Panic-mode skip after a top-level parse failure: consume raw tokens while tracking brace
+   * depth (relative to the error position) and stop just BEFORE a type-declaration keyword at
+   * depth zero, just AFTER the `}` closing the enclosing declaration, or just AFTER a `;` --
+   * or a newline, when the failure happened where the grammar's IN_STATEMENT state would have
+   * made one a statement terminator (`eolSignificant` here, `states.isEmpty()` there).
+   * The port of JJOnionParser.skipToToplevelSyncPoint, over this parser's own token buffer.
+   *
+   * @return true if a sync point was found, false if EOF was reached
+   */
+  private def skipToToplevelSyncPoint(): Boolean = {
+    val eolIsSync = eolSignificant && modeStack.isEmpty
+    var depth = 0
+    while (true) {
+      val t = rawAt(pos)
+      if (t.kind == K.EOF) return false
+      if (depth == 0 && isDeclarationStartImage(t.image)) return true
+      pos += 1
+      last = t
+      cur = null
+      if (t.kind == K.LBRACE) depth += 1
+      else if (t.kind == K.RBRACE) { if (depth > 0) depth -= 1 else return true }
+      else if (depth == 0 && (t.kind == K.SEMI || (t.kind == K.EOL && eolIsSync))) return true
+    }
+    false
+  }
+
+  /** A failure can strand any of the parser's stacks mid-nesting (an `enterSection` whose
+   *  `leaveSection` never ran); recovery restarts from the top level, whose baseline is
+   *  DEFAULT state with every stack empty. There is no pre-failure mark to reset to. */
+  private def resetToToplevelBaseline(): Unit = {
+    modeStack.clear()
+    eolSignificant = false
+    cur = null
+    conditionContexts.clear()
+    assignedScopes.clear()
+  }
+
   /** The give-up signal; with -Donion.parser.debug=true it says where. */
   private def fail: Fail =
     if (debug) new Fail(s"at ${peek(1).beginLine}:${peek(1).beginColumn} next=<${peek(1).image}> kind=${peek(1).kind} last=<${if (last == null) "" else last.image}> " +
@@ -262,7 +416,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def expect(k: Int): Token = {
-    if (kind(1) != k) throw fail
+    if (kind(1) != k) { recordExpected(k); throw fail }
     next()
   }
 
@@ -303,7 +457,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   /** Whether `body` parses from here; the cursor is restored either way. */
   private inline def looksLike(inline body: Unit): Boolean = {
     val m = mark()
-    val ok = try { body; true } catch { case _: Fail => false }
+    speculating += 1
+    val ok =
+      try {
+        body
+        true
+      } catch {
+        case _: Fail => false
+      } finally {
+        speculating -= 1
+      }
     reset(m)
     ok
   }
@@ -396,18 +559,26 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def isId(k: Int): Boolean = k == K.ID || k == K.QUOTED_ID
 
-  private def id(): Token = { val k = kind(1); if (isId(k)) next() else throw fail }
+  private def id(): Token = {
+    val k = kind(1)
+    if (isId(k)) next()
+    else { recordExpectedAll(K.ID, K.QUOTED_ID); throw fail }
+  }
 
   private def importId(): Token = {
     val k = kind(1)
     if (isId(k) || k == K.K_LONG || k == K.K_INT || k == K.K_SHORT || k == K.K_BYTE || k == K.K_CHAR ||
-        k == K.K_FLOAT || k == K.K_DOUBLE || k == K.K_BOOLEAN) next() else throw fail
+        k == K.K_FLOAT || k == K.K_DOUBLE || k == K.K_BOOLEAN) next()
+    else {
+      recordExpectedAll(K.ID, K.QUOTED_ID, K.K_LONG, K.K_INT, K.K_SHORT, K.K_BYTE, K.K_CHAR, K.K_FLOAT, K.K_DOUBLE, K.K_BOOLEAN)
+      throw fail
+    }
   }
 
   private def eos(): Unit = {
     val k = kind(1)
     if (k == K.SEMI || k == K.EOL) next()
-    else if (k != K.EOF) throw fail
+    else if (k != K.EOF) { recordExpectedAll(K.SEMI, K.EOL, K.EOF); throw fail }
     leaveSection()
     eols()
   }
@@ -417,18 +588,61 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (k == K.SEMI || k == K.EOL) { next(); leaveSection(); eols() }
     else if (k == K.EOF) { leaveSection(); eols() }
     else if (k == K.RBRACE) leaveSection()
-    else throw fail
+    else { recordExpectedAll(K.SEMI, K.EOL, K.EOF, K.RBRACE); throw fail }
   }
 
   // ---------------------------------------------------------------- unit level
 
   def unit(): AST.CompilationUnit = {
+    if (errorRecoveryMode) return unitWithRecovery()
     val module = if (kind(1) == K.K_MODULE) moduleDecl() else null
     val imports = if (kind(1) == K.K_IMPORT) importDecl() else null
     val tops = new ArrayBuffer[AST.Toplevel]()
     while (kind(1) != K.EOF) tops += topLevel()
     if (tops.isEmpty) throw fail // the grammar demands at least one top-level element
     AST.CompilationUnit(new Location(1, 1), null, module, imports, tops.toList, needsBodyRewrite, AST.toScalaSet(unitAssigned))
+  }
+
+  /**
+   * `unit()` under `enableErrorRecovery`: never throws. Each top-level parse failure becomes a
+   * CollectedError, the parser resynchronizes at the next top-level sync point, and whatever
+   * parsed cleanly is returned as a partial unit — the port of JJOnionParser's recovery loop.
+   */
+  private def unitWithRecovery(): AST.CompilationUnit = {
+    var module: AST.ModuleDeclaration = null
+    var imports: AST.ImportClause = null
+    val tops = new ArrayBuffer[AST.Toplevel]()
+    def partialUnit(): AST.CompilationUnit =
+      AST.CompilationUnit(new Location(1, 1), null, module, imports, tops.toList, needsBodyRewrite, AST.toScalaSet(unitAssigned))
+    // A failure anywhere records the deepest diagnostic and resynchronizes; give up (returning
+    // the partial unit — the errors are collected) once maxErrors is reached or EOF is hit.
+    def recover(): Boolean = {
+      snapshotError()
+      if (collectedErrors.length >= maxErrors) return false
+      val synced = skipToToplevelSyncPoint() // reads the failure-time EOL state; reset comes after
+      resetToToplevelBaseline()
+      synced
+    }
+    try {
+      if (kind(1) == K.K_MODULE) module = moduleDecl()
+      if (kind(1) == K.K_IMPORT) imports = importDecl()
+    } catch { case _: Fail => if (!recover()) return partialUnit() }
+    while (kind(1) != K.EOF) {
+      val startPos = pos
+      try tops += topLevel()
+      catch {
+        case _: Fail =>
+          if (!recover()) return partialUnit()
+          // A declaration keyword is a sync point the skip stops BEFORE; if the failed attempt
+          // consumed nothing, re-parsing from the same token would loop forever — force one
+          // token of progress instead.
+          if (pos == startPos && rawAt(pos).kind != K.EOF) { pos += 1; cur = null }
+      }
+    }
+    // An empty file is a syntax error (the grammar demands one top-level element), reported
+    // rather than thrown: found="" renders as the unexpected-EOF message downstream.
+    if (tops.isEmpty && collectedErrors.isEmpty) snapshotError()
+    partialUnit()
   }
 
   private def moduleDecl(): AST.ModuleDeclaration = {
@@ -451,7 +665,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val sb = new java.lang.StringBuilder
       // (import_id ".")+ : at least one dotted prefix
       var n = importId()
-      if (kind(1) != K.DOT) throw fail
+      if (kind(1) != K.DOT) { recordExpected(K.DOT); throw fail }
       var more = true
       while (more) {
         expect(K.DOT)
@@ -488,14 +702,30 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (k == K.K_INSTANCE) return instanceDecl()
     val declStart = isModifierKind(k) || k == K.K_TYPE || k == K.K_CLASS || k == K.K_INTERFACE || k == K.K_TRAIT ||
       k == K.K_RECORD || k == K.K_ENUM || k == K.K_DEF || k == K.ANNOTATION
-    if (!declStart) return topLevelElement()
+    if (!declStart) {
+      // JavaCC's top_level records the declaration alternatives' first tokens at this choice
+      // point, so a statement that fails on its very first token lists them as expected too
+      // (`public class ...` classifies from "class" being in that set). Mirror that.
+      recordExpectedAll(K.K_TYPE, K.K_INTERFACE, K.K_TRAIT, K.K_CLASS, K.K_RECORD, K.K_ENUM, K.K_DEF,
+        K.ANNOTATION, K.K_EXTENSION, K.K_INSTANCE)
+      return topLevelElement()
+    }
+    // An annotation opens a fun_decl only when what follows can continue one (another
+    // annotation, or `def`); anything else — `@Override void m()`, `@A static def f()` —
+    // must fail AT the annotation token, where the misplacement hints read it.
+    if (k == K.ANNOTATION && kind(2) != K.ANNOTATION && kind(2) != K.K_DEF) {
+      recordExpectedAll(K.K_TYPE, K.K_INTERFACE, K.K_TRAIT, K.K_CLASS, K.K_RECORD, K.K_ENUM, K.K_DEF, K.K_VAL, K.K_VAR)
+      throw fail
+    }
     val mset = if (isModifierKind(k)) modifiers() else 0
     kind(1) match {
       case K.K_TYPE => typeAliasDecl(mset)
       case K.K_INTERFACE | K.K_TRAIT | K.K_CLASS | K.K_RECORD | K.K_ENUM => typeDecl(mset)
       case K.K_DEF | K.ANNOTATION => funDecl(mset)
       case K.K_VAL | K.K_VAR => varDecl(mset)
-      case _ => throw fail
+      case _ =>
+        recordExpectedAll(K.K_TYPE, K.K_INTERFACE, K.K_TRAIT, K.K_CLASS, K.K_RECORD, K.K_ENUM, K.K_DEF, K.ANNOTATION, K.K_VAL, K.K_VAR)
+        throw fail
     }
   }
 
@@ -535,7 +765,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def varDecl(modifiers: Int): AST.GlobalVariableDeclaration = {
     enterSection()
-    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else throw fail
+    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else { recordExpectedAll(K.K_VAL, K.K_VAR); throw fail }
     val name = id()
     expect(K.COLON)
     val ty = typ()
@@ -633,7 +863,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case K.K_CLASS => classDecl(modifiers)
     case K.K_RECORD => recordDecl(modifiers)
     case K.K_ENUM => enumDecl(modifiers)
-    case _ => throw fail
+    case _ =>
+      recordExpectedAll(K.K_INTERFACE, K.K_TRAIT, K.K_CLASS, K.K_RECORD, K.K_ENUM)
+      throw fail
   }
 
   // ---------------------------------------------------------------- blocks & modifiers
@@ -657,7 +889,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def blockElements(): List[AST.BlockElement] = {
     val elements = new ArrayBuffer[AST.BlockElement]()
-    if (!blockElementFollows()) throw fail
+    // A block whose first token already ends it (`else`, `case`, EOF where a statement should
+    // be) reports the enclosing block's closing brace as expected — the dangling-else hint
+    // reads the `else` this leaves as the found token.
+    if (!blockElementFollows()) { recordExpected(K.RBRACE); throw fail }
     while (blockElementFollows()) {
       elements += blockElement()
       eols()
@@ -668,7 +903,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def modifiers(): Int = {
     var mset = 0
     val k0 = kind(1)
-    if (!isModifierKind(k0)) throw fail
+    if (!isModifierKind(k0)) {
+      recordExpectedAll(K.K_FINAL, K.K_INTERNAL, K.K_VOLATILE, K.K_ABSTRACT, K.K_SYNCHRONIZED, K.K_STATIC, K.K_OVERRIDE, K.K_SEALED)
+      throw fail
+    }
     next()
     mset = modifierBit(k0)
     var going = true
@@ -693,6 +931,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       mset = if (isModifierKind(kind(1))) modifiers() else 0
       members += memberDecl(mset)
     }
+    recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF, K.ANNOTATION)
     AST.AccessSection(location, AST.M_PRIVATE, members.toList)
   }
 
@@ -702,7 +941,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case K.K_PUBLIC => AST.M_PUBLIC
       case K.K_PROTECTED => AST.M_PROTECTED
       case K.K_PRIVATE => AST.M_PRIVATE
-      case _ => throw fail
+      case _ =>
+        recordExpectedAll(K.K_PUBLIC, K.K_PROTECTED, K.K_PRIVATE)
+        throw fail
     }
     expect(K.COLON)
     val members = new ArrayBuffer[AST.MemberDeclaration]()
@@ -710,6 +951,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val mset = if (isModifierKind(kind(1))) modifiers() else 0
       members += memberDecl(mset)
     }
+    recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF, K.ANNOTATION)
     AST.AccessSection(p(t), sectionType, members.toList)
   }
 
@@ -719,8 +961,15 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case K.K_VAL | K.K_VAR => fieldDecl(mset)
     case K.K_FORWARD => delegateDecl(mset)
     case K.K_DEF if image(2) == "this" => constructorDecl(mset)
+    // An annotation opens a method only when another annotation or `def` follows; a
+    // `@Override void m()` must fail AT the annotation token, where its hint reads it.
+    case K.ANNOTATION if kind(2) != K.ANNOTATION && kind(2) != K.K_DEF =>
+      recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF)
+      throw fail
     case K.K_DEF | K.ANNOTATION => methodDecl(mset)
-    case _ => throw fail
+    case _ =>
+      recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF, K.ANNOTATION)
+      throw fail
   }
 
   // ---------------------------------------------------------------- type declarations
@@ -748,6 +997,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     var ty1: AST.TypeNode = null
     var superArgs: List[AST.Expression] = null
+    // Record the not-taken optional clauses' keywords (JavaCC's choice points do): a later
+    // failure at this same token then lists `extends`/`{` as expected, which the old-extends
+    // and Python-colon-block hints classify from (`class A : B`, `class Foo:`).
+    if (kind(1) != K.K_EXTENDS) recordExpected(K.K_EXTENDS)
     if (accept(K.K_EXTENDS)) {
       ty1 = typ()
       if (kind(1) == K.LPAREN) { next(); superArgs = terms(); expect(K.RPAREN) }
@@ -764,9 +1017,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       next()
       if (kind(1) != K.RBRACE && !isAccessSectionStart(kind(1))) sec1 = defaultSection()
       while (isAccessSectionStart(kind(1))) sec2s += accessSection()
+      recordExpectedAll(K.K_PUBLIC, K.K_PROTECTED, K.K_PRIVATE)
       expect(K.RBRACE)
       accept(K.SEMI)
     } else if (kind(1) == K.SEMI) next()
+    else recordExpectedAll(K.LBRACE, K.SEMI)
     val hasPrimary = primaryParams != null || superArgs != null
     if (primaryParams == null && superArgs != null) {
       primaryParams = new ArrayBuffer[AST.Argument]()
@@ -1018,7 +1273,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case K.K_FLOAT => AST.KFloat
     case K.K_DOUBLE => AST.KDouble
     case K.K_BOOLEAN => AST.KBoolean
-    case _ => throw fail
+    case _ =>
+      recordExpectedAll(K.K_BYTE, K.K_SHORT, K.K_CHAR, K.K_INT, K.K_LONG, K.K_FLOAT, K.K_DOUBLE, K.K_BOOLEAN)
+      throw fail
   }
 
   private def basicType(): AST.TypeNode = {
@@ -1034,13 +1291,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def dottedClassType(): AST.TypeNode = {
     var n = id()
     val sb = new java.lang.StringBuilder(c(n))
-    if (kind(1) != K.DOT) throw fail
+    if (kind(1) != K.DOT) { recordExpected(K.DOT); throw fail }
     while (kind(1) == K.DOT) { next(); n = id(); sb.append('.').append(c(n)) }
     AST.TypeNode(p(n), AST.ReferenceType(sb.toString, true), false)
   }
 
   private def boxedClassType(): AST.TypeNode = {
-    if (!isBasicKind(kind(1))) throw fail
+    if (!isBasicKind(kind(1))) {
+      recordExpectedAll(K.K_BYTE, K.K_SHORT, K.K_CHAR, K.K_INT, K.K_LONG, K.K_FLOAT, K.K_DOUBLE, K.K_BOOLEAN)
+      throw fail
+    }
     val t = next()
     AST.TypeNode(p(t), AST.ReferenceType(boxedNames.getOrElse(t.image, t.image), true), false)
   }
@@ -1237,7 +1497,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def delegateDecl(modifiers: Int): AST.DelegatedFieldDeclaration = {
     enterSection()
     val start = expect(K.K_FORWARD)
-    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else throw fail
+    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else { recordExpectedAll(K.K_VAL, K.K_VAR); throw fail }
     val name = id()
     expect(K.COLON)
     val ty = typ()
@@ -1249,7 +1509,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def fieldDecl(modifiers: Int): AST.FieldDeclaration = {
     enterSection()
-    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else throw fail
+    val keyword = if (kind(1) == K.K_VAL || kind(1) == K.K_VAR) next() else { recordExpectedAll(K.K_VAL, K.K_VAR); throw fail }
     val name = id()
     expect(K.COLON)
     val ty = typ()
@@ -1271,7 +1531,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         case K.K_FOR => forExpression()
         case K.K_FOREACH => foreachExpression()
         case K.K_DO if kind(2) == K.LBRACE => doWhileExpression()
-        case _ => throw fail
+        case _ =>
+          recordExpectedAll(K.K_WHILE, K.K_FOR, K.K_FOREACH, K.K_DO)
+          throw fail
       }
       return AST.LabeledLoop(p(lbl), c(lbl), lp)
     }
@@ -1302,7 +1564,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       next()
       val names = new ArrayBuffer[String]()
       names += c(id())
-      if (kind(1) != K.COMMA) throw fail
+      if (kind(1) != K.COMMA) { recordExpected(K.COMMA); throw fail }
       while (accept(K.COMMA)) names += c(id())
       expect(K.RPAREN)
       expect(K.ASSIGN)
@@ -1617,7 +1879,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case K.K_VAL | K.K_VAR =>
       localVarDeclaration() match {
         case d: AST.LocalVariableDeclaration => AST.ForInitDeclaration(d)
-        case _ => throw fail
+        case _ => throw fail // unreachable: localVarDeclaration() always returns a LocalVariableDeclaration
       }
     case K.SEMI => AST.ForInitEmpty(p(next()))
     case _ => AST.ForInitExpression(expressionElement())
@@ -1657,7 +1919,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def assignable(): AST.Expression = {
     var a = pipeline()
     val k = kind(1)
-    if (isAssignOp(k)) {
+    // Two tokens on purpose, like the grammar's LOOKAHEAD(2): `x => y` must fail at the
+    // `=`, not after consuming it, for the old-arrow hint to see the `=>`. An assignment
+    // commits only when what follows the operator can continue one (a value, or a newline
+    // the `eols()` below swallows).
+    if (isAssignOp(k) && (kind(2) == K.EOL || isTermStart(kind(2)))) {
       next()
       eols()
       val b = expression()
@@ -1676,7 +1942,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         case K.LSHIFTEQ => AST.LeftShiftAssignment(loc, a, b)
         case K.RSHIFTEQ => AST.MathRightShiftAssignment(loc, a, b)
         case K.URSHIFTEQ => AST.LogicalRightShiftAssignment(loc, a, b)
-        case _ => throw fail
+        case _ => throw fail // unreachable: exhaustive over isAssignOp's kinds
       }
     }
     a
@@ -1703,7 +1969,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case s: AST.MemberSelection => new AST.MethodCall(loc, s.target, s.name, List(value))
     case c: AST.StaticMethodCall => AST.StaticMethodCall(loc, c.typeRef, c.name, value +: c.args, c.typeArgs)
     case s: AST.StaticMemberSelection => new AST.StaticMethodCall(loc, s.typeRef, s.name, List(value))
-    case _ => throw fail
+    case _ => throw fail // a semantic check on the already-parsed rhs shape, not a token expectation
   }
 
   private def logicalOr(): AST.Expression = {
@@ -1877,7 +2143,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           val t = next(); e = AST.NotNullAssertion(p(t), e)
         case K.MINUSMINUS =>
           val t = next(); noteAssigned(e); e = AST.PostDecrement(p(t), e)
-        case _ => throw fail
+        case _ =>
+          recordExpectedAll(K.LBRACKET, K.SAFE_INDEX, K.DOT, K.SAFE_ACCESS, K.K_AS, K.PLUSPLUS, K.NOT_NULL, K.MINUSMINUS)
+          throw fail
       }
     }
     e
@@ -2155,7 +2423,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       case K.K_TRUE => AST.BooleanLiteral(p(next()), true)
       case K.K_FALSE => AST.BooleanLiteral(p(next()), false)
       case K.K_NULL => AST.NullLiteral(p(next()))
-      case _ => throw fail
+      case _ =>
+        recordExpectedAll(K.ID, K.QUOTED_ID, K.LBRACKET, K.LPAREN, K.K_NEW, K.K_SELF, K.K_THIS,
+          K.INTEGER, K.FLOAT, K.CHARACTER, K.STRING, K.MULTI_LINE_STRING,
+          K.RE_STRING, K.FILE_STRING, K.HTTP_STRING, K.SCHEME_STRING, K.K_TRUE, K.K_FALSE, K.K_NULL)
+        throw fail
     }
   }
 
@@ -2282,6 +2554,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       expect(K.RBRACKET)
       AST.MapLiteral(p(t), entries.toList)
     } else {
+      // The map alternative's `:` stays in the expected set at this decision point (a Ruby
+      // `["k" => "v"]` fails right here, and its diagnostic must say `:` was possible so the
+      // old-lambda-arrow hint knows not to fire).
+      recordExpected(K.COLON)
       val elems = new ArrayBuffer[AST.Expression]()
       elems += first
       while (accept(K.COMMA)) { eols(); elems += argumentExpr() }
@@ -2376,9 +2652,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         a
       } else {
         // No arrow: a zero-parameter lambda. The slips that have hints (`{ (k, v) -> }`,
-        // `{ x => }`, `switch (x) { case ... }`) are left to the JavaCC parser, which reports
-        // them at the `{`.
-        if (kind(1) == K.K_CASE || parenthesizedLambdaHeadAhead() || oldArrowLambdaHeadAhead()) throw fail
+        // `{ x => }`, `switch (x) { case ... }`) are reported at the `{`, expecting `->`,
+        // exactly where their classifier cases read them (the grammar throws the same
+        // synthetic diagnostic here).
+        if (kind(1) == K.K_CASE || parenthesizedLambdaHeadAhead() || oldArrowLambdaHeadAhead()) {
+          adoptFailureAt(t, K.ARROW)
+          throw fail
+        }
         Nil
       }
     enterOperand()
@@ -2492,7 +2772,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           if (isPlainIdentifier(exprStr)) AST.Id(Location(line, col, line, col + exprStr.length - 1), exprStr)
           else {
             val sub = new OnionParser(exprStr, line - 1, col - 1)
-            val parsed = try sub.term() catch { case _: Exception => throw fail }
+            val parsed = try sub.term() catch {
+              case _: Exception =>
+                sub.deepestFailure().foreach { case (subLoc, foundImage, kinds) => adoptFailure(subLoc, foundImage, kinds) }
+                throw fail
+            }
             needsBodyRewrite |= sub.needsBodyRewrite
             parsed
           }

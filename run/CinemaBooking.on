@@ -12,14 +12,16 @@ enum SeatType {
 }
 
 // ── Records ───────────────────────────────────────────────────────────────────
-record Movie(title: String, genre: String, durationMin: Int)
+record Movie(title: String, genre: String, durationMin: Int) {
   example { new Movie("T", "Drama", 120).durationMin() == 120 }
   example { new Movie("T", "Drama", 120).genre() == "Drama" }
+}
 
-record Booking(movie: Movie, seat: SeatType, customer: String, basePrice: Int)
+record Booking(movie: Movie, seat: SeatType, customer: String, basePrice: Int) {
   example {
     new Booking(new Movie("X", "Action", 90), new Standard(), "Alice", 1200).basePrice() == 1200
   }
+}
 
 record MovieStat(title: String, genre: String, count: Int, revenue: Int)
 

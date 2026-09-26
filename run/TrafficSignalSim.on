@@ -48,9 +48,8 @@ extension String {
 
 // ─── record with examples and a body ─────────────────────────────────────────
 
-record CycleStats(redTicks: Int, yellowTicks: Int, greenTicks: Int, cycles: Int)
+record CycleStats(redTicks: Int, yellowTicks: Int, greenTicks: Int, cycles: Int) {
   example totalMatches { new CycleStats(3, 1, 5, 1).totalTicks() == 9 }
-{
 public:
   def totalTicks(): Int = self.redTicks() + self.yellowTicks() + self.greenTicks()
 

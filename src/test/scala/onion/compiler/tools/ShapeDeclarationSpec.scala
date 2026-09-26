@@ -19,8 +19,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("parses through the named shape") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
@@ -37,8 +38,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("prints back, and satisfies parse(print(v)) == Ok(v)") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -56,9 +58,10 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
       // The thing `from re"..."` structurally cannot do.
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape v1 = re"(-?\d+),(-?\d+)"
           |  shape v2 = re"x=(-?\d+) y=(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -76,8 +79,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("distinguishes a non-match from a broken field") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(\w+),(\w+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -95,8 +99,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("reports every broken field at once") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(\w+),(\w+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
@@ -111,8 +116,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
       // What parseAll cannot do: it drops the bad lines without trace.
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -131,8 +137,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("rejects a capture-group / component-count mismatch") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape bad = re"(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -144,8 +151,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     it("rejects a malformed regex literal") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape bad = re"([unclosed"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -161,8 +169,9 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
       // caller meets "method not found"; a shape answers the question directly.
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape loose = re"(-?\d+)\s+(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {

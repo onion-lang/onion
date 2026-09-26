@@ -33,12 +33,14 @@ public:
 }
 
 // ─── Records ──────────────────────────────────────────────────────────────────
-record Job(id: Int, name: String, priority: Int, estimatedMs: Int)
+record Job(id: Int, name: String, priority: Int, estimatedMs: Int) {
   example { new Job(1, "compile", 9, 4000).priority() == 9 }
   example { new Job(2, "lint", 3, 1200).estimatedMs() == 1200 }
+}
 
-record Worker(id: Int, name: String, capacity: Int)
+record Worker(id: Int, name: String, capacity: Int) {
   example { new Worker(1, "runner-a", 2).capacity() == 2 }
+}
 
 record RunResult(job: Job, state: JobState)
 
@@ -48,9 +50,10 @@ record QueueSummary(
   failed: Int,
   pending: Int,
   totalMs: Int
-)
+) {
   example { new QueueSummary(10, 7, 1, 2, 5000).succeeded() == 7 }
   example { new QueueSummary(10, 7, 1, 2, 5000).failed() + 9 == 10 }
+}
 
 // ─── Extension methods ────────────────────────────────────────────────────────
 extension Int {

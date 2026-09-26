@@ -144,9 +144,10 @@ A record can carry `law` and `example` clauses that the **compiler runs at build
 time** — the specification lives in the language, not a separate test suite:
 
 ```onion
-record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
   example { Pt::parse("3,4") == new Pt(3, 4) }
+}
 ```
 
 `example { e }` must evaluate to `true`. `law name(p: T) { e }` is property-checked:

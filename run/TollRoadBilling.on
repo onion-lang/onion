@@ -27,8 +27,9 @@ public:
 // A toll-gate log line: gate name, vehicle class name, plate, HH:MM, distance
 // in km. `shape line` names the boundary so a plain-text field can be parsed
 // and a broken line reported without stopping the whole batch.
-record TollPass(gate: String, vehicleClass: String, plate: String, hour: Int, minute: Int, km: Int)
+record TollPass(gate: String, vehicleClass: String, plate: String, hour: Int, minute: Int, km: Int) {
   shape line = re"(\S+) (\w+) (\S+) (\d{2}):(\d{2}) (\d+)"
+}
 
 record Bill(plate: String, vehicleClass: VehicleClass, gate: String, fee: Double) {
 public:

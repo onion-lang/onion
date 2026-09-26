@@ -22,17 +22,19 @@ for a line that is not an access log entry at all.
 ## Declaring a shape
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 ```
 
 `shape name = ...` gives the boundary a name, so a record can carry as many as it needs:
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
   shape tabbed = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
   shape doc    = json
+}
 ```
 
 `shape` is a soft keyword — it stays usable as an ordinary identifier.
@@ -89,8 +91,9 @@ Not every pattern can print. `\s+` as a separator has no unique rendering — ho
 spaces? — so such a shape is read-only and says so:
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape loose = re"(-?\d+)\s+(-?\d+)"
+}
 
 Pt::loose().canPrint()     // false
 ```
@@ -120,8 +123,9 @@ Naming a format instead of a pattern reads a structured document, with the compo
 as keys:
 
 ```onion
-record Person(name: String, age: Int)
+record Person(name: String, age: Int) {
   shape doc = json
+}
 
 Person::doc().parse("{\"age\": 30}")
 //   name: expected String, found absent
@@ -157,13 +161,14 @@ not consume: comments, blank lines, key order, spacing, unknown keys, and the or
 spelling of every value. `printLossless` reassembles the two:
 
 ```onion
-record Server(host: String, port: Int, debug: Boolean)
+record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
   example l2 {
     val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
     val r = Server::cfg().parseLossless(t).get()
     Server::cfg().printLossless(r.value(), r.residue()) == t
   }
+}
 ```
 
 The `example` clause is the point: L2 is not a comment, it is machine-checked at build
@@ -198,9 +203,10 @@ runs this as a tool, so `--plan` shows the read and the write before anything ha
 `law` runs at compile time, so the round-trip property can be machine-checked:
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+}
 ```
 
 A law whose parameter type cannot be sampled is an error (E0074), not a silent skip — a

@@ -1,0 +1,402 @@
+// SmartFarm.on — IoT crop-monitoring simulation
+// Exercises: records (with from-regex, example), data-carrying enums, ADT enums,
+// classes, interfaces, collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find/partition/zip), select/pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, while, foreach (ranges and map
+// entries), |> pipeline.
+
+import {
+  java.util.*
+}
+
+// ─── Simple enums ────────────────────────────────────────────────────────────
+
+enum CropType { Wheat, Corn, Soybean, Tomato, Lettuce }
+
+enum SensorKind { Temperature, Humidity, SoilMoisture, Ph, Luminosity }
+
+// ─── Data-carrying enum ───────────────────────────────────────────────────────
+
+enum AlertLevel(code: String, label: String, priority: Int) {
+  Critical("C", "CRITICAL", 3),
+  Warning("W", "WARNING",  2),
+  Normal("N",  "OK",       1)
+}
+
+// ─── ADT enum ─────────────────────────────────────────────────────────────────
+
+enum SensorAlert {
+  case OverRange(sensorId: String, value: Double, limit: Double)
+  case UnderRange(sensorId: String, value: Double, limit: Double)
+  case Nominal
+public:
+  def level(): AlertLevel = select this {
+    case a is OverRange:  AlertLevel::Critical
+    case a is UnderRange: AlertLevel::Warning
+    case a is Nominal:    AlertLevel::Normal
+  }
+  def describe(): String = select this {
+    case a is OverRange:
+      "#{a.sensorId()} OVER #{a.value()} (limit #{a.limit()})"
+    case a is UnderRange:
+      "#{a.sensorId()} UNDER #{a.value()} (min #{a.limit()})"
+    case a is Nominal:
+      "nominal"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record SensorSpec(kind: SensorKind, unit: String, minVal: Double, maxVal: Double) {
+public:
+  def rangeLabel(): String = "#{minVal()}–#{maxVal()} #{unit()}"
+  def check(sensorId: String, v: Double): SensorAlert = {
+    if v > maxVal() { new OverRange(sensorId, v, maxVal()) }
+    else if v < minVal() { new UnderRange(sensorId, v, minVal()) }
+    else { new Nominal() }
+  }
+}
+
+// Raw log line: "sensorId value timestamp" — parsed via regex
+record RawReading(sensorId: String, value: Double, ts: Long)
+  from re"(\S+) ([\d.]+) (\d+)"
+  example { RawReading::parse("zone1-T 22.5 1700000000") != null }
+
+record Reading(sensorId: String, kind: SensorKind, value: Double, ts: Long) {
+public:
+  def label(): String = "#{sensorId()} #{value()}"
+}
+
+record Zone(id: String, name: String, crop: CropType, areaSqm: Double, sensorIds: List[String]) {
+public:
+  def shortInfo(): String = "#{id()} #{name()} (#{crop()}, #{areaSqm()} m²)"
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── Sensor registry ─────────────────────────────────────────────────────────
+
+class SensorRegistry {
+  val specsByid: Map[String, SensorSpec]
+  val kindById:  Map[String, SensorKind]
+
+public:
+  def this {
+    specsByid = [:]
+    kindById  = [:]
+  }
+
+  def register(sensorId: String, kind: SensorKind, unit: String, minV: Double, maxV: Double): void {
+    val spec = new SensorSpec(kind, unit, minV, maxV)
+    specsByid[sensorId] = spec
+    kindById[sensorId]  = kind
+  }
+
+  def specFor(sensorId: String): SensorSpec? =
+    if specsByid.containsKey(sensorId) { specsByid.get(sensorId) as SensorSpec }
+    else { null }
+
+  def kindFor(sensorId: String): SensorKind? =
+    if kindById.containsKey(sensorId) { kindById.get(sensorId) as SensorKind }
+    else { null }
+
+  def size(): Int = specsByid.size
+}
+
+// ─── Farm controller ─────────────────────────────────────────────────────────
+
+class FarmController conforms Reportable {
+  val registry: SensorRegistry
+  val zones:    List[Zone]
+  val readings: List[Reading]
+
+public:
+  def this(reg: SensorRegistry) {
+    registry = reg
+    zones    = []
+    readings = []
+  }
+
+  def addZone(z: Zone): void { zones.add(z) }
+
+  def zones(): List[Zone] = zones
+  def readings(): List[Reading] = readings
+
+  def ingestRaw(line: String): Boolean = {
+    val raw: RawReading? = RawReading::parse(line)
+    if raw == null { return false }
+    val kind: SensorKind? = registry.kindFor(raw.sensorId())
+    if kind == null { return false }
+    readings.add(new Reading(raw.sensorId(), kind, raw.value(), raw.ts()))
+    true
+  }
+
+  def readingsFor(sensorId: String): List[Reading] =
+    readings.filter { r -> (r as Reading).sensorId() == sensorId }
+
+  def allAlerts(): List[SensorAlert] =
+    readings
+      .map { r ->
+        val rd = r as Reading
+        val spec: SensorSpec? = registry.specFor(rd.sensorId())
+        if spec == null { new Nominal() as SensorAlert }
+        else { spec.check(rd.sensorId(), rd.value()) }
+      }
+      .filter { a -> (a as SensorAlert).level().priority() >= AlertLevel::Warning.priority() }
+
+  def zoneOf(sensorId: String): Zone? = {
+    var result: Zone? = null
+    foreach z: Zone in zones {
+      if z.sensorIds().contains(sensorId) { result = z }
+    }
+    result
+  }
+
+  def avgValue(sensorId: String): Double = {
+    val rs = readingsFor(sensorId)
+    if rs.size == 0 { return 0.0 }
+    val sum = rs.fold(0.0) { acc, r -> (acc as Double) + (r as Reading).value() }
+    (sum as Double) / rs.size
+  }
+
+  def minValue(sensorId: String): Double = {
+    val rs = readingsFor(sensorId)
+    if rs.size == 0 { return 0.0 }
+    var m = (rs[0] as Reading).value()
+    foreach r: Reading in rs {
+      val v = r.value()
+      if v < m { m = v }
+    }
+    m
+  }
+
+  def maxValue(sensorId: String): Double = {
+    val rs = readingsFor(sensorId)
+    if rs.size == 0 { return 0.0 }
+    var m = (rs[0] as Reading).value()
+    foreach r: Reading in rs {
+      val v = r.value()
+      if v > m { m = v }
+    }
+    m
+  }
+
+  def totalReadings(): Int = readings.size
+  def zoneCount():    Int = zones.size
+
+  def report(): String =
+    "FarmController: #{zoneCount()} zones, #{totalReadings()} readings, #{registry.size()} sensors"
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def fmtDouble(v: Double): String = {
+  val i = v as Int
+  val frac = ((v - i) * 10.0) as Int
+  "#{i}.#{frac}"
+}
+
+def separator(): void {
+  println("─────────────────────────────────────────")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val reg = new SensorRegistry()
+
+reg.register("z1-T",  SensorKind::Temperature, "°C",  5.0, 35.0)
+reg.register("z1-H",  SensorKind::Humidity,    "%",  30.0, 90.0)
+reg.register("z1-SM", SensorKind::SoilMoisture,"%",  20.0, 80.0)
+reg.register("z2-T",  SensorKind::Temperature, "°C",  5.0, 30.0)
+reg.register("z2-H",  SensorKind::Humidity,    "%",  40.0, 95.0)
+reg.register("z2-PH", SensorKind::Ph,          "pH",  6.0,  7.5)
+reg.register("z3-T",  SensorKind::Temperature, "°C",  8.0, 28.0)
+reg.register("z3-LX", SensorKind::Luminosity,  "klx", 5.0, 80.0)
+
+val farm = new FarmController(reg)
+
+farm.addZone(new Zone("Z1", "North Field", CropType::Wheat,   4200.0, ["z1-T", "z1-H", "z1-SM"]))
+farm.addZone(new Zone("Z2", "South Field", CropType::Tomato,  1800.0, ["z2-T", "z2-H", "z2-PH"]))
+farm.addZone(new Zone("Z3", "Greenhouse",  CropType::Lettuce,  350.0, ["z3-T", "z3-LX"]))
+
+// Simulated sensor log lines
+val lines: List[String] = [
+  "z1-T 22.3 1700000100",
+  "z1-H 65.0 1700000100",
+  "z1-SM 45.0 1700000100",
+  "z2-T 28.5 1700000100",
+  "z2-H 72.0 1700000100",
+  "z2-PH 6.8 1700000100",
+  "z3-T 24.0 1700000100",
+  "z3-LX 40.0 1700000100",
+  "z1-T 36.1 1700000200",    // over max -> Critical
+  "z1-H 28.5 1700000200",    // under min -> Warning
+  "z1-SM 50.0 1700000200",
+  "z2-T 29.9 1700000200",
+  "z2-H 88.0 1700000200",
+  "z2-PH 7.1 1700000200",
+  "z3-T 15.0 1700000200",
+  "z3-LX 3.8 1700000200",    // under min -> Warning
+  "z1-T 23.0 1700000300",
+  "z1-H 60.0 1700000300",
+  "z1-SM 55.0 1700000300",
+  "z2-T 27.0 1700000300",
+  "z2-H 80.0 1700000300",
+  "z2-PH 6.5 1700000300",
+  "z3-T 25.5 1700000300",
+  "z3-LX 55.0 1700000300",
+  "bad-format-line",           // rejected: no match
+  "z99-unknown 10.0 1700000"   // rejected: sensor not registered
+]
+
+var ingested = 0
+var rejected = 0
+foreach line: String in lines {
+  if farm.ingestRaw(line) { ingested++ } else { rejected++ }
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+println("╔═══════════════════════════════════════╗")
+println("║    SMART FARM MONITORING REPORT       ║")
+println("╚═══════════════════════════════════════╝")
+println("Sensors registered : #{reg.size()}")
+println("Zones              : #{farm.zoneCount()}")
+println("Readings ingested  : #{ingested}")
+println("Lines rejected     : #{rejected}")
+
+// ─── Zone overview ────────────────────────────────────────────────────────────
+separator()
+println("ZONE OVERVIEW")
+separator()
+foreach z: Zone in farm.zones() {
+  println("  #{z.shortInfo()}")
+}
+
+// ─── Sensor stats per zone ────────────────────────────────────────────────────
+separator()
+println("SENSOR STATS")
+separator()
+foreach z: Zone in farm.zones() {
+  println("  Zone: #{z.name()}")
+  foreach sid: String in z.sensorIds() {
+    val spec: SensorSpec? = reg.specFor(sid)
+    val kindLabel = if spec != null { (spec as SensorSpec).kind().toString() } else { "?" }
+    val avg = farm.avgValue(sid)
+    val mn  = farm.minValue(sid)
+    val mx  = farm.maxValue(sid)
+    println("    #{sid}  #{kindLabel}  avg=#{fmtDouble(avg)}  min=#{fmtDouble(mn)}  max=#{fmtDouble(mx)}")
+  }
+}
+
+// ─── Active alerts ────────────────────────────────────────────────────────────
+separator()
+println("ACTIVE ALERTS")
+separator()
+val alerts: List[SensorAlert] = farm.allAlerts()
+if alerts.size == 0 {
+  println("  No alerts.")
+} else {
+  foreach a: SensorAlert in alerts {
+    println("  [#{a.level().label()}] #{a.describe()}")
+  }
+}
+val critCount = alerts.filter { a -> (a as SensorAlert).level() == AlertLevel::Critical }.size
+val warnCount = alerts.filter { a -> (a as SensorAlert).level() == AlertLevel::Warning  }.size
+println("  Critical: #{critCount}  Warning: #{warnCount}  Total: #{alerts.size}")
+
+// ─── Select on alert level ────────────────────────────────────────────────────
+separator()
+println("ALERT CLASSIFICATION")
+foreach a: SensorAlert in alerts {
+  val msg = select a.level() {
+    case AlertLevel::Critical: "!! IMMEDIATE ACTION REQUIRED"
+    case AlertLevel::Warning:  "!  Check soon"
+    case AlertLevel::Normal:   "   All clear"
+  }
+  println("  #{msg}: #{a.describe()}")
+}
+
+// ─── Crop distribution via groupBy ───────────────────────────────────────────
+separator()
+println("CROP DISTRIBUTION")
+separator()
+val byCrop = farm.zones().groupBy { z -> (z as Zone).crop().toString() }
+foreach (k, v) in byCrop {
+  val zoneList = v as List[Zone]
+  println("  #{k}: #{zoneList.size} zone(s)")
+}
+
+// ─── Largest zone by area ──────────────────────────────────────────────────────
+val sortedZones: List[Zone] =
+  farm.zones().sortedBy { z -> 0.0 - (z as Zone).areaSqm() }
+val biggest: Zone = sortedZones[0] as Zone
+println("")
+println("Largest zone: #{biggest.name()} (#{biggest.areaSqm()} m²)")
+
+// ─── All distinct sensor IDs across zones ────────────────────────────────────
+val allSensorIds: List[String] =
+  farm.zones()
+    .map { z -> (z as Zone).sensorIds() }
+    .flatten()
+println("Distinct sensor IDs: #{allSensorIds.distinct().size}")
+
+// ─── Try-catch: bad parse should not crash ────────────────────────────────────
+try {
+  val bad: RawReading? = RawReading::parse("not valid")
+  println("bad parse returned null: #{bad == null}")
+} catch e: Exception {
+  println("unexpected exception: #{e.message()}")
+}
+
+// ─── Recursive alert counter ──────────────────────────────────────────────────
+def countAtPriority(list: List[SensorAlert], minPri: Int, idx: Int): Int = {
+  if idx >= list.size { return 0 }
+  val a = list[idx] as SensorAlert
+  val hit = if a.level().priority() >= minPri { 1 } else { 0 }
+  hit + countAtPriority(list, minPri, idx + 1)
+}
+
+val highCount = countAtPriority(alerts, AlertLevel::Warning.priority(), 0)
+println("High-priority alert count (recursive): #{highCount}")
+
+// ─── Partition readings by threshold ─────────────────────────────────────────
+separator()
+println("TEMPERATURE READINGS — above/below 25°C")
+val tempReadings: List[Reading] = farm.readings().filter { r ->
+  (r as Reading).kind() == SensorKind::Temperature
+}
+val tempParts = tempReadings.partition { r -> (r as Reading).value() > 25.0 }
+val hot:  List[Reading] = tempParts[0] as List[Reading]
+val cool: List[Reading] = tempParts[1] as List[Reading]
+println("  Above 25°C: #{hot.size}  At/below: #{cool.size}")
+
+// ─── Zip zones with sensor counts ─────────────────────────────────────────────
+separator()
+println("ZONES WITH SENSOR COUNT")
+val zoneList:  List[Zone] = farm.zones()
+val sensorCounts: List[Int] = zoneList.map { z -> (z as Zone).sensorIds().size }
+val zipped = zoneList.zip(sensorCounts)
+foreach pair: Object in zipped {
+  val p = pair as List[Object]
+  val z = p[0] as Zone
+  val n = p[1] as Int
+  println("  #{z.name()}: #{n} sensor(s)")
+}
+
+// ─── |> pipeline: sorted alert descriptions ──────────────────────────────────
+separator()
+println("ALERT DESCRIPTIONS (sorted)")
+val descs: List[String] =
+  alerts
+    .sortedBy { a -> 0 - (a as SensorAlert).level().priority() }
+    .map { a -> (a as SensorAlert).describe() }
+descs |> println
+
+// ─── Done ─────────────────────────────────────────────────────────────────────
+separator()
+println(farm.report())
+println("Report complete.")

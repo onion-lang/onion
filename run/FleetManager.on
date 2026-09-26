@@ -55,11 +55,13 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record TripEntry(vehicleId: String, distanceKm: Double, fuelUsedL: Double, driver: String)
+record TripEntry(vehicleId: String, distanceKm: Double, fuelUsedL: Double, driver: String) {
   example { new TripEntry("X", 10.0, 1.0, "A").distanceKm() > 0.0 }
+}
 
-record MaintenanceEntry(vehicleId: String, description: String, costUsd: Double, mileage: Int)
+record MaintenanceEntry(vehicleId: String, description: String, costUsd: Double, mileage: Int) {
   example { new MaintenanceEntry("X", "Oil", 50.0, 1000).costUsd() >= 0.0 }
+}
 
 record FleetStats(totalVehicles: Int, activeCount: Int, totalDistanceKm: Double,
                   avgFuelEffKmL: Double, totalMaintenanceCost: Double)

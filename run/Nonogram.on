@@ -45,11 +45,10 @@ extension String {
 
 // ─── Clue: run-lengths for one row or column ─────────────────────────────────
 
-record Clue(groups: List[Int])
+record Clue(groups: List[Int]) {
   example { new Clue([3, 2]).minLength() == 6 }
   example { new Clue([]).minLength() == 0 }
   example { new Clue([1]).minLength() == 1 }
-{
 public:
   def minLength(): Int {
     if groups().isEmpty() { return 0 }

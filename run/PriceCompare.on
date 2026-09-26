@@ -29,14 +29,17 @@ enum Discount {
 
 // ── Records ───────────────────────────────────────────────────────────────────
 
-record Store(id: Int, name: String, category: StoreCategory)
+record Store(id: Int, name: String, category: StoreCategory) {
   example { new Store(1, "MegaMart", StoreCategory::RETAIL).category() == StoreCategory::RETAIL }
+}
 
-record Product(sku: String, name: String, basePrice: Int)
+record Product(sku: String, name: String, basePrice: Int) {
   example { new Product("P001", "Widget", 1000).basePrice() > 0 }
+}
 
-record Listing(store: Store, product: Product, price: Int, discount: Discount)
+record Listing(store: Store, product: Product, price: Int, discount: Discount) {
   example { new Listing(new Store(1,"S",StoreCategory::ONLINE), new Product("X","Y",100), 999, new None()).price() == 999 }
+}
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 

@@ -1,0 +1,327 @@
+// DistributedTrace.on — distributed-tracing system (OpenTelemetry-inspired)
+// Exercises: records with law/example, ADT enums with methods, data-carrying
+// enums, classes, interfaces, generics, extension methods (Long/String/List),
+// collection pipelines (map/filter/fold/groupBy/sortedBy/find/partition/zip),
+// select/pattern matching with exhaustiveness, nullable, do notation (Option),
+// |> pipelines, foreach (range and map k,v), while, try/catch,
+// string interpolation, closures, recursion.
+
+import {
+  java.util.*
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SpanStatus {
+  case Ok
+  case Error(message: String)
+  case Timeout(limitMs: Long)
+public:
+  def label(): String = select this {
+    case s is Ok:      "OK"
+    case e is Error:   "ERR:" + e.message()
+    case t is Timeout: "TIMEOUT(#{t.limitMs()}ms)"
+  }
+  def isOk(): Boolean = select this { case s is Ok: true; else: false }
+}
+
+enum SpanKind { Server, Client, Internal, Producer, Consumer }
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Span(
+  spanId:    String,
+  traceId:   String,
+  parentId:  String?,
+  service:   String,
+  operation: String,
+  kind:      SpanKind,
+  startMs:   Long,
+  durationMs: Long,
+  status:    SpanStatus,
+  tags:      Map[String, String]
+)
+  example { new Span("s1","t1",null,"svc","op", SpanKind::Internal, 0L, 10L, new Ok(), [:]).spanId() == "s1" }
+  example { new Span("s2","t1","s1","svc","op", SpanKind::Server,  5L, 20L, new Ok(), [:]).parentId() == "s1" }
+{
+public:
+  def endMs(): Long = startMs() + durationMs()
+  def isRoot(): Boolean = parentId() == null
+  def isSlow(thresholdMs: Long): Boolean = durationMs() >= thresholdMs
+  def tag(key: String): String? = tags().get(key)
+  def summary(): String =
+    "[#{service()}.#{operation()}] #{durationMs()}ms #{status().label()}"
+}
+
+record ServiceNode(
+  name: String,
+  spanCount: Int,
+  errorCount: Int,
+  totalMs: Long
+)
+  example { new ServiceNode("api", 3, 0, 150L).errorRate() == 0.0 }
+{
+public:
+  def avgMs(): Long = if spanCount() == 0 { 0L } else { totalMs() / spanCount() }
+  def errorRate(): Double =
+    if spanCount() == 0 { 0.0 } else { (errorCount() * 100.0) / spanCount() }
+}
+
+record TraceStats(
+  traceId: String,
+  spanCount: Int,
+  services: List[String],
+  totalDurationMs: Long,
+  errorCount: Int,
+  maxSpanMs: Long
+) {
+public:
+  def serviceList(): String = services().fold("") { acc, s -> if acc == "" { s } else { acc + "→" + s } }
+  def hasErrors(): Boolean = errorCount() > 0
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Long {
+  def humanMs(): String {
+    if self < 1000L  { return "" + self + "ms" }
+    if self < 60000L { return Format::fixed(self / 1000.0d, 1) + "s" }
+    return Format::fixed(self / 60000.0d, 1) + "min"
+  }
+  def bar(maxVal: Long, width: Int): String {
+    if maxVal <= 0L { return "│" + " ".repeat(width) + "│" }
+    val filled = ((self * width) / maxVal) as Int
+    val cap: Int = if filled > width { width } else { filled }
+    return "│" + "█".repeat(cap) + " ".repeat(width - cap) + "│"
+  }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── TraceStore class ─────────────────────────────────────────────────────────
+
+class TraceStore {
+  var items: List[Span]
+
+public:
+  def this { items = [] }
+
+  def addSpan(span: Span): void { items << span }
+
+  def spans(): List[Span] = items
+
+  def findSpan(spanId: String): Span? {
+    return items.find { s -> s.spanId() == spanId }
+  }
+
+  def spansForTrace(traceId: String): List[Span] {
+    return items.filter { s -> s.traceId() == traceId }
+  }
+
+  def traceIds(): List[String] {
+    return items.map { s -> s.traceId() }.distinct()
+  }
+
+  def rootSpan(traceId: String): Span? {
+    return spansForTrace(traceId).find { s -> s.isRoot() }
+  }
+
+  // Compute stats for one trace
+  def traceStats(traceId: String): TraceStats? {
+    val ts = spansForTrace(traceId)
+    if ts.size == 0 { return null }
+    val svcList = ts.map { s -> s.service() }.distinct().sortedBy { s -> s }
+    val errs = ts.filter { s -> !s.status().isOk() }.size
+    val maxSpan: Long = ts.fold(0L) { acc, s ->
+      if s.durationMs() > acc { s.durationMs() } else { acc }
+    }
+    val root: Span? = rootSpan(traceId)
+    val total: Long = if root != null { root.durationMs() } else { maxSpan }
+    return new TraceStats(traceId, ts.size, svcList, total, errs, maxSpan)
+  }
+
+  // Build service topology: service → list of downstream services called
+  def topology(): Map[String, List[String]] {
+    val result: Map[String, List[String]] = [:]
+    foreach span: Span in items {
+      val pid: String? = span.parentId()
+      if pid != null {
+        val parent: Span? = findSpan(pid)
+        if parent != null && parent.service() != span.service() {
+          val key: String = parent.service()
+          if !result.containsKey(key) {
+            val fresh: List[String] = []
+            result.put(key, fresh)
+          }
+          val deps: List[String] = result.get(key) as List[String]
+          if !deps.contains(span.service()) {
+            deps << span.service()
+          }
+        }
+      }
+    }
+    return result
+  }
+
+  // Group spans by service and aggregate stats
+  def serviceNodes(): List[ServiceNode] {
+    val grouped: Map[String, List[Span]] = items.groupBy { s -> s.service() }
+    val nodes: List[ServiceNode] = []
+    foreach (svc, svcSpans) in grouped {
+      val errors: Int = svcSpans.filter { s -> !s.status().isOk() }.size
+      val total: Long = svcSpans.fold(0L) { acc, s -> acc + s.durationMs() }
+      nodes << new ServiceNode(svc, svcSpans.size, errors, total)
+    }
+    return nodes.sortedBy { n -> n.name() }
+  }
+
+  def allStats(): List[TraceStats] {
+    return traceIds().map { tid -> traceStats(tid) }
+             .filter { s -> s != null }
+             .map { s -> s as TraceStats }
+             .sortedBy { s -> s.traceId() }
+  }
+}
+
+// ─── Report functions ─────────────────────────────────────────────────────────
+
+def printBanner(title: String): void {
+  val line: String = "═".repeat(title.length() + 4)
+  IO::println("╔" + line + "╗")
+  IO::println("║  " + title + "  ║")
+  IO::println("╚" + line + "╝")
+}
+
+def printServiceReport(store: TraceStore): void {
+  printBanner("Service Overview")
+  val nodes = store.serviceNodes()
+  val maxMs: Long = nodes.fold(0L) { acc, n -> if n.avgMs() > acc { n.avgMs() } else { acc } }
+  IO::println("  Service          Spans  Errors  AvgLatency  P(err)  Histogram")
+  IO::println("  " + "─".repeat(65))
+  foreach node: ServiceNode in nodes {
+    val errPct: String = Format::fixed(node.errorRate(), 1).lpad(5) + "%"
+    val avg: String = node.avgMs().humanMs().lpad(10)
+    val hist: String = node.avgMs().bar(maxMs, 16)
+    IO::println("  " + node.name().rpad(16) +
+                node.spanCount().toString().lpad(5) + "  " +
+                node.errorCount().toString().lpad(6) + "  " +
+                avg + "  " + errPct + "  " + hist)
+  }
+}
+
+def printTraceReport(stats: List[TraceStats]): void {
+  printBanner("Trace Summary")
+  IO::println("  TraceId            Spans  Errors  Duration  Services")
+  IO::println("  " + "─".repeat(60))
+  foreach ts: TraceStats in stats {
+    val dur: String = ts.totalDurationMs().humanMs().lpad(8)
+    val err: String = if ts.hasErrors() { "⚠ " + ts.errorCount() } else { "─" }
+    IO::println("  " + ts.traceId().rpad(18) + "  " +
+                ts.spanCount().toString().lpad(5) + "  " +
+                err.rpad(6) + "  " + dur + "  " + ts.serviceList())
+  }
+}
+
+def printTopology(store: TraceStore): void {
+  printBanner("Service Call Graph")
+  val topo = store.topology()
+  if topo.size == 0 {
+    IO::println("  (no cross-service calls)")
+    return
+  }
+  foreach (svc, deps) in topo {
+    val joined: String = deps.fold("") { acc, d -> if acc == "" { d } else { acc + ", " + d } }
+    IO::println("  #{svc} ──▶ #{joined}")
+  }
+}
+
+def slowestSpans(store: TraceStore, n: Int): void {
+  printBanner("Slowest Spans (top #{n})")
+  val top = store.spans().sortedBy { s -> 0L - s.durationMs() }
+  var i: Int = 0
+  foreach span: Span in top {
+    if i >= n { break }
+    IO::println("  #{(i + 1).toString().lpad(2)}. " + span.summary() +
+                "  (trace=#{span.traceId()})")
+    i++
+  }
+}
+
+// ─── Seed data ────────────────────────────────────────────────────────────────
+
+def buildStore(): TraceStore {
+  val store = new TraceStore()
+
+  // ── Trace T001: user login flow ───────────────────────────────────────────
+  store.addSpan(new Span("A1","T001",null,    "gateway",  "POST /login", SpanKind::Server,   0L, 312L, new Ok(), ["http.status": "200"]))
+  store.addSpan(new Span("A2","T001","A1",    "auth-svc", "validateToken", SpanKind::Internal, 5L, 180L, new Ok(), [:]))
+  store.addSpan(new Span("A3","T001","A2",    "user-db",  "query",         SpanKind::Client,  10L,  60L, new Ok(), ["db.table": "users"]))
+  store.addSpan(new Span("A4","T001","A1",    "session",  "createSession", SpanKind::Internal,195L, 110L, new Ok(), [:]))
+
+  // ── Trace T002: order checkout ────────────────────────────────────────────
+  store.addSpan(new Span("B1","T002",null,    "gateway",  "POST /checkout", SpanKind::Server,   0L, 980L, new Ok(), ["http.status": "200"]))
+  store.addSpan(new Span("B2","T002","B1",    "order-svc","createOrder",    SpanKind::Internal, 10L, 820L, new Ok(), [:]))
+  store.addSpan(new Span("B3","T002","B2",    "inventory","checkStock",     SpanKind::Client,   15L, 230L, new Ok(), [:]))
+  store.addSpan(new Span("B4","T002","B2",    "payment",  "charge",         SpanKind::Client,  260L, 450L, new Ok(), ["payment.method": "card"]))
+  store.addSpan(new Span("B5","T002","B4",    "payment",  "fraud-check",    SpanKind::Internal,265L, 200L, new Ok(), [:]))
+  store.addSpan(new Span("B6","T002","B2",    "notif-svc","sendEmail",      SpanKind::Producer,720L,  95L, new Ok(), [:]))
+
+  // ── Trace T003: failed request ────────────────────────────────────────────
+  store.addSpan(new Span("C1","T003",null,    "gateway",  "GET /profile",   SpanKind::Server,   0L, 550L, new Error("upstream timeout"), ["http.status": "503"]))
+  store.addSpan(new Span("C2","T003","C1",    "profile-svc","getUser",      SpanKind::Internal, 8L, 530L, new Timeout(500L), [:]))
+  store.addSpan(new Span("C3","T003","C2",    "user-db",  "query",          SpanKind::Client,  12L, 510L, new Error("connection reset"), ["db.table": "profiles"]))
+
+  // ── Trace T004: background sync ───────────────────────────────────────────
+  store.addSpan(new Span("D1","T004",null,    "scheduler","runSync",        SpanKind::Internal,  0L,4200L, new Ok(), [:]))
+  store.addSpan(new Span("D2","T004","D1",    "sync-svc", "fetchRemote",    SpanKind::Client,   50L,3900L, new Ok(), ["remote": "partner-api"]))
+  store.addSpan(new Span("D3","T004","D1",    "user-db",  "bulkUpsert",     SpanKind::Client, 3960L, 230L, new Ok(), ["db.table": "sync_log"]))
+
+  // ── Trace T005: search ────────────────────────────────────────────────────
+  store.addSpan(new Span("E1","T005",null,    "gateway",  "GET /search",    SpanKind::Server,    0L,  88L, new Ok(), ["http.status": "200"]))
+  store.addSpan(new Span("E2","T005","E1",    "search-svc","query",         SpanKind::Internal,  5L,  72L, new Ok(), [:]))
+  store.addSpan(new Span("E3","T005","E2",    "user-db",  "query",          SpanKind::Client,   10L,  25L, new Ok(), ["db.table": "items"]))
+
+  return store
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val store = buildStore()
+
+IO::println("")
+printServiceReport(store)
+IO::println("")
+printTopology(store)
+IO::println("")
+printTraceReport(store.allStats())
+IO::println("")
+slowestSpans(store, 5)
+
+// ── nullable chaining: look up a span and its parent ─────────────────────────
+IO::println("")
+printBanner("Span Lineage")
+val rootSpan4: Span? = store.findSpan("B4")
+val lineage: String? = if rootSpan4 != null {
+  val pid4: String? = rootSpan4.parentId()
+  val parent4: Span? = if pid4 != null { store.findSpan(pid4) } else { null }
+  if parent4 != null {
+    "#{rootSpan4.service()}/#{rootSpan4.operation()} ← parent: #{parent4.service()}/#{parent4.operation()}"
+  } else { null }
+} else { null }
+IO::println("  " + (lineage ?: "(span not found)"))
+
+IO::println("")
+IO::println("Total spans indexed: #{store.spans().size}")
+IO::println("Traces with errors:  #{store.allStats().filter { s -> s.hasErrors() }.size}")
+IO::println("Done.")

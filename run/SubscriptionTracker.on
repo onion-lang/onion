@@ -75,9 +75,10 @@ record Subscription(
   cycle: BillingCycle,
   costCents: Int,
   active: Boolean
-)
+) {
   example { new Subscription(1, "Spotify", Category::STREAMING, new Monthly(), 999, true).id() == 1 }
   example { new Subscription(2, "test",    Category::CLOUD,     new Annual(),  0,   false).costCents() >= 0 }
+}
 
 record CategorySummary(
   label: String,

@@ -22,9 +22,10 @@ enum LotStatus {
 
 // ── Bid record ────────────────────────────────────────────────────────────────
 
-record Bid(bidder: String, amount: Int)
+record Bid(bidder: String, amount: Int) {
   example { new Bid("alice", 500).amount() == 500 }
   example { new Bid("bob", 300).bidder() == "bob" }
+}
 
 // ── Int extension for currency display ───────────────────────────────────────
 

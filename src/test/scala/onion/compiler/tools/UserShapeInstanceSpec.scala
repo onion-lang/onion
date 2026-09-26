@@ -112,8 +112,9 @@ class UserShapeInstanceSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "")
         .replace("record P(name: String, amount: Int)",
-          """record P(name: String, amount: Int)
-            |  example nonEmpty { new FW().print(new P("A", 1)).length() == 16 }""".stripMargin)
+          """record P(name: String, amount: Int) {
+            |  example nonEmpty { new FW().print(new P("A", 1)).length() == 16 }
+            |}""".stripMargin)
       val r = shell.run(viaRecordLaw +
         """class Test {
           |public:

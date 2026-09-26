@@ -64,10 +64,9 @@ record Puzzle(
   solution:    String,
   difficulty:  Int,
   basePoints:  Int
-)
+) {
   example { new Puzzle("P1", "Cipher", "1234", 5, 100).scaledPoints(1.0) == 150 }
   example { new Puzzle("P2", "Mirror", "X",    1, 200).scaledPoints(1.0) == 220 }
-{
 public:
   def scaledPoints(mod: Double): Int {
     val raw: Double = basePoints() * mod * (1.0 + difficulty() * 0.1)
@@ -80,17 +79,17 @@ record Team(
   id:    String,
   name:  String,
   size:  Int
-)
+) {
   example { new Team("T1", "Brainiacs", 4).size() == 4 }
-{
 public:
   def label(): String = "#{name()} (#{size()} members)"
 }
 
 // Attempt line parsed from a session log: "teamId:answer@elapsedSec"
 record AttemptLine(teamId: String, answer: String, elapsedSec: Int)
-  from re"(\w+):([^@]+)@(\d+)"
+  from re"(\w+):([^@]+)@(\d+)" {
   example { AttemptLine::parse("alpha:doorcode@45") != null }
+}
 
 record SessionResult(
   teamId:       String,

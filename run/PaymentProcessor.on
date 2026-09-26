@@ -118,10 +118,9 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Transaction(id: String, cardNum: String, amount: Double, merchant: String, category: String)
+record Transaction(id: String, cardNum: String, amount: Double, merchant: String, category: String) {
   example { new Transaction("X1", "4111111111111111", 50.0, "Shop", "RETAIL").cardType() == CardType::Visa }
   example { new Transaction("X2", "371449635398431",  50.0, "Hotel","TRAVEL").cardType() == CardType::Amex }
-{
 public:
   def masked(): String = cardNum().maskCard()
   def cardType(): CardType = CardType::detect(cardNum())

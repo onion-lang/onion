@@ -25,9 +25,10 @@ class RecordDuplicateLawExampleSpec extends AbstractShellSpec {
     it("reports E0026 (not an internal compiler error) for two laws with the same name and params") {
       val codes = errorCodes(
         """
-          |record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+          |record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
           |  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
           |  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -41,9 +42,10 @@ class RecordDuplicateLawExampleSpec extends AbstractShellSpec {
     it("reports E0026 for two examples with the same explicit name") {
       val codes = errorCodes(
         """
-          |record R(x: Int)
+          |record R(x: Int) {
           |  example dup { new R(1).x() == 1 }
           |  example dup { new R(2).x() == 2 }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -57,9 +59,10 @@ class RecordDuplicateLawExampleSpec extends AbstractShellSpec {
     it("still allows two laws with the same name but different parameter types") {
       val codes = errorCodes(
         """
-          |record Point(x: Int, y: Int)
+          |record Point(x: Int, y: Int) {
           |  law reflexiveP(p: Point) { p == p }
           |  law reflexiveN(n: Int) { n == n }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }

@@ -77,19 +77,17 @@ public:
 
 // ─── Records ─────────────────────────────────────────────────────────────────
 
-record Species(name: String, symbol: String, initPop: Int, birthRate: Double, deathRate: Double)
+record Species(name: String, symbol: String, initPop: Int, birthRate: Double, deathRate: Double) {
   example { new Species("Rabbit", "R", 100, 1.2, 0.1).initPop() == 100 }
   example { new Species("Fox",    "F",  20, 0.4, 0.3).name() == "Fox" }
-{
 public:
   def isViable(): Boolean = initPop() > 0 && birthRate() > deathRate()
   def summary(): String   = "#{name()} (init=#{initPop()} birth=#{birthRate()} death=#{deathRate()})"
 }
 
-record PopSnapshot(step: Int, preyPop: Double, predPop: Double, season: Season)
+record PopSnapshot(step: Int, preyPop: Double, predPop: Double, season: Season) {
   example { new PopSnapshot(0, 100.0, 20.0, Season::SPRING).step() == 0 }
   example { new PopSnapshot(1, 50.0, 5.0, Season::AUTUMN).preyPop() == 50.0 }
-{
 public:
   def ratio(): Double =
     if predPop() < 0.01 { 99999.0 } else { preyPop() / predPop() }

@@ -37,17 +37,20 @@ public:
 
 // ─── Records ─────────────────────────────────────────────────────────────────
 
-record Book(isbn: String, title: String, author: String, year: Int, genre: Genre)
+record Book(isbn: String, title: String, author: String, year: Int, genre: Genre) {
   example { new Book("978-A", "Dune", "Herbert", 1965, Genre::FICTION).year() == 1965 }
   example { new Book("978-B", "Cosmos", "Sagan", 1980, Genre::SCIENCE).genre() == Genre::SCIENCE }
+}
 
-record Member(id: Int, name: String, email: String, maxLoans: Int)
+record Member(id: Int, name: String, email: String, maxLoans: Int) {
   example { new Member(1, "Alice", "a@b.org", 5).maxLoans() == 5 }
   example { new Member(2, "Bob",   "b@c.org", 3).name() == "Bob" }
+}
 
-record Loan(id: Int, memberId: Int, isbn: String, borrowDay: Int, dueDay: Int, returnedDay: Int?)
+record Loan(id: Int, memberId: Int, isbn: String, borrowDay: Int, dueDay: Int, returnedDay: Int?) {
   example { new Loan(1, 1, "978-A", 1, 15, null).returnedDay() == null }
   example { new Loan(2, 1, "978-B", 1, 15, 10).returnedDay() != null }
+}
 
 // ─── Extension methods ────────────────────────────────────────────────────────
 

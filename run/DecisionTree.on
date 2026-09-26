@@ -26,9 +26,10 @@ extension Double {
 // ── Core Records ──────────────────────────────────────────────────────────────
 
 // An attribute (feature column): name and zero-based index in feature vector
-record Attribute(name: String, index: Int)
+record Attribute(name: String, index: Int) {
   example { new Attribute("Outlook", 0).index() == 0 }
   example { new Attribute("Wind",    3).name()  == "Wind" }
+}
 
 // A labelled training example: parallel ArrayList of string features + label
 record Example(features: ArrayList[String], label: String)

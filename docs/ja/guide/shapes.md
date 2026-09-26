@@ -22,17 +22,19 @@ val rows = Access::parseAll(logText)
 ## shape を宣言する
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 ```
 
 `shape name = ...` は境界に名前を与えるので、1つのレコードが必要なだけ持てます。
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
   shape tabbed = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
   shape doc    = json
+}
 ```
 
 `shape` はソフトキーワードなので、通常の識別子としても使えます。
@@ -89,8 +91,9 @@ s.parse(s.print(row)).get() == row     // true
 書き戻し方がない（空白は何個？）ので、その shape は read-only になり、そう答えます。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape loose = re"(-?\d+)\s+(-?\d+)"
+}
 
 Pt::loose().canPrint()     // false
 ```
@@ -118,8 +121,9 @@ intList.print(evilInts)   // throws: element at index 1 contains the separator, 
 パターンの代わりにフォーマット名を書くと、成分名をキーとして構造化文書を読みます。
 
 ```onion
-record Person(name: String, age: Int)
+record Person(name: String, age: Int) {
   shape doc = json
+}
 
 Person::doc().parse("{\"age\": 30}")
 //   name: expected String, found absent
@@ -155,13 +159,14 @@ val api  = http"https://example.com/p".read(Person::doc())
 `printLossless` が2つを再組立てします：
 
 ```onion
-record Server(host: String, port: Int, debug: Boolean)
+record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
   example l2 {
     val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
     val r = Server::cfg().parseLossless(t).get()
     Server::cfg().printLossless(r.value(), r.residue()) == t
   }
+}
 ```
 
 この `example` 節こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
@@ -195,9 +200,10 @@ Files::writeText(path, out)
 `law` はコンパイル時に実行されるので、往復の性質を機械検査できます。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+}
 ```
 
 引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。

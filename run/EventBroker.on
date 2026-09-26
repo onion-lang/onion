@@ -30,9 +30,10 @@ public:
 
 // ─── TopicInfo ───────────────────────────────────────────────────────────────
 
-record TopicInfo(name: String, maxHistory: Int)
+record TopicInfo(name: String, maxHistory: Int) {
   example { new TopicInfo("payments", 10).name() == "payments" }
   example { new TopicInfo("x", 5).maxHistory() == 5 }
+}
 
 // ─── Message ADT ─────────────────────────────────────────────────────────────
 
@@ -82,8 +83,9 @@ public:
 
 // ─── DeadLetter ──────────────────────────────────────────────────────────────
 
-record DeadLetter(msg: Message, reason: String)
+record DeadLetter(msg: Message, reason: String) {
   example { new DeadLetter(new ControlMessage("x","y"), "test").reason() == "test" }
+}
 
 // ─── MatchEvent ──────────────────────────────────────────────────────────────
 

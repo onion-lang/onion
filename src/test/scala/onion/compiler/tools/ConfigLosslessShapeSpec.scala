@@ -12,8 +12,9 @@ import onion.tools.Shell
 class ConfigLosslessShapeSpec extends AbstractShellSpec {
 
   private val decl =
-    """record Server(host: String, port: Int, debug: Boolean)
+    """record Server(host: String, port: Int, debug: Boolean) {
       |  shape cfg = config
+      |}
       |""".stripMargin
 
   describe("L2: print(parse(t)) == t") {
@@ -182,8 +183,9 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(
-        """record Pt(x: Int, y: Int)
+        """record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -202,10 +204,12 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
 
     it("a foreign residue is rejected, never misrendered through") {
       val r = shell.run(
-        """record A(host: String, port: Int, debug: Boolean)
+        """record A(host: String, port: Int, debug: Boolean) {
           |  shape cfg = config
-          |record B(name: String)
+          |}
+          |record B(name: String) {
           |  shape cfg = config
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {

@@ -26,14 +26,17 @@ public:
 
 // ── Low-level VCS objects ────────────────────────────────────────────────────
 
-record Blob(hash: String, content: String)
+record Blob(hash: String, content: String) {
   example { new Blob("abc1234", "hello\n").hash() == "abc1234" }
+}
 
-record TreeEntry(name: String, blobHash: String)
+record TreeEntry(name: String, blobHash: String) {
   example { new TreeEntry("README.md", "abc1234").name() == "README.md" }
+}
 
-record Tree(hash: String, entries: List[TreeEntry])
+record Tree(hash: String, entries: List[TreeEntry]) {
   example { new Tree("fffffff", []).entries().size == 0 }
+}
 
 record CommitObj(
   hash:    String,
@@ -42,11 +45,12 @@ record CommitObj(
   epoch:   Int,
   tree:    String,   // tree hash
   parent:  String?   // null for root commit
-)
+) {
   example {
     val c: CommitObj = new CommitObj("aabbcc1", "init", "alice", 1000, "tree123", null)
     c.parent() == null && c.author() == "alice"
   }
+}
 
 // ── Branch ────────────────────────────────────────────────────────────────────
 

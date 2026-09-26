@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.0] - 2026-09-26
+
 ### Changed
 
 - **`law`, `example`, and `shape` clauses on a `record` now must be written inside the record's brace-enclosed `{ }` body, alongside any methods, instead of floating between the constructor parameter list and a separate optional body brace.** Mirrored in both parsers (`grammar/JJOnionParser.jj` and the hand-written fast-path `OnionParser.scala`); every existing use in `run/*.on`, embedded-source test specs, and the English/Japanese docs (including `CLAUDE.md`) was migrated to the new placement (merged via #1561).

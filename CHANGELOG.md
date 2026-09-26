@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GemCollection.on`** — a 458-line mineral and gemstone collection management system, a new domain for the `run/` corpus (records with methods `Mineral` (`hardnessGroup`/`isGemQuality`/`shortLabel`) and `CollectionEntry` (`statusLabel`/`age`/`label`); data-carrying enums `CrystalSystem(shortName, axisCount)`/`ChemicalGroup(symbol)`; an ADT case-enum `LusterType` (`Metallic`/`Vitreous(transparency)`/`Adamantine`/`Resinous`/`Silky(fibrous)`/`Waxy`/`Earthy`) dispatched via `select`; plain enums `Rarity`/`CollectionStatus`; a class `MineralCatalog conforms Catalogable`; extension methods `Double.fmt1`/`String.rpad`/`String.lpad`/`String.repeat`/`Int.lpadN`; collection pipelines `filter`/`map`/`fold`/`sortedBy`/`find`/`zip`/`distinct`; nullable map lookups (`Int?`) with null checks; closures; string interpolation; recursion (`hardnessMax`/`hardnessMin`); `while`/`foreach` loops over ranges and map entries — rendering a full catalog, hardness/chemical/crystal-system groupings, gem-quality and status breakdowns, an acquisition timeline, hardness statistics, rarity distribution, and a zip-based collection-ages table across 15 minerals), added to the `run/` corpus (merged via #1594).
+
 ## [0.116.0] - 2026-09-26
 
 ### Added

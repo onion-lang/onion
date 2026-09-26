@@ -54,9 +54,10 @@ record FastaHeader(id: String, description: String)
 
 // ── Sequence region record ───────────────────────────────────────────────────
 
-record SequenceRegion(start: Int, end: Int, label: String)
+record SequenceRegion(start: Int, end: Int, label: String) {
   example { new SequenceRegion(5, 20, "exon").end() == 20 }
   example { new SequenceRegion(0, 30, "intron").start() == 0 }
+}
 
 def regionLength(r: SequenceRegion): Int = r.end() - r.start()
 
@@ -68,9 +69,10 @@ def regionDisplay(r: SequenceRegion): String =
 
 // ── Motif match record ───────────────────────────────────────────────────────
 
-record MotifMatch(motif: String, position: Int)
+record MotifMatch(motif: String, position: Int) {
   example { new MotifMatch("ATG", 3).position() == 3 }
   example { new MotifMatch("ATG", 0).motif() == "ATG" }
+}
 
 // ── GC classification ADT ────────────────────────────────────────────────────
 

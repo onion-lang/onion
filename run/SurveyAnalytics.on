@@ -77,9 +77,10 @@ public:
 
 // ── Records ───────────────────────────────────────────────────────────────
 
-record SurveyResponse(questionKey: String, answer: String)
+record SurveyResponse(questionKey: String, answer: String) {
   example { new SurveyResponse("q1", "5").questionKey() == "q1" }
   example { new SurveyResponse("q2", "yes").answer() == "yes" }
+}
 
 // Summary records (scalar fields only, so derive!(Json) works)
 

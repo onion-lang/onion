@@ -822,38 +822,39 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val laws = new ArrayBuffer[AST.LawClause]()
     val examples = new ArrayBuffer[AST.ExampleClause]()
     val shapes = new ArrayBuffer[AST.ShapeClause]()
-    var going = true
-    while (going) {
-      if (kind(1) == K.ID && image(1) == "law" && kind(2) == K.ID) {
-        next()
-        val lt = expect(K.ID)
-        expect(K.LPAREN)
-        val largs = argsList()
-        expect(K.RPAREN)
-        val lb = block()
-        laws += AST.LawClause(p(lt), c(lt), largs, lb)
-      } else if (kind(1) == K.ID && image(1) == "example" && (kind(2) == K.LBRACE || kind(2) == K.ID)) {
-        val et = expect(K.ID)
-        val enm = if (kind(1) == K.ID) expect(K.ID) else null
-        val eb = block()
-        examples += AST.exampleClause(p(et), if (enm == null) null else c(enm), eb)
-      } else if (kind(1) == K.ID && image(1) == "shape" && kind(2) == K.ID) {
-        next()
-        val st = expect(K.ID)
-        expect(K.ASSIGN)
-        if (kind(1) == K.RE_STRING) {
-          val srt = next()
-          shapes += AST.regexShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length - 1))
-        } else {
-          val srt = expect(K.ID)
-          shapes += AST.formatShapeClause(p(st), c(st), c(srt))
-        }
-      } else going = false
-    }
     val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
     if (accept(K.LBRACE)) {
-      while (isAccessSectionStart(kind(1))) sections += accessSection()
+      var going = true
+      while (going) {
+        if (isAccessSectionStart(kind(1))) {
+          sections += accessSection()
+        } else if (kind(1) == K.ID && image(1) == "law" && kind(2) == K.ID) {
+          next()
+          val lt = expect(K.ID)
+          expect(K.LPAREN)
+          val largs = argsList()
+          expect(K.RPAREN)
+          val lb = block()
+          laws += AST.LawClause(p(lt), c(lt), largs, lb)
+        } else if (kind(1) == K.ID && image(1) == "example" && (kind(2) == K.LBRACE || kind(2) == K.ID)) {
+          val et = expect(K.ID)
+          val enm = if (kind(1) == K.ID) expect(K.ID) else null
+          val eb = block()
+          examples += AST.exampleClause(p(et), if (enm == null) null else c(enm), eb)
+        } else if (kind(1) == K.ID && image(1) == "shape" && kind(2) == K.ID) {
+          next()
+          val st = expect(K.ID)
+          expect(K.ASSIGN)
+          if (kind(1) == K.RE_STRING) {
+            val srt = next()
+            shapes += AST.regexShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length - 1))
+          } else {
+            val srt = expect(K.ID)
+            shapes += AST.formatShapeClause(p(st), c(st), c(srt))
+          }
+        } else going = false
+      }
       expect(K.RBRACE)
     }
     accept(K.SEMI)

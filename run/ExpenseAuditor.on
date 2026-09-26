@@ -46,9 +46,10 @@ public:
 // build-time-checked input/output pair (E0065 on a false one).
 
 record Expense(date: String, category: String, amount: Double, memo: String)
-  from re"(\d{4}-\d{2}-\d{2})\|(\w+)\|([0-9.]+)\|(.*)"
+  from re"(\d{4}-\d{2}-\d{2})\|(\w+)\|([0-9.]+)\|(.*)" {
   example { Expense::parse("2026-01-05|Travel|120.50|taxi to airport")?.amount() == 120.50 }
   example { Expense::parse("not a valid line") == null }
+}
 
 // ── formatting extension ──────────────────────────────────────────────────────
 

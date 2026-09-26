@@ -31,8 +31,9 @@ public:
 // apparent magnitude (can be negative for the brightest objects), and how
 // many minutes it was tracked. `shape line` names the boundary so a broken
 // line is reported instead of stopping the whole batch.
-record Sighting(time: String, name: String, kindCode: String, detail: String, magnitude: Double, minutes: Int)
+record Sighting(time: String, name: String, kindCode: String, detail: String, magnitude: Double, minutes: Int) {
   shape line = re"(\d{2}:\d{2}) (\S+) (\w) (\S+) mag=(-?\d+\.\d+) (\d+)min"
+}
 
 record Entry(sighting: Sighting, kind: ObjectKind) {
 public:

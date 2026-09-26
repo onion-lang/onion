@@ -24,9 +24,9 @@ enum ScanSeverity {
 
 // ── Records ───────────────────────────────────────────────────────────────────
 
-record Digest(algorithm: String, hex: String)
+record Digest(algorithm: String, hex: String) {
   example { new Digest("sha256", "abc123").algorithm() == "sha256" }
-  example { new Digest("sha256", "abc123").hex() == "abc123" } {
+  example { new Digest("sha256", "abc123").hex() == "abc123" }
 public:
   def full(): String = "#{algorithm()}:#{hex()}"
   def short(): String {
@@ -35,8 +35,9 @@ public:
   }
 }
 
-record Layer(digest: Digest, size: Long, mediaType: String)
+record Layer(digest: Digest, size: Long, mediaType: String) {
   example { new Layer(new Digest("sha256", "dead"), 4096L, "application/octet-stream").size() == 4096L }
+}
 
 record Vulnerability(id: String, severity: ScanSeverity, description: String, fixable: Boolean)
 
@@ -50,8 +51,9 @@ public:
   def passed():   Boolean = critical() == 0
 }
 
-record ManifestRef(repo: String, tag: String, digest: Digest, totalSize: Long, layers: List[Layer])
+record ManifestRef(repo: String, tag: String, digest: Digest, totalSize: Long, layers: List[Layer]) {
   example { new ManifestRef("lib/nginx", "latest", new Digest("sha256", "cafe"), 102400L, []).repo() == "lib/nginx" }
+}
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 

@@ -709,8 +709,9 @@ record R(a: Int, a: Int)   // E0086: レコード R の成分 a が重複して�
 （シードやサンプル数などの）生成設定とともに報告されます。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   law wrong(p: Pt) { p.x() == p.y() }   // E0064: 反証された（例: Pt(0, 1)）
+}
 ```
 
 対処: あらゆる生成サンプルに対して成り立つように law（またはチェック対象のコード）を
@@ -723,8 +724,9 @@ record Pt(x: Int, y: Int)
 `example` は生成されたサンプル群ではなく、1つの固定ケースをチェックします。
 
 ```onion
-record R(x: Int)
+record R(x: Int) {
   example { new R(1).x() == 2 }   // E0065: false と評価された
+}
 ```
 
 対処: example が期待する値を修正するか、その example が検証しているコード側を
@@ -753,8 +755,9 @@ foreach k: String in m.keySet() { println(k) }
 全成分が生成可能なレコードです。
 
 ```onion
-record Dummy(v: Int)
+record Dummy(v: Int) {
   law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
+}
 ```
 
 それ以外——配列、`Map`、enum、インターフェース、コンストラクタが複数あるクラス——には
@@ -763,8 +766,9 @@ record Dummy(v: Int)
 引数の型を変えるか、law を削除してください。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
+}
 ```
 
 ### `E0075` — law を持つクラスをロードできなかった
@@ -780,8 +784,9 @@ law はコンパイル済みクラスに対して実行されます。`law` / `e
 エラーにしています。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape doc = toml     // E0076: サポートしているのは json, yaml, config
+}
 ```
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
@@ -1079,9 +1084,10 @@ record の `law`/`example` 節は、節ごとに検査用メソッドを1つ合�
 していました。
 
 ```onion
-record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
   law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+}
 ```
 
 対処: 一方の節の名前を変更するか、重複を削除してください。

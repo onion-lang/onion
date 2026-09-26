@@ -1,0 +1,431 @@
+// DartsScorer.on — a professional darts 501 game simulator
+//
+// Exercises: records with methods and example clauses; plain enums with methods;
+// ADT case enums (GameResult, Multiplier); primary constructors; classes with
+// public/private sections; interfaces (Printable); collection pipelines
+// (map/filter/fold/find/sortedBy/groupBy/count/any); select / ADT type-pattern
+// matching; guard conditions; nullable types and null checks; extension methods
+// on Int (padLeft) and String (padRight2); closures; string interpolation;
+// while / foreach (ranges and map k,v); try/catch; recursion (checkout finder).
+
+import {
+  java.util.ArrayList
+  java.util.HashMap
+  java.lang.Math
+}
+
+// ─── Extensions ────────────────────────────────────────────────────────────────
+
+extension Int {
+  def padLeft(width: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length() < width { r = " " + r }
+    return r
+  }
+  def toDouble2(): Double = self * 1.0
+}
+
+extension String {
+  def padRight2(width: Int): String {
+    var r: String = self
+    while r.length() < width { r = r + " " }
+    return r
+  }
+}
+
+// ─── Multiplier enum ───────────────────────────────────────────────────────────
+
+enum Multiplier {
+  case Singles
+  case Doubles
+  case Trebles
+public:
+  def factor(): Int = select this {
+    case s is Singles: 1
+    case d is Doubles: 2
+    case t is Trebles: 3
+  }
+  def label(): String = select this {
+    case s is Singles: "S"
+    case d is Doubles: "D"
+    case t is Trebles: "T"
+  }
+  def fullLabel(): String = select this {
+    case s is Singles: "single"
+    case d is Doubles: "double"
+    case t is Trebles: "treble"
+  }
+}
+
+// ─── Game result ADT ───────────────────────────────────────────────────────────
+
+enum GameResult {
+  case InProgress(throwerName: String, remaining: Int)
+  case Won(playerName: String, dartsThrown: Int)
+  case Bust
+public:
+  def describe(): String = select this {
+    case ip is InProgress: "#{ip.throwerName()}: #{ip.remaining()} remaining"
+    case w  is Won:        "#{w.playerName()} wins in #{w.dartsThrown()} darts!"
+    case b  is Bust:       "BUST - score unchanged"
+  }
+}
+
+// ─── Records ───────────────────────────────────────────────────────────────────
+
+record DartThrow(sector: Int, multiplier: Multiplier) {
+  example { new DartThrow(20, new Singles()).score() == 20 }
+  example { new DartThrow(20, new Trebles()).score() == 60 }
+  example { new DartThrow(25, new Doubles()).score() == 50 }
+public:
+  def score(): Int    = sector * multiplier.factor()
+  def label(): String = "#{multiplier.label()}#{sector}"
+  def isDouble(): Boolean = multiplier is Doubles
+}
+
+record PlayerState(name: String, remaining: Int, dartsThrown: Int) {
+  example { new PlayerState("Alice", 501, 0).isStarting() }
+  example { !new PlayerState("Bob",  0,   9).isStarting() }
+public:
+  def isStarting(): Boolean  = remaining == 501 && dartsThrown == 0
+  def canCheckout(): Boolean = remaining >= 2 && remaining <= 170
+  def display(): String      = "#{name.padRight2(12)} #{remaining.padLeft(3)}"
+}
+
+// Scripted dart throw for simulation
+record DartSpec(sector: Int, mult: Multiplier) {
+public:
+  def toDart(): DartThrow = new DartThrow(sector, mult)
+  def score(): Int = sector * mult.factor()
+}
+
+record CheckoutRoute(darts: List[DartThrow]) {
+public:
+  def dartCount(): Int = darts.size
+  def describe(): String {
+    var s: String = ""
+    var i: Int = 0
+    foreach d: DartThrow in darts {
+      if i > 0 { s = s + " -> " }
+      s = s + d.label()
+      i++
+    }
+    return s
+  }
+}
+
+// ─── Checkout Finder ───────────────────────────────────────────────────────────
+
+class CheckoutFinder {
+private:
+  static def allDarts(): List[DartThrow] {
+    val result: List[DartThrow] = []
+    foreach sector: Int in 1..20 {
+      result.add(new DartThrow(sector, new Singles()))
+      result.add(new DartThrow(sector, new Doubles()))
+      result.add(new DartThrow(sector, new Trebles()))
+    }
+    result.add(new DartThrow(25, new Singles()))
+    result.add(new DartThrow(25, new Doubles()))
+    return result
+  }
+
+public:
+  // Returns a checkout route for the given remaining score, or null if none found.
+  static def find(remaining: Int): CheckoutRoute? {
+    if remaining < 2 || remaining > 170 { return null }
+    val all: List[DartThrow] = allDarts()
+
+    // 1-dart checkout: must be a double
+    foreach d1: DartThrow in all {
+      if d1.score() == remaining && d1.isDouble() {
+        return new CheckoutRoute([d1])
+      }
+    }
+
+    // 2-dart: any dart + double finish
+    foreach d1: DartThrow in all {
+      val left1: Int = remaining - d1.score()
+      if left1 >= 2 {
+        foreach d2: DartThrow in all {
+          if d2.score() == left1 && d2.isDouble() {
+            return new CheckoutRoute([d1, d2])
+          }
+        }
+      }
+    }
+
+    // 3-dart: two setup + double finish
+    foreach d1: DartThrow in all {
+      val left1: Int = remaining - d1.score()
+      if left1 >= 2 {
+        foreach d2: DartThrow in all {
+          val left2: Int = left1 - d2.score()
+          if left2 >= 2 {
+            foreach d3: DartThrow in all {
+              if d3.score() == left2 && d3.isDouble() {
+                return new CheckoutRoute([d1, d2, d3])
+              }
+            }
+          }
+        }
+      }
+    }
+    return null
+  }
+}
+
+// ─── Game ──────────────────────────────────────────────────────────────────────
+
+interface Printable {
+  def printStatus(): void
+}
+
+class DartsGame conforms Printable {
+private:
+  var players: List[PlayerState]
+  var currentIdx: Int
+  var turnDarts: List[DartThrow]
+  var finished: Boolean
+
+public:
+  def this(playerNames: List[String]) {
+    players   = []
+    foreach name: String in playerNames {
+      players.add(new PlayerState(name, 501, 0))
+    }
+    currentIdx = 0
+    turnDarts  = []
+    finished   = false
+  }
+
+  def currentPlayer(): PlayerState = players[currentIdx] as PlayerState
+
+  def isFinished(): Boolean = finished
+
+  def throwDart(sector: Int, mult: Multiplier): GameResult {
+    if finished { return new InProgress("", 0) }
+    val player: PlayerState = currentPlayer()
+    val dart: DartThrow     = new DartThrow(sector, mult)
+    val pts: Int            = dart.score()
+    val newScore: Int       = player.remaining - pts
+    val newTotal: Int       = player.dartsThrown + 1
+
+    turnDarts.add(dart)
+
+    // Bust: overshot, exactly 1 left, or finish not on a double
+    if newScore < 0 || newScore == 1 || (newScore == 0 && !dart.isDouble()) {
+      players[currentIdx] = new PlayerState(player.name(), player.remaining, newTotal)
+      turnDarts = []
+      advancePlayer()
+      return new Bust()
+    }
+
+    if newScore == 0 {
+      // WIN: hit exactly 0 on a double
+      finished = true
+      players[currentIdx] = new PlayerState(player.name(), 0, newTotal)
+      return new Won(player.name(), newTotal)
+    }
+
+    players[currentIdx] = new PlayerState(player.name(), newScore, newTotal)
+
+    if turnDarts.size >= 3 {
+      turnDarts = []
+      advancePlayer()
+    }
+    return new InProgress(player.name(), newScore)
+  }
+
+  def scores(): List[PlayerState] = players
+
+  def printStatus(): void {
+    IO::println("+-----------------------+")
+    IO::println("|  DARTS 501  SCOREBOARD|")
+    IO::println("+----------------+------+")
+    var i: Int = 0
+    foreach ps: PlayerState in players {
+      val arrow: String = if i == currentIdx && !finished { " <" } else { "  " }
+      IO::println("| #{ps.display()}#{arrow} |")
+      i++
+    }
+    IO::println("+----------------+------+")
+  }
+
+private:
+  def advancePlayer(): void {
+    currentIdx = (currentIdx + 1) % players.size
+  }
+}
+
+// ─── Statistics ────────────────────────────────────────────────────────────────
+
+record TurnStats(playerName: String, history: List[DartThrow]) {
+public:
+  def totalScore(): Int {
+    var total: Int = 0
+    foreach d: DartThrow in history { total = total + d.score() }
+    return total
+  }
+  def avgPerDart(): Double {
+    if history.size == 0 { return 0.0 }
+    return totalScore().toDouble2() / history.size.toDouble2()
+  }
+  def bestDart(): DartThrow? {
+    var best: DartThrow? = null
+    foreach d: DartThrow in history {
+      if best == null || d.score() > (best as DartThrow).score() {
+        best = d
+      }
+    }
+    return best
+  }
+  def countByMultiplier(): Map[String, Int] {
+    val m: Map[String, Int] = [:]
+    foreach d: DartThrow in history {
+      val k: String = d.multiplier().fullLabel()
+      val c: Int = if m.containsKey(k) { m.get(k) as Int } else { 0 }
+      m.put(k, c + 1)
+    }
+    return m
+  }
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== DARTS 501 SIMULATOR ===")
+  IO::println("")
+
+  // ── Checkout route table ────────────────────────────────────────────────────
+  IO::println("Checkout routes:")
+  IO::println("  Score  Route                   Darts")
+  IO::println("  -----  ----------------------  -----")
+  val targets: List[Int] = [170, 167, 160, 121, 100, 60, 50, 40, 32, 16, 2]
+  foreach score: Int in targets {
+    val route: CheckoutRoute? = CheckoutFinder::find(score)
+    if route != null {
+      val r: CheckoutRoute = route as CheckoutRoute
+      IO::println("  #{score.padLeft(5)}  #{r.describe().padRight2(22)}  #{r.dartCount()}")
+    } else {
+      IO::println("  #{score.padLeft(5)}  (no route)                -")
+    }
+  }
+  IO::println("")
+
+  // ── Simulate Alice vs Bob ───────────────────────────────────────────────────
+  IO::println("Game: Alice vs Bob (501, first to finish wins)")
+  IO::println("")
+
+  // Alice: R1 T20×3=180 (321 left), R2 T20×3=180 (141 left),
+  //         R3 T20+T15+D18 = 60+45+36 = 141 → 0, WIN in 9 darts
+  val aliceScript: List[DartSpec] = [
+    new DartSpec(20, new Trebles()), new DartSpec(20, new Trebles()), new DartSpec(20, new Trebles()),
+    new DartSpec(20, new Trebles()), new DartSpec(20, new Trebles()), new DartSpec(20, new Trebles()),
+    new DartSpec(20, new Trebles()), new DartSpec(15, new Trebles()), new DartSpec(18, new Doubles())
+  ]
+  val bobScript: List[DartSpec] = [
+    new DartSpec(19, new Trebles()), new DartSpec(19, new Trebles()), new DartSpec(19, new Trebles()),
+    new DartSpec(18, new Trebles()), new DartSpec(18, new Trebles()), new DartSpec(18, new Trebles()),
+    new DartSpec(17, new Trebles()), new DartSpec(17, new Trebles()), new DartSpec(17, new Trebles())
+  ]
+
+  val game: DartsGame = new DartsGame(["Alice", "Bob"])
+  game.printStatus()
+  IO::println("")
+
+  var aIdx: Int    = 0
+  var bIdx: Int    = 0
+  var round: Int   = 1
+  var done: Boolean = false
+
+  while !done {
+    IO::println("-- Round #{round} --")
+
+    // Alice throws up to 3 darts
+    var aThisRound: Int = 0
+    while aThisRound < 3 && aIdx < aliceScript.size && !done {
+      val spec: DartSpec = aliceScript[aIdx] as DartSpec
+      val result: GameResult = game.throwDart(spec.sector(), spec.mult())
+      val dart: DartThrow    = spec.toDart()
+      IO::print("  Alice  #{dart.label().padRight2(4)} (#{dart.score().padLeft(3)})  ")
+      select result {
+        case ip is InProgress:
+          IO::println("#{ip.throwerName()}: #{ip.remaining()} remaining")
+        case w is Won:
+          IO::println(w.describe())
+          done = true
+        case b is Bust:
+          IO::println("BUST!")
+      }
+      aIdx++
+      aThisRound++
+    }
+
+    // Bob throws up to 3 darts
+    var bThisRound: Int = 0
+    while bThisRound < 3 && bIdx < bobScript.size && !done {
+      val spec2: DartSpec = bobScript[bIdx] as DartSpec
+      val result2: GameResult = game.throwDart(spec2.sector(), spec2.mult())
+      val dart2: DartThrow    = spec2.toDart()
+      IO::print("  Bob    #{dart2.label().padRight2(4)} (#{dart2.score().padLeft(3)})  ")
+      select result2 {
+        case ip is InProgress:
+          IO::println("#{ip.throwerName()}: #{ip.remaining()} remaining")
+        case w is Won:
+          IO::println(w.describe())
+          done = true
+        case b is Bust:
+          IO::println("BUST!")
+      }
+      bIdx++
+      bThisRound++
+    }
+
+    if aIdx >= aliceScript.size && bIdx >= bobScript.size { done = true }
+    round++
+  }
+
+  IO::println("")
+  game.printStatus()
+  IO::println("")
+
+  // ── Post-game statistics ────────────────────────────────────────────────────
+  IO::println("Alice's statistics:")
+  val aliceDarts: List[DartThrow] = []
+  foreach spec: DartSpec in aliceScript {
+    aliceDarts.add(spec.toDart())
+  }
+  val stats: TurnStats = new TurnStats("Alice", aliceDarts)
+  IO::println("  Total scored : #{stats.totalScore()}")
+  IO::println("  Avg per dart : #{stats.avgPerDart()}")
+  val best: DartThrow? = stats.bestDart()
+  if best != null {
+    IO::println("  Best dart    : #{(best as DartThrow).label()} = #{(best as DartThrow).score()}")
+  }
+  IO::println("  By multiplier:")
+  val byMult: Map[String, Int] = stats.countByMultiplier()
+  foreach (k, v) in byMult {
+    IO::println("    #{(k as String).padRight2(8)}: #{v}")
+  }
+  IO::println("")
+
+  // ── Top highest achievable checkouts ───────────────────────────────────────
+  IO::println("Top 5 highest valid checkouts (from 170 down):")
+  val hiList: List[Int] = []
+  var hiScore: Int = 170
+  while hiScore >= 2 && hiList.size < 5 {
+    val r2: CheckoutRoute? = CheckoutFinder::find(hiScore)
+    if r2 != null { hiList.add(hiScore) }
+    hiScore--
+  }
+  foreach score2: Int in hiList {
+    val r3: CheckoutRoute? = CheckoutFinder::find(score2)
+    if r3 != null {
+      IO::println("  #{score2.padLeft(3)}: #{(r3 as CheckoutRoute).describe()}")
+    }
+  }
+  IO::println("")
+  IO::println("Done.")
+}

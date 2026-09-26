@@ -1,0 +1,458 @@
+// GemCollection.on — mineral and gemstone collection management system
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+//   interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+//   sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+//   closures, string interpolation, try/catch, recursion, while, foreach.
+
+// ─── Plain enums ──────────────────────────────────────────────────────────────
+
+enum Rarity { Common, Uncommon, Rare, VeryRare, Exceptional }
+
+enum CollectionStatus { Owned, Wishlist, Loaned, ForSale }
+
+// ─── Data-carrying enums ──────────────────────────────────────────────────────
+
+enum CrystalSystem(shortName: String, axisCount: Int) {
+  Cubic("Cubic", 3),
+  Hexagonal("Hex", 4),
+  Tetragonal("Tet", 3),
+  Orthorhombic("Orth", 3),
+  Monoclinic("Mono", 3),
+  Triclinic("Tri", 3),
+  Amorphous("Amrph", 0)
+}
+
+enum ChemicalGroup(symbol: String) {
+  Silicate("Si"),
+  Oxide("Ox"),
+  Carbonate("CO3"),
+  Sulfide("S"),
+  Halide("Hal"),
+  Native("Nat"),
+  Phosphate("PO4"),
+  Sulfate("SO4")
+}
+
+// ─── ADT enum: LusterType ─────────────────────────────────────────────────────
+
+enum LusterType {
+  case Metallic
+  case Vitreous(transparency: String)
+  case Adamantine
+  case Resinous
+  case Silky(fibrous: Boolean)
+  case Waxy
+  case Earthy
+public:
+  def description(): String = select this {
+    case m is Metallic:  "metallic"
+    case v is Vitreous:  "vitreous (#{v.transparency()})"
+    case a is Adamantine: "adamantine"
+    case r is Resinous:  "resinous"
+    case s is Silky:     if s.fibrous() { "silky/fibrous" } else { "silky" }
+    case w is Waxy:      "waxy"
+    case e is Earthy:    "earthy"
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt1(): String {
+    val i: Int = (self * 10.0 + 0.5) as Int
+    return "" + (i / 10) + "." + (i % 10)
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s: String = ""
+    foreach _: Int in 1..n { s = s + self }
+    return s
+  }
+}
+
+extension Int {
+  def lpadN(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Mineral(
+  name:          String,
+  formula:       String,
+  group:         ChemicalGroup,
+  crystalSystem: CrystalSystem,
+  mohsHardness:  Double,
+  luster:        LusterType,
+  rarity:        Rarity,
+  mainColor:     String,
+  description:   String
+) {
+public:
+  def hardnessGroup(): String =
+    if mohsHardness() < 3.0      { "Soft (< 3)" }
+    else if mohsHardness() < 6.0 { "Medium (3-6)" }
+    else if mohsHardness() < 8.0 { "Hard (6-8)" }
+    else                          { "Very Hard (8+)" }
+
+  def isGemQuality(): Boolean = mohsHardness() >= 7.0 && rarity().ordinal() >= Rarity::Rare.ordinal()
+
+  def shortLabel(): String = "#{name()} (#{formula()}) H=#{mohsHardness().fmt1()}"
+}
+
+record CollectionEntry(
+  mineral:      Mineral,
+  sampleWeight: Double,
+  acquisitionYear: Int,
+  source:       String,
+  status:       CollectionStatus,
+  notes:        String
+) {
+public:
+  def statusLabel(): String = select status() {
+    case CollectionStatus::Owned:    "Owned"
+    case CollectionStatus::Wishlist: "Wishlist"
+    case CollectionStatus::Loaned:   "Loaned"
+    case CollectionStatus::ForSale:  "For Sale"
+    else:                            "Unknown"
+  }
+  def age(currentYear: Int): Int = currentYear - acquisitionYear()
+  def label(): String =
+    "#{mineral().name()} | #{sampleWeight().fmt1()}g | #{source()} | #{statusLabel()}"
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Catalogable {
+  def entryCount(): Int
+  def catalogTitle(): String
+}
+
+// ─── MineralCatalog ───────────────────────────────────────────────────────────
+
+class MineralCatalog conforms Catalogable {
+  val entries: List[CollectionEntry]
+  val title:   String
+
+public:
+  def this(t: String) {
+    this.title   = t
+    this.entries = []
+  }
+
+  def addEntry(e: CollectionEntry): void { entries.add(e) }
+  def getEntries(): List[CollectionEntry]  = entries
+  def entryCount(): Int                    = entries.size
+  def catalogTitle(): String               = title
+
+  def findByName(name: String): CollectionEntry? =
+    entries.find { e -> (e as CollectionEntry).mineral().name() == name }
+
+  def byGroup(g: ChemicalGroup): List[CollectionEntry] =
+    entries.filter { e -> (e as CollectionEntry).mineral().group() == g }
+           .map    { e -> e as CollectionEntry }
+
+  def byStatus(s: CollectionStatus): List[CollectionEntry] =
+    entries.filter { e -> (e as CollectionEntry).status() == s }
+           .map    { e -> e as CollectionEntry }
+
+  def hardestFirst(): List[CollectionEntry] =
+    entries.sortedBy { e -> 0.0 - (e as CollectionEntry).mineral().mohsHardness() }
+           .map { e -> e as CollectionEntry }
+
+  def gemQualityEntries(): List[CollectionEntry] =
+    entries.filter { e -> (e as CollectionEntry).mineral().isGemQuality() }
+           .map    { e -> e as CollectionEntry }
+
+  def totalWeight(): Double =
+    entries.fold(0.0) { acc, e -> (acc as Double) + (e as CollectionEntry).sampleWeight() } as Double
+
+  def groupCounts(): Map[String, Int] {
+    val counts: Map[String, Int] = [:]
+    foreach e: CollectionEntry in entries {
+      val key: String = e.mineral().group().symbol()
+      val c: Int? = counts[key]
+      counts[key] = if c == null { 1 } else { c + 1 }
+    }
+    return counts
+  }
+
+  def averageHardness(): Double {
+    val n: Int = entries.size
+    if n == 0 { return 0.0 }
+    val sum: Double = entries.fold(0.0) { acc, e ->
+      (acc as Double) + (e as CollectionEntry).mineral().mohsHardness()
+    } as Double
+    return sum / n
+  }
+}
+
+// ─── Analysis helpers ─────────────────────────────────────────────────────────
+
+def rarityStars(r: Rarity): String = select r {
+  case Rarity::Common:      "*"
+  case Rarity::Uncommon:    "**"
+  case Rarity::Rare:        "***"
+  case Rarity::VeryRare:    "****"
+  case Rarity::Exceptional: "*****"
+  else:                     "?"
+}
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  IO::println(s)
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+// ─── Mineral data ─────────────────────────────────────────────────────────────
+
+val diamond    = new Mineral("Diamond",    "C",         ChemicalGroup::Native,    CrystalSystem::Cubic,       10.0, new Adamantine(),              Rarity::Exceptional, "Colorless", "Hardest natural material")
+val quartz     = new Mineral("Quartz",     "SiO2",      ChemicalGroup::Silicate,  CrystalSystem::Hexagonal,    7.0, new Vitreous("transparent"),   Rarity::Common,      "Clear",     "Most abundant mineral")
+val calcite    = new Mineral("Calcite",    "CaCO3",     ChemicalGroup::Carbonate, CrystalSystem::Hexagonal,    3.0, new Vitreous("transparent"),   Rarity::Common,      "White",     "Ubiquitous rock-forming mineral")
+val pyrite     = new Mineral("Pyrite",     "FeS2",      ChemicalGroup::Sulfide,   CrystalSystem::Cubic,        6.0, new Metallic(),                Rarity::Common,      "Gold",      "Fool's gold — cubic crystals")
+val malachite  = new Mineral("Malachite",  "Cu2CO3(OH)2", ChemicalGroup::Carbonate, CrystalSystem::Monoclinic, 3.5, new Silky(false),              Rarity::Uncommon,    "Green",     "Vivid green banded carbonate")
+val fluorite   = new Mineral("Fluorite",   "CaF2",      ChemicalGroup::Halide,    CrystalSystem::Cubic,        4.0, new Vitreous("translucent"),   Rarity::Common,      "Purple",    "Fluorescent, perfect octahedral cleavage")
+val tourmaline = new Mineral("Tourmaline", "Complex",   ChemicalGroup::Silicate,  CrystalSystem::Hexagonal,    7.5, new Vitreous("transparent"),   Rarity::Uncommon,    "Multi",     "Widest color range of any gem mineral")
+val gypsum     = new Mineral("Gypsum",     "CaSO4·2H2O", ChemicalGroup::Sulfate,  CrystalSystem::Monoclinic,  2.0, new Silky(true),               Rarity::Common,      "White",     "Very soft; satin spar variety is fibrous")
+val apatite    = new Mineral("Apatite",    "Ca5(PO4)3", ChemicalGroup::Phosphate, CrystalSystem::Hexagonal,    5.0, new Vitreous("translucent"),   Rarity::Uncommon,    "Blue-green", "Defines Mohs 5; hardness of teeth")
+val magnetite  = new Mineral("Magnetite",  "Fe3O4",     ChemicalGroup::Oxide,     CrystalSystem::Cubic,        5.5, new Metallic(),                Rarity::Common,      "Black",     "Strongly magnetic iron oxide")
+val corundum   = new Mineral("Corundum",   "Al2O3",     ChemicalGroup::Oxide,     CrystalSystem::Hexagonal,    9.0, new Vitreous("transparent"),   Rarity::Rare,        "Varies",    "Ruby (red) and sapphire (other) are varieties")
+val amazonite  = new Mineral("Amazonite",  "KAlSi3O8",  ChemicalGroup::Silicate,  CrystalSystem::Triclinic,    6.0, new Vitreous("translucent"),   Rarity::Uncommon,    "Teal",      "Blue-green feldspar variety")
+val tanzanite  = new Mineral("Tanzanite",  "Ca2Al3Si3O12(OH)", ChemicalGroup::Silicate, CrystalSystem::Orthorhombic, 6.5, new Vitreous("transparent"), Rarity::Rare,   "Violet-blue", "Found only near Mount Kilimanjaro")
+val rhodonite  = new Mineral("Rhodonite",  "MnSiO3",    ChemicalGroup::Silicate,  CrystalSystem::Triclinic,    5.5, new Vitreous("translucent"),   Rarity::Uncommon,    "Pink-red",  "Pink manganese silicate, black veins")
+val celestine  = new Mineral("Celestine",  "SrSO4",     ChemicalGroup::Sulfate,   CrystalSystem::Orthorhombic, 3.0, new Vitreous("transparent"),   Rarity::Uncommon,    "Pale blue", "Sky-blue crystals, strontium source")
+
+// ─── Collection entries ───────────────────────────────────────────────────────
+
+val catalog = new MineralCatalog("Avery's Gem & Mineral Collection")
+
+catalog.addEntry(new CollectionEntry(diamond,    0.3,  2019, "Artisan trader",      CollectionStatus::Owned,    "Small brilliant cut"))
+catalog.addEntry(new CollectionEntry(quartz,     245.0, 2015, "Oregon dig site",    CollectionStatus::Owned,    "Large smoky cluster"))
+catalog.addEntry(new CollectionEntry(calcite,    88.5, 2016, "Local mine",          CollectionStatus::Owned,    "Dog-tooth scalenohedra"))
+catalog.addEntry(new CollectionEntry(pyrite,     310.0, 2014, "Spain (Navajun)",    CollectionStatus::Owned,    "Perfect cubes on matrix"))
+catalog.addEntry(new CollectionEntry(malachite,  152.0, 2017, "Congo specimen",     CollectionStatus::Owned,    "Banded cabochon"))
+catalog.addEntry(new CollectionEntry(fluorite,   95.0, 2020, "Illinois",            CollectionStatus::Owned,    "Purple octahedra"))
+catalog.addEntry(new CollectionEntry(tourmaline, 28.0, 2021, "Brazil",              CollectionStatus::Owned,    "Bicolor crystal"))
+catalog.addEntry(new CollectionEntry(gypsum,     40.0, 2018, "Selenite cave repro", CollectionStatus::Owned,    "Satin spar blade"))
+catalog.addEntry(new CollectionEntry(apatite,    22.0, 2022, "Mexico",              CollectionStatus::Wishlist, "Need parasite green variety"))
+catalog.addEntry(new CollectionEntry(magnetite,  180.0, 2013, "Utah",               CollectionStatus::Owned,    "Octahedral crystals"))
+catalog.addEntry(new CollectionEntry(corundum,   4.5,  2023, "Myanmar rubies",      CollectionStatus::Owned,    "Uncut ruby crystal"))
+catalog.addEntry(new CollectionEntry(amazonite,  65.0, 2019, "Colorado",            CollectionStatus::Owned,    "Microcline feldspar"))
+catalog.addEntry(new CollectionEntry(tanzanite,  3.2,  2022, "Gem show",            CollectionStatus::Owned,    "Faceted, strong trichroism"))
+catalog.addEntry(new CollectionEntry(rhodonite,  78.0, 2020, "New Zealand",         CollectionStatus::Owned,    "Polished slab"))
+catalog.addEntry(new CollectionEntry(celestine,  55.0, 2021, "Madagascar",          CollectionStatus::Loaned,   "On loan to local museum"))
+
+val CURRENT_YEAR: Int = 2026
+
+// ─── Overview ─────────────────────────────────────────────────────────────────
+
+printSection("=== " + catalog.catalogTitle() + " ===")
+IO::println("  Entries: #{catalog.entryCount()}  |  Total weight: #{catalog.totalWeight().fmt1()} g")
+IO::println("  Avg hardness: #{catalog.averageHardness().fmt1()} (Mohs)")
+
+// ─── Full catalog listing ─────────────────────────────────────────────────────
+
+printSection("=== Full Catalog ===")
+foreach e: CollectionEntry in catalog.hardestFirst() {
+  val m: Mineral = e.mineral()
+  IO::println("  " + m.name().rpad(14) + " H=" + m.mohsHardness().fmt1().lpad(4) +
+    "  " + m.crystalSystem().shortName().rpad(6) +
+    "  " + rarityStars(m.rarity()).rpad(6) +
+    "  " + e.statusLabel().rpad(10) +
+    "  " + m.luster().description())
+}
+
+// ─── Hardness group distribution ─────────────────────────────────────────────
+
+printSection("=== Hardness Group Distribution ===")
+val hardGroups: Map[String, Int] = [:]
+foreach e: CollectionEntry in catalog.getEntries() {
+  val grp: String = e.mineral().hardnessGroup()
+  val c: Int? = hardGroups[grp]
+  hardGroups[grp] = if c == null { 1 } else { c + 1 }
+}
+val orderedGroups: List[String] = ["Soft (< 3)", "Medium (3-6)", "Hard (6-8)", "Very Hard (8+)"]
+foreach grp: String in orderedGroups {
+  val cnt: Int? = hardGroups[grp]
+  if cnt != null {
+    val bar: String = "|".repeat(cnt)
+    IO::println("  " + grp.rpad(18) + " " + cnt.lpadN(3) + "  " + bar)
+  }
+}
+
+// ─── Chemical group breakdown ─────────────────────────────────────────────────
+
+printSection("=== Chemical Group Breakdown ===")
+val groupCounts: Map[String, Int] = catalog.groupCounts()
+val sortedGroups: List[String] = groupCounts.keys().sortedBy { k ->
+  val c: Int? = groupCounts[k as String]
+  0 - (if c == null { 0 } else { c })
+}
+foreach g: Object in sortedGroups {
+  val gs: String = g as String
+  val cnt: Int = (groupCounts[gs]) ?: 0
+  val bar: String = "*".repeat(cnt)
+  IO::println("  " + gs.rpad(6) + " " + cnt.lpadN(3) + "  " + bar)
+}
+
+// ─── Crystal system analysis ──────────────────────────────────────────────────
+
+printSection("=== Crystal System Distribution ===")
+val sysCounts: Map[String, Int] = [:]
+foreach e: CollectionEntry in catalog.getEntries() {
+  val sys: String = e.mineral().crystalSystem().shortName()
+  val c: Int? = sysCounts[sys]
+  sysCounts[sys] = if c == null { 1 } else { c + 1 }
+}
+foreach (sys, cnt) in sysCounts {
+  val bar: String = "=".repeat(cnt as Int)
+  IO::println("  " + (sys as String).rpad(8) + " " + (cnt as Int).lpadN(3) + "  " + bar)
+}
+
+// ─── Gem-quality specimens ────────────────────────────────────────────────────
+
+printSection("=== Gem-Quality Specimens ===")
+val gems: List[CollectionEntry] = catalog.gemQualityEntries()
+IO::println("  #{gems.size} gem-quality entries (H>=7 and Rare+):")
+foreach e: CollectionEntry in gems {
+  val m: Mineral = e.mineral()
+  IO::println("  * #{m.name().rpad(14)} #{m.mainColor().rpad(12)} #{rarityStars(m.rarity())} — #{m.description()}")
+}
+
+// ─── Status breakdown ─────────────────────────────────────────────────────────
+
+printSection("=== Collection Status ===")
+val owned:    List[CollectionEntry] = catalog.byStatus(CollectionStatus::Owned)
+val wishlist: List[CollectionEntry] = catalog.byStatus(CollectionStatus::Wishlist)
+val loaned:   List[CollectionEntry] = catalog.byStatus(CollectionStatus::Loaned)
+val forsale:  List[CollectionEntry] = catalog.byStatus(CollectionStatus::ForSale)
+IO::println("  Owned:    #{owned.size}")
+IO::println("  Wishlist: #{wishlist.size}")
+IO::println("  Loaned:   #{loaned.size}")
+IO::println("  For Sale: #{forsale.size}")
+if loaned.size > 0 {
+  IO::println("  Loaned items:")
+  foreach e: CollectionEntry in loaned {
+    IO::println("    - #{e.mineral().name()} (#{e.notes()})")
+  }
+}
+
+// ─── Silicate family detail ───────────────────────────────────────────────────
+
+printSection("=== Silicate Minerals ===")
+val silicates: List[CollectionEntry] = catalog.byGroup(ChemicalGroup::Silicate)
+IO::println("  #{silicates.size} silicate entries, sorted by hardness:")
+val silicatesSorted: List[CollectionEntry] = silicates.sortedBy { e ->
+  0.0 - (e as CollectionEntry).mineral().mohsHardness()
+}.map { e -> e as CollectionEntry }
+foreach e: CollectionEntry in silicatesSorted {
+  val m: Mineral = e.mineral()
+  IO::println("  #{m.name().rpad(14)} #{m.crystalSystem().shortName().rpad(6)} H=#{m.mohsHardness().fmt1()}")
+}
+
+// ─── Acquisition timeline ─────────────────────────────────────────────────────
+
+printSection("=== Acquisition Timeline ===")
+val byYear: Map[String, Int] = [:]
+foreach e: CollectionEntry in catalog.getEntries() {
+  val yr: String = "" + e.acquisitionYear()
+  val c: Int? = byYear[yr]
+  byYear[yr] = if c == null { 1 } else { c + 1 }
+}
+val years: List[String] = byYear.keys().sortedBy { k -> k as String }
+foreach yr: Object in years {
+  val yrs: String = yr as String
+  val cnt: Int = (byYear[yrs]) ?: 0
+  val bar: String = "+".repeat(cnt)
+  IO::println("  " + yrs + " " + cnt.lpadN(3) + "  " + bar)
+}
+
+// ─── Hardness statistics (fold + recursion) ──────────────────────────────────
+
+printSection("=== Hardness Statistics ===")
+
+def hardnessMax(entries: List[CollectionEntry], idx: Int, current: Double): Double {
+  if idx >= entries.size { return current }
+  val h: Double = (entries.get(idx) as CollectionEntry).mineral().mohsHardness()
+  return hardnessMax(entries, idx + 1, if h > current { h } else { current })
+}
+
+def hardnessMin(entries: List[CollectionEntry], idx: Int, current: Double): Double {
+  if idx >= entries.size { return current }
+  val h: Double = (entries.get(idx) as CollectionEntry).mineral().mohsHardness()
+  return hardnessMin(entries, idx + 1, if h < current { h } else { current })
+}
+
+val allEntries: List[CollectionEntry] = catalog.getEntries()
+val hMax: Double = hardnessMax(allEntries, 1, (allEntries.get(0) as CollectionEntry).mineral().mohsHardness())
+val hMin: Double = hardnessMin(allEntries, 1, (allEntries.get(0) as CollectionEntry).mineral().mohsHardness())
+val hAvg: Double = catalog.averageHardness()
+
+IO::println("  Min: #{hMin.fmt1()}  Max: #{hMax.fmt1()}  Avg: #{hAvg.fmt1()}")
+IO::println("  Harder than avg: " + catalog.getEntries().filter { e ->
+  (e as CollectionEntry).mineral().mohsHardness() > hAvg
+}.size + " / " + catalog.entryCount())
+
+// ─── Rarity distribution ──────────────────────────────────────────────────────
+
+printSection("=== Rarity Distribution ===")
+val rarityCounts: Map[String, Int] = [:]
+foreach e: CollectionEntry in catalog.getEntries() {
+  val r: String = "" + e.mineral().rarity()
+  val c: Int? = rarityCounts[r]
+  rarityCounts[r] = if c == null { 1 } else { c + 1 }
+}
+val rarityOrder: List[String] = ["Common", "Uncommon", "Rare", "VeryRare", "Exceptional"]
+foreach rr: String in rarityOrder {
+  val cnt: Int? = rarityCounts[rr]
+  if cnt != null {
+    IO::println("  " + rr.rpad(12) + " " + cnt.lpadN(3) + "  " + rarityStars(
+      select rr {
+        case "Common":      Rarity::Common
+        case "Uncommon":    Rarity::Uncommon
+        case "Rare":        Rarity::Rare
+        case "VeryRare":    Rarity::VeryRare
+        case "Exceptional": Rarity::Exceptional
+        else:               Rarity::Common
+      }
+    ))
+  }
+}
+
+// ─── Zip: mineral paired with age in collection ──────────────────────────────
+
+printSection("=== Collection Ages ===")
+val entryList: List[CollectionEntry] = catalog.hardestFirst()
+val names: List[String] = entryList.map { e -> (e as CollectionEntry).mineral().name() }
+val ages: List[Int]    = entryList.map { e -> (e as CollectionEntry).age(CURRENT_YEAR) }
+val paired = names.zip(ages)
+foreach pair: Object in paired {
+  val p: List[Object] = pair as List[Object]
+  val nm:  String = p[0] as String
+  val age: Int    = p[1] as Int
+  IO::println("  " + nm.rpad(14) + " " + age.lpadN(3) + " yr" + (if age == 1 { "" } else { "s" }))
+}
+
+IO::println("")
+IO::println("=== Collection analysis complete ===")

@@ -1,0 +1,231 @@
+// AirTrafficControl.on — a small airport tower control simulation.
+//
+// Exercises: ADT case-enum with data-carrying case and select dispatch, a
+// data-carrying enum, a record deriving a parser from a regex literal (with
+// a compile-time `example` clause), records with methods, an interface
+// implemented by a class with public/private sections and mutable state,
+// extension methods on Int/String, collection pipelines (filter/map/fold/
+// groupBy/sortedBy/find/partition), nullable lookups with null guards,
+// closures, string interpolation, try/catch, while/foreach loops.
+
+import {
+  java.util.*
+}
+
+// ─── Flight phase (ADT) ───────────────────────────────────────────────────────
+
+enum FlightPhase {
+  case Boarding
+  case Taxiing
+  case Airborne(altitudeFt: Int)
+  case Landed
+public:
+  def label(): String = select this {
+    case p is Boarding:  "boarding"
+    case p is Taxiing:   "taxiing"
+    case p is Airborne:  "airborne @#{p.altitudeFt()}ft"
+    case p is Landed:    "landed"
+  }
+
+  def isActive(): Boolean = select this {
+    case p is Landed: false
+    else: true
+  }
+}
+
+// ─── Runway status (data-carrying enum) ──────────────────────────────────────
+
+enum RunwayStatus(code: String, label: String) {
+  Active(     "A", "active"),
+  Closed(     "C", "closed"),
+  Maintenance("M", "maintenance")
+}
+
+// ─── Clearance log line parser ────────────────────────────────────────────────
+
+// A ground-control log line: "AAL123 TAXI 09R 1422" (callsign, action, runway, hhmm)
+record ClearanceLog(callsign: String, action: String, runway: String, hhmm: Int)
+  from re"(\S+) (\S+) (\S+) (\d+)"
+  example { ClearanceLog::parse("AAL123 TAXI 09R 1422") != null }
+  example { ClearanceLog::parse("not a valid line") == null }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def toAltitudeLabel(): String = if self <= 0 { "ground" } else { "#{self}ft" }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Flight and runway records ────────────────────────────────────────────────
+
+record Flight(callsign: String, origin: String, destination: String, phase: FlightPhase) {
+public:
+  def route(): String = "#{origin()}->#{destination()}"
+
+  def summary(): String = "#{callsign().rpad(8)} #{route().rpad(12)} #{phase().label()}"
+}
+
+record Runway(id: String, lengthFt: Int, status: RunwayStatus) {
+public:
+  def isUsable(): Boolean = status() === RunwayStatus::Active
+
+  def label(): String = "#{id()} (#{lengthFt()}ft, #{status().label()})"
+}
+
+// ─── Tower ─────────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class Tower conforms Reportable {
+  val name: String
+  var flights: List[Flight]
+  var runways: List[Runway]
+  var clock: Int
+
+public:
+  def this(name: String, runways: List[Runway]) {
+    this.name = name
+    this.flights = new ArrayList[Flight]()
+    this.runways = runways
+    this.clock = 0
+  }
+
+  def addFlight(f: Flight): void {
+    flights.add(f)
+  }
+
+  def findFlight(callsign: String): Flight? = flights.find { f -> f.callsign() == callsign }
+
+  def advance(callsign: String, next: FlightPhase): void {
+    val found: Flight? = findFlight(callsign)
+    if found == null {
+      throw new RuntimeException("no such flight: #{callsign}")
+    }
+    val idx = flights.indexOf(found)
+    flights[idx] = new Flight(found.callsign(), found.origin(), found.destination(), next)
+  }
+
+  def tick(): void {
+    clock = clock + 1
+  }
+
+  def allFlights(): List[Flight] = flights
+
+  def activeFlights(): List[Flight] = flights.filter { f -> f.phase().isActive() }
+
+  def usableRunways(): List[Runway] = runways.filter { r -> r.isUsable() }
+
+  def flightsByDestination(): Map[String, List[Flight]] = flights.groupBy { f -> f.destination() }
+
+  def busiestDestination(): String? {
+    val grouped = flightsByDestination()
+    if grouped.isEmpty() { return null }
+    var best: String? = null
+    var bestCount = 0
+    foreach (dest, fs) in grouped {
+      if fs.size > bestCount {
+        best = dest
+        bestCount = fs.size
+      }
+    }
+    return best
+  }
+
+public:
+  def report(): String {
+    var lines = "=== Tower: #{name} (t=#{clock}) ===\n"
+    lines = lines + "-- Runways --\n"
+    foreach r: Runway in runways {
+      lines = lines + r.label() + "\n"
+    }
+    lines = lines + "-- Flights --\n"
+    foreach f: Flight in flights {
+      lines = lines + f.summary() + "\n"
+    }
+    return lines
+  }
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val runways = [
+    new Runway("09R", 11000, RunwayStatus::Active),
+    new Runway("27L", 9500,  RunwayStatus::Active),
+    new Runway("14",  6000,  RunwayStatus::Maintenance)
+  ]
+  val tower = new Tower("Springfield Intl", runways)
+
+  tower.addFlight(new Flight("AAL123", "ORD", "JFK", new Boarding()))
+  tower.addFlight(new Flight("UAL456", "SFO", "JFK", new Taxiing()))
+  tower.addFlight(new Flight("DAL789", "ATL", "LAX", new Airborne(32000)))
+  tower.addFlight(new Flight("SWA321", "DEN", "JFK", new Landed()))
+
+  IO::println(tower.report())
+
+  IO::println("-- Usable runways --")
+  foreach r: Runway in tower.usableRunways() {
+    IO::println(r.label())
+  }
+
+  IO::println("")
+  IO::println("-- Active flights --")
+  foreach f: Flight in tower.activeFlights() {
+    IO::println(f.summary())
+  }
+
+  IO::println("")
+  val busiest: String? = tower.busiestDestination()
+  IO::println("Busiest destination: #{busiest ?: "none"}")
+
+  IO::println("")
+  IO::println("-- Advancing AAL123: boarding -> taxiing -> airborne --")
+  tower.advance("AAL123", new Taxiing())
+  tower.tick()
+  tower.advance("AAL123", new Airborne(1200))
+  tower.tick()
+  val updated: Flight? = tower.findFlight("AAL123")
+  if updated != null {
+    IO::println(updated.summary())
+  }
+
+  IO::println("")
+  IO::println("-- Ground control log --")
+  val logLines = ["AAL123 TAXI 09R 1422", "UAL456 HOLD 27L 1425", "garbage line here"]
+  foreach line: String in logLines {
+    val parsed: ClearanceLog? = ClearanceLog::parse(line)
+    if parsed == null {
+      IO::println("  (unparsed) #{line}")
+    } else {
+      IO::println("  #{parsed.callsign()} #{parsed.action()} on #{parsed.runway()} at #{parsed.hhmm()}")
+    }
+  }
+
+  IO::println("")
+  IO::println("-- Runway length ranking --")
+  val ranked = runways.sortedBy { r -> -r.lengthFt() }
+  for var i: Int = 0; i < ranked.size; i++ {
+    val r = ranked[i]
+    IO::println("#{i + 1}. #{r.id()} — #{r.lengthFt().toAltitudeLabel()}")
+  }
+
+  val parts = tower.allFlights().partition { f -> f.phase().isActive() }
+  IO::println("")
+  IO::println("Active: #{(parts[0] as List[Object]).size}, Grounded/landed: #{(parts[1] as List[Object]).size}")
+
+  try {
+    tower.advance("ZZZ999", new Landed())
+  } catch e: RuntimeException {
+    IO::println("")
+    IO::println("Caught expected error: #{e.message()}")
+  }
+}

@@ -1,0 +1,511 @@
+// BudgetPlanner.on — personal budget and expense tracking system
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Month {
+  Jan, Feb, Mar, Apr, May, Jun,
+  Jul, Aug, Sep, Oct, Nov, Dec
+}
+
+enum Category(label: String, isEssential: Boolean) {
+  Housing("Housing", true),
+  Food("Food", true),
+  Transport("Transport", true),
+  Healthcare("Healthcare", true),
+  Utilities("Utilities", true),
+  Entertainment("Entertainment", false),
+  Clothing("Clothing", false),
+  Education("Education", false),
+  Savings("Savings", false),
+  Other("Other", false)
+}
+
+// ─── ADT: TransactionKind ─────────────────────────────────────────────────────
+
+enum TransactionKind {
+  case Income(source: String)
+  case Expense(category: Category)
+  case Transfer(toAccount: String)
+public:
+  def label(): String = select this {
+    case i is Income:   "Income from #{i.source()}"
+    case e is Expense:  "Expense: #{e.category().label()}"
+    case t is Transfer: "Transfer to #{t.toAccount()}"
+  }
+  def isExpense(): Boolean = select this {
+    case e is Expense: true
+    else:              false
+  }
+  def isIncome(): Boolean = select this {
+    case i is Income: true
+    else:             false
+  }
+}
+
+// ─── Formatting helpers (defined before records that use it) ──────────────────
+
+class Format {
+public:
+  static def money(v: Double): String {
+    val rounded: Long = v as Long
+    val s: String = Long::toString(rounded)
+    val len: Int = s.length()
+    if len <= 3 {
+      return s
+    }
+    val prefix: String = s.substring(0, len - 3)
+    val suffix: String = s.substring(len - 3, len)
+    return "#{prefix},#{suffix}"
+  }
+
+  static def pct(v: Double): String = Format::money(v) + "%"
+
+  static def pad(s: String, width: Int): String {
+    var r: String = s
+    while r.length() < width { r = " " + r }
+    return r
+  }
+
+  static def bar(filled: Int, total: Int, width: Int): String {
+    val fillCount: Int = if total <= 0 { 0 } else { filled * width / total }
+    var s: String = "["
+    var i: Int = 0
+    while i < width {
+      if i < fillCount { s = s + "#" }
+      else             { s = s + "." }
+      i = i + 1
+    }
+    return s + "]"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Transaction(
+  id:          Int,
+  description: String,
+  amount:      Double,
+  kind:        TransactionKind,
+  month:       Month,
+  day:         Int
+) {
+public:
+  def isIncome(): Boolean  = kind().isIncome()
+  def isExpense(): Boolean = kind().isExpense()
+
+  def expenseCategory(): Category? = select kind() {
+    case e is Expense: e.category()
+    else:              null
+  }
+
+  def dateLabel(): String = "#{month()}/#{day()}"
+
+  def summary(): String =
+    "[#{dateLabel()}] #{description()} — $#{Format::money(amount())} (#{kind().label()})"
+}
+
+record Budget(
+  category: Category,
+  monthly:  Double
+) {
+public:
+  def label(): String = "#{category().label()}: $#{Format::money(monthly())}/mo"
+}
+
+record MonthSummary(
+  month:        Month,
+  totalIncome:  Double,
+  totalExpense: Double,
+  txCount:      Int
+) {
+public:
+  def netFlow(): Double  = totalIncome() - totalExpense()
+  def surplus(): Boolean = netFlow() > 0.0
+
+  def report(): String {
+    val net: Double = netFlow()
+    val sign: String = if net >= 0.0 { "+" } else { "" }
+    return "#{month()}: income=$#{Format::money(totalIncome())}  " +
+           "exp=$#{Format::money(totalExpense())}  " +
+           "net=#{sign}$#{Format::money(net)}  " +
+           "(#{txCount()} tx)"
+  }
+
+  def savingsRate(): Double =
+    if totalIncome() <= 0.0 { 0.0 }
+    else { (totalIncome() - totalExpense()) / totalIncome() * 100.0 }
+}
+
+record CategorySpend(
+  category: Category,
+  total:    Double,
+  txCount:  Int,
+  budget:   Double
+) {
+public:
+  def overBudget(): Boolean = total() > budget() && budget() > 0.0
+
+  def utilizationPct(): Double =
+    if budget() <= 0.0 { 0.0 } else { total() / budget() * 100.0 }
+
+  def label(): String {
+    val flag: String = if overBudget() { " [OVER BUDGET]" } else { "" }
+    return "#{category().label()}: $#{Format::money(total())} / $#{Format::money(budget())} " +
+           "(#{Format::pct(utilizationPct())})#{flag}"
+  }
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def generateReport(): String
+}
+
+// ─── Account class ────────────────────────────────────────────────────────────
+
+class Account conforms Reportable {
+  val name:         String
+  val transactions: List[Transaction]
+  val budgets:      List[Budget]
+  var nextId:       Int
+
+public:
+  def this(name: String) {
+    self.name = name
+    self.transactions = []
+    self.budgets = []
+    self.nextId = 1
+  }
+
+  def addTransaction(desc: String, amount: Double, kind: TransactionKind, month: Month, day: Int): Transaction {
+    val tx: Transaction = new Transaction(nextId, desc, amount, kind, month, day)
+    transactions.add(tx)
+    self.nextId = nextId + 1
+    return tx
+  }
+
+  def addBudget(cat: Category, monthly: Double): void {
+    budgets.add(new Budget(cat, monthly))
+  }
+
+  def getBudget(cat: Category): Double {
+    val b: Budget? = budgets.find { b -> b.category() == cat }
+    if b != null { return b.monthly() }
+    return 0.0
+  }
+
+  def totalIncome(): Double =
+    transactions
+      .filter { t -> t.isIncome() }
+      .map    { t -> t.amount() }
+      .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+
+  def totalExpenses(): Double =
+    transactions
+      .filter { t -> t.isExpense() }
+      .map    { t -> t.amount() }
+      .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+
+  def savingsRate(): Double {
+    val inc: Double = totalIncome()
+    if inc <= 0.0 { return 0.0 }
+    return (inc - totalExpenses()) / inc * 100.0
+  }
+
+  def expensesByCategory(): List[CategorySpend] {
+    val cats: List[Category] = transactions
+      .filter  { t -> t.isExpense() && t.expenseCategory() != null }
+      .map     { t -> t.expenseCategory() as Category }
+      .distinct()
+    return cats.map { cat -> {
+      val total: Double = transactions
+        .filter { t -> t.isExpense() && t.expenseCategory() == cat }
+        .map    { t -> t.amount() }
+        .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+      val cnt: Int = transactions
+        .filter { t -> t.isExpense() && t.expenseCategory() == cat }
+        .size
+      new CategorySpend(cat, total, cnt, getBudget(cat))
+    }}
+  }
+
+  def monthSummaries(): List[MonthSummary] {
+    val months: List[Month] = transactions.map { t -> t.month() }.distinct()
+    return months.map { m -> {
+      val mTx: List[Transaction] = transactions.filter { t -> t.month() == m }
+      val income: Double = mTx
+        .filter { t -> t.isIncome() }
+        .map    { t -> t.amount() }
+        .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+      val expense: Double = mTx
+        .filter { t -> t.isExpense() }
+        .map    { t -> t.amount() }
+        .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+      new MonthSummary(m, income, expense, mTx.size)
+    }}
+  }
+
+  def essentialTotal(): Double =
+    transactions
+      .filter { t ->
+        t.isExpense() &&
+        t.expenseCategory() != null &&
+        (t.expenseCategory() as Category).isEssential()
+      }
+      .map    { t -> t.amount() }
+      .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+
+  def discretionaryTotal(): Double =
+    transactions
+      .filter { t ->
+        t.isExpense() &&
+        t.expenseCategory() != null &&
+        !(t.expenseCategory() as Category).isEssential()
+      }
+      .map    { t -> t.amount() }
+      .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+
+  def getTransactions(): List[Transaction] = transactions
+
+  def getName(): String = name
+
+  def generateReport(): String =
+    "=== Finance Report: #{name} ===\n" +
+    "Total income:   $#{Format::money(totalIncome())}\n" +
+    "Total expenses: $#{Format::money(totalExpenses())}\n" +
+    "Net:            $#{Format::money(totalIncome() - totalExpenses())}\n" +
+    "Savings rate:   #{Format::pct(savingsRate())}\n"
+}
+
+// ─── Projection engine ────────────────────────────────────────────────────────
+
+class ProjectionEngine {
+  val account: Account
+
+public:
+  def this(account: Account) {
+    self.account = account
+  }
+
+  def projectBalance(months: Int, monthlyIncome: Double, monthlyExpense: Double): Double {
+    val current: Double = account.totalIncome() - account.totalExpenses()
+    return current + (monthlyIncome - monthlyExpense) * (months as Double)
+  }
+
+  def monthsToGoal(goal: Double, monthlyIncome: Double, monthlyExpense: Double): Int {
+    val surplus: Double = monthlyIncome - monthlyExpense
+    if surplus <= 0.0 { return -1 }
+    val current: Double = account.totalIncome() - account.totalExpenses()
+    val needed:  Double = goal - current
+    if needed <= 0.0 { return 0 }
+    val m: Int = (needed / surplus) as Int
+    if (m as Double) * surplus < needed { return m + 1 }
+    return m
+  }
+
+  def breakEvenUnits(fixedCosts: Double, revenuePerUnit: Double, costPerUnit: Double): Double {
+    val margin: Double = revenuePerUnit - costPerUnit
+    if margin <= 0.0 { return -1.0 }
+    return fixedCosts / margin
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val acct: Account = new Account("Personal 2025")
+
+  // Set up budgets
+  acct.addBudget(Category::Housing,       2000.0)
+  acct.addBudget(Category::Food,           600.0)
+  acct.addBudget(Category::Transport,      300.0)
+  acct.addBudget(Category::Healthcare,     200.0)
+  acct.addBudget(Category::Utilities,      250.0)
+  acct.addBudget(Category::Entertainment,  200.0)
+  acct.addBudget(Category::Clothing,       150.0)
+  acct.addBudget(Category::Education,      100.0)
+  acct.addBudget(Category::Savings,        500.0)
+
+  // January transactions
+  acct.addTransaction("Salary",            5200.0, new Income("Employer"),               Month::Jan, 1)
+  acct.addTransaction("Rent",              1800.0, new Expense(Category::Housing),       Month::Jan, 3)
+  acct.addTransaction("Electricity",         95.0, new Expense(Category::Utilities),     Month::Jan, 5)
+  acct.addTransaction("Groceries",          220.0, new Expense(Category::Food),          Month::Jan, 7)
+  acct.addTransaction("Bus pass",            80.0, new Expense(Category::Transport),     Month::Jan, 8)
+  acct.addTransaction("Cinema & dining",    145.0, new Expense(Category::Entertainment), Month::Jan, 12)
+  acct.addTransaction("Gym membership",      45.0, new Expense(Category::Healthcare),    Month::Jan, 15)
+  acct.addTransaction("Freelance project",  800.0, new Income("Freelance"),              Month::Jan, 20)
+  acct.addTransaction("Clothing shop",      130.0, new Expense(Category::Clothing),      Month::Jan, 22)
+  acct.addTransaction("Online course",       49.0, new Expense(Category::Education),     Month::Jan, 25)
+  acct.addTransaction("Savings deposit",    400.0, new Expense(Category::Savings),       Month::Jan, 28)
+  acct.addTransaction("Restaurant",          85.0, new Expense(Category::Food),          Month::Jan, 30)
+
+  // February transactions
+  acct.addTransaction("Salary",            5200.0, new Income("Employer"),               Month::Feb, 1)
+  acct.addTransaction("Rent",              1800.0, new Expense(Category::Housing),       Month::Feb, 3)
+  acct.addTransaction("Internet",            60.0, new Expense(Category::Utilities),     Month::Feb, 4)
+  acct.addTransaction("Electricity",         88.0, new Expense(Category::Utilities),     Month::Feb, 5)
+  acct.addTransaction("Grocery run",        195.0, new Expense(Category::Food),          Month::Feb, 9)
+  acct.addTransaction("Doctor visit",        75.0, new Expense(Category::Healthcare),    Month::Feb, 11)
+  acct.addTransaction("Pharmacy",            40.0, new Expense(Category::Healthcare),    Month::Feb, 11)
+  acct.addTransaction("Concert tickets",    180.0, new Expense(Category::Entertainment), Month::Feb, 14)
+  acct.addTransaction("Gas fill-up",         55.0, new Expense(Category::Transport),     Month::Feb, 16)
+  acct.addTransaction("Side project",       350.0, new Income("Freelance"),              Month::Feb, 22)
+  acct.addTransaction("Savings deposit",    500.0, new Expense(Category::Savings),       Month::Feb, 28)
+
+  // March transactions
+  acct.addTransaction("Salary",            5200.0, new Income("Employer"),               Month::Mar, 1)
+  acct.addTransaction("Rent",              1800.0, new Expense(Category::Housing),       Month::Mar, 3)
+  acct.addTransaction("Electricity",         72.0, new Expense(Category::Utilities),     Month::Mar, 5)
+  acct.addTransaction("Internet",            60.0, new Expense(Category::Utilities),     Month::Mar, 6)
+  acct.addTransaction("Groceries",          240.0, new Expense(Category::Food),          Month::Mar, 8)
+  acct.addTransaction("Coffee shop",         35.0, new Expense(Category::Food),          Month::Mar, 10)
+  acct.addTransaction("Car repair",         320.0, new Expense(Category::Transport),     Month::Mar, 13)
+  acct.addTransaction("Gym",                 45.0, new Expense(Category::Healthcare),    Month::Mar, 15)
+  acct.addTransaction("Streaming services",  42.0, new Expense(Category::Entertainment), Month::Mar, 17)
+  acct.addTransaction("New jacket",         165.0, new Expense(Category::Clothing),      Month::Mar, 19)
+  acct.addTransaction("Tax refund",         620.0, new Income("Tax"),                    Month::Mar, 21)
+  acct.addTransaction("Online course",       99.0, new Expense(Category::Education),     Month::Mar, 22)
+  acct.addTransaction("Savings deposit",    600.0, new Expense(Category::Savings),       Month::Mar, 28)
+  acct.addTransaction("Dinner out",          90.0, new Expense(Category::Food),          Month::Mar, 30)
+
+  // ─── Print recent transactions ──────────────────────────────────────────────
+  IO::println("=== Recent Transactions (last 5) ===")
+  val recent: List[Transaction] = acct.getTransactions().sortedBy { t -> -(t.id()) }
+  var shown: Int = 0
+  foreach tx: Transaction in recent {
+    if shown < 5 {
+      IO::println("  " + tx.summary())
+      shown = shown + 1
+    }
+  }
+  IO::println("")
+
+  // ─── Month-by-month summary ─────────────────────────────────────────────────
+  IO::println("=== Monthly Summary ===")
+  val summaries: List[MonthSummary] = acct.monthSummaries()
+  foreach ms: MonthSummary in summaries {
+    IO::println("  " + ms.report())
+  }
+  IO::println("")
+
+  // ─── Category breakdown with budget utilization bars ────────────────────────
+  IO::println("=== Category Breakdown (vs Budget) ===")
+  val catSpends: List[CategorySpend] = acct.expensesByCategory()
+    .sortedBy { cs -> -(cs.total()) }
+  foreach cs: CategorySpend in catSpends {
+    val filledInt: Int = cs.total() as Int
+    val capInt:    Int = if cs.budget() > 0.0 { (cs.budget() * 1.5) as Int } else { filledInt + 1 }
+    val bar: String = Format::bar(filledInt, capInt, 20)
+    IO::println("  #{bar} #{cs.label()}")
+  }
+  IO::println("")
+
+  // ─── Essential vs discretionary ─────────────────────────────────────────────
+  IO::println("=== Essential vs Discretionary Spending ===")
+  val essential:     Double = acct.essentialTotal()
+  val discretionary: Double = acct.discretionaryTotal()
+  val totalSpend:    Double = essential + discretionary
+  val essentialPct:     Double = if totalSpend > 0.0 { essential     / totalSpend * 100.0 } else { 0.0 }
+  val discretionaryPct: Double = if totalSpend > 0.0 { discretionary / totalSpend * 100.0 } else { 0.0 }
+  IO::println("  Essential:     $#{Format::money(essential)} (#{Format::pct(essentialPct)})")
+  IO::println("  Discretionary: $#{Format::money(discretionary)} (#{Format::pct(discretionaryPct)})")
+  IO::println("")
+
+  // ─── Overall report ─────────────────────────────────────────────────────────
+  IO::println(acct.generateReport())
+
+  // ─── Top spending months ────────────────────────────────────────────────────
+  IO::println("=== Top Expense Months ===")
+  val topMonths: List[MonthSummary] = summaries.sortedBy { ms -> -(ms.totalExpense()) }
+  var rank: Int = 1
+  foreach ms: MonthSummary in topMonths {
+    IO::println("  ##{rank}: #{ms.report()}")
+    rank = rank + 1
+  }
+  IO::println("")
+
+  // ─── Per-month savings rate bar chart ───────────────────────────────────────
+  IO::println("=== Per-Month Savings Rate ===")
+  foreach ms: MonthSummary in summaries {
+    val rate: Double = ms.savingsRate()
+    val barLen: Int = if rate > 0.0 { (rate * 0.4) as Int } else { 0 }
+    var bar: String = ""
+    var bi: Int = 0
+    while bi < barLen { bar = bar + "|"; bi = bi + 1 }
+    IO::println("  #{ms.month()} #{Format::pad(bar, 15)} #{Format::pct(rate)}")
+  }
+  IO::println("")
+
+  // ─── 12-Month projection ────────────────────────────────────────────────────
+  val engine: ProjectionEngine = new ProjectionEngine(acct)
+  val monthlyIncome:  Double = 5500.0
+  val monthlyExpense: Double = 3800.0
+  val projBalance: Double = engine.projectBalance(12, monthlyIncome, monthlyExpense)
+  val moToGoal:    Int    = engine.monthsToGoal(20000.0, monthlyIncome, monthlyExpense)
+
+  IO::println("=== 12-Month Projection (avg $5,500 income / $3,800 expense) ===")
+  IO::println("  Projected balance end of year: $#{Format::money(projBalance)}")
+  val goalStr: String = if moToGoal < 0 {
+    "never (spending exceeds income)"
+  } else {
+    Long::toString(moToGoal as Long) + " months"
+  }
+  IO::println("  Months to $20,000 savings goal: #{goalStr}")
+  IO::println("")
+
+  // ─── Break-even analysis for a hypothetical side business ───────────────────
+  val bep: Double = engine.breakEvenUnits(1200.0, 45.0, 12.0)
+  IO::println("=== Break-Even Analysis (side business) ===")
+  IO::println("  Fixed costs: $1,200/mo | Price per unit: $45 | COGS: $12")
+  IO::println("  Break-even: #{Format::money(bep)} units/month")
+  IO::println("")
+
+  // ─── Over-budget alert ──────────────────────────────────────────────────────
+  IO::println("=== Budget Alerts ===")
+  val overBudget: List[CategorySpend] = acct.expensesByCategory()
+    .filter { cs -> cs.overBudget() }
+  if overBudget.size == 0 {
+    IO::println("  All categories within budget.")
+  } else {
+    foreach cs: CategorySpend in overBudget {
+      IO::println("  ALERT: #{cs.label()}")
+    }
+  }
+  IO::println("")
+
+  // ─── Largest single expenses ────────────────────────────────────────────────
+  IO::println("=== Top 5 Largest Expenses ===")
+  val topExpenses: List[Transaction] = acct.getTransactions()
+    .filter { t -> t.isExpense() }
+    .sortedBy { t -> -(t.amount()) }
+  var eRank: Int = 1
+  foreach tx: Transaction in topExpenses {
+    if eRank <= 5 {
+      IO::println("  ##{eRank}: #{tx.summary()}")
+      eRank = eRank + 1
+    }
+  }
+  IO::println("")
+
+  // ─── Income by source ───────────────────────────────────────────────────────
+  IO::println("=== Income by Source ===")
+  val incomeTx: List[Transaction] = acct.getTransactions().filter { t -> t.isIncome() }
+  val allSources: List[String] = ["Employer", "Freelance", "Tax"]
+  foreach src: String in allSources {
+    val srcTotal: Double = incomeTx
+      .filter { t -> {
+        val k: TransactionKind = t.kind()
+        if k is Income { (k as Income).source() == src } else { false }
+      }}
+      .map    { t -> t.amount() }
+      .fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+    if srcTotal > 0.0 {
+      IO::println("  #{src}: $#{Format::money(srcTotal)}")
+    }
+  }
+}

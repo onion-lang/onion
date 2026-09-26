@@ -40,9 +40,10 @@ record Span(
   durationMs: Long,
   status:    SpanStatus,
   tags:      Map[String, String]
-) {
+)
   example { new Span("s1","t1",null,"svc","op", SpanKind::Internal, 0L, 10L, new Ok(), [:]).spanId() == "s1" }
   example { new Span("s2","t1","s1","svc","op", SpanKind::Server,  5L, 20L, new Ok(), [:]).parentId() == "s1" }
+{
 public:
   def endMs(): Long = startMs() + durationMs()
   def isRoot(): Boolean = parentId() == null
@@ -57,8 +58,9 @@ record ServiceNode(
   spanCount: Int,
   errorCount: Int,
   totalMs: Long
-) {
+)
   example { new ServiceNode("api", 3, 0, 150L).errorRate() == 0.0 }
+{
 public:
   def avgMs(): Long = if spanCount() == 0 { 0L } else { totalMs() / spanCount() }
   def errorRate(): Double =

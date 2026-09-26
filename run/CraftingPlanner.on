@@ -1,0 +1,267 @@
+// CraftingPlanner.on — crafting recipe dependency calculator (~220 lines)
+//
+// Exercises: sealed ADT case-enum with methods, records with methods,
+// recursive dependency expansion with memo, collection pipelines
+// (map/filter/sortedBy/fold/find), foreach (k,v) in Map, extension
+// methods on Int and String, Map[K,V] / List[T] typed collections,
+// nullable types + null checks, string interpolation, while loops.
+//
+// Domain: given a library of crafting recipes (ingredients → output),
+// compute the full raw-materials shopping list for any target goal and
+// quantity, collapsing duplicates across sub-recipes, and emit the
+// step-by-step crafting order (leaves first, target last).
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def times(label: String): String = "#{self}x #{label}"
+}
+
+extension String {
+  def padTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ─── Sealed ADT: item category ───────────────────────────────────────────────
+
+enum ItemCategory {
+  case RawMaterial
+  case Intermediate
+  case Tool
+  case Consumable
+  case Finished
+public:
+  def label(): String = select this {
+    case r is RawMaterial:  "Raw "
+    case i is Intermediate: "Mid "
+    case t is Tool:         "Tool"
+    case c is Consumable:   "Cons"
+    case f is Finished:     "Done"
+  }
+  def sortKey(): Int = select this {
+    case r is RawMaterial:  0
+    case i is Intermediate: 1
+    case t is Tool:         2
+    case c is Consumable:   3
+    case f is Finished:     4
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Ingredient(name: String, quantity: Int)
+
+record Recipe(
+  output: String,
+  outputQty: Int,
+  category: ItemCategory,
+  ingredients: List[Ingredient]
+) {
+public:
+  def batchesNeeded(needed: Int): Int {
+    val b: Int = needed / outputQty()
+    if b * outputQty() < needed { return b + 1 }
+    return b
+  }
+  def describe(): String {
+    val parts: List[String] = ingredients().map { i -> "#{(i as Ingredient).quantity()}x #{(i as Ingredient).name()}" }
+    return parts.fold("") { acc, s ->
+      val a: String = acc as String
+      val p: String = s as String
+      if a == "" { p } else { a + ", " + p }
+    }
+  }
+}
+
+record ShoppingLine(name: String, needed: Int, category: ItemCategory) {
+public:
+  def row(): String {
+    val qty: String = ("" + needed()).padTo(5)
+    val cat: String = category().label()
+    return "#{qty}  [#{cat}]  #{name()}"
+  }
+}
+
+// ─── Recipe Registry ─────────────────────────────────────────────────────────
+
+class RecipeRegistry {
+  var byName: Map[String, Recipe]
+public:
+  def this() { byName = [:] }
+
+  def add(r: Recipe): void { byName.put(r.output(), r) }
+
+  def find(name: String): Recipe? {
+    if !byName.containsKey(name) { return null }
+    return byName.get(name) as Recipe
+  }
+}
+
+// ─── Dependency Resolver ─────────────────────────────────────────────────────
+
+class Resolver {
+  var reg:      RecipeRegistry
+  var totals:   Map[String, Int]   // accumulated quantities needed
+  var expanded: Map[String, Int]   // batches already expanded (incremental tracking)
+  var order:    List[String]       // crafting order, leaves first
+public:
+  def this(r: RecipeRegistry) {
+    reg      = r
+    totals   = [:]
+    expanded = [:]
+    order    = []
+  }
+
+  def need(name: String, qty: Int): void {
+    val prevQty: Int = if totals.containsKey(name) { totals.get(name) as Int } else { 0 }
+    totals.put(name, prevQty + qty)
+
+    val recipe: Recipe? = reg.find(name)
+    if recipe == null { return }   // leaf / raw material
+
+    // Track incremental batches to correctly handle shared sub-recipes (diamonds).
+    // Only expand the delta between previously-expanded batches and newly-needed batches.
+    val prevBatches: Int = if expanded.containsKey(name) { expanded.get(name) as Int } else { 0 }
+    val newBatches: Int  = recipe.batchesNeeded(prevQty + qty)
+    val delta: Int       = newBatches - prevBatches
+
+    if delta > 0 {
+      expanded.put(name, newBatches)
+      foreach ing: Ingredient in recipe.ingredients() {
+        need(ing.name(), delta * ing.quantity())
+      }
+      if prevBatches == 0 {
+        order.add(name)   // add to crafting order on first visit (post-order → leaves first)
+      }
+    }
+  }
+
+  def shoppingList(): List[ShoppingLine] {
+    val result: List[ShoppingLine] = []
+    foreach (k, v) in totals {
+      val itemName: String = k as String
+      val itemQty: Int  = v as Int
+      val recipe: Recipe? = reg.find(itemName)
+      val cat: ItemCategory =
+        if recipe != null { recipe.category() } else { new RawMaterial() }
+      result.add(new ShoppingLine(itemName, itemQty, cat))
+    }
+    return result.sortedBy { s -> (s as ShoppingLine).category().sortKey() * 1000 }
+  }
+
+  def craftingSteps(): List[Recipe] {
+    val result: List[Recipe] = []
+    foreach name: String in order {
+      val r: Recipe? = reg.find(name)
+      if r != null { result.add(r) }
+    }
+    return result
+  }
+
+  def totalFor(name: String): Int =
+    if totals.containsKey(name) { totals.get(name) as Int } else { 0 }
+}
+
+// ─── Print helpers ───────────────────────────────────────────────────────────
+
+def banner(title: String): void {
+  val line: String = "─".rep(52)
+  IO::println(line)
+  IO::println("  " + title)
+  IO::println(line)
+}
+
+def printList(items: List[ShoppingLine]): void {
+  banner("SHOPPING LIST  (all raw materials + intermediates)")
+  IO::println("  Qty    Cat    Item")
+  IO::println("  " + "─".rep(44))
+  foreach item: ShoppingLine in items {
+    IO::println("  " + item.row())
+  }
+}
+
+def printOrder(steps: List[Recipe]): void {
+  banner("CRAFTING ORDER  (leaves first, target last)")
+  var i: Int = 1
+  foreach step: Recipe in steps {
+    val cat: String = step.category().label()
+    IO::println("  #{i}. [#{cat}] #{step.output()} (yields #{step.outputQty()} per batch)")
+    IO::println("       needs: #{step.describe()}")
+    i++
+  }
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val reg: RecipeRegistry = new RecipeRegistry()
+
+  // Raw materials: Wood, Stone, Iron, Coal, Wheat, Cow Hide — no recipe needed.
+
+  // Intermediates
+  reg.add(new Recipe("Plank",       4, new Intermediate(), [new Ingredient("Wood",  1)]))
+  reg.add(new Recipe("Stick",       4, new Intermediate(), [new Ingredient("Plank", 2)]))
+  reg.add(new Recipe("Cobblestone", 1, new Intermediate(), [new Ingredient("Stone", 1)]))
+  reg.add(new Recipe("Iron Ingot",  1, new Intermediate(), [new Ingredient("Iron",  1), new Ingredient("Coal", 1)]))
+
+  // Tools
+  reg.add(new Recipe("Wooden Pickaxe", 1, new Tool(), [
+    new Ingredient("Plank", 3), new Ingredient("Stick", 2)
+  ]))
+  reg.add(new Recipe("Stone Pickaxe", 1, new Tool(), [
+    new Ingredient("Cobblestone", 3), new Ingredient("Stick", 2)
+  ]))
+  reg.add(new Recipe("Iron Pickaxe", 1, new Tool(), [
+    new Ingredient("Iron Ingot", 3), new Ingredient("Stick", 2)
+  ]))
+  reg.add(new Recipe("Sword", 1, new Tool(), [
+    new Ingredient("Iron Ingot", 2), new Ingredient("Stick", 1)
+  ]))
+
+  // Consumables
+  reg.add(new Recipe("Torch", 4, new Consumable(), [
+    new Ingredient("Coal", 1), new Ingredient("Stick", 1)
+  ]))
+  reg.add(new Recipe("Bread", 1, new Consumable(), [new Ingredient("Wheat", 3)]))
+
+  // Finished goods
+  reg.add(new Recipe("Full Iron Kit", 1, new Finished(), [
+    new Ingredient("Iron Pickaxe", 1),
+    new Ingredient("Sword",        1),
+    new Ingredient("Torch",        8)
+  ]))
+
+  // ── Goal: 2x Full Iron Kit + 12 extra Torches ────────────────────────────
+  val resolver: Resolver = new Resolver(reg)
+  resolver.need("Full Iron Kit", 2)
+  resolver.need("Torch", 12)
+
+  IO::println("")
+  IO::println("  Goal: 2× Full Iron Kit  +  12× Torch")
+  IO::println("")
+  printList(resolver.shoppingList())
+  IO::println("")
+  printOrder(resolver.craftingSteps())
+  IO::println("")
+
+  // ── Quick sanity check: sticks needed ───────────────────────────────────
+  // 2x Full Iron Kit needs 2x Iron Pickaxe + 2x Sword + 16x Torch
+  //   Iron Pickaxe  needs 3x Iron Ingot + 2x Stick → batches: 2 → 4 Stick
+  //   Sword         needs 2x Iron Ingot + 1x Stick → batches: 2 → 2 Stick
+  //   16x Torch     needs 4 batches (of 4) → 4 Stick
+  //   12x Torch     needs 3 batches → 3 Stick
+  // Total Stick: 4 + 2 + 4 + 3 = 13  (but resolver merges Torch: 16+12=28 → 7 batches → 7 Stick)
+  // Let's just print what we computed:
+  val stickQty: Int = resolver.totalFor("Stick")
+  IO::println("  Sticks computed: #{stickQty}")
+  IO::println("  Done.")
+}

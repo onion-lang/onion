@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/EnergyGridSim.on`** — a 378-line electricity-grid management and dispatch simulation (records `PowerPlant`/`Consumer`/`GridEvent`; data-carrying enum `PowerSource` (`Coal`/`Gas`/`Nuclear`/`Hydro`/`Wind`/`Solar`); plain enum `ConsumerTier`; a data-carrying ADT enum `GridState` (`Balanced`/`Surplus`/`Deficit`/`Blackout`) with `label()`/`isCritical()`; a generic `RingBuffer[T]`; a `Grid`/`RegionalGrid` class hierarchy implementing a `Reportable` interface; collection pipelines `filter`/`map`/`fold`/`sortedBy`/`groupBy`/`distinct`/`partition`/`find`; `select` on ADT cases and enum values; nullable types, closures, string interpolation, `try`/`catch`, recursion, `while`, `foreach`, and range iteration), added to the `run/` corpus (merged via #1605).
+- **`run/ConcurrentMetrics.on`** — a ~300-line concurrent metrics-collection pipeline simulation centering `do[Future]` (previously covered by only one corpus file), alongside `Future::all` parallel fan-out, `from re"..."` + `derive!(Json)` on the same record, `record example`/`law`, an ADT case-enum (`PipelineState`), `@TailRecursive` mutual recursion, `do[Option]`, the `|>` pipeline operator, extension methods, and collection pipelines, added to the `run/` corpus (merged via #1606).
+
 ## [0.117.0] - 2026-09-26
 
 ### Added

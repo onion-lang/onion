@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLAUDE.md's and docs/ja/CLAUDE_ja.md's "Control Flow" section showed `for i = 0; i < 10; i++ { ... }` as the `for` loop example, which does not actually compile** (`E0002: local variable i is not found` — a fresh loop variable must be declared with `val`/`var`, matching every other `for` example in the same files and in `run/*.on`). Fixed to `for var i: Int = 0; i < 10; i++ { ... }` in both files.
+
 ### Added
 
 - **`run/DistributedTrace.on`** — a 327-line OpenTelemetry-inspired distributed-tracing system, a new domain for the `run/` corpus (an ADT enum `SpanStatus` (`Ok`/`Error`/`Timeout`) with exhaustive `select` and methods; a data-carrying enum `SpanKind`; records with `example` clauses `Span`/`ServiceNode`/`TraceStats`; a class `TraceStore` with a private field and collection-heavy public API (`groupBy`/`sortedBy`/`filter`/`map`/`fold`/`distinct`/`find`); extension methods on `Long` (`humanMs`, a bar-chart renderer) and `String` (`rpad`/`lpad`); `foreach` over `List` and over `Map` `(k, v)` destructuring; nullable `Span?`/`String?`/`TraceStats?` with null-checks and `?:` Elvis; closures; the `|>` pipeline; string interpolation; a `while` loop; Unicode box-drawing ASCII report panels; a service call-graph built via `Map[String, List[String]]`; and span lineage via nullable chaining — modelling five synthetic traces across nine microservices and rendering a service overview, call graph, trace summary, slowest-spans ranking, and span lineage), added to the `run/` corpus (merged via #1572, with a grammar-placement fix for its `example` clauses in #1573).

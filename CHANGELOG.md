@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `do[...]` notation block (or any other body-level rewrite) inside a record's own user-written method was silently miscompiled instead of type-checked.** `rewriteRecordDeclaration` (`Rewriting.scala`) only synthesized derived methods (`from`/`data`/`json`/`yaml`/`shape`/`law`/`example`) and never rewrote the record's own `public:`/`private:` sections, unlike `rewriteClassDeclaration` for classes. A raw, unrewritten `do[Option] { ... }` therefore reached typing directly, where a placeholder dispatch branch reported no diagnostic; a local-variable codegen path misread that missing diagnostic as "already reported" and silently dropped the whole initializer as a no-op — compiling without error but producing a `java.lang.VerifyError: Bad local variable type` at class-load time. Fixed by rewriting a record's sections exactly like a class's. Covered by `DoNotationRecordMethodSpec` (discovered while writing `run/TeaHouse.on`, #1575).
+
 - **CLAUDE.md's and docs/ja/CLAUDE_ja.md's "Control Flow" section showed `for i = 0; i < 10; i++ { ... }` as the `for` loop example, which does not actually compile** (`E0002: local variable i is not found` — a fresh loop variable must be declared with `val`/`var`, matching every other `for` example in the same files and in `run/*.on`). Fixed to `for var i: Int = 0; i < 10; i++ { ... }` in both files.
 
 ### Added

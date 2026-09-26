@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CookingContest.on`** — a 343-line culinary competition scoring and leaderboard system, a new domain for the `run/` corpus (records `Contestant`/`Dish`/`ScoreCard`/`ContestantSummary`; a homogeneous enum `Medal` (`GOLD`/`SILVER`/`BRONZE`/`NONE`); a data-carrying ADT enum `Tier` (`Elite`/`Qualified`/`Participant`, each carrying a `bonus: Double`) with `label()` dispatched via `select this`; extension methods `Double.fmt2()`/`String.rpad`/`lpad`/`truncate`; collection pipelines `groupBy`/`sortedByDescending`/`filter`/`fold`/`map`; `select` pattern matching on `Int`/`String`/enum values/ADT cases; string interpolation; `try`/`catch` for safe index access; `while` loops and `foreach` over ranges — ranking 7 contestants across regions and dish categories with a leaderboard, judge statistics, and tier distribution), added to the `run/` corpus (merged via #1571).
+
 ## [0.113.0] - 2026-09-26
 
 ### Changed

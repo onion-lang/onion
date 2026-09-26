@@ -1,0 +1,272 @@
+// ArtGallery.on — art gallery management and analytics (~200 lines)
+// Exercises: data-carrying enums, plain enum with methods (select), records
+// with methods, interface, class, collection pipelines (filter/sortedBy/
+// groupBy/fold/find/map/distinct), pattern-matching select, nullable,
+// string interpolation, try/catch, recursion, while, foreach (ranges and
+// map entries).
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum Medium(label: String, isPhysical: Boolean) {
+  OIL_PAINT("Oil Paint", true),
+  WATERCOLOR("Watercolor", true),
+  SCULPTURE("Sculpture", true),
+  DIGITAL("Digital Art", false),
+  PHOTOGRAPHY("Photography", false)
+}
+
+enum ArtStyle {
+  REALISM, IMPRESSIONISM, ABSTRACT, CONTEMPORARY, SURREALISM
+public:
+  def label(): String = select this {
+    case ArtStyle::REALISM:       "Realism"
+    case ArtStyle::IMPRESSIONISM: "Impressionism"
+    case ArtStyle::ABSTRACT:      "Abstract"
+    case ArtStyle::CONTEMPORARY:  "Contemporary"
+    case ArtStyle::SURREALISM:    "Surrealism"
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Artist(name: String, nationality: String, birthYear: Int) {
+public:
+  def age(currentYear: Int): Int = currentYear - birthYear()
+  def display(): String = "#{name()} (#{nationality()}, b.#{birthYear()})"
+}
+
+record Artwork(title: String, artist: Artist, medium: Medium, style: ArtStyle,
+               yearCreated: Int, priceUSD: Int) {
+public:
+  def summary(): String =
+    "'#{title()}' by #{artist().name()} | #{medium().label()} | #{style().label()} | $#{priceUSD()}"
+  def isDigital(): Boolean = !medium().isPhysical()
+}
+
+record Sale(artworkTitle: String, buyer: String, salePrice: Int, year: Int) {
+public:
+  def display(): String = "'#{artworkTitle()}' → #{buyer()} for $#{salePrice()} (#{year()})"
+}
+
+// ── Interface and implementations ────────────────────────────────────────────
+
+interface GalleryReport {
+  def totalCatalogValue(): Int
+  def artworkCount(): Int
+  def soldCount(): Int
+}
+
+// ── Gallery class ─────────────────────────────────────────────────────────────
+
+class Gallery conforms GalleryReport {
+  val name: String
+  val catalog: List[Object]
+  val sales: List[Object]
+
+public:
+  def this(galleryName: String) {
+    this.name = galleryName
+    this.catalog = []
+    this.sales = []
+  }
+
+  def addArtwork(a: Artwork): void {
+    catalog.add(a)
+  }
+
+  def recordSale(artworkTitle: String, buyer: String, salePrice: Int, year: Int): void {
+    sales.add(new Sale(artworkTitle, buyer, salePrice, year))
+  }
+
+  override def totalCatalogValue(): Int =
+    catalog.fold(0) { acc, a -> (acc as Int) + (a as Artwork).priceUSD() }
+
+  override def artworkCount(): Int = catalog.size
+
+  override def soldCount(): Int = sales.size
+
+  def findByArtist(artistName: String): List[Object] =
+    catalog.filter { a -> (a as Artwork).artist().name() == artistName }
+
+  def findMostExpensive(): Artwork? {
+    if catalog.isEmpty() { return null }
+    return catalog.sortedBy { a -> 0 - (a as Artwork).priceUSD() }.get(0) as Artwork
+  }
+
+  def byMedium(): Map[Object, List[Object]] =
+    catalog.groupBy { a -> (a as Artwork).medium().label() }
+
+  def byStyle(): Map[Object, List[Object]] =
+    catalog.groupBy { a -> (a as Artwork).style().label() }
+
+  def digitalArtworks(): List[Object] =
+    catalog.filter { a -> (a as Artwork).isDigital() }
+
+  def priceRange(): String {
+    if catalog.isEmpty() { return "no artworks" }
+    val sorted = catalog.sortedBy { a -> (a as Artwork).priceUSD() }
+    val lo = (sorted.get(0) as Artwork).priceUSD()
+    val hi = (sorted.get(sorted.size - 1) as Artwork).priceUSD()
+    return "$#{lo} – $#{hi}"
+  }
+
+  def totalSalesRevenue(): Int =
+    sales.fold(0) { acc, s -> (acc as Int) + (s as Sale).salePrice() }
+
+  def getAll(): List[Object] = catalog
+}
+
+// ── Artists ───────────────────────────────────────────────────────────────────
+
+val monet    = new Artist("Claude Monet", "French", 1840)
+val picasso  = new Artist("Pablo Picasso", "Spanish", 1881)
+val warhol   = new Artist("Andy Warhol", "American", 1928)
+val hockney  = new Artist("David Hockney", "British", 1937)
+val okeefe   = new Artist("Georgia O'Keeffe", "American", 1887)
+
+IO::println("=== Paris Contemporary Gallery ===")
+IO::println("Artists registered: 5")
+IO::println("Monet age in 1920: #{monet.age(1920)}")
+
+// ── Build catalog ─────────────────────────────────────────────────────────────
+
+val gallery = new Gallery("Paris Contemporary")
+
+gallery.addArtwork(new Artwork("Water Lilies",      monet,   Medium::OIL_PAINT,   ArtStyle::IMPRESSIONISM, 1906, 82000))
+gallery.addArtwork(new Artwork("Haystacks",         monet,   Medium::OIL_PAINT,   ArtStyle::IMPRESSIONISM, 1891, 65000))
+gallery.addArtwork(new Artwork("Guernica Study",    picasso, Medium::OIL_PAINT,   ArtStyle::ABSTRACT,      1937, 95000))
+gallery.addArtwork(new Artwork("Cubist Portrait",   picasso, Medium::WATERCOLOR,  ArtStyle::ABSTRACT,      1915, 42000))
+gallery.addArtwork(new Artwork("Marilyn #3",        warhol,  Medium::PHOTOGRAPHY, ArtStyle::CONTEMPORARY,  1964, 38000))
+gallery.addArtwork(new Artwork("Campbell Soup",     warhol,  Medium::PHOTOGRAPHY, ArtStyle::CONTEMPORARY,  1962, 45000))
+gallery.addArtwork(new Artwork("A Bigger Splash",   hockney, Medium::OIL_PAINT,   ArtStyle::CONTEMPORARY,  1967, 71000))
+gallery.addArtwork(new Artwork("Pool Reflection",   hockney, Medium::DIGITAL,     ArtStyle::CONTEMPORARY,  2010, 30000))
+gallery.addArtwork(new Artwork("Red Poppy",         okeefe,  Medium::OIL_PAINT,   ArtStyle::REALISM,       1927, 55000))
+gallery.addArtwork(new Artwork("Blue Morning Glories", okeefe, Medium::WATERCOLOR, ArtStyle::REALISM,      1935, 28000))
+
+IO::println("Catalog size: #{gallery.artworkCount()}")
+IO::println("Total catalog value: $#{gallery.totalCatalogValue()}")
+IO::println("Price range: #{gallery.priceRange()}")
+
+// ── Most expensive ─────────────────────────────────────────────────────────────
+
+val top = gallery.findMostExpensive()
+if top != null {
+  IO::println("Most expensive: " + (top as Artwork).summary())
+}
+
+// ── Find by artist ─────────────────────────────────────────────────────────────
+
+IO::println("\n=== Monet Works ===")
+val monetWorks = gallery.findByArtist("Claude Monet")
+foreach a: Artwork in monetWorks {
+  IO::println("  " + a.summary())
+}
+
+// ── Group by medium ────────────────────────────────────────────────────────────
+
+IO::println("\n=== By Medium ===")
+val byMedium = gallery.byMedium()
+foreach (med, works) in byMedium {
+  IO::println("  #{med}: #{(works as List).size} work(s)")
+}
+
+// ── Group by style ─────────────────────────────────────────────────────────────
+
+IO::println("\n=== By Style ===")
+val byStyle = gallery.byStyle()
+foreach (style, works) in byStyle {
+  IO::println("  #{style}: #{(works as List).size} work(s)")
+}
+
+// ── Digital artworks ───────────────────────────────────────────────────────────
+
+IO::println("\n=== Digital / Photography ===")
+val digital = gallery.digitalArtworks()
+IO::println("Digital/Photo artworks: #{digital.size}")
+foreach a: Artwork in digital {
+  IO::println("  " + a.summary())
+}
+
+// ── Sales ──────────────────────────────────────────────────────────────────────
+
+IO::println("\n=== Sales ===")
+gallery.recordSale("Water Lilies",   "Metropolitan Museum",   88000, 2022)
+gallery.recordSale("Guernica Study", "Tate Modern",            99500, 2023)
+gallery.recordSale("Red Poppy",      "Private Collector A",    57000, 2023)
+
+IO::println("Sales recorded: #{gallery.soldCount()}")
+IO::println("Total revenue:  $#{gallery.totalSalesRevenue()}")
+
+// ── try/catch for invalid lookup ───────────────────────────────────────────────
+
+IO::println("\n=== Error Handling ===")
+try {
+  val notFound = gallery.findByArtist("Banksy")
+  if notFound.isEmpty() {
+    IO::println("Artist 'Banksy' not in catalog — returned empty list")
+  }
+} catch e: Exception {
+  IO::println("Unexpected error: " + e.getMessage())
+}
+
+// ── Recursive total count over a range ────────────────────────────────────────
+
+def sumPrices(works: List[Object], i: Int): Int =
+  if i >= works.size { 0 }
+  else { (works.get(i) as Artwork).priceUSD() + sumPrices(works, i + 1) }
+
+val catalog = gallery.findByArtist("Pablo Picasso")
+IO::println("\n=== Recursive Picasso total ===")
+IO::println("Picasso catalog sum: $#{sumPrices(catalog, 0)}")
+
+// ── Price tiers (while loop over all artworks) ────────────────────────────────
+
+IO::println("\n=== Price Tier Distribution ===")
+val allCatalogItems = gallery.getAll()
+var budget = 0
+var midRange = 0
+var premium = 0
+var ti = 0
+while ti < allCatalogItems.size {
+  val price = (allCatalogItems.get(ti) as Artwork).priceUSD()
+  if price < 40000 { budget = budget + 1 }
+  else if price < 70000 { midRange = midRange + 1 }
+  else { premium = premium + 1 }
+  ti = ti + 1
+}
+IO::println("  Budget   (<$40k):  #{budget}")
+IO::println("  Mid-range ($40k-$70k): #{midRange}")
+IO::println("  Premium  (>$70k):  #{premium}")
+
+// ── Range-based artist age check ───────────────────────────────────────────────
+
+IO::println("\n=== Artists Born Before 1900 ===")
+val allArtists = [monet, picasso, warhol, hockney, okeefe]
+foreach a: Artist in allArtists {
+  if a.birthYear() < 1900 {
+    IO::println("  #{a.display()}")
+  }
+}
+
+// ── Artworks by decade (range foreach + filter) ───────────────────────────────
+
+IO::println("\n=== Artworks by Creation Decade ===")
+foreach decade: Int in 0..8 {
+  val start = 1890 + decade * 10
+  val end   = start + 9
+  val count = gallery.getAll()
+    .filter { a -> (a as Artwork).yearCreated() >= start && (a as Artwork).yearCreated() <= end }
+    .size
+  if count > 0 {
+    IO::println("  #{start}s: #{count} work(s)")
+  }
+}
+
+// ── Summary statistics via pipeline ──────────────────────────────────────────
+
+IO::println("\n=== Summary ===")
+val avgPrice = gallery.totalCatalogValue() / gallery.artworkCount()
+IO::println("Artworks: #{gallery.artworkCount()}")
+IO::println("Catalog value: $#{gallery.totalCatalogValue()}")
+IO::println("Average price: $#{avgPrice}")
+IO::println("Sales: #{gallery.soldCount()}, Revenue: $#{gallery.totalSalesRevenue()}")

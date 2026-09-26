@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/DistributedTrace.on`** — a 327-line OpenTelemetry-inspired distributed-tracing system, a new domain for the `run/` corpus (an ADT enum `SpanStatus` (`Ok`/`Error`/`Timeout`) with exhaustive `select` and methods; a data-carrying enum `SpanKind`; records with `example` clauses `Span`/`ServiceNode`/`TraceStats`; a class `TraceStore` with a private field and collection-heavy public API (`groupBy`/`sortedBy`/`filter`/`map`/`fold`/`distinct`/`find`); extension methods on `Long` (`humanMs`, a bar-chart renderer) and `String` (`rpad`/`lpad`); `foreach` over `List` and over `Map` `(k, v)` destructuring; nullable `Span?`/`String?`/`TraceStats?` with null-checks and `?:` Elvis; closures; the `|>` pipeline; string interpolation; a `while` loop; Unicode box-drawing ASCII report panels; a service call-graph built via `Map[String, List[String]]`; and span lineage via nullable chaining — modelling five synthetic traces across nine microservices and rendering a service overview, call graph, trace summary, slowest-spans ranking, and span lineage), added to the `run/` corpus (merged via #1572, with a grammar-placement fix for its `example` clauses in #1573).
+
 ## [0.113.0] - 2026-09-26
 
 ### Changed

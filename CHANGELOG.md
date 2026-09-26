@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.116.0] - 2026-09-26
+
 ### Added
 
 - **`run/EpidemicSim.on`** — a 334-line SEIR (Susceptible–Exposed–Infected–Recovered–Deceased) epidemic dynamics simulator, a new domain for the `run/` corpus (records with computed methods `DiseaseProfile`/`DayReport`/`SimResult`; a plain enum `SeverityLevel` (`LOW`/`MODERATE`/`HIGH`/`CRITICAL`); a data-carrying ADT enum `Scenario` (`SeasonalFlu`/`CovidLike`/`MeaslesLike`/`CustomOutbreak`, each carrying a `DiseaseProfile`) dispatched via `select this`; an interface `ReportFormatter` with two implementations `TerseFormatter`/`VerboseFormatter`; a class `SeirModel` encapsulating mutable compartment state and the daily SEIR step; extension methods `Double.fmt1()`/`Double.fmt2()`; collection pipelines `sortedBy`/`filter`/`foreach` over `List[Object]`; string interpolation with column-width specifiers (`#{val,7}`); `while`/`foreach` loops — comparing three disease profiles (seasonal flu, COVID-like, measles-like) across peak active cases, attack rate, capacity ratio, and combined deaths), added to the `run/` corpus (merged via #1592).

@@ -1,0 +1,345 @@
+// BondPortfolio.on — Fixed-income bond pricing, duration analytics,
+//   and portfolio risk management.
+// Exercises: data-carrying enums, ADT case-enum, records with methods
+//   and example clauses, extension Double/String, collection pipelines
+//   (map/filter/fold/sortedBy/groupBy/find), select/pattern matching,
+//   nullable, closures, string interpolation, while loop, foreach over
+//   ranges, and Newton-Raphson iteration.
+
+import { java.lang.Math as JMath }
+
+// ── Bond classification ───────────────────────────────────────────────────────
+
+enum BondType(label: String, taxExempt: Boolean, riskLevel: Int) {
+  Government("Gov",  false, 1),
+  Corporate ("Corp", true,  3),
+  Municipal ("Muni", false, 2),
+  HighYield ("HY",   true,  5)
+}
+
+// ── Rating (ADT case-enum) ────────────────────────────────────────────────────
+
+enum Rating {
+  case Investment
+  case Speculative(grade: String)
+  case Distressed
+
+public:
+  def label(): String = select this {
+    case v is Investment:  "Investment Grade"
+    case s is Speculative: "Speculative (#{s.grade()})"
+    case v is Distressed:  "Distressed"
+  }
+  def spreadBps(): Int = select this {
+    case v is Investment:  50
+    case v is Speculative: 250
+    case v is Distressed:  600
+  }
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val r: Long  = JMath::round(self * 100.0)
+    val i: Long  = r / 100L
+    val raw: Long = if r < 0L { 0L - r } else { r }
+    val f: Long  = raw % 100L
+    val fs: String = if f < 10L { "0" + f } else { "" + f }
+    return "#{i}.#{fs}"
+  }
+  def pct2(): String = (self * 100.0).fmt2() + "%"
+  def absd(): Double = if self < 0.0 { 0.0 - self } else { self }
+}
+
+extension String {
+  def rpadN(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpadN(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── Core bond record ──────────────────────────────────────────────────────────
+
+record Bond(isin: String, name: String, faceValue: Double, couponRate: Double, periodsLeft: Int, bondType: BondType, rating: Rating) {
+  example {
+    val b = new Bond("US001", "T", 1000.0, 0.04, 10, BondType::Government, new Investment())
+    val p: Double = b.price(0.04)
+    p > 999.0 && p < 1001.0
+  }
+public:
+  def semiCoupon(): Double = faceValue() * couponRate() / 2.0
+
+  def price(ytm: Double): Double {
+    val r: Double = ytm / 2.0
+    var pv: Double = 0.0
+    foreach t: Int in 1..periodsLeft() {
+      val isFinal: Boolean = t == periodsLeft()
+      val cf: Double = if isFinal { semiCoupon() + faceValue() } else { semiCoupon() }
+      pv = pv + cf / JMath::pow(1.0 + r, t as Double)
+    }
+    return pv
+  }
+
+  def duration(ytm: Double): Double {
+    val r: Double = ytm / 2.0
+    var num: Double = 0.0
+    var den: Double = 0.0
+    foreach t: Int in 1..periodsLeft() {
+      val isFinal: Boolean = t == periodsLeft()
+      val cf: Double = if isFinal { semiCoupon() + faceValue() } else { semiCoupon() }
+      val df: Double = JMath::pow(1.0 + r, t as Double)
+      num = num + (t as Double) * cf / df
+      den = den + cf / df
+    }
+    return num / den / 2.0
+  }
+
+  def modDuration(ytm: Double): Double = duration(ytm) / (1.0 + ytm / 2.0)
+
+  def dv01(ytm: Double): Double = modDuration(ytm) * price(ytm) / 10000.0
+
+  def ytm(marketPrice: Double): Double {
+    var y: Double = couponRate()
+    var iter: Int = 0
+    var converged: Boolean = false
+    while iter < 50 && !converged {
+      val p: Double    = price(y)
+      val dp: Double   = (price(y + 0.0001) - p) / 0.0001
+      val delta: Double = (p - marketPrice) / dp
+      y = y - delta
+      if delta.absd() < 0.000001 { converged = true }
+      iter = iter + 1
+    }
+    return y
+  }
+}
+
+// ── Holding: a bond position ──────────────────────────────────────────────────
+
+record Holding(bond: Bond, quantity: Double, marketPrice: Double) {
+public:
+  def faceTotal(): Double   = bond().faceValue() * quantity()
+  def marketValue(): Double = marketPrice() / 100.0 * faceTotal()
+  def annualIncome(): Double = bond().couponRate() * faceTotal()
+  def currentYtm(): Double  = bond().ytm(bond().faceValue() * marketPrice() / 100.0)
+  def currentDuration(): Double = bond().duration(currentYtm())
+  def currentDv01(): Double = bond().dv01(currentYtm()) * quantity()
+}
+
+// ── Portfolio ─────────────────────────────────────────────────────────────────
+
+class BondPortfolio {
+public:
+  var holdings: List[Holding]
+  def this { holdings = [] }
+  def add(h: Holding): void { holdings.add(h) }
+
+  def totalMarketValue(): Double {
+    var sum: Double = 0.0
+    foreach h: Holding in holdings { sum = sum + h.marketValue() }
+    return sum
+  }
+
+  def totalAnnualIncome(): Double {
+    var sum: Double = 0.0
+    foreach h: Holding in holdings { sum = sum + h.annualIncome() }
+    return sum
+  }
+
+  def wavgYtm(): Double {
+    val mv: Double = totalMarketValue()
+    if mv == 0.0 { return 0.0 }
+    var sum: Double = 0.0
+    foreach h: Holding in holdings { sum = sum + h.currentYtm() * h.marketValue() }
+    return sum / mv
+  }
+
+  def wavgDuration(): Double {
+    val mv: Double = totalMarketValue()
+    if mv == 0.0 { return 0.0 }
+    var sum: Double = 0.0
+    foreach h: Holding in holdings { sum = sum + h.currentDuration() * h.marketValue() }
+    return sum / mv
+  }
+
+  def totalDv01(): Double {
+    var sum: Double = 0.0
+    foreach h: Holding in holdings { sum = sum + h.currentDv01() }
+    return sum
+  }
+
+  def mvByType(): Map[String, Double] {
+    val m: Map[String, Double] = [:]
+    foreach h: Holding in holdings {
+      val key: String = h.bond().bondType().label()
+      val cur: Double? = m[key]
+      if cur == null { m[key] = h.marketValue() }
+      else           { m[key] = cur + h.marketValue() }
+    }
+    return m
+  }
+
+  def igMarketValue(): Double {
+    var sum: Double = 0.0
+    foreach h: Holding in holdings {
+      val isIg: Boolean = select h.bond().rating() {
+        case v is Investment: true
+        else:                 false
+      }
+      if isIg { sum = sum + h.marketValue() }
+    }
+    return sum
+  }
+
+  def specMarketValue(): Double {
+    var sum: Double = 0.0
+    foreach h: Holding in holdings {
+      val isSpec: Boolean = select h.bond().rating() {
+        case v is Speculative: true
+        else:                  false
+      }
+      if isSpec { sum = sum + h.marketValue() }
+    }
+    return sum
+  }
+}
+
+// ── Report utilities ──────────────────────────────────────────────────────────
+
+def rule(n: Int): String {
+  var s: String = ""
+  foreach i: Int in 1..n { s = s + "─" }
+  return s
+}
+
+def printHolding(h: Holding): void {
+  val mv:   Double = h.marketValue() / 1000.0
+  val ytm:  Double = h.currentYtm()
+  val dur:  Double = h.currentDuration()
+  val dv01: Double = h.currentDv01()
+  IO::println("  " +
+    h.bond().name().rpadN(22) +
+    h.bond().bondType().label().rpadN(6) +
+    ("" + (h.quantity() as Int)).lpadN(7) + " " +
+    h.marketPrice().fmt2().lpadN(7) + " " +
+    mv.fmt2().lpadN(9) + " " +
+    ytm.pct2().lpadN(7) + " " +
+    dur.fmt2().lpadN(5) + " " +
+    dv01.fmt2().lpadN(9))
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+val b1 = new Bond("US0000", "10Y Treasury",  1000.0, 0.045, 20, BondType::Government, new Investment())
+val b2 = new Bond("US0001", "2Y Treasury",   1000.0, 0.050,  4, BondType::Government, new Investment())
+val b3 = new Bond("US0002", "AAPL 5Y Corp",  1000.0, 0.055, 10, BondType::Corporate,  new Investment())
+val b4 = new Bond("US0003", "GS 7Y Corp",    1000.0, 0.060, 14, BondType::Corporate,  new Investment())
+val b5 = new Bond("US0004", "NYC Muni 10Y",  1000.0, 0.038, 20, BondType::Municipal,  new Investment())
+val b6 = new Bond("US0005", "HY Energy 5Y",  1000.0, 0.085, 10, BondType::HighYield,  new Speculative("BB"))
+val b7 = new Bond("US0006", "HY Tech 3Y",    1000.0, 0.090,  6, BondType::HighYield,  new Speculative("B"))
+
+val portfolio = new BondPortfolio()
+portfolio.add(new Holding(b1,  50.0,  99.50))
+portfolio.add(new Holding(b2, 100.0, 100.20))
+portfolio.add(new Holding(b3,  30.0, 101.50))
+portfolio.add(new Holding(b4,  20.0, 102.00))
+portfolio.add(new Holding(b5,  40.0,  98.75))
+portfolio.add(new Holding(b6,  10.0,  94.00))
+portfolio.add(new Holding(b7,   8.0,  91.00))
+
+// ── Main report ───────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("  Bond Portfolio Analytics Report")
+IO::println("  " + rule(76))
+IO::println("")
+IO::println("  " + "Name".rpadN(22) + "Type".rpadN(6) + "Qty".lpadN(7) +
+  " Price".lpadN(7) + "  MV($k)".lpadN(9) + "  YTM".lpadN(7) + " Dur".lpadN(5) + "  DV01($)".lpadN(9))
+IO::println("  " + rule(76))
+foreach h: Holding in portfolio.holdings { printHolding(h) }
+IO::println("  " + rule(76))
+
+val mv:   Double = portfolio.totalMarketValue()
+val inc:  Double = portfolio.totalAnnualIncome()
+val ytm:  Double = portfolio.wavgYtm()
+val dur:  Double = portfolio.wavgDuration()
+val dv01: Double = portfolio.totalDv01()
+
+IO::println("")
+IO::println("  Portfolio Summary")
+IO::println("  " + rule(40))
+IO::println("  Total Market Value   : $#{(mv / 1000.0).fmt2()}k")
+IO::println("  Annual Coupon Income : $#{(inc / 1000.0).fmt2()}k")
+IO::println("  Current Yield        : #{(inc / mv).pct2()}")
+IO::println("  Wtd-Avg YTM          : #{ytm.pct2()}")
+IO::println("  Wtd-Avg Duration     : #{dur.fmt2()} years")
+IO::println("  Total DV01           : $#{dv01.fmt2()} per bp")
+
+IO::println("")
+IO::println("  Allocation by Bond Type")
+IO::println("  " + rule(40))
+foreach (k, v) in portfolio.mvByType() {
+  val typeMv: Double = v
+  val typeKey: String = k
+  IO::println("  #{typeKey.rpadN(12)}: $#{ (typeMv / 1000.0).fmt2().lpadN(9) }k  #{(typeMv / mv).pct2().lpadN(7)}")
+}
+
+IO::println("")
+IO::println("  Price Sensitivity (parallel yield shift of ±100bp)")
+IO::println("  " + rule(60))
+IO::println("  " + "Name".rpadN(22) + " Px@YTM".lpadN(9) + " Px+100bp".lpadN(10) + " Px-100bp".lpadN(10))
+IO::println("  " + rule(60))
+foreach h: Holding in portfolio.holdings {
+  val y:   Double = h.currentYtm()
+  val pPar: Double = h.bond().price(y)
+  val pUp:  Double = h.bond().price(y + 0.01)
+  val pDn:  Double = h.bond().price(y - 0.01)
+  IO::println("  " +
+    h.bond().name().rpadN(22) +
+    pPar.fmt2().lpadN(9) +
+    pUp.fmt2().lpadN(10) +
+    pDn.fmt2().lpadN(10))
+}
+
+IO::println("")
+IO::println("  Credit Quality Breakdown")
+IO::println("  " + rule(40))
+val igMv:   Double = portfolio.igMarketValue()
+val specMv: Double = portfolio.specMarketValue()
+IO::println("  Investment Grade : $#{(igMv   / 1000.0).fmt2()}k  #{(igMv   / mv).pct2()}")
+IO::println("  Speculative      : $#{(specMv / 1000.0).fmt2()}k  #{(specMv / mv).pct2()}")
+
+IO::println("")
+IO::println("  Duration Bucket Breakdown")
+IO::println("  " + rule(40))
+var shortMv: Double = 0.0
+var medMv:   Double = 0.0
+var longMv:  Double = 0.0
+foreach h: Holding in portfolio.holdings {
+  val d: Double = h.currentDuration()
+  if d < 3.0             { shortMv = shortMv + h.marketValue() }
+  else if d < 7.0        { medMv   = medMv   + h.marketValue() }
+  else                   { longMv  = longMv  + h.marketValue() }
+}
+IO::println("  Short (<3yr)   : $#{(shortMv / 1000.0).fmt2()}k  #{(shortMv / mv).pct2()}")
+IO::println("  Medium (3-7yr) : $#{(medMv   / 1000.0).fmt2()}k  #{(medMv   / mv).pct2()}")
+IO::println("  Long  (>7yr)   : $#{(longMv  / 1000.0).fmt2()}k  #{(longMv  / mv).pct2()}")
+
+IO::println("")
+IO::println("  Top / Bottom YTM Holdings")
+IO::println("  " + rule(40))
+val sorted = portfolio.holdings.sortedBy { h -> h.currentYtm() }
+val loYtm:  Holding = sorted[0]
+val hiYtm:  Holding = sorted[sorted.size - 1]
+IO::println("  Lowest  YTM: #{loYtm.bond().name()}  #{loYtm.currentYtm().pct2()}")
+IO::println("  Highest YTM: #{hiYtm.bond().name()}  #{hiYtm.currentYtm().pct2()}")
+
+IO::println("")
+IO::println("  Report complete.")

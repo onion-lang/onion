@@ -277,10 +277,11 @@ val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 その一つの記述から両方向が出てきます。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   shape doc  = json
   law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+}
 ```
 
 読み取りは `Outcome` を返します。値か、値でない理由**すべて**です。

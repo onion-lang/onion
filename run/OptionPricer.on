@@ -66,12 +66,14 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Market(spot: Double, vol: Double, rate: Double)
+record Market(spot: Double, vol: Double, rate: Double) {
   example { new Market(100.0, 0.2, 0.05).spot() == 100.0 }
   example { new Market(100.0, 0.2, 0.05).vol()  == 0.2   }
+}
 
-record OptionSpec(kind: OptionType, strike: Double, expiry: Double)
+record OptionSpec(kind: OptionType, strike: Double, expiry: Double) {
   example { new OptionSpec(new Call(), 100.0, 1.0).strike() == 100.0 }
+}
 
 record GreekResult(greek: Greek, value: Double) {
 public:

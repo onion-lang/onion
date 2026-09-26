@@ -21,8 +21,9 @@ extension Int {
 }
 
 // ── Records ───────────────────────────────────────────────────────────────────
-record Clause(lits: List[Int])
+record Clause(lits: List[Int]) {
   example { new Clause([1, -2]).lits().size == 2 }
+}
 
 record SolveStats(decisions: Int, propagations: Int)
 

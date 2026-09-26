@@ -49,8 +49,9 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Corpus(name: String, text: String, category: TextCategory)
+record Corpus(name: String, text: String, category: TextCategory) {
   example { new Corpus("t", "a b", new Literary()).name() == "t" }
+}
 
 record ChainStats(uniqueStates: Int, totalTransitions: Int) {
 public:
@@ -62,12 +63,12 @@ public:
   }
 }
 
-record WordFreq(word: String, freq: Int)
+record WordFreq(word: String, freq: Int) {
   example { new WordFreq("the", 5).freq() == 5 }
+}
 
-record GenerationResult(text: String, wordCount: Int, sentenceCount: Int)
+record GenerationResult(text: String, wordCount: Int, sentenceCount: Int) {
   example { new GenerationResult("Hello world.", 2, 1).wordCount() == 2 }
-{
 public:
   def describe(): String = "#{wordCount()} words, #{sentenceCount()} sentence(s)"
 }

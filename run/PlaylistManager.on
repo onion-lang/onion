@@ -84,12 +84,14 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Song(id: Int, title: String, artist: String, album: String, durationSec: Int, genre: Genre, year: Int, rating: Int)
+record Song(id: Int, title: String, artist: String, album: String, durationSec: Int, genre: Genre, year: Int, rating: Int) {
   example { new Song(1, "T", "A", "Alb", 200, new Pop(), 2000, 4).rating() == 4 }
   example { new Song(1, "T", "A", "Alb", 200, new Pop(), 2000, 4).durationSec() > 0 }
+}
 
-record PlaylistStats(totalSongs: Int, totalDurationSec: Int, averageRating: Double, topArtist: String?)
+record PlaylistStats(totalSongs: Int, totalDurationSec: Int, averageRating: Double, topArtist: String?) {
   example { new PlaylistStats(5, 1000, 4.2, "Queen").totalSongs() == 5 }
+}
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 

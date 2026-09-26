@@ -1,0 +1,341 @@
+// Logic gate simulator: combinational circuits, truth tables, and simple
+// expression evaluation using exhaustive Boolean select expressions.
+// Exercises: records, ADT enum, pattern matching (case true/false exhaustive),
+// generics, closures, collection pipelines, string interpolation, recursion.
+
+import {
+  java.util.List
+  java.util.ArrayList
+}
+
+// ──────────────────────────────── ADT ──────────────────────────────────────
+
+enum GateType {
+  case And
+  case Or
+  case Not
+  case Nand
+  case Nor
+  case Xor
+  case Xnor
+  case Buffer
+}
+
+// Represents a two-input (or one-input for NOT/Buffer) gate node
+record Gate(kind: GateType, a: Int, b: Int)
+
+// A circuit is a sequence of Gate nodes that feed each other.
+// Node index 0 and 1 are the two primary inputs.
+record Circuit(name: String, gates: List[Gate], inputCount: Int)
+
+// A single row in a truth table
+record TruthRow(inputs: List[Boolean], output: Boolean)
+
+// ────────────────────────────── Gate evaluation ────────────────────────────
+
+def evalGate(kind: GateType, va: Boolean, vb: Boolean): Boolean = select kind {
+  case g is And:    va && vb
+  case g is Or:     va || vb
+  case g is Not:    !va
+  case g is Nand:   !(va && vb)
+  case g is Nor:    !(va || vb)
+  case g is Xor:    va != vb
+  case g is Xnor:   va == vb
+  case g is Buffer: va
+}
+
+def gateSymbol(kind: GateType): String = select kind {
+  case g is And:    "AND"
+  case g is Or:     "OR"
+  case g is Not:    "NOT"
+  case g is Nand:   "NAND"
+  case g is Nor:    "NOR"
+  case g is Xor:    "XOR"
+  case g is Xnor:   "XNOR"
+  case g is Buffer: "BUF"
+}
+
+// ────────────────────────────── Boolean formatting ─────────────────────────
+
+// Exhaustive Boolean select: the fix under test
+def boolStr(b: Boolean): String = select b {
+  case true:  "1"
+  case false: "0"
+}
+
+def boolWord(b: Boolean): String = select b {
+  case true:  "TRUE"
+  case false: "FALSE"
+}
+
+// Tri-valued display helper: uses a boolean select to pick a symbol
+def yesNo(b: Boolean): String = select b {
+  case true:  "YES"
+  case false: "NO"
+}
+
+// ────────────────────────────── Circuit simulator ──────────────────────────
+
+// Evaluates the whole circuit for the given input vector.
+// Wire indices 0..inputCount-1 are primary inputs; gates add wire nodes above.
+def simulate(c: Circuit, inputs: List[Boolean]): Boolean {
+  var wires: List[Boolean] = new ArrayList[Boolean]()
+  var i: Int = 0
+  while i < inputs.size {
+    wires.add(inputs[i])
+    i++
+  }
+  foreach gate: Gate in c.gates {
+    val va: Boolean = wires[gate.a()]
+    val vb: Boolean = if (gate.kind() is Not) || (gate.kind() is Buffer) { false } else { wires[gate.b()] }
+    val out: Boolean = evalGate(gate.kind(), va, vb)
+    wires.add(out)
+  }
+  return wires[wires.size - 1]
+}
+
+// ────────────────────────────── Truth table ────────────────────────────────
+
+// Generates all 2^n input combinations
+def allInputs(n: Int): List[List[Boolean]] {
+  val result: List[List[Boolean]] = new ArrayList[List[Boolean]]()
+  val total: Int = 1 << n
+  var row: Int = 0
+  while row < total {
+    val combo: List[Boolean] = new ArrayList[Boolean]()
+    var bit: Int = n - 1
+    while bit >= 0 {
+      combo.add((row >> bit & 1) == 1)
+      bit--
+    }
+    result.add(combo)
+    row++
+  }
+  return result
+}
+
+def buildTruthTable(c: Circuit): List[TruthRow] {
+  val rows: List[TruthRow] = new ArrayList[TruthRow]()
+  foreach inputs: List[Boolean] in allInputs(c.inputCount()) {
+    val out: Boolean = simulate(c, inputs)
+    rows.add(new TruthRow(inputs, out))
+  }
+  return rows
+}
+
+def printTruthTable(c: Circuit): void {
+  IO::println("Truth table: #{c.name()}")
+  val header: String = "| A | B | Out |"
+  val sep:    String = "+---+---+-----+"
+  IO::println(sep)
+  IO::println(header)
+  IO::println(sep)
+  foreach row: TruthRow in buildTruthTable(c) {
+    val a:   String = boolStr(row.inputs()[0])
+    val b:   String = if c.inputCount() > 1 { boolStr(row.inputs()[1]) } else { "-" }
+    val out: String = boolStr(row.output())
+    IO::println("| #{a} | #{b} |  #{out}  |")
+  }
+  IO::println(sep)
+  IO::println("")
+}
+
+// ────────────────────────────── Simple logic expression parser/eval ─────────
+
+// Evaluates a small expression tree represented as a string of tokens:
+//   a, b, c = boolean variable names; &, |, ^ = binary ops; ! = prefix not
+//
+// We use a recursive descent approach with a List-based token cursor.
+// This exercises: closures, recursion, ArrayList, pattern matching on char.
+
+def evalExpr(expr: String, env: List[String], vals: List[Boolean]): Boolean {
+  val tokens: List[String] = tokenise(expr)
+  val pos: Int[] = new Int[1]
+  pos[0] = 0
+  return parseOr(tokens, pos, env, vals)
+}
+
+def tokenise(expr: String): List[String] {
+  val out: List[String] = new ArrayList[String]()
+  var i: Int = 0
+  while i < expr.length() {
+    val ch: String = expr.substring(i, i + 1)
+    if ch != " " {
+      out.add(ch)
+    }
+    i++
+  }
+  return out
+}
+
+def parseOr(tokens: List[String], pos: Int[], env: List[String], vals: List[Boolean]): Boolean {
+  var left: Boolean = parseAnd(tokens, pos, env, vals)
+  while pos[0] < tokens.size && tokens[pos[0]] == "|" {
+    pos[0]++
+    val right: Boolean = parseAnd(tokens, pos, env, vals)
+    left = left || right
+  }
+  return left
+}
+
+def parseAnd(tokens: List[String], pos: Int[], env: List[String], vals: List[Boolean]): Boolean {
+  var left: Boolean = parseNot(tokens, pos, env, vals)
+  while pos[0] < tokens.size && tokens[pos[0]] == "&" {
+    pos[0]++
+    val right: Boolean = parseNot(tokens, pos, env, vals)
+    left = left && right
+  }
+  return left
+}
+
+def parseNot(tokens: List[String], pos: Int[], env: List[String], vals: List[Boolean]): Boolean {
+  if pos[0] < tokens.size && tokens[pos[0]] == "!" {
+    pos[0]++
+    return !parseAtom(tokens, pos, env, vals)
+  }
+  return parseAtom(tokens, pos, env, vals)
+}
+
+def parseAtom(tokens: List[String], pos: Int[], env: List[String], vals: List[Boolean]): Boolean {
+  if pos[0] >= tokens.size {
+    return false
+  }
+  val tok: String = tokens[pos[0]]
+  pos[0]++
+  if tok == "1" { return true  }
+  if tok == "0" { return false }
+  // look up variable
+  var i: Int = 0
+  while i < env.size {
+    if env[i] == tok {
+      return vals[i]
+    }
+    i++
+  }
+  return false
+}
+
+// ────────────────────────────── Sample circuits ────────────────────────────
+
+def halfAdder(): Circuit {
+  // Sum = A XOR B (wire 2), Carry = A AND B (wire 3)
+  // For the truth table we expose just Sum as the output.
+  val gates: List[Gate] = new ArrayList[Gate]()
+  gates.add(new Gate(new Xor(), 0, 1))  // sum  (wire 2)
+  return new Circuit("Half Adder (Sum)", gates, 2)
+}
+
+def halfAdderCarry(): Circuit {
+  val gates: List[Gate] = new ArrayList[Gate]()
+  gates.add(new Gate(new And(), 0, 1))  // carry (wire 2)
+  return new Circuit("Half Adder (Carry)", gates, 2)
+}
+
+def xorGate(): Circuit {
+  val gates: List[Gate] = new ArrayList[Gate]()
+  gates.add(new Gate(new Xor(), 0, 1))
+  return new Circuit("XOR Gate", gates, 2)
+}
+
+def notGate(): Circuit {
+  val gates: List[Gate] = new ArrayList[Gate]()
+  gates.add(new Gate(new Not(), 0, 0))
+  return new Circuit("NOT Gate", gates, 1)
+}
+
+def mux2to1(): Circuit {
+  // MUX(A, B, S) = (A AND !S) OR (B AND S)
+  // Inputs: 0=A, 1=B, 2=S
+  val gates: List[Gate] = new ArrayList[Gate]()
+  gates.add(new Gate(new Not(), 2, 2))     // wire 3 = !S
+  gates.add(new Gate(new And(), 0, 3))     // wire 4 = A & !S
+  gates.add(new Gate(new And(), 1, 2))     // wire 5 = B & S
+  gates.add(new Gate(new Or(),  4, 5))     // wire 6 = output
+  return new Circuit("2-to-1 MUX", gates, 3)
+}
+
+// ────────────────────────────── Main ───────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Logic Gate Simulator ===")
+  IO::println("")
+
+  // Print truth tables for standard gates
+  foreach c: Circuit in [notGate(), halfAdder(), halfAdderCarry(), xorGate()] {
+    printTruthTable(c)
+  }
+
+  // MUX truth table (3 inputs)
+  val mux: Circuit = mux2to1()
+  IO::println("Truth table: #{mux.name()}")
+  val sep: String = "+---+---+---+-----+"
+  IO::println(sep)
+  IO::println("| A | B | S | Out |")
+  IO::println(sep)
+  foreach row: TruthRow in buildTruthTable(mux) {
+    val a:   String = boolStr(row.inputs()[0])
+    val b:   String = boolStr(row.inputs()[1])
+    val s:   String = boolStr(row.inputs()[2])
+    val out: String = boolStr(row.output())
+    IO::println("| #{a} | #{b} | #{s} |  #{out}  |")
+  }
+  IO::println(sep)
+  IO::println("")
+
+  // Gate property checks using exhaustive Boolean select
+  IO::println("=== Gate Properties ===")
+  val gates: List[GateType] = [new And(), new Or(), new Nand(), new Nor(), new Xor(), new Xnor()]
+  foreach g: GateType in gates {
+    val sym:       String  = gateSymbol(g)
+    val commutes:  Boolean = evalGate(g, true, false) == evalGate(g, false, true)
+    val t00:       Boolean = evalGate(g, false, false)
+    val t11:       Boolean = evalGate(g, true,  true)
+    IO::println("#{sym}: commutative=#{yesNo(commutes)} f(0,0)=#{boolStr(t00)} f(1,1)=#{boolStr(t11)}")
+  }
+  IO::println("")
+
+  // Expression evaluator
+  IO::println("=== Expression Evaluator ===")
+  val varNames: List[String]  = ["a", "b", "c"]
+  val testCases: List[String] = [
+    "a & b",
+    "a | b",
+    "! a",
+    "a & ! b",
+    "a & b | c",
+    "! a | b & c"
+  ]
+  val inputs: List[Boolean] = [true, false, true]
+  IO::println("Inputs: a=#{boolWord(inputs[0])} b=#{boolWord(inputs[1])} c=#{boolWord(inputs[2])}")
+  foreach expr: String in testCases {
+    val result: Boolean = evalExpr(expr, varNames, inputs)
+    IO::println("  #{expr}  =>  #{boolWord(result)}")
+  }
+  IO::println("")
+
+  // Summary statistics using exhaustive boolean select
+  IO::println("=== Boolean Statistics ===")
+  val bools: List[Boolean] = [true, false, true, true, false, true, false, false, true]
+  var trueCount:  Int = 0
+  var falseCount: Int = 0
+  foreach b: Boolean in bools {
+    val delta: Int = select b {
+      case true:  1
+      case false: 0
+    }
+    trueCount = trueCount + delta
+    val delta2: Int = select b {
+      case true:  0
+      case false: 1
+    }
+    falseCount = falseCount + delta2
+  }
+  IO::println("Sample: #{bools.size} values")
+  IO::println("  TRUE  count: #{trueCount}")
+  IO::println("  FALSE count: #{falseCount}")
+  val majority: Boolean = trueCount > falseCount
+  IO::println("  Majority: #{boolWord(majority)}")
+
+  IO::println("")
+  IO::println("Done.")
+}

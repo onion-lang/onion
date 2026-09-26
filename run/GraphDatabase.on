@@ -1,0 +1,412 @@
+// GraphDatabase.on — an in-memory toy graph DB exercising many Onion features.
+// Nodes have labels and a name; directed edges have typed relationships and a weight.
+
+// ── enums ──────────────────────────────────────────────────────────────────
+
+enum NodeLabel { PERSON, PRODUCT, COMPANY, CITY }
+
+enum EdgeType { KNOWS, WORKS_AT, BASED_IN, PURCHASED, REVIEWS }
+
+// ADT: a query result can be empty, a single node, a list, or a path.
+enum QueryResult {
+  case NoMatch
+  case OneNode(node: Node)
+  case NodeSet(nodes: List[Node])
+  case PathFound(path: List[String], totalWeight: Double)
+}
+
+// ── records ────────────────────────────────────────────────────────────────
+
+record Node(id: Int, label: NodeLabel, name: String)
+
+record Edge(id: Int, from: Int, to: Int, edgeType: EdgeType, weight: Double)
+
+// ── interfaces ─────────────────────────────────────────────────────────────
+
+interface Traversable {
+  def neighbors(nodeId: Int): List[Node]
+}
+
+interface Describable {
+  def describe(): String
+}
+
+// ── GraphDB class ──────────────────────────────────────────────────────────
+
+class GraphDB conforms Traversable, Describable {
+  var nodeMap: Map[Int, Node]
+  var edgeMap: Map[Int, Edge]
+  var nextNodeId: Int
+  var nextEdgeId: Int
+
+public:
+  def this {
+    this.nodeMap = [:]
+    this.edgeMap = [:]
+    this.nextNodeId = 1
+    this.nextEdgeId = 1
+  }
+
+  def addNode(label: NodeLabel, name: String): Int {
+    val id = this.nextNodeId
+    this.nextNodeId = this.nextNodeId + 1
+    this.nodeMap[id] = new Node(id, label, name)
+    return id
+  }
+
+  def addEdge(from: Int, to: Int, edgeType: EdgeType, weight: Double): Int {
+    val id = this.nextEdgeId
+    this.nextEdgeId = this.nextEdgeId + 1
+    this.edgeMap[id] = new Edge(id, from, to, edgeType, weight)
+    return id
+  }
+
+  def getNode(id: Int): Node? {
+    return this.nodeMap[id]
+  }
+
+  def allNodes(): List[Node] {
+    val result: List[Node] = []
+    foreach v: Object in this.nodeMap.values() {
+      result.add(v as Node)
+    }
+    return result
+  }
+
+  def allEdges(): List[Edge] {
+    val result: List[Edge] = []
+    foreach v: Object in this.edgeMap.values() {
+      result.add(v as Edge)
+    }
+    return result
+  }
+
+  // Traversable: outgoing neighbors of nodeId
+  def neighbors(nodeId: Int): List[Node] {
+    val result: List[Node] = []
+    foreach v: Object in this.edgeMap.values() {
+      val e = v as Edge
+      if e.from() == nodeId {
+        val neighbor: Node? = this.nodeMap[e.to()]
+        if neighbor != null {
+          result.add(neighbor)
+        }
+      }
+    }
+    return result
+  }
+
+  // Find nodes by label
+  def findByLabel(label: NodeLabel): List[Node] {
+    return this.allNodes()
+      .filter { n -> (n as Node).label() == label }
+      .map    { n -> n as Node }
+  }
+
+  // Outgoing edges from a node
+  def edgesFrom(nodeId: Int): List[Edge] {
+    return this.allEdges()
+      .filter { e -> (e as Edge).from() == nodeId }
+      .map    { e -> e as Edge }
+  }
+
+  // Edges of a given type
+  def edgesOfType(et: EdgeType): List[Edge] {
+    return this.allEdges()
+      .filter { e -> (e as Edge).edgeType() == et }
+      .map    { e -> e as Edge }
+  }
+
+  // Describable
+  def describe(): String {
+    val nc = this.allNodes().size
+    val ec = this.allEdges().size
+    return "GraphDB(#{nc} nodes, #{ec} edges)"
+  }
+}
+
+// ── query helpers ──────────────────────────────────────────────────────────
+
+def queryNode(db: GraphDB, id: Int): QueryResult {
+  val n: Node? = db.getNode(id)
+  if n == null {
+    return new NoMatch()
+  } else {
+    return new OneNode(n)
+  }
+}
+
+def labelOf(label: NodeLabel): String {
+  select label {
+    case NodeLabel::PERSON:  return "Person"
+    case NodeLabel::PRODUCT: return "Product"
+    case NodeLabel::COMPANY: return "Company"
+    case NodeLabel::CITY:    return "City"
+    else:                    return "Unknown"
+  }
+}
+
+def edgeTypeName(et: EdgeType): String {
+  select et {
+    case EdgeType::KNOWS:     return "KNOWS"
+    case EdgeType::WORKS_AT:  return "WORKS_AT"
+    case EdgeType::BASED_IN:  return "BASED_IN"
+    case EdgeType::PURCHASED: return "PURCHASED"
+    case EdgeType::REVIEWS:   return "REVIEWS"
+    else:                     return "UNKNOWN"
+  }
+}
+
+// BFS shortest-path (by hop count) from src to dst; returns QueryResult.
+def findPath(db: GraphDB, src: Int, dst: Int): QueryResult {
+  if src == dst {
+    val n: Node? = db.getNode(src)
+    if n == null { return new NoMatch() }
+    val names: List[String] = [(n as Node).name()]
+    return new PathFound(names, 0.0)
+  }
+
+  val visited: List[Int] = []
+  val queue: List[Int] = []
+  // pathMap: nodeId -> list of node ids forming the path from src
+  val pathMap: Map[Int, List[Int]] = [:]
+  visited.add(src)
+  queue.add(src)
+  pathMap[src] = [src]
+
+  var foundDst = -1
+  while queue.size > 0 && foundDst == -1 {
+    val cur = queue.get(0) as Int
+    queue.remove(0)
+    val edges = db.edgesFrom(cur)
+    foreach edge: Edge in edges {
+      val next = edge.to()
+      val alreadySeen = visited.find { v -> (v as Int) == next } != null
+      if !alreadySeen {
+        visited.add(next)
+        val curPath: List[Int] = pathMap[cur] as List[Int]
+        val newPath: List[Int] = []
+        foreach step: Object in curPath { newPath.add(step as Int) }
+        newPath.add(next)
+        pathMap[next] = newPath
+        if next == dst {
+          foundDst = next
+        } else {
+          queue.add(next)
+        }
+      }
+    }
+  }
+
+  if foundDst == -1 {
+    return new NoMatch()
+  }
+  val rawPath: List[Int] = pathMap[foundDst] as List[Int]
+  val names: List[String] = rawPath.map { nodeId -> (db.getNode(nodeId as Int) as Node).name() }
+  return new PathFound(names, (rawPath.size - 1) * 1.0)
+}
+
+// ── extension methods ──────────────────────────────────────────────────────
+
+extension Node {
+  def fullLabel(): String = labelOf(self.label()) + "/" + self.name()
+}
+
+// ── statistics helper ──────────────────────────────────────────────────────
+
+def degreeStats(db: GraphDB): void {
+  val nodes = db.allNodes()
+  val allEdges = db.allEdges()
+  val degrees = nodes.map { n ->
+    val id = (n as Node).id()
+    val out = db.edgesFrom(id).size
+    val in_ = allEdges.filter { e -> (e as Edge).to() == id }.size
+    out + in_
+  }
+  val total = degrees.fold(0) { acc, d -> (acc as Int) + (d as Int) }
+  val maxDeg = degrees.fold(0) { acc, d -> if (d as Int) > (acc as Int) { d } else { acc } } as Int
+  val avg = if nodes.size > 0 { (total as Int) * 1.0 / nodes.size } else { 0.0 }
+  println("  degree stats: total=#{total as Int}, max=#{maxDeg}, avg=#{avg}")
+}
+
+// DFS: count nodes reachable from `from` (mutates visited list)
+def countReachable(db: GraphDB, from: Int, visited: List[Int]): Int {
+  val neighbors = db.neighbors(from)
+  var count = 0
+  foreach n: Node in neighbors {
+    val alreadyVisited = visited.find { v -> (v as Int) == n.id() } != null
+    if !alreadyVisited {
+      visited.add(n.id())
+      count = count + 1 + countReachable(db, n.id(), visited)
+    }
+  }
+  return count
+}
+
+// ── main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val db = new GraphDB()
+
+  // Add people
+  val alice   = db.addNode(NodeLabel::PERSON, "Alice")
+  val bob     = db.addNode(NodeLabel::PERSON, "Bob")
+  val carol   = db.addNode(NodeLabel::PERSON, "Carol")
+  val dave    = db.addNode(NodeLabel::PERSON, "Dave")
+
+  // Add companies
+  val acme    = db.addNode(NodeLabel::COMPANY, "Acme Corp")
+  val beacon  = db.addNode(NodeLabel::COMPANY, "Beacon Ltd")
+
+  // Add cities
+  val nyc     = db.addNode(NodeLabel::CITY, "New York")
+  val sf      = db.addNode(NodeLabel::CITY, "San Francisco")
+
+  // Add products
+  val widget  = db.addNode(NodeLabel::PRODUCT, "Widget X")
+  val gadget  = db.addNode(NodeLabel::PRODUCT, "Gadget Y")
+
+  // Relationships
+  db.addEdge(alice, bob,    EdgeType::KNOWS,     1.0)
+  db.addEdge(alice, carol,  EdgeType::KNOWS,     0.8)
+  db.addEdge(bob,   carol,  EdgeType::KNOWS,     0.6)
+  db.addEdge(carol, dave,   EdgeType::KNOWS,     0.9)
+  db.addEdge(alice, acme,   EdgeType::WORKS_AT,  1.0)
+  db.addEdge(bob,   beacon, EdgeType::WORKS_AT,  1.0)
+  db.addEdge(carol, acme,   EdgeType::WORKS_AT,  1.0)
+  db.addEdge(acme,  nyc,    EdgeType::BASED_IN,  1.0)
+  db.addEdge(beacon,sf,     EdgeType::BASED_IN,  1.0)
+  db.addEdge(alice, widget, EdgeType::PURCHASED, 1.0)
+  db.addEdge(bob,   gadget, EdgeType::PURCHASED, 1.0)
+  db.addEdge(carol, widget, EdgeType::PURCHASED, 1.0)
+  db.addEdge(alice, widget, EdgeType::REVIEWS,   1.0)
+
+  println(db.describe())
+
+  // ── query 1: nodes by label ──
+  println("\n-- People:")
+  val people = db.findByLabel(NodeLabel::PERSON)
+  foreach p: Node in people {
+    println("  " + p.fullLabel())
+  }
+
+  // ── query 2: pattern match on QueryResult ADT ──
+  println("\n-- Node lookup:")
+  foreach targetId: Int in [alice, 999] {
+    select queryNode(db, targetId) {
+      case r is OneNode:
+        val found = r as OneNode
+        println("  found: " + found.node().fullLabel())
+      case r is NoMatch:
+        println("  not found id=" + targetId)
+      else: {}
+    }
+  }
+
+  // ── query 3: edges of type KNOWS ──
+  println("\n-- KNOWS edges:")
+  val knowsEdges = db.edgesOfType(EdgeType::KNOWS)
+  foreach e: Edge in knowsEdges {
+    val fromNode = db.getNode(e.from()) as Node
+    val toNode   = db.getNode(e.to())   as Node
+    println("  #{fromNode.name()} -> #{toNode.name()} (w=#{e.weight()})")
+  }
+
+  // ── query 4: who works at Acme? ──
+  println("\n-- Acme employees:")
+  val acmeEdges = db.edgesOfType(EdgeType::WORKS_AT)
+    .filter { e -> (e as Edge).to() == acme }
+  foreach e: Object in acmeEdges {
+    val edge = e as Edge
+    val person = db.getNode(edge.from()) as Node
+    println("  " + person.name())
+  }
+
+  // ── query 5: BFS path ──
+  println("\n-- Paths:")
+  val pairs: List[Int] = [alice, dave, alice, sf, alice, 999]
+  var pi = 0
+  while pi < pairs.size {
+    val src = pairs.get(pi) as Int
+    val dst = pairs.get(pi + 1) as Int
+    pi = pi + 2
+    val srcNode: Node? = db.getNode(src)
+    val dstNodeOrNull: Node? = db.getNode(dst)
+    val srcName = if srcNode != null { (srcNode as Node).name() } else { "id=" + src }
+    val dstName = if dstNodeOrNull != null { (dstNodeOrNull as Node).name() } else { "id=" + dst }
+    select findPath(db, src, dst) {
+      case r is PathFound:
+        val pf = r as PathFound
+        println("  #{srcName} -> #{dstName}: #{pf.path()} (#{pf.totalWeight()} hops)")
+      case r is NoMatch:
+        println("  #{srcName} -> #{dstName}: no path")
+      else: {}
+    }
+  }
+
+  // ── query 6: grouped by label ──
+  println("\n-- Nodes grouped by label:")
+  val byLabel = db.allNodes().groupBy { n -> labelOf((n as Node).label()) }
+  foreach (lbl, nodes) in byLabel {
+    val names = (nodes as List[Node]).map { n -> (n as Node).name() }
+    println("  #{lbl}: #{names}")
+  }
+
+  // ── statistics ──
+  println("\n-- Degree statistics:")
+  degreeStats(db)
+
+  // ── nullable / safe-call demo ──
+  println("\n-- Nullable demo:")
+  val missing: Node? = null
+  val safeResult = missing?.name() ?: "no node"
+  println("  safe result: " + safeResult)
+
+  // ── try/catch demo ──
+  println("\n-- Try/catch demo:")
+  try {
+    val list: List[Node] = []
+    val item = list.get(99)
+    println("  got: " + item)
+  } catch e: Exception {
+    println("  caught: " + e.getMessage())
+  }
+
+  // ── string interpolation + range ──
+  println("\n-- Node IDs 1..5:")
+  foreach i: Int in 1..5 {
+    val nodeOrNull: Node? = db.getNode(i)
+    if nodeOrNull != null {
+      println("  id=#{i} => #{nodeOrNull.fullLabel()}")
+    } else {
+      println("  id=#{i} => (not found)")
+    }
+  }
+
+  // ── product-purchase summary ──
+  println("\n-- Products purchased:")
+  val purchaseEdges = db.edgesOfType(EdgeType::PURCHASED)
+  val productIds: List[Int] = purchaseEdges.map { e -> (e as Edge).to() }.distinct()
+  foreach pid: Int in productIds {
+    val product = db.getNode(pid) as Node
+    val buyers = purchaseEdges
+      .filter { e -> (e as Edge).to() == pid }
+      .map    { e -> (db.getNode((e as Edge).from()) as Node).name() }
+    println("  #{product.name()}: buyers=#{buyers}")
+  }
+
+  // ── KNOWS degree (closures stored in vals) ──
+  println("\n-- Social degrees:")
+  val countKnows = (nodeId: Int) -> db.edgesFrom(nodeId).filter { e -> (e as Edge).edgeType() == EdgeType::KNOWS }.size
+  foreach p: Node in db.findByLabel(NodeLabel::PERSON) {
+    println("  #{p.name()}: knows #{countKnows(p.id())} people")
+  }
+
+  // ── recursion: count reachable nodes via DFS ──
+  println("\n-- Reachable from Alice:")
+  val reachableVisited: List[Int] = [alice]
+  val reachableCount = countReachable(db, alice, reachableVisited)
+  println("  Alice can reach #{reachableCount} other node(s)")
+
+  println("\nDone.")
+}

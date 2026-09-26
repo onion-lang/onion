@@ -1,0 +1,389 @@
+// FlightPlanner.on — airline flight planning and operations analytics
+// Exercises: case-enum with method, records with methods, classes (public:),
+// extension methods on Int, typed generics (List[T], Map[K,V]), collection
+// pipelines (filter/sortedBy), select/type patterns, nullable + Elvis (?:),
+// closures, string interpolation, foreach/while loops, Format library.
+
+import {
+  java.util.*
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AircraftClass {
+  case NarrowBody; case WideBody; case RegionalJet; case TurboProp
+public:
+  def label(): String = select this {
+    case c is NarrowBody:  "Narrow-body"
+    case c is WideBody:    "Wide-body"
+    case c is RegionalJet: "Regional jet"
+    case c is TurboProp:   "Turboprop"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Airport(code: String, name: String, city: String, lat: Double, lon: Double)
+
+record Aircraft(
+  id: String, model: String, acClass: AircraftClass,
+  rangeKm: Int, cruiseKmh: Int, capacity: Int, fuelBurnLph: Double
+)
+
+record Route(fromCode: String, toCode: String, distKm: Int)
+
+record FlightPlan(flightNo: String, acId: String, fromCode: String, toCode: String, depHour: Int, pax: Int)
+
+record FlightResult(
+  flightNo: String, aircraft: Aircraft, origin: Airport, dest: Airport,
+  distKm: Int, durationMin: Int, fuelL: Double, pax: Int,
+  revenueUsd: Double, costUsd: Double
+) {
+public:
+  def profit(): Double = revenueUsd() - costUsd()
+  def loadFactor(): Double = pax() as Double / aircraft().capacity() as Double * 100.0
+  def profitStr(): String {
+    val p: Double = profit()
+    val abs: Double = if p < 0.0 { 0.0 - p } else { p }
+    val sign: String = if p >= 0.0 { "+" } else { "-" }
+    return sign + "$" + Format::number(abs, 2)
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def toHHMM(): String {
+    val h: Int = self / 60
+    val m: Int = self % 60
+    val ms: String = if m < 10 { "0" + m } else { "" + m }
+    return h + "h " + ms + "m"
+  }
+}
+
+// ─── Flight Planner class ─────────────────────────────────────────────────────
+
+class FlightPlanner {
+  var airports: List[Airport] = []
+  var aircraft: List[Aircraft] = []
+  var routes: List[Route] = []
+  var plans: List[FlightPlan] = []
+
+public:
+  def addAirport(a: Airport): void { airports.add(a) }
+  def addAircraft(a: Aircraft): void { aircraft.add(a) }
+  def addRoute(r: Route): void { routes.add(r) }
+  def addPlan(p: FlightPlan): void { plans.add(p) }
+
+  def findAirport(code: String): Airport? {
+    foreach a: Airport in airports {
+      if a.code() == code { return a }
+    }
+    return null
+  }
+
+  def findAircraft(acId: String): Aircraft? {
+    foreach ac: Aircraft in aircraft {
+      if ac.id() == acId { return ac }
+    }
+    return null
+  }
+
+  def findRoute(from: String, to: String): Route? {
+    foreach r: Route in routes {
+      if r.fromCode() == from && r.toCode() == to { return r }
+      if r.fromCode() == to && r.toCode() == from { return r }
+    }
+    return null
+  }
+
+  def executePlan(p: FlightPlan): FlightResult? {
+    val ac: Aircraft? = findAircraft(p.acId())
+    val orig: Airport? = findAirport(p.fromCode())
+    val dst: Airport? = findAirport(p.toCode())
+    val route: Route? = findRoute(p.fromCode(), p.toCode())
+    if ac == null || orig == null || dst == null || route == null { return null }
+    val dist: Int = route.distKm()
+    if dist > ac.rangeKm() { return null }
+    val durationMin: Int = (dist * 60 / ac.cruiseKmh()) + 30
+    val fuelL: Double = ac.fuelBurnLph() * (durationMin as Double / 60.0)
+    val revUsd: Double = p.pax() as Double * (200.0 + dist as Double * 0.08)
+    val costUsd: Double = fuelL * 0.85 + (ac.capacity() as Double * 120.0)
+    return new FlightResult(p.flightNo(), ac, orig, dst, dist, durationMin, fuelL, p.pax(), revUsd, costUsd)
+  }
+
+  def runAllFlights(): List[FlightResult] {
+    val results: List[FlightResult] = []
+    foreach p: FlightPlan in plans {
+      val r: FlightResult? = executePlan(p)
+      if r != null { results.add(r) }
+    }
+    return results
+  }
+
+  def printFleetSummary(): void {
+    println("=== Fleet Summary (#{aircraft.size()} aircraft) ===")
+    foreach ac: Aircraft in aircraft {
+      println("  #{ac.id()}  #{ac.model()}  [#{ac.acClass().label()}]  range=#{ac.rangeKm()}km  cap=#{ac.capacity()}pax  burn=#{ac.fuelBurnLph()}L/h")
+    }
+    println("")
+  }
+
+  def printRouteMap(): void {
+    println("=== Route Map (#{routes.size()} routes) ===")
+    val sortedRoutes: List[Route] = routes.sortedBy { r: Route -> r.distKm() }
+    foreach r: Route in sortedRoutes {
+      val a: Airport? = findAirport(r.fromCode())
+      val b: Airport? = findAirport(r.toCode())
+      val aCity: String = if a != null { a.city() } else { r.fromCode() }
+      val bCity: String = if b != null { b.city() } else { r.toCode() }
+      println("  #{r.fromCode()} (#{aCity}) <-> #{r.toCode()} (#{bCity})  #{r.distKm()} km")
+    }
+    println("")
+  }
+}
+
+// ─── Setup ────────────────────────────────────────────────────────────────────
+
+def buildPlanner(): FlightPlanner {
+  val fp: FlightPlanner = new FlightPlanner()
+
+  fp.addAirport(new Airport("JFK", "John F. Kennedy Intl",  "New York",    40.6413, -73.7781))
+  fp.addAirport(new Airport("LAX", "Los Angeles Intl",      "Los Angeles", 33.9425, -118.4081))
+  fp.addAirport(new Airport("ORD", "O'Hare Intl",           "Chicago",     41.9742, -87.9073))
+  fp.addAirport(new Airport("MIA", "Miami Intl",            "Miami",       25.7959, -80.2870))
+  fp.addAirport(new Airport("SEA", "Seattle-Tacoma Intl",   "Seattle",     47.4502, -122.3088))
+  fp.addAirport(new Airport("DFW", "Dallas/Fort Worth Intl","Dallas",      32.8998, -97.0403))
+  fp.addAirport(new Airport("BOS", "Logan Intl",            "Boston",      42.3656, -71.0096))
+  fp.addAirport(new Airport("DEN", "Denver Intl",           "Denver",      39.8561, -104.6737))
+
+  fp.addAircraft(new Aircraft("N101", "Boeing 737-800",   new NarrowBody(),  5765, 842, 162, 2850.0))
+  fp.addAircraft(new Aircraft("N202", "Boeing 777-300ER", new WideBody(),   13650, 905, 396, 7530.0))
+  fp.addAircraft(new Aircraft("N303", "Airbus A320neo",   new NarrowBody(),  6300, 833, 165, 2580.0))
+  fp.addAircraft(new Aircraft("N404", "Embraer E175",     new RegionalJet(), 3735, 870,  76, 1620.0))
+  fp.addAircraft(new Aircraft("N505", "Airbus A350-900",  new WideBody(),   15000, 910, 369, 6940.0))
+  fp.addAircraft(new Aircraft("N606", "ATR 72-600",       new TurboProp(),   1528, 510,  70, 1100.0))
+
+  fp.addRoute(new Route("JFK", "LAX", 3983))
+  fp.addRoute(new Route("JFK", "MIA", 1757))
+  fp.addRoute(new Route("JFK", "ORD", 1191))
+  fp.addRoute(new Route("JFK", "BOS",  299))
+  fp.addRoute(new Route("LAX", "SEA", 1535))
+  fp.addRoute(new Route("LAX", "DFW", 1994))
+  fp.addRoute(new Route("LAX", "DEN", 1389))
+  fp.addRoute(new Route("ORD", "DFW", 1290))
+  fp.addRoute(new Route("ORD", "DEN", 1474))
+  fp.addRoute(new Route("ORD", "MIA", 2197))
+  fp.addRoute(new Route("MIA", "DFW", 1793))
+  fp.addRoute(new Route("SEA", "DEN", 1625))
+  fp.addRoute(new Route("DFW", "DEN", 1063))
+  fp.addRoute(new Route("BOS", "ORD", 1377))
+  fp.addRoute(new Route("BOS", "MIA", 2034))
+  fp.addRoute(new Route("LAX", "ORD", 2806))
+
+  fp.addPlan(new FlightPlan("OA101", "N101", "JFK", "LAX",  8, 148))
+  fp.addPlan(new FlightPlan("OA102", "N303", "LAX", "ORD", 10, 155))
+  fp.addPlan(new FlightPlan("OA103", "N404", "JFK", "BOS",  7,  68))
+  fp.addPlan(new FlightPlan("OA104", "N101", "ORD", "DFW",  9, 140))
+  fp.addPlan(new FlightPlan("OA105", "N505", "JFK", "LAX", 12, 350))
+  fp.addPlan(new FlightPlan("OA106", "N404", "BOS", "ORD", 14,  65))
+  fp.addPlan(new FlightPlan("OA107", "N101", "MIA", "DFW", 11, 150))
+  fp.addPlan(new FlightPlan("OA108", "N202", "LAX", "SEA",  6, 310))
+  fp.addPlan(new FlightPlan("OA109", "N303", "DFW", "DEN", 13, 145))
+  fp.addPlan(new FlightPlan("OA110", "N606", "BOS", "JFK",  9,  60))
+
+  return fp
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+def usd(v: Double): String = "$" + Format::number(v, 2)
+
+def sumRevenue(list: List[FlightResult]): Double {
+  var s: Double = 0.0
+  foreach fr: FlightResult in list { s = s + fr.revenueUsd() }
+  return s
+}
+
+// ─── Reporting ────────────────────────────────────────────────────────────────
+
+def printFlightResults(results: List[FlightResult]): void {
+  println("=== Flight Operations (#{results.size()} flights) ===")
+  foreach fr: FlightResult in results {
+    println("  #{fr.flightNo()}  #{fr.origin().code()}->#{fr.dest().code()}  #{fr.distKm()}km  #{fr.durationMin().toHHMM()}  #{fr.pax()}pax  rev=#{usd(fr.revenueUsd())}  cost=#{usd(fr.costUsd())}  profit=#{fr.profitStr()}")
+  }
+  println("")
+}
+
+def printAnalytics(results: List[FlightResult]): void {
+  println("=== Operations Summary ===")
+
+  var totalRev: Double = 0.0
+  var totalCost: Double = 0.0
+  var totalPax: Int = 0
+  var totalDist: Int = 0
+  var totalFuel: Double = 0.0
+  foreach fr: FlightResult in results {
+    totalRev  = totalRev  + fr.revenueUsd()
+    totalCost = totalCost + fr.costUsd()
+    totalPax  = totalPax  + fr.pax()
+    totalDist = totalDist + fr.distKm()
+    totalFuel = totalFuel + fr.fuelL()
+  }
+
+  val netProfit: Double = totalRev - totalCost
+  val marginPct: Long = if totalRev > 0.0 { (netProfit / totalRev * 100.0) as Long } else { 0L }
+  println("  Total Revenue : #{usd(totalRev)}")
+  println("  Total Cost    : #{usd(totalCost)}")
+  println("  Net Profit    : #{usd(netProfit)} (#{marginPct}% margin)")
+  println("  Total Pax     : #{Format::integer(totalPax as Long)}")
+  println("  Total Dist    : #{Format::integer(totalDist as Long)} km")
+  println("  Total Fuel    : #{Format::integer(totalFuel as Long)} L")
+  println("")
+
+  val sortedByProfit: List[FlightResult] = results.sortedBy { fr: FlightResult -> 0L - fr.profit() as Long }
+  if sortedByProfit.size() > 0 {
+    val best: FlightResult = sortedByProfit[0]
+    println("  Best profit  : #{best.flightNo()} #{best.origin().code()}->#{best.dest().code()} #{usd(best.profit())}")
+    val worst: FlightResult = sortedByProfit[sortedByProfit.size() - 1]
+    println("  Worst profit : #{worst.flightNo()} #{worst.origin().code()}->#{worst.dest().code()} #{worst.profitStr()}")
+  }
+  println("")
+}
+
+def printAircraftUtilization(results: List[FlightResult]): void {
+  println("=== Aircraft Utilization ===")
+  val countMap: Map[String, Int] = [:]
+  val fuelMap: Map[String, Double] = [:]
+  foreach fr: FlightResult in results {
+    val id: String = fr.aircraft().id()
+    val prevCount: Int? = countMap.get(id)
+    countMap.put(id, if prevCount != null { prevCount + 1 } else { 1 })
+    val prevFuel: Double? = fuelMap.get(id)
+    fuelMap.put(id, if prevFuel != null { prevFuel + fr.fuelL() } else { fr.fuelL() })
+  }
+  val keys: List[String] = Colls::toList(countMap.keySet()).sortedBy { k: String -> k }
+  foreach id: String in keys {
+    val cnt: Int = (countMap.get(id) ?: 0)
+    val fuel: Double = (fuelMap.get(id) ?: 0.0)
+    println("  #{id}: #{cnt} flight(s)  total fuel: #{Format::integer(fuel as Long)} L")
+  }
+  println("")
+}
+
+def printAircraftClassBreakdown(results: List[FlightResult]): void {
+  println("=== Revenue by Aircraft Class ===")
+  var nbRev: Double = 0.0
+  var wbRev: Double = 0.0
+  var rjRev: Double = 0.0
+  var tpRev: Double = 0.0
+  foreach fr: FlightResult in results {
+    select fr.aircraft().acClass() {
+      case c is NarrowBody:  nbRev = nbRev + fr.revenueUsd()
+      case c is WideBody:    wbRev = wbRev + fr.revenueUsd()
+      case c is RegionalJet: rjRev = rjRev + fr.revenueUsd()
+      case c is TurboProp:   tpRev = tpRev + fr.revenueUsd()
+    }
+  }
+  println("  Narrow-body   : #{usd(nbRev)}")
+  println("  Wide-body     : #{usd(wbRev)}")
+  println("  Regional jet  : #{usd(rjRev)}")
+  println("  Turboprop     : #{usd(tpRev)}")
+  println("")
+}
+
+def printLoadFactorReport(results: List[FlightResult]): void {
+  println("=== Load Factors ===")
+  val sorted: List[FlightResult] = results.sortedBy { fr: FlightResult -> 0L - fr.loadFactor() as Long }
+  foreach fr: FlightResult in sorted {
+    val lf: Double = fr.loadFactor()
+    val bars: Int = (lf / 5.0) as Int
+    var barStr: String = ""
+    var i: Int = 0
+    while i < 20 {
+      barStr = barStr + (if i < bars { "#" } else { "." })
+      i++
+    }
+    println("  #{fr.flightNo()} #{fr.origin().code()}->#{fr.dest().code()} [#{barStr}] #{lf as Long}%")
+  }
+  println("")
+}
+
+def printHaulBreakdown(results: List[FlightResult]): void {
+  println("=== Short-haul vs Long-haul ===")
+  val shortH: List[FlightResult] = results.filter { fr: FlightResult -> fr.distKm() < 2000 }
+  val longH: List[FlightResult]  = results.filter { fr: FlightResult -> fr.distKm() >= 2000 }
+  val shortRev: Double = sumRevenue(shortH)
+  val longRev: Double  = sumRevenue(longH)
+  println("  Short-haul (<2000km)  : #{shortH.size()} flights  rev #{usd(shortRev)}")
+  println("  Long-haul  (>=2000km) : #{longH.size()} flights  rev #{usd(longRev)}")
+  println("")
+}
+
+def printTopOrigins(results: List[FlightResult]): void {
+  println("=== Departure Frequency ===")
+  val countMap: Map[String, Int] = [:]
+  foreach fr: FlightResult in results {
+    val code: String = fr.origin().code()
+    val prev: Int? = countMap.get(code)
+    countMap.put(code, if prev != null { prev + 1 } else { 1 })
+  }
+  val sortedKeys: List[String] = Colls::toList(countMap.keySet()).sortedBy { k: String ->
+    0 - (countMap.get(k) ?: 0)
+  }
+  foreach code: String in sortedKeys {
+    val cnt: Int = (countMap.get(code) ?: 0)
+    println("  #{code}: #{cnt} departure(s)")
+  }
+  println("")
+}
+
+def printFuelEfficiency(results: List[FlightResult]): void {
+  println("=== Fuel Efficiency ===")
+  val sorted: List[FlightResult] = results.sortedBy { fr: FlightResult ->
+    (fr.fuelL() / fr.distKm() as Double * 1000.0) as Long
+  }
+  foreach fr: FlightResult in sorted {
+    val effPerKm: Long = (fr.fuelL() / fr.distKm() as Double) as Long
+    val effPerPax: Long = (fr.fuelL() / fr.pax() as Double) as Long
+    println("  #{fr.flightNo()} #{fr.aircraft().model()}: #{effPerKm} L/km  #{effPerPax} L/pax")
+  }
+  println("")
+}
+
+def printRangeUtilization(results: List[FlightResult]): void {
+  println("=== Range Utilization ===")
+  foreach fr: FlightResult in results {
+    val pct: Double = fr.distKm() as Double / fr.aircraft().rangeKm() as Double * 100.0
+    val bars: Int = (pct / 5.0) as Int
+    var barStr: String = ""
+    var i: Int = 0
+    while i < 20 {
+      barStr = barStr + (if i < bars { "=" } else { "." })
+      i++
+    }
+    println("  #{fr.flightNo()} [#{barStr}] #{pct as Long}% (#{fr.distKm()}/#{fr.aircraft().rangeKm()} km)")
+  }
+  println("")
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val fp: FlightPlanner = buildPlanner()
+  fp.printFleetSummary()
+  fp.printRouteMap()
+
+  val results: List[FlightResult] = fp.runAllFlights()
+  printFlightResults(results)
+  printAnalytics(results)
+  printAircraftUtilization(results)
+  printAircraftClassBreakdown(results)
+  printLoadFactorReport(results)
+  printHaulBreakdown(results)
+  printTopOrigins(results)
+  printFuelEfficiency(results)
+  printRangeUtilization(results)
+
+  println("Done. #{results.size()} flights processed.")
+}

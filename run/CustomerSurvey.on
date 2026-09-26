@@ -1,0 +1,346 @@
+// CustomerSurvey.on — customer satisfaction survey system
+// Exercises: records with methods, plain enum, data-carrying enum, ADT enum,
+// interface, classes, extension methods, collection pipelines (filter/map/fold/
+// groupBy/sortedBy/find/distinct/partition/sumBy), select/pattern matching,
+// nullable, closures, string interpolation, try/catch, recursion, while, foreach.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SurveyCategory { Service, Product, Delivery, Overall }
+
+enum Sentiment(score: Int, stars: String) {
+  Excellent(5, "*****"),
+  Good(4, "****-"),
+  Neutral(3, "***--"),
+  Poor(2, "**---"),
+  Terrible(1, "*----")
+}
+
+enum FeedbackStatus {
+  case Open
+  case InProgress(assignee: String)
+  case Resolved(resolution: String)
+  case Dismissed(reason: String)
+public:
+  def label(): String = select this {
+    case s is Open:        "Open"
+    case s is InProgress:  "In Progress (#{s.assignee()})"
+    case s is Resolved:    "Resolved: #{s.resolution()}"
+    case s is Dismissed:   "Dismissed: #{s.reason()}"
+    else:                  "?"
+  }
+  def isOpen(): Boolean = select this {
+    case s is Open:       true
+    case s is InProgress: true
+    else:                 false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record FeedbackEntry(
+  id:         String,
+  customerId: String,
+  category:   SurveyCategory,
+  sentiment:  Sentiment,
+  comment:    String
+) {
+public:
+  def categoryLabel(): String = select category() {
+    case SurveyCategory::Service:  "Service"
+    case SurveyCategory::Product:  "Product"
+    case SurveyCategory::Delivery: "Delivery"
+    case SurveyCategory::Overall:  "Overall"
+    else:                          "Other"
+  }
+  def label(): String = "[#{id()}] #{categoryLabel()} #{sentiment().stars()} - #{comment()}"
+  def isPositive(): Boolean = sentiment().score() >= 4
+  def isNegative(): Boolean = sentiment().score() <= 2
+}
+
+record CustomerProfile(id: String, name: String, tier: String) {
+public:
+  def display(): String = "#{name()} (#{tier()}) [#{id()}]"
+}
+
+// ─── Interface ─────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): Double {
+    val x = (self * 10.0 + 0.5) as Int
+    return (x as Double) / 10.0
+  }
+  def fmt1(): String {
+    val i = (self * 10.0 + 0.5) as Int
+    val whole = i / 10
+    val frac  = i % 10
+    return "" + whole + "." + frac
+  }
+}
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "0.0%" }
+    val p = ((self as Double) / (total as Double) * 100.0).round1()
+    return p.fmt1() + "%"
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Classes ──────────────────────────────────────────────────────────────────
+
+class SurveyRound conforms Summarizable {
+  val title:    String
+  val entries:  List[FeedbackEntry]
+  var statuses: List[FeedbackStatus]
+public:
+  def this(title: String) {
+    self.title    = title
+    self.entries  = []
+    self.statuses = []
+  }
+  def addEntry(e: FeedbackEntry): void {
+    entries.add(e)
+    statuses.add(new Open())
+  }
+  def setStatus(idx: Int, s: FeedbackStatus): void {
+    if idx >= 0 && idx < statuses.size {
+      statuses.set(idx, s)
+    }
+  }
+  def getStatus(idx: Int): FeedbackStatus {
+    return statuses.get(idx) as FeedbackStatus
+  }
+  def getTitle(): String = title
+  def size(): Int = entries.size
+  def getEntries(): List[FeedbackEntry] = entries
+  def avgScore(): Double {
+    if entries.size == 0 { return 0.0 }
+    val total = entries.fold(0) { acc, e ->
+      (acc as Int) + (e as FeedbackEntry).sentiment().score()
+    } as Int
+    return (total as Double) / (entries.size as Double)
+  }
+  def summary(): String {
+    val avg = avgScore().fmt1()
+    val pos = entries.filter { e -> (e as FeedbackEntry).isPositive() }.size
+    return "#{title}: #{entries.size} entries, avg #{avg}/5, #{pos} positive"
+  }
+}
+
+class FeedbackRepository {
+  val rounds: List[SurveyRound]
+  val profiles: List[CustomerProfile]
+public:
+  def this() {
+    self.rounds   = []
+    self.profiles = []
+  }
+  def addRound(r: SurveyRound): void    { rounds.add(r) }
+  def addProfile(p: CustomerProfile): void { profiles.add(p) }
+  def findProfile(id: String): CustomerProfile? {
+    val r = profiles.find { p -> (p as CustomerProfile).id() == id }
+    if r == null { return null }
+    return r as CustomerProfile
+  }
+  def allRounds(): List[SurveyRound] = rounds
+  def allProfiles(): List[CustomerProfile] = profiles
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def printHeader(h: String): void {
+  IO::println("")
+  IO::println(h)
+  var sep: String = ""
+  var i: Int = 0
+  while i < h.length() { sep = sep + "-"; i++ }
+  IO::println(sep)
+}
+
+def safeProfile(repo: FeedbackRepository, id: String): String {
+  try {
+    val p = repo.findProfile(id)
+    if p == null { throw new Exception("Unknown customer: " + id) }
+    return (p as CustomerProfile).display()
+  } catch e: Exception {
+    return "UNKNOWN(" + id + ")"
+  }
+}
+
+def countBySentiment(entries: List[FeedbackEntry], target: Sentiment, idx: Int): Int {
+  if idx >= entries.size { return 0 }
+  val entry = entries.get(idx) as FeedbackEntry
+  val rest  = countBySentiment(entries, target, idx + 1)
+  if entry.sentiment() == target { return 1 + rest }
+  return rest
+}
+
+// ─── Script ───────────────────────────────────────────────────────────────────
+
+val repo = new FeedbackRepository()
+
+// --- Customer profiles ---
+repo.addProfile(new CustomerProfile("C001", "Alice Martin",  "Gold"))
+repo.addProfile(new CustomerProfile("C002", "Bob Nguyen",    "Silver"))
+repo.addProfile(new CustomerProfile("C003", "Clara Reyes",   "Gold"))
+repo.addProfile(new CustomerProfile("C004", "David Kim",     "Bronze"))
+repo.addProfile(new CustomerProfile("C005", "Eva Schulz",    "Silver"))
+
+// --- Round 1: Q3 Survey ---
+val q3 = new SurveyRound("Q3 2025")
+q3.addEntry(new FeedbackEntry("F001", "C001", SurveyCategory::Service,  Sentiment::Excellent, "Fantastic support, quick resolution!"))
+q3.addEntry(new FeedbackEntry("F002", "C002", SurveyCategory::Product,  Sentiment::Good,      "Product works well, minor UX issues"))
+q3.addEntry(new FeedbackEntry("F003", "C003", SurveyCategory::Delivery, Sentiment::Neutral,   "Delivery was late by two days"))
+q3.addEntry(new FeedbackEntry("F004", "C004", SurveyCategory::Service,  Sentiment::Poor,      "Waited 45 minutes for a callback"))
+q3.addEntry(new FeedbackEntry("F005", "C005", SurveyCategory::Overall,  Sentiment::Good,      "Happy overall but room for improvement"))
+q3.addEntry(new FeedbackEntry("F006", "C001", SurveyCategory::Product,  Sentiment::Excellent, "Love the new features in v3!"))
+q3.addEntry(new FeedbackEntry("F007", "C003", SurveyCategory::Delivery, Sentiment::Terrible,  "Package arrived damaged"))
+q3.addEntry(new FeedbackEntry("F008", "C002", SurveyCategory::Service,  Sentiment::Good,      "Agent was polite and knowledgeable"))
+
+q3.setStatus(3, new Resolved("Callback SLA extended to 15 min"))
+q3.setStatus(6, new InProgress("Logistics Team"))
+repo.addRound(q3)
+
+// --- Round 2: Q4 Survey ---
+val q4 = new SurveyRound("Q4 2025")
+q4.addEntry(new FeedbackEntry("F009", "C001", SurveyCategory::Service,  Sentiment::Excellent, "Best support experience ever"))
+q4.addEntry(new FeedbackEntry("F010", "C004", SurveyCategory::Product,  Sentiment::Neutral,   "Documentation needs improvement"))
+q4.addEntry(new FeedbackEntry("F011", "C005", SurveyCategory::Delivery, Sentiment::Good,      "On-time delivery, well packaged"))
+q4.addEntry(new FeedbackEntry("F012", "C002", SurveyCategory::Overall,  Sentiment::Poor,      "Pricing increase was unexpected"))
+q4.addEntry(new FeedbackEntry("F013", "C003", SurveyCategory::Service,  Sentiment::Good,      "Response time improved significantly"))
+q4.addEntry(new FeedbackEntry("F014", "C004", SurveyCategory::Overall,  Sentiment::Excellent, "Major improvement from last quarter!"))
+
+q4.setStatus(3, new Dismissed("Pricing is market-aligned"))
+repo.addRound(q4)
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+printHeader("=== CUSTOMER PROFILES ===")
+foreach p: CustomerProfile in repo.allProfiles() {
+  IO::println("  " + p.display())
+}
+
+printHeader("=== ROUND SUMMARIES ===")
+foreach r: SurveyRound in repo.allRounds() {
+  IO::println("  " + r.summary())
+}
+
+// --- Per-round details ---
+foreach round: SurveyRound in repo.allRounds() {
+  printHeader("=== " + round.getTitle() + " ===")
+  val entries = round.getEntries()
+  foreach idx: Int in 0..<entries.size {
+    val e = entries.get(idx) as FeedbackEntry
+    val st = round.getStatus(idx)
+    val prof = safeProfile(repo, e.customerId())
+    IO::println("  " + e.label().rpad(60) + " | " + st.label())
+    IO::println("    Customer: " + prof)
+  }
+}
+
+// --- Category breakdown across all rounds ---
+printHeader("=== CATEGORY BREAKDOWN ===")
+val allEntries: List[FeedbackEntry] = []
+foreach r: SurveyRound in repo.allRounds() {
+  foreach e: FeedbackEntry in r.getEntries() {
+    allEntries.add(e)
+  }
+}
+
+val byCategory = allEntries.groupBy { e -> (e as FeedbackEntry).categoryLabel() }
+foreach (cat, catEntries) in byCategory {
+  val es = catEntries as List[FeedbackEntry]
+  val avgScore = es.fold(0) { acc, e -> (acc as Int) + (e as FeedbackEntry).sentiment().score() } as Int
+  val avg = ((avgScore as Double) / (es.size as Double)).round1()
+  IO::println("  " + (cat as String).rpad(10) + es.size + " entries, avg " + avg.fmt1() + "/5")
+}
+
+// --- Sentiment distribution ---
+printHeader("=== SENTIMENT DISTRIBUTION ===")
+val total = allEntries.size
+val excCount  = countBySentiment(allEntries, Sentiment::Excellent, 0)
+val goodCount = countBySentiment(allEntries, Sentiment::Good, 0)
+val neutCount = countBySentiment(allEntries, Sentiment::Neutral, 0)
+val poorCount = countBySentiment(allEntries, Sentiment::Poor, 0)
+val terrCount = countBySentiment(allEntries, Sentiment::Terrible, 0)
+IO::println("  Excellent  " + Sentiment::Excellent.stars() + " : " + excCount  + " (" + excCount.pct(total)  + ")")
+IO::println("  Good       " + Sentiment::Good.stars()      + " : " + goodCount + " (" + goodCount.pct(total) + ")")
+IO::println("  Neutral    " + Sentiment::Neutral.stars()   + " : " + neutCount + " (" + neutCount.pct(total) + ")")
+IO::println("  Poor       " + Sentiment::Poor.stars()      + " : " + poorCount + " (" + poorCount.pct(total) + ")")
+IO::println("  Terrible   " + Sentiment::Terrible.stars()  + " : " + terrCount + " (" + terrCount.pct(total) + ")")
+
+// --- Positive vs negative (partition) ---
+printHeader("=== POSITIVE vs NON-POSITIVE ===")
+val parts = allEntries.partition { e -> (e as FeedbackEntry).isPositive() }
+val positive = parts.get(0) as List[FeedbackEntry]
+val negative = parts.get(1) as List[FeedbackEntry]
+IO::println("  Positive   (score >= 4): " + positive.size + " (" + positive.size.pct(total) + ")")
+IO::println("  Non-positive (score < 4): " + negative.size + " (" + negative.size.pct(total) + ")")
+IO::println("  Top positive comment:  " +
+  positive.sortedBy { e -> 0 - (e as FeedbackEntry).sentiment().score() }.get(0).comment())
+if negative.size > 0 {
+  IO::println("  Top negative comment:  " +
+    negative.sortedBy { e -> (e as FeedbackEntry).sentiment().score() }.get(0).comment())
+}
+
+// --- Status overview ---
+printHeader("=== TICKET STATUS OVERVIEW ===")
+var openCount: Int = 0
+var resolvedCount: Int = 0
+var dismissedCount: Int = 0
+var inProgressCount: Int = 0
+foreach r: SurveyRound in repo.allRounds() {
+  foreach idx: Int in 0..<r.size() {
+    val st = r.getStatus(idx)
+    select st {
+      case x is Open:        openCount++
+      case x is InProgress:  inProgressCount++
+      case x is Resolved:    resolvedCount++
+      case x is Dismissed:   dismissedCount++
+      else: {}
+    }
+  }
+}
+IO::println("  Open:        " + openCount)
+IO::println("  In Progress: " + inProgressCount)
+IO::println("  Resolved:    " + resolvedCount)
+IO::println("  Dismissed:   " + dismissedCount)
+
+// --- Top customers by feedback volume ---
+printHeader("=== TOP CUSTOMERS BY FEEDBACK ===")
+val byCust = allEntries.groupBy { e -> (e as FeedbackEntry).customerId() }
+val custIds = allEntries.map { e -> (e as FeedbackEntry).customerId() }.distinct()
+val ranked = custIds.sortedBy { id ->
+  0 - (byCust.get(id as String) as List[FeedbackEntry]).size
+}
+foreach id: String in ranked {
+  val count = (byCust.get(id) as List[FeedbackEntry]).size
+  val prof = safeProfile(repo, id)
+  IO::println("  " + prof.rpad(32) + " " + count + " response(s)")
+}
+
+// --- Overall average across all rounds ---
+printHeader("=== OVERALL AVERAGE ===")
+val grandTotal = allEntries.fold(0) { acc, e ->
+  (acc as Int) + (e as FeedbackEntry).sentiment().score()
+} as Int
+val grandAvg = ((grandTotal as Double) / (allEntries.size as Double)).round1()
+IO::println("  Grand average score: " + grandAvg.fmt1() + " / 5.0")
+IO::println("  Entries analysed:    " + allEntries.size)
+
+IO::println("")
+IO::println("Done.")

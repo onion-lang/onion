@@ -1,0 +1,296 @@
+// SurveyAnalyzer.on — survey design and response analytics (~280 lines)
+//
+// Exercises: ADT enums (data-carrying + singleton cases), records with method
+// bodies, interfaces, class with mutable state, pattern matching on ADT cases
+// from outside the enum, collection pipelines (filter/map/fold/groupBy/
+// sortedBy/find/any/distinct), closures, nullable, string interpolation,
+// foreach over ranges and map entries, try/catch, recursion.
+
+// ── Question-type ADT ─────────────────────────────────────────────────────────
+enum QuestionKind {
+  case Scale(lo: Int, hi: Int)
+  case MultiChoice(options: List[String])
+  case YesNo
+public:
+  def label(): String = select this {
+    case s is Scale:       "Scale #{s.lo()}–#{s.hi()}"
+    case m is MultiChoice: "Choice (#{m.options().size} options)"
+    case y is YesNo:       "Yes/No"
+  }
+  def maxScore(): Int = select this {
+    case s is Scale: s.hi()
+    case _: 1
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+interface Reportable {
+  def printSummary(): void
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Question(id: Int, text: String, kind: QuestionKind)
+
+record Answer(respondentId: Int, questionId: Int, score: Int)
+
+record ScoreSummary(questionId: Int, mean: Double, min: Int, max: Int, count: Int) {
+public:
+  def printSummary(): void {
+    IO::println("  Q#{questionId()}: mean=#{mean()}, range=#{min()}–#{max()}, n=#{count()}")
+  }
+  def grade(): String {
+    val pct = if max() > 0 { (mean() / max()) * 100.0 } else { 0.0 }
+    return if pct >= 80.0 { "Excellent" }
+           else if pct >= 60.0 { "Good" }
+           else if pct >= 40.0 { "Fair" }
+           else { "Poor" }
+  }
+}
+
+// ── Statistics helpers ────────────────────────────────────────────────────────
+def listMean(scores: List[Int]): Double {
+  if scores.size == 0 { return 0.0 }
+  val total = scores.fold(0) { acc, v -> (acc as Int) + (v as Int) }
+  return (total as Int) / (scores.size as Double)
+}
+
+def listMin(scores: List[Int]): Int {
+  if scores.size == 0 { return 0 }
+  var m = (scores[0] as Int)
+  foreach s: Object in scores {
+    val v = s as Int
+    if v < m { m = v }
+  }
+  return m
+}
+
+def listMax(scores: List[Int]): Int {
+  if scores.size == 0 { return 0 }
+  var m = (scores[0] as Int)
+  foreach s: Object in scores {
+    val v = s as Int
+    if v > m { m = v }
+  }
+  return m
+}
+
+def repeatStr(s: String, n: Int): String {
+  if n <= 0 { return "" }
+  return s + repeatStr(s, n - 1)
+}
+
+def barChart(score: Int, max: Int): String {
+  val filled = if max > 0 { (score * 20) / max } else { 0 }
+  return "[" + repeatStr("#", filled) + repeatStr(".", 20 - filled) + "]"
+}
+
+// ── Survey class ──────────────────────────────────────────────────────────────
+class Survey {
+  val title: String
+  var questions: List[Question]
+  var answers: List[Answer]
+
+public:
+  def this(t: String) {
+    title = t
+    questions = []
+    answers = []
+  }
+
+  def addQuestion(q: Question): void {
+    questions.add(q)
+  }
+
+  def addAnswer(a: Answer): void {
+    answers.add(a)
+  }
+
+  def answersFor(questionId: Int): List[Answer] {
+    return answers.filter { a -> (a as Answer).questionId() == questionId }
+  }
+
+  def findQuestion(id: Int): Question? {
+    val found = questions.find { q -> (q as Question).id() == id }
+    return if found != null { found as Question } else { null }
+  }
+
+  def summarizeQuestion(questionId: Int): ScoreSummary? {
+    val q = findQuestion(questionId)
+    if q == null { return null }
+    val scores = answersFor(questionId).map { a -> (a as Answer).score() }
+    val mean = listMean(scores)
+    val mn = listMin(scores)
+    val mx = listMax(scores)
+    return new ScoreSummary(questionId, mean, mn, mx, scores.size)
+  }
+
+  // Net Promoter Score for a 0-10 scale question
+  // promoters (9-10) minus detractors (0-6), as a percentage of total
+  def nps(questionId: Int): Int {
+    val vals = answersFor(questionId)
+    if vals.size == 0 { return 0 }
+    val promoters = vals.filter { a -> (a as Answer).score() >= 9 }.size
+    val detractors = vals.filter { a -> (a as Answer).score() <= 6 }.size
+    return ((promoters - detractors) * 100) / vals.size
+  }
+
+  // Distribution: score → list of answers
+  def distribution(questionId: Int): Map[Object, List[Answer]] {
+    return answersFor(questionId).groupBy { a -> (a as Answer).score() }
+  }
+
+  def respondentIds(): List[Int] {
+    return answers.map { a -> (a as Answer).respondentId() }.distinct()
+  }
+
+  // Average score across all questions for one respondent
+  def respondentScore(respondentId: Int): Double {
+    val mine = answers.filter { a -> (a as Answer).respondentId() == respondentId }
+    val scores = mine.map { a -> (a as Answer).score() }
+    return listMean(scores)
+  }
+
+  def printDistribution(questionId: Int): void {
+    val q = findQuestion(questionId)
+    if q == null { return }
+    IO::println("  Distribution for Q" + questionId + " [" + q.kind().label() + "]:")
+    val dist = distribution(questionId)
+    val sortedKeys = answersFor(questionId)
+      .map { a -> (a as Answer).score() }
+      .distinct()
+      .sortedBy { v -> v as Int }
+    foreach k: Object in sortedKeys {
+      val bucket = dist.get(k)
+      val cnt = if bucket != null { (bucket as List[Answer]).size } else { 0 }
+      val bar = barChart(cnt, answersFor(questionId).size)
+      IO::println("    #{k}: #{bar} #{cnt}")
+    }
+  }
+
+  def getQuestions(): List[Question] = questions
+
+  def printReport(): void {
+    IO::println("══════════════════════════════════════════")
+    IO::println(" " + title)
+    IO::println("══════════════════════════════════════════")
+    val nRespondents = respondentIds().size
+    IO::println("Respondents : " + nRespondents)
+    IO::println("Questions   : " + questions.size)
+    IO::println("")
+    foreach q: Object in questions {
+      val question = q as Question
+      IO::println("Q#{question.id()}: #{question.text()}")
+      IO::println("  Type  : " + question.kind().label())
+      val summary = summarizeQuestion(question.id())
+      if summary != null {
+        val s = summary as ScoreSummary
+        s.printSummary()
+        IO::println("  Grade : " + s.grade())
+      }
+      IO::println("")
+    }
+  }
+}
+
+// ── Demo: two surveys ─────────────────────────────────────────────────────────
+
+// --- Survey 1: customer satisfaction ---
+val csat = new Survey("Customer Satisfaction — Q4 2025")
+
+csat.addQuestion(new Question(1, "Overall satisfaction (1-10)", new Scale(1, 10)))
+csat.addQuestion(new Question(2, "Likelihood to recommend (0-10) [NPS]", new Scale(0, 10)))
+csat.addQuestion(new Question(3, "Support quality (1-5)", new Scale(1, 5)))
+csat.addQuestion(new Question(4, "Would you buy again?", new YesNo()))
+
+// 10 respondents: [overall, nps, support, buyAgain]
+val rawData: List[List[Int]] = [
+  [8, 9, 4, 1],
+  [7, 7, 5, 0],
+  [9, 10, 4, 1],
+  [6, 5, 3, 0],
+  [10, 9, 5, 1],
+  [5, 6, 2, 0],
+  [8, 9, 4, 1],
+  [9, 10, 5, 1],
+  [4, 4, 2, 0],
+  [7, 8, 4, 1]
+]
+
+var rid = 1
+foreach row: Object in rawData {
+  val r = row as List[Int]
+  csat.addAnswer(new Answer(rid, 1, r[0] as Int))
+  csat.addAnswer(new Answer(rid, 2, r[1] as Int))
+  csat.addAnswer(new Answer(rid, 3, r[2] as Int))
+  csat.addAnswer(new Answer(rid, 4, r[3] as Int))
+  rid = rid + 1
+}
+
+csat.printReport()
+
+IO::println("NPS (Q2)    : " + csat.nps(2))
+IO::println("")
+csat.printDistribution(2)
+IO::println("")
+
+// Top respondents by average score
+IO::println("── Top 3 respondents by average score ──")
+val allIds = csat.respondentIds()
+val sorted = allIds.sortedBy { id -> 0 - (csat.respondentScore(id as Int) * 100.0 as Int) }
+foreach i: Int in 0..<3 {
+  if i < sorted.size {
+    val respondentId = sorted[i] as Int
+    val avg = csat.respondentScore(respondentId)
+    IO::println("  ##{i+1}: respondent #{respondentId}  avg=#{avg}")
+  }
+}
+IO::println("")
+
+// try/catch: safe integer parse helper
+def tryParseInt(s: String): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch _: Exception {
+    return 0 - 1
+  }
+}
+IO::println("tryParseInt(\"42\"): " + tryParseInt("42"))
+IO::println("tryParseInt(\"oops\"): " + tryParseInt("oops"))
+IO::println("")
+
+// --- Survey 2: product feedback with multiple choice ---
+val feedback = new Survey("Product Feature Feedback")
+
+feedback.addQuestion(new Question(1, "Most valued feature",
+  new MultiChoice(["Performance", "Usability", "Price", "Support"])))
+feedback.addQuestion(new Question(2, "Overall rating (1-5)", new Scale(1, 5)))
+
+// 8 responses: feature choice index (0-3) and rating (1-5)
+val featureVotes: List[Int] = [0, 1, 0, 2, 1, 0, 3, 1]
+val ratings: List[Int] = [5, 4, 5, 3, 4, 5, 4, 5]
+
+foreach i: Int in 0..<8 {
+  feedback.addAnswer(new Answer(i + 1, 1, featureVotes[i] as Int))
+  feedback.addAnswer(new Answer(i + 1, 2, ratings[i] as Int))
+}
+
+feedback.printReport()
+feedback.printDistribution(1)
+IO::println("")
+feedback.printDistribution(2)
+IO::println("")
+
+// Pattern match on question kind to show extra info
+IO::println("── Question kind details ──")
+foreach q: Object in feedback.getQuestions() {
+  val question = q as Question
+  select question.kind() {
+    case m is MultiChoice:
+      val opts = m.options()
+      IO::println("Q#{question.id()} options: " + opts.toString())
+    case s is Scale:
+      IO::println("Q#{question.id()} range: #{s.lo()}–#{s.hi()} (max #{s.hi()})")
+    case _:
+      IO::println("Q#{question.id()} is Yes/No")
+  }
+}

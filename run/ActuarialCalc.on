@@ -1,0 +1,336 @@
+// ActuarialCalc.on – Life insurance premium calculator using a simplified mortality table
+// Exercises: data-carrying enum (RiskClass), ADT case-enum (PolicyType with 4 cases),
+//   records with methods (PremiumResult.grossPremium), extension Double/String,
+//   collection pipelines (map/fold/filter/groupBy/sortedBy), foreach over lists
+//   and ranges, select-pattern dispatch, nullable types, try/catch,
+//   and string interpolation throughout.
+
+import { java.lang.Math as JMath }
+
+// ── Risk classification ────────────────────────────────────────────────────────
+// multiplier scales each q_x: Preferred clients have lower mortality risk
+enum RiskClass(label: String, multiplier: Double) {
+  PREFERRED   ("Preferred",   0.80),
+  STANDARD    ("Standard",    1.00),
+  SUBSTANDARD ("Substandard", 1.35)
+}
+
+// ── Policy type (ADT case-enum) ────────────────────────────────────────────────
+// Four product families; term and endowment carry a policy duration
+enum PolicyType {
+  case TermLife(years: Int)       // death benefit within n years
+  case WholeLife                  // death benefit whenever it occurs
+  case Endowment(years: Int)      // death benefit OR maturity payout at x+n
+  case LifeAnnuity                // level annuity paid while alive
+public:
+  def label(): String = select this {
+    case t is TermLife:    "Term #{t.years()}yr"
+    case w is WholeLife:   "Whole Life"
+    case e is Endowment:   "Endow-#{e.years()}yr"
+    case a is LifeAnnuity: "Life Annuity"
+  }
+  def horizon(): Int = select this {
+    case t is TermLife:    t.years()
+    case w is WholeLife:   80
+    case e is Endowment:   e.years()
+    case a is LifeAnnuity: 80
+  }
+  def isInsurance(): Boolean = select this {
+    case a is LifeAnnuity: false
+    else: true
+  }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────────
+record Policy(id: String, ptype: PolicyType, issueAge: Int, face: Double,
+              interestRate: Double, riskClass: RiskClass)
+
+record PremiumResult(id: String, ptype: PolicyType,
+                     nsp: Double, annuityDue: Double, annualPremium: Double) {
+public:
+  def grossPremium(): Double = annualPremium() * 1.15   // 15% expense loading
+  def loadingAmount(): Double = annualPremium() * 0.15
+}
+
+// ── Simplified US mortality table (q_x anchors at 5-yr intervals, age 20–80) ───
+class LifeTable {
+  val anchors: List[Double]
+
+public:
+  def this {
+    // Anchor q_x values loosely based on 2001 CSO (non-smoker, aggregate)
+    this.anchors = [
+      0.00067, 0.00082, 0.00099, 0.00143, 0.00212,
+      0.00330, 0.00528, 0.00854, 0.01271, 0.01952,
+      0.02917, 0.04520, 0.07011
+    ]
+  }
+
+  // Linear interpolation between 5-yr anchors; extra growth beyond age 80
+  def qxAt(age: Int): Double {
+    if age < 20 { return 0.00050 }
+    if age >= 100 { return 1.00000 }
+    val capAge: Int = if age > 80 { 80 } else { age }
+    val baseAge: Int = 20 + ((capAge - 20) / 5) * 5
+    val idx: Int = (baseAge - 20) / 5
+    val frac: Double = (capAge - baseAge) * 1.0 / 5.0
+    val q0: Double = anchors[idx] as Double
+    val q1: Double =
+      if idx + 1 < anchors.size { anchors[idx + 1] as Double }
+      else { q0 * 1.4 }
+    val base: Double = q0 + (q1 - q0) * frac
+    if age <= 80 { return base }
+    // Ages 81–99: compound growth at 8 %/yr beyond the table
+    return base * JMath::pow(1.08, age - 80)
+  }
+}
+
+// ── Actuarial core functions ───────────────────────────────────────────────────
+// Cap q at 1.0 after applying the risk multiplier
+def safeQ(raw: Double, mult: Double): Double = {
+  val q: Double = raw * mult
+  if q > 1.0 { 1.0 } else { q }
+}
+
+// A^1_{x:n|} – net single premium for pure n-year term insurance ($1 benefit)
+def nspTerm(table: LifeTable, issueAge: Int, n: Int, v: Double, mult: Double): Double = {
+  var sum: Double = 0.0
+  var lx: Double  = 100000.0
+  var k: Int      = 0
+  while k < n {
+    val qx: Double = safeQ(table.qxAt(issueAge + k), mult)
+    val dx: Double = lx * qx
+    sum = sum + JMath::pow(v, k + 1) * dx
+    lx  = lx - dx
+    k++
+  }
+  sum / 100000.0
+}
+
+// ä_{x:n|} – expected PV of annuity-due of $1/yr for n years while alive
+def annuityDue(table: LifeTable, issueAge: Int, n: Int, v: Double, mult: Double): Double = {
+  var sum: Double = 0.0
+  var lx: Double  = 100000.0
+  var k: Int      = 0
+  while k < n {
+    sum = sum + JMath::pow(v, k) * lx
+    val qx: Double = safeQ(table.qxAt(issueAge + k), mult)
+    lx = lx * (1.0 - qx)
+    k++
+  }
+  sum / 100000.0
+}
+
+// Compute lx after n years under mult-adjusted mortality
+def survivorsAfter(table: LifeTable, issueAge: Int, n: Int, mult: Double): Double = {
+  var lx: Double = 100000.0
+  var k: Int     = 0
+  while k < n {
+    val qx: Double = safeQ(table.qxAt(issueAge + k), mult)
+    lx = lx * (1.0 - qx)
+    k++
+  }
+  lx
+}
+
+// Central computation: NSP and level annual premium for one policy
+def computePremium(policy: Policy, table: LifeTable): PremiumResult = {
+  val i: Double    = policy.interestRate()
+  val v: Double    = 1.0 / (1.0 + i)
+  val mult: Double = policy.riskClass().multiplier()
+  val age: Int     = policy.issueAge()
+  val face: Double = policy.face()
+
+  val nspPerDollar: Double = select policy.ptype() {
+    case t is TermLife:
+      nspTerm(table, age, t.years(), v, mult)
+    case w is WholeLife:
+      nspTerm(table, age, 80, v, mult)
+    case e is Endowment: {
+      val termPart: Double = nspTerm(table, age, e.years(), v, mult)
+      val lxn: Double = survivorsAfter(table, age, e.years(), mult)
+      termPart + JMath::pow(v, e.years()) * lxn / 100000.0
+    }
+    case a is LifeAnnuity:
+      annuityDue(table, age, 80, v, mult)
+  }
+
+  val nsp: Double = nspPerDollar * face
+
+  val n: Int = policy.ptype().horizon()
+  val ad: Double = annuityDue(table, age, n, v, mult)
+  val annPrem: Double =
+    if policy.ptype().isInsurance() && ad > 0.0001 { nsp / ad }
+    else { nsp }                    // annuity: single premium only
+
+  new PremiumResult(policy.id(), policy.ptype(), nsp, ad, annPrem)
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+extension Double {
+  def fmt2(): String = {
+    val r: Long = JMath::round(self * 100.0)
+    val i: Long = r / 100L
+    val f: Long = r - i * 100L
+    if f < 10L { "#{i}.0#{f}" } else { "#{i}.#{f}" }
+  }
+  def pct(): String = "#{(self * 100.0).fmt2()}%"
+  def fmt5(): String = {
+    val r: Long = JMath::round(self * 100000.0)
+    val i: Long = r / 100000L
+    val f: Long = r - i * 100000L
+    val fs: String =
+      if f < 10L { "0000#{f}" }
+      else if f < 100L { "000#{f}" }
+      else if f < 1000L { "00#{f}" }
+      else if f < 10000L { "0#{f}" }
+      else { "#{f}" }
+    "#{i}.#{fs}"
+  }
+}
+
+extension String {
+  def padR(w: Int): String = {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    s
+  }
+  def padL(w: Int): String = {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    s
+  }
+  def rep(n: Int): String = {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    s
+  }
+}
+
+// ── Portfolio and report ───────────────────────────────────────────────────────
+def bar(label: String): void {
+  val dashes: Int = 62 - label.length() - 4
+  val pad: String = if dashes > 0 { "─".rep(dashes) } else { "" }
+  IO::println("── #{label} #{pad}")
+}
+
+def main(): void {
+  val table: LifeTable = new LifeTable()
+
+  // ── Portfolio definition ──────────────────────────────────────────────────
+  val policies: List[Object] = [
+    new Policy("T20-30P", new TermLife(20), 30, 500000.0, 0.04, RiskClass::PREFERRED),
+    new Policy("T20-30S", new TermLife(20), 30, 500000.0, 0.04, RiskClass::STANDARD),
+    new Policy("T20-45U", new TermLife(20), 45, 250000.0, 0.04, RiskClass::SUBSTANDARD),
+    new Policy("T30-35S", new TermLife(30), 35, 300000.0, 0.04, RiskClass::STANDARD),
+    new Policy("WL-35P",  new WholeLife(),  35, 100000.0, 0.035, RiskClass::PREFERRED),
+    new Policy("WL-35U",  new WholeLife(),  35, 100000.0, 0.035, RiskClass::SUBSTANDARD),
+    new Policy("WL-45S",  new WholeLife(),  45, 150000.0, 0.035, RiskClass::STANDARD),
+    new Policy("EN-25S",  new Endowment(30), 25, 200000.0, 0.04, RiskClass::STANDARD),
+    new Policy("EN-40P",  new Endowment(20), 40, 150000.0, 0.04, RiskClass::PREFERRED),
+    new Policy("LA-65S",  new LifeAnnuity(), 65,  48000.0, 0.035, RiskClass::STANDARD)
+  ]
+
+  val results: List[Object] =
+    policies.map { p -> computePremium(p as Policy, table) }
+
+  // ── Summary table ──────────────────────────────────────────────────────────
+  IO::println("╔═══════════════════════════════════════════════════════════════╗")
+  IO::println("║    ACTUARIAL PREMIUM CALCULATION REPORT (Simplified CSO)     ║")
+  IO::println("╠═══════════════════════════════════════════════════════════════╣")
+  IO::println("║ ID        Type          Age  Face ($)     Rate  Annual Prem  ║")
+  IO::println("╠═══════════════════════════════════════════════════════════════╣")
+
+  var idx: Int = 0
+  while idx < results.size {
+    val r: PremiumResult = results[idx] as PremiumResult
+    val p: Policy = policies[idx] as Policy
+    val line: String =
+      "║ #{p.id().padR(8)} #{r.ptype().label().padR(12)} #{p.issueAge().toString().padL(4)}" +
+      "  #{p.face().fmt2().padL(11)}  #{p.interestRate().pct()}  #{r.annualPremium().fmt2().padL(11)} ║"
+    IO::println(line)
+    idx++
+  }
+  IO::println("╚═══════════════════════════════════════════════════════════════╝")
+
+  // ── Per-policy detail ─────────────────────────────────────────────────────
+  IO::println("")
+  bar("Policy Detail")
+  foreach rObj: Object in results {
+    val r: PremiumResult = rObj as PremiumResult
+    val isAnnuity: Boolean = !r.ptype().isInsurance()
+    IO::println("  #{r.id()}  #{r.ptype().label()}")
+    IO::println("    NSP (net single):      $#{r.nsp().fmt2()}")
+    IO::println("    Annuity-due factor:     #{r.annuityDue().fmt2()}")
+    if isAnnuity {
+      IO::println("    Single purchase price: $#{r.annualPremium().fmt2()}")
+    } else {
+      IO::println("    Annual net prem:       $#{r.annualPremium().fmt2()}")
+      IO::println("    Annual gross prem:     $#{r.grossPremium().fmt2()}  (15% loading)")
+    }
+    IO::println("")
+  }
+
+  // ── Risk class impact (term-20, age 30, $500k, 4%) ───────────────────────
+  bar("Risk Class Impact  — Term-20, Age 30, $500 000, i=4.0%")
+  IO::println("  Class         Annual Net Prem   Multiplier")
+  IO::println("  ──────────────────────────────────────────")
+  foreach rcObj: Object in [RiskClass::PREFERRED, RiskClass::STANDARD, RiskClass::SUBSTANDARD] {
+    val rc: RiskClass = rcObj as RiskClass
+    val pol: Policy   = new Policy("COMP", new TermLife(20), 30, 500000.0, 0.04, rc)
+    val res: PremiumResult = computePremium(pol, table)
+    IO::println("  #{rc.label().padR(14)} $#{res.annualPremium().fmt2().padL(13)}   #{rc.multiplier().fmt2()}×")
+  }
+
+  // ── Interest rate sensitivity (whole life, age 35, $100k, standard) ──────
+  IO::println("")
+  bar("Interest Rate Sensitivity  — Whole Life, Age 35, $100 000, Standard")
+  IO::println("  Rate    NSP ($)      Annual Prem ($)")
+  IO::println("  ──────────────────────────────────────")
+  foreach rateObj: Object in [0.02, 0.03, 0.04, 0.05, 0.06] {
+    val rate: Double = rateObj as Double
+    val pol: Policy  = new Policy("SENS", new WholeLife(), 35, 100000.0, rate, RiskClass::STANDARD)
+    val res: PremiumResult = computePremium(pol, table)
+    IO::println("  #{rate.pct()}   #{res.nsp().fmt2().padL(11)}   #{res.annualPremium().fmt2().padL(14)}")
+  }
+
+  // ── Mortality table spot-check ────────────────────────────────────────────
+  IO::println("")
+  bar("Mortality Table q_x Spot-Check")
+  IO::println("  Age   q_x (Standard, 5dp)   Survivors from 100 000 at age 20")
+  IO::println("  ──────────────────────────────────────────────────────────────")
+  val checkAges: List[Int] = [25, 35, 45, 55, 65, 75]
+  foreach ageObj: Object in checkAges {
+    val a: Int = ageObj as Int
+    val qx: Double = table.qxAt(a)
+    val surv: Double = survivorsAfter(table, 20, a - 20, 1.0)
+    IO::println("  #{a.toString().padL(4)}  #{qx.fmt5()}        #{surv.fmt2().padL(12)}")
+  }
+
+  // ── Portfolio totals ──────────────────────────────────────────────────────
+  IO::println("")
+  bar("Portfolio Summary")
+  val totalFace: Double =
+    policies.fold(0.0) { acc, p -> acc + (p as Policy).face() }
+  val totalAnn: Double =
+    results.fold(0.0) { acc, r -> acc + (r as PremiumResult).annualPremium() }
+  val totalGross: Double =
+    results.fold(0.0) { acc, r -> acc + (r as PremiumResult).grossPremium() }
+  IO::println("  Policies in portfolio:    #{policies.size}")
+  IO::println("  Total insured value:      $#{totalFace.fmt2()}")
+  IO::println("  Total annual net prem:    $#{totalAnn.fmt2()}")
+  IO::println("  Total annual gross prem:  $#{totalGross.fmt2()}")
+  IO::println("  Avg net prem/face ratio:  #{(totalAnn / totalFace * 1000.0).fmt2()} per $1 000")
+
+  // Group by policy type
+  val byType: Map[String, List[Object]] =
+    results.groupBy { r -> (r as PremiumResult).ptype().label() }
+  IO::println("")
+  IO::println("  By type:")
+  foreach (typeLabel, group) in byType {
+    val grp: List[Object] = group as List[Object]
+    val typeTotal: Double  = grp.fold(0.0) { acc, r -> acc + (r as PremiumResult).annualPremium() }
+    IO::println("    #{(typeLabel as String).padR(15)}  #{grp.size} policy(ies)  $#{typeTotal.fmt2()}")
+  }
+}

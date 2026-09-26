@@ -9,6 +9,7 @@ package onion.compiler.optimization
 
 import onion.compiler._
 import onion.compiler.TypedAST._
+import onion.compiler.TermWalk
 import scala.collection.mutable
 import scala.util.boundary, boundary.break
 
@@ -206,6 +207,21 @@ class MutualRecursionOptimization(config: CompilerConfig)
       }
     }
 
+    // Check 6: No member may declare a local variable beyond its parameter list.
+    // rewriteParameterReferences only redirects RefLocal/SetLocal references with
+    // index < paramCount to the merged state machine's loop-variable slots; a local
+    // declared in the body (e.g. `val next: Box = ...`) keeps its original slot index,
+    // which collides with the loop/state/temp variable slots the merged method
+    // introduces starting at exactly that index once every member's body is spliced
+    // into one shared frame -- producing invalid bytecode (a JVM VerifyError at
+    // class-load time) instead of either compiling correctly or failing to compile.
+    val paramCountForLocals = group.head.arguments.length
+    val declaresExtraLocal = group.find(m => referencesLocalBeyondParams(m.getBlock, paramCountForLocals))
+    declaresExtraLocal.foreach { method =>
+      break(Some(s"method ${method.name} declares a local variable beyond its parameter list, " +
+        "which the generated state machine method cannot give a non-overlapping slot"))
+    }
+
     validationError
   }
 
@@ -224,6 +240,34 @@ class MutualRecursionOptimization(config: CompilerConfig)
       warnings += CompileWarning(sourceFile, method.location, WarningCategory.IneffectiveTailRecursive, message)
     }
   }
+
+  /**
+   * Whether `body` still touches the enclosing instance -- directly as `this`/the
+   * outer-class `this` of a nested class, or (via TermWalk's normal descent into every
+   * term's children) as the implicit receiver of a field access or instance method call.
+   * Used to catch, before it reaches BytecodeGeneration, a state-machine body that would
+   * need a receiver despite being emitted as a static method.
+   */
+  private def referencesThis(body: StatementBlock): Boolean =
+    TermWalk.existsIn(body) {
+      case _: TypedAST.This      => true
+      case _: TypedAST.OuterThis => true
+      case _                     => false
+    }
+
+  /**
+   * Whether `body` reads or writes a local-variable slot beyond the method's own
+   * `paramCount` parameters -- i.e. an ordinary `val`/`var` declared in the body (or any
+   * other local the method's own frame allocated past its parameters). See Check 6 in
+   * `validateGroup` for why such a local cannot safely share the merged state machine's
+   * frame.
+   */
+  private def referencesLocalBeyondParams(body: StatementBlock, paramCount: Int): Boolean =
+    TermWalk.existsIn(body) {
+      case ref: TypedAST.RefLocal => ref.frame == 0 && ref.index >= paramCount
+      case set: TypedAST.SetLocal => set.frame == 0 && set.index >= paramCount
+      case _                      => false
+    }
 
   /**
    * Check if method is private
@@ -269,6 +313,28 @@ class MutualRecursionOptimization(config: CompilerConfig)
       paramTypes,
       returnType
     )
+
+    // Guard: the state machine method is always emitted `private static` (it has no
+    // enclosing instance -- the whole point is a flat loop with no call-stack growth).
+    // transformMethodBodyForStateMachine only rewrites *tail* calls to other members of
+    // the group; anything else in the original bodies -- a field read, `this` passed as
+    // a value, or a call to another instance method, whether reached in tail position or
+    // not -- survives verbatim into the generated body still expecting a receiver. With
+    // no receiver on a static method, that used to crash BytecodeGeneration with
+    // "no 'this' pointer within static method" (an I0000 internal error) instead of
+    // compiling or reporting a normal diagnostic. Detect any leftover `this` in the
+    // generated body up front and fall back to the ordinary (non-tail-optimized)
+    // methods, the same degraded-but-safe path the other validateGroup checks use.
+    if (referencesThis(stateMachineMethod.getBlock)) {
+      reportIneffective(
+        classDef,
+        group,
+        "the group reads instance state (a field, or a call to another instance method, " +
+          "via an implicit or explicit `this`), which the generated state machine method " +
+          "-- always `private static` -- cannot access"
+      )
+      return
+    }
 
     // Step 4: Add state machine method to class
     classDef.methods_.add(stateMachineMethod)

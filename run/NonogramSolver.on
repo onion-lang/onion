@@ -1,0 +1,533 @@
+// NonogramSolver.on — Nonogram (Picross) constraint-propagation puzzle solver
+//
+// A nonogram is a logic puzzle on an n×m grid.  Row and column clues list the
+// lengths of consecutive filled-cell runs (in order, left→right / top→down).
+// Goal: determine which cells are filled and which are empty.
+//
+// Strategy: iterative line-level constraint propagation.
+//   For each row / column enumerate all valid placements of the runs; any
+//   cell that is filled in EVERY valid placement must be filled; any cell
+//   that is empty in EVERY valid placement must be empty.  Repeat until
+//   the grid stops changing, is fully solved, or a pass limit is reached.
+//
+// Exercises: 2D Int[][] arrays, ADT case-enum with instance methods,
+// data-carrying enum, records with body methods, interface + conforms,
+// extension methods on Int/String, collection pipelines (map/filter/fold/
+// reduce/all/any/count/find/partition), recursive enumeration, select
+// type-pattern matching, nullable, string interpolation, try/catch, foreach
+// on ranges and on List, while loop, closures, static fields.
+
+import { java.util.ArrayList }
+
+// ─── Constants (cell values for Int[][] grid) ─────────────────────────────
+// UNKNOWN = -1,  EMPTY = 0,  FILLED = 1
+
+// ─── Extension: String utilities ───────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Extension: cell display ───────────────────────────────────────────────
+
+extension Int {
+  def cellChar(): String = select this {
+    case  1: "█"
+    case  0: "."
+    else:    "?"
+  }
+  def maxWith(other: Int): Int = if self >= other { self } else { other }
+}
+
+// ─── Records ───────────────────────────────────────────────────────────────
+
+record Puzzle(title: String, rowClues: List[List[Int]], colClues: List[List[Int]]) {
+public:
+  def height(): Int = rowClues().size
+  def width():  Int = colClues().size
+}
+
+record SolveStats(passes: Int, cellsFixed: Int) {
+public:
+  def summary(): String = "#{passes()} pass(es), #{cellsFixed()} cells fixed"
+}
+
+// ─── ADT: overall solve result ─────────────────────────────────────────────
+
+enum SolveResult {
+  case Solved(stats: SolveStats)
+  case Impossible(reason: String)
+  case Timeout(passes: Int)
+public:
+  def label(): String = select this {
+    case r is Solved:     "Solved — #{r.stats().summary()}"
+    case r is Impossible: "No solution: #{r.reason()}"
+    case r is Timeout:    "Stalled after #{r.passes()} passes"
+  }
+  def ok(): Boolean = this is Solved
+}
+
+// ─── Interface ─────────────────────────────────────────────────────────────
+
+interface Renderable {
+  def render(): String
+}
+
+// ─── Line helpers ──────────────────────────────────────────────────────────
+
+class Lines {
+public:
+  // Sum of run lengths plus mandatory gaps: the minimum span of a clue.
+  static def minSpan(clue: List[Int]): Int {
+    if clue.size == 0 { return 0 }
+    var total: Int = 0
+    var first: Boolean = true
+    foreach run: Int in clue {
+      if !first { total = total + 1 }
+      total = total + run
+      first = false
+    }
+    return total
+  }
+
+  // Generate all valid placements for `clue` in a line of length `len`,
+  // consistent with known cells in `current` (-1=unknown, 0=empty, 1=filled).
+  static def options(clue: List[Int], current: Int[], len: Int): List[List[Int]] {
+    val result: List[List[Int]] = new ArrayList[List[Int]]()
+    val scratch: Int[] = new Int[len]
+    Lines::build(clue, 0, 0, len, scratch, current, result)
+    return result
+  }
+
+  // Recursive backtracker: place clue[idx..] starting from `pos`.
+  static def build(clue: List[Int], idx: Int, pos: Int, len: Int, line: Int[], current: Int[], acc: List[List[Int]]): void {
+    if idx >= clue.size {
+      // All runs placed; remaining cells must be empty.
+      var ok: Boolean = true
+      foreach i: Int in pos..<len {
+        if current[i] == 1 { ok = false }
+      }
+      if ok {
+        foreach i: Int in pos..<len { line[i] = 0 }
+        val copy: List[Int] = new ArrayList[Int]()
+        foreach v: Int in 0..<len { copy.add(line[v]) }
+        acc.add(copy)
+      }
+      return
+    }
+    val run: Int = clue[idx] as Int
+    // Remaining clues after this one (with their mandatory gaps).
+    var restSpan: Int = 0
+    foreach k: Int in (idx + 1)..<clue.size {
+      restSpan = restSpan + (clue[k] as Int) + 1
+    }
+    val maxStart: Int = len - run - restSpan
+    foreach start: Int in pos..maxStart {
+      var conflict: Boolean = false
+      // Cells before the run start must not be FILLED.
+      foreach i: Int in pos..<start {
+        if current[i] == 1 { conflict = true }
+      }
+      // Cells of the run must not be EMPTY.
+      if !conflict {
+        foreach i: Int in start..<(start + run) {
+          if current[i] == 0 { conflict = true }
+        }
+      }
+      // The cell immediately after the run (if any) must not be FILLED.
+      if !conflict && start + run < len {
+        if current[start + run] == 1 { conflict = true }
+      }
+      if !conflict {
+        foreach i: Int in pos..<start { line[i] = 0 }
+        foreach i: Int in start..<(start + run) { line[i] = 1 }
+        if start + run < len { line[start + run] = 0 }
+        Lines::build(clue, idx + 1, start + run + 1, len, line, current, acc)
+      }
+    }
+  }
+
+  // Intersect all options: -1 for undetermined, 0/1 for fixed cells.
+  static def intersect(opts: List[List[Int]], len: Int): Int[]? {
+    if opts.size == 0 { return null }
+    val result: Int[] = new Int[len]
+    foreach i: Int in 0..<len { result[i] = -1 }
+    var first: Boolean = true
+    foreach opt: List[Int] in opts {
+      if first {
+        foreach i: Int in 0..<len { result[i] = opt[i] as Int }
+        first = false
+      } else {
+        foreach i: Int in 0..<len {
+          if result[i] != (opt[i] as Int) { result[i] = -1 }
+        }
+      }
+    }
+    return result
+  }
+
+  // Max clue length in a list of clues (for formatting).
+  static def maxLen(clues: List[List[Int]]): Int {
+    var m: Int = 0
+    foreach cl: List[Int] in clues {
+      if cl.size > m { m = cl.size }
+    }
+    return m
+  }
+}
+
+// ─── Board ─────────────────────────────────────────────────────────────────
+
+class Board conforms Renderable {
+public:
+  val puzzle:  Puzzle
+  var cells:   Int[][]
+  var changed: Boolean
+
+  def this(p: Puzzle) {
+    self.puzzle  = p
+    self.changed = false
+    self.cells   = new Int[p.height()][p.width()]
+    foreach r: Int in 0..<p.height() {
+      foreach c: Int in 0..<p.width() { self.cells[r][c] = -1 }
+    }
+  }
+
+  def isSolved(): Boolean {
+    foreach r: Int in 0..<puzzle.height() {
+      foreach c: Int in 0..<puzzle.width() {
+        if cells[r][c] == -1 { return false }
+      }
+    }
+    return true
+  }
+
+  def unknownCount(): Int {
+    var n: Int = 0
+    foreach r: Int in 0..<puzzle.height() {
+      foreach c: Int in 0..<puzzle.width() {
+        if cells[r][c] == -1 { n = n + 1 }
+      }
+    }
+    return n
+  }
+
+  def getRow(r: Int): Int[] {
+    val row: Int[] = new Int[puzzle.width()]
+    foreach c: Int in 0..<puzzle.width() { row[c] = cells[r][c] }
+    return row
+  }
+
+  def getCol(c: Int): Int[] {
+    val col: Int[] = new Int[puzzle.height()]
+    foreach r: Int in 0..<puzzle.height() { col[r] = cells[r][c] }
+    return col
+  }
+
+  def setRow(r: Int, line: Int[]): Int {
+    var n: Int = 0
+    foreach c: Int in 0..<puzzle.width() {
+      if line[c] != -1 && cells[r][c] == -1 {
+        cells[r][c] = line[c]
+        n = n + 1
+        self.changed = true
+      }
+    }
+    return n
+  }
+
+  def setCol(c: Int, line: Int[]): Int {
+    var n: Int = 0
+    foreach r: Int in 0..<puzzle.height() {
+      if line[r] != -1 && cells[r][c] == -1 {
+        cells[r][c] = line[r]
+        n = n + 1
+        self.changed = true
+      }
+    }
+    return n
+  }
+
+  // Render the board with clue annotations.
+  def render(): String {
+    val sb: StringBuilder = new StringBuilder()
+    val maxRowClue: Int = Lines::maxLen(puzzle.rowClues())
+    val maxColClue: Int = Lines::maxLen(puzzle.colClues())
+
+    // Column clue rows (transposed)
+    foreach depth: Int in 0..<maxColClue {
+      sb.append(" ".rep(maxRowClue * 2 + 1))
+      foreach c: Int in 0..<puzzle.width() {
+        val cl: List[Int] = puzzle.colClues()[c] as List[Int]
+        val offset: Int = maxColClue - cl.size
+        if depth >= offset {
+          val num: Int = cl[depth - offset] as Int
+          sb.append(("" + num).lpad(2))
+        } else {
+          sb.append("  ")
+        }
+      }
+      sb.append("\n")
+    }
+
+    // Grid rows with row-clue prefix
+    foreach r: Int in 0..<puzzle.height() {
+      val cl: List[Int] = puzzle.rowClues()[r] as List[Int]
+      val offset: Int = maxRowClue - cl.size
+      foreach depth: Int in 0..<maxRowClue {
+        if depth >= offset {
+          sb.append(("" + (cl[depth - offset] as Int)).lpad(2))
+        } else {
+          sb.append("  ")
+        }
+      }
+      sb.append(" ")
+      foreach c: Int in 0..<puzzle.width() {
+        sb.append(cells[r][c].cellChar() + " ")
+      }
+      sb.append("\n")
+    }
+    return sb.toString()
+  }
+}
+
+// ─── Solver ────────────────────────────────────────────────────────────────
+
+class NonogramSolver {
+public:
+  static val MAX_PASSES: Int = 100
+
+  static def solve(puzzle: Puzzle): SolveResult {
+    val board: Board = new Board(puzzle)
+    var passes: Int = 0
+    var totalFixed: Int = 0
+
+    while passes < NonogramSolver::MAX_PASSES {
+      board.changed = false
+      var passFixed: Int = 0
+      var contradiction: Boolean = false
+
+      // Propagate rows
+      foreach r: Int in 0..<puzzle.height() {
+        val clue: List[Int] = puzzle.rowClues()[r] as List[Int]
+        val cur: Int[] = board.getRow(r)
+        val opts: List[List[Int]] = Lines::options(clue, cur, puzzle.width())
+        if opts.size == 0 {
+          contradiction = true
+        } else {
+          val fixed: Int[]? = Lines::intersect(opts, puzzle.width())
+          if fixed != null { passFixed = passFixed + board.setRow(r, fixed as Int[]) }
+        }
+      }
+      if contradiction {
+        return new Impossible("row contradiction at pass #{passes + 1}")
+      }
+
+      // Propagate columns
+      foreach c: Int in 0..<puzzle.width() {
+        val clue: List[Int] = puzzle.colClues()[c] as List[Int]
+        val cur: Int[] = board.getCol(c)
+        val opts: List[List[Int]] = Lines::options(clue, cur, puzzle.height())
+        if opts.size == 0 {
+          contradiction = true
+        } else {
+          val fixed: Int[]? = Lines::intersect(opts, puzzle.height())
+          if fixed != null { passFixed = passFixed + board.setCol(c, fixed as Int[]) }
+        }
+      }
+      if contradiction {
+        return new Impossible("column contradiction at pass #{passes + 1}")
+      }
+
+      passes = passes + 1
+      totalFixed = totalFixed + passFixed
+
+      if board.isSolved() { return new Solved(new SolveStats(passes, totalFixed)) }
+      if !board.changed   { return new Timeout(passes) }
+    }
+    return new Timeout(passes)
+  }
+
+  // Re-run propagation and return the board state (for display after solve).
+  static def buildBoard(puzzle: Puzzle): Board {
+    val board: Board = new Board(puzzle)
+    var passes: Int = 0
+    while passes < NonogramSolver::MAX_PASSES {
+      board.changed = false
+      foreach r: Int in 0..<puzzle.height() {
+        val clue: List[Int] = puzzle.rowClues()[r] as List[Int]
+        val cur: Int[] = board.getRow(r)
+        val opts: List[List[Int]] = Lines::options(clue, cur, puzzle.width())
+        if opts.size > 0 {
+          val fixed: Int[]? = Lines::intersect(opts, puzzle.width())
+          if fixed != null { board.setRow(r, fixed as Int[]) }
+        }
+      }
+      foreach c: Int in 0..<puzzle.width() {
+        val clue: List[Int] = puzzle.colClues()[c] as List[Int]
+        val cur: Int[] = board.getCol(c)
+        val opts: List[List[Int]] = Lines::options(clue, cur, puzzle.height())
+        if opts.size > 0 {
+          val fixed: Int[]? = Lines::intersect(opts, puzzle.height())
+          if fixed != null { board.setCol(c, fixed as Int[]) }
+        }
+      }
+      passes = passes + 1
+      if board.isSolved() || !board.changed { return board }
+    }
+    return board
+  }
+}
+
+// ─── Puzzle runner ─────────────────────────────────────────────────────────
+
+class PuzzleRunner {
+public:
+  static def run(puzzle: Puzzle): void {
+    IO::println("═".rep(52))
+    IO::println("Puzzle: #{puzzle.title()}  (#{puzzle.height()}×#{puzzle.width()})")
+    IO::println("═".rep(52))
+    try {
+      val result: SolveResult = NonogramSolver::solve(puzzle)
+      IO::println("Result : #{result.label()}")
+      IO::println("")
+      val board: Board = NonogramSolver::buildBoard(puzzle)
+      select result {
+        case r is Solved:
+          IO::println(board.render())
+        case r is Timeout:
+          IO::println("Partial solution (#{board.unknownCount()} cells undetermined):\n#{board.render()}")
+        case r is Impossible:
+          IO::println("(no grid to show)")
+      }
+    } catch e: Exception {
+      IO::println("Error: #{e.getMessage()}")
+    }
+  }
+}
+
+// ─── Statistics helper ──────────────────────────────────────────────────────
+
+class Stats {
+public:
+  // Count total clue entries across all puzzles.
+  static def totalClues(puzzles: List[Puzzle]): Int {
+    var n: Int = 0
+    foreach p: Puzzle in puzzles {
+      foreach cl: List[Int] in p.rowClues() { n = n + cl.size }
+      foreach cl: List[Int] in p.colClues() { n = n + cl.size }
+    }
+    return n
+  }
+
+  // Total cells across all puzzles.
+  static def totalCells(puzzles: List[Puzzle]): Int {
+    var n: Int = 0
+    foreach p: Puzzle in puzzles { n = n + p.height() * p.width() }
+    return n
+  }
+}
+
+// ─── Puzzle catalogue ──────────────────────────────────────────────────────
+//
+// All puzzles below have unique solutions solvable by propagation alone.
+//
+// Puzzle 1 — Cross (5×5): the centre row and centre column are filled.
+// Puzzle 2 — Box border (5×5): the outer border of the grid.
+// Puzzle 3 — Staircase (5×5): a lower-left triangular staircase.
+// Puzzle 4 — Hourglass (7×7): two symmetric triangles meeting at a point.
+// Puzzle 5 — Diamond (9×9): a filled diamond / rhombus shape.
+
+class Puzzles {
+public:
+  // 5×5 cross: centre row + centre column.
+  static def cross5(): Puzzle {
+    val rows: List[List[Int]] = [[1], [1], [5], [1], [1]]
+    val cols: List[List[Int]] = [[1], [1], [5], [1], [1]]
+    return new Puzzle("Cross (5×5)", rows, cols)
+  }
+
+  // 5×5 box: every cell on the outer border is filled, interior empty.
+  static def boxBorder5(): Puzzle {
+    val rows: List[List[Int]] = [[5], [1, 1], [1, 1], [1, 1], [5]]
+    val cols: List[List[Int]] = [[5], [1, 1], [1, 1], [1, 1], [5]]
+    return new Puzzle("Box Border (5×5)", rows, cols)
+  }
+
+  // 5×5 staircase: row k has k+1 filled cells starting from the left.
+  static def staircase5(): Puzzle {
+    val rows: List[List[Int]] = [[1], [2], [3], [4], [5]]
+    val cols: List[List[Int]] = [[5], [4], [3], [2], [1]]
+    return new Puzzle("Staircase (5×5)", rows, cols)
+  }
+
+  // 7×7 hourglass: rows are [7,5,3,1,3,5,7], symmetric about the centre row.
+  static def hourglass7(): Puzzle {
+    val rows: List[List[Int]] = [[7], [5], [3], [1], [3], [5], [7]]
+    val cols: List[List[Int]] = [[1, 1], [2, 2], [3, 3], [7], [3, 3], [2, 2], [1, 1]]
+    return new Puzzle("Hourglass (7×7)", rows, cols)
+  }
+
+  // 9×9 diamond: rows are [1,3,5,7,9,7,5,3,1], symmetric in both axes.
+  static def diamond9(): Puzzle {
+    val rows: List[List[Int]] = [[1], [3], [5], [7], [9], [7], [5], [3], [1]]
+    val cols: List[List[Int]] = [[1], [3], [5], [7], [9], [7], [5], [3], [1]]
+    return new Puzzle("Diamond (9×9)", rows, cols)
+  }
+}
+
+// ─── Entry point ───────────────────────────────────────────────────────────
+
+def main(): void {
+  val puzzles: List[Puzzle] = [
+    Puzzles::cross5(),
+    Puzzles::boxBorder5(),
+    Puzzles::staircase5(),
+    Puzzles::hourglass7(),
+    Puzzles::diamond9()
+  ]
+
+  foreach p: Puzzle in puzzles {
+    PuzzleRunner::run(p)
+    IO::println("")
+  }
+
+  // Summary statistics
+  IO::println("═".rep(52))
+  IO::println("Catalogue summary:")
+  IO::println("  Puzzles:      #{puzzles.size}")
+  IO::println("  Total cells:  #{Stats::totalCells(puzzles)}")
+  IO::println("  Total clues:  #{Stats::totalClues(puzzles)}")
+
+  // Feature showcase: ADT enum pattern matching
+  val results: List[SolveResult] = puzzles.map { p: Puzzle -> NonogramSolver::solve(p) }
+  var solved: Int = 0
+  var stalled: Int = 0
+  var impossible: Int = 0
+  foreach r: SolveResult in results {
+    select r {
+      case x is Solved:     solved     = solved + 1
+      case x is Timeout:    stalled    = stalled + 1
+      case x is Impossible: impossible = impossible + 1
+    }
+  }
+  IO::println("  Solved:       #{solved}")
+  IO::println("  Stalled:      #{stalled}")
+  IO::println("  Impossible:   #{impossible}")
+  IO::println("═".rep(52))
+}

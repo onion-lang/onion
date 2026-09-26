@@ -178,8 +178,9 @@ println(celsius + "C = " + celsius.celsiusToFahrenheit().rounded(2) + "F")
 **`LogLines.on`**
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 
 def main(): void {
   val log = "10.0.0.1 GET /a 200\nbroken line\n10.0.0.2 GET /b 404"
@@ -203,8 +204,9 @@ def main(): void {
 **ConfigEdit.on**
 
 ```onion
-record Server(host: String, port: Int, debug: Boolean)
+record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
+}
 
 tool setport(path: String, port: Int): Int
   requires { read(path), write(path), console }

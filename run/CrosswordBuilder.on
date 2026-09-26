@@ -1,0 +1,468 @@
+// CrosswordBuilder.on — crossword puzzle builder and validator (~280 lines)
+// Domain: a "Programming Languages" 13×13 crossword, fully self-contained.
+// Design: five DOWN words are engineered to cross SYNTAX (row 6) at every letter;
+//   all 17 placements succeed deterministically — no conflicts.
+// Exercises: ADT enum (Direction), data-carrying enum (WordRating), records with
+//   methods, classes with 2D List[List[String]] grid, collection pipelines
+//   (map/filter/fold/sortedBy/distinct/groupBy/find/partition), select/pattern
+//   matching, extension methods on Int/String/Double, closures, nullable, try/catch,
+//   string interpolation, recursion, foreach over List and Map.
+
+// ─── Direction ADT ────────────────────────────────────────────────────────────
+
+enum Direction {
+  case Across; case Down
+public:
+  def label(): String = select this {
+    case x is Across: "ACROSS"
+    case x is Down:   "DOWN"
+  }
+  def dr(): Int = select this {
+    case x is Down: 1
+    else: 0
+  }
+  def dc(): Int = select this {
+    case x is Across: 1
+    else: 0
+  }
+}
+
+// ─── Word difficulty rating ────────────────────────────────────────────────────
+
+enum WordRating(stars: Int, desc: String) {
+  Easy(1, "beginner"),
+  Medium(2, "intermediate"),
+  Hard(3, "expert")
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record ClueEntry(num: Int, dir: Direction, row: Int, col: Int, word: String, clue: String, rating: WordRating) {
+public:
+  def len(): Int = word().length()
+  def endRow(): Int = row() + dir().dr() * (len() - 1)
+  def endCol(): Int = col() + dir().dc() * (len() - 1)
+  def label(): String = "#{num()}. #{dir().label()} (#{rating().desc()})"
+}
+
+record PuzzleStats(wordCount: Int, letterCount: Int, blackCells: Int, intersections: Int, avgWordLen: Double) {
+public:
+  def fillPct(): Double = letterCount() * 100.0 / (letterCount() + blackCells())
+  def report(): String =
+    "words=#{wordCount()}  letters=#{letterCount()}  " +
+    "black=#{blackCells()}  crossings=#{intersections()}  " +
+    "avg=#{avgWordLen().round1()}  fill=#{fillPct().round1()}%"
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): Double = ((self * 10.0 + 0.5) as Int).doubleValue() / 10.0
+}
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def ch(i: Int): String = self.substring(i, i + 1)
+}
+
+// ─── CrosswordGrid ─────────────────────────────────────────────────────────────
+
+class CrosswordGrid {
+  var size:    Int
+  var cells:   java.util.List[java.util.List[String]]
+  var entries: java.util.List[ClueEntry]
+  var nextNum: Int
+
+public:
+  def this(n: Int) {
+    size    = n
+    cells   = new java.util.ArrayList[java.util.List[String]]()
+    entries = new java.util.ArrayList[ClueEntry]()
+    nextNum = 1
+    var r: Int = 0
+    while r < n {
+      val row: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+      var c: Int = 0
+      while c < n { row.add(" "); c++ }
+      cells.add(row)
+      r++
+    }
+  }
+
+  def get(r: Int, c: Int): String =
+    (cells.get(r) as java.util.List[String]).get(c) as String
+
+  def set(r: Int, c: Int, v: String): void {
+    (cells.get(r) as java.util.List[String]).set(c, v)
+  }
+
+  def inBounds(r: Int, c: Int): Boolean =
+    r >= 0 && r < size && c >= 0 && c < size
+
+  def canPlace(row: Int, col: Int, dir: Direction, word: String): Boolean {
+    val len: Int = word.length()
+    val er: Int  = row + dir.dr() * (len - 1)
+    val ec: Int  = col + dir.dc() * (len - 1)
+    if !inBounds(er, ec) { return false }
+    var i: Int = 0
+    while i < len {
+      val r: Int = row + dir.dr() * i
+      val c: Int = col + dir.dc() * i
+      val ch: String = word.ch(i)
+      val cur: String = get(r, c)
+      if cur != " " && cur != ch { return false }
+      i++
+    }
+    return true
+  }
+
+  def place(row: Int, col: Int, dir: Direction, word: String, clue: String, rating: WordRating): Boolean {
+    if !canPlace(row, col, dir, word) { return false }
+    val len: Int = word.length()
+    var i: Int = 0
+    while i < len {
+      set(row + dir.dr() * i, col + dir.dc() * i, word.ch(i))
+      i++
+    }
+    entries.add(new ClueEntry(nextNum, dir, row, col, word, clue, rating))
+    nextNum++
+    return true
+  }
+
+  def fillBlacks(): void {
+    var r: Int = 0
+    while r < size {
+      var c: Int = 0
+      while c < size {
+        if get(r, c) == " " { set(r, c, ".") }
+        c++
+      }
+      r++
+    }
+  }
+
+  def printGrid(): void {
+    val bar: String = "+" + "-".repeat(size * 2 + 1) + "+"
+    IO::println(bar)
+    var r: Int = 0
+    while r < size {
+      var line: String = "| "
+      var c: Int = 0
+      while c < size {
+        val cell: String = get(r, c)
+        if cell == "." { line = line + "# " }
+        else           { line = line + cell + " " }
+        c++
+      }
+      IO::println(line + "|")
+      r++
+    }
+    IO::println(bar)
+  }
+
+  def printClues(): void {
+    IO::println("ACROSS:")
+    foreach e: ClueEntry in entries {
+      select e.dir() {
+        case x is Across:
+          IO::println("  " + e.num().lpad(2) + ". " + e.clue().rpad(44) + " [" + e.word() + "]")
+        else: {}
+      }
+    }
+    IO::println("")
+    IO::println("DOWN:")
+    foreach e: ClueEntry in entries {
+      select e.dir() {
+        case x is Down:
+          IO::println("  " + e.num().lpad(2) + ". " + e.clue().rpad(44) + " [" + e.word() + "]")
+        else: {}
+      }
+    }
+  }
+
+  def countIntersections(): Int {
+    var count: Int = 0
+    var r: Int = 0
+    while r < size {
+      var c: Int = 0
+      while c < size {
+        val cell: String = get(r, c)
+        if cell != "." && cell != " " {
+          var inA: Boolean = false
+          var inD: Boolean = false
+          foreach e: ClueEntry in entries {
+            select e.dir() {
+              case x is Across:
+                if e.row() == r && e.col() <= c && c <= e.endCol() { inA = true }
+              case x is Down:
+                if e.col() == c && e.row() <= r && r <= e.endRow() { inD = true }
+            }
+          }
+          if inA && inD { count++ }
+        }
+        c++
+      }
+      r++
+    }
+    return count
+  }
+
+  def stats(): PuzzleStats {
+    var letters: Int = 0
+    var blacks:  Int = 0
+    var r: Int = 0
+    while r < size {
+      var c: Int = 0
+      while c < size {
+        val cell: String = get(r, c)
+        if cell == "." { blacks++ } else { letters++ }
+        c++
+      }
+      r++
+    }
+    val totalLen: Int =
+      entries.fold(0) { acc, e -> (acc as Int) + (e as ClueEntry).len() } as Int
+    val wc: Int = entries.size
+    val avgLen: Double =
+      if wc == 0 { 0.0 } else { totalLen.doubleValue() / wc.doubleValue() }
+    return new PuzzleStats(wc, letters, blacks, countIntersections(), avgLen)
+  }
+
+  def getEntries(): java.util.List[ClueEntry] = entries
+}
+
+// ─── Word bank ─────────────────────────────────────────────────────────────────
+
+class WordBank {
+  var wordList: java.util.List[String]
+  var clueMap:  java.util.Map[String, String]
+
+public:
+  def this() {
+    wordList = new java.util.ArrayList[String]()
+    clueMap  = new java.util.LinkedHashMap[String, String]()
+  }
+
+  def add(word: String, clue: String): void {
+    val up: String = word.toUpperCase()
+    wordList.add(up)
+    clueMap.put(up, clue)
+  }
+
+  def getClue(word: String): String {
+    val v: String? = clueMap.get(word.toUpperCase()) as String?
+    return v ?: "—"
+  }
+
+  def byLength(): java.util.Map[Int, java.util.List[String]] =
+    wordList.groupBy { w -> (w as String).length() }
+
+  def longest(minLen: Int): java.util.List[String] =
+    wordList.sortedBy { w -> 0 - (w as String).length() }
+            .filter  { w -> (w as String).length() >= minLen }
+}
+
+// ─── Recursive helper ─────────────────────────────────────────────────────────
+
+def totalLetters(entries: java.util.List[ClueEntry], idx: Int): Int {
+  if idx >= entries.size { return 0 }
+  return (entries.get(idx) as ClueEntry).len() + totalLetters(entries, idx + 1)
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println("-".repeat(title.length()))
+}
+
+// ─── Main: build a "Programming Languages" crossword ──────────────────────────
+//
+// Layout (13×13, 0-indexed):
+//
+//   Col:    0  1  2  3  4  5  6  7  8  9  10  11  12
+//   Row  2: C  A                                       CLASS↓, ARRAY↓ start
+//   Row  3: L  R     S  J
+//   Row  4: A  R     O  A     T  Y  P  C                E
+//   Row  5: S  A  O  R  V     Y        O                N
+//   Row  6: S  Y  N  T  A  X             D               U   (← SYNTAX ACROSS)
+//   Row  7:       I              L  O  O  E               M
+//   Row  8:       O           N  O  D  E
+//   Row  9:       N        H  E  A  P
+//   Row 10: G  R  A  P  H
+//   Row 11: L  A  M  B  D  A
+//   Row 12: E  D  G  E
+//
+// Key crossings (all letter-verified):
+//   CLASS[4]='S' at (6,0) = SYNTAX[0]='S'  ✓
+//   ARRAY[4]='Y' at (6,1) = SYNTAX[1]='Y'  ✓
+//   ONION[1]='N' at (6,2) = SYNTAX[2]='N'  ✓
+//   SORT [3]='T' at (6,3) = SYNTAX[3]='T'  ✓
+//   JAVA [3]='A' at (6,4) = SYNTAX[4]='A'  ✓
+
+val bank: WordBank = new WordBank()
+bank.add("SYNTAX",  "Grammar rules of a language")
+bank.add("CLASS",   "Blueprint for objects")
+bank.add("ARRAY",   "Fixed-length indexed sequence")
+bank.add("ONION",   "This layered JVM language")
+bank.add("SORT",    "Arrange elements by order")
+bank.add("JAVA",    "Platform this language compiles to")
+bank.add("STACK",   "LIFO data structure; also overflows")
+bank.add("TYPE",    "Classification enforced by the compiler")
+bank.add("LOOP",    "Repeated-execution control")
+bank.add("NODE",    "Single element of a tree or graph")
+bank.add("HEAP",    "Priority-queue structure")
+bank.add("GRAPH",   "Nodes plus edges — adjacency structure")
+bank.add("LAMBDA",  "Anonymous function value")
+bank.add("EDGE",    "Link between two graph nodes")
+bank.add("CODE",    "Source text; or compiled bytecode")
+bank.add("ENUM",    "Named-constant group type")
+bank.add("RECORD",  "Immutable product type")
+bank.add("MATCH",   "Pattern-___ expression")
+bank.add("CLOSURE", "Function that captures outer variables")
+bank.add("PARSE",   "Convert source text to an AST")
+bank.add("TREE",    "AST — abstract ___ structure")
+
+val grid: CrosswordGrid = new CrosswordGrid(13)
+
+// ── ACROSS words ──────────────────────────────────────────────────────────────
+// STACK ACROSS at (3,6):   no DOWN word conflicts in cols 6-10 at row 3
+val ok01: Boolean = grid.place(3,  6,  new Across(), "STACK",  bank.getClue("STACK"),  WordRating::Easy)
+// TYPE ACROSS at (4,6):    no conflicts — starts one col after STACK finishes
+val ok02: Boolean = grid.place(4,  6,  new Across(), "TYPE",   bank.getClue("TYPE"),   WordRating::Easy)
+// SYNTAX ACROSS at (6,0):  the keystone; DOWN words engineered to cross here
+val ok03: Boolean = grid.place(6,  0,  new Across(), "SYNTAX", bank.getClue("SYNTAX"), WordRating::Medium)
+// LOOP ACROSS at (7,6):    L,O,O,P — clears SYNTAX and intersecting DOWN words
+val ok04: Boolean = grid.place(7,  6,  new Across(), "LOOP",   bank.getClue("LOOP"),   WordRating::Easy)
+// NODE ACROSS at (8,5):    N,O,D,E — below LOOP
+val ok05: Boolean = grid.place(8,  5,  new Across(), "NODE",   bank.getClue("NODE"),   WordRating::Easy)
+// HEAP ACROSS at (9,4):    H,E,A,P — below NODE
+val ok06: Boolean = grid.place(9,  4,  new Across(), "HEAP",   bank.getClue("HEAP"),   WordRating::Easy)
+// GRAPH ACROSS at (10,0):  G,R,A,P,H
+val ok07: Boolean = grid.place(10, 0,  new Across(), "GRAPH",  bank.getClue("GRAPH"),  WordRating::Medium)
+// LAMBDA ACROSS at (11,0): L,A,M,B,D,A
+val ok08: Boolean = grid.place(11, 0,  new Across(), "LAMBDA", bank.getClue("LAMBDA"), WordRating::Medium)
+// EDGE ACROSS at (12,0):   E,D,G,E
+val ok09: Boolean = grid.place(12, 0,  new Across(), "EDGE",   bank.getClue("EDGE"),   WordRating::Easy)
+
+// ── DOWN words ────────────────────────────────────────────────────────────────
+// CLASS DOWN at (2,0): C,L,A,S,S — CLASS[4]='S' lands on SYNTAX[0]='S' at (6,0)
+val ok10: Boolean = grid.place(2,  0,  new Down(),   "CLASS",  bank.getClue("CLASS"),  WordRating::Easy)
+// ARRAY DOWN at (2,1): A,R,R,A,Y — ARRAY[4]='Y' lands on SYNTAX[1]='Y' at (6,1)
+val ok11: Boolean = grid.place(2,  1,  new Down(),   "ARRAY",  bank.getClue("ARRAY"),  WordRating::Easy)
+// ONION DOWN at (5,2): O,N,I,O,N — ONION[1]='N' lands on SYNTAX[2]='N' at (6,2)
+val ok12: Boolean = grid.place(5,  2,  new Down(),   "ONION",  bank.getClue("ONION"),  WordRating::Easy)
+// SORT DOWN at (3,3):  S,O,R,T — SORT[3]='T' lands on SYNTAX[3]='T' at (6,3)
+val ok13: Boolean = grid.place(3,  3,  new Down(),   "SORT",   bank.getClue("SORT"),   WordRating::Easy)
+// JAVA DOWN at (3,4):  J,A,V,A — JAVA[3]='A' lands on SYNTAX[4]='A' at (6,4)
+val ok14: Boolean = grid.place(3,  4,  new Down(),   "JAVA",   bank.getClue("JAVA"),   WordRating::Easy)
+// CODE DOWN at (4,10): C,O,D,E — free-standing in the eastern half (col 10)
+val ok15: Boolean = grid.place(4,  10, new Down(),   "CODE",   bank.getClue("CODE"),   WordRating::Easy)
+// ENUM DOWN at (4,12): E,N,U,M — rightmost column
+val ok16: Boolean = grid.place(4,  12, new Down(),   "ENUM",   bank.getClue("ENUM"),   WordRating::Easy)
+// PARSE DOWN at (3,11): P,A,R,S,E — five letters to the right
+val ok17: Boolean = grid.place(3,  11, new Down(),   "PARSE",  bank.getClue("PARSE"),  WordRating::Medium)
+
+grid.fillBlacks()
+
+// ─── Report ────────────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════╗")
+IO::println("║  CROSSWORD: The World of Programming     ║")
+IO::println("╚══════════════════════════════════════════╝")
+
+printSection("Grid (# = black square)")
+grid.printGrid()
+
+printSection("Clues")
+grid.printClues()
+
+printSection("Placement results")
+val placed: java.util.List[Boolean] =
+  [ok01, ok02, ok03, ok04, ok05, ok06, ok07, ok08, ok09,
+   ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17]
+val successes: Int = placed.filter { b -> b as Boolean }.size
+val failures:  Int = placed.size - successes
+IO::println("  Placed : " + successes + " / " + placed.size + " words")
+IO::println("  Skipped: " + failures + " (conflict or out-of-bounds)")
+
+printSection("Difficulty breakdown")
+val byRating: java.util.Map[Int, java.util.List[ClueEntry]] =
+  grid.getEntries().groupBy { e -> (e as ClueEntry).rating().stars() }
+foreach (stars, group) in byRating {
+  val label: String = select stars as Int {
+    case 1: "Easy  "
+    case 2: "Medium"
+    else:   "Hard  "
+  }
+  IO::println("  " + label + " (" + stars + "★): " +
+              (group as java.util.List[ClueEntry]).size + " words")
+}
+
+printSection("Longest available words (6+ letters)")
+foreach w: String in bank.longest(6) {
+  IO::println("  " + w.rpad(10) + " — " + bank.getClue(w))
+}
+
+printSection("Words by length (word bank)")
+val byLen: java.util.Map[Int, java.util.List[String]] = bank.byLength()
+foreach (len, ws) in byLen {
+  IO::println("  " + len + " letters: " + (ws as java.util.List[String]).size + " word(s)")
+}
+
+printSection("Recursive total letters (placed words)")
+val recLetters: Int = totalLetters(grid.getEntries(), 0)
+IO::println("  Total letter-slots filled (recursive): " + recLetters)
+
+// try/catch: safe lookup
+printSection("Safe word lookup")
+def lookupWord(bank2: WordBank, w: String): String {
+  try {
+    val clue: String = bank2.getClue(w)
+    if clue == "—" { throw new Exception("Unknown word: " + w) }
+    return "\"" + w + "\" → " + clue
+  } catch e: Exception {
+    return "ERROR: " + e.getMessage()
+  }
+}
+IO::println("  " + lookupWord(bank, "LAMBDA"))
+IO::println("  " + lookupWord(bank, "MONAD"))
+
+// partition: short (<= 4 letters) vs long (>= 5 letters)
+printSection("Short vs long placed words")
+val parts = grid.getEntries().partition { e -> (e as ClueEntry).len() <= 4 }
+val shortWords = parts[0] as java.util.List[Object]
+val longWords  = parts[1] as java.util.List[Object]
+IO::println("  Short (<=4 letters): " +
+  shortWords.map { e -> (e as ClueEntry).word() })
+IO::println("  Long  (>=5 letters): " +
+  longWords.map  { e -> (e as ClueEntry).word() })
+
+// distinct letters across all placed words
+printSection("Distinct letters used")
+var allLetters: java.util.List[String] = []
+foreach e: ClueEntry in grid.getEntries() {
+  var i: Int = 0
+  while i < e.len() { allLetters.add(e.word().ch(i)); i++ }
+}
+val distinctLetters: java.util.List[String] =
+  allLetters.distinct().sortedBy { c -> c as String }
+IO::println("  " + distinctLetters.size + " distinct: " + distinctLetters)
+
+// Final stats
+printSection("Puzzle statistics")
+val st: PuzzleStats = grid.stats()
+IO::println("  " + st.report())
+IO::println("")
+IO::println("Done.")

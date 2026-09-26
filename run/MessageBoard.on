@@ -39,19 +39,23 @@ enum Category(label: String) {
 
 // ── Records ───────────────────────────────────────────────────────────────
 
-record User(id: Int, name: String, role: UserRole, reputation: Int)
+record User(id: Int, name: String, role: UserRole, reputation: Int) {
   example { new User(1, "alice", UserRole::ADMIN, 100).reputation() == 100 }
+}
 
-record Tag(slug: String)
+record Tag(slug: String) {
   example { new Tag("onion-lang").slug() != null }
+}
 
 record Post(id: Int, threadId: Int, authorId: Int, body: String,
-            upvotes: Int, downvotes: Int, status: PostStatus)
+            upvotes: Int, downvotes: Int, status: PostStatus) {
   example { new Post(1, 1, 1, "hi", 0, 0, new Visible()).status().isVisible() == true }
+}
 
 record Thread(id: Int, title: String, category: Category,
-              authorId: Int, views: Int, pinned: Boolean)
+              authorId: Int, views: Int, pinned: Boolean) {
   example { new Thread(1, "t", Category::TECH, 2, 0, false).pinned() == false }
+}
 
 record SearchHit(threadId: Int, title: String, score: Int)
 

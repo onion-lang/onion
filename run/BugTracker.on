@@ -138,9 +138,10 @@ record Issue(
   resolution: Resolution,
   assignee: String?,
   storyPoints: Int
-)
+) {
   example { new Issue(1, "crash", IssueType::BUG, new Critical(), new Open(), new Unresolved(), null, 3).id() == 1 }
   example { new Issue(2, "feat",  IssueType::FEATURE, new Low(), new Done(), new Fixed("v2.0"), "alice", 5).assignee() == "alice" }
+}
 
 // ── IssueTracker class ────────────────────────────────────────────────────────
 

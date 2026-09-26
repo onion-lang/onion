@@ -1831,38 +1831,36 @@ AST.RecordDeclaration record_decl(int mset) : {
     <ID> <NOT> "(" mk=id() {append(deriveBuf, c(mk));}
           ("," mk=id() {append(deriveBuf, c(mk));})* ")"
   ]
-  // Optional `law name(p: T) { expr }` / `example [name] { expr }` clauses (B3). Both are
-  // soft keywords recognized only here; each becomes a boolean static method the compiler
-  // executes at build time (LawCheckPhase). `law` is property-checked over generated args.
-  (
-    LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
-      <ID> lt=<ID> "(" largs=args() ")" lb=block()
-      { append(lawBuf, new AST.LawClause(p(lt), c(lt), largs, lb)); }
-  |
-    LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || getToken(2).kind == ID)})
-      et=<ID> { enm = null; } [ LOOKAHEAD({getToken(1).kind == ID}) enm=<ID> ] eb=block()
-      { append(exBuf, AST.exampleClause(p(et), enm == null ? null : c(enm), eb)); }
-  |
-    // `shape name = re"..."` — a named boundary for this record. Like `law` and
-    // `example`, `shape` is a soft keyword recognized only here, so it stays usable as
-    // an ordinary identifier. A record may carry several.
-    LOOKAHEAD({getToken(1).image.equals("shape") && getToken(2).kind == ID})
-      <ID> st=<ID> "="
-      ( srt=<RE_STRING>
-          { append(shapeBuf, AST.regexShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length() - 1))); }
-      | srt=<ID>
-          { append(shapeBuf, AST.formatShapeClause(p(st), c(st), c(srt))); }
-      )
-  )*
   [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID>
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ]
-  // Optional brace body: `record R(...) { access-section* }`, mirroring enum bodies so
-  // records can carry behaviour (methods). A leading `{` with no preceding soft keyword
-  // is unambiguously the record body (the `law`/`example` clauses above are introduced
-  // by their own soft keywords before any block).
-  [ "{" (sec=access_section() {append(sections, sec);})* "}" ]
+  // Optional brace body: `record R(...) { access-section* | law* | example* | shape* }`,
+  // mirroring enum bodies so records can carry behaviour (methods) alongside their
+  // `law`/`example`/`shape` clauses (B3), all enclosed together. `law`, `example` and
+  // `shape` are soft keywords recognized only here (each guarded by a LOOKAHEAD on the
+  // token(s) that follow), so they stay usable as ordinary identifiers everywhere else.
+  // `law` and `example` each become a boolean static method the compiler executes at
+  // build time (LawCheckPhase); `law` is property-checked over generated args.
+  [ "{"
+    ( sec=access_section() {append(sections, sec);}
+    | LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
+        <ID> lt=<ID> "(" largs=args() ")" lb=block()
+        { append(lawBuf, new AST.LawClause(p(lt), c(lt), largs, lb)); }
+    | LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || getToken(2).kind == ID)})
+        et=<ID> { enm = null; } [ LOOKAHEAD({getToken(1).kind == ID}) enm=<ID> ] eb=block()
+        { append(exBuf, AST.exampleClause(p(et), enm == null ? null : c(enm), eb)); }
+    | // `shape name = re"..."` — a named boundary for this record. A record may carry several.
+      LOOKAHEAD({getToken(1).image.equals("shape") && getToken(2).kind == ID})
+        <ID> st=<ID> "="
+        ( srt=<RE_STRING>
+            { append(shapeBuf, AST.regexShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length() - 1))); }
+        | srt=<ID>
+            { append(shapeBuf, AST.formatShapeClause(p(st), c(st), c(srt))); }
+        )
+    )*
+    "}"
+  ]
   [";"] {
     return AST.recordDeclaration(
       p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),

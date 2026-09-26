@@ -23,18 +23,21 @@ enum PackageStatus {
 
 // ── Records ───────────────────────────────────────────────────────────────────
 
-record Address(street: String, city: String, zip: String)
+record Address(street: String, city: String, zip: String) {
   example { new Address("1 Oak St", "Portland", "97201").city() == "Portland" }
   example { new Address("2 Elm Ave", "Seattle", "98101").zip() == "98101" }
+}
 
-record Customer(id: Int, name: String, email: String, address: Address)
+record Customer(id: Int, name: String, email: String, address: Address) {
   example {
     val addr = new Address("10 Pine St", "Denver", "80203")
     new Customer(42, "Alice", "alice@example.com", addr).name() == "Alice"
   }
+}
 
-record RouteStop(hub: String, arrivalTime: Int)
+record RouteStop(hub: String, arrivalTime: Int) {
   example { new RouteStop("PDX Hub", 480).hub() == "PDX Hub" }
+}
 
 // ── Int extension for display ─────────────────────────────────────────────────
 

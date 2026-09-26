@@ -6,9 +6,10 @@
 
 // ---------- Data types ----------
 
-record Item(sku: String, name: String, unitPrice: Double, stock: Int, category: String)
+record Item(sku: String, name: String, unitPrice: Double, stock: Int, category: String) {
   example { new Item("E001", "Test", 9.99, 10, "ELEC").stock() == 10 }
   example { new Item("E001", "Test", 9.99, 10, "ELEC").sku() == "E001" }
+}
 
 // Data-carrying enum: each section has a title.
 enum ReportSection(title: String) {

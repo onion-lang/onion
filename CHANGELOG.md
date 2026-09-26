@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/DartsScorer.on`** — a 433-line darts 501 game simulator, a new domain for the `run/` corpus (records with `example` clauses `DartThrow`/`PlayerState`/`DartSpec`/`CheckoutRoute`/`TurnStats`; an ADT case-enum `Multiplier` (`Singles`/`Doubles`/`Trebles`) and `GameResult` (`InProgress`/`Won`/`Bust`) dispatched via `select`; a class `DartsGame conforms Printable` with public/private sections and mutable state; a static-only helper class `CheckoutFinder` with a brute-force recursive 1/2/3-dart checkout search over all 62 board darts, enforcing the double-out finish rule; extension methods on `Int`/`String`; typed generic collections and `foreach` over ranges and map entries; nullable `CheckoutRoute?`/`DartThrow?` with null-check guards; string interpolation, `while` loops, nested `foreach`, closures — simulating an Alice vs Bob 501 game, a checkout-route table, per-player statistics, and a top-5 highest-checkout ranking), added to the `run/` corpus (merged via #1581).
+
 ## [0.114.0] - 2026-09-26
 
 ### Fixed

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.113.0] - 2026-09-26
+
+### Changed
+
+- **`law`, `example`, and `shape` clauses on a `record` now must be written inside the record's brace-enclosed `{ }` body, alongside any methods, instead of floating between the constructor parameter list and a separate optional body brace.** Mirrored in both parsers (`grammar/JJOnionParser.jj` and the hand-written fast-path `OnionParser.scala`); every existing use in `run/*.on`, embedded-source test specs, and the English/Japanese docs (including `CLAUDE.md`) was migrated to the new placement (merged via #1561).
+
+### Added
+
+- **`run/MemoryAllocator.on`** — a 582-line memory allocation strategy simulation, a new domain for the `run/` corpus (a record `Block`; an ADT enum `AllocResult` (`Allocated`/`Failed`) dispatched via `select`; a class hierarchy `FreeListAllocator` (base) with `FirstFit`/`BestFit`/`WorstFit`/`Buddy` subclasses conforming to an interface `MemAllocator`; extension methods on `Int`/`String`/`Double`; collection pipelines `map`/`filter`/`fold`/`sortedBy`/`sortedByDescending`/`find`/`partition`/`groupBy`/`zip`; nullable `Object?` with a pre-unboxing check; closures as pipeline predicates; string interpolation; `while`/`foreach`/ranges (`0..<n`) and `foreach (k, v)` over a map — running a 20-op alloc/free workload across First-Fit, Best-Fit, Worst-Fit, and Buddy System allocators and comparing fragmentation statistics), added to the `run/` corpus (merged via #1562).
+
+- **`run/BondPortfolio.on`** — a 345-line fixed-income bond pricing and risk analytics system, a new domain for the `run/` corpus (a data-carrying enum `BondType(label, taxExempt, riskLevel)`; an ADT case-enum `Rating` (`Investment`/`Speculative(grade)`/`Distressed`) with `label()`/`spreadBps()` dispatched via `select this`; a record `Bond` with an `example` clause and methods `price(ytm)`/`duration(ytm)`/`modDuration(ytm)`/`dv01(ytm)`/`ytm(price)` (Newton-Raphson yield-solve via a bounded `while` loop); a record `Holding` with computed market-value, annual-income, and per-holding DV01; a class `BondPortfolio` with typed `Map[String, Double]` allocation grouping, weighted-average YTM/duration, total DV01, and an IG-vs-speculative credit-quality split; extension methods on `Double`/`String`; `foreach` over ranges, `select` type patterns in method bodies and inline Boolean guards, and `sortedBy` ranking — pricing 7 instruments across four asset types (Government, Corporate, Municipal, High Yield)), added to the `run/` corpus (merged via #1564).
+
+- **`run/ArtGallery.on`** — a 272-line art gallery management simulation, a new domain for the `run/` corpus (data-carrying enums `Medium(label, isPhysical)`/`ArtStyle` with a `select`-based `label()` covering all 5 cases; records with methods `Artist`/`Artwork`/`Sale`; an interface `GalleryReport` implemented by a class `Gallery`; collection pipelines `filter`/`fold`/`sortedBy`/`groupBy`/`find`/`size`; nullable `Artwork?` return from `findMostExpensive()`; string interpolation; `try`/`catch`; recursion (`sumPrices`); a `while` loop for price-tier distribution; `foreach` over ranges and map entries — rendering catalog value, sales revenue, price tiers, and decade/style breakdowns for a contemporary gallery), added to the `run/` corpus (merged via #1566).
+
 ## [0.112.0] - 2026-09-26
 
 ### Added

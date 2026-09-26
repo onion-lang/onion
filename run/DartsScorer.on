@@ -74,21 +74,19 @@ public:
 
 // ─── Records ───────────────────────────────────────────────────────────────────
 
-record DartThrow(sector: Int, multiplier: Multiplier)
+record DartThrow(sector: Int, multiplier: Multiplier) {
   example { new DartThrow(20, new Singles()).score() == 20 }
   example { new DartThrow(20, new Trebles()).score() == 60 }
   example { new DartThrow(25, new Doubles()).score() == 50 }
-{
 public:
   def score(): Int    = sector * multiplier.factor()
   def label(): String = "#{multiplier.label()}#{sector}"
   def isDouble(): Boolean = multiplier is Doubles
 }
 
-record PlayerState(name: String, remaining: Int, dartsThrown: Int)
+record PlayerState(name: String, remaining: Int, dartsThrown: Int) {
   example { new PlayerState("Alice", 501, 0).isStarting() }
   example { !new PlayerState("Bob",  0,   9).isStarting() }
-{
 public:
   def isStarting(): Boolean  = remaining == 501 && dartsThrown == 0
   def canCheckout(): Boolean = remaining >= 2 && remaining <= 170

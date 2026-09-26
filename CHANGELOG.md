@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.112.0] - 2026-09-26
+
 ### Added
 
 - **`run/SwimMeet.on`** — a 476-line swimming meet results tracker and ranking system, a new domain for the `run/` corpus (data-carrying enums `Stroke(code, fullName)`/`Distance(meters)`; an ADT enum `SwimResult` (`Finished(timeSeconds)`/`DQ(reason)`/`DNS`) dispatched via `select this`; records with methods `Swimmer`/`EventSpec`/`HeatEntry`; a class `Meet conforms Reportable` and a `PersonalBestRegistry`; extension methods on `Int`/`Double`/`String` (`lpad`/`rpad`/`round3`); collection pipelines `filter`/`map`/`distinct`/`sortedBy`/`find`/`groupBy`; nullable `Double?`/`HeatEntry?` with `?:` and null checks; string interpolation and closures as trailing lambdas; `foreach` over ranges and `(k, v)` map destructuring; `while` loops; `select` on a string value — rendering a meet overview, per-event results with DQ/DNS handling, a personal-best times table, club standings, event winners, and a youth-swimmers report), added to the `run/` corpus (merged via #1560).

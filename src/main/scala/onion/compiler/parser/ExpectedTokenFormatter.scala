@@ -32,7 +32,20 @@ private[compiler] object ExpectedTokenFormatter {
       }
     }
 
-    val expected = expectedSet.toSeq
+    render(expectedSet.toSeq)
+  }
+
+  /** The same two renderings, over a plain kind list (the handwritten parser's
+   *  CollectedError.expectedKinds) instead of JavaCC's expected-token sequences. */
+  def formatKinds(kinds: Seq[Int], tokenImages: Array[String]): String =
+    render(LinkedHashSet.from(kinds.map(tokenImages(_))).toSeq)
+
+  def formatAllKinds(kinds: Seq[Int], tokenImages: Array[String]): String = {
+    val images = LinkedHashSet.from(kinds.map(tokenImages(_)))
+    if (images.isEmpty) Fallback else images.mkString(", ")
+  }
+
+  private def render(expected: Seq[String]): String =
     if (expected.isEmpty) {
       Fallback
     } else if (expected.size == 1) {
@@ -43,5 +56,4 @@ private[compiler] object ExpectedTokenFormatter {
       val shown = expected.take(4)
       shown.mkString(", ") + s", ... (${expected.size - shown.size} more)"
     }
-  }
 }

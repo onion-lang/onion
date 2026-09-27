@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/GolfScorecard.on`** — a 317-line 18-hole golf tournament scorecard and leaderboard, a new domain for the `run/` corpus (a plain enum with methods `TeeColor`; an ADT case-enum mixing zero-field cases with a data-carrying case `ScoreType` (`Eagle`/`Birdie`/`Par`/`Bogey`/`DoubleBogey`/`Other(over)`) dispatched via `select`/`is` type patterns; records with methods `Hole`/`Course`/`HoleScore`/`PlayerRound` implementing standard handicap-stroke allocation, net scoring and Stableford points; a class with a primary-style constructor and a private helper `Tournament` computing gross/net/Stableford leaderboards and a skins game; extension methods on `Int`/`String`; collection pipelines `filter`/`sortedBy`/`sortedByDescending`/`groupBy`; nullable types and the Elvis operator; function-typed parameters and lambdas; `foreach` over ranges, lists, and map `(k, v)` entries; `try`/`catch` — rendering full 18-hole scorecards for three players, three leaderboards, and a skins-game breakdown), added to the `run/` corpus (merged via #1638).
+
 ## [0.120.0] - 2026-09-27
 
 ### Added

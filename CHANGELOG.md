@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ComplexArithmetic.on`** — a 274-line complex-number algebra and Mandelbrot/Julia fractal renderer, a new domain for the `run/` corpus (a `record Complex` with operator overloading — `plus`/`minus`/`times`/`div`/`scale`/`neg` mapped to `+`/`-`/`*`/`/` — and integer exponentiation via fast binary exponentiation; four build-time `example` invariants on `abs()`/`absSquared()`/`conjugate()`; extension methods on `Double` (`toComplex`/`i`); `do[Option]` monadic chaining for safe division that short-circuits on division by zero; recursive `mandelbrot`/`julia`/`renderMandelbrot`; `foreach` over exclusive ranges (`0..<rows`); `select` with an `else` arm for operator dispatch; collection pipelines `map`/`fold` — rendering complex arithmetic identities and an ASCII Mandelbrot fractal), added to the `run/` corpus (merged via #1648).
+- **`run/LazySegTree.on`** — a 366-line segment tree with lazy propagation, a new domain for the `run/` corpus (complementing the point-update `SegmentTree.on`; a `LazySegTree` class with mutable `Int[]` array fields (`sumT`/`maxT`/`minT`/`lazy`) implementing O(log n) range-add updates and range-sum/max/min queries via recursive `addRange`/`qSum`/`qMax`/`qMin`/`push`; a data-carrying enum `CalibEvent` and an ADT case-enum `AnalysisResult` dispatched via `select`/type patterns; a `record RangeStats` with `avg(): Double`; extension methods on `Int`/`Double`/`String`; a `WeatherStation` class wrapping the tree for a 30-day temperature analysis with cross-station comparison and peak-window scans), added to the `run/` corpus (merged via #1649).
+
 ## [0.122.0] - 2026-09-27
 
 ### Added

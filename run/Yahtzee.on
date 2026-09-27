@@ -85,9 +85,8 @@ public:
 
 // ─── Die record ───────────────────────────────────────────────────────────────
 
-record Die(face: Int, kind: DieKind)
+record Die(face: Int, kind: DieKind) {
   example { new Die(3, DieKind::Standard).face() == 3 }
-{
 public:
   def show(): String = "[" + face() + "]"
   static def roll(rng: LCG): Die {

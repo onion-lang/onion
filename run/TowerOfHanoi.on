@@ -1,0 +1,260 @@
+// TowerOfHanoi.on — Tower of Hanoi puzzle solver demonstrating recursion,
+// ADT enums, records, extension methods on Int, collection pipelines,
+// foreach ranges, select pattern matching, and verified output.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  // 2^n via recursion — tests that Int extension methods work
+  def pow2(): Int {
+    if self == 0 { return 1 }
+    return 2 * (self - 1).pow2()
+  }
+  def repeat(ch: String): String {
+    var s: String = ""
+    var i: Int = self
+    while i > 0 {
+      s = s + ch
+      i--
+    }
+    return s
+  }
+}
+
+// ─── Data model ───────────────────────────────────────────────────────────────
+
+record Move(disk: Int, from: Int, to: Int)
+
+record SolveStats(n: Int, moves: Int, optimal: Int) {
+public:
+  def isOptimal(): Boolean = moves() == optimal()
+  def label(): String = if isOptimal() { "OPTIMAL" } else { "SUBOPTIMAL (+" + (moves() - optimal()) + ")" }
+}
+
+// ADT enum: sealed quality assessment
+enum MoveQuality {
+  case Optimal
+  case Suboptimal(extra: Int)
+public:
+  def describe(): String = select this {
+    case o is Optimal: "optimal (2^n - 1)"
+    case s is Suboptimal: "suboptimal (+#{s.extra()} extra)"
+  }
+}
+
+// Data-carrying enum: peg identity
+enum Peg(label: String, pegIdx: Int) {
+  A("A", 0),
+  B("B", 1),
+  C("C", 2)
+}
+
+// ─── ASCII bar builder ─────────────────────────────────────────────────────────
+
+def diskBar(disk: Int, maxDisk: Int): String {
+  val pad: Int = maxDisk - disk
+  val bar: Int = disk * 2 + 1
+  return pad.repeat(" ") + bar.repeat("=") + pad.repeat(" ")
+}
+
+def emptyBar(maxDisk: Int): String = maxDisk.repeat(" ") + "|" + maxDisk.repeat(" ")
+
+// ─── Solver ───────────────────────────────────────────────────────────────────
+
+class HanoiSolver {
+  var n: Int
+  var pegs: List[Object]   // each element is a List[Object] of disk Ints (bottom-first)
+  var history: List[Object] // each element is a Move record
+
+public:
+  def this(diskCount: Int) {
+    n = diskCount
+    history = []
+    val src: List[Object] = []
+    var i: Int = diskCount
+    while i >= 1 {
+      src.add(i)
+      i--
+    }
+    pegs = [src, [], []]
+  }
+
+  def solve(disks: Int, fromPeg: Int, toPeg: Int, viaPeg: Int): void {
+    if disks > 0 {
+      solve(disks - 1, fromPeg, viaPeg, toPeg)
+      doMove(fromPeg, toPeg, disks)
+      solve(disks - 1, viaPeg, toPeg, fromPeg)
+    }
+  }
+
+  def doMove(from: Int, to: Int, disk: Int): void {
+    val src: List[Object] = pegs.get(from) as List[Object]
+    val dst: List[Object] = pegs.get(to) as List[Object]
+    src.remove(src.size - 1)
+    dst.add(disk)
+    history.add(new Move(disk, from, to))
+  }
+
+  def pegLabel(i: Int): String {
+    if i == 0 { return "A" }
+    if i == 1 { return "B" }
+    return "C"
+  }
+
+  def moveCount(): Int = history.size
+
+  def optimalCount(): Int = n.pow2() - 1
+
+  def quality(): MoveQuality {
+    val extra: Int = moveCount() - optimalCount()
+    if extra == 0 { return new Optimal() }
+    return new Suboptimal(extra)
+  }
+
+  def stats(): SolveStats = new SolveStats(n, moveCount(), optimalCount())
+
+  def isVerified(): Boolean {
+    val dest: List[Object] = pegs.get(2) as List[Object]
+    if dest.size != n { return false }
+    var prev: Int = n + 1
+    foreach d: Object in dest {
+      val disk: Int = d as Int
+      if disk >= prev { return false }
+      prev = disk
+    }
+    return true
+  }
+
+  def printMoves(limit: Int): void {
+    var count: Int = 0
+    foreach m: Object in history {
+      if count >= limit { break }
+      val mv: Move = m as Move
+      IO::println("  " + (count + 1) + ". disk " + mv.disk() + ": " + pegLabel(mv.from()) + " -> " + pegLabel(mv.to()))
+      count++
+    }
+    if history.size > limit {
+      IO::println("  ... (" + (history.size - limit) + " more not shown)")
+    }
+  }
+
+  def printState(title: String): void {
+    IO::println("  [" + title + "]")
+    foreach i: Int in 0..2 {
+      val stack: List[Object] = pegs.get(i) as List[Object]
+      var content: String = "(empty)"
+      if stack.size > 0 { content = stack.toString() }
+      IO::println("    " + pegLabel(i) + ": " + content)
+    }
+  }
+
+  def printVisual(): void {
+    var row: Int = n - 1
+    while row >= 0 {
+      var line: String = "  "
+      foreach p: Int in 0..2 {
+        if p > 0 { line = line + "   " }
+        val stack: List[Object] = pegs.get(p) as List[Object]
+        val depth: Int = n - 1 - row
+        if depth < stack.size {
+          val disk: Int = stack.get(stack.size - 1 - depth) as Int
+          line = line + diskBar(disk, n)
+        } else {
+          line = line + emptyBar(n)
+        }
+      }
+      IO::println(line)
+      row--
+    }
+    var base: String = "  "
+    foreach p: Int in 0..2 {
+      if p > 0 { base = base + "   " }
+      base = base + (2 * n + 1).repeat("-")
+    }
+    IO::println(base)
+    var labels: String = "  "
+    foreach p: Int in 0..2 {
+      if p > 0 { labels = labels + "   " }
+      labels = labels + n.repeat(" ") + pegLabel(p) + n.repeat(" ")
+    }
+    IO::println(labels)
+  }
+
+  def getMoves(): List[Object] = history
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Tower of Hanoi Solver ===")
+  IO::println("")
+
+  // Quick survey: n = 1..7
+  IO::println("Move-count survey (n = 1..7):")
+  IO::println("  n  | moves | optimal | status")
+  IO::println("  ---+-------+---------+--------")
+  foreach n: Int in 1..7 {
+    val s: HanoiSolver = new HanoiSolver(n)
+    s.solve(n, 0, 2, 1)
+    val st: SolveStats = s.stats()
+    IO::println("  " + n + "  | " + st.moves() + "     | " + st.optimal() + "       | " + st.label())
+  }
+
+  IO::println("")
+
+  // Detailed n=3 trace
+  IO::println("=== Detailed solution: n=3 ===")
+  val s3: HanoiSolver = new HanoiSolver(3)
+  s3.printState("initial")
+  s3.solve(3, 0, 2, 1)
+  IO::println("")
+  IO::println("  All " + s3.moveCount() + " moves:")
+  s3.printMoves(30)
+  IO::println("")
+  s3.printState("final")
+  IO::println("")
+  IO::println("  Quality : " + s3.quality().describe())
+  IO::println("  Verified: " + s3.isVerified())
+
+  IO::println("")
+
+  // n=4 ASCII visualization
+  IO::println("=== n=4 (ASCII visualization) ===")
+  val s4: HanoiSolver = new HanoiSolver(4)
+  IO::println("  Before:")
+  s4.printVisual()
+  s4.solve(4, 0, 2, 1)
+  IO::println("  After:")
+  s4.printVisual()
+  IO::println("  " + s4.moveCount() + " moves | " + s4.quality().describe() + " | verified=" + s4.isVerified())
+
+  IO::println("")
+
+  // Collection pipeline: disk-move frequency analysis for n=4
+  IO::println("=== Disk move frequency (n=4) ===")
+  foreach disk: Int in 1..4 {
+    val d: Int = disk
+    val count: Int = s4.getMoves().filter { m -> (m as Move).disk() == d }.size
+    val pct: Int = count * 100 / s4.moveCount()
+    IO::println("  disk " + disk + ": " + count + " moves (" + pct + "%)")
+  }
+
+  IO::println("")
+
+  // First-move and last-move from pipeline
+  val moves4: List[Object] = s4.getMoves()
+  val firstMove: Move = moves4.get(0) as Move
+  val lastMove: Move = moves4.get(moves4.size - 1) as Move
+  IO::println("  First move: disk " + firstMove.disk() + ": " + s4.pegLabel(firstMove.from()) + " -> " + s4.pegLabel(firstMove.to()))
+  IO::println("  Last move : disk " + lastMove.disk() + ": " + s4.pegLabel(lastMove.from()) + " -> " + s4.pegLabel(lastMove.to()))
+
+  IO::println("")
+
+  // Large cases: verify correctness
+  IO::println("=== Large cases ===")
+  foreach n: Int in [8, 10, 12] {
+    val big: HanoiSolver = new HanoiSolver(n)
+    big.solve(n, 0, 2, 1)
+    IO::println("  n=" + n + ": " + big.moveCount() + " moves, " + big.quality().describe() + ", verified=" + big.isVerified())
+  }
+}

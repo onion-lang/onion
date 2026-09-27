@@ -1,0 +1,472 @@
+// Yahtzee.on — Yahtzee dice-game engine: score calculation, AI scorer,
+// multi-round simulation, and final leaderboard.
+//
+// Exercises: homogeneous enum (Category, DieKind), records with examples,
+// extension methods on Int, class with mutable state, collection pipelines
+// (groupBy/sortedBy/filter/map/fold/find/partition/count/any/distinct/reduce),
+// select on enum values, nullable types, string interpolation, foreach over
+// ranges and lists, while loops, closures, recursion, try/catch.
+
+import {
+  java.util.ArrayList;
+  java.util.LinkedHashMap;
+  java.lang.Math;
+}
+
+// ─── Extension: Int display helpers ──────────────────────────────────────────
+extension Int {
+  def padLeft(width: Int): String {
+    val s: String = "" + self
+    var result: String = s
+    while result.length() < width {
+      result = " " + result
+    }
+    return result
+  }
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self {
+      s = s + "*"
+      i++
+    }
+    return s
+  }
+}
+
+extension String {
+  def padLeft(width: Int): String {
+    var result: String = self
+    while result.length() < width {
+      result = " " + result
+    }
+    return result
+  }
+  def repeat(n: Int): String {
+    var result: String = ""
+    var i: Int = 0
+    while i < n { result = result + self; i++ }
+    return result
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val rounded: Long = Math::round(self * 100.0)
+    val whole: Long = rounded / 100L
+    val frac: Long = rounded % 100L
+    val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum DieKind { Standard, Wild }
+
+enum Category {
+  Ones, Twos, Threes, Fours, Fives, Sixes,
+  ThreeOfAKind, FourOfAKind, FullHouse,
+  SmallStraight, LargeStraight,
+  YahtzeeCategory, Chance
+}
+
+// ─── Simple LCG pseudo-random number generator ───────────────────────────────
+
+class LCG {
+  var seed: Long
+public:
+  def this(s: Long) { self.seed = s }
+  def nextInt(bound: Int): Int {
+    seed = (seed * 6364136223846793005L + 1442695040888963407L) & 0x7fffffffffffffffL
+    return ((seed >>> 17) % (bound as Long)) as Int
+  }
+}
+
+// ─── Die record ───────────────────────────────────────────────────────────────
+
+record Die(face: Int, kind: DieKind) {
+  example { new Die(3, DieKind::Standard).face() == 3 }
+public:
+  def show(): String = "[" + face() + "]"
+  static def roll(rng: LCG): Die {
+    return new Die(rng.nextInt(6) + 1, DieKind::Standard)
+  }
+}
+
+// ─── DiceSet: five dice and scoring logic ─────────────────────────────────────
+
+record DiceSet(dice: List[Die]) {
+public:
+  def show(): String {
+    var s: String = ""
+    foreach d: Die in dice() {
+      s = s + d.show() + " "
+    }
+    return s.trim()
+  }
+
+  def counts(): Map[Int, Int] {
+    val m: Map[Int, Int] = [:]
+    foreach d: Die in dice() {
+      val f: Int = d.face()
+      val prev: Int? = m[f] as Int?
+      m[f] = (prev ?: 0) + 1
+    }
+    return m
+  }
+
+  def facesSorted(): List[Int] {
+    val result: List[Int] = []
+    foreach d: Die in dice() {
+      result.add(d.face())
+    }
+    return result.sortedBy { x: Int -> x }
+  }
+
+  def sumFaces(): Int {
+    var s: Int = 0
+    foreach d: Die in dice() {
+      s = s + d.face()
+    }
+    return s
+  }
+
+  def maxCount(): Int {
+    var best: Int = 0
+    foreach (_, cnt) in counts() {
+      if cnt as Int > best { best = cnt as Int }
+    }
+    return best
+  }
+
+  def score(cat: Category): Int = select cat {
+    case Category::Ones:   sumOfFace(1)
+    case Category::Twos:   sumOfFace(2)
+    case Category::Threes: sumOfFace(3)
+    case Category::Fours:  sumOfFace(4)
+    case Category::Fives:  sumOfFace(5)
+    case Category::Sixes:  sumOfFace(6)
+    case Category::ThreeOfAKind: if maxCount() >= 3 { sumFaces() } else { 0 }
+    case Category::FourOfAKind:  if maxCount() >= 4 { sumFaces() } else { 0 }
+    case Category::FullHouse:    if isFullHouse() { 25 } else { 0 }
+    case Category::SmallStraight:  if hasSmallStraight() { 30 } else { 0 }
+    case Category::LargeStraight:  if hasLargeStraight() { 40 } else { 0 }
+    case Category::YahtzeeCategory: if maxCount() == 5 { 50 } else { 0 }
+    case Category::Chance: sumFaces()
+  }
+
+  def sumOfFace(face: Int): Int {
+    var s: Int = 0
+    foreach d: Die in dice() {
+      if d.face() == face { s = s + face }
+    }
+    return s
+  }
+
+  def isFullHouse(): Boolean {
+    val cnts: List[Int] = []
+    foreach (_, cnt) in counts() {
+      cnts.add(cnt as Int)
+    }
+    val sorted: List[Int] = cnts.sortedBy { x: Int -> x }
+    return sorted.size == 2 && (sorted[0] as Int) == 2 && (sorted[1] as Int) == 3
+  }
+
+  def hasSmallStraight(): Boolean {
+    val uniq: List[Int] = facesSorted().distinct()
+    return containsRun(uniq, 4)
+  }
+
+  def hasLargeStraight(): Boolean {
+    val uniq: List[Int] = facesSorted().distinct()
+    return uniq.size == 5 && containsRun(uniq, 5)
+  }
+
+  def containsRun(sorted: List[Int], len: Int): Boolean {
+    var run: Int = 1
+    var best: Int = 1
+    var i: Int = 1
+    while i < sorted.size {
+      if (sorted[i] as Int) - (sorted[i-1] as Int) == 1 {
+        run++
+        if run > best { best = run }
+      } else {
+        run = 1
+      }
+      i++
+    }
+    return best >= len
+  }
+
+  static def rollAll(rng: LCG): DiceSet {
+    val result: List[Die] = []
+    foreach i: Int in 0..<5 {
+      result.add(Die::roll(rng))
+    }
+    return new DiceSet(result)
+  }
+
+  def reroll(keepIndices: List[Int], rng: LCG): DiceSet {
+    val result: List[Die] = []
+    var i: Int = 0
+    foreach d: Die in dice() {
+      val keep: Boolean = keepIndices.any { k: Int -> k == i }
+      if keep {
+        result.add(d)
+      } else {
+        result.add(Die::roll(rng))
+      }
+      i++
+    }
+    return new DiceSet(result)
+  }
+}
+
+// ─── ScoreCard for one player ─────────────────────────────────────────────────
+
+class ScoreCard {
+  val scores: Map[String, Int]
+  val used: List[String]
+public:
+  def this() {
+    self.scores = [:]
+    self.used = []
+  }
+
+  def isUsed(cat: Category): Boolean {
+    return used.any { s: String -> s == cat.name() }
+  }
+
+  def addScore(cat: Category, value: Int): void {
+    scores[cat.name()] = value
+    used.add(cat.name())
+  }
+
+  def get(cat: Category): Int? {
+    return scores[cat.name()] as Int?
+  }
+
+  def upperSection(): Int {
+    var s: Int = 0
+    foreach cat: Category in ScoreCard::upperCategories() {
+      val v: Int? = get(cat)
+      if v != null { s = s + v }
+    }
+    return s
+  }
+
+  def bonus(): Int = if upperSection() >= 63 { 35 } else { 0 }
+
+  def lowerSection(): Int {
+    var s: Int = 0
+    foreach cat: Category in ScoreCard::lowerCategories() {
+      val v: Int? = get(cat)
+      if v != null { s = s + v }
+    }
+    return s
+  }
+
+  def total(): Int = upperSection() + bonus() + lowerSection()
+
+  def isComplete(): Boolean = used.size == 13
+
+  static def upperCategories(): List[Category] = [
+    Category::Ones, Category::Twos, Category::Threes,
+    Category::Fours, Category::Fives, Category::Sixes
+  ]
+
+  static def lowerCategories(): List[Category] = [
+    Category::ThreeOfAKind, Category::FourOfAKind, Category::FullHouse,
+    Category::SmallStraight, Category::LargeStraight,
+    Category::YahtzeeCategory, Category::Chance
+  ]
+
+  static def allCategories(): List[Category] {
+    val all: List[Category] = []
+    foreach c: Category in ScoreCard::upperCategories() { all.add(c) }
+    foreach c: Category in ScoreCard::lowerCategories() { all.add(c) }
+    return all
+  }
+
+  def printSummary(playerName: String): void {
+    IO::println("\n  ── #{playerName}'s Scorecard ──────────────────")
+    IO::println("  Upper Section:")
+    foreach cat: Category in ScoreCard::upperCategories() {
+      val v: Int? = get(cat)
+      val label: String = cat.name().padLeft(14)
+      val display: String = if v != null { ("" + v).padLeft(4) } else { "   -" }
+      IO::println("  #{label}: #{display}")
+    }
+    IO::println("  Subtotal   : #{upperSection().padLeft(4)}")
+    IO::println("  Bonus      : #{bonus().padLeft(4)}")
+    IO::println("  Lower Section:")
+    foreach cat: Category in ScoreCard::lowerCategories() {
+      val v: Int? = get(cat)
+      val label: String = cat.name().padLeft(14)
+      val display: String = if v != null { ("" + v).padLeft(4) } else { "   -" }
+      IO::println("  #{label}: #{display}")
+    }
+    IO::println("  ─────────────────────────────────────────")
+    IO::println("  TOTAL      : #{total().padLeft(4)}")
+  }
+}
+
+// ─── AI player: greedy category selection ─────────────────────────────────────
+
+class YahtzeeAI {
+  val playerName: String
+  val card: ScoreCard
+  val rng: LCG
+public:
+  def this(n: String, seed: Long) {
+    self.playerName = n
+    self.card = new ScoreCard()
+    self.rng = new LCG(seed)
+  }
+
+  def getName(): String = playerName
+
+  def chooseBestCategory(dice: DiceSet): Category {
+    var bestCat: Category? = null
+    var bestScore: Int = -1
+    foreach cat: Category in ScoreCard::allCategories() {
+      if !card.isUsed(cat) {
+        val s: Int = dice.score(cat)
+        if s > bestScore {
+          bestScore = s
+          bestCat = cat
+        }
+      }
+    }
+    return bestCat ?: Category::Chance
+  }
+
+  def decideDiceToKeep(dice: DiceSet): List[Int] {
+    val cnts: Map[Int, Int] = dice.counts()
+    var bestFace: Int = 1
+    var bestCnt: Int = 0
+    foreach (face, cnt) in cnts {
+      val f: Int = face as Int
+      val c: Int = cnt as Int
+      if c > bestCnt { bestCnt = c; bestFace = f }
+    }
+    val keep: List[Int] = []
+    var i: Int = 0
+    foreach d: Die in dice.dice() {
+      if d.face() == bestFace { keep.add(i) }
+      i++
+    }
+    return keep
+  }
+
+  def playTurn(): void {
+    var dice: DiceSet = DiceSet::rollAll(rng)
+    IO::println("  #{playerName} Roll1: #{dice.show()}")
+
+    val keep1: List[Int] = decideDiceToKeep(dice)
+    dice = dice.reroll(keep1, rng)
+    IO::println("  #{playerName} Roll2: #{dice.show()}")
+
+    val keep2: List[Int] = decideDiceToKeep(dice)
+    dice = dice.reroll(keep2, rng)
+    IO::println("  #{playerName} Roll3: #{dice.show()}")
+
+    val cat: Category = chooseBestCategory(dice)
+    val pts: Int = dice.score(cat)
+    card.addScore(cat, pts)
+    IO::println("  #{playerName} scores #{pts} in #{cat.name()}")
+  }
+
+  def scorecard(): ScoreCard = card
+}
+
+// ─── Game statistics helpers ──────────────────────────────────────────────────
+
+def categoryHitRate(card: ScoreCard): String {
+  var hits: Int = 0
+  foreach cat: Category in ScoreCard::allCategories() {
+    val v: Int? = card.get(cat)
+    if v != null && v > 0 { hits++ }
+  }
+  val pct: Double = (hits as Double) * 100.0 / 13.0
+  return "#{pct.fmt2()}%"
+}
+
+def bestCategory(card: ScoreCard): String {
+  var bestName: String = "-"
+  var bestVal: Int = 0
+  foreach cat: Category in ScoreCard::allCategories() {
+    val v: Int? = card.get(cat)
+    if v != null && v > bestVal { bestVal = v; bestName = cat.name() }
+  }
+  return "#{bestName} (#{bestVal})"
+}
+
+// ─── Game runner ──────────────────────────────────────────────────────────────
+
+class YahtzeeGame {
+  val players: List[YahtzeeAI]
+public:
+  def this(ps: List[YahtzeeAI]) {
+    self.players = ps
+  }
+
+  def run(): void {
+    IO::println("╔══════════════════════════════════════════╗")
+    IO::println("║           YAHTZEE SIMULATION             ║")
+    IO::println("╚══════════════════════════════════════════╝")
+
+    var round: Int = 1
+    while round <= 13 {
+      IO::println("\n┌── Round #{round} ───────────────────────────────┐")
+      foreach player: YahtzeeAI in players {
+        player.playTurn()
+      }
+      round++
+    }
+
+    IO::println("\n\n══════════ FINAL SCORECARDS ══════════")
+    foreach player: YahtzeeAI in players {
+      player.scorecard().printSummary(player.getName())
+    }
+
+    // Find winner (highest total)
+    var winnerIdx: Int = 0
+    var winnerScore: Int = 0
+    var i: Int = 0
+    foreach player: YahtzeeAI in players {
+      val t: Int = player.scorecard().total()
+      if t > winnerScore { winnerScore = t; winnerIdx = i }
+      i++
+    }
+    val winner: YahtzeeAI = players[winnerIdx] as YahtzeeAI
+    IO::println("\n  Winner: #{winner.getName()} with #{winnerScore} points!")
+
+    IO::println("\n── Score Summary ──────────────────────────")
+    IO::println("  #{"Player".padLeft(8)}  #{"Total".padLeft(5)}  #{"Hit%".padLeft(6)}  Best Category")
+    IO::println("  " + "─".repeat(50))
+    foreach player: YahtzeeAI in players.sortedByDescending { p: YahtzeeAI -> p.scorecard().total() } {
+      val total: Int = player.scorecard().total()
+      val hitPct: String = categoryHitRate(player.scorecard())
+      val best: String = bestCategory(player.scorecard())
+      IO::println("  #{player.getName().padLeft(8)}  #{total.padLeft(5)}  #{hitPct.padLeft(6)}  #{best}")
+    }
+
+    IO::println("\n── Score Bars ──────────────────────────────")
+    foreach player: YahtzeeAI in players.sortedByDescending { p: YahtzeeAI -> p.scorecard().total() } {
+      val bar: String = (player.scorecard().total() / 5).stars()
+      IO::println("  #{player.getName().padLeft(8)}: #{bar}")
+    }
+  }
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+val alice: YahtzeeAI = new YahtzeeAI("Alice", 42L)
+val bob: YahtzeeAI   = new YahtzeeAI("Bob",   137L)
+val carol: YahtzeeAI = new YahtzeeAI("Carol", 271828L)
+val dave: YahtzeeAI  = new YahtzeeAI("Dave",  31415L)
+
+val game: YahtzeeGame = new YahtzeeGame([alice, bob, carol, dave])
+game.run()

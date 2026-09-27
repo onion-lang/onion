@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.123.0] - 2026-09-27
+
 ### Added
 
 - **`run/ComplexArithmetic.on`** — a 274-line complex-number algebra and Mandelbrot/Julia fractal renderer, a new domain for the `run/` corpus (a `record Complex` with operator overloading — `plus`/`minus`/`times`/`div`/`scale`/`neg` mapped to `+`/`-`/`*`/`/` — and integer exponentiation via fast binary exponentiation; four build-time `example` invariants on `abs()`/`absSquared()`/`conjugate()`; extension methods on `Double` (`toComplex`/`i`); `do[Option]` monadic chaining for safe division that short-circuits on division by zero; recursive `mandelbrot`/`julia`/`renderMandelbrot`; `foreach` over exclusive ranges (`0..<rows`); `select` with an `else` arm for operator dispatch; collection pipelines `map`/`fold` — rendering complex arithmetic identities and an ASCII Mandelbrot fractal), added to the `run/` corpus (merged via #1648).

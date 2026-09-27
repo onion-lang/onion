@@ -1,0 +1,387 @@
+// TarotDeck.on — tarot card deck and reading analytics (~270 lines).
+//
+// Models the standard 78-card tarot: 22 Major Arcana and 56 Minor Arcana
+// across four suits. Demonstrates deck shuffling, reading spreads, and
+// statistical breakdowns — purely as a data-modelling exercise.
+//
+// Exercises: ADT (case) enum, data-carrying enum, plain enum, records,
+// class hierarchy, collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find/partition/zip), select/type-pattern matching, nullable,
+// closures, extension methods, string interpolation, try/catch, recursion,
+// while + foreach (ranges and map (k,v) entries).
+
+import {
+  java.util.Random
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Int {
+  def pad2(): String {
+    val s: String = "" + self
+    if s.length() < 2 { return "0" + s }
+    return s
+  }
+}
+
+// ── Suit (data-carrying enum) ─────────────────────────────────────────────────
+
+enum Suit(label: String, element: String, keyword: String) {
+  Wands("Wands",         "Fire",  "Action"),
+  Cups("Cups",           "Water", "Emotion"),
+  Swords("Swords",       "Air",   "Thought"),
+  Pentacles("Pentacles", "Earth", "Material")
+}
+
+// ── Spread (data-carrying enum) ───────────────────────────────────────────────
+
+enum Spread(positions: Int, label: String) {
+  OneCard(1,    "Single Card"),
+  ThreeCard(3,  "Past-Present-Future"),
+  Celtic(10,    "Celtic Cross")
+}
+
+// ── Arcana (ADT enum) ─────────────────────────────────────────────────────────
+
+enum Arcana {
+  case Major(num: Int, title: String, meaning: String)
+  case Minor(suit: Suit, rank: Int, name: String)
+public:
+  def displayName(): String = select this {
+    case m is Major: "#{m.num().pad2()} #{m.title()}"
+    case n is Minor: "#{n.suit().label()} #{n.rank().pad2()} – #{n.name()}"
+  }
+  def shortMeaning(): String = select this {
+    case m is Major: m.meaning()
+    case n is Minor: "#{n.suit().keyword()}: #{n.name()}"
+  }
+  def isMajor(): Boolean = select this {
+    case m is Major: true
+    else: false
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record DrawnCard(arcana: Arcana, position: String, reversed: Boolean)
+
+record ReadingStats(
+  querent: String,
+  spread: Spread,
+  majorCount: Int,
+  suitBreakdown: String,
+  reversedCount: Int
+)
+
+// ── TarotDeck ─────────────────────────────────────────────────────────────────
+
+class TarotDeck {
+  var cards: List[Object]
+  val rng: Random
+
+public:
+  def this() {
+    rng   = new Random(42L)
+    cards = buildDeck()
+  }
+
+  def allCards(): List[Object] = cards
+
+  def buildDeck(): List[Object] {
+    val deck: List[Object] = []
+    // 22 Major Arcana
+    deck.add(new Major(0,  "The Fool",        "Beginnings"))
+    deck.add(new Major(1,  "The Magician",    "Willpower"))
+    deck.add(new Major(2,  "High Priestess",  "Intuition"))
+    deck.add(new Major(3,  "The Empress",     "Abundance"))
+    deck.add(new Major(4,  "The Emperor",     "Authority"))
+    deck.add(new Major(5,  "The Hierophant",  "Tradition"))
+    deck.add(new Major(6,  "The Lovers",      "Choice"))
+    deck.add(new Major(7,  "The Chariot",     "Control"))
+    deck.add(new Major(8,  "Strength",        "Courage"))
+    deck.add(new Major(9,  "The Hermit",      "Solitude"))
+    deck.add(new Major(10, "Wheel of Fortune","Cycles"))
+    deck.add(new Major(11, "Justice",         "Balance"))
+    deck.add(new Major(12, "The Hanged Man",  "Suspension"))
+    deck.add(new Major(13, "Death",           "Transition"))
+    deck.add(new Major(14, "Temperance",      "Moderation"))
+    deck.add(new Major(15, "The Devil",       "Materialism"))
+    deck.add(new Major(16, "The Tower",       "Disruption"))
+    deck.add(new Major(17, "The Star",        "Hope"))
+    deck.add(new Major(18, "The Moon",        "Illusion"))
+    deck.add(new Major(19, "The Sun",         "Vitality"))
+    deck.add(new Major(20, "Judgement",       "Renewal"))
+    deck.add(new Major(21, "The World",       "Completion"))
+    // 56 Minor Arcana — 14 per suit
+    val suits: List[Object] = [Suit::Wands, Suit::Cups, Suit::Swords, Suit::Pentacles]
+    val rankNames: List[Object] = [
+      "Ace", "Two", "Three", "Four", "Five", "Six", "Seven",
+      "Eight", "Nine", "Ten", "Page", "Knight", "Queen", "King"
+    ]
+    foreach s: Object in suits {
+      var r: Int = 1
+      while r <= 14 {
+        deck.add(new Minor(s as Suit, r, rankNames[r - 1] as String))
+        r = r + 1
+      }
+    }
+    return deck
+  }
+
+  def shuffle(): void {
+    var i: Int = cards.size() - 1
+    while i > 0 {
+      val j: Int = (rng.nextInt(i + 1) as Int)
+      val tmp: Object = cards[i]
+      cards[i] = cards[j]
+      cards[j] = tmp
+      i = i - 1
+    }
+  }
+
+  def draw(n: Int): List[Object] {
+    shuffle()
+    val drawn: List[Object] = []
+    var k: Int = 0
+    while k < n && k < cards.size() {
+      val reversed: Boolean = rng.nextBoolean()
+      drawn.add(new DrawnCard(cards[k] as Arcana, "?", reversed))
+      k = k + 1
+    }
+    return drawn
+  }
+
+  def size(): Int = cards.size()
+}
+
+// ── ReadingSession ─────────────────────────────────────────────────────────────
+
+class ReadingSession {
+  val deck: TarotDeck
+
+public:
+  def this(d: TarotDeck) { deck = d }
+
+  def spreadPositions(spread: Spread): List[Object] = select spread {
+    case Spread::OneCard:   ["The Answer"]
+    case Spread::ThreeCard: ["Past", "Present", "Future"]
+    case Spread::Celtic:    [
+      "Significator", "Crossing", "Foundation", "Recent Past",
+      "Possible Outcome", "Near Future", "Querent", "Environment",
+      "Hopes & Fears", "Final Outcome"
+    ]
+  }
+
+  def conduct(querent: String, spread: Spread): List[Object] {
+    val positions: List[Object] = spreadPositions(spread)
+    val rawCards: List[Object]  = deck.draw(spread.positions())
+    // zip positions with drawn cards, then assign positions
+    val zipped = positions.zip(rawCards)
+    val paired: List[Object] = []
+    var k: Int = 0
+    while k < zipped.size() {
+      val pair: List[Object] = zipped[k] as List[Object]
+      val pos: String        = pair[0] as String
+      val dc: DrawnCard      = pair[1] as DrawnCard
+      paired.add(new DrawnCard(dc.arcana(), pos, dc.reversed()))
+      k = k + 1
+    }
+    return paired
+  }
+
+  def analyzeReading(querent: String, spread: Spread, cards: List[Object]): ReadingStats {
+    val majorCards: List[Object] = cards.filter { c -> (c as DrawnCard).arcana().isMajor() }
+    val majorCount: Int = majorCards.size()
+
+    // Group minor arcana by suit
+    val minors: List[Object] = cards.filter { c -> !(c as DrawnCard).arcana().isMajor() }
+    val bySuit: Map[String, List[Object]] = minors.groupBy { c ->
+      val minor: Minor = (c as DrawnCard).arcana() as Minor
+      minor.suit().label()
+    }
+    val suitLine: String = buildSuitLine(bySuit)
+
+    val reversedCount: Int = cards.filter { c -> (c as DrawnCard).reversed() }.size()
+
+    return new ReadingStats(querent, spread, majorCount, suitLine, reversedCount)
+  }
+
+  def buildSuitLine(bySuit: Map[String, List[Object]]): String {
+    var line: String = ""
+    foreach (suit, group) in bySuit {
+      val count: Int = (group as List[Object]).size()
+      if line.length() > 0 { line = line + ", " }
+      line = line + "#{suit as String}:#{count}"
+    }
+    if line.length() == 0 { return "—" }
+    return line
+  }
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+class Reporter {
+public:
+  static def printCards(querent: String, spread: Spread, cards: List[Object]): void {
+    IO::println("═══════════════════════════════════════════════════════")
+    IO::println("  Reading for #{querent}  |  #{spread.label()}")
+    IO::println("───────────────────────────────────────────────────────")
+    foreach c: Object in cards {
+      val dc: DrawnCard = c as DrawnCard
+      val rev: String   = if dc.reversed() { " [Rev]" } else { "" }
+      val pos: String   = dc.position().rpad(16)
+      val name: String  = dc.arcana().displayName().rpad(28)
+      IO::println("  #{pos}  #{name}#{rev}")
+    }
+    IO::println("───────────────────────────────────────────────────────")
+    IO::println("")
+  }
+
+  static def printStats(stats: ReadingStats): void {
+    IO::println("  Querent  : #{stats.querent()}")
+    IO::println("  Spread   : #{stats.spread().label()}")
+    IO::println("  Major    : #{stats.majorCount()} / #{stats.spread().positions()}")
+    IO::println("  Suits    : #{stats.suitBreakdown()}")
+    IO::println("  Reversed : #{stats.reversedCount()}")
+    IO::println("")
+  }
+
+  static def deckSummary(deck: TarotDeck): void {
+    val allCards: List[Object] = deck.allCards()
+
+    IO::println("── Deck Statistics ─────────────────────────────────────")
+    IO::println("  Total cards : #{deck.size()}")
+    val majors: List[Object] = allCards.filter { c -> (c as Arcana).isMajor() }
+    val minors: List[Object] = allCards.filter { c -> !(c as Arcana).isMajor() }
+    IO::println("  Major Arcana: #{majors.size()}")
+    IO::println("  Minor Arcana: #{minors.size()}")
+
+    // Group minors by suit
+    val bySuit: Map[String, List[Object]] = minors.groupBy { c ->
+      val m: Minor = (c as Arcana) as Minor
+      m.suit().label()
+    }
+    IO::println("  By suit:")
+    foreach (suit, group) in bySuit {
+      IO::println("    #{(suit as String).rpad(10)} #{(group as List[Object]).size()} cards")
+    }
+    IO::println("")
+
+    // Sorted Major Arcana by number
+    IO::println("── Major Arcana (sorted) ───────────────────────────────")
+    val sortedMajors: List[Object] = majors.sortedBy { c ->
+      val m: Major = (c as Arcana) as Major
+      m.num()
+    }
+    foreach c: Object in sortedMajors {
+      val m: Major = (c as Arcana) as Major
+      IO::println("  #{m.num().pad2()}  #{m.title().rpad(18)}  #{m.meaning()}")
+    }
+    IO::println("")
+
+    // Distinct suit keywords via map then distinct
+    val keywords: List[Object] = minors.map { c ->
+      val m: Minor = (c as Arcana) as Minor
+      m.suit().keyword() as Object
+    }.distinct()
+    IO::println("── Suit keywords ───────────────────────────────────────")
+    foreach k: Object in keywords {
+      IO::println("  #{k as String}")
+    }
+    IO::println("")
+
+    // Partition: cards with rank < 8 vs rank >= 8 (minor arcana only)
+    val rankParts = minors.partition { c ->
+      val m: Minor = (c as Arcana) as Minor
+      m.rank() < 8
+    }
+    val lower: List[Object] = rankParts[0] as List[Object]
+    val upper: List[Object] = rankParts[1] as List[Object]
+    IO::println("── Rank partition (rank < 8 vs >= 8) ───────────────────")
+    IO::println("  Rank 1-7  : #{lower.size()} cards")
+    IO::println("  Rank 8-14 : #{upper.size()} cards")
+    IO::println("")
+
+    // Find highest-numbered major (The World = 21)
+    val highest: Object? = majors.find { c ->
+      val m: Major = (c as Arcana) as Major
+      m.num() == 21
+    }
+    if highest != null {
+      val hw: Major = (highest as Arcana) as Major
+      IO::println("  Highest Major: #{hw.title()} (#{hw.meaning()})")
+    }
+    IO::println("")
+  }
+}
+
+// ── Scenario ──────────────────────────────────────────────────────────────────
+
+val deck: TarotDeck        = new TarotDeck()
+val session: ReadingSession = new ReadingSession(deck)
+
+// Print deck statistics first (uses the unshuffled deck)
+Reporter::deckSummary(deck)
+
+// Reading 1: single card for Alice
+var stats1: ReadingStats? = null
+try {
+  val cards1: List[Object] = session.conduct("Alice", Spread::OneCard)
+  Reporter::printCards("Alice", Spread::OneCard, cards1)
+  stats1 = session.analyzeReading("Alice", Spread::OneCard, cards1)
+  if stats1 != null { Reporter::printStats(stats1 as ReadingStats) }
+} catch e: Exception {
+  IO::println("Reading failed: #{e.getMessage()}")
+}
+
+// Reading 2: three-card for Bob
+val cards2: List[Object]   = session.conduct("Bob", Spread::ThreeCard)
+Reporter::printCards("Bob", Spread::ThreeCard, cards2)
+val stats2: ReadingStats = session.analyzeReading("Bob", Spread::ThreeCard, cards2)
+Reporter::printStats(stats2)
+
+// Reading 3: Celtic Cross for Carol
+val cards3: List[Object]   = session.conduct("Carol", Spread::Celtic)
+Reporter::printCards("Carol", Spread::Celtic, cards3)
+val stats3: ReadingStats = session.analyzeReading("Carol", Spread::Celtic, cards3)
+Reporter::printStats(stats3)
+
+// Multi-reading analytics: compare major-arcana density
+IO::println("── Major Arcana Density per Reading ────────────────────")
+val presentStats: List[Object] = [stats2, stats3]
+val allStatsList: List[Object] = if stats1 != null {
+  val s: List[Object] = [stats1, stats2, stats3]
+  s
+} else {
+  presentStats
+}
+val ranked: List[Object] = allStatsList.sortedBy { s ->
+  0 - (s as ReadingStats).majorCount()
+}
+foreach s: Object in ranked {
+  val rs: ReadingStats = s as ReadingStats
+  val pct: Int = if rs.spread().positions() == 0 { 0 }
+                 else { rs.majorCount() * 100 / rs.spread().positions() }
+  IO::println("  #{rs.querent().rpad(8)}  #{rs.majorCount()} major / #{rs.spread().positions()} cards  (#{pct}%)")
+}
+
+// Total reversed cards via fold
+val totalReversed: Int = allStatsList.fold(0) { acc, s ->
+  (acc as Int) + (s as ReadingStats).reversedCount()
+} as Int
+IO::println("")
+IO::println("  Total reversed cards across all readings: #{totalReversed}")
+IO::println("═══════════════════════════════════════════════════════")

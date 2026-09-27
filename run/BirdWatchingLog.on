@@ -1,0 +1,311 @@
+// BirdWatchingLog.on — ornithology field observation tracker (~280 lines)
+//
+// Exercises: records, ADT case-enum with methods, plain enum, generics
+// (List[T]/Map[K,V]), collection pipelines (filter/map/groupBy/sortedBy/
+// distinct/count/any), select/type-pattern exhaustiveness, nullable types,
+// closures, string interpolation, foreach (list + map k,v),
+// while, extension Int/String.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Habitat {
+  WOODLAND, GRASSLAND, WETLAND, COASTAL, URBAN, MONTANE
+}
+
+enum ConservationStatus {
+  LEAST_CONCERN, NEAR_THREATENED, VULNERABLE, ENDANGERED, CRITICAL
+}
+
+enum Behaviour {
+  case Foraging(food: String)
+  case Displaying(target: String)
+  case Nesting(nestType: String)
+  case Migrating(direction: String)
+  case Roosting(groupSize: Int)
+  case Singing(durationMin: Int)
+public:
+  def label(): String = select this {
+    case b is Foraging:   "Foraging (#{b.food()})"
+    case b is Displaying: "Displaying to #{b.target()}"
+    case b is Nesting:    "Nesting: #{b.nestType()}"
+    case b is Migrating:  "Migrating #{b.direction()}"
+    case b is Roosting:   "Roosting (group: #{b.groupSize()})"
+    case b is Singing:    "Singing (#{b.durationMin()} min)"
+  }
+  def isBreeding(): Boolean = select this {
+    case b is Foraging:   false
+    case b is Displaying: true
+    case b is Nesting:    true
+    case b is Migrating:  false
+    case b is Roosting:   false
+    case b is Singing:    false
+  }
+  def category(): String = select this {
+    case b is Foraging:   "Feeding"
+    case b is Displaying: "Breeding"
+    case b is Nesting:    "Breeding"
+    case b is Migrating:  "Movement"
+    case b is Roosting:   "Movement"
+    case b is Singing:    "Vocal"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Species(commonName: String, sciName: String, family: String, status: ConservationStatus)
+
+record Sighting(sightingId: String, speciesName: String, habitat: Habitat, count: Int, behaviour: Behaviour, observer: String, month: Int, year: Int)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+  def monthName(): String = select self {
+    case 1:  "January"
+    case 2:  "February"
+    case 3:  "March"
+    case 4:  "April"
+    case 5:  "May"
+    case 6:  "June"
+    case 7:  "July"
+    case 8:  "August"
+    case 9:  "September"
+    case 10: "October"
+    case 11: "November"
+    case 12: "December"
+    else:    "Unknown"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trunc(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+}
+
+// ─── FieldLog class ───────────────────────────────────────────────────────────
+
+class FieldLog {
+  val logName:  String
+  val species:  List[Species]
+  val sightings: List[Sighting]
+  var nextId:   Int
+public:
+  def this(name: String) {
+    logName   = name
+    species   = new ArrayList[Species]()
+    sightings = new ArrayList[Sighting]()
+    nextId    = 1
+  }
+
+  def name(): String          = logName
+  def speciesCount(): Int     = species.size
+  def sightingCount(): Int    = sightings.size
+  def allSpecies(): List[Species]    = species
+  def allSightings(): List[Sighting] = sightings
+
+  def registerSpecies(common: String, sci: String, family: String, status: ConservationStatus): Species = {
+    val s: Species = new Species(common, sci, family, status)
+    species.add(s)
+    return s
+  }
+
+  def logSighting(speciesName: String, habitat: Habitat, count: Int, behaviour: Behaviour, observer: String, month: Int, year: Int): Sighting = {
+    val n: Int = nextId
+    val id: String = if n < 10 { "OBS-0#{n}" } else { "OBS-#{n}" }
+    nextId++
+    val s: Sighting = new Sighting(id, speciesName, habitat, count, behaviour, observer, month, year)
+    sightings.add(s)
+    return s
+  }
+
+  def findSpecies(name: String): Species? = {
+    foreach sp: Species in species {
+      if sp.commonName() == name { return sp }
+    }
+    return null
+  }
+
+  def isThreatened(speciesName: String): Boolean = {
+    val sp: Species? = findSpecies(speciesName)
+    if sp == null { return false }
+    return sp.status() != ConservationStatus::LEAST_CONCERN
+  }
+
+  def byHabitat(h: Habitat): List[Sighting] =
+    sightings.filter { s: Sighting -> s.habitat() == h }
+
+  def byObserver(obs: String): List[Sighting] =
+    sightings.filter { s: Sighting -> s.observer() == obs }
+
+  def breedingSightings(): List[Sighting] =
+    sightings.filter { s: Sighting -> s.behaviour().isBreeding() }
+
+  def threatenedSightings(): List[Sighting] =
+    sightings.filter { s: Sighting -> isThreatened(s.speciesName()) }
+
+  def speciesObserved(): List[String] =
+    sightings.map { s: Sighting -> s.speciesName() }.distinct()
+
+  def totalIndividuals(): Int = {
+    var total: Int = 0
+    foreach s: Sighting in sightings { total = total + s.count() }
+    return total
+  }
+
+  def topSpecies(): String? = {
+    if sightings.isEmpty() { return null }
+    val groups: Map[String, List[Sighting]] =
+      sightings.groupBy { s: Sighting -> s.speciesName() }
+    var best: String = ""
+    var bestN: Int   = 0
+    foreach (spName, list) in groups {
+      if list.size > bestN {
+        best  = spName
+        bestN = list.size
+      }
+    }
+    return if best == "" { null } else { best }
+  }
+
+  def peakMonth(): Int? = {
+    if sightings.isEmpty() { return null }
+    var bestMonth: Int = 0
+    var bestCount: Int = 0
+    foreach m: Int in 1..12 {
+      var cnt: Int = 0
+      foreach s: Sighting in sightings { if s.month() == m { cnt++ } }
+      if cnt > bestCount { bestCount = cnt; bestMonth = m }
+    }
+    return if bestMonth == 0 { null } else { bestMonth }
+  }
+
+  def behaviourBreakdown(): List[String] = {
+    val groups: Map[String, List[Sighting]] =
+      sightings.groupBy { s: Sighting -> s.behaviour().category() }
+    val result: List[String] = new ArrayList[String]()
+    foreach (cat, list) in groups {
+      result.add("#{cat}: #{list.size.plural("record")}")
+    }
+    return result
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def sep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val log: FieldLog = new FieldLog("Fenland Survey 2026")
+
+  log.registerSpecies("Robin",         "Erithacus rubecula",       "Muscicapidae",    ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Whitethroat",   "Curruca communis",         "Sylviidae",       ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Marsh Harrier", "Circus aeruginosus",       "Accipitridae",    ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Lapwing",       "Vanellus vanellus",        "Charadriidae",    ConservationStatus::NEAR_THREATENED)
+  log.registerSpecies("Barn Owl",      "Tyto alba",                "Tytonidae",       ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Turtle Dove",   "Streptopelia turtur",      "Columbidae",      ConservationStatus::VULNERABLE)
+  log.registerSpecies("Curlew",        "Numenius arquata",         "Scolopacidae",    ConservationStatus::NEAR_THREATENED)
+  log.registerSpecies("Nightingale",   "Luscinia megarhynchos",    "Muscicapidae",    ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Kestrel",       "Falco tinnunculus",        "Falconidae",      ConservationStatus::LEAST_CONCERN)
+  log.registerSpecies("Reed Warbler",  "Acrocephalus scirpaceus",  "Acrocephalidae",  ConservationStatus::LEAST_CONCERN)
+
+  log.logSighting("Robin",         Habitat::WOODLAND,  1,  new Singing(5),          "Alice", 3, 2026)
+  log.logSighting("Whitethroat",   Habitat::GRASSLAND, 2,  new Foraging("insects"), "Bob",   5, 2026)
+  log.logSighting("Marsh Harrier", Habitat::WETLAND,   1,  new Foraging("fish"),    "Alice", 5, 2026)
+  log.logSighting("Lapwing",       Habitat::GRASSLAND, 8,  new Displaying("hen"),   "Alice", 4, 2026)
+  log.logSighting("Barn Owl",      Habitat::GRASSLAND, 1,  new Roosting(1),         "Bob",   1, 2026)
+  log.logSighting("Turtle Dove",   Habitat::WOODLAND,  2,  new Singing(3),          "Alice", 6, 2026)
+  log.logSighting("Curlew",        Habitat::COASTAL,   4,  new Migrating("north"),  "Bob",   4, 2026)
+  log.logSighting("Nightingale",   Habitat::WOODLAND,  1,  new Singing(10),         "Alice", 5, 2026)
+  log.logSighting("Kestrel",       Habitat::GRASSLAND, 1,  new Foraging("voles"),   "Bob",   2, 2026)
+  log.logSighting("Reed Warbler",  Habitat::WETLAND,   3,  new Nesting("reed"),     "Alice", 6, 2026)
+  log.logSighting("Robin",         Habitat::URBAN,     1,  new Displaying("rival"), "Alice", 3, 2026)
+  log.logSighting("Whitethroat",   Habitat::GRASSLAND, 1,  new Singing(4),          "Bob",   6, 2026)
+  log.logSighting("Marsh Harrier", Habitat::WETLAND,   2,  new Migrating("south"),  "Alice", 9, 2026)
+  log.logSighting("Lapwing",       Habitat::WETLAND,   15, new Roosting(15),        "Bob",   10, 2026)
+  log.logSighting("Kestrel",       Habitat::URBAN,     1,  new Foraging("sparrows"),"Alice", 6, 2026)
+  log.logSighting("Turtle Dove",   Habitat::WOODLAND,  1,  new Nesting("twig"),     "Bob",   6, 2026)
+
+  println("╔══════════════════════════════════════════════════╗")
+  println("║         BIRD WATCHING FIELD LOG REPORT          ║")
+  println("╚══════════════════════════════════════════════════╝")
+  println("")
+  println("  Survey: #{log.name()}")
+  println("  Species on record: #{log.speciesCount()} species")
+  println("  Observations:      #{log.sightingCount().plural("sighting")}")
+  println("  Individuals seen:  #{log.totalIndividuals()}")
+  println("")
+
+  println("SPECIES REGISTER")
+  sep(70)
+  println("  #{"Common Name".padRight(16)} #{"Scientific Name".padRight(28)} #{"Family".padRight(16)} Status")
+  sep(70)
+  foreach sp: Species in log.allSpecies() {
+    val st: String = sp.status().name().substring(0, 4)
+    println("  #{sp.commonName().padRight(16)} #{sp.sciName().padRight(28)} #{sp.family().padRight(16)} #{st}")
+  }
+  println("")
+
+  println("OBSERVATION LOG")
+  sep(70)
+  println("  #{"ID".padRight(8)} #{"Species".padRight(16)} #{"Habitat".padRight(12)} #{"Count".padRight(6)} Behaviour")
+  sep(70)
+  foreach s: Sighting in log.allSightings() {
+    val hab: String = s.habitat().name().substring(0, 4)
+    println("  #{s.sightingId().padRight(8)} #{s.speciesName().padRight(16)} #{hab.padRight(12)} #{("#{s.count()}").padRight(6)} #{s.behaviour().label().trunc(24)}")
+  }
+  println("")
+
+  println("CONSERVATION ALERTS")
+  sep(70)
+  val alerts: List[Sighting] = log.threatenedSightings()
+  if alerts.isEmpty() {
+    println("  No threatened species sighted.")
+  } else {
+    foreach s: Sighting in alerts {
+      val sp: Species? = log.findSpecies(s.speciesName())
+      val stLabel: String = if sp != null { sp.status().name() } else { "UNKNOWN" }
+      println("  #{s.sightingId()} #{s.speciesName().padRight(16)} [#{stLabel}] — #{s.behaviour().label()}")
+    }
+  }
+  println("")
+
+  println("BREEDING ACTIVITY")
+  sep(70)
+  val breeding: List[Sighting] = log.breedingSightings()
+  println("  #{breeding.size.plural("breeding record")} found:")
+  foreach s: Sighting in breeding {
+    println("  #{s.sightingId()} #{s.speciesName().padRight(16)} #{s.month().monthName()} #{s.year()} — #{s.behaviour().label()}")
+  }
+  println("")
+
+  println("SUMMARY")
+  sep(70)
+  val top: String? = log.topSpecies()
+  if top != null {
+    println("  Most-recorded species:  #{top}")
+  }
+  val peak: Int? = log.peakMonth()
+  if peak != null {
+    println("  Peak observation month: #{peak.monthName()}")
+  }
+  println("  Species observed:  #{log.speciesObserved().size} distinct species")
+  println("  Behaviour breakdown:")
+  foreach line: String in log.behaviourBreakdown() {
+    println("    #{line}")
+  }
+}

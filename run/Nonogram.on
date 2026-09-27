@@ -1,0 +1,352 @@
+// Nonogram.on — Nonogram (Picross) puzzle solver and renderer (~260 lines).
+//
+// A nonogram is a logic puzzle: a grid where row/column "clues" name the lengths
+// of each contiguous run of filled cells.  The solver combines overlap propagation
+// (overlap technique) with backtracking.
+//
+// Exercises: ADT case-enum (Cell), records with law/example/methods, classes with
+//   private: sections, extension methods on Int, collection pipelines
+//   (filter/map/fold/find/any/all/count), pattern matching (select/is),
+//   recursion, nullable return, string interpolation, foreach + while loops,
+//   try/catch.
+
+import { java.util.ArrayList as JList }
+
+// ─── Cell state ──────────────────────────────────────────────────────────────
+
+enum Cell {
+  case Unknown
+  case Filled
+  case Empty
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def padLeft(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Clue: run-lengths for one row or column ─────────────────────────────────
+
+record Clue(groups: List[Int]) {
+  example { new Clue([3, 2]).minLength() == 6 }
+  example { new Clue([]).minLength() == 0 }
+  example { new Clue([1]).minLength() == 1 }
+public:
+  def minLength(): Int {
+    if groups().isEmpty() { return 0 }
+    val sum: Int = groups().fold(0) { acc, n -> acc + n }
+    return sum + groups().size - 1
+  }
+  def show(): String {
+    if groups().isEmpty() { return "0" }
+    return groups().map { g -> "" + g }.fold("") { acc, s ->
+      if acc.isEmpty() { s } else { acc + " " + s }
+    }
+  }
+}
+
+// ─── Helper: is position idx filled under placement starts/groups? ────────────
+
+class PlacementCheck {
+public:
+  static def isFilled(starts: List[Int], groups: List[Int], idx: Int): Boolean {
+    var i: Int = 0
+    while i < groups.size {
+      val s: Int = starts.get(i)
+      val g: Int = groups.get(i)
+      if idx >= s && idx < s + g { return true }
+      i = i + 1
+    }
+    return false
+  }
+}
+
+// ─── Line solver: overlap technique ──────────────────────────────────────────
+
+class LineSolver {
+private:
+  // Enumerate all valid placements via recursive backtracking.
+  // acc = current partial list of start positions (one per group).
+  static def enumerate(groups: List[Int], gidx: Int, offset: Int, sz: Int, acc: List[Int], all: List[List[Int]]): void {
+    if gidx >= groups.size {
+      all.add(acc.map { x -> x })   // snapshot current acc
+      return
+    }
+    val g: Int = groups.get(gidx)
+    // remaining groups after this one need at least this much space
+    val restMin: Int = new Clue(groups.subList(gidx + 1, groups.size)).minLength()
+    val limit: Int = sz - g - (if restMin > 0 { restMin + 1 } else { 0 })
+    var start: Int = offset
+    while start <= limit {
+      acc.add(start)
+      enumerate(groups, gidx + 1, start + g + 1, sz, acc, all)
+      acc.remove(acc.size - 1)
+      start = start + 1
+    }
+  }
+
+public:
+  // Returns refined line (Filled/Empty/Unknown cells), or null on contradiction.
+  static def solve(line: List[Cell], clue: Clue): List[Cell]? {
+    val sz: Int = line.size
+    val groups: List[Int] = clue.groups()
+
+    // Collect all valid placements
+    val all: List[List[Int]] = []
+    enumerate(groups, 0, 0, sz, [], all)
+
+    // Filter: each placement must be compatible with already-known cells
+    val valid: List[List[Int]] = all.filter { starts ->
+      var ok: Boolean = true
+      var idx: Int = 0
+      while idx < sz && ok {
+        val implied: Boolean = PlacementCheck::isFilled(starts, groups, idx)
+        select line.get(idx) {
+          case f is Filled: if !implied { ok = false }
+          case e is Empty:  if implied  { ok = false }
+          else:
+        }
+        idx = idx + 1
+      }
+      ok
+    }
+
+    if valid.isEmpty() { return null }   // contradiction
+
+    // Intersect: Filled where ALL placements fill; Empty where NONE fill; else Unknown
+    val result: List[Cell] = []
+    var i: Int = 0
+    while i < sz {
+      val pos: Int = i
+      val alwaysFilled: Boolean = valid.all { s -> PlacementCheck::isFilled(s, groups, pos) }
+      val neverFilled:  Boolean = valid.all { s -> !PlacementCheck::isFilled(s, groups, pos) }
+      if alwaysFilled     { result.add(new Filled())  }
+      else if neverFilled { result.add(new Empty())   }
+      else                { result.add(new Unknown()) }
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── Board ────────────────────────────────────────────────────────────────────
+
+class Board {
+  var cells: List[List[Cell]]
+  val rowClues: List[Clue]
+  val colClues: List[Clue]
+public:
+  val rows: Int
+  val cols: Int
+
+  def this(rows: Int, cols: Int, rc: List[Clue], cc: List[Clue]) {
+    this.rows = rows
+    this.cols = cols
+    rowClues = rc
+    colClues = cc
+    cells = []
+    var r: Int = 0
+    while r < rows {
+      val row: List[Cell] = []
+      var c: Int = 0
+      while c < cols { row.add(new Unknown()); c = c + 1 }
+      cells.add(row)
+      r = r + 1
+    }
+  }
+
+  def get(r: Int, c: Int): Cell = cells.get(r).get(c)
+  def set(r: Int, c: Int, v: Cell): void { cells.get(r).set(c, v) }
+
+  def rowLine(r: Int): List[Cell] = cells.get(r).map { x -> x }
+  def colLine(c: Int): List[Cell] {
+    val line: List[Cell] = []
+    var r: Int = 0
+    while r < rows { line.add(get(r, c)); r = r + 1 }
+    return line
+  }
+
+  def isSolved(): Boolean {
+    var r: Int = 0
+    while r < rows {
+      var c: Int = 0
+      while c < cols {
+        select get(r, c) { case u is Unknown: return false; else: }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return true
+  }
+
+  def firstUnknownPos(): Int? {
+    var r: Int = 0
+    while r < rows {
+      var c: Int = 0
+      while c < cols {
+        select get(r, c) { case u is Unknown: return r * cols + c; else: }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return null
+  }
+
+  def copy(): Board {
+    val b2 = new Board(rows, cols, rowClues, colClues)
+    var r: Int = 0
+    while r < rows {
+      var c: Int = 0
+      while c < cols { b2.set(r, c, get(r, c)); c = c + 1 }
+      r = r + 1
+    }
+    return b2
+  }
+
+  // One propagation pass; returns false if contradiction found.
+  def propagate(): Boolean {
+    var r: Int = 0
+    while r < rows {
+      val solved: List[Cell]? = LineSolver::solve(rowLine(r), rowClues.get(r))
+      if solved == null { return false }
+      var c: Int = 0
+      while c < cols { set(r, c, solved.get(c)); c = c + 1 }
+      r = r + 1
+    }
+    var c2: Int = 0
+    while c2 < cols {
+      val solved: List[Cell]? = LineSolver::solve(colLine(c2), colClues.get(c2))
+      if solved == null { return false }
+      var r2: Int = 0
+      while r2 < rows { set(r2, c2, solved.get(r2)); r2 = r2 + 1 }
+      c2 = c2 + 1
+    }
+    return true
+  }
+
+  def show(): String {
+    val maxHint: Int = rowClues.map { rc -> rc.show().length() }.fold(0) { mx, n -> if n > mx { n } else { mx } }
+    var sb: String = ""
+    var r: Int = 0
+    while r < rows {
+      val hint: String = rowClues.get(r).show()
+      var line: String = hint.padRight(maxHint) + " | "
+      var c: Int = 0
+      while c < cols {
+        select get(r, c) {
+          case f is Filled:  line = line + "█"
+          case e is Empty:   line = line + "·"
+          case u is Unknown: line = line + "?"
+        }
+        c = c + 1
+      }
+      sb = sb + line + "\n"
+      r = r + 1
+    }
+    return sb
+  }
+}
+
+// ─── Top-level solver (propagate → backtrack) ─────────────────────────────────
+
+def solve(board: Board): Board? {
+  var changed: Boolean = true
+  while changed {
+    val before: String = board.show()
+    if !board.propagate() { return null }
+    changed = board.show() != before
+  }
+  if board.isSolved() { return board }
+
+  // Pick first unknown cell and try both states
+  val pos: Int? = board.firstUnknownPos()
+  if pos == null { return board }
+  val r: Int = pos / board.cols
+  val c: Int = pos % board.cols
+
+  val b1 = board.copy()
+  b1.set(r, c, new Filled())
+  val r1: Board? = solve(b1)
+  if r1 != null { return r1 }
+
+  val b2 = board.copy()
+  b2.set(r, c, new Empty())
+  return solve(b2)
+}
+
+// Helper: build a List[Clue] from a List[List[Int]]
+def clues(raw: List[List[Int]]): List[Clue] = raw.map { g -> new Clue(g) }
+
+// ─── Demo puzzles ─────────────────────────────────────────────────────────────
+
+IO::println("=== Nonogram Solver ===\n")
+
+// 5×5 T-shape:  █████ / ..█.. / ..█.. / ..█.. / .███.
+//   Row: [5],[1],[1],[1],[3]    Col: [1],[1 1],[5],[1 1],[1]
+val b1 = new Board(5, 5,
+  clues([[5], [1], [1], [1], [3]]),
+  clues([[1], [1, 1], [5], [1, 1], [1]]))
+val s1: Board? = solve(b1)
+IO::println("5×5 T-shape:")
+IO::println(if s1 != null { s1.show() } else { "No solution\n" })
+
+// 5×5 cross
+val b2 = new Board(5, 5,
+  clues([[1], [3], [5], [3], [1]]),
+  clues([[1], [3], [5], [3], [1]]))
+val s2: Board? = solve(b2)
+IO::println("5×5 Cross:")
+IO::println(if s2 != null { s2.show() } else { "No solution\n" })
+
+// 5×5 checkerboard-like
+val b3 = new Board(5, 5,
+  clues([[1, 1, 1], [1, 1], [1, 1, 1], [1, 1], [1, 1, 1]]),
+  clues([[1, 1, 1], [1, 1], [1, 1, 1], [1, 1], [1, 1, 1]]))
+val s3: Board? = solve(b3)
+IO::println("5×5 Checker:")
+IO::println(if s3 != null { s3.show() } else { "No solution\n" })
+
+// Count solved cells and report stats
+val boards: List[Board?] = [s1, s2, s3]
+val names: List[String] = ["Puzzle A", "Cross", "Checker"]
+IO::println("=== Summary ===")
+var i: Int = 0
+while i < boards.size {
+  val nb: Board? = boards.get(i)
+  val name: String = names.get(i)
+  if nb != null {
+    val total: Int = nb.rows * nb.cols
+    var filled: Int = 0
+    var r: Int = 0
+    while r < nb.rows {
+      var c: Int = 0
+      while c < nb.cols {
+        select nb.get(r, c) { case f is Filled: filled = filled + 1; else: }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    IO::println("  #{name}: #{filled}/#{total} cells filled")
+  } else {
+    IO::println("  #{name}: unsolvable")
+  }
+  i = i + 1
+}

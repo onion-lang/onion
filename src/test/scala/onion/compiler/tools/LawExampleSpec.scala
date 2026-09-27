@@ -27,9 +27,10 @@ class LawExampleSpec extends AbstractShellSpec {
     it("compiles and runs when law and example hold") {
       val result = shell.run(
         """
-          |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+          |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
           |  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
           |  example { Pt::parse("3,4") == new Pt(3, 4) }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -44,8 +45,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("fails compilation on a false example") {
       val result = shell.run(
         """
-          |record R(x: Int)
+          |record R(x: Int) {
           |  example { new R(1).x() == 2 }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -60,8 +62,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("reports E0065 for a false example") {
       val codes = errorCodes(
         """
-          |record R(x: Int)
+          |record R(x: Int) {
           |  example { new R(1).x() == 2 }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -73,8 +76,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("fails compilation on a falsified law (counterexample x != y)") {
       val result = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  law wrong(p: Pt) { p.x() == p.y() }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -89,8 +93,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("reports E0064 for a falsified law (counterexample x != y)") {
       val codes = errorCodes(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  law wrong(p: Pt) { p.x() == p.y() }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -102,8 +107,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("reports E0074 for a law parameter type that cannot be sample-generated") {
       val codes = errorCodes(
         """
-          |record Dummy(v: Int)
+          |record Dummy(v: Int) {
           |  law bad(r: Runnable) { r != null }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -115,8 +121,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("fails compilation on a falsified scalar-arg law (generator produces negatives)") {
       val result = shell.run(
         """
-          |record Dummy(v: Int)
+          |record Dummy(v: Int) {
           |  law nonneg(n: Int) { n >= 0 }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -131,8 +138,9 @@ class LawExampleSpec extends AbstractShellSpec {
     it("passes a true scalar-arg law") {
       val result = shell.run(
         """
-          |record Dummy(v: Int)
+          |record Dummy(v: Int) {
           |  law reflexive(n: Int) { n == n }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }
@@ -147,9 +155,10 @@ class LawExampleSpec extends AbstractShellSpec {
     it("coexists with derive!(Json) — law holds, json round-trips") {
       val result = shell.run(
         """
-          |record P(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
+          |record P(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json) {
           |  law textRoundtrip(p: P) { P::parse(P::format(p)) == p }
           |  example { P::fromJson(P::toJson(new P(3, 4))) == new P(3, 4) }
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }

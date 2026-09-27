@@ -1,0 +1,242 @@
+// CourseGradeBook — a university grade tracking system exercising records,
+// homogeneous data-carrying enums, a data-carrying ADT enum, extension methods
+// on Int, collection pipelines, pattern matching, and nullable types.
+
+// --- Domain types ---
+
+enum Semester { FALL, SPRING, SUMMER }
+
+// Homogeneous data-carrying enum: every grade letter carries integer grade points
+// (×10 of the GPA digit, so A=40, B=30, C=20, D=10, F=0).
+enum LetterGrade(pts: Int) {
+  GRADE_A(40), GRADE_B(30), GRADE_C(20), GRADE_D(10), GRADE_F(0)
+public:
+  def label(): String {
+    var r: String = "?"
+    select this {
+      case LetterGrade::GRADE_A: r = "A"
+      case LetterGrade::GRADE_B: r = "B"
+      case LetterGrade::GRADE_C: r = "C"
+      case LetterGrade::GRADE_D: r = "D"
+      case LetterGrade::GRADE_F: r = "F"
+    }
+    return r
+  }
+  def passing(): Boolean = this != LetterGrade::GRADE_F
+}
+
+record Course(code: String, title: String, credits: Int, semester: Semester)
+
+record Student(id: Int, name: String, major: String)
+
+record Enrollment(student: Student, course: Course, grade: LetterGrade?)
+
+record ScoreEntry(studentId: Int, courseCode: String, score: Int)
+
+// --- Extension methods ---
+
+extension Int {
+  def gpaTier(): String {
+    if self >= 37 { return "A" }
+    else if self >= 30 { return "B" }
+    else if self >= 20 { return "C" }
+    else if self >= 10 { return "D" }
+    else               { return "F" }
+  }
+  def repeat(times: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < times { s = s + self.toString(); i++ }
+    return s
+  }
+  def times10(): Int = self * 10
+}
+
+// Convert a raw score (0-100) to a LetterGrade
+def scoreToGrade(score: Int): LetterGrade {
+  if score >= 90      { return LetterGrade::GRADE_A }
+  else if score >= 80 { return LetterGrade::GRADE_B }
+  else if score >= 70 { return LetterGrade::GRADE_C }
+  else if score >= 60 { return LetterGrade::GRADE_D }
+  else                { return LetterGrade::GRADE_F  }
+}
+
+// --- GradeBook class ---
+
+class GradeBook {
+  val enrollments: List[Enrollment]
+public:
+  def this() { this.enrollments = [] }
+
+  def enroll(e: Enrollment): void { enrollments.add(e) }
+
+  def studentEnrollments(studentId: Int): List[Enrollment] {
+    return enrollments.filter { e -> (e as Enrollment).student().id() == studentId }
+  }
+
+  def courseEnrollments(courseCode: String): List[Enrollment] {
+    return enrollments.filter { e -> (e as Enrollment).course().code() == courseCode }
+  }
+
+  // Weighted GPA for a student (only graded enrollments count)
+  def gpaPoints(studentId: Int): Int {
+    val graded = studentEnrollments(studentId).filter { e ->
+      (e as Enrollment).grade() != null
+    }
+    if graded.size == 0 { return -1 }
+    var totalPoints: Int = 0
+    var totalCredits: Int = 0
+    foreach e: Enrollment in graded {
+      val g: LetterGrade = e.grade()!!
+      totalPoints  = totalPoints  + g.pts() * e.course().credits()
+      totalCredits = totalCredits + e.course().credits()
+    }
+    return if totalCredits > 0 { totalPoints / totalCredits } else { 0 }
+  }
+
+  def gpaTier(studentId: Int): String {
+    val pts: Int = gpaPoints(studentId)
+    if pts < 0 { return "N/A" }
+    return pts.gpaTier()
+  }
+
+  def summary(studentId: Int): void {
+    val ses: List[Enrollment] = studentEnrollments(studentId)
+    if ses.size == 0 {
+      IO::println("  No enrollments found.")
+      return
+    }
+    foreach e: Enrollment in ses {
+      val lbl: String = if e.grade() != null { e.grade()!!.label() } else { "pending" }
+      IO::println("  #{e.course().code()} #{e.course().title()} (#{e.course().credits()} cr): #{lbl}")
+    }
+    IO::println("  GPA tier: #{gpaTier(studentId)}")
+  }
+
+  def passingCount(studentId: Int): Int {
+    return studentEnrollments(studentId).filter { e ->
+      val g: LetterGrade? = (e as Enrollment).grade()
+      g != null && g.passing()
+    }.size
+  }
+}
+
+// --- Reporting helpers ---
+
+def classAvgTier(book: GradeBook, courseCode: String): String {
+  val graded = book.courseEnrollments(courseCode).filter { e ->
+    (e as Enrollment).grade() != null
+  }
+  if graded.size == 0 { return "no grades" }
+  var total: Int = 0
+  foreach e: Enrollment in graded {
+    total = total + (e as Enrollment).grade()!!.pts()
+  }
+  val avg: Int = total / graded.size
+  return avg.gpaTier()
+}
+
+def topStudents(book: GradeBook, students: List[Student]): List[Student] {
+  return students.filter { s ->
+    book.gpaTier((s as Student).id()) == "A"
+  }
+}
+
+// ===================== main =====================
+
+val cs101 = new Course("CS101", "Intro to CS",   3, Semester::FALL)
+val ma201 = new Course("MA201", "Calculus I",     4, Semester::FALL)
+val en110 = new Course("EN110", "English Comp",   3, Semester::SPRING)
+val ph301 = new Course("PH301", "Physics I",      4, Semester::SPRING)
+val courses: List[Course] = [cs101, ma201, en110, ph301]
+
+val alice = new Student(1, "Alice Ng",    "Computer Science")
+val bob   = new Student(2, "Bob Chen",    "Mathematics")
+val carol = new Student(3, "Carol Lima",  "Physics")
+val dave  = new Student(4, "Dave Park",   "Computer Science")
+val students: List[Student] = [alice, bob, carol, dave]
+
+val book = new GradeBook()
+
+// Score data using records
+val scores: List[ScoreEntry] = [
+  new ScoreEntry(1, "CS101", 95), new ScoreEntry(1, "MA201", 82),
+  new ScoreEntry(1, "EN110", 78), new ScoreEntry(1, "PH301", 91),
+  new ScoreEntry(2, "MA201", 88), new ScoreEntry(2, "CS101", 71),
+  new ScoreEntry(2, "EN110", 66),
+  new ScoreEntry(3, "PH301", 97), new ScoreEntry(3, "MA201", 73),
+  new ScoreEntry(3, "CS101", 60),
+  new ScoreEntry(4, "CS101", 55), new ScoreEntry(4, "EN110", 84),
+  new ScoreEntry(4, "MA201", 63)
+]
+
+def findCourse(cs: List[Course], code: String): Course? {
+  return cs.find { c -> (c as Course).code() == code }
+}
+
+def findStudent(ss: List[Student], id: Int): Student? {
+  return ss.find { s -> (s as Student).id() == id }
+}
+
+foreach row: ScoreEntry in scores {
+  val s: Student? = findStudent(students, row.studentId())
+  val c: Course?  = findCourse(courses, row.courseCode())
+  if s != null && c != null {
+    book.enroll(new Enrollment(s, c, scoreToGrade(row.score())))
+  }
+}
+
+// --- Print transcripts ---
+IO::println("=== Student Transcripts ===")
+foreach s: Student in students {
+  IO::println("#{s.name()} (#{s.major()})")
+  book.summary(s.id())
+  IO::println("  Passing courses: #{book.passingCount(s.id())}")
+}
+
+// --- Class averages ---
+IO::println("")
+IO::println("=== Class Averages ===")
+foreach c: Course in courses {
+  val avg: String = classAvgTier(book, c.code())
+  IO::println("  #{c.code()} #{c.title()} [#{c.semester()}]: avg tier #{avg}")
+}
+
+// --- Top students ---
+IO::println("")
+IO::println("=== Top Students (GPA tier A) ===")
+val top: List[Student] = topStudents(book, students)
+if top.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach s: Student in top {
+    IO::println("  #{s.name()} — tier #{book.gpaTier(s.id())}")
+  }
+}
+
+// --- Extension method demo ---
+IO::println("")
+IO::println("=== Grade-tier extension method on Int ===")
+foreach pts: Int in [0, 10, 20, 30, 40] {
+  IO::println("  #{pts} points → tier #{pts.gpaTier()}")
+}
+
+// --- Grade distribution per course ---
+IO::println("")
+IO::println("=== Grade Distribution ===")
+foreach c: Course in courses {
+  val ces = book.courseEnrollments(c.code())
+  val aCount = ces.filter { e -> (e as Enrollment).grade() != null && (e as Enrollment).grade() == LetterGrade::GRADE_A }.size
+  val bCount = ces.filter { e -> (e as Enrollment).grade() != null && (e as Enrollment).grade() == LetterGrade::GRADE_B }.size
+  val cCount = ces.filter { e -> (e as Enrollment).grade() != null && (e as Enrollment).grade() == LetterGrade::GRADE_C }.size
+  val dCount = ces.filter { e -> (e as Enrollment).grade() != null && (e as Enrollment).grade() == LetterGrade::GRADE_D }.size
+  val fCount = ces.filter { e -> (e as Enrollment).grade() != null && (e as Enrollment).grade() == LetterGrade::GRADE_F }.size
+  IO::println("  #{c.code()}: A=#{aCount} B=#{bCount} C=#{cCount} D=#{dCount} F=#{fCount}")
+}
+
+// --- Range and repeat demo ---
+IO::println("")
+IO::println("=== Numeric extensions (ranges) ===")
+foreach i: Int in 1..5 {
+  IO::println("  #{i} repeated #{i.times10()} → #{i.repeat(3)}")
+}

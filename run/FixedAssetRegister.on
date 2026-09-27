@@ -1,0 +1,329 @@
+// FixedAssetRegister.on — corporate fixed-asset tracking with three depreciation methods
+// Exercises: ADT case-enum (DepreciationMethod), data-carrying enum (AssetCategory),
+//   records with methods (Disposal.gainLoss), class AssetRegister, extension methods
+//   on Double/String, collection pipelines, select-pattern dispatch, nullable types,
+//   foreach over ranges, string interpolation, closures, try/catch
+
+import { java.lang.Math as JMath }
+
+// ─── Depreciation method — ADT enum ──────────────────────────────────────────
+
+enum DepreciationMethod {
+  case StraightLine
+  case DecliningBalance(rate: Double)     // e.g. 0.40 = 40 % per year
+  case SumOfYearsDigits
+public:
+  def label(): String = select this {
+    case sl  is StraightLine:      "Straight-Line"
+    case db  is DecliningBalance:  "Declining Balance (#{(db.rate() * 100.0) as Int}%)"
+    case syd is SumOfYearsDigits:  "Sum-of-Years-Digits"
+  }
+}
+
+// ─── Asset category — data-carrying enum ─────────────────────────────────────
+
+enum AssetCategory(defaultLife: Int, tag: String) {
+  EQUIPMENT(10, "EQ"),
+  VEHICLE  (5,  "VH"),
+  IT_HW    (3,  "IT"),
+  FURNITURE(7,  "FN"),
+  BUILDING (40, "BL")
+public:
+  def label(): String = select this {
+    case AssetCategory::EQUIPMENT: "Equipment"
+    case AssetCategory::VEHICLE:   "Vehicle"
+    case AssetCategory::IT_HW:     "IT Hardware"
+    case AssetCategory::FURNITURE: "Furniture"
+    else:                          "Building"
+  }
+}
+
+// ─── Asset status ─────────────────────────────────────────────────────────────
+
+enum AssetStatus {
+  ACTIVE, DISPOSED
+public:
+  def label(): String = select this {
+    case AssetStatus::ACTIVE:   "Active"
+    else:                       "Disposed"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Asset(id: Int, description: String, category: AssetCategory,
+             dept: String, yearAcquired: Int, cost: Double, salvage: Double,
+             life: Int, method: DepreciationMethod, status: AssetStatus)
+
+record DeprEntry(year: Int, opening: Double, charge: Double, closing: Double, cumulative: Double)
+
+record Disposal(assetId: Int, yearDisposed: Int, proceeds: Double, nbv: Double) {
+public:
+  def gainLoss(): Double = proceeds() - nbv()
+  def isGain(): Boolean  = gainLoss() >= 0.0
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String = {
+    val neg: Boolean = self < 0.0
+    val abs: Double  = if neg { 0.0 - self } else { self }
+    val r: Long      = JMath::round(abs * 100.0)
+    val i: Long      = r / 100L
+    val f: Long      = r - i * 100L
+    val fStr: String = if f < 10L { "0#{f}" } else { "#{f}" }
+    val sign: String = if neg { "-" } else { "" }
+    "#{sign}#{i}.#{fStr}"
+  }
+}
+
+extension String {
+  def padL(w: Int): String = {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    s
+  }
+  def padR(w: Int): String = {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    s
+  }
+  def rep(n: Int): String = {
+    var s: String = ""
+    var i: Int    = 0
+    while i < n { s = s + self; i++ }
+    s
+  }
+}
+
+// ─── Depreciation schedule ────────────────────────────────────────────────────
+
+def calcSchedule(a: Asset): List[Object] {
+  val entries: List[Object] = []
+  val depreciable: Double = a.cost() - a.salvage()
+  val n: Int              = a.life()
+  val syd: Int            = n * (n + 1) / 2
+  val slAnnual: Double    = if n > 0 { depreciable / (n as Double) } else { 0.0 }
+  var nbv: Double         = a.cost()
+  var cumulative: Double  = 0.0
+
+  foreach yr: Int in 1..n {
+    val charge: Double = select a.method() {
+      case sl  is StraightLine:
+        slAnnual
+      case db  is DecliningBalance:
+        val raw: Double   = nbv * db.rate()
+        val floor: Double = nbv - a.salvage()
+        if raw > floor { floor } else { raw }
+      case syd2 is SumOfYearsDigits:
+        ((n - yr + 1) as Double) / (syd as Double) * depreciable
+    }
+    val safeCharge: Double = if charge < 0.0 { 0.0 } else { charge }
+    val opening: Double    = nbv
+    nbv        = nbv - safeCharge
+    cumulative = cumulative + safeCharge
+    entries.add(new DeprEntry(yr, opening, safeCharge, nbv, cumulative))
+  }
+  return entries
+}
+
+def currentNBV(a: Asset, ageYears: Int): Double {
+  if ageYears <= 0 { return a.cost() }
+  var result: Double = a.cost()
+  foreach e: DeprEntry in calcSchedule(a) {
+    if e.year() <= ageYears { result = e.closing() }
+  }
+  return result
+}
+
+// ─── Asset register class ─────────────────────────────────────────────────────
+
+class AssetRegister {
+public:
+  val assets:    List[Object] = []
+  val disposals: List[Object] = []
+  var nextId: Int = 1
+
+  def register(description: String, category: AssetCategory, dept: String, yearAcquired: Int, cost: Double, salvage: Double, life: Int, method: DepreciationMethod): Asset {
+    val a = new Asset(nextId, description, category, dept, yearAcquired,
+                      cost, salvage, life, method, AssetStatus::ACTIVE)
+    assets.add(a)
+    nextId = nextId + 1
+    return a
+  }
+
+  def dispose(id: Int, yearDisposed: Int, proceeds: Double): Boolean {
+    var target: Asset? = null
+    var result: Boolean = false
+    foreach a: Asset in assets {
+      if a.id() == id && a.status() == AssetStatus::ACTIVE { target = a }
+    }
+    if target != null {
+      val orig: Asset = target
+      val age: Int    = yearDisposed - orig.yearAcquired()
+      val nbv: Double = currentNBV(orig, age)
+      disposals.add(new Disposal(id, yearDisposed, proceeds, nbv))
+      assets.remove(target)
+      assets.add(new Asset(orig.id(), orig.description(), orig.category(), orig.dept(),
+                           orig.yearAcquired(), orig.cost(), orig.salvage(), orig.life(),
+                           orig.method(), AssetStatus::DISPOSED))
+      result = true
+    }
+    return result
+  }
+
+  def activeAssets(): List[Object] =
+    assets.filter { a -> (a as Asset).status() == AssetStatus::ACTIVE }
+
+  def totalGross(): Double =
+    activeAssets().fold(0.0) { acc, a -> (acc as Double) + (a as Asset).cost() }
+
+  def totalNBV(reportYear: Int): Double {
+    var total: Double = 0.0
+    foreach a: Asset in activeAssets() {
+      total = total + currentNBV(a, reportYear - a.yearAcquired())
+    }
+    return total
+  }
+
+  def totalAccumDepr(reportYear: Int): Double = totalGross() - totalNBV(reportYear)
+
+  def nbvByDept(reportYear: Int): Map[Object, Object] {
+    val m: Map[Object, Object] = [:]
+    foreach a: Asset in activeAssets() {
+      val dept: String  = a.dept()
+      val nbv: Double   = currentNBV(a, reportYear - a.yearAcquired())
+      val cur: Double   = if m.containsKey(dept) { m.get(dept) as Double } else { 0.0 }
+      m.put(dept, cur + nbv)
+    }
+    return m
+  }
+
+  def nbvByCategory(reportYear: Int): Map[Object, Object] {
+    val m: Map[Object, Object] = [:]
+    foreach a: Asset in activeAssets() {
+      val key: String  = a.category().label()
+      val nbv: Double  = currentNBV(a, reportYear - a.yearAcquired())
+      val cur: Double  = if m.containsKey(key) { m.get(key) as Double } else { 0.0 }
+      m.put(key, cur + nbv)
+    }
+    return m
+  }
+
+  def disposalGainLoss(): Double {
+    var total: Double = 0.0
+    foreach d: Disposal in disposals { total = total + d.gainLoss() }
+    return total
+  }
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def printAssetLine(a: Asset, reportYear: Int): void {
+  val age: Int        = reportYear - a.yearAcquired()
+  val nbv: Double     = currentNBV(a, age)
+  val idStr: String   = ("#" + a.id()).padR(4)
+  val desc: String    = a.description().padR(28)
+  val cat: String     = a.category().label().padR(12)
+  val dept: String    = a.dept().padR(10)
+  val costS: String   = a.cost().fmt2().padL(12)
+  val nbvS: String    = nbv.fmt2().padL(12)
+  IO::println("  #{idStr} #{desc} #{cat} #{dept} #{costS} #{nbvS}")
+}
+
+def printScheduleRow(e: DeprEntry): void {
+  val yr: String  = ("Yr " + e.year()).padR(6)
+  val op: String  = e.opening().fmt2().padL(13)
+  val ch: String  = e.charge().fmt2().padL(13)
+  val cl: String  = e.closing().fmt2().padL(13)
+  val cu: String  = e.cumulative().fmt2().padL(13)
+  IO::println("    #{yr}  #{op}  #{ch}  #{cl}  #{cu}")
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val reg: AssetRegister = new AssetRegister()
+val reportYear: Int = 2026
+
+// ── Register assets ────────────────────────────────────────────────────────────
+val a1 = reg.register("CNC Lathe Machine",   AssetCategory::EQUIPMENT, "Production", 2020, 48000.0,  2000.0, 10, new StraightLine())
+val a2 = reg.register("Delivery Van #1",     AssetCategory::VEHICLE,   "Logistics",  2021, 32000.0,  4000.0,  5, new DecliningBalance(0.40))
+val a3 = reg.register("Server Rack (10U)",   AssetCategory::IT_HW,     "IT Dept",    2022, 18000.0,  1000.0,  3, new StraightLine())
+val a4 = reg.register("Office Chairs (20x)", AssetCategory::FURNITURE, "HR",         2019, 12000.0,   500.0,  7, new SumOfYearsDigits())
+val a5 = reg.register("Warehouse Forklift",  AssetCategory::VEHICLE,   "Logistics",  2023, 55000.0,  5000.0,  5, new DecliningBalance(0.40))
+val a6 = reg.register("3D Printer",          AssetCategory::EQUIPMENT, "R&D",        2024, 22500.0,  1500.0, 10, new SumOfYearsDigits())
+val a7 = reg.register("Storage Building",    AssetCategory::BUILDING,  "Facilities", 2000,800000.0, 80000.0, 40, new StraightLine())
+val a8 = reg.register("Laptop Fleet (50x)",  AssetCategory::IT_HW,     "IT Dept",    2023, 75000.0,  5000.0,  3, new DecliningBalance(0.40))
+
+// ── Dispose two older assets ───────────────────────────────────────────────────
+reg.dispose(a1.id(), 2025, 28000.0)  // CNC Lathe sold
+reg.dispose(a4.id(), 2024,  2500.0)  // Office chairs scrapped
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+IO::println("═" .rep(70))
+IO::println("  FIXED ASSET REGISTER — Report Year: #{reportYear}")
+IO::println("═" .rep(70))
+
+IO::println("")
+IO::println("── Active Assets ──────────────────────────────────────────────────────")
+IO::println("  ID   Description                  Category     Dept         Gross Cost      NBV")
+foreach a: Asset in reg.activeAssets() {
+  printAssetLine(a, reportYear)
+}
+val gross: Double   = reg.totalGross()
+val nbv: Double     = reg.totalNBV(reportYear)
+val accDepr: Double = reg.totalAccumDepr(reportYear)
+IO::println("  " + "─".rep(78))
+IO::println("  Gross Value:              #{gross.fmt2().padL(14)}")
+IO::println("  Net Book Value:           #{nbv.fmt2().padL(14)}")
+IO::println("  Accumulated Depreciation: #{accDepr.fmt2().padL(14)}")
+
+IO::println("")
+IO::println("── NBV by Department (#{reportYear}) ────────────────────────────────────────────")
+foreach (dept, v) in reg.nbvByDept(reportYear) {
+  IO::println("  #{dept}: #{(v as Double).fmt2()}")
+}
+
+IO::println("")
+IO::println("── NBV by Category (#{reportYear}) ──────────────────────────────────────────────")
+foreach (cat, v) in reg.nbvByCategory(reportYear) {
+  IO::println("  #{cat}: #{(v as Double).fmt2()}")
+}
+
+IO::println("")
+IO::println("── Depreciation Schedules ─────────────────────────────────────────────")
+foreach a: Asset in reg.activeAssets() {
+  IO::println("")
+  IO::println("  #{a.description().padR(30)} | #{a.category().label().padR(12)} | Dept: #{a.dept()}")
+  IO::println("  Method: #{a.method().label()} | Cost: #{a.cost().fmt2()} | Salvage: #{a.salvage().fmt2()} | Life: #{a.life()} yr | Acq: #{a.yearAcquired()}")
+  IO::println("    " + "─".rep(70))
+  IO::println("    Period  Opening NBV    Charge         Closing NBV    Cumulative")
+  IO::println("    " + "─".rep(70))
+  foreach e: DeprEntry in calcSchedule(a) {
+    printScheduleRow(e)
+  }
+}
+
+IO::println("")
+IO::println("── Disposal History ───────────────────────────────────────────────────")
+IO::println("  Asset  Year    Proceeds      NBV at Disp.  Gain/(Loss)")
+IO::println("  " + "─".rep(55))
+foreach d: Disposal in reg.disposals {
+  val gl: Double     = d.gainLoss()
+  val glStr: String  = (if d.isGain() { "+" } else { "" }) + gl.fmt2()
+  IO::println("  ##{d.assetId()}    #{d.yearDisposed()}  #{d.proceeds().fmt2().padL(12)}  #{d.nbv().fmt2().padL(12)}  #{glStr}")
+}
+val totalGL: Double = reg.disposalGainLoss()
+IO::println("  " + "─".rep(55))
+IO::println("  Total Disposal Gain/(Loss): #{(if totalGL >= 0.0 { "+" } else { "" }) + totalGL.fmt2()}")
+
+IO::println("")
+IO::println("── Summary ────────────────────────────────────────────────────────────")
+IO::println("  Active assets    : #{reg.activeAssets().size}")
+IO::println("  Disposed assets  : #{reg.disposals.size}")
+IO::println("  Total gross value: #{gross.fmt2()}")
+IO::println("  Total NBV        : #{nbv.fmt2()}")
+IO::println("  Accum. depr.     : #{accDepr.fmt2()}")
+IO::println("  Disp. gain/(loss): #{(if totalGL >= 0.0 { "+" } else { "" }) + totalGL.fmt2()}")

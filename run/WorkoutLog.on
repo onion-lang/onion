@@ -187,10 +187,9 @@ public:
   }
 }
 
-record FitnessProfile(name: String, heightCm: Int, weightKg: Double, ageYears: Int)
+record FitnessProfile(name: String, heightCm: Int, weightKg: Double, ageYears: Int) {
   example { new FitnessProfile("Test", 170, 70.0, 25).heightCm() > 0 }
   example { new FitnessProfile("Test", 170, 70.0, 25).bmi() > 0.0 }
-{
 public:
   def bmi(): Double = weightKg() / ((heightCm().toDouble() / 100.0) * (heightCm().toDouble() / 100.0))
   def bmiCategory(): String {

@@ -27,8 +27,9 @@
 
 // The data side of the same thesis: a shape names the boundary between messy
 // text and typed values, and failure is a positioned defect, never a null.
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 
 class ToolDemoSupport {
 public:

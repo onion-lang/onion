@@ -1,0 +1,456 @@
+// ProteinAnalyzer.on — amino acid properties and protein sequence analysis
+//
+// Exercises: data-carrying enum (AaClass), ADT case-enum with methods
+// (AaPolarity), records with example clause, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/find/distinct),
+// foreach (k,v) in Map, do[Option], extension methods (Int/String/Double),
+// nullable types, closures, string interpolation, try/catch, while.
+
+import {
+  java.lang.Math as JMath;
+  onion.Option;
+}
+
+// ── Amino acid polarity: ADT case-enum ───────────────────────────────────────
+
+enum AaPolarity {
+  case Nonpolar
+  case Polar
+  case PositiveCharge
+  case NegativeCharge
+  case Special
+public:
+  def label(): String = select this {
+    case p is Nonpolar:        "Nonpolar"
+    case p is Polar:           "Polar"
+    case p is PositiveCharge:  "Positive (+)"
+    case p is NegativeCharge:  "Negative (-)"
+    case p is Special:         "Special"
+  }
+  def symbol(): String = select this {
+    case p is Nonpolar:        "o"
+    case p is Polar:           "*"
+    case p is PositiveCharge:  "+"
+    case p is NegativeCharge:  "-"
+    case p is Special:         "!"
+  }
+}
+
+// ── Amino acid class (data-carrying enum) ────────────────────────────────────
+
+enum AaClass(abbrev: String, description: String) {
+  Aliphatic("Ali",  "aliphatic"),
+  Aromatic ("Aro",  "aromatic"),
+  Amide    ("Ami",  "amide"),
+  Acidic   ("Aci",  "acidic"),
+  Basic    ("Bas",  "basic"),
+  Hydroxyl ("Hyd",  "hydroxyl"),
+  Sulfur   ("Sul",  "sulfur"),
+  Imino    ("Imi",  "imino")
+}
+
+// ── AminoAcid record ─────────────────────────────────────────────────────────
+
+record AminoAcid(
+  name:     String,
+  code1:    String,
+  code3:    String,
+  mw:       Double,
+  polarity: AaPolarity,
+  aaClass:  AaClass
+) {
+public:
+  def isCharged(): Boolean =
+    polarity() is PositiveCharge || polarity() is NegativeCharge
+  def isNonpolar(): Boolean = polarity() is Nonpolar
+  def label(): String = "#{name()} (#{code1()}/#{code3()})"
+  def summary(): String =
+    "#{code1()} #{code3()} #{polarity().symbol()} #{aaClass().abbrev()} MW=#{mw()}Da"
+}
+
+example {
+  new AminoAcid("Glycine","G","Gly",57.05,new Nonpolar(),AaClass::Aliphatic).isCharged() == false
+}
+example {
+  new AminoAcid("Lysine","K","Lys",128.17,new PositiveCharge(),AaClass::Basic).isCharged() == true
+}
+
+// ── Standard amino acid table ────────────────────────────────────────────────
+
+def makeTable(): Map[String, AminoAcid] = [
+  "G": new AminoAcid("Glycine",      "G","Gly",57.05,  new Nonpolar(),       AaClass::Aliphatic),
+  "A": new AminoAcid("Alanine",      "A","Ala",71.08,  new Nonpolar(),       AaClass::Aliphatic),
+  "V": new AminoAcid("Valine",       "V","Val",99.13,  new Nonpolar(),       AaClass::Aliphatic),
+  "L": new AminoAcid("Leucine",      "L","Leu",113.16, new Nonpolar(),       AaClass::Aliphatic),
+  "I": new AminoAcid("Isoleucine",   "I","Ile",113.16, new Nonpolar(),       AaClass::Aliphatic),
+  "P": new AminoAcid("Proline",      "P","Pro",97.12,  new Nonpolar(),       AaClass::Imino),
+  "F": new AminoAcid("Phenylalanine","F","Phe",147.18, new Nonpolar(),       AaClass::Aromatic),
+  "W": new AminoAcid("Tryptophan",   "W","Trp",186.21, new Nonpolar(),       AaClass::Aromatic),
+  "M": new AminoAcid("Methionine",   "M","Met",131.20, new Nonpolar(),       AaClass::Sulfur),
+  "S": new AminoAcid("Serine",       "S","Ser",87.08,  new Polar(),          AaClass::Hydroxyl),
+  "T": new AminoAcid("Threonine",    "T","Thr",101.10, new Polar(),          AaClass::Hydroxyl),
+  "C": new AminoAcid("Cysteine",     "C","Cys",103.14, new Polar(),          AaClass::Sulfur),
+  "Y": new AminoAcid("Tyrosine",     "Y","Tyr",163.18, new Polar(),          AaClass::Aromatic),
+  "N": new AminoAcid("Asparagine",   "N","Asn",114.10, new Polar(),          AaClass::Amide),
+  "Q": new AminoAcid("Glutamine",    "Q","Gln",128.13, new Polar(),          AaClass::Amide),
+  "D": new AminoAcid("Aspartate",    "D","Asp",115.09, new NegativeCharge(), AaClass::Acidic),
+  "E": new AminoAcid("Glutamate",    "E","Glu",129.12, new NegativeCharge(), AaClass::Acidic),
+  "K": new AminoAcid("Lysine",       "K","Lys",128.17, new PositiveCharge(), AaClass::Basic),
+  "R": new AminoAcid("Arginine",     "R","Arg",156.19, new PositiveCharge(), AaClass::Basic),
+  "H": new AminoAcid("Histidine",    "H","His",137.14, new PositiveCharge(), AaClass::Basic)
+] as Map[String, AminoAcid]
+
+// ── Protein chain class ───────────────────────────────────────────────────────
+
+class ProteinChain {
+  var pname:    String
+  var sequence: String
+  var table:    Map[String, AminoAcid]
+public:
+  def this(n: String, seq: String, tbl: Map[String, AminoAcid]) {
+    self.pname    = n
+    self.sequence = seq.toUpperCase()
+    self.table    = tbl
+  }
+
+  def pname(): String   = pname
+  def sequence(): String = sequence
+  def length(): Int     = sequence.length()
+
+  def residues(): List[AminoAcid] = {
+    val result: List[AminoAcid] = []
+    var i: Int = 0
+    while i < sequence.length() {
+      val code: String = sequence.substring(i, i + 1)
+      val aa: AminoAcid? = table[code] as AminoAcid?
+      if aa != null { result.add(aa) }
+      i++
+    }
+    result
+  }
+
+  def molecularWeight(): Double = {
+    var total: Double = 18.02
+    foreach r: AminoAcid in residues() {
+      total = total + r.mw()
+    }
+    total
+  }
+
+  def chargedCount(): Int = {
+    var n: Int = 0
+    foreach r: AminoAcid in residues() {
+      if r.isCharged() { n++ }
+    }
+    n
+  }
+
+  def nonpolarCount(): Int = {
+    var n: Int = 0
+    foreach r: AminoAcid in residues() {
+      if r.isNonpolar() { n++ }
+    }
+    n
+  }
+
+  def countByCode(): Map[String, Int] = {
+    val counts: Map[String, Int] = [:]
+    var i: Int = 0
+    while i < sequence.length() {
+      val code: String = sequence.substring(i, i + 1)
+      val prev: Int? = counts[code] as Int?
+      if prev == null { counts[code] = 1 } else { counts[code] = prev + 1 }
+      i++
+    }
+    counts
+  }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def pad(width: Int): String = {
+    var result: String = "" + self
+    while result.length() < width { result = " " + result }
+    result
+  }
+}
+
+extension Double {
+  def fmt2(): String = {
+    val rounded: Long = JMath::round(self * 100.0)
+    val whole: Long   = rounded / 100L
+    val frac: Long    = JMath::abs(rounded % 100L)
+    val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
+    whole + "." + fracStr
+  }
+  def pct2(): String = (self * 100.0).fmt2() + "%"
+}
+
+extension String {
+  def padR(width: Int): String = {
+    var result: String = self
+    while result.length() < width { result = result + " " }
+    result
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def printHR(w: Int): void {
+  var line: String = ""
+  var i: Int = 0
+  while i < w { line = line + "-"; i++ }
+  IO::println(line)
+}
+
+def validateSequence(seq: String, table: Map[String, AminoAcid]): List[String] = {
+  val errors: List[String] = []
+  val upper: String = seq.toUpperCase()
+  var i: Int = 0
+  while i < upper.length() {
+    val code: String = upper.substring(i, i + 1)
+    if (table[code] as AminoAcid?) == null {
+      errors.add("Unknown residue '#{code}' at position #{i + 1}")
+    }
+    i++
+  }
+  errors
+}
+
+def lookupAa(code: String, table: Map[String, AminoAcid]): Option[AminoAcid] = {
+  val aa: AminoAcid? = table[code] as AminoAcid?
+  if aa == null { Option::none() } else { Option::some(aa) }
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+def printProteinReport(chain: ProteinChain): void {
+  val w: Int = 58
+  printHR(w)
+  IO::println("  Protein : #{chain.pname()} (#{chain.length()} residues)")
+  printHR(w)
+  val mwStr: String   = chain.molecularWeight().fmt2()
+  val chargedN: Int   = chain.chargedCount()
+  val npFrac: Double  = (chain.nonpolarCount() * 1.0) / (chain.length() * 1.0)
+  IO::println("  Mol. wt : #{mwStr} Da")
+  IO::println("  Charged : #{chargedN} / #{chain.length()}")
+  IO::println("  Nonpolar: #{npFrac.pct2()}")
+  IO::println("")
+
+  // composition sorted by frequency (top 5)
+  IO::println("  Composition (top-5):")
+  val counts: Map[String, Int] = chain.countByCode()
+  val codes: List[String]      = counts.keys() as List[String]
+  val sorted: List[String]     = codes.sortedBy { k -> -(counts[k as String] as Int) } as List[String]
+  var shown: Int = 0
+  foreach code: String in sorted {
+    if shown >= 5 { break }
+    val cnt: Int    = counts[code] as Int
+    val pct: Double = (cnt * 1.0) / (chain.length() * 1.0)
+    IO::println("    #{code}  #{cnt.pad(3)}  #{pct.pct2()}")
+    shown++
+  }
+  IO::println("")
+
+  // polarity breakdown
+  IO::println("  Polarity groups:")
+  val res: List[AminoAcid] = chain.residues()
+  val byPol: Map[String, List[AminoAcid]] = res.groupBy { r -> (r as AminoAcid).polarity().label() } as Map[String, List[AminoAcid]]
+  val polOrder: List[String] = ["Nonpolar","Polar","Positive (+)","Negative (-)","Special"]
+  foreach key: String in polOrder {
+    val members: List[AminoAcid]? = byPol[key] as List[AminoAcid]?
+    val n: Int = if members == null { 0 } else { members.size }
+    val pct: Double = (n * 1.0) / (res.size * 1.0)
+    IO::println("    #{key.padR(14)}  #{n.pad(3)}  #{pct.pct2()}")
+  }
+  IO::println("")
+
+  // structural classes
+  IO::println("  Structural classes:")
+  val byClass: Map[String, List[AminoAcid]] = res.groupBy { r -> (r as AminoAcid).aaClass().description() } as Map[String, List[AminoAcid]]
+  val classKeys: List[String]   = byClass.keys() as List[String]
+  val sortedClasses: List[String] = classKeys.sortedBy { k ->
+    -((byClass[k as String] as List[AminoAcid]).size)
+  } as List[String]
+  foreach key: String in sortedClasses {
+    val members: List[AminoAcid] = byClass[key] as List[AminoAcid]
+    IO::println("    #{key.padR(12)}  #{members.size.pad(3)}")
+  }
+  printHR(w)
+  IO::println("")
+}
+
+// ── Codon table and translation ───────────────────────────────────────────────
+
+def makeCodonTable(): Map[String, String] = [
+  "GGG":"G","GGA":"G","GGC":"G","GGT":"G",
+  "GCG":"A","GCA":"A","GCC":"A","GCT":"A",
+  "GTG":"V","GTA":"V","GTC":"V","GTT":"V",
+  "CTG":"L","CTA":"L","CTC":"L","CTT":"L","TTG":"L","TTA":"L",
+  "ATT":"I","ATC":"I","ATA":"I",
+  "CCG":"P","CCA":"P","CCC":"P","CCT":"P",
+  "TTT":"F","TTC":"F","TGG":"W","ATG":"M",
+  "AGT":"S","AGC":"S","TCG":"S","TCA":"S","TCC":"S","TCT":"S",
+  "ACG":"T","ACA":"T","ACC":"T","ACT":"T",
+  "TGT":"C","TGC":"C","TAT":"Y","TAC":"Y",
+  "AAT":"N","AAC":"N","CAG":"Q","CAA":"Q",
+  "GAT":"D","GAC":"D","GAG":"E","GAA":"E",
+  "AAG":"K","AAA":"K",
+  "AGG":"R","AGA":"R","CGG":"R","CGA":"R","CGC":"R","CGT":"R",
+  "CAT":"H","CAC":"H",
+  "TAA":"*","TAG":"*","TGA":"*"
+] as Map[String, String]
+
+def translateCodons(dna: String, codonTable: Map[String, String]): String = {
+  var protein: String = ""
+  var i: Int = 0
+  while i + 3 <= dna.length() {
+    val codon: String = dna.substring(i, i + 3).toUpperCase()
+    val code: String? = codonTable[codon] as String?
+    if code == null || code == "*" { break }
+    protein = protein + code
+    i = i + 3
+  }
+  protein
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val table: Map[String, AminoAcid]   = makeTable()
+  val codonTable: Map[String, String] = makeCodonTable()
+
+  val samples: List[List[String]] = [
+    ["Insulin B-chain",        "FVNQHLCGSHLVEALYLVCGERGFFYTPKT"],
+    ["Cytochrome c (partial)", "GDVEKGKKIFVQKCAQCHTVEKGGKHKTGP"],
+    ["Myoglobin N-term",       "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSH"]
+  ] as List[List[String]]
+
+  foreach entry: List[String] in samples {
+    val pname: String        = entry[0]
+    val pseq:  String        = entry[1]
+    val errors: List[String] = validateSequence(pseq, table)
+    if errors.size > 0 {
+      IO::println("Skipping #{pname}: #{errors[0]}")
+    } else {
+      val chain: ProteinChain = new ProteinChain(pname, pseq, table)
+      printProteinReport(chain)
+    }
+  }
+
+  // codon translation demo
+  val dna: String        = "ATGGTGCTGAGCGGCGAAATGGAGCAGCTG"
+  val translated: String = translateCodons(dna, codonTable)
+  IO::println("Codon translation demo:")
+  IO::println("  DNA     : #{dna}")
+  IO::println("  Protein : #{translated}")
+  IO::println("")
+
+  // aggregate stats across all proteins
+  val chains: List[ProteinChain] = samples.map { e ->
+    val entry: List[String] = e as List[String]
+    new ProteinChain(entry[0], entry[1], table) as ProteinChain
+  } as List[ProteinChain]
+
+  val totalLen: Int   = chains.fold(0) { acc, c -> (acc as Int) + (c as ProteinChain).length() }
+  val totalMw: Double = chains.fold(0.0) { acc, c -> (acc as Double) + (c as ProteinChain).molecularWeight() }
+  val avgMw: Double   = totalMw / (chains.size * 1.0)
+
+  val allCodes: List[String] = []
+  foreach chain: ProteinChain in chains {
+    val seq: String = chain.sequence()
+    var i: Int = 0
+    while i < seq.length() {
+      allCodes.add(seq.substring(i, i + 1))
+      i++
+    }
+  }
+  val uniqueCount: Int = allCodes.distinct().size
+
+  IO::println("Aggregate stats (#{chains.size} proteins):")
+  IO::println("  Total residues  : #{totalLen}")
+  IO::println("  Total MW        : #{totalMw.fmt2()} Da")
+  IO::println("  Average MW      : #{avgMw.fmt2()} Da")
+  IO::println("  Unique residues : #{uniqueCount} / 20")
+  IO::println("")
+
+  // global residue frequency
+  val freqMap: Map[String, Int] = [:]
+  foreach code: String in allCodes {
+    val prev: Int? = freqMap[code] as Int?
+    freqMap[code] = if prev == null { 1 } else { prev + 1 }
+  }
+  val sortedCodes: List[String] = (allCodes.distinct() as List[String]).sortedBy { code ->
+    -(freqMap[code as String] as Int)
+  } as List[String]
+
+  IO::println("  Top-3 residues globally:")
+  var rank: Int = 0
+  foreach code: String in sortedCodes {
+    if rank >= 3 { break }
+    val cnt: Int    = freqMap[code] as Int
+    val pct: Double = (cnt * 1.0) / (totalLen * 1.0)
+    IO::println("    #{rank + 1}. #{code}  #{cnt.pad(3)}  #{pct.pct2()}")
+    rank++
+  }
+  IO::println("")
+
+  // do[Option] safe lookup
+  IO::println("Residue lookups (do[Option]):")
+  val lookups: List[String] = ["G", "W", "X", "K"]
+  foreach code: String in lookups {
+    val opt: Option[AminoAcid] = do[Option] {
+      aa <- lookupAa(code, table)
+      ret aa
+    }
+    val result: String = opt.map { aa ->
+      val a: AminoAcid = aa as AminoAcid
+      "#{a.label()} | #{a.polarity().label()} | MW=#{a.mw().fmt2()}Da"
+    }.getOrElse("Unknown residue '#{code}'")
+    IO::println("  #{code}: #{result}")
+  }
+  IO::println("")
+
+  // nonpolar vs hydrophilic across all proteins
+  val allResidues: List[AminoAcid] = chains.flatMap { c ->
+    (c as ProteinChain).residues()
+  } as List[AminoAcid]
+  val nonpolarList: List[AminoAcid] = allResidues.filter { r -> (r as AminoAcid).isNonpolar() } as List[AminoAcid]
+  val polarList: List[AminoAcid]    = allResidues.filter { r -> !(r as AminoAcid).isNonpolar() } as List[AminoAcid]
+  IO::println("Nonpolar vs polar+charged across all proteins:")
+  IO::println("  Nonpolar    : #{nonpolarList.size}")
+  IO::println("  Polar+charged: #{polarList.size}")
+  IO::println("")
+
+  // foreach (k,v) over amino acid table — heaviest per class
+  val heaviest: Map[String, AminoAcid] = [:]
+  foreach (code, aa) in table {
+    val cls: String     = (aa as AminoAcid).aaClass().description()
+    val prev: AminoAcid? = heaviest[cls] as AminoAcid?
+    if prev == null || (aa as AminoAcid).mw() > prev.mw() {
+      heaviest[cls] = aa as AminoAcid
+    }
+  }
+  IO::println("Heaviest residue per structural class:")
+  foreach (cls, aa) in heaviest {
+    IO::println("  #{(cls as String).padR(10)}  #{(aa as AminoAcid).summary()}")
+  }
+  IO::println("")
+
+  // try/catch: validate a sequence with unknown residues
+  try {
+    val badSeq: String   = "MALFXQ"
+    val errs: List[String] = validateSequence(badSeq, table)
+    IO::println("Validation for '#{badSeq}':")
+    if errs.size == 0 {
+      IO::println("  All residues recognized")
+    } else {
+      foreach err: String in errs {
+        IO::println("  #{err}")
+      }
+    }
+  } catch e: Exception {
+    IO::println("Unexpected: #{e.message()}")
+  }
+}

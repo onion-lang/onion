@@ -278,10 +278,11 @@ describes how text and a record correspond, and both directions come from that o
 description:
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   shape doc  = json
   law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+}
 ```
 
 Reading returns an `Outcome` — a value, or **every** reason there is not one:

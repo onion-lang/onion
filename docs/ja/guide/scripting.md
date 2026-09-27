@@ -130,9 +130,10 @@ val b = User::fromYaml(s)  // User?
 レコードに `law` / `example` を書くと、**コンパイラがビルド時に実行検証**します。仕様をテストやドキュメントではなく言語の中に置けます。
 
 ```onion
-record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
   example { Pt::parse("3,4") == new Pt(3, 4) }
+}
 ```
 
 `example` は `true` でなければコンパイルエラー（E0065）。`law` は生成された値で property 検査され、反例が見つかればコンパイルエラー（E0064、反例つき）。`parse∘format == id` が機械検証される仕組みです。

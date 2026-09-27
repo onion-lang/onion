@@ -1,0 +1,350 @@
+// ConcordanceIndex.on — full-text concordance builder with frequency analysis.
+// Exercises: records, ADT enums, extension methods, collection pipelines,
+//            select/is pattern matching, generics, foreach (ranges, maps),
+//            string interpolation #{}, nullable types, try/catch.
+
+// ---------- ADT enum for word classification ---------------------------------
+
+enum WordClass {
+  case HapaxLegomenon  // exactly once
+  case RareWord        // 2-3 times
+  case CommonWord      // 4-8 times
+  case FrequentWord    // > 8 times
+}
+
+// ---------- extensions --------------------------------------------------------
+
+extension String {
+  def trimLower(): String = self.trim().toLowerCase()
+
+  def centred(width: Int): String {
+    val s = self
+    val pad = width - s.length
+    if pad <= 0 { return s }
+    val left  = pad / 2
+    val right = pad - left
+    var out = ""
+    foreach i: Int in 0..<left  { out = out + " " }
+    out = out + s
+    foreach i: Int in 0..<right { out = out + " " }
+    return out
+  }
+
+  def padRight(width: Int): String {
+    val s = self
+    if s.length >= width { return s }
+    var out = s
+    foreach i: Int in s.length..<width { out = out + " " }
+    return out
+  }
+
+  def truncate(max: Int): String {
+    if self.length <= max { return self }
+    return self.substring(0, max - 1) + "..."
+  }
+}
+
+extension Int {
+  def repeatChar(ch: String): String {
+    var out = ""
+    foreach i: Int in 0..<self { out = out + ch }
+    return out
+  }
+}
+
+// ---------- data model --------------------------------------------------------
+
+record Occurrence(line: Int, col: Int, context: String)
+
+class WordEntry {
+  var wordText:    String
+  val occList:     List[Occurrence]
+
+public:
+  def this(w: String) {
+    wordText = w
+    occList  = []
+  }
+
+  def word(): String = wordText
+
+  def occurrences(): List[Occurrence] = occList
+
+  def addOcc(occ: Occurrence): void { occList.add(occ) }
+
+  def count(): Int = occList.size
+
+  def classify(): WordClass {
+    val c = count()
+    if c == 1 { return new HapaxLegomenon() }
+    if c <= 3  { return new RareWord() }
+    if c <= 8  { return new CommonWord() }
+    return new FrequentWord()
+  }
+
+  def lineLabel(): String {
+    if occList.isEmpty { return "(none)" }
+    var s = "" + (occList[0] as Occurrence).line()
+    var i: Int = 1
+    while i < occList.size {
+      s = s + ", " + (occList[i] as Occurrence).line()
+      i++
+    }
+    return s
+  }
+
+  def firstContext(): String {
+    if occList.isEmpty { return "" }
+    return (occList[0] as Occurrence).context()
+  }
+}
+
+record CorpusStats(
+  totalLines: Int,
+  totalWords: Int,
+  uniqueWords: Int,
+  longestWord: String,
+  topWord: String,
+  topCount: Int
+)
+
+// ---------- concordance engine ------------------------------------------------
+
+class Concordance {
+  val entries: Map[String, WordEntry]
+  var lineCount: Int
+
+public:
+  def this {
+    entries   = [:]
+    lineCount = 0
+  }
+
+  def addLine(lineNum: Int, text: String): void {
+    lineCount = lineNum
+    val toks = text.split("\\s+")
+    var col: Int = 0
+    foreach tok: String in toks {
+      val clean = tok.replaceAll("[^a-zA-Z0-9']", "").trimLower()
+      if clean.length > 0 {
+        val ctx = text.trim().truncate(60)
+        val occ = new Occurrence(lineNum, col + 1, ctx)
+        if entries[clean] == null {
+          val e = new WordEntry(clean)
+          e.addOcc(occ)
+          entries[clean] = e
+        } else {
+          (entries[clean] as WordEntry).addOcc(occ)
+        }
+      }
+      col = col + tok.length + 1
+    }
+  }
+
+  def build(lines: List[String]): void {
+    var n: Int = 1
+    foreach line: String in lines {
+      addLine(n, line)
+      n++
+    }
+  }
+
+  def lookup(word: String): WordEntry? {
+    val key = word.trimLower()
+    val v = entries[key]
+    if v == null { return null }
+    return v as WordEntry
+  }
+
+  def stats(): CorpusStats {
+    var totalWords: Int = 0
+    var longestWord: String = ""
+    var topWord: String = ""
+    var topCount: Int = 0
+    foreach (k, v) in entries {
+      val e = v as WordEntry
+      totalWords = totalWords + e.count()
+      val w = k as String
+      if w.length > longestWord.length { longestWord = w }
+      if e.count() > topCount { topCount = e.count(); topWord = w }
+    }
+    return new CorpusStats(lineCount, totalWords, entries.size, longestWord, topWord, topCount)
+  }
+
+  // Returns WordEntry objects sorted by descending frequency.
+  def sortedByFrequency(): List[WordEntry] {
+    val all: List[WordEntry] = []
+    foreach v: Object in entries.values() { all.add(v as WordEntry) }
+    val sorted = all.sortedBy { e: WordEntry -> -e.count() }
+    val result: List[WordEntry] = []
+    foreach e: Object in sorted { result.add(e as WordEntry) }
+    return result
+  }
+
+  // Returns alphabetically sorted word keys.
+  def alphabeticKeys(): List[String] {
+    val keys: List[String] = []
+    foreach k: Object in entries.keySet() { keys.add(k as String) }
+    val sorted = keys.sortedBy { k: String -> k }
+    val result: List[String] = []
+    foreach k: Object in sorted { result.add(k as String) }
+    return result
+  }
+}
+
+// ---------- report helpers ---------------------------------------------------
+
+def classLabel(wc: WordClass): String = select wc {
+  case h is HapaxLegomenon: "[hapax] "
+  case r is RareWord:       "[rare]  "
+  case c is CommonWord:     "[common]"
+  case f is FrequentWord:   "[freq]  "
+}
+
+def printHRule(width: Int): void {
+  IO::println(width.repeatChar("─"))
+}
+
+def printSection(title: String, width: Int): void {
+  printHRule(width)
+  IO::println(title.centred(width))
+  printHRule(width)
+}
+
+def printEntry(idx: Int, entry: WordEntry): void {
+  val label = classLabel(entry.classify())
+  IO::println("  #{idx}. #{entry.word().padRight(20)} #{label}  #{entry.count()}x  lines: #{entry.lineLabel()}")
+}
+
+// ---------- sample corpus ----------------------------------------------------
+
+def sampleText(): List[String] {
+  return [
+    "The quick brown fox jumps over the lazy dog",
+    "The fox was very quick and the dog was very lazy",
+    "A brown dog chased the fox over the hill",
+    "Quick brown foxes are rare but quick dogs are common",
+    "The dog and the fox became friends in the end",
+    "Over the hill and far away the fox went running",
+    "The lazy dog slept while the quick fox ran away",
+    "Brown fox brown dog brown hill brown sky",
+    "Dogs and foxes share the same habitat in many regions",
+    "The quick brown fox is a classic pangram sentence",
+    "Every good pangram uses each letter of the alphabet",
+    "The fox jumped quickly over the sleeping brown dog",
+    "A lazy fox and a quick dog swapped their usual roles",
+    "In the wild the brown fox is faster than the dog",
+    "The end of the story finds the fox and dog as friends"
+  ]
+}
+
+// ---------- main --------------------------------------------------------------
+
+def main(): void {
+  val WIDTH: Int = 72
+  val corpus = sampleText()
+  val concordance = new Concordance()
+  concordance.build(corpus)
+  val stats = concordance.stats()
+
+  printSection("  CONCORDANCE INDEX — SAMPLE CORPUS  ", WIDTH)
+  IO::println("")
+  IO::println("  Lines : #{stats.totalLines()}   Words : #{stats.totalWords()}   Unique : #{stats.uniqueWords()}")
+  IO::println("  Longest word : \"#{stats.longestWord()}\"   Top : \"#{stats.topWord()}\" (#{stats.topCount()}x)")
+  IO::println("")
+
+  // alphabetical listing — first 30 entries
+  printSection("  ALPHABETICAL LISTING (first 30)  ", WIDTH)
+  val alpha = concordance.alphabeticKeys()
+  val limit: Int = if alpha.size < 30 { alpha.size } else { 30 }
+  var i: Int = 0
+  foreach key: String in alpha {
+    if i >= limit { break }
+    val entry = concordance.lookup(key)
+    if entry != null {
+      printEntry(i + 1, entry)
+    }
+    i++
+  }
+  IO::println("")
+
+  // top 10 by frequency
+  printSection("  TOP 10 BY FREQUENCY  ", WIDTH)
+  val byFreq = concordance.sortedByFrequency()
+  val topN: Int = if byFreq.size < 10 { byFreq.size } else { 10 }
+  i = 0
+  while i < topN {
+    val entry = byFreq[i] as WordEntry
+    IO::println("  #{i + 1}. \"#{entry.word()}\" — #{entry.count()}x")
+    IO::println("       #{entry.firstContext().truncate(58)}")
+    i++
+  }
+  IO::println("")
+
+  // hapax legomena — words appearing exactly once
+  printSection("  HAPAX LEGOMENA (appear exactly once)  ", WIDTH)
+  val hapaxList: List[WordEntry] = []
+  foreach key: String in alpha {
+    val e = concordance.lookup(key)
+    if e != null && e.count() == 1 { hapaxList.add(e) }
+  }
+  IO::println("  #{hapaxList.size} word(s) appear only once:")
+  var lineBuf: String = "  "
+  var col: Int = 2
+  foreach entry: WordEntry in hapaxList {
+    val w = entry.word()
+    if col + w.length + 2 > WIDTH - 2 {
+      IO::println(lineBuf)
+      lineBuf = "  "
+      col = 2
+    }
+    lineBuf = lineBuf + w + "  "
+    col = col + w.length + 2
+  }
+  if col > 2 { IO::println(lineBuf) }
+  IO::println("")
+
+  // word class distribution — using select/is on each word's classification
+  printSection("  WORD CLASS DISTRIBUTION  ", WIDTH)
+  var hapaxCnt: Int = 0
+  var rareCnt:  Int = 0
+  var commCnt:  Int = 0
+  var freqCnt:  Int = 0
+  foreach key: String in alpha {
+    val e = concordance.lookup(key)
+    if e != null {
+      select e.classify() {
+        case h is HapaxLegomenon: hapaxCnt++
+        case r is RareWord:       rareCnt++
+        case c is CommonWord:     commCnt++
+        case f is FrequentWord:   freqCnt++
+      }
+    }
+  }
+  IO::println("  Hapax    (1x)   : #{hapaxCnt}")
+  IO::println("  Rare     (2-3x) : #{rareCnt}")
+  IO::println("  Common   (4-8x) : #{commCnt}")
+  IO::println("  Frequent (>8x)  : #{freqCnt}")
+  IO::println("")
+
+  // specific word lookups with try/catch
+  printSection("  SPECIFIC WORD LOOKUPS  ", WIDTH)
+  val toSearch: List[String] = ["fox", "dog", "quick", "brown", "the", "missing"]
+  foreach word: String in toSearch {
+    try {
+      val entry = concordance.lookup(word)
+      if entry != null {
+        IO::println("  \"#{word.padRight(8)}\" → #{entry.count()}x   lines: #{entry.lineLabel()}")
+      } else {
+        IO::println("  \"#{word.padRight(8)}\" → not found in corpus")
+      }
+    } catch e: Exception {
+      IO::println("  \"#{word}\" → error: #{e.message()}")
+    }
+  }
+  IO::println("")
+
+  printHRule(WIDTH)
+  IO::println("  Done.".centred(WIDTH))
+  printHRule(WIDTH)
+}

@@ -1,0 +1,378 @@
+// EnergyGridSim.on — electricity-grid management and dispatch simulation
+// Exercises: records + methods, data-carrying enums, ADT enum (GridState),
+// class hierarchy (Grid / RegionalGrid), interface (Reportable),
+// generics (RingBuffer[T]), collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition), select/pattern-matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach,
+// range iteration.
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum PowerSource(label: String, co2PerMwh: Double, renewable: Boolean) {
+  Coal("Coal",     820.0, false),
+  Gas("Gas",       490.0, false),
+  Nuclear("Nuclear", 12.0, false),
+  Hydro("Hydro",    24.0, true),
+  Wind("Wind",      11.0, true),
+  Solar("Solar",    45.0, true)
+}
+
+enum ConsumerTier { Residential, Commercial, Industrial, Critical }
+
+// ─── ADT: GridState ──────────────────────────────────────────────────────────
+
+enum GridState {
+  case Balanced
+  case Surplus(excessMwh: Double)
+  case Deficit(shortfallMwh: Double)
+  case Blackout(region: String)
+public:
+  def label(): String = select this {
+    case b is Balanced: "BALANCED"
+    case s is Surplus:  "SURPLUS  +#{s.excessMwh()} MWh"
+    case d is Deficit:  "DEFICIT  -#{d.shortfallMwh()} MWh"
+    case b is Blackout: "BLACKOUT in #{b.region()}"
+  }
+  def isCritical(): Boolean = select this {
+    case d is Deficit:  d.shortfallMwh() > 100.0
+    case b is Blackout: true
+    else: false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record PowerPlant(
+  id:     String,
+  name:   String,
+  source: PowerSource,
+  region: String,
+  maxMwh: Double,
+  online: Boolean
+) {
+public:
+  def dispatch(requested: Double): Double =
+    if !online() { 0.0 }
+    else if requested > maxMwh() { maxMwh() }
+    else { requested }
+
+  def co2Total(outputMwh: Double): Double = outputMwh * source().co2PerMwh()
+
+  override def toString(): String =
+    "#{id()} [#{source().label()}] #{if online() { "ON" } else { "OFF" }} max=#{maxMwh()} MWh"
+}
+
+record Consumer(
+  id:        String,
+  name:      String,
+  region:    String,
+  tier:      ConsumerTier,
+  demandMwh: Double
+) {
+public:
+  def priority(): Int = select tier() {
+    case ConsumerTier::Critical:    4
+    case ConsumerTier::Industrial:  3
+    case ConsumerTier::Commercial:  2
+    case ConsumerTier::Residential: 1
+  }
+
+  override def toString(): String =
+    "#{name()} [#{region()}] #{demandMwh()} MWh (#{tier()})"
+}
+
+record GridEvent(
+  hour:      Int,
+  plantId:   String,
+  eventType: String,
+  detail:    String
+) {
+public:
+  override def toString(): String = "h#{hour()} #{plantId()} [#{eventType()}] #{detail()}"
+}
+
+// ─── Generic ring buffer for event history ───────────────────────────────────
+
+class RingBuffer[T](val capacity: Int) {
+  var buf: List[T] = []
+public:
+  def push(item: T): void {
+    buf.add(item)
+    while buf.size > capacity {
+      buf.remove(0)
+    }
+  }
+
+  def items(): List[T] = buf
+
+  def size(): Int = buf.size
+}
+
+// ─── Interface ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def summaryLine(): String
+  def detailLines(): List[Object]
+}
+
+// ─── Grid class ──────────────────────────────────────────────────────────────
+
+class Grid(val name: String) conforms Reportable {
+public:
+  var plants:    List[PowerPlant]      = []
+  var consumers: List[Consumer]        = []
+  var history:   RingBuffer[GridEvent] = new RingBuffer[GridEvent](20)
+  var hour:      Int = 0
+  def addPlant(p: PowerPlant): void    { plants.add(p) }
+  def addConsumer(c: Consumer): void   { consumers.add(c) }
+
+  def totalCapacityMwh(): Double =
+    plants.filter { p -> p.online() }
+          .map    { p -> p.maxMwh() }
+          .fold(0.0) { acc, x -> (acc as Double) + (x as Double) }
+
+  def totalDemandMwh(): Double =
+    consumers.map { c -> c.demandMwh() }
+             .fold(0.0) { acc, x -> (acc as Double) + (x as Double) }
+
+  def computeState(): GridState = {
+    val cap  = totalCapacityMwh()
+    val dem  = totalDemandMwh()
+    val diff = cap - dem
+    if diff > 50.0       { new Surplus(diff) }
+    else if diff < -50.0 { new Deficit(-diff) }
+    else                 { new Balanced() }
+  }
+
+  def dispatch(requestedMwh: Double): Double = {
+    var remaining = requestedMwh
+    var total     = 0.0
+    val sorted = plants.sortedBy { p -> -((p as PowerPlant).source().co2PerMwh()) }
+    foreach p: PowerPlant in sorted {
+      if remaining > 0.0 {
+        val got = p.dispatch(remaining)
+        total     = total + got
+        remaining = remaining - got
+      }
+    }
+    total
+  }
+
+  def runHour(): GridState = {
+    hour = hour + 1
+    val state = computeState()
+    history.push(new GridEvent(hour, name, "HOUR", state.label()))
+    state
+  }
+
+  def takeOffline(plantId: String): void {
+    val updated: List[PowerPlant] = plants.map { p ->
+      if (p as PowerPlant).id() == plantId {
+        val q = p as PowerPlant
+        new PowerPlant(q.id(), q.name(), q.source(), q.region(), q.maxMwh(), false)
+      } else {
+        p as PowerPlant
+      }
+    }
+    plants = updated
+    history.push(new GridEvent(hour, plantId, "OFFLINE", "Plant taken offline"))
+  }
+
+  def bringOnline(plantId: String): void {
+    val updated: List[PowerPlant] = plants.map { p ->
+      if (p as PowerPlant).id() == plantId {
+        val q = p as PowerPlant
+        new PowerPlant(q.id(), q.name(), q.source(), q.region(), q.maxMwh(), true)
+      } else {
+        p as PowerPlant
+      }
+    }
+    plants = updated
+    history.push(new GridEvent(hour, plantId, "ONLINE", "Plant brought online"))
+  }
+
+  def renewableShare(): Double = {
+    val total = totalCapacityMwh()
+    if total == 0.0 { return 0.0 }
+    val renewMwh = plants.filter { p -> p.online() && p.source().renewable() }
+                         .map    { p -> p.maxMwh() }
+                         .fold(0.0) { acc, x -> (acc as Double) + (x as Double) }
+    renewMwh / total * 100.0
+  }
+
+  def plantsBySource(): Map[Object, List[PowerPlant]] = plants.groupBy { p -> p.source().label() }
+
+  def regionNames(): List[String] = consumers.map { c -> c.region() }.distinct()
+
+  def highPriorityConsumers(): List[Consumer] =
+    consumers.filter { c -> c.priority() >= 3 }
+             .sortedBy { c -> -((c as Consumer).priority()) }
+
+  def onlinePlantCount(): Int = plants.filter { p -> p.online() }.size
+
+  override def summaryLine(): String =
+    "#{name} | cap=#{totalCapacityMwh()} MWh  demand=#{totalDemandMwh()} MWh  " +
+    "renewable=#{renewableShare()}%  hour=#{hour}"
+
+  override def detailLines(): List[Object] =
+    plants.map { p -> "  #{p.source().label()} | #{p}" }
+}
+
+// ─── RegionalGrid (subclass) ─────────────────────────────────────────────────
+
+class RegionalGrid(val gridName: String, val region: String) extends Grid(gridName) {
+  var loadFactor: Double = 1.0
+public:
+  def setLoadFactor(f: Double): void { loadFactor = f }
+
+  def effectiveDemandMwh(): Double = super.totalDemandMwh() * loadFactor
+
+  override def computeState(): GridState = {
+    val cap  = totalCapacityMwh()
+    val dem  = effectiveDemandMwh()
+    val diff = cap - dem
+    if diff > 50.0       { new Surplus(diff) }
+    else if diff < -50.0 { new Deficit(-diff) }
+    else                 { new Balanced() }
+  }
+
+  override def summaryLine(): String =
+    "[REGIONAL #{region}] #{super.summaryLine()} loadFactor=#{loadFactor}"
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def printSep(): void { IO::println("─".repeat(60)) }
+
+def runSimulation(grid: Grid, hours: Int): void {
+  IO::println("Starting simulation: #{grid.summaryLine()}")
+  printSep()
+  var h = 0
+  while h < hours {
+    val state = grid.runHour()
+    val marker = if state.isCritical() { " *** CRITICAL ***" } else { "" }
+    IO::println("Hour #{grid.hour} → #{state.label()}#{marker}")
+    h = h + 1
+  }
+  printSep()
+}
+
+// Recursive helper: sum of renewable capacities across a list slice
+def renewableSum(plants: List[PowerPlant], idx: Int): Double =
+  if idx >= plants.size { 0.0 }
+  else {
+    val p = plants[idx]
+    val here = if p.source().renewable() && p.online() { p.maxMwh() } else { 0.0 }
+    here + renewableSum(plants, idx + 1)
+  }
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val grid = new Grid("NorthernGrid")
+
+grid.addPlant(new PowerPlant("P01", "Riverside Coal", PowerSource::Coal,    "North", 500.0, true))
+grid.addPlant(new PowerPlant("P02", "Valley Gas",     PowerSource::Gas,     "North", 300.0, true))
+grid.addPlant(new PowerPlant("P03", "Hillside Wind",  PowerSource::Wind,    "East",  200.0, true))
+grid.addPlant(new PowerPlant("P04", "Desert Solar",   PowerSource::Solar,   "South", 150.0, true))
+grid.addPlant(new PowerPlant("P05", "Gorge Hydro",    PowerSource::Hydro,   "West",  400.0, true))
+grid.addPlant(new PowerPlant("P06", "Atom Station",   PowerSource::Nuclear, "North", 600.0, true))
+
+grid.addConsumer(new Consumer("C01", "Metro Residences", "North", ConsumerTier::Residential, 400.0))
+grid.addConsumer(new Consumer("C02", "East Office Park", "East",  ConsumerTier::Commercial,  250.0))
+grid.addConsumer(new Consumer("C03", "Steel Mill",       "North", ConsumerTier::Industrial,  350.0))
+grid.addConsumer(new Consumer("C04", "City Hospital",    "North", ConsumerTier::Critical,    100.0))
+grid.addConsumer(new Consumer("C05", "Data Center",      "South", ConsumerTier::Critical,     80.0))
+grid.addConsumer(new Consumer("C06", "Suburb Zone A",    "West",  ConsumerTier::Residential, 200.0))
+
+IO::println("=== Power Grid Simulation ===")
+IO::println("")
+IO::println("Plants:")
+foreach p: PowerPlant in grid.plants { IO::println("  " + p) }
+IO::println("")
+IO::println("Consumers (priority order):")
+foreach c: Consumer in grid.highPriorityConsumers() {
+  IO::println("  #{c}  priority=#{c.priority()}")
+}
+IO::println("")
+
+// 3 normal hours
+runSimulation(grid, 3)
+
+// Take coal offline → deficit
+IO::println(">>> Taking P01 (Riverside Coal) offline")
+grid.takeOffline("P01")
+runSimulation(grid, 2)
+
+// Bring back online
+IO::println(">>> Bringing P01 back online")
+grid.bringOnline("P01")
+runSimulation(grid, 2)
+
+// Blackout scenario: simulate grid with extreme overload
+IO::println(">>> Stress test: adding high-demand consumer")
+grid.addConsumer(new Consumer("C07", "Megafactory", "North", ConsumerTier::Industrial, 1800.0))
+val stressState = grid.computeState()
+IO::println("Stress state: #{stressState.label()}  critical=#{stressState.isCritical()}")
+// Remove the stress consumer
+grid.consumers.remove(grid.consumers.size - 1)
+
+// Regional grid demo
+IO::println("")
+IO::println("=== Regional Grid Demo ===")
+val rg = new RegionalGrid("PeakGrid", "East")
+rg.addPlant(new PowerPlant("R01", "East Wind Farm", PowerSource::Wind,  "East", 120.0, true))
+rg.addPlant(new PowerPlant("R02", "East Solar",     PowerSource::Solar, "East",  80.0, true))
+rg.addConsumer(new Consumer("RC1", "East Suburb",  "East", ConsumerTier::Residential, 160.0))
+rg.addConsumer(new Consumer("RC2", "East Factory", "East", ConsumerTier::Industrial,  100.0))
+rg.setLoadFactor(1.3)
+runSimulation(rg, 2)
+
+// Statistics
+printSep()
+IO::println("Final NorthernGrid statistics:")
+IO::println("  Renewable share:  #{grid.renewableShare()}%")
+IO::println("  Recursive check:  #{renewableSum(grid.plants, 0)} MWh renewable capacity")
+IO::println("  Regions served:   #{grid.regionNames()}")
+IO::println("  Total capacity:   #{grid.totalCapacityMwh()} MWh")
+IO::println("  Total demand:     #{grid.totalDemandMwh()} MWh")
+IO::println("  Online plants:    #{grid.onlinePlantCount()}")
+IO::println("")
+
+// Detail lines via Reportable interface
+val rep: Reportable = grid
+IO::println("Plant detail (via Reportable):")
+foreach line: Object in rep.detailLines() { IO::println("" + line) }
+IO::println("")
+
+// Plants grouped by source
+IO::println("Plants by source:")
+foreach (src, items) in grid.plantsBySource() {
+  val count = (items as List[PowerPlant]).size
+  IO::println("  #{src}: #{count} plant(s)")
+}
+IO::println("")
+
+// Range iteration: hourly load profile simulation
+IO::println("Hourly load profile (hours 1..8):")
+foreach h: Int in 1..8 {
+  val load = 1000.0 + h as Double * 50.0
+  val state: GridState =
+    if load <= grid.totalCapacityMwh() { new Balanced() }
+    else { new Deficit(load - grid.totalCapacityMwh()) }
+  IO::println("  Hour #{h}: load=#{load} MWh → #{state.label()}")
+}
+IO::println("")
+
+// Partition consumers by tier priority
+val parts    = grid.consumers.partition { c -> c.priority() >= 4 }
+val critical = parts[0] as List[Consumer]
+val rest     = parts[1] as List[Consumer]
+IO::println("Critical consumers: #{critical.size}")
+IO::println("Other consumers:    #{rest.size}")
+IO::println("")
+
+// Event history
+IO::println("Recent grid events (last #{grid.history.size()}):")
+foreach ev: GridEvent in grid.history.items() {
+  IO::println("  #{ev}")
+}

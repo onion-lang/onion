@@ -1,0 +1,357 @@
+// PkgGraph.on — package dependency graph and resolver
+// Exercises: records (from re"..."), ADT case-enums, classes,
+//   collection pipelines (map/filter/fold/sortedBy/find/groupBy/forEach),
+//   select/type-pattern matching, closures, string interpolation,
+//   recursion, nullable handling, foreach over map (k,v),
+//   extension methods on String/Int.
+
+import {
+  java.lang.Integer as JInteger
+}
+
+// ─── Version ──────────────────────────────────────────────────────────────────
+
+record Version(major: Int, minor: Int, patch: Int)
+  from re"(\d+)\.(\d+)\.(\d+)" {
+public:
+  def toString(): String = "#{major()}.#{minor()}.#{patch()}"
+  def compareTo(other: Version): Int {
+    if major() != other.major() { return major() - other.major() }
+    if minor() != other.minor() { return minor() - other.minor() }
+    return patch() - other.patch()
+  }
+  def isCompatible(required: Version): Boolean =
+    major() == required.major() && compareTo(required) >= 0
+  def isGreaterThan(other: Version): Boolean = compareTo(other) > 0
+  def sortKey(): Int = major() * 1000000 + minor() * 1000 + patch()
+}
+
+// ─── Dependency spec & Package ────────────────────────────────────────────────
+
+record Dep(name: String, minVersion: Version)
+
+record Package(name: String, version: Version, deps: List[Object]) {
+public:
+  def id(): String = "#{name()}@#{version()}"
+  def depCount(): Int = deps().size
+  def depNames(): List[Object] = deps().map { d -> (d as Dep).name() }
+}
+
+// ─── Resolution result (ADT) ──────────────────────────────────────────────────
+
+enum ResolveResult {
+  case Resolved(packages: List[Object])
+  case Conflict(pkg: String, reason: String)
+  case Missing(pkgName: String)
+public:
+  def isOk(): Boolean = select this {
+    case r is Resolved: true
+    else: false
+  }
+  def summary(): String = select this {
+    case r is Resolved:  "OK — #{r.packages().size} package(s)"
+    case c is Conflict:  "CONFLICT: #{c.pkg()} — #{c.reason()}"
+    case m is Missing:   "MISSING: #{m.pkgName()}"
+  }
+}
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+class Registry {
+  var store: Map[String, Object]
+public:
+  def this {
+    store = [:]
+  }
+  def register(pkg: Package): void {
+    store[pkg.id()] = pkg
+  }
+  def findBest(name: String, minVer: Version): Package? {
+    var best: Package? = null
+    foreach (_, v) in store {
+      val pkg: Package = v as Package
+      if pkg.name() == name && pkg.version().isCompatible(minVer) {
+        if best == null || pkg.version().isGreaterThan((best as Package).version()) {
+          best = pkg
+        }
+      }
+    }
+    return best
+  }
+  def allPackages(): List[Object] {
+    val result: List[Object] = []
+    foreach (_, v) in store {
+      result.add(v)
+    }
+    return result
+  }
+  def count(): Int = store.size
+}
+
+// ─── Resolver ─────────────────────────────────────────────────────────────────
+
+class Resolver {
+  val registry: Registry
+  var visited:  Map[String, Boolean]
+  var resolved: List[Object]
+public:
+  def this(reg: Registry) {
+    registry = reg
+    visited  = [:]
+    resolved = []
+  }
+  def resolve(name: String, minVer: Version): ResolveResult {
+    if visited[name] != null {
+      return new Resolved(resolved)
+    }
+    visited[name] = true
+    val pkg: Package? = registry.findBest(name, minVer)
+    if pkg == null { return new Missing(name) }
+    foreach raw: Object in pkg.deps() {
+      val d: Dep = raw as Dep
+      val sub: ResolveResult = resolve(d.name(), d.minVersion())
+      if !sub.isOk() { return sub }
+    }
+    resolved.add(pkg)
+    return new Resolved(resolved)
+  }
+}
+
+// ─── Cycle detector ───────────────────────────────────────────────────────────
+
+class CycleDetector {
+  val registry: Registry
+  var path: List[Object]
+  var onPath: Map[String, Boolean]
+public:
+  def this(reg: Registry) {
+    registry = reg
+    path   = []
+    onPath = [:]
+  }
+  def hasCycle(name: String): Boolean {
+    if onPath[name] != null { return true }
+    val pkg: Package? = registry.findBest(name, new Version(0, 0, 0))
+    if pkg == null { return false }
+    onPath[name] = true
+    path.add(name)
+    var found: Boolean = false
+    foreach raw: Object in pkg.deps() {
+      val d: Dep = raw as Dep
+      if hasCycle(d.name()) {
+        found = true
+      }
+    }
+    onPath[name] = null
+    path.remove(path.size - 1)
+    return found
+  }
+}
+
+// ─── String helpers ───────────────────────────────────────────────────────────
+
+extension String {
+  def times(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+  def padRight(width: Int): String {
+    val need: Int = width - self.length
+    if need <= 0 { return self }
+    return self + " ".times(need)
+  }
+  def padLeft(width: Int): String {
+    val need: Int = width - self.length
+    if need <= 0 { return self }
+    return " ".times(need) + self
+  }
+}
+
+extension Int {
+  def fmt(): String = ("" + self).padLeft(3)
+}
+
+// ─── Convenience constructors ─────────────────────────────────────────────────
+
+def ver(s: String): Version {
+  val v: Version? = Version::parse(s)
+  return if v != null { v } else { new Version(0, 0, 0) }
+}
+
+def dep(name: String, minVer: String): Dep = new Dep(name, ver(minVer))
+
+def pkg(name: String, version: String, deps: List[Object]): Package =
+  new Package(name, ver(version), deps)
+
+def hr(title: String): void {
+  IO::println("")
+  IO::println("─".times(56))
+  IO::println("  " + title)
+  IO::println("─".times(56))
+}
+
+// ─── Populate registry ────────────────────────────────────────────────────────
+
+val reg: Registry = new Registry()
+
+reg.register(pkg("core",    "1.0.0", []))
+reg.register(pkg("core",    "1.2.0", []))
+reg.register(pkg("core",    "2.0.0", []))
+reg.register(pkg("utils",   "1.0.0", [dep("core", "1.0.0")]))
+reg.register(pkg("utils",   "1.5.0", [dep("core", "1.2.0")]))
+reg.register(pkg("http",    "1.0.0", [dep("core", "1.0.0"), dep("utils", "1.0.0")]))
+reg.register(pkg("http",    "2.0.0", [dep("core", "2.0.0"), dep("utils", "1.5.0")]))
+reg.register(pkg("json",    "1.0.0", [dep("core", "1.0.0")]))
+reg.register(pkg("json",    "2.0.0", [dep("core", "2.0.0")]))
+reg.register(pkg("restkit", "1.0.0", [dep("http", "2.0.0"), dep("json", "2.0.0")]))
+reg.register(pkg("logger",  "1.0.0", [dep("utils", "1.0.0")]))
+reg.register(pkg("myapp",   "1.0.0", [dep("restkit", "1.0.0"), dep("logger", "1.0.0")]))
+
+// ─── Registry listing ─────────────────────────────────────────────────────────
+
+hr("Registry  (#{reg.count()} packages)")
+reg.allPackages()
+  .sortedBy { raw -> (raw as Package).id() }
+  .forEach { raw ->
+    val p: Package = raw as Package
+    val depStr: String = if p.depCount() == 0 {
+      "(no deps)"
+    } else {
+      p.deps()
+       .map { d -> (d as Dep).name() + ">=" + (d as Dep).minVersion() }
+       .fold("") { acc, s ->
+         if acc == "" { s as String } else { acc + ", " + (s as String) }
+       }
+    }
+    IO::println("  #{p.id().padRight(22)} #{depStr}")
+  }
+
+// ─── Resolve myapp ────────────────────────────────────────────────────────────
+
+hr("Resolve myapp@1.0.0")
+val r1: ResolveResult = new Resolver(reg).resolve("myapp", ver("1.0.0"))
+IO::println("  " + r1.summary())
+select r1 {
+  case r is Resolved:
+    r.packages()
+     .sortedBy { raw -> (raw as Package).name() }
+     .forEach { raw ->
+       val p: Package = raw as Package
+       IO::println("  ✓ #{p.id()}")
+     }
+  case c is Conflict:
+    IO::println("  ✗ conflict: #{c.reason()}")
+  case m is Missing:
+    IO::println("  ✗ missing: #{m.pkgName()}")
+}
+
+// ─── Resolve http@1.0.0 ───────────────────────────────────────────────────────
+
+hr("Resolve http@1.0.0")
+val r2: ResolveResult = new Resolver(reg).resolve("http", ver("1.0.0"))
+IO::println("  " + r2.summary())
+select r2 {
+  case r is Resolved:
+    r.packages()
+     .sortedBy { raw -> (raw as Package).name() }
+     .forEach { raw -> IO::println("  ✓ " + (raw as Package).id()) }
+  case m is Missing:
+    IO::println("  ✗ missing: #{m.pkgName()}")
+  case c is Conflict:
+    IO::println("  ✗ conflict")
+}
+
+// ─── Missing package ──────────────────────────────────────────────────────────
+
+hr("Resolve ghost@1.0.0  (not in registry)")
+val r3: ResolveResult = new Resolver(reg).resolve("ghost", ver("1.0.0"))
+IO::println("  " + r3.summary())
+
+// ─── Version compatibility matrix ─────────────────────────────────────────────
+
+hr("Version Compatibility Matrix")
+val haveVers: List[Object] = [ver("1.0.0"), ver("1.2.0"), ver("2.0.0")]
+val needVers: List[Object] = [ver("1.0.0"), ver("1.1.0"), ver("2.0.0"), ver("2.1.0")]
+IO::println("  have\\need  " +
+  needVers.map { v -> (v as Version).toString().padRight(9) }
+          .fold("") { acc, s -> acc + (s as String) })
+foreach hv: Object in haveVers {
+  val h: Version = hv as Version
+  var row: String = "  #{h.toString().padRight(10)} "
+  foreach nv: Object in needVers {
+    val n: Version = nv as Version
+    row = row + (if h.isCompatible(n) { "yes      " } else { "no       " })
+  }
+  IO::println(row)
+}
+
+// ─── Cycle detection ──────────────────────────────────────────────────────────
+
+hr("Cycle Detection")
+val checkNames: List[Object] = ["core", "utils", "http", "myapp"]
+foreach raw: Object in checkNames {
+  val n: String = raw as String
+  val det: CycleDetector = new CycleDetector(reg)
+  val hasCyc: Boolean = det.hasCycle(n)
+  IO::println("  #{n.padRight(12)} #{if hasCyc { "cycle detected!" } else { "no cycles" }}")
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+hr("Statistics")
+val all: List[Object] = reg.allPackages()
+var totalEdges: Int = 0
+all.forEach { raw -> totalEdges = totalEdges + (raw as Package).depCount() }
+val deepest: Package = all
+  .sortedBy { raw -> -(raw as Package).depCount() }
+  .first() as Package
+
+IO::println("  Packages in registry : #{all.size}")
+IO::println("  Total dependency arcs: #{totalEdges}")
+IO::println("  Most dependencies    : #{deepest.id()} (#{deepest.depCount()} direct deps)")
+
+// Group packages by name — show names with multiple versions
+val byName: Map[Object, List[Object]] = all.groupBy { raw -> (raw as Package).name() }
+IO::println("  Multi-version packages:")
+foreach (k, v) in byName {
+  val grp: List[Object] = v
+  if grp.size > 1 {
+    val vers: String = grp
+      .sortedBy { raw -> (raw as Package).version().sortKey() }
+      .map { raw -> (raw as Package).version().toString() }
+      .fold("") { acc, s -> if acc == "" { s as String } else { acc + ", " + (s as String) } }
+    IO::println("    #{k}: [#{vers}]")
+  }
+}
+
+// Find packages that nothing else depends on (root packages)
+val allDepNames: List[Object] = all.fold([] as List[Object]) { acc, raw ->
+  (raw as Package).depNames().forEach { n -> acc.add(n) }
+  acc
+}
+val roots: List[Object] = all.filter { raw ->
+  val p: Package = raw as Package
+  allDepNames.find { n -> (n as String) == p.name() } == null
+}
+IO::println("  Root packages (no dependents):")
+roots.sortedBy { raw -> (raw as Package).id() }
+     .forEach { raw -> IO::println("    #{(raw as Package).id()}") }
+
+// ─── Dependency fan-in table ──────────────────────────────────────────────────
+
+hr("Dependency Fan-in (how many packages depend on each)")
+// Build name -> count map by scanning all packages' dep lists
+val allNames: List[String] = all.map { raw -> (raw as Package).name() }.distinct()
+allNames.sortedBy { n -> n }.forEach { raw ->
+  val pname: String = raw
+  var count: Int = 0
+  all.forEach { p ->
+    if (p as Package).depNames().find { dn -> (dn as String) == pname } != null {
+      count = count + 1
+    }
+  }
+  val bar: String = "█".times(count)
+  IO::println("  #{pname.padRight(12)} #{count.fmt()} #{bar}")
+}

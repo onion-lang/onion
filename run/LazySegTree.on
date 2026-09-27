@@ -1,4 +1,4 @@
-// SegmentTree.on — lazy-propagation segment tree: range sum/max/min + range-add
+// LazySegTree.on — lazy-propagation segment tree: range sum/max/min + range-add
 // Exercises: Int[] arrays, classes with mutable state, records, data-carrying
 // enum, ADT enum, extension methods (Int/Double/String), foreach over ranges and
 // List, select/pattern matching, recursive methods, while loops, nullable,

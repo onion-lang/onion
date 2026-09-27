@@ -1,0 +1,278 @@
+// ArchaeologicalDig.on — excavation site management system (~270 lines)
+//
+// Exercises: records, ADT case-enum with methods, plain enum, generics
+// (List[T]/Map[K,V]), collection pipelines (filter/map/groupBy/sortedBy/
+// fold/count/find/distinct), select/type-pattern exhaustiveness,
+// nullable types, closures, string interpolation, foreach (list + map k,v),
+// while, extension Int/String.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Period {
+  case Paleolithic; case Neolithic; case BronzeAge; case IronAge
+  case Classical; case Medieval; case Modern
+public:
+  def label(): String = select this {
+    case p is Paleolithic: "Paleolithic"
+    case p is Neolithic:   "Neolithic"
+    case p is BronzeAge:   "Bronze Age"
+    case p is IronAge:     "Iron Age"
+    case p is Classical:   "Classical"
+    case p is Medieval:    "Medieval"
+    case p is Modern:      "Modern"
+  }
+  def approxDate(): String = select this {
+    case p is Paleolithic: "pre-10000 BC"
+    case p is Neolithic:   "10000-3000 BC"
+    case p is BronzeAge:   "3000-1200 BC"
+    case p is IronAge:     "1200-550 BC"
+    case p is Classical:   "550 BC-500 AD"
+    case p is Medieval:    "500-1500 AD"
+    case p is Modern:      "post-1500 AD"
+  }
+}
+
+enum Condition {
+  EXCELLENT, GOOD, FAIR, POOR, FRAGMENTARY
+}
+
+enum ArtifactType {
+  case LithicTool(material: String, toolFunction: String)
+  case Ceramic(material: String, decoration: String)
+  case Jewelry(material: String, gemstone: String)
+  case Coin(metal: String, denomination: String)
+  case BoneRemains(species: String, humanRemains: Boolean)
+  case Architectural(buildMat: String, featureType: String)
+public:
+  def label(): String = select this {
+    case t is LithicTool:    "Tool: #{t.material()} (#{t.toolFunction()})"
+    case t is Ceramic:       "Ceramic: #{t.material()}, #{t.decoration()}"
+    case t is Jewelry: {
+      val gem: String = if t.gemstone() == "" { "" } else { " + #{t.gemstone()}" }
+      "Jewelry: #{t.material()}#{gem}"
+    }
+    case t is Coin:          "Coin: #{t.metal()} #{t.denomination()}"
+    case t is BoneRemains: {
+      val who: String = if t.humanRemains() { "human" } else { t.species() }
+      "Bone: #{who}"
+    }
+    case t is Architectural: "Feature: #{t.buildMat()} #{t.featureType()}"
+  }
+  def category(): String = select this {
+    case t is LithicTool:    "Material Culture"
+    case t is Ceramic:       "Material Culture"
+    case t is Jewelry:       "Adornment"
+    case t is Coin:          "Economy"
+    case t is BoneRemains:   "Biological"
+    case t is Architectural: "Architecture"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record ExcavationUnit(unitId: String, gridX: Int, gridY: Int, depthCm: Int)
+
+record Artifact(
+  artifactId: String,
+  unitId: String,
+  kind: ArtifactType,
+  period: Period,
+  condition: Condition,
+  notes: String
+)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trunc(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+}
+
+// ─── DigSite class ────────────────────────────────────────────────────────────
+
+class DigSite {
+  val siteName: String
+  val units: List[ExcavationUnit]
+  val artifacts: List[Artifact]
+  var nextId: Int
+public:
+  def this(name: String) {
+    siteName = name
+    units     = new ArrayList[ExcavationUnit]()
+    artifacts = new ArrayList[Artifact]()
+    nextId    = 1
+  }
+
+  def name(): String = siteName
+
+  def openUnit(gridX: Int, gridY: Int, depthCm: Int): ExcavationUnit = {
+    val id: String = "#{gridX}x#{gridY}@#{depthCm}"
+    val u: ExcavationUnit = new ExcavationUnit(id, gridX, gridY, depthCm)
+    units.add(u)
+    return u
+  }
+
+  def recordFind(unitId: String, kind: ArtifactType, period: Period, cond: Condition, notes: String): Artifact = {
+    val n: Int = nextId
+    val id: String = if n < 10 { "ART-00#{n}" } else if n < 100 { "ART-0#{n}" } else { "ART-#{n}" }
+    nextId++
+    val a: Artifact = new Artifact(id, unitId, kind, period, cond, notes)
+    artifacts.add(a)
+    return a
+  }
+
+  def allUnits(): List[ExcavationUnit] = units
+  def allArtifacts(): List[Artifact]   = artifacts
+  def unitCount(): Int  = units.size
+  def findCount(): Int  = artifacts.size
+
+  def byPeriod(p: Period): List[Artifact] =
+    artifacts.filter { a: Artifact -> a.period().label() == p.label() }
+
+  def byCategory(cat: String): List[Artifact] =
+    artifacts.filter { a: Artifact -> a.kind().category() == cat }
+
+  def periodsPresent(): List[String] =
+    artifacts.map { a: Artifact -> a.period().label() }.distinct()
+
+  def deepestUnit(): ExcavationUnit? = {
+    if units.isEmpty() { return null }
+    return units.sortedBy { u: ExcavationUnit -> 0 - u.depthCm() }[0]
+  }
+
+  def topCategory(): String = {
+    val groups: Map[String, List[Artifact]] =
+      artifacts.groupBy { a: Artifact -> a.kind().category() }
+    var best: String = "none"
+    var bestN: Int   = 0
+    foreach (cat, list) in groups {
+      if list.size > bestN {
+        best  = cat
+        bestN = list.size
+      }
+    }
+    return best
+  }
+
+  def conditionBreakdown(): List[String] = {
+    val groups: Map[String, List[Artifact]] =
+      artifacts.groupBy { a: Artifact -> a.condition().name() }
+    val result: List[String] = new ArrayList[String]()
+    foreach (cond, list) in groups {
+      result.add("#{cond}: #{list.size.plural("find")}")
+    }
+    return result
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def sep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val site: DigSite = new DigSite("Tell Qasile")
+
+  val u1: ExcavationUnit = site.openUnit(1, 1,  30)
+  val u2: ExcavationUnit = site.openUnit(1, 2,  60)
+  val u3: ExcavationUnit = site.openUnit(2, 1,  90)
+  val u4: ExcavationUnit = site.openUnit(2, 2, 120)
+  val u5: ExcavationUnit = site.openUnit(3, 1, 150)
+  val u6: ExcavationUnit = site.openUnit(3, 2, 180)
+
+  site.recordFind(u1.unitId(), new LithicTool("flint", "cutting"),          new Neolithic(),   Condition::GOOD,        "well-knapped blade")
+  site.recordFind(u1.unitId(), new Ceramic("clay", "incised lines"),         new BronzeAge(),   Condition::FAIR,        "rim sherd")
+  site.recordFind(u1.unitId(), new Coin("silver", "half-shekel"),            new Classical(),   Condition::EXCELLENT,   "legible inscription")
+  site.recordFind(u2.unitId(), new Ceramic("burnished clay", "red slip"),    new IronAge(),     Condition::GOOD,        "near-complete vessel")
+  site.recordFind(u2.unitId(), new Jewelry("bronze", "carnelian"),           new BronzeAge(),   Condition::GOOD,        "intact ring")
+  site.recordFind(u2.unitId(), new LithicTool("obsidian", "scraping"),       new Paleolithic(), Condition::EXCELLENT,   "pristine edge")
+  site.recordFind(u3.unitId(), new Architectural("mudbrick", "wall"),        new BronzeAge(),   Condition::POOR,        "eroded foundation")
+  site.recordFind(u3.unitId(), new Coin("bronze", "quarter-shekel"),         new Classical(),   Condition::FAIR,        "worn")
+  site.recordFind(u3.unitId(), new BoneRemains("ovicaprid", false),          new IronAge(),     Condition::FRAGMENTARY, "butchery marks")
+  site.recordFind(u4.unitId(), new Jewelry("gold", "lapis lazuli"),          new BronzeAge(),   Condition::EXCELLENT,   "scarab pendant")
+  site.recordFind(u4.unitId(), new Ceramic("terracotta", "geometric paint"), new IronAge(),     Condition::GOOD,        "complete bowl")
+  site.recordFind(u4.unitId(), new Coin("bronze", "lepton"),                 new Medieval(),    Condition::FAIR,        "cross motif")
+  site.recordFind(u5.unitId(), new Architectural("limestone", "pillar base"),new Classical(),   Condition::GOOD,        "monumental")
+  site.recordFind(u5.unitId(), new BoneRemains("human", true),               new BronzeAge(),   Condition::FRAGMENTARY, "secondary burial")
+  site.recordFind(u5.unitId(), new LithicTool("basalt", "grinding"),         new Neolithic(),   Condition::GOOD,        "quern fragment")
+  site.recordFind(u6.unitId(), new Ceramic("clay", "plain"),                 new IronAge(),     Condition::POOR,        "storage jar base")
+  site.recordFind(u6.unitId(), new Jewelry("silver", ""),                    new Classical(),   Condition::GOOD,        "earring")
+  site.recordFind(u6.unitId(), new Coin("gold", "drachm"),                   new Classical(),   Condition::EXCELLENT,   "Alexander type")
+
+  println("╔══════════════════════════════════════════════════╗")
+  println("║        ARCHAEOLOGICAL DIG SITE REPORT            ║")
+  println("╚══════════════════════════════════════════════════╝")
+  println("")
+  println("  Site:      #{site.name()}")
+  println("  Units:     #{site.unitCount().plural("excavation unit")}")
+  println("  Artifacts: #{site.findCount().plural("find")}")
+  println("")
+
+  println("ARTIFACT CATALOG")
+  sep(72)
+  println("  #{"ID".padRight(9)} #{"Unit".padRight(12)} #{"Kind".padRight(30)} #{"Period".padRight(12)} Cond")
+  sep(72)
+  foreach a: Artifact in site.allArtifacts() {
+    val cond: String = a.condition().name().substring(0, 4)
+    println("  #{a.artifactId().padRight(9)} #{a.unitId().padRight(12)} #{a.kind().label().trunc(30).padRight(30)} #{a.period().label().padRight(12)} #{cond}")
+  }
+  println("")
+
+  println("FINDS BY PERIOD")
+  sep(72)
+  val allPeriods: List[Period] = [new Paleolithic(), new Neolithic(), new BronzeAge(),
+                                  new IronAge(), new Classical(), new Medieval(), new Modern()]
+  foreach p: Period in allPeriods {
+    val found: List[Artifact] = site.byPeriod(p)
+    if !found.isEmpty() {
+      println("  #{p.label().padRight(14)} (#{p.approxDate()}) — #{found.size.plural("find")}")
+      foreach a: Artifact in found {
+        println("    · #{a.artifactId()} #{a.kind().label().trunc(42)}")
+      }
+    }
+  }
+  println("")
+
+  println("CATEGORY BREAKDOWN")
+  sep(72)
+  val cats: List[String] = ["Material Culture", "Adornment", "Economy", "Biological", "Architecture"]
+  foreach cat: String in cats {
+    val found: List[Artifact] = site.byCategory(cat)
+    if !found.isEmpty() {
+      println("  #{cat.padRight(18)}: #{found.size.plural("find")}")
+    }
+  }
+  println("")
+
+  println("CONDITION REPORT")
+  sep(72)
+  foreach line: String in site.conditionBreakdown() {
+    println("  #{line}")
+  }
+  println("")
+
+  val deepest: ExcavationUnit? = site.deepestUnit()
+  if deepest != null {
+    println("  Deepest unit:         #{deepest.unitId()} at #{deepest.depthCm()} cm depth")
+  }
+  println("  Top category:         #{site.topCategory()}")
+  println("  Periods represented:  #{site.periodsPresent().size.plural("era")}")
+}

@@ -1,0 +1,268 @@
+// Knight's Tour — finds a Hamiltonian path for a chess knight on an n×n board.
+// Uses Warnsdorff's heuristic (fewest onward moves first) with backtracking.
+// Exercises: records, ADT enum, collection pipelines, recursion, 2D board state,
+// foreach (ranges + lists), while, closures, string interpolation, nullable types.
+
+record Pos(row: Int, col: Int) {
+  public:
+  def toString(): String = "(#{row},#{col})"
+}
+
+enum TourResult {
+  case Complete(path: List[Pos])
+  case Incomplete(visited: Int)
+}
+
+// Knight move deltas
+val DR = [-2, -2, -1, -1,  1,  1,  2,  2]
+val DC = [-1,  1, -2,  2, -2,  2, -1,  1]
+
+def validMoves(board: List[List[Int]], pos: Pos, n: Int): List[Pos] {
+  val result: List[Pos] = []
+  var i: Int = 0
+  while i < 8 {
+    val nr = pos.row() + DR[i]
+    val nc = pos.col() + DC[i]
+    if nr >= 0 && nr < n && nc >= 0 && nc < n && board[nr][nc] == 0 {
+      result.add(new Pos(nr, nc))
+    }
+    i++
+  }
+  return result
+}
+
+def degree(board: List[List[Int]], pos: Pos, n: Int): Int =
+  validMoves(board, pos, n).size
+
+// Warnsdorff: pick next move by fewest onward moves (ties broken by position)
+def warnsdorffNext(board: List[List[Int]], pos: Pos, n: Int): Pos? {
+  val moves = validMoves(board, pos, n)
+  if moves.size == 0 { return null }
+  var best: Pos = moves[0]
+  var bestDeg: Int = degree(board, moves[0], n) + 1
+  foreach m: Pos in moves {
+    val d = degree(board, m, n)
+    if d < bestDeg {
+      bestDeg = d
+      best = m
+    }
+  }
+  return best
+}
+
+def makeBoard(n: Int): List[List[Int]] {
+  val board: List[List[Int]] = []
+  var r: Int = 0
+  while r < n {
+    val row: List[Int] = []
+    var c: Int = 0
+    while c < n { row.add(0); c++ }
+    board.add(row)
+    r++
+  }
+  return board
+}
+
+def setCell(board: List[List[Int]], r: Int, c: Int, v: Int): void {
+  board[r][c] = v
+}
+
+// Solve using Warnsdorff, fall back to backtracking if stuck
+def solve(n: Int, startRow: Int, startCol: Int): TourResult {
+  val board = makeBoard(n)
+  val path: List[Pos] = []
+  val total = n * n
+
+  val start = new Pos(startRow, startCol)
+  setCell(board, startRow, startCol, 1)
+  path.add(start)
+
+  var pos: Pos = start
+  var step: Int = 2
+  while step <= total {
+    val next = warnsdorffNext(board, pos, n)
+    if next == null {
+      return new Incomplete(step - 1)
+    }
+    setCell(board, next.row(), next.col(), step)
+    path.add(next)
+    pos = next
+    step++
+  }
+  return new Complete(path)
+}
+
+def printBoard(board: List[List[Int]], n: Int): void {
+  val width = if n * n >= 100 { 3 } else { 2 }
+  var r: Int = 0
+  while r < n {
+    var line: String = ""
+    var c: Int = 0
+    while c < n {
+      val v = board[r][c]
+      var s: String = "" + v
+      while s.length() < width { s = " " + s }
+      line = line + s
+      if c < n - 1 { line = line + " " }
+      c++
+    }
+    IO::println(line)
+    r++
+  }
+}
+
+def runTour(n: Int, startR: Int, startC: Int): void {
+  IO::println("Knight's Tour: #{n}x#{n}, start=#{new Pos(startR, startC)}")
+  val result = solve(n, startR, startC)
+  select result {
+    case c is Complete: {
+      IO::println("Complete tour! #{c.path().size} squares visited.")
+      val board = makeBoard(n)
+      var step: Int = 1
+      foreach p: Pos in c.path() {
+        setCell(board, p.row(), p.col(), step)
+        step++
+      }
+      printBoard(board, n)
+    }
+    case inc is Incomplete:
+      IO::println("Incomplete: only #{inc.visited()} of #{n*n} squares visited.")
+  }
+  IO::println("")
+}
+
+// Test on several board sizes
+runTour(5, 0, 0)
+runTour(6, 0, 0)
+runTour(8, 0, 0)
+
+// Stats: how many starting positions yield a complete tour on a 5x5 board?
+IO::println("=== 5x5 completion rate ===")
+var complete: Int = 0
+var total: Int = 0
+var sr: Int = 0
+while sr < 5 {
+  var sc: Int = 0
+  while sc < 5 {
+    val res = solve(5, sr, sc)
+    select res {
+      case c is Complete: complete++
+      case inc is Incomplete: {}
+    }
+    total++
+    sc++
+  }
+  sr++
+}
+IO::println("#{complete}/#{total} starting positions complete the 5x5 tour.")
+
+// Backtracking solver — slow but complete, used when Warnsdorff's fails
+def solveBacktrack(board: List[List[Int]], pos: Pos, step: Int, n: Int, path: List[Pos]): Boolean {
+  if step > n * n { return true }
+  val moves = validMoves(board, pos, n)
+  // Warnsdorff order for branching efficiency
+  val ordered = moves.sortedBy { m -> degree(board, m, n) }
+  foreach m: Pos in ordered {
+    setCell(board, m.row(), m.col(), step)
+    path.add(m)
+    if solveBacktrack(board, m, step + 1, n, path) { return true }
+    setCell(board, m.row(), m.col(), 0)
+    path.remove(path.size - 1)
+  }
+  return false
+}
+
+def solveWithFallback(n: Int, startR: Int, startC: Int): TourResult {
+  // First try fast Warnsdorff's
+  val fast = solve(n, startR, startC)
+  select fast {
+    case c is Complete: return c
+    case inc is Incomplete: {}
+  }
+  // Fall back to full backtracking
+  val board = makeBoard(n)
+  val path: List[Pos] = []
+  val start = new Pos(startR, startC)
+  setCell(board, startR, startC, 1)
+  path.add(start)
+  if solveBacktrack(board, start, 2, n, path) {
+    return new Complete(path)
+  }
+  return new Incomplete(path.size)
+}
+
+// Check if a tour is a closed tour (can return to start in one knight move)
+def isClosedTour(path: List[Pos], n: Int): Boolean {
+  if path.size < 2 { return false }
+  val start = path[0]
+  val end = path[path.size - 1]
+  val dr = (start.row() - end.row())
+  val dc = (start.col() - end.col())
+  val absDr = if dr < 0 { 0 - dr } else { dr }
+  val absDc = if dc < 0 { 0 - dc } else { dc }
+  return (absDr == 1 && absDc == 2) || (absDr == 2 && absDc == 1)
+}
+
+IO::println("=== 4x4 board (odd, harder) — backtracking fallback ===")
+var r4c: Int = 0
+var r4total: Int = 0
+var r4comp: Int = 0
+while r4c < 4 {
+  var c4c: Int = 0
+  while c4c < 4 {
+    val res = solveWithFallback(4, r4c, c4c)
+    select res {
+      case c is Complete: r4comp++
+      case inc is Incomplete: {}
+    }
+    r4total++
+    c4c++
+  }
+  r4c++
+}
+IO::println("4x4: #{r4comp}/#{r4total} complete (expected: 0 — no 4x4 tour exists)")
+IO::println("")
+
+IO::println("=== Closed tour check on 6x6 and 8x8 ===")
+val r6 = solve(6, 1, 0)
+select r6 {
+  case c6 is Complete: {
+    val closed = isClosedTour(c6.path(), 6)
+    IO::println("6x6 from (1,0): #{if closed { "CLOSED" } else { "open" }} tour")
+  }
+  case inc is Incomplete: IO::println("6x6 from (1,0): incomplete")
+}
+val r8 = solve(8, 0, 0)
+select r8 {
+  case c8 is Complete: {
+    val closed = isClosedTour(c8.path(), 8)
+    IO::println("8x8 from (0,0): #{if closed { "CLOSED" } else { "open" }} tour")
+  }
+  case inc is Incomplete: IO::println("8x8 from (0,0): incomplete")
+}
+
+// Try a closed 8x8 start that is known to yield a closed tour
+val r8closed = solve(8, 0, 1)
+select r8closed {
+  case c is Complete: {
+    val closed = isClosedTour(c.path(), 8)
+    IO::println("8x8 from (0,1): #{if closed { "CLOSED" } else { "open" }} tour")
+  }
+  case inc is Incomplete: IO::println("8x8 from (0,1): incomplete")
+}
+IO::println("")
+
+IO::println("=== Path prefix: first 10 moves of 8x8 tour from (0,0) ===")
+val r8full = solve(8, 0, 0)
+select r8full {
+  case c is Complete: {
+    var i: Int = 0
+    foreach p: Pos in c.path() {
+      if i < 10 {
+        IO::println("  Step #{i+1}: #{p}")
+      }
+      i++
+    }
+  }
+  case inc is Incomplete: IO::println("incomplete")
+}

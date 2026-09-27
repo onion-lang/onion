@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.118.0] - 2026-09-27
+
 ### Added
 
 - **`run/CourseGrades.on`** — a 294-line course grade-book, a new domain for the `run/` corpus (an ADT case-enum `LetterGrade` (`A`/`B`/`C`/`D`/`F`, each carrying a `minScore: Double`) with `label()`/`gpaPoints()` dispatched via `select this`, plus a static `fromScore` classifier; records `Assignment`/`Student`; classes `Enrollment`/`Course` with mutable `List` fields, a `public:` section, and nullable `Enrollment?` lookups with null checks; weighted-average and GPA computation over `foreach`-accumulated totals; a `Map[String, Int]` grade-distribution histogram built and read back via `foreach (k, v)`; string interpolation — rendering two course reports (class average, high/low, passing count, grade distribution, student roster) and a cross-course cumulative-GPA summary across 5 students), added to the `run/` corpus (merged via #1612).

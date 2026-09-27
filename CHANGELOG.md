@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.0] - 2026-09-27
+
 ### Added
 
 - **`run/SokobanSolver.on`** — a 280-line Sokoban box-pushing puzzle solver, a new domain for the `run/` corpus (an ADT case-enum `Cell` with 7 cases dispatched via exhaustive `select`/`is` patterns and shared methods `ch`/`isBox`/`isTarget`/`isPushable`; an immutable flat-string `Board` where every `setCell`/`tryMove` call returns a new instance, enabling cheap BFS state cloning; nullable return type (`Board?`) from `tryMove` for illegal-move signalling, consumed via the Elvis operator; breadth-first search over a `java.util.HashSet[String]` visited set keyed by board data, finding the optimal shortest solution; records `SearchState`/`SolveResult`; string interpolation, `foreach`/`while`, `public:` field sections — solving a single-box puzzle (6 moves, 40 BFS states) and a symmetric two-box puzzle (6 moves, 70 BFS states), both replayed step by step), added to the `run/` corpus (merged via #1633).

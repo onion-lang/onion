@@ -203,6 +203,8 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `FileResource`, `HttpResource` - The objects behind the `file"…"`/`http"…"` literals: bundle a path/URL with its read/write or request operations
 - `Resources` - The default-imported factory functions (`file`, `http`, `re`) backing the `file"…"`/`http"…"`/`re"…"` literals; the literal and the bare function call are exactly equivalent
 - `Lossless`, `Residue` - Round-trip-preserving lens pair for lossless shape parsing (`parseLossless`/`printLossless`)
+- `ConfigShape` - The `Shape[T]` backing `shape name = config`: a lossless shape over commented `key = value` documents
+- `ToolCli` - The runtime dispatch behind a top-level `tool` declaration's synthesized `main` (`--help`, `--contract`, `--plan`, flag/positional parsing)
 
 ## Testing
 
@@ -320,7 +322,7 @@ if condition { ... } else { ... }
 while condition { ... }
 
 // for loop
-for i = 0; i < 10; i++ { ... }
+for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
 foreach item: Type in collection { ... }
@@ -530,9 +532,9 @@ These are frequently confused with other languages. **Always check these:**
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
-| need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) shape name = re"..."` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
+| need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) { shape name = re"..." }` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
-| test a record in a separate suite | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
+| test a record in a separate suite | `record R(...) { law name(p: T) { boolExpr }; example { boolExpr } }` - `law`/`example`/`shape` clauses live inside the record's brace-enclosed body, alongside any methods; the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 
 ### Lambdas & Functions
 

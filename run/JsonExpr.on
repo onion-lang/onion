@@ -1,0 +1,275 @@
+// JsonExpr — custom JSON value ADT with builder, serializer, path queries,
+// and statistics. Exercises: ADT enum with case methods, records, classes,
+// pattern matching, closures, collection pipelines (map/filter/fold/find/
+// sortedBy), string interpolation with #{}, nullable types, foreach,
+// |> pipeline, Colls::concat, extension methods on JVal, recursive types.
+
+class JField {
+  val key: String
+  val val_: JVal
+public:
+  def this(k: String, v: JVal) { key = k; val_ = v }
+  def key(): String = key
+  def val_(): JVal = val_
+}
+
+enum JVal {
+  case JNull
+  case JBool(v: Boolean)
+  case JNum(n: Double)
+  case JStr(s: String)
+  case JArr(items: List[JVal])
+  case JObj(fields: List[JField])
+public:
+  def toJson(): String = select this {
+    case _n is JNull: "null"
+    case b is JBool:
+      if b.v() { "true" } else { "false" }
+    case n is JNum:
+      val d = n.n()
+      val lng = d.longValue()
+      if d == lng.doubleValue() { "" + lng } else { "" + d }
+    case s is JStr:
+      "\"" + s.s().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    case a is JArr:
+      "[" + a.items().map { it -> it.toJson() }.join(", ") + "]"
+    case o is JObj:
+      val parts = o.fields().map { f -> "\"" + f.key() + "\": " + f.val_().toJson() }
+      "{" + parts.join(", ") + "}"
+  }
+
+  def prettyJson(indent: Int): String = select this {
+    case _n is JNull: "null"
+    case b is JBool:
+      if b.v() { "true" } else { "false" }
+    case n is JNum:
+      val d = n.n()
+      val lng = d.longValue()
+      if d == lng.doubleValue() { "" + lng } else { "" + d }
+    case s is JStr:
+      "\"" + s.s().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    case a is JArr:
+      if a.items().size == 0 { "[]" } else {
+        val pad = Strings::repeat(" ", indent + 2)
+        val innerPad = Strings::repeat(" ", indent)
+        val items = a.items().map { it -> pad + it.prettyJson(indent + 2) }
+        "[\n" + items.join(",\n") + "\n" + innerPad + "]"
+      }
+    case o is JObj:
+      if o.fields().size == 0 { "{}" } else {
+        val pad = Strings::repeat(" ", indent + 2)
+        val innerPad = Strings::repeat(" ", indent)
+        val parts = o.fields().map { f ->
+          pad + "\"" + f.key() + "\": " + f.val_().prettyJson(indent + 2)
+        }
+        "{\n" + parts.join(",\n") + "\n" + innerPad + "}"
+      }
+  }
+
+  def get(key: String): JVal? =
+    select this {
+      case o is JObj:
+        o.fields().find { f -> f.key() == key }?.val_()
+      else: null
+    }
+
+  def at(idx: Int): JVal? =
+    select this {
+      case a is JArr:
+        val list = a.items()
+        if idx >= 0 && idx < list.size { list[idx] } else { null }
+      else: null
+    }
+
+  def size(): Int =
+    select this {
+      case a is JArr: a.items().size
+      case o is JObj: o.fields().size
+      else: 0
+    }
+
+  def asStr(): String? =
+    select this {
+      case s is JStr: s.s()
+      else: null
+    }
+
+  def asNum(): Double? =
+    select this {
+      case n is JNum: n.n()
+      else: null
+    }
+
+  def asBool(): Boolean? =
+    select this {
+      case b is JBool: b.v()
+      else: null
+    }
+
+  def isNull_(): Boolean =
+    select this {
+      case _n is JNull: true
+      else: false
+    }
+
+  def isObj(): Boolean =
+    select this {
+      case _o is JObj: true
+      else: false
+    }
+
+  def isArr(): Boolean =
+    select this {
+      case _a is JArr: true
+      else: false
+    }
+
+  def keys(): List[String] =
+    select this {
+      case o is JObj: o.fields().map { f -> f.key() }
+      else: []
+    }
+
+  def values(): List[JVal] =
+    select this {
+      case a is JArr: a.items()
+      case o is JObj: o.fields().map { f -> f.val_() }
+      else: []
+    }
+
+  def merge(other: JVal): JVal =
+    select this {
+      case o is JObj:
+        select other {
+          case p is JObj:
+            val combined = o.fields().filter { f ->
+              p.fields().find { g -> g.key() == f.key() } == null
+            }
+            new JObj(Colls::concat(combined, p.fields()))
+          else: this
+        }
+      else: other
+    }
+}
+
+def obj(fields: List[JField]): JVal = new JObj(fields)
+def arr(items: List[JVal]): JVal = new JArr(items)
+def str_(s: String): JVal = new JStr(s)
+def num_(n: Double): JVal = new JNum(n)
+def bool_(v: Boolean): JVal = new JBool(v)
+val jnull: JVal = new JNull()
+def f(k: String, v: JVal): JField = new JField(k, v)
+
+// --- path query: "a.b[2].c" ---
+def query(root: JVal, path: String): JVal? {
+  var current: JVal? = root
+  foreach segment: String in Strings::split(path, ".") {
+    if current == null { return null }
+    val node = current
+    if segment.endsWith("]") {
+      val brk = segment.indexOf("[")
+      val key = segment.substring(0, brk)
+      val idxStr = segment.substring(brk + 1, segment.length() - 1)
+      val idx = Integer::parseInt(idxStr)
+      current = if key.length() > 0 {
+        val inner = node?.get(key)
+        if inner != null { inner.at(idx) } else { null }
+      } else {
+        node?.at(idx)
+      }
+    } else {
+      current = node?.get(segment)
+    }
+  }
+  return current
+}
+
+// --- statistics over numeric arrays ---
+def numStats(v: JVal): void {
+  val nums = v.values().filter { it -> it.asNum() != null }.map { it -> it.asNum() ?: 0.0 }
+  if nums.size == 0 { IO::println("  (no numbers)"); return }
+  val total = nums.fold(0.0) { acc, x -> (acc as Double) + (x as Double) }
+  val avg = (total as Double) / nums.size
+  val sorted = nums.sortedBy { x -> x as Double }
+  val min_ = sorted[0] as Double
+  val max_ = sorted[sorted.size - 1] as Double
+  IO::println("  count=" + nums.size + " sum=" + (total as Double) + " avg=" + avg + " min=" + min_ + " max=" + max_)
+}
+
+def main(): void {
+  val alice: JVal = obj([
+    f("name",  str_("Alice")),
+    f("age",   num_(30.0)),
+    f("admin", bool_(true)),
+    f("scores", arr([num_(88.0), num_(95.0), num_(72.0), num_(91.0)])),
+    f("address", obj([
+      f("city",    str_("Tokyo")),
+      f("country", str_("Japan")),
+      f("zip",     str_("100-0001"))
+    ])),
+    f("meta", jnull)
+  ])
+
+  IO::println("=== compact JSON ===")
+  IO::println(alice.toJson())
+
+  IO::println("\n=== pretty JSON ===")
+  IO::println(alice.prettyJson(0))
+
+  IO::println("\n=== path queries ===")
+  IO::println("name:          " + (query(alice, "name")?.asStr() ?: "?"))
+  IO::println("address.city:  " + (query(alice, "address.city")?.asStr() ?: "?"))
+  IO::println("scores[2]:     " + (query(alice, "scores[2]")?.asNum() ?: 0.0))
+  IO::println("missing:       " + (query(alice, "missing")?.asStr() ?: "(none)"))
+  IO::println("meta is null:  " + (alice.get("meta")?.isNull_() ?: false))
+
+  IO::println("\n=== object info ===")
+  IO::println("keys: " + alice.keys().join(", "))
+  IO::println("size: " + alice.size())
+
+  IO::println("\n=== score stats ===")
+  val scores = alice.get("scores") ?: jnull
+  numStats(scores)
+
+  IO::println("\n=== merge ===")
+  val patch: JVal = obj([
+    f("age",  num_(31.0)),
+    f("role", str_("senior"))
+  ])
+  val merged = alice.merge(patch)
+  IO::println("age after merge:  " + (merged.get("age")?.asNum() ?: 0.0))
+  IO::println("role after merge: " + (merged.get("role")?.asStr() ?: "?"))
+  IO::println("name preserved:   " + (merged.get("name")?.asStr() ?: "?"))
+
+  IO::println("\n=== array filtering ===")
+  val highScores = scores.values()
+    .filter { v -> (v.asNum() ?: 0.0) >= 90.0 }
+    .map { v -> v.asNum() ?: 0.0 }
+    .sortedBy { n -> 0.0 - (n as Double) }
+  IO::println("scores >= 90, desc: " + highScores.join(", "))
+
+  IO::println("\n=== |> pipeline ===")
+  val scoreCount = scores.values()
+    .map { v -> v.asNum() ?: 0.0 }
+    |> Colls::sumBy { n -> n as Double }
+  IO::println("score sum via |>: #{scoreCount}")
+
+  IO::println("\n=== string interpolation ===")
+  val n_ = alice.get("name")?.asStr() ?: "?"
+  val a_ = alice.get("age")?.asNum() ?: 0.0
+  IO::println("#{n_} is #{a_} years old")
+
+  IO::println("\n=== foreach over fields ===")
+  foreach nestedKey: String in alice.values()
+    .filter { v -> v.isObj() }
+    .flatMap { v -> (v as JVal).keys() } {
+    IO::println("  nested key: #{nestedKey}")
+  }
+
+  IO::println("\n=== build array with range ===")
+  var rangeArr: List[JVal] = []
+  foreach i: Int in 1..5 {
+    rangeArr = Colls::concat(rangeArr, [num_(i.doubleValue())])
+  }
+  IO::println(arr(rangeArr).toJson())
+}

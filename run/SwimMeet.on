@@ -1,0 +1,476 @@
+// SwimMeet.on — Swimming meet results tracker and ranking system
+// Exercises: records with methods/bodies, data-carrying enums, ADT enums,
+// classes, interfaces, generics, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/distinct/find/partition/zip), select/pattern matching,
+// nullable, closures, string interpolation, try/catch, recursion,
+// while, foreach (ranges and map k,v), extension methods.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Stroke(code: String, fullName: String) {
+  Freestyle("FR", "Freestyle"),
+  Backstroke("BK", "Backstroke"),
+  Breaststroke("BR", "Breaststroke"),
+  Butterfly("FLY", "Butterfly"),
+  Medley("IM", "Individual Medley")
+}
+
+enum Distance(meters: Int) {
+  D50(50),
+  D100(100),
+  D200(200),
+  D400(400),
+  D800(800)
+}
+
+// ─── ADT: SwimResult ──────────────────────────────────────────────────────────
+
+enum SwimResult {
+  case Finished(timeSeconds: Double)
+  case DQ(reason: String)
+  case DNS
+public:
+  def label(): String = select this {
+    case r is Finished: formatTime(r.timeSeconds())
+    case d is DQ:       "DQ: #{d.reason()}"
+    case n is DNS:      "DNS"
+  }
+  def isFinished(): Boolean = select this {
+    case r is Finished: true
+    else: false
+  }
+  def timeOrNull(): Double? = select this {
+    case r is Finished: r.timeSeconds()
+    else: null
+  }
+}
+
+// ─── Utility functions ────────────────────────────────────────────────────────
+
+def formatTime(secs: Double): String {
+  val totalMs: Int  = (secs * 1000.0) as Int
+  val ms:      Int  = totalMs % 1000
+  val totalS:  Int  = totalMs / 1000
+  val s:       Int  = totalS % 60
+  val m:       Int  = totalS / 60
+  if m > 0 {
+    return "#{m}:#{zeroPad2(s)}.#{zeroPad3(ms)}"
+  } else {
+    return "#{s}.#{zeroPad3(ms)}"
+  }
+}
+
+def zeroPad2(n: Int): String {
+  if n < 10 { return "0" + n } else { return "" + n }
+}
+
+def zeroPad3(n: Int): String {
+  if n < 10  { return "00" + n }
+  else if n < 100 { return "0" + n }
+  else { return "" + n }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Swimmer(
+  id:   String,
+  name: String,
+  club: String,
+  age:  Int
+) {
+public:
+  def label(): String = "#{name()} (#{club()}, age #{age()})"
+  def isYouth(): Boolean = age() < 18
+}
+
+record EventSpec(
+  stroke:   Stroke,
+  distance: Distance
+) {
+public:
+  def code(): String  = "#{distance().meters()}#{stroke().code()}"
+  def title(): String = "#{distance().meters()}m #{stroke().fullName()}"
+}
+
+record HeatEntry(
+  swimmer:  Swimmer,
+  event:    EventSpec,
+  lane:     Int,
+  result:   SwimResult
+) {
+public:
+  def isValid(): Boolean = result().isFinished()
+  def timeOrNull(): Double? = result().timeOrNull()
+  def summary(): String =
+    "Lane #{lane()} #{swimmer().name()} — #{result().label()}"
+}
+
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def round3(): Double {
+    return ((self * 1000.0 + 0.5) as Int) * 1.0 / 1000.0
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def title(): String
+  def printReport(): void
+}
+
+// ─── PersonalBest registry ────────────────────────────────────────────────────
+
+class PersonalBestRegistry {
+  val records: Map[String, Double]   // key = swimmerId + "|" + eventCode
+
+public:
+  def this() { this.records = [:] }
+
+  def key(swimmerId: String, eventCode: String): String =
+    swimmerId + "|" + eventCode
+
+  def update(swimmerId: String, eventCode: String, timeS: Double): Boolean {
+    val k: String = key(swimmerId, eventCode)
+    val prev: Double? = records[k] as Double?
+    if prev == null || timeS < (prev as Double) {
+      records[k] = timeS
+      return true
+    }
+    return false
+  }
+
+  def get(swimmerId: String, eventCode: String): Double? {
+    val k: String = key(swimmerId, eventCode)
+    return records[k] as Double?
+  }
+
+  def hasPB(swimmerId: String, eventCode: String): Boolean {
+    return get(swimmerId, eventCode) != null
+  }
+}
+
+// ─── Heat ─────────────────────────────────────────────────────────────────────
+
+class Heat {
+  val event:   EventSpec
+  val number:  Int
+  val entries: List[HeatEntry]
+
+public:
+  def this(ev: EventSpec, num: Int) {
+    this.event   = ev
+    this.number  = num
+    this.entries = []
+  }
+
+  def addEntry(e: HeatEntry): void { entries.add(e) }
+
+  def getEvent():   EventSpec      = event
+  def getNumber():  Int            = number
+  def getEntries(): List[HeatEntry] = entries
+
+  def validEntries(): List[HeatEntry] =
+    entries.filter { e -> (e as HeatEntry).isValid() }
+
+  def winner(): HeatEntry? {
+    val valid = validEntries()
+    if valid.size == 0 { return null }
+    var best: HeatEntry = valid[0] as HeatEntry
+    foreach e: HeatEntry in valid {
+      val t: Double? = e.timeOrNull()
+      val bt: Double? = best.timeOrNull()
+      if t != null && bt != null && (t as Double) < (bt as Double) {
+        best = e
+      }
+    }
+    return best
+  }
+
+  def rankedEntries(): List[HeatEntry] {
+    val valid = validEntries()
+    return valid.sortedBy { e ->
+      val t: Double? = (e as HeatEntry).timeOrNull()
+      if t != null { (t as Double) } else { 9999.0 }
+    }
+  }
+}
+
+// ─── Meet ─────────────────────────────────────────────────────────────────────
+
+class Meet conforms Reportable {
+  val name:    String
+  val venue:   String
+  val heats:   List[Heat]
+  val pb:      PersonalBestRegistry
+
+public:
+  def this(n: String, v: String) {
+    this.name  = n
+    this.venue = v
+    this.heats = []
+    this.pb    = new PersonalBestRegistry()
+  }
+
+  def addHeat(h: Heat): void { heats.add(h) }
+
+  def getName():  String = name
+  def getVenue(): String = venue
+
+  def recordResults(): void {
+    foreach h: Heat in heats {
+      foreach e: HeatEntry in (h as Heat).validEntries() {
+        val ev   = (e as HeatEntry).event()
+        val sw   = (e as HeatEntry).swimmer()
+        val t:   Double? = (e as HeatEntry).timeOrNull()
+        if t != null {
+          pb.update(sw.id(), ev.code(), t as Double)
+        }
+      }
+    }
+  }
+
+  def allEntries(): List[HeatEntry] {
+    var result: List[HeatEntry] = []
+    foreach h: Heat in heats {
+      foreach e: HeatEntry in (h as Heat).getEntries() {
+        result.add(e as HeatEntry)
+      }
+    }
+    return result
+  }
+
+  def entriesForEvent(code: String): List[HeatEntry] =
+    allEntries().filter { e -> (e as HeatEntry).event().code() == code }
+
+  def eventCodes(): List[String] =
+    allEntries()
+      .map { e -> (e as HeatEntry).event().code() }
+      .distinct()
+
+  def allSwimmers(): List[Swimmer] =
+    allEntries()
+      .map { e -> (e as HeatEntry).swimmer() }
+      .distinct()
+
+  def title(): String = "#{name} at #{venue}"
+
+  def getPb(): PersonalBestRegistry = pb
+
+  def printReport(): void {
+    printHeader("MEET: #{name}")
+    println("Venue: #{venue}")
+    println("Heats: #{heats.size}")
+    println("Events: #{eventCodes().size}")
+    println("Swimmers: #{allSwimmers().size}")
+  }
+}
+
+// ─── Utility printers ─────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  println(s)
+}
+
+def printHeader(title: String): void {
+  println("")
+  println(title)
+  hr(title.length())
+}
+
+// ─── Sample data ──────────────────────────────────────────────────────────────
+
+val swimmers: List[Swimmer] = [
+  new Swimmer("S01", "Alice Marsh",   "TideSwim",   17),
+  new Swimmer("S02", "Ben Kowalski",  "WaveRiders",  20),
+  new Swimmer("S03", "Cleo Park",     "TideSwim",    15),
+  new Swimmer("S04", "David Lee",     "BlueAquatic", 22),
+  new Swimmer("S05", "Emma Cruz",     "WaveRiders",  18),
+  new Swimmer("S06", "Felix Ndoye",   "BlueAquatic", 16),
+  new Swimmer("S07", "Gina Sato",     "TideSwim",    19),
+  new Swimmer("S08", "Henry Voss",    "WaveRiders",  21)
+]
+
+val e100FR  = new EventSpec(Stroke::Freestyle,   Distance::D100)
+val e100BK  = new EventSpec(Stroke::Backstroke,  Distance::D100)
+val e100BR  = new EventSpec(Stroke::Breaststroke,Distance::D100)
+val e200IM  = new EventSpec(Stroke::Medley,      Distance::D200)
+val e50FR   = new EventSpec(Stroke::Freestyle,   Distance::D50)
+
+val meet = new Meet("City Open Championship", "Lakeside Aquatic Centre")
+
+// Heat 1: 100m Freestyle (lanes 1-6)
+val h1 = new Heat(e100FR, 1)
+h1.addEntry(new HeatEntry(swimmers[0], e100FR, 1, new Finished(57.23)))
+h1.addEntry(new HeatEntry(swimmers[1], e100FR, 2, new Finished(58.01)))
+h1.addEntry(new HeatEntry(swimmers[2], e100FR, 3, new Finished(60.44)))
+h1.addEntry(new HeatEntry(swimmers[3], e100FR, 4, new Finished(56.88)))
+h1.addEntry(new HeatEntry(swimmers[4], e100FR, 5, new DQ("false start")))
+h1.addEntry(new HeatEntry(swimmers[5], e100FR, 6, new Finished(61.30)))
+
+// Heat 2: 100m Backstroke
+val h2 = new Heat(e100BK, 1)
+h2.addEntry(new HeatEntry(swimmers[0], e100BK, 1, new Finished(63.45)))
+h2.addEntry(new HeatEntry(swimmers[6], e100BK, 2, new Finished(62.10)))
+h2.addEntry(new HeatEntry(swimmers[1], e100BK, 3, new Finished(64.88)))
+h2.addEntry(new HeatEntry(swimmers[7], e100BK, 4, new DNS()))
+h2.addEntry(new HeatEntry(swimmers[3], e100BK, 5, new Finished(61.77)))
+
+// Heat 3: 100m Breaststroke
+val h3 = new Heat(e100BR, 1)
+h3.addEntry(new HeatEntry(swimmers[2], e100BR, 1, new Finished(74.12)))
+h3.addEntry(new HeatEntry(swimmers[4], e100BR, 2, new Finished(72.88)))
+h3.addEntry(new HeatEntry(swimmers[5], e100BR, 3, new Finished(76.55)))
+h3.addEntry(new HeatEntry(swimmers[6], e100BR, 4, new Finished(71.30)))
+h3.addEntry(new HeatEntry(swimmers[7], e100BR, 5, new Finished(75.00)))
+
+// Heat 4: 200m Individual Medley
+val h4 = new Heat(e200IM, 1)
+h4.addEntry(new HeatEntry(swimmers[0], e200IM, 1, new Finished(134.55)))
+h4.addEntry(new HeatEntry(swimmers[3], e200IM, 2, new Finished(131.20)))
+h4.addEntry(new HeatEntry(swimmers[6], e200IM, 3, new Finished(138.77)))
+h4.addEntry(new HeatEntry(swimmers[7], e200IM, 4, new Finished(136.44)))
+h4.addEntry(new HeatEntry(swimmers[1], e200IM, 5, new DQ("stroke violation")))
+
+// Heat 5: 50m Freestyle (sprint)
+val h5 = new Heat(e50FR, 1)
+h5.addEntry(new HeatEntry(swimmers[1], e50FR, 1, new Finished(26.88)))
+h5.addEntry(new HeatEntry(swimmers[3], e50FR, 2, new Finished(25.44)))
+h5.addEntry(new HeatEntry(swimmers[4], e50FR, 3, new Finished(27.01)))
+h5.addEntry(new HeatEntry(swimmers[5], e50FR, 4, new Finished(27.55)))
+h5.addEntry(new HeatEntry(swimmers[2], e50FR, 5, new Finished(28.10)))
+h5.addEntry(new HeatEntry(swimmers[7], e50FR, 6, new Finished(26.22)))
+
+foreach h: Heat in [h1, h2, h3, h4, h5] { meet.addHeat(h as Heat) }
+meet.recordResults()
+
+// ─── Report 1: Meet overview ──────────────────────────────────────────────────
+
+meet.printReport()
+
+// ─── Report 2: Results by event ───────────────────────────────────────────────
+
+printHeader("RESULTS BY EVENT")
+foreach h: Heat in [h1, h2, h3, h4, h5] {
+  val ev = (h as Heat).getEvent()
+  println("\n  #{ev.title()} — Heat #{(h as Heat).getNumber()}")
+  var rank: Int = 1
+  foreach e: HeatEntry in (h as Heat).rankedEntries() {
+    val name = e.swimmer().name().rpad(16)
+    val club = e.swimmer().club().rpad(12)
+    val time = e.result().label().lpad(12)
+    println("  #{rank.lpad(2)}.  #{name} #{club} #{time}")
+    rank = rank + 1
+  }
+  val dqs = (h as Heat).getEntries().filter { e -> !(e as HeatEntry).isValid() }
+  foreach e: HeatEntry in dqs {
+    val name = e.swimmer().name().rpad(16)
+    val status = e.result().label()
+    println("       #{name} — #{status}")
+  }
+}
+
+// ─── Report 3: Personal bests ─────────────────────────────────────────────────
+
+printHeader("PERSONAL BEST TIMES")
+val eventList: List[EventSpec] = [e100FR, e100BK, e100BR, e200IM, e50FR]
+val header = "Swimmer".rpad(18) + "Club".rpad(14) +
+             "100FR".lpad(10) + "100BK".lpad(10) +
+             "100BR".lpad(10) + "200IM".lpad(12) + "50FR".lpad(8)
+println(header)
+hr(header.length())
+foreach s: Swimmer in swimmers {
+  var row: String = s.name().rpad(18) + s.club().rpad(14)
+  foreach ev: EventSpec in eventList {
+    val pb: Double? = meet.getPb().get(s.id(), ev.code())
+    val cell: String = if pb != null { formatTime(pb as Double) } else { "—" }
+    val w: Int = select ev.code() {
+      case "200IM": 12
+      case "50FR":  8
+      else: 10
+    }
+    row = row + cell.lpad(w)
+  }
+  println(row)
+}
+
+// ─── Report 4: Club standings ─────────────────────────────────────────────────
+
+printHeader("CLUB STANDINGS (by valid swims)")
+
+val grouped = swimmers.groupBy { s -> (s as Swimmer).club() }
+foreach (club, members) in grouped {
+  val memberList = members as List[Swimmer]
+  var totalSwims: Int = 0
+  var totalDQs: Int = 0
+  foreach s: Swimmer in memberList {
+    val entries = meet.allEntries().filter {
+      e -> (e as HeatEntry).swimmer().id() == (s as Swimmer).id()
+    }
+    totalSwims = totalSwims + (entries.filter { e -> (e as HeatEntry).isValid() }).size
+    totalDQs   = totalDQs   + (entries.filter { e -> !(e as HeatEntry).isValid() }).size
+  }
+  val youthCount = memberList.filter { s -> (s as Swimmer).isYouth() }.size
+  println("  #{club}: #{memberList.size} swimmers (#{youthCount} youth)" +
+          ", #{totalSwims} valid swims, #{totalDQs} disqualified")
+}
+
+// ─── Report 5: Event winners ──────────────────────────────────────────────────
+
+printHeader("EVENT WINNERS")
+foreach h: Heat in [h1, h2, h3, h4, h5] {
+  val ev     = (h as Heat).getEvent()
+  val winner: HeatEntry? = (h as Heat).winner()
+  if winner != null {
+    val w = winner as HeatEntry
+    println("  #{ev.title().rpad(30)}  #{w.swimmer().name().rpad(16)} #{w.result().label()}")
+  } else {
+    println("  #{ev.title().rpad(30)}  (no valid finishers)")
+  }
+}
+
+// ─── Report 6: Youth swimmers ─────────────────────────────────────────────────
+
+printHeader("YOUTH SWIMMERS (Under 18)")
+val youth = swimmers.filter { s -> (s as Swimmer).isYouth() }
+foreach s: Swimmer in youth {
+  val entries = meet.allEntries().filter {
+    e -> (e as HeatEntry).swimmer().id() == (s as Swimmer).id()
+  }
+  val count = entries.size
+  val best: HeatEntry? = entries.filter { e -> (e as HeatEntry).isValid() }
+    .sortedBy { e -> (e as HeatEntry).timeOrNull() ?: 9999.0 }
+    .find { _ -> true }
+  val bestStr: String = if best != null { (best as HeatEntry).result().label() +
+    " (" + (best as HeatEntry).event().title() + ")" } else { "no finish" }
+  println("  #{s.name().rpad(16)} age #{s.age()}" +
+          ", #{count} entries, best: #{bestStr}")
+}
+
+println("")
+println("=== End of Report ===")

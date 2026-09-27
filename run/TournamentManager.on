@@ -1,0 +1,371 @@
+// TournamentManager.on — round-robin football tournament tracker
+// Exercises: records, data-carrying enums, interfaces, generics,
+// collection pipelines (sortedBy/filter/map/fold/find/count), select with
+// type patterns, nullable, closures, string interpolation, foreach on Map,
+// while loops, recursion, try/catch.
+
+import {
+  java.util.*
+  java.lang.Math as JMath
+}
+
+// ── Domain model ─────────────────────────────────────────────────────────────
+
+record Team(name: String, city: String, founded: Int) {
+public:
+  def shortName(): String = name.substring(0, JMath::min(3, name.length())).toUpperCase()
+  def label(): String = "#{name} (#{city}, est. #{founded})"
+}
+
+// Match result from the home team's perspective
+enum MatchResult {
+  case Win
+  case Draw
+  case Loss
+}
+
+record MatchReport(
+  home: Team,
+  away: Team,
+  homeGoals: Int,
+  awayGoals: Int
+) {
+public:
+  def result(): MatchResult {
+    if homeGoals > awayGoals { return new Win() }
+    if homeGoals == awayGoals { return new Draw() }
+    return new Loss()
+  }
+
+  def awayResult(): MatchResult {
+    select result() {
+      case r is Win:  return new Loss()
+      case r is Draw: return new Draw()
+      case r is Loss: return new Win()
+    }
+  }
+
+  def totalGoals(): Int = homeGoals + awayGoals
+
+  def summary(): String = "#{home.name} #{homeGoals}-#{awayGoals} #{away.name}"
+
+  def resultLabel(): String {
+    select result() {
+      case r is Win:  return home.name + " WIN"
+      case r is Draw: return "DRAW"
+      case r is Loss: return away.name + " WIN"
+    }
+  }
+}
+
+// ── Standing ──────────────────────────────────────────────────────────────────
+
+record Standing(
+  team: Team,
+  played: Int,
+  won: Int,
+  drawn: Int,
+  lost: Int,
+  goalsFor: Int,
+  goalsAgainst: Int
+) {
+public:
+  def points(): Int = won * 3 + drawn
+  def goalDiff(): Int = goalsFor - goalsAgainst
+  def winPct(): Double = if played == 0 { 0.0 } else { (won as Double) / (played as Double) * 100.0 }
+
+  def withMatch(report: MatchReport, isHome: Boolean): Standing {
+    val gf: Int = if isHome { report.homeGoals() } else { report.awayGoals() }
+    val ga: Int = if isHome { report.awayGoals() } else { report.homeGoals() }
+    val res: MatchResult = if isHome { report.result() } else { report.awayResult() }
+    select res {
+      case r is Win:
+        return new Standing(team, played+1, won+1, drawn,   lost,   goalsFor+gf, goalsAgainst+ga)
+      case r is Draw:
+        return new Standing(team, played+1, won,   drawn+1, lost,   goalsFor+gf, goalsAgainst+ga)
+      case r is Loss:
+        return new Standing(team, played+1, won,   drawn,   lost+1, goalsFor+gf, goalsAgainst+ga)
+    }
+  }
+
+  def sortKey(): Int = 0 - (points() * 1000000 + goalDiff() * 1000 + goalsFor())
+
+  def row(rank: Int): String {
+    val pts: String = if points() < 10 { " " + points() } else { "" + points() }
+    val gd: String  = if goalDiff() >= 0 { "+" + goalDiff() } else { "" + goalDiff() }
+    val pct: Int    = (winPct() + 0.5) as Int
+    return "#{rank}. #{team.shortName()}  P:#{played}  W:#{won}  D:#{drawn}  L:#{lost}  " +
+           "GF:#{goalsFor}  GA:#{goalsAgainst}  GD:#{gd}  Pts:#{pts}  Win%:#{pct}"
+  }
+}
+
+// ── Tournament ────────────────────────────────────────────────────────────────
+
+class Tournament {
+public:
+  var teams: List[Team]           = []
+  var results: List[MatchReport]  = []
+
+  def this(teamList: List[Team]) {
+    self.teams = teamList
+  }
+
+  def addResult(r: MatchReport): void {
+    results.add(r)
+  }
+
+  def buildTable(): Map[String, Standing] {
+    var table: Map[String, Standing] = [:]
+    foreach t: Team in teams {
+      table.put(t.name(), new Standing(t, 0, 0, 0, 0, 0, 0))
+    }
+    foreach m: MatchReport in results {
+      val hs: Standing? = table.get(m.home().name())
+      val as_: Standing? = table.get(m.away().name())
+      if hs != null {
+        table.put(m.home().name(), hs.withMatch(m, true))
+      }
+      if as_ != null {
+        table.put(m.away().name(), as_.withMatch(m, false))
+      }
+    }
+    return table
+  }
+
+  def standings(): List[Standing] {
+    val table: Map[String, Standing] = buildTable()
+    val list: List[Standing] = []
+    foreach (_, v) in table {
+      list.add(v as Standing)
+    }
+    return list.sortedBy { s: Standing -> s.sortKey() }
+  }
+
+  def totalGoals(): Int {
+    var total: Int = 0
+    foreach m: MatchReport in results {
+      total = total + m.totalGoals()
+    }
+    return total
+  }
+
+  def avgGoalsPerMatch(): Double {
+    if results.size == 0 { return 0.0 }
+    return (totalGoals() as Double) / (results.size as Double)
+  }
+
+  def highestScoringMatch(): MatchReport? {
+    if results.size == 0 { return null }
+    var best: MatchReport = results.get(0) as MatchReport
+    foreach m: MatchReport in results {
+      if m.totalGoals() > best.totalGoals() {
+        best = m
+      }
+    }
+    return best
+  }
+
+  def teamCount(): Int = teams.size
+  def matchCount(): Int = results.size
+
+  def topTeam(): Team? {
+    val ranked: List[Standing] = standings()
+    if ranked.size == 0 { return null }
+    return (ranked.get(0) as Standing).team()
+  }
+
+  def cleanSheets(): Map[String, Int] {
+    var cs: Map[String, Int] = [:]
+    foreach t: Team in teams {
+      cs.put(t.name(), 0)
+    }
+    foreach m: MatchReport in results {
+      if m.awayGoals() == 0 {
+        val n: String = m.home().name()
+        val c: Int? = cs.get(n)
+        if c != null { cs.put(n, c + 1) }
+      }
+      if m.homeGoals() == 0 {
+        val n: String = m.away().name()
+        val c: Int? = cs.get(n)
+        if c != null { cs.put(n, c + 1) }
+      }
+    }
+    return cs
+  }
+}
+
+// ── Fixture generator ─────────────────────────────────────────────────────────
+
+def generateFixtures(teams: List[Team]): List[MatchReport] {
+  val n: Int = teams.size
+  val fixtures: List[MatchReport] = []
+  foreach i: Int in 0..<n {
+    foreach j: Int in (i+1)..<n {
+      val home: Team = teams.get(i) as Team
+      val away: Team = teams.get(j) as Team
+      val hg: Int = (i * 3 + j * 2) % 4
+      val ag: Int = (i * 2 + j) % 3
+      fixtures.add(new MatchReport(home, away, hg, ag))
+    }
+  }
+  return fixtures
+}
+
+// ── Recursive head-to-head tiebreaker ─────────────────────────────────────────
+
+def headToHeadPoints(a: Team, b: Team, results: List[MatchReport]): Int {
+  var pts: Int = 0
+  foreach m: MatchReport in results {
+    if m.home().name() == a.name() && m.away().name() == b.name() {
+      select m.result() {
+        case r is Win:  pts = pts + 3
+        case r is Draw: pts = pts + 1
+        case r is Loss: pts = pts
+      }
+    }
+    if m.home().name() == b.name() && m.away().name() == a.name() {
+      select m.awayResult() {
+        case r is Win:  pts = pts + 3
+        case r is Draw: pts = pts + 1
+        case r is Loss: pts = pts
+      }
+    }
+  }
+  return pts
+}
+
+// ── Pretty printers ───────────────────────────────────────────────────────────
+
+def line(ch: String, width: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < width { s = s + ch; i++ }
+  return s
+}
+
+def printHeader(title: String): void {
+  val w: Int = 54
+  IO::println(line("=", w))
+  IO::println("  " + title)
+  IO::println(line("=", w))
+}
+
+def printSection(label: String): void {
+  IO::println("")
+  IO::println("── " + label + " " + line("─", 40 - label.length()))
+}
+
+def printTeams(t: Tournament): void {
+  printSection("TEAMS")
+  foreach team: Team in t.teams {
+    IO::println("  • " + team.label())
+  }
+}
+
+def printResults(t: Tournament): void {
+  printSection("MATCH RESULTS (" + t.matchCount() + " games)")
+  var i: Int = 1
+  foreach m: MatchReport in t.results {
+    IO::println("  #{i}. #{m.summary()}  [#{m.resultLabel()}]")
+    i++
+  }
+}
+
+def printStandings(t: Tournament): void {
+  printSection("LEAGUE TABLE")
+  IO::println("  Rank  Team  P  W  D  L  GF  GA  GD  Pts  Win%")
+  IO::println("  " + line("-", 50))
+  var rank: Int = 1
+  foreach s: Standing in t.standings() {
+    IO::println("  " + s.row(rank))
+    rank++
+  }
+}
+
+def printStats(t: Tournament): void {
+  printSection("TOURNAMENT STATISTICS")
+  IO::println("  Matches played    : #{t.matchCount()}")
+  IO::println("  Total goals       : #{t.totalGoals()}")
+  val avg: Double = t.avgGoalsPerMatch()
+  val avgInt: Int = avg as Int
+  val avgFrac: Int = ((avg - (avgInt as Double)) * 10.0 + 0.5) as Int
+  IO::println("  Avg goals/match   : #{avgInt}.#{avgFrac}")
+
+  val best: MatchReport? = t.highestScoringMatch()
+  if best != null {
+    IO::println("  Highest scoring   : #{best.summary()} (#{best.totalGoals()} goals)")
+  }
+
+  val winner: Team? = t.topTeam()
+  if winner != null {
+    IO::println("  Current leader    : #{winner.name()}")
+  }
+}
+
+def printCleanSheets(t: Tournament): void {
+  printSection("CLEAN SHEETS")
+  val cs: Map[String, Int] = t.cleanSheets()
+  val names: List[String] = []
+  foreach (k, _) in cs {
+    names.add(k as String)
+  }
+  val sorted: List[String] = names.sortedBy { n -> 0 - (cs.get(n as String) as Int) }
+  foreach name: String in sorted {
+    val count: Int? = cs.get(name)
+    if count != null {
+      IO::println("  #{name}: #{count} clean sheet(s)")
+    }
+  }
+}
+
+def printHeadToHead(t: Tournament): void {
+  printSection("HEAD-TO-HEAD (selected pairs)")
+  val teams: List[Team] = t.teams
+  if teams.size < 2 { return }
+  var i: Int = 0
+  while i < JMath::min(3, teams.size) {
+    var j: Int = i + 1
+    while j < JMath::min(i + 3, teams.size) {
+      val a: Team = teams.get(i) as Team
+      val b: Team = teams.get(j) as Team
+      val ptsA: Int = headToHeadPoints(a, b, t.results)
+      val ptsB: Int = headToHeadPoints(b, a, t.results)
+      IO::println("  #{a.name()} vs #{b.name()}: #{ptsA} pts vs #{ptsB} pts")
+      j++
+    }
+    i++
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val teams: List[Team] = [
+    new Team("Arsenal",    "London",     1886),
+    new Team("Chelsea",    "London",     1905),
+    new Team("Liverpool",  "Liverpool",  1892),
+    new Team("Man City",   "Manchester", 1880),
+    new Team("Newcastle",  "Newcastle",  1892),
+    new Team("Tottenham",  "London",     1882)
+  ]
+
+  val t: Tournament = new Tournament(teams)
+
+  val fixtures: List[MatchReport] = generateFixtures(teams)
+  foreach f: MatchReport in fixtures {
+    t.addResult(f)
+  }
+
+  printHeader("ONION PREMIER LEAGUE — Season 2025/26")
+  printTeams(t)
+  printResults(t)
+  printStandings(t)
+  printStats(t)
+  printCleanSheets(t)
+  printHeadToHead(t)
+  IO::println("")
+  IO::println(line("=", 54))
+  IO::println("  Report generated by TournamentManager.on")
+  IO::println(line("=", 54))
+}

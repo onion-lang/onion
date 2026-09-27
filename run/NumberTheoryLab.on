@@ -21,11 +21,13 @@ public:
 
 // ─── Records with examples ───────────────────────────────────────────────────
 
-record GcdResult(a: Int, b: Int, result: Int)
+record GcdResult(a: Int, b: Int, result: Int) {
   example { new GcdResult(12, 8, 4).result() == 4 }
+}
 
-record PrimeRange(lo: Int, hi: Int, count: Int)
+record PrimeRange(lo: Int, hi: Int, count: Int) {
   example { new PrimeRange(1, 10, 4).count() >= 0 }
+}
 
 // ─── Extension methods on Int ────────────────────────────────────────────────
 

@@ -1,0 +1,325 @@
+// HotelBooking.on — hotel reservation and reporting system
+// Exercises: data-carrying enums, ADT case enums, records with methods,
+// interfaces, class inheritance, generics, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/zip/take),
+// select/pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while, foreach (list + map + range), extension methods.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum RoomKind(label: String, baseRate: Int) {
+  Standard    ("Standard",     120),
+  Deluxe      ("Deluxe",       180),
+  Suite       ("Suite",        280),
+  Presidential("Presidential", 500)
+}
+
+enum MealPlan(label: String, dailyCost: Int) {
+  None     ("Room only",     0),
+  Breakfast("Bed+Breakfast", 25),
+  HalfBoard("Half board",    55),
+  FullBoard ("Full board",   90)
+}
+
+// ADT: booking lifecycle
+enum BookingStatus {
+  case Pending
+  case Confirmed(confirmCode: String)
+  case CheckedIn(actualDate: String)
+  case CheckedOut(checkOutDate: String, finalTotal: Int)
+  case Cancelled(reason: String)
+public:
+  def label(): String = select this {
+    case s is Pending:    "Pending"
+    case s is Confirmed:  "Confirmed (##{s.confirmCode()})"
+    case s is CheckedIn:  "Checked in #{s.actualDate()}"
+    case s is CheckedOut: "Checked out #{s.checkOutDate()} — $#{s.finalTotal()}"
+    case s is Cancelled:  "Cancelled: #{s.reason()}"
+  }
+  def isActive(): Boolean = select this {
+    case s is Pending:   true
+    case s is Confirmed: true
+    case s is CheckedIn: true
+    else:                false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Room(number: Int, kind: RoomKind, floor: Int, smokingAllowed: Boolean) {
+public:
+  def label(): String    = "Room #{number()} (#{kind().label()}, floor #{floor()})"
+  def nightly(): Int     = kind().baseRate()
+}
+
+record Guest(name: String, email: String, loyaltyTier: Int) {
+public:
+  def tierLabel(): String = select loyaltyTier() {
+    case 1: "Silver"
+    case 2: "Gold"
+    case 3: "Platinum"
+    else:   "Standard"
+  }
+  def discount(): Double = select loyaltyTier() {
+    case 1: 0.05
+    case 2: 0.10
+    case 3: 0.15
+    else:   0.0
+  }
+}
+
+record Booking(id: Int, guest: Guest, room: Room, checkIn: Int, checkOut: Int, plan: MealPlan, status: BookingStatus) {
+public:
+  def nights(): Int   = checkOut() - checkIn()
+  def roomTotal(): Int = nights() * room().nightly()
+  def mealTotal(): Int = nights() * plan().dailyCost()
+  def subtotal(): Int  = roomTotal() + mealTotal()
+  def total(): Int {
+    val disc = (subtotal() as Double) * guest().discount()
+    return subtotal() - (disc as Int)
+  }
+  def summary(): String =
+    "Booking ##{id()} — #{guest().name()} in #{room().label()}" +
+    " | #{nights()} nights | Plan: #{plan().label()} | $#{total()} | #{status().label()}"
+}
+
+// ─── Pricing interface and implementations ────────────────────────────────────
+
+interface PricingStrategy {
+  def calculate(room: Room, nights: Int, plan: MealPlan): Int
+}
+
+class StandardPricing conforms PricingStrategy {
+public:
+  override def calculate(room: Room, nights: Int, plan: MealPlan): Int =
+    nights * room.nightly() + nights * plan.dailyCost()
+}
+
+class MemberPricing extends StandardPricing {
+  val pct: Int
+public:
+  def this(discountPct: Int) {
+    this.pct = discountPct
+  }
+  override def calculate(room: Room, nights: Int, plan: MealPlan): Int {
+    val base = nights * room.nightly() + nights * plan.dailyCost()
+    return base - (base * pct / 100)
+  }
+}
+
+// ─── Hotel class ──────────────────────────────────────────────────────────────
+
+class Hotel {
+public:
+  val name:     String
+  val rooms:    List[Room]
+  val bookings: List[Booking]
+  var nextId:   Int
+
+  def this(hotelName: String) {
+    this.name     = hotelName
+    this.rooms    = []
+    this.bookings = []
+    this.nextId   = 1
+  }
+
+  def addRoom(r: Room): void { rooms << r }
+
+  def availableRooms(checkIn: Int, checkOut: Int): List[Room] {
+    val occupied: List[Int] = bookings
+      .filter { b -> (b as Booking).status().isActive() && overlaps((b as Booking).checkIn(), (b as Booking).checkOut(), checkIn, checkOut) }
+      .map    { b -> (b as Booking).room().number() }
+    return rooms.filter { r -> !occupied.contains((r as Room).number()) }
+  }
+
+  def book(guest: Guest, roomNum: Int, checkIn: Int, checkOut: Int, plan: MealPlan): Booking? {
+    val room: Room? = rooms.find { r -> (r as Room).number() == roomNum }
+    if room == null { return null }
+    val b = new Booking(nextId, guest, room, checkIn, checkOut, plan, new Pending())
+    bookings << b
+    nextId = nextId + 1
+    return b
+  }
+
+  def confirm(bookingId: Int, code: String): Boolean {
+    var i: Int = 0
+    while i < bookings.size {
+      val b = bookings[i] as Booking
+      if b.id() == bookingId {
+        bookings[i] = new Booking(b.id(), b.guest(), b.room(), b.checkIn(), b.checkOut(), b.plan(), new Confirmed(code))
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+
+  def checkIn(bookingId: Int, date: String): Boolean {
+    var i: Int = 0
+    while i < bookings.size {
+      val b = bookings[i] as Booking
+      if b.id() == bookingId {
+        bookings[i] = new Booking(b.id(), b.guest(), b.room(), b.checkIn(), b.checkOut(), b.plan(), new CheckedIn(date))
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+
+  def cancel(bookingId: Int, reason: String): Boolean {
+    var i: Int = 0
+    while i < bookings.size {
+      val b = bookings[i] as Booking
+      if b.id() == bookingId && b.status().isActive() {
+        bookings[i] = new Booking(b.id(), b.guest(), b.room(), b.checkIn(), b.checkOut(), b.plan(), new Cancelled(reason))
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+
+  def revenueReport(): void {
+    IO::println("\n=== Revenue Report: #{name} ===")
+    val active = bookings.filter { b -> (b as Booking).status().isActive() }
+    val total  = active.fold(0) { acc, b -> (acc as Int) + (b as Booking).total() }
+    IO::println("Active bookings: #{active.size}")
+    IO::println("Projected revenue: $#{total}")
+    val byKind = active.groupBy { b -> (b as Booking).room().kind().label() }
+    foreach (rtype, blist) in byKind {
+      val bl = blist as List[Booking]
+      val rev = bl.fold(0) { acc, b -> (acc as Int) + (b as Booking).total() }
+      IO::println("  #{rtype}: #{bl.size} booking(s) — $#{rev}")
+    }
+  }
+
+  def guestReport(): void {
+    IO::println("\n=== Guest Report ===")
+    val guestNames = bookings.map { b -> (b as Booking).guest().name() }.distinct()
+    IO::println("Unique guests: #{guestNames.size}")
+    val byTier = bookings.groupBy { b -> (b as Booking).guest().tierLabel() }
+    foreach (tier, blist) in byTier {
+      IO::println("  #{tier}: #{(blist as List[Booking]).size} booking(s)")
+    }
+  }
+
+  def occupancyRate(checkIn: Int, checkOut: Int): Double {
+    val avail = rooms.size
+    val occ   = avail - availableRooms(checkIn, checkOut).size
+    return if avail == 0 { 0.0 } else { (occ as Double) / (avail as Double) * 100.0 }
+  }
+
+  static def overlaps(s1: Int, e1: Int, s2: Int, e2: Int): Boolean = s1 < e2 && s2 < e1
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def usd(): String   = "$#{self}"
+  def nts(): String   = if self == 1 { "1 night" } else { "#{self} nights" }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val hotel = new Hotel("Grand Onion Palace")
+
+// Add rooms on floors 1..4
+foreach floor: Int in 1..4 {
+  hotel.addRoom(new Room(floor * 100 + 1, RoomKind::Standard,     floor, false))
+  hotel.addRoom(new Room(floor * 100 + 2, RoomKind::Deluxe,       floor, false))
+  hotel.addRoom(new Room(floor * 100 + 3, RoomKind::Suite,        floor, false))
+}
+hotel.addRoom(new Room(500, RoomKind::Presidential, 5, false))
+IO::println("Rooms added: #{hotel.rooms.size}")
+
+// Create guests
+val alice = new Guest("Alice Summers", "alice@example.com", 2)  // Gold
+val bob   = new Guest("Bob Winters",   "bob@example.com",   1)  // Silver
+val carol = new Guest("Carol Spring",  "carol@example.com", 3)  // Platinum
+val dave  = new Guest("Dave Autumn",   "dave@example.com",  0)  // Standard
+
+// Make bookings: days represented as integers
+val b1 = hotel.book(alice, 101, 1, 4, MealPlan::Breakfast)   // 3 nights
+val b2 = hotel.book(bob,   202, 2, 5, MealPlan::HalfBoard)   // 3 nights
+val b3 = hotel.book(carol, 303, 1, 6, MealPlan::FullBoard)    // 5 nights
+val b4 = hotel.book(dave,  500, 3, 8, MealPlan::None)         // 5 nights (will be cancelled)
+
+if b1 != null {
+  hotel.confirm(b1.id(), "CONF-001")
+}
+if b2 != null {
+  hotel.confirm(b2.id(), "CONF-002")
+  hotel.checkIn(b2.id(), "Day 2")
+}
+if b3 != null {
+  hotel.confirm(b3.id(), "CONF-003")
+}
+if b4 != null {
+  hotel.cancel(b4.id(), "Guest request")
+}
+
+// Print current booking status
+IO::println("\n=== Current Bookings ===")
+foreach bk: Booking in hotel.bookings.sortedBy { b -> (b as Booking).id() } {
+  IO::println(bk.summary())
+}
+
+// Occupancy
+val occ = hotel.occupancyRate(1, 6)
+IO::println("\nOccupancy (days 1-6): #{occ}%")
+
+// Available rooms
+val avail = hotel.availableRooms(1, 6)
+IO::println("Available rooms (days 1-6): #{avail.size}")
+foreach r: Room in avail.sortedBy { r -> (r as Room).number() }.take(5) {
+  IO::println("  #{r.label()} — #{r.nightly().usd()}/night")
+}
+
+// Reports
+hotel.revenueReport()
+hotel.guestReport()
+
+// Top rooms by rate using a pipeline
+IO::println("\n=== Top 5 Rooms by Nightly Rate ===")
+val topRooms = hotel.rooms
+  .sortedBy { r -> 0 - (r as Room).nightly() }
+  .distinct ()
+  .take     (5)
+foreach r: Room in topRooms {
+  IO::println("  #{r.label()}: #{r.nightly().usd()}/night")
+}
+
+// Pricing strategy comparison
+IO::println("\n=== Pricing comparison: Suite 3 nights Full Board ===")
+val suiteRoom: Room? = hotel.rooms.find { r -> (r as Room).kind() == RoomKind::Suite }
+if suiteRoom != null {
+  val sp: PricingStrategy = new StandardPricing()
+  val mp: PricingStrategy = new MemberPricing(15)
+  IO::println("  Standard: " + sp.calculate(suiteRoom, 3, MealPlan::FullBoard).usd())
+  IO::println("  Member:   " + mp.calculate(suiteRoom, 3, MealPlan::FullBoard).usd())
+}
+
+// Booking statistics using fold and partition
+val parts    = hotel.bookings.partition { b -> (b as Booking).status().isActive() }
+val active   = parts[0] as List[Booking]
+val inactive = parts[1] as List[Booking]
+IO::println("\nActive bookings: #{active.size}, Completed/Cancelled: #{inactive.size}")
+
+val avgNights: Double = if active.size == 0 { 0.0 } else {
+  val totalNts = active.fold(0) { acc, b -> (acc as Int) + (b as Booking).nights() }
+  (totalNts as Int) * 1.0 / (active.size * 1.0)
+}
+IO::println("Avg nights (active): #{avgNights}")
+
+// Extension method demo
+IO::println("\n3.usd() = #{3.usd()}, 1.nts() = #{1.nts()}, 5.nts() = #{5.nts()}")
+
+// Zip demo: pairing room numbers with their rates
+val roomNos   = hotel.rooms.map { r -> (r as Room).number() }
+val roomRates = hotel.rooms.map { r -> (r as Room).nightly() }
+val zipped    = roomNos.zip(roomRates)
+IO::println("\nFirst 4 room-rate pairs:")
+foreach pair: List in zipped.take(4) {
+  IO::println("  Room #{pair[0]}: #{(pair[1] as Int).usd()}/night")
+}

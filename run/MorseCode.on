@@ -45,10 +45,11 @@ public:
 
 // ── Statistics record ─────────────────────────────────────────────────────────
 
-record MorseStats(dots: Int, dashes: Int, duration: Int, words: Int)
+record MorseStats(dots: Int, dashes: Int, duration: Int, words: Int) {
   example { new MorseStats(3, 2, 14, 1).dots()     == 3    }
   example { new MorseStats(3, 2, 14, 1).duration() == 14   }
   example { new MorseStats(0, 0,  0, 0).words()    == 0    }
+}
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 

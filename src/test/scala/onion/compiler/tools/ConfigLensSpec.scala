@@ -10,8 +10,9 @@ import onion.tools.Shell
 class ConfigLensSpec extends AbstractShellSpec {
 
   private val decl =
-    """record Server(host: String, port: Int, debug: Boolean)
+    """record Server(host: String, port: Int, debug: Boolean) {
       |  shape cfg = config
+      |}
       |""".stripMargin
 
   describe("edit / render") {

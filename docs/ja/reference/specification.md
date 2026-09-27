@@ -264,9 +264,10 @@ record Access(time: String, method: String, path: String, status: Int)
 ソフトキーワードなので、通常の識別子としても使えます。
 
 ```onion
-record Access(time: String, method: String, path: String, status: Int)
+record Access(time: String, method: String, path: String, status: Int) {
   shape v1 = re"(\S+) (\w+) (\S+) (\d+)"
   shape v2 = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
+}
 
 val rows = Access::v1().eachLine(logText)
 ```
@@ -274,9 +275,10 @@ val rows = Access::v1().eachLine(logText)
 パターンの代わりにフォーマット名を書くと、1行のテキストではなく構造化文書を読めます。
 
 ```onion
-record Person(name: String, age: Int)
+record Person(name: String, age: Int) {
   shape doc = json
   shape cfg = yaml
+}
 ```
 
 この場合、成分名が文書のキーになります。キーの欠落は defect です
@@ -350,13 +352,15 @@ record 宣言の後に `law` 節と `example` 節を続けることができま�
 失敗したチェックは**コンパイルエラー**であり、実行時エラーではありません。
 
 ```onion
-record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
   example { Pt::parse("3,4") == new Pt(3, 4) }
+}
 
-record User(name: String, age: Int) derive!(Json)
+record User(name: String, age: Int) derive!(Json) {
   law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
   example { new User("ko", 3).name() == "ko" }
+}
 ```
 
 **`example { boolExpr }`** — 具体的なアサーション。コンパイラは `boolExpr` を評価し、
@@ -374,10 +378,11 @@ record User(name: String, age: Int) derive!(Json)
 `from re"..."` や `derive!(...)` と自由に共存します。
 
 ```onion
-record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
+record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json) {
   law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
   law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
   example { R::parse("0,0") == new R(0, 0) }
+}
 ```
 
 `law` / `example` の目的は、仕様 — 単なるドキュメントではなく、機械検証された
@@ -570,9 +575,10 @@ val body = http"https://api.example.com".get() // HttpResource: get/getJson/post
 読み方の集合が閉じています。`read(shape)` はこれを開きます。
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape doc = json
   shape line = re"(-?\d+),(-?\d+)"
+}
 
 val one  = file"point.json".read(Pt::doc())        // Outcome[Pt]
 val many = file"points.txt".eachLine(Pt::line())   // List[Outcome[Pt]]

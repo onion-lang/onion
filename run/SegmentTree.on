@@ -1,0 +1,366 @@
+// SegmentTree.on — lazy-propagation segment tree: range sum/max/min + range-add
+// Exercises: Int[] arrays, classes with mutable state, records, data-carrying
+// enum, ADT enum, extension methods (Int/Double/String), foreach over ranges and
+// List, select/pattern matching, recursive methods, while loops, nullable,
+// collection pipelines (map/filter/fold), string interpolation, try/catch.
+
+import {
+  java.lang.Integer as JInteger;
+}
+
+// ─── Extension helpers ───────────────────────────────────────────────────────
+
+extension Int {
+  def maxOf(other: Int): Int = if self >= other { self } else { other }
+  def minOf(other: Int): Int = if self <= other { self } else { other }
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+}
+
+extension Double {
+  def fmt1(): String {
+    if self < 0.0 { return "-" + (0.0 - self).fmt1() }
+    val tenths: Int = (self * 10.0 + 0.5) as Int
+    return (tenths / 10) + "." + (tenths % 10)
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── RangeStats record ───────────────────────────────────────────────────────
+
+record RangeStats(lo: Int, hi: Int, total: Int, count: Int) {
+public:
+  def avg(): Double = (total * 1.0) / (count * 1.0)
+  def spread(): Int = hi - lo
+  def show(): String =
+    "sum=#{total.lpad(6)} max=#{hi.lpad(5)} min=#{lo.lpad(5)} avg=#{avg().fmt1()} spread=#{spread()}"
+}
+
+// ─── LazySegTree ─────────────────────────────────────────────────────────────
+
+class LazySegTree {
+  var sumT: Int[]
+  var maxT: Int[]
+  var minT: Int[]
+  var lazy: Int[]
+  var n:    Int
+  var cap:  Int
+
+public:
+  def this(n: Int) {
+    self.n = n
+    cap = 1
+    while cap < n { cap = cap * 2 }
+    val sz: Int = 2 * cap
+    sumT = new Int[sz]
+    maxT = new Int[sz]
+    minT = new Int[sz]
+    lazy = new Int[sz]
+    var i: Int = 0
+    while i < sz {
+      maxT[i] = JInteger::MIN_VALUE
+      minT[i] = JInteger::MAX_VALUE
+      i++
+    }
+  }
+
+  def build(values: List[Int]): void {
+    var i: Int = 0
+    foreach v: Int in values {
+      if i < n {
+        sumT[cap + i] = v
+        maxT[cap + i] = v
+        minT[cap + i] = v
+      }
+      i++
+    }
+    i = cap - 1
+    while i >= 1 {
+      sumT[i] = sumT[2*i] + sumT[2*i+1]
+      maxT[i] = maxT[2*i].maxOf(maxT[2*i+1])
+      minT[i] = minT[2*i].minOf(minT[2*i+1])
+      i--
+    }
+  }
+
+  def push(nd: Int, len: Int): void {
+    if lazy[nd] != 0 {
+      val half: Int = len / 2
+      val lc: Int = 2 * nd
+      val rc: Int = 2 * nd + 1
+      sumT[lc] = sumT[lc] + lazy[nd] * half
+      maxT[lc] = maxT[lc] + lazy[nd]
+      minT[lc] = minT[lc] + lazy[nd]
+      lazy[lc] = lazy[lc] + lazy[nd]
+      sumT[rc] = sumT[rc] + lazy[nd] * half
+      maxT[rc] = maxT[rc] + lazy[nd]
+      minT[rc] = minT[rc] + lazy[nd]
+      lazy[rc] = lazy[rc] + lazy[nd]
+      lazy[nd] = 0
+    }
+  }
+
+  def addRange(nd: Int, ndL: Int, ndR: Int, l: Int, r: Int, d: Int): void {
+    if r < ndL || ndR < l { return }
+    if l <= ndL && ndR <= r {
+      val len: Int = ndR - ndL + 1
+      sumT[nd] = sumT[nd] + d * len
+      maxT[nd] = maxT[nd] + d
+      minT[nd] = minT[nd] + d
+      lazy[nd] = lazy[nd] + d
+      return
+    }
+    val mid: Int = (ndL + ndR) / 2
+    push(nd, ndR - ndL + 1)
+    addRange(2*nd, ndL, mid, l, r, d)
+    addRange(2*nd+1, mid+1, ndR, l, r, d)
+    sumT[nd] = sumT[2*nd] + sumT[2*nd+1]
+    maxT[nd] = maxT[2*nd].maxOf(maxT[2*nd+1])
+    minT[nd] = minT[2*nd].minOf(minT[2*nd+1])
+  }
+
+  def qSum(nd: Int, ndL: Int, ndR: Int, l: Int, r: Int): Int {
+    if r < ndL || ndR < l { return 0 }
+    if l <= ndL && ndR <= r { return sumT[nd] }
+    val mid: Int = (ndL + ndR) / 2
+    push(nd, ndR - ndL + 1)
+    return qSum(2*nd, ndL, mid, l, r) + qSum(2*nd+1, mid+1, ndR, l, r)
+  }
+
+  def qMax(nd: Int, ndL: Int, ndR: Int, l: Int, r: Int): Int {
+    if r < ndL || ndR < l { return JInteger::MIN_VALUE }
+    if l <= ndL && ndR <= r { return maxT[nd] }
+    val mid: Int = (ndL + ndR) / 2
+    push(nd, ndR - ndL + 1)
+    return qMax(2*nd, ndL, mid, l, r).maxOf(qMax(2*nd+1, mid+1, ndR, l, r))
+  }
+
+  def qMin(nd: Int, ndL: Int, ndR: Int, l: Int, r: Int): Int {
+    if r < ndL || ndR < l { return JInteger::MAX_VALUE }
+    if l <= ndL && ndR <= r { return minT[nd] }
+    val mid: Int = (ndL + ndR) / 2
+    push(nd, ndR - ndL + 1)
+    return qMin(2*nd, ndL, mid, l, r).minOf(qMin(2*nd+1, mid+1, ndR, l, r))
+  }
+
+  def rangeAdd(l: Int, r: Int, d: Int): void { addRange(1, 0, cap-1, l, r, d) }
+  def sum(l: Int, r: Int): Int = qSum(1, 0, cap-1, l, r)
+  def max(l: Int, r: Int): Int = qMax(1, 0, cap-1, l, r)
+  def min(l: Int, r: Int): Int = qMin(1, 0, cap-1, l, r)
+  def stats(l: Int, r: Int): RangeStats =
+    new RangeStats(min(l, r), max(l, r), sum(l, r), r - l + 1)
+}
+
+// ─── CalibEvent enum ─────────────────────────────────────────────────────────
+
+enum CalibEvent(offset: Int, reason: String) {
+  SensorDrift(5,  "sensor drift correction"),
+  HeatIsland(-3,  "urban heat island correction"),
+  RainShadow(2,   "rain shadow adjustment"),
+  Baseline(0,     "baseline — no change")
+}
+
+// ─── AnalysisResult ADT ──────────────────────────────────────────────────────
+
+enum AnalysisResult {
+  case HeatWave(start: Int, end: Int, peak: Int)
+  case ColdSnap(start: Int, end: Int, valley: Int)
+  case Stable(low: Int, high: Int)
+public:
+  def label(): String = select this {
+    case h is HeatWave: "HeatWave  days #{h.start()}-#{h.end()} peak=#{h.peak()}"
+    case c is ColdSnap: "ColdSnap  days #{c.start()}-#{c.end()} valley=#{c.valley()}"
+    case s is Stable:   "Stable    range #{s.low()}-#{s.high()}"
+  }
+}
+
+// ─── WeatherStation ───────────────────────────────────────────────────────────
+
+class WeatherStation {
+  val stationName: String
+  val days: Int
+  var tree: LazySegTree
+
+public:
+  def this(name: String, data: List[Int]) {
+    stationName = name
+    days = data.size
+    tree = new LazySegTree(days)
+    tree.build(data)
+  }
+
+  def stats(l: Int, r: Int): RangeStats = tree.stats(l, r)
+
+  def applyCalib(l: Int, r: Int, ev: CalibEvent): void {
+    if ev.offset() != 0 {
+      tree.rangeAdd(l, r, ev.offset())
+    }
+  }
+
+  def findPeakWindow(width: Int): Int {
+    var best: Int = tree.sum(0, width - 1)
+    var bestStart: Int = 0
+    var i: Int = 1
+    while i + width - 1 < days {
+      val s: Int = tree.sum(i, i + width - 1)
+      if s > best { best = s; bestStart = i }
+      i++
+    }
+    return bestStart
+  }
+
+  def classify(): AnalysisResult {
+    val s: RangeStats = stats(0, days - 1)
+    val mean: Int = s.total() / days
+    val threshold: Int = 15
+    if s.hi() - mean > threshold {
+      return new HeatWave(0, days - 1, s.hi())
+    } else if mean - s.lo() > threshold {
+      return new ColdSnap(0, days - 1, s.lo())
+    } else {
+      return new Stable(s.lo(), s.hi())
+    }
+  }
+
+  def printReport(windowWidth: Int): void {
+    val sep: String = "─────────────────────────────────────────────────────"
+    IO::println(sep)
+    IO::println("Station: " + stationName)
+    IO::println(sep)
+    val full: RangeStats = stats(0, days - 1)
+    IO::println("Full period: " + full.show())
+    IO::println("")
+    IO::println("Weekly breakdown:")
+    var w: Int = 0
+    while w * 7 < days {
+      val l: Int = w * 7
+      val r: Int = (l + 6).minOf(days - 1)
+      val s: RangeStats = stats(l, r)
+      IO::println("  Week #{(w+1).lpad(2)} [#{l.lpad(2)}-#{r.lpad(2)}]: " + s.show())
+      w++
+    }
+    IO::println("")
+    val pw: Int = findPeakWindow(windowWidth)
+    val pwS: RangeStats = stats(pw, pw + windowWidth - 1)
+    IO::println("Peak #{windowWidth}-day window: days #{pw}-#{pw + windowWidth - 1}")
+    IO::println("  " + pwS.show())
+    IO::println("")
+    val result: AnalysisResult = classify()
+    IO::println("Classification: " + result.label())
+    IO::println(sep)
+  }
+}
+
+// ─── Separator helper ─────────────────────────────────────────────────────────
+
+def sep(c: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + c; i++ }
+  return s
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val coastData: List[Int] = [
+    145, 150, 158, 162, 168, 173, 178,
+    183, 190, 195, 201, 208, 214, 220,
+    225, 228, 231, 235, 232, 228, 225,
+    220, 215, 209, 203, 197, 192, 186,
+    180, 175
+  ]
+  val inlandData: List[Int] = [
+    120, 128, 137, 145, 152, 161, 170,
+    179, 188, 197, 206, 215, 222, 229,
+    234, 238, 240, 241, 239, 235, 230,
+    224, 217, 210, 202, 194, 186, 178,
+    171, 163
+  ]
+
+  val coast  = new WeatherStation("Coastal Station",  coastData)
+  val inland = new WeatherStation("Inland Station",   inlandData)
+
+  IO::println(sep("═", 55))
+  IO::println("  Weather Analysis — 30-Day Temperature Study (×10°C)")
+  IO::println(sep("═", 55))
+  IO::println("")
+
+  IO::println("=== Before calibration ===")
+  coast.printReport(7)
+  inland.printReport(7)
+
+  // Apply sensor calibrations via lazy range-add
+  IO::println("")
+  IO::println("=== Applying calibrations ===")
+  IO::println("  Coastal days 10-19: " + CalibEvent::SensorDrift.reason())
+  coast.applyCalib(10, 19, CalibEvent::SensorDrift)
+  IO::println("  Inland  days 14-24: " + CalibEvent::HeatIsland.reason())
+  inland.applyCalib(14, 24, CalibEvent::HeatIsland)
+  IO::println("  Inland  days  0-6:  " + CalibEvent::RainShadow.reason())
+  inland.applyCalib(0, 6, CalibEvent::RainShadow)
+
+  IO::println("")
+  IO::println("=== After calibration ===")
+  coast.printReport(7)
+  inland.printReport(7)
+
+  // Cross-station comparison
+  IO::println("")
+  IO::println("=== Cross-station comparison (full period after calibration) ===")
+  val cS: RangeStats = coast.stats(0, 29)
+  val iS: RangeStats = inland.stats(0, 29)
+  val header: String = "Station".rpad(20) + "sum".lpad(8) + "max".lpad(7) + "min".lpad(7) + "avg".lpad(8)
+  IO::println(header)
+  IO::println(sep("─", 50))
+  IO::println("Coastal".rpad(20) + cS.total().lpad(8) + cS.hi().lpad(7) + cS.lo().lpad(7) + cS.avg().fmt1().lpad(8))
+  IO::println("Inland".rpad(20) + iS.total().lpad(8) + iS.hi().lpad(7) + iS.lo().lpad(7) + iS.avg().fmt1().lpad(8))
+
+  IO::println("")
+  val maxDiff: Int = iS.hi() - cS.hi()
+  val minDiff: Int = iS.lo() - cS.lo()
+  IO::println("Max temp delta (inland-coast): #{maxDiff}  (#{(maxDiff * 1.0 / 10.0).fmt1()}°C)")
+  IO::println("Min temp delta (inland-coast): #{minDiff}  (#{(minDiff * 1.0 / 10.0).fmt1()}°C)")
+
+  // Point-query spot check via single-element stats
+  IO::println("")
+  IO::println("=== Spot readings (coast, after calibration) ===")
+  val spotDays: List[Int] = [0, 7, 14, 21, 28]
+  foreach d: Int in spotDays {
+    val v: Int = coast.stats(d, d).total()
+    IO::println("  Day #{d.lpad(2)}: #{v}  (#{(v * 1.0 / 10.0).fmt1()}°C)")
+  }
+
+  // Verify lazy propagation: re-query a range after a series of updates
+  IO::println("")
+  IO::println("=== Lazy propagation stress check ===")
+  val testTree = new LazySegTree(8)
+  testTree.build([1, 2, 3, 4, 5, 6, 7, 8])
+  IO::println("Initial sum[0-7] = " + testTree.sum(0, 7))           // 36
+  testTree.rangeAdd(0, 7, 10)
+  IO::println("After +10 to [0-7]: sum = " + testTree.sum(0, 7))   // 116
+  testTree.rangeAdd(2, 5, 100)
+  IO::println("After +100 to [2-5]: sum[2-5] = " + testTree.sum(2, 5))  // 414+400=414... 3+4+5+6+10+10+10+10+100*4=414
+  IO::println("sum[0-1] = " + testTree.sum(0, 1))                   // 11+12=23
+  IO::println("max[0-7] = " + testTree.max(0, 7))                   // max=108
+  IO::println("min[0-7] = " + testTree.min(0, 7))                   // min=11
+
+  IO::println("")
+  IO::println("Done.")
+}

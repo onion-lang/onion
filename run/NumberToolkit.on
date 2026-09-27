@@ -1,0 +1,365 @@
+// NumberToolkit.on — comprehensive numeric analysis toolkit
+// Exercises: extension Int/Long/Double/String, records, ADT enums,
+// generics, collection pipelines, pattern matching, closures, recursion,
+// foreach (ranges and map), string interpolation, try/catch, nullable
+
+import {
+  java.lang.Integer as JInteger;
+  java.lang.Math as JMath;
+}
+
+// ── Extension methods on primitive types ────────────────────────────────────
+
+extension Int {
+  def isPrime(): Boolean {
+    if self < 2 { return false }
+    if self == 2 { return true }
+    if self % 2 == 0 { return false }
+    var i: Int = 3
+    while i * i <= self {
+      if self % i == 0 { return false }
+      i = i + 2
+    }
+    return true
+  }
+
+  def gcd(other: Int): Int {
+    var a: Int = if self < 0 { -self } else { self }
+    var b: Int = if other < 0 { -other } else { other }
+    while b != 0 {
+      val tmp: Int = b
+      b = a % b
+      a = tmp
+    }
+    return a
+  }
+
+  def lcm(other: Int): Int = (self * other).abs() / self.gcd(other)
+
+  def abs(): Int = if self < 0 { -self } else { self }
+
+  def factorial(): Long {
+    if self < 0 { return -1L }
+    var result: Long = 1L
+    foreach i: Int in 2..self {
+      result = result * i
+    }
+    return result
+  }
+
+  def toBinary(): String {
+    if self == 0 { return "0" }
+    var n: Int = if self < 0 { -self } else { self }
+    var bits: String = ""
+    while n > 0 {
+      bits = "" + (n % 2) + bits
+      n = n / 2
+    }
+    return if self < 0 { "-" + bits } else { bits }
+  }
+
+  def digits(): List[Int] {
+    val s: String = "" + self.abs()
+    val result: List[Int] = []
+    foreach i: Int in 0..<s.length() {
+      result.add(s.charAt(i) - '0')
+    }
+    return result
+  }
+
+  def digitSum(): Int = self.digits().fold(0) { acc, d -> acc + d }
+}
+
+extension Double {
+  def roundTo(places: Int): Double {
+    var factor: Double = 1.0
+    foreach i: Int in 0..<places {
+      factor = factor * 10.0
+    }
+    return Math::round(self * factor) / factor
+  }
+
+  def between(lo: Double, hi: Double): Boolean = self >= lo && self <= hi
+
+  def lerp(target: Double, t: Double): Double = self + (target - self) * t
+}
+
+extension Long {
+  def isEven(): Boolean = self % 2L == 0L
+  def isOdd(): Boolean = self % 2L != 0L
+  def abs(): Long = if self < 0L { -self } else { self }
+}
+
+extension String {
+  def isPalindrome(): Boolean {
+    val n: Int = self.length()
+    foreach i: Int in 0..<(n / 2) {
+      if self.charAt(i) != self.charAt(n - 1 - i) { return false }
+    }
+    return true
+  }
+
+  def countChar(c: Char): Int {
+    var count: Int = 0
+    foreach i: Int in 0..<self.length() {
+      if self.charAt(i) == c { count = count + 1 }
+    }
+    return count
+  }
+
+  def toIntOrNull(): Int? {
+    try {
+      return JInteger::parseInt(self)
+    } catch e: Exception {
+      return null
+    }
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Fraction(num: Int, den: Int) {
+public:
+  static def of(n: Int, d: Int): Fraction {
+    if d == 0 { return new Fraction(0, 1) }
+    val g: Int = n.gcd(d)
+    val sign: Int = if d < 0 { -1 } else { 1 }
+    return new Fraction(n * sign / g, d * sign / g)
+  }
+
+  def plus(o: Fraction): Fraction = Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+  def minus(o: Fraction): Fraction = Fraction::of(num() * o.den() - o.num() * den(), den() * o.den())
+  def times(o: Fraction): Fraction = Fraction::of(num() * o.num(), den() * o.den())
+  def divide(o: Fraction): Fraction = Fraction::of(num() * o.den(), den() * o.num())
+  def toDouble(): Double = (num() as Double) / (den() as Double)
+  def display(): String {
+    if den() == 1 { return "" + num() }
+    return "#{num()}/#{den()}"
+  }
+}
+
+record Stats(count: Int, sum: Double, min: Double, max: Double, mean: Double, stddev: Double) {
+public:
+  static def of(values: List[Double]): Stats {
+    if values.isEmpty() { return new Stats(0, 0.0, 0.0, 0.0, 0.0, 0.0) }
+    val n: Int = values.size()
+    var s: Double = 0.0
+    var mn: Double = values[0]
+    var mx: Double = values[0]
+    foreach v: Double in values {
+      s = s + v
+      if v < mn { mn = v }
+      if v > mx { mx = v }
+    }
+    val avg: Double = s / n
+    var variance: Double = 0.0
+    foreach v: Double in values {
+      val diff: Double = v - avg
+      variance = variance + diff * diff
+    }
+    val sd: Double = JMath::sqrt(variance / n)
+    return new Stats(n, s, mn, mx, avg, sd)
+  }
+
+  def display(): String =
+    "n=#{count()} sum=#{sum().roundTo(2)} min=#{min().roundTo(2)} max=#{max().roundTo(2)} mean=#{mean().roundTo(2)} sd=#{stddev().roundTo(2)}"
+}
+
+// ── ADT enum for number categories ───────────────────────────────────────────
+
+enum NumberKind {
+  case Negative
+  case Zero
+  case SmallPositive(value: Int)   // 1..9
+  case MediumPositive(value: Int)  // 10..999
+  case LargePositive(value: Int)   // 1000+
+}
+
+def classify(n: Int): NumberKind {
+  if n < 0  { return new Negative() }
+  if n == 0 { return new Zero() }
+  if n < 10  { return new SmallPositive(n) }
+  if n < 1000 { return new MediumPositive(n) }
+  return new LargePositive(n)
+}
+
+// ── Primes sieve up to N ─────────────────────────────────────────────────────
+
+def primesUpTo(limit: Int): List[Int] {
+  val sieve: Boolean[] = new Boolean[limit + 1]
+  foreach i: Int in 0..limit { sieve[i] = true }
+  sieve[0] = false
+  if limit >= 1 { sieve[1] = false }
+  foreach i: Int in 2..limit {
+    if sieve[i] {
+      var j: Int = i * i
+      while j <= limit {
+        sieve[j] = false
+        j = j + i
+      }
+    }
+  }
+  val result: List[Int] = []
+  foreach i: Int in 2..limit {
+    if sieve[i] { result.add(i) }
+  }
+  return result
+}
+
+// ── Fibonacci with memoization ────────────────────────────────────────────────
+
+val fibCache: Map[Int, Long] = [0: 0L, 1: 1L]
+
+def fib(n: Int): Long {
+  if fibCache.containsKey(n) { return fibCache[n] }
+  val result: Long = fib(n - 1) + fib(n - 2)
+  fibCache[n] = result
+  return result
+}
+
+// ── Collatz sequence ──────────────────────────────────────────────────────────
+
+def collatz(n: Int): List[Int] {
+  val seq: List[Int] = []
+  var x: Int = n
+  while x != 1 {
+    seq.add(x)
+    if x % 2 == 0 { x = x / 2 } else { x = 3 * x + 1 }
+  }
+  seq.add(1)
+  return seq
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+IO::println("=== Number Toolkit ===")
+IO::println("")
+
+// Extension Int: primes and number properties
+IO::println("── Prime numbers up to 50 ──")
+val primes50: List[Int] = primesUpTo(50)
+IO::println("Sieve: #{primes50}")
+
+IO::println("isPrime checks: 2=#{(2).isPrime()} 7=#{(7).isPrime()} 10=#{(10).isPrime()} 97=#{(97).isPrime()}")
+IO::println("GCD(12,8)=#{(12).gcd(8)}  LCM(4,6)=#{(4).lcm(6)}")
+IO::println("12! = #{(12).factorial()}")
+IO::println("42 in binary: #{(42).toBinary()}")
+IO::println("digitSum(1729) = #{(1729).digitSum()}")
+
+IO::println("")
+
+// Extension Double
+IO::println("── Double extensions ──")
+IO::println("3.14159 rounded to 2 places: #{(3.14159).roundTo(2)}")
+IO::println("5.0.lerp(10.0, 0.3) = #{(5.0).lerp(10.0, 0.3)}")
+IO::println("7.5 between 5.0 and 10.0: #{(7.5).between(5.0, 10.0)}")
+
+IO::println("")
+
+// Extension Long
+IO::println("── Long extensions ──")
+IO::println("fib(10)=#{fib(10)} isEven=#{fib(10).isEven()}")
+IO::println("fib(20)=#{fib(20)} isOdd=#{fib(20).isOdd()}")
+foreach i: Int in 0..10 {
+  IO::print("fib(#{i})=#{fib(i)} ")
+}
+IO::println("")
+
+IO::println("")
+
+// Extension String
+IO::println("── String extensions ──")
+val words: List[String] = ["racecar", "hello", "level", "world", "madam"]
+foreach w: String in words {
+  IO::println("  \"#{w}\" isPalindrome=#{w.isPalindrome()}")
+}
+IO::println("\"banana\".countChar('a') = #{"banana".countChar('a')}")
+val parsed: Int? = "42".toIntOrNull()
+val failed: Int? = "abc".toIntOrNull()
+IO::println("\"42\".toIntOrNull() = #{if parsed != null { "" + parsed } else { "null" }}")
+IO::println("\"abc\".toIntOrNull() = #{if failed != null { "" + failed } else { "null" }}")
+
+IO::println("")
+
+// Records: Fraction arithmetic
+IO::println("── Fraction arithmetic ──")
+val half: Fraction = Fraction::of(1, 2)
+val third: Fraction = Fraction::of(1, 3)
+val sum: Fraction = half.plus(third)
+val product: Fraction = half.times(third)
+IO::println("1/2 + 1/3 = #{sum.display()} (≈ #{sum.toDouble().roundTo(4)})")
+IO::println("1/2 × 1/3 = #{product.display()}")
+IO::println("1/2 ÷ 1/3 = #{half.divide(third).display()}")
+
+val fractions: List[Fraction] = [
+  Fraction::of(3, 4), Fraction::of(1, 2), Fraction::of(2, 3),
+  Fraction::of(1, 6), Fraction::of(5, 6)
+]
+val frSum: Fraction = fractions.fold(Fraction::of(0, 1)) { acc, f -> acc.plus(f) }
+IO::println("Sum of fractions: #{frSum.display()}")
+
+IO::println("")
+
+// Stats record
+IO::println("── Statistics ──")
+val data: List[Double] = [2.5, 3.1, 4.8, 1.2, 5.5, 3.9, 2.2, 4.1]
+val st: Stats = Stats::of(data)
+IO::println(st.display())
+
+IO::println("")
+
+// ADT enum pattern matching
+IO::println("── Number classification (ADT enum) ──")
+val testNums: List[Int] = [-5, 0, 3, 42, 1500, 7, 250, -100]
+foreach n: Int in testNums {
+  val kind: NumberKind = classify(n)
+  val desc: String = select kind {
+    case k is Negative: "negative"
+    case k is Zero: "zero"
+    case k is SmallPositive: "small (#{k.value()})"
+    case k is MediumPositive: "medium (#{k.value()})"
+    case k is LargePositive: "large (#{k.value()})"
+  }
+  IO::println("  #{n} → #{desc}")
+}
+
+IO::println("")
+
+// Collection pipelines
+IO::println("── Collection pipelines ──")
+val nums: List[Int] = primesUpTo(100)
+IO::println("Primes up to 100: #{nums.size()} found")
+val primeSum: Int = nums.fold(0) { a, b -> a + b }
+IO::println("Sum of primes ≤ 100: #{primeSum}")
+IO::println("Twin primes (p, p+2 both prime):")
+val twins: List[Int] = nums.filter { p -> (p + 2).isPrime() && primesUpTo(p + 2).contains(p + 2) }
+IO::println("  #{twins.size()} twin-prime leaders: #{twins.take(8)}")
+
+val squares: List[Int] = (1..20).map { n -> n * n }.filter { n -> n.isPrime() }.toList()
+IO::println("Squares of 1..20 that are prime: #{squares}")
+
+IO::println("")
+
+// Collatz sequences
+IO::println("── Collatz sequences ──")
+val starts: List[Int] = [6, 11, 27]
+foreach s: Int in starts {
+  val seq: List[Int] = collatz(s)
+  val peak: Int = seq.fold(0) { a, b -> if b > a { b } else { a } }
+  IO::println("  Collatz(#{s}): length=#{seq.size()} peak=#{peak}")
+}
+
+// Find the starting number under 50 with the longest Collatz sequence
+var bestStart: Int = 1
+var bestLen: Int = 0
+foreach i: Int in 1..49 {
+  val len: Int = collatz(i).size()
+  if len > bestLen {
+    bestLen = len
+    bestStart = i
+  }
+}
+IO::println("Longest Collatz under 50: start=#{bestStart} length=#{bestLen}")
+
+IO::println("")
+IO::println("=== Done ===")

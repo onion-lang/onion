@@ -1,0 +1,337 @@
+// HexGame.on — Monte-Carlo simulation of the game of Hex.
+//
+// Hex is played on an n×n rhombus grid.  Red wins by connecting the top
+// row to the bottom row; Blue wins by connecting the left column to the
+// right column.  Draws are impossible by the strategy-stealing argument.
+//
+// This program:
+//   1.  Runs NUM_GAMES random games (uniform random move order) on BOARD_SIZE×BOARD_SIZE.
+//   2.  Reports win rates, average game length, and a move-count histogram.
+//   3.  Displays the final board of a sample game.
+//
+// Exercises: homogeneous enum, class with mutable List fields, BFS win
+// detection, top-level vars (LCG state), extension methods on enums,
+// foreach on ranges and typed lists, while loops, Fisher-Yates shuffle,
+// select expressions, string interpolation.
+
+// ── Pseudo-random number generator (LCG) ─────────────────────────────────────
+
+var rngSeed: Long = 20230927L
+
+def nextRng(bound: Int): Int {
+  rngSeed = (rngSeed * 1103515245L + 12345L) % 2147483648L
+  if rngSeed < 0L { rngSeed = 0L - rngSeed }
+  return (rngSeed % (bound as Long)) as Int
+}
+
+// ── Stone ──────────────────────────────────────────────────────────────────────
+
+enum Stone { Empty, Red, Blue }
+
+extension Stone {
+  def sym(): String = select this {
+    case Stone::Empty: "·"
+    case Stone::Red:   "R"
+    case Stone::Blue:  "B"
+  }
+  def name(): String = select this {
+    case Stone::Empty: "Empty"
+    case Stone::Red:   "Red"
+    case Stone::Blue:  "Blue"
+  }
+}
+
+// ── HexBoard ───────────────────────────────────────────────────────────────────
+
+class HexBoard {
+  val n:    Int
+  var grid: List[Stone]   // flat row-major, n*n cells
+
+public:
+  def this(size: Int) {
+    n    = size
+    grid = []
+    foreach i: Int in 0..<(size * size) { grid.add(Stone::Empty) }
+  }
+
+  def idx(r: Int, c: Int): Int = r * n + c
+
+  def at(r: Int, c: Int): Stone = grid.get(idx(r, c)) as Stone
+
+  def place(r: Int, c: Int, s: Stone): void { grid.set(idx(r, c), s) }
+
+  def isEmpty(r: Int, c: Int): Boolean = (grid.get(idx(r, c)) as Stone) == Stone::Empty
+
+  // Six Hex-grid neighbors on a triangular lattice
+  def nbrs(r: Int, c: Int): List[Int] {
+    val drs: List[Int] = [-1, 0, 1,  1,  0, -1]
+    val dcs: List[Int] = [ 1, 1, 0, -1, -1,  0]
+    val out: List[Int] = []
+    foreach i: Int in 0..5 {
+      val nr: Int = r + (drs.get(i) as Int)
+      val nc: Int = c + (dcs.get(i) as Int)
+      if nr >= 0 && nr < n && nc >= 0 && nc < n {
+        out.add(idx(nr, nc))
+      }
+    }
+    return out
+  }
+
+  // BFS: does `stone` connect its two edges?
+  // Red: top row (r=0) to bottom row (r=n-1)
+  // Blue: left col (c=0) to right col (c=n-1)
+  def wins(stone: Stone): Boolean {
+    val vis: List[Boolean] = []
+    foreach i: Int in 0..<(n * n) { vis.add(false) }
+    val queue: List[Int] = []
+
+    foreach i: Int in 0..<n {
+      val r0: Int = if stone == Stone::Red  { 0 } else { i }
+      val c0: Int = if stone == Stone::Red  { i } else { 0 }
+      if at(r0, c0) == stone {
+        val id: Int = idx(r0, c0)
+        vis.set(id, true)
+        queue.add(id)
+      }
+    }
+
+    var qi: Int = 0
+    while qi < queue.size {
+      val cur: Int = queue.get(qi) as Int
+      val cr:  Int = cur / n
+      val cc:  Int = cur % n
+      if stone == Stone::Red  && cr == n - 1 { return true }
+      if stone == Stone::Blue && cc == n - 1 { return true }
+      foreach nb: Int in nbrs(cr, cc) {
+        if !(vis.get(nb) as Boolean) && at(nb / n, nb % n) == stone {
+          vis.set(nb, true)
+          queue.add(nb)
+        }
+      }
+      qi = qi + 1
+    }
+    return false
+  }
+
+  // ASCII display (parallelogram orientation matches standard Hex diagrams)
+  def display(): void {
+    // Column header: A B C D ...
+    var hdr: String = "     "
+    foreach c: Int in 0..<n { hdr = hdr + ((65 + c) as Char) + " " }
+    IO::println(hdr)
+    foreach r: Int in 0..<n {
+      var line: String = ""
+      foreach sp: Int in 0..<r { line = line + " " }
+      if r < 10 { line = line + " " }
+      line = line + r + "  "
+      foreach c: Int in 0..<n {
+        line = line + at(r, c).sym()
+        if c < n - 1 { line = line + " " }
+      }
+      IO::println(line)
+    }
+  }
+}
+
+// ── Game record ────────────────────────────────────────────────────────────────
+
+record GameResult(winner: Stone, moves: Int)
+
+// ── Play one random game ───────────────────────────────────────────────────────
+
+def playGame(size: Int): GameResult {
+  val board: HexBoard = new HexBoard(size)
+  val order: List[Int] = []
+  foreach i: Int in 0..<(size * size) { order.add(i) }
+
+  // Fisher-Yates shuffle
+  val total: Int = order.size
+  foreach i: Int in 0..<(total - 1) {
+    val j: Int = i + nextRng(total - i)
+    val ti: Int = order.get(i) as Int
+    order.set(i, order.get(j))
+    order.set(j, ti)
+  }
+
+  var turn:  Stone = Stone::Red
+  var moves: Int   = 0
+  foreach cellId: Int in order {
+    board.place(cellId / size, cellId % size, turn)
+    moves = moves + 1
+    if board.wins(turn) { return new GameResult(turn, moves) }
+    turn = if turn == Stone::Red { Stone::Blue } else { Stone::Red }
+  }
+  return new GameResult(Stone::Empty, moves)
+}
+
+// ── Histogram helper ───────────────────────────────────────────────────────────
+
+def padLeft(s: String, w: Int): String {
+  var r: String = s
+  while r.length() < w { r = " " + r }
+  return r
+}
+
+def bar(count: Int, maxCount: Int, width: Int): String {
+  val filled: Int = if maxCount == 0 { 0 } else { count * width / maxCount }
+  var b: String = ""
+  foreach i: Int in 0..<filled { b = b + "█" }
+  foreach i: Int in filled..<width { b = b + " " }
+  return b
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────────
+
+val BOARD_SIZE: Int = 7
+val NUM_GAMES:  Int = 300
+
+IO::println("╔════════════════════════════════════════╗")
+IO::println("║          HEX GAME  —  Monte Carlo      ║")
+IO::println("╚════════════════════════════════════════╝")
+IO::println("Board : #{BOARD_SIZE}×#{BOARD_SIZE}   Games : #{NUM_GAMES}")
+IO::println("")
+
+var redWins:   Int  = 0
+var blueWins:  Int  = 0
+var totalMove: Int  = 0
+val moveCounts: List[Int] = []
+
+foreach g: Int in 0..<NUM_GAMES {
+  val res: GameResult = playGame(BOARD_SIZE)
+  if res.winner() == Stone::Red  { redWins  = redWins  + 1 }
+  if res.winner() == Stone::Blue { blueWins = blueWins + 1 }
+  totalMove = totalMove + res.moves()
+  moveCounts.add(res.moves())
+}
+
+val avgMoves: Double = (totalMove as Double) / (NUM_GAMES as Double)
+val redPct:   Int    = redWins  * 100 / NUM_GAMES
+val bluePct:  Int    = blueWins * 100 / NUM_GAMES
+
+IO::println("── Win statistics ──────────────────────────────")
+IO::println("  Red  wins : #{redWins}  (#{redPct}%)")
+IO::println("  Blue wins : #{blueWins}  (#{bluePct}%)")
+val avgRounded: Int = ((avgMoves * 100.0) as Int)
+IO::println("  Avg moves : #{avgRounded / 100}.#{if avgRounded % 100 < 10 { "0" } else { "" }}#{avgRounded % 100}")
+IO::println("")
+
+// Move-count histogram (bucket width = 5)
+var minM: Int = 1000
+var maxM: Int = 0
+foreach m: Int in moveCounts {
+  if m < minM { minM = m }
+  if m > maxM { maxM = m }
+}
+var maxCnt: Int = 0
+var bucket: Int = (minM / 5) * 5
+while bucket <= maxM {
+  val lo: Int = bucket
+  val hi: Int = bucket + 4
+  var cnt: Int = 0
+  foreach m: Int in moveCounts { if m >= lo && m <= hi { cnt = cnt + 1 } }
+  if cnt > maxCnt { maxCnt = cnt }
+  bucket = bucket + 5
+}
+
+IO::println("── Move-count distribution (bucket = 5) ─────────")
+bucket = (minM / 5) * 5
+while bucket <= maxM {
+  val lo: Int = bucket
+  val hi: Int = bucket + 4
+  var cnt: Int = 0
+  foreach m: Int in moveCounts { if m >= lo && m <= hi { cnt = cnt + 1 } }
+  val label: String = padLeft("" + lo, 3) + "-" + padLeft("" + hi, 2)
+  IO::println("  #{label}: #{bar(cnt, maxCnt, 30)} #{cnt}")
+  bucket = bucket + 5
+}
+IO::println("")
+
+// Play and display one sample game
+IO::println("── Sample game board ─────────────────────────────")
+val sample: HexBoard = new HexBoard(BOARD_SIZE)
+val sOrder: List[Int] = []
+foreach i: Int in 0..<(BOARD_SIZE * BOARD_SIZE) { sOrder.add(i) }
+val st: Int = sOrder.size
+foreach i: Int in 0..<(st - 1) {
+  val j: Int = i + nextRng(st - i)
+  val ti: Int = sOrder.get(i) as Int
+  sOrder.set(i, sOrder.get(j))
+  sOrder.set(j, ti)
+}
+var sTurn:   Stone = Stone::Red
+var sWinner: Stone = Stone::Empty
+var sMoves:  Int   = 0
+foreach cellId: Int in sOrder {
+  sample.place(cellId / BOARD_SIZE, cellId % BOARD_SIZE, sTurn)
+  sMoves = sMoves + 1
+  if sample.wins(sTurn) {
+    sWinner = sTurn
+    break
+  }
+  sTurn = if sTurn == Stone::Red { Stone::Blue } else { Stone::Red }
+}
+IO::println("  Winner : #{sWinner.name()}  in #{sMoves} moves")
+IO::println("")
+sample.display()
+IO::println("")
+
+// ── Game-phase classification (data-carrying enum) ─────────────────────────
+
+enum GamePhase(label: String, lo: Int, hi: Int) {
+  Lightning("Lightning (<25 moves)", 0,  24),
+  Quick    ("Quick     (25-34)",     25, 34),
+  Standard ("Standard  (35-44)",     35, 44),
+  Endgame  ("Endgame   (≥45)",       45, 999)
+}
+
+def classifyPhase(moves: Int): GamePhase = select true {
+  case moves < 25: GamePhase::Lightning
+  case moves < 35: GamePhase::Quick
+  case moves < 45: GamePhase::Standard
+  else:            GamePhase::Endgame
+}
+
+IO::println("── Game phase breakdown (data-carrying enum + groupBy) ────────────")
+val phaseLabels: List[String] = moveCounts.map { m -> classifyPhase(m as Int).label() }
+val byPhase: Map[String, List[String]] = phaseLabels.groupBy { p -> p as String }
+
+val phases: List[GamePhase] = [
+  GamePhase::Lightning, GamePhase::Quick, GamePhase::Standard, GamePhase::Endgame
+]
+foreach ph: GamePhase in phases {
+  val group = byPhase.get(ph.label())
+  val cnt: Int = if group == null { 0 } else { (group as List).size }
+  val pct: Int = cnt * 100 / NUM_GAMES
+  IO::println("  #{ph.label()}: #{cnt}  (#{pct}%)")
+}
+IO::println("")
+
+// ── Collection pipeline showcase ───────────────────────────────────────────
+
+// Fold: total move count across all games
+var totalForFold: Int = 0
+foreach m: Int in moveCounts { totalForFold = totalForFold + m }
+IO::println("Total moves (all games) : #{totalForFold}")
+
+// sortedBy: sort game lengths ascending
+val sorted: List[Int] = moveCounts.sortedBy { m -> m as Int }
+val shortestM: Int = sorted.get(0) as Int
+val longestM:  Int = sorted.get(sorted.size - 1) as Int
+
+IO::println("Shortest game  : #{shortestM} moves")
+IO::println("Longest  game  : #{longestM} moves")
+
+// distinct: how many unique game lengths occurred
+val uniqueLengths: List[Int] = sorted.distinct()
+IO::println("Unique lengths : #{uniqueLengths.size} distinct values over #{NUM_GAMES} games")
+IO::println("")
+
+// partition: games ending early (<40) vs late (≥40)
+val parts = moveCounts.partition { m -> (m as Int) < 40 }
+val earlyGames = parts[0] as List[Object]
+val lateGames  = parts[1] as List[Object]
+IO::println("── Partition: early (<40) vs late (≥40) ──────────────────────────")
+IO::println("  Early games : #{earlyGames.size}  (#{earlyGames.size * 100 / NUM_GAMES}%)")
+IO::println("  Late  games : #{lateGames.size}  (#{lateGames.size  * 100 / NUM_GAMES}%)")
+IO::println("")
+IO::println("Done.")

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.122.0] - 2026-09-27
+
 ### Added
 
 - **`run/BeekeepingLog.on`** — a ~280-line apiary management program, a new domain for the `run/` corpus (ADT case-enums with methods `HiveStatus` (5 cases, Boolean/Int fields, `label()`/`isActive()`) and `InspectionNote` (5 cases, a Double field, `label()`/`isAlert()`); a plain enum `Season`; records `Hive`/`Inspection`/`Harvest`; extension methods `Double.kgFmt`/`Int.plural`/`String.padRight`; collection pipelines `filter`/`map`/`groupBy`/`distinct`; nullable `String?`/`Int?` narrowed via `if != null`; a mutable list-slot update (`hives[idx] = ...`) after null narrowing; `foreach` over lists and nested map `(k, v)` entries — rendering a hive registry, inspection log, disease-alert summary, per-hive harvest totals, and an active-hive listing), added to the `run/` corpus (merged via #1642).

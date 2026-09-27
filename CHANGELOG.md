@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## [0.121.0] - 2026-09-27
+
+### Added
+
 - **`run/TarotDeck.on`** — a 387-line 78-card tarot deck analyser and reading session, a new domain for the `run/` corpus (an ADT case-enum `Arcana` (`Major`/`Minor`) with `select`/type-pattern `displayName()`; data-carrying enums `Suit(label, element, keyword)` and `Spread(positions, label)`; records `DrawnCard`/`ReadingStats`; a class hierarchy `TarotDeck`/`ReadingSession`/`Reporter`; extension methods `String.rpad`/`String.lpad`/`Int.pad2`; collection pipelines `map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`partition`/`zip`/`find`; nullable `ReadingStats?`; `try`/`catch`; `while` (Fisher-Yates shuffle, suit builders) and `foreach` over ranges and map `(k, v)` entries — rendering deck statistics, per-suit breakdowns, major-arcana density across three readings, and a reversed-card tally), added to the `run/` corpus (merged via #1640).
 - **`run/ArchaeologicalDig.on`** — a 278-line excavation-site management program, a new domain for the `run/` corpus (an ADT case-enum with methods `Period` (7 cases, Paleolithic → Modern) via `label()`/`approxDate()`, and `ArtifactType` (6 cases) via `label()`/`category()`; a plain enum `Condition`; records `ExcavationUnit`/`Artifact`; generics `List[ExcavationUnit]`/`Map[String, List[Artifact]]`; collection pipelines `filter`/`map`/`groupBy`/`sortedBy`/`distinct`; nullable `ExcavationUnit?` narrowed via `if != null`; extension methods `Int.plural`/`String.padRight`/`String.trunc`; `foreach` over typed lists, ADT-cased lists, and map `(k, v)` entries — rendering an artifact catalog, finds-by-period and category breakdowns, a condition report, and deepest-unit/top-category summaries), added to the `run/` corpus (merged via #1639).
 

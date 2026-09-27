@@ -306,7 +306,7 @@ if condition { ... } else { ... }
 while condition { ... }
 
 // forループ
-for i = 0; i < 10; i++ { ... }
+for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
 foreach item: Type in collection { ... }

@@ -1,0 +1,443 @@
+// FarmAnalytics.on — crop and field analytics for a multi-field farm
+// Exercises: records w/ methods, data-carrying and ADT enums, classes,
+// interfaces, generics, extensions, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/distinct/find/partition), select/pattern matching,
+// nullable, closures, string interpolation, try/catch, recursion,
+// while, foreach (ranges and map entries).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Season { Spring, Summer, Autumn, Winter }
+
+enum SoilQuality(label: String, baseYieldPerHa: Double) {
+  Excellent("Excellent", 8.0),
+  Good("Good",           6.0),
+  Fair("Fair",           4.5),
+  Poor("Poor",           2.5)
+}
+
+enum CropFamily { Cereal, Legume, Vegetable, Fruit, Oilseed }
+
+// ADT: outcome of a harvest attempt
+enum HarvestOutcome {
+  case Bumper(tonnes: Double)
+  case Normal(tonnes: Double)
+  case Reduced(tonnes: Double, reason: String)
+  case Failed(reason: String)
+public:
+  def tonnes(): Double = select this {
+    case r is Bumper:  r.tonnes()
+    case r is Normal:  r.tonnes()
+    case r is Reduced: r.tonnes()
+    case r is Failed:  0.0
+  }
+  def tag(): String = select this {
+    case r is Bumper:  "BUMPER"
+    case r is Normal:  "Normal"
+    case r is Reduced: "Reduced"
+    case r is Failed:  "FAILED"
+  }
+  def detail(): String = select this {
+    case r is Bumper:  r.tonnes() + "t (bumper)"
+    case r is Normal:  r.tonnes() + "t"
+    case r is Reduced: r.tonnes() + "t (" + r.reason() + ")"
+    case r is Failed:  "0t (" + r.reason() + ")"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Field(
+  id:      String,
+  name:    String,
+  areaHa:  Double,
+  soil:    SoilQuality
+) {
+public:
+  def label(): String = "#{id()} – #{name()} (#{areaHa()}ha, #{soil().label()} soil)"
+  def maxYieldEst(): Double = areaHa() * soil().baseYieldPerHa()
+}
+
+record Crop(
+  name:          String,
+  family:        CropFamily,
+  daysToHarvest: Int,
+  waterNeedMm:   Int
+) {
+public:
+  def familyLabel(): String = select family() {
+    case CropFamily::Cereal:    "Cereal"
+    case CropFamily::Legume:    "Legume"
+    case CropFamily::Vegetable: "Vegetable"
+    case CropFamily::Fruit:     "Fruit"
+    case CropFamily::Oilseed:   "Oilseed"
+    else: "Other"
+  }
+}
+
+record Planting(
+  year:    Int,
+  season:  Season,
+  fieldId: String,
+  crop:    Crop,
+  outcome: HarvestOutcome
+) {
+public:
+  def seasonLabel(): String = select season() {
+    case Season::Spring: "Spring"
+    case Season::Summer: "Summer"
+    case Season::Autumn: "Autumn"
+    case Season::Winter: "Winter"
+    else: "?"
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Double {
+  def round2(): Double {
+    return ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def reportTitle(): String
+  def plantingCount(): Int
+}
+
+// ─── FarmManager ──────────────────────────────────────────────────────────────
+
+class FarmManager conforms Reportable {
+  val name:      String
+  val fields:    List[Field]
+  val plantings: List[Planting]
+
+public:
+  def this(name: String, fields: List[Field], plantings: List[Planting]) {
+    this.name      = name
+    this.fields    = fields
+    this.plantings = plantings
+  }
+
+  def getName():      String         = name
+  def getFields():    List[Field]    = fields
+  def getPlantings(): List[Planting] = plantings
+
+  def totalAreaHa(): Double =
+    fields.fold(0.0) { acc, f -> (acc as Double) + (f as Field).areaHa() }
+
+  def totalYield(): Double =
+    plantings.fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+
+  def yieldForYear(year: Int): Double =
+    plantings
+      .filter  { p -> (p as Planting).year() == year }
+      .fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+
+  def plantingsForField(id: String): List[Planting] =
+    plantings.filter { p -> (p as Planting).fieldId() == id }
+
+  def plantingsForCrop(cropName: String): List[Planting] =
+    plantings.filter { p -> (p as Planting).crop().name() == cropName }
+
+  def fieldForId(id: String): Field? {
+    val found = fields.find { f -> (f as Field).id() == id }
+    if found == null { return null }
+    return found as Field
+  }
+
+  def years(): List[Int] =
+    plantings.map { p -> (p as Planting).year() }.distinct()
+
+  def cropNames(): List[String] =
+    plantings.map { p -> (p as Planting).crop().name() }.distinct()
+
+  def bestYear(): Int? {
+    val ys = years()
+    if ys.size == 0 { return null }
+    var best: Int = ys[0] as Int
+    var bestYield: Double = yieldForYear(best)
+    foreach y: Int in ys {
+      val yy = yieldForYear(y)
+      if yy > bestYield { best = y; bestYield = yy }
+    }
+    return best
+  }
+
+  def mostProductiveField(): Field? {
+    if fields.size == 0 { return null }
+    var bestField: Field = fields[0] as Field
+    var bestYield: Double = 0.0 - 1.0
+    foreach f: Field in fields {
+      val yld = plantingsForField(f.id())
+        .fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+      if yld > bestYield { bestField = f; bestYield = yld }
+    }
+    return bestField
+  }
+
+  def reportTitle(): String  = "Farm Analytics: #{name}"
+  def plantingCount(): Int   = plantings.size
+}
+
+// ─── Utility functions ────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  IO::println(s)
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+def safeDiv(a: Double, b: Double): Double {
+  try {
+    if b == 0.0 { return 0.0 }
+    return a / b
+  } catch e: Exception {
+    return 0.0
+  }
+}
+
+// Fibonacci — exercises direct recursion
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+val fields: List[Field] = [
+  new Field("F01", "North Paddock", 45.0, SoilQuality::Excellent),
+  new Field("F02", "South Valley",  32.0, SoilQuality::Good),
+  new Field("F03", "East Slope",    18.5, SoilQuality::Fair),
+  new Field("F04", "West Plain",    55.0, SoilQuality::Good),
+  new Field("F05", "Hill Terrace",  12.0, SoilQuality::Poor)
+]
+
+val wheat  = new Crop("Wheat",   CropFamily::Cereal,     120, 450)
+val barley = new Crop("Barley",  CropFamily::Cereal,     100, 400)
+val lentil = new Crop("Lentils", CropFamily::Legume,      95, 300)
+val canola = new Crop("Canola",  CropFamily::Oilseed,    120, 380)
+val potato = new Crop("Potato",  CropFamily::Vegetable,   90, 600)
+
+val plantings: List[Planting] = [
+  // 2021
+  new Planting(2021, Season::Spring, "F01", wheat,  new Bumper(342.0)),
+  new Planting(2021, Season::Spring, "F02", barley, new Normal(185.0)),
+  new Planting(2021, Season::Spring, "F03", lentil, new Reduced(62.0, "late frost")),
+  new Planting(2021, Season::Autumn, "F04", canola, new Normal(290.0)),
+  new Planting(2021, Season::Spring, "F05", potato, new Failed("drought")),
+  // 2022
+  new Planting(2022, Season::Spring, "F01", wheat,  new Normal(310.0)),
+  new Planting(2022, Season::Spring, "F02", wheat,  new Normal(178.0)),
+  new Planting(2022, Season::Spring, "F03", barley, new Bumper(98.0)),
+  new Planting(2022, Season::Autumn, "F04", canola, new Reduced(210.0, "aphid infestation")),
+  new Planting(2022, Season::Spring, "F05", lentil, new Normal(38.0)),
+  // 2023
+  new Planting(2023, Season::Spring, "F01", wheat,  new Bumper(395.0)),
+  new Planting(2023, Season::Spring, "F02", lentil, new Normal(161.0)),
+  new Planting(2023, Season::Spring, "F03", canola, new Normal(75.0)),
+  new Planting(2023, Season::Autumn, "F04", wheat,  new Bumper(430.0)),
+  new Planting(2023, Season::Spring, "F05", potato, new Normal(52.0))
+]
+
+val farm = new FarmManager("Sunrise Agricultural Co.", fields, plantings)
+
+// ─── Report ────────────────────────────────────────────────────────────────────
+
+printSection("=== " + farm.reportTitle() + " ===")
+IO::println("Total area    : " + farm.totalAreaHa() + " ha")
+IO::println("Total yield   : " + farm.totalYield() + " tonnes (all years)")
+IO::println("Fields        : " + farm.getFields().size)
+IO::println("Plantings     : " + farm.plantingCount())
+
+// ─── Field Inventory ──────────────────────────────────────────────────────────
+
+printSection("Field Inventory")
+foreach f: Field in farm.getFields() {
+  val est = f.maxYieldEst().round2()
+  IO::println("  " + f.label())
+  IO::println("    potential: " + est + "t/year (est.)")
+}
+
+// ─── Crop Family Legend ───────────────────────────────────────────────────────
+
+printSection("Crops in Use")
+foreach cn: String in farm.cropNames().sortedBy { s -> s as String } {
+  val ps = farm.plantingsForCrop(cn)
+  if ps.size > 0 {
+    val c = (ps[0] as Planting).crop()
+    IO::println("  " + cn.rpad(10) + " " + c.familyLabel().rpad(12) +
+                " " + c.daysToHarvest() + "d  " + c.waterNeedMm() + "mm water")
+  }
+}
+
+// ─── Yearly Yield Summary ─────────────────────────────────────────────────────
+
+printSection("Yearly Yield Summary")
+foreach y: Int in farm.years().sortedBy { y -> y as Int } {
+  val yt = farm.yieldForYear(y).round2()
+  IO::println("  " + y + "  →  " + yt + "t")
+}
+
+val best = farm.bestYear()
+if best != null {
+  val by = best as Int
+  IO::println("Best year: " + by + " (" + farm.yieldForYear(by).round2() + "t)")
+} else {
+  IO::println("Best year: (no data)")
+}
+
+// ─── Per-Crop Totals ──────────────────────────────────────────────────────────
+
+printSection("Yield by Crop (all years)")
+foreach cn: String in farm.cropNames().sortedBy { s -> s as String } {
+  val ps = farm.plantingsForCrop(cn)
+  val total = ps.fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+  IO::println("  " + cn.rpad(10) + ("" + total.round2() + "t").lpad(10) +
+              "  (" + ps.size + " planting(s))")
+}
+
+// ─── Field Performance Detail ─────────────────────────────────────────────────
+
+printSection("Field Performance (3-year roll-up)")
+foreach f: Field in farm.getFields() {
+  val ps = farm.plantingsForField(f.id())
+  val yld = ps.fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+  val maxPossible = f.maxYieldEst() * 3.0
+  val effPct = safeDiv(yld, maxPossible) * 100.0
+  IO::println("  " + f.id() + " " + f.name().rpad(16) +
+              " yield=" + yld.round2() + "t  eff=" + effPct.round2() + "%")
+  foreach p: Planting in ps.sortedBy { p -> (p as Planting).year() as Int } {
+    IO::println("    " + p.year() + " " + p.seasonLabel().rpad(7) +
+                " " + p.crop().name().rpad(8) + " " + p.outcome().tag().rpad(8) +
+                " " + p.outcome().detail())
+  }
+}
+
+// ─── Most Productive Field ────────────────────────────────────────────────────
+
+printSection("Most Productive Field")
+val mpf = farm.mostProductiveField()
+if mpf != null {
+  IO::println("  " + (mpf as Field).label())
+} else {
+  IO::println("  (no data)")
+}
+
+// ─── Failed Harvests ──────────────────────────────────────────────────────────
+
+def isFailed(p: Planting): Boolean = select p.outcome() {
+  case r is Failed: true
+  else: false
+}
+
+printSection("Failed Harvests")
+val failures = farm.getPlantings().filter { p -> isFailed(p as Planting) }
+if failures.size > 0 {
+  foreach p: Planting in failures {
+    IO::println("  " + p.year() + "  " + p.fieldId() + "  " +
+                p.crop().name().rpad(8) + "  " + p.outcome().detail())
+  }
+} else {
+  IO::println("  None")
+}
+
+// ─── Seasonal Breakdown ───────────────────────────────────────────────────────
+
+printSection("Seasonal Yield Breakdown")
+val bySeason = farm.getPlantings().groupBy { p -> (p as Planting).seasonLabel() }
+foreach (sk, slist) in bySeason {
+  val total = (slist as List).fold(0.0) { acc, p -> (acc as Double) + (p as Planting).outcome().tonnes() }
+  IO::println("  " + (sk as String).rpad(8) + ("" + total.round2() + "t").lpad(10))
+}
+
+// ─── Low-Quality Soil Warning ─────────────────────────────────────────────────
+
+printSection("Low-Quality Soil Fields")
+val lowSoil = farm.getFields().filter { f ->
+  (f as Field).soil() == SoilQuality::Fair || (f as Field).soil() == SoilQuality::Poor
+}
+if lowSoil.size > 0 {
+  foreach f: Field in lowSoil {
+    IO::println("  " + (f as Field).label() +
+                "  (potential only " + (f as Field).maxYieldEst() + "t/yr)")
+  }
+} else {
+  IO::println("  None")
+}
+
+// ─── Bumper Harvest Spotlight ─────────────────────────────────────────────────
+
+def isBumper(p: Planting): Boolean = select p.outcome() {
+  case r is Bumper: true
+  else: false
+}
+
+printSection("Bumper Harvests")
+val bumpers = farm.getPlantings()
+  .filter  { p -> isBumper(p as Planting) }
+  .sortedBy { p -> 0.0 - (p as Planting).outcome().tonnes() }
+foreach p: Planting in bumpers {
+  IO::println("  " + p.year() + "  " + p.fieldId() + "  " +
+              p.crop().name().rpad(8) + "  " + p.outcome().detail())
+}
+
+// ─── Water Need Analysis ──────────────────────────────────────────────────────
+
+printSection("Crop Water Needs (sorted high→low)")
+val waterOrder = farm.cropNames()
+  .map { cn -> farm.plantingsForCrop(cn as String)[0] as Planting }
+  .sortedBy { p -> 0 - (p as Planting).crop().waterNeedMm() }
+foreach p: Planting in waterOrder {
+  IO::println("  " + p.crop().name().rpad(10) + p.crop().waterNeedMm() + "mm")
+}
+
+// ─── Recursion demo ───────────────────────────────────────────────────────────
+
+printSection("Fibonacci sequence (1..10) — recursion demo")
+var fseq: String = ""
+foreach i: Int in 1..10 {
+  if fseq.length() > 0 { fseq = fseq + ", " }
+  fseq = fseq + fib(i)
+}
+IO::println("  " + fseq)
+
+// ─── Try/catch demo ───────────────────────────────────────────────────────────
+
+printSection("Division safety demo")
+IO::println("  10 / 3 = " + safeDiv(10.0, 3.0).round2())
+IO::println("  10 / 0 = " + safeDiv(10.0, 0.0))
+
+// ─── Closure stored in val ────────────────────────────────────────────────────
+
+printSection("Yield adjustment via closure")
+val addBonus = (base: Double, pct: Double) -> base + base * pct / 100.0
+IO::println("  342t +15% bonus = " + addBonus(342.0, 15.0).round2() + "t")
+IO::println("  185t  -5% loss  = " + addBonus(185.0, -5.0).round2() + "t")
+
+// ─── String interpolation demo ────────────────────────────────────────────────
+
+val n = farm.plantingCount()
+val total = farm.totalYield().round2()
+val area  = farm.totalAreaHa()
+IO::println("")
+IO::println("Summary: #{n} plantings | #{total}t harvested | #{area}ha managed")
+IO::println("Report complete.")

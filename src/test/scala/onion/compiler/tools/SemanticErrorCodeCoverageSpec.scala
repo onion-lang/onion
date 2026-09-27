@@ -562,8 +562,9 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
     it("E0076 unknown shape format") {
       failsWith("E0076",
-        """record P(x: Int)
+        """record P(x: Int) {
           |  shape d = toml
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Int { return 0 }

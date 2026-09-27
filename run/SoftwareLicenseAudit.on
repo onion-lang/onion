@@ -1,0 +1,316 @@
+// SoftwareLicenseAudit.on — dependency license compliance checker
+// Exercises: records with methods, data-carrying enums, ADT enum, classes,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition), select/pattern matching, nullable, closures, string
+// interpolation, foreach (ranges and maps), extension methods, while loops.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum LicenseFamily(label: String) {
+  Permissive("Permissive"),
+  WeakCopyleft("Weak Copyleft"),
+  StrongCopyleft("Strong Copyleft"),
+  Proprietary("Proprietary"),
+  Unknown("Unknown")
+}
+
+enum LicenseId(spdx: String, family: LicenseFamily, commercialOk: Boolean) {
+  MIT("MIT",             LicenseFamily::Permissive,     true),
+  Apache2("Apache-2.0",  LicenseFamily::Permissive,     true),
+  BSD2("BSD-2-Clause",   LicenseFamily::Permissive,     true),
+  BSD3("BSD-3-Clause",   LicenseFamily::Permissive,     true),
+  ISC("ISC",             LicenseFamily::Permissive,      true),
+  LGPL21("LGPL-2.1",     LicenseFamily::WeakCopyleft,   true),
+  MPL2("MPL-2.0",        LicenseFamily::WeakCopyleft,   true),
+  GPL2("GPL-2.0",        LicenseFamily::StrongCopyleft, true),
+  GPL3("GPL-3.0",        LicenseFamily::StrongCopyleft, true),
+  AGPL3("AGPL-3.0",      LicenseFamily::StrongCopyleft, true),
+  Proprietary("Proprietary", LicenseFamily::Proprietary, false),
+  UnknownLicense("Unknown",  LicenseFamily::Unknown,     false)
+}
+
+// ─── Records (declared before AuditResult so the ADT can reference Issue) ─────
+
+record Issue(sev: String, dep: String, reason: String) {
+public:
+  def format(): String = "[#{sev()}] #{dep()}: #{reason()}"
+  def isError(): Boolean = sev() == "ERROR"
+}
+
+record Dependency(
+  name:    String,
+  version: String,
+  license: LicenseId,
+  direct:  Boolean
+) {
+public:
+  def label():      String  = "#{name()} #{version()} [#{license().spdx()}]"
+  def permissive(): Boolean = license().family() == LicenseFamily::Permissive
+  def copyleft():   Boolean {
+    val f = license().family()
+    return f == LicenseFamily::WeakCopyleft || f == LicenseFamily::StrongCopyleft
+  }
+}
+
+record Policy(
+  allowWeakCopyleft:   Boolean,
+  allowStrongCopyleft: Boolean,
+  requireCommercialOk: Boolean,
+  maxDirectDeps:       Int
+) {
+public:
+  static def standard(): Policy = new Policy(true, false, true, 50)
+  static def strict():   Policy = new Policy(false, false, true, 20)
+  static def open():     Policy = new Policy(true, true, false, 100)
+}
+
+record FamilyStat(family: String, count: Int, pct: Double) {
+public:
+  def format(): String {
+    val bar: String = buildBar(count())
+    return "  #{(family() + ":").padRight(18)} #{bar} #{count()} (#{pct().round1()}%)"
+  }
+}
+
+// ─── ADT: AuditResult ─────────────────────────────────────────────────────────
+
+enum AuditResult {
+  case Clean(count: Int)
+  case HasIssues(warnings: List[Issue], errors: List[Issue])
+public:
+  def ok(): Boolean = select this {
+    case c is Clean:     true
+    case i is HasIssues: i.errors().size == 0
+  }
+  def summary(): String = select this {
+    case c is Clean:
+      "✓ Clean — #{c.count()} dependencies audited, no issues"
+    case i is HasIssues:
+      "⚠ Issues — #{i.warnings().size} warning(s), #{i.errors().size} error(s)"
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+extension Double {
+  def round1(): Double = ((self * 10.0 + 0.5) as Int) * 1.0 / 10.0
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def buildBar(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  val cap: Int = if n > 12 { 12 } else { n }
+  while i < cap { s = s + "█"; i++ }
+  return s
+}
+
+def sep(): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < 60 { s = s + "─"; i++ }
+  return s
+}
+
+// ─── Checker ──────────────────────────────────────────────────────────────────
+
+class LicenseChecker {
+  var deps:   List[Dependency]
+  var policy: Policy
+
+public:
+  def this(policy: Policy) {
+    self.deps   = []
+    self.policy = policy
+  }
+
+  def add(d: Dependency): void {
+    deps.add(d)
+  }
+
+  def audit(): AuditResult {
+    val warnings: List[Issue] = []
+    val errors:   List[Issue] = []
+
+    foreach d: Dependency in deps {
+      val lbl: String = d.label()
+      val fam: LicenseFamily = d.license().family()
+
+      if fam == LicenseFamily::Unknown {
+        warnings.add(new Issue("WARN", lbl, "license is unknown — review manually"))
+      }
+
+      if fam == LicenseFamily::StrongCopyleft && !policy.allowStrongCopyleft() {
+        errors.add(new Issue("ERROR", lbl,
+          "strong copyleft (#{d.license().spdx()}) not permitted by policy"))
+      }
+
+      if fam == LicenseFamily::WeakCopyleft && !policy.allowWeakCopyleft() {
+        warnings.add(new Issue("WARN", lbl,
+          "weak copyleft (#{d.license().spdx()}) needs review under strict policy"))
+      }
+
+      if !d.license().commercialOk() && policy.requireCommercialOk() {
+        errors.add(new Issue("ERROR", lbl, "license may not permit commercial use"))
+      }
+
+      if fam == LicenseFamily::Proprietary {
+        warnings.add(new Issue("WARN", lbl, "proprietary license — verify distribution rights"))
+      }
+    }
+
+    val directCount: Int = deps.filter { d: Dependency -> d.direct() }.size
+    if directCount > policy.maxDirectDeps() {
+      warnings.add(new Issue("WARN", "project",
+        "#{directCount} direct deps exceeds policy limit of #{policy.maxDirectDeps()}"))
+    }
+
+    if warnings.size == 0 && errors.size == 0 {
+      return new Clean(deps.size)
+    }
+    return new HasIssues(warnings, errors)
+  }
+
+  def familyStats(): List[FamilyStat] {
+    val total: Double = deps.size * 1.0
+    if total == 0.0 { return [] }
+
+    val grouped: Map[String, Int] = [:]
+    foreach d: Dependency in deps {
+      val key: String = d.license().family().label()
+      val cur: Int = if grouped.containsKey(key) { grouped.get(key) as Int } else { 0 }
+      grouped.put(key, cur + 1)
+    }
+
+    val stats: List[FamilyStat] = []
+    foreach (k, v) in grouped {
+      val cnt: Int = v as Int
+      val pct: Double = cnt * 100.0 / total
+      stats.add(new FamilyStat(k as String, cnt, pct))
+    }
+    return stats.sortedBy { s: FamilyStat -> -s.count() }
+  }
+
+  def topByFamily(family: LicenseFamily): List[Dependency] =
+    deps
+      .filter  { d: Dependency -> d.license().family() == family }
+      .sortedBy { d: Dependency -> d.name() }
+
+  def directDeps():  List[Dependency] = deps.filter { d: Dependency -> d.direct() }
+  def transitDeps(): List[Dependency] = deps.filter { d: Dependency -> !d.direct() }
+  def totalCount():  Int = deps.size
+
+  def licenseBreakdown(): List[String] =
+    deps
+      .map      { d: Dependency -> d.license().spdx() }
+      .distinct
+      .sortedBy { s: String -> s }
+}
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+def printReport(checker: LicenseChecker, projectName: String): void {
+  IO::println("╔════════════════════════════════════════════════════════╗")
+  IO::println("  License Audit: #{projectName}")
+  IO::println("╚════════════════════════════════════════════════════════╝")
+
+  val result: AuditResult = checker.audit()
+  IO::println("Overall: " + result.summary())
+  IO::println(sep())
+
+  select result {
+    case i is HasIssues: {
+      if i.errors().size > 0 {
+        IO::println("Errors:")
+        foreach issue: Issue in i.errors() { IO::println("  " + issue.format()) }
+      }
+      if i.warnings().size > 0 {
+        IO::println("Warnings:")
+        foreach issue: Issue in i.warnings() { IO::println("  " + issue.format()) }
+      }
+      IO::println(sep())
+    }
+    case c is Clean: {}
+  }
+
+  IO::println("License Family Distribution (#{checker.totalCount()} total):")
+  foreach stat: FamilyStat in checker.familyStats() {
+    IO::println(stat.format())
+  }
+  IO::println(sep())
+
+  IO::println("Direct: #{checker.directDeps().size}  |  Transitive: #{checker.transitDeps().size}")
+
+  val breakdown: List[String] = checker.licenseBreakdown()
+  IO::println("SPDX identifiers: " + breakdown.fold("") { acc: String, s: String ->
+    if acc.length() == 0 { s } else { acc + ", " + s }
+  })
+
+  val copyleft: List[Dependency] = checker.topByFamily(LicenseFamily::StrongCopyleft)
+  if copyleft.size > 0 {
+    IO::println(sep())
+    IO::println("Strong-copyleft dependencies:")
+    foreach d: Dependency in copyleft { IO::println("  • " + d.label()) }
+  }
+  IO::println("")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Project A — commercial product (strict policy)
+  val checkerA: LicenseChecker = new LicenseChecker(Policy::strict())
+  checkerA.add(new Dependency("spring-core",    "6.1.4",   LicenseId::Apache2,  true))
+  checkerA.add(new Dependency("jackson-core",   "2.16.1",  LicenseId::Apache2,  true))
+  checkerA.add(new Dependency("guava",          "33.0.0",  LicenseId::Apache2,  true))
+  checkerA.add(new Dependency("slf4j-api",      "2.0.12",  LicenseId::MIT,      true))
+  checkerA.add(new Dependency("logback",        "1.4.14",  LicenseId::LGPL21,   true))
+  checkerA.add(new Dependency("commons-lang3",  "3.14.0",  LicenseId::Apache2,  false))
+  checkerA.add(new Dependency("asm",            "9.6.0",   LicenseId::BSD3,     false))
+  checkerA.add(new Dependency("byte-buddy",     "1.14.11", LicenseId::Apache2,  false))
+  checkerA.add(new Dependency("antlr4-runtime", "4.13.1",  LicenseId::BSD3,     false))
+  printReport(checkerA, "ProjectA (strict policy)")
+
+  // Project B — open-source library with some GPL (open policy)
+  val checkerB: LicenseChecker = new LicenseChecker(Policy::open())
+  checkerB.add(new Dependency("jflex",          "1.9.1",   LicenseId::BSD3,            true))
+  checkerB.add(new Dependency("cup",            "0.11b",   LicenseId::GPL2,            true))
+  checkerB.add(new Dependency("junit5",         "5.10.2",  LicenseId::Apache2,         false))
+  checkerB.add(new Dependency("mockito",        "5.10.0",  LicenseId::MIT,             false))
+  checkerB.add(new Dependency("mystery-lib",    "0.0.1",   LicenseId::UnknownLicense,  false))
+  printReport(checkerB, "ProjectB (open policy, GPL allowed)")
+
+  // Project C — standard policy showing proprietary dep
+  val checkerC: LicenseChecker = new LicenseChecker(Policy::standard())
+  checkerC.add(new Dependency("open-pdf",       "3.0.0",   LicenseId::Apache2,    true))
+  checkerC.add(new Dependency("acme-charts",    "2.5.0",   LicenseId::Proprietary, true))
+  checkerC.add(new Dependency("acme-export",    "1.2.0",   LicenseId::Proprietary, false))
+  checkerC.add(new Dependency("commons-io",     "2.15.1",  LicenseId::Apache2,    false))
+  printReport(checkerC, "ProjectC (standard policy, proprietary deps)")
+
+  // Policy comparison table for LGPL-2.1 dependency
+  IO::println(sep())
+  IO::println("Policy comparison — logback LGPL-2.1:")
+  val lgplDep: Dependency = new Dependency("logback", "1.4.14", LicenseId::LGPL21, true)
+  val policies: List[Policy] = [Policy::strict(), Policy::standard(), Policy::open()]
+  val pnames:   List[String] = ["strict", "standard", "open"]
+  var i: Int = 0
+  while i < policies.size {
+    val p:  Policy = policies.get(i) as Policy
+    val pn: String = pnames.get(i) as String
+    val c:  LicenseChecker = new LicenseChecker(p)
+    c.add(lgplDep)
+    val r: AuditResult = c.audit()
+    IO::println("  #{(pn + ":").padRight(12)} #{r.summary()}")
+    i++
+  }
+}

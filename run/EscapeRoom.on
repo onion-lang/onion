@@ -1,0 +1,384 @@
+// EscapeRoom.on — escape-room puzzle design and play-session management
+// Exercises: records with regex parsing, record laws, ADT enums,
+// data-carrying enums, classes with inheritance, interfaces, generics,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition/zip), select/pattern matching, nullable, closures, string
+// interpolation, try/catch, recursion, while, foreach over ranges and maps.
+
+import {
+  java.util.List
+  java.util.ArrayList
+  java.util.Map
+  java.util.LinkedHashMap
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum RoomTheme(label: String, difficultyMod: Double) {
+  Horror("Horror",  1.5),
+  Mystery("Mystery", 1.2),
+  SciFi("Sci-Fi",  1.0),
+  Fantasy("Fantasy", 0.9),
+  Western("Western", 0.95)
+}
+
+enum HintPenalty(seconds: Int) {
+  Minor(30),
+  Major(90),
+  Critical(180)
+}
+
+// ─── ADT: PuzzleEvent ─────────────────────────────────────────────────────────
+
+enum PuzzleEvent {
+  case Solved(puzzleId: String, teamId: String, elapsedSec: Int)
+  case Hinted(puzzleId: String, teamId: String, penalty: HintPenalty)
+  case Failed(puzzleId: String, teamId: String, attempts: Int)
+  case Skipped(puzzleId: String, teamId: String)
+public:
+  def teamId(): String = select this {
+    case s is Solved:  s.teamId()
+    case h is Hinted:  h.teamId()
+    case f is Failed:  f.teamId()
+    case k is Skipped: k.teamId()
+  }
+  def puzzleId(): String = select this {
+    case s is Solved:  s.puzzleId()
+    case h is Hinted:  h.puzzleId()
+    case f is Failed:  f.puzzleId()
+    case k is Skipped: k.puzzleId()
+  }
+  def label(): String = select this {
+    case s is Solved:  "SOLVED in #{s.elapsedSec()}s"
+    case h is Hinted:  "HINT   (-#{h.penalty().seconds()}s penalty)"
+    case f is Failed:  "FAILED (#{f.attempts()} attempts)"
+    case k is Skipped: "SKIP"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Puzzle(
+  id:          String,
+  title:       String,
+  solution:    String,
+  difficulty:  Int,
+  basePoints:  Int
+) {
+  example { new Puzzle("P1", "Cipher", "1234", 5, 100).scaledPoints(1.0) == 150 }
+  example { new Puzzle("P2", "Mirror", "X",    1, 200).scaledPoints(1.0) == 220 }
+public:
+  def scaledPoints(mod: Double): Int {
+    val raw: Double = basePoints() * mod * (1.0 + difficulty() * 0.1)
+    return raw as Int
+  }
+  def label(): String = "[#{id()}] #{title()} (diff=#{difficulty()})"
+}
+
+record Team(
+  id:    String,
+  name:  String,
+  size:  Int
+) {
+  example { new Team("T1", "Brainiacs", 4).size() == 4 }
+public:
+  def label(): String = "#{name()} (#{size()} members)"
+}
+
+// Attempt line parsed from a session log: "teamId:answer@elapsedSec"
+record AttemptLine(teamId: String, answer: String, elapsedSec: Int)
+  from re"(\w+):([^@]+)@(\d+)" {
+  example { AttemptLine::parse("alpha:doorcode@45") != null }
+}
+
+record SessionResult(
+  teamId:       String,
+  totalPoints:  Int,
+  penaltySec:   Int,
+  solvedCount:  Int,
+  hintCount:    Int,
+  skippedCount: Int
+) {
+public:
+  def netTime(): Int = penaltySec()
+  def rank(): String = "#{totalPoints()} pts, #{solvedCount()} solved, #{penaltySec()}s penalty"
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def toMinSec(): String {
+    val m: Int = self / 60
+    val s: Int = self % 60
+    if s < 10 {
+      return "#{m}:0#{s}"
+    }
+    return "#{m}:#{s}"
+  }
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def centre(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s + " " }
+    return s.substring(0, w)
+  }
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Interface + Class ────────────────────────────────────────────────────────
+
+interface Scoreable {
+  def score(): Int
+  def describe(): String
+}
+
+class TeamScore(val result: SessionResult, val rank: Int) conforms Scoreable {
+public:
+  def score(): Int = result.totalPoints()
+  def describe(): String =
+    "#{rank.lpad(3)}. #{result.teamId().rpad(12)} #{score().lpad(6)}pts " +
+    "solved=#{result.solvedCount()} hints=#{result.hintCount()} " +
+    "penalty=#{result.penaltySec().toMinSec()}"
+}
+
+// ─── Generic Leaderboard ──────────────────────────────────────────────────────
+
+class Leaderboard[T extends Scoreable](val entries: List[T]) {
+public:
+  def top(n: Int): List[T] {
+    val sorted: List[T] = Colls::sortedBy(entries, (e: T) -> 0 - e.score())
+    return Colls::take(sorted, n)
+  }
+  def champion(): T? {
+    if entries.size() == 0 { return null }
+    return Colls::sortedBy(entries, (e: T) -> 0 - e.score()).get(0)
+  }
+}
+
+// ─── Session Engine ───────────────────────────────────────────────────────────
+
+class EscapeRoomSession(
+  val room:    String,
+  val theme:   RoomTheme,
+  val puzzles: List[Puzzle],
+  val teams:   List[Team]
+) {
+  var events: List[PuzzleEvent] = new ArrayList[PuzzleEvent]()
+
+public:
+  def addEvent(e: PuzzleEvent): void {
+    events.add(e)
+  }
+
+  def eventsFor(teamId: String): List[PuzzleEvent] {
+    return Colls::filter(events, (e: PuzzleEvent) -> e.teamId() == teamId)
+  }
+
+  def computeResult(teamId: String): SessionResult {
+    val teamEvents: List[PuzzleEvent] = eventsFor(teamId)
+    var totalPoints: Int = 0
+    var penalty: Int = 0
+    var solved: Int = 0
+    var hints: Int = 0
+    var skipped: Int = 0
+    foreach ev: PuzzleEvent in teamEvents {
+      select ev {
+        case s is Solved: {
+          val puzzle: Puzzle? = Colls::find(puzzles, (p: Puzzle) -> p.id() == s.puzzleId())
+          if puzzle != null {
+            totalPoints = totalPoints + (puzzle as Puzzle).scaledPoints(theme.difficultyMod())
+          }
+          solved = solved + 1
+        }
+        case h is Hinted: {
+          penalty = penalty + h.penalty().seconds()
+          hints = hints + 1
+        }
+        case f is Failed: {
+          penalty = penalty + f.attempts() * 15
+        }
+        case k is Skipped: {
+          skipped = skipped + 1
+        }
+      }
+    }
+    return new SessionResult(teamId, totalPoints, penalty, solved, hints, skipped)
+  }
+
+  def getEvents(): List[PuzzleEvent] = events
+
+  def buildLeaderboard(): Leaderboard[TeamScore] {
+    val results: List[SessionResult] = Colls::map(teams, (t: Team) -> computeResult(t.id()))
+    val sorted: List[SessionResult] = Colls::sortedBy(results, (r: SessionResult) -> 0 - r.totalPoints())
+    val scores: List[TeamScore] = new ArrayList[TeamScore]()
+    var idx: Int = 1
+    foreach r: SessionResult in sorted {
+      scores.add(new TeamScore(r, idx))
+      idx = idx + 1
+    }
+    return new Leaderboard[TeamScore](scores)
+  }
+
+  def puzzleStats(): void {
+    val byPuzzle: Map[String, List[PuzzleEvent]] = Colls::groupBy(events, (e: PuzzleEvent) -> e.puzzleId())
+    IO::println("\n  Puzzle breakdown:")
+    foreach (pid, evs) in byPuzzle {
+      val solves: Int = Colls::count(evs, (e: PuzzleEvent) -> e is Solved)
+      val hints:  Int = Colls::count(evs, (e: PuzzleEvent) -> e is Hinted)
+      val puzzle: Puzzle? = Colls::find(puzzles, (p: Puzzle) -> p.id() == pid)
+      val title: String = if puzzle != null { (puzzle as Puzzle).title() } else { pid }
+      IO::println("    #{title.rpad(20)} solves=#{solves} hints=#{hints}")
+    }
+  }
+
+  def printReport(): void {
+    val divider: String = "─".centre(64)
+    IO::println(divider)
+    IO::println("  #{room} · Theme: #{theme.label()}".centre(64))
+    IO::println(divider)
+    val lb: Leaderboard[TeamScore] = buildLeaderboard()
+    IO::println("\n  Leaderboard:")
+    foreach ts: TeamScore in lb.entries {
+      IO::println("  " + ts.describe())
+    }
+    val champ: TeamScore? = lb.champion()
+    if champ != null {
+      IO::println("\n  Champion: #{(champ as TeamScore).result.teamId()} — #{(champ as TeamScore).score()} pts")
+    }
+    puzzleStats()
+    IO::println(divider)
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def makePuzzles(): List[Puzzle] {
+  val ps: List[Puzzle] = new ArrayList[Puzzle]()
+  ps.add(new Puzzle("P1", "Cipher Lock",     "7391", 3, 150))
+  ps.add(new Puzzle("P2", "Mirror Maze",     "RED",  5, 250))
+  ps.add(new Puzzle("P3", "Chemical Mix",    "H2O",  7, 400))
+  ps.add(new Puzzle("P4", "Telescope Code",  "STAR", 4, 200))
+  ps.add(new Puzzle("P5", "Final Countdown", "2048", 9, 600))
+  return ps
+}
+
+def makeTeams(): List[Team] {
+  val ts: List[Team] = new ArrayList[Team]()
+  ts.add(new Team("alpha",  "Alpha Squad",    4))
+  ts.add(new Team("beta",   "Beta Breakers",  3))
+  ts.add(new Team("gamma",  "Gamma Force",    5))
+  ts.add(new Team("delta",  "Delta Detectives", 4))
+  return ts
+}
+
+// ─── Attempt parser demo ──────────────────────────────────────────────────────
+
+def parseAttempts(): void {
+  val lines: java.util.List[String] = [
+    "alpha:7391@180",
+    "beta:7391@210",
+    "gamma:9999@120",
+    "alpha:RED@350",
+    "delta:H2O@420"
+  ]
+  IO::println("  Parsed attempts:")
+  foreach raw: String in lines {
+    val a: AttemptLine? = AttemptLine::parse(raw)
+    if a != null {
+      val al: AttemptLine = a as AttemptLine
+      IO::println("    team=#{al.teamId()} answer=#{al.answer()} at #{al.elapsedSec().toMinSec()}")
+    } else {
+      IO::println("    (failed to parse: #{raw})")
+    }
+  }
+}
+
+// ─── Recursive solve rate ─────────────────────────────────────────────────────
+
+def solveRate(events: List[PuzzleEvent], idx: Int, acc: Int): Int {
+  if idx >= events.size() { return acc }
+  val ev: PuzzleEvent = events.get(idx)
+  val next: Int = if ev is Solved { acc + 1 } else { acc }
+  return solveRate(events, idx + 1, next)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val puzzles: List[Puzzle] = makePuzzles()
+val teams:   List[Team]   = makeTeams()
+val session = new EscapeRoomSession("Haunted Mansion", RoomTheme::Horror, puzzles, teams)
+
+// Seed events for all teams
+// Alpha: solves P1, P2 (with hint), skips P3, fails P4, solves P5
+session.addEvent(new Solved("P1", "alpha", 185))
+session.addEvent(new Hinted("P2", "alpha", HintPenalty::Minor))
+session.addEvent(new Solved("P2", "alpha", 320))
+session.addEvent(new Skipped("P3", "alpha"))
+session.addEvent(new Failed("P4", "alpha", 3))
+session.addEvent(new Solved("P5", "alpha", 2700))
+
+// Beta: solves P1, P3 (with major hint), fails P5 twice
+session.addEvent(new Solved("P1", "beta", 220))
+session.addEvent(new Hinted("P3", "beta", HintPenalty::Major))
+session.addEvent(new Solved("P3", "beta", 480))
+session.addEvent(new Failed("P5", "beta", 2))
+
+// Gamma: solves P1, P2, P3, P4 — no P5
+session.addEvent(new Solved("P1", "gamma", 150))
+session.addEvent(new Solved("P2", "gamma", 290))
+session.addEvent(new Solved("P3", "gamma", 430))
+session.addEvent(new Solved("P4", "gamma", 540))
+
+// Delta: solves P1, uses two critical hints, solves P2 and P5
+session.addEvent(new Solved("P1", "delta", 200))
+session.addEvent(new Hinted("P2", "delta", HintPenalty::Critical))
+session.addEvent(new Solved("P2", "delta", 370))
+session.addEvent(new Hinted("P5", "delta", HintPenalty::Critical))
+session.addEvent(new Solved("P5", "delta", 2850))
+
+// Print report
+session.printReport()
+
+// Parse demo
+IO::println("")
+parseAttempts()
+
+// Overall solve rate via recursion
+val allEvents: List[PuzzleEvent] = session.getEvents()
+val rate: Int = solveRate(allEvents, 0, 0)
+IO::println("\n  Total solves across all teams: #{rate} / #{allEvents.size()} events")
+
+// Collection pipeline extras: partition by score
+val results: List[SessionResult] = Colls::map(teams, (t: Team) -> session.computeResult(t.id()))
+val parts = Colls::partition(results, (r: SessionResult) -> r.totalPoints() >= 500)
+val highScores: List[Object] = parts[0] as List[Object]
+val lowScores:  List[Object] = parts[1] as List[Object]
+IO::println("  High-score teams (>=500 pts): #{Colls::map(highScores, (r: Object) -> (r as SessionResult).teamId())}")
+IO::println("  Low-score teams  (<500 pts):  #{Colls::map(lowScores,  (r: Object) -> (r as SessionResult).teamId())}")
+
+// Average penalty
+val totalPenalty: Int = Colls::fold(results, 0, (acc: Int, r: SessionResult) -> acc + r.penaltySec())
+val avgPenalty: Int = if results.size() > 0 { totalPenalty / results.size() } else { 0 }
+IO::println("  Average penalty: #{avgPenalty.toMinSec()}")
+
+// Zip puzzles with their difficulty for a summary
+val difficulties: List[Int] = Colls::map(puzzles, (p: Puzzle) -> p.difficulty())
+val zipped: List[List[Object]] = Colls::zip(puzzles, difficulties)
+IO::println("\n  Puzzle difficulties:")
+foreach pair: List[Object] in zipped {
+  val pz: Puzzle   = pair.get(0) as Puzzle
+  val diff: Object = pair.get(1)
+  IO::println("    #{pz.title().rpad(20)} diff=#{diff}")
+}
+
+

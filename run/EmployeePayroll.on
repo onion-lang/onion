@@ -1,0 +1,350 @@
+import {
+  java.util.*
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum Department {
+  ENGINEERING, SALES, MARKETING, OPERATIONS, HR, FINANCE
+public:
+  def label(): String = select this {
+    case Department::ENGINEERING: "Engineering"
+    case Department::SALES:       "Sales"
+    case Department::MARKETING:   "Marketing"
+    case Department::OPERATIONS:  "Operations"
+    case Department::HR:          "HR"
+    case Department::FINANCE:     "Finance"
+  }
+}
+
+enum PayStatus {
+  PENDING, PROCESSED, FAILED
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record TaxBracket(minIncome: Double, maxIncome: Double, rate: Double, label: String)
+
+record Employee(
+  id: String,
+  name: String,
+  department: Department,
+  baseSalary: Double,
+  yearsOfService: Int,
+  isManager: Boolean
+)
+
+record PaySlip(
+  employeeId: String,
+  employeeName: String,
+  grossPay: Double,
+  federalTax: Double,
+  stateTax: Double,
+  socialSecurity: Double,
+  medicare: Double,
+  netPay: Double,
+  status: PayStatus
+)
+
+record DeptStats(department: String, headcount: Int, avgSalary: Double, totalPayroll: Double)
+
+record PayrollSummary(
+  totalEmployees: Int,
+  totalGross: Double,
+  totalNet: Double,
+  totalTaxes: Double,
+  departmentBreakdown: List[DeptStats]
+)
+
+// ── Tax brackets (simplified 2024 US federal) ─────────────────────────────
+
+class TaxCalculator {
+  val brackets: List[TaxBracket]
+
+public:
+  def this {
+    brackets = [
+      new TaxBracket(0.0,      11600.0,  0.10, "10%"),
+      new TaxBracket(11600.0,  47150.0,  0.12, "12%"),
+      new TaxBracket(47150.0,  100525.0, 0.22, "22%"),
+      new TaxBracket(100525.0, 191950.0, 0.24, "24%"),
+      new TaxBracket(191950.0, 243725.0, 0.32, "32%"),
+      new TaxBracket(243725.0, 609350.0, 0.35, "35%"),
+      new TaxBracket(609350.0, 999999999.0, 0.37, "37%")
+    ]
+  }
+
+  def annualFederalTax(annualIncome: Double): Double {
+    var tax: Double = 0.0
+    var i: Int = 0
+    while i < brackets.size {
+      val b = brackets[i]
+      if annualIncome > b.minIncome() {
+        val upper  = if annualIncome < b.maxIncome() { annualIncome } else { b.maxIncome() }
+        val slice  = upper - b.minIncome()
+        tax = tax + slice * b.rate()
+      }
+      i++
+    }
+    return tax
+  }
+
+  def effectiveRate(annualIncome: Double): Double {
+    if annualIncome <= 0.0 { return 0.0 }
+    return annualFederalTax(annualIncome) / annualIncome * 100.0
+  }
+}
+
+// ── Payroll Service ────────────────────────────────────────────────────────
+
+class PayrollService {
+  val taxCalc: TaxCalculator
+  val STATE_TAX_RATE: Double
+  val SS_RATE: Double
+  val MEDICARE_RATE: Double
+
+public:
+  def this {
+    taxCalc        = new TaxCalculator()
+    STATE_TAX_RATE = 0.05
+    SS_RATE        = 0.062
+    MEDICARE_RATE  = 0.0145
+  }
+
+  def seniorityBonus(years: Int): Double = select years {
+    case 0, 1, 2: 0.0
+    case 3, 4:    0.02
+    case 5, 6, 7: 0.04
+    case 8, 9:    0.06
+    else:         0.08
+  }
+
+  def departmentBonus(dept: Department): Double = select dept {
+    case Department::SALES:       0.05
+    case Department::ENGINEERING: 0.03
+    case Department::FINANCE:     0.025
+    else: 0.01
+  }
+
+  def computeGross(emp: Employee): Double {
+    val monthly  = emp.baseSalary() / 12.0
+    val seniority = seniorityBonus(emp.yearsOfService())
+    val dept      = departmentBonus(emp.department())
+    val mgmt      = if emp.isManager() { 0.10 } else { 0.0 }
+    return monthly * (1.0 + seniority + dept + mgmt)
+  }
+
+  def computePaySlip(emp: Employee): PaySlip {
+    val gross      = computeGross(emp)
+    val annualGross = gross * 12.0
+    val fedMonthly = taxCalc.annualFederalTax(annualGross) / 12.0
+    val state      = gross * STATE_TAX_RATE
+    val ss         = gross * SS_RATE
+    val medi       = gross * MEDICARE_RATE
+    val net        = gross - fedMonthly - state - ss - medi
+    return new PaySlip(emp.id(), emp.name(),
+      gross, fedMonthly, state, ss, medi, net, PayStatus::PROCESSED)
+  }
+
+  def taxCalculator: TaxCalculator = taxCalc
+
+  def processAll(employees: List[Employee]): List[PaySlip] =
+    employees.map { e -> computePaySlip(e) }
+
+  def summarise(employees: List[Employee], slips: List[PaySlip]): PayrollSummary {
+    var totalGross: Double = 0.0
+    var totalNet: Double   = 0.0
+    var i: Int = 0
+    while i < slips.size {
+      val s = slips[i]
+      totalGross = totalGross + s.grossPay()
+      totalNet   = totalNet   + s.netPay()
+      i++
+    }
+
+    val deptNames: List[String] = ["ENGINEERING", "SALES", "MARKETING", "OPERATIONS", "HR", "FINANCE"]
+    val breakdown: List[DeptStats] = []
+    var di: Int = 0
+    while di < deptNames.size {
+      val dName = deptNames[di]
+      val group: List[Employee] = employees.filter { e -> e.department().name() == dName }
+      if group.size > 0 {
+        var dTotal: Double = 0.0
+        var ej: Int = 0
+        while ej < group.size {
+          dTotal = dTotal + group[ej].baseSalary()
+          ej++
+        }
+        breakdown.add(new DeptStats(dName, group.size, dTotal / group.size, dTotal))
+      }
+      di++
+    }
+
+    return new PayrollSummary(employees.size, totalGross, totalNet,
+      totalGross - totalNet, breakdown)
+  }
+}
+
+// ── Formatting helpers ─────────────────────────────────────────────────────
+
+def fmtMoney(d: Double): String {
+  val cents  = (d * 100.0 + 0.5) as Int
+  val whole  = cents / 100
+  val frac   = cents % 100
+  val fracStr = if frac < 10 { "0" + frac } else { "" + frac }
+  return "$#{whole}.#{fracStr}"
+}
+
+def padRight(s: String, w: Int): String {
+  var out: String = s
+  while out.length() < w { out = out + " " }
+  return out
+}
+
+def padLeft(s: String, w: Int): String {
+  var out: String = s
+  while out.length() < w { out = " " + out }
+  return out
+}
+
+def hr(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "─"; i++ }
+  return s
+}
+
+def printSlipRow(s: PaySlip): void {
+  IO::println("  " + padRight(s.employeeName(), 22) +
+    padLeft(fmtMoney(s.grossPay()),    12) +
+    padLeft(fmtMoney(s.federalTax()),  12) +
+    padLeft(fmtMoney(s.stateTax()),    10) +
+    padLeft(fmtMoney(s.netPay()),      12))
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val employees: List[Employee] = [
+    new Employee("E001", "Alice Thornton",  Department::ENGINEERING, 120000.0, 8,  true),
+    new Employee("E002", "Bob Marlowe",     Department::SALES,        95000.0, 3,  false),
+    new Employee("E003", "Carol Reyes",     Department::MARKETING,    85000.0, 5,  false),
+    new Employee("E004", "David Kim",       Department::OPERATIONS,   78000.0, 1,  false),
+    new Employee("E005", "Eva Schultz",     Department::ENGINEERING, 135000.0, 12, true),
+    new Employee("E006", "Frank Osei",      Department::FINANCE,     110000.0, 6,  false),
+    new Employee("E007", "Grace Nguyen",    Department::HR,           72000.0, 2,  false),
+    new Employee("E008", "Hiro Tanaka",     Department::SALES,        98000.0, 9,  true),
+    new Employee("E009", "Ingrid Petersen", Department::ENGINEERING, 118000.0, 4,  false),
+    new Employee("E010", "Jorge Santos",    Department::OPERATIONS,   82000.0, 7,  true)
+  ]
+
+  val svc   = new PayrollService()
+  val slips = svc.processAll(employees)
+
+  IO::println("╔══════════════════════════════════════════════════════════╗")
+  IO::println("║          MONTHLY PAYROLL REGISTER — JAN 2025            ║")
+  IO::println("╚══════════════════════════════════════════════════════════╝")
+  IO::println("")
+  IO::println("  " + padRight("Employee", 22) +
+    padLeft("Gross", 12) + padLeft("Fed Tax", 12) +
+    padLeft("State", 10) + padLeft("Net Pay", 12))
+  IO::println("  " + hr(22) + hr(12) + hr(12) + hr(10) + hr(12))
+
+  var k: Int = 0
+  while k < slips.size {
+    printSlipRow(slips[k])
+    k++
+  }
+
+  val summary = svc.summarise(employees, slips)
+  IO::println("  " + hr(68))
+  IO::println("  " + padRight("TOTALS (" + summary.totalEmployees() + " employees)", 22) +
+    padLeft(fmtMoney(summary.totalGross()), 12) +
+    padLeft("", 22) +
+    padLeft(fmtMoney(summary.totalNet()), 12))
+  IO::println("  Total taxes withheld this month: " + fmtMoney(summary.totalTaxes()))
+  IO::println("")
+
+  IO::println("DEPARTMENT BREAKDOWN")
+  IO::println("  " + padRight("Department", 16) +
+    padLeft("Staff",    8) +
+    padLeft("Avg Base", 14) +
+    padLeft("Total",    14))
+  val bd = summary.departmentBreakdown()
+  var di: Int = 0
+  while di < bd.size {
+    val ds = bd[di]
+    IO::println("  " + padRight(ds.department(), 16) +
+      padLeft("" + ds.headcount(), 8) +
+      padLeft(fmtMoney(ds.avgSalary() / 12.0), 14) +
+      padLeft(fmtMoney(ds.totalPayroll() / 12.0), 14))
+    di++
+  }
+
+  IO::println("")
+  IO::println("TAX ANALYSIS (annual basis)")
+  IO::println("  " + padRight("Employee", 22) +
+    padLeft("Annual Gross", 14) +
+    padLeft("Fed Tax", 14) +
+    padLeft("Eff Rate", 10))
+  IO::println("  " + hr(60))
+  var ti: Int = 0
+  while ti < employees.size {
+    val emp    = employees[ti]
+    val slip   = slips[ti]
+    val annual = slip.grossPay() * 12.0
+    val fedAnn = svc.taxCalculator.annualFederalTax(annual)
+    val rate   = fedAnn / annual * 100.0
+    val rateI  = (rate * 10.0 + 0.5) as Int
+    IO::println("  " + padRight(emp.name(), 22) +
+      padLeft(fmtMoney(annual), 14) +
+      padLeft(fmtMoney(fedAnn), 14) +
+      padLeft("" + (rateI / 10) + "." + (rateI % 10) + "%", 10))
+    ti++
+  }
+
+  IO::println("")
+  // Highest earner this month
+  var maxNet: Double = 0.0
+  var maxName: String = ""
+  var mi: Int = 0
+  while mi < slips.size {
+    val s = slips[mi]
+    if s.netPay() > maxNet {
+      maxNet  = s.netPay()
+      maxName = s.employeeName()
+    }
+    mi++
+  }
+  IO::println("Highest net pay: " + maxName + " at " + fmtMoney(maxNet) + "/month")
+
+  // Sort slips by net pay descending (bubble sort for illustration)
+  val sorted: List[PaySlip] = []
+  var si: Int = 0
+  while si < slips.size { sorted.add(slips[si]); si++ }
+  var changed: Boolean = true
+  while changed {
+    changed = false
+    var ci: Int = 0
+    while ci < sorted.size - 1 {
+      if (sorted[ci]).netPay() < (sorted[ci + 1]).netPay() {
+        val tmp = sorted[ci]
+        sorted[ci] = sorted[ci + 1]
+        sorted[ci + 1] = tmp
+        changed = true
+      }
+      ci++
+    }
+  }
+  IO::println("")
+  IO::println("TOP 3 NET PAY EARNERS")
+  var ri: Int = 0
+  while ri < 3 && ri < sorted.size {
+    val s = sorted[ri]
+    IO::println("  " + (ri + 1) + ". " + padRight(s.employeeName(), 22) + fmtMoney(s.netPay()))
+    ri++
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

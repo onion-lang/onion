@@ -43,16 +43,19 @@ public:
 
 // ─── Records ─────────────────────────────────────────────────────────────────
 
-record Habit(id: Int, name: String, description: String, frequency: Frequency, targetDays: Int)
+record Habit(id: Int, name: String, description: String, frequency: Frequency, targetDays: Int) {
   example { new Habit(1, "Run", "Morning jog", Frequency::DAILY, 30).targetDays() == 30 }
   example { new Habit(2, "Read", "30 min book", Frequency::WEEKDAYS, 20).name() == "Read" }
+}
 
-record CheckIn(habitId: Int, result: CheckResult)
+record CheckIn(habitId: Int, result: CheckResult) {
   example { new CheckIn(1, new Success(5, "3 km")).habitId() == 1 }
   example { new CheckIn(1, new Missed(3)).result().isSuccess() == false }
+}
 
-record Streak(habitId: Int, start: Int, length: Int)
+record Streak(habitId: Int, start: Int, length: Int) {
   example { new Streak(1, 1, 5).length() == 5 }
+}
 
 // ─── Extension methods ────────────────────────────────────────────────────────
 

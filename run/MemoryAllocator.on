@@ -1,0 +1,582 @@
+// MemoryAllocator.on — memory-allocation strategy simulation
+// Implements First-Fit, Best-Fit, Worst-Fit, and Buddy System allocators.
+// Runs a scripted alloc/free workload, prints a visual of each allocator's
+// memory layout after every step, then compares fragmentation statistics.
+//
+// Features: records with body methods, data-carrying enum, ADT case-enum,
+// classes + interface + inheritance, extension Int/Double/String, collection
+// pipelines (map/filter/fold/sortedBy/sortedByDescending/find/partition/
+// groupBy/zip), select/pattern matching, nullable, closures, string
+// interpolation, while/foreach/ranges (0..<n), foreach (k,v) on Map.
+
+import {
+  java.util.ArrayList
+  java.lang.Math
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension Int {
+  def nextPow2(): Int {
+    if self <= 0 { return 1 }
+    var n: Int = 1
+    while n < self { n = n * 2 }
+    return n
+  }
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def ljust(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def rjust(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def truncate(w: Int): String {
+    if self.length() <= w { return self }
+    return self.substring(0, w)
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+}
+
+// ─── Data model ───────────────────────────────────────────────────────────────
+
+record Block(id: Int, start: Int, size: Int, free: Boolean, tag: String)
+
+// Allocation outcome — ADT enum
+enum AllocResult {
+  case Allocated(id: Int, start: Int, reqSize: Int, actualSize: Int)
+  case Failed(requestedSize: Int, reason: String)
+}
+
+record WorkloadOp(opType: String, tag: String, size: Int)
+
+record AllocStats(strategy: String, totalMem: Int, allocReqs: Int,
+                  freeReqs: Int, failures: Int, peakUsed: Int,
+                  finalUsed: Int, finalFreeBlocks: Int) {
+public:
+  def utilPct(): Double = (finalUsed as Double) * 100.0 / (totalMem as Double)
+  def failPct(): Double =
+    if allocReqs() == 0 { 0.0 }
+    else { (failures() as Double) * 100.0 / (allocReqs() as Double) }
+  def summary(): String =
+    "#{strategy().ljust(12)} util=#{utilPct().fmt1()}%  " +
+    "fail=#{failures()}/#{allocReqs()}  " +
+    "freeBlks=#{finalFreeBlocks()}  peak=#{peakUsed()}"
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface MemAllocator {
+  def alloc(tag: String, size: Int): AllocResult
+  def free(tag: String): Boolean
+  def snapshot(): List[Object]
+  def computeStats(): AllocStats
+  def allocName(): String
+}
+
+// ─── Visualization ────────────────────────────────────────────────────────────
+
+class Viz {
+public:
+  static def bar(blocks: List[Object], width: Int): String {
+    val mem: Int = blocks.fold(0) { acc, b -> acc + (b as Block).size() }
+    if mem == 0 { return "[]" }
+    var out: String = "["
+    foreach b: Object in blocks {
+      val bl: Block = b as Block
+      val chars: Int = Math::max(1, (bl.size() * width) / mem)
+      val fill: String = if bl.free() { "." } else { bl.tag().truncate(1) }
+      foreach i: Int in 0..<chars { out = out + fill }
+    }
+    return out + "]"
+  }
+
+  static def printRow(name: String, blocks: List[Object]): void {
+    val bar: String = Viz::bar(blocks, 40)
+    val used: Int = blocks.fold(0) { acc, b ->
+      if (b as Block).free() { acc } else { acc + (b as Block).size() }
+    }
+    val freeSum: Int = blocks.fold(0) { acc, b ->
+      if (b as Block).free() { acc + (b as Block).size() } else { acc }
+    }
+    val freeBlks: Int = blocks.filter { b -> (b as Block).free() }.size
+    IO::println("  #{name.ljust(12)} #{bar}  used=#{used} free=#{freeSum}(#{freeBlks}blk)")
+  }
+}
+
+// ─── Free-list allocator (base class) ────────────────────────────────────────
+
+class FreeListAllocator {
+  var _blocks: List[Object]
+  var _tagToId: Map[Object, Object]
+  var _totalMem: Int
+  var _nextId: Int
+  var _allocCount: Int
+  var _freeCount: Int
+  var _failCount: Int
+  var _peakUsed: Int
+  var _stratName: String
+
+public:
+  def this(mem: Int, sname: String) {
+    _blocks = [new Block(1, 0, mem, true, "")]
+    _tagToId = [:]
+    _totalMem = mem
+    _nextId = 2
+    _allocCount = 0
+    _freeCount = 0
+    _failCount = 0
+    _peakUsed = 0
+    _stratName = sname
+  }
+
+  def allocName(): String = _stratName
+
+  def snapshot(): List[Object] = _blocks
+
+  def usedBytes(): Int =
+    _blocks.fold(0) { acc, b -> if (b as Block).free() { acc } else { acc + (b as Block).size() } }
+
+  def eligibleFree(size: Int): List[Object] =
+    _blocks.filter { b -> (b as Block).free() && (b as Block).size() >= size }
+
+  def markFailed(): void { _failCount = _failCount + 1 }
+
+  // Commit the allocation of `chosen` block for `reqSize` bytes with label `tag`.
+  def allocChosen(tag: String, chosen: Block, reqSize: Int): AllocResult {
+    val id: Int = _nextId
+    _nextId = _nextId + 1
+    _allocCount = _allocCount + 1
+    val fresh: List[Object] = []
+    foreach b: Object in _blocks {
+      val bl: Block = b as Block
+      if bl.id() == chosen.id() {
+        fresh.add(new Block(id, bl.start(), reqSize, false, tag))
+        if bl.size() > reqSize {
+          fresh.add(new Block(_nextId, bl.start() + reqSize, bl.size() - reqSize, true, ""))
+          _nextId = _nextId + 1
+        }
+      } else {
+        fresh.add(b)
+      }
+    }
+    _blocks = fresh
+    _tagToId.put(tag, id as Object)
+    val used: Int = usedBytes()
+    if used > _peakUsed { _peakUsed = used }
+    return new Allocated(id, chosen.start(), reqSize, reqSize)
+  }
+
+  def free(tag: String): Boolean {
+    val idObj: Object? = _tagToId.get(tag)
+    if idObj == null { return false }
+    val id: Int = idObj as Int
+    _tagToId.remove(tag)
+    val fresh: List[Object] = []
+    foreach b: Object in _blocks {
+      val bl: Block = b as Block
+      if bl.id() == id {
+        fresh.add(new Block(bl.id(), bl.start(), bl.size(), true, ""))
+      } else {
+        fresh.add(b)
+      }
+    }
+    _blocks = fresh
+    _freeCount = _freeCount + 1
+    coalesce()
+    return true
+  }
+
+  // Merge adjacent free blocks repeatedly until stable.
+  def coalesce(): void {
+    var changed: Boolean = true
+    while changed {
+      changed = false
+      var i: Int = 0
+      while i < _blocks.size - 1 {
+        val a: Block = _blocks[i] as Block
+        val bk: Block = _blocks[i + 1] as Block
+        if a.free() && bk.free() {
+          val fresh: List[Object] = []
+          var j: Int = 0
+          while j < _blocks.size {
+            if j == i {
+              fresh.add(new Block(a.id(), a.start(), a.size() + bk.size(), true, ""))
+              j = j + 2
+            } else {
+              fresh.add(_blocks[j])
+              j = j + 1
+            }
+          }
+          _blocks = fresh
+          changed = true
+        } else {
+          i = i + 1
+        }
+      }
+    }
+  }
+
+  def computeStats(): AllocStats {
+    val used: Int = usedBytes()
+    val freeBlks: Int = _blocks.filter { b -> (b as Block).free() }.size
+    return new AllocStats(_stratName, _totalMem, _allocCount, _freeCount,
+                          _failCount, _peakUsed, used, freeBlks)
+  }
+
+  def alloc(tag: String, size: Int): AllocResult {
+    markFailed()
+    return new Failed(size, "base allocator: no strategy")
+  }
+}
+
+// ─── First-Fit (scan left, take first block that fits) ────────────────────────
+
+class FirstFitAllocator(mem: Int) extends FreeListAllocator(mem, "First-Fit") conforms MemAllocator {
+public:
+  override def alloc(tag: String, size: Int): AllocResult {
+    val el: List[Object] = eligibleFree(size)
+    if el.size == 0 { markFailed(); return new Failed(size, "no free block large enough") }
+    return allocChosen(tag, el[0] as Block, size)
+  }
+}
+
+// ─── Best-Fit (smallest free block that fits → minimal internal waste) ─────────
+
+class BestFitAllocator(mem: Int) extends FreeListAllocator(mem, "Best-Fit") conforms MemAllocator {
+public:
+  override def alloc(tag: String, size: Int): AllocResult {
+    val el: List[Object] = eligibleFree(size)
+    if el.size == 0 { markFailed(); return new Failed(size, "no free block large enough") }
+    val sorted: List[Object] = el.sortedBy { b -> (b as Block).size() }
+    return allocChosen(tag, sorted[0] as Block, size)
+  }
+}
+
+// ─── Worst-Fit (largest free block → leaves biggest remainder) ────────────────
+
+class WorstFitAllocator(mem: Int) extends FreeListAllocator(mem, "Worst-Fit") conforms MemAllocator {
+public:
+  override def alloc(tag: String, size: Int): AllocResult {
+    val el: List[Object] = eligibleFree(size)
+    if el.size == 0 { markFailed(); return new Failed(size, "no free block large enough") }
+    val sorted: List[Object] = el.sortedByDescending { b -> (b as Block).size() }
+    return allocChosen(tag, sorted[0] as Block, size)
+  }
+}
+
+// ─── Buddy System (power-of-2 block sizes; split buddies on alloc, merge on free) ──
+
+class BuddyAllocator conforms MemAllocator {
+  var _blks: List[Object]
+  var _tagToId: Map[Object, Object]
+  var _totalMem: Int
+  var _nextId: Int
+  var _allocCount: Int
+  var _freeCount: Int
+  var _failCount: Int
+  var _peakUsed: Int
+
+public:
+  def this(mem: Int) {
+    val rounded: Int = mem.nextPow2()
+    _blks = [new Block(1, 0, rounded, true, "")]
+    _tagToId = [:]
+    _totalMem = rounded
+    _nextId = 2
+    _allocCount = 0
+    _freeCount = 0
+    _failCount = 0
+    _peakUsed = 0
+  }
+
+  def allocName(): String = "Buddy"
+
+  def snapshot(): List[Object] = _blks
+
+  def usedBytes(): Int =
+    _blks.fold(0) { acc, b -> if (b as Block).free() { acc } else { acc + (b as Block).size() } }
+
+  def alloc(tag: String, size: Int): AllocResult {
+    val bsz: Int = size.nextPow2()
+    val eligible: List[Object] = _blks.filter { b ->
+      (b as Block).free() && (b as Block).size() >= bsz
+    }
+    if eligible.size == 0 {
+      _failCount = _failCount + 1
+      return new Failed(size, "no buddy block available (need #{bsz})")
+    }
+    val sorted: List[Object] = eligible.sortedBy { b -> (b as Block).size() }
+    var chosen: Block = sorted[0] as Block
+
+    // Split chosen block down to bsz
+    while chosen.size() > bsz {
+      val half: Int = chosen.size() / 2
+      val leftId: Int = _nextId;  _nextId = _nextId + 1
+      val rightId: Int = _nextId; _nextId = _nextId + 1
+      val fresh: List[Object] = []
+      foreach b: Object in _blks {
+        val bl: Block = b as Block
+        if bl.id() == chosen.id() {
+          fresh.add(new Block(leftId,  bl.start(),        half, true, ""))
+          fresh.add(new Block(rightId, bl.start() + half, half, true, ""))
+        } else {
+          fresh.add(b)
+        }
+      }
+      _blks = fresh
+      chosen = new Block(leftId, chosen.start(), half, true, "")
+    }
+
+    val id: Int = _nextId; _nextId = _nextId + 1
+    _allocCount = _allocCount + 1
+    val fresh: List[Object] = []
+    foreach b: Object in _blks {
+      val bl: Block = b as Block
+      if bl.id() == chosen.id() {
+        fresh.add(new Block(id, bl.start(), bsz, false, tag))
+      } else {
+        fresh.add(b)
+      }
+    }
+    _blks = fresh
+    _tagToId.put(tag, id as Object)
+    val used: Int = usedBytes()
+    if used > _peakUsed { _peakUsed = used }
+    return new Allocated(id, chosen.start(), size, bsz)
+  }
+
+  def free(tag: String): Boolean {
+    val idObj: Object? = _tagToId.get(tag)
+    if idObj == null { return false }
+    val id: Int = idObj as Int
+    _tagToId.remove(tag)
+    val fresh: List[Object] = []
+    foreach b: Object in _blks {
+      val bl: Block = b as Block
+      if bl.id() == id {
+        fresh.add(new Block(bl.id(), bl.start(), bl.size(), true, ""))
+      } else {
+        fresh.add(b)
+      }
+    }
+    _blks = fresh
+    _freeCount = _freeCount + 1
+    mergeBuddies()
+    return true
+  }
+
+  def mergeBuddies(): void {
+    var changed: Boolean = true
+    while changed {
+      changed = false
+      var i: Int = 0
+      while i < _blks.size - 1 && !changed {
+        val a: Block = _blks[i] as Block
+        val bk: Block = _blks[i + 1] as Block
+        if a.free() && bk.free() && a.size() == bk.size() && a.start() + a.size() == bk.start() {
+          val mergedId: Int = _nextId; _nextId = _nextId + 1
+          val fresh: List[Object] = []
+          var j: Int = 0
+          while j < _blks.size {
+            if j == i {
+              fresh.add(new Block(mergedId, a.start(), a.size() * 2, true, ""))
+              j = j + 2
+            } else {
+              fresh.add(_blks[j])
+              j = j + 1
+            }
+          }
+          _blks = fresh
+          changed = true
+        } else {
+          i = i + 1
+        }
+      }
+    }
+  }
+
+  def computeStats(): AllocStats {
+    val used: Int = usedBytes()
+    val freeBlks: Int = _blks.filter { b -> (b as Block).free() }.size
+    return new AllocStats("Buddy", _totalMem, _allocCount, _freeCount,
+                          _failCount, _peakUsed, used, freeBlks)
+  }
+}
+
+// ─── Workload runner ──────────────────────────────────────────────────────────
+
+class Runner {
+public:
+  static def run(allocs: List[Object], ops: List[Object], verbose: Boolean): void {
+    IO::println("=== Memory Allocator Comparison ===")
+    IO::println("Workload: #{ops.size} operations | Strategies: #{allocs.size}")
+    IO::println("")
+    foreach op: Object in ops {
+      val wop: WorkloadOp = op as WorkloadOp
+      if verbose {
+        IO::println("OP  #{wop.opType().ljust(5)} tag=#{wop.tag().ljust(4)} size=#{("" + wop.size()).rjust(3)}")
+      }
+      foreach a: Object in allocs {
+        val al: MemAllocator = a as MemAllocator
+        select wop.opType() {
+        case "alloc":
+          val r: AllocResult = al.alloc(wop.tag(), wop.size())
+          if verbose {
+            select r {
+            case ok is Allocated:
+              IO::println("    [#{al.allocName().ljust(10)}] OK  addr=#{("" + ok.start()).rjust(3)} " +
+                          "req=#{ok.reqSize()} actual=#{ok.actualSize()}")
+            case f is Failed:
+              IO::println("    [#{al.allocName().ljust(10)}] FAIL #{f.reason()}")
+            }
+          }
+        case "free":
+          val freed: Boolean = al.free(wop.tag())
+          if verbose && !freed {
+            IO::println("    [#{al.allocName().ljust(10)}] WARN '#{wop.tag()}' not found")
+          }
+        }
+        if verbose { Viz::printRow(al.allocName(), al.snapshot()) }
+      }
+      if verbose { IO::println("") }
+    }
+  }
+
+  static def printSummary(allocs: List[Object]): void {
+    IO::println("=== Final Statistics ===")
+    val statList: List[Object] = allocs.map { a -> (a as MemAllocator).computeStats() as Object }
+    foreach s: Object in statList {
+      IO::println((s as AllocStats).summary())
+    }
+
+    IO::println("")
+    IO::println("=== Final Memory Layout ===")
+    foreach a: Object in allocs {
+      val al: MemAllocator = a as MemAllocator
+      Viz::printRow(al.allocName(), al.snapshot())
+    }
+
+    IO::println("")
+    IO::println("=== Ranked by fragmentation (fewer free blocks = less fragmented) ===")
+    val ranked: List[Object] = statList.sortedBy { s -> (s as AllocStats).finalFreeBlocks() }
+    foreach s: Object in ranked {
+      val st: AllocStats = s as AllocStats
+      IO::println("  #{st.strategy().ljust(12)} freeBlks=#{st.finalFreeBlocks()}  " +
+                  "util=#{st.utilPct().fmt1()}%  failures=#{st.failures()}")
+    }
+
+    // zip: pair each strategy with its utilization rank
+    IO::println("")
+    IO::println("=== Utilization vs fragmentation (zip) ===")
+    val byUtil: List[Object] = statList.sortedByDescending { s -> (s as AllocStats).utilPct() }
+    val byFrag: List[Object] = statList.sortedBy { s -> (s as AllocStats).finalFreeBlocks() }
+    val pairs = byUtil.zip(byFrag)
+    foreach p: Object in pairs {
+      val z = p as java.util.List
+      val hi: AllocStats = z.get(0) as AllocStats
+      val lo: AllocStats = z.get(1) as AllocStats
+      IO::println("  highUtil: #{hi.strategy().ljust(12)} #{hi.utilPct().fmt1()}%  " +
+                  "lowFrag: #{lo.strategy().ljust(12)} #{lo.finalFreeBlocks()} blk")
+    }
+
+    // group by failure count bucket
+    IO::println("")
+    IO::println("=== Grouped by failure count ===")
+    val grouped = statList.groupBy { s ->
+      if (s as AllocStats).failures() == 0 { "no-fail" as Object } else { "had-fail" as Object }
+    }
+    foreach (k, v) in grouped {
+      val group: List[Object] = v as List[Object]
+      val names: String = group.fold("") { acc, s ->
+        val sep: String = if acc == "" { "" } else { ", " }
+        acc + sep + (s as AllocStats).strategy()
+      }
+      IO::println("  #{k}: #{names}")
+    }
+
+    // partition: over vs under 50% utilization
+    val parts = statList.partition { s -> (s as AllocStats).utilPct() > 50.0 }
+    val over50: List[Object]  = parts.get(0) as List[Object]
+    val under50: List[Object] = parts.get(1) as List[Object]
+    IO::println("")
+    val overNames: String = over50.fold("") { acc, s ->
+      val sep: String = if acc == "" { "" } else { ", " }
+      acc + sep + (s as AllocStats).strategy()
+    }
+    val underNames: String = under50.fold("") { acc, s ->
+      val sep: String = if acc == "" { "" } else { ", " }
+      acc + sep + (s as AllocStats).strategy()
+    }
+    IO::println("Over  50% util: #{overNames}")
+    IO::println("Under 50% util: #{underNames}")
+
+    // find: first strategy with 0 failures
+    val firstPerfect: AllocStats? = statList.find { s -> (s as AllocStats).failures() == 0 } as AllocStats?
+    IO::println("")
+    if firstPerfect != null {
+      IO::println("First zero-failure strategy: #{(firstPerfect as AllocStats).strategy()}")
+    } else {
+      IO::println("No strategy achieved zero failures")
+    }
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val MEM: Int = 256
+
+val allocators: List[Object] = [
+  new FirstFitAllocator(MEM) as Object,
+  new BestFitAllocator(MEM)  as Object,
+  new WorstFitAllocator(MEM) as Object,
+  new BuddyAllocator(MEM)    as Object
+]
+
+// Workload stresses fragmentation: alloc/free in non-LIFO order
+val ops: List[Object] = [
+  new WorkloadOp("alloc", "A",  30) as Object,
+  new WorkloadOp("alloc", "B",  20) as Object,
+  new WorkloadOp("alloc", "C",  50) as Object,
+  new WorkloadOp("alloc", "D",  10) as Object,
+  new WorkloadOp("free",  "B",   0) as Object,  // 20-byte hole
+  new WorkloadOp("alloc", "E",  15) as Object,
+  new WorkloadOp("free",  "A",   0) as Object,  // 30-byte hole
+  new WorkloadOp("alloc", "F",  25) as Object,
+  new WorkloadOp("alloc", "G",  40) as Object,
+  new WorkloadOp("free",  "D",   0) as Object,  // 10-byte hole
+  new WorkloadOp("free",  "C",   0) as Object,  // merges with D hole
+  new WorkloadOp("alloc", "H",  60) as Object,
+  new WorkloadOp("free",  "E",   0) as Object,
+  new WorkloadOp("alloc", "I",   8) as Object,
+  new WorkloadOp("alloc", "J",   5) as Object,
+  new WorkloadOp("free",  "F",   0) as Object,
+  new WorkloadOp("free",  "G",   0) as Object,
+  new WorkloadOp("alloc", "K",  70) as Object,
+  new WorkloadOp("free",  "H",   0) as Object,
+  new WorkloadOp("alloc", "L",  45) as Object
+]
+
+Runner::run(allocators, ops, false)
+IO::println("")
+Runner::printSummary(allocators)

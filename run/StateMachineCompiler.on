@@ -1,0 +1,387 @@
+// StateMachineCompiler.on — DFA builder, validator, simulator, and minimiser
+//
+// Models a deterministic finite automaton (DFA) as a typed graph of states and
+// labelled transitions, validates the machine for completeness and determinism,
+// simulates execution on words, and renders a textual transition table.
+// A Myhill-Nerode table-filling pass then finds all indistinguishable state
+// pairs and reports the minimal equivalent.
+//
+// Exercises: records with methods (State, Transition, SimTrace), ADT case-enum
+//   (ValidationIssue, five cases), data-carrying plain enum (MachineKind),
+//   class with mutable state (DFA), generics on List and Map, collection
+//   pipelines (filter/map/fold/find/groupBy/sortedBy/distinct/any/all/
+//   partition/zip), select/type-pattern matching, nullable and null checks,
+//   extension methods on String and Int, string interpolation, try/catch,
+//   recursion (reachability BFS), while, foreach over lists and map entries.
+
+import { java.util.LinkedHashMap; }
+
+// ── String and Int extensions ─────────────────────────────────────────────────
+
+extension String {
+  def padRight(w: Int): String {
+    if self.length() >= w { return self }
+    var s: String = self
+    for var i: Int = self.length(); i < w; i++ { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+}
+
+extension Int {
+  def padLeft(w: Int): String {
+    val s: String = "" + self
+    if s.length() >= w { return s }
+    return " ".rep(w - s.length()) + s
+  }
+}
+
+// ── State record ─────────────────────────────────────────────────────────────
+
+record State(id: String) {
+public:
+  def label(): String = "q" + id()
+  def eqId(other: State): Boolean = id() == other.id()
+}
+
+// ── Transition record ─────────────────────────────────────────────────────────
+
+record Transition(from: State, symbol: String, to: State) {
+public:
+  def display(): String = from().label() + " --[" + symbol() + "]--> " + to().label()
+}
+
+// ── SimTrace record ───────────────────────────────────────────────────────────
+
+record SimTrace(word: String, accepted: Boolean, path: List[String]) {
+public:
+  def verdict(): String = if accepted() { "ACCEPT" } else { "REJECT" }
+  def show(): String = word() + "  " + verdict() + "  [" +
+    path().fold("") { acc, p -> if (acc as String) == "" { p as String } else { (acc as String) + " → " + (p as String) } } + "]"
+}
+
+// ── ValidationIssue ADT ───────────────────────────────────────────────────────
+
+enum ValidationIssue {
+  case NoInitialState
+  case NoAcceptingStates
+  case UnreachableState(stateId: String)
+  case NondeterministicOn(stateId: String, symbol: String)
+  case IncompleteOn(stateId: String, symbol: String)
+public:
+  def isWarning(): Boolean = select this {
+    case u is UnreachableState: true
+    else: false
+  }
+  def severity(): String = if isWarning() { "WARN" } else { "ERROR" }
+  def describe(): String = select this {
+    case v is NoInitialState:     "no initial state defined"
+    case v is NoAcceptingStates:  "no accepting states"
+    case v is UnreachableState:   "unreachable state: " + v.stateId()
+    case v is NondeterministicOn: "nondeterministic: " + v.stateId() + " on '" + v.symbol() + "'"
+    case v is IncompleteOn:       "incomplete: " + v.stateId() + " on '" + v.symbol() + "' (no transition)"
+  }
+}
+
+// ── DFA class ─────────────────────────────────────────────────────────────────
+
+class DFA {
+  var machineName: String
+  var alphabet: List[String]
+  var transitions: List[Transition]
+  var initial: State?
+  var accepting: List[State]
+  var allStates: List[State]
+
+public:
+  def this(name: String, alphabet: List[String]) {
+    this.machineName = name
+    this.alphabet = alphabet
+    this.transitions = []
+    this.accepting = []
+    this.allStates = []
+    this.initial = null
+  }
+
+  def name(): String = machineName
+  def getAlphabet(): List[String] = alphabet
+  def getStates(): List[State] = allStates
+  def getInitial(): State? = initial
+  def getAccepting(): List[State] = accepting
+
+  def getOrAddState(id: String): State {
+    val found: State? = allStates.find { s ->
+      s.id() == id
+    } as State?
+    if found != null { return found }
+    val s: State = new State(id)
+    allStates << s
+    return s
+  }
+
+  def setInitial(id: String): DFA {
+    initial = getOrAddState(id)
+    return self
+  }
+
+  def addAccept(id: String): DFA {
+    val s: State = getOrAddState(id)
+    if !accepting.any { a -> (a as State).id() == s.id() } {
+      accepting << s
+    }
+    return self
+  }
+
+  def addTrans(fromId: String, sym: String, toId: String): DFA {
+    transitions << new Transition(getOrAddState(fromId), sym, getOrAddState(toId))
+    return self
+  }
+
+  def step(s: State, sym: String): State? {
+    val found: Transition? = transitions.find { t ->
+      val tr: Transition = t as Transition
+      tr.from().id() == s.id() && tr.symbol() == sym
+    } as Transition?
+    return if found != null { found.to() } else { null }
+  }
+
+  def isAccepting(s: State): Boolean =
+    accepting.any { a -> a.id() == s.id() }
+
+  def reachable(): List[State] {
+    val start: State? = initial
+    if start == null { return [] }
+    val visited: List[State] = []
+    val worklist: List[State] = [start]
+    while worklist.size > 0 {
+      val cur: State = worklist.remove(0) as State
+      if visited.any { v -> v.id() == cur.id() } { continue }
+      visited << cur
+      foreach sym: String in alphabet {
+        val nxt: State? = step(cur, sym)
+        if nxt != null && !visited.any { v -> v.id() == nxt.id() } {
+          worklist << nxt
+        }
+      }
+    }
+    return visited
+  }
+
+  def validate(): List[ValidationIssue] {
+    val issues: List[ValidationIssue] = []
+    if initial == null { issues << new NoInitialState() }
+    if accepting.size == 0 { issues << new NoAcceptingStates() }
+    val reach: List[State] = reachable()
+    foreach s: State in allStates {
+      if !reach.any { r -> r.id() == s.id() } {
+        issues << new UnreachableState(s.id())
+      }
+    }
+    foreach s: State in reach {
+      foreach sym: String in alphabet {
+        val matches: List[Transition] = transitions.filter { t ->
+          t.from().id() == s.id() && t.symbol() == sym
+        }
+        if matches.size > 1 {
+          issues << new NondeterministicOn(s.id(), sym)
+        } else if matches.size == 0 {
+          issues << new IncompleteOn(s.id(), sym)
+        }
+      }
+    }
+    return issues
+  }
+
+  def simulate(word: String): SimTrace {
+    val syms: List[String] = []
+    for var i: Int = 0; i < word.length(); i++ {
+      syms << "" + word.charAt(i)
+    }
+    val path: List[String] = []
+    var cur: State? = initial
+    if cur == null { return new SimTrace(word, false, path) }
+    path << (cur!!).label()
+    foreach sym: String in syms {
+      val nxt: State? = step(cur!!, sym)
+      if nxt == null {
+        path << "?(no δ on '" + sym + "')"
+        return new SimTrace(word, false, path)
+      }
+      cur = nxt
+      path << nxt.label()
+    }
+    val ok: Boolean = isAccepting(cur!!)
+    return new SimTrace(word, ok, path)
+  }
+
+  def printTable(): void {
+    val colW: Int = 7
+    val symW: Int = 5
+    var hdr: String = "State".padRight(colW)
+    foreach sym: String in alphabet { hdr = hdr + sym.padRight(symW) }
+    IO::println(hdr)
+    IO::println("-".rep(hdr.length()))
+    val sorted: List[State] = allStates.sortedBy { s -> s.id() }
+    foreach s: State in sorted {
+      val acc: String = if isAccepting(s) { "*" } else { " " }
+      val ini: String = if initial != null && (initial!!).id() == s.id() { ">" } else { " " }
+      var row: String = (ini + acc + s.id()).padRight(colW)
+      foreach sym: String in alphabet {
+        val nxt: State? = step(s, sym)
+        val cell: String = if nxt != null { nxt.id() } else { "-" }
+        row = row + cell.padRight(symW)
+      }
+      IO::println(row)
+    }
+  }
+
+  def printMinInfo(): void {
+    val stList: List[State] = allStates.sortedBy { s -> s.id() }
+    val n: Int = stList.size
+    // Table-filling: mark distinguishable pairs in a set of "key1,key2" strings
+    val dist: java.util.HashSet[String] = new java.util.HashSet()
+    // seed: accepting vs non-accepting
+    for var i: Int = 0; i < n; i++ {
+      for var j: Int = i + 1; j < n; j++ {
+        val si: State = stList.get(i) as State
+        val sj: State = stList.get(j) as State
+        if isAccepting(si) != isAccepting(sj) {
+          dist.add(si.id() + "," + sj.id())
+        }
+      }
+    }
+    // Iterate until stable
+    var changed: Boolean = true
+    while changed {
+      changed = false
+      for var i: Int = 0; i < n; i++ {
+        for var j: Int = i + 1; j < n; j++ {
+          val si: State = stList.get(i) as State
+          val sj: State = stList.get(j) as State
+          val key: String = si.id() + "," + sj.id()
+          if dist.contains(key) { continue }
+          var markDist: Boolean = false
+          foreach sym: String in alphabet {
+            val ni: State? = step(si, sym)
+            val nj: State? = step(sj, sym)
+            if ni == null || nj == null { continue }
+            val a: String = if ni.id().compareTo(nj.id()) < 0 { ni.id() } else { nj.id() }
+            val b: String = if ni.id().compareTo(nj.id()) < 0 { nj.id() } else { ni.id() }
+            if dist.contains(a + "," + b) { markDist = true }
+          }
+          if markDist {
+            dist.add(key)
+            changed = true
+          }
+        }
+      }
+    }
+    // Find equivalent pairs (not distinguished)
+    val eqPairs: List[String] = []
+    for var i: Int = 0; i < n; i++ {
+      for var j: Int = i + 1; j < n; j++ {
+        val si: State = stList.get(i) as State
+        val sj: State = stList.get(j) as State
+        val key: String = si.id() + "," + sj.id()
+        if !dist.contains(key) {
+          eqPairs << si.label() + " = " + sj.label()
+        }
+      }
+    }
+    if eqPairs.size == 0 {
+      IO::println("  -> already minimal (" + n + " states)")
+    } else {
+      IO::println("  -> equivalent (mergeable) pairs:")
+      foreach pair: String in eqPairs { IO::println("      " + pair) }
+      val minStates: Int = n - eqPairs.size
+      IO::println("  -> minimal form has <= " + minStates + " states")
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("── " + title + " " + "─".rep(50 - title.length()))
+}
+
+def runDemo(dfa: DFA, tests: List[String]): void {
+  section("Machine: " + dfa.name())
+  IO::println("  Alphabet : " + dfa.getAlphabet().fold("") { a, s -> (a as String) + " " + (s as String) }.trim())
+  IO::println("  States   : " + dfa.getStates().size)
+  val ini0: State? = dfa.getInitial()
+  val initLabel: String = if ini0 != null { ini0.label() } else { "(none)" }
+  IO::println("  Initial  : " + initLabel)
+  val accLabels: String = dfa.getAccepting().map { s -> s.label() }.fold("") { a, s -> (a as String) + " " + (s as String) }.trim()
+  IO::println("  Accepting: " + accLabels)
+
+  section("Transition table")
+  dfa.printTable()
+
+  section("Validation")
+  val issues: List[ValidationIssue] = dfa.validate()
+  if issues.size == 0 {
+    IO::println("  ✓ complete, deterministic DFA")
+  } else {
+    foreach issue: ValidationIssue in issues {
+      IO::println("  [" + issue.severity() + "] " + issue.describe())
+    }
+  }
+
+  section("Simulation")
+  foreach word: String in tests {
+    try {
+      val trace: SimTrace = dfa.simulate(word)
+      IO::println("  " + trace.show())
+    } catch e: Exception {
+      IO::println("  ERROR simulating '" + word + "': " + e.getMessage())
+    }
+  }
+
+  section("Minimality analysis")
+  dfa.printMinInfo()
+}
+
+// ── Example 1: even number of 'a's over {a, b} ────────────────────────────────
+// States: 0 (initial, accepting), 1
+// δ(0,a)=1, δ(0,b)=0, δ(1,a)=0, δ(1,b)=1
+
+val evenA: DFA = new DFA("Even-a's  (accepts {w | #a(w) ≡ 0 mod 2})", ["a", "b"])
+evenA.setInitial("0").addAccept("0")
+evenA.addTrans("0", "a", "1").addTrans("0", "b", "0")
+evenA.addTrans("1", "a", "0").addTrans("1", "b", "1")
+
+// ── Example 2: strings over {a,b} ending in "ab" ────────────────────────────
+// States: S (start), A (saw 'a'), AB (saw 'ab' — accepting)
+// δ(S,a)=A, δ(S,b)=S, δ(A,a)=A, δ(A,b)=AB, δ(AB,a)=A, δ(AB,b)=S
+
+val endAB: DFA = new DFA("Ends-in-ab  (accepts {w | w ends with 'ab'})", ["a", "b"])
+endAB.setInitial("S").addAccept("AB")
+endAB.addTrans("S",  "a", "A").addTrans("S",  "b", "S")
+endAB.addTrans("A",  "a", "A").addTrans("A",  "b", "AB")
+endAB.addTrans("AB", "a", "A").addTrans("AB", "b", "S")
+
+// ── Example 3: non-minimal DFA (two equivalent states) ───────────────────────
+// Accepts strings over {0,1} where at least one '1' appears.
+// Built with a redundant state: both D and E represent "saw a 1" but
+// are reached via different paths, making them equivalent.
+
+val hasOne: DFA = new DFA("Has-a-1 (redundant states — non-minimal)", ["0", "1"])
+hasOne.setInitial("A")
+hasOne.addAccept("C").addAccept("D")
+// A: no 1 seen; B: no 1 seen (redundant twin of A); C: 1 seen; D: 1 seen (twin of C)
+hasOne.addTrans("A", "0", "B").addTrans("A", "1", "C")
+hasOne.addTrans("B", "0", "A").addTrans("B", "1", "D")
+hasOne.addTrans("C", "0", "C").addTrans("C", "1", "C")
+hasOne.addTrans("D", "0", "D").addTrans("D", "1", "D")
+
+// ── Run all demos ─────────────────────────────────────────────────────────────
+
+runDemo(evenA,  ["", "a", "aa", "aaa", "b", "ab", "aab", "bba"])
+runDemo(endAB,  ["", "ab", "aab", "bab", "aba", "b", "aaab"])
+runDemo(hasOne, ["", "0", "1", "00", "01", "10", "11", "000", "001"])

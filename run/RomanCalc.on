@@ -1,0 +1,291 @@
+// RomanCalc.on — Roman numeral encoder / decoder, safe arithmetic, and calendar.
+// Exercises: records (RomanDigit, RomanMonth), ADT enum (CalcResult), plain enum
+// (Epoch with methods), extension methods on Int/String, while loops, collection
+// pipelines (filter/map/fold/sortedBy/find), select pattern matching, nullable
+// types, string interpolation, foreach over List and ranges.
+
+// ─── Roman digit table ─────────────────────────────────────────────────────────
+
+record RomanDigit(value: Int, symbol: String)
+
+val DIGITS: List[Object] = [
+  new RomanDigit(1000, "M"),  new RomanDigit(900,  "CM"),
+  new RomanDigit(500,  "D"),  new RomanDigit(400,  "CD"),
+  new RomanDigit(100,  "C"),  new RomanDigit(90,   "XC"),
+  new RomanDigit(50,   "L"),  new RomanDigit(40,   "XL"),
+  new RomanDigit(10,   "X"),  new RomanDigit(9,    "IX"),
+  new RomanDigit(5,    "V"),  new RomanDigit(4,    "IV"),
+  new RomanDigit(1,    "I")
+]
+
+// ─── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def inRomanRange(): Boolean = self >= 1 && self <= 3999
+  def romanWidth(): Int = if self < 10 { 1 } else if self < 100 { 2 }
+                           else if self < 1000 { 3 } else { 4 }
+}
+
+extension String {
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Conversion functions ──────────────────────────────────────────────────────
+
+def toRoman(n: Int): String {
+  if !n.inRomanRange() { return "???" }
+  var result: String = ""
+  var remaining: Int = n
+  var i: Int = 0
+  while i < DIGITS.size {
+    val digit = DIGITS[i] as RomanDigit
+    while remaining >= digit.value() {
+      result = result + digit.symbol()
+      remaining = remaining - digit.value()
+    }
+    i = i + 1
+  }
+  return result
+}
+
+def fromRoman(s: String): Int? {
+  if s == null || s.length() == 0 { return null }
+  val upper = s.toUpperCase()
+  var result: Int = 0
+  var pos: Int = 0
+  while pos < upper.length() {
+    var matched: Boolean = false
+    // Try 2-character prefix first
+    if pos + 1 < upper.length() {
+      val two = upper.substring(pos, pos + 2)
+      var j: Int = 0
+      while j < DIGITS.size && !matched {
+        val digit = DIGITS[j] as RomanDigit
+        if digit.symbol().length() == 2 && digit.symbol() == two {
+          result = result + digit.value()
+          pos = pos + 2
+          matched = true
+        }
+        j = j + 1
+      }
+    }
+    // Try 1-character prefix
+    if !matched {
+      val one = upper.substring(pos, pos + 1)
+      var found: Boolean = false
+      var j: Int = 0
+      while j < DIGITS.size && !found {
+        val digit = DIGITS[j] as RomanDigit
+        if digit.symbol().length() == 1 && digit.symbol() == one {
+          result = result + digit.value()
+          pos = pos + 1
+          found = true
+        }
+        j = j + 1
+      }
+      if !found { return null }
+    }
+  }
+  if result <= 0 { return null }
+  return result
+}
+
+// ─── Arithmetic result ADT ─────────────────────────────────────────────────────
+
+enum CalcResult {
+  case Value(roman: String, decimal: Int)
+  case InvalidInput(msg: String)
+  case OutOfRange(computed: Int)
+public:
+  def describe(): String = select this {
+    case v is Value:        "#{v.roman()} (#{v.decimal()})"
+    case e is InvalidInput: "Error: #{e.msg()}"
+    case r is OutOfRange:   "Out of range: #{r.computed()} not in [1, 3999]"
+  }
+  def isOk(): Boolean = select this {
+    case v is Value: true
+    else:            false
+  }
+  def getDecimal(): Int = select this {
+    case v is Value: v.decimal()
+    else:            0
+  }
+}
+
+// ─── Safe arithmetic ───────────────────────────────────────────────────────────
+
+def romanAdd(a: String, b: String): CalcResult {
+  val va: Int? = fromRoman(a)
+  val vb: Int? = fromRoman(b)
+  if va == null { return new InvalidInput("not a Roman numeral: #{a}") }
+  if vb == null { return new InvalidInput("not a Roman numeral: #{b}") }
+  val sum: Int = (va as Int) + (vb as Int)
+  if !sum.inRomanRange() { return new OutOfRange(sum) }
+  return new Value(toRoman(sum), sum)
+}
+
+def romanSub(a: String, b: String): CalcResult {
+  val va: Int? = fromRoman(a)
+  val vb: Int? = fromRoman(b)
+  if va == null { return new InvalidInput("not a Roman numeral: #{a}") }
+  if vb == null { return new InvalidInput("not a Roman numeral: #{b}") }
+  val diff: Int = (va as Int) - (vb as Int)
+  if !diff.inRomanRange() { return new OutOfRange(diff) }
+  return new Value(toRoman(diff), diff)
+}
+
+def romanMul(a: String, b: Int): CalcResult {
+  val va: Int? = fromRoman(a)
+  if va == null { return new InvalidInput("not a Roman numeral: #{a}") }
+  val prod: Int = (va as Int) * b
+  if !prod.inRomanRange() { return new OutOfRange(prod) }
+  return new Value(toRoman(prod), prod)
+}
+
+// ─── Epoch enum ────────────────────────────────────────────────────────────────
+
+enum Epoch {
+  KINGDOM, REPUBLIC, EMPIRE, LATE
+public:
+  def label(): String = select this {
+    case Epoch::KINGDOM:  "Kingdom"
+    case Epoch::REPUBLIC: "Republic"
+    case Epoch::EMPIRE:   "Empire"
+    case Epoch::LATE:     "Late Antiquity"
+  }
+  def startAUC(): Int = select this {
+    case Epoch::KINGDOM:  1
+    case Epoch::REPUBLIC: 244
+    case Epoch::EMPIRE:   727
+    case Epoch::LATE:     1037
+  }
+  def endAUC(): Int = select this {
+    case Epoch::KINGDOM:  244
+    case Epoch::REPUBLIC: 727
+    case Epoch::EMPIRE:   1037
+    case Epoch::LATE:     1229
+  }
+  def duration(): Int = endAUC() - startAUC()
+}
+
+// ─── Roman calendar months ────────────────────────────────────────────────────
+
+record RomanMonth(number: Int, latin: String, days: Int, honor: String?)
+
+val MONTHS: List[Object] = [
+  new RomanMonth(1,  "Ianuarius",  31, "Janus"),
+  new RomanMonth(2,  "Februarius", 28, "Februa"),
+  new RomanMonth(3,  "Martius",    31, "Mars"),
+  new RomanMonth(4,  "Aprilis",    30, null),
+  new RomanMonth(5,  "Maius",      31, "Maia"),
+  new RomanMonth(6,  "Iunius",     30, "Juno"),
+  new RomanMonth(7,  "Iulius",     31, "Julius Caesar"),
+  new RomanMonth(8,  "Augustus",   31, "Augustus Caesar"),
+  new RomanMonth(9,  "September",  30, null),
+  new RomanMonth(10, "October",    31, null),
+  new RomanMonth(11, "November",   30, null),
+  new RomanMonth(12, "December",   31, null)
+]
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+IO::println("══════════════════════════════════════════════════════")
+IO::println("  RomanCalc — Roman numerals, arithmetic, and calendar")
+IO::println("══════════════════════════════════════════════════════")
+IO::println("")
+
+// Encode/decode round-trip table
+IO::println("── Encode / decode round-trip ────────────────────────")
+val samples: List[Object] = [1, 4, 9, 14, 40, 90, 399, 400, 900, 1999, 2024, 3999]
+foreach item: Object in samples {
+  val n = item as Int
+  val roman = toRoman(n)
+  val back: Int? = fromRoman(roman)
+  val check = if back != null && (back as Int) == n { "✓" } else { "✗" }
+  IO::println("  #{("" + n).padLeft(4)}  →  #{roman.padRight(12)}  →  back=#{back}  #{check}")
+}
+IO::println("")
+
+// Arithmetic
+IO::println("── Safe arithmetic ───────────────────────────────────")
+val ops: List[Object] = [
+  romanAdd("XIV", "XXVIII"),
+  romanAdd("CMXCIX", "I"),
+  romanAdd("MMMCMXCIX", "I"),
+  romanSub("XL", "XIV"),
+  romanSub("V", "VI"),
+  romanMul("XII", 12),
+  romanMul("MMCCC", 2),
+  romanAdd("abc", "XIV")
+]
+foreach op: Object in ops {
+  val r = op as CalcResult
+  IO::println("  #{r.describe()}")
+}
+IO::println("")
+
+// Calendar display
+IO::println("── Roman calendar ────────────────────────────────────")
+val totalDays = MONTHS
+  .fold(0) { acc, m -> (acc as Int) + (m as RomanMonth).days() }
+IO::println("  Total days: #{totalDays}")
+IO::println("")
+IO::println("  #{"No.".padRight(4)} #{"Latin name".padRight(14)} #{"Days".padRight(6)} Named after")
+IO::println("  " + "─".repeat(50))
+foreach m: Object in MONTHS {
+  val month = m as RomanMonth
+  val honor = if month.honor() != null { month.honor() as String } else { "—" }
+  IO::println("  #{("" + month.number()).padRight(4)} #{month.latin().padRight(14)} #{("" + month.days()).padRight(6)} #{honor}")
+}
+IO::println("")
+
+// Named months
+val named = MONTHS.filter { m -> (m as RomanMonth).honor() != null }
+IO::println("  Months named after someone: #{named.size}")
+IO::println("")
+
+// Epoch statistics
+IO::println("── Roman epochs ──────────────────────────────────────")
+val epochs: List[Object] = [Epoch::KINGDOM, Epoch::REPUBLIC, Epoch::EMPIRE, Epoch::LATE]
+foreach e: Object in epochs {
+  val ep = e as Epoch
+  IO::println("  #{ep.label().padRight(16)} #{toRoman(ep.startAUC()).padRight(8)} – #{toRoman(ep.endAUC()).padRight(10)} (#{ep.duration()} years AUC)")
+}
+IO::println("")
+
+// Longest epoch by duration
+var longestEpoch: Epoch? = null
+foreach e: Object in epochs {
+  val ep = e as Epoch
+  if longestEpoch == null || ep.duration() > (longestEpoch as Epoch).duration() {
+    longestEpoch = ep
+  }
+}
+if longestEpoch != null {
+  val best = longestEpoch as Epoch
+  IO::println("  Longest epoch: #{best.label()} (#{best.duration()} years)")
+}
+IO::println("")
+
+// Statistics over arithmetic results
+IO::println("── Arithmetic result statistics ──────────────────────")
+val okCount = ops.filter { r -> (r as CalcResult).isOk() }.size
+val errCount = ops.size - okCount
+IO::println("  Total operations: #{ops.size}")
+IO::println("  Valid results:    #{okCount}")
+IO::println("  Errors/overflows: #{errCount}")
+val sumOk = ops
+  .filter { r -> (r as CalcResult).isOk() }
+  .fold(0) { acc, r -> (acc as Int) + (r as CalcResult).getDecimal() }
+IO::println("  Sum of valid decimals: #{sumOk}")
+
+IO::println("══════════════════════════════════════════════════════")

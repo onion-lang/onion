@@ -1,0 +1,352 @@
+// OrienteeringEvent.on — orienteering competition management system
+
+extension Int {
+  def toTimeStr(): String {
+    val m: Int = self / 60
+    val s: Int = self - m * 60
+    val ms: String = if m < 10 { "0" + m } else { "" + m }
+    val ss: String = if s < 10 { "0" + s } else { "" + s }
+    return ms + ":" + ss
+  }
+  def lpad(w: Int): String {
+    var r: String = "" + self
+    while r.length() < w { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var r: String = self
+    while r.length() < w { r = r + " " }
+    return r
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val whole: Int  = self as Int
+    val frac:  Int  = ((self - (whole as Double)) * 10.0) as Int
+    return "" + whole + "." + frac
+  }
+}
+
+// ── enums ──────────────────────────────────────────────────────────────────
+
+enum StartMethod { Interval, Mass, Chase }
+
+enum CourseClass(shortName: String, lengthKm: Double, climbM: Int) {
+  Elite("E", 8.5, 320),
+  Advanced("A", 6.2, 240),
+  Intermediate("I", 4.5, 160),
+  Novice("N", 2.8, 80)
+}
+
+enum CompetitorResult {
+  case Finished(totalSeconds: Int, controlsVisited: Int)
+  case DidNotFinish(lastControl: Int)
+  case DidNotStart
+public:
+  def tag(): String = select this {
+    case f is Finished:      "OK"
+    case d is DidNotFinish:  "DNF"
+    case s is DidNotStart:   "DNS"
+  }
+  def isFinished(): Boolean = select this {
+    case f is Finished: true
+    else:               false
+  }
+}
+
+// ── records ────────────────────────────────────────────────────────────────
+
+record Control(code: String, description: String, pointValue: Int) {
+  example { new Control("101", "Hilltop boulder", 5).pointValue() == 5 }
+public:
+  def label(): String = code().rpad(5) + description().rpad(28) + "" + pointValue() + " pts"
+}
+
+record EntryRecord(bibNumber: Int, name: String, club: String,
+    courseClass: CourseClass, result: CompetitorResult) {
+  example {
+    new EntryRecord(1, "Alice", "FjordOK", CourseClass::Elite,
+      new Finished(2895, 18)).finishSeconds() == 2895
+  }
+  example {
+    new EntryRecord(2, "Bob", "LakeOK", CourseClass::Novice,
+      new DidNotFinish(4)).finishSeconds() == 999999
+  }
+public:
+  def finishSeconds(): Int = select result() {
+    case f is Finished: f.totalSeconds()
+    else:               999999
+  }
+  def controlCount(): Int = select result() {
+    case f is Finished: f.controlsVisited()
+    else:               0
+  }
+  def shortRow(): String =
+    bibNumber().lpad(4) + "  " +
+    name().rpad(20) + club().rpad(12) +
+    courseClass().shortName().rpad(4) +
+    result().tag().rpad(5) +
+    (select result() {
+      case f is Finished: f.totalSeconds().toTimeStr()
+      else:               "  --:--"
+    })
+}
+
+// ── interface & class ──────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+  def itemCount(): Int
+}
+
+class OEvent conforms Summarizable {
+  val eventName:   String
+  val venue:       String
+  val dateStr:     String
+  val startMethod: StartMethod
+  val entries:     List[EntryRecord]
+  val controls:    List[Control]
+public:
+  def this(n: String, v: String, d: String, sm: StartMethod) {
+    this.eventName   = n
+    this.venue       = v
+    this.dateStr     = d
+    this.startMethod = sm
+    this.entries     = []
+    this.controls    = []
+  }
+  def getEntries():  List[EntryRecord] = entries
+  def getControls(): List[Control]     = controls
+  def addEntry(e: EntryRecord): void   { entries.add(e) }
+  def addControl(c: Control):   void   { controls.add(c) }
+
+  def itemCount(): Int = entries.size
+
+  def summary(): String =
+    "Event: " + eventName + " | " + venue + " | " + dateStr +
+    " | Start: " + startMethod + " | Entries: " + entries.size
+
+  def totalFinishers(): Int =
+    entries.filter { e -> (e as EntryRecord).result().isFinished() }.size
+
+  def finishersByClass(cc: CourseClass): List[EntryRecord] =
+    entries.filter { e ->
+      val er: EntryRecord = e as EntryRecord
+      er.courseClass() == cc && er.result().isFinished()
+    }.map { e -> e as EntryRecord }
+    .sortedBy { e -> (e as EntryRecord).finishSeconds() }
+    .map { e -> e as EntryRecord }
+
+  def totalPointsForFinisher(bib: Int): Int {
+    var pts: Int = 0
+    foreach e: EntryRecord in entries {
+      if e.bibNumber() == bib {
+        pts = e.controlCount() * 5
+      }
+    }
+    return pts
+  }
+}
+
+// ── recursive helper ───────────────────────────────────────────────────────
+
+def sumFinishSeconds(list: List[EntryRecord], idx: Int): Int {
+  if idx >= list.size { return 0 }
+  val e: EntryRecord = list.get(idx) as EntryRecord
+  val t: Int = if e.result().isFinished() { e.finishSeconds() } else { 0 }
+  return t + sumFinishSeconds(list, idx + 1)
+}
+
+// ── main ───────────────────────────────────────────────────────────────────
+
+val ev: OEvent = new OEvent(
+  "Ridgeline Open 2026",
+  "Thornwood Forest Park",
+  "2026-09-26",
+  StartMethod::Interval
+)
+
+// Controls
+foreach c: Control in [
+  new Control("101", "Hilltop boulder",     5),
+  new Control("102", "Trail junction S",    5),
+  new Control("103", "Reentrant N",         5),
+  new Control("104", "Rootstock E",         5),
+  new Control("105", "Cliff base",          5),
+  new Control("106", "Stream crossing",     5),
+  new Control("107", "Fence corner",        5),
+  new Control("108", "Knoll top",           5),
+  new Control("109", "Marsh edge",          5),
+  new Control("110", "Stone wall end",      5)
+] { ev.addControl(c) }
+
+// Entries
+foreach e: EntryRecord in [
+  // Elite
+  new EntryRecord(101, "Sara Nilsson",    "StormOK",    CourseClass::Elite,     new Finished(2895, 18)),
+  new EntryRecord(102, "Mikael Berg",     "FjordOK",    CourseClass::Elite,     new Finished(3012, 18)),
+  new EntryRecord(103, "Ingrid Holm",     "LakeOK",     CourseClass::Elite,     new Finished(3187, 17)),
+  new EntryRecord(104, "Tomas Eriksson",  "PineOK",     CourseClass::Elite,     new DidNotFinish(14)),
+  new EntryRecord(105, "Katja Lindqvist", "StormOK",    CourseClass::Elite,     new DidNotStart()),
+  // Advanced
+  new EntryRecord(201, "Erik Sundqvist",  "FjordOK",    CourseClass::Advanced,  new Finished(2540, 14)),
+  new EntryRecord(202, "Anna Larsson",    "RidgeOK",    CourseClass::Advanced,  new Finished(2704, 14)),
+  new EntryRecord(203, "Jonas Persson",   "MapOK",      CourseClass::Advanced,  new Finished(2890, 13)),
+  new EntryRecord(204, "Malin Johansson", "PineOK",     CourseClass::Advanced,  new DidNotFinish(9)),
+  new EntryRecord(205, "Fredrik Olsson",  "LakeOK",     CourseClass::Advanced,  new Finished(3105, 14)),
+  // Intermediate
+  new EntryRecord(301, "Hanna Svensson",  "MapOK",      CourseClass::Intermediate, new Finished(1920, 10)),
+  new EntryRecord(302, "Oscar Karlsson",  "RidgeOK",    CourseClass::Intermediate, new Finished(2088, 10)),
+  new EntryRecord(303, "Lena Gustafsson", "StormOK",    CourseClass::Intermediate, new DidNotFinish(6)),
+  // Novice
+  new EntryRecord(401, "Axel Magnusson",  "MapOK",      CourseClass::Novice,    new Finished(1450, 7)),
+  new EntryRecord(402, "Frida Andersson", "RidgeOK",    CourseClass::Novice,    new Finished(1623, 7)),
+  new EntryRecord(403, "Emil Hansson",    "FjordOK",    CourseClass::Novice,    new Finished(1387, 7))
+] { ev.addEntry(e) }
+
+val entries: List[EntryRecord] = ev.getEntries()
+
+// ── Section 1: Event banner ────────────────────────────────────────────────
+IO::println("=".rpad(62))
+IO::println(ev.summary())
+IO::println("=".rpad(62))
+IO::println("")
+
+// ── Section 2: Control list ────────────────────────────────────────────────
+IO::println("── Controls (" + ev.getControls().size + ") ──────────────────────────────────────")
+foreach c: Control in ev.getControls() {
+  IO::println("  " + c.label())
+}
+IO::println("")
+
+// ── Section 3: Full start list ─────────────────────────────────────────────
+IO::println("── Start List ─────────────────────────────────────────────")
+IO::println(" Bib  Name                Club        Cls  Stat Time  ")
+IO::println(" ".rpad(60))
+foreach e: EntryRecord in entries {
+  IO::println(e.shortRow())
+}
+IO::println("")
+
+// ── Section 4: Results by class ────────────────────────────────────────────
+IO::println("── Results by Course Class ────────────────────────────────")
+val classes: List[CourseClass] = [
+  CourseClass::Elite,
+  CourseClass::Advanced,
+  CourseClass::Intermediate,
+  CourseClass::Novice
+]
+foreach cc: CourseClass in classes {
+  val finishers: List[EntryRecord] = ev.finishersByClass(cc)
+  IO::println("  " + cc + " (" + cc.shortName() + ")  " +
+    cc.lengthKm().fmt1() + " km  +" + cc.climbM() + "m  — " +
+    finishers.size + " finisher(s)")
+  var place: Int = 1
+  foreach f: EntryRecord in finishers {
+    IO::println("    " + place.lpad(2) + ". " +
+      f.name().rpad(20) + f.club().rpad(12) +
+      f.finishSeconds().toTimeStr())
+    place = place + 1
+  }
+}
+IO::println("")
+
+// ── Section 5: DNS / DNF / OK breakdown ───────────────────────────────────
+IO::println("── Status Summary ─────────────────────────────────────────")
+var okCount:  Int = 0
+var dnfCount: Int = 0
+var dnsCount: Int = 0
+foreach e: EntryRecord in entries {
+  select e.result() {
+    case f is Finished:     okCount  = okCount  + 1
+    case d is DidNotFinish: dnfCount = dnfCount + 1
+    case s is DidNotStart:  dnsCount = dnsCount + 1
+  }
+}
+IO::println("  Finished : " + okCount)
+IO::println("  DNF      : " + dnfCount)
+IO::println("  DNS      : " + dnsCount)
+IO::println("  Total    : " + entries.size)
+IO::println("")
+
+// ── Section 6: Top-5 finishers overall ────────────────────────────────────
+IO::println("── Top-5 Overall Finishers ────────────────────────────────")
+val allFinishers: List[EntryRecord] =
+  entries.filter { e -> (e as EntryRecord).result().isFinished() }
+         .map    { e -> e as EntryRecord }
+         .sortedBy { e -> (e as EntryRecord).finishSeconds() }
+         .map    { e -> e as EntryRecord }
+var rank: Int = 1
+foreach f: EntryRecord in allFinishers {
+  if rank <= 5 {
+    IO::println("  " + rank.lpad(2) + ". " +
+      f.name().rpad(20) + f.courseClass().shortName().rpad(4) +
+      f.finishSeconds().toTimeStr())
+    rank = rank + 1
+  }
+}
+IO::println("")
+
+// ── Section 7: Club participation (groupBy) ───────────────────────────────
+IO::println("── Club Participation ─────────────────────────────────────")
+val byClub = entries.groupBy { e -> (e as EntryRecord).club() }
+foreach (club, lst) in byClub {
+  val clubEntries: List[EntryRecord] = lst as List[EntryRecord]
+  var clubFinished: Int = 0
+  foreach ce: EntryRecord in clubEntries {
+    if ce.result().isFinished() { clubFinished = clubFinished + 1 }
+  }
+  IO::println("  " + (club as String).rpad(12) +
+    clubEntries.size + " entries  " + clubFinished + " finished")
+}
+IO::println("")
+
+// ── Section 8: Partition finishers vs non-finishers ───────────────────────
+IO::println("── Finisher Partition ─────────────────────────────────────")
+val parts = entries.partition { e -> (e as EntryRecord).result().isFinished() }
+val finished: List[Object] = parts[0] as List[Object]
+val notFin:   List[Object] = parts[1] as List[Object]
+IO::println("  Completed course : " + finished.size())
+IO::println("  Did not complete : " + notFin.size())
+IO::println("  Finish rate      : " +
+  (((finished.size() as Double) / (entries.size as Double)) * 100.0).fmt1() + "%")
+IO::println("")
+
+// ── Section 9: Course statistics ──────────────────────────────────────────
+IO::println("── Course Distance & Climb ────────────────────────────────")
+foreach cc: CourseClass in classes {
+  IO::println("  " + cc.shortName().rpad(4) +
+    cc.lengthKm().fmt1().rpad(6) + " km   +" + cc.climbM() + " m climb")
+}
+IO::println("")
+
+// ── Section 10: Recursive total time for finishers ────────────────────────
+IO::println("── Aggregate Time (recursive) ─────────────────────────────")
+val allFin2: List[EntryRecord] =
+  entries.filter { e -> (e as EntryRecord).result().isFinished() }
+         .map    { e -> e as EntryRecord }
+val totalSec: Int = sumFinishSeconds(allFin2, 0)
+IO::println("  Sum of all finish times : " + totalSec.toTimeStr() +
+  "  (" + totalSec + " sec)")
+IO::println("  Finishers counted       : " + allFin2.size)
+IO::println("")
+
+// ── Section 11: Zip bib# vs finish time ───────────────────────────────────
+IO::println("── Bib → Finish Time (zip) ────────────────────────────────")
+val bibs:  List[Object] = allFin2.map { e -> (e as EntryRecord).bibNumber() }
+val times: List[Object] = allFin2.map { e -> (e as EntryRecord).finishSeconds() }
+val zipped = bibs.zip(times)
+foreach pair: Object in zipped {
+  val p = pair as List
+  val bib: Int = p.get(0) as Int
+  val sec: Int = p.get(1) as Int
+  IO::println("  bib " + bib.lpad(3) + "  →  " + sec.toTimeStr())
+}
+IO::println("")
+
+IO::println("=".rpad(62))
+IO::println("End of report.")

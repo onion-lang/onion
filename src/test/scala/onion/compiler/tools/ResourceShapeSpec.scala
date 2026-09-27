@@ -31,8 +31,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
       withTempFile("""{"x": 3, "y": 4}""") { f =>
         val r = shell.run(
           s"""
-             |record Pt(x: Int, y: Int)
+             |record Pt(x: Int, y: Int) {
              |  shape doc = json
+             |}
              |class Test {
              |public:
              |  static def main(args: String[]): Int {
@@ -50,8 +51,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
       withTempFile("""{"y": 4}""") { f =>
         val r = shell.run(
           s"""
-             |record Pt(x: Int, y: Int)
+             |record Pt(x: Int, y: Int) {
              |  shape doc = json
+             |}
              |class Test {
              |public:
              |  static def main(args: String[]): String {
@@ -69,8 +71,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
       withTempFile("1,2\nbroken\n3,4\n") { f =>
         val r = shell.run(
           s"""
-             |record Pt(x: Int, y: Int)
+             |record Pt(x: Int, y: Int) {
              |  shape text = re"(-?\\d+),(-?\\d+)"
+             |}
              |class Test {
              |public:
              |  static def main(args: String[]): String {
@@ -88,8 +91,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
     it("reports a missing file as a defect rather than throwing") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -124,8 +128,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
       withHttpServer("1,2\nbroken\n3,4\n") { url =>
         val r = shell.run(
           s"""
-             |record Pt(x: Int, y: Int)
+             |record Pt(x: Int, y: Int) {
              |  shape text = re"(-?\\d+),(-?\\d+)"
+             |}
              |class Test {
              |public:
              |  static def main(args: String[]): String {
@@ -143,8 +148,9 @@ class ResourceShapeSpec extends AbstractShellSpec {
     it("reports a transport failure as a defect rather than throwing") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {

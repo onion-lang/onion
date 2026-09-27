@@ -1,0 +1,348 @@
+// VetClinic.on — Veterinary practice management system
+// Exercises: homogeneous enums, ADT enums, records, class hierarchy, generics,
+// collection pipelines, nullable handling, pattern matching, string interpolation,
+// closures, try/catch, foreach over map entries
+
+import {
+  java.util.*
+}
+
+// ─── Domain enums ─────────────────────────────────────────────────────────────
+
+enum Species {
+  DOG, CAT, RABBIT, BIRD, REPTILE
+public:
+  def label(): String = select this {
+    case Species::DOG:    "Dog"
+    case Species::CAT:    "Cat"
+    case Species::RABBIT: "Rabbit"
+    case Species::BIRD:   "Bird"
+    else:                 "Reptile"
+  }
+}
+
+enum ApptStatus {
+  SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+public:
+  def label(): String = select this {
+    case ApptStatus::SCHEDULED:   "Scheduled"
+    case ApptStatus::IN_PROGRESS: "In Progress"
+    case ApptStatus::COMPLETED:   "Completed"
+    else:                         "Cancelled"
+  }
+  def isFinal(): Boolean = this == ApptStatus::COMPLETED || this == ApptStatus::CANCELLED
+}
+
+enum TreatKind {
+  VACCINATION, SURGERY, CHECKUP, DENTAL, GROOMING, EMERGENCY
+public:
+  def label(): String = select this {
+    case TreatKind::VACCINATION: "Vaccination"
+    case TreatKind::SURGERY:     "Surgery"
+    case TreatKind::CHECKUP:     "Checkup"
+    case TreatKind::DENTAL:      "Dental"
+    case TreatKind::GROOMING:    "Grooming"
+    else:                        "Emergency"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Owner(id: Int, name: String, phone: String, email: String)
+
+record Pet(id: Int, name: String, species: Species, breed: String, ageYears: Double, ownerId: Int)
+
+record Treatment(kind: TreatKind, description: String, cost: Double)
+
+record Appointment(id: Int, petId: Int, vetId: Int, date: String, status: ApptStatus, treatments: List[Object])
+
+// ─── Staff hierarchy ──────────────────────────────────────────────────────────
+
+class Staff {
+public:
+  var id: Int
+  var name: String
+  var phone: String
+  def this(id: Int, name: String, phone: String) {
+    self.id    = id
+    self.name  = name
+    self.phone = phone
+  }
+  def role(): String = "Staff"
+  def summary(): String = "#{role()}: #{self.name} (id=#{self.id})"
+}
+
+class Veterinarian(id: Int, name: String, phone: String, var speciality: String, var licenseNumber: String)
+    extends Staff(id, name, phone) {
+public:
+  override def role(): String = "Veterinarian"
+  override def summary(): String = "#{role()} #{self.name} [#{self.speciality}] license=#{self.licenseNumber}"
+}
+
+class Receptionist(id: Int, name: String, phone: String, var shift: String)
+    extends Staff(id, name, phone) {
+public:
+  override def role(): String = "Receptionist"
+  override def summary(): String = "#{role()}: #{self.name} shift=#{self.shift}"
+}
+
+// ─── Clinic registry ──────────────────────────────────────────────────────────
+
+class Clinic {
+public:
+  val owners: List[Object]       = []
+  val pets: List[Object]         = []
+  val staff: List[Object]        = []
+  val appointments: List[Object] = []
+  var nextOwnerId: Int   = 1
+  var nextPetId: Int     = 1
+  var nextApptId: Int    = 1
+  def addOwner(name: String, phone: String, email: String): Owner {
+    val o = new Owner(nextOwnerId, name, phone, email)
+    owners.add(o)
+    nextOwnerId = nextOwnerId + 1
+    return o
+  }
+
+  def addPet(name: String, species: Species, breed: String, age: Double, ownerId: Int): Pet {
+    val p = new Pet(nextPetId, name, species, breed, age, ownerId)
+    pets.add(p)
+    nextPetId = nextPetId + 1
+    return p
+  }
+
+  def addStaff(member: Staff): void {
+    staff.add(member)
+  }
+
+  def scheduleAppointment(petId: Int, vetId: Int, date: String, treatments: List[Object]): Appointment {
+    val a = new Appointment(nextApptId, petId, vetId, date, ApptStatus::SCHEDULED, treatments)
+    appointments.add(a)
+    nextApptId = nextApptId + 1
+    return a
+  }
+
+  def completeAppointment(apptId: Int): Boolean {
+    var found: Boolean = false
+    var toRemove: Appointment? = null
+    foreach appt: Appointment in appointments {
+      if appt.id() == apptId {
+        toRemove = appt
+        found = true
+      }
+    }
+    if toRemove != null {
+      appointments.remove(toRemove)
+      val a: Appointment = toRemove
+      appointments.add(new Appointment(a.id(), a.petId(), a.vetId(), a.date(), ApptStatus::COMPLETED, a.treatments()))
+    }
+    return found
+  }
+
+  def cancelAppointment(apptId: Int): Boolean {
+    var found: Boolean = false
+    var toRemove: Appointment? = null
+    foreach appt: Appointment in appointments {
+      if appt.id() == apptId {
+        toRemove = appt
+        found = true
+      }
+    }
+    if toRemove != null {
+      appointments.remove(toRemove)
+      val a: Appointment = toRemove
+      appointments.add(new Appointment(a.id(), a.petId(), a.vetId(), a.date(), ApptStatus::CANCELLED, a.treatments()))
+    }
+    return found
+  }
+
+  def findPet(id: Int): Pet? {
+    foreach pet: Pet in pets {
+      if pet.id() == id { return pet }
+    }
+    return null
+  }
+
+  def findOwner(id: Int): Owner? {
+    foreach o: Owner in owners {
+      if o.id() == id { return o }
+    }
+    return null
+  }
+
+  def petsForOwner(ownerId: Int): List[Object] =
+    pets.filter { p -> (p as Pet).ownerId() == ownerId }
+
+  def appointmentsForPet(petId: Int): List[Object] =
+    appointments.filter { a -> (a as Appointment).petId() == petId }
+
+  def appointmentsByVet(vetId: Int): List[Object] =
+    appointments.filter { a -> (a as Appointment).vetId() == vetId }
+
+  def completedAppointments(): List[Object] =
+    appointments.filter { a -> (a as Appointment).status() == ApptStatus::COMPLETED }
+
+  def totalRevenue(): Double {
+    var total: Double = 0.0
+    foreach appt: Appointment in completedAppointments() {
+      foreach t: Treatment in appt.treatments() {
+        total = total + t.cost()
+      }
+    }
+    return total
+  }
+
+  def speciesBreakdown(): Map[Object, Object] {
+    val counts: Map[Object, Object] = [:]
+    foreach pet: Pet in pets {
+      val key: String = pet.species().label()
+      val cur: Int = if counts.containsKey(key) { counts.get(key) as Int } else { 0 }
+      counts.put(key, cur + 1)
+    }
+    return counts
+  }
+
+  def treatmentRevenue(): Map[Object, Object] {
+    val revenue: Map[Object, Object] = [:]
+    foreach appt: Appointment in completedAppointments() {
+      foreach t: Treatment in appt.treatments() {
+        val key: String = t.kind().label()
+        val cur: Double = if revenue.containsKey(key) { revenue.get(key) as Double } else { 0.0 }
+        revenue.put(key, cur + t.cost())
+      }
+    }
+    return revenue
+  }
+
+  def printSummary(): void {
+    IO::println("=== Clinic Summary ===")
+    IO::println("Owners      : #{owners.size}")
+    IO::println("Pets        : #{pets.size}")
+    IO::println("Staff       : #{staff.size}")
+    IO::println("Appointments: #{appointments.size}")
+    IO::println("Completed   : #{completedAppointments().size}")
+    IO::println("Revenue     : $#{totalRevenue()}")
+  }
+}
+
+// ─── Reporting helpers ────────────────────────────────────────────────────────
+
+def apptTotal(appt: Appointment): Double {
+  var total: Double = 0.0
+  foreach t: Treatment in appt.treatments() {
+    total = total + t.cost()
+  }
+  return total
+}
+
+def printAppointmentLine(clinic: Clinic, appt: Appointment): void {
+  val pet: Pet? = clinic.findPet(appt.petId())
+  val petName: String = if pet != null { pet.name() } else { "Unknown" }
+  val total: Double = apptTotal(appt)
+  IO::println("  Appt ##{appt.id()} | #{appt.date()} | #{petName} | #{appt.status().label()} | $#{total}")
+}
+
+def printOwnerRecord(clinic: Clinic, owner: Owner): void {
+  val ownedPets: List[Object] = clinic.petsForOwner(owner.id())
+  IO::println("Owner: #{owner.name()} <#{owner.email()}> | #{owner.phone()}")
+  foreach pet: Pet in ownedPets {
+    IO::println("  Pet ##{pet.id()}: #{pet.name()} (#{pet.species().label()}, #{pet.breed()}, #{pet.ageYears()} yrs)")
+    val appts: List[Object] = clinic.appointmentsForPet(pet.id())
+    foreach a: Appointment in appts {
+      IO::println("    Appt #{a.id()} on #{a.date()} — #{a.status().label()}")
+    }
+  }
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val clinic: Clinic = new Clinic()
+
+// Staff — using primary constructor form: (id, name, phone, speciality, license)
+val drKim: Veterinarian  = new Veterinarian(1, "Dr. Kim",  "555-1001", "Small Animals",  "VT-4821")
+val drPark: Veterinarian = new Veterinarian(2, "Dr. Park", "555-1002", "Exotic Animals", "VT-5530")
+val alice: Receptionist  = new Receptionist(3, "Alice",    "555-2001", "Morning")
+clinic.addStaff(drKim)
+clinic.addStaff(drPark)
+clinic.addStaff(alice)
+
+// Owners
+val o1: Owner = clinic.addOwner("James Lee",   "555-3001", "james@example.com")
+val o2: Owner = clinic.addOwner("Sarah Chen",  "555-3002", "sarah@example.com")
+val o3: Owner = clinic.addOwner("Mike Torres", "555-3003", "mike@example.com")
+
+// Pets
+val p1: Pet = clinic.addPet("Buddy",    Species::DOG,    "Labrador",        3.0, o1.id())
+val p2: Pet = clinic.addPet("Whiskers", Species::CAT,    "Siamese",         5.5, o1.id())
+val p3: Pet = clinic.addPet("Thumper",  Species::RABBIT, "Dutch",           1.5, o2.id())
+val p4: Pet = clinic.addPet("Polly",    Species::BIRD,   "Parrot",          8.0, o3.id())
+val p5: Pet = clinic.addPet("Rex",      Species::DOG,    "German Shepherd", 4.0, o2.id())
+val p6: Pet = clinic.addPet("Scales",   Species::REPTILE,"Leopard Gecko",   2.0, o3.id())
+
+// Treatments menu
+val vaccTreat:     Treatment = new Treatment(TreatKind::VACCINATION, "Annual rabies vaccine",  45.0)
+val checkupTreat:  Treatment = new Treatment(TreatKind::CHECKUP,     "General wellness exam",  75.0)
+val dentalTreat:   Treatment = new Treatment(TreatKind::DENTAL,      "Teeth cleaning",        120.0)
+val groomTreat:    Treatment = new Treatment(TreatKind::GROOMING,    "Full groom",             55.0)
+val emergTreat:    Treatment = new Treatment(TreatKind::EMERGENCY,   "Laceration repair",     250.0)
+val surgTreat:     Treatment = new Treatment(TreatKind::SURGERY,     "Spay procedure",        350.0)
+val exoticCheckup: Treatment = new Treatment(TreatKind::CHECKUP,     "Exotic bird exam",       90.0)
+val reptileCheckup:Treatment = new Treatment(TreatKind::CHECKUP,     "Reptile wellness check", 85.0)
+
+// Schedule appointments
+val a1: Appointment = clinic.scheduleAppointment(p1.id(), drKim.id,  "2026-01-10", [vaccTreat, checkupTreat])
+val a2: Appointment = clinic.scheduleAppointment(p2.id(), drKim.id,  "2026-01-11", [dentalTreat])
+val a3: Appointment = clinic.scheduleAppointment(p3.id(), drPark.id, "2026-01-12", [checkupTreat])
+val a4: Appointment = clinic.scheduleAppointment(p4.id(), drPark.id, "2026-01-13", [exoticCheckup, groomTreat])
+val a5: Appointment = clinic.scheduleAppointment(p5.id(), drKim.id,  "2026-01-14", [emergTreat])
+val a6: Appointment = clinic.scheduleAppointment(p1.id(), drKim.id,  "2026-01-15", [surgTreat])
+val a7: Appointment = clinic.scheduleAppointment(p6.id(), drPark.id, "2026-01-16", [reptileCheckup])
+val a8: Appointment = clinic.scheduleAppointment(p2.id(), drKim.id,  "2026-01-17", [vaccTreat])
+
+// Complete some, cancel one
+clinic.completeAppointment(a1.id())
+clinic.completeAppointment(a2.id())
+clinic.completeAppointment(a3.id())
+clinic.completeAppointment(a5.id())
+clinic.completeAppointment(a7.id())
+clinic.cancelAppointment(a4.id())
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Staff Roster ===")
+foreach s: Staff in clinic.staff {
+  IO::println("  " + s.summary())
+}
+
+IO::println("")
+IO::println("=== Owner Records ===")
+foreach o: Owner in clinic.owners {
+  printOwnerRecord(clinic, o)
+}
+
+IO::println("")
+IO::println("=== All Appointments ===")
+foreach a: Appointment in clinic.appointments {
+  printAppointmentLine(clinic, a)
+}
+
+IO::println("")
+IO::println("=== Dr. Kim Appointments ===")
+foreach a: Appointment in clinic.appointmentsByVet(drKim.id) {
+  printAppointmentLine(clinic, a)
+}
+
+IO::println("")
+IO::println("=== Species Distribution ===")
+foreach (k, v) in clinic.speciesBreakdown() {
+  IO::println("  #{k}: #{v} patient(s)")
+}
+
+IO::println("")
+IO::println("=== Revenue by Treatment Type ===")
+foreach (k, v) in clinic.treatmentRevenue() {
+  IO::println("  #{k}: $#{v}")
+}
+
+IO::println("")
+clinic.printSummary()

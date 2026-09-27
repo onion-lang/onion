@@ -1,0 +1,343 @@
+// CookingContest.on — culinary competition scoring and leaderboard system.
+//
+// Exercises: records, homogeneous enum, data-carrying ADT enum, extension
+// methods (Double.fmt2, String.rpad/lpad), collection pipelines (groupBy,
+// sortedByDescending, filter, fold, map), select/pattern matching, string
+// interpolation, nullable, while / foreach / ranges, try/catch.
+
+// ─── Data Model ──────────────────────────────────────────────────────────────
+
+record Contestant(name: String, region: String, specialty: String)
+
+record Dish(name: String, category: String)
+
+record ScoreCard(
+  contestant: Contestant,
+  dish:       Dish,
+  judge:      String,
+  flavor:     Int,
+  presentation: Int,
+  creativity: Int,
+  difficulty: Int
+)
+
+record ContestantSummary(
+  name:     String,
+  region:   String,
+  dish:     String,
+  category: String,
+  avgScore: Double,
+  rank:     Int
+)
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Medal { GOLD, SILVER, BRONZE, NONE }
+
+// ADT enum: award tier with a bonus score
+enum Tier {
+  case Elite(bonus: Double)
+  case Qualified(bonus: Double)
+  case Participant(bonus: Double)
+
+  public:
+    def label(): String = select this {
+      case e is Elite:       "Elite"
+      case q is Qualified:   "Qualified"
+      case p is Participant: "Participant"
+    }
+}
+
+// ─── Extension Methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val i100 = (self * 100.0 + 0.5) as Int
+    val whole = i100 / 100
+    val frac  = i100 % 100
+    val fracStr = if frac < 10 { "0" + frac } else { "" + frac }
+    return "" + whole + "." + fracStr
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s = self
+    while s.length < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s = self
+    while s.length < w { s = " " + s }
+    return s
+  }
+  def truncate(w: Int): String {
+    return if self.length <= w { self } else { self.substring(0, w) }
+  }
+}
+
+// ─── Business Logic ───────────────────────────────────────────────────────────
+
+// Weighted score: flavour 35%, presentation 25%, creativity 25%, difficulty 15%
+def weightedTotal(sc: ScoreCard): Double =
+  (sc.flavor() as Double) * 0.35 +
+  (sc.presentation() as Double) * 0.25 +
+  (sc.creativity() as Double) * 0.25 +
+  (sc.difficulty() as Double) * 0.15
+
+def medalFor(rank: Int): Medal = select rank {
+  case 1: Medal::GOLD
+  case 2: Medal::SILVER
+  case 3: Medal::BRONZE
+  else:   Medal::NONE
+}
+
+def medalLabel(m: Medal): String = select m {
+  case Medal::GOLD:   "Gold  "
+  case Medal::SILVER: "Silver"
+  case Medal::BRONZE: "Bronze"
+  case Medal::NONE:   "      "
+}
+
+def tierFor(avg: Double): Tier =
+  if avg >= 8.5 { new Elite(0.5) }
+  else if avg >= 7.5 { new Qualified(0.25) }
+  else { new Participant(0.0) }
+
+def categoryLabel(cat: String): String = select cat {
+  case "MAIN":      "Main Course"
+  case "DESSERT":   "Dessert"
+  case "APPETIZER": "Appetizer"
+  case "BEVERAGE":  "Beverage"
+  else:             "Other"
+}
+
+def factorial(n: Int): Int = if n <= 1 { 1 } else { n * factorial(n - 1) }
+
+// ─── Sample Data ─────────────────────────────────────────────────────────────
+
+def makeScorecards(): List[Object] {
+  val alice   = new Contestant("Alice Chen",      "Asia-Pacific", "Ramen")
+  val bob     = new Contestant("Bob Laurent",     "Europe",       "Pastry")
+  val carla   = new Contestant("Carla Santos",    "Americas",     "Italian")
+  val dmitri  = new Contestant("Dmitri Volkov",   "Europe",       "Slavic")
+  val elena   = new Contestant("Elena Kim",       "Asia-Pacific", "Fusion")
+  val fiona   = new Contestant("Fiona MacLeod",   "Europe",       "French")
+  val gabriel = new Contestant("Gabriel Moreau",  "Americas",     "Peruvian")
+
+  val ramen    = new Dish("Artisan Ramen",         "MAIN")
+  val tart     = new Dish("Citrus Tart",           "DESSERT")
+  val brusch   = new Dish("Truffle Bruschetta",    "APPETIZER")
+  val borscht  = new Dish("Craft Borscht",         "MAIN")
+  val bibimbap = new Dish("Fusion Bibimbap",       "MAIN")
+  val macaron  = new Dish("Matcha Macaron Tower",  "DESSERT")
+  val ceviche  = new Dish("Tiger Milk Ceviche",    "APPETIZER")
+
+  val cards: List[Object] = Colls::mutableListOf()
+  cards.add(new ScoreCard(alice,   ramen,    "Judge A",  9, 8, 9, 8))
+  cards.add(new ScoreCard(alice,   ramen,    "Judge B",  8, 9, 8, 9))
+  cards.add(new ScoreCard(alice,   ramen,    "Judge C",  9, 8, 7, 8))
+  cards.add(new ScoreCard(bob,     tart,     "Judge A",  7, 9, 8, 6))
+  cards.add(new ScoreCard(bob,     tart,     "Judge B",  8, 9, 7, 7))
+  cards.add(new ScoreCard(bob,     tart,     "Judge C",  7, 8, 9, 6))
+  cards.add(new ScoreCard(carla,   brusch,   "Judge A",  8, 7, 9, 7))
+  cards.add(new ScoreCard(carla,   brusch,   "Judge B",  9, 8, 8, 8))
+  cards.add(new ScoreCard(carla,   brusch,   "Judge C",  8, 9, 9, 7))
+  cards.add(new ScoreCard(dmitri,  borscht,  "Judge A",  7, 8, 7, 9))
+  cards.add(new ScoreCard(dmitri,  borscht,  "Judge B",  8, 7, 8, 8))
+  cards.add(new ScoreCard(dmitri,  borscht,  "Judge C",  8, 8, 7, 9))
+  cards.add(new ScoreCard(elena,   bibimbap, "Judge A",  9, 9, 8, 8))
+  cards.add(new ScoreCard(elena,   bibimbap, "Judge B",  9, 8, 9, 9))
+  cards.add(new ScoreCard(elena,   bibimbap, "Judge C",  8, 9, 9, 8))
+  cards.add(new ScoreCard(fiona,   macaron,  "Judge A",  8, 10, 9, 7))
+  cards.add(new ScoreCard(fiona,   macaron,  "Judge B",  9,  9, 8, 8))
+  cards.add(new ScoreCard(fiona,   macaron,  "Judge C",  9, 10, 9, 7))
+  cards.add(new ScoreCard(gabriel, ceviche,  "Judge A",  9,  8, 10, 9))
+  cards.add(new ScoreCard(gabriel, ceviche,  "Judge B",  8,  9,  9, 8))
+  cards.add(new ScoreCard(gabriel, ceviche,  "Judge C", 10,  8,  9, 9))
+  return cards
+}
+
+// ─── Ranking Engine ───────────────────────────────────────────────────────────
+
+def computeRankings(cards: List[Object]): List[Object] {
+  val byContestant = cards.groupBy { sc -> (sc as ScoreCard).contestant().name() }
+  val unsorted: List[Object] = Colls::mutableListOf()
+
+  foreach (cname, scorecards) in byContestant {
+    val cardList = scorecards as List[Object]
+    val first = cardList[0] as ScoreCard
+    val n = cardList.size
+    val total = (cardList.fold(0.0) { acc, sc ->
+      (acc as Double) + weightedTotal(sc as ScoreCard)
+    } as Double)
+    val avg = total / (n as Double)
+    unsorted.add(new ContestantSummary(
+      cname as String,
+      first.contestant().region(),
+      first.dish().name(),
+      first.dish().category(),
+      avg,
+      0
+    ))
+  }
+
+  val sorted = unsorted.sortedByDescending { r -> (r as ContestantSummary).avgScore() }
+  val ranked: List[Object] = Colls::mutableListOf()
+  var rank = 1
+  foreach r: Object in sorted {
+    val cs = r as ContestantSummary
+    ranked.add(new ContestantSummary(cs.name(), cs.region(), cs.dish(), cs.category(), cs.avgScore(), rank))
+    rank = rank + 1
+  }
+  return ranked
+}
+
+// ─── Report Sections ─────────────────────────────────────────────────────────
+
+def printHeader(): void {
+  IO::println("=".repeat(72))
+  IO::println("       WORLD CULINARY CHAMPIONSHIP — FINAL RESULTS")
+  IO::println("=".repeat(72))
+}
+
+def printLeaderboard(rankings: List[Object]): void {
+  IO::println("")
+  IO::println("LEADERBOARD")
+  IO::println("-".repeat(72))
+  IO::println("Rank  Medal   Contestant             Region           Score  Tier")
+  IO::println("-".repeat(72))
+  foreach r: Object in rankings {
+    val cs    = r as ContestantSummary
+    val med   = medalFor(cs.rank())
+    val tier  = tierFor(cs.avgScore())
+    val rankS = ("" + cs.rank()).lpad(2)
+    val score = cs.avgScore().fmt2().lpad(5)
+    val name  = cs.name().truncate(22).rpad(22)
+    val reg   = cs.region().truncate(16).rpad(16)
+    IO::println("#{rankS}    #{medalLabel(med)}  #{name} #{reg} #{score}  #{tier.label()}")
+  }
+  IO::println("-".repeat(72))
+}
+
+def printCategoryWinners(rankings: List[Object]): void {
+  IO::println("")
+  IO::println("CATEGORY WINNERS")
+  IO::println("-".repeat(72))
+  val categories: List[String] = ["MAIN", "DESSERT", "APPETIZER", "BEVERAGE"]
+  foreach cat: String in categories {
+    val catWinners = rankings.filter { r ->
+      (r as ContestantSummary).category() == cat
+    }
+    if catWinners.size > 0 {
+      val winner = catWinners[0] as ContestantSummary
+      val label  = categoryLabel(cat).rpad(14)
+      IO::println("#{label}  #{winner.name()} (#{winner.avgScore().fmt2()}) — #{winner.dish()}")
+    }
+  }
+}
+
+def printJudgeStats(cards: List[Object]): void {
+  IO::println("")
+  IO::println("JUDGE STATISTICS  (average per scoring dimension)")
+  IO::println("-".repeat(72))
+  val judges: List[String] = ["Judge A", "Judge B", "Judge C"]
+  foreach judge: String in judges {
+    val jCards = cards.filter { sc -> (sc as ScoreCard).judge() == judge }
+    val n = jCards.size
+    if n > 0 {
+      val sumF = (jCards.fold(0) { acc, sc -> (acc as Int) + (sc as ScoreCard).flavor()       } as Int)
+      val sumP = (jCards.fold(0) { acc, sc -> (acc as Int) + (sc as ScoreCard).presentation() } as Int)
+      val sumC = (jCards.fold(0) { acc, sc -> (acc as Int) + (sc as ScoreCard).creativity()   } as Int)
+      val sumD = (jCards.fold(0) { acc, sc -> (acc as Int) + (sc as ScoreCard).difficulty()   } as Int)
+      val nd = n as Double
+      val aF = (sumF as Double / nd).fmt2()
+      val aP = (sumP as Double / nd).fmt2()
+      val aC = (sumC as Double / nd).fmt2()
+      val aD = (sumD as Double / nd).fmt2()
+      IO::println("#{judge}:  Flavor #{aF}  Presentation #{aP}  Creativity #{aC}  Difficulty #{aD}")
+    }
+  }
+}
+
+def printRegionBreakdown(rankings: List[Object]): void {
+  IO::println("")
+  IO::println("REGION BREAKDOWN")
+  IO::println("-".repeat(72))
+  val byRegion = rankings.groupBy { r -> (r as ContestantSummary).region() }
+  foreach (region, contestants) in byRegion {
+    val cList = contestants as List[Object]
+    val cnt   = cList.size
+    val top   = cList[0] as ContestantSummary
+    val reg   = (region as String).rpad(20)
+    IO::println("#{reg}  #{cnt} contestant(s), top: #{top.name()} (#{top.avgScore().fmt2()})")
+  }
+}
+
+def printTierDistribution(rankings: List[Object]): void {
+  IO::println("")
+  IO::println("TIER DISTRIBUTION")
+  IO::println("-".repeat(72))
+  val tiers = rankings.map { r -> tierFor((r as ContestantSummary).avgScore()).label() }
+  val elite     = tiers.filter { t -> t == "Elite"       }.size
+  val qualified = tiers.filter { t -> t == "Qualified"   }.size
+  val particip  = tiers.filter { t -> t == "Participant" }.size
+  IO::println("Elite:       #{elite}")
+  IO::println("Qualified:   #{qualified}")
+  IO::println("Participant: #{particip}")
+}
+
+def printClosingStats(cards: List[Object], rankings: List[Object]): void {
+  IO::println("")
+  IO::println("CLOSING STATISTICS")
+  IO::println("-".repeat(72))
+  val totalCards = cards.size
+  val total      = rankings.size
+  val grandSum   = (rankings.fold(0.0) { acc, r ->
+    (acc as Double) + (r as ContestantSummary).avgScore()
+  } as Double)
+  val grandAvg   = grandSum / (total as Double)
+  val champion   = rankings[0] as ContestantSummary
+  val lastPlace  = rankings[total - 1] as ContestantSummary
+  IO::println("Total score cards   : #{totalCards}")
+  IO::println("Total contestants   : #{total}")
+  IO::println("Grand average score : #{grandAvg.fmt2()}")
+  IO::println("Champion            : #{champion.name()} from #{champion.region()}")
+  IO::println("Score spread        : #{lastPlace.avgScore().fmt2()} to #{champion.avgScore().fmt2()}")
+  IO::println("Fun fact            : #{total}! = #{factorial(total)}")
+}
+
+def safeRank(rankings: List[Object], idx: Int): String {
+  try {
+    val cs = rankings[idx] as ContestantSummary
+    return cs.name() + " (" + cs.avgScore().fmt2() + ")"
+  } catch e: Exception {
+    return "Index out of bounds"
+  }
+}
+
+// ─── Entry Point ─────────────────────────────────────────────────────────────
+
+def main(): void {
+  val cards    = makeScorecards()
+  val rankings = computeRankings(cards)
+
+  printHeader()
+  printLeaderboard(rankings)
+  printCategoryWinners(rankings)
+  printJudgeStats(cards)
+  printRegionBreakdown(rankings)
+  printTierDistribution(rankings)
+  printClosingStats(cards, rankings)
+
+  IO::println("")
+  IO::println("Podium check (safe index access):")
+  foreach i: Int in 0..4 {
+    IO::println("  #{i + 1}. #{safeRank(rankings, i)}")
+  }
+
+  IO::println("")
+  IO::println("=".repeat(72))
+  IO::println("  Thank you for watching the World Culinary Championship!")
+  IO::println("=".repeat(72))
+}

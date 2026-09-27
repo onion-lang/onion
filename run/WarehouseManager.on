@@ -1,0 +1,300 @@
+// WarehouseManager.on — warehouse inventory and order management system (~260 lines)
+//
+// Exercises: records, ADT case-enum with methods, plain enum, generics
+// (List[T]/Map[K,V]), collection pipelines (filter/map/groupBy/sortedBy/fold/
+// count/any/find/distinct), select/type-pattern exhaustiveness, nullable types,
+// closures, string interpolation, foreach (list + map k,v), while, extension Int/String.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Category {
+  ELECTRONICS, CLOTHING, FOOD, TOOLS, BOOKS, MISC
+}
+
+enum OrderStatus {
+  case Pending; case Picking; case Packed; case Shipped; case Cancelled
+public:
+  def label(): String = select this {
+    case s is Pending:   "PENDING"
+    case s is Picking:   "PICKING"
+    case s is Packed:    "PACKED"
+    case s is Shipped:   "SHIPPED"
+    case s is Cancelled: "CANCELLED"
+  }
+}
+
+enum MovementKind {
+  case Receipt(supplier: String)
+  case Dispatch(orderId: String)
+  case Transfer(fromBin: String, toBin: String)
+  case Adjustment(reason: String)
+public:
+  def label(): String = select this {
+    case m is Receipt:    "RCPT from #{m.supplier()}"
+    case m is Dispatch:   "DISP for order #{m.orderId()}"
+    case m is Transfer:   "XFER #{m.fromBin()} -> #{m.toBin()}"
+    case m is Adjustment: "ADJ (#{m.reason()})"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Product(sku: String, name: String, category: Category, unitPrice: Double)
+
+record BinSlot(binId: String, sku: String, qty: Int)
+
+record StockMove(sku: String, qty: Int, kind: MovementKind)
+
+record OrderLine(sku: String, qty: Int)
+
+record Order(orderId: String, customer: String, lines: List[OrderLine], status: OrderStatus)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt(): String = {
+    val cents: Int = (self * 100.0 + 0.5) as Int
+    val dollars: Int = cents / 100
+    val c: Int = cents % 100
+    return "$#{dollars}.#{if c < 10 { "0" + c } else { "#{c}" }}"
+  }
+}
+
+extension Int {
+  def plural(word: String): String = if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Warehouse class ──────────────────────────────────────────────────────────
+
+class Warehouse {
+  val products: List[Product]
+  val bins: List[BinSlot]
+  val moves: List[StockMove]
+  val orders: List[Order]
+public:
+  def this {
+    products = new ArrayList[Product]()
+    bins     = new ArrayList[BinSlot]()
+    moves    = new ArrayList[StockMove]()
+    orders   = new ArrayList[Order]()
+  }
+
+  def addProduct(p: Product): void { products.add(p) }
+
+  def receive(sku: String, binId: String, qty: Int, supplier: String): void {
+    moves.add(new StockMove(sku, qty, new Receipt(supplier)))
+    val existing: BinSlot? = bins.find { b: BinSlot -> b.binId() == binId && b.sku() == sku }
+    if existing != null {
+      bins.remove(existing)
+      bins.add(new BinSlot(binId, sku, existing.qty() + qty))
+    } else {
+      bins.add(new BinSlot(binId, sku, qty))
+    }
+  }
+
+  def stockLevel(sku: String): Int =
+    bins.filter { b: BinSlot -> b.sku() == sku }.fold(0) { acc: Int, b: BinSlot -> acc + b.qty() }
+
+  def placeOrder(orderId: String, customer: String, lines: List[OrderLine]): Order = {
+    val order: Order = new Order(orderId, customer, lines, new Pending())
+    orders.add(order)
+    return order
+  }
+
+  def advanceOrder(orderId: String): Boolean = {
+    val idx: Int? = findOrderIdx(orderId)
+    if idx == null { return false }
+    val order: Order = orders[idx]
+    val next: OrderStatus? = select order.status() {
+      case s is Pending: new Picking()
+      case s is Picking: {
+        dispatchLines(order)
+        new Packed()
+      }
+      case s is Packed: new Shipped()
+      else: null
+    }
+    if next == null { return false }
+    orders[idx] = new Order(orderId, order.customer(), order.lines(), next)
+    return true
+  }
+
+  def cancelOrder(orderId: String): Boolean = {
+    val idx: Int? = findOrderIdx(orderId)
+    if idx == null { return false }
+    val order: Order = orders[idx]
+    if order.status() is Shipped { return false }
+    orders[idx] = new Order(orderId, order.customer(), order.lines(), new Cancelled())
+    return true
+  }
+
+  def allProducts(): List[Product] = products
+  def allOrders(): List[Order] = orders
+  def allMoves(): List[StockMove] = moves
+
+  def ordersByStatus(s: OrderStatus): List[Order] =
+    orders.filter { o: Order -> o.status().label() == s.label() }
+
+  def totalValue(): Double =
+    bins.fold(0.0) { acc: Double, b: BinSlot ->
+      val p: Product? = products.find { p: Product -> p.sku() == b.sku() }
+      acc + (if p == null { 0.0 } else { p.unitPrice() * b.qty() })
+    }
+
+  def lowStock(threshold: Int): List[Product] =
+    products.filter { p: Product -> stockLevel(p.sku()) <= threshold }
+
+private:
+  def findOrderIdx(orderId: String): Int? {
+    foreach i: Int in 0..<orders.size {
+      if orders[i].orderId() == orderId { return i }
+    }
+    return null
+  }
+
+  def dispatchLines(order: Order): void {
+    foreach line: OrderLine in order.lines() {
+      val sku: String = line.sku()
+      var remaining: Int = line.qty()
+      val slots: List[BinSlot] = bins.filter { b: BinSlot -> b.sku() == sku }.sortedBy { b: BinSlot -> 0 - b.qty() }
+      foreach slot: BinSlot in slots {
+        if remaining <= 0 { break }
+        val take: Int = if slot.qty() <= remaining { slot.qty() } else { remaining }
+        remaining = remaining - take
+        bins.remove(slot)
+        if slot.qty() - take > 0 {
+          bins.add(new BinSlot(slot.binId(), sku, slot.qty() - take))
+        }
+      }
+      if line.qty() > 0 {
+        moves.add(new StockMove(sku, line.qty(), new Dispatch(order.orderId())))
+      }
+    }
+  }
+}
+
+// ─── Print helpers ────────────────────────────────────────────────────────────
+
+def sep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+def printOrder(o: Order): void {
+  val lineText: String = o.lines().size.plural("line")
+  println("  #{o.orderId().padRight(8)} #{o.customer().padRight(16)} #{lineText.padRight(10)} #{o.status().label()}")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val wh: Warehouse = new Warehouse()
+
+  wh.addProduct(new Product("SKU-001", "USB-C Cable 2m",      Category::ELECTRONICS, 12.99))
+  wh.addProduct(new Product("SKU-002", "Wireless Mouse",       Category::ELECTRONICS, 29.99))
+  wh.addProduct(new Product("SKU-003", "Work Gloves (L)",      Category::TOOLS,        8.49))
+  wh.addProduct(new Product("SKU-004", "Safety Goggles",       Category::TOOLS,       14.99))
+  wh.addProduct(new Product("SKU-005", "Python Crash Course",  Category::BOOKS,       35.00))
+  wh.addProduct(new Product("SKU-006", "Cotton T-Shirt (M)",   Category::CLOTHING,    19.99))
+
+  wh.receive("SKU-001", "A1", 100, "CableCo")
+  wh.receive("SKU-002", "A2",  50, "TechSupply")
+  wh.receive("SKU-003", "B1", 200, "SafetyPlus")
+  wh.receive("SKU-004", "B2",  75, "SafetyPlus")
+  wh.receive("SKU-005", "C1",  30, "BookWorld")
+  wh.receive("SKU-006", "D1", 120, "FashionHub")
+  wh.receive("SKU-001", "A3",  50, "CableCo")
+
+  val o1Lines: List[OrderLine] = [new OrderLine("SKU-001", 5), new OrderLine("SKU-002", 2)]
+  val o2Lines: List[OrderLine] = [new OrderLine("SKU-003", 10), new OrderLine("SKU-004", 3)]
+  val o3Lines: List[OrderLine] = [new OrderLine("SKU-005", 4)]
+  val o4Lines: List[OrderLine] = [new OrderLine("SKU-006", 8), new OrderLine("SKU-001", 3)]
+
+  wh.placeOrder("ORD-001", "Acme Corp",     o1Lines)
+  wh.placeOrder("ORD-002", "Build & Fix",   o2Lines)
+  wh.placeOrder("ORD-003", "City Library",  o3Lines)
+  wh.placeOrder("ORD-004", "FashionWorld",  o4Lines)
+
+  wh.advanceOrder("ORD-001")
+  wh.advanceOrder("ORD-001")
+  wh.advanceOrder("ORD-001")
+  wh.advanceOrder("ORD-002")
+  wh.cancelOrder("ORD-003")
+
+  println("╔══════════════════════════════════════════════╗")
+  println("║         WAREHOUSE MANAGEMENT SYSTEM          ║")
+  println("╚══════════════════════════════════════════════╝")
+  println("")
+
+  println("PRODUCT CATALOG & STOCK LEVELS")
+  sep(58)
+  println("  #{"SKU".padRight(10)} #{"Name".padRight(24)} #{"Category".padRight(12)} Stock  Price")
+  sep(58)
+  foreach p: Product in wh.allProducts().sortedBy { p: Product -> p.sku() } {
+    val stock: Int = wh.stockLevel(p.sku())
+    val flag: String = if stock <= 10 { " LOW" } else { "" }
+    println("  #{p.sku().padRight(10)} #{p.name().padRight(24)} #{p.category().name().padRight(12)} #{stock.plural("unit").padRight(8)} #{p.unitPrice().fmt()}#{flag}")
+  }
+  println("")
+  println("  Total inventory value: #{wh.totalValue().fmt()}")
+  println("")
+
+  println("ORDERS")
+  sep(58)
+  println("  #{"ID".padRight(8)} #{"Customer".padRight(16)} #{"Lines".padRight(10)} Status")
+  sep(58)
+  foreach o: Order in wh.allOrders() {
+    printOrder(o)
+  }
+  println("")
+
+  println("ORDERS BY STATUS")
+  sep(58)
+  val statuses: List[OrderStatus] = [new Pending(), new Picking(), new Packed(), new Shipped(), new Cancelled()]
+  foreach s: OrderStatus in statuses {
+    val group: List[Order] = wh.ordersByStatus(s)
+    if !group.isEmpty() {
+      println("  #{s.label()}: #{group.size.plural("order")}")
+      foreach o: Order in group {
+        println("    - #{o.orderId()} (#{o.customer()})")
+      }
+    }
+  }
+  println("")
+
+  println("STOCK MOVEMENTS (last #{wh.allMoves().size})")
+  sep(58)
+  foreach m: StockMove in wh.allMoves() {
+    val sign: String = select m.kind() {
+      case k is Receipt:    "+"
+      case k is Dispatch:   "-"
+      case k is Transfer:   " "
+      case k is Adjustment: if m.qty() >= 0 { "+" } else { "" }
+    }
+    println("  #{m.sku().padRight(10)} #{sign}#{m.qty()} units   #{m.kind().label()}")
+  }
+  println("")
+
+  println("LOW-STOCK ALERTS (≤ 20 units)")
+  sep(58)
+  val low: List[Product] = wh.lowStock(20)
+  if low.isEmpty() {
+    println("  No low-stock items.")
+  } else {
+    foreach p: Product in low {
+      println("  #{p.sku().padRight(10)} #{p.name().padRight(24)} #{wh.stockLevel(p.sku())} units remaining")
+    }
+  }
+}

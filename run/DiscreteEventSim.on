@@ -7,13 +7,15 @@
 
 // ── Records ──────────────────────────────────────────────────────────────────
 
-record Customer(id: Int, arrivalTime: Double, serviceTime: Double, vip: Boolean)
+record Customer(id: Int, arrivalTime: Double, serviceTime: Double, vip: Boolean) {
   example { new Customer(0, 0.0, 2.0, false).id() == 0 }
   example { new Customer(1, 1.5, 3.0, true).vip() == true }
+}
 
-record CompletedServ(custId: Int, wait: Double, depart: Double, tellerId: Int)
+record CompletedServ(custId: Int, wait: Double, depart: Double, tellerId: Int) {
   example { new CompletedServ(0, 0.0, 3.5, 0).custId() == 0 }
   example { new CompletedServ(1, 1.5, 5.5, 1).wait() == 1.5 }
+}
 
 // ── Event ADT ────────────────────────────────────────────────────────────────
 

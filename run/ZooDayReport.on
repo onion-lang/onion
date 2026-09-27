@@ -1,0 +1,291 @@
+// ZooManagement.on — A zoo management simulation (~260 lines)
+//
+// Exercises: records; plain enums; ADT case-enums; classes; collection
+// pipelines (map/filter/fold/sortedBy); select / type-pattern matching with
+// exhaustiveness; nullable types and null checks; closures; string
+// interpolation; foreach (list + map k,v); while loop.
+
+import {
+  java.util.*
+}
+
+// ─── Plain enums ─────────────────────────────────────────────────────────────
+
+enum Diet {
+  CARNIVORE, HERBIVORE, OMNIVORE, INSECTIVORE
+}
+
+enum EnclosureType {
+  SAVANNA, AQUATIC, TROPICAL, ARCTIC, NOCTURNAL, AVIARY
+}
+
+// ─── ADT enum for animal health status ───────────────────────────────────────
+
+enum AnimalStatus {
+  case Healthy(note: String)
+  case UnderObservation(reason: String, sinceDay: Int)
+  case Quarantined(illness: String)
+  case Recovered(from: String)
+public:
+  def label(): String = select this {
+    case h is Healthy:           "Healthy (#{h.note()})"
+    case o is UnderObservation:  "Obs: #{o.reason()} since day #{o.sinceDay()}"
+    case q is Quarantined:       "Quarantined: #{q.illness()}"
+    case r is Recovered:         "Recovered from #{r.from()}"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Species(name: String, diet: Diet, enclosureType: EnclosureType, avgLifespan: Int)
+
+record Animal(id: String, name: String, species: Species, age: Int, weightKg: Double, status: AnimalStatus)
+
+record FeedingRecord(animalId: String, day: Int, foodKg: Double, keeper: String)
+
+record VetRecord(animalId: String, day: Int, diagnosis: String, treated: Boolean)
+
+// ─── Zoo class ───────────────────────────────────────────────────────────────
+
+class Zoo {
+  var animals:    List[Animal]
+  var feedings:   List[FeedingRecord]
+  var vetRecords: List[VetRecord]
+  var currentDay: Int
+
+public:
+  def this {
+    animals    = []
+    feedings   = []
+    vetRecords = []
+    currentDay = 1
+  }
+
+  def day(): Int = currentDay
+
+  def addAnimal(a: Animal): void {
+    animals.add(a)
+  }
+
+  def recordFeeding(animalId: String, foodKg: Double, keeper: String): void {
+    feedings.add(new FeedingRecord(animalId, currentDay, foodKg, keeper))
+  }
+
+  def recordVetVisit(animalId: String, diagnosis: String, treated: Boolean): void {
+    vetRecords.add(new VetRecord(animalId, currentDay, diagnosis, treated))
+  }
+
+  def advanceDay(): void {
+    currentDay++
+  }
+
+  def allAnimals(): List[Animal] {
+    val copy: List[Animal] = []
+    foreach a: Animal in animals { copy.add(a) }
+    return copy
+  }
+
+  def findAnimal(id: String): Animal? {
+    foreach a: Animal in animals {
+      if a.id() == id { return a }
+    }
+    return null
+  }
+
+  def animalsByDiet(diet: Diet): List[Animal] {
+    return animals.filter { a: Animal -> (a.species()).diet() == diet }
+  }
+
+  def totalFeedingByKeeper(keeper: String): Double {
+    return feedings.filter { f: FeedingRecord -> f.keeper() == keeper }
+                   .map    { f: FeedingRecord -> f.foodKg() }
+                   .fold(0.0d) { acc: Double, v: Double -> acc + v }
+  }
+
+  def quarantinedAnimals(): List[Animal] {
+    return animals.filter { a: Animal ->
+      select a.status() {
+        case s is Quarantined: true
+        else: false
+      }
+    }
+  }
+
+  def countHealthy(): Int {
+    return animals.filter { a: Animal ->
+      select a.status() {
+        case h is Healthy: true
+        else: false
+      }
+    }.size
+  }
+
+  def feedingsInRange(fromDay: Int, toDay: Int): List[FeedingRecord] {
+    return feedings.filter { f: FeedingRecord ->
+      f.day() >= fromDay && f.day() <= toDay
+    }
+  }
+
+  def vetVisitsOnDay(d: Int): List[VetRecord] {
+    return vetRecords.filter { v: VetRecord -> v.day() == d }
+  }
+
+  // ── Reports ──────────────────────────────────────────────────────────────
+
+  def printEnclosureReport(): void {
+    println("=== Enclosure Population Report ===")
+    val groups: Map[String, Int] = [:]
+    foreach a: Animal in animals {
+      val key: String = (a.species()).enclosureType().name()
+      val cur: Int? = groups.get(key)
+      if cur == null {
+        groups.put(key, 1)
+      } else {
+        groups.put(key, cur + 1)
+      }
+    }
+    foreach (k, v) in groups {
+      println("  #{k}: #{v} animal(s)")
+    }
+  }
+
+  def printFeedingReport(fromDay: Int, toDay: Int): void {
+    println("=== Feeding Summary (Days #{fromDay}–#{toDay}) ===")
+    val relevant: List[FeedingRecord] = feedingsInRange(fromDay, toDay)
+    val total: Double = relevant.map { f: FeedingRecord -> f.foodKg() }
+                                .fold(0.0d) { acc: Double, v: Double -> acc + v }
+    println("  Total food: #{total}kg across #{relevant.size} feedings")
+    val byKeeper: Map[String, Int] = [:]
+    foreach f: FeedingRecord in relevant {
+      val cur: Int? = byKeeper.get(f.keeper())
+      if cur == null {
+        byKeeper.put(f.keeper(), 1)
+      } else {
+        byKeeper.put(f.keeper(), cur + 1)
+      }
+    }
+    foreach (keeper, count) in byKeeper {
+      val kg: Double = totalFeedingByKeeper(keeper)
+      println("  #{keeper}: #{count} feedings, #{kg}kg total")
+    }
+  }
+
+  def printHealthReport(): void {
+    println("=== Health Report (Day #{currentDay}) ===")
+    val total: Int = animals.size
+    val healthy: Int = countHealthy()
+    println("  Status: #{healthy}/#{total} animals healthy")
+    val sick: List[Animal] = quarantinedAnimals()
+    if sick.size > 0 {
+      println("  Animals in quarantine:")
+      foreach a: Animal in sick {
+        println("    - #{a.name()} (#{(a.species()).name()}): #{a.status().label()}")
+      }
+    }
+    val vetToday: List[VetRecord] = vetVisitsOnDay(currentDay)
+    if vetToday.size > 0 {
+      println("  Vet visits today: #{vetToday.size}")
+      foreach v: VetRecord in vetToday {
+        val opt: Animal? = findAnimal(v.animalId())
+        val aname: String = if opt != null { (opt).name() } else { v.animalId() }
+        println("    - #{aname}: #{v.diagnosis()} (treated: #{v.treated()})")
+      }
+    }
+  }
+
+  def printDietBreakdown(): void {
+    println("=== Diet Breakdown ===")
+    val groups: Map[Diet, List[Animal]] = animals.groupBy { a: Animal -> a.species().diet() }
+    foreach (diet, group) in groups {
+      val names: String = group.map { a: Animal -> a.name() }
+                               .fold("") { acc: String, n: String ->
+                                 if acc == "" { n } else { "#{acc}, #{n}" }
+                               }
+      println("  #{diet.name()} (#{group.size}): #{names}")
+    }
+  }
+
+  def printLongevityRanking(topN: Int): void {
+    println("=== Longevity Ranking (Top #{topN}) ===")
+    val sorted: List[Animal] = animals.sortedBy { a: Animal -> (a.species()).avgLifespan() * -1 }
+    var rank: Int = 1
+    foreach a: Animal in sorted {
+      if rank <= topN {
+        val sp: Species = a.species()
+        println("  #{rank}. #{a.name()} (#{sp.name()}, avg #{sp.avgLifespan()} yrs) — #{a.status().label()}")
+      }
+      rank++
+    }
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  val lion:      Species = new Species("African Lion", Diet::CARNIVORE,   EnclosureType::SAVANNA,   16)
+  val elephant:  Species = new Species("Elephant",     Diet::HERBIVORE,   EnclosureType::SAVANNA,   60)
+  val penguin:   Species = new Species("Penguin",      Diet::CARNIVORE,   EnclosureType::AQUATIC,   20)
+  val orangutan: Species = new Species("Orangutan",    Diet::OMNIVORE,    EnclosureType::TROPICAL,  35)
+  val axolotl:   Species = new Species("Axolotl",      Diet::CARNIVORE,   EnclosureType::AQUATIC,   10)
+  val owl:       Species = new Species("Barn Owl",     Diet::CARNIVORE,   EnclosureType::NOCTURNAL,  4)
+  val zebra:     Species = new Species("Zebra",        Diet::HERBIVORE,   EnclosureType::SAVANNA,   25)
+  val toucan:    Species = new Species("Toucan",       Diet::OMNIVORE,    EnclosureType::AVIARY,    20)
+
+  val zoo: Zoo = new Zoo()
+
+  zoo.addAnimal(new Animal("L001", "Simba",  lion,       5,   180.5d, new Healthy("routine checkup clear")))
+  zoo.addAnimal(new Animal("L002", "Nala",   lion,       4,   120.0d, new Healthy("good condition")))
+  zoo.addAnimal(new Animal("E001", "Dumbo",  elephant,  12,  4200.0d, new Healthy("excellent")))
+  zoo.addAnimal(new Animal("E002", "Ellie",  elephant,   8,  3800.0d, new UnderObservation("limping slightly", 3)))
+  zoo.addAnimal(new Animal("P001", "Pingu",  penguin,    3,     5.2d, new Healthy("active")))
+  zoo.addAnimal(new Animal("P002", "Splash", penguin,    2,     4.8d, new Quarantined("respiratory infection")))
+  zoo.addAnimal(new Animal("O001", "Rusty",  orangutan,  7,    65.0d, new Healthy("playful")))
+  zoo.addAnimal(new Animal("A001", "Axel",   axolotl,    1,     0.3d, new Healthy("regenerating limb")))
+  zoo.addAnimal(new Animal("W001", "Hootie", owl,        2,     0.5d, new Recovered("feather mites")))
+  zoo.addAnimal(new Animal("Z001", "Zara",   zebra,      6,   350.0d, new Healthy("normal")))
+  zoo.addAnimal(new Animal("Z002", "Stripe", zebra,      3,   290.0d, new Healthy("energetic")))
+  zoo.addAnimal(new Animal("T001", "Keel",   toucan,     4,     0.6d, new Healthy("colourful")))
+
+  // ── Day 1 ──────────────────────────────────────────────────────────────────
+  zoo.recordFeeding("L001",   8.0d, "Alice")
+  zoo.recordFeeding("L002",   6.5d, "Alice")
+  zoo.recordFeeding("E001", 120.0d, "Bob")
+  zoo.recordFeeding("E002",  90.0d, "Bob")
+  zoo.recordFeeding("P001",   1.5d, "Carol")
+  zoo.recordFeeding("P002",   0.8d, "Carol")
+  zoo.recordFeeding("O001",   5.0d, "Alice")
+  zoo.recordVetVisit("P002", "respiratory infection - antibiotics started", true)
+  zoo.recordVetVisit("E002", "mild lameness - anti-inflammatory given", true)
+
+  println("──── City Zoo  Day #{zoo.day()} ────────────────────────────────────")
+  zoo.printHealthReport()
+  println("")
+  zoo.printEnclosureReport()
+
+  zoo.advanceDay()
+
+  // ── Day 2 ──────────────────────────────────────────────────────────────────
+  zoo.recordFeeding("L001",   7.5d, "Alice")
+  zoo.recordFeeding("L002",   6.0d, "Dave")
+  zoo.recordFeeding("E001", 130.0d, "Bob")
+  zoo.recordFeeding("E002",  95.0d, "Bob")
+  zoo.recordFeeding("P001",   1.8d, "Carol")
+  zoo.recordFeeding("O001",   4.5d, "Dave")
+  zoo.recordFeeding("Z001",  30.0d, "Dave")
+  zoo.recordFeeding("Z002",  25.0d, "Dave")
+  zoo.recordFeeding("T001",   0.4d, "Carol")
+  zoo.recordVetVisit("P002", "improving - continue antibiotics", true)
+
+  println("")
+  println("──── City Zoo  Day #{zoo.day()} ────────────────────────────────────")
+  zoo.printHealthReport()
+  println("")
+  zoo.printDietBreakdown()
+  println("")
+  zoo.printFeedingReport(1, 2)
+  println("")
+  zoo.printLongevityRanking(5)
+
+  println("")
+  println("Simulation complete — #{zoo.allAnimals().size} animals, #{zoo.day() - 1} days recorded.")
+}

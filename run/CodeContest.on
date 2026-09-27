@@ -83,14 +83,16 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Problem(id: String, title: String, points: Int, difficulty: Int)
+record Problem(id: String, title: String, points: Int, difficulty: Int) {
   example { new Problem("A", "Hello World", 100, 1).points() == 100 }
   example { new Problem("A", "Test", 200, 3).difficulty() == 3 }
+}
 
 record Submission(handle: String, problemId: String, lang: Language,
-                  verdict: Verdict, elapsedMin: Int, execMs: Int)
+                  verdict: Verdict, elapsedMin: Int, execMs: Int) {
   example { new Submission("alice", "A", Language::ONION, Verdict::ACCEPTED, 5, 400).verdict().isAccepted() }
   example { new Submission("bob",   "B", Language::CPP,   Verdict::WRONG_ANSWER, 10, 900).verdict().symbol() == "WA" }
+}
 
 record Ranked[T](item: T, rank: Int, penalty: Int)
 

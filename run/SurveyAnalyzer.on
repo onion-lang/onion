@@ -1,0 +1,312 @@
+// SurveyAnalyzer.on — Survey analysis: cross-tabs, stats, response distributions
+//
+// Exercises: records, ADT case-enum with methods, plain homogeneous enum,
+// generics (List[T]/Map[K,V]), collection pipelines (filter/map/groupBy/
+// sortedBy/fold/count/any/find/partition/distinct), select/type-pattern
+// exhaustiveness, nullable types, closures, string interpolation, foreach
+// (list + map k,v), while loop, try/catch, extension methods.
+
+import { java.util.ArrayList }
+
+// ─── Question type (plain homogeneous enum) ───────────────────────────────
+
+enum QuestionType {
+  RATING, YESNO, CHOICE, OPEN
+}
+
+// ─── Demographic group (ADT enum with label) ──────────────────────────────
+
+enum AgeGroup {
+  case Youth; case Adult; case Senior
+public:
+  def label(): String = select this {
+    case g is Youth:  "18-34"
+    case g is Adult:  "35-54"
+    case g is Senior: "55+"
+  }
+}
+
+// ─── Answer (ADT enum: one variant per question type) ─────────────────────
+
+enum Answer {
+  case RatingAnswer(score: Int)        // 1-5
+  case YesNoAnswer(yes: Boolean)
+  case ChoiceAnswer(option: String)
+  case OpenAnswer(text: String)
+public:
+  def summary(): String = select this {
+    case a is RatingAnswer: "#{a.score()}/5"
+    case a is YesNoAnswer:  if a.yes() { "Yes" } else { "No" }
+    case a is ChoiceAnswer: a.option()
+    case a is OpenAnswer:   a.text()
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────
+
+record Question(id: String, text: String, qtype: QuestionType)
+
+record Respondent(id: String, name: String, ageGroup: AgeGroup)
+
+record Response(respondent: Respondent, questionId: String, answer: Answer)
+
+// ─── Extension methods ────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): String = {
+    if total == 0 { return "  0%" }
+    val p: Int = self * 100 / total
+    var s: String = "#{p}%"
+    while s.length() < 4 { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Survey analyzer ──────────────────────────────────────────────────────
+
+class Survey {
+  val questions: List[Question]
+  val responses: List[Response]
+public:
+  def this {
+    questions = new ArrayList[Question]()
+    responses = new ArrayList[Response]()
+  }
+  def addQuestion(q: Question): void { questions.add(q) }
+  def addResponse(r: Response): void { responses.add(r) }
+  def allQuestions(): List[Question] = questions
+  def allResponses(): List[Response] = responses
+
+  def responsesFor(qid: String): List[Response] =
+    responses.filter { r: Response -> r.questionId() == qid }
+
+  def respondentCount(): Int = {
+    val ids: List[String] = responses.map { r: Response -> r.respondent().id() }
+    return ids.distinct().size
+  }
+
+  def ratingStats(qid: String): String = {
+    val answers: List[Response] = responsesFor(qid).filter { r: Response -> r.answer() is RatingAnswer }
+    if answers.isEmpty() { return "  no data" }
+    val total: Int = answers.fold(0) { acc: Int, r: Response ->
+      val a: Answer = r.answer()
+      acc + (if a is RatingAnswer { (a as RatingAnswer).score() } else { 0 })
+    }
+    val avg10: Int = total * 10 / answers.size
+    val avgStr: String = "#{avg10 / 10}.#{avg10 % 10}"
+    val counts: Map[String, Int] = [:]
+    foreach r: Response in answers {
+      val key: String = r.answer().summary()
+      val cur: Int? = counts.get(key)
+      counts.put(key, if cur == null { 1 } else { cur + 1 })
+    }
+    var dist: String = ""
+    foreach i: Int in 1..5 {
+      val k: String = "#{i}/5"
+      val c: Int? = counts.get(k)
+      val n: Int = if c == null { 0 } else { c }
+      dist = dist + "  #{i}:#{n.pct(answers.size)}"
+    }
+    return "  avg=#{avgStr}  n=#{answers.size}  #{dist}"
+  }
+
+  def yesNoStats(qid: String): String = {
+    val answers: List[Response] = responsesFor(qid).filter { r: Response -> r.answer() is YesNoAnswer }
+    if answers.isEmpty() { return "  no data" }
+    val yesCount: Int = answers.count { r: Response ->
+      val a: Answer = r.answer()
+      a is YesNoAnswer && (a as YesNoAnswer).yes()
+    }
+    val noCount: Int = answers.size - yesCount
+    return "  Yes:#{yesCount.pct(answers.size)}  No:#{noCount.pct(answers.size)}  (n=#{answers.size})"
+  }
+
+  def choiceStats(qid: String): List[String] = {
+    val answers: List[Response] = responsesFor(qid).filter { r: Response -> r.answer() is ChoiceAnswer }
+    if answers.isEmpty() { return [] }
+    val grouped: Map[String, List[Response]] = answers.groupBy { r: Response -> r.answer().summary() }
+    val options: List[String] = []
+    foreach k: Object in grouped.keySet() { options.add(k as String) }
+    val sorted: List[String] = options.sortedBy { opt: String ->
+      val g: List[Response]? = grouped.get(opt)
+      0 - (if g == null { 0 } else { g.size })
+    }
+    val result: List[String] = new ArrayList[String]()
+    foreach opt: String in sorted {
+      val g: List[Response]? = grouped.get(opt)
+      val n: Int = if g == null { 0 } else { g.size }
+      result.add("  #{opt.padRight(20)} #{n.pct(answers.size)}  (#{n})")
+    }
+    return result
+  }
+
+  def ageBreakdown(qid: String): List[String] = {
+    val answers: List[Response] = responsesFor(qid)
+    if answers.isEmpty() { return [] }
+    val groups: Map[String, List[Response]] = answers.groupBy { r: Response -> r.respondent().ageGroup().label() }
+    val result: List[String] = new ArrayList[String]()
+    foreach (grp, list) in groups {
+      val gLabel: String = grp as String
+      val gList: List[Response] = list as List[Response]
+      val yesCount: Int = gList.count { r: Response ->
+        val a: Answer = r.answer()
+        a is YesNoAnswer && (a as YesNoAnswer).yes()
+      }
+      result.add("    #{gLabel.padRight(8)} #{yesCount.pct(gList.size)} Yes  (n=#{gList.size})")
+    }
+    return result
+  }
+}
+
+// ─── Print helpers ────────────────────────────────────────────────────────
+
+def bar(n: Int, total: Int, width: Int): String = {
+  if total == 0 { return "" }
+  val filled: Int = n * width / total
+  var s: String = "["
+  var i: Int = 0
+  while i < width {
+    s = s + (if i < filled { "#" } else { "." })
+    i++
+  }
+  return s + "]"
+}
+
+def printSep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val survey: Survey = new Survey()
+
+  val q1: Question = new Question("Q1", "How satisfied are you with our service?", QuestionType::RATING)
+  val q2: Question = new Question("Q2", "Would you recommend us to a friend?",     QuestionType::YESNO)
+  val q3: Question = new Question("Q3", "How did you hear about us?",              QuestionType::CHOICE)
+  val q4: Question = new Question("Q4", "How satisfied are you with our pricing?", QuestionType::RATING)
+
+  foreach q: Question in [q1, q2, q3, q4] { survey.addQuestion(q) }
+
+  val youth:  AgeGroup = new Youth()
+  val adult:  AgeGroup = new Adult()
+  val senior: AgeGroup = new Senior()
+
+  val respondents: List[Respondent] = [
+    new Respondent("R01", "Alice",    youth),
+    new Respondent("R02", "Bob",      adult),
+    new Respondent("R03", "Carol",    senior),
+    new Respondent("R04", "Dave",     youth),
+    new Respondent("R05", "Eve",      adult),
+    new Respondent("R06", "Frank",    senior),
+    new Respondent("R07", "Grace",    youth),
+    new Respondent("R08", "Hank",     adult),
+    new Respondent("R09", "Iris",     senior),
+    new Respondent("R10", "Jack",     adult),
+    new Respondent("R11", "Karen",    youth),
+    new Respondent("R12", "Leo",      adult)
+  ]
+
+  val q1answers: List[Answer] = [
+    new RatingAnswer(5), new RatingAnswer(3), new RatingAnswer(4), new RatingAnswer(5),
+    new RatingAnswer(2), new RatingAnswer(4), new RatingAnswer(5), new RatingAnswer(3),
+    new RatingAnswer(4), new RatingAnswer(5), new RatingAnswer(4), new RatingAnswer(3)
+  ]
+  val q2answers: List[Answer] = [
+    new YesNoAnswer(true),  new YesNoAnswer(true),  new YesNoAnswer(false), new YesNoAnswer(true),
+    new YesNoAnswer(false), new YesNoAnswer(true),  new YesNoAnswer(true),  new YesNoAnswer(true),
+    new YesNoAnswer(false), new YesNoAnswer(true),  new YesNoAnswer(true),  new YesNoAnswer(false)
+  ]
+  val sources: List[String] = [
+    "Social Media", "Friend", "Search Engine", "Social Media",
+    "Friend",       "TV Ad",  "Social Media",  "Friend",
+    "Search Engine","Social Media","Friend",     "TV Ad"
+  ]
+  val q4answers: List[Answer] = [
+    new RatingAnswer(4), new RatingAnswer(3), new RatingAnswer(3), new RatingAnswer(5),
+    new RatingAnswer(2), new RatingAnswer(3), new RatingAnswer(4), new RatingAnswer(4),
+    new RatingAnswer(3), new RatingAnswer(4), new RatingAnswer(5), new RatingAnswer(2)
+  ]
+
+  foreach i: Int in 0..<respondents.size {
+    val r: Respondent = respondents[i]
+    survey.addResponse(new Response(r, "Q1", q1answers[i]))
+    survey.addResponse(new Response(r, "Q2", q2answers[i]))
+    survey.addResponse(new Response(r, "Q3", new ChoiceAnswer(sources[i])))
+    survey.addResponse(new Response(r, "Q4", q4answers[i]))
+  }
+
+  println("╔═══════════════════════════════════════════════════╗")
+  println("║           CUSTOMER SATISFACTION SURVEY            ║")
+  println("╚═══════════════════════════════════════════════════╝")
+  println("Respondents: #{survey.respondentCount()}    Questions: #{survey.allQuestions().size}")
+  println("")
+
+  foreach q: Question in survey.allQuestions() {
+    println("#{q.id()}: #{q.text()}")
+    printSep(55)
+    if q.qtype() === QuestionType::RATING {
+      println(survey.ratingStats(q.id()))
+    } else if q.qtype() === QuestionType::YESNO {
+      println(survey.yesNoStats(q.id()))
+      println("  Age breakdown:")
+      foreach line: String in survey.ageBreakdown(q.id()) {
+        println(line)
+      }
+    } else if q.qtype() === QuestionType::CHOICE {
+      val lines: List[String] = survey.choiceStats(q.id())
+      foreach line: String in lines { println(line) }
+    }
+    println("")
+  }
+
+  println("SATISFACTION vs RECOMMENDATION CROSS-TAB")
+  printSep(55)
+  val highSat: List[Response] = survey.responsesFor("Q1").filter { r: Response ->
+    val a: Answer = r.answer()
+    a is RatingAnswer && (a as RatingAnswer).score() >= 4
+  }
+  val highIds: List[String] = highSat.map { r: Response -> r.respondent().id() }
+  val highRec: Int = survey.responsesFor("Q2").count { r: Response ->
+    val a: Answer = r.answer()
+    highIds.contains(r.respondent().id()) && a is YesNoAnswer && (a as YesNoAnswer).yes()
+  }
+  val lowSat: List[Response] = survey.responsesFor("Q1").filter { r: Response ->
+    val a: Answer = r.answer()
+    a is RatingAnswer && (a as RatingAnswer).score() < 4
+  }
+  val lowIds: List[String] = lowSat.map { r: Response -> r.respondent().id() }
+  val lowRec: Int = survey.responsesFor("Q2").count { r: Response ->
+    val a: Answer = r.answer()
+    lowIds.contains(r.respondent().id()) && a is YesNoAnswer && (a as YesNoAnswer).yes()
+  }
+  println("  High satisfaction (4-5): #{highSat.size} respondents → #{highRec} would recommend (#{highRec.pct(highSat.size)})")
+  println("  Low  satisfaction (1-3): #{lowSat.size} respondents → #{lowRec} would recommend (#{lowRec.pct(lowSat.size)})")
+  println("")
+
+  println("AGE GROUP OVERVIEW")
+  printSep(55)
+  val byAge: Map[String, List[Response]] = survey.allResponses().groupBy { r: Response -> r.respondent().ageGroup().label() }
+  foreach (grp, list) in byAge {
+    val gLabel: String = grp as String
+    val gList: List[Response] = list as List[Response]
+    val n: Int = gList.map { r: Response -> r.respondent().id() }.distinct().size
+    println("  #{gLabel.padRight(8)} #{n} respondents  #{n * 4} total answers")
+  }
+}

@@ -1,0 +1,267 @@
+// FlashcardSRS.on — Spaced Repetition System simulator (~280 lines).
+//
+// Exercises: plain enum with methods, data-carrying records with body methods,
+// SM-2 scheduling algorithm (adaptive interval/ease-factor updates), collection
+// pipelines (filter/map/sortedBy/groupBy/reduce/count/any/maxBy/minBy/find),
+// closures and trailing lambdas, string interpolation, select/pattern matching,
+// while/foreach (ranges and map (k,v)), extension methods on Int and Double,
+// nullable and Elvis operator, block expressions, generics (List[T]).
+
+import { java.util.* }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+
+  def rjust(w: Int): String {
+    val s: String = self.toString()
+    if s.length() >= w { return s }
+    var r: String = s
+    while r.length() < w { r = " " + r }
+    return r
+  }
+
+  def bar(max: Int, width: Int): String {
+    val filled: Int = if max == 0 { 0 } else { (self * width) / max }
+    var b: String = ""
+    var i: Int = 0
+    while i < filled { b = b + "#"; i = i + 1 }
+    while i < width  { b = b + "."; i = i + 1 }
+    return "[#{b}]"
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val scaled: Long = Math::round(self * 100.0)
+    val whole: Long  = scaled / 100L
+    val frac: Long   = scaled % 100L
+    val fs: String   = if frac < 10L { "0#{frac}" } else { "#{frac}" }
+    return "#{whole}.#{fs}"
+  }
+}
+
+// ─── Grade enum ──────────────────────────────────────────────────────────────
+
+enum Grade {
+  AGAIN, HARD, GOOD, EASY
+public:
+  def quality(): Int = select this {
+    case Grade::AGAIN: 0
+    case Grade::HARD:  3
+    case Grade::GOOD:  4
+    case Grade::EASY:  5
+    else:              4
+  }
+  def label(): String = select this {
+    case Grade::AGAIN: "Again "
+    case Grade::HARD:  "Hard  "
+    case Grade::GOOD:  "Good  "
+    case Grade::EASY:  "Easy  "
+    else:              "?     "
+  }
+  def symbol(): String = select this {
+    case Grade::AGAIN: "✗"
+    case Grade::HARD:  "~"
+    case Grade::GOOD:  "✓"
+    case Grade::EASY:  "★"
+    else:              "?"
+  }
+}
+
+// ─── FlashCard: vocabulary entry ─────────────────────────────────────────────
+
+record FlashCard(id: Int, front: String, back: String)
+
+// ─── CardState: SM-2 state per card ──────────────────────────────────────────
+
+record CardState(cardId: Int, interval: Int, ease: Double, dueDay: Int, reps: Int) {
+public:
+  def isDue(today: Int): Boolean = today >= dueDay()
+
+  def summary(): String {
+    val due: String = "day #{dueDay().rjust(3)}"
+    val ivl: String = "ivl=#{interval().rjust(3)}d"
+    val esf: String = "ef=#{ease().fmt2()}"
+    val rep: String = "reps=#{reps().rjust(2)}"
+    return "card ##{cardId().rjust(2)}  #{due}  #{ivl}  #{esf}  #{rep}"
+  }
+}
+
+// ─── StudyResult: one card review ────────────────────────────────────────────
+
+record StudyResult(cardId: Int, grade: Grade, day: Int, newInterval: Int)
+
+// ─── SM-2 algorithm ──────────────────────────────────────────────────────────
+
+class SM2 {
+public:
+  static def initial(cardId: Int, startDay: Int): CardState =
+    new CardState(cardId, 1, 2.5, startDay, 0)
+
+  static def schedule(state: CardState, grade: Grade, today: Int): CardState {
+    val q: Int = grade.quality()
+    // Ease-factor update (SM-2 formula)
+    var ease: Double = state.ease() + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)
+    if ease < 1.3 { ease = 1.3 }
+    // Failure: reset repetition count
+    if q < 3 {
+      return new CardState(state.cardId(), 1, ease, today + 1, 0)
+    }
+    // Success: advance interval
+    val newInterval: Int =
+      if state.reps() == 0 { 1 }
+      else if state.reps() == 1 { 6 }
+      else { (state.interval() * state.ease() + 0.5) as Int }
+    return new CardState(state.cardId(), newInterval, ease, today + newInterval, state.reps() + 1)
+  }
+}
+
+// ─── Simulation helper ───────────────────────────────────────────────────────
+
+def gradeFor(reps: Int): Grade = select reps % 4 {
+  case 0: Grade::HARD
+  case 1: Grade::GOOD
+  case 2: Grade::GOOD
+  case 3: Grade::EASY
+  else:   Grade::GOOD
+}
+
+// ─── Report helpers ──────────────────────────────────────────────────────────
+
+def printBanner(title: String): void {
+  val line: String = "─".repeat(Math::min(title.length() + 4, 52))
+  IO::println(line)
+  IO::println("  #{title}")
+  IO::println(line)
+}
+
+def bar(count: Int, total: Int, width: Int): String {
+  val filled: Int = if total == 0 { 0 } else { count * width / total }
+  var b: String = ""
+  var i: Int = 0
+  while i < filled { b = b + "█"; i = i + 1 }
+  while i < width  { b = b + "░"; i = i + 1 }
+  return b
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  printBanner("Spaced Repetition System Demo")
+  IO::println("")
+
+  // Vocabulary deck
+  val cards: List[FlashCard] = [
+    new FlashCard(1,  "anamnesis",    "recollection of past events"),
+    new FlashCard(2,  "ephemeral",    "lasting for a very short time"),
+    new FlashCard(3,  "mellifluous",  "sweet or musical; pleasant to hear"),
+    new FlashCard(4,  "sanguine",     "optimistic in difficult situations"),
+    new FlashCard(5,  "loquacious",   "tending to talk a great deal"),
+    new FlashCard(6,  "perspicacious","having ready insight; shrewd"),
+    new FlashCard(7,  "obsequious",   "obedient or attentive excessively"),
+    new FlashCard(8,  "vicarious",    "experienced through another"),
+    new FlashCard(9,  "laconic",      "using very few words"),
+    new FlashCard(10, "recondite",    "not known by many people")
+  ]
+
+  IO::println("Deck: #{cards.size.plural("card")}")
+  IO::println("")
+
+  // Initialise all card states on day 0
+  var states: List[CardState] = cards.map { c -> SM2::initial(c.id(), 0) }
+
+  val allResults = new ArrayList[StudyResult]()
+
+  // ── Simulate 30 study days ────────────────────────────────────────────────
+  var totalDay: Int  = 0
+  var totalRev: Int  = 0
+  foreach day: Int in 0..<30 {
+    val dueStates: List[CardState] = states.filter { s -> s.isDue(day) }
+    if dueStates.size == 0 { continue }
+
+    totalDay  = totalDay + 1
+    totalRev  = totalRev + dueStates.size
+
+    IO::println("Day #{day.rjust(2)}: #{dueStates.size.plural("review")}")
+
+    val updatedStates = new ArrayList[CardState]()
+    foreach s: CardState in dueStates {
+      val grade: Grade = gradeFor(s.reps())
+      val next: CardState = SM2::schedule(s, grade, day)
+      allResults.add(new StudyResult(s.cardId(), grade, day, next.interval()))
+      updatedStates.add(next)
+      IO::println("       #{grade.symbol()} #{grade.label()} card ##{s.cardId().rjust(2)} → next in #{next.interval().plural("day")}")
+    }
+
+    // Merge updated states back into the deck
+    val updatedIds: List[Int] = updatedStates.map { s -> s.cardId() }
+    val kept: List[CardState] = states.filter { s -> !updatedIds.contains(s.cardId()) }
+    val merged = new ArrayList[CardState]()
+    foreach s: CardState in kept        { merged.add(s) }
+    foreach s: CardState in updatedStates { merged.add(s) }
+    states = merged
+  }
+
+  IO::println("")
+
+  // ── Final card state summary ──────────────────────────────────────────────
+  printBanner("Final Card States")
+  val sorted: List[CardState] = states.sortedBy { s -> s.dueDay() }
+  foreach s: CardState in sorted {
+    IO::println("  #{s.summary()}")
+  }
+  IO::println("")
+
+  // ── Grade distribution ────────────────────────────────────────────────────
+  printBanner("Grade Distribution  (#{allResults.size.plural("review")} total)")
+  val results: List[StudyResult] = allResults
+  val allGrades: List[Grade] = [Grade::AGAIN, Grade::HARD, Grade::GOOD, Grade::EASY]
+  foreach g: Grade in allGrades {
+    val key: String = g.label()
+    val cnt: Int    = results.count { r -> r.grade() == g }
+    val pct: Int    = if results.size == 0 { 0 } else { cnt * 100 / results.size }
+    IO::println("  #{g.symbol()} #{key} #{cnt.rjust(3)} (#{pct.rjust(3)}%) #{bar(cnt, results.size, 20)}")
+  }
+  IO::println("")
+
+  // ── Per-card stats ────────────────────────────────────────────────────────
+  printBanner("Per-card Review Summary")
+  val cardGroups = results.groupBy { r -> r.cardId() }
+  val sortedCards: List[FlashCard] = cards.sortedBy { c -> c.id() }
+  foreach c: FlashCard in sortedCards {
+    val rs: List[StudyResult] = cardGroups[c.id()] ?: []
+    val revCount: Int = rs.size
+    var totalIvl: Int = 0
+    foreach r: StudyResult in rs { totalIvl = totalIvl + r.newInterval() }
+    val avgIvl: Double =
+      if revCount == 0 { 0.0 }
+      else { totalIvl as Double / revCount as Double }
+    IO::println("  ##{c.id().rjust(2)} #{c.front()} — #{revCount.plural("review")}, avg next interval: #{avgIvl.fmt2()} days")
+  }
+  IO::println("")
+
+  // ── Ease-factor stats ─────────────────────────────────────────────────────
+  printBanner("Ease Factor Statistics")
+  var totalEase: Double = 0.0
+  foreach s: CardState in states { totalEase = totalEase + s.ease() }
+  val avgEase: Double = totalEase / states.size as Double
+  val minState: CardState = states.minBy { s -> s.ease() }
+  val maxState: CardState = states.maxBy { s -> s.ease() }
+  IO::println("  Average : #{avgEase.fmt2()}")
+  IO::println("  Minimum : #{minState.ease().fmt2()} (card ##{minState.cardId()})")
+  IO::println("  Maximum : #{maxState.ease().fmt2()} (card ##{maxState.cardId()})")
+  IO::println("")
+  IO::println("  Ease histogram (one bar per card, sorted by ease):")
+  val byEase: List[CardState] = states.sortedBy { s -> s.ease() }
+  foreach s: CardState in byEase {
+    val efBar: String = bar((s.ease() * 100.0) as Int, 400, 20)
+    IO::println("    card ##{s.cardId().rjust(2)}  ef=#{s.ease().fmt2()}  #{efBar}")
+  }
+  IO::println("")
+
+  // ── Summary line ─────────────────────────────────────────────────────────
+  IO::println("Simulation complete: #{totalDay.plural("active study day")}, #{totalRev.plural("total review")}.")
+}

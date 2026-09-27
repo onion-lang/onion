@@ -1,0 +1,313 @@
+// LexerMachine.on — expression tokenizer + recursive-descent evaluator for a
+// tiny arithmetic language.  Also demonstrates @TailRecursive mutual recursion:
+// NumberParity.isEven / isOdd form a private, no-instance-state SCC that the
+// compiler's MutualRecursionOptimization pass rewrites as a single state-machine
+// method, preventing stack overflow even at n = 2 000 000.
+
+import {
+  java.lang.Double as JDouble;
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record Token(kind: String, text: String, pos: Int)
+record VarDef(name: String, value: Double)
+record KindStat(kind: String, count: Int)
+record ParityResult(value: Int, even: Boolean)
+
+// ── Extension methods ─────────────────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    var s = ""
+    foreach i: Int in 1..n { s = s + self }
+    return s
+  }
+  def padRight(width: Int): String {
+    var s = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+extension Double {
+  def r2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+}
+
+// ── @TailRecursive mutual recursion demonstration ─────────────────────────
+//
+// Requirements for the state-machine rewrite:
+//   • All methods in the SCC must be private (no public: section).
+//   • All methods must have the same parameter count.
+//   • No local variable declarations inside any method.
+//   • No access to instance fields or calls to methods outside the SCC.
+//
+// isEven and isOdd satisfy all four conditions.
+
+class NumberParity {
+  @TailRecursive
+  def isEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return isOdd(n - 1)
+  }
+
+  @TailRecursive
+  def isOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return isEven(n - 1)
+  }
+
+public:
+  def even(n: Int): Boolean = isEven(n)
+  def odd(n: Int): Boolean  = isOdd(n)
+}
+
+// ── Lexer ─────────────────────────────────────────────────────────────────
+//
+// lexNumber and lexIdent each use plain self-tail-recursion (handled by the
+// standard TailCallOptimization pass).  The cross-calls lexMain->lexNumber->
+// lexMain etc. are direct recursive calls without @TailRecursive because the
+// methods access this.src_; a separate static refactor would be needed to
+// enable the mutual-recursion state machine here.
+
+class Lexer {
+  val src_: String
+
+  def isAlpha(c: Char): Boolean =
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+
+  def isDigit(c: Char): Boolean = c >= '0' && c <= '9'
+
+  def isAlNum(c: Char): Boolean = isAlpha(c) || isDigit(c)
+
+  def lexMain(pos: Int, acc: List[Token]): List[Token] {
+    if pos >= src_.length() {
+      acc << new Token("EOF", "", pos)
+      return acc
+    }
+    val ch = src_.charAt(pos)
+    if ch == ' ' || ch == '\t' { return lexMain(pos + 1, acc) }
+    if isDigit(ch)              { return lexNumber(pos, pos, acc) }
+    if isAlpha(ch)              { return lexIdent(pos, pos, acc) }
+    val kind: String =
+      if ch == '+' { "+" }
+      else if ch == '-' { "-" }
+      else if ch == '*' { "*" }
+      else if ch == '/' { "/" }
+      else if ch == '(' { "(" }
+      else if ch == ')' { ")" }
+      else              { "?" }
+    acc << new Token(kind, src_.substring(pos, pos + 1), pos)
+    return lexMain(pos + 1, acc)
+  }
+
+  def lexNumber(start: Int, pos: Int, acc: List[Token]): List[Token] {
+    if pos < src_.length() &&
+       (isDigit(src_.charAt(pos)) || src_.charAt(pos) == '.') {
+      return lexNumber(start, pos + 1, acc)
+    }
+    acc << new Token("NUM", src_.substring(start, pos), start)
+    return lexMain(pos, acc)
+  }
+
+  def lexIdent(start: Int, pos: Int, acc: List[Token]): List[Token] {
+    if pos < src_.length() && isAlNum(src_.charAt(pos)) {
+      return lexIdent(start, pos + 1, acc)
+    }
+    acc << new Token("IDENT", src_.substring(start, pos), start)
+    return lexMain(pos, acc)
+  }
+
+public:
+  def this(src: String) { this.src_ = src }
+  def tokenize(): List[Token] = lexMain(0, [])
+}
+
+// ── Recursive-descent evaluator ───────────────────────────────────────────
+
+class EvalCtx {
+  val tokens_: List[Token]
+  val vars_:   List[VarDef]
+  var idx_:    Int
+
+public:
+  def this(tokens: List[Token], vars: List[VarDef]) {
+    this.tokens_ = tokens
+    this.vars_   = vars
+    this.idx_    = 0
+  }
+
+  def peek(): Token {
+    if idx_ >= tokens_.size { return new Token("EOF", "", -1) }
+    return tokens_[idx_] as Token
+  }
+
+  def next(): Token {
+    val t = peek()
+    idx_ = idx_ + 1
+    return t
+  }
+
+  def eat(kind: String): Boolean {
+    if peek().kind() == kind { next(); return true }
+    return false
+  }
+
+  def lookup(name: String): Double {
+    foreach v: Object in vars_ {
+      val d = v as VarDef
+      if d.name() == name { return d.value() }
+    }
+    return 0.0
+  }
+
+  // expr = term (('+' | '-') term)*
+  def evalExpr(): Double {
+    var v = evalTerm()
+    var go = true
+    while go {
+      if peek().kind() == "+"      { next(); v = v + evalTerm() }
+      else if peek().kind() == "-" { next(); v = v - evalTerm() }
+      else                         { go = false }
+    }
+    return v
+  }
+
+  // term = unary (('*' | '/') unary)*
+  def evalTerm(): Double {
+    var v = evalUnary()
+    var go = true
+    while go {
+      if peek().kind() == "*" {
+        next()
+        v = v * evalUnary()
+      } else if peek().kind() == "/" {
+        next()
+        val d = evalUnary()
+        v = if d == 0.0 { 0.0 } else { v / d }
+      } else {
+        go = false
+      }
+    }
+    return v
+  }
+
+  // unary = '-' unary | atom
+  def evalUnary(): Double {
+    if peek().kind() == "-" { next(); return 0.0 - evalUnary() }
+    return evalAtom()
+  }
+
+  // atom = NUM | IDENT | '(' expr ')'
+  def evalAtom(): Double {
+    val t = next()
+    if t.kind() == "NUM"   { return JDouble::parseDouble(t.text()) }
+    if t.kind() == "IDENT" { return lookup(t.text()) }
+    if t.kind() == "("     { val v = evalExpr(); eat(")"); return v }
+    return 0.0
+  }
+}
+
+// ── Top-level helpers ─────────────────────────────────────────────────────
+
+def evalStr(src: String, vars: List[VarDef]): Double {
+  val tokens = (new Lexer(src)).tokenize()
+  val ctx    = new EvalCtx(tokens, vars)
+  return ctx.evalExpr()
+}
+
+// ── Variables and sample expressions ─────────────────────────────────────
+
+val vars: List[VarDef] = [
+  new VarDef("x",  3.0),
+  new VarDef("y",  4.0),
+  new VarDef("pi", 3.14159),
+  new VarDef("e",  2.71828),
+  new VarDef("r",  5.0),
+  new VarDef("n",  10.0)
+]
+
+val exprs: List[String] = [
+  "1 + 2",
+  "10 - 3",
+  "6 * 7",
+  "100 / 4",
+  "x + y",
+  "x * x + y * y",
+  "(x + y) * (x - y)",
+  "pi * r * r",
+  "2 * pi * r",
+  "e * x",
+  "1 + 2 * 3",
+  "(1 + 2) * 3",
+  "x * (y + 1) / 2",
+  "10 / 0",
+  "-x + y",
+  "-pi * r",
+  "n * (n + 1) / 2"
+]
+
+// ── Evaluation table ──────────────────────────────────────────────────────
+
+IO::println("=".rep(52))
+IO::println("Expression Evaluator  (x=3 y=4 pi=3.14159 r=5 n=10)")
+IO::println("=".rep(52))
+foreach expr: String in exprs {
+  val result = evalStr(expr, vars)
+  IO::println("  " + expr.padRight(24) + "= " + result.r2())
+}
+IO::println("=".rep(52))
+
+// ── Mutual tail recursion: NumberParity stress test ───────────────────────
+
+IO::println("")
+IO::println("@TailRecursive mutual recursion — NumberParity.isEven / isOdd")
+IO::println("(state-machine rewrite; tested at n = 2 000 000 without overflow)")
+val parity = new NumberParity()
+val samples: List[Int] = [0, 1, 2, 7, 100, 999, 1000, 2000000]
+foreach n: Object in samples {
+  val ni = n as Int
+  val tag = if parity.even(ni) { "even" } else { "odd" }
+  IO::println("  #{ni} is #{tag}")
+}
+
+// ── Lexer stress test: 500-term expression ────────────────────────────────
+
+IO::println("")
+IO::println("Lexer stress test: lex + eval sum(1..500)")
+var bigExpr = "1"
+foreach i: Int in 2..500 {
+  bigExpr = bigExpr + " + " + i
+}
+val bigResult = evalStr(bigExpr, vars)
+val expected  = 500 * 501 / 2
+IO::println("  sum(1..500) = " + (bigResult as Int))
+IO::println("  expected    = " + expected)
+IO::println("  ok          = " + ((bigResult as Int) == expected))
+
+// ── Token-kind histogram ──────────────────────────────────────────────────
+
+IO::println("")
+IO::println("Token-kind histogram across " + exprs.size + " sample expressions:")
+val allToks: List[Object] = []
+foreach expr: String in exprs {
+  val toks = (new Lexer(expr)).tokenize()
+  foreach t: Object in toks {
+    val tok = t as Token
+    if tok.kind() != "EOF" { allToks << tok }
+  }
+}
+val groups: Map[String, List[Object]] = allToks.groupBy { t -> (t as Token).kind() }
+val stats: List[KindStat] = []
+foreach (kind, toks) in groups {
+  stats << new KindStat(kind as String, (toks as List[Object]).size)
+}
+val sorted = stats.sortedBy { s -> 0 - (s as KindStat).count() }
+foreach s: Object in sorted {
+  val ks = s as KindStat
+  IO::println("  " + ks.kind().padRight(8) + ks.count())
+}
+IO::println("")
+IO::println("Total tokens (excl. EOF): " + allToks.size)
+IO::println("Distinct token kinds:     " + groups.size)
+IO::println("=".rep(52))

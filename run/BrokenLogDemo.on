@@ -10,13 +10,14 @@
 // A `shape` clause names the boundary, so a record can carry as many as it needs.
 // `parse` returns an Outcome rather than null, so "this line is not a log entry" and
 // "this line has a broken status" are different answers instead of the same one.
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common  = re"(\S+) (\w+) (\S+) (\d+)"
   // The same record, read leniently: the status group accepts any word, so a
   // non-numeric status matches the line and then fails to convert. That is what
   // makes the two kinds of failure distinguishable below -- with `common` alone,
   // "status abc" simply fails to match and looks like any other junk line.
   shape lenient = re"(\S+) (\w+) (\S+) (\w+)"
+}
 
 // A record for a value produced by `xmap`: a distance that happens to be spelled
 // as a bare integer on the wire.

@@ -713,8 +713,9 @@ counterexample, reported with the settings (seed, sample count) that produced
 it so the failure can be reproduced.
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   law wrong(p: Pt) { p.x() == p.y() }   // E0064: falsified, e.g. by Pt(0, 1)
+}
 ```
 
 Fix: correct the law (or the code it's checking) so it holds for every
@@ -727,8 +728,9 @@ A top-level or record-attached `example { boolExpr }` clause evaluated to
 case, not a generated family of them.
 
 ```onion
-record R(x: Int)
+record R(x: Int) {
   example { new R(1).x() == 2 }   // E0065: evaluated to false
+}
 ```
 
 Fix: correct the example's expected value, or fix the code it's asserting
@@ -757,8 +759,9 @@ needs a generator. Generatable types are `String`, `Int`, `Long`, `Double`, `Flo
 `Boolean`, `Short`, `Byte`, and records whose components are all generatable.
 
 ```onion
-record Dummy(v: Int)
+record Dummy(v: Int) {
   law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
+}
 ```
 
 Anything else — arrays, `Map`, enums, interfaces, or a class with more than one
@@ -767,8 +770,9 @@ indistinguishable from a law that held; a check that cannot run must not look li
 that passed. Change the parameter type, or remove the law.
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
+}
 ```
 
 ### `E0075` — A class declaring laws could not be loaded
@@ -784,8 +788,9 @@ Guessing would produce a shape that silently reads nothing, so it is an error li
 what is supported.
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape doc = toml     // E0076: supported formats are json, yaml, config
+}
 ```
 
 For an inline pattern, write `shape name = re"..."`.
@@ -1084,9 +1089,10 @@ codegen. Without this check the collision surfaced later as a raw JVM
 `ClassFormatError` instead of a normal diagnostic.
 
 ```onion
-record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
   law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+}
 ```
 
 Fix: rename one of the clauses, or remove the duplicate.

@@ -1,0 +1,245 @@
+// MovieReviewAnalyzer.on — movie collection with reviews, ratings, and analytics.
+// Exercises: records; Java-style enum; collection pipelines (filter/map/fold/
+// sortedBy/distinct/any/count/find); select/pattern matching; nullable types;
+// closures; string interpolation; foreach (list + ranges); while loop;
+// recursion; try/catch; extension methods.
+
+import {
+  java.util.*
+}
+
+// Java-style homogeneous enum (values() / valueOf() work)
+enum Genre {
+  ACTION, COMEDY, DRAMA, SCIFI, HORROR, DOCUMENTARY, ANIMATION
+}
+
+record Movie(title: String, year: Int, genre: Genre, director: String?)
+
+record Review(movie: String, reviewer: String, score: Int, comment: String)
+
+record MovieStats(title: String, avgScore: Double, reviewCount: Int)
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension String {
+  def padR(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padL(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def fix1(): String = Format::fixed(self, 1)
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def genreName(g: Genre): String =
+  select g {
+    case Genre::ACTION:      "Action"
+    case Genre::COMEDY:      "Comedy"
+    case Genre::DRAMA:       "Drama"
+    case Genre::SCIFI:       "Sci-Fi"
+    case Genre::HORROR:      "Horror"
+    case Genre::DOCUMENTARY: "Documentary"
+    case Genre::ANIMATION:   "Animation"
+  }
+
+def scoreLabel(avg: Double): String {
+  val r: Int = (avg + 0.5) as Int
+  return select r {
+    case 10: "Masterpiece"
+    case 9:  "Excellent"
+    case 8:  "Great"
+    case 7:  "Good"
+    case 6:  "Fine"
+    case 5:  "Average"
+    else:    if r < 5 { "Below average" } else { "Poor" }
+  }
+}
+
+def computeStats(title: String, reviews: List[Review]): MovieStats {
+  val filtered: List[Review] = reviews.filter { r -> r.movie() == title }
+  val count: Int = filtered.size
+  if count == 0 { return new MovieStats(title, 0.0, 0) }
+  val total: Int = filtered.fold(0) { acc, r -> (acc as Int) + r.score() }
+  val avg: Double = (total as Double) / (count as Double)
+  return new MovieStats(title, avg, count)
+}
+
+// Recursive helper: sum all review scores for a list
+def sumScores(reviews: List[Review], i: Int): Int {
+  if i >= reviews.size { return 0 }
+  return (reviews[i] as Review).score() + sumScores(reviews, i + 1)
+}
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+val MOVIES: List[Movie] = [
+  new Movie("Inception",                 2010, Genre::SCIFI,       "Christopher Nolan"),
+  new Movie("The Dark Knight",           2008, Genre::ACTION,      "Christopher Nolan"),
+  new Movie("Parasite",                  2019, Genre::DRAMA,       "Bong Joon-ho"),
+  new Movie("WALL-E",                    2008, Genre::ANIMATION,   "Andrew Stanton"),
+  new Movie("Get Out",                   2017, Genre::HORROR,      "Jordan Peele"),
+  new Movie("Knives Out",                2019, Genre::COMEDY,      "Rian Johnson"),
+  new Movie("Interstellar",              2014, Genre::SCIFI,       "Christopher Nolan"),
+  new Movie("Spirited Away",             2001, Genre::ANIMATION,   "Hayao Miyazaki"),
+  new Movie("The Grand Budapest Hotel",  2014, Genre::COMEDY,      "Wes Anderson"),
+  new Movie("Arrival",                   2016, Genre::SCIFI,       null),
+  new Movie("Mad Max: Fury Road",        2015, Genre::ACTION,      "George Miller"),
+  new Movie("Her",                       2013, Genre::SCIFI,       "Spike Jonze"),
+  new Movie("Hunt for the Wilderpeople", 2016, Genre::COMEDY,      "Taika Waititi"),
+  new Movie("A Quiet Place",             2018, Genre::HORROR,      "John Krasinski"),
+  new Movie("Portrait of a Lady on Fire",2019, Genre::DRAMA,       "Céline Sciamma")
+]
+
+val REVIEWS: List[Review] = [
+  new Review("Inception",            "Alice", 9,  "Mind-bending thriller"),
+  new Review("Inception",            "Bob",   8,  "Needs multiple watches"),
+  new Review("Inception",            "Carol", 10, "Perfect film"),
+  new Review("The Dark Knight",      "Alice", 10, "Best superhero film"),
+  new Review("The Dark Knight",      "Dave",  9,  "Ledger is unforgettable"),
+  new Review("Parasite",             "Alice", 10, "Deserved the Oscar"),
+  new Review("Parasite",             "Bob",   9,  "Genre-defying masterpiece"),
+  new Review("WALL-E",               "Carol", 9,  "Beautiful and touching"),
+  new Review("Get Out",              "Dave",  8,  "Very smart horror"),
+  new Review("Get Out",              "Alice", 9,  "Socially brilliant"),
+  new Review("Knives Out",           "Bob",   8,  "Great fun"),
+  new Review("Knives Out",           "Carol", 9,  "Sharp writing"),
+  new Review("Interstellar",         "Carol", 8,  "Visually stunning"),
+  new Review("Interstellar",         "Dave",  7,  "Slightly overlong"),
+  new Review("Spirited Away",        "Alice", 10, "Miyazaki at his best"),
+  new Review("Spirited Away",        "Bob",   10, "Timeless masterpiece"),
+  new Review("Arrival",              "Bob",   9,  "Thoughtful sci-fi"),
+  new Review("Arrival",              "Carol", 8,  "Haunting and beautiful"),
+  new Review("Arrival",              "Dave",  9,  "Best sci-fi in years"),
+  new Review("Mad Max: Fury Road",   "Alice", 9,  "Non-stop adrenaline"),
+  new Review("Mad Max: Fury Road",   "Dave",  8,  "Visually inventive"),
+  new Review("Her",                  "Bob",   9,  "Tender and original"),
+  new Review("Her",                  "Carol", 8,  "Deeply affecting"),
+  new Review("A Quiet Place",        "Alice", 8,  "Inventive premise"),
+  new Review("A Quiet Place",        "Dave",  7,  "Tense but thin"),
+  new Review("Portrait of a Lady on Fire", "Carol", 10, "Achingly beautiful")
+]
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Movie Review Analyzer ===")
+  IO::println("")
+
+  // ── 1. All films with stats ───────────────────────────────────────────────
+  IO::println("--- All Films (sorted by avg rating) ---")
+  val allStats: List[MovieStats] = MOVIES.map { m -> computeStats(m.title(), REVIEWS) }
+  val sorted: List[MovieStats] = allStats.sortedBy { s -> 0.0 - s.avgScore() }
+  foreach s: MovieStats in sorted {
+    if s.reviewCount() > 0 {
+      val m: Movie? = MOVIES.find { mv -> mv.title() == s.title() } as Movie?
+      if m != null {
+        val titleCol = s.title().padR(34)
+        val avgCol = s.avgScore().fix1().padL(4)
+        val label = scoreLabel(s.avgScore())
+        IO::println("  #{titleCol} #{avgCol}  #{genreName(m.genre())}  [#{label}]")
+      }
+    }
+  }
+  IO::println("")
+
+  // ── 2. Genre summary ─────────────────────────────────────────────────────
+  IO::println("--- Films by Genre ---")
+  val genres: List[Genre] = [Genre::ACTION, Genre::COMEDY, Genre::DRAMA, Genre::SCIFI,
+                              Genre::HORROR, Genre::ANIMATION, Genre::DOCUMENTARY]
+  foreach g: Genre in genres {
+    val gMovies: List[Movie] = MOVIES.filter { m -> m.genre() == g }
+    if gMovies.size > 0 {
+      val label = genreName(g).padR(12)
+      val titles: List[String] = gMovies.map { m -> m.title() }
+      val joined = Strings::join(titles, ", ")
+      IO::println("  #{label} #{joined}")
+    }
+  }
+  IO::println("")
+
+  // ── 3. Director spotlight (2+ films) ─────────────────────────────────────
+  IO::println("--- Directors with Multiple Films ---")
+  val directors: List[String] = MOVIES
+    .filter { m -> m.director() != null }
+    .map { m -> m.director() as String }
+    .distinct()
+  foreach dir: String in directors {
+    val dirMovies: List[Movie] = MOVIES.filter { m -> m.director() == dir }
+    if dirMovies.size >= 2 {
+      val titles: List[String] = dirMovies.map { m -> m.title() }
+      val joined = Strings::join(titles, " | ")
+      IO::println("  #{dir}: #{joined}")
+    }
+  }
+  IO::println("")
+
+  // ── 4. Masterpieces (avg >= 9.5) ─────────────────────────────────────────
+  IO::println("--- Near-Perfect Films (avg >= 9.5) ---")
+  val masterpieces: List[MovieStats] = allStats
+    .filter { s -> s.avgScore() >= 9.5 }
+    .sortedBy { s -> 0.0 - s.avgScore() }
+  if masterpieces.size == 0 {
+    IO::println("  (none this collection)")
+  } else {
+    foreach s: MovieStats in masterpieces {
+      IO::println("  #{s.title().padR(34)} #{s.avgScore().fix1()}")
+    }
+  }
+  IO::println("")
+
+  // ── 5. Reviewer stats ────────────────────────────────────────────────────
+  IO::println("--- Reviewer Statistics ---")
+  val reviewers: List[String] = REVIEWS.map { r -> r.reviewer() }.distinct()
+  foreach reviewer: String in reviewers {
+    val rList: List[Review] = REVIEWS.filter { r -> r.reviewer() == reviewer }
+    val cnt = rList.size
+    val total: Int = rList.fold(0) { acc, r -> (acc as Int) + r.score() }
+    val avg: Double = (total as Double) / (cnt as Double)
+    val mn: Int = rList.fold(10) { acc, r -> val s = r.score(); if s < (acc as Int) { s } else { acc as Int } }
+    val mx: Int = rList.fold(0)  { acc, r -> val s = r.score(); if s > (acc as Int) { s } else { acc as Int } }
+    IO::println("  #{reviewer.padR(6)}  #{cnt} reviews  avg #{avg.fix1()}  range #{mn}–#{mx}")
+  }
+  IO::println("")
+
+  // ── 6. Nullable director check ───────────────────────────────────────────
+  IO::println("--- Films with Unknown Director ---")
+  val noDir: List[Movie] = MOVIES.filter { m -> m.director() == null }
+  if noDir.size == 0 {
+    IO::println("  (all directors known)")
+  } else {
+    foreach m: Movie in noDir {
+      IO::println("  #{m.title()}")
+    }
+  }
+  IO::println("")
+
+  // ── 7. Decade histogram ──────────────────────────────────────────────────
+  IO::println("--- Films by Decade ---")
+  foreach decade: Int in [2000, 2010, 2020] {
+    val cnt = MOVIES.count { m -> m.year() >= decade && m.year() < decade + 10 }
+    if cnt > 0 {
+      var bar: String = ""
+      var i: Int = 0
+      while i < cnt { bar = bar + "▪"; i++ }
+      IO::println("  #{decade}s  #{bar} (#{cnt})")
+    }
+  }
+  IO::println("")
+
+  // ── 8. Recursive score sum (verify pipeline fold) ────────────────────────
+  val totalViaFold: Int = REVIEWS.fold(0) { acc, r -> (acc as Int) + r.score() }
+  val totalViaRec: Int = sumScores(REVIEWS, 0)
+  val overallAvg: Double = (totalViaFold as Double) / (REVIEWS.size as Double)
+  IO::println("Summary: #{MOVIES.size} films · #{REVIEWS.size} reviews · overall avg #{overallAvg.fix1()}")
+  val checkOk = if totalViaFold == totalViaRec { "✓" } else { "✗" }
+  IO::println("Fold/recursion agreement: #{checkOk}")
+}

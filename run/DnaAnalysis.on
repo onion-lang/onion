@@ -1,0 +1,393 @@
+// DnaAnalysis.on — DNA sequence analysis: GC content, k-mer counting,
+// reverse complement, motif search, variant classification, and dinucleotide stats.
+// Exercises: sealed ADT enum with type-pattern select, records, extension methods
+// on String/Double/Int, do[List] for k-mer generation, classes, collection
+// pipelines (map/filter/fold/sortedBy/groupBy/partition/reduce/distinct/take),
+// foreach (k,v) on Map, string interpolation, try/catch, nullable handling.
+
+// ── Variant classification (sealed ADT enum) ──────────────────────────────
+
+enum Variant {
+  case Substitution(pos: Int, from_: String, to: String)
+  case Insertion(pos: Int, seq: String)
+  case Deletion(pos: Int, len: Int)
+}
+
+def variantDesc(v: Variant): String {
+  select v {
+    case s is Substitution: return "sub@#{s.pos()}: #{s.from_()}->#{s.to()}"
+    case i is Insertion:    return "ins@#{i.pos()}: +#{i.seq()}"
+    case d is Deletion:     return "del@#{d.pos()}: -#{d.len()}bp"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────
+
+record Sequence(name: String, bases: String)
+record KmerCount(kmer: String, count: Int)
+record NucFreq(a: Int, t: Int, g: Int, c: Int)
+
+// ── Extension methods on Double ───────────────────────────────────────────
+
+extension Double {
+  def r2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def pct(): String = (self * 100.0).r2() + "%"
+}
+
+// ── Extension methods on String ───────────────────────────────────────────
+
+extension String {
+  def gcContent(): Double {
+    if self.length() == 0 { return 0.0 }
+    var gc = 0
+    foreach i: Int in 0..<self.length() {
+      val b = self.charAt(i)
+      if b == 'G' || b == 'C' { gc = gc + 1 }
+    }
+    return (gc as Double) / self.length()
+  }
+
+  def complement(): String {
+    var result = ""
+    foreach i: Int in 0..<self.length() {
+      val b = self.charAt(i)
+      val c: String =
+        if b == 'A' { "T" }
+        else if b == 'T' { "A" }
+        else if b == 'G' { "C" }
+        else if b == 'C' { "G" }
+        else { "N" }
+      result = result + c
+    }
+    return result
+  }
+
+  def reverseComplement(): String {
+    var rev = ""
+    foreach i: Int in 0..<self.length() {
+      rev = self.charAt(self.length() - 1 - i) + rev
+    }
+    return rev.complement()
+  }
+
+  def countOccurrences(motif: String): Int {
+    val mlen = motif.length()
+    if mlen == 0 || self.length() < mlen { return 0 }
+    var count = 0
+    foreach i: Int in 0..<(self.length() - mlen + 1) {
+      if self.substring(i, i + mlen) == motif { count = count + 1 }
+    }
+    return count
+  }
+
+  def atContent(): Double = 1.0 - self.gcContent()
+
+  def rep(n: Int): String {
+    var s = ""
+    foreach i: Int in 1..n { s = s + self }
+    return s
+  }
+}
+
+// ── Nucleotide frequency computation ─────────────────────────────────────
+
+def nucFreq(bases: String): NucFreq {
+  var a = 0
+  var t = 0
+  var g = 0
+  var c = 0
+  foreach i: Int in 0..<bases.length() {
+    val b = bases.charAt(i)
+    select b {
+      case 'A': a = a + 1
+      case 'T': t = t + 1
+      case 'G': g = g + 1
+      case 'C': c = c + 1
+      else: {}
+    }
+  }
+  return new NucFreq(a, t, g, c)
+}
+
+// ── K-mer counting ────────────────────────────────────────────────────────
+
+def allKmers(s: String, k: Int): List[String] {
+  val result: List[String] = []
+  if k > s.length() { return result }
+  foreach i: Int in 0..<(s.length() - k + 1) {
+    result << s.substring(i, i + k)
+  }
+  return result
+}
+
+def topKmers(s: String, k: Int, n: Int): List[KmerCount] {
+  val kmers = allKmers(s, k)
+  val groups: Map[String, List[String]] = kmers.groupBy { km -> km }
+  val counts: List[KmerCount] = []
+  foreach (kmer, instances) in groups {
+    counts << new KmerCount(kmer as String, (instances as List[String]).size)
+  }
+  return counts.sortedBy { kc -> 0 - (kc as KmerCount).count() }.take(n)
+}
+
+// ── Motif positions ───────────────────────────────────────────────────────
+
+def findMotif(bases: String, motif: String): List[Int] {
+  val mlen = motif.length()
+  val positions: List[Int] = []
+  if mlen == 0 || bases.length() < mlen { return positions }
+  foreach i: Int in 0..<(bases.length() - mlen + 1) {
+    if bases.substring(i, i + mlen) == motif {
+      positions << (i + 1)
+    }
+  }
+  return positions
+}
+
+// ── Variant detection between two sequences ───────────────────────────────
+
+def detectVariants(ref: String, alt: String): List[Variant] {
+  val variants: List[Variant] = []
+  val minLen = if ref.length() < alt.length() { ref.length() } else { alt.length() }
+  foreach i: Int in 0..<minLen {
+    val r = ref.substring(i, i + 1)
+    val a = alt.substring(i, i + 1)
+    if r != a {
+      variants << new Substitution(i + 1, r, a)
+    }
+  }
+  if ref.length() < alt.length() {
+    variants << new Insertion(ref.length() + 1, alt.substring(ref.length()))
+  } else if ref.length() > alt.length() {
+    variants << new Deletion(alt.length() + 1, ref.length() - alt.length())
+  }
+  return variants
+}
+
+// ── SequenceAnalyzer class ────────────────────────────────────────────────
+
+class SequenceAnalyzer {
+  val seq_: Sequence
+
+public:
+  def this(s: Sequence) {
+    this.seq_ = s
+  }
+
+  def gcContent(): Double = seq_.bases().gcContent()
+  def atContent(): Double = seq_.bases().atContent()
+
+  def nucFrequency(): NucFreq = nucFreq(seq_.bases())
+
+  def topKmers(k: Int, n: Int): List[KmerCount] = topKmers(seq_.bases(), k, n)
+
+  def findMotif(motif: String): List[Int] = findMotif(seq_.bases(), motif)
+
+  def reverseComplement(): String = seq_.bases().reverseComplement()
+
+  def cpgIslands(): Int {
+    val bases = seq_.bases()
+    var count = 0
+    foreach i: Int in 0..<(bases.length() - 1) {
+      if bases.substring(i, i + 2) == "CG" { count = count + 1 }
+    }
+    return count
+  }
+
+  def summary(): String =
+    "#{seq_.name()} (#{seq_.bases().length()}bp) GC=#{gcContent().pct()} AT=#{atContent().pct()} CpG=#{cpgIslands()}"
+}
+
+// ── Genome class (collection of sequences) ────────────────────────────────
+
+class Genome {
+  val name_: String
+  val sequences_: List[Sequence]
+
+public:
+  def this(name: String, seqs: List[Sequence]) {
+    this.name_ = name
+    this.sequences_ = seqs
+  }
+
+  def name(): String = name_
+  def sequences(): List[Sequence] = sequences_
+
+  def totalBases(): Int =
+    sequences_.fold(0) { acc, s -> (acc as Int) + (s as Sequence).bases().length() }
+
+  def meanGC(): Double {
+    if sequences_.size == 0 { return 0.0 }
+    val total = sequences_.fold(0.0) { acc, s ->
+      (acc as Double) + (s as Sequence).bases().gcContent()
+    }
+    return (total as Double) / sequences_.size
+  }
+
+  def longestSeq(): Sequence? {
+    if sequences_.size == 0 { return null }
+    return sequences_.reduce { a, b ->
+      if (a as Sequence).bases().length() >= (b as Sequence).bases().length() { a } else { b }
+    } as Sequence?
+  }
+
+  def highGC(threshold: Double): List[Sequence] =
+    sequences_.filter { s -> (s as Sequence).bases().gcContent() > threshold }
+
+  def allMotifPositions(motif: String): Map[String, List[Int]] {
+    val result: Map[String, List[Int]] = [:]
+    foreach s: Sequence in sequences_ {
+      val positions = findMotif(s.bases(), motif)
+      if positions.size > 0 {
+        result[s.name()] = positions
+      }
+    }
+    return result
+  }
+}
+
+// ── Sample genome data ────────────────────────────────────────────────────
+
+val sequences: List[Sequence] = [
+  new Sequence("BRCA1_ex11", "ATGCGATCGATCGATCGATCGCGATCGCGATCGATCGATCGCGATCGATCGATCGATCGATCGATCG"),
+  new Sequence("TP53_ex5",   "GCGCATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"),
+  new Sequence("KRAS_ex2",   "ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGTGCCTTGACGATACAG"),
+  new Sequence("EGFR_ex19",  "ATGCGATCGCGATCGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"),
+  new Sequence("MYC_ex2",    "CAGCTGCTGCAGTCGCAGCAGCTGAAGCAGCTGCAGCAGCAGCAGCAGCAGCAGCAGATCCAGCAGCAG")
+]
+
+val genome = new Genome("HumanDemo", sequences)
+
+// ── Main report ───────────────────────────────────────────────────────────
+
+IO::println("=".rep(50))
+IO::println("Genome: #{genome.name()}")
+IO::println("Sequences: #{genome.sequences().size}")
+IO::println("Total bases: #{genome.totalBases()}")
+IO::println("Mean GC: #{genome.meanGC().pct()}")
+
+val longest = genome.longestSeq()
+if longest != null {
+  val ls = longest as Sequence
+  IO::println("Longest: #{ls.name()} (#{ls.bases().length()}bp)")
+}
+IO::println("=".rep(50))
+IO::println("")
+
+// Per-sequence analysis
+IO::println("--- Per-Sequence Analysis ---")
+foreach s: Sequence in sequences {
+  val analyzer = new SequenceAnalyzer(s)
+  IO::println(analyzer.summary())
+  val freq = analyzer.nucFrequency()
+  IO::println("  A=#{freq.a()} T=#{freq.t()} G=#{freq.g()} C=#{freq.c()}")
+  val top3 = analyzer.topKmers(3, 3)
+  foreach kc: Object in top3 {
+    val kc2 = kc as KmerCount
+    IO::print("  3-mer #{kc2.kmer()}:#{kc2.count()} ")
+  }
+  IO::println("")
+}
+
+// Reverse complement
+IO::println("")
+IO::println("--- Reverse Complements (first 25bp) ---")
+foreach s: Sequence in sequences {
+  val bases = s.bases()
+  val rc = bases.reverseComplement()
+  val preview = if rc.length() > 25 { rc.substring(0, 25) + "..." } else { rc }
+  IO::println("#{s.name()}: #{preview}")
+}
+
+// Motif search
+IO::println("")
+IO::println("--- Motif search: GATCG ---")
+val motifResults = genome.allMotifPositions("GATCG")
+foreach (seqName, positions) in motifResults {
+  IO::println("#{seqName}: " + (positions as List[Int]).toString())
+}
+
+// Partition by GC content
+IO::println("")
+IO::println("--- Partition by GC > 50% ---")
+val parts = sequences.partition { s -> (s as Sequence).bases().gcContent() > 0.5 }
+val highGC = parts.get(0) as List[Sequence]
+val lowGC  = parts.get(1) as List[Sequence]
+IO::println("High-GC (>50%): #{highGC.size}")
+foreach s: Sequence in highGC {
+  IO::println("  #{s.name()} GC=#{s.bases().gcContent().pct()}")
+}
+IO::println("Low-GC (<=50%): #{lowGC.size}")
+foreach s: Sequence in lowGC {
+  IO::println("  #{s.name()} GC=#{s.bases().gcContent().pct()}")
+}
+
+// do[List] for all 16 dinucleotides
+IO::println("")
+IO::println("--- All Dinucleotides (do[List]) ---")
+val nucleotides: List[String] = ["A", "T", "G", "C"]
+val dinucs: List[String] = do[List] {
+  a <- nucleotides
+  b <- nucleotides
+  ret a + b
+}
+IO::println("Generated #{dinucs.size} dinucleotides")
+
+// Count non-zero occurrences in KRAS
+val kras = sequences.get(2) as Sequence
+val dinucCounts: List[KmerCount] = []
+foreach dn: String in dinucs {
+  val n = kras.bases().countOccurrences(dn)
+  if n > 0 { dinucCounts << new KmerCount(dn, n) }
+}
+val sortedDinucs = dinucCounts.sortedBy { kc -> 0 - (kc as KmerCount).count() }.take(5)
+IO::println("Top dinucleotides in #{kras.name()}:")
+foreach kc: Object in sortedDinucs {
+  val kc2 = kc as KmerCount
+  IO::println("  #{kc2.kmer()}: #{kc2.count()}")
+}
+
+// Variant detection
+IO::println("")
+IO::println("--- Variant Detection ---")
+val ref = "ATGCGATCGATCGATCGATCG"
+val alt = "ATGCAATCGATCGATCGATCGCGT"
+IO::println("ref: #{ref}")
+IO::println("alt: #{alt}")
+val variants: List[Variant] = detectVariants(ref, alt)
+IO::println("variants found: #{variants.size}")
+foreach v: Object in variants {
+  IO::println("  " + variantDesc(v as Variant))
+}
+
+// Variant type distribution
+val subs    = variants.filter { v -> v is Substitution }
+val inserts = variants.filter { v -> v is Insertion }
+val dels    = variants.filter { v -> v is Deletion }
+IO::println("  substitutions=#{subs.size} insertions=#{inserts.size} deletions=#{dels.size}")
+
+// GC trend across sequences (fold)
+IO::println("")
+IO::println("--- GC Trend ---")
+val gcValues: List[Double] = sequences.map { s ->
+  (s as Sequence).bases().gcContent()
+}
+val maxGC = gcValues.reduce { a, b -> if (a as Double) >= (b as Double) { a } else { b } }
+val minGC = gcValues.reduce { a, b -> if (a as Double) <= (b as Double) { a } else { b } }
+IO::println("Max GC: #{(maxGC as Double).pct()}")
+IO::println("Min GC: #{(minGC as Double).pct()}")
+val gcRange = (maxGC as Double) - (minGC as Double)
+IO::println("GC range: #{gcRange.pct()}")
+
+// Distinct 2-mers found across all sequences
+IO::println("")
+IO::println("--- Distinct 2-mers across genome ---")
+val allDimers: List[String] = sequences
+  .map { s -> allKmers((s as Sequence).bases(), 2) }
+  .flatten()
+val distinctDimers = allDimers.distinct()
+IO::println("Distinct dimers: #{distinctDimers.size} / 16 possible")
+
+IO::println("")
+IO::println("=".rep(50))
+IO::println("Analysis complete.")

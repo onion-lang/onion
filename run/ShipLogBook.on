@@ -1,0 +1,314 @@
+// ShipLogBook.on — maritime voyage log analytics
+// Exercises: data-carrying enums, ADT enum, records with methods, interface,
+// class inheritance, extension methods (Int + Double), collection pipelines
+// (map / filter / fold / groupBy / sortedBy / distinct / find / partition),
+// select / pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while, foreach (ranges + maps).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CargoType(hazardous: Boolean, label: String) {
+  Grain(false,       "Grain"),
+  Fuel(true,         "Fuel"),
+  Timber(false,      "Timber"),
+  Chemicals(true,    "Chemicals"),
+  Electronics(false, "Electronics"),
+  Livestock(false,   "Livestock")
+}
+
+enum WeatherCode(severity: Int, desc: String) {
+  Clear(0,  "Clear"),
+  Cloudy(1, "Cloudy"),
+  Rain(2,   "Rain"),
+  Fog(3,    "Fog"),
+  Storm(4,  "Storm")
+}
+
+// ADT: operational status of a voyage
+enum VoyageStatus {
+  case Planned(departurePort: String)
+  case InTransit(progressPct: Int)
+  case Arrived(finalPort: String, daysAtSea: Int)
+  case Delayed(reason: String, extraDays: Int)
+public:
+  def shortLabel(): String = select this {
+    case p is Planned:   "Planned from #{p.departurePort()}"
+    case t is InTransit: "In Transit — #{t.progressPct()}%"
+    case a is Arrived:   "Arrived at #{a.finalPort()} (#{a.daysAtSea()} day(s))"
+    case d is Delayed:   "Delayed: #{d.reason()}, +#{d.extraDays()} day(s)"
+  }
+  def isComplete(): Boolean = select this {
+    case a is Arrived:   true
+    case p is Planned:   false
+    case t is InTransit: false
+    case d is Delayed:   false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Port(code: String, name: String, country: String) {
+public:
+  def label(): String = "#{code()} · #{name()}, #{country()}"
+}
+
+record Voyage(
+  id: String, vessel: String,
+  fromPort: String, toPort: String,
+  cargo: CargoType, tonnes: Int,
+  weather: WeatherCode, days: Int,
+  status: VoyageStatus
+) {
+public:
+  def route(): String        = "#{fromPort()}→#{toPort()}"
+  def isHazardous(): Boolean = cargo().hazardous()
+  def summary(): String =
+    "#{id()} [#{vessel()}] #{route()} | #{cargo().label()} #{tonnes()}t | #{weather().desc()} | #{days()}d"
+}
+
+record CrewMember(id: String, name: String, rank: String, voyagesDone: Int) {
+public:
+  def label(): String = "#{rank()} #{name()} (#{voyagesDone()} voyage(s))"
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def dayWord(): String = if self == 1 { "day"   } else { "days"   }
+  def tonWord(): String = if self == 1 { "tonne" } else { "tonnes" }
+  def bar10(): String {
+    val filled = self / 10
+    var s = ""
+    var i = 0
+    while i < 10 {
+      s = s + (if i < filled { "█" } else { "░" })
+      i = i + 1
+    }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val sc = (self * 10.0) as Int
+    val w  = sc / 10
+    val f  = sc % 10
+    return "" + w + "." + f
+  }
+}
+
+// ─── Base class ───────────────────────────────────────────────────────────────
+
+class ShipLogBase(val fleetName: String) {
+public:
+  def banner(): String = "=== #{fleetName} Fleet Log ==="
+}
+
+// ─── Fleet log class ──────────────────────────────────────────────────────────
+
+class ShipLog(
+  fleet: String,
+  val voyages: List[Voyage],
+  val crew: List[CrewMember],
+  val ports: List[Port]
+) extends ShipLogBase(fleet) conforms Reportable {
+public:
+  def report(): String =
+    "#{voyages.size} voyage(s), #{crew.size} crew, #{ports.size} port(s)"
+
+  def totalTonnes(): Int =
+    voyages.fold(0) { acc, v -> (acc as Int) + (v as Voyage).tonnes() }
+
+  def heaviest(): List[Voyage] =
+    voyages.sortedBy { v -> 0 - (v as Voyage).tonnes() }
+
+  def activePorts(): List[Port] =
+    ports.filter { p ->
+      val code = (p as Port).code()
+      voyages.find { v ->
+        (v as Voyage).fromPort() == code || (v as Voyage).toPort() == code
+      } != null
+    }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Recursive: sum days over a voyage list slice
+def sumDays(vs: List[Voyage], idx: Int): Int {
+  if idx >= vs.size { return 0 }
+  val v = vs.get(idx) as Voyage
+  return v.days() + sumDays(vs, idx + 1)
+}
+
+// Safe Int parse
+def safeInt(s: String): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch e: Exception {
+    return -1
+  }
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+val ports: List[Port] = [
+  new Port("SOT", "Southampton", "UK"),
+  new Port("HAM", "Hamburg",     "DE"),
+  new Port("RTM", "Rotterdam",   "NL"),
+  new Port("SIN", "Singapore",   "SG"),
+  new Port("SHA", "Shanghai",    "CN"),
+  new Port("NYK", "New York",    "US")
+]
+
+val voyages: List[Voyage] = [
+  new Voyage("V001","MV Aurora", "SOT","HAM", CargoType::Electronics, 1800, WeatherCode::Clear,  4,  new Arrived("HAM",4)),
+  new Voyage("V002","MV Crest",  "HAM","RTM", CargoType::Grain,       4200, WeatherCode::Rain,   2,  new Arrived("RTM",2)),
+  new Voyage("V003","MV Horizon","RTM","SIN", CargoType::Fuel,        6500, WeatherCode::Storm,  18, new Delayed("engine fault",3)),
+  new Voyage("V004","MV Aurora", "SIN","SHA", CargoType::Electronics, 2100, WeatherCode::Cloudy, 5,  new Arrived("SHA",5)),
+  new Voyage("V005","MV Crest",  "SHA","NYK", CargoType::Timber,      5300, WeatherCode::Fog,    14, new InTransit(60)),
+  new Voyage("V006","MV Horizon","NYK","SOT", CargoType::Chemicals,   3800, WeatherCode::Clear,  7,  new Planned("NYK")),
+  new Voyage("V007","MV Delphi", "SOT","RTM", CargoType::Livestock,    900, WeatherCode::Clear,  2,  new Arrived("RTM",2)),
+  new Voyage("V008","MV Delphi", "RTM","HAM", CargoType::Grain,       3100, WeatherCode::Rain,   3,  new Arrived("HAM",3)),
+  new Voyage("V009","MV Aurora", "HAM","SHA", CargoType::Fuel,        7200, WeatherCode::Storm,  22, new Arrived("SHA",22)),
+  new Voyage("V010","MV Crest",  "SHA","SIN", CargoType::Electronics, 2400, WeatherCode::Clear,  4,  new InTransit(30))
+]
+
+val crew: List[CrewMember] = [
+  new CrewMember("C01","James Webb",   "Captain",       14),
+  new CrewMember("C02","Lily Matsuda", "First Officer",  9),
+  new CrewMember("C03","Omar Hassan",  "Engineer",       7),
+  new CrewMember("C04","Priya Singh",  "Navigator",     11),
+  new CrewMember("C05","Tom Eriksson", "Bosun",          5),
+  new CrewMember("C06","Ana Costa",    "Cook",           3)
+]
+
+val log = new ShipLog("Pacific-Atlantic", voyages, crew, ports)
+
+// ─── Analysis ─────────────────────────────────────────────────────────────────
+
+IO::println(log.banner())
+IO::println(log.report())
+IO::println("")
+
+// 1. Voyage status list (ADT select inside shortLabel / isComplete)
+IO::println("── Voyage Status ──")
+foreach v: Voyage in voyages {
+  val tick = if v.status().isComplete() { "✓" } else { "·" }
+  IO::println("  #{tick} #{v.id()}: #{v.status().shortLabel()}")
+}
+IO::println("")
+
+// 2. Cargo type breakdown (groupBy + fold + extension)
+IO::println("── Cargo Breakdown ──")
+val byType = voyages.groupBy { v -> (v as Voyage).cargo().label() }
+foreach (cLabel, vs) in byType {
+  val vList = vs as List
+  val t = vList.fold(0) { acc, v -> (acc as Int) + (v as Voyage).tonnes() }
+  IO::println("  #{cLabel}: #{vList.size} voyage(s), #{t} #{(t as Int).tonWord()}")
+}
+IO::println("")
+
+// 3. Top 3 heaviest cargoes (sortedBy + while)
+IO::println("── Top 3 by Tonnage ──")
+val top3 = log.heaviest()
+var ri = 0
+while ri < 3 {
+  val v = top3.get(ri) as Voyage
+  IO::println("  ##{ri + 1}. #{v.id()} (#{v.vessel()}): #{v.tonnes()} #{v.tonnes().tonWord()}")
+  ri = ri + 1
+}
+IO::println("")
+
+// 4. Hazardous vs safe partition
+IO::println("── Cargo Safety ──")
+val parts  = voyages.partition { v -> (v as Voyage).isHazardous() }
+val hazard = parts.get(0) as List
+val safe   = parts.get(1) as List
+IO::println("  Hazardous cargoes: #{hazard.size}")
+IO::println("  Safe cargoes:      #{safe.size}")
+IO::println("")
+
+// 5. Days at sea per vessel (groupBy + recursion)
+IO::println("── Days at Sea per Vessel ──")
+val byVessel = voyages.groupBy { v -> (v as Voyage).vessel() }
+foreach (vessel, vs) in byVessel {
+  val vList = vs as List
+  val days  = sumDays(vList as List[Voyage], 0)
+  IO::println("  #{vessel}: #{days} #{days.dayWord()}")
+}
+IO::println("")
+
+// 6. Active ports (filter + find / nullable check)
+IO::println("── Active Ports ──")
+val active = log.activePorts()
+foreach p: Port in active {
+  IO::println("  #{p.label()}")
+}
+IO::println("")
+
+// 7. Weather severity scale (foreach range + extension bar10)
+IO::println("── Weather Severity Scale ──")
+foreach sev: Int in 0..4 {
+  val pct = sev * 25
+  IO::println("  Severity #{sev}: #{pct.bar10()} #{pct}%")
+}
+IO::println("")
+
+// 8. Crew sorted by experience (sortedBy + foreach)
+IO::println("── Crew Roster (most experienced first) ──")
+val byCrew = crew.sortedBy { c -> 0 - (c as CrewMember).voyagesDone() }
+foreach c: CrewMember in byCrew {
+  IO::println("  #{c.label()}")
+}
+IO::println("")
+
+// 9. Distinct cargo types used (map + distinct + sortedBy)
+IO::println("── Cargo Types in Log ──")
+val cargoLabels = voyages
+  .map     { v -> (v as Voyage).cargo().label() }
+  .distinct()
+  .sortedBy { s -> s as String }
+IO::println("  " + cargoLabels.toString())
+IO::println("")
+
+// 10. Fleet totals (fold + Double extension)
+IO::println("── Fleet Totals ──")
+val total   = log.totalTonnes()
+val allDays = sumDays(voyages as List[Voyage], 0)
+val avg     = (total as Double) / voyages.size
+IO::println("  Tonnage:           #{total} #{total.tonWord()}")
+IO::println("  Sea-days:          #{allDays} #{allDays.dayWord()}")
+IO::println("  Avg tonnes/voyage: #{avg.fmt1()}")
+IO::println("")
+
+// 11. Nullable voyage lookup
+IO::println("── Voyage Lookup ──")
+val found = voyages.find { v -> (v as Voyage).id() == "V005" }
+if found != null {
+  IO::println("  V005: " + (found as Voyage).summary())
+} else {
+  IO::println("  V005: not found")
+}
+val notFound = voyages.find { v -> (v as Voyage).id() == "V999" }
+IO::println("  V999: " + (if notFound != null { (notFound as Voyage).id() } else { "not found" }))
+IO::println("")
+
+// 12. Safe parse demo
+IO::println("── safeInt tests ──")
+val p1 = safeInt("42")
+val p2 = safeInt("oops")
+IO::println("  '42'   → #{p1}")
+IO::println("  'oops' → #{p2}")
+IO::println("")
+
+// 13. Completion rate (filter + bar10 extension)
+IO::println("── Completion Rate ──")
+val done = voyages.filter { v -> (v as Voyage).status().isComplete() }
+val pct  = done.size * 100 / voyages.size
+IO::println("  #{done.size} of #{voyages.size} completed  #{pct.bar10()}  #{pct}%")

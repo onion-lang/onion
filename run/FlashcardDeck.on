@@ -93,9 +93,10 @@ public:
 
 // ─── ReviewEntry record ───────────────────────────────────────────────────────
 
-record ReviewEntry(cardId: Int, result: ReviewResult, intervalAfter: Int)
+record ReviewEntry(cardId: Int, result: ReviewResult, intervalAfter: Int) {
   example { new ReviewEntry(1, new Good(1), 3).intervalAfter() == 3 }
   example { new ReviewEntry(2, new Easy(2), 12).result().score() == 5 }
+}
 
 // ─── DeckStats record ─────────────────────────────────────────────────────────
 

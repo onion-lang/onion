@@ -112,14 +112,17 @@ public:
 }
 
 // ─── Records ──────────────────────────────────────────────────────────────────
-record TerrainCell(x: Int, y: Int, height: Double, biome: Biome)
+record TerrainCell(x: Int, y: Int, height: Double, biome: Biome) {
   example { new TerrainCell(0, 0, 0.5, new Plains()).biome().elevation() == 3 }
+}
 
-record BiomeStat(biomeLabel: String, count: Int, barLen: Int)
+record BiomeStat(biomeLabel: String, count: Int, barLen: Int) {
   example { new BiomeStat("Ocean", 10, 5).count() == 10 }
+}
 
-record PathResult(found: Boolean, steps: Int)
+record PathResult(found: Boolean, steps: Int) {
   example { !new PathResult(false, -1).found() }
+}
 
 // ─── Height-map helpers ───────────────────────────────────────────────────────
 def generateRaw(rng: LCG, size: Int): Double[] {

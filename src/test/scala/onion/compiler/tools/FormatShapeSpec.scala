@@ -18,8 +18,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("reads a document into a record") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
@@ -35,8 +36,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("round-trips: parse(print(v)) == Ok(v)") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Boolean {
@@ -53,8 +55,9 @@ class FormatShapeSpec extends AbstractShellSpec {
       // derive!(Json) returns a record with a null non-nullable String field here.
       val r = shell.run(
         """
-          |record Person(name: String, age: Int)
+          |record Person(name: String, age: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -70,8 +73,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("reports every missing key at once") {
       val r = shell.run(
         """
-          |record Person(name: String, age: Int)
+          |record Person(name: String, age: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
@@ -87,8 +91,9 @@ class FormatShapeSpec extends AbstractShellSpec {
       // away; a shape turns it into a position.
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -104,8 +109,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("reports a wrongly-typed value as a defect") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -124,8 +130,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("round-trips a flat document") {
       val r = shell.run(
         """
-          |record Cfg(host: String, port: Int)
+          |record Cfg(host: String, port: Int) {
           |  shape doc = yaml
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): Boolean {
@@ -144,9 +151,10 @@ class FormatShapeSpec extends AbstractShellSpec {
       // The thing `from re"..." derive!(Json)` can do only with fixed names, one each.
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape text = re"(-?\d+),(-?\d+)"
           |  shape doc = json
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -164,8 +172,9 @@ class FormatShapeSpec extends AbstractShellSpec {
     it("is rejected at compile time, listing what is supported") {
       val r = shell.run(
         """
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  shape doc = toml
+          |}
           |class Test {
           |public:
           |  static def main(args: String[]): String { return "ok" }

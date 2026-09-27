@@ -1,0 +1,345 @@
+// DiceStats.on — Dice Statistics Simulator
+// Simulates RPG dice rolls, computes frequency distributions,
+// compares Normal / Advantage / Disadvantage / Exploding mechanics,
+// and renders ASCII histograms.
+//
+// Exercises: ADT enums (zero-field + data-carrying cases), records with
+// methods, extension methods on Int/Double/String, collection pipelines
+// (groupBy/sortedBy/filter/map/fold), closures, string interpolation #{},
+// foreach (ranges + maps), select/pattern-matching, do[Option] notation,
+// |> pipeline, try/catch, while loops, nullable.
+
+import { java.lang.Math }
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def pctStr(total: Int): String {
+    if total == 0 { return "0.0%" }
+    return Format::fixed(self as Double * 100.0 / total as Double, 1) + "%"
+  }
+  def hashBar(total: Int, width: Int): String {
+    val len = if total == 0 { 0 } else {
+      (self as Double / total as Double * width as Double) as Int
+    }
+    var s: String = ""
+    foreach _i: Int in 0..<len { s = s + "#" }
+    return s
+  }
+}
+
+extension Double {
+  def fmt2(): String = Format::fixed(self, 2)
+}
+
+extension String {
+  def padL(width: Int): String {
+    var r = self
+    while r.length() < width { r = " " + r }
+    return r
+  }
+  def padR(width: Int): String {
+    var r = self
+    while r.length() < width { r = r + " " }
+    return r
+  }
+}
+
+// ── DieType ADT enum ───────────────────────────────────────────────────────
+
+enum DieType {
+  case D4
+  case D6
+  case D8
+  case D10
+  case D12
+  case D20
+  case Custom(numFaces: Int)
+public:
+  def faces(): Int = select this {
+    case _d is D4:    4
+    case _d is D6:    6
+    case _d is D8:    8
+    case _d is D10:   10
+    case _d is D12:   12
+    case _d is D20:   20
+    case c is Custom: c.numFaces()
+  }
+  def label(): String = select this {
+    case _d is D4:    "d4"
+    case _d is D6:    "d6"
+    case _d is D8:    "d8"
+    case _d is D10:   "d10"
+    case _d is D12:   "d12"
+    case _d is D20:   "d20"
+    case c is Custom: "d#{c.numFaces()}"
+  }
+  def expected(): Double = (faces() + 1) as Double / 2.0
+}
+
+// ── Mechanic ADT enum ──────────────────────────────────────────────────────
+
+enum Mechanic {
+  case Normal
+  case Advantage
+  case Disadvantage
+  case Exploding
+public:
+  def label(): String = select this {
+    case _n is Normal:       "Normal"
+    case _a is Advantage:    "Advantage"
+    case _d is Disadvantage: "Disadvantage"
+    case _e is Exploding:    "Exploding"
+  }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record FreqBucket(value: Int, count: Int) {
+public:
+  def pctStr(total: Int): String = count().pctStr(total)
+  def barStr(total: Int): String = count().hashBar(total, 28)
+  def describe(total: Int): String =
+    "  #{(value() + "").padL(4)} | #{barStr(total)} #{pctStr(total)}"
+}
+
+record RollSummary(die: DieType, mechanic: Mechanic, n: Int,
+                   mean: Double, stddev: Double,
+                   minimum: Int, maximum: Int) {
+public:
+  def header(): String =
+    "── #{die().label()} #{mechanic().label()} (#{n()} rolls) ──"
+  def stats(): String =
+    "   mean=#{mean().fmt2()}  std=#{stddev().fmt2()}" +
+    "  min=#{minimum()}  max=#{maximum()}" +
+    "  expected=#{die().expected().fmt2()}"
+}
+
+// ── Roller class ───────────────────────────────────────────────────────────
+
+class Roller {
+  val die: DieType
+  val mechanic: Mechanic
+
+public:
+  def this(d: DieType, m: Mechanic) {
+    self.die      = d
+    self.mechanic = m
+  }
+
+  def rollOnce(): Int {
+    val f = die.faces()
+    return select self.mechanic {
+      case _n is Normal:
+        Rand::nextInt(f) + 1
+      case _a is Advantage: {
+        val r1 = Rand::nextInt(f) + 1
+        val r2 = Rand::nextInt(f) + 1
+        if r1 > r2 { r1 } else { r2 }
+      }
+      case _d is Disadvantage: {
+        val r1 = Rand::nextInt(f) + 1
+        val r2 = Rand::nextInt(f) + 1
+        if r1 < r2 { r1 } else { r2 }
+      }
+      case _e is Exploding: {
+        var total: Int = 0
+        var cont: Boolean = true
+        while cont {
+          val r = Rand::nextInt(f) + 1
+          total = total + r
+          cont = r == f
+        }
+        total
+      }
+    }
+  }
+
+  def simulate(n: Int): List[Int] {
+    val results: List[Int] = []
+    foreach _i: Int in 0..<n { results.add(rollOnce()) }
+    return results
+  }
+}
+
+// ── Analysis ───────────────────────────────────────────────────────────────
+
+def computeSummary(die: DieType, mech: Mechanic, results: List[Int]): RollSummary {
+  val n = results.size
+  if n == 0 {
+    return new RollSummary(die, mech, 0, 0.0, 0.0, 0, 0)
+  }
+  var sum: Int = 0
+  var minV: Int = results[0] as Int
+  var maxV: Int = results[0] as Int
+  foreach v: Int in results {
+    sum = sum + v
+    if v < minV { minV = v }
+    if v > maxV { maxV = v }
+  }
+  val mean = sum as Double / n as Double
+  var varAcc: Double = 0.0
+  foreach v: Int in results {
+    val d = v as Double - mean
+    varAcc = varAcc + d * d
+  }
+  val std = Math::sqrt(varAcc / n as Double)
+  return new RollSummary(die, mech, n, mean, std, minV, maxV)
+}
+
+def buildFreqTable(results: List[Int]): List[FreqBucket] {
+  val groups = results.groupBy { v -> v }
+  val buckets: List[FreqBucket] = []
+  foreach (k, lst) in groups {
+    buckets.add(new FreqBucket(k as Int, (lst as List[Int]).size))
+  }
+  return buckets.sortedBy { b: FreqBucket -> b.value() }
+}
+
+// ── do[Option] helpers ─────────────────────────────────────────────────────
+
+def toOpt(fb: FreqBucket?): Option[FreqBucket] =
+  if fb == null { Option::none() } else { Option::some(fb) }
+
+def findPeak(table: List[FreqBucket]): FreqBucket? {
+  if table.size == 0 { return null }
+  var best: FreqBucket = table[0] as FreqBucket
+  foreach b: FreqBucket in table {
+    if b.count() > best.count() { best = b }
+  }
+  return best
+}
+
+def findValley(table: List[FreqBucket]): FreqBucket? {
+  if table.size == 0 { return null }
+  var worst: FreqBucket = table[0] as FreqBucket
+  foreach b: FreqBucket in table {
+    if b.count() < worst.count() { worst = b }
+  }
+  return worst
+}
+
+def peakAndValleyStr(table: List[FreqBucket]): Option[String] =
+  do[Option] {
+    peak   <- toOpt(findPeak(table))
+    valley <- toOpt(findValley(table))
+    ret "   mode=#{peak.value()} (#{peak.count()} hits)  least=#{valley.value()} (#{valley.count()} hits)"
+  }
+
+// ── Display ────────────────────────────────────────────────────────────────
+
+def displayReport(summary: RollSummary, table: List[FreqBucket]): void {
+  IO::println(summary.header())
+  IO::println(summary.stats())
+  val n = summary.n()
+  foreach b: FreqBucket in table {
+    IO::println(b.describe(n))
+  }
+  val pv = peakAndValleyStr(table)
+  if pv != null { IO::println(pv.get()) }
+  IO::println("")
+}
+
+def nonzero(table: List[FreqBucket]): List[FreqBucket] =
+  table.filter { b: FreqBucket -> b.count() > 0 }
+
+def runDemo(d: DieType, m: Mechanic, n: Int): void {
+  val roller  = new Roller(d, m)
+  val results = roller.simulate(n)
+  val summary = computeSummary(d, m, results)
+  val table   = buildFreqTable(results) |> nonzero
+  displayReport(summary, table)
+}
+
+// ── Mechanic comparison ────────────────────────────────────────────────────
+
+def compareMechanics(d: DieType, n: Int): void {
+  IO::println("=== Comparing mechanics on #{d.label()} (#{n} rolls each) ===")
+  IO::println("")
+  val mechs: List[Mechanic] = [new Normal(), new Advantage(), new Disadvantage(), new Exploding()]
+  foreach m: Mechanic in mechs {
+    val roller  = new Roller(d, m)
+    val results = roller.simulate(n)
+    val summary = computeSummary(d, m, results)
+    val bias    = (summary.mean() - d.expected()).fmt2()
+    IO::println("  #{m.label().padR(15)} mean=#{summary.mean().fmt2()}  bias=#{bias}  std=#{summary.stddev().fmt2()}")
+  }
+  IO::println("")
+}
+
+// ── Dice pool ──────────────────────────────────────────────────────────────
+
+def dicePoolDemo(count: Int, die: DieType, rolls: Int): void {
+  IO::println("=== #{count}x#{die.label()} pool (#{rolls} rolls) ===")
+  IO::println("")
+  val r = new Roller(die, new Normal())
+  val results: List[Int] = []
+  foreach _i: Int in 0..<rolls {
+    var total: Int = 0
+    foreach _j: Int in 0..<count { total = total + r.rollOnce() }
+    results.add(total)
+  }
+  val summary     = computeSummary(die, new Normal(), results)
+  val theoretical = die.expected() * count as Double
+  IO::println("  mean=#{summary.mean().fmt2()}  theoretical=#{Format::fixed(theoretical, 2)}  std=#{summary.stddev().fmt2()}")
+  IO::println("  min=#{summary.minimum()}  max=#{summary.maximum()}")
+  IO::println("")
+}
+
+// ── Custom die and error handling ──────────────────────────────────────────
+
+def customDieDemo(): void {
+  IO::println("=== Custom d13 Exploding ===")
+  IO::println("")
+  val roller  = new Roller(new Custom(13), new Exploding())
+  val results = roller.simulate(400)
+  val summary = computeSummary(new Custom(13), new Exploding(), results)
+  val table   = buildFreqTable(results).filter { b: FreqBucket -> b.count() >= 3 }
+  IO::println("  d13 Exploding: mean=#{summary.mean().fmt2()}  std=#{summary.stddev().fmt2()}")
+  IO::println("  distinct values (>=3 hits): #{table.size}")
+  IO::println("")
+
+  IO::println("=== Parsing dice notation (try/catch) ===")
+  IO::println("")
+  foreach attempt: String in ["d6", "d20", "dXX", "d0"] {
+    try {
+      val suffix = attempt.substring(1)
+      val n      = Integer::parseInt(suffix)
+      if n <= 0 { throw new IllegalArgumentException("sides must be > 0") }
+      val s = computeSummary(new Custom(n), new Normal(), new Roller(new Custom(n), new Normal()).simulate(200))
+      IO::println("  #{attempt}: mean=#{s.mean().fmt2()}")
+    } catch e: Exception {
+      IO::println("  #{attempt}: error — #{e.message()}")
+    }
+  }
+  IO::println("")
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("╔══════════════════════════════════════════╗")
+  IO::println("║       Dice Statistics Simulator          ║")
+  IO::println("╚══════════════════════════════════════════╝")
+  IO::println("")
+
+  IO::println("=== Section 1: Standard dice histograms ===")
+  IO::println("")
+  runDemo(new D6(), new Normal(), 600)
+  runDemo(new D20(), new Normal(), 2000)
+
+  compareMechanics(new D20(), 800)
+
+  IO::println("=== Section 3: Exploding dice ===")
+  IO::println("")
+  runDemo(new D6(), new Exploding(), 500)
+  runDemo(new D12(), new Exploding(), 500)
+
+  dicePoolDemo(2, new D6(), 1000)
+  dicePoolDemo(3, new D6(), 1000)
+  dicePoolDemo(4, new D4(), 1000)
+
+  customDieDemo()
+
+  IO::println("Done.")
+}

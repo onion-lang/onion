@@ -1,0 +1,294 @@
+// GradeBook.on — Course grade management with weighted averages, statistics, and reports
+
+import {
+  java.lang.Math
+}
+
+// ADT enum for letter grades — each case carries the minimum cutoff score
+enum LetterGrade {
+  case A(minScore: Double)
+  case B(minScore: Double)
+  case C(minScore: Double)
+  case D(minScore: Double)
+  case F(minScore: Double)
+
+  public:
+  def label(): String = select this {
+    case g is A: "A"
+    case g is B: "B"
+    case g is C: "C"
+    case g is D: "D"
+    case g is F: "F"
+  }
+
+  def gpaPoints(): Double = select this {
+    case g is A: 4.0
+    case g is B: 3.0
+    case g is C: 2.0
+    case g is D: 1.0
+    case g is F: 0.0
+  }
+
+  static def fromScore(score: Double): LetterGrade =
+    if score >= 90.0 { new A(90.0) }
+    else if score >= 80.0 { new B(80.0) }
+    else if score >= 70.0 { new C(70.0) }
+    else if score >= 60.0 { new D(60.0) }
+    else { new F(0.0) }
+}
+
+// A single graded item (quiz, exam, homework, midterm, final)
+record Assignment(name: String, category: String, score: Double, maxScore: Double, weight: Double)
+
+// Represents one student in the system
+record Student(id: Int, name: String, major: String)
+
+// Enrollment ties a student to a set of assignments in one course
+class Enrollment {
+  val student: Student
+  var assignments: List[Assignment]
+
+  public:
+  def this(s: Student) {
+    self.student = s
+    self.assignments = ([] as List[Assignment])
+  }
+
+  def getStudent(): Student = student
+
+  def addAssignment(a: Assignment): void {
+    assignments.add(a)
+  }
+
+  def weightedAverage(): Double {
+    if assignments.isEmpty { return 0.0 }
+    var totalWeight: Double = 0.0
+    var totalPoints: Double = 0.0
+    foreach a: Assignment in assignments {
+      totalWeight = totalWeight + a.weight()
+      totalPoints = totalPoints + (a.score() / a.maxScore()) * 100.0 * a.weight()
+    }
+    if totalWeight == 0.0 { return 0.0 }
+    return totalPoints / totalWeight
+  }
+
+  def letterGrade(): LetterGrade = LetterGrade::fromScore(weightedAverage())
+
+  def gpa(): Double = letterGrade().gpaPoints()
+
+  def isPassing(): Boolean = weightedAverage() >= 60.0
+
+  def summary(): String =
+    "#{student.name()} (#{student.major()}) — avg=#{weightedAverage()} letter=#{letterGrade().label()}"
+}
+
+// A course holds multiple enrollments and knows its own assignment weights
+class Course {
+  val courseId: String
+  val title: String
+  val instructor: String
+  var enrollments: List[Enrollment]
+
+  public:
+  def this(id: String, title: String, instructor: String) {
+    self.courseId = id
+    self.title = title
+    self.instructor = instructor
+    self.enrollments = ([] as List[Enrollment])
+  }
+
+  def enroll(s: Student): Enrollment {
+    val e: Enrollment = new Enrollment(s)
+    enrollments.add(e)
+    return e
+  }
+
+  def findEnrollment(studentId: Int): Enrollment? {
+    foreach e: Enrollment in enrollments {
+      if e.getStudent().id() == studentId { return e }
+    }
+    return null
+  }
+
+  def size(): Int = enrollments.size
+
+  def classAverage(): Double {
+    if enrollments.isEmpty { return 0.0 }
+    var total: Double = 0.0
+    foreach e: Enrollment in enrollments {
+      total = total + e.weightedAverage()
+    }
+    return total / enrollments.size
+  }
+
+  def highestAverage(): Double {
+    if enrollments.isEmpty { return 0.0 }
+    var best: Double = 0.0
+    foreach e: Enrollment in enrollments {
+      val avg: Double = e.weightedAverage()
+      if avg > best { best = avg }
+    }
+    return best
+  }
+
+  def lowestAverage(): Double {
+    if enrollments.isEmpty { return 100.0 }
+    var worst: Double = 100.0
+    foreach e: Enrollment in enrollments {
+      val avg: Double = e.weightedAverage()
+      if avg < worst { worst = avg }
+    }
+    return worst
+  }
+
+  def passingCount(): Int {
+    var count: Int = 0
+    foreach e: Enrollment in enrollments {
+      if e.isPassing() { count++ }
+    }
+    return count
+  }
+
+  def gradeDistribution(): Map[String, Int] {
+    val dist: Map[String, Int] = ["A": 0, "B": 0, "C": 0, "D": 0, "F": 0]
+    foreach e: Enrollment in enrollments {
+      val label: String = e.letterGrade().label()
+      val cur: Int = (dist[label] as Int)
+      dist[label] = cur + 1
+    }
+    return dist
+  }
+
+  def printReport(): void {
+    IO::println("=================================================")
+    IO::println("Course: #{title} (#{courseId})")
+    IO::println("Instructor: #{instructor}")
+    IO::println("Enrolled: #{size()} student(s)")
+    IO::println("-------------------------------------------------")
+    val avg: Double = classAverage()
+    IO::println("Class average : #{avg}")
+    IO::println("Highest score : #{highestAverage()}")
+    IO::println("Lowest score  : #{lowestAverage()}")
+    IO::println("Passing       : #{passingCount()} / #{size()}")
+    IO::println("-------------------------------------------------")
+    IO::println("Grade distribution:")
+    val dist: Map[String, Int] = gradeDistribution()
+    foreach (grade, cnt) in dist {
+      IO::println("  #{grade}: #{cnt}")
+    }
+    IO::println("-------------------------------------------------")
+    IO::println("Student roster:")
+    foreach e: Enrollment in enrollments {
+      IO::println("  " + e.summary())
+    }
+    IO::println("=================================================")
+  }
+}
+
+// Helper to round to 2 decimal places for display
+def round2(v: Double): Double = Math::floor(v * 100.0 + 0.5) / 100.0
+
+def main(): void {
+  // Set up courses
+  val cs101: Course = new Course("CS101", "Intro to Computer Science", "Dr. Smith")
+  val math201: Course = new Course("MATH201", "Linear Algebra", "Prof. Chen")
+
+  // Create students
+  val alice: Student = new Student(1, "Alice", "CS")
+  val bob: Student = new Student(2, "Bob", "Math")
+  val carol: Student = new Student(3, "Carol", "CS")
+  val dave: Student = new Student(4, "Dave", "Physics")
+  val eve: Student = new Student(5, "Eve", "CS")
+
+  // Enroll students in CS101
+  val eAlice: Enrollment = cs101.enroll(alice)
+  val eBob: Enrollment = cs101.enroll(bob)
+  val eCarol: Enrollment = cs101.enroll(carol)
+  val eDave: Enrollment = cs101.enroll(dave)
+  val eEve: Enrollment = cs101.enroll(eve)
+
+  // Add assignments for CS101 (weights: hw=30%, midterm=30%, final=40%)
+  eAlice.addAssignment(new Assignment("HW1", "homework", 95.0, 100.0, 10.0))
+  eAlice.addAssignment(new Assignment("HW2", "homework", 88.0, 100.0, 10.0))
+  eAlice.addAssignment(new Assignment("HW3", "homework", 92.0, 100.0, 10.0))
+  eAlice.addAssignment(new Assignment("Midterm", "exam", 87.0, 100.0, 30.0))
+  eAlice.addAssignment(new Assignment("Final", "exam", 91.0, 100.0, 40.0))
+
+  eBob.addAssignment(new Assignment("HW1", "homework", 70.0, 100.0, 10.0))
+  eBob.addAssignment(new Assignment("HW2", "homework", 75.0, 100.0, 10.0))
+  eBob.addAssignment(new Assignment("HW3", "homework", 68.0, 100.0, 10.0))
+  eBob.addAssignment(new Assignment("Midterm", "exam", 72.0, 100.0, 30.0))
+  eBob.addAssignment(new Assignment("Final", "exam", 78.0, 100.0, 40.0))
+
+  eCarol.addAssignment(new Assignment("HW1", "homework", 100.0, 100.0, 10.0))
+  eCarol.addAssignment(new Assignment("HW2", "homework", 98.0, 100.0, 10.0))
+  eCarol.addAssignment(new Assignment("HW3", "homework", 95.0, 100.0, 10.0))
+  eCarol.addAssignment(new Assignment("Midterm", "exam", 96.0, 100.0, 30.0))
+  eCarol.addAssignment(new Assignment("Final", "exam", 99.0, 100.0, 40.0))
+
+  eDave.addAssignment(new Assignment("HW1", "homework", 50.0, 100.0, 10.0))
+  eDave.addAssignment(new Assignment("HW2", "homework", 45.0, 100.0, 10.0))
+  eDave.addAssignment(new Assignment("HW3", "homework", 55.0, 100.0, 10.0))
+  eDave.addAssignment(new Assignment("Midterm", "exam", 48.0, 100.0, 30.0))
+  eDave.addAssignment(new Assignment("Final", "exam", 52.0, 100.0, 40.0))
+
+  eEve.addAssignment(new Assignment("HW1", "homework", 82.0, 100.0, 10.0))
+  eEve.addAssignment(new Assignment("HW2", "homework", 79.0, 100.0, 10.0))
+  eEve.addAssignment(new Assignment("HW3", "homework", 85.0, 100.0, 10.0))
+  eEve.addAssignment(new Assignment("Midterm", "exam", 80.0, 100.0, 30.0))
+  eEve.addAssignment(new Assignment("Final", "exam", 83.0, 100.0, 40.0))
+
+  // Print CS101 report
+  cs101.printReport()
+
+  // Enroll some students in Math201
+  val eBobMath: Enrollment = math201.enroll(bob)
+  val eAliceMath: Enrollment = math201.enroll(alice)
+  val eDaveMath: Enrollment = math201.enroll(dave)
+
+  eBobMath.addAssignment(new Assignment("Quiz1", "quiz", 90.0, 100.0, 15.0))
+  eBobMath.addAssignment(new Assignment("Quiz2", "quiz", 85.0, 100.0, 15.0))
+  eBobMath.addAssignment(new Assignment("Midterm", "exam", 88.0, 100.0, 35.0))
+  eBobMath.addAssignment(new Assignment("Final", "exam", 92.0, 100.0, 35.0))
+
+  eAliceMath.addAssignment(new Assignment("Quiz1", "quiz", 78.0, 100.0, 15.0))
+  eAliceMath.addAssignment(new Assignment("Quiz2", "quiz", 82.0, 100.0, 15.0))
+  eAliceMath.addAssignment(new Assignment("Midterm", "exam", 75.0, 100.0, 35.0))
+  eAliceMath.addAssignment(new Assignment("Final", "exam", 80.0, 100.0, 35.0))
+
+  eDaveMath.addAssignment(new Assignment("Quiz1", "quiz", 65.0, 100.0, 15.0))
+  eDaveMath.addAssignment(new Assignment("Quiz2", "quiz", 70.0, 100.0, 15.0))
+  eDaveMath.addAssignment(new Assignment("Midterm", "exam", 60.0, 100.0, 35.0))
+  eDaveMath.addAssignment(new Assignment("Final", "exam", 68.0, 100.0, 35.0))
+
+  math201.printReport()
+
+  // Cross-course GPA summary
+  IO::println("=================================================")
+  IO::println("Cross-course GPA summary:")
+  IO::println("-------------------------------------------------")
+
+  val students: List[Student] = [alice, bob, carol, dave, eve]
+  foreach s: Student in students {
+    var totalGpaPoints: Double = 0.0
+    var courseCount: Int = 0
+
+    val cs101e: Enrollment? = cs101.findEnrollment(s.id())
+    if cs101e != null {
+      totalGpaPoints = totalGpaPoints + cs101e.gpa()
+      courseCount++
+    }
+
+    val math201e: Enrollment? = math201.findEnrollment(s.id())
+    if math201e != null {
+      totalGpaPoints = totalGpaPoints + math201e.gpa()
+      courseCount++
+    }
+
+    if courseCount > 0 {
+      val cumGpa: Double = totalGpaPoints / courseCount
+      IO::println("  #{s.name()} (#{s.major()}): cumulative GPA = #{cumGpa}")
+    }
+  }
+  IO::println("=================================================")
+}

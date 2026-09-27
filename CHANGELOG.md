@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/DnaAnalysis.on`** — a 393-line DNA sequence analysis tool, a new domain for the `run/` corpus (a sealed ADT case-enum `Variant` (`Substitution`/`Insertion`/`Deletion`) dispatched via `select`/`is` type patterns; records `Sequence`/`KmerCount`/`NucFreq`; extension methods on `String` (`gcContent`/`complement`/`reverseComplement`/`countOccurrences`/`rep`) and `Double` (`r2`/`pct`); `do[List]` notation generating all 16 dinucleotide combinations; classes `SequenceAnalyzer`/`Genome` (CpG islands, nucleotide frequency, k-mer counting, motif search, high-GC filtering); collection pipelines `fold`/`map`/`filter`/`sortedBy`/`groupBy`/`partition`/`reduce`/`distinct`/`take`/`flatten`; `foreach (k, v)` over `Map` results; `select` on `Char` values for nucleotide dispatch; nullable handling — rendering per-sequence GC/AT/CpG stats, reverse complements, motif search, GC-based partitioning, dinucleotide frequency, reference/alternate variant detection, and cross-genome distinct-k-mer counts across a 5-sequence demo genome), added to the `run/` corpus (merged via #1625).
+
 ## [0.119.0] - 2026-09-27
 
 ### Added

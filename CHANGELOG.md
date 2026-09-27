@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/LoanAmortizer.on`** — a 376-line mortgage and loan amortization schedule calculator, a new domain for the `run/` corpus (a data-carrying enum `LoanType` (`FIXED`/`ARM`/`BALLOON`/`IO`); an ADT case-enum `PayClass` (`Regular`/`BalloonPayment`/`FinalPrincipal`) with a `tag()` method; records with expression-body and block-body methods `LoanParams`/`PaymentEntry`/`LoanSchedule`; extension methods on `Double` (`fmt2`/`pct2`/`dollars`/`round2`) and `String` (`lpadN`/`rpadN`/`rep`); collection pipelines `fold`/`map`/`filter`/`find`; `foreach` over `Int` ranges and typed lists; `select` on a homogeneous enum — rendering fixed-rate, ARM, balloon, and interest-only schedules on a $350,000/30-year loan, equity milestones, a decade-by-decade interest breakdown, and a Fixed-vs-ARM break-even analysis), added to the `run/` corpus (merged via #1614).
+- **`run/HexGame.on`** — a 337-line Monte-Carlo simulator for the board game Hex on a 7×7 board, a new domain for the `run/` corpus (a homogeneous enum `Stone` with an `extension` block; a data-carrying enum `GamePhase(label, lo, hi)` for game-length classification; a class `HexBoard` with BFS win detection over a mutable `List[Stone]` grid; a record `GameResult`; a top-level `var` LCG and Fisher-Yates shuffle for random play; `foreach` over ranges and typed lists; collection pipelines `sortedBy`/`distinct`/`groupBy`/`partition`/`filter`/`map`; `select` on enum values and boolean conditions — rendering win statistics, a move-count histogram, and a game-phase breakdown across 300 simulated games), added to the `run/` corpus (merged via #1615).
+
 ## [0.118.0] - 2026-09-27
 
 ### Added

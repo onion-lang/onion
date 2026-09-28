@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.127.0] - 2026-09-28
-
 ### Added
 
 - **`run/TelescopeLog.on`** — a 383-line amateur-astronomer observation log and reporting program, a new domain for the `run/` corpus (a `from re"..."` record `RawObs` parsing `"YYYY-MM-DD,ID,DUR,SEEING,TAG,NOTES"` log lines with `Int`/`String` capture groups; data-carrying enums `ObjectType(symbol, tag)`/`Seeing(code, summary)`; an ADT case-enum `ObsOutcome` (`Hit`/`Miss`/`Partial`) dispatched via exhaustive `select`; records with methods `CatalogEntry`/`Observation`; extension methods on `Int`/`Double`; collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`distinct`/`partition`/`find`/`any`; nullable types with null narrowing (`findEntry(): CatalogEntry?`); `foreach (k, v) in map`; string interpolation; a recursive `streak()` longest-consecutive-success-run helper; two inline `example` clauses on `RawObs` — rendering a 12-section report covering monthly summaries, by-object-type and by-seeing breakdowns, and streak analysis across 30 parsed observations), added to the `run/` corpus (merged via #1699).

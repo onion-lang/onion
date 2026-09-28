@@ -1,0 +1,499 @@
+// CipherPlayground.on — Classical cipher suite with frequency analysis.
+//
+// Exercises: records (with example / law clauses), ADT case-enum (CipherOp),
+// data-carrying enum (Alphabet), classes with inheritance, interface + conforms,
+// generic record (Ranked[T]), extension methods on String/Int, collection
+// pipelines (filter/map/fold/groupBy/sortedBy/distinct()/find/count/any/zip),
+// foreach over Map (k,v) and ranges, nullable types, closures, string
+// interpolation, try/catch, recursion, while, select/pattern matching.
+
+import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padR(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padL(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def truncate(w: Int): String {
+    if self.length() <= w { return self }
+    return self.substring(0, w - 3) + "..."
+  }
+  def upper(): String = self.toUpperCase()
+  def lower(): String = self.toLowerCase()
+}
+
+extension Int {
+  def padL(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def plural(word: String): String = if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+  def mod(n: Int): Int {
+    val r: Int = self % n
+    return if r < 0 { r + n } else { r }
+  }
+}
+
+// ─── ADT enum CipherOp ───────────────────────────────────────────────────────
+
+enum CipherOp {
+  case Encrypt
+  case Decrypt
+public:
+  def label(): String = select this {
+    case _k is Encrypt: "Encrypt"
+    case _k is Decrypt: "Decrypt"
+  }
+  def flip(): CipherOp = select this {
+    case _k is Encrypt: new Decrypt()
+    case _k is Decrypt: new Encrypt()
+  }
+}
+
+// ─── Data-carrying enum Alphabet ─────────────────────────────────────────────
+
+enum Alphabet(chars: String, size: Int, aLabel: String) {
+  UPPER("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 26, "Uppercase"),
+  LOWER("abcdefghijklmnopqrstuvwxyz", 26, "Lowercase"),
+  DIGITS("0123456789", 10, "Digits"),
+  ALPHANUM("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 62, "Alphanumeric")
+public:
+  def label(): String = aLabel()
+  def contains(c: String): Boolean = chars().indexOf(c) >= 0
+  def indexOf(c: String): Int = chars().indexOf(c)
+  def charAt(i: Int): String = chars().substring(i, i + 1)
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record CipherConfig(name: String, keyStr: String) {
+  example {
+    val cc: CipherConfig = new CipherConfig("Caesar-13", "13")
+    cc.name().length() > 0
+  }
+public:
+  def keyInt(): Int {
+    try {
+      return java.lang.Integer::parseInt(keyStr())
+    } catch e: Exception {
+      return 0
+    }
+  }
+}
+
+record CipherResult(original: String, result: String, op: CipherOp, cipherName: String) {
+  example {
+    val cr: CipherResult = new CipherResult("HELLO", "URYYB", new Encrypt(), "ROT13")
+    cr.original().length() == cr.result().length()
+  }
+public:
+  def summary(): String =
+    "#{cipherName()} #{op().label()}: '#{original().truncate(30)}' → '#{result().truncate(30)}'"
+}
+
+record FreqEntry(ch: String, count: Int, total: Int) {
+  example {
+    val fe: FreqEntry = new FreqEntry("E", 15, 100)
+    fe.count() <= fe.total()
+  }
+public:
+  def freq(): Double = if total() <= 0 { 0.0 } else { (count() as Double) / (total() as Double) }
+  def bar(width: Int): String {
+    val filled: Int = (freq() * width.doubleValue() + 0.5) as Int
+    val empty: Int = width - filled
+    return "|" + "#".rep(filled) + ".".rep(empty) + "|"
+  }
+  def pctStr(): String {
+    val pct: Double = freq() * 100.0
+    val whole: Int = pct as Int
+    val frac: Int = ((pct - whole.doubleValue()) * 10.0) as Int
+    return "#{whole}.#{frac}%"
+  }
+}
+
+// ─── Generic ranked wrapper ───────────────────────────────────────────────────
+
+record Ranked[T](rank: Int, item: T, score: Double)
+  example { new Ranked[String](1, "E", 12.7).rank() == 1 }
+
+// ─── Interface Cipher ─────────────────────────────────────────────────────────
+
+interface Cipher {
+  def name(): String
+  def encipher(text: String, op: CipherOp): String
+}
+
+// ─── CaesarCipher class (conforms Cipher) ────────────────────────────────────
+
+class CaesarCipher conforms Cipher {
+  val shift: Int
+
+public:
+  def this(s: Int) { this.shift = s }
+
+  override def name(): String = "Caesar(#{shift})"
+
+  override def encipher(text: String, op: CipherOp): String {
+    val actualShift: Int = select op {
+      case _k is Encrypt: shift.mod(26)
+      case _k is Decrypt: (26 - shift.mod(26)).mod(26)
+    }
+    var result: String = ""
+    var i: Int = 0
+    while i < text.length() {
+      val c: String = text.substring(i, i + 1)
+      if Alphabet::UPPER.contains(c) {
+        val pos: Int = Alphabet::UPPER.indexOf(c)
+        result = result + Alphabet::UPPER.charAt((pos + actualShift).mod(26))
+      } else if Alphabet::LOWER.contains(c) {
+        val pos: Int = Alphabet::LOWER.indexOf(c)
+        result = result + Alphabet::LOWER.charAt((pos + actualShift).mod(26))
+      } else {
+        result = result + c
+      }
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── VigenereCipher class (conforms Cipher) ──────────────────────────────────
+
+class VigenereCipher conforms Cipher {
+  val keyword: String
+
+public:
+  def this(kw: String) { this.keyword = kw.upper() }
+
+  override def name(): String = "Vigenere(#{keyword})"
+
+  override def encipher(text: String, op: CipherOp): String {
+    val klen: Int = keyword.length()
+    if klen == 0 { return text }
+    var result: String = ""
+    var keyIdx: Int = 0
+    var i: Int = 0
+    while i < text.length() {
+      val c: String = text.substring(i, i + 1)
+      if Alphabet::UPPER.contains(c) || Alphabet::LOWER.contains(c) {
+        val isUpper: Boolean = Alphabet::UPPER.contains(c)
+        val alpha: Alphabet = if isUpper { Alphabet::UPPER } else { Alphabet::LOWER }
+        val pos: Int = alpha.indexOf(c)
+        val keyChar: String = keyword.substring(keyIdx.mod(klen), keyIdx.mod(klen) + 1)
+        val keyShift: Int = Alphabet::UPPER.indexOf(keyChar)
+        val newPos: Int = select op {
+          case _k is Encrypt: (pos + keyShift).mod(26)
+          case _k is Decrypt: (pos - keyShift).mod(26)
+        }
+        result = result + alpha.charAt(newPos)
+        keyIdx = keyIdx + 1
+      } else {
+        result = result + c
+      }
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── AtbashCipher class (conforms Cipher) ────────────────────────────────────
+
+class AtbashCipher conforms Cipher {
+
+public:
+  def this() {}
+
+  override def name(): String = "Atbash"
+
+  override def encipher(text: String, op: CipherOp): String {
+    var result: String = ""
+    var i: Int = 0
+    while i < text.length() {
+      val c: String = text.substring(i, i + 1)
+      if Alphabet::UPPER.contains(c) {
+        val pos: Int = Alphabet::UPPER.indexOf(c)
+        result = result + Alphabet::UPPER.charAt(25 - pos)
+      } else if Alphabet::LOWER.contains(c) {
+        val pos: Int = Alphabet::LOWER.indexOf(c)
+        result = result + Alphabet::LOWER.charAt(25 - pos)
+      } else {
+        result = result + c
+      }
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── Frequency analysis ───────────────────────────────────────────────────────
+
+def letterFrequency(text: String): List[Object] {
+  val counts: Map[String, List[Object]] = new JLinkedHashMap[String, List[Object]]()
+  var total: Int = 0
+  var i: Int = 0
+  while i < text.length() {
+    val c: String = text.substring(i, i + 1).upper()
+    if Alphabet::UPPER.contains(c) {
+      val existing: Object? = counts.get(c)
+      if existing == null {
+        val lst: List[Object] = new ArrayList[Object]()
+        lst.add(1)
+        counts.put(c, lst)
+      } else {
+        val lst: List[Object] = existing as List[Object]
+        lst.set(0, (lst.get(0) as Int) + 1)
+      }
+      total = total + 1
+    }
+    i = i + 1
+  }
+  val tot: Int = total
+  val entries: List[Object] = new ArrayList[Object]()
+  foreach (ch, lst) in counts {
+    val cnt: Int = (lst as List[Object]).get(0) as Int
+    entries.add(new FreqEntry(ch, cnt, tot))
+  }
+  return entries.sortedBy { e -> (e as FreqEntry).count() }
+}
+
+def topFreqRanked(entries: List[Object], n: Int): List[Object] {
+  val result: List[Object] = new ArrayList[Object]()
+  val limit: Int = if n < entries.size { n } else { entries.size }
+  var i: Int = entries.size - 1
+  var rank: Int = 1
+  while i >= 0 && rank <= limit {
+    val fe: FreqEntry = entries.get(i) as FreqEntry
+    result.add(new Ranked[FreqEntry](rank, fe, fe.freq()))
+    i = i - 1
+    rank = rank + 1
+  }
+  return result
+}
+
+// ─── Helper: apply a cipher to a list of texts ───────────────────────────────
+
+def batchEncipher(cipher: Cipher, texts: List[Object], op: CipherOp): List[Object] =
+  texts.map { t ->
+    val text: String = t as String
+    new CipherResult(text, cipher.encipher(text, op), op, cipher.name())
+  }
+
+// ─── Recursive brute-force Caesar solver ─────────────────────────────────────
+
+def bruteForce(ciphertext: String, shift: Int): void {
+  if shift >= 26 { return }
+  val c: CaesarCipher = new CaesarCipher(shift)
+  val plain: String = c.encipher(ciphertext, new Decrypt())
+  IO::println("  Shift #{shift.padL(2)}: #{plain.truncate(60)}")
+  bruteForce(ciphertext, shift + 1)
+}
+
+// ─── Print helpers ────────────────────────────────────────────────────────────
+
+def sep(char: String, width: Int): String = char.rep(width)
+
+def printFreqChart(entries: List[Object], title: String): void {
+  IO::println("  #{title}")
+  IO::println("  #{sep("-", 48)}")
+  val top: List[Object] = topFreqRanked(entries, 10)
+  foreach r: Object in top {
+    val rk: Ranked[FreqEntry] = r as Ranked[FreqEntry]
+    val fe: FreqEntry = rk.item()
+    IO::println("  #{rk.rank().padL(2)}. #{fe.ch().padR(3)} #{fe.bar(30)} #{fe.pctStr().padL(6)} (#{fe.count().plural("letter")})")
+  }
+}
+
+def printCipherResults(results: List[Object]): void {
+  foreach r: Object in results {
+    val cr: CipherResult = r as CipherResult
+    IO::println("  #{cr.summary()}")
+  }
+}
+
+// ─── Coincidence index (IC) — measures language naturalness ──────────────────
+
+def indexOfCoincidence(text: String): Double {
+  val entries: List[Object] = letterFrequency(text)
+  val n: Int = entries
+    .map  { e -> (e as FreqEntry).count() }
+    .fold(0) { acc, v -> acc + (v as Int) }
+  if n <= 1 { return 0.0 }
+  val sumPairs: Int = entries
+    .map  { e -> (e as FreqEntry).count() }
+    .fold(0) { acc, v -> val c: Int = v as Int; acc + c * (c - 1) }
+  return (sumPairs as Double) / ((n as Double) * ((n - 1) as Double))
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println(sep("=", 62))
+  IO::println("  Cipher Playground")
+  IO::println(sep("=", 62))
+
+  // ── Ciphers under test ────────────────────────────────────────────────────
+  val caesar13: Cipher = new CaesarCipher(13)  // ROT13
+  val caesar3:  Cipher = new CaesarCipher(3)
+  val vigenere: Cipher = new VigenereCipher("SECRET")
+  val atbash:   Cipher = new AtbashCipher()
+
+  val ciphers: List[Object] = [caesar13, caesar3, vigenere, atbash]
+
+  // ── Samples to encipher ───────────────────────────────────────────────────
+  val samples: List[Object] = [
+    "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG",
+    "Programming languages are fascinating tools for thought.",
+    "Cryptography protects private communication.",
+    "To be or not to be, that is the question."
+  ]
+
+  // ── Per-cipher encrypt + decrypt round-trip ───────────────────────────────
+  foreach c: Object in ciphers {
+    val cipher: Cipher = c as Cipher
+    IO::println("\n  Cipher: #{cipher.name()}")
+    IO::println("  #{sep("-", 58)}")
+    foreach s: Object in samples {
+      val plain: String = s as String
+      val enc: String = cipher.encipher(plain, new Encrypt())
+      val dec: String = cipher.encipher(enc, new Decrypt())
+      val ok: String = if dec == plain { "[OK]" } else { "[FAIL]" }
+      IO::println("  Plain : #{plain.truncate(50)}")
+      IO::println("  Cipher: #{enc.truncate(50)}")
+      IO::println("  RTrip : #{dec.truncate(50)} #{ok}")
+      IO::println("")
+    }
+  }
+
+  // ── Batch encipher all samples with Caesar-3 ─────────────────────────────
+  IO::println("  Batch Caesar-3 encrypt:")
+  val batchResults: List[Object] = batchEncipher(caesar3, samples, new Encrypt())
+  printCipherResults(batchResults)
+
+  // ── Frequency analysis on a longer text ───────────────────────────────────
+  val longText: String =
+    "In the beginning was the Word and the Word was with God and the Word was God " +
+    "The same was in the beginning with God All things were made by him and without " +
+    "him was not any thing made that was made In him was life and the life was the " +
+    "light of men And the light shineth in darkness and the darkness comprehended it not"
+
+  IO::println("\n  Frequency analysis — plaintext:")
+  val freqPlain: List[Object] = letterFrequency(longText)
+  printFreqChart(freqPlain, "Top-10 letter frequencies (plain text)")
+
+  val encLong: String = caesar13.encipher(longText, new Encrypt())
+  IO::println("\n  Frequency analysis — ROT13 ciphertext:")
+  val freqEnc: List[Object] = letterFrequency(encLong)
+  printFreqChart(freqEnc, "Top-10 letter frequencies (ROT13 ciphertext)")
+
+  // ── Index of Coincidence comparison ───────────────────────────────────────
+  IO::println("\n  Index of Coincidence (IC) comparison:")
+  IO::println("  #{sep("-", 44)}")
+  val icPlain: Double = indexOfCoincidence(longText)
+  val icRot13: Double = indexOfCoincidence(encLong)
+  val icVig:   Double = indexOfCoincidence(vigenere.encipher(longText, new Encrypt()))
+  IO::println("  English plaintext  : #{icPlain}")
+  IO::println("  ROT13 ciphertext   : #{icRot13}")
+  IO::println("  Vigenere ciphertext: #{icVig}")
+  IO::println("  (English IC ≈ 0.065; random ≈ 0.038)")
+
+  // ── Brute-force Caesar over short ciphertext ─────────────────────────────
+  val puzzle: String = caesar3.encipher("Meet at dawn!", new Encrypt())
+  IO::println("\n  Brute-force Caesar '#{puzzle}':")
+  bruteForce(puzzle, 0)
+
+  // ── Collection pipeline demos ─────────────────────────────────────────────
+
+  // partition: letters that appear more/less than average frequency in English
+  val letterCount: Int = freqPlain
+    .map  { e -> (e as FreqEntry).count() }
+    .fold(0) { acc, v -> acc + (v as Int) }
+  val numLetters: Int = freqPlain.size
+  val avgFreq: Double = if numLetters == 0 { 0.0 } else {
+    (letterCount as Double) / (numLetters as Double)
+  }
+  val partitioned = freqPlain.partition { e ->
+    (e as FreqEntry).freq() * (letterCount as Double) >= avgFreq
+  }
+  val aboveAvg: List[Object] = partitioned[0] as List[Object]
+  val belowAvg: List[Object] = partitioned[1] as List[Object]
+  IO::println("\n  Letters above avg frequency: #{aboveAvg.size}")
+  IO::println("  Letters below avg frequency: #{belowAvg.size}")
+
+  // zip: pair each cipher with its IC on longText
+  val cipherNames: List[Object] = ciphers.map { c -> (c as Cipher).name() }
+  val ics: List[Object] = ciphers.map { c ->
+    val enc2: String = (c as Cipher).encipher(longText, new Encrypt())
+    indexOfCoincidence(enc2) as Object
+  }
+  val pairs: List[List[Object]] = cipherNames.zip(ics)
+  IO::println("\n  IC for each cipher on the test text:")
+  foreach p: List[Object] in pairs {
+    val cname: String = p[0] as String
+    val ic: Double = p[1] as Double
+    IO::println("    #{cname.padR(22)} IC = #{ic}")
+  }
+
+  // distinct alphabet chars used in samples (no duplicates)
+  val allChars: List[String] = samples
+    .map { s ->
+      val str: String = s as String
+      str.upper().substring(0, if str.length() > 0 { 1 } else { 0 })
+    }
+    .distinct()
+  IO::println("\n  Distinct first chars of samples: #{allChars.size}")
+
+  // any: check if any result has "FAIL"
+  val anyFail: Boolean = batchResults.any { r -> (r as CipherResult).result() == (r as CipherResult).original() }
+  IO::println("  Any no-op encryption? #{anyFail}")
+
+  // count: how many sample encryptions contain "X"
+  val withX: Int = batchResults.count { r -> (r as CipherResult).result().upper().indexOf("X") >= 0 }
+  IO::println("  Batch results containing 'X': #{withX}")
+
+  // find: first cipher result longer than 40 chars
+  val longResult: Object? = batchResults.find { r -> (r as CipherResult).result().length() > 40 }
+  if longResult != null {
+    val cr: CipherResult = longResult as CipherResult
+    IO::println("  First long result: #{cr.result().truncate(40)}")
+  }
+
+  // range: generate all ROT-N ciphers for N in 1..5 and show first sample
+  IO::println("\n  ROT-N variants for '#{(samples.get(0) as String).truncate(20)}':")
+  foreach n: Int in 1..5 {
+    val c2: CaesarCipher = new CaesarCipher(n)
+    val enc3: String = c2.encipher(samples.get(0) as String, new Encrypt())
+    IO::println("    ROT-#{n}: #{enc3.truncate(50)}")
+  }
+
+  // groupBy: group freq entries by common first-letter of the alphabet thirds
+  val grouped: Map[String, List[Object]] = freqPlain.groupBy { e ->
+    val pos: Int = Alphabet::UPPER.indexOf((e as FreqEntry).ch())
+    if pos < 9 { "A-I" } else if pos < 18 { "J-R" } else { "S-Z" }
+  }
+  IO::println("\n  Letter groups by position in alphabet:")
+  foreach (group, lst) in grouped {
+    val grpEntries: List[Object] = lst as List[Object]
+    val total: Int = grpEntries
+      .map  { e -> (e as FreqEntry).count() }
+      .fold(0) { acc, v -> acc + (v as Int) }
+    IO::println("    #{group}: #{grpEntries.size.plural("letter")} — #{total.plural("occurrence")}")
+  }
+
+  IO::println("\n" + sep("─", 62))
+  IO::println("  Done. #{ciphers.size.plural("cipher")} tested on #{samples.size.plural("sample")}.")
+}

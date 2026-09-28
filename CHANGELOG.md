@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.126.0] - 2026-09-28
+
 ### Added
 
 - **`run/LighthouseNetwork.on`** — a 336-line coastal lighthouse network monitoring and shipping-lane advisory system, a new domain for the `run/` corpus (an ADT case-enum `LightSignal` (`Fixed`/`Flashing(periodSec)`/`Occulting(periodSec)`/`Group(flashes, periodSec)`) dispatched via `select`/`is` with `characterCode()`/`cycleDescription()`; a homogeneous data-carrying enum `SeaState(waveM, label)`; an ADT case-enum `AdvisoryLevel` (`Normal`/`SmallCraftAdvisory(reason)`/`GaleWarning(reason)`/`StormWarning(reason)`) with `label()`/`isOperational()`; records with methods `Lighthouse`/`WeatherLog`/`HazardReport`; a class `LighthouseStation` with mutable `List[T]` state computing average wind, worst visibility, and a rule-based `issueAdvisory()`; extension methods on `Int`/`Double`/`String`; collection pipelines `map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`; `foreach` over ranges, lists, and map `(k, v)` entries; nullable types with null checks; a recursive severity-sum helper; `try`/`catch` around a manual log-line parse; string interpolation throughout — rendering a station roster, 24h weather logs, per-station advisories, a windiest-station ranking, a network-wide hazard log grouped by severity, and nearest-backup-station lookups per hazard), added to the `run/` corpus (merged via #1683).

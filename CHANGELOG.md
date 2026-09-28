@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.124.0] - 2026-09-28
-
 ### Added
 
 - **`run/KanbanBoard.on`** — a 347-line Kanban board work-item tracker, a new domain for the `run/` corpus (a data-carrying enum `Priority(weight, symbol)`; a plain enum with methods `Column` carrying WIP limits; an ADT case-enum `Blocker` (`WaitingOn`/`NeedsInfo`/`Technical`/`None`) dispatched via `select`/`is` type patterns; a record `Task` using named partial copy (`.copy(col=c)`) for `moveTo`/`assignTo`/`block`; a generic class `Board` with mutable `List[Task]` state and `Function1[Task, Task]` callbacks; a `@TailRecursive` accumulator `sumPoints`; extension methods on `Int` (`plural`/`rpad`) and `String` (`padRight`/`padLeft`); collection pipelines `filter`/`groupBy`/`sortedBy`/`find`; `foreach (k, v) in map`; nullable `String?` with the Elvis operator; string interpolation — rendering a column summary, priority breakdown with ASCII progress bars, assignee workload, blocked-task list, and a WIP-limit check), added to the `run/` corpus (merged via #1652).

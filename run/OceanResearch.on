@@ -1,0 +1,413 @@
+// OceanResearch.on — marine biology / oceanographic research station
+// Exercises: records with methods, data-carrying enums, ADT enums,
+// classes with mutable state, interfaces, generics, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/zip),
+// select/pattern matching, nullable and null checks, closures,
+// string interpolation, do[Option] monadic chaining, |> pipeline,
+// foreach (ranges and map k,v), try/catch, recursion, while.
+
+// ─── Ocean Zone Enum ─────────────────────────────────────────────────────────
+
+enum OceanZone(label: String, code: String, minDepth: Int, maxDepth: Int) {
+  Epipelagic("Sunlit",    "EPL",  0,    200),
+  Mesopelagic("Twilight", "MSP",  200,  1000),
+  Bathypelagic("Midnight","BTH",  1000, 4000),
+  Abyssopelagic("Abyssal","ABY",  4000, 6000),
+  Hadopelagic("Hadal",    "HAD",  6000, 11000)
+public:
+  def containsDepth(d: Int): Boolean = d >= minDepth() && d < maxDepth()
+  def depthRange(): String = "#{minDepth()}-#{maxDepth()} m"
+}
+
+// ─── Conservation Status ─────────────────────────────────────────────────────
+
+enum MarineStatus(symbol: String, urgent: Boolean) {
+  Extinct("EX", true),
+  CriticallyEndangered("CR", true),
+  Endangered("EN", true),
+  Vulnerable("VU", false),
+  NearThreatened("NT", false),
+  LeastConcern("LC", false)
+}
+
+// ─── ADT: ReadingResult ──────────────────────────────────────────────────────
+
+enum ReadingResult {
+  case ValidReading(value: Double, unit: String)
+  case AnomalousReading(value: Double, reason: String)
+  case MissingReading(sensor: String)
+public:
+  def display(): String = select this {
+    case r is ValidReading:    "#{r.value()} #{r.unit()}"
+    case r is AnomalousReading:"[ANOMALY #{r.value()}: #{r.reason()}]"
+    case r is MissingReading:  "[NO DATA: #{r.sensor()}]"
+  }
+  def isValid(): Boolean = select this {
+    case r is ValidReading: true
+    else: false
+  }
+  def valueOrDefault(dflt: Double): Double = select this {
+    case r is ValidReading: r.value()
+    else: dflt
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Species(
+  id:        String,
+  commonName: String,
+  latinName: String,
+  zone:      OceanZone,
+  status:    MarineStatus,
+  avgLenCm:  Double
+) {
+public:
+  def label(): String = "#{commonName()} (#{latinName()})"
+  def isAtRisk(): Boolean = status().urgent()
+  def zoneName(): String = zone().label()
+}
+
+record Sighting(
+  expeditionId: String,
+  speciesId:    String,
+  depth:        Int,
+  count:        Int,
+  tempC:        Double
+) {
+public:
+  def key(): String = "#{expeditionId()}:#{speciesId()}"
+}
+
+record WaterSample(
+  expeditionId: String,
+  depth:        Int,
+  tempC:        Double,
+  salinityPpt:  Double,
+  oxygenMlL:   Double
+) {
+public:
+  def isAnoxic(): Boolean = oxygenMlL() < 0.5
+  def depthZone(): OceanZone = zoneOf(depth())
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+  def fmt2(): String {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".00" }
+    val end: Int = dot + 3
+    if s.length() <= end {
+      if s.length() == dot + 2 { return s + "0" }
+      return s
+    }
+    return s.substring(0, end)
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def center(w: Int): String {
+    var s: String = self
+    while s.length() < w {
+      s = " " + s
+      if s.length() < w { s = s + " " }
+    }
+    return s
+  }
+}
+
+// ─── Utility function ────────────────────────────────────────────────────────
+
+def zoneOf(depth: Int): OceanZone {
+  if depth < 200  { return OceanZone::Epipelagic }
+  if depth < 1000 { return OceanZone::Mesopelagic }
+  if depth < 4000 { return OceanZone::Bathypelagic }
+  if depth < 6000 { return OceanZone::Abyssopelagic }
+  return OceanZone::Hadopelagic
+}
+
+// ─── ResearchStation class ───────────────────────────────────────────────────
+
+class ResearchStation {
+  var name_: String
+  var species_: List[Species]
+  var sightings_: List[Sighting]
+  var samples_: List[WaterSample]
+
+public:
+  def this(name: String) {
+    name_ = name
+    species_ = []
+    sightings_ = []
+    samples_ = []
+  }
+
+  def name(): String = name_
+
+  def addSpecies(s: Species): void    { species_.add(s) }
+  def addSighting(s: Sighting): void  { sightings_.add(s) }
+  def addSample(w: WaterSample): void { samples_.add(w) }
+
+  def findSpecies(id: String): Species? {
+    foreach s: Species in species_ {
+      if s.id() == id { return s }
+    }
+    return null
+  }
+
+  def allSpecies(): List[Species] = species_
+
+  def atRiskSpecies(): List[Species] {
+    return species_.filter { s -> (s as Species).isAtRisk() }
+  }
+
+  def sightingsByZone(): Map[Object, List[Sighting]] {
+    return sightings_.groupBy { sg -> zoneOf((sg as Sighting).depth()).label() }
+  }
+
+  def averageTempByZone(): Map[Object, Object] {
+    val grouped: Map[Object, List[WaterSample]] = samples_.groupBy { w -> (w as WaterSample).depthZone().label() }
+    val result: Map[Object, Object] = [:]
+    foreach (zName, wList) in grouped {
+      val lst: List[WaterSample] = wList as List[WaterSample]
+      val total: Double = lst.fold(0.0) { acc, w -> (acc as Double) + (w as WaterSample).tempC() }
+      val avg: Double = total / (lst.size() as Double)
+      result[zName] = avg
+    }
+    return result
+  }
+
+  def speciesCountByZone(): Map[Object, Object] {
+    val grouped: Map[Object, List[Species]] = species_.groupBy { s -> (s as Species).zoneName() }
+    val result: Map[Object, Object] = [:]
+    foreach (k, v) in grouped {
+      result[k] = (v as List[Species]).size()
+    }
+    return result
+  }
+
+  def topSightingsByCount(): List[Sighting] {
+    return sightings_.sortedBy { sg -> (sg as Sighting).count() }.reverse()
+  }
+
+  def biodiversityIndex(): Double {
+    val total: Int = sightings_.fold(0) { acc, sg -> (acc as Int) + (sg as Sighting).count() }
+    if total == 0 { return 0.0 }
+    val distinct: Int = sightings_.map { sg -> (sg as Sighting).speciesId() }.distinct().size()
+    return (distinct as Double) / (total as Double)
+  }
+
+  def anoxicSampleCount(): Int {
+    return samples_.count { w -> (w as WaterSample).isAnoxic() }
+  }
+
+  def deepestSighting(): Sighting? {
+    var deepest: Sighting? = null
+    foreach sg: Sighting in sightings_ {
+      if deepest == null || sg.depth() > deepest.depth() {
+        deepest = sg
+      }
+    }
+    return deepest
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def bar(n: Int, max: Int, width: Int): String {
+  val filled: Int = if max == 0 { 0 } else { (n * width / max) }
+  var s: String = ""
+  var i: Int = 0
+  while i < width {
+    if i < filled { s = s + "█" } else { s = s + "░" }
+    i++
+  }
+  return s
+}
+
+def separator(w: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "─"; i++ }
+  return s
+}
+
+def header(title: String): void {
+  IO::println("")
+  IO::println(separator(60))
+  IO::println(" " + title)
+  IO::println(separator(60))
+}
+
+// ─── Sample data ─────────────────────────────────────────────────────────────
+
+def buildStation(): ResearchStation {
+  val st: ResearchStation = new ResearchStation("Pacific Deep Survey")
+
+  // Species
+  st.addSpecies(new Species("BLWH", "Blue Whale",        "Balaenoptera musculus",  OceanZone::Epipelagic,    MarineStatus::Endangered,         2700.0))
+  st.addSpecies(new Species("HMPK", "Humpback Whale",    "Megaptera novaeangliae", OceanZone::Epipelagic,    MarineStatus::LeastConcern,       1500.0))
+  st.addSpecies(new Species("GRTW", "Great White Shark", "Carcharodon carcharias", OceanZone::Epipelagic,    MarineStatus::Vulnerable,          600.0))
+  st.addSpecies(new Species("OCTO", "Giant Octopus",     "Enteroctopus dofleini",  OceanZone::Mesopelagic,   MarineStatus::LeastConcern,        300.0))
+  st.addSpecies(new Species("LANT", "Lanternfish",       "Myctophum punctatum",    OceanZone::Mesopelagic,   MarineStatus::LeastConcern,         10.0))
+  st.addSpecies(new Species("ANGL", "Anglerfish",        "Melanocetus johnsonii",  OceanZone::Bathypelagic,  MarineStatus::LeastConcern,         20.0))
+  st.addSpecies(new Species("VFSH", "Viperfish",         "Chauliodus sloani",      OceanZone::Bathypelagic,  MarineStatus::LeastConcern,         35.0))
+  st.addSpecies(new Species("GBSQ", "Giant Squid",       "Architeuthis dux",       OceanZone::Bathypelagic,  MarineStatus::NearThreatened,      1300.0))
+  st.addSpecies(new Species("DMP",  "Dumbo Octopus",     "Grimpoteuthis boylei",   OceanZone::Abyssopelagic, MarineStatus::LeastConcern,         20.0))
+  st.addSpecies(new Species("SPDR", "Sea Spider",        "Pycnogonum litorale",    OceanZone::Abyssopelagic, MarineStatus::LeastConcern,          1.0))
+  st.addSpecies(new Species("SNPF", "Snailfish",         "Pseudoliparis swirei",   OceanZone::Hadopelagic,   MarineStatus::NearThreatened,       28.0))
+
+  // Sightings (expeditionId, speciesId, depth, count, tempC)
+  st.addSighting(new Sighting("EXP01", "BLWH", 50,   3, 18.5))
+  st.addSighting(new Sighting("EXP01", "HMPK", 30,   7, 19.2))
+  st.addSighting(new Sighting("EXP01", "GRTW", 80,   2, 17.8))
+  st.addSighting(new Sighting("EXP02", "OCTO", 400,  4, 8.3))
+  st.addSighting(new Sighting("EXP02", "LANT", 600, 42, 5.1))
+  st.addSighting(new Sighting("EXP02", "HMPK", 20,   2, 20.1))
+  st.addSighting(new Sighting("EXP03", "ANGL", 1800, 1, 4.0))
+  st.addSighting(new Sighting("EXP03", "VFSH", 2100, 6, 3.8))
+  st.addSighting(new Sighting("EXP03", "GBSQ", 1500, 1, 4.5))
+  st.addSighting(new Sighting("EXP04", "DMP",  4200, 2, 2.1))
+  st.addSighting(new Sighting("EXP04", "SPDR", 4800, 9, 1.8))
+  st.addSighting(new Sighting("EXP05", "SNPF", 7500, 3, 0.5))
+
+  // Water samples (expeditionId, depth, tempC, salinityPpt, oxygenMlL)
+  st.addSample(new WaterSample("EXP01", 50,   18.5, 34.5, 6.8))
+  st.addSample(new WaterSample("EXP01", 100,  15.2, 34.8, 6.1))
+  st.addSample(new WaterSample("EXP02", 400,   8.3, 35.0, 3.2))
+  st.addSample(new WaterSample("EXP02", 800,   5.1, 35.1, 0.4))
+  st.addSample(new WaterSample("EXP03", 1800,  4.0, 34.9, 3.5))
+  st.addSample(new WaterSample("EXP03", 2500,  3.2, 34.8, 4.1))
+  st.addSample(new WaterSample("EXP04", 4500,  1.9, 34.7, 5.2))
+  st.addSample(new WaterSample("EXP04", 5000,  1.7, 34.6, 5.4))
+  st.addSample(new WaterSample("EXP05", 7500,  0.5, 34.5, 5.9))
+  st.addSample(new WaterSample("EXP05", 9000,  0.3, 34.4, 6.0))
+
+  return st
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val st: ResearchStation = buildStation()
+
+  IO::println("╔══════════════════════════════════════════════════════════╗")
+  IO::println("║       OCEAN RESEARCH STATION  —  " + st.name().padRight(22) + "║")
+  IO::println("╚══════════════════════════════════════════════════════════╝")
+
+  // 1. Species catalogue — all species, at-risk flagged
+  val atRiskCount: Int = st.atRiskSpecies().size()
+  header("SPECIES CATALOGUE  (" + atRiskCount + " urgent / 11 total)")
+  IO::println("  " + "ID  ".padRight(6) + "Common Name".padRight(22) + "Zone      ".padRight(12) + "Status  Avg Len")
+  IO::println("  " + separator(58))
+  foreach s: Species in st.allSpecies() {
+    val flag: String = if s.isAtRisk() { " !" } else { "  " }
+    IO::println("  " + s.id().padRight(6) + s.commonName().padRight(22) + s.zoneName().padRight(12) + s.status().symbol().padRight(5) + flag + "  " + s.avgLenCm() + " cm")
+  }
+
+  // 2. Sightings by zone
+  header("SIGHTINGS BY OCEAN ZONE")
+  val byZone: Map[Object, List[Sighting]] = st.sightingsByZone()
+  val zoneLbls: List[String] = ["Sunlit", "Twilight", "Midnight", "Abyssal", "Hadal"]
+  foreach zl: String in zoneLbls {
+    val list: List[Sighting] = byZone[zl] as List[Sighting]
+    if list != null && list.size() > 0 {
+      val total: Int = list.fold(0) { acc, sg -> (acc as Int) + (sg as Sighting).count() }
+      IO::println("  " + zl.padRight(12) + (list.size().lpad(2)) + " species  " + total.lpad(4) + " individuals  " + bar(total, 80, 20))
+    }
+  }
+
+  // 3. Temperature by zone
+  header("AVERAGE WATER TEMPERATURE BY ZONE")
+  val avgTemps: Map[Object, Object] = st.averageTempByZone()
+  foreach zl: String in zoneLbls {
+    val v: Object = avgTemps[zl]
+    if v != null {
+      val t: Double = v as Double
+      IO::println("  " + zl.padRight(12) + (t.fmt1() + " C").padRight(10) + bar((t * 2.0) as Int, 40, 20))
+    }
+  }
+
+  // 4. Top sightings
+  header("TOP 5 SIGHTINGS BY INDIVIDUAL COUNT")
+  val topSightings: List[Sighting] = st.topSightingsByCount()
+  var rank: Int = 1
+  foreach sg: Sighting in topSightings {
+    if rank > 5 { break }
+    val sp: Species? = st.findSpecies(sg.speciesId())
+    val spName: String = if sp == null { sg.speciesId() } else { sp.commonName() }
+    IO::println("  " + rank.lpad(2) + ". " + spName.padRight(20) + sg.count().lpad(4) + " @ " + sg.depth() + " m  (EXP: " + sg.expeditionId() + ")")
+    rank++
+  }
+
+  // 5. do[Option] — deepest sighting details
+  header("DEEPEST SIGHTING RECORD")
+  val deepestInfo: Option[String] = do[Option] {
+    sg  <- toOptionSighting(st.deepestSighting())
+    sp  <- toOptionSpecies(st.findSpecies(sg.speciesId()))
+    ret "#{sp.label()} at #{sg.depth()} m  (#{sg.count()} ind., #{sg.tempC().fmt1()} C)"
+  }
+  if deepestInfo == null {
+    IO::println("  No sighting data available.")
+  } else {
+    IO::println("  " + deepestInfo.get())
+  }
+
+  // 6. Sensor readings (ADT demo)
+  header("SENSOR READINGS DEMO (ADT ReadingResult)")
+  val readings: List[ReadingResult] = [
+    new ValidReading(18.5, "degC"),
+    new AnomalousReading(45.0, "calibration error"),
+    new MissingReading("oxygen probe")
+  ]
+  foreach r: ReadingResult in readings {
+    val tag: String = if r.isValid() { "[OK]     " } else { "[!]      " }
+    IO::println("  " + tag + r.display())
+  }
+
+  // 7. Zone depth ranges (pipeline + |>)
+  header("OCEAN ZONE DEPTH REFERENCE")
+  val zones: List[OceanZone] = [OceanZone::Epipelagic, OceanZone::Mesopelagic, OceanZone::Bathypelagic, OceanZone::Abyssopelagic, OceanZone::Hadopelagic]
+  val zoneLines: List[String] = zones.map { z -> "  " + (z as OceanZone).label().padRight(12) + (z as OceanZone).depthRange().padRight(18) + "(" + (z as OceanZone).code() + ")" }
+  foreach line: String in zoneLines { line |> IO::println }
+
+  // 8. Biodiversity & anoxic summary
+  header("STATION SUMMARY")
+  val bdi: Double = st.biodiversityIndex()
+  IO::println("  Biodiversity index:  " + bdi.fmt2())
+  IO::println("  Anoxic samples:      " + st.anoxicSampleCount())
+  IO::println("  At-risk species:     " + st.atRiskSpecies().size())
+  IO::println("  Total sightings:     " + st.topSightingsByCount().size())
+
+  IO::println("")
+  IO::println("Report complete.")
+}
+
+def toOptionSighting(s: Sighting?): Option[Sighting] =
+  if s == null { Option::none() } else { Option::some(s as Sighting) }
+
+def toOptionSpecies(s: Species?): Option[Species] =
+  if s == null { Option::none() } else { Option::some(s as Species) }

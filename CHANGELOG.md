@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ByteCodeVM.on`** — a 357-line stack-based bytecode virtual machine that runs hand-assembled programs, a new domain for the `run/` corpus (an ADT enum `Instr` with 20 opcodes — zero-arg singleton cases (`Pop`/`Add`/`Halt`/…) and data-carrying cases (`Push(value)`/`Load(name)`/`PrintStr(text)`/…) — dispatched via exhaustive `select`/`is` type patterns; records `Program`/`EvalResult`; a class `VM` with mutable `List[Int]`/`Map[String, Int]` state for the stack, variables, and label table; `foreach` for label pre-scan and `while` for the execution loop; `try`/`catch` for runtime errors (div-by-zero, stack underflow, unknown label); string interpolation throughout trace output — running Sum(1..10), Fibonacci(10), Factorial(7), and Collatz(27) step-count programs), added to the `run/` corpus (merged via #1682).
+
 ## [0.126.0] - 2026-09-28
 
 ### Added

@@ -1,0 +1,416 @@
+// BurrowsWheeler.on — Burrows-Wheeler Transform and Move-to-Front coding.
+// BWT rearranges a string to group similar characters together, enabling
+// better compression. MTF exploits those runs to produce small integers.
+// Exercises: records with methods (Rotation, BwtResult, BwtRun, MtfResult,
+//   BwtStats), Int[] arrays with precomputed rank and LF tables,
+//   extension methods on String/Int, collection pipelines
+//   (sortedBy/fold/filter/count/find), while/foreach/break,
+//   string interpolation, static val, try/catch,
+//   select with value patterns, |> pipeline.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def pct(total: Int): String {
+    if total == 0 { return "n/a" }
+    val p: Int = self * 100 / total
+    return p.lpad(3) + "%"
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  // Shadows built-in charAt, returning Int to avoid Char-typed local VerifyError.
+  def charAt(i: Int): Int = self.charAt(i) as Int
+}
+
+// ─── Records ────────────────────────────────────────────────────────────────
+
+record Rotation(index: Int, text: String)
+
+record BwtResult(transform: String, origin: Int) {
+public:
+  def display(): String = "bwt=\"#{transform()}\"  origin=#{origin()}"
+}
+
+record BwtRun(code: Int, count: Int) {
+public:
+  def display(): String {
+    val ch: String = "" + (code() as Char)
+    return "(#{ch}×#{count()})"
+  }
+}
+
+record MtfResult(codes: List[Int]) {
+public:
+  def size(): Int = codes().size
+  def zerosCount(): Int = codes().count { n -> (n as Int) == 0 }
+  def maxCode(): Int {
+    return codes().fold(0) { mx, n ->
+      if (n as Int) > (mx as Int) { n } else { mx }
+    } as Int
+  }
+  def avgCode(): Int {
+    if codes().size == 0 { return 0 }
+    val total: Int = codes().fold(0) { acc, n ->
+      (acc as Int) + (n as Int)
+    } as Int
+    return total / codes().size
+  }
+}
+
+record BwtStats(label: String, length: Int, runCount: Int, mtfZeros: Int) {
+public:
+  def runRatio(): String = runCount().pct(length())
+  def zeroRatio(): String = mtfZeros().pct(length())
+  def summary(): String =
+    "#{label().rpad(14)} len=#{length().lpad(3)}  " +
+    "runs=#{runCount().lpad(3)} (#{runRatio()})  " +
+    "mtf0=#{mtfZeros().lpad(3)} (#{zeroRatio()})"
+}
+
+// ─── BWT forward pass ─────────────────────────────────────────────────────────
+
+def makeRotation(text: String, start: Int): String {
+  val n: Int = text.length()
+  var rot: String = ""
+  var i: Int = 0
+  while i < n {
+    rot = rot + ("" + (text.charAt((start + i) % n) as Char))
+    i++
+  }
+  return rot
+}
+
+def bwtEncode(text: String): BwtResult {
+  val n: Int = text.length()
+  val rotations: List[Rotation] = []
+  var i: Int = 0
+  while i < n {
+    rotations.add(new Rotation(i, makeRotation(text, i)))
+    i++
+  }
+  // Sort all rotations lexicographically
+  val sorted: List[Rotation] = rotations.sortedBy { r -> (r as Rotation).text() }
+  // Find which row holds the original string (start index = 0)
+  var origin: Int = 0
+  var j: Int = 0
+  while j < sorted.size {
+    if (sorted[j] as Rotation).index() == 0 { origin = j; break }
+    j++
+  }
+  // BWT = last character of each sorted rotation
+  var bwt: String = ""
+  foreach r: Object in sorted {
+    val rot: Rotation = r as Rotation
+    val lastIdx: Int = (rot.index() + n - 1) % n
+    bwt = bwt + ("" + (text.charAt(lastIdx) as Char))
+  }
+  return new BwtResult(bwt, origin)
+}
+
+// ─── BWT inverse pass (O(n) LF-mapping algorithm) ────────────────────────────
+
+def bwtDecode(result: BwtResult): String {
+  val bwt: String = result.transform()
+  val n: Int = bwt.length()
+  if n == 0 { return "" }
+
+  // Frequency table for each character (0–255)
+  val freq: Int[] = new Int[256]
+  var i: Int = 0
+  while i < n {
+    val fch: Int = bwt.charAt(i)
+    freq[fch] = freq[fch] + 1
+    i++
+  }
+
+  // F-count: for character c, how many chars in bwt are strictly less than c
+  val fCount: Int[] = new Int[256]
+  var cumul: Int = 0
+  var c: Int = 0
+  while c < 256 {
+    fCount[c] = cumul
+    cumul = cumul + freq[c]
+    c++
+  }
+
+  // Rank array: rank[i] = occurrences of bwt[i] at positions < i
+  val rankArr: Int[] = new Int[n]
+  val seen: Int[] = new Int[256]
+  i = 0
+  while i < n {
+    val ch: Int = bwt.charAt(i)
+    rankArr[i] = seen[ch]
+    seen[ch] = seen[ch] + 1
+    i++
+  }
+
+  // LF mapping: position in the sorted (first) column
+  val lf: Int[] = new Int[n]
+  i = 0
+  while i < n {
+    val lch: Int = bwt.charAt(i)
+    lf[i] = fCount[lch] + rankArr[i]
+    i++
+  }
+
+  // Follow LF from origin; chars collected in reverse order
+  var reversed: String = ""
+  var pos: Int = result.origin()
+  i = 0
+  while i < n {
+    reversed = reversed + ("" + (bwt.charAt(pos) as Char))
+    pos = lf[pos]
+    i++
+  }
+
+  // Reverse
+  var decoded: String = ""
+  var ri: Int = reversed.length() - 1
+  while ri >= 0 {
+    decoded = decoded + ("" + (reversed.charAt(ri) as Char))
+    ri--
+  }
+  return decoded
+}
+
+// ─── Run-length analysis of BWT output ───────────────────────────────────────
+
+def bwtRuns(bwt: String): List[BwtRun] {
+  val runs: List[BwtRun] = []
+  val len: Int = bwt.length()
+  if len == 0 { return runs }
+  var i: Int = 0
+  while i < len {
+    val ch: Int = bwt.charAt(i)
+    var cnt: Int = 1
+    while i + cnt < len && bwt.charAt(i + cnt) == ch { cnt++ }
+    runs.add(new BwtRun(ch, cnt))
+    i = i + cnt
+  }
+  return runs
+}
+
+// ─── Move-to-Front encoding ───────────────────────────────────────────────────
+
+def buildAlphabet(text: String): List[Int] {
+  val unique: List[Int] = []
+  var i: Int = 0
+  while i < text.length() {
+    val ch: Int = text.charAt(i)
+    var already: Boolean = false
+    var k: Int = 0
+    while k < unique.size {
+      if (unique[k] as Int) == ch { already = true; break }
+      k++
+    }
+    if !already { unique.add(ch) }
+    i++
+  }
+  return unique.sortedBy { c -> c as Int }
+}
+
+def mtfEncode(text: String): MtfResult {
+  val n: Int = text.length()
+  if n == 0 { return new MtfResult([]) }
+  val alphabet: List[Int] = buildAlphabet(text)
+  val codes: List[Int] = []
+  var i: Int = 0
+  while i < n {
+    val ch: Int = text.charAt(i)
+    var pos: Int = 0
+    var j: Int = 0
+    while j < alphabet.size {
+      if (alphabet[j] as Int) == ch { pos = j; break }
+      j++
+    }
+    codes.add(pos)
+    alphabet.remove(pos)
+    alphabet.add(0, ch)
+    i++
+  }
+  return new MtfResult(codes)
+}
+
+def mtfDecode(mtf: MtfResult, bwtText: String): String {
+  val alphabet: List[Int] = buildAlphabet(bwtText)
+  var decoded: String = ""
+  foreach item: Object in mtf.codes() {
+    val pos: Int = item as Int
+    val ch: Int = alphabet[pos] as Int
+    decoded = decoded + ("" + (ch as Char))
+    alphabet.remove(pos)
+    alphabet.add(0, ch)
+  }
+  return decoded
+}
+
+// ─── Static corpus ────────────────────────────────────────────────────────────
+
+static val CORPUS: List[String] = [
+  "banana",
+  "abracadabra",
+  "mississippi",
+  "to be or not to be",
+  "aaaaabbbbbccccc",
+  "abcabcabcabc",
+  "aaaaaaaaaaaaaaaa"
+]
+
+static val LABELS: List[String] = [
+  "banana",
+  "abracadabra",
+  "mississippi",
+  "shakespeare",
+  "runs-abc",
+  "repeat-abc",
+  "all-same"
+]
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // 1. Visual walkthrough: BWT of "banana" with full rotation matrix
+  "=== Burrows-Wheeler Transform: 'banana' ===" |> IO::println
+  val banana: String = "banana"
+  val bananaRes: BwtResult = bwtEncode(banana)
+  IO::println("  Input:   \"#{banana}\"")
+  IO::println("  Result:  #{bananaRes.display()}")
+  IO::println("  Sorted rotation matrix (F | L = BWT col):")
+  val rots: List[Rotation] = []
+  var idx: Int = 0
+  while idx < banana.length() {
+    rots.add(new Rotation(idx, makeRotation(banana, idx)))
+    idx++
+  }
+  val sortedRots: List[Rotation] = rots.sortedBy { r -> (r as Rotation).text() }
+  var row: Int = 0
+  foreach r: Object in sortedRots {
+    val rot: Rotation = r as Rotation
+    val marker: String = if row == bananaRes.origin() { " ← origin" } else { "" }
+    IO::println("    [#{row}] #{rot.text()}#{marker}")
+    row++
+  }
+  val bananaDecoded: String = bwtDecode(bananaRes)
+  val bananaOkStr: String = if bananaDecoded == banana { "OK" } else { "FAIL" }
+  IO::println("  BWT last col: \"#{bananaRes.transform()}\"")
+  IO::println("  Decoded back: \"#{bananaDecoded}\"  #{bananaOkStr}")
+  IO::println("")
+
+  // 2. Run-length analysis: BWT groups similar chars, reducing run count
+  "=== BWT Run-Length Analysis ===" |> IO::println
+  IO::println("  Compare raw-string runs vs. BWT runs:")
+  IO::println("  #{"label".rpad(14)} #{"raw".rpad(6)} #{"bwt-runs".rpad(10)} compression")
+  var ci: Int = 0
+  while ci < CORPUS.size {
+    val text: String = CORPUS[ci] as String
+    val label: String = LABELS[ci] as String
+    val rawRuns: List[BwtRun] = bwtRuns(text)
+    val bwtRes: BwtResult = bwtEncode(text)
+    val bwtRunList: List[BwtRun] = bwtRuns(bwtRes.transform())
+    val saved: Int = rawRuns.size - bwtRunList.size
+    val direction: String = select saved {
+      case 0:  "same"
+      else:    if saved > 0 { "#{saved} fewer runs" } else { "#{0 - saved} more" }
+    }
+    IO::println("  #{label.rpad(14)} #{rawRuns.size.lpad(5)}  #{bwtRunList.size.lpad(8)}  #{direction}")
+    ci++
+  }
+  IO::println("")
+
+  // 3. BWT detail for "mississippi"
+  "=== BWT of 'mississippi' ===" |> IO::println
+  val miss: String = "mississippi"
+  val missRes: BwtResult = bwtEncode(miss)
+  IO::println("  Input: \"#{miss}\"")
+  IO::println("  BWT:   \"#{missRes.transform()}\"  (origin=#{missRes.origin()})")
+  val missRuns: List[BwtRun] = bwtRuns(missRes.transform())
+  IO::print("  Runs:  ")
+  foreach run: Object in missRuns {
+    IO::print((run as BwtRun).display() + " ")
+  }
+  IO::println("  (#{missRuns.size} runs from #{miss.length()} chars)")
+  IO::println("")
+
+  // 4. Move-to-Front encoding on BWT output
+  "=== Move-to-Front Encoding ===" |> IO::println
+  IO::println("  MTF applied to each BWT output:")
+  ci = 0
+  while ci < CORPUS.size {
+    val text: String = CORPUS[ci] as String
+    val label: String = LABELS[ci] as String
+    val bwtRes: BwtResult = bwtEncode(text)
+    val mtf: MtfResult = mtfEncode(bwtRes.transform())
+    IO::println("  #{label.rpad(14)} bwt=\"#{bwtRes.transform()}\"" +
+      "  mtf-avg=#{mtf.avgCode().lpad(3)}  zeros=#{mtf.zerosCount()}/#{mtf.size()}")
+    ci++
+  }
+  IO::println("")
+
+  // 5. Full benchmark table
+  "=== Full Pipeline Benchmark ===" |> IO::println
+  val allStats: List[BwtStats] = []
+  ci = 0
+  while ci < CORPUS.size {
+    val text: String = CORPUS[ci] as String
+    val label: String = LABELS[ci] as String
+    try {
+      val bwtRes: BwtResult = bwtEncode(text)
+      val runs: List[BwtRun] = bwtRuns(bwtRes.transform())
+      val mtf: MtfResult = mtfEncode(bwtRes.transform())
+      val stats: BwtStats = new BwtStats(label, text.length(), runs.size, mtf.zerosCount())
+      allStats.add(stats)
+      IO::println("  " + stats.summary())
+    } catch e: Exception {
+      IO::println("  #{label.rpad(14)} ERROR: " + e.message())
+    }
+    ci++
+  }
+  IO::println("")
+
+  // 6. Round-trip verification
+  "=== Round-Trip Verification ===" |> IO::println
+  ci = 0
+  while ci < CORPUS.size {
+    val text: String = CORPUS[ci] as String
+    val label: String = LABELS[ci] as String
+    try {
+      val bwtRes: BwtResult = bwtEncode(text)
+      val bwtBack: String = bwtDecode(bwtRes)
+      val bwtOk: Boolean = bwtBack == text
+      val mtf: MtfResult = mtfEncode(bwtRes.transform())
+      val mtfBack: String = mtfDecode(mtf, bwtRes.transform())
+      val mtfOk: Boolean = mtfBack == bwtRes.transform()
+      val status: String = if bwtOk && mtfOk { "OK" } else if !bwtOk { "BWT FAIL" } else { "MTF FAIL" }
+      IO::println("  #{label.rpad(14)} #{status}")
+    } catch e: Exception {
+      IO::println("  #{label.rpad(14)} ERROR: " + e.message())
+    }
+    ci++
+  }
+  IO::println("")
+
+  // 7. Ranked table: best run compression via BWT (fewest runs)
+  "=== Ranked by BWT Run Compression (fewest runs) ===" |> IO::println
+  val ranked: List[BwtStats] = allStats.sortedBy { s -> (s as BwtStats).runCount() }
+  var rank: Int = 1
+  foreach s: Object in ranked {
+    val stat: BwtStats = s as BwtStats
+    IO::println("  #{rank.lpad(2)}. #{stat.summary()}")
+    rank++
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

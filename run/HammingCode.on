@@ -1,0 +1,396 @@
+// HammingCode.on — Hamming error-correcting codes (SECDED variant)
+// Demonstrates: Hamming(7,4) and Hamming(15,11) encoding; single-bit error
+// correction; double-bit error detection (extended Hamming / SECDED);
+// syndrome decoding; bulk statistics over random bit-flip scenarios.
+//
+// Exercises: records, ADT enums, classes with static methods, bit manipulation
+// (& | ^ << >>), collection pipelines (map/filter/fold), string interpolation,
+// foreach with ranges, while loops, closures, nullable types.
+
+import { java.util.* }
+
+// ─── Decode status ────────────────────────────────────────────────────────────
+
+enum DecodeStatus {
+  case Clean           // no errors detected
+  case Corrected       // single-bit error detected and corrected
+  case Uncorrectable   // two or more bit errors — data unreliable
+}
+
+// ─── Decode result ────────────────────────────────────────────────────────────
+
+record DecodeResult(data: Int, errorBit: Int, status: DecodeStatus) {
+public:
+  def describe(): String = select status() {
+    case s is Clean:         "OK  data=#{data()}"
+    case s is Corrected:     "FIX data=#{data()} (corrected bit #{errorBit()})"
+    case s is Uncorrectable: "ERR uncorrectable (2+ bit errors)"
+  }
+  def isOk(): Boolean = select status() {
+    case s is Uncorrectable: false
+    else:                    true
+  }
+}
+
+// ─── Batch stats ──────────────────────────────────────────────────────────────
+
+record BatchStats(total: Int, clean: Int, corrected: Int, uncorrectable: Int) {
+public:
+  def pctOk():  Int = (clean() + corrected()) * 100 / total()
+  def pctBad(): Int = uncorrectable() * 100 / total()
+  def summary(): String =
+    "total=#{total()}  clean=#{clean()}  corrected=#{corrected()}  " +
+    "uncorrectable=#{uncorrectable()}  ok=#{pctOk()}%  bad=#{pctBad()}%"
+}
+
+// ─── String helper ────────────────────────────────────────────────────────────
+
+def padLeft(s: String, width: Int): String {
+  var r: String = s
+  while r.length() < width { r = "0" + r }
+  return r
+}
+
+// ─── Hamming(7,4) ─────────────────────────────────────────────────────────────
+// Parity bits at positions (1-indexed): p1=1, p2=2, p4=4
+// Data bits at positions:               d1=3, d2=5, d3=6, d4=7
+// Stored as a 7-bit Int; bit 6 (MSB) = position 1, bit 0 (LSB) = position 7
+
+class Hamming74 {
+public:
+
+  // Encode 4-bit data (bits 3..0) into a 7-bit Hamming codeword.
+  static def encode(data: Int): Int {
+    val d1: Int = (data >> 0) & 1
+    val d2: Int = (data >> 1) & 1
+    val d3: Int = (data >> 2) & 1
+    val d4: Int = (data >> 3) & 1
+    // p1 covers positions {1,3,5,7} = p1, d1, d2, d4
+    val p1: Int = d1 ^ d2 ^ d4
+    // p2 covers positions {2,3,6,7} = p2, d1, d3, d4
+    val p2: Int = d1 ^ d3 ^ d4
+    // p4 covers positions {4,5,6,7} = p4, d2, d3, d4
+    val p4: Int = d2 ^ d3 ^ d4
+    // bit layout [pos1 pos2 pos3 pos4 pos5 pos6 pos7] = [p1 p2 d1 p4 d2 d3 d4]
+    // stored in bits 6..0: bit6=p1, bit5=p2, bit4=d1, bit3=p4, bit2=d2, bit1=d3, bit0=d4
+    return (p1 << 6) | (p2 << 5) | (d1 << 4) | (p4 << 3) | (d2 << 2) | (d3 << 1) | d4
+  }
+
+  // Decode a (possibly corrupt) 7-bit codeword; correct single-bit errors.
+  static def decode(codeword: Int): DecodeResult {
+    // Extract bit at position p (1-indexed), stored at bit (7-p)
+    val b1: Int = (codeword >> 6) & 1
+    val b2: Int = (codeword >> 5) & 1
+    val b3: Int = (codeword >> 4) & 1
+    val b4: Int = (codeword >> 3) & 1
+    val b5: Int = (codeword >> 2) & 1
+    val b6: Int = (codeword >> 1) & 1
+    val b7: Int = (codeword >> 0) & 1
+
+    // Syndrome: each parity bit should XOR to 0 over its coverage set
+    val s1: Int = b1 ^ b3 ^ b5 ^ b7    // covers positions 1,3,5,7
+    val s2: Int = b2 ^ b3 ^ b6 ^ b7    // covers positions 2,3,6,7
+    val s4: Int = b4 ^ b5 ^ b6 ^ b7    // covers positions 4,5,6,7
+
+    val syndrome: Int = (s4 << 2) | (s2 << 1) | s1
+    // syndrome == 0: no error; else: error at position `syndrome`
+
+    val fixed: Int =
+      if syndrome == 0 { codeword }
+      else             { codeword ^ (1 << (7 - syndrome)) }
+
+    // Extract data bits from fixed codeword: positions 3,5,6,7 = bits 4,2,1,0
+    val d1f: Int = (fixed >> 4) & 1
+    val d2f: Int = (fixed >> 2) & 1
+    val d3f: Int = (fixed >> 1) & 1
+    val d4f: Int = (fixed >> 0) & 1
+    val data: Int = (d4f << 3) | (d3f << 2) | (d2f << 1) | d1f
+
+    val st: DecodeStatus = if syndrome == 0 { new Clean() } else { new Corrected() }
+    return new DecodeResult(data, syndrome, st)
+  }
+
+  // Inject a single-bit flip at position pos (1-indexed, pos 1 = MSB of codeword)
+  static def flipBit(codeword: Int, pos: Int): Int = codeword ^ (1 << (7 - pos))
+}
+
+// ─── SECDED(8,4) — extended Hamming with overall parity ──────────────────────
+// Adds an overall parity bit (bit 7 of the 8-bit word) to Hamming(7,4).
+// Syndrome ≠ 0 AND overall parity fails  → single-bit error, correct it.
+// Syndrome ≠ 0 AND overall parity passes → double-bit error, uncorrectable.
+// Syndrome = 0 AND overall parity fails  → overall parity bit itself flipped.
+
+class SECDED84 {
+public:
+
+  static def encode(data: Int): Int {
+    val h7: Int = Hamming74::encode(data)
+    var p: Int = 0
+    foreach i: Int in 0..<7 { p = p ^ ((h7 >> i) & 1) }
+    return (p << 7) | h7
+  }
+
+  static def decode(codeword: Int): DecodeResult {
+    val h7: Int = codeword & 0x7F
+
+    // Overall parity of all 8 bits (should be 0 for a valid codeword)
+    var p: Int = 0
+    foreach i: Int in 0..<8 { p = p ^ ((codeword >> i) & 1) }
+    val overallOk: Boolean = (p == 0)
+
+    val inner: DecodeResult = Hamming74::decode(h7)
+    val syndromeZero: Boolean = inner.errorBit() == 0
+
+    if syndromeZero && overallOk {
+      return new DecodeResult(inner.data(), 0, new Clean())
+    } else if !syndromeZero && !overallOk {
+      // Single-bit error corrected by inner decode
+      return new DecodeResult(inner.data(), inner.errorBit(), new Corrected())
+    } else if syndromeZero && !overallOk {
+      // Overall parity bit itself was flipped; inner data is fine
+      return new DecodeResult(inner.data(), 0, new Clean())
+    } else {
+      // Double-bit error: syndrome ≠ 0 but overall parity passes
+      return new DecodeResult(0, -1, new Uncorrectable())
+    }
+  }
+}
+
+// ─── Hamming(15,11) ───────────────────────────────────────────────────────────
+// Parity bits at positions that are powers of 2: 1,2,4,8.
+// Data bits fill the remaining positions 3,5,6,7,9,10,11,12,13,14,15.
+
+class Hamming1511 {
+public:
+
+  static def encode(data: Int): Int {
+    // Place 11 data bits into non-parity positions 3,5,6,7,9,10,11,12,13,14,15
+    val pos: Int[] = new Int[16]    // pos[1..15], pos[0] unused
+    var di: Int = 10                // data bit index, MSB first
+    foreach i: Int in 1..<16 {
+      val isParity: Boolean = (i & (i - 1)) == 0
+      if !isParity {
+        pos[i] = (data >> di) & 1
+        di--
+      }
+    }
+    // Compute each parity bit
+    foreach pp: Int in [1, 2, 4, 8] {
+      var par: Int = 0
+      foreach i: Int in 1..<16 {
+        if (i & pp) != 0 { par = par ^ pos[i] }
+      }
+      pos[pp] = par
+    }
+    // Assemble 15-bit codeword (MSB = position 1)
+    var cw: Int = 0
+    foreach i: Int in 1..<16 { cw = (cw << 1) | pos[i] }
+    return cw
+  }
+
+  static def decode(codeword: Int): DecodeResult {
+    val pos: Int[] = new Int[16]
+    foreach i: Int in 1..<16 { pos[i] = (codeword >> (15 - i)) & 1 }
+
+    // Compute syndrome from parity checks
+    var syndrome: Int = 0
+    foreach pp: Int in [1, 2, 4, 8] {
+      var par: Int = 0
+      foreach i: Int in 1..<16 {
+        if (i & pp) != 0 { par = par ^ pos[i] }
+      }
+      if par != 0 { syndrome = syndrome | pp }
+    }
+
+    // Correct error if syndrome ≠ 0
+    if syndrome != 0 { pos[syndrome] = 1 - pos[syndrome] }
+
+    // Reconstruct 11-bit data from non-parity positions
+    var data: Int = 0
+    foreach i: Int in 1..<16 {
+      val isParity: Boolean = (i & (i - 1)) == 0
+      if !isParity { data = (data << 1) | pos[i] }
+    }
+
+    val st: DecodeStatus = if syndrome == 0 { new Clean() } else { new Corrected() }
+    return new DecodeResult(data, syndrome, st)
+  }
+
+  static def flipBit(codeword: Int, pos: Int): Int = codeword ^ (1 << (15 - pos))
+}
+
+// ─── Batch testers ────────────────────────────────────────────────────────────
+
+def batchTest74(n: Int): BatchStats {
+  var clean: Int = 0
+  var corrected: Int = 0
+  var uncorrectable: Int = 0
+  foreach _: Int in 0..<n {
+    val data: Int = (Math::random() * 16) as Int
+    val cw: Int   = Hamming74::encode(data)
+    val pos: Int  = (Math::random() * 7) as Int + 1    // flip one of positions 1..7
+    val err: Int  = Hamming74::flipBit(cw, pos)
+    val res: DecodeResult = Hamming74::decode(err)
+    select res.status() {
+      case s is Clean:         clean++
+      case s is Corrected:     corrected++
+      case s is Uncorrectable: uncorrectable++
+    }
+  }
+  return new BatchStats(n, clean, corrected, uncorrectable)
+}
+
+def batchTestSECDED(n: Int): BatchStats {
+  var clean: Int = 0
+  var corrected: Int = 0
+  var uncorrectable: Int = 0
+  foreach _: Int in 0..<n {
+    val data: Int = (Math::random() * 16) as Int
+    val cw: Int   = SECDED84::encode(data)
+    val r: Double = Math::random()
+    var err: Int  = cw
+    if r < 0.4 {
+      // no flip
+    } else if r < 0.7 {
+      // 1-bit flip (any of 8 bits)
+      val b: Int = (Math::random() * 8) as Int
+      err = cw ^ (1 << b)
+    } else {
+      // 2-bit flip (two distinct bits)
+      val b1: Int = (Math::random() * 8) as Int
+      var b2: Int = (Math::random() * 8) as Int
+      if b2 == b1 { b2 = (b1 + 1) % 8 }
+      err = cw ^ (1 << b1) ^ (1 << b2)
+    }
+    val res: DecodeResult = SECDED84::decode(err)
+    select res.status() {
+      case s is Clean:         clean++
+      case s is Corrected:     corrected++
+      case s is Uncorrectable: uncorrectable++
+    }
+  }
+  return new BatchStats(n, clean, corrected, uncorrectable)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Hamming Error-Correcting Codes ===\n")
+
+  // ── Hamming(7,4): encode all 16 data values ──────────────────────────
+  IO::println("── Hamming(7,4): encode all 4-bit values ──")
+  IO::println("  data  binary  codeword-binary  hex")
+  foreach d: Int in 0..<16 {
+    val cw: Int = Hamming74::encode(d)
+    IO::println("   #{d}    #{padLeft(Integer::toBinaryString(d), 4)}    #{padLeft(Integer::toBinaryString(cw), 7)}       0x#{Integer::toHexString(cw)}")
+  }
+  IO::println("")
+
+  // ── Hamming(7,4): verify all single-bit errors are corrected ─────────
+  IO::println("── Hamming(7,4): exhaustive single-bit error correction check ──")
+  var fails74: Int = 0
+  foreach d: Int in 0..<16 {
+    val cw: Int = Hamming74::encode(d)
+    foreach pos: Int in 1..<8 {
+      val err: Int = Hamming74::flipBit(cw, pos)
+      val res: DecodeResult = Hamming74::decode(err)
+      if res.data() != d || !res.isOk() {
+        IO::println("  FAIL d=#{d} pos=#{pos} → decoded=#{res.data()}")
+        fails74++
+      }
+    }
+  }
+  IO::println("  Result: #{if fails74 == 0 { "all 16*7=112 single-bit flips corrected" } else { "#{fails74} failures!" }}")
+  IO::println("")
+
+  // ── SECDED(8,4): check single-bit correction + double-bit detection ───
+  IO::println("── SECDED(8,4): exhaustive single-bit + double-bit check ──")
+  var secdOk: Int = 0
+  var secdFail: Int = 0
+  foreach d: Int in 0..<16 {
+    val cw8: Int = SECDED84::encode(d)
+    // Clean transmission
+    val r0: DecodeResult = SECDED84::decode(cw8)
+    if r0.isOk() && r0.data() == d { secdOk++ } else { secdFail++ }
+    // Single-bit flip on any of the 8 bits
+    foreach b: Int in 0..<8 {
+      val e1: Int = cw8 ^ (1 << b)
+      val r1: DecodeResult = SECDED84::decode(e1)
+      if r1.isOk() && r1.data() == d { secdOk++ } else { secdFail++ }
+    }
+    // Double-bit flip on every distinct pair
+    foreach b1: Int in 0..<8 {
+      foreach b2: Int in (b1 + 1)..<8 {
+        val e2: Int = cw8 ^ (1 << b1) ^ (1 << b2)
+        val r2: DecodeResult = SECDED84::decode(e2)
+        select r2.status() {
+          case s is Uncorrectable: secdOk++
+          else:                    secdFail++
+        }
+      }
+    }
+  }
+  IO::println("  Clean + single-bit corrections + double-bit detections: #{secdOk} passed, #{secdFail} failed")
+  IO::println("")
+
+  // ── Hamming(15,11): spot check ───────────────────────────────────────
+  IO::println("── Hamming(15,11): encode/decode spot check ──")
+  val data1511: List[Int] = [0, 1, 100, 511, 1023, 1024, 2047]
+  var h1511Pass: Int = 0
+  var h1511Fail: Int = 0
+  foreach d: Int in data1511 {
+    val cw: Int = Hamming1511::encode(d)
+    // Clean
+    val r0: DecodeResult = Hamming1511::decode(cw)
+    if r0.data() == d { h1511Pass++ } else { h1511Fail++ }
+    // Every single-bit error on 15 positions
+    foreach pos: Int in 1..<16 {
+      val err: Int = Hamming1511::flipBit(cw, pos)
+      val res: DecodeResult = Hamming1511::decode(err)
+      if res.data() == d { h1511Pass++ } else { h1511Fail++ }
+    }
+  }
+  IO::println("  #{h1511Pass} passed, #{h1511Fail} failed (expect all passed)")
+  IO::println("")
+
+  // ── Batch: Hamming(7,4) random single-bit errors ─────────────────────
+  IO::println("── Batch test: Hamming(7,4) with random 1-bit errors (n=500) ──")
+  val bs74: BatchStats = batchTest74(500)
+  IO::println("  " + bs74.summary())
+  IO::println("  (Every flip must be corrected → corrected should be ~500)")
+  IO::println("")
+
+  // ── Batch: SECDED mixed 0/1/2 bit flips ─────────────────────────────
+  IO::println("── Batch test: SECDED(8,4) mixed 0/1/2-bit flips (n=600) ──")
+  val bsS: BatchStats = batchTestSECDED(600)
+  IO::println("  " + bsS.summary())
+  IO::println("  (clean=0-flip, corrected=1-flip, uncorrectable=2-flip)")
+  IO::println("")
+
+  // ── Minimum Hamming distance over all Hamming(7,4) codewords ─────────
+  IO::println("── Hamming(7,4): minimum pairwise Hamming distance ──")
+  var minDist: Int = 999
+  foreach i: Int in 0..<16 {
+    foreach j: Int in (i + 1)..<16 {
+      val cwi: Int = Hamming74::encode(i)
+      val cwj: Int = Hamming74::encode(j)
+      var dist: Int = 0
+      var xor: Int  = cwi ^ cwj
+      while xor != 0 { dist = dist + (xor & 1); xor = xor >> 1 }
+      if dist < minDist { minDist = dist }
+    }
+  }
+  IO::println("  Min distance = #{minDist} (must be ≥ 3 for single-error correction)")
+  IO::println("")
+
+  // ── Code rate comparison table ────────────────────────────────────────
+  IO::println("── Code rate comparison ──")
+  IO::println("  Code           Data bits  Codeword bits  Rate")
+  IO::println("  Hamming(7,4)       4          7          #{4 * 100 / 7}%")
+  IO::println("  SECDED(8,4)        4          8          50%")
+  IO::println("  Hamming(15,11)    11         15          #{11 * 100 / 15}%")
+  IO::println("  Hamming(31,26)    26         31          #{26 * 100 / 31}%  (theoretical)")
+  IO::println("")
+
+  IO::println("Done.")
+}

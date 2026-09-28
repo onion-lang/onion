@@ -1,0 +1,336 @@
+// LighthouseNetwork.on — coastal lighthouse network monitoring and shipping
+// lane advisory system (~290 lines)
+//
+// Exercises: ADT case-enums with data fields dispatched via select/is,
+// homogeneous data-carrying enum, records with methods, extension methods on
+// Int/Double/String, a class with mutable List[T] state, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/find/distinct), foreach over ranges/lists/
+// map (k, v) entries, nullable types with null checks, closures, string
+// interpolation, try/catch, and a recursive helper.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(n: Int): String = {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def fmt1(): String = {
+    val s: String = "" + self
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".0" }
+    val end: Int = dot + 2
+    if s.length() <= end { return s }
+    return s.substring(0, end)
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+// The blink pattern a light exhibits, each case carrying its own timing data.
+enum LightSignal {
+  case Fixed
+  case Flashing(periodSec: Double)
+  case Occulting(periodSec: Double)
+  case Group(flashes: Int, periodSec: Double)
+public:
+  def characterCode(): String = select this {
+    case f is Fixed:     "F"
+    case fl is Flashing: "Fl"
+    case o is Occulting: "Oc"
+    case g is Group:     "Fl(#{g.flashes()})"
+  }
+  def cycleDescription(): String = select this {
+    case f is Fixed:     "steady, no eclipse"
+    case fl is Flashing: "light #{fl.periodSec()}s cycle, mostly dark"
+    case o is Occulting: "light #{o.periodSec()}s cycle, mostly lit"
+    case g is Group:     "#{g.flashes()} flashes every #{g.periodSec()}s"
+  }
+}
+
+// Sea state on the Douglas scale, with a representative wave height.
+enum SeaState(waveM: Double, label: String) {
+  Calm(0.1, "Calm"),
+  Slight(0.6, "Slight"),
+  Moderate(1.5, "Moderate"),
+  Rough(3.0, "Rough"),
+  VeryRough(5.0, "Very Rough"),
+  High(8.0, "High")
+}
+
+// The advisory posted to mariners, each case carrying the reason it was issued.
+enum AdvisoryLevel {
+  case Normal
+  case SmallCraftAdvisory(reason: String)
+  case GaleWarning(reason: String)
+  case StormWarning(reason: String)
+public:
+  def label(): String = select this {
+    case n is Normal:              "NORMAL"
+    case s is SmallCraftAdvisory:  "SMALL CRAFT ADVISORY (#{s.reason()})"
+    case g is GaleWarning:         "GALE WARNING (#{g.reason()})"
+    case st is StormWarning:       "STORM WARNING (#{st.reason()})"
+  }
+  def isOperational(): Boolean = select this {
+    case n is Normal:             true
+    case s is SmallCraftAdvisory: true
+    case _:                       false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Lighthouse(
+  code:    String,
+  name:    String,
+  lat:     Double,
+  lon:     Double,
+  heightM: Int,
+  signal:  LightSignal,
+  rangeNm: Double
+) {
+public:
+  def rangeKm(): Double = rangeNm() * 1.852
+  def summary(): String =
+    "#{name()} (#{code()}) — #{signal().characterCode()}, #{heightM()}m, range #{rangeKm().fmt1()}km"
+}
+
+record WeatherLog(hour: Int, seaState: SeaState, windKn: Double, visibilityNm: Double) {
+public:
+  def isGale(): Boolean = windKn() >= 34.0
+  def isFoggy(): Boolean = visibilityNm() < 2.0
+  def line(): String =
+    "  #{hour().lpad(2)}:00  sea=#{seaState().label()}  wind=#{windKn().fmt1()}kn  vis=#{visibilityNm().fmt1()}nm"
+}
+
+record HazardReport(lighthouseCode: String, hour: Int, description: String, severity: Int) {
+public:
+  def summary(): String =
+    "  [sev #{severity()}] #{hour().lpad(2)}:00 @ #{lighthouseCode()} — #{description()}"
+}
+
+// ─── Station (lighthouse + its rolling logs) ──────────────────────────────────
+
+class LighthouseStation {
+public:
+  val house:  Lighthouse
+  var logs:   List[WeatherLog]
+  var alerts: List[HazardReport]
+
+  def this(h: Lighthouse) {
+    this.house  = h
+    this.logs   = []
+    this.alerts = []
+  }
+
+  def log(w: WeatherLog): void { logs.add(w) }
+  def report(h: HazardReport): void { alerts.add(h) }
+
+  def averageWindKn(): Double = {
+    if logs.size == 0 { return 0.0 }
+    val total: Double = logs.fold(0.0) { acc, w -> acc + w.windKn() }
+    return total / (logs.size + 0.0)
+  }
+
+  def worstVisibility(): WeatherLog? = {
+    if logs.size == 0 { return null }
+    return logs.fold(logs[0] as WeatherLog) { worst, w ->
+      if w.visibilityNm() < worst.visibilityNm() { w } else { worst }
+    }
+  }
+
+  // Highest-precedence advisory the observed conditions justify.
+  def issueAdvisory(): AdvisoryLevel = {
+    val gales: List[WeatherLog] = logs.filter { w -> w.isGale() }
+    val fogs:  List[WeatherLog] = logs.filter { w -> w.isFoggy() }
+    val maxWind: Double = logs.fold(0.0) { acc, w -> if w.windKn() > acc { w.windKn() } else { acc } }
+    if maxWind >= 48.0 { return new StormWarning("sustained winds #{maxWind.fmt1()}kn") }
+    if gales.size > 0 { return new GaleWarning("#{gales.size} gale-force reading(s)") }
+    if fogs.size > 0 { return new SmallCraftAdvisory("#{fogs.size} low-visibility reading(s)") }
+    return new Normal()
+  }
+}
+
+// ─── Free functions ────────────────────────────────────────────────────────────
+
+// Approximate great-circle distance in km (equirectangular projection, fine for coastal spacing).
+def approxDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+  val R: Double = 6371.0
+  val pi: Double = 3.14159265358979
+  val dlat: Double = (lat2 - lat1) * pi / 180.0
+  val dlon: Double = (lon2 - lon1) * pi / 180.0
+  val alat: Double = (lat1 + lat2) / 2.0 * pi / 180.0
+  val dx: Double = R * dlon * Math::cos(alat)
+  val dy: Double = R * dlat
+  return Math::sqrt(dx * dx + dy * dy)
+}
+
+// Recursively sum hazard severities from index idx onward.
+def totalSeverity(reports: List[HazardReport], idx: Int): Int {
+  if idx >= reports.size { return 0 }
+  val rest: Int = totalSeverity(reports, idx + 1)
+  return (reports[idx] as HazardReport).severity() + rest
+}
+
+def main(): void {
+  val stations: List[LighthouseStation] = [
+    new LighthouseStation(new Lighthouse("CBR", "Cape Breakwater",   50.1, -5.3, 42, new Flashing(5.0), 18.0)),
+    new LighthouseStation(new Lighthouse("PPT", "Pointe du Phare",   48.4, -4.8, 65, new Group(3, 12.0), 22.0)),
+    new LighthouseStation(new Lighthouse("SHL", "Shoal Head",        43.7,  7.3, 28, new Occulting(6.0), 15.0)),
+    new LighthouseStation(new Lighthouse("BLD", "Bell Rock Beacon",  56.4, -2.4, 35, new Fixed(), 12.0)),
+    new LighthouseStation(new Lighthouse("GST", "Gale Strait Light", 59.9, 10.6, 51, new Flashing(2.5), 20.0)),
+    new LighthouseStation(new Lighthouse("MRN", "Marina Point",      36.8, -76.3, 20, new Occulting(4.0), 10.0))
+  ]
+
+  // Simulate a 24-hour cycle of weather logs, every 4 hours, per station.
+  val hours: List[Int] = [0, 4, 8, 12, 16, 20]
+  var stIdx: Int = 0
+  foreach st: LighthouseStation in stations {
+    foreach h: Int in hours {
+      val bump: Int = (stIdx * 5 + h + stIdx * h) % 6
+      val sea: SeaState = select bump {
+        case 0: SeaState::Calm
+        case 1: SeaState::Slight
+        case 2: SeaState::Moderate
+        case 3: SeaState::Rough
+        case 4: SeaState::VeryRough
+        else:   SeaState::High
+      }
+      val wind: Double = 8.0 + (bump * 8) + (h % 5) + (stIdx * 2)
+      val vis:  Double = 12.0 - (bump * 1.8) - (stIdx % 3)
+      st.log(new WeatherLog(h, sea, wind, vis))
+    }
+    stIdx++
+  }
+
+  // Manually log a few notable hazards spotted by keepers.
+  stations[1].report(new HazardReport("PPT", 8, "drifting fishing net near approach channel", 2))
+  stations[1].report(new HazardReport("PPT", 20, "unlit skiff reported by passing ferry", 4))
+  stations[4].report(new HazardReport("GST", 16, "ice floe fragments in strait", 5))
+  stations[3].report(new HazardReport("BLD", 12, "sandbar shift after storm surge", 3))
+
+  IO::println("=== LIGHTHOUSE NETWORK REPORT ===")
+  IO::println("Stations monitored: #{stations.size}")
+  IO::println("")
+
+  IO::println("--- Station Roster ---")
+  foreach st: LighthouseStation in stations {
+    IO::println(st.house.summary())
+    IO::println("  #{st.house.signal().cycleDescription()}")
+  }
+  IO::println("")
+
+  IO::println("--- 24h Weather Logs ---")
+  foreach st: LighthouseStation in stations {
+    IO::println("#{st.house.name()} (#{st.house.code()}):")
+    foreach w: WeatherLog in st.logs {
+      IO::println(w.line())
+    }
+  }
+  IO::println("")
+
+  IO::println("--- Advisories ---")
+  foreach st: LighthouseStation in stations {
+    val adv: AdvisoryLevel = st.issueAdvisory()
+    val flag: String = if adv.isOperational() { "open" } else { "closed to small craft" }
+    IO::println("#{st.house.code().padRight(4)} #{adv.label()} (#{flag})")
+  }
+  IO::println("")
+
+  // Rank stations by average wind, worst first.
+  val byWind: List[LighthouseStation] = stations.sortedBy { s -> -s.averageWindKn() }
+  IO::println("--- Windiest Stations (avg over the day) ---")
+  var rank: Int = 0
+  foreach st: LighthouseStation in byWind {
+    rank++
+    IO::println("#{rank}. #{st.house.name()} — #{st.averageWindKn().fmt1()}kn avg")
+  }
+  IO::println("")
+
+  IO::println("--- Worst Visibility Reading per Station ---")
+  foreach st: LighthouseStation in stations {
+    val worst: WeatherLog? = st.worstVisibility()
+    if worst != null {
+      IO::println("#{st.house.code()}: #{(worst as WeatherLog).visibilityNm().fmt1()}nm at hour #{(worst as WeatherLog).hour()}")
+    } else {
+      IO::println("#{st.house.code()}: no readings")
+    }
+  }
+  IO::println("")
+
+  // Collect and group all hazard reports across the network.
+  val allHazards: List[HazardReport] = []
+  foreach st: LighthouseStation in stations {
+    allHazards.addAll(st.alerts)
+  }
+  IO::println("--- Hazard Log (network-wide, #{allHazards.size} report(s)) ---")
+  foreach h: HazardReport in allHazards {
+    IO::println(h.summary())
+  }
+  val bySeverity: Map[Int, List[HazardReport]] = allHazards.groupBy { h -> h.severity() }
+  IO::println("By severity:")
+  foreach (sev, group) in bySeverity {
+    IO::println("  severity #{sev}: #{group.size} report(s)")
+  }
+  IO::println("Total severity (recursive sum): #{totalSeverity(allHazards, 0)}")
+  IO::println("")
+
+  // For each hazard, find the nearest *other* station that could assist.
+  IO::println("--- Nearest Assisting Station per Hazard ---")
+  foreach h: HazardReport in allHazards {
+    var origin: Lighthouse? = null
+    foreach st: LighthouseStation in stations {
+      if st.house.code() == h.lighthouseCode() { origin = st.house }
+    }
+    if origin != null {
+      val o: Lighthouse = origin as Lighthouse
+      var bestDist: Double = 999999.0
+      var bestName: String = "NONE"
+      foreach st: LighthouseStation in stations {
+        if st.house.code() != o.code() {
+          val d: Double = approxDistanceKm(o.lat(), o.lon(), st.house.lat(), st.house.lon())
+          if d < bestDist {
+            bestDist = d
+            bestName = st.house.name()
+          }
+        }
+      }
+      IO::println("  #{h.lighthouseCode()} hazard → nearest backup: #{bestName} (~#{bestDist.fmt1()}km)")
+    }
+  }
+  IO::println("")
+
+  // Parse a hand-entered log line defensively.
+  try {
+    val fields: List[String] = Strings::split("BLD,14,3.5,9.0", ",")
+    val code: String = fields[0]
+    val hour: Int = Int::parseInt(fields[1])
+    val wind: Double = Double::parseDouble(fields[2])
+    IO::println("--- Manual Entry Parsed ---")
+    IO::println("#{code} hour=#{hour} wind=#{wind.fmt1()}kn")
+  } catch e: Exception {
+    IO::println("Failed to parse manual entry: #{e.message()}")
+  }
+  IO::println("")
+
+  val distinctSignals: List[String] = stations.map { s -> s.house.signal().characterCode() }.distinct()
+  IO::println("--- Distinct Signal Characters in Use ---")
+  foreach c: String in distinctSignals {
+    IO::println("  #{c}")
+  }
+
+  IO::println("")
+  IO::println("=== END OF REPORT ===")
+}

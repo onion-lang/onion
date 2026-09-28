@@ -1,0 +1,465 @@
+// SensorNetwork.on — IoT sensor-network simulation with anomaly detection
+//   and PID-based control loop.
+// Exercises: records; data-carrying and ADT enums; classes, inheritance,
+//   interfaces; generics (RollingBuffer[T]); collection pipelines
+//   (map/filter/fold/groupBy/sortedBy/find/partition/zip/reduce);
+//   select/pattern matching; nullable; closures; string interpolation;
+//   try/catch; recursion; while; foreach (ranges + map entries).
+
+import {
+  java.util.ArrayList
+  java.lang.Math as JMath
+  java.lang.Double as JDouble
+}
+
+// ─── Domain enums ─────────────────────────────────────────────────────────────
+
+enum SensorKind(unit: String, lo: Double, hi: Double, warnLo: Double, warnHi: Double) {
+  Temperature("°C",  -40.0, 125.0,   5.0,  75.0),
+  Humidity(   "%",     0.0, 100.0,  15.0,  90.0),
+  Pressure(   "hPa", 800.0,1100.0, 870.0,1050.0),
+  CO2(        "ppm",   0.0,5000.0,   0.0,1800.0)
+}
+
+enum AlertLevel {
+  Info, Warning, Critical
+}
+
+// ADT: what the PID controller recommends
+enum ControlAction {
+  case Increase(delta: Double)
+  case Decrease(delta: Double)
+  case Maintain
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Sensor(id: Int, name: String, kind: SensorKind, zone: String)
+
+record Reading(sensorId: Int, tick: Int, value: Double)
+
+record Alert(sensor: Sensor, reading: Reading, level: AlertLevel, msg: String)
+
+record ZoneReport(zone: String, avgTemp: Double, avgHum: Double,
+                  alertCount: Int, topAlert: Alert?)
+
+// ─── Generic rolling buffer ────────────────────────────────────────────────────
+
+class RollingBuffer[T] {
+  var buf: List[Object]
+  val cap: Int
+
+public:
+  def this(capacity: Int) {
+    self.cap = capacity
+    self.buf = new ArrayList[Object]()
+  }
+
+  def push(v: T): void {
+    buf.add(v as Object)
+    if buf.size > cap {
+      buf.remove(0)
+    }
+  }
+
+  def values(): List[Object] = buf
+
+  def size(): Int = buf.size
+}
+
+// ─── Anomaly-detector interface ────────────────────────────────────────────────
+
+interface AnomalyDetector {
+  def check(sensor: Sensor, reading: Reading): Alert?
+}
+
+// ─── Threshold-based detector ─────────────────────────────────────────────────
+
+class ThresholdDetector conforms AnomalyDetector {
+public:
+  def check(sensor: Sensor, reading: Reading): Alert? {
+    val kind: SensorKind = sensor.kind()
+    val v: Double = reading.value()
+    if v < kind.warnLo() {
+      val level: AlertLevel =
+        if v < kind.lo() { AlertLevel::Critical } else { AlertLevel::Warning }
+      return new Alert(sensor, reading, level, "#{sensor.name()} low: #{v}#{kind.unit()}")
+    }
+    if v > kind.warnHi() {
+      val level: AlertLevel =
+        if v > kind.hi() { AlertLevel::Critical } else { AlertLevel::Warning }
+      return new Alert(sensor, reading, level, "#{sensor.name()} high: #{v}#{kind.unit()}")
+    }
+    return null
+  }
+}
+
+// ─── Z-score anomaly detector ─────────────────────────────────────────────────
+
+class ZScoreDetector conforms AnomalyDetector {
+  val threshold: Double
+  val window: RollingBuffer[Double]
+
+public:
+  def this(thresh: Double, windowSize: Int) {
+    self.threshold = thresh
+    self.window = new RollingBuffer[Double](windowSize)
+  }
+
+  def check(sensor: Sensor, reading: Reading): Alert? {
+    val v: Double = reading.value()
+    window.push(v)
+    if window.size() < 3 { return null }
+    val vals: List[Object] = window.values()
+    val n: Double = vals.size() as Double
+    var sum: Double = 0.0
+    foreach item: Object in vals { sum = sum + (item as Double) }
+    val mean: Double = sum / n
+    var sq: Double = 0.0
+    foreach item: Object in vals {
+      val diff: Double = (item as Double) - mean
+      sq = sq + diff * diff
+    }
+    val stddev: Double = JMath::sqrt(sq / n)
+    if stddev < 0.001 { return null }
+    val z: Double = JMath::abs(v - mean) / stddev
+    if z > threshold {
+      return new Alert(sensor, reading, AlertLevel::Warning,
+        "#{sensor.name()} z-score #{z} (mean=#{mean}, sd=#{stddev})")
+    }
+    return null
+  }
+}
+
+// ─── PID controller ───────────────────────────────────────────────────────────
+
+class PidController {
+  val kp: Double
+  val ki: Double
+  val kd: Double
+  var prevErr: Double
+  var integral: Double
+
+public:
+  def this(kp: Double, ki: Double, kd: Double) {
+    self.kp       = kp
+    self.ki       = ki
+    self.kd       = kd
+    self.prevErr  = 0.0
+    self.integral = 0.0
+  }
+
+  def step(setpoint: Double, measured: Double): ControlAction {
+    val err: Double = setpoint - measured
+    integral = integral + err
+    val deriv: Double = err - prevErr
+    prevErr = err
+    val output: Double = kp * err + ki * integral + kd * deriv
+    if JMath::abs(output) < 0.5 {
+      return new Maintain()
+    }
+    if output > 0.0 {
+      return new Increase(output)
+    }
+    return new Decrease(-output)
+  }
+}
+
+// ─── Sensor-network orchestrator ──────────────────────────────────────────────
+
+class SensorNetwork {
+  val sensors: List[Object]
+  val detector: AnomalyDetector
+  val alertList: List[Object]
+  val readingList: List[Object]
+
+public:
+  def this(det: AnomalyDetector) {
+    self.sensors     = new ArrayList[Object]()
+    self.detector    = det
+    self.alertList   = new ArrayList[Object]()
+    self.readingList = new ArrayList[Object]()
+  }
+
+  def addSensor(s: Sensor): void {
+    sensors.add(s)
+  }
+
+  def ingest(r: Reading): void {
+    readingList.add(r)
+    val sensor: Sensor? =
+      sensors.find { s -> (s as Sensor).id() == r.sensorId() } as Sensor?
+    if sensor != null {
+      val alert: Alert? = detector.check(sensor, r)
+      if alert != null { alertList.add(alert) }
+    }
+  }
+
+  def alertCount(): Int = alertList.size()
+
+  def readingCount(): Int = readingList.size()
+
+  def allAlerts(): List[Object] = alertList
+
+  def allReadings(): List[Object] = readingList
+
+  def allSensors(): List[Object] = sensors
+
+  def zoneReport(zone: String): ZoneReport {
+    val zoneSensors: List[Object] = sensors.filter { s -> (s as Sensor).zone() == zone }
+
+    val tempIds: List[Object] = zoneSensors
+      .filter { s -> (s as Sensor).kind() == SensorKind::Temperature }
+      .map { s -> (s as Sensor).id() as Object }
+    val tempVals: List[Object] = readingList
+      .filter { r -> tempIds.find { id -> (id as Int) == (r as Reading).sensorId() } != null }
+      .map { r -> (r as Reading).value() as Object }
+    var tempSum: Double = 0.0
+    foreach tv: Object in tempVals { tempSum = tempSum + (tv as Double) }
+    val avgTemp: Double = if tempVals.isEmpty() { 0.0 } else { tempSum / tempVals.size() }
+
+    val humIds: List[Object] = zoneSensors
+      .filter { s -> (s as Sensor).kind() == SensorKind::Humidity }
+      .map { s -> (s as Sensor).id() as Object }
+    val humVals: List[Object] = readingList
+      .filter { r -> humIds.find { id -> (id as Int) == (r as Reading).sensorId() } != null }
+      .map { r -> (r as Reading).value() as Object }
+    var humSum: Double = 0.0
+    foreach hv: Object in humVals { humSum = humSum + (hv as Double) }
+    val avgHum: Double = if humVals.isEmpty() { 0.0 } else { humSum / humVals.size() }
+
+    val zoneAlerts: List[Object] =
+      alertList.filter { a -> (a as Alert).sensor().zone() == zone }
+
+    var topAlert: Alert? = null
+    foreach a: Object in zoneAlerts {
+      val cur: Alert = a as Alert
+      if topAlert == null {
+        topAlert = cur
+      } else {
+        val top: Alert = topAlert!!
+        val curIsBetter: Boolean = select cur.level() {
+          case AlertLevel::Critical: true
+          case AlertLevel::Warning:  top.level() == AlertLevel::Info
+          else: false
+        }
+        if curIsBetter { topAlert = cur }
+      }
+    }
+
+    return new ZoneReport(zone, avgTemp, avgHum, zoneAlerts.size(), topAlert)
+  }
+}
+
+// ─── Simulation helpers ───────────────────────────────────────────────────────
+
+def simulate(seed: Long, base: Double, amplitude: Double, noise: Double, tick: Int): Double {
+  val phase: Double = (tick * 3.14159 * 2.0) / 144.0
+  val signal: Double = base + amplitude * JMath::sin(phase)
+  var r: Long = seed * 1664525L + 1013904223L + (tick as Long) * 22695477L
+  r = r ^ (r >> 13)
+  r = r ^ (r << 7)
+  val nz: Double = ((r % 1000L) as Double / 1000.0) * noise * 2.0 - noise
+  return signal + nz
+}
+
+def formatDouble(v: Double): String {
+  val rounded: Long = (v * 10.0 + 0.5) as Long
+  val whole: Long = rounded / 10L
+  val frac: Long = JMath::abs(rounded % 10L) as Long
+  return "#{whole}.#{frac}"
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val detector: AnomalyDetector = new ThresholdDetector()
+val net: SensorNetwork = new SensorNetwork(detector)
+
+val sensors: List[Object] = [
+  new Sensor(1, "TempA",  SensorKind::Temperature, "LabA") as Object,
+  new Sensor(2, "HumA",   SensorKind::Humidity,    "LabA") as Object,
+  new Sensor(3, "TempB",  SensorKind::Temperature, "LabB") as Object,
+  new Sensor(4, "HumB",   SensorKind::Humidity,    "LabB") as Object,
+  new Sensor(5, "CO2-A",  SensorKind::CO2,         "LabA") as Object,
+  new Sensor(6, "PressA", SensorKind::Pressure,    "LabA") as Object
+]
+
+foreach s: Object in sensors { net.addSensor(s as Sensor) }
+
+// Simulate 48 ticks (one reading per 30 min, one day)
+foreach tick: Int in 0..<48 {
+  net.ingest(new Reading(1, tick, simulate(101L, 22.0, 8.0,  1.0, tick)))
+  net.ingest(new Reading(2, tick, simulate(202L, 55.0, 15.0, 3.0, tick)))
+  net.ingest(new Reading(3, tick, simulate(303L, 18.0, 5.0,  2.0, tick)))
+  net.ingest(new Reading(4, tick, simulate(404L, 60.0, 10.0, 4.0, tick)))
+  net.ingest(new Reading(5, tick, simulate(505L, 800.0,200.0,30.0,tick)))
+  val pressVal: Double =
+    if tick == 30 { 1100.5 }
+    else { simulate(606L, 1013.0, 15.0, 5.0, tick) }
+  net.ingest(new Reading(6, tick, pressVal))
+}
+
+// ─── PID demo ────────────────────────────────────────────────────────────────
+
+IO::println("=== PID Temperature Regulation Demo ===")
+val pid: PidController = new PidController(0.6, 0.1, 0.05)
+var temp: Double = 15.0
+foreach step: Int in 1..20 {
+  val action: ControlAction = pid.step(23.0, temp)
+  select action {
+    case inc is Increase: temp = temp + inc.delta() * 0.3
+    case dec is Decrease: temp = temp - dec.delta() * 0.3
+    case m is Maintain:   temp = temp
+  }
+  val marker: String = if JMath::abs(temp - 23.0) < 0.5 { " [converged]" } else { "" }
+  IO::println("  step #{step}: temp=#{formatDouble(temp)} C#{marker}")
+}
+
+// ─── Network summary ─────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Sensor Network Summary ===")
+IO::println("Total readings : #{net.readingCount()}")
+IO::println("Total alerts   : #{net.alertCount()}")
+IO::println("")
+
+// Group alerts by level
+val byLevel: Map[Object, List[Object]] = net.allAlerts().groupBy { a -> (a as Alert).level().toString() }
+IO::println("Alerts by level:")
+foreach (level, group) in byLevel {
+  IO::println("  #{level}: #{(group as List[Object]).size()}")
+}
+IO::println("")
+
+// Zone reports
+foreach zone: String in ["LabA", "LabB"] {
+  val report: ZoneReport = net.zoneReport(zone)
+  IO::println("Zone #{zone}:")
+  IO::println("  avg temp   = #{formatDouble(report.avgTemp())} C")
+  IO::println("  avg hum    = #{formatDouble(report.avgHum())} %")
+  IO::println("  alerts     = #{report.alertCount()}")
+  val top: Alert? = report.topAlert()
+  if top != null {
+    IO::println("  top alert  = #{top.msg()}")
+  }
+  IO::println("")
+}
+
+// Sorted sensors by total alert count
+IO::println("=== Sensors by Alert Count ===")
+val alertsBySensor: Map[Object, List[Object]] =
+  net.allAlerts().groupBy { a -> (a as Alert).sensor().name() }
+val sortedSensors: List[Object] = sensors
+  .sortedBy { s ->
+    val nm: String = (s as Sensor).name()
+    val grp: List[Object]? = alertsBySensor[nm] as List[Object]?
+    if grp != null { -(grp.size()) } else { 0 }
+  }
+foreach s: Object in sortedSensors {
+  val nm: String = (s as Sensor).name()
+  val grp: List[Object]? = alertsBySensor[nm] as List[Object]?
+  val cnt: Int = if grp != null { grp.size() } else { 0 }
+  IO::println("  #{nm}: #{cnt} alert(s)")
+}
+
+// Partition readings into in-range / out-of-range
+IO::println("")
+IO::println("=== Reading Range Partition ===")
+val parts = net.allReadings().partition { r ->
+  val rd: Reading = r as Reading
+  val sensor: Sensor? =
+    sensors.find { s -> (s as Sensor).id() == rd.sensorId() } as Sensor?
+  if sensor == null { true }
+  else {
+    val k: SensorKind = sensor.kind()
+    rd.value() >= k.lo() && rd.value() <= k.hi()
+  }
+}
+val inRange: List[Object] = parts[0] as List[Object]
+val outRange: List[Object] = parts[1] as List[Object]
+IO::println("In-range readings : #{inRange.size()}")
+IO::println("Out-of-range      : #{outRange.size()}")
+
+// Per-sensor min/max/avg
+IO::println("")
+IO::println("=== Per-Sensor Statistics ===")
+foreach s: Object in sensors {
+  val sensor: Sensor = s as Sensor
+  val sReadings: List[Object] = net.allReadings()
+    .filter { r -> (r as Reading).sensorId() == sensor.id() }
+  if !sReadings.isEmpty() {
+    var mn: Double = (sReadings[0] as Reading).value()
+    var mx: Double = mn
+    var total: Double = 0.0
+    foreach r: Object in sReadings {
+      val v: Double = (r as Reading).value()
+      if v < mn { mn = v }
+      if v > mx { mx = v }
+      total = total + v
+    }
+    val avg: Double = total / sReadings.size()
+    IO::println("  #{sensor.name()} (#{sensor.kind().unit()}): min=#{formatDouble(mn)} max=#{formatDouble(mx)} avg=#{formatDouble(avg)}")
+  }
+}
+
+// ─── Recursive helper: exponential moving average ─────────────────────────────
+// Computes EMA over a list of readings using tail recursion.
+
+def ema(readings: List[Object], idx: Int, prev: Double, alpha: Double): Double {
+  if idx >= readings.size() { return prev }
+  val v: Double = (readings[idx] as Reading).value()
+  val next: Double = alpha * v + (1.0 - alpha) * prev
+  return ema(readings, idx + 1, next, alpha)
+}
+
+IO::println("")
+IO::println("=== Exponential Moving Average (EMA, alpha=0.15) ===")
+foreach s: Object in sensors {
+  val sensor: Sensor = s as Sensor
+  val sReadings: List[Object] = net.allReadings()
+    .filter { r -> (r as Reading).sensorId() == sensor.id() }
+  if !sReadings.isEmpty() {
+    val seed: Double = (sReadings[0] as Reading).value()
+    val result: Double = ema(sReadings, 1, seed, 0.15)
+    IO::println("  #{sensor.name()}: EMA = #{formatDouble(result)} #{sensor.kind().unit()}")
+  }
+}
+
+// ─── While loop: find first tick with above-avg readings ─────────────────────
+
+IO::println("")
+IO::println("=== First Above-Average Tick per Sensor ===")
+foreach s: Object in sensors {
+  val sensor: Sensor = s as Sensor
+  val sReadings: List[Object] = net.allReadings()
+    .filter { r -> (r as Reading).sensorId() == sensor.id() }
+  if !sReadings.isEmpty() {
+    var total: Double = 0.0
+    foreach r: Object in sReadings { total = total + (r as Reading).value() }
+    val avg: Double = total / sReadings.size()
+    var i: Int = 0
+    var foundTick: Int = -1
+    while i < sReadings.size() && foundTick < 0 {
+      if (sReadings[i] as Reading).value() > avg { foundTick = (sReadings[i] as Reading).tick() }
+      i++
+    }
+    if foundTick >= 0 {
+      IO::println("  #{sensor.name()}: first above-avg at tick #{foundTick}")
+    }
+  }
+}
+
+// ─── Try/catch: parse sensor value from string ────────────────────────────────
+
+IO::println("")
+IO::println("=== Parse Sensor Values from Strings ===")
+val rawInputs: List[Object] = ["23.5" as Object, "bad_value" as Object, "1013.2" as Object, "" as Object, "72.0" as Object]
+foreach raw: Object in rawInputs {
+  val s: String = raw as String
+  try {
+    val v: Double = JDouble::parseDouble(s)
+    IO::println("  parsed '#{s}' -> #{formatDouble(v)}")
+  } catch e: Exception {
+    IO::println("  failed '#{s}' -> #{e.message()}")
+  }
+}

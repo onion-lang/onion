@@ -1,0 +1,347 @@
+// KanbanBoard.on — a Kanban-style work-item tracker
+// Exercises: records with methods (named partial copy), data-carrying enums,
+// ADT case-enum, extension Int/String, collection pipelines (filter/map/fold/
+// groupBy/sortedBy/partition/find/any), foreach (k,v) on Map, select/pattern
+// matching, nullable, closures, string interpolation, @TailRecursive,
+// while loop, foreach over list and ranges.
+
+import { java.lang.Integer as JInteger }
+
+// ─── Priority enum (data-carrying) ───────────────────────────────────────────
+
+enum Priority(weight: Int, symbol: String) {
+  Critical(4, "!!!"),
+  High(3, "!! "),
+  Medium(2, "!  "),
+  Low(1, "   ")
+public:
+  def label(): String = select this {
+    case Priority::Critical: "CRITICAL"
+    case Priority::High:     "HIGH"
+    case Priority::Medium:   "MEDIUM"
+    case Priority::Low:      "LOW"
+    else:                    "?"
+  }
+}
+
+// ─── Column enum ─────────────────────────────────────────────────────────────
+
+enum Column {
+  Backlog, Todo, InProgress, Review, Done
+public:
+  def label(): String = select this {
+    case Column::Backlog:    "Backlog"
+    case Column::Todo:       "To Do"
+    case Column::InProgress: "In Progress"
+    case Column::Review:     "Review"
+    case Column::Done:       "Done"
+    else:                    "?"
+  }
+  def wipLimit(): Int = select this {
+    case Column::InProgress: 3
+    case Column::Review:     2
+    else:                    99
+  }
+}
+
+// ─── Blocker ADT ─────────────────────────────────────────────────────────────
+
+enum Blocker {
+  case WaitingOn(dependency: String)
+  case NeedsInfo(from: String)
+  case Technical(detail: String)
+  case None
+public:
+  def label(): String = select this {
+    case b is WaitingOn: "waiting on: #{b.dependency()}"
+    case b is NeedsInfo: "needs info from: #{b.from()}"
+    case b is Technical: "tech: #{b.detail()}"
+    case b is None:      ""
+  }
+  def isBlocked(): Boolean = select this {
+    case b is None: false
+    else:           true
+  }
+}
+
+// ─── Task record ─────────────────────────────────────────────────────────────
+
+record Task(
+  id:       Int,
+  title:    String,
+  col:      Column,
+  priority: Priority,
+  assignee: String?,
+  points:   Int,
+  blocker:  Blocker
+) {
+public:
+  def isBlocked():  Boolean = blocker().isBlocked()
+  def isAssigned(): Boolean = assignee() != null
+  def isDone():     Boolean = col() == Column::Done
+
+  def moveTo(c: Column): Task   = self.copy(col = c)
+  def assignTo(who: String): Task = self.copy(assignee = who)
+  def block(b: Blocker): Task   = self.copy(blocker = b)
+
+  def line(): String {
+    val who = assignee() ?: "unassigned"
+    val blk = if blocker().isBlocked() { " BLOCKED" } else { "" }
+    return "#{priority().symbol()} ##{id()} #{title()} → #{col().label()} (#{who}, #{points()}pt)#{blk}"
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(one: String, many: String): String =
+    if self == 1 { "#{self} #{one}" } else { "#{self} #{many}" }
+  def rpad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Board ────────────────────────────────────────────────────────────────────
+
+class Board {
+  var tasks: List[Task]
+  var seq:   Int
+
+public:
+  def this() {
+    tasks = []
+    seq   = 1
+  }
+
+  def allTasks(): List[Task] = tasks
+
+  def add(title: String, priority: Priority, assignee: String?, points: Int): Task {
+    val t = new Task(seq, title, Column::Backlog, priority, assignee, points, new None())
+    tasks.add(t)
+    seq = seq + 1
+    return t
+  }
+
+  def findById(id: Int): Task? {
+    val hit = tasks.find { x -> (x as Task).id() == id }
+    if hit == null { return null }
+    return hit as Task
+  }
+
+  def mutate(id: Int, f: Function1[Task, Task]): void {
+    var i: Int = 0
+    while i < tasks.size {
+      val t = tasks.get(i) as Task
+      if t.id() == id { tasks.set(i, f(t)) }
+      i = i + 1
+    }
+  }
+
+  def move(id: Int, c: Column): void {
+    mutate(id, { t -> t.moveTo(c) })
+  }
+  def assign(id: Int, who: String): void {
+    mutate(id, { t -> t.assignTo(who) })
+  }
+  def blockTask(id: Int, b: Blocker): void {
+    mutate(id, { t -> t.block(b) })
+  }
+
+  def inCol(c: Column): List[Task] =
+    tasks.filter { x -> (x as Task).col() == c } as List[Task]
+
+  def wipCount(c: Column): Int = inCol(c).size
+  def overWip(c: Column):  Boolean = wipCount(c) > c.wipLimit()
+}
+
+// ─── Recursive point sum ──────────────────────────────────────────────────────
+
+@TailRecursive
+def sumPoints(ts: List[Task], acc: Int): Int {
+  if ts.size == 0 { return acc }
+  val head = ts.get(0) as Task
+  return sumPoints(ts.subList(1, ts.size) as List[Task], acc + head.points())
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+def bar(n: Int, total: Int, width: Int): String {
+  if total == 0 { return ("░".padRight(width)) }
+  val filled: Int = n * width / total
+  var s: String = "["
+  var i: Int = 0
+  while i < width {
+    s = s + (if i < filled { "█" } else { "░" })
+    i = i + 1
+  }
+  return s + "]"
+}
+
+def hline(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "─"; i = i + 1 }
+  return s
+}
+
+// ─── Report sections ──────────────────────────────────────────────────────────
+
+def printColumnSummary(board: Board): void {
+  val allCols = [Column::Backlog, Column::Todo, Column::InProgress,
+                 Column::Review, Column::Done]
+  IO::println("  " + "COLUMN".padRight(14) + "  CNT  POINTS  BLOCKED")
+  IO::println("  " + hline(40))
+  foreach col: Column in allCols {
+    val ts  = board.inCol(col)
+    val cnt = ts.size
+    val pts = sumPoints(ts, 0)
+    val blk = ts.filter { x -> (x as Task).isBlocked() }.size
+    val wip = if col.wipLimit() < 99 {
+      val over = if board.overWip(col) { "!" } else { " " }
+      " #{cnt}/#{col.wipLimit()}#{over}"
+    } else { "  -  " }
+    IO::println("  #{col.label().padRight(14)}  #{cnt.rpad(3)}  #{pts.rpad(5)}    #{blk.rpad(3)}#{wip}")
+  }
+  IO::println("  " + hline(40))
+  val total = board.allTasks().size
+  val pts   = sumPoints(board.allTasks(), 0)
+  IO::println("  Total: #{total.plural("task", "tasks")}, #{pts} story points")
+}
+
+def printPriorityBreakdown(board: Board): void {
+  val groups = board.allTasks().groupBy { x -> (x as Task).priority().label() }
+  IO::println("  " + "PRIORITY".padRight(10) + "  CNT  POINTS  DONE  PROGRESS")
+  IO::println("  " + hline(50))
+  val prios = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+  foreach lbl: String in prios {
+    val grp = groups.get(lbl)
+    if grp != null {
+      val ts   = grp as List[Task]
+      val cnt  = ts.size
+      val pts  = sumPoints(ts, 0)
+      val done = ts.filter { x -> (x as Task).isDone() }.size
+      IO::println("  #{lbl.padRight(10)}  #{cnt.rpad(3)}     #{pts.rpad(3)}   #{done.rpad(3)}  #{bar(done, cnt, 8)}")
+    }
+  }
+}
+
+def printAssigneeLoad(board: Board): void {
+  val assigned = board.allTasks().filter { x -> (x as Task).isAssigned() } as List[Task]
+  val groups   = assigned.groupBy { x -> (x as Task).assignee() }
+  IO::println("  " + "ASSIGNEE".padRight(12) + "  CNT  POINTS  DONE")
+  IO::println("  " + hline(38))
+  foreach (name, grp) in groups {
+    val ts   = grp as List[Task]
+    val cnt  = ts.size
+    val pts  = sumPoints(ts, 0)
+    val done = ts.filter { x -> (x as Task).isDone() }.size
+    IO::println("  #{(name as String).padRight(12)}  #{cnt.rpad(3)}     #{pts.rpad(3)}   #{done.rpad(3)}")
+  }
+  val unassigned = board.allTasks().filter { x -> !(x as Task).isAssigned() }.size
+  if unassigned > 0 {
+    IO::println("  (unassigned)    #{unassigned.rpad(3)}")
+  }
+}
+
+def printBlockers(board: Board): void {
+  val blocked = board.allTasks().filter { x -> (x as Task).isBlocked() } as List[Task]
+  if blocked.size == 0 {
+    IO::println("  No blocked tasks.")
+    return
+  }
+  foreach t: Task in blocked {
+    IO::println("  ##{t.id()} #{t.title()}: #{t.blocker().label()}")
+  }
+}
+
+def printWipCheck(board: Board): void {
+  val wipCols = [Column::InProgress, Column::Review]
+  var violations: Int = 0
+  foreach col: Column in wipCols {
+    val cnt    = board.wipCount(col)
+    val lim    = col.wipLimit()
+    val status = if board.overWip(col) { "OVER LIMIT!" } else { "OK" }
+    IO::println("  #{col.label().padRight(14)} #{cnt}/#{lim} — #{status}")
+    if board.overWip(col) { violations = violations + 1 }
+  }
+  if violations == 0 {
+    IO::println("  All WIP limits respected.")
+  } else {
+    IO::println("  #{violations.plural("violation", "violations")} detected!")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val board = new Board()
+
+  board.add("Design login page",         Priority::High,     "Alice",   3)
+  board.add("Implement JWT auth",         Priority::Critical, "Bob",     8)
+  board.add("Write API docs",             Priority::Medium,   "Alice",   2)
+  board.add("Set up CI/CD pipeline",     Priority::High,     "Charlie", 5)
+  board.add("Database schema migration", Priority::Critical, "Bob",     5)
+  board.add("Mobile-responsive CSS",     Priority::Medium,   null,      3)
+  board.add("Write unit tests",          Priority::High,     "Diana",   4)
+  board.add("Performance profiling",    Priority::Low,      "Diana",   2)
+  board.add("Fix login redirect bug",   Priority::Critical, "Alice",   1)
+  board.add("Review access control",    Priority::High,     "Charlie", 3)
+
+  board.move(1, Column::Todo)
+  board.move(2, Column::InProgress)
+  board.move(3, Column::Done)
+  board.move(4, Column::InProgress)
+  board.move(5, Column::Todo)
+  board.move(7, Column::Review)
+  board.move(9, Column::InProgress)
+  board.move(10, Column::Review)
+
+  board.blockTask(5, new WaitingOn("Schema design sign-off"))
+  board.blockTask(6, new NeedsInfo("Design team"))
+
+  var sep: String = ""
+  var i: Int = 0
+  while i < 60 { sep = sep + "═"; i = i + 1 }
+
+  IO::println(sep)
+  IO::println("  KANBAN BOARD REPORT")
+  IO::println(sep)
+
+  IO::println("\n  COLUMN SUMMARY")
+  printColumnSummary(board)
+
+  IO::println("\n  PRIORITY BREAKDOWN")
+  printPriorityBreakdown(board)
+
+  IO::println("\n  ASSIGNEE WORKLOAD")
+  printAssigneeLoad(board)
+
+  IO::println("\n  BLOCKED TASKS")
+  printBlockers(board)
+
+  IO::println("\n  ALL TASKS (sorted by priority, highest first)")
+  val sorted = board.allTasks().sortedBy { x -> -(x as Task).priority().weight() } as List[Task]
+  foreach t: Task in sorted {
+    IO::println("  " + t.line())
+  }
+
+  IO::println("\n  WIP LIMIT STATUS")
+  printWipCheck(board)
+
+  IO::println("\n" + sep)
+}

@@ -1,0 +1,531 @@
+// HikingTrailPlanner.on — Trail management, route planning, and trip reporting.
+//
+// Exercises: records (with example clauses), ADT case-enum, data-carrying
+// enums, extension methods on Double/Int/String, interface, classes with
+// inheritance, generic record, collection pipelines (filter/map/fold/sortedBy/
+// groupBy/distinct/find/partition/count/any/reduce), foreach over Map (k,v),
+// nullable types, closures/lambdas, string interpolation, try/catch, recursion,
+// while and foreach with ranges.
+
+import { java.lang.Math }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): Double {
+    val s: Int = (self * 10.0) as Int
+    return s.doubleValue() / 10.0
+  }
+  def formatElev(): String = "#{self.round1()}m"
+  def formatDist(): String = "#{self.round1()}km"
+  def abs(): Double = if self < 0.0 { 0.0 - self } else { self }
+}
+
+extension Int {
+  def plural(word: String): String = if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+  def padL(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padR(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def truncate(w: Int): String {
+    if self.length() <= w { return self }
+    return self.substring(0, w - 3) + "..."
+  }
+}
+
+// ─── Difficulty ADT enum ──────────────────────────────────────────────────────
+
+enum Difficulty {
+  case Easy
+  case Moderate
+  case Hard
+  case Expert
+public:
+  def label(): String = select this {
+    case d is Easy:     "Easy"
+    case d is Moderate: "Moderate"
+    case d is Hard:     "Hard"
+    case d is Expert:   "Expert"
+  }
+  def symbol(): String = select this {
+    case d is Easy:     "[*   ]"
+    case d is Moderate: "[**  ]"
+    case d is Hard:     "[*** ]"
+    case d is Expert:   "[****]"
+  }
+  def minFitness(): Int = select this {
+    case d is Easy:     1
+    case d is Moderate: 3
+    case d is Hard:     6
+    case d is Expert:   9
+  }
+}
+
+// ─── Terrain ADT enum ─────────────────────────────────────────────────────────
+
+enum Terrain {
+  case Forest
+  case Alpine
+  case Desert
+  case Coastal
+  case Mixed
+public:
+  def label(): String = select this {
+    case t is Forest:  "Forest"
+    case t is Alpine:  "Alpine"
+    case t is Desert:  "Desert"
+    case t is Coastal: "Coastal"
+    case t is Mixed:   "Mixed"
+  }
+  def emoji(): String = select this {
+    case t is Forest:  "[F]"
+    case t is Alpine:  "[A]"
+    case t is Desert:  "[D]"
+    case t is Coastal: "[C]"
+    case t is Mixed:   "[M]"
+  }
+}
+
+// ─── Season (data-carrying enum) ─────────────────────────────────────────────
+
+enum Season(monthStart: Int, monthEnd: Int, lbl: String) {
+  SPRING(3, 5, "Spring"),
+  SUMMER(6, 8, "Summer"),
+  AUTUMN(9, 11, "Autumn"),
+  WINTER(12, 2, "Winter")
+public:
+  def label(): String = lbl()
+  def includesMonth(m: Int): Boolean {
+    if monthStart() <= monthEnd() {
+      return m >= monthStart() && m <= monthEnd()
+    }
+    return m >= monthStart() || m <= monthEnd()
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Waypoint(name: String, elevation: Double, distFromStart: Double)
+  example {
+    val wp: Waypoint = new Waypoint("Summit", 2450.0, 8.5)
+    wp.elevation() > wp.distFromStart()
+  }
+
+record ElevationProfile(gain: Double, loss: Double, maxElev: Double, minElev: Double) {
+  example {
+    val ep: ElevationProfile = new ElevationProfile(400.0, 50.0, 1200.0, 800.0)
+    ep.gain() > ep.loss()
+  }
+public:
+  def netChange(): Double = gain() - loss()
+  def range(): Double = maxElev() - minElev()
+  def summary(): String = "+#{gain().formatElev()} / -#{loss().formatElev()}  net: #{netChange().formatElev()}"
+}
+
+record TrailStats(trailCount: Int, totalDist: Double, avgElev: Double, hardestDiff: String)
+  example { new TrailStats(5, 42.3, 1200.0, "Hard").trailCount() == 5 }
+
+// ─── Generic ranked wrapper ───────────────────────────────────────────────────
+
+record Ranked[T](rank: Int, item: T, score: Double)
+  example { new Ranked[String](1, "Summit Loop", 9.2).rank() == 1 }
+
+// ─── Trail class ─────────────────────────────────────────────────────────────
+
+class Trail {
+  val trailId: String
+  val name: String
+  val waypoints: List[Object]
+  val difficulty: Difficulty
+  val terrain: Terrain
+  val bestMonths: List[Object]
+
+public:
+  def this(id: String, n: String, wps: List[Object], diff: Difficulty, ter: Terrain, bm: List[Object]) {
+    this.trailId = id
+    this.name = n
+    this.waypoints = wps
+    this.difficulty = diff
+    this.terrain = ter
+    this.bestMonths = bm
+  }
+
+  def getId(): String = trailId
+  def getName(): String = name
+  def getDifficulty(): Difficulty = difficulty
+  def getTerrain(): Terrain = terrain
+  def getBestMonths(): List[Object] = bestMonths
+  def getWaypoints(): List[Object] = waypoints
+
+  def totalDistance(): Double {
+    if waypoints.isEmpty { return 0.0 }
+    return (waypoints.get(waypoints.size - 1) as Waypoint).distFromStart()
+  }
+
+  def elevationProfile(): ElevationProfile {
+    if waypoints.isEmpty { return new ElevationProfile(0.0, 0.0, 0.0, 0.0) }
+    var gain: Double = 0.0
+    var loss: Double = 0.0
+    var maxE: Double = 0.0 - 9999.0
+    var minE: Double = 9999.0
+    var i: Int = 0
+    while i < waypoints.size {
+      val wp: Waypoint = waypoints.get(i) as Waypoint
+      val elev: Double = wp.elevation()
+      if elev > maxE { maxE = elev }
+      if elev < minE { minE = elev }
+      if i > 0 {
+        val prev: Waypoint = waypoints.get(i - 1) as Waypoint
+        val diff: Double = elev - prev.elevation()
+        if diff > 0.0 { gain = gain + diff } else { loss = loss + (0.0 - diff) }
+      }
+      i = i + 1
+    }
+    return new ElevationProfile(gain, loss, maxE, minE)
+  }
+
+  def suitableForMonth(month: Int): Boolean {
+    return bestMonths.any { m -> (m as Int) == month }
+  }
+
+  def summary(): String {
+    val ep: ElevationProfile = elevationProfile()
+    return "#{name.padR(28)} #{difficulty.symbol()} #{terrain.emoji()}  #{totalDistance().formatDist().padR(8)} #{ep.summary()}"
+  }
+}
+
+// ─── Trail database ───────────────────────────────────────────────────────────
+
+class TrailDatabase {
+  val trails: List[Object]
+
+public:
+  def this(ts: List[Object]) {
+    this.trails = ts
+  }
+
+  def getTrails(): List[Object] = trails
+
+  def findById(id: String): Trail? {
+    val found = trails.find { t -> (t as Trail).getId() == id }
+    if found == null { return null }
+    return found as Trail
+  }
+
+  def byDifficulty(d: Difficulty): List[Object] {
+    return trails.filter { t -> (t as Trail).getDifficulty().label() == d.label() }
+  }
+
+  def byTerrain(te: Terrain): List[Object] {
+    return trails.filter { t -> (t as Trail).getTerrain().label() == te.label() }
+  }
+
+  def suitableForMonth(month: Int): List[Object] {
+    return trails.filter { t -> (t as Trail).suitableForMonth(month) }
+  }
+
+  def stats(): TrailStats {
+    if trails.isEmpty { return new TrailStats(0, 0.0, 0.0, "N/A") }
+    val totalDist: Double = trails.fold(0.0) { acc, t ->
+      (acc as Double) + (t as Trail).totalDistance()
+    } as Double
+    val avgElev: Double = trails.fold(0.0) { acc, t ->
+      val ep: ElevationProfile = (t as Trail).elevationProfile()
+      (acc as Double) + ep.maxElev()
+    } as Double / trails.size.doubleValue()
+    val hardest: Trail = trails.fold(trails.get(0) as Trail) { acc, t ->
+      val a: Trail = acc as Trail
+      val b: Trail = t as Trail
+      if b.getDifficulty().minFitness() > a.getDifficulty().minFitness() { b } else { a }
+    } as Trail
+    return new TrailStats(trails.size, totalDist, avgElev.round1(), hardest.getDifficulty().label())
+  }
+}
+
+// ─── Report generator ─────────────────────────────────────────────────────────
+
+class TrailReporter {
+  val db: TrailDatabase
+
+public:
+  def this(d: TrailDatabase) {
+    this.db = d
+  }
+
+  def sep(w: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < w { s = s + "-"; i = i + 1 }
+    return s
+  }
+
+  def header(): String {
+    val stats: TrailStats = db.stats()
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("#{sep(65)}\n")
+    sb.append("  HIKING TRAIL PLANNER  |  #{stats.trailCount().plural("trail")} in database\n")
+    sb.append("#{sep(65)}\n")
+    sb.append("  Total distance: #{stats.totalDist().formatDist()}   Avg peak: #{stats.avgElev().formatElev()}   Hardest: #{stats.hardestDiff()}\n")
+    sb.append("#{sep(65)}\n")
+    return sb.toString()
+  }
+
+  def allTrails(): String {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("ALL TRAILS (sorted by distance):\n")
+    val sorted: List[Object] = db.getTrails().sortedBy { t -> (t as Trail).totalDistance() }
+    var n: Int = 1
+    foreach t: Object in sorted {
+      val trail: Trail = t as Trail
+      sb.append("  #{n.padL(2)}. #{trail.summary()}\n")
+      n = n + 1
+    }
+    return sb.toString()
+  }
+
+  def byTerrainSection(): String {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("\nTRAILS BY TERRAIN:\n")
+    val grouped: Map[String, List[Object]] = db.getTrails().groupBy { t ->
+      (t as Trail).getTerrain().label()
+    }
+    foreach (terrain, trails) in grouped {
+      val tlist: List[Object] = trails as List[Object]
+      sb.append("  #{terrain} #{(tlist.get(0) as Trail).getTerrain().emoji()}  (#{tlist.size.plural("trail")})\n")
+      val sorted: List[Object] = tlist.sortedBy { t -> (t as Trail).totalDistance() }
+      foreach t: Object in sorted {
+        val trail: Trail = t as Trail
+        sb.append("    - #{trail.getName().padR(28)} #{trail.getDifficulty().symbol()}  #{trail.totalDistance().formatDist()}\n")
+      }
+    }
+    return sb.toString()
+  }
+
+  def elevationLeaderboard(n: Int): String {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("\nTOP #{n} BY ELEVATION GAIN:\n")
+    val ranked: List[Object] = db.getTrails()
+      .sortedBy { t -> 0.0 - (t as Trail).elevationProfile().gain() }
+    var rank: Int = 1
+    foreach t: Object in ranked {
+      if rank > n { break }
+      val trail: Trail = t as Trail
+      val ep: ElevationProfile = trail.elevationProfile()
+      sb.append("  #{rank.padL(2)}. #{trail.getName().padR(28)} gain: #{ep.gain().formatElev()}  #{ep.summary()}\n")
+      rank = rank + 1
+    }
+    return sb.toString()
+  }
+
+  def seasonalGuide(month: Int): String {
+    val sb: StringBuilder = new StringBuilder()
+    val season: Season? = [Season::SPRING, Season::SUMMER, Season::AUTUMN, Season::WINTER]
+      .find { s -> (s as Season).includesMonth(month) } as Season?
+    val seasonName: String = if season == null { "month #{month}" } else { (season as Season).label() }
+    val suitable: List[Object] = db.suitableForMonth(month)
+    sb.append("\nSEASONAL GUIDE (#{seasonName}):\n")
+    sb.append("  #{suitable.size.plural("trail")} recommended:\n")
+    val byStar: List[Object] = suitable.sortedBy { t -> (t as Trail).getDifficulty().minFitness() }
+    foreach t: Object in byStar {
+      val trail: Trail = t as Trail
+      sb.append("  - #{trail.getName().padR(28)} #{trail.getDifficulty().symbol()}\n")
+    }
+    return sb.toString()
+  }
+
+  def generate(month: Int): String {
+    return header() + allTrails() + byTerrainSection() + elevationLeaderboard(5) + seasonalGuide(month)
+  }
+}
+
+// ─── Recursive helpers ────────────────────────────────────────────────────────
+
+def cumulativeGain(waypoints: List[Object], idx: Int): Double {
+  if idx <= 0 { return 0.0 }
+  val curr: Waypoint = waypoints.get(idx) as Waypoint
+  val prev: Waypoint = waypoints.get(idx - 1) as Waypoint
+  val diff: Double = curr.elevation() - prev.elevation()
+  val step: Double = if diff > 0.0 { diff } else { 0.0 }
+  return step + cumulativeGain(waypoints, idx - 1)
+}
+
+// ─── Sample data ─────────────────────────────────────────────────────────────
+
+def buildDatabase(): TrailDatabase {
+  val t1: Trail = new Trail(
+    "T001", "Summit Loop",
+    [
+      new Waypoint("Trailhead",     850.0, 0.0),
+      new Waypoint("Ridge Start",  1120.0, 2.5),
+      new Waypoint("False Summit", 1380.0, 5.0),
+      new Waypoint("Summit",       1524.0, 7.2),
+      new Waypoint("Trailhead",     850.0, 14.4)
+    ],
+    new Hard(), new Alpine(),
+    [6, 7, 8, 9]
+  )
+
+  val t2: Trail = new Trail(
+    "T002", "Forest Wanderer",
+    [
+      new Waypoint("Parking Lot",   320.0, 0.0),
+      new Waypoint("Meadow",        380.0, 1.8),
+      new Waypoint("Old Bridge",    295.0, 3.6),
+      new Waypoint("Viewpoint",     410.0, 5.2),
+      new Waypoint("Parking Lot",   320.0, 6.8)
+    ],
+    new Easy(), new Forest(),
+    [3, 4, 5, 6, 7, 8, 9, 10, 11]
+  )
+
+  val t3: Trail = new Trail(
+    "T003", "Coastal Cliffs",
+    [
+      new Waypoint("Beach Access",   15.0, 0.0),
+      new Waypoint("Bluff Top",     120.0, 1.5),
+      new Waypoint("Lighthouse",    145.0, 3.8),
+      new Waypoint("Sea Cave",       20.0, 5.5),
+      new Waypoint("Beach Access",   15.0, 7.0)
+    ],
+    new Moderate(), new Coastal(),
+    [4, 5, 6, 7, 8, 9, 10]
+  )
+
+  val t4: Trail = new Trail(
+    "T004", "Desert Canyon Run",
+    [
+      new Waypoint("Canyon Mouth",  480.0, 0.0),
+      new Waypoint("Narrows",       520.0, 2.2),
+      new Waypoint("Arch Rock",     610.0, 4.1),
+      new Waypoint("Upper Bench",   720.0, 6.5),
+      new Waypoint("Canyon Mouth",  480.0, 11.0)
+    ],
+    new Moderate(), new Desert(),
+    [10, 11, 12, 1, 2, 3]
+  )
+
+  val t5: Trail = new Trail(
+    "T005", "Alpine Explorer",
+    [
+      new Waypoint("Lower Trailhead",  1100.0, 0.0),
+      new Waypoint("Snowfield Base",   1620.0, 3.2),
+      new Waypoint("Ice Lake",         1890.0, 5.8),
+      new Waypoint("Pass",             2210.0, 8.4),
+      new Waypoint("Peak",             2380.0, 10.5)
+    ],
+    new Expert(), new Alpine(),
+    [7, 8]
+  )
+
+  val t6: Trail = new Trail(
+    "T006", "Mixed Terrain Trek",
+    [
+      new Waypoint("Village Edge",  180.0, 0.0),
+      new Waypoint("Forest Path",   240.0, 1.5),
+      new Waypoint("Rocky Ridge",   520.0, 4.2),
+      new Waypoint("Meadow",        380.0, 7.0),
+      new Waypoint("Village Edge",  180.0, 9.5)
+    ],
+    new Moderate(), new Mixed(),
+    [4, 5, 6, 7, 8, 9, 10]
+  )
+
+  val t7: Trail = new Trail(
+    "T007", "Beginner Circuit",
+    [
+      new Waypoint("Picnic Area",   95.0, 0.0),
+      new Waypoint("Pond",         110.0, 0.8),
+      new Waypoint("Oak Grove",    105.0, 1.6),
+      new Waypoint("Picnic Area",   95.0, 2.4)
+    ],
+    new Easy(), new Forest(),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  )
+
+  return new TrailDatabase([t1, t2, t3, t4, t5, t6, t7])
+}
+
+// ─── Top-level helpers ────────────────────────────────────────────────────────
+
+def safeParse(s: String): Double {
+  try {
+    return Double::parseDouble(s)
+  } catch e: Exception {
+    return 0.0 - 1.0
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val db: TrailDatabase = buildDatabase()
+  val reporter: TrailReporter = new TrailReporter(db)
+
+  IO::println(reporter.generate(7))   // July report
+
+  // --- Extra pipelines demo ---
+  IO::println("\n--- PIPELINE DEMOS ---")
+
+  // Find the trail with highest peak elevation (sort descending, take first)
+  val byPeak: List[Object] = db.getTrails().sortedBy { t ->
+    0.0 - (t as Trail).elevationProfile().maxElev()
+  }
+  if byPeak.size > 0 {
+    val hp: Trail = byPeak.get(0) as Trail
+    IO::println("Highest peak: #{hp.getName()} at #{hp.elevationProfile().maxElev().formatElev()}")
+  }
+
+  // Partition: day hike (< 10km) vs multi-segment (>= 10km)
+  val shortTrails: List[Object] = db.getTrails().filter { t -> (t as Trail).totalDistance() < 10.0 }
+  val longTrails: List[Object]  = db.getTrails().filter { t -> (t as Trail).totalDistance() >= 10.0 }
+  IO::println("Short hikes (<10km): #{shortTrails.size}  Longer routes (>=10km): #{longTrails.size}")
+
+  // Distinct terrain types present
+  val terrains: List[String] = db.getTrails()
+    .map { t -> (t as Trail).getTerrain().label() }
+    .distinct()
+  IO::println("Terrain types: " + terrains.toString())
+
+  // Total network distance via fold
+  val total: Double = db.getTrails().fold(0.0) { acc, t ->
+    (acc as Double) + (t as Trail).totalDistance()
+  } as Double
+  IO::println("Total trail network: #{total.formatDist()}")
+
+  // Recursive cumulative gain on Summit Loop (T001)
+  val summit: Trail? = db.findById("T001")
+  if summit != null {
+    val st: Trail = summit as Trail
+    val wps: List[Object] = st.getWaypoints()
+    val recGain: Double = cumulativeGain(wps, wps.size - 1)
+    IO::println("Summit Loop cumulative gain (recursive): #{recGain.formatElev()}")
+  }
+
+  // Range: fitness level breakdown
+  IO::println("\nFitness requirement distribution:")
+  foreach lvl: Int in 1..10 {
+    val count: Int = db.getTrails().count { t ->
+      (t as Trail).getDifficulty().minFitness() == lvl
+    }
+    if count > 0 {
+      IO::println("  Level #{lvl}: #{count.plural("trail")}")
+    }
+  }
+
+  // Any trail suitable for December?
+  val decCount: Int = db.suitableForMonth(12).size
+  IO::println("\nTrails open in December: #{decCount}")
+
+  // Try-catch: safe parse
+  IO::println("safeParse(\"1234.5\") = #{safeParse("1234.5")}")
+  IO::println("safeParse(\"bad\")    = #{safeParse("bad")}")
+}

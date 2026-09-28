@@ -1,0 +1,383 @@
+// TelescopeLog.on — amateur-astronomer observation log, analysis, and reporting.
+// Exercises: from re"..." records with Int/String groups, data-carrying enums,
+// ADT enums, records with methods, extension methods (Int/Double), collection
+// pipelines (filter/map/fold/groupBy/sortedBy/distinct/partition/find/any),
+// select/exhaustive pattern matching, nullable + null-narrowing, closures,
+// string interpolation, try/catch, foreach (list & map k,v), recursion.
+
+// ─── extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def repeatStr(ch: String): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + ch; i++ }
+    return s
+  }
+  def pct(den: Int): String {
+    if den == 0 { return "0%" }
+    return "" + (self * 100 / den) + "%"
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    val factor: Long = 100L
+    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+  }
+}
+
+// ─── ObjectType: data-carrying enum ──────────────────────────────────────────
+
+enum ObjectType(symbol: String, tag: String) {
+  Star("★", "star"),
+  Planet("●", "planet"),
+  Galaxy("⬡", "galaxy"),
+  Nebula("☁", "nebula"),
+  Cluster("✦", "cluster"),
+  Comet("☄", "comet"),
+  Unknown("?", "unknown")
+public:
+  def label(): String = "#{symbol()} #{tag()}"
+}
+
+// ─── Seeing: Antoniadi scale 1–5 ─────────────────────────────────────────────
+
+enum Seeing(code: Int, summary: String) {
+  Perfect(1, "no quivering"),
+  Good(2,  "slight undulations"),
+  Average(3, "moderate quivering"),
+  Poor(4,  "constant undulations"),
+  Terrible(5, "barely usable")
+public:
+  def stars(): String = (6 - code()).repeatStr("★")
+  static def fromCode(c: Int): Seeing = select c {
+    case 1: Seeing::Perfect
+    case 2: Seeing::Good
+    case 3: Seeing::Average
+    case 4: Seeing::Poor
+    else:   Seeing::Terrible
+  }
+}
+
+// ─── ObsOutcome: ADT ─────────────────────────────────────────────────────────
+
+enum ObsOutcome {
+  case Hit(notes: String)
+  case Miss(reason: String)
+  case Partial(pct: Int, notes: String)
+public:
+  def tag(): String = select this {
+    case h is Hit:     "HIT"
+    case m is Miss:    "MISS"
+    case p is Partial: "PART"
+  }
+  def shortNote(): String = select this {
+    case h is Hit:     h.notes()
+    case m is Miss:    "failed: " + m.reason()
+    case p is Partial: p.pct() + "% — " + p.notes()
+  }
+  def isSuccess(): Boolean = select this {
+    case h is Hit:     true
+    case m is Miss:    false
+    case p is Partial: p.pct() >= 50
+  }
+  static def of(tag: String, notes: String): ObsOutcome = select tag {
+    case "HIT":  new Hit(notes)
+    case "MISS": new Miss(notes)
+    else:        new Partial(70, notes)
+  }
+}
+
+// ─── CatalogEntry ─────────────────────────────────────────────────────────────
+
+record CatalogEntry(
+  id:        String,
+  name:      String,
+  objType:   ObjectType,
+  magnitude: Double,
+  constell:  String
+) {
+public:
+  def label(): String = "#{id()} #{name()} [#{objType().symbol()}] mag=#{magnitude()} (#{constell()})"
+  def isTelescopic(): Boolean = magnitude() > 5.5
+  def isDeepSky(): Boolean = select objType() {
+    case ObjectType::Galaxy:  true
+    case ObjectType::Nebula:  true
+    case ObjectType::Cluster: true
+    else: false
+  }
+}
+
+// ─── RawObs: parsed from "YYYY-MM-DD,ID,DURATION,SEEING_CODE,TAG,NOTES" ──────
+
+record RawObs(
+  date:        String,
+  catalogId:   String,
+  durationMin: Int,
+  seeingCode:  Int,
+  resultTag:   String,
+  notes:       String
+) from re"(\d{4}-\d{2}-\d{2}),([A-Z][A-Z0-9]+),(\d+),(\d),(HIT|MISS|PART),(.*)"
+
+example { RawObs::parse("2024-03-15,M42,45,1,HIT,Excellent detail") != null }
+example { RawObs::parse("bad-line") == null }
+
+// ─── Observation ─────────────────────────────────────────────────────────────
+
+record Observation(
+  date:        String,
+  entry:       CatalogEntry,
+  durationMin: Int,
+  seeing:      Seeing,
+  outcome:     ObsOutcome
+) {
+public:
+  def month(): String = date().substring(0, 7)
+  def year():  String = date().substring(0, 4)
+  def hitScore(): Int = select outcome() {
+    case h is Hit:     if seeing().code() <= 2 { 5 } else { 3 }
+    case p is Partial: 2
+    case m is Miss:    0
+  }
+  def label(): String =
+    "#{date()} #{entry().id()} (#{entry().objType().symbol()}) " +
+    "#{durationMin()}min see=#{seeing().stars()} → #{outcome().tag()}"
+}
+
+// ─── catalog data ─────────────────────────────────────────────────────────────
+
+val catalog: List[CatalogEntry] = [
+  new CatalogEntry("M42",   "Orion Nebula",       ObjectType::Nebula,    4.0,  "Ori"),
+  new CatalogEntry("M31",   "Andromeda Galaxy",    ObjectType::Galaxy,    3.4,  "And"),
+  new CatalogEntry("M45",   "Pleiades",            ObjectType::Cluster,   1.6,  "Tau"),
+  new CatalogEntry("M13",   "Hercules Cluster",    ObjectType::Cluster,   5.8,  "Her"),
+  new CatalogEntry("M57",   "Ring Nebula",         ObjectType::Nebula,    8.8,  "Lyr"),
+  new CatalogEntry("M81",   "Bodes Galaxy",        ObjectType::Galaxy,    6.9,  "UMa"),
+  new CatalogEntry("M82",   "Cigar Galaxy",        ObjectType::Galaxy,    8.4,  "UMa"),
+  new CatalogEntry("M51",   "Whirlpool Galaxy",    ObjectType::Galaxy,    8.4,  "CVn"),
+  new CatalogEntry("MARS",  "Mars",                ObjectType::Planet,   -2.9,  "Oph"),
+  new CatalogEntry("JPTR",  "Jupiter",             ObjectType::Planet,   -2.5,  "Gem"),
+  new CatalogEntry("SAT",   "Saturn",              ObjectType::Planet,    0.7,  "Aqr"),
+  new CatalogEntry("ALT",   "Altair",              ObjectType::Star,      0.8,  "Aql"),
+  new CatalogEntry("NGC884","Double Cluster",      ObjectType::Cluster,   4.3,  "Per"),
+  new CatalogEntry("M27",   "Dumbbell Nebula",     ObjectType::Nebula,    7.5,  "Vul"),
+  new CatalogEntry("M35",   "M35 Open Cluster",    ObjectType::Cluster,   5.3,  "Gem")
+]
+
+// ─── raw log lines ────────────────────────────────────────────────────────────
+
+val rawLines: List[String] = [
+  "2024-01-05,M42,55,1,HIT,Trapezium resolved; four stars visible",
+  "2024-01-05,M45,20,1,HIT,Brilliant; nebulosity around Merope",
+  "2024-01-05,JPTR,40,2,HIT,GRS visible; two cloud bands sharp",
+  "2024-01-12,M31,60,3,PART,Core bright; arms barely visible",
+  "2024-01-12,M42,30,3,HIT,Some detail; wind gusts occasionally",
+  "2024-02-03,M81,50,1,HIT,Galaxy nucleus crisp; hint of spiral",
+  "2024-02-03,M82,45,1,HIT,Irregular form; dark lane visible",
+  "2024-02-03,M51,50,2,HIT,Companion NGC 5195 clear",
+  "2024-02-18,SAT,60,2,HIT,Cassini Division crisp; 5 moons",
+  "2024-02-18,NGC884,25,2,HIT,Two distinct clusters resolved",
+  "2024-03-01,M13,45,1,HIT,Granular texture; stunning globular",
+  "2024-03-01,M57,35,1,HIT,Ring plainly visible at 200x",
+  "2024-03-01,M27,40,1,HIT,Bow-tie shape clear at 120x",
+  "2024-03-15,MARS,30,4,PART,Surface detail obscured by dust storm",
+  "2024-03-15,M42,25,4,MISS,Clouds rolled in mid-session",
+  "2024-04-02,M51,55,1,HIT,Best view yet; spiral arms both traced",
+  "2024-04-02,M81,45,1,HIT,Clean nucleus; spiral hints in averted vision",
+  "2024-04-02,M13,50,2,HIT,Resolved to magnitude 13 stars at edge",
+  "2024-04-20,JPTR,35,3,HIT,Bands visible; GRS on limb",
+  "2024-04-20,SAT,40,2,HIT,Ring tilt favorable; shadow visible",
+  "2024-05-10,M57,30,1,HIT,Central star suspected at 350x",
+  "2024-05-10,M27,35,1,HIT,Best view yet; color tint noted",
+  "2024-05-10,M35,20,1,HIT,Dozens of stars resolved",
+  "2024-05-25,NGC884,20,2,HIT,Classic double cluster",
+  "2024-05-25,ALT,10,2,HIT,Spectral type A; rapid rotator",
+  "2024-06-08,M13,60,1,HIT,Spectacular; best of the season",
+  "2024-06-08,M57,40,1,HIT,Ring sharply defined; elliptical at 400x",
+  "2024-06-22,M31,90,4,MISS,Clouds; aborted 15 min in",
+  "2024-07-05,M13,45,2,HIT,Still excellent after midnight",
+  "2024-07-05,M57,35,1,HIT,Central star confirmed at 350x"
+]
+
+// ─── parse log lines ──────────────────────────────────────────────────────────
+
+def findEntry(id: String): CatalogEntry? =
+  catalog.find { e -> (e as CatalogEntry).id() == id }
+
+def parseObs(line: String): Observation? {
+  val raw: RawObs? = RawObs::parse(line)
+  if raw == null { return null }
+  val raw2: RawObs = raw as RawObs
+  val entry: CatalogEntry? = findEntry(raw2.catalogId())
+  if entry == null { return null }
+  return new Observation(
+    raw2.date(),
+    entry as CatalogEntry,
+    raw2.durationMin(),
+    Seeing::fromCode(raw2.seeingCode()),
+    ObsOutcome::of(raw2.resultTag(), raw2.notes())
+  )
+}
+
+val observations: List[Observation] = rawLines
+  .map    { line -> parseObs(line as String) }
+  .filter { o    -> o != null }
+  .map    { o    -> o as Observation }
+
+// ─── display helper ───────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println(80.repeatStr("-"))
+}
+
+// ─── 1. Raw log dump ──────────────────────────────────────────────────────────
+
+printHeader("=== All Observations ===")
+IO::println("  Parsed " + observations.size + " / " + rawLines.size + " lines")
+foreach obs: Observation in observations {
+  IO::println("  " + obs.label())
+}
+
+// ─── 2. Success / failure breakdown ──────────────────────────────────────────
+
+printHeader("=== Success / Failure Breakdown ===")
+val partSF   = observations.partition { o -> (o as Observation).outcome().isSuccess() }
+val hits     = partSF[0] as List[Object]
+val misses   = partSF[1] as List[Object]
+IO::println("  Total:   " + observations.size)
+IO::println("  Success: " + hits.size + "  (" + hits.size.pct(observations.size) + ")")
+IO::println("  Failure: " + misses.size + "  (" + misses.size.pct(observations.size) + ")")
+
+// ─── 3. By object type ────────────────────────────────────────────────────────
+
+printHeader("=== Observations by Object Type ===")
+val byType = observations.groupBy { o -> (o as Observation).entry().objType().symbol() }
+foreach (sym, obsList) in byType {
+  val ol = obsList as List[Observation]
+  val ok = ol.filter { o -> (o as Observation).outcome().isSuccess() }
+  IO::println("  " + sym + "  " + ol.size + " obs,  " + ok.size + " hits  (" + ok.size.pct(ol.size) + ")")
+}
+
+// ─── 4. Monthly summary ───────────────────────────────────────────────────────
+
+printHeader("=== Monthly Summary ===")
+val byMonth = observations.groupBy { o -> (o as Observation).month() }
+val months: List[String] = byMonth.keys().sortedBy { k -> k as String }
+foreach m: String in months {
+  val mo = byMonth.get(m) as List[Observation]
+  val mins = mo.fold(0) { acc, o -> (acc as Int) + (o as Observation).durationMin() }
+  val ok2  = mo.filter { o -> (o as Observation).outcome().isSuccess() }
+  IO::println("  " + m + "  " + mo.size + " obs / " + mins + " min / " + ok2.size + " hits")
+}
+
+// ─── 5. Top targets by cumulative hit score ───────────────────────────────────
+
+printHeader("=== Top Targets by Hit Score ===")
+val byTarget = observations.groupBy { o -> (o as Observation).entry().id() }
+val targetIds: List[String] = byTarget.keys()
+  .map { k -> k as String }
+  .sortedBy { id ->
+    val ol2 = byTarget.get(id) as List[Observation]
+    0 - ol2.fold(0) { acc, o -> (acc as Int) + (o as Observation).hitScore() }
+  }
+foreach tid: String in targetIds {
+  val ol3 = byTarget.get(tid) as List[Observation]
+  val score = ol3.fold(0) { acc, o -> (acc as Int) + (o as Observation).hitScore() }
+  val found: CatalogEntry? = findEntry(tid)
+  val name: String = if found != null { (found as CatalogEntry).name() } else { tid }
+  IO::println("  " + tid + "  " + name + "  score=" + score + "  (" + ol3.size + " obs)")
+}
+
+// ─── 6. Seeing distribution ──────────────────────────────────────────────────
+
+printHeader("=== Seeing Condition Distribution ===")
+val bySeeingCode = observations.groupBy { o -> "" + (o as Observation).seeing().code() }
+val seeingKeys: List[String] = bySeeingCode.keys().sortedBy { k -> k as String }
+foreach sk: String in seeingKeys {
+  val sl = bySeeingCode.get(sk) as List[Observation]
+  val seeing = sl[0].seeing()
+  IO::println("  " + seeing.stars() + "  Antoniadi " + sk + " (" + seeing.summary() + ") — " + sl.size + " sessions")
+}
+
+// ─── 7. Longest sessions (top 5) ─────────────────────────────────────────────
+
+printHeader("=== Five Longest Sessions ===")
+val byDuration: List[Observation] = observations.sortedBy { o -> 0 - (o as Observation).durationMin() }
+var rank: Int = 0
+foreach obs2: Observation in byDuration {
+  if rank >= 5 { break }
+  IO::println("  #" + (rank + 1) + "  " + obs2.durationMin() + "min  " + obs2.entry().name() + "  " + obs2.date())
+  rank++
+}
+
+// ─── 8. Deep-sky vs. solar-system ────────────────────────────────────────────
+
+printHeader("=== Deep-Sky vs. Solar-System ===")
+val partDS   = observations.partition { o -> (o as Observation).entry().isDeepSky() }
+val deepSky  = partDS[0] as List[Object]
+val solarSys = partDS[1] as List[Object]
+val dsHits   = deepSky.filter  { o -> (o as Observation).outcome().isSuccess() }
+val ssHits   = solarSys.filter { o -> (o as Observation).outcome().isSuccess() }
+IO::println("  Deep-sky    : " + deepSky.size  + " obs,  " + dsHits.size  + " hits  (" + dsHits.size.pct(deepSky.size)   + ")")
+IO::println("  Solar-system: " + solarSys.size + " obs,  " + ssHits.size  + " hits  (" + ssHits.size.pct(solarSys.size)  + ")")
+
+// ─── 9. Catalog summary ───────────────────────────────────────────────────────
+
+printHeader("=== Catalog (sorted by magnitude) ===")
+foreach e: CatalogEntry in catalog.sortedBy { e -> (e as CatalogEntry).magnitude() } {
+  IO::println("  " + e.label())
+}
+
+// ─── 10. Observed vs. unobserved ─────────────────────────────────────────────
+
+printHeader("=== Coverage ===")
+val seenIds: List[String] = observations.map { o -> (o as Observation).entry().id() }.distinct()
+IO::println("  Observed  : " + seenIds.size + " of " + catalog.size + " catalog objects")
+val unseen: List[String] = catalog
+  .filter { e -> !seenIds.any { sid -> (sid as String) == (e as CatalogEntry).id() } }
+  .map    { e -> (e as CatalogEntry).name() }
+IO::println("  Unobserved: " + unseen.toString())
+
+// ─── 11. Best night (most successful observations) ───────────────────────────
+
+printHeader("=== Best Night ===")
+val byDate = observations.groupBy { o -> (o as Observation).date() }
+var bestDate: String = ""
+var bestCount: Int = 0
+foreach (dt, obsList2) in byDate {
+  val ol4 = obsList2 as List[Observation]
+  val hitCount = ol4.filter { o -> (o as Observation).outcome().isSuccess() }.size
+  if hitCount > bestCount {
+    bestCount = hitCount
+    bestDate  = dt as String
+  }
+}
+IO::println("  Best night: " + bestDate + " with " + bestCount + " successful observations")
+val bestNightObs = (byDate.get(bestDate) as List[Observation])
+  .filter { o -> (o as Observation).outcome().isSuccess() }
+foreach b: Observation in bestNightObs {
+  IO::println("    " + b.entry().name() + " — " + b.outcome().shortNote())
+}
+
+// ─── 12. Recursion: Fibonacci approximation of max observation streak ─────────
+
+def streak(obs: List[Observation], idx: Int, current: Int, best: Int): Int {
+  if idx >= obs.size { return if current > best { current } else { best } }
+  val o: Observation = obs[idx] as Observation
+  val b2: Int = if current > best { current } else { best }
+  if o.outcome().isSuccess() {
+    return streak(obs, idx + 1, current + 1, b2)
+  } else {
+    return streak(obs, idx + 1, 0, b2)
+  }
+}
+
+printHeader("=== Longest Success Streak ===")
+val streakLen = streak(observations, 0, 0, 0)
+IO::println("  Longest consecutive-success run: " + streakLen + " observations")
+
+IO::println("")
+IO::println("=== TelescopeLog complete (" + observations.size + " observations) ===")

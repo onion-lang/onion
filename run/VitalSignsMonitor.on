@@ -1,0 +1,367 @@
+// VitalSignsMonitor.on — ICU telemetry processing system
+// Exercises: ADT case-enums with methods and sealed dispatch; records with
+// static factories; guard patterns (case x when cond:); |> pipeline operator;
+// collection pipelines (map/filter/fold/sortedBy/groupBy/distinct/find);
+// foreach over typed lists and ranges; nullable safe-navigation; string
+// interpolation; while loops; closures as Function1 fields; extension methods.
+
+import {
+  java.lang.Math
+}
+
+// ─── vital sign types ──────────────────────────────────────────────────────────
+
+enum VitalType {
+  case HeartRate
+  case SystolicBP
+  case DiastolicBP
+  case Temperature
+  case SpO2
+  case RespiratoryRate
+public:
+  def label(): String = select this {
+    case v is HeartRate:       "HR"
+    case v is SystolicBP:      "SBP"
+    case v is DiastolicBP:     "DBP"
+    case v is Temperature:     "TEMP"
+    case v is SpO2:            "SpO2"
+    case v is RespiratoryRate: "RR"
+  }
+  def unit(): String = select this {
+    case v is HeartRate:       "bpm"
+    case v is SystolicBP:      "mmHg"
+    case v is DiastolicBP:     "mmHg"
+    case v is Temperature:     "°C"
+    case v is SpO2:            "%"
+    case v is RespiratoryRate: "brpm"
+  }
+}
+
+// ─── alert level ──────────────────────────────────────────────────────────────
+
+enum AlertLevel {
+  case Normal
+  case Warning
+  case Critical
+public:
+  def tag(): String = select this {
+    case a is Normal:   "[OK  ]"
+    case a is Warning:  "[WARN]"
+    case a is Critical: "[CRIT]"
+  }
+  def priority(): Int = select this {
+    case a is Normal:   0
+    case a is Warning:  1
+    case a is Critical: 2
+  }
+}
+
+// ─── threshold definition ─────────────────────────────────────────────────────
+
+record Threshold(vtype: VitalType, lo: Double, hi: Double, loWarn: Double, hiWarn: Double) {
+public:
+  def classify(value: Double): AlertLevel {
+    if value < lo() || value > hi()              { return new Critical() }
+    if value < loWarn() || value > hiWarn()      { return new Warning() }
+    return new Normal()
+  }
+  def rangeStr(): String = "normal #{loWarn()}–#{hiWarn()}, critical <#{lo()} or >#{hi()}"
+}
+
+// ─── single vital reading ─────────────────────────────────────────────────────
+
+record VitalReading(patientId: Int, vtype: VitalType, value: Double, tick: Int) {
+public:
+  def toString(): String =
+    "t=#{tick()} P#{patientId()} #{vtype().label()}=#{value()} #{vtype().unit()}"
+}
+
+// ─── patient profile ──────────────────────────────────────────────────────────
+
+record Patient(id: Int, name: String, ageYrs: Int, ward: String) {
+public:
+  def toString(): String = "P#{id()} #{name()} age=#{ageYrs()} ward=#{ward()}"
+}
+
+// ─── alert event ─────────────────────────────────────────────────────────────
+
+record Alert(reading: VitalReading, level: AlertLevel, threshold: Threshold) {
+public:
+  def message(): String {
+    val r: VitalReading = reading()
+    val t: Threshold = threshold()
+    return "#{level().tag()} P#{r.patientId()} #{r.vtype().label()}=#{r.value()} " +
+           "(#{t.rangeStr()}) at t=#{r.tick()}"
+  }
+}
+
+// ─── per-vital statistics ─────────────────────────────────────────────────────
+
+record VitalStats(vtype: VitalType, mean: Double, stddev: Double, minV: Double, maxV: Double, n: Int) {
+public:
+  def toString(): String =
+    "#{vtype().label()}: n=#{n()} mean=#{round2(mean())} std=#{round2(stddev())} " +
+    "min=#{minV()} max=#{maxV()}"
+
+  static def round2(x: Double): Double = (Math::round(x * 100.0) as Double) / 100.0
+
+  static def compute(vtype: VitalType, readings: List[VitalReading]): VitalStats? {
+    val vs: List[VitalReading] = readings.filter { r -> (r as VitalReading).vtype().label() == vtype.label() }
+    val n: Int = vs.size
+    if n == 0 { return null }
+    var sum: Double = 0.0
+    var minV: Double = (vs[0] as VitalReading).value()
+    var maxV: Double = (vs[0] as VitalReading).value()
+    foreach r: VitalReading in vs {
+      sum = sum + r.value()
+      if r.value() < minV { minV = r.value() }
+      if r.value() > maxV { maxV = r.value() }
+    }
+    val mean: Double = sum / (n as Double)
+    var vsum: Double = 0.0
+    foreach r: VitalReading in vs {
+      val d: Double = r.value() - mean
+      vsum = vsum + d * d
+    }
+    val std: Double = Math::sqrt(vsum / (n as Double))
+    return new VitalStats(vtype, mean, std, minV, maxV, n)
+  }
+}
+
+// ─── generate synthetic waveform data ─────────────────────────────────────────
+
+def sineWave(baseline: Double, amplitude: Double, period: Int, tick: Int): Double {
+  val rad: Double = 2.0 * Math::PI * (tick as Double) / (period as Double)
+  return baseline + amplitude * Math::sin(rad)
+}
+
+def makeReadings(patientId: Int, ticks: Int): List[VitalReading] {
+  val out: List[VitalReading] = []
+  foreach t: Int in 0..<ticks {
+    // Heart rate oscillates around 72 bpm with small variation
+    val hr: Double = sineWave(72.0, 8.0, 20, t) + (if t % 7 == 0 { 15.0 } else { 0.0 })
+    // Systolic BP trends up slightly
+    val sbp: Double = 120.0 + (t as Double) * 0.3 + sineWave(0.0, 5.0, 15, t)
+    val dbp: Double = 80.0 + sineWave(0.0, 3.0, 15, t)
+    // Temperature stays nearly flat with occasional spike
+    val temp: Double = 37.0 + sineWave(0.0, 0.2, 30, t) + (if t == 18 { 1.8 } else { 0.0 })
+    // SpO2 stays high with occasional brief dip
+    val spo2: Double = 98.0 + sineWave(0.0, 1.0, 25, t) - (if t == 12 { 5.0 } else { 0.0 })
+    val rr: Double   = sineWave(16.0, 2.0, 18, t)
+
+    out.add(new VitalReading(patientId, new HeartRate(),       hr,   t))
+    out.add(new VitalReading(patientId, new SystolicBP(),      sbp,  t))
+    out.add(new VitalReading(patientId, new DiastolicBP(),     dbp,  t))
+    out.add(new VitalReading(patientId, new Temperature(),     temp, t))
+    out.add(new VitalReading(patientId, new SpO2(),            spo2, t))
+    out.add(new VitalReading(patientId, new RespiratoryRate(), rr,   t))
+  }
+  return out
+}
+
+// ─── threshold registry ───────────────────────────────────────────────────────
+
+def defaultThresholds(): List[Threshold] {
+  return [
+    new Threshold(new HeartRate(),       30.0, 150.0, 50.0, 100.0),
+    new Threshold(new SystolicBP(),      70.0, 200.0, 90.0, 140.0),
+    new Threshold(new DiastolicBP(),     40.0, 130.0, 60.0,  90.0),
+    new Threshold(new Temperature(),     35.0,  41.0, 36.0,  38.0),
+    new Threshold(new SpO2(),            80.0, 101.0, 94.0, 100.0),
+    new Threshold(new RespiratoryRate(), 6.0,   35.0, 12.0,  20.0)
+  ]
+}
+
+def findThreshold(thresholds: List[Threshold], vtype: VitalType): Threshold? {
+  foreach t: Threshold in thresholds {
+    if t.vtype().label() == vtype.label() { return t }
+  }
+  return null
+}
+
+// ─── alert engine ────────────────────────────────────────────────────────────
+
+def checkReadings(readings: List[VitalReading], thresholds: List[Threshold]): List[Alert] {
+  val alerts: List[Alert] = []
+  foreach r: VitalReading in readings {
+    val thresh: Threshold? = findThreshold(thresholds, r.vtype())
+    if thresh != null {
+      val t: Threshold = thresh as Threshold
+      val level: AlertLevel = t.classify(r.value())
+      select level {
+        case n is Normal: {}    // no alert
+        case w is Warning:  alerts.add(new Alert(r, level, t))
+        case c is Critical: alerts.add(new Alert(r, level, t))
+      }
+    }
+  }
+  return alerts
+}
+
+// ─── trend detection ─────────────────────────────────────────────────────────
+
+def linearSlope(values: List[Double]): Double {
+  val n: Int = values.size
+  if n < 2 { return 0.0 }
+  var sumX: Double = 0.0
+  var sumY: Double = 0.0
+  var sumXY: Double = 0.0
+  var sumX2: Double = 0.0
+  foreach i: Int in 0..<n {
+    val x: Double = i as Double
+    val y: Double = values[i] as Double
+    sumX  = sumX  + x
+    sumY  = sumY  + y
+    sumXY = sumXY + x * y
+    sumX2 = sumX2 + x * x
+  }
+  val nD: Double = n as Double
+  val denom: Double = nD * sumX2 - sumX * sumX
+  if Math::abs(denom) < 1.0e-12 { return 0.0 }
+  return (nD * sumXY - sumX * sumY) / denom
+}
+
+def trendLabel(slope: Double): String {
+  var label: String = "→ stable"
+  select slope {
+    case s when s > 0.5:  label = "↑ rising"
+    case s when s < -0.5: label = "↓ falling"
+    else: {}
+  }
+  return label
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  val patients: List[Patient] = [
+    new Patient(1, "Alice", 54, "ICU-A"),
+    new Patient(2, "Bob",   72, "ICU-B")
+  ]
+
+  val thresholds: List[Threshold] = defaultThresholds()
+  val ticks: Int = 30  // 30 time steps
+
+  // Collect readings for both patients
+  val allReadings: List[VitalReading] = []
+  foreach p: Patient in patients {
+    val rs = makeReadings(p.id(), ticks)
+    foreach r: VitalReading in rs { allReadings.add(r) }
+  }
+
+  IO::println("=== VitalSignsMonitor — #{ticks} ticks × #{patients.size} patients ===")
+  IO::println("  Total readings: #{allReadings.size}")
+
+  // ── alert summary ─────────────────────────────────────────────────────────
+
+  IO::println("")
+  IO::println("=== Alerts ===")
+
+  val alerts: List[Alert] = checkReadings(allReadings, thresholds)
+  val criticals: List[Alert] = alerts.filter { a -> (a as Alert).level().priority() >= 2 }
+  val warnings:  List[Alert] = alerts.filter { a -> (a as Alert).level().priority() == 1 }
+
+  IO::println("  Total alerts: #{alerts.size}  (critical=#{criticals.size}, warning=#{warnings.size})")
+
+  // sort critical alerts by patient then tick and print
+  val sortedCrits: List[Alert] = criticals.sortedBy { a ->
+    val al: Alert = a as Alert
+    al.reading().patientId() * 1000 + al.reading().tick()
+  }
+  foreach a: Alert in sortedCrits {
+    IO::println("  " + (a as Alert).message())
+  }
+
+  // ── per-patient vital stats ───────────────────────────────────────────────
+
+  IO::println("")
+  IO::println("=== Per-Patient Statistics ===")
+
+  val vtypes: List[VitalType] = [
+    new HeartRate(), new SystolicBP(), new DiastolicBP(),
+    new Temperature(), new SpO2(), new RespiratoryRate()
+  ]
+
+  foreach p: Patient in patients {
+    IO::println("")
+    IO::println("  " + p.toString())
+    val prReadings: List[VitalReading] = allReadings.filter { r ->
+      (r as VitalReading).patientId() == p.id()
+    }
+    foreach vt: VitalType in vtypes {
+      val st: VitalStats? = VitalStats::compute(vt, prReadings)
+      if st != null {
+        IO::println("    " + (st as VitalStats).toString())
+      }
+    }
+  }
+
+  // ── trend analysis using |> pipeline ─────────────────────────────────────
+
+  IO::println("")
+  IO::println("=== Trend Analysis (SBP per patient) ===")
+
+  foreach p: Patient in patients {
+    val sbpValues: List[Double] = allReadings
+      .filter { r -> (r as VitalReading).patientId() == p.id() &&
+                     (r as VitalReading).vtype().label() == "SBP" }
+      .sortedBy { r -> (r as VitalReading).tick() }
+      .map     { r -> (r as VitalReading).value() }
+
+    val slope: Double = sbpValues |> linearSlope
+    IO::println("  P#{p.id()} #{p.name()}: slope=#{VitalStats::round2(slope)}  #{trendLabel(slope)}")
+  }
+
+  // ── alert frequency by vital type ─────────────────────────────────────────
+
+  IO::println("")
+  IO::println("=== Alert Frequency by Vital Type ===")
+
+  foreach vt: VitalType in vtypes {
+    val cnt: Int = alerts.filter { a ->
+      (a as Alert).reading().vtype().label() == vt.label()
+    }.size
+    if cnt > 0 {
+      IO::println("  #{vt.label()}: #{cnt} alerts")
+    }
+  }
+
+  // ── high-resolution SpO2 dip check via guard patterns ────────────────────
+
+  IO::println("")
+  IO::println("=== SpO2 Dip Events (guard patterns) ===")
+
+  val spo2Readings: List[VitalReading] = allReadings.filter { r ->
+    (r as VitalReading).vtype().label() == "SpO2"
+  }
+  foreach r: VitalReading in spo2Readings {
+    select r.value() {
+      case v when v < 90.0:  IO::println("  CRITICAL dip P#{r.patientId()} SpO2=#{v} at t=#{r.tick()}")
+      case v when v < 94.0:  IO::println("  WARNING  dip P#{r.patientId()} SpO2=#{v} at t=#{r.tick()}")
+      else: {}
+    }
+  }
+
+  // ── ward summary ─────────────────────────────────────────────────────────
+
+  IO::println("")
+  IO::println("=== Ward Alert Summary ===")
+
+  val wardNames: List[String] = patients
+    .map    { p -> (p as Patient).ward() }
+    .distinct()
+
+  foreach ward: String in wardNames {
+    val wardPatients: List[Patient] = patients.filter { p -> (p as Patient).ward() == ward }
+    var wardCrits: Int = 0
+    foreach wp: Patient in wardPatients {
+      val cnt: Int = criticals.filter { a -> (a as Alert).reading().patientId() == wp.id() }.size
+      wardCrits = wardCrits + cnt
+    }
+    IO::println("  #{ward}: #{wardPatients.size} patient(s), #{wardCrits} critical alert(s)")
+  }
+
+  IO::println("")
+  IO::println("=== Done ===")
+}

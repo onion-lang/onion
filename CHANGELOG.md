@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.127.0] - 2026-09-28
+
 ### Added
 
 - **`run/MiniAssembler.on`** — a 573-line two-pass assembler and simulator for a fictional 8-bit CPU, a new domain for the `run/` corpus (a 21-instruction ISA — `NOP`/`LOAD`/`MOVE`/`ADD`/`SUB`/`AND`/`OR`/`XOR`/`NOT`/`INC`/`DEC`/`CMP`/`JMP`/`JEQ`/`JNE`/`JLT`/`CALL`/`RET`/`PUSH`/`POP`/`HALT` over 8 registers and 256 bytes of memory; a record with methods `Word` (`bytes()`/`hex()`) plus `AsmLine`/`AsmResult`; classes with `public:` sections `Assembler`/`Disassembler`/`Simulator`; a two-pass assembly pattern (pass 1 collects labels and computes addresses, pass 2 encodes instructions); `Map[String, Int]` symbol table with subscript write and nullable `.get()` read; `List[Int]`/`Int[]` for the memory image and register file; `try`/`catch` for hex/decimal immediate parsing; `select` expression and statement forms with multi-value case labels; string interpolation, `foreach`, `while`, `if`/`else if` chains — running Fibonacci(10), Sum(1..8), and bitwise-op programs to completion plus an error-handling pass over malformed assembly), added to the `run/` corpus (merged via #1694).

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.126.0] - 2026-09-28
+
 ### Added
 
 - **`run/RunLengthCoder.on`** — a 327-line run-length encoding/decoding suite with a configurable minimum-run threshold, character-frequency analysis, and multi-sample statistics, a new domain for the `run/` corpus (an ADT case-enum `RleToken` (`Literal`/`Run`) with shared `charVal()`/`length()`/`describe()`; a record with methods `CompressionStats` (`ratio()`/`saved()`/`expansionLabel()`); a class `RunLengthCoder` with `Map[String,String]` state and a full public API (`encode`/`decode`/`tokenise`/`getCodes`/`countBits`); a `Map[String,Int]` frequency map built via `foreach (k, v)`; collection pipelines `sortedBy`/`fold`/`filter`/`foreach` over `List[RleToken]`/`List[Object]`; `select`/`is` type-pattern dispatch on `RleToken` variants; range-based `foreach` (`0..<n`) for gradient/zigzag patterns; nullable `Map.get` handling; string interpolation — rendering encode/decode roundtrip checks, a gradient-pattern demo, and compression statistics), added to the `run/` corpus (merged via #1663).

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.0] - 2026-09-28
+
 ### Added
 
 - **`run/CipherPlayground.on`** — a 499-line classical cipher suite with frequency analysis, a new domain for the `run/` corpus (records with `example`/`law` clauses `CipherConfig`/`CipherResult`/`FreqEntry`; a generic record `Ranked[T]`; an ADT case-enum `CipherOp` (`Encrypt`/`Decrypt`) with `label()`/`flip()`; a data-carrying enum `Alphabet(chars, size, label)`; an interface `Cipher` implemented by classes `CaesarCipher`/`VigenereCipher`/`AtbashCipher`; extension methods on `String`/`Int`; collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`/`count`/`any`/`zip`; a recursive brute-force Caesar solver; `foreach` over map `(k, v)` entries and ranges; nullable types, closures, string interpolation, `try`/`catch`, `while`, `select`/pattern matching — rendering Caesar/Vigenère/Atbash encrypt-decrypt round-trips, a batch cipher comparison, an index-of-coincidence check, a brute-force Caesar crack, and an English-letter frequency analysis), added to the `run/` corpus (merged via #1658).

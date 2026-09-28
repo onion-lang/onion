@@ -1,0 +1,449 @@
+// KnittingProject.on — yarn stash manager and knitting project tracker.
+// Exercises: data-carrying enums (FiberType, YarnWeight), ADT enum
+// (ProjectStatus), records with methods, class, interface, extension methods,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition), select/is pattern matching, nullable, foreach (list/map/range),
+// closures, string interpolation, while, try/catch, generics.
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Int {
+  def rpt(ch: String): String {
+    var out: String = ""
+    foreach _: Int in 0..<self { out = out + ch }
+    return out
+  }
+}
+
+extension Double {
+  def round1(): Double = ((self * 10.0 + 0.5) as Int) * 1.0 / 10.0
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum FiberType(label: String, isAnimal: Boolean) {
+  Wool(    "Wool",     true),
+  Cotton(  "Cotton",   false),
+  Alpaca(  "Alpaca",   true),
+  Merino(  "Merino",   true),
+  Silk(    "Silk",     true),
+  Linen(   "Linen",    false),
+  Acrylic( "Acrylic",  false),
+  Blend(   "Blend",    false)
+}
+
+enum YarnWeight(label: String, mmRange: String, skeinYards: Int) {
+  Fingering("Fingering", "1.5-2.4mm",  400),
+  Sport(    "Sport",     "2.5-3.2mm",  300),
+  DK(       "DK",        "3.5-4.0mm",  250),
+  Worsted(  "Worsted",   "4.5-5.4mm",  200),
+  Bulky(    "Bulky",     "5.5-8.0mm",  130),
+  SuperBulky("SuperBulky","9.0+mm",     80)
+}
+
+enum ProjectType(label: String, typicalYards: Int) {
+  Scarf(   "Scarf",    400),
+  Hat(     "Hat",      200),
+  Sweater( "Sweater", 1800),
+  Socks(   "Socks",    400),
+  Blanket( "Blanket", 3000),
+  Shawl(   "Shawl",   800),
+  Mittens( "Mittens",  150)
+}
+
+// ── ADT: ProjectStatus ────────────────────────────────────────────────────────
+
+enum ProjectStatus {
+  case Active(percentDone: Int)
+  case Completed(dateFinished: String)
+  case Frogged(reason: String)
+  case OnHold
+public:
+  def label(): String = select this {
+    case a is Active:    "Active (#{a.percentDone()}%)"
+    case c is Completed: "Done on #{c.dateFinished()}"
+    case f is Frogged:   "Frogged: #{f.reason()}"
+    case h is OnHold:    "On Hold"
+  }
+  def isDone(): Boolean = select this {
+    case c is Completed: true
+    else: false
+  }
+  def isActive(): Boolean = select this {
+    case a is Active: true
+    else: false
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record YarnSkein(
+  name:     String,
+  colorway: String,
+  fiber:    FiberType,
+  weight:   YarnWeight,
+  yardage:  Int,
+  skeins:   Int
+) {
+public:
+  def totalYards(): Int = yardage() * skeins()
+  def label(): String = "#{name()} '#{colorway()}' [#{fiber().label()}, #{weight().label()}]"
+  def summary(): String = "#{label()} — #{totalYards()} yds (#{skeins()} × #{yardage()})"
+}
+
+record NeedleSize(mm: Double, usSize: String) {
+public:
+  def label(): String = "#{mm()}mm (US #{usSize()})"
+}
+
+record KnittingProject(
+  name:       String,
+  ptype:      ProjectType,
+  needles:    NeedleSize,
+  yarnNames:  List[String],
+  yardageUsed: Int,
+  status:     ProjectStatus,
+  notes:      String?
+) {
+public:
+  def label(): String = "#{name()} (#{ptype().label()}) — #{status().label()}"
+  def completion(): Int = select status() {
+    case a is Active:    a.percentDone()
+    case c is Completed: 100
+    else: 0
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Describable {
+  def describe(): String
+  def lineCount(): Int
+}
+
+// ── YarnStash ─────────────────────────────────────────────────────────────────
+
+class YarnStash conforms Describable {
+  val skeins: List[YarnSkein]
+
+public:
+  def this(initial: List[YarnSkein]) {
+    this.skeins = initial
+  }
+
+  def count(): Int = skeins.size
+
+  def totalYards(): Int =
+    skeins.fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).totalYards() }
+
+  def totalSkeins(): Int =
+    skeins.fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).skeins() }
+
+  def byWeight(): Map[String, List[YarnSkein]] =
+    skeins.groupBy { s -> (s as YarnSkein).weight().label() }
+
+  def byFiber(): Map[String, List[YarnSkein]] =
+    skeins.groupBy { s -> (s as YarnSkein).fiber().label() }
+
+  def heaviestWeight(): YarnWeight? {
+    val order = [
+      YarnWeight::SuperBulky, YarnWeight::Bulky, YarnWeight::Worsted,
+      YarnWeight::DK, YarnWeight::Sport, YarnWeight::Fingering
+    ]
+    foreach w: YarnWeight in order {
+      val found = skeins.find { s -> (s as YarnSkein).weight() == w }
+      if found != null { return w }
+    }
+    return null
+  }
+
+  def animalFiberYards(): Int =
+    skeins.filter { s -> (s as YarnSkein).fiber().isAnimal() }
+          .fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).totalYards() }
+
+  def findByName(name: String): YarnSkein? {
+    val found = skeins.find { s -> (s as YarnSkein).name() == name }
+    return if found != null { found as YarnSkein? } else { null }
+  }
+
+  def describe(): String =
+    "Yarn stash: #{count()} entries, #{totalSkeins()} skeins, #{totalYards()} total yards"
+
+  def lineCount(): Int = count()
+}
+
+// ── ProjectBook ───────────────────────────────────────────────────────────────
+
+class ProjectBook conforms Describable {
+public:
+  val projects: List[KnittingProject]
+
+  def this(ps: List[KnittingProject]) {
+    this.projects = ps
+  }
+
+  def count(): Int = projects.size
+
+  def active(): List[KnittingProject] =
+    projects.filter { p -> (p as KnittingProject).status().isActive() }
+
+  def completed(): List[KnittingProject] =
+    projects.filter { p -> (p as KnittingProject).status().isDone() }
+
+  def totalYardageUsed(): Int =
+    projects.fold(0) { acc, p -> (acc as Int) + (p as KnittingProject).yardageUsed() }
+
+  def avgCompletion(): Double {
+    val n = active().size
+    if n == 0 { return 0.0 }
+    val sum = active().fold(0) { acc, p ->
+      (acc as Int) + (p as KnittingProject).completion()
+    }
+    return (sum as Int) * 1.0 / n
+  }
+
+  def byType(): Map[String, List[KnittingProject]] =
+    projects.groupBy { p -> (p as KnittingProject).ptype().label() }
+
+  def mostUsedNeedle(): NeedleSize? {
+    val sizeCounts: Map[String, Int] = [:]
+    foreach p: KnittingProject in projects {
+      val k = p.needles().label()
+      val cur: Int? = sizeCounts.get(k) as Int?
+      sizeCounts[k] = if cur != null { (cur as Int) + 1 } else { 1 }
+    }
+    val top = sizeCounts.keys().sortedBy { k ->
+      0 - ((sizeCounts.get(k as String) as Int?) ?: 0)
+    }.find { _ -> true }
+    if top == null { return null }
+    val needle = projects.find { p -> (p as KnittingProject).needles().label() == (top as String) }
+    return if needle != null { (needle as KnittingProject).needles() } else { null }
+  }
+
+  def describe(): String =
+    "Project book: #{count()} projects, #{completed().size} done, #{active().size} active"
+
+  def lineCount(): Int = count()
+}
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  IO::println(n.rpt("─"))
+}
+
+def section(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+def bar(value: Int, maxValue: Int, width: Int): String {
+  val filled = if maxValue > 0 { value * width / maxValue } else { 0 }
+  var s: String = "["
+  foreach _: Int in 0..<filled       { s = s + "█" }
+  foreach _: Int in filled..<width   { s = s + "·" }
+  return s + "]"
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+val stash: YarnStash = new YarnStash([
+  new YarnSkein("Malabrigo Rios",    "Cereza",          FiberType::Merino,  YarnWeight::Worsted,    210, 3),
+  new YarnSkein("Malabrigo Rios",    "Teal Feather",    FiberType::Merino,  YarnWeight::Worsted,    210, 2),
+  new YarnSkein("Cascade 220",       "Heather Gray",    FiberType::Wool,    YarnWeight::Worsted,    220, 4),
+  new YarnSkein("Cascade 220",       "Natural",         FiberType::Wool,    YarnWeight::Worsted,    220, 1),
+  new YarnSkein("Koigu KPPPM",       "K2300",           FiberType::Merino,  YarnWeight::Fingering,  170, 8),
+  new YarnSkein("Madelinetosh Tosh DK","Meteorite",     FiberType::Merino,  YarnWeight::DK,         225, 2),
+  new YarnSkein("Madelinetosh Tosh DK","Farmhouse White",FiberType::Merino, YarnWeight::DK,         225, 3),
+  new YarnSkein("Blue Sky Alpaca",   "Natural Brown",   FiberType::Alpaca,  YarnWeight::Sport,      110, 5),
+  new YarnSkein("Berroco Ultra Wool","Pimento",         FiberType::Wool,    YarnWeight::Worsted,    219, 2),
+  new YarnSkein("Lion Brand Thick&Quick","Graphite",    FiberType::Acrylic, YarnWeight::SuperBulky, 87,  2),
+  new YarnSkein("Noro Silk Garden",  "Color 84",        FiberType::Blend,   YarnWeight::Worsted,    110, 3),
+  new YarnSkein("Malabrigo Sock",    "Solis",           FiberType::Merino,  YarnWeight::Fingering,  440, 1)
+])
+
+val projects: ProjectBook = new ProjectBook([
+  new KnittingProject(
+    "Alpine Cables Sweater",
+    ProjectType::Sweater,
+    new NeedleSize(4.5, "7"),
+    ["Cascade 220 Heather Gray"],
+    1620,
+    new Completed("2024-02-14"),
+    "Seamless yoke construction, cables on body and sleeves."
+  ),
+  new KnittingProject(
+    "Autumn Shawl",
+    ProjectType::Shawl,
+    new NeedleSize(3.75, "5"),
+    ["Madelinetosh Tosh DK Meteorite", "Madelinetosh Tosh DK Farmhouse White"],
+    650,
+    new Active(72),
+    "Gradient fade from dark to light, lace border."
+  ),
+  new KnittingProject(
+    "Cereza Scarf",
+    ProjectType::Scarf,
+    new NeedleSize(4.5, "7"),
+    ["Malabrigo Rios Cereza"],
+    380,
+    new Completed("2024-04-20"),
+    null
+  ),
+  new KnittingProject(
+    "Koigu Socks",
+    ProjectType::Socks,
+    new NeedleSize(2.25, "1"),
+    ["Koigu KPPPM K2300"],
+    360,
+    new Active(45),
+    "Top-down, short-row heel."
+  ),
+  new KnittingProject(
+    "Baby Blanket",
+    ProjectType::Blanket,
+    new NeedleSize(5.0, "8"),
+    ["Cascade 220 Natural", "Berroco Ultra Wool Pimento"],
+    1200,
+    new Active(30),
+    null
+  ),
+  new KnittingProject(
+    "Alpaca Hat",
+    ProjectType::Hat,
+    new NeedleSize(3.75, "5"),
+    ["Blue Sky Alpaca Natural Brown"],
+    180,
+    new Completed("2024-06-01"),
+    "Ribbed brim, stockinette crown."
+  ),
+  new KnittingProject(
+    "Colorwork Mittens",
+    ProjectType::Mittens,
+    new NeedleSize(2.75, "2"),
+    ["Cascade 220 Heather Gray", "Berroco Ultra Wool Pimento"],
+    280,
+    new Frogged("Gauge was off, fingers too tight."),
+    null
+  ),
+  new KnittingProject(
+    "Noro Fade Scarf",
+    ProjectType::Scarf,
+    new NeedleSize(4.5, "7"),
+    ["Noro Silk Garden Color 84"],
+    320,
+    new OnHold(),
+    "Waiting for more Noro to arrive."
+  )
+])
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+val jarWidth = 62
+IO::println(jarWidth.rpt("═"))
+IO::println("  KNITTING STASH & PROJECT TRACKER")
+IO::println("  " + stash.describe())
+IO::println("  " + projects.describe())
+IO::println(jarWidth.rpt("═"))
+
+section("YARN STASH OVERVIEW")
+IO::println("  Total skeins  : " + stash.totalSkeins())
+IO::println("  Total yardage : " + stash.totalYards() + " yds")
+IO::println("  Animal fiber  : " + stash.animalFiberYards() + " yds (" +
+  ((stash.animalFiberYards() * 1000 / stash.totalYards() + 5) / 10) + "%)")
+
+section("STASH BY WEIGHT")
+val byWeight = stash.byWeight()
+val weightKeys = byWeight.keys().sortedBy { k -> k as String }
+foreach wk: String in weightKeys {
+  val list = byWeight.get(wk) as List[YarnSkein]
+  val yards = list.fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).totalYards() }
+  val cnt   = list.fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).skeins() }
+  IO::println("  " + wk.padRight(12) + " : " + ("" + cnt).padLeft(2) + " skeins  " +
+    ("" + yards).padLeft(5) + " yds  " + bar(yards, 2000, 20))
+}
+
+section("STASH BY FIBER")
+val byFiber = stash.byFiber()
+val fiberKeys = byFiber.keys().sortedBy { k ->
+  0 - (byFiber.get(k as String) as List[YarnSkein]).fold(0) { acc, s ->
+    (acc as Int) + (s as YarnSkein).totalYards()
+  }
+}
+foreach fk: String in fiberKeys {
+  val list = byFiber.get(fk) as List[YarnSkein]
+  val yards = list.fold(0) { acc, s -> (acc as Int) + (s as YarnSkein).totalYards() }
+  IO::println("  " + fk.padRight(10) + " : " + ("" + yards).padLeft(5) + " yds")
+}
+
+section("ALL PROJECTS")
+foreach p: KnittingProject in projects.projects {
+  val note = p.notes()
+  val notePart = if note != null { "  → " + (note as String) } else { "" }
+  IO::println("  " + p.label())
+  IO::println("    Needles: #{p.needles().label()}  |  Yarn used: #{p.yardageUsed()} yds#{notePart}")
+}
+
+section("ACTIVE PROJECTS")
+val activeList = projects.active()
+val avgComp = projects.avgCompletion().round1()
+IO::println("  Active: #{activeList.size} project(s),  avg completion: #{avgComp}%")
+foreach p: KnittingProject in activeList.sortedBy { p -> (p as KnittingProject).completion() } {
+  val pct = p.completion()
+  IO::println("  [#{("" + pct).padLeft(3)}%] #{p.name().padRight(28)} #{bar(pct, 100, 20)}")
+}
+
+section("COMPLETED PROJECTS")
+val doneList = projects.completed()
+val totalUsed = projects.totalYardageUsed()
+IO::println("  Finished: #{doneList.size} of #{projects.count()} project(s)")
+IO::println("  Total yardage used across all projects: #{totalUsed} yds")
+foreach p: KnittingProject in doneList {
+  IO::println("  ✓ #{p.name()} — #{p.yardageUsed()} yds")
+}
+
+section("PROJECT BREAKDOWN BY TYPE")
+val byType = projects.byType()
+val typeKeys = byType.keys().sortedBy { k ->
+  0 - (byType.get(k as String) as List[KnittingProject]).size
+}
+foreach tk: String in typeKeys {
+  val list = byType.get(tk) as List[KnittingProject]
+  IO::println("  " + tk.padRight(12) + " : " + list.size + " project(s)")
+}
+
+section("NEEDLE SIZE ANALYSIS")
+val topNeedle = projects.mostUsedNeedle()
+if topNeedle != null {
+  IO::println("  Most-used needle: #{(topNeedle as NeedleSize).label()}")
+}
+val needleSizes = projects.projects
+  .map { p -> (p as KnittingProject).needles().label() }
+  .distinct()
+  .sortedBy { n -> n as String }
+IO::println("  Needle sizes in use: #{needleSizes.size}")
+foreach ns: String in needleSizes {
+  val count = projects.projects.filter { p ->
+    (p as KnittingProject).needles().label() == ns
+  }.size
+  IO::println("  " + ns.padRight(20) + " × " + count)
+}
+
+IO::println("")
+IO::println(jarWidth.rpt("═"))
+IO::println("  END OF REPORT")
+IO::println(jarWidth.rpt("═"))

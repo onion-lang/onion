@@ -31,8 +31,9 @@ class LspLawExecutionSpec extends AnyFunSpec {
        |""".stripMargin
 
   private val falsifiedLaw =
-    s"""|record Pt(x: Int, y: Int)
+    s"""|record Pt(x: Int, y: Int) {
         |  law wrong(p: Pt) { p.x() == p.y() }
+        |}
         |$main""".stripMargin
 
   describe("the language server's validation config") {
@@ -48,8 +49,9 @@ class LspLawExecutionSpec extends AnyFunSpec {
     it("still reports ordinary compile errors") {
       val codes = errorCodes(
         OnionTextDocumentService.validationConfig,
-        s"""|record R(x: Int)
+        s"""|record R(x: Int) {
             |  law bad(xs: Int[]) { xs != null }
+            |}
             |$main""".stripMargin
       )
       // E0074 comes from LawCheckPhase too, so switching the phase off must not be

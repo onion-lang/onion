@@ -35,8 +35,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
   describe("a law whose parameter cannot be generated") {
     it("reports E0074 for an array parameter instead of skipping silently") {
       val codes = errorCodes(
-        s"""|record Dummy(v: Int)
+        s"""|record Dummy(v: Int) {
             |  law overArray(xs: Int[]) { xs != null }
+            |}
             |$main""".stripMargin
       )
       assert(codes.contains("E0074"))
@@ -51,8 +52,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
             |  def this { }
             |  def this(x: Int) { }
             |}
-            |record Dummy(v: Int)
+            |record Dummy(v: Int) {
             |  law overMulti(m: Multi) { m != null }
+            |}
             |$main""".stripMargin
       )
       assert(codes.contains("E0074"))
@@ -63,8 +65,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
         s"""|interface Shape {
             |  def area(): Int
             |}
-            |record Dummy(v: Int)
+            |record Dummy(v: Int) {
             |  law overIface(s: Shape) { s != null }
+            |}
             |$main""".stripMargin
       )
       assert(codes.contains("E0074"))
@@ -74,8 +77,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
   describe("laws that can be generated are unaffected") {
     it("does not report E0074 for a scalar parameter") {
       val codes = errorCodes(
-        s"""|record Dummy(v: Int)
+        s"""|record Dummy(v: Int) {
             |  law reflexive(n: Int) { n == n }
+            |}
             |$main""".stripMargin
       )
       assert(!codes.contains("E0074"), s"unexpected E0074: $codes")
@@ -84,8 +88,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
 
     it("does not report E0074 for a flat record parameter") {
       val codes = errorCodes(
-        s"""|record Pt(x: Int, y: Int)
+        s"""|record Pt(x: Int, y: Int) {
             |  law reflexive(p: Pt) { p == p }
+            |}
             |$main""".stripMargin
       )
       assert(!codes.contains("E0074"), s"unexpected E0074: $codes")
@@ -94,8 +99,9 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
 
     it("does not report E0074 for a zero-parameter example") {
       val codes = errorCodes(
-        s"""|record R(x: Int)
+        s"""|record R(x: Int) {
             |  example { new R(1).x() == 1 }
+            |}
             |$main""".stripMargin
       )
       assert(!codes.contains("E0074"), s"unexpected E0074: $codes")

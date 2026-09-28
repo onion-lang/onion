@@ -614,7 +614,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {
+  def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = withTypeParams(declaration.typeParameters.map(_.name)) {
     // A componentless record has nothing to derive into, so don't synthesize methods.
     val fromMethods = declaration.fromPattern match {
       case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)
@@ -635,11 +635,16 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val lawMethods = declaration.laws.map(synthesizeLawMethod)
     val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
     val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ lawMethods ++ exampleMethods
-    if (all.isEmpty) declaration
+    // A record's own user-written methods (e.g. `def f(): ... { do[Option] { ... } }`) need
+    // the same body-level rewriting (do-notation desugaring, trait method lowering) that a
+    // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
+    // typing unrewritten inside a record method.
+    val newSections = declaration.sections.map(rewriteAccessSection)
+    if (all.isEmpty) declaration.copy(sections = newSections)
     // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
     // capture-group count against the components (E0060), which the `from` synthesis gets
     // for free by routing through a regex select pattern and this one does not.
-    else declaration.copy(synthesizedMethods = all, laws = Nil, examples = Nil)
+    else declaration.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil)
   }
 
   /**

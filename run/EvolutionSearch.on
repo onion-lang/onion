@@ -1,0 +1,233 @@
+// EvolutionSearch.on — genetic algorithm for bit-string optimization (OneMax & TargetMatch)
+// Exercises: records with methods, classes with mutable state,
+// collection pipelines (map/filter/sortedBy/reduce/groupBy/any/find),
+// closures, extension methods, while loops, string interpolation,
+// nullable types, generics, recursion.
+
+// ─── Core types ───────────────────────────────────────────────────────────────
+
+record Individual(genes: List[Int], fitness: Double)
+
+record RunStats(problem: String, solved: Boolean, generations: Int, bestFitness: Double)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def pct2(): String {
+    val p: Int = (self * 10000.0 + 0.5) as Int
+    val frac: Int = p % 100
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return (p / 100) + "." + fracStr + "%"
+  }
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+def geneToStr(genes: List[Int]): String {
+  var sb: String = ""
+  foreach g: Int in genes { sb = sb + g }
+  return sb
+}
+
+// ─── RNG ──────────────────────────────────────────────────────────────────────
+
+class Rng {
+  var _state: Int
+public:
+  def this(seed: Int) { _state = (if seed == 0 { 1 } else { seed }) }
+  def nextInt(): Int {
+    _state = (_state * 1103515245 + 12345) % 2147483647
+    return if _state < 0 { -_state } else { _state }
+  }
+  def nextBit(): Int = nextInt() % 2
+  def nextFloat(): Double = (nextInt() % 100000 as Double) / 100000.0
+  def nextRange(lo: Int, hi: Int): Int {
+    val range: Int = hi - lo
+    return lo + (if range <= 0 { 0 } else { nextInt() % range })
+  }
+}
+
+// ─── GA operators ─────────────────────────────────────────────────────────────
+
+def randomGenes(n: Int, rng: Rng): List[Int] {
+  val genes: List[Int] = []
+  var i: Int = 0
+  while i < n { genes.add(rng.nextBit()); i = i + 1 }
+  return genes
+}
+
+def oneMaxFitness(genes: List[Int]): Double {
+  val ones: Int = genes.filter { g -> g == 1 }.size
+  return (ones as Double) / (genes.size as Double)
+}
+
+def targetMatchFitness(genes: List[Int], target: List[Int]): Double {
+  var score: Int = 0
+  var i: Int = 0
+  while i < target.size {
+    if genes[i] == target[i] { score = score + 1 }
+    i = i + 1
+  }
+  return (score as Double) / (target.size as Double)
+}
+
+def tournamentSelect(pop: List[Individual], k: Int, rng: Rng): Individual {
+  var best: Individual = pop[rng.nextRange(0, pop.size)]
+  var i: Int = 1
+  while i < k {
+    val cand: Individual = pop[rng.nextRange(0, pop.size)]
+    if cand.fitness() > best.fitness() { best = cand }
+    i = i + 1
+  }
+  return best
+}
+
+def crossover(a: Individual, b: Individual, point: Int): List[Int] {
+  val genes: List[Int] = []
+  var i: Int = 0
+  val ag: List[Int] = a.genes()
+  val bg: List[Int] = b.genes()
+  while i < ag.size {
+    if i < point { genes.add(ag[i]) } else { genes.add(bg[i]) }
+    i = i + 1
+  }
+  return genes
+}
+
+def mutate(genes: List[Int], mutRate: Double, rng: Rng): List[Int] {
+  val result: List[Int] = []
+  foreach g: Int in genes {
+    if rng.nextFloat() < mutRate {
+      result.add(if g == 0 { 1 } else { 0 })
+    } else {
+      result.add(g)
+    }
+  }
+  return result
+}
+
+def bestOf(pop: List[Individual]): Individual {
+  var best: Individual = pop[0]
+  foreach ind: Individual in pop {
+    if ind.fitness() > best.fitness() { best = ind }
+  }
+  return best
+}
+
+def diversity(pop: List[Individual]): Double {
+  if pop.size <= 1 { return 0.0 }
+  val n: Int = pop[0].genes().size
+  var totalDiff: Int = 0
+  var comparisons: Int = 0
+  var i: Int = 0
+  while i < pop.size - 1 {
+    var j: Int = i + 1
+    while j < pop.size {
+      val gi: List[Int] = pop[i].genes()
+      val gj: List[Int] = pop[j].genes()
+      var k: Int = 0
+      while k < n {
+        if gi[k] != gj[k] { totalDiff = totalDiff + 1 }
+        k = k + 1
+      }
+      comparisons = comparisons + 1
+      j = j + 1
+    }
+    i = i + 1
+  }
+  if comparisons == 0 || n == 0 { return 0.0 }
+  return (totalDiff as Double) / ((comparisons * n) as Double)
+}
+
+// ─── GA runner ────────────────────────────────────────────────────────────────
+
+def runGA(
+  problem: String,
+  n: Int,
+  popSize: Int,
+  maxGen: Int,
+  mutRate: Double,
+  fitnessOf: Function1[List[Int], Double],
+  rng: Rng,
+  verbose: Boolean
+): RunStats {
+  var pop: List[Individual] = []
+  var i: Int = 0
+  while i < popSize {
+    val g: List[Int] = randomGenes(n, rng)
+    pop.add(new Individual(g, fitnessOf(g)))
+    i = i + 1
+  }
+
+  var gen: Int = 0
+  var solved: Boolean = false
+  while gen < maxGen && !solved {
+    val best: Individual = bestOf(pop)
+    if verbose && gen % 10 == 0 {
+      val div: Double = diversity(pop)
+      IO::println("  gen #{gen}: fitness=#{best.fitness().pct2()} diversity=#{div.pct2()}")
+    }
+    if best.fitness() >= 1.0 {
+      solved = true
+    } else {
+      val next: List[Individual] = [bestOf(pop)]
+      while next.size < popSize {
+        val p1: Individual = tournamentSelect(pop, 3, rng)
+        val p2: Individual = tournamentSelect(pop, 3, rng)
+        val point: Int = rng.nextRange(1, n)
+        val childGenes: List[Int] = mutate(crossover(p1, p2, point), mutRate, rng)
+        next.add(new Individual(childGenes, fitnessOf(childGenes)))
+      }
+      pop = next
+      gen = gen + 1
+    }
+  }
+
+  val topInd: Individual = bestOf(pop)
+  if verbose {
+    if solved {
+      IO::println("  → Solved at gen #{gen}: #{geneToStr(topInd.genes())}")
+    } else {
+      IO::println("  → Failed after #{maxGen} gen; best=#{topInd.fitness().pct2()}")
+    }
+  }
+  return new RunStats(problem, solved, gen, topInd.fitness())
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val rng: Rng = new Rng(7919)
+
+IO::println("══════════════════════════════════════")
+IO::println(" Genetic Algorithm Demo")
+IO::println("══════════════════════════════════════")
+
+// Problem 1: OneMax (maximize number of 1s in a 20-bit string)
+IO::println("\n[Problem 1] OneMax — 20-bit string, maximize 1s")
+val s1: RunStats = runGA("OneMax", 20, 30, 500, 0.02, { g -> oneMaxFitness(g as List[Int]) }, rng, true)
+
+// Problem 2: Target match (match a specific 24-bit pattern)
+val target: List[Int] = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
+IO::println("\n[Problem 2] TargetMatch — 24-bit target: #{geneToStr(target)}")
+val s2: RunStats = runGA("TargetMatch", target.size, 40, 500, 0.03,
+  { g -> targetMatchFitness(g as List[Int], target) }, rng, true)
+
+// Multi-trial statistics for OneMax
+IO::println("\n[Experiment] OneMax 10-bit — 20 independent trials")
+val multiRng: Rng = new Rng(31337)
+val allStats: List[RunStats] = []
+var trial: Int = 0
+while trial < 20 {
+  val s: RunStats = runGA("OneMax", 10, 20, 300, 0.05, { g -> oneMaxFitness(g as List[Int]) }, new Rng(multiRng.nextInt()), false)
+  allStats.add(s)
+  trial = trial + 1
+}
+val solved: List[RunStats] = allStats.filter { s -> (s as RunStats).solved() }
+val totalGen: Int = solved.map { s -> (s as RunStats).generations() }.reduce(0) { acc, v -> acc + v }
+val avgGen: Double = if solved.size == 0 { 0.0 } else { (totalGen as Double) / (solved.size as Double) }
+IO::println("  Solved: #{solved.size}/#{allStats.size}")
+IO::println("  Avg generations (solved): #{avgGen}")
+
+IO::println("\n[Summary]")
+IO::println("  OneMax:      solved=#{s1.solved()}, gen=#{s1.generations()}, fitness=#{s1.bestFitness().pct2()}")
+IO::println("  TargetMatch: solved=#{s2.solved()}, gen=#{s2.generations()}, fitness=#{s2.bestFitness().pct2()}")

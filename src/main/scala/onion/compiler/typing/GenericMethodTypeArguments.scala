@@ -52,7 +52,12 @@ private[typing] object GenericMethodTypeArguments {
       return None
     }
 
-    val subst = typeParams.zip(mappedArgs).map { case (p, a) => p.name -> a }.toMap
+    // Box primitive type arguments (Int -> Integer) so that the substitution
+    // map matches what inference produces via Constraints.unify, which boxes
+    // primitives before inserting them.  Without boxing, List[T] with T=int
+    // becomes List[int], and the invariant type-argument check rejects
+    // ArrayList[Integer] even though the code is correct.
+    val subst = typeParams.zip(mappedArgs).map { case (p, a) => p.name -> boxedTypeArg(a) }.toMap
 
     val allBoundsOk = typeParams.indices.forall { i =>
       val tp = typeParams(i)

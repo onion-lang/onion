@@ -58,9 +58,8 @@ extension String {
 // ─── Domain 1: Chess player ───────────────────────────────────────────────────
 enum Title { GM, IM, FM, CM, NONE }
 
-record ChessPlayer(playerName: String, rating: Int, title: Title, wins: Int, losses: Int)
+record ChessPlayer(playerName: String, rating: Int, title: Title, wins: Int, losses: Int) {
   example { new ChessPlayer("Magnus", 2850, Title::GM, 312, 48).winRate() > 80 }
-{
 public:
   def winRate(): Int {
     val total: Int = wins() + losses()
@@ -97,9 +96,8 @@ instance Formattable[ChessPlayer] {
 }
 
 // ─── Domain 2: Racing driver ─────────────────────────────────────────────────
-record Driver(driverName: String, team: String, points: Int, fastestLaps: Int, dnfs: Int)
+record Driver(driverName: String, team: String, points: Int, fastestLaps: Int, dnfs: Int) {
   example { new Driver("Hamilton", "Mercedes", 287, 6, 1).reliability() > 80 }
-{
 public:
   // reliability: penalise DNFs relative to total race events
   def reliability(): Int {

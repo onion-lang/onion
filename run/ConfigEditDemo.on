@@ -11,12 +11,12 @@
 //   $ diff app.conf.bak app.conf                       # ...provably one line
 //
 // The pieces, and where they came from:
-//   shape cfg = config      a lossless shape: parse keeps a Residue        (#362)
+//   { shape cfg = config }  a lossless shape: parse keeps a Residue        (#362)
 //   .readLossless(...)      byte-faithful read of value + residue          (#363)
 //   .edit { ... }.render()  the lens: update the value, reassemble text    (#363)
 //   tool ... requires       the write-back is a declared, checked effect   (#357)
 
-record Server(host: String, port: Int, debug: Boolean)
+record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
   // L2, machine-checked at build time: an unedited document reproduces byte for
   // byte. If ConfigShape ever loses this property, this file stops compiling.
@@ -33,6 +33,7 @@ record Server(host: String, port: Int, debug: Boolean)
     val out = r.edit { v -> v.copy(debug = true) }.render()
     out == "# prod\nhost = a.example\nport = 007\ndebug = true\n"
   }
+}
 
 tool setport(path: String, port: Int, backup: Boolean = false): Int
   requires { read(path), write(path), console }

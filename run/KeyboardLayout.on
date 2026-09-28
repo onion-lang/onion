@@ -1,0 +1,371 @@
+// KeyboardLayout.on — keyboard-layout efficiency analyser
+// Compares QWERTY, Dvorak, and Colemak across sample texts.
+// Exercises: records (with do[Option] methods), data-carrying enums,
+//   ADT case-enums, static val/var, select { case true: / case false: },
+//   collection pipelines (groupBy/sortedBy/filter/map/fold/reduce),
+//   extension methods on String/Int/Double, nullable types,
+//   foreach (ranges + map entries), while, try/catch, recursion,
+//   string interpolation.
+
+import { java.lang.Math as JMath; java.lang.Character as JChar }
+
+// ─── Finger assignment enum ───────────────────────────────────────────────────
+
+enum Finger(label: String, homeRow: Char, strength: Double) {
+  LPinky  ("LP", 'a', 0.60),
+  LRing   ("LR", 's', 0.75),
+  LMiddle ("LM", 'd', 0.90),
+  LIndex  ("LI", 'f', 1.00),
+  LThumb  ("LT", ' ', 0.80),
+  RThumb  ("RT", ' ', 0.80),
+  RIndex  ("RI", 'j', 1.00),
+  RMiddle ("RM", 'k', 0.90),
+  RRing   ("RR", 'l', 0.75),
+  RPinky  ("RP", ';', 0.60)
+public:
+  def isLeft(): Boolean = select this {
+    case Finger::LPinky:  true
+    case Finger::LRing:   true
+    case Finger::LMiddle: true
+    case Finger::LIndex:  true
+    case Finger::LThumb:  true
+    else:                 false
+  }
+}
+
+// ─── Row enum ─────────────────────────────────────────────────────────────────
+
+enum Row(effort: Double) {
+  Top   (1.20),
+  Home  (1.00),
+  Bottom(1.10)
+}
+
+// ─── ADT: effort classification ───────────────────────────────────────────────
+
+enum EffortClass {
+  case Easy(finger: Finger)
+  case Moderate(finger: Finger, row: Row)
+  case Hard(finger: Finger, reason: String)
+public:
+  def finger(): Finger = select this {
+    case e is Easy:     e.finger()
+    case m is Moderate: m.finger()
+    case h is Hard:     h.finger()
+  }
+  def cost(): Double = select this {
+    case e is Easy:     1.0 / e.finger().strength()
+    case m is Moderate: m.row().effort() / m.finger().strength()
+    case h is Hard:     2.5 / h.finger().strength()
+  }
+  def label(): String = select this {
+    case e is Easy:     "easy/#{e.finger().label()}"
+    case m is Moderate: "#{m.row().effort()}x/#{m.finger().label()}"
+    case h is Hard:     "hard(#{h.reason()})/#{h.finger().label()}"
+  }
+}
+
+// ─── Key record ───────────────────────────────────────────────────────────────
+
+record Key(ch: Char, finger: Finger, row: Row) {
+public:
+  def effortClass(): EffortClass {
+    val homeRow = row() == Row::Home
+    val strongFinger = finger().strength() >= 0.90
+    if homeRow && strongFinger { return new Easy(finger()) }
+    if homeRow               { return new Moderate(finger(), row()) }
+    if !homeRow && !strongFinger { return new Hard(finger(), "weak+offrow") }
+    return new Moderate(finger(), row())
+  }
+  def typingCost(): Double = effortClass().cost()
+}
+
+// ─── Layout record ────────────────────────────────────────────────────────────
+
+record Layout(name: String, keys: List[Key]) {
+public:
+  // Look up a key by character (lower-cased for case-insensitive lookup)
+  def findKey(ch: Char): Key? {
+    val lcInt: Int = JChar::toLowerCase(ch) as Int
+    val found = keys().find { k -> (k.ch() as Int) == lcInt }
+    return if found != null { found as Key } else { null }
+  }
+
+  def costFor(chInt: Int): Double {
+    val k: Key? = findKeyByInt(chInt)
+    if k == null { return 0.0 }
+    return (k as Key).typingCost()
+  }
+
+  def averageCost(text: String): Double {
+    if text.length() == 0 { return 0.0 }
+    var total: Double = 0.0
+    var counted: Int = 0
+    var i: Int = 0
+    while i < text.length() {
+      val chInt: Int = text.charAt(i) as Int
+      val k: Key? = findKeyByInt(chInt)
+      if k != null {
+        total = total + (k as Key).typingCost()
+        counted = counted + 1
+      }
+      i = i + 1
+    }
+    if counted == 0 { return 0.0 }
+    return total / counted
+  }
+
+  def handBalance(text: String): String {
+    var left: Int = 0
+    var right: Int = 0
+    var i: Int = 0
+    while i < text.length() {
+      val chInt: Int = text.charAt(i) as Int
+      val k: Key? = findKeyByInt(chInt)
+      if k != null {
+        if (k as Key).finger().isLeft() { left = left + 1 }
+        else { right = right + 1 }
+      }
+      i = i + 1
+    }
+    val total: Int = left + right
+    if total == 0 { return "0%L / 0%R" }
+    val lp: Int = left * 100 / total
+    return "#{lp}%L / #{100 - lp}%R"
+  }
+
+  def fingerUsage(text: String): Map[String, Int] {
+    val usage: Map[String, Int] = [:]
+    var i: Int = 0
+    while i < text.length() {
+      val chInt: Int = text.charAt(i) as Int
+      val k: Key? = findKeyByInt(chInt)
+      if k != null {
+        val label: String = (k as Key).finger().label()
+        val cur: Int = if usage.containsKey(label) { usage[label] as Int } else { 0 }
+        usage[label] = cur + 1
+      }
+      i = i + 1
+    }
+    return usage
+  }
+
+  def findKeyByInt(chInt: Int): Key? {
+    val lcInt: Int = JChar::toLowerCase(chInt as Char) as Int
+    val found = keys().find { k -> (k.ch() as Int) == lcInt }
+    return if found != null { found as Key } else { null }
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val x100: Int = (self * 100.0 + 0.5) as Int
+    val whole: Int = x100 / 100
+    val frac: Int = x100 % 100
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr
+  }
+}
+
+extension Int {
+  def lpad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── Layout factory helpers ───────────────────────────────────────────────────
+
+def makeKey(ch: Char, f: Finger, r: Row): Key = new Key(ch, f, r)
+
+// Build QWERTY home row + top row + bottom row
+def buildQwerty(): Layout {
+  val keys: List[Key] = [
+    // Home row
+    makeKey('a', Finger::LPinky,  Row::Home),
+    makeKey('s', Finger::LRing,   Row::Home),
+    makeKey('d', Finger::LMiddle, Row::Home),
+    makeKey('f', Finger::LIndex,  Row::Home),
+    makeKey('g', Finger::LIndex,  Row::Home),
+    makeKey('h', Finger::RIndex,  Row::Home),
+    makeKey('j', Finger::RIndex,  Row::Home),
+    makeKey('k', Finger::RMiddle, Row::Home),
+    makeKey('l', Finger::RRing,   Row::Home),
+    // Top row
+    makeKey('q', Finger::LPinky,  Row::Top),
+    makeKey('w', Finger::LRing,   Row::Top),
+    makeKey('e', Finger::LMiddle, Row::Top),
+    makeKey('r', Finger::LIndex,  Row::Top),
+    makeKey('t', Finger::LIndex,  Row::Top),
+    makeKey('y', Finger::RIndex,  Row::Top),
+    makeKey('u', Finger::RIndex,  Row::Top),
+    makeKey('i', Finger::RMiddle, Row::Top),
+    makeKey('o', Finger::RRing,   Row::Top),
+    makeKey('p', Finger::RPinky,  Row::Top),
+    // Bottom row
+    makeKey('z', Finger::LPinky,  Row::Bottom),
+    makeKey('x', Finger::LRing,   Row::Bottom),
+    makeKey('c', Finger::LMiddle, Row::Bottom),
+    makeKey('v', Finger::LIndex,  Row::Bottom),
+    makeKey('b', Finger::LIndex,  Row::Bottom),
+    makeKey('n', Finger::RIndex,  Row::Bottom),
+    makeKey('m', Finger::RIndex,  Row::Bottom),
+    // Space
+    makeKey(' ', Finger::LThumb,  Row::Home)
+  ]
+  return new Layout("QWERTY", keys)
+}
+
+// Dvorak: vowels on left home, consonants on right
+def buildDvorak(): Layout {
+  val keys: List[Key] = [
+    // Home row (Dvorak: a o e u i / d h t n s)
+    makeKey('a', Finger::LPinky,  Row::Home),
+    makeKey('o', Finger::LRing,   Row::Home),
+    makeKey('e', Finger::LMiddle, Row::Home),
+    makeKey('u', Finger::LIndex,  Row::Home),
+    makeKey('i', Finger::LIndex,  Row::Home),
+    makeKey('d', Finger::RIndex,  Row::Home),
+    makeKey('h', Finger::RIndex,  Row::Home),
+    makeKey('t', Finger::RMiddle, Row::Home),
+    makeKey('n', Finger::RRing,   Row::Home),
+    makeKey('s', Finger::RPinky,  Row::Home),
+    // Top row
+    makeKey('q', Finger::LPinky,  Row::Top),
+    makeKey('p', Finger::LRing,   Row::Top),
+    makeKey('y', Finger::LMiddle, Row::Top),
+    makeKey('f', Finger::LIndex,  Row::Top),
+    makeKey('g', Finger::LIndex,  Row::Top),
+    makeKey('c', Finger::RIndex,  Row::Top),
+    makeKey('r', Finger::RIndex,  Row::Top),
+    makeKey('l', Finger::RMiddle, Row::Top),
+    makeKey('j', Finger::RPinky,  Row::Top),
+    // Bottom row
+    makeKey('z', Finger::LPinky,  Row::Bottom),
+    makeKey('x', Finger::LRing,   Row::Bottom),
+    makeKey('b', Finger::LIndex,  Row::Bottom),
+    makeKey('m', Finger::RIndex,  Row::Bottom),
+    makeKey('w', Finger::RMiddle, Row::Bottom),
+    makeKey('v', Finger::RRing,   Row::Bottom),
+    makeKey(' ', Finger::LThumb,  Row::Home)
+  ]
+  return new Layout("Dvorak", keys)
+}
+
+// Colemak: similar to QWERTY but rotates some keys for better home-row access
+def buildColemak(): Layout {
+  val keys: List[Key] = [
+    // Home row (Colemak: a r s t / n e i o)
+    makeKey('a', Finger::LPinky,  Row::Home),
+    makeKey('r', Finger::LRing,   Row::Home),
+    makeKey('s', Finger::LMiddle, Row::Home),
+    makeKey('t', Finger::LIndex,  Row::Home),
+    makeKey('d', Finger::LIndex,  Row::Home),
+    makeKey('h', Finger::RIndex,  Row::Home),
+    makeKey('n', Finger::RIndex,  Row::Home),
+    makeKey('e', Finger::RMiddle, Row::Home),
+    makeKey('i', Finger::RRing,   Row::Home),
+    makeKey('o', Finger::RPinky,  Row::Home),
+    // Top row
+    makeKey('q', Finger::LPinky,  Row::Top),
+    makeKey('w', Finger::LRing,   Row::Top),
+    makeKey('f', Finger::LMiddle, Row::Top),
+    makeKey('p', Finger::LIndex,  Row::Top),
+    makeKey('g', Finger::LIndex,  Row::Top),
+    makeKey('j', Finger::RIndex,  Row::Top),
+    makeKey('l', Finger::RIndex,  Row::Top),
+    makeKey('u', Finger::RMiddle, Row::Top),
+    makeKey('y', Finger::RRing,   Row::Top),
+    // Bottom row
+    makeKey('z', Finger::LPinky,  Row::Bottom),
+    makeKey('x', Finger::LRing,   Row::Bottom),
+    makeKey('c', Finger::LMiddle, Row::Bottom),
+    makeKey('v', Finger::LIndex,  Row::Bottom),
+    makeKey('b', Finger::LIndex,  Row::Bottom),
+    makeKey('k', Finger::RIndex,  Row::Bottom),
+    makeKey('m', Finger::RMiddle, Row::Bottom),
+    // Space
+    makeKey(' ', Finger::LThumb,  Row::Home)
+  ]
+  return new Layout("Colemak", keys)
+}
+
+// ─── Analyser ─────────────────────────────────────────────────────────────────
+
+def printAnalysis(layout: Layout, text: String): void {
+  val avg: Double = layout.averageCost(text)
+  val bal: String = layout.handBalance(text)
+  IO::println("Layout: " + layout.name())
+  IO::println("  avg cost/key : " + avg.fmt2())
+  IO::println("  hand balance : " + bal)
+
+  // Top 5 most-used fingers
+  val usage: Map[String, Int] = layout.fingerUsage(text)
+  val sortedFingers: List[String] = usage.keys().sortedBy { k -> 0 - (usage[k as String] as Int) }
+  IO::println("  top fingers  :")
+  var shown: Int = 0
+  foreach entry: Object in sortedFingers {
+    if shown < 5 {
+      val fLabel: String = entry as String
+      val cnt: Int = usage[fLabel] as Int
+      IO::println("    #{fLabel}: #{cnt} keystrokes")
+      shown = shown + 1
+    }
+  }
+  IO::println("")
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+static val TEXTS: List[String] = [
+  "the quick brown fox jumps over the lazy dog",
+  "to be or not to be that is the question",
+  "hello world this is a test of keyboard efficiency"
+]
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val layouts: List[Layout] = [buildQwerty(), buildDvorak(), buildColemak()]
+
+  foreach text: String in TEXTS {
+    IO::println("=== Text: \"" + text + "\" ===")
+    foreach layout: Layout in layouts {
+      printAnalysis(layout, text)
+    }
+  }
+
+  // Summary: rank layouts by average cost across all texts
+  IO::println("=== Summary: average cost across all sample texts ===")
+  val summary: List[Object] = layouts.map { layout ->
+    var total: Double = 0.0
+    foreach text: String in TEXTS {
+      total = total + layout.averageCost(text)
+    }
+    val avg: Double = total / TEXTS.size
+    layout.name() + ": " + avg.fmt2()
+  }
+  foreach line: String in summary {
+    IO::println(line)
+  }
+
+  // Demonstrate select { case true: / case false: }
+  IO::println("")
+  IO::println("=== Finger-side classification ===")
+  val qwerty: Layout = buildQwerty()
+  foreach ch: String in ["a", "e", "i", "o", "u"] {
+    val chInt: Int = ch.charAt(0) as Int
+    val k: Key? = qwerty.findKeyByInt(chInt)
+    if k != null {
+      val isL: Boolean = (k as Key).finger().isLeft()
+      val side: String = select isL {
+        case true:  "left"
+        case false: "right"
+      }
+      IO::println("  '#{ch}' -> #{side} hand (#{(k as Key).effortClass().label()})")
+    }
+  }
+}

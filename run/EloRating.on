@@ -1,0 +1,230 @@
+// EloRating.on — Chess tournament Elo rating system
+// Exercises: ADT case-enums, records with methods, classes, collection
+//            pipelines, pattern matching, closures, nullable, extension methods.
+import {
+  java.lang.Math
+}
+
+enum GameResult {
+  case WhiteWins
+  case BlackWins
+  case Draw
+}
+
+record MatchRecord(white: String, black: String, result: GameResult)
+
+record RankEntry(name: String, rating: Double, wins: Int, losses: Int, draws: Int) {
+public:
+  def games(): Int = wins() + losses() + draws()
+  def points(): Double = wins() * 1.0 + draws() * 0.5
+  def winRate(): Double {
+    if games() == 0 { return 0.0 }
+    return wins() * 1.0 / games()
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+extension Double {
+  def roundTo(decimals: Int): Double {
+    val factor = Math::pow(10.0, decimals * 1.0)
+    return Math::round(self * factor) * 1.0 / factor
+  }
+  def asPercent(): String = "" + (self * 100.0).roundTo(1) + "%"
+}
+
+class EloSystem {
+  var ratings: Map[String, Object]
+  var winCounts: Map[String, Object]
+  var lossCounts: Map[String, Object]
+  var drawCounts: Map[String, Object]
+  val kFactor: Double
+
+public:
+  def this(k: Double) {
+    this.kFactor = k
+    this.ratings    = new java.util.LinkedHashMap[String, Object]()
+    this.winCounts  = new java.util.LinkedHashMap[String, Object]()
+    this.lossCounts = new java.util.LinkedHashMap[String, Object]()
+    this.drawCounts = new java.util.LinkedHashMap[String, Object]()
+  }
+
+  def addPlayer(name: String, rating: Double): void {
+    this.ratings[name] = rating
+    this.winCounts[name] = 0
+    this.lossCounts[name] = 0
+    this.drawCounts[name] = 0
+  }
+
+  def getRating(name: String): Double {
+    val v = ratings[name]
+    if v == null { return 1200.0 }
+    return (v as Double)
+  }
+
+  def expectedScore(rA: Double, rB: Double): Double {
+    return 1.0 / (1.0 + Math::pow(10.0, (rB - rA) / 400.0))
+  }
+
+  def processMatch(m: MatchRecord): void {
+    val rW = getRating(m.white())
+    val rB = getRating(m.black())
+    val eW = expectedScore(rW, rB)
+    val eB = 1.0 - eW
+
+    var scoreW = 0.0
+    var scoreB = 0.0
+    select m.result() {
+      case r is WhiteWins: { scoreW = 1.0; scoreB = 0.0 }
+      case r is BlackWins: { scoreW = 0.0; scoreB = 1.0 }
+      case r is Draw:      { scoreW = 0.5; scoreB = 0.5 }
+    }
+
+    this.ratings[m.white()] = rW + kFactor * (scoreW - eW)
+    this.ratings[m.black()] = rB + kFactor * (scoreB - eB)
+
+    select m.result() {
+      case r is WhiteWins: {
+        this.winCounts[m.white()]  = (winCounts[m.white()]  as Int) + 1
+        this.lossCounts[m.black()] = (lossCounts[m.black()] as Int) + 1
+      }
+      case r is BlackWins: {
+        this.winCounts[m.black()]  = (winCounts[m.black()]  as Int) + 1
+        this.lossCounts[m.white()] = (lossCounts[m.white()] as Int) + 1
+      }
+      case r is Draw: {
+        this.drawCounts[m.white()] = (drawCounts[m.white()] as Int) + 1
+        this.drawCounts[m.black()] = (drawCounts[m.black()] as Int) + 1
+      }
+    }
+  }
+
+  def buildRankEntry(name: String): RankEntry {
+    val r = getRating(name)
+    val w = winCounts[name]
+    val l = lossCounts[name]
+    val d = drawCounts[name]
+    val wins   = if w == null { 0 } else { (w as Int) }
+    val losses = if l == null { 0 } else { (l as Int) }
+    val draws  = if d == null { 0 } else { (d as Int) }
+    return new RankEntry(name, r, wins, losses, draws)
+  }
+
+  def rankings(): List[RankEntry] {
+    val names = []
+    foreach k: Object in ratings.keySet() { names.add(k) }
+    val entries: List[RankEntry] = names.map { n -> buildRankEntry((n as String)) }
+    return entries.sortedBy { e -> 0.0 - e.rating() }
+  }
+}
+
+// --- helper: format a rating for display ---
+def fmtRating(r: Double): String {
+  val rounded = (r + 0.5) as Int
+  return "" + rounded
+}
+
+// --- print the leaderboard ---
+def printBoard(system: EloSystem): void {
+  val board = system.rankings()
+  IO::println("Rank  Player            Rating  W  L  D  Pts   WinRate")
+  IO::println("----  ----------------  ------  -  -  -  ----  -------")
+  var rank = 1
+  foreach entry: RankEntry in board {
+    val e = entry
+    val name = e.name()
+    val ratingStr = fmtRating(e.rating())
+    val pts = e.points()
+    IO::println("#{rank}     #{name}  #{ratingStr}  #{e.wins()}  #{e.losses()}  #{e.draws()}  #{pts}  #{e.winRate().asPercent()}")
+    rank = rank + 1
+  }
+}
+
+// ============================================================
+// Main: run a small round-robin tournament
+// ============================================================
+
+val system = new EloSystem(32.0)
+
+// --- register players ---
+val players = ["Magnus", "Hikaru", "Fabiano", "Ding", "Wesley", "Alireza"]
+foreach name: String in players {
+  system.addPlayer(name, 2600.0 + Rand::nextInt(401) * 1.0 - 200.0)
+}
+
+// Print initial ratings
+IO::println("=== Initial Ratings ===")
+foreach name: String in players {
+  val r = system.getRating(name)
+  IO::println("  #{name}: #{fmtRating(r)}")
+}
+IO::println("")
+
+// --- a round-robin: each pair plays 2 matches ---
+val matches = [
+  new MatchRecord("Magnus",  "Hikaru",  new WhiteWins()),
+  new MatchRecord("Hikaru",  "Magnus",  new Draw()),
+  new MatchRecord("Magnus",  "Fabiano", new Draw()),
+  new MatchRecord("Fabiano", "Magnus",  new BlackWins()),
+  new MatchRecord("Hikaru",  "Fabiano", new WhiteWins()),
+  new MatchRecord("Fabiano", "Hikaru",  new Draw()),
+  new MatchRecord("Ding",    "Wesley",  new Draw()),
+  new MatchRecord("Wesley",  "Ding",    new BlackWins()),
+  new MatchRecord("Ding",    "Alireza", new WhiteWins()),
+  new MatchRecord("Alireza", "Ding",    new BlackWins()),
+  new MatchRecord("Wesley",  "Alireza", new WhiteWins()),
+  new MatchRecord("Alireza", "Wesley",  new WhiteWins()),
+  new MatchRecord("Magnus",  "Ding",    new WhiteWins()),
+  new MatchRecord("Hikaru",  "Wesley",  new Draw()),
+  new MatchRecord("Fabiano", "Alireza", new BlackWins())
+]
+
+foreach m: Object in matches {
+  system.processMatch((m as MatchRecord))
+}
+
+IO::println("=== Tournament Results ===")
+printBoard(system)
+IO::println("")
+
+// --- compute rating changes ---
+IO::println("=== Rating Change Summary ===")
+foreach name: String in players {
+  val entry = system.buildRankEntry(name)
+  val initial = 2600.0
+  val change = (entry.rating() - initial).roundTo(1)
+  IO::println("  #{name}: #{fmtRating(entry.rating())} (#{change})")
+}
+IO::println("")
+
+// --- statistics: average rating, most active player ---
+val allEntries: List[RankEntry] = system.rankings()
+val totalRating = allEntries.fold(0.0) { acc, e -> (acc as Double) + (e as RankEntry).rating() }
+val avgRating = (totalRating as Double) / allEntries.size
+IO::println("Average rating: #{fmtRating(avgRating)}")
+
+val mostActive: List[RankEntry] = allEntries.sortedBy { e -> 0 - (e as RankEntry).games() }
+val top = mostActive[0]
+IO::println("Most active: #{top.name()} with #{top.games()} games")
+
+// --- find the upset: biggest upset means winner had lowest expected score ---
+IO::println("")
+IO::println("=== Sample Expected Score ===")
+val rMagnus  = 2750.0
+val rHikaru  = 2720.0
+val rFabiano = 2700.0
+val sysTemp = new EloSystem(32.0)
+sysTemp.addPlayer("Magnus",  rMagnus)
+sysTemp.addPlayer("Hikaru",  rHikaru)
+sysTemp.addPlayer("Fabiano", rFabiano)
+IO::println("  Magnus vs Hikaru expected:  #{sysTemp.expectedScore(rMagnus, rHikaru).roundTo(3)}")
+IO::println("  Hikaru vs Fabiano expected: #{sysTemp.expectedScore(rHikaru, rFabiano).roundTo(3)}")
+IO::println("  Fabiano vs Magnus expected: #{sysTemp.expectedScore(rFabiano, rMagnus).roundTo(3)}")
+IO::println("")
+IO::println("Done.")

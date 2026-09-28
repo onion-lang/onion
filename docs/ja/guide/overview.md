@@ -14,8 +14,9 @@ Java・Kotlin・Scala を書いたことがあれば、このページの大半�
 読み取り・書き戻し・失敗の報告・CLI をその記述から導出します。
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 
 val each = file"access.log".eachLine(Access::common())
 val rows = Outcome::values(each)      // 読めた行

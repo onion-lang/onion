@@ -1,0 +1,297 @@
+import {
+  java.lang.Math
+}
+
+// ── Category (data-carrying ADT enum) ─────────────────────────────────────────
+
+enum Category {
+  case Housing(budgetMonthly: Double)
+  case Food(budgetMonthly: Double)
+  case Transport(budgetMonthly: Double)
+  case Entertainment(budgetMonthly: Double)
+  case Health(budgetMonthly: Double)
+  case Utilities(budgetMonthly: Double)
+  case Savings(budgetMonthly: Double)
+  case Other(budgetMonthly: Double)
+
+  public:
+  def label(): String = select this {
+    case h is Housing:       "Housing"
+    case f is Food:          "Food"
+    case t is Transport:     "Transport"
+    case e is Entertainment: "Entertainment"
+    case h is Health:        "Health"
+    case u is Utilities:     "Utilities"
+    case s is Savings:       "Savings"
+    case o is Other:         "Other"
+  }
+
+  def budget(): Double = select this {
+    case h is Housing:       h.budgetMonthly()
+    case f is Food:          f.budgetMonthly()
+    case t is Transport:     t.budgetMonthly()
+    case e is Entertainment: e.budgetMonthly()
+    case h is Health:        h.budgetMonthly()
+    case u is Utilities:     u.budgetMonthly()
+    case s is Savings:       s.budgetMonthly()
+    case o is Other:         o.budgetMonthly()
+  }
+}
+
+// ── Transaction type ──────────────────────────────────────────────────────────
+
+enum TxType { case Income; case Expense }
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Transaction(id: Int, description: String, amount: Double, txType: TxType, category: Category, month: Int, day: Int)
+
+record BudgetSummary(category: Category, totalSpent: Double, budget: Double, txCount: Int) {
+  public:
+  def variance(): Double    = budget() - totalSpent()
+  def pctUsed(): Double     = if budget() > 0.0d { (totalSpent() / budget()) * 100.0d } else { 0.0d }
+  def isOverBudget(): Boolean = totalSpent() > budget()
+}
+
+record MonthlySummary(month: Int, totalIncome: Double, totalExpenses: Double, netSavings: Double, txCount: Int)
+
+// ── Extension methods on Double (currency/percentage formatting) ───────────────
+
+extension Double {
+  def fmtCurrency(): String {
+    val whole: Long = self.longValue()
+    val fracRaw: Double = (self - whole.doubleValue()) * 100.0d
+    val frac: Int = Math::abs(fracRaw.intValue())
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "$" + whole + "." + fracStr
+  }
+
+  def fmtPct(): String = self.intValue() + "%"
+
+  def roundCents(): Double = self.longValue().doubleValue()
+}
+
+// ── Extension methods on Int (month names) ────────────────────────────────────
+
+extension Int {
+  def monthName(): String = select this {
+    case 1:  "January"
+    case 2:  "February"
+    case 3:  "March"
+    case 4:  "April"
+    case 5:  "May"
+    case 6:  "June"
+    case 7:  "July"
+    case 8:  "August"
+    case 9:  "September"
+    case 10: "October"
+    case 11: "November"
+    case 12: "December"
+    else:    "Unknown"
+  }
+}
+
+// ── String extension helpers ──────────────────────────────────────────────────
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── Budget ledger ──────────────────────────────────────────────────────────────
+
+class Budget {
+  var transactions: List[Transaction] = []
+  var nextId: Int = 1
+
+private:
+  def addTx(desc: String, amount: Double, txType: TxType, cat: Category, month: Int, day: Int): Transaction {
+    val tx: Transaction = new Transaction(nextId, desc, amount, txType, cat, month, day)
+    transactions.add(tx)
+    nextId = nextId + 1
+    return tx
+  }
+
+public:
+  def addExpense(desc: String, amount: Double, cat: Category, month: Int, day: Int): Transaction {
+    return addTx(desc, amount, new Expense(), cat, month, day)
+  }
+
+  def addIncome(desc: String, amount: Double, month: Int, day: Int): Transaction {
+    return addTx(desc, amount, new Income(), new Other(0.0d), month, day)
+  }
+
+  def txCount(): Int = transactions.size
+
+  def expensesForMonth(month: Int): List[Transaction] {
+    return transactions.filter { tx: Transaction ->
+      (tx.txType() is Expense) && tx.month() == month
+    }
+  }
+
+  def incomeForMonth(month: Int): List[Transaction] {
+    return transactions.filter { tx: Transaction ->
+      (tx.txType() is Income) && tx.month() == month
+    }
+  }
+
+  def totalExpenses(month: Int): Double {
+    var total: Double = 0.0d
+    foreach tx: Transaction in expensesForMonth(month) { total = total + tx.amount() }
+    return total
+  }
+
+  def totalIncome(month: Int): Double {
+    var total: Double = 0.0d
+    foreach tx: Transaction in incomeForMonth(month) { total = total + tx.amount() }
+    return total
+  }
+
+  def summaryFor(month: Int): MonthlySummary {
+    val income: Double = totalIncome(month)
+    val expenses: Double = totalExpenses(month)
+    val count: Int = transactions.filter { tx: Transaction -> tx.month() == month }.size
+    return new MonthlySummary(month, income, expenses, income - expenses, count)
+  }
+
+  def categoryBreakdown(month: Int, budgets: List[Category]): List[BudgetSummary] {
+    val expenses: List[Transaction] = expensesForMonth(month)
+    val result: List[BudgetSummary] = []
+    foreach cat: Category in budgets {
+      val catLabel: String = cat.label()
+      val catTxs: List[Transaction] = expenses.filter { tx: Transaction ->
+        tx.category().label() == catLabel
+      }
+      var spent: Double = 0.0d
+      foreach tx: Transaction in catTxs { spent = spent + tx.amount() }
+      if spent > 0.0d {
+        result.add(new BudgetSummary(cat, spent, cat.budget(), catTxs.size))
+      }
+    }
+    return result
+  }
+
+  def topExpenses(month: Int, n: Int): List[Transaction] {
+    val sorted: List[Transaction] = expensesForMonth(month).sortedBy { tx: Transaction -> -tx.amount() }
+    val result: List[Transaction] = []
+    var i: Int = 0
+    while i < n && i < sorted.size {
+      result.add(sorted.get(i))
+      i = i + 1
+    }
+    return result
+  }
+
+  def allMonths(): List[Int] {
+    val seen: List[Int] = []
+    foreach tx: Transaction in transactions {
+      if !seen.contains(tx.month()) { seen.add(tx.month()) }
+    }
+    return seen.sortedBy { m: Int -> m }
+  }
+}
+
+// ── Report formatting ──────────────────────────────────────────────────────────
+
+def printSep(): void {
+  IO::println("─────────────────────────────────────────────")
+}
+
+def printHeader(title: String): void {
+  printSep()
+  IO::println("  " + title)
+  printSep()
+}
+
+def printMonthlySummary(s: MonthlySummary): void {
+  printHeader("Monthly Summary — " + s.month().monthName())
+  IO::println("  Transactions : " + s.txCount())
+  IO::println("  Total Income : " + s.totalIncome().fmtCurrency())
+  IO::println("  Total Expenses: " + s.totalExpenses().fmtCurrency())
+  val sign: String = if s.netSavings() >= 0.0d { "+" } else { "" }
+  IO::println("  Net Savings  : " + sign + s.netSavings().fmtCurrency())
+}
+
+def printCategoryBreakdown(breakdowns: List[BudgetSummary]): void {
+  printHeader("Category Breakdown")
+  foreach summary: BudgetSummary in breakdowns {
+    val over: String = if summary.isOverBudget() { " *** OVER BUDGET ***" } else { "" }
+    val line: String = "  " + summary.category().label().padRight(15) + "  " + summary.totalSpent().fmtCurrency().padLeft(10) + "  / " + summary.budget().fmtCurrency() + "  (" + summary.pctUsed().fmtPct() + ")" + over
+    IO::println(line)
+  }
+}
+
+def printTopExpenses(expenses: List[Transaction], label: String): void {
+  printHeader(label)
+  var rank: Int = 1
+  foreach tx: Transaction in expenses {
+    IO::println("  " + rank + ". " + tx.description().padRight(30) + tx.amount().fmtCurrency())
+    rank = rank + 1
+  }
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────────
+
+val budget: Budget = new Budget()
+
+// March income
+budget.addIncome("Salary",             4200.0d, 3, 1)
+budget.addIncome("Freelance project",   350.0d, 3, 15)
+
+// March expenses
+budget.addExpense("Rent",                     1450.0d, new Housing(1500.0d),       3, 1)
+budget.addExpense("Electricity",                92.0d, new Utilities(250.0d),      3, 3)
+budget.addExpense("Internet",                   55.0d, new Utilities(250.0d),      3, 3)
+budget.addExpense("Groceries week 1",          143.0d, new Food(600.0d),           3, 5)
+budget.addExpense("Groceries week 2",          128.0d, new Food(600.0d),           3, 12)
+budget.addExpense("Restaurant lunches",         74.0d, new Food(600.0d),           3, 14)
+budget.addExpense("Monthly transit pass",       95.0d, new Transport(300.0d),      3, 1)
+budget.addExpense("Gas",                        62.0d, new Transport(300.0d),      3, 18)
+budget.addExpense("Cinema tickets",             38.0d, new Entertainment(200.0d),  3, 8)
+budget.addExpense("Streaming services",         31.0d, new Entertainment(200.0d),  3, 1)
+budget.addExpense("Doctor visit copay",         30.0d, new Health(150.0d),         3, 20)
+budget.addExpense("Pharmacy",                   18.0d, new Health(150.0d),         3, 21)
+budget.addExpense("Car repair (emergency)",    285.0d, new Transport(300.0d),      3, 25)
+budget.addExpense("Savings transfer",          500.0d, new Savings(500.0d),        3, 1)
+budget.addExpense("Groceries week 3",          115.0d, new Food(600.0d),           3, 19)
+budget.addExpense("Gym membership",             40.0d, new Health(150.0d),         3, 1)
+
+// Budget category list (used for breakdown)
+val monthBudgets: List[Category] = [
+  new Housing(1500.0d),
+  new Food(600.0d),
+  new Transport(300.0d),
+  new Entertainment(200.0d),
+  new Health(150.0d),
+  new Utilities(250.0d),
+  new Savings(500.0d)
+]
+
+IO::println("")
+
+val march: MonthlySummary = budget.summaryFor(3)
+printMonthlySummary(march)
+
+IO::println("")
+val breakdowns: List[BudgetSummary] = budget.categoryBreakdown(3, monthBudgets)
+printCategoryBreakdown(breakdowns)
+
+IO::println("")
+val top5: List[Transaction] = budget.topExpenses(3, 5)
+printTopExpenses(top5, "Top 5 Expenses — March")
+
+val withinBudget: Int = breakdowns.filter { s: BudgetSummary -> !s.isOverBudget() }.size
+printSep()
+IO::println("  Budget health: " + withinBudget + " / " + breakdowns.size + " categories within budget")
+IO::println("  Total transactions: " + budget.txCount())
+printSep()
+IO::println("")

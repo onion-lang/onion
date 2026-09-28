@@ -1,0 +1,414 @@
+// TimetableBuilder.on — school timetable design and constraint analysis
+// Exercises: records with methods, data-carrying + ADT enums, class+interface,
+// generic Pair record, extension methods (Int/Double), collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/zip), select/
+// pattern matching, nullable, string interpolation, try/catch, recursion,
+// while + foreach (ranges + map entries).
+
+import {
+  java.util.ArrayList
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Day { Mon, Tue, Wed, Thu, Fri }
+
+enum Slot(label: String, hour: Int) {
+  S1("08:00",  8),
+  S2("09:00",  9),
+  S3("10:00", 10),
+  S4("13:00", 13),
+  S5("14:00", 14),
+  S6("15:00", 15)
+}
+
+// ADT: weekly-session policy for a subject
+enum SubjectPolicy {
+  case Core(minSessions: Int, maxSessions: Int)
+  case Elective(sessions: Int)
+  case Activity(outdoor: Boolean)
+public:
+  def maxAllowed(): Int = select this {
+    case c is Core:     c.maxSessions()
+    case e is Elective: e.sessions()
+    case a is Activity: 2
+  }
+  def minRequired(): Int = select this {
+    case c is Core:     c.minSessions()
+    case e is Elective: e.sessions()
+    case a is Activity: 1
+  }
+  def typeName(): String = select this {
+    case c is Core:     "Core"
+    case e is Elective: "Elective"
+    case a is Activity: if a.outdoor() { "Outdoor" } else { "Indoor Activity" }
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Pair[A, B](first: A, second: B)
+
+record Teacher(id: String, name: String, specialism: String) {
+public:
+  def label(): String = "#{id()} #{name()} (#{specialism()})"
+}
+
+record Subject(id: String, name: String, policy: SubjectPolicy) {
+public:
+  def label(): String = "#{id()} #{name()} [#{policy().typeName()}]"
+}
+
+record Room(id: String, capacity: Int, lab: Boolean) {
+public:
+  def label(): String {
+    val kind = if lab() { "Lab" } else { "Classroom" }
+    return "#{id()} #{kind} cap=#{capacity()}"
+  }
+}
+
+record Group(id: String, year: Int, section: String, size: Int) {
+public:
+  def label(): String = "Year #{year()}#{section()} (#{size()} pupils)"
+}
+
+record Lesson(
+  teacherId: String,
+  subjectId: String,
+  groupId:   String,
+  roomId:    String,
+  day:       Day,
+  slot:      Slot
+) {
+public:
+  def timeAt(): String        = "#{day()} #{slot().label()}"
+  def teacherSlot(): String = "#{teacherId()}-#{timeAt()}"
+  def roomSlot(): String    = "#{roomId()}-#{timeAt()}"
+  def groupSlot(): String   = "#{groupId()}-#{timeAt()}"
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Auditable {
+  def audit(): void
+}
+
+// ─── Extension Methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def sessionWord(): String = if self == 1 { "session" } else { "sessions" }
+  def pctOf(total: Int): Int {
+    if total == 0 { return 0 }
+    return (self * 100) / total
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val sc = (self * 10.0) as Int
+    val w  = sc / 10
+    val f  = sc % 10
+    return "#{w}.#{f}"
+  }
+}
+
+// ─── TimetableDB ─────────────────────────────────────────────────────────────
+
+class TimetableDB(
+  val teachers: List[Teacher],
+  val subjects: List[Subject],
+  val rooms:    List[Room],
+  val groups:   List[Group],
+  val lessons:  List[Lesson]
+) conforms Auditable {
+
+public:
+  def audit(): void {
+    IO::println("  #{teachers.size} teachers  #{subjects.size} subjects")
+    IO::println("  #{rooms.size} rooms  #{groups.size} groups  #{lessons.size} lessons")
+  }
+
+  def findTeacher(id: String): Teacher? =
+    teachers.find { t -> (t as Teacher).id() == id } as Teacher?
+
+  def findSubject(id: String): Subject? =
+    subjects.find { s -> (s as Subject).id() == id } as Subject?
+
+  def findRoom(id: String): Room? =
+    rooms.find { r -> (r as Room).id() == id } as Room?
+
+  def sessionsFor(teacherId: String): Int =
+    lessons.filter { l -> (l as Lesson).teacherId() == teacherId }.size
+
+  def groupLessons(groupId: String): List[Lesson] =
+    lessons.filter { l -> (l as Lesson).groupId() == groupId }
+
+  def roomLessons(roomId: String): List[Lesson] =
+    lessons.filter { l -> (l as Lesson).roomId() == roomId }
+
+  def subjectSessions(subjectId: String, groupId: String): Int =
+    lessons.filter { l ->
+      (l as Lesson).subjectId() == subjectId && (l as Lesson).groupId() == groupId
+    }.size
+
+  def avgTeacherLoad(): Double {
+    if teachers.size == 0 { return 0.0 }
+    return (lessons.size as Double) / teachers.size
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Recursive: total sessions for a group across all its lessons
+def totalGroupSessions(groupId: String, ls: List[Lesson], idx: Int): Int {
+  if idx >= ls.size { return 0 }
+  val l = ls.get(idx) as Lesson
+  val add = if l.groupId() == groupId { 1 } else { 0 }
+  return add + totalGroupSessions(groupId, ls, idx + 1)
+}
+
+// Safe parse Double with try/catch
+def safeDouble(s: String): Double {
+  try {
+    return Double::parseDouble(s)
+  } catch e: Exception {
+    return 0.0
+  }
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+val teachers: List[Teacher] = [
+  new Teacher("T01", "Alice Kumar",  "Mathematics"),
+  new Teacher("T02", "Ben Shaw",     "English"),
+  new Teacher("T03", "Carol Patel",  "Science"),
+  new Teacher("T04", "David Osei",   "Humanities"),
+  new Teacher("T05", "Emma Reyes",   "Physical Education")
+]
+
+val subjects: List[Subject] = [
+  new Subject("MATH", "Mathematics",     new Core(4, 5)),
+  new Subject("ENG",  "English",         new Core(4, 5)),
+  new Subject("SCI",  "Science",         new Core(3, 4)),
+  new Subject("HIST", "History",         new Elective(2)),
+  new Subject("ART",  "Art",             new Activity(false)),
+  new Subject("PE",   "Physical Ed",     new Activity(true))
+]
+
+val rooms: List[Room] = [
+  new Room("R101", 30, false),
+  new Room("R102", 30, false),
+  new Room("R103", 30, false),
+  new Room("LAB1", 25, true)
+]
+
+val groups: List[Group] = [
+  new Group("G7A", 7, "A", 28),
+  new Group("G7B", 7, "B", 26),
+  new Group("G8A", 8, "A", 29)
+]
+
+val lessons: List[Lesson] = [
+  // Group G7A
+  new Lesson("T01","MATH","G7A","R101", Day::Mon, Slot::S1),
+  new Lesson("T02","ENG", "G7A","R102", Day::Mon, Slot::S4),
+  new Lesson("T01","MATH","G7A","R101", Day::Tue, Slot::S1),
+  new Lesson("T03","SCI", "G7A","LAB1", Day::Tue, Slot::S4),
+  new Lesson("T02","ENG", "G7A","R102", Day::Wed, Slot::S2),
+  new Lesson("T04","HIST","G7A","R103", Day::Wed, Slot::S5),
+  new Lesson("T01","MATH","G7A","R101", Day::Thu, Slot::S1),
+  new Lesson("T04","ART", "G7A","R103", Day::Thu, Slot::S5),
+  new Lesson("T02","ENG", "G7A","R102", Day::Fri, Slot::S2),
+  new Lesson("T05","PE",  "G7A","R101", Day::Fri, Slot::S4),
+  // Group G7B
+  new Lesson("T01","MATH","G7B","R103", Day::Mon, Slot::S2),
+  new Lesson("T02","ENG", "G7B","R103", Day::Mon, Slot::S5),
+  new Lesson("T01","MATH","G7B","R103", Day::Tue, Slot::S2),
+  new Lesson("T03","SCI", "G7B","LAB1", Day::Tue, Slot::S5),
+  new Lesson("T02","ENG", "G7B","R103", Day::Wed, Slot::S1),
+  new Lesson("T04","HIST","G7B","R101", Day::Wed, Slot::S4),
+  new Lesson("T01","MATH","G7B","R103", Day::Thu, Slot::S2),
+  new Lesson("T04","ART", "G7B","R101", Day::Thu, Slot::S4),
+  new Lesson("T02","ENG", "G7B","R103", Day::Fri, Slot::S1),
+  new Lesson("T05","PE",  "G7B","R103", Day::Fri, Slot::S5),
+  // Group G8A
+  new Lesson("T01","MATH","G8A","R102", Day::Mon, Slot::S3),
+  new Lesson("T02","ENG", "G8A","R102", Day::Mon, Slot::S6),
+  new Lesson("T01","MATH","G8A","R102", Day::Tue, Slot::S3),
+  new Lesson("T03","SCI", "G8A","LAB1", Day::Tue, Slot::S6),
+  new Lesson("T02","ENG", "G8A","R102", Day::Wed, Slot::S3),
+  new Lesson("T04","HIST","G8A","R103", Day::Wed, Slot::S6),
+  new Lesson("T01","MATH","G8A","R102", Day::Thu, Slot::S3),
+  new Lesson("T04","ART", "G8A","R102", Day::Thu, Slot::S6),
+  new Lesson("T02","ENG", "G8A","R102", Day::Fri, Slot::S3),
+  new Lesson("T05","PE",  "G8A","R102", Day::Fri, Slot::S6)
+]
+
+val db = new TimetableDB(teachers, subjects, rooms, groups, lessons)
+
+// ─── Analysis ────────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════╗")
+IO::println("║     School Timetable Analysis        ║")
+IO::println("╚══════════════════════════════════════╝")
+db.audit()
+IO::println("")
+
+// 1. Teacher load (sorted descending, with generic Pair for top-3 list)
+IO::println("── Teacher Session Load ──")
+val sortedTeachers = teachers.sortedBy { t -> 0 - db.sessionsFor((t as Teacher).id()) }
+var rank = 1
+val top3 = new ArrayList[Pair[String, Int]]()
+foreach t: Teacher in sortedTeachers {
+  val n = db.sessionsFor(t.id())
+  IO::println("  ##{rank} #{t.label()} — #{n} #{n.sessionWord()}")
+  if rank <= 3 { top3.add(new Pair[String, Int](t.name(), n)) }
+  rank = rank + 1
+}
+IO::println("  Avg load: #{db.avgTeacherLoad().fmt1()} sessions/teacher")
+IO::println("")
+
+// 2. Top-3 busiest teachers using generic Pair
+IO::println("── Top 3 Busiest Teachers ──")
+var pi = 0
+while pi < top3.size {
+  val p = top3.get(pi) as Pair
+  IO::println("  #{pi + 1}. #{p.first()} (#{p.second()} sessions)")
+  pi = pi + 1
+}
+IO::println("")
+
+// 3. Group schedule: lessons per day (groupBy day)
+IO::println("── Group Schedules ──")
+foreach g: Group in groups {
+  IO::println("  #{g.label()}")
+  val gls = db.groupLessons(g.id())
+  val byDay = gls.groupBy { l -> "" + (l as Lesson).day() }
+  foreach (day, ls) in byDay {
+    val dayLs = ls as List
+    IO::print("    #{day}: ")
+    var first = true
+    foreach l: Lesson in dayLs {
+      if !first { IO::print(", ") }
+      IO::print("#{l.slot().label()} #{l.subjectId()}")
+      first = false
+    }
+    IO::println("")
+  }
+  IO::println("")
+}
+
+// 4. Subject sessions per group (fold to check policy compliance)
+IO::println("── Subject Policy Compliance ──")
+foreach subj: Subject in subjects {
+  IO::print("  #{subj.label()}: ")
+  var anyGroup = false
+  foreach g: Group in groups {
+    val n = db.subjectSessions(subj.id(), g.id())
+    if n > 0 {
+      val ok  = n >= subj.policy().minRequired() && n <= subj.policy().maxAllowed()
+      val tag = if ok { "OK" } else { "WARN" }
+      IO::print("#{g.id()}=#{n}[#{tag}] ")
+      anyGroup = true
+    }
+  }
+  if !anyGroup { IO::println("(not scheduled)") }
+  else { IO::println("") }
+}
+IO::println("")
+
+// 5. Room utilisation — distinct subjects per room
+IO::println("── Room Utilisation ──")
+foreach r: Room in rooms {
+  val rls = db.roomLessons(r.id())
+  val subjects2 = rls.map { l -> (l as Lesson).subjectId() }.distinct()
+  IO::println("  #{r.label()} — #{rls.size} #{rls.size.sessionWord()}, #{subjects2.size} subject(s)")
+}
+IO::println("")
+
+// 6. Conflict detection: teacher and room double-booking
+IO::println("── Conflict Check ──")
+val teacherGroups = lessons.groupBy { l -> (l as Lesson).teacherSlot() }
+var tConflicts = 0
+foreach (key, ls) in teacherGroups {
+  if (ls as List).size > 1 { tConflicts = tConflicts + 1 }
+}
+val roomGroups = lessons.groupBy { l -> (l as Lesson).roomSlot() }
+var rConflicts = 0
+foreach (key, ls) in roomGroups {
+  if (ls as List).size > 1 { rConflicts = rConflicts + 1 }
+}
+IO::println("  Teacher conflicts: #{tConflicts}")
+IO::println("  Room conflicts:    #{rConflicts}")
+IO::println(if (tConflicts + rConflicts) == 0 { "  Timetable is conflict-free ✓" } else { "  WARNING: conflicts found" })
+IO::println("")
+
+// 7. Partition rooms into lab / non-lab
+IO::println("── Room Types ──")
+val roomParts = rooms.partition { r -> (r as Room).lab() }
+val labs      = roomParts.get(0) as List
+val standard  = roomParts.get(1) as List
+IO::println("  Labs:      #{labs.size}")
+IO::println("  Standard:  #{standard.size}")
+IO::println("")
+
+// 8. Recursive total sessions per group
+IO::println("── Total Sessions per Group (recursive) ──")
+foreach g: Group in groups {
+  val total = totalGroupSessions(g.id(), lessons, 0)
+  val pct   = total.pctOf(lessons.size)
+  IO::println("  #{g.label()}: #{total} #{total.sessionWord()} (#{pct}% of all lessons)")
+}
+IO::println("")
+
+// 9. Nullable teacher lookup
+IO::println("── Teacher Lookup ──")
+val found    = db.findTeacher("T03")
+val notFound = db.findTeacher("T99")
+IO::println("  T03: #{if found != null { (found as Teacher).label() } else { "not found" }}")
+IO::println("  T99: #{if notFound != null { (notFound as Teacher).label() } else { "not found" }}")
+IO::println("")
+
+// 10. ADT pattern match on SubjectPolicy
+IO::println("── Subject Policies ──")
+foreach s: Subject in subjects {
+  val note = select s.policy() {
+    case c is Core:     "#{c.minSessions()}-#{c.maxSessions()} sessions required"
+    case e is Elective: "exactly #{e.sessions()} sessions"
+    case a is Activity: if a.outdoor() { "outdoor sport" } else { "indoor activity" }
+  }
+  IO::println("  #{s.name()}: #{note}")
+}
+IO::println("")
+
+// 11. ZIP teachers with their session counts → produce summary strings
+IO::println("── Teacher/Load Zip ──")
+val loadCounts = teachers.map { t -> db.sessionsFor((t as Teacher).id()) }
+val zipped     = teachers.zip(loadCounts)
+foreach pair: Object in zipped {
+  val z = pair as java.util.List
+  val teacher = z.get(0) as Teacher
+  val load    = z.get(1) as Int
+  IO::println("  #{teacher.name()}: #{load} #{load.sessionWord()}")
+}
+IO::println("")
+
+// 12. Safe-parse demo
+IO::println("── Safe Parse Demo ──")
+IO::println("  '4.5'  -> #{safeDouble("4.5")}")
+IO::println("  'oops' -> #{safeDouble("oops")}")
+IO::println("")
+
+// 13. Foreach over range: weekly time grid
+IO::println("── Weekly Time Grid (Mon–Fri, slots 1-6) ──")
+val slotLabels = [Slot::S1.label(), Slot::S2.label(), Slot::S3.label(),
+                  Slot::S4.label(), Slot::S5.label(), Slot::S6.label()]
+foreach i: Int in 0..<6 {
+  val sl = slotLabels.get(i) as String
+  IO::print("  #{sl}: ")
+  val busyCount = lessons.filter { l -> (l as Lesson).slot().label() == sl }.size
+  IO::println("#{busyCount} lesson(s)")
+}
+IO::println("")
+
+IO::println("Analysis complete.")

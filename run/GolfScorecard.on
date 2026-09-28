@@ -1,0 +1,317 @@
+// GolfScorecard.on — 18-hole golf tournament scorecard and leaderboard (~300 lines)
+//
+// Exercises: plain enum with methods (TeeColor); ADT case-enum mixing
+// zero-field cases and a data-carrying case (ScoreType: Eagle/Birdie/Par/
+// Bogey/DoubleBogey/Other(over)) dispatched via select/is type patterns;
+// records with methods (Hole/Course/HoleScore/PlayerRound); a class with a
+// primary-style constructor and private helper (Tournament); extension
+// methods on Int and String; collection pipelines (filter/sortedBy/
+// sortedByDescending/groupBy); nullable types and the Elvis operator;
+// function-typed parameters and lambdas; closures; string interpolation;
+// foreach over ranges, lists and map (k, v) entries; while loops; try/catch.
+
+// ─── Extensions ────────────────────────────────────────────────────────────
+
+extension Int {
+  def rjust(w: Int): String {
+    var r: String = self.toString()
+    while r.length() < w { r = " " + r }
+    return r
+  }
+
+  def toParStr(): String {
+    if self == 0 { return "E" }
+    if self > 0 { return "+" + self }
+    return "" + self
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var r: String = self
+    while r.length() < w { r = r + " " }
+    return r
+  }
+}
+
+// ─── Tee (plain enum with methods) ──────────────────────────────────────────
+
+enum TeeColor {
+  BLACK, BLUE, WHITE, RED
+public:
+  def label(): String = select this {
+    case TeeColor::BLACK: "Championship"
+    case TeeColor::BLUE:  "Men's"
+    case TeeColor::WHITE: "Forward"
+    case TeeColor::RED:   "Senior/Ladies"
+    else:                 "?"
+  }
+}
+
+// ─── Score classification (ADT case-enum) ───────────────────────────────────
+
+enum ScoreType {
+  case Eagle
+  case Birdie
+  case Par
+  case Bogey
+  case DoubleBogey
+  case Other(over: Int)
+public:
+  def label(): String = select this {
+    case s is Eagle:       "Eagle"
+    case s is Birdie:      "Birdie"
+    case s is Par:         "Par"
+    case s is Bogey:       "Bogey"
+    case s is DoubleBogey: "Dbl Bogey"
+    case o is Other:       "+#{o.over()}"
+  }
+}
+
+def classifyScore(diff: Int): ScoreType {
+  if diff <= -2 { return new Eagle() }
+  if diff == -1 { return new Birdie() }
+  if diff == 0  { return new Par() }
+  if diff == 1  { return new Bogey() }
+  if diff == 2  { return new DoubleBogey() }
+  return new Other(diff)
+}
+
+// Standard handicap allowance: one extra stroke per full 18 strokes of
+// handicap, plus one more on every hole whose stroke index is within the
+// remainder.
+def handicapStrokes(handicap: Int, strokeIndex: Int): Int {
+  val base: Int = handicap / 18
+  val rem: Int = handicap % 18
+  if strokeIndex <= rem { return base + 1 }
+  return base
+}
+
+// ─── Course ──────────────────────────────────────────────────────────────
+
+record Hole(number: Int, par: Int, strokeIndex: Int, yards: Int)
+
+record Course(name: String, tee: TeeColor, holes: List[Hole]) {
+public:
+  def totalPar(): Int {
+    var t: Int = 0
+    foreach h: Hole in holes { t = t + h.par() }
+    return t
+  }
+  def totalYards(): Int {
+    var t: Int = 0
+    foreach h: Hole in holes { t = t + h.yards() }
+    return t
+  }
+}
+
+// ─── Scorecard ───────────────────────────────────────────────────────────
+
+record HoleScore(hole: Hole, strokes: Int) {
+public:
+  def grossDiff(): Int = strokes - hole.par()
+  def scoreType(): ScoreType = classifyScore(grossDiff())
+  def strokesGiven(handicap: Int): Int = handicapStrokes(handicap, hole.strokeIndex())
+  def netStrokes(handicap: Int): Int = strokes - strokesGiven(handicap)
+  def stablefordPoints(handicap: Int): Int {
+    val netDiff: Int = netStrokes(handicap) - hole.par()
+    val pts: Int = 2 - netDiff
+    if pts < 0 { return 0 }
+    return pts
+  }
+}
+
+record PlayerRound(playerName: String, handicap: Int, scores: List[HoleScore]) {
+public:
+  def grossTotal(): Int {
+    var t: Int = 0
+    foreach s: HoleScore in scores { t = t + s.strokes() }
+    return t
+  }
+  def netTotal(): Int {
+    var t: Int = 0
+    foreach s: HoleScore in scores { t = t + s.netStrokes(handicap) }
+    return t
+  }
+  def stablefordTotal(): Int {
+    var t: Int = 0
+    foreach s: HoleScore in scores { t = t + s.stablefordPoints(handicap) }
+    return t
+  }
+  def toParGross(coursePar: Int): Int = grossTotal() - coursePar
+  def frontNine(): List[HoleScore] = scores.filter { s -> s.hole().number() <= 9 }
+  def backNine(): List[HoleScore] = scores.filter { s -> s.hole().number() > 9 }
+  def subtotal(part: List[HoleScore]): Int {
+    var t: Int = 0
+    foreach s: HoleScore in part { t = t + s.strokes() }
+    return t
+  }
+}
+
+def buildRound(name: String, handicap: Int, holes: List[Hole], strokes: List[Int]): PlayerRound {
+  var scores: List[HoleScore] = []
+  var i: Int = 0
+  while i < holes.size {
+    scores.add(new HoleScore(holes[i], strokes[i]))
+    i = i + 1
+  }
+  return new PlayerRound(name, handicap, scores)
+}
+
+// ─── Tournament ──────────────────────────────────────────────────────────
+
+class Tournament {
+  val course: Course
+  val players: List[PlayerRound]
+
+public:
+  def this(course: Course, players: List[PlayerRound]) {
+    self.course = course
+    self.players = players
+  }
+
+private:
+  def findScore(p: PlayerRound, holeNumber: Int): HoleScore? {
+    foreach s: HoleScore in p.scores() {
+      if s.hole().number() == holeNumber { return s }
+    }
+    return null
+  }
+
+public:
+  def grossLeaderboard(): List[PlayerRound] = players.sortedBy { p -> p.grossTotal() }
+  def netLeaderboard(): List[PlayerRound] = players.sortedBy { p -> p.netTotal() }
+  def stablefordLeaderboard(): List[PlayerRound] = players.sortedByDescending { p -> p.stablefordTotal() }
+
+  // A hole is a "skin": whoever has the sole lowest gross score on it wins it.
+  def skinsGame(): Map[Int, String] {
+    val result: Map[Int, String] = [:]
+    foreach h: Hole in course.holes() {
+      var best: Int = 999
+      var bestName: String? = null
+      var tied: Boolean = false
+      foreach p: PlayerRound in players {
+        val sc: HoleScore? = findScore(p, h.number())
+        if sc != null {
+          val strokes: Int = sc.strokes()
+          if strokes < best {
+            best = strokes
+            bestName = p.playerName()
+            tied = false
+          } else if strokes == best {
+            tied = true
+          }
+        }
+      }
+      if bestName != null && !tied {
+        result[h.number()] = bestName
+      }
+    }
+    return result
+  }
+}
+
+// ─── Reporting ───────────────────────────────────────────────────────────
+
+def printPlayerCard(p: PlayerRound, coursePar: Int): void {
+  IO::println("")
+  IO::println("#{p.playerName()} (hcp #{p.handicap()})")
+  foreach s: HoleScore in p.scores() {
+    val h: Hole = s.hole()
+    IO::println("  Hole #{h.number().rjust(2)}  Par #{h.par()}  Strokes #{s.strokes().rjust(2)}  (#{s.grossDiff().toParStr().rpad(3)})  #{s.scoreType().label()}")
+  }
+  val front: Int = p.subtotal(p.frontNine())
+  val back: Int = p.subtotal(p.backNine())
+  IO::println("  Front 9: #{front}   Back 9: #{back}   Gross: #{p.grossTotal()} (#{p.toParGross(coursePar).toParStr()})")
+  IO::println("  Net: #{p.netTotal()}   Stableford points: #{p.stablefordTotal()}")
+
+  val hist: Map[String, List[HoleScore]] = p.scores().groupBy { s -> s.scoreType().label() }
+  var line: String = "  Breakdown:"
+  foreach (k, v) in hist {
+    line = line + "  #{k}=#{v.size}"
+  }
+  IO::println(line)
+}
+
+def printLeaderboard(title: String, ranked: List[PlayerRound], valueOf: (PlayerRound) -> Int): void {
+  IO::println("")
+  IO::println(title)
+  var pos: Int = 1
+  foreach p: PlayerRound in ranked {
+    IO::println("  #{pos}. #{p.playerName().rpad(14)} #{valueOf(p)}")
+    pos = pos + 1
+  }
+}
+
+def main(): void {
+  val tee: TeeColor = TeeColor::BLUE
+  val holes: List[Hole] = []
+  holes.add(new Hole(1, 4, 7, 385))
+  holes.add(new Hole(2, 3, 15, 165))
+  holes.add(new Hole(3, 5, 3, 520))
+  holes.add(new Hole(4, 4, 11, 402))
+  holes.add(new Hole(5, 4, 1, 440))
+  holes.add(new Hole(6, 3, 17, 155))
+  holes.add(new Hole(7, 5, 5, 545))
+  holes.add(new Hole(8, 4, 9, 375))
+  holes.add(new Hole(9, 4, 13, 410))
+  holes.add(new Hole(10, 4, 8, 395))
+  holes.add(new Hole(11, 3, 16, 170))
+  holes.add(new Hole(12, 5, 2, 560))
+  holes.add(new Hole(13, 4, 10, 415))
+  holes.add(new Hole(14, 4, 4, 430))
+  holes.add(new Hole(15, 3, 18, 145))
+  holes.add(new Hole(16, 5, 6, 535))
+  holes.add(new Hole(17, 4, 12, 390))
+  holes.add(new Hole(18, 4, 14, 420))
+
+  val course: Course = new Course("Cedar Ridge Golf Club", tee, holes)
+
+  IO::println("#{course.name()} — #{tee.label()} tees, par #{course.totalPar()}, #{course.totalYards()} yards")
+
+  val aikoStrokes: List[Int] = [4, 3, 4, 5, 4, 2, 3, 4, 5, 4, 3, 4, 4, 3, 4, 6, 4, 5]
+  val benStrokes: List[Int] = [5, 4, 6, 5, 5, 4, 6, 5, 6, 5, 4, 7, 5, 6, 4, 7, 5, 6]
+  val chidiStrokes: List[Int] = [6, 4, 7, 6, 6, 4, 7, 5, 6, 6, 5, 7, 6, 7, 4, 8, 5, 7]
+
+  val aiko: PlayerRound = buildRound("Aiko Tanaka", 8, holes, aikoStrokes)
+  val ben: PlayerRound = buildRound("Ben Carter", 18, holes, benStrokes)
+  val chidi: PlayerRound = buildRound("Chidi Okafor", 24, holes, chidiStrokes)
+
+  val players: List[PlayerRound] = [aiko, ben, chidi]
+  val tournament: Tournament = new Tournament(course, players)
+
+  foreach p: PlayerRound in players {
+    printPlayerCard(p, course.totalPar())
+  }
+
+  printLeaderboard("GROSS LEADERBOARD", tournament.grossLeaderboard(), (p) -> p.grossTotal())
+  printLeaderboard("NET LEADERBOARD", tournament.netLeaderboard(), (p) -> p.netTotal())
+  printLeaderboard("STABLEFORD LEADERBOARD", tournament.stablefordLeaderboard(), (p) -> p.stablefordTotal())
+
+  IO::println("")
+  IO::println("SKINS GAME (holes won outright)")
+  val skins: Map[Int, String] = tournament.skinsGame()
+  var skinCounts: Map[String, Int] = [:]
+  foreach h: Hole in holes {
+    val winner: String = skins[h.number()] ?: "(halved)"
+    IO::println("  Hole #{h.number().rjust(2)}: #{winner}")
+    if winner != "(halved)" {
+      val prev: Int = skinCounts[winner] ?: 0
+      skinCounts[winner] = prev + 1
+    }
+  }
+  IO::println("")
+  IO::println("Skins won:")
+  foreach (name, count) in skinCounts {
+    IO::println("  #{name.rpad(14)} #{count}")
+  }
+
+  // Safe parsing of a manually-entered scorecard correction.
+  IO::println("")
+  try {
+    val corrected: Int = Int::parseInt("five")
+    IO::println("corrected score: #{corrected}")
+  } catch e: Exception {
+    IO::println("Could not parse manual score entry: #{e.message()}")
+  }
+}

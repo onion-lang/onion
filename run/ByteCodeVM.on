@@ -1,0 +1,357 @@
+// ByteCodeVM.on — Stack-based bytecode virtual machine.
+//
+// Exercises: ADT enum (Instr cases); records (Program, Frame);
+// classes (VM); generics (List[Int], Map[String,Int]);
+// select pattern matching; foreach; while; try/catch;
+// string interpolation; recursion (factorial demo program).
+
+import {
+  java.lang.Integer as JInt
+}
+
+// ── Instruction set ───────────────────────────────────────────────────────────
+
+enum Instr {
+  case Push(value: Int)
+  case Pop
+  case Dup
+  case Add
+  case Sub
+  case Mul
+  case Div
+  case Mod
+  case Neg
+  case CmpEq
+  case CmpLt
+  case CmpGt
+  case Load(name: String)
+  case Store(name: String)
+  case Jump(label: String)
+  case JumpZ(label: String)   // jump if top == 0
+  case JumpNZ(label: String)  // jump if top != 0
+  case Label(name: String)
+  case PrintInt
+  case PrintStr(text: String)
+  case Halt
+}
+
+// ── Program = list of instructions ───────────────────────────────────────────
+
+record Program(name: String, instrs: List[Instr])
+
+// ── VM ────────────────────────────────────────────────────────────────────────
+
+class VM {
+  var stack: List[Int]
+  var vars: Map[String, Int]
+  var labels: Map[String, Int]
+  var instrs: List[Instr]
+  var pc: Int
+  var running: Boolean
+  var stepLog: List[String]
+  var traceOn: Boolean
+
+public:
+  def this {
+    stack = []
+    vars = [:]
+    labels = [:]
+    instrs = []
+    pc = 0
+    running = false
+    stepLog = []
+    traceOn = false
+  }
+
+  def enableTrace(): void { traceOn = true }
+
+  def load(prog: Program): void {
+    instrs = prog.instrs()
+    labels = [:]
+    var i: Int = 0
+    while i < instrs.size {
+      val instr: Instr = instrs[i]
+      select instr {
+        case l is Label: labels[l.name()] = i
+        else: {}
+      }
+      i++
+    }
+  }
+
+  def push(v: Int): void { stack.add(0, v) }
+
+  def pop(): Int {
+    if stack.size == 0 { throw new Exception("stack underflow") }
+    val v: Int = stack[0]
+    stack.remove(0)
+    return v
+  }
+
+  def peek(): Int {
+    if stack.size == 0 { throw new Exception("stack empty") }
+    return stack[0]
+  }
+
+  def log(msg: String): void {
+    stepLog.add(msg)
+    if traceOn { IO::println("  [trace] " + msg) }
+  }
+
+  def run(prog: Program): void {
+    load(prog)
+    pc = 0
+    running = true
+    stack = []
+    vars = [:]
+    stepLog = []
+    IO::println("=== Running: #{prog.name()} ===")
+    while running && pc < instrs.size {
+      val instr: Instr = instrs[pc]
+      pc++
+      step(instr)
+    }
+  }
+
+  def step(instr: Instr): void {
+    select instr {
+      case p is Push: {
+        push(p.value())
+        log("PUSH #{p.value()}  stack=#{stackStr()}")
+      }
+      case _pop is Pop: {
+        val v: Int = pop()
+        log("POP #{v}  stack=#{stackStr()}")
+      }
+      case _dup is Dup: {
+        val v: Int = peek()
+        push(v)
+        log("DUP #{v}")
+      }
+      case _add is Add: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a + b)
+        log("ADD #{a}+#{b}=#{a+b}  stack=#{stackStr()}")
+      }
+      case _sub is Sub: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a - b)
+        log("SUB #{a}-#{b}=#{a-b}  stack=#{stackStr()}")
+      }
+      case _mul is Mul: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a * b)
+        log("MUL #{a}*#{b}=#{a*b}  stack=#{stackStr()}")
+      }
+      case _div is Div: {
+        val b: Int = pop()
+        val a: Int = pop()
+        if b == 0 { throw new Exception("div by zero") }
+        push(a / b)
+        log("DIV #{a}/#{b}=#{a/b}")
+      }
+      case _mod is Mod: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a % b)
+        log("MOD #{a}%#{b}=#{a%b}")
+      }
+      case _neg is Neg: {
+        val a: Int = pop()
+        push(-a)
+        log("NEG #{a}->#{-a}")
+      }
+      case _eq is CmpEq: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(if a == b { 1 } else { 0 })
+        log("CMPEQ #{a}==#{b}? #{a==b}")
+      }
+      case _lt is CmpLt: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(if a < b { 1 } else { 0 })
+        log("CMPLT #{a}<#{b}? #{a<b}")
+      }
+      case _gt is CmpGt: {
+        val b: Int = pop()
+        val a: Int = pop()
+        push(if a > b { 1 } else { 0 })
+        log("CMPGT #{a}>#{b}? #{a>b}")
+      }
+      case ld is Load: {
+        val name: String = ld.name()
+        val v: Int? = vars.get(name) as Int?
+        val val2: Int = v ?: 0
+        push(val2)
+        log("LOAD #{name}=#{val2}")
+      }
+      case st is Store: {
+        val name: String = st.name()
+        val v: Int = pop()
+        vars[name] = v
+        log("STORE #{name}=#{v}")
+      }
+      case j is Jump: {
+        val lbl: String = j.label()
+        if !labels.containsKey(lbl) { throw new Exception("unknown label: #{lbl}") }
+        pc = labels.get(lbl) as Int
+        log("JUMP #{lbl} -> #{pc}")
+      }
+      case jz is JumpZ: {
+        val lbl: String = jz.label()
+        val cond: Int = pop()
+        if cond == 0 {
+          if !labels.containsKey(lbl) { throw new Exception("unknown label: #{lbl}") }
+          pc = labels.get(lbl) as Int
+          log("JUMPZ taken -> #{lbl}")
+        } else {
+          log("JUMPZ not taken (#{cond})")
+        }
+      }
+      case jnz is JumpNZ: {
+        val lbl: String = jnz.label()
+        val cond: Int = pop()
+        if cond != 0 {
+          if !labels.containsKey(lbl) { throw new Exception("unknown label: #{lbl}") }
+          pc = labels.get(lbl) as Int
+          log("JUMPNZ taken -> #{lbl}")
+        } else {
+          log("JUMPNZ not taken (#{cond})")
+        }
+      }
+      case _lbl is Label: {
+        // labels are no-ops at runtime
+      }
+      case _pi is PrintInt: {
+        val v: Int = pop()
+        IO::println(v)
+        log("PRINT #{v}")
+      }
+      case ps is PrintStr: {
+        IO::println(ps.text())
+        log("PRINTS #{ps.text()}")
+      }
+      case _halt is Halt: {
+        running = false
+        log("HALT")
+      }
+    }
+  }
+
+  def stackStr(): String {
+    if stack.size == 0 { return "[]" }
+    var s: String = "["
+    var i: Int = 0
+    while i < stack.size {
+      if i > 0 { s = s + "," }
+      s = s + stack[i]
+      i++
+    }
+    return s + "]"
+  }
+
+  def printStats(): void {
+    IO::println("  steps=#{stepLog.size}  vars=#{vars.size}  stackDepth=#{stack.size}")
+  }
+}
+
+// ── Programs ──────────────────────────────────────────────────────────────────
+
+// 1. Sum 1..10 using a loop
+val sumProg: Program = new Program("Sum 1..10", [
+  new Push(0),       new Store("sum"),
+  new Push(1),       new Store("i"),
+  new Label("loop"),
+  new Load("i"),     new Push(11), new CmpLt,
+  new JumpZ("end"),
+  new Load("sum"),   new Load("i"), new Add,  new Store("sum"),
+  new Load("i"),     new Push(1),  new Add,   new Store("i"),
+  new Jump("loop"),
+  new Label("end"),
+  new PrintStr("Sum 1..10 ="),
+  new Load("sum"),   new PrintInt,
+  new Halt
+])
+
+// 2. Fibonacci iterative (F(10))
+val fibProg: Program = new Program("Fibonacci F(10)", [
+  new Push(0),  new Store("a"),
+  new Push(1),  new Store("b"),
+  new Push(0),  new Store("i"),
+  new Label("loop"),
+  new Load("i"),  new Push(10), new CmpLt,
+  new JumpZ("done"),
+  new Load("a"),  new Load("b"),  new Add,  new Store("tmp"),
+  new Load("b"),  new Store("a"),
+  new Load("tmp"), new Store("b"),
+  new Load("i"),  new Push(1), new Add,  new Store("i"),
+  new Jump("loop"),
+  new Label("done"),
+  new PrintStr("F(10) ="),
+  new Load("b"),  new PrintInt,
+  new Halt
+])
+
+// 3. Factorial n=7 (iterative)
+val factProg: Program = new Program("Factorial 7!", [
+  new Push(7),   new Store("n"),
+  new Push(1),   new Store("acc"),
+  new Label("loop"),
+  new Load("n"),  new Push(0), new CmpGt,
+  new JumpZ("done"),
+  new Load("acc"), new Load("n"), new Mul, new Store("acc"),
+  new Load("n"),   new Push(1), new Sub, new Store("n"),
+  new Jump("loop"),
+  new Label("done"),
+  new PrintStr("7! ="),
+  new Load("acc"), new PrintInt,
+  new Halt
+])
+
+// 4. Collatz steps for n=27
+val collatzProg: Program = new Program("Collatz steps n=27", [
+  new Push(27),  new Store("n"),
+  new Push(0),   new Store("steps"),
+  new Label("loop"),
+  new Load("n"),  new Push(1), new CmpEq,
+  new JumpNZ("done"),
+  new Load("n"),  new Push(2), new Mod,
+  new JumpNZ("odd"),
+  // even: n = n / 2
+  new Load("n"),  new Push(2), new Div, new Store("n"),
+  new Jump("next"),
+  new Label("odd"),
+  // odd: n = 3*n + 1
+  new Load("n"),  new Push(3), new Mul,
+  new Push(1),    new Add,     new Store("n"),
+  new Label("next"),
+  new Load("steps"), new Push(1), new Add, new Store("steps"),
+  new Jump("loop"),
+  new Label("done"),
+  new PrintStr("Collatz(27) steps ="),
+  new Load("steps"), new PrintInt,
+  new Halt
+])
+
+// ── Run all ───────────────────────────────────────────────────────────────────
+
+val vm: VM = new VM()
+
+vm.run(sumProg)
+vm.printStats()
+
+IO::println("")
+vm.run(fibProg)
+vm.printStats()
+
+IO::println("")
+vm.run(factProg)
+vm.printStats()
+
+IO::println("")
+vm.run(collatzProg)
+vm.printStats()

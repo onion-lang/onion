@@ -1,0 +1,299 @@
+// ConcurrentMetrics.on — concurrent metrics-collection pipeline simulation.
+//
+// Exercises: do[Future] sequential composition (main focus), Future::all
+// parallel fan-out, from re"...", derive!(Json), record example/law,
+// ADT case-enum, @TailRecursive mutual recursion, do[Option], |> pipeline,
+// extension methods, collection pipelines (filter/map/fold/sortedBy).
+//
+//   onion ConcurrentMetrics.on
+
+import { java.lang.Exception; }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmtMs(): String {
+    if self < 0.0 { return "-" + (-self).fmtMs() }
+    val scaled: Int = (self * 100.0 + 0.5) as Int
+    val ip: Int = scaled / 100
+    val fp: Int = scaled % 100
+    return if fp == 0           { "#{ip}ms" }
+           else if fp < 10      { "#{ip}.0#{fp}ms" }
+           else if fp % 10 == 0 { "#{ip}.#{fp / 10}ms" }
+           else                 { "#{ip}.#{fp}ms" }
+  }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── MetricSample ─────────────────────────────────────────────────────────────
+// Lines look like  "api.latency 1.5 ms"  →  MetricSample("api","latency",1.5,"ms")
+
+record MetricSample(service: String, name: String, value: Double, unit: String)
+  from re"(\w+)\.(\w+) ([\d.]+) (\w+)"
+  derive!(Json)
+  example { MetricSample::parse("api.latency 1.5 ms")      == new MetricSample("api",  "latency",  1.5,  "ms")   }
+  example { MetricSample::parse("cache.hitRate 0.92 ratio") == new MetricSample("cache","hitRate",  0.92, "ratio") }
+  example { MetricSample::format(new MetricSample("db","queryTime",3.5,"ms")) == "db.queryTime 3.5 ms" }
+
+// ─── ServiceStats ─────────────────────────────────────────────────────────────
+
+record ServiceStats(service: String, count: Int, total: Double, minVal: Double, maxVal: Double) {
+  law accessor_stable(n: Int) { new ServiceStats("svc", n, 0.0, 0.0, 0.0).count() == n }
+  example {
+    val s = new ServiceStats("api", 3, 6.0, 1.0, 3.0)
+    s.count() == 3 && s.total() == 6.0
+  }
+public:
+  def avg(): Double = if count() == 0 { 0.0 } else { total() / (count() * 1.0) }
+  def report(): String {
+    val svc  = service().rpad(10)
+    val cnt  = ("" + count()).lpad(3)
+    val avgS = avg().fmtMs()
+    val minS = minVal().fmtMs()
+    val maxS = maxVal().fmtMs()
+    return "  #{svc} cnt=#{cnt}  avg=#{avgS}  min=#{minS}  max=#{maxS}"
+  }
+}
+
+// ─── ADT: PipelineState ───────────────────────────────────────────────────────
+
+enum PipelineState {
+  case Idle
+  case Running(sources: Int)
+  case Done(stats: List[ServiceStats], skipped: Int)
+  case Failed(reason: String)
+public:
+  def label(): String = select this {
+    case x is Idle:    "idle"
+    case x is Running: "running (#{x.sources()} source(s))"
+    case x is Done:    "done — #{x.stats().size} service(s), #{x.skipped()} skipped"
+    case x is Failed:  "failed: #{x.reason()}"
+  }
+  def ok(): Boolean = select this {
+    case x is Done: x.stats().size > 0
+    else:           false
+  }
+}
+
+// ─── @TailRecursive mutual recursion: alternating reducer ────────────────────
+//
+// addPass adds item at index i, then delegates to subPass for the next index.
+// subPass subtracts item at index i, then delegates to addPass for the next.
+// Together they compute v₀ − v₁ + v₂ − v₃ + … without growing the call stack.
+// Methods are private so the optimizer can fuse them into a single state machine.
+
+class AlternatingReducer {
+private:
+  @TailRecursive
+  def addPass(samples: List[MetricSample], i: Int, acc: Double): Double {
+    if i >= samples.size { return acc }
+    return subPass(samples, i + 1, acc + (samples[i] as MetricSample).value())
+  }
+
+  @TailRecursive
+  def subPass(samples: List[MetricSample], i: Int, acc: Double): Double {
+    if i >= samples.size { return acc }
+    return addPass(samples, i + 1, acc - (samples[i] as MetricSample).value())
+  }
+
+public:
+  def alternatingSum(samples: List[MetricSample]): Double =
+    addPass(samples, 0, 0.0)
+}
+
+// ─── Aggregation helpers ──────────────────────────────────────────────────────
+
+def buildStats(samples: List[MetricSample]): List[ServiceStats] {
+  val groups: Map[String, List[MetricSample]] = [:]
+  foreach m: MetricSample in samples {
+    val key: String = m.service()
+    if !groups.containsKey(key) { groups.put(key, []) }
+    (groups.get(key) as List[MetricSample]).add(m)
+  }
+  val result: List[ServiceStats] = []
+  foreach (k, v) in groups {
+    val ms: List[MetricSample] = v as List[MetricSample]
+    var total: Double = 0.0
+    var minV: Double  = 1000000.0
+    var maxV: Double  = 0.0
+    foreach m: MetricSample in ms {
+      val vv: Double = m.value()
+      total = total + vv
+      if vv < minV { minV = vv }
+      if vv > maxV { maxV = vv }
+    }
+    result.add(new ServiceStats(k as String, ms.size, total, minV, maxV))
+  }
+  return result.sortedBy { s: ServiceStats -> s.service() }
+}
+
+def combineAll(
+  a: List[MetricSample],
+  b: List[MetricSample],
+  c: List[MetricSample]
+): List[MetricSample] {
+  val out: List[MetricSample] = []
+  foreach m: MetricSample in a { out.add(m) }
+  foreach m: MetricSample in b { out.add(m) }
+  foreach m: MetricSample in c { out.add(m) }
+  return out
+}
+
+// ─── Async source simulation ──────────────────────────────────────────────────
+
+def collectSource(lines: List[String]): Future[List[MetricSample]] {
+  return Future::async {
+    Thread::sleep(10L)
+    val out: List[MetricSample] = []
+    foreach line: String in lines {
+      val m: MetricSample? = MetricSample::parse(line)
+      if m != null { out.add(m) }
+    }
+    return out
+  }
+}
+
+// ─── Option helper ────────────────────────────────────────────────────────────
+
+def toOpt(m: MetricSample?): Option[MetricSample] =
+  if m == null { Option::none() } else { Option::some(m as MetricSample) }
+
+// ─── Report helper ────────────────────────────────────────────────────────────
+
+def printState(title: String, state: PipelineState): void {
+  IO::println("── " + title)
+  IO::println("   " + state.label())
+  select state {
+    case d is Done: {
+      foreach s: ServiceStats in d.stats() { IO::println(s.report()) }
+      if d.skipped() > 0 { IO::println("   (#{d.skipped()} line(s) not matched)") }
+    }
+    else: {}
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val apiLines: List[String] = [
+    "api.latency 1.2 ms",
+    "api.latency 2.4 ms",
+    "api.latency 0.8 ms",
+    "api.errors 0.0 count",
+    "api.throughput 245.0 rps"
+  ]
+  val dbLines: List[String] = [
+    "db.queryTime 3.5 ms",
+    "db.queryTime 4.1 ms",
+    "db.connections 12.0 count",
+    "NOT A VALID METRIC LINE",
+    "db.cacheHit 0.87 ratio"
+  ]
+  val cacheLines: List[String] = [
+    "cache.hitRate 0.92 ratio",
+    "cache.missRate 0.08 ratio",
+    "cache.latency 0.1 ms"
+  ]
+
+  // 1. Sequential pipeline via do[Future] ────────────────────────────────────
+  //    Each source is collected one after the other; the do-notation threads
+  //    the Future monad so each step waits for the previous one.
+  val seqFuture: Future[PipelineState] = do[Future] {
+    apiS   <- collectSource(apiLines)
+    dbS    <- collectSource(dbLines)
+    cacheS <- collectSource(cacheLines)
+    ret new Done(buildStats(combineAll(apiS, dbS, cacheS)), 0)
+  }
+  val seqResult: PipelineState = seqFuture.getOrElse(new Failed("sequential failed"))
+  printState("do[Future] sequential pipeline", seqResult)
+
+  IO::println("")
+
+  // 2. Parallel fan-out via Future::all ──────────────────────────────────────
+  //    All three sources are kicked off concurrently; Future::all joins them.
+  val fa: Future[List[MetricSample]] = collectSource(apiLines)
+  val fb: Future[List[MetricSample]] = collectSource(dbLines)
+  val fc: Future[List[MetricSample]] = collectSource(cacheLines)
+  val defaultRaw: List[Object] = []
+  val allRaw: List[Object] = Future::all(fa, fb, fc).getOrElse(defaultRaw)
+  val parState: PipelineState = if allRaw.size == 3 {
+    val aS: List[MetricSample] = allRaw[0] as List[MetricSample]
+    val bS: List[MetricSample] = allRaw[1] as List[MetricSample]
+    val cS: List[MetricSample] = allRaw[2] as List[MetricSample]
+    new Done(buildStats(combineAll(aS, bS, cS)), 0)
+  } else {
+    new Failed("parallel collection: only " + allRaw.size + "/3 results")
+  }
+  printState("Future::all parallel fan-out", parState)
+
+  IO::println("")
+
+  // 3. @TailRecursive mutual recursion ───────────────────────────────────────
+  //    Parse api lines and compute the alternating sum v₀−v₁+v₂−…
+  val apiSamples: List[MetricSample] = []
+  foreach line: String in apiLines {
+    val m: MetricSample? = MetricSample::parse(line)
+    if m != null { apiSamples.add(m) }
+  }
+  val reducer: AlternatingReducer = new AlternatingReducer()
+  val altSum: Double = reducer.alternatingSum(apiSamples)
+  IO::println("── @TailRecursive alternating sum (api)")
+  IO::println("   samples=" + apiSamples.size + "  alternating sum=" + altSum.fmtMs())
+
+  IO::println("")
+
+  // 4. do[Option] ─────────────────────────────────────────────────────────────
+  //    find returns MetricSample? (nullable); wrap in Option before do[Option].
+  val directSamples: List[MetricSample] = [
+    new MetricSample("api",   "latency",   1.5,  "ms"),
+    new MetricSample("db",    "queryTime", 3.2,  "ms"),
+    new MetricSample("cache", "hitRate",   0.91, "ratio")
+  ]
+  val dbResult: Option[Double] = do[Option] {
+    m <- toOpt(directSamples.find { s: MetricSample -> s.service() == "db" && s.name() == "queryTime" })
+    ret m.value()
+  }
+  val missingResult: Option[Double] = do[Option] {
+    m <- toOpt(directSamples.find { s: MetricSample -> s.service() == "redis" })
+    ret m.value()
+  }
+  IO::println("── do[Option] lookup")
+  IO::println("   db.queryTime     = " + dbResult.getOrElse(-1.0).fmtMs())
+  IO::println("   redis (missing)  = " + missingResult.getOrElse(-1.0).fmtMs())
+
+  IO::println("")
+
+  // 5. |> pipeline operator ───────────────────────────────────────────────────
+  val labelSummary: String = apiSamples
+    .map    { m: MetricSample -> m.service() + "." + m.name() + "=" + m.value().fmtMs() }
+    .fold("") { acc: String, s: String ->
+      if acc == "" { s } else { acc + ", " + s }
+    }
+  IO::println("── |> pipeline")
+  labelSummary |> IO::println
+
+  IO::println("")
+
+  // 6. derive!(Json) round-trip ───────────────────────────────────────────────
+  val orig: MetricSample = new MetricSample("api", "latency", 1.5, "ms")
+  val json: String = MetricSample::toJson(orig)
+  val back: MetricSample? = MetricSample::fromJson(json)
+  IO::println("── derive!(Json) round-trip")
+  IO::println("   json  : " + json)
+  if back != null {
+    IO::println("   back  : " + back.service() + "." + back.name() + " = " + back.value().fmtMs())
+    IO::println("   equal : " + (back == orig))
+  }
+}

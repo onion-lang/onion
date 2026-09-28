@@ -1,0 +1,296 @@
+// BeekeepingLog.on — apiary management system (~280 lines)
+//
+// Exercises: records, ADT case-enum with methods, plain enum, generics
+// (List[T]/Map[K,V]), collection pipelines (filter/map/groupBy/sortedBy/
+// fold/count/find/any/distinct), select/type-pattern exhaustiveness,
+// nullable types, closures, string interpolation, foreach (list + map k,v),
+// while, extension Double/Int/String.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Season {
+  SPRING, SUMMER, AUTUMN, WINTER
+}
+
+enum HiveStatus {
+  case Healthy(queenPresent: Boolean)
+  case Queenless
+  case Swarmed(remainingBees: Int)
+  case Overwintering
+  case Collapsed
+public:
+  def label(): String = select this {
+    case h is Healthy: {
+      val q: String = if h.queenPresent() { "queen OK" } else { "queen uncertain" }
+      "Healthy (#{q})"
+    }
+    case h is Queenless:     "Queenless"
+    case h is Swarmed:       "Swarmed (#{h.remainingBees()} bees left)"
+    case h is Overwintering: "Overwintering"
+    case h is Collapsed:     "Collapsed"
+  }
+  def isActive(): Boolean = select this {
+    case h is Healthy:       true
+    case h is Queenless:     true
+    case h is Swarmed:       h.remainingBees() > 5000
+    case h is Overwintering: true
+    case h is Collapsed:     false
+  }
+}
+
+enum InspectionNote {
+  case Routine(broodFrames: Int)
+  case QueenSighted(layingPattern: String)
+  case DiseaseAlert(disease: String, severity: Int)
+  case HarvestReady(estimatedKg: Double)
+  case Requeen(source: String)
+public:
+  def label(): String = select this {
+    case n is Routine:      "Routine: #{n.broodFrames()} brood frames"
+    case n is QueenSighted: "Queen sighted, pattern: #{n.layingPattern()}"
+    case n is DiseaseAlert: "ALERT: #{n.disease()}, severity #{n.severity()}/5"
+    case n is HarvestReady: "Harvest ready (~#{n.estimatedKg()} kg est.)"
+    case n is Requeen:      "Requeen from #{n.source()}"
+  }
+  def isAlert(): Boolean = select this {
+    case n is Routine:      false
+    case n is QueenSighted: false
+    case n is DiseaseAlert: true
+    case n is HarvestReady: false
+    case n is Requeen:      false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Hive(hiveId: String, location: String, established: Int, status: HiveStatus)
+
+record Inspection(hiveId: String, season: Season, year: Int, note: InspectionNote, inspector: String)
+
+record Harvest(hiveId: String, season: Season, year: Int, kg: Double, quality: String)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def kgFmt(): String = {
+    val tenths: Int = (self * 10.0 + 0.5) as Int
+    val whole: Int  = tenths / 10
+    val frac: Int   = tenths % 10
+    return "#{whole}.#{frac} kg"
+  }
+}
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Apiary class ─────────────────────────────────────────────────────────────
+
+class Apiary {
+  val apiaryName: String
+  val hives: List[Hive]
+  val inspections: List[Inspection]
+  val harvests: List[Harvest]
+public:
+  def this(name: String) {
+    apiaryName  = name
+    hives       = new ArrayList[Hive]()
+    inspections = new ArrayList[Inspection]()
+    harvests    = new ArrayList[Harvest]()
+  }
+
+  def name(): String             = apiaryName
+  def allHives(): List[Hive]     = hives
+  def allInspections(): List[Inspection] = inspections
+  def allHarvests(): List[Harvest]       = harvests
+  def hiveCount(): Int    = hives.size
+  def activeCount(): Int  = hives.filter { h: Hive -> h.status().isActive() }.size
+
+  def addHive(id: String, location: String, established: Int, status: HiveStatus): Hive = {
+    val h: Hive = new Hive(id, location, established, status)
+    hives.add(h)
+    return h
+  }
+
+  def updateStatus(hiveId: String, newStatus: HiveStatus): Boolean = {
+    val idx: Int? = findHiveIdx(hiveId)
+    if idx == null { return false }
+    val h: Hive = hives[idx]
+    hives[idx] = new Hive(h.hiveId(), h.location(), h.established(), newStatus)
+    return true
+  }
+
+  def inspect(hiveId: String, season: Season, year: Int, note: InspectionNote, inspector: String): Inspection = {
+    val i: Inspection = new Inspection(hiveId, season, year, note, inspector)
+    inspections.add(i)
+    return i
+  }
+
+  def recordHarvest(hiveId: String, season: Season, year: Int, kg: Double, quality: String): Harvest = {
+    val h: Harvest = new Harvest(hiveId, season, year, kg, quality)
+    harvests.add(h)
+    return h
+  }
+
+  def activeHives(): List[Hive] =
+    hives.filter { h: Hive -> h.status().isActive() }
+
+  def alertInspections(): List[Inspection] =
+    inspections.filter { i: Inspection -> i.note().isAlert() }
+
+  def totalHarvest(): Double = {
+    var total: Double = 0.0
+    foreach h: Harvest in harvests { total = total + h.kg() }
+    return total
+  }
+
+  def harvestByHive(): List[String] = {
+    val groups: Map[String, List[Harvest]] =
+      harvests.groupBy { h: Harvest -> h.hiveId() }
+    val result: List[String] = new ArrayList[String]()
+    foreach (id, hlist) in groups {
+      var total: Double = 0.0
+      foreach h: Harvest in hlist { total = total + h.kg() }
+      result.add("#{id}: #{total.kgFmt()}")
+    }
+    return result
+  }
+
+  def bestProducer(): String? = {
+    if harvests.isEmpty() { return null }
+    val groups: Map[String, List[Harvest]] =
+      harvests.groupBy { h: Harvest -> h.hiveId() }
+    var bestId: String  = ""
+    var bestKg: Double  = 0.0
+    foreach (id, hlist) in groups {
+      var total: Double = 0.0
+      foreach h: Harvest in hlist { total = total + h.kg() }
+      if total > bestKg {
+        bestId = id
+        bestKg = total
+      }
+    }
+    return if bestId == "" { null } else { bestId }
+  }
+
+  def seasonsActive(): List[String] =
+    inspections.map { i: Inspection -> i.season().name() }.distinct()
+
+private:
+  def findHiveIdx(id: String): Int? {
+    foreach i: Int in 0..<hives.size {
+      if hives[i].hiveId() == id { return i }
+    }
+    return null
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def sep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val apiary: Apiary = new Apiary("Meadow's Edge")
+
+  apiary.addHive("H-A", "North Field",  2022, new Healthy(true))
+  apiary.addHive("H-B", "Orchard",      2021, new Healthy(true))
+  apiary.addHive("H-C", "South Hedge",  2023, new Healthy(false))
+  apiary.addHive("H-D", "West Pasture", 2020, new Queenless())
+  apiary.addHive("H-E", "East Wood",    2022, new Healthy(true))
+  apiary.addHive("H-F", "Garden",       2024, new Healthy(true))
+
+  apiary.inspect("H-A", Season::SPRING, 2026, new Routine(8),                    "Alice")
+  apiary.inspect("H-B", Season::SPRING, 2026, new QueenSighted("solid brood"),   "Alice")
+  apiary.inspect("H-C", Season::SPRING, 2026, new Routine(5),                    "Bob")
+  apiary.inspect("H-D", Season::SPRING, 2026, new DiseaseAlert("Varroa", 3),     "Alice")
+  apiary.inspect("H-E", Season::SPRING, 2026, new Routine(9),                    "Bob")
+  apiary.inspect("H-F", Season::SPRING, 2026, new Routine(3),                    "Bob")
+  apiary.inspect("H-A", Season::SUMMER, 2026, new HarvestReady(14.0),            "Alice")
+  apiary.inspect("H-B", Season::SUMMER, 2026, new HarvestReady(9.5),             "Alice")
+  apiary.inspect("H-C", Season::SUMMER, 2026, new Requeen("registered breeder"), "Alice")
+  apiary.inspect("H-D", Season::SUMMER, 2026, new DiseaseAlert("Varroa", 4),     "Bob")
+  apiary.inspect("H-E", Season::SUMMER, 2026, new HarvestReady(11.0),            "Alice")
+  apiary.inspect("H-F", Season::SUMMER, 2026, new Routine(6),                    "Bob")
+
+  apiary.recordHarvest("H-A", Season::SUMMER, 2026, 13.8, "Light floral")
+  apiary.recordHarvest("H-B", Season::SUMMER, 2026,  9.2, "Mixed wildflower")
+  apiary.recordHarvest("H-E", Season::SUMMER, 2026, 10.6, "Orchard blossom")
+
+  apiary.updateStatus("H-D", new Swarmed(3200))
+  apiary.updateStatus("H-C", new Healthy(true))
+
+  println("╔════════════════════════════════════════════════╗")
+  println("║           APIARY MANAGEMENT REPORT            ║")
+  println("╚════════════════════════════════════════════════╝")
+  println("")
+  println("  Apiary:       #{apiary.name()}")
+  println("  Hives:        #{apiary.hiveCount().plural("hive")} (#{apiary.activeCount()} active)")
+  println("")
+
+  println("HIVE REGISTRY")
+  sep(64)
+  println("  #{"ID".padRight(6)} #{"Location".padRight(14)} #{"Est.".padRight(6)} Status")
+  sep(64)
+  foreach h: Hive in apiary.allHives() {
+    println("  #{h.hiveId().padRight(6)} #{h.location().padRight(14)} #{("#{h.established()}").padRight(6)} #{h.status().label()}")
+  }
+  println("")
+
+  println("INSPECTION LOG (#{apiary.allInspections().size} entries)")
+  sep(64)
+  println("  #{"Hive".padRight(6)} #{"Season".padRight(8)} #{"Year".padRight(6)} #{"Note".padRight(34)} Inspector")
+  sep(64)
+  foreach i: Inspection in apiary.allInspections() {
+    println("  #{i.hiveId().padRight(6)} #{i.season().name().padRight(8)} #{("#{i.year()}").padRight(6)} #{i.note().label().padRight(34)} #{i.inspector()}")
+  }
+  println("")
+
+  println("DISEASE ALERTS")
+  sep(64)
+  val alerts: List[Inspection] = apiary.alertInspections()
+  if alerts.isEmpty() {
+    println("  No active alerts.")
+  } else {
+    foreach i: Inspection in alerts {
+      println("  #{i.hiveId()} (#{i.season().name()} #{i.year()}): #{i.note().label()}")
+    }
+  }
+  println("")
+
+  println("HARVEST SUMMARY")
+  sep(64)
+  foreach line: String in apiary.harvestByHive() {
+    println("  #{line}")
+  }
+  println("  " + "-".padRight(30))
+  println("  Total: #{apiary.totalHarvest().kgFmt()}")
+  println("")
+
+  val best: String? = apiary.bestProducer()
+  if best != null {
+    println("  Best producer:   #{best}")
+  }
+  println("  Seasons active:  #{apiary.seasonsActive().size.plural("season")}")
+  println("  Active hives:")
+  foreach h: Hive in apiary.activeHives() {
+    println("    · #{h.hiveId()} (#{h.location()}) — #{h.status().label()}")
+  }
+}

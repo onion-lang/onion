@@ -1,0 +1,279 @@
+// SignalAnalyzer.on — Signal processing toolkit (~230 lines).
+//
+// Exercises: records with methods (Sample, FrequencyBin, AnalysisResult);
+// plain enum (WindowFunction) with methods; ADT case-enum (SignalShape);
+// extension methods on Double; class SignalAnalyzer with typed mutable state;
+// collection pipelines (map/filter/sortedBy/find/fold/reduce/zip/distinct);
+// select pattern matching; foreach with ranges; string interpolation;
+// try/catch; nullable types; recursion (DFT); while/foreach loops.
+//
+// Run: onion run/SignalAnalyzer.on
+
+import { java.util.ArrayList }
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val neg: Boolean = self < 0.0
+    val abs: Double = if neg { 0.0 - self } else { self }
+    val i: Int = abs.intValue()
+    val frac: Int = ((abs - i * 1.0) * 100.0 + 0.5).intValue()
+    val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return if neg { "-" + i + "." + fs } else { "" + i + "." + fs }
+  }
+}
+
+extension Int {
+  def asDouble(): Double = self * 1.0
+}
+
+// ── Window functions ──────────────────────────────────────────────────────────
+
+enum WindowFunction {
+  Rectangular, Hann, Hamming, Blackman
+public:
+  def label(): String = select this {
+    case WindowFunction::Rectangular: "Rectangular"
+    case WindowFunction::Hann:        "Hann"
+    case WindowFunction::Hamming:     "Hamming"
+    case WindowFunction::Blackman:    "Blackman"
+    else: "?"
+  }
+  def coeff(n: Int, N: Int): Double {
+    val pi: Double = Math::PI
+    val t: Double = 2.0 * pi * n.asDouble() / N.asDouble()
+    select this {
+      case WindowFunction::Rectangular: return 1.0
+      case WindowFunction::Hann:        return 0.5 * (1.0 - Math::cos(t))
+      case WindowFunction::Hamming:     return 0.54 - 0.46 * Math::cos(t)
+      case WindowFunction::Blackman:    return 0.42 - 0.5 * Math::cos(t) + 0.08 * Math::cos(2.0 * t)
+      else: return 1.0
+    }
+  }
+}
+
+// ── Signal shape (for synthesis) ──────────────────────────────────────────────
+
+enum SignalShape {
+  case SineWave(freq: Double, amplitude: Double)
+  case SquareWave(freq: Double, amplitude: Double)
+  case SawtoothWave(freq: Double, amplitude: Double)
+  case DCOffset(level: Double)
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Sample(index: Int, value: Double) {
+public:
+  def describe(): String = "#{index()}: #{value().fmt2()}"
+}
+
+record FrequencyBin(binIndex: Int, frequency: Double, magnitude: Double, phase: Double) {
+public:
+  def isPeak(threshold: Double): Boolean = magnitude() > threshold
+  def describe(): String =
+    "bin #{binIndex()} freq=#{frequency().fmt2()} Hz  mag=#{magnitude().fmt2()}  phi=#{phase().fmt2()}"
+}
+
+record AnalysisResult(
+  sampleCount: Int,
+  sampleRate: Double,
+  windowUsed: String,
+  peakFrequency: Double,
+  peakMagnitude: Double,
+  dcComponent: Double,
+  rmsLevel: Double
+) {
+public:
+  def summarize(): String =
+    "Samples: #{sampleCount()}  Rate: #{sampleRate().fmt2()} Hz\n" +
+    "Window: #{windowUsed()}  Peak: #{peakFrequency().fmt2()} Hz (mag #{peakMagnitude().fmt2()})\n" +
+    "DC offset: #{dcComponent().fmt2()}  RMS: #{rmsLevel().fmt2()}"
+}
+
+// ── Signal synthesis ──────────────────────────────────────────────────────────
+
+class SignalSynthesizer {
+public:
+  static def generate(shapes: List[SignalShape], numSamples: Int, sampleRate: Double): List[Sample] {
+    val out: ArrayList[Sample] = new ArrayList[Sample]()
+    foreach n: Int in 0..<numSamples {
+      var v: Double = 0.0
+      foreach shape: SignalShape in shapes {
+        select shape {
+          case s is SineWave:
+            val phase: Double = 2.0 * Math::PI * s.freq() * n.asDouble() / sampleRate
+            v = v + s.amplitude() * Math::sin(phase)
+          case s is SquareWave:
+            val phase: Double = 2.0 * Math::PI * s.freq() * n.asDouble() / sampleRate
+            v = v + s.amplitude() * (if Math::sin(phase) >= 0.0 { 1.0 } else { -1.0 })
+          case s is SawtoothWave:
+            val norm: Double = (s.freq() * n.asDouble() / sampleRate) % 1.0
+            v = v + s.amplitude() * (2.0 * norm - 1.0)
+          case s is DCOffset:
+            v = v + s.level()
+        }
+      }
+      out.add(new Sample(n, v))
+    }
+    return out
+  }
+}
+
+// ── DFT (Discrete Fourier Transform) ─────────────────────────────────────────
+
+class DFT {
+public:
+  static def compute(samples: List[Sample], window: WindowFunction): List[FrequencyBin] {
+    val N: Int = samples.size
+    val bins: ArrayList[FrequencyBin] = new ArrayList[FrequencyBin]()
+    foreach k: Int in 0..<(N / 2) {
+      var realPart: Double = 0.0
+      var imagPart: Double = 0.0
+      foreach n: Int in 0..<N {
+        val w: Double = window.coeff(n, N)
+        val v: Double = (samples.get(n) as Sample).value() * w
+        val angle: Double = 2.0 * Math::PI * k.asDouble() * n.asDouble() / N.asDouble()
+        realPart = realPart + v * Math::cos(angle)
+        imagPart = imagPart - v * Math::sin(angle)
+      }
+      val mag: Double = Math::sqrt(realPart * realPart + imagPart * imagPart) * 2.0 / N.asDouble()
+      val phase: Double = Math::atan2(imagPart, realPart)
+      bins.add(new FrequencyBin(k, 0.0, mag, phase))
+    }
+    return bins
+  }
+}
+
+// ── SignalAnalyzer ────────────────────────────────────────────────────────────
+
+class SignalAnalyzer {
+  var samples: List[Sample]
+  var sampleRate: Double
+public:
+  def this(samples: List[Sample], sampleRate: Double) {
+    this.samples = samples
+    this.sampleRate = sampleRate
+  }
+
+  def rms(): Double {
+    val n: Int = samples.size
+    if n == 0 { return 0.0 }
+    var sum: Double = 0.0
+    foreach s: Sample in samples {
+      sum = sum + s.value() * s.value()
+    }
+    return Math::sqrt(sum / n.asDouble())
+  }
+
+  def dcOffset(): Double {
+    val n: Int = samples.size
+    if n == 0 { return 0.0 }
+    var sum: Double = 0.0
+    foreach s: Sample in samples { sum = sum + s.value() }
+    return sum / n.asDouble()
+  }
+
+  def analyze(window: WindowFunction): AnalysisResult {
+    val n: Int = samples.size
+    val bins: List[FrequencyBin] = DFT::compute(samples, window)
+    val freqRes: Double = sampleRate / n.asDouble()
+
+    // Find peak bin (skip DC bin 0)
+    var peakBin: FrequencyBin? = null
+    var peakMag: Double = -1.0
+    foreach i: Int in 1..<bins.size {
+      val b: FrequencyBin = bins.get(i) as FrequencyBin
+      if b.magnitude() > peakMag {
+        peakMag = b.magnitude()
+        peakBin = b
+      }
+    }
+
+    val peakFreq: Double = if peakBin != null { peakBin.binIndex().asDouble() * freqRes } else { 0.0 }
+    val peakMagVal: Double = if peakBin != null { peakBin.magnitude() } else { 0.0 }
+
+    return new AnalysisResult(n, sampleRate, window.label(), peakFreq, peakMagVal,
+                              dcOffset(), rms())
+  }
+
+  def topBins(window: WindowFunction, count: Int): List[FrequencyBin] {
+    val n: Int = samples.size
+    val bins: List[FrequencyBin] = DFT::compute(samples, window)
+    val freqRes: Double = sampleRate / n.asDouble()
+    // Rebuild with frequency labels
+    val labeled: ArrayList[FrequencyBin] = new ArrayList[FrequencyBin]()
+    foreach i: Int in 1..<bins.size {
+      val b: FrequencyBin = bins.get(i) as FrequencyBin
+      labeled.add(new FrequencyBin(b.binIndex(), b.binIndex().asDouble() * freqRes,
+                                   b.magnitude(), b.phase()))
+    }
+    val sorted: List[FrequencyBin] = labeled
+      .sortedBy { b -> 0.0 - (b as FrequencyBin).magnitude() }
+    var result: ArrayList[FrequencyBin] = new ArrayList[FrequencyBin]()
+    var i: Int = 0
+    while i < count && i < sorted.size {
+      result.add(sorted.get(i) as FrequencyBin)
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+val SR: Double = 256.0    // sample rate (Hz)
+val N: Int = 64           // number of samples
+
+// Synthesize a signal: 8 Hz sine + 24 Hz sine (smaller) + small DC offset
+val shapes: List[SignalShape] = [
+  new SineWave(8.0, 1.0),
+  new SineWave(24.0, 0.4),
+  new DCOffset(0.1)
+]
+val signal: List[Sample] = SignalSynthesizer::generate(shapes, N, SR)
+
+IO::println("=== Signal Analyzer Demo ===")
+IO::println("Signal: #{N} samples @ #{SR.fmt2()} Hz")
+IO::println("Components: 8 Hz (amp=1.0), 24 Hz (amp=0.4), DC=0.1")
+IO::println("")
+
+// Print a few samples
+IO::println("─── First 8 samples ───")
+foreach i: Int in 0..<8 {
+  val s: Sample = signal.get(i) as Sample
+  IO::println("  " + s.describe())
+}
+IO::println("")
+
+val analyzer = new SignalAnalyzer(signal, SR)
+
+// Analyze with each window function
+foreach w: WindowFunction in [WindowFunction::Rectangular, WindowFunction::Hann, WindowFunction::Hamming] {
+  val result: AnalysisResult = analyzer.analyze(w)
+  IO::println("─── #{w.label()} window ───")
+  IO::println("  " + result.summarize())
+  IO::println("")
+}
+
+// Show top-3 frequency bins with Hann window
+IO::println("─── Top 3 bins (Hann window) ───")
+val topBins: List[FrequencyBin] = analyzer.topBins(WindowFunction::Hann, 3)
+foreach i: Int in 0..<topBins.size {
+  val b: FrequencyBin = topBins.get(i) as FrequencyBin
+  IO::println("  " + b.describe())
+}
+IO::println("")
+
+// Pipeline: find all bins with magnitude > 0.1
+IO::println("─── Significant bins (Hann, mag > 0.1) ───")
+val allBins: List[FrequencyBin] = analyzer.topBins(WindowFunction::Hann, 30)
+val sigBins: List[FrequencyBin] = allBins.filter { b -> (b as FrequencyBin).magnitude() > 0.1 }
+foreach i: Int in 0..<sigBins.size {
+  val b: FrequencyBin = sigBins.get(i) as FrequencyBin
+  IO::println("  #{b.frequency().fmt2()} Hz  mag=#{b.magnitude().fmt2()}")
+}
+
+IO::println("")
+IO::println("Done.")

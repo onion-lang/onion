@@ -63,6 +63,38 @@ class OnionDocSpec extends AnyFunSpec {
       assert(typeHtml.contains("a greeting string"))
     }
 
+    it("still extracts the parseable types from a file with a syntax error") {
+      // DocModel wants a best-effort AST even from broken source: the recovery parse must
+      // return the declarations that did parse, structurally intact, not throw and not
+      // carry corrupted state (stranded scopes/lexer modes) across the recovery boundary.
+      val broken =
+        """/**
+          | * Fine.
+          | */
+          |class Good {
+          |public:
+          |  def ok(): Int { return 1 }
+          |}
+          |class Broken {
+          |public:
+          |  def bad(: Int): Int { return 2 }
+          |}
+          |/**
+          | * Also fine.
+          | */
+          |class AlsoGood {
+          |public:
+          |  def fine(name: String): String { return name }
+          |}
+          |""".stripMargin
+      val model = DocModel.fromSource(broken, "Broken.on")
+      assert(model.types.map(_.name).contains("Good"))
+      assert(model.types.map(_.name).contains("AlsoGood"))
+      val alsoGood = model.types.find(_.name == "AlsoGood").get
+      assert(alsoGood.methods.exists(_.signature.contains("def fine(name: String): String")))
+      assert(alsoGood.doc.exists(_.body.contains("Also fine")))
+    }
+
     it("runs end-to-end via OnionDoc.run") {
       val srcDir = Files.createTempDirectory("oniondoc-src").toFile
       val srcFile = new File(srcDir, "Greeter.on")

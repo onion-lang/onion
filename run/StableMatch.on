@@ -1,0 +1,550 @@
+// StableMatch.on — Gale-Shapley stable-matching simulation (college admissions).
+// Each student proposes to universities in preference order; each university
+// tentatively holds its best applicants and rejects the rest.  The algorithm
+// terminates with a student-optimal stable matching.
+//
+// Exercises: records with methods, data-carrying enums, ADT enum (RoundEvent),
+// plain enum (MatchPhase), classes + interface (Rankable), extension methods
+// (Int, String), generics (Ranked[T]), collection pipelines (map/filter/fold/
+// groupBy/sortedBy/distinct/find/partition/zip/any/count), select + type-pattern
+// matching, nullable, closures, string interpolation, try/catch, recursion,
+// foreach (ranges + k,v on map), while, |> pipeline.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def pad(w: Int): String {
+    val s: String = "" + self
+    if s.length() >= w { return s }
+    var r: String = s
+    while r.length() < w { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    if self.length() >= w { return self }
+    var r: String = self
+    while r.length() < w { r = r + " " }
+    return r
+  }
+  def lpad(w: Int): String {
+    if self.length() >= w { return self }
+    var r: String = self
+    while r.length() < w { r = " " + r }
+    return r
+  }
+}
+
+// ─── Plain enum ───────────────────────────────────────────────────────────────
+
+enum MatchPhase { Proposing, Holding, Finalised }
+
+// ─── Data-carrying enum: Region ───────────────────────────────────────────────
+
+enum Region(code: String, label: String) {
+  Northeast("NE", "Northeast"),
+  South    ("SO", "South"),
+  Midwest  ("MW", "Midwest"),
+  West     ("WE", "West"),
+  Pacific  ("PC", "Pacific")
+public:
+  def display(): String = "#{label()} [#{code()}]"
+}
+
+// ─── ADT enum: RoundEvent ─────────────────────────────────────────────────────
+
+enum RoundEvent {
+  case Proposed(studentName: String, uniName: String)
+  case Accepted(studentName: String, uniName: String)
+  case Upgraded(studentName: String, uniName: String, displaced: String)
+  case Rejected(studentName: String, uniName: String)
+public:
+  def describe(): String = select this {
+    case e is Proposed:  "  #{e.studentName()} → proposes to #{e.uniName()}"
+    case e is Accepted:  "  #{e.studentName()} ✓ held by #{e.uniName()}"
+    case e is Upgraded:  "  #{e.studentName()} ↑ replaces #{e.displaced()} at #{e.uniName()}"
+    case e is Rejected:  "  #{e.studentName()} ✗ rejected by #{e.uniName()}"
+  }
+  def isAccepted(): Boolean = select this {
+    case e is Accepted: true
+    case e is Upgraded: true
+    else: false
+  }
+}
+
+// ─── Generic record: Ranked[T] ────────────────────────────────────────────────
+
+record Ranked[T](rank: Int, value: T) {
+public:
+  def label(): String = "#{rank()}. #{value()}"
+}
+
+// ─── Interface: Rankable ─────────────────────────────────────────────────────
+
+interface Rankable {
+  def getId(): String
+  def getName(): String
+  def getScore(): Int
+}
+
+// ─── Record: Student ─────────────────────────────────────────────────────────
+
+record Student(
+  id:        String,
+  name:      String,
+  gpa:       Double,
+  satScore:  Int,
+  region:    Region,
+  prefs:     List[String]   // university IDs in preference order
+) {
+public:
+  def getId():    String = id()
+  def getName():  String = name()
+  def getScore(): Int    = satScore()
+  def label():    String = "#{name()} (GPA #{gpa()}, SAT #{satScore()}, #{region().code()})"
+  def topChoice():String? = if prefs().size > 0 { prefs().get(0) as String } else { null }
+}
+
+// ─── Record: University ───────────────────────────────────────────────────────
+
+record University(
+  id:       String,
+  name:     String,
+  region:   Region,
+  capacity: Int,
+  ranking:  Int
+) {
+public:
+  def getId():    String = id()
+  def getName():  String = name()
+  def getScore(): Int    = 100 - ranking()
+  def label():    String = "#{name()} (Rank ##{ranking()}, Cap #{capacity()}, #{region().code()})"
+  def isElite():  Boolean = ranking() <= 10
+}
+
+// ─── Class: MatchEngine ───────────────────────────────────────────────────────
+
+class MatchEngine {
+  val students:     List[Student]
+  val universities: List[University]
+  val uniPrefs:     Map[String, List[String]]  // uni id -> ordered student ids
+
+  // mutable matching state
+  var freeStudents: List[String]         // student ids still unmatched
+  var nextProposal: Map[String, Int]     // student id -> next pref index
+  var held:         Map[String, List[String]]  // uni id -> currently held student ids
+  var matched:      Map[String, String]  // student id -> matched uni id (or null)
+
+  var roundEvents:  List[RoundEvent]
+  var roundNumber:  Int
+  var phase:        MatchPhase
+
+public:
+  def this(students: List[Student], universities: List[University], uniPrefs: Map[String, List[String]]) {
+    this.students     = students
+    this.universities = universities
+    this.uniPrefs     = uniPrefs
+    this.freeStudents = []
+    this.nextProposal = [:]
+    this.held         = [:]
+    this.matched      = [:]
+    this.roundEvents  = []
+    this.roundNumber  = 0
+    this.phase        = MatchPhase::Proposing
+    this.init()
+  }
+
+  def init(): void {
+    foreach s: Student in students { freeStudents.add(s.id()) }
+    foreach s: Student in students { nextProposal.put(s.id(), 0) }
+    foreach u: University in universities { held.put(u.id(), []) }
+  }
+
+  def findStudent(id: String): Student? {
+    return students.find { s -> (s as Student).id() == id } as Student?
+  }
+
+  def findUniversity(id: String): University? {
+    return universities.find { u -> (u as University).id() == id } as University?
+  }
+
+  def uniCapacity(uniId: String): Int {
+    val u: University? = findUniversity(uniId)
+    if u == null { return 0 }
+    return (u as University).capacity()
+  }
+
+  // rank of a student at a university (lower = more preferred; -1 = not on list)
+  def rankAtUni(uniId: String, studentId: String): Int {
+    val prefs: List[String]? = uniPrefs.get(uniId) as List[String]?
+    if prefs == null { return -1 }
+    var i: Int = 0
+    foreach sid: String in (prefs as List[String]) {
+      if sid == studentId { return i }
+      i++
+    }
+    return -1
+  }
+
+  // worst held student at a uni (highest rank index = least preferred held)
+  def worstHeld(uniId: String): String? {
+    val heldList: List[String]? = held.get(uniId) as List[String]?
+    if heldList == null || (heldList as List[String]).size == 0 { return null }
+    var worst: String? = null
+    var worstRank: Int = -1
+    foreach sid: String in (heldList as List[String]) {
+      val r: Int = rankAtUni(uniId, sid)
+      if r > worstRank { worstRank = r; worst = sid }
+    }
+    return worst
+  }
+
+  // run one proposal round; return false when all students are matched or have exhausted prefs
+  def step(): Boolean {
+    if freeStudents.size == 0 { return false }
+    roundNumber++
+    val events: List[RoundEvent] = []
+
+    foreach studentId: String in freeStudents.filter { s -> true } {
+      val nextIdx: Int = nextProposal.get(studentId) as Int
+      val s: Student?  = findStudent(studentId)
+      if s == null { continue }
+      val prefs: List[String] = (s as Student).prefs()
+      if nextIdx >= prefs.size { continue }  // exhausted all prefs
+
+      val uniId: String = prefs.get(nextIdx) as String
+      nextProposal.put(studentId, nextIdx + 1)
+      events.add(new Proposed(studentId, uniId))
+
+      val u: University? = findUniversity(uniId)
+      if u == null { continue }
+      val uniRankMe: Int = rankAtUni(uniId, studentId)
+      if uniRankMe < 0 { events.add(new Rejected(studentId, uniId)); continue }
+
+      val cap: Int = uniCapacity(uniId)
+      val heldList: List[String] = held.get(uniId) as List[String]
+
+      if heldList.size < cap {
+        heldList.add(studentId)
+        held.put(uniId, heldList)
+        freeStudents.remove(studentId)
+        matched.put(studentId, uniId)
+        events.add(new Accepted(studentId, uniId))
+      } else {
+        val worst: String? = worstHeld(uniId)
+        if worst == null { events.add(new Rejected(studentId, uniId)); continue }
+        val worstRank: Int = rankAtUni(uniId, worst as String)
+        if uniRankMe < worstRank {
+          heldList.remove(worst)
+          heldList.add(studentId)
+          held.put(uniId, heldList)
+          freeStudents.remove(studentId)
+          freeStudents.add(worst as String)
+          matched.put(studentId, uniId)
+          matched.put(worst as String, "")
+          events.add(new Upgraded(studentId, uniId, worst as String))
+        } else {
+          events.add(new Rejected(studentId, uniId))
+        }
+      }
+    }
+
+    foreach e: RoundEvent in events { roundEvents.add(e) }
+    val stillFree: List[String] = freeStudents.filter { sid ->
+      val idx: Int = nextProposal.get(sid as String) as Int
+      val st: Student? = findStudent(sid as String)
+      if st == null { false } else { idx < (st as Student).prefs().size }
+    }
+    return stillFree.size > 0
+  }
+
+  def run(): void {
+    phase = MatchPhase::Proposing
+    while step() { }
+    phase = MatchPhase::Finalised
+  }
+
+  def getMatchedUni(studentId: String): String? {
+    val v: String? = matched.get(studentId) as String?
+    if v == null || v == "" { return null }
+    return v
+  }
+
+  def getRounds(): Int = roundNumber
+  def getEvents(): List[RoundEvent] = roundEvents
+  def getHeld(): Map[String, List[String]] = held
+  def getMatched(): Map[String, String] = matched
+}
+
+// ─── Stability check ─────────────────────────────────────────────────────────
+
+// A matching is stable if no student-university pair both prefer each other
+// to their current assignments (a "blocking pair").
+def countBlockingPairs(
+    engine:   MatchEngine,
+    students: List[Student],
+    uniPrefs: Map[String, List[String]]
+): Int {
+  var count: Int = 0
+  foreach s: Student in students {
+    val matchedUni: String? = engine.getMatchedUni(s.id())
+    var myRankAtMatch: Int = if matchedUni == null { 999 } else {
+      var idx: Int = 0
+      var found: Int = -1
+      foreach uid: String in s.prefs() {
+        if uid == matchedUni { found = idx }
+        idx++
+      }
+      if found < 0 { 999 } else { found }
+    }
+    foreach uniId: String in s.prefs() {
+      val uniPrefsForUni: List[String]? = uniPrefs.get(uniId) as List[String]?
+      if uniPrefsForUni == null { continue }
+      val uniRanksMe: Int = engine.rankAtUni(uniId, s.id())
+      if uniRanksMe < 0 { continue }
+      val myPrefRank: Int = {
+        var r: Int = 0
+        var found2: Int = -1
+        foreach uid2: String in s.prefs() {
+          if uid2 == uniId { found2 = r }
+          r++
+        }
+        found2
+      }
+      if myPrefRank < 0 || myPrefRank >= myRankAtMatch { continue }
+      val heldByUni: List[String] = engine.getHeld().get(uniId) as List[String]
+      val uniCap: Int = engine.uniCapacity(uniId)
+      if heldByUni.size < uniCap { count++; continue }
+      val worstRankAtUni: Int = {
+        var worst: Int = -1
+        foreach hid: String in heldByUni {
+          val r2: Int = engine.rankAtUni(uniId, hid)
+          if r2 > worst { worst = r2 }
+        }
+        worst
+      }
+      if uniRanksMe < worstRankAtUni { count++ }
+    }
+  }
+  return count
+}
+
+// ─── Sample data ─────────────────────────────────────────────────────────────
+
+val universities: List[University] = [
+  new University("MIT",       "MIT",              Region::Northeast, 2, 1),
+  new University("STANFORD",  "Stanford",         Region::Pacific,   2, 2),
+  new University("HARVARD",   "Harvard",          Region::Northeast, 2, 3),
+  new University("CALTECH",   "Caltech",          Region::Pacific,   1, 4),
+  new University("CHICAGO",   "U of Chicago",     Region::Midwest,   2, 5),
+  new University("COLUMBIA",  "Columbia",         Region::Northeast, 2, 6),
+  new University("DUKE",      "Duke",             Region::South,     2, 7),
+  new University("MICHIGAN",  "U of Michigan",    Region::Midwest,   3, 8)
+]
+
+val students: List[Student] = [
+  new Student("S01", "Alice",   3.97, 1540, Region::Northeast, ["MIT", "HARVARD", "STANFORD", "COLUMBIA", "CHICAGO"]),
+  new Student("S02", "Bob",     3.85, 1490, Region::Pacific,   ["STANFORD", "MIT", "CALTECH", "CHICAGO", "MICHIGAN"]),
+  new Student("S03", "Carol",   3.92, 1520, Region::South,     ["MIT", "HARVARD", "STANFORD", "CALTECH", "COLUMBIA"]),
+  new Student("S04", "David",   3.78, 1460, Region::Midwest,   ["STANFORD", "CHICAGO", "MIT", "COLUMBIA", "MICHIGAN"]),
+  new Student("S05", "Eve",     4.00, 1580, Region::Pacific,   ["MIT", "CALTECH", "STANFORD", "HARVARD", "CHICAGO"]),
+  new Student("S06", "Frank",   3.65, 1430, Region::South,     ["HARVARD", "DUKE", "MICHIGAN", "CHICAGO", "COLUMBIA"]),
+  new Student("S07", "Grace",   3.89, 1510, Region::Northeast, ["HARVARD", "MIT", "COLUMBIA", "STANFORD", "DUKE"]),
+  new Student("S08", "Henry",   3.72, 1450, Region::Midwest,   ["STANFORD", "MICHIGAN", "CHICAGO", "DUKE", "COLUMBIA"]),
+  new Student("S09", "Iris",    3.95, 1530, Region::Pacific,   ["MIT", "CALTECH", "STANFORD", "HARVARD", "CHICAGO"]),
+  new Student("S10", "Jake",    3.81, 1480, Region::South,     ["HARVARD", "STANFORD", "MICHIGAN", "CHICAGO", "COLUMBIA"]),
+  new Student("S11", "Kate",    3.88, 1505, Region::Northeast, ["MIT", "HARVARD", "COLUMBIA", "CHICAGO", "STANFORD"]),
+  new Student("S12", "Liam",    3.74, 1455, Region::Midwest,   ["CHICAGO", "MICHIGAN", "DUKE", "STANFORD", "MIT"])
+]
+
+// University preference lists — each school weights criteria differently.
+// MIT / Caltech: SAT-heavy; Harvard / Columbia: GPA-heavy;
+// Stanford: balanced; Chicago / Michigan: GPA-only; Duke: SAT-only.
+def score(s: Student): Int = (s.gpa() * 400.0) as Int + s.satScore()
+
+def uniScore(uniId: String, s: Student): Int = select uniId {
+  case "MIT":      (s.satScore() * 7 / 10) + ((s.gpa() * 400.0) as Int) * 3 / 10
+  case "CALTECH":  (s.satScore() * 7 / 10) + ((s.gpa() * 400.0) as Int) * 3 / 10
+  case "HARVARD":  ((s.gpa() * 400.0) as Int) * 7 / 10 + s.satScore() * 3 / 10
+  case "COLUMBIA": ((s.gpa() * 400.0) as Int) * 7 / 10 + s.satScore() * 3 / 10
+  case "STANFORD": ((s.gpa() * 400.0) as Int) / 2 + s.satScore() / 2
+  case "CHICAGO":  (s.gpa() * 1000.0) as Int
+  case "MICHIGAN": (s.gpa() * 1000.0) as Int
+  case "DUKE":     s.satScore()
+  else:            score(s)
+}
+
+def makeUniPrefs(unis: List[University], studs: List[Student]): Map[String, List[String]] {
+  val m: Map[String, List[String]] = [:]
+  foreach u: University in unis {
+    val uid: String = u.id()
+    val ranked: List[String] = studs
+      .sortedBy { s -> 0 - uniScore(uid, s as Student) }
+      .map { s -> (s as Student).id() }
+    m.put(uid, ranked)
+  }
+  return m
+}
+
+val uniPrefs: Map[String, List[String]] = makeUniPrefs(universities, students)
+
+// ─── Run the match ────────────────────────────────────────────────────────────
+
+val engine: MatchEngine = new MatchEngine(students, universities, uniPrefs)
+engine.run()
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  foreach _: Int in 1..n { s = s + "-" }
+  IO::println(s)
+}
+
+def section(title: String): void {
+  IO::println("")
+  IO::println(title)
+  hr(title.length())
+}
+
+// ─── Report: Algorithm summary ────────────────────────────────────────────────
+
+section("=== Gale-Shapley Stable Match — College Admissions ===")
+IO::println("  Students:     " + students.size)
+IO::println("  Universities: " + universities.size)
+IO::println("  Total seats:  " + universities.fold(0) { acc, u -> (acc as Int) + (u as University).capacity() })
+IO::println("  Rounds run:   " + engine.getRounds())
+IO::println("  Phase:        Finalised")
+
+// ─── Report: Final matching ───────────────────────────────────────────────────
+
+section("=== Final Matching ===")
+foreach s: Student in students.sortedBy { s -> (s as Student).name() } {
+  val uniId: String? = engine.getMatchedUni(s.id())
+  val uniName: String = if uniId == null { "(unmatched)" } else {
+    val u: University? = engine.findUniversity(uniId as String)
+    if u == null { uniId as String } else { (u as University).name() }
+  }
+  val prefRank: String = if uniId == null { "—" } else {
+    var rank: Int = 1
+    var found: Boolean = false
+    foreach pid: String in s.prefs() {
+      if pid == uniId { found = true; break }
+      rank++
+    }
+    if found { "choice #" + rank } else { "?" }
+  }
+  IO::println("  " + s.name().rpad(8) + "  →  " + uniName.rpad(16) + "  (" + prefRank + ")")
+}
+
+// ─── Report: University fill rates ───────────────────────────────────────────
+
+section("=== University Fill Rates ===")
+foreach (uniId, heldList) in engine.getHeld() {
+  val u: University? = engine.findUniversity(uniId as String)
+  val heldStudents: List[String] = heldList as List[String]
+  if u == null { continue }
+  val uni: University = u as University
+  val fill: String = heldStudents.size + "/" + uni.capacity()
+  val names: String = heldStudents.map { sid ->
+    val st: Student? = engine.findStudent(sid as String)
+    if st == null { sid as String } else { (st as Student).name() }
+  }.fold("") { acc, n -> if (acc as String) == "" { n as String } else { (acc as String) + ", " + (n as String) } }
+  IO::println("  " + uni.name().rpad(18) + fill.lpad(4) + "  — " + names)
+}
+
+// ─── Report: Choice quality ───────────────────────────────────────────────────
+
+section("=== Student Choice Quality ===")
+var first: Int  = 0
+var second: Int = 0
+var third: Int  = 0
+var later: Int  = 0
+var unmatched: Int = 0
+
+foreach s: Student in students {
+  val uniId: String? = engine.getMatchedUni(s.id())
+  if uniId == null { unmatched++; continue }
+  var rank: Int = 1
+  var found: Boolean = false
+  foreach pid: String in s.prefs() {
+    if pid == uniId { found = true; break }
+    rank++
+  }
+  if !found { unmatched++ }
+  else if rank == 1 { first++ }
+  else if rank == 2 { second++ }
+  else if rank == 3 { third++ }
+  else { later++ }
+}
+IO::println("  1st choice: " + first   + " students")
+IO::println("  2nd choice: " + second  + " students")
+IO::println("  3rd choice: " + third   + " students")
+IO::println("  4th+ choice:" + later   + " students")
+IO::println("  Unmatched:  " + unmatched + " students")
+
+// ─── Report: Regional breakdown ──────────────────────────────────────────────
+
+section("=== Matched Students by Region ===")
+val byRegion = students
+  .filter { s -> engine.getMatchedUni((s as Student).id()) != null }
+  .groupBy { s -> (s as Student).region().display() }
+foreach (region, regionStudents) in byRegion {
+  val cnt: Int = (regionStudents as List[Student]).size
+  IO::println("  " + (region as String).rpad(22) + cnt.pad(3) + " matched")
+}
+
+// ─── Report: Elite university admits ────────────────────────────────────────
+
+section("=== Elite University Admits (Top-10 ranked) ===")
+val eliteUnis: List[University] = universities.filter { u -> (u as University).isElite() }
+foreach u: University in eliteUnis.sortedBy { u -> (u as University).ranking() } {
+  val heldIds: List[String] = engine.getHeld().get(u.id()) as List[String]
+  val avgGpa: Double = if heldIds.size == 0 { 0.0 } else {
+    val total: Double = heldIds.fold(0.0) { acc, sid ->
+      val st: Student? = engine.findStudent(sid as String)
+      if st == null { acc as Double } else { (acc as Double) + (st as Student).gpa() }
+    } as Double
+    total / (heldIds.size as Double)
+  }
+  val gpaStr: String = "" + (avgGpa as Int) + "." +
+    (((avgGpa * 10.0)   as Int) % 10) +
+    (((avgGpa * 100.0)  as Int) % 10) +
+    (((avgGpa * 1000.0) as Int) % 10)
+  IO::println("  #" + ("" + u.ranking()).rpad(3) + u.name().rpad(16) + "avg GPA " + gpaStr.lpad(5))
+}
+
+// ─── Stability verification ───────────────────────────────────────────────────
+
+section("=== Stability Verification ===")
+val blockingPairs: Int = countBlockingPairs(engine, students, uniPrefs)
+IO::println("  Blocking pairs found: " + blockingPairs)
+if blockingPairs == 0 {
+  IO::println("  ✓ Matching is STABLE — Gale-Shapley guarantee verified.")
+} else {
+  IO::println("  ✗ Matching is NOT stable — " + blockingPairs + " blocking pair(s) found.")
+}
+
+// ─── Pipeline demo: top-5 students by composite score ─────────────────────────
+
+section("=== Top 5 Applicants by Score ===")
+val top5 = students
+  .sortedBy { s -> 0 - score(s as Student) }
+  .filter { s -> true }
+
+var rank: Int = 1
+foreach s: Student in top5 {
+  if rank > 5 { break }
+  val uniId: String? = engine.getMatchedUni(s.id())
+  val dest: String = if uniId == null { "unmatched" } else {
+    val u: University? = engine.findUniversity(uniId as String)
+    if u == null { uniId as String } else { (u as University).name() }
+  }
+  IO::println("  " + ("" + rank).rpad(3) + s.name().rpad(8) + " score=" + score(s) + "  → " + dest)
+  rank++
+}
+
+IO::println("")
+IO::println("Done.")

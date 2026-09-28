@@ -1,0 +1,417 @@
+// SocialFeed.on — A social-network feed simulator.
+//
+// Models:
+//   User, Post (text/photo/link), Reaction (like/love/laugh/sad/angry),
+//   Comment, Follow graph, and a ranked-feed algorithm.
+//
+// Features exercised:
+//   records, homogeneous enums, generics, collection pipelines
+//   (map/filter/fold/sortedBy/find), closures, string interpolation,
+//   while, foreach, nullable types, extension methods, static methods.
+
+import {
+  java.util.*
+}
+
+// ── Enumerations ──────────────────────────────────────────────────────────────
+
+enum ReactionKind { Like, Love, Laugh, Sad, Angry }
+
+enum PostKind { Text, Photo, Link }
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record User(id: Int, name: String, bio: String) {
+  public:
+  def handle(): String = "@" + self.name().toLowerCase().replace(" ", "_")
+  static def of(id: Int, name: String): User = new User(id, name, "")
+}
+
+record Reaction(userId: Int, kind: ReactionKind, postId: Int)
+
+record Comment(id: Int, postId: Int, authorId: Int, body: String, ts: Long)
+
+record Post(
+  id: Int,
+  authorId: Int,
+  kind: PostKind,
+  body: String,
+  tags: List[String],
+  ts: Long
+) {
+  public:
+  def summary(): String {
+    val kindPrefix: String = if self.kind() == PostKind::Text  { "[T]" }
+                        else if self.kind() == PostKind::Photo { "[P]" }
+                        else                                   { "[L]" }
+    val short: String = if self.body().length() > 60 {
+      self.body().substring(0, 57) + "..."
+    } else {
+      self.body()
+    }
+    return "#{kindPrefix} #{short}"
+  }
+}
+
+record ReactionWeight(kind: ReactionKind, weight: Int)
+
+record FeedEntry(
+  post: Post,
+  authorName: String,
+  reactionCount: Int,
+  commentCount: Int,
+  score: Double
+) {
+  public:
+  def display(): String {
+    return "  Post ##{self.post().id()} by #{self.authorName()}: #{self.post().summary()}\n" +
+           "  Reactions: #{self.reactionCount()}  Comments: #{self.commentCount()}  Score: #{self.score()}"
+  }
+}
+
+// ── Network ───────────────────────────────────────────────────────────────────
+
+class Network {
+  var nextPostId:    Int
+  var nextCommentId: Int
+  val users:     Map[Int, User]
+  val posts:     Map[Int, Post]
+  val reactions: List[Reaction]
+  val comments:  List[Comment]
+  val follows:   Map[Int, List[Int]]
+  val weights:   List[ReactionWeight]
+
+public:
+  def this {
+    self.nextPostId    = 1
+    self.nextCommentId = 1
+    self.users    = [:]
+    self.posts    = [:]
+    self.reactions = []
+    self.comments  = []
+    self.follows   = [:]
+    self.weights   = [
+      new ReactionWeight(ReactionKind::Like,  1),
+      new ReactionWeight(ReactionKind::Love,  3),
+      new ReactionWeight(ReactionKind::Laugh, 2),
+      new ReactionWeight(ReactionKind::Sad,   2),
+      new ReactionWeight(ReactionKind::Angry, 1)
+    ]
+  }
+
+  def userCount(): Int = self.users.size()
+  def postCount(): Int = self.posts.size()
+  def reactionCount(): Int = self.reactions.size
+  def commentCount(): Int = self.comments.size
+
+  def addUser(u: User): void {
+    self.users[u.id()] = u
+    self.follows[u.id()] = []
+  }
+
+  def follow(followerId: Int, followeeId: Int): void {
+    val list: List[Int]? = self.follows[followerId]
+    if list != null {
+      if !list.contains(followeeId) { list.add(followeeId) }
+    }
+  }
+
+  def post(authorId: Int, kind: PostKind, body: String, tags: List[String], ts: Long): Post {
+    val p: Post = new Post(self.nextPostId, authorId, kind, body, tags, ts)
+    self.posts[self.nextPostId] = p
+    self.nextPostId = self.nextPostId + 1
+    return p
+  }
+
+  def react(userId: Int, postId: Int, kind: ReactionKind): void {
+    var found: Boolean = false
+    var i: Int = 0
+    while i < self.reactions.size {
+      val r: Reaction = self.reactions[i]
+      if r.userId() == userId && r.postId() == postId {
+        self.reactions[i] = new Reaction(userId, kind, postId)
+        found = true
+        break
+      }
+      i = i + 1
+    }
+    if !found { self.reactions.add(new Reaction(userId, kind, postId)) }
+  }
+
+  def comment(authorId: Int, postId: Int, body: String, ts: Long): Comment {
+    val c: Comment = new Comment(self.nextCommentId, postId, authorId, body, ts)
+    self.comments.add(c)
+    self.nextCommentId = self.nextCommentId + 1
+    return c
+  }
+
+  def scorePost(postId: Int): Double {
+    val postReactions: List[Reaction] = self.reactions.filter { r -> r.postId() == postId }
+    var total: Int = 0
+    foreach r: Reaction in postReactions {
+      val w: ReactionWeight? = self.weights.find { w -> w.kind() == r.kind() }
+      if w != null { total = total + w.weight() }
+    }
+    val commentBonus: Int = self.comments.filter { c -> c.postId() == postId }.size
+    return (total as Double) + (commentBonus as Double) * 0.5
+  }
+
+  def allPostsList(): List[Post] {
+    return new ArrayList[Post](self.posts.values())
+  }
+
+  def allUserIdsList(): List[Int] {
+    val keys: List[Object] = new ArrayList[Object](self.users.keySet())
+    return keys.map { k -> k as Int }
+  }
+
+  def feedFor(userId: Int): List[FeedEntry] {
+    val followees: List[Int]? = self.follows[userId]
+    if followees == null { return [] }
+
+    val allPosts: List[Post] = self.allPostsList()
+    val candidatePosts: List[Post] = allPosts
+      .filter { p -> followees.contains(p.authorId()) }
+      .sortedBy { p -> -(p.ts() as Double) }
+
+    val entries: List[FeedEntry] = candidatePosts.map { p ->
+      val author: User? = self.users[p.authorId()]
+      val authorName: String = if author != null { author.name() } else { "Unknown" }
+      val rc: Int = self.reactions.filter { r -> r.postId() == p.id() }.size
+      val cc: Int = self.comments.filter { c -> c.postId() == p.id() }.size
+      val score: Double = self.scorePost(p.id())
+      new FeedEntry(p, authorName, rc, cc, score)
+    }
+
+    return entries.sortedBy { e -> -(e.score() * 1000000.0 + (e.post().ts() as Double)) }
+  }
+
+  def trending(n: Int): List[FeedEntry] {
+    val allPosts: List[Post] = self.allPostsList()
+    val all: List[FeedEntry] = allPosts.map { p ->
+      val author: User? = self.users[p.authorId()]
+      val authorName: String = if author != null { author.name() } else { "Unknown" }
+      val rc: Int = self.reactions.filter { r -> r.postId() == p.id() }.size
+      val cc: Int = self.comments.filter { c -> c.postId() == p.id() }.size
+      val score: Double = self.scorePost(p.id())
+      new FeedEntry(p, authorName, rc, cc, score)
+    }
+    val sorted: List[FeedEntry] = all.sortedBy { e -> -e.score() }
+    val result: List[FeedEntry] = []
+    var i: Int = 0
+    while i < sorted.size && i < n {
+      result.add(sorted[i])
+      i = i + 1
+    }
+    return result
+  }
+
+  def engagementReport(): List[String] {
+    val lines: List[String] = []
+    val userIds: List[Int] = self.allUserIdsList()
+    foreach uid: Int in userIds {
+      val user: User? = self.users[uid]
+      if user == null { continue }
+      val userPosts: List[Post] = self.allPostsList().filter { p -> p.authorId() == uid }
+      val postIds: List[Int] = userPosts.map { p -> p.id() }
+      var totalReactions: Int = 0
+      var totalComments: Int = 0
+      foreach pid: Int in postIds {
+        totalReactions = totalReactions + self.reactions.filter { r -> r.postId() == pid }.size
+        totalComments  = totalComments  + self.comments.filter  { c -> c.postId() == pid }.size
+      }
+      val line: String = "  #{user.name()} (#{user.handle()}): #{userPosts.size} posts, #{totalReactions} reactions, #{totalComments} comments"
+      lines.add(line)
+    }
+    return lines.sortedBy { l -> l }
+  }
+
+  def tagStats(): List[String] {
+    val tagCounts: Map[String, Int] = [:]
+    foreach post: Post in self.allPostsList() {
+      foreach tag: String in post.tags() {
+        val cur: Int? = tagCounts[tag]
+        tagCounts[tag] = if cur != null { cur + 1 } else { 1 }
+      }
+    }
+    val keyList: List[String] = new ArrayList[Object](tagCounts.keySet()).map { k -> k as String }
+    return keyList.map { k ->
+      val cnt: Int? = tagCounts[k]
+      "#{k}: #{if cnt != null { cnt } else { 0 }}"
+    }.sortedBy { s -> s }
+  }
+
+  def mutualFollowers(): List[String] {
+    val result: List[String] = []
+    val seen: List[String] = []
+    val userIds: List[Int] = self.allUserIdsList()
+    foreach a: Int in userIds {
+      foreach b: Int in userIds {
+        if a == b { continue }
+        val fa: List[Int]? = self.follows[a]
+        val fb: List[Int]? = self.follows[b]
+        val aFollowsB: Boolean = if fa != null { fa.contains(b) } else { false }
+        val bFollowsA: Boolean = if fb != null { fb.contains(a) } else { false }
+        if aFollowsB && bFollowsA {
+          val key1: String = "#{a}-#{b}"
+          val key2: String = "#{b}-#{a}"
+          if !seen.contains(key1) && !seen.contains(key2) {
+            seen.add(key1)
+            val uA: User? = self.users[a]
+            val uB: User? = self.users[b]
+            if uA != null && uB != null {
+              result.add("  #{uA.name()} <-> #{uB.name()}")
+            }
+          }
+        }
+      }
+    }
+    return result.sortedBy { s -> s }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def separator(title: String): void {
+  IO::println("\n-- #{title} " + "-".repeat(48 - title.length()))
+}
+
+def printList(items: List[String]): void {
+  if items.size == 0 { IO::println("  (none)"); return }
+  foreach item: String in items { IO::println(item) }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val net: Network = new Network()
+
+val alice: User = new User(1, "Alice Chen",  "Software engineer & coffee addict")
+val bob:   User = new User(2, "Bob Tanaka",  "Photographer and world traveller")
+val carol: User = new User(3, "Carol Davis", "Data scientist | Python & ML")
+val dan:   User = new User(4, "Dan Patel",   "Game developer, pixel art lover")
+val eve:   User = new User(5, "Eve Mueller", "Open source contributor")
+val frank: User = new User(6, "Frank Osei",  "Backend engineer, Rust enthusiast")
+
+net.addUser(alice)
+net.addUser(bob)
+net.addUser(carol)
+net.addUser(dan)
+net.addUser(eve)
+net.addUser(frank)
+
+net.follow(1, 2); net.follow(1, 3); net.follow(1, 5)
+net.follow(2, 1); net.follow(2, 4)
+net.follow(3, 1); net.follow(3, 2); net.follow(3, 6)
+net.follow(4, 3); net.follow(4, 5)
+net.follow(5, 1); net.follow(5, 2)
+net.follow(6, 3); net.follow(6, 4)
+
+val p1: Post = net.post(1, PostKind::Text,
+  "Just shipped a new feature after three weeks of debugging. Sleep is for the weak.",
+  ["coding", "rant", "coffee"], 1000L)
+val p2: Post = net.post(2, PostKind::Photo,
+  "Sunrise over Mount Fuji -- worth the 4am wake-up call every single time.",
+  ["travel", "photography", "japan"], 1010L)
+val p3: Post = net.post(3, PostKind::Link,
+  "Great read on transformer model efficiency: https://example.com/transformer-tips",
+  ["ml", "ai", "python"], 1020L)
+val p4: Post = net.post(4, PostKind::Text,
+  "Spent all day tweaking pixel shaders. My eyes are squares now.",
+  ["gamedev", "graphics", "pixelart"], 1030L)
+val p5: Post = net.post(5, PostKind::Text,
+  "Merged my 200th PR today. Open source is the best thing about tech.",
+  ["opensource", "coding"], 1040L)
+val p6: Post = net.post(6, PostKind::Link,
+  "Rust's borrow checker finally clicked -- here's what helped: https://example.com/rust-borrow",
+  ["rust", "coding", "systems"], 1050L)
+val p7: Post = net.post(1, PostKind::Text,
+  "Hot take: dark mode is a personality trait. Fight me.",
+  ["coding", "opinion"], 1060L)
+val p8: Post = net.post(2, PostKind::Photo,
+  "Street food in Bangkok -- my stomach is very brave or very stupid.",
+  ["travel", "food", "thailand"], 1070L)
+val p9: Post = net.post(3, PostKind::Text,
+  "Running k-means on a dataset with no preprocessing is a crime against data science.",
+  ["ml", "data", "rant"], 1080L)
+val p10: Post = net.post(4, PostKind::Link,
+  "Released v0.3 of my hobby game engine! https://example.com/tinygfx",
+  ["gamedev", "opensource", "pixelart"], 1090L)
+
+net.react(2, p1.id(), ReactionKind::Laugh); net.react(3, p1.id(), ReactionKind::Love)
+net.react(5, p1.id(), ReactionKind::Like);  net.react(6, p1.id(), ReactionKind::Laugh)
+
+net.react(1, p2.id(), ReactionKind::Love);  net.react(3, p2.id(), ReactionKind::Love)
+net.react(4, p2.id(), ReactionKind::Love);  net.react(5, p2.id(), ReactionKind::Love)
+net.react(6, p2.id(), ReactionKind::Like)
+
+net.react(1, p3.id(), ReactionKind::Like);  net.react(4, p3.id(), ReactionKind::Like)
+net.react(6, p3.id(), ReactionKind::Love)
+
+net.react(1, p4.id(), ReactionKind::Laugh); net.react(2, p4.id(), ReactionKind::Laugh)
+net.react(5, p4.id(), ReactionKind::Love)
+
+net.react(1, p5.id(), ReactionKind::Love);  net.react(2, p5.id(), ReactionKind::Love)
+net.react(3, p5.id(), ReactionKind::Love);  net.react(4, p5.id(), ReactionKind::Love)
+net.react(6, p5.id(), ReactionKind::Like)
+
+net.react(1, p6.id(), ReactionKind::Like);  net.react(3, p6.id(), ReactionKind::Love)
+net.react(5, p6.id(), ReactionKind::Like)
+
+net.react(2, p7.id(), ReactionKind::Laugh); net.react(3, p7.id(), ReactionKind::Laugh)
+net.react(4, p7.id(), ReactionKind::Angry); net.react(5, p7.id(), ReactionKind::Laugh)
+net.react(6, p7.id(), ReactionKind::Laugh)
+
+net.react(1, p8.id(), ReactionKind::Love);  net.react(3, p8.id(), ReactionKind::Laugh)
+net.react(4, p8.id(), ReactionKind::Love)
+
+net.react(2, p9.id(), ReactionKind::Laugh); net.react(4, p9.id(), ReactionKind::Like)
+net.react(6, p9.id(), ReactionKind::Love)
+
+net.react(1, p10.id(), ReactionKind::Love); net.react(2, p10.id(), ReactionKind::Love)
+net.react(3, p10.id(), ReactionKind::Like); net.react(5, p10.id(), ReactionKind::Love)
+net.react(6, p10.id(), ReactionKind::Love)
+
+net.comment(3, p1.id(),  "Feel this in my soul.", 1005L)
+net.comment(4, p1.id(),  "Three weeks? Rookie numbers. Try three months.", 1006L)
+net.comment(1, p2.id(),  "Absolutely stunning!", 1012L)
+net.comment(5, p2.id(),  "Adding Japan to my bucket list immediately.", 1015L)
+net.comment(6, p3.id(),  "Bookmarked, thanks!", 1022L)
+net.comment(1, p4.id(),  "Pixel shaders are where sanity goes to die.", 1032L)
+net.comment(2, p5.id(),  "Congrats! Huge milestone.", 1042L)
+net.comment(4, p5.id(),  "Goals!", 1043L)
+net.comment(5, p5.id(),  "The community thanks you!", 1044L)
+net.comment(1, p6.id(),  "That blog post is gold.", 1052L)
+net.comment(2, p6.id(),  "Rust clicked for me after reading the Rustonomicon.", 1053L)
+net.comment(1, p7.id(),  "I stand by this.", 1062L)
+net.comment(4, p7.id(),  "I use light mode and I'm fine.", 1063L)
+net.comment(5, p8.id(),  "That looks incredible!", 1072L)
+net.comment(1, p9.id(),  "The crime is real.", 1082L)
+net.comment(2, p10.id(), "Downloading now!", 1092L)
+net.comment(5, p10.id(), "Love the pixel art style!", 1093L)
+net.comment(1, p10.id(), "This is so cool!", 1094L)
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+separator("ALICE'S FEED")
+val aliceFeed: List[FeedEntry] = net.feedFor(alice.id())
+foreach entry: FeedEntry in aliceFeed { IO::println(entry.display()) }
+
+separator("BOB'S FEED")
+val bobFeed: List[FeedEntry] = net.feedFor(bob.id())
+foreach entry: FeedEntry in bobFeed { IO::println(entry.display()) }
+
+separator("TRENDING (top 5)")
+val top5: List[FeedEntry] = net.trending(5)
+foreach entry: FeedEntry in top5 { IO::println(entry.display()) }
+
+separator("ENGAGEMENT REPORT")
+printList(net.engagementReport())
+
+separator("TAG STATISTICS")
+printList(net.tagStats())
+
+separator("MUTUAL FOLLOWS")
+printList(net.mutualFollowers())
+
+separator("DONE")
+IO::println("Simulated #{net.userCount()} users, #{net.postCount()} posts, #{net.reactionCount()} reactions, #{net.commentCount()} comments.")

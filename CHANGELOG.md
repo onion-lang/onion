@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/RunLengthCoder.on`** — a 327-line run-length encoding/decoding suite with a configurable minimum-run threshold, character-frequency analysis, and multi-sample statistics, a new domain for the `run/` corpus (an ADT case-enum `RleToken` (`Literal`/`Run`) with shared `charVal()`/`length()`/`describe()`; a record with methods `CompressionStats` (`ratio()`/`saved()`/`expansionLabel()`); a class `RunLengthCoder` with `Map[String,String]` state and a full public API (`encode`/`decode`/`tokenise`/`getCodes`/`countBits`); a `Map[String,Int]` frequency map built via `foreach (k, v)`; collection pipelines `sortedBy`/`fold`/`filter`/`foreach` over `List[RleToken]`/`List[Object]`; `select`/`is` type-pattern dispatch on `RleToken` variants; range-based `foreach` (`0..<n`) for gradient/zigzag patterns; nullable `Map.get` handling; string interpolation — rendering encode/decode roundtrip checks, a gradient-pattern demo, and compression statistics), added to the `run/` corpus (merged via #1663).
+- **`run/UnionFindMST.on`** — a 215-line Disjoint Set Union + Kruskal's Minimum Spanning Tree demo modelling an 8-city road network and an 8-person social graph, a new domain for the `run/` corpus (a class with `Int[]` array state implementing DSU via recursive path-compressed `find` and union-by-rank `unite`; records with methods `Edge`/`City`/`MSTResult`; top-level `static val List[City]`/`List[Edge]` constants; collection pipelines `sortedBy`/`fold`/`find`/`partition` over `List[Edge]`; extension methods `Int.lpad`/`String.rpad`; `foreach` over typed lists without `Object` casts; `while` loops for DSU array init and pair iteration; nullable types with `!!` force-unwrap; `select` with integer patterns classifying component size as singleton/small/medium/large; string interpolation — rendering a road-network MST report and a social-network connected-components analysis), added to the `run/` corpus (merged via #1665).
+
 ## [0.125.0] - 2026-09-28
 
 ### Added

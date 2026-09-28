@@ -1,0 +1,298 @@
+// UnionFindMST.on — Disjoint Set Union (Union-Find) + Kruskal's MST
+// Models a road network and a social graph with connected-component analysis.
+// Exercises: class with Int[] arrays (path compression, union by rank);
+//   records with methods; static val; collection pipelines
+//   (sortedBy/filter/map/fold/find/partition); extension methods on Int/String;
+//   while/foreach over List and ranges; string interpolation; nullable types;
+//   recursion; select pattern matching.
+
+// ─── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def absVal(): Int = if self < 0 { 0 - self } else { self }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── DSU: path compression + union by rank ──────────────────────────────────
+
+class DSU {
+  val parent: Int[]
+  val rank: Int[]
+  var components: Int
+  val n: Int
+
+public:
+  def this(size: Int) {
+    this.n = size
+    this.parent = new Int[size]
+    this.rank = new Int[size]
+    this.components = size
+    var i: Int = 0
+    while i < size {
+      parent[i] = i
+      rank[i] = 0
+      i = i + 1
+    }
+  }
+
+  def find(x: Int): Int {
+    if parent[x] == x { return x }
+    parent[x] = find(parent[x])
+    return parent[x]
+  }
+
+  def unite(x: Int, y: Int): Boolean {
+    val rx: Int = find(x)
+    val ry: Int = find(y)
+    if rx == ry { return false }
+    if rank[rx] < rank[ry] {
+      parent[rx] = ry
+    } else if rank[rx] > rank[ry] {
+      parent[ry] = rx
+    } else {
+      parent[ry] = rx
+      rank[rx] = rank[rx] + 1
+    }
+    components = components - 1
+    return true
+  }
+
+  def same(x: Int, y: Int): Boolean = find(x) == find(y)
+
+  def componentCount(): Int = components
+
+  def membersOf(x: Int): List[Int] {
+    val root: Int = find(x)
+    val result: List[Int] = []
+    var i: Int = 0
+    while i < n {
+      if find(i) == root { result.add(i) }
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── Records ────────────────────────────────────────────────────────────────
+
+record Edge(u: Int, v: Int, weight: Int) {
+public:
+  def detail(): String = "#{u()}-#{v()} (#{weight()} km)"
+}
+
+record City(id: Int, name: String, population: Int) {
+public:
+  def label(): String {
+    val pop: Int = population()
+    return "#{id().lpad(2)}: #{name().rpad(12)} pop=#{pop}"
+  }
+}
+
+record MSTResult(mstEdges: List[Edge], totalWeight: Int) {
+public:
+  def summary(): String {
+    val n: Int = mstEdges().size
+    return "#{n} edge(s), total weight #{totalWeight()} km"
+  }
+}
+
+// ─── Kruskal's MST ──────────────────────────────────────────────────────────
+
+def kruskalMST(nodeCount: Int, edges: List[Edge]): MSTResult {
+  val sorted: List[Edge] = edges.sortedBy { e -> (e as Edge).weight() }
+  val dsu = new DSU(nodeCount)
+  val mstEdges: List[Edge] = []
+  var total: Int = 0
+  foreach e: Edge in sorted {
+    if dsu.unite(e.u(), e.v()) {
+      mstEdges.add(e)
+      total = total + e.weight()
+    }
+  }
+  return new MSTResult(mstEdges, total)
+}
+
+// ─── Static data ────────────────────────────────────────────────────────────
+
+static val CITIES: List[City] = [
+  new City(0, "Aldgate",    820000),
+  new City(1, "Barholm",    340000),
+  new City(2, "Crestwick",  510000),
+  new City(3, "Dunford",    270000),
+  new City(4, "Eastmere",   190000),
+  new City(5, "Fernshaw",   430000),
+  new City(6, "Greystone",  610000),
+  new City(7, "Hillcroft",  150000)
+]
+
+// Road segments (bidirectional), cost in km
+static val ROADS: List[Edge] = [
+  new Edge(0, 1, 82),  new Edge(0, 2, 64),  new Edge(1, 3, 47),
+  new Edge(1, 4, 91),  new Edge(2, 3, 33),  new Edge(2, 5, 58),
+  new Edge(3, 4, 40),  new Edge(3, 6, 75),  new Edge(4, 7, 53),
+  new Edge(5, 6, 21),  new Edge(6, 7, 62),  new Edge(1, 2, 99)
+]
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // 1. City roster
+  IO::println("=== City Roster ===")
+  foreach c: Object in CITIES {
+    IO::println("  " + (c as City).label())
+  }
+  IO::println("")
+
+  // 2. Road network connectivity
+  IO::println("=== Road Network Connectivity ===")
+  val connDSU = new DSU(CITIES.size)
+  foreach e: Object in ROADS {
+    val edge: Edge = e as Edge
+    connDSU.unite(edge.u(), edge.v())
+  }
+  val numComponents: Int = connDSU.componentCount()
+  IO::println("  Components  : #{numComponents}")
+  IO::println("  Fully linked: #{numComponents == 1}")
+  IO::println("")
+
+  // 3. Kruskal's MST
+  IO::println("=== Minimum Spanning Tree (Kruskal) ===")
+  val mst: MSTResult = kruskalMST(CITIES.size, ROADS)
+  IO::println("  " + mst.summary())
+  foreach e: Object in mst.mstEdges() {
+    val edge: Edge = e as Edge
+    val nameU: String = (CITIES.get(edge.u()) as City).name()
+    val nameV: String = (CITIES.get(edge.v()) as City).name()
+    IO::println("    #{nameU.rpad(12)} — #{nameV.rpad(12)} #{edge.weight().lpad(4)} km")
+  }
+  IO::println("")
+
+  // 4. fold: total and average road length
+  val totalKm: Int = ROADS.fold(0) { acc, e -> (acc as Int) + (e as Edge).weight() } as Int
+  val avgKm: Int = totalKm / ROADS.size
+  IO::println("  Total road km : #{totalKm}")
+  IO::println("  Average segment: #{avgKm} km")
+  IO::println("")
+
+  // 5. sortedBy + show cheapest 5 segments
+  IO::println("=== Five Cheapest Road Segments ===")
+  val cheapest: List[Edge] = ROADS.sortedBy { e -> (e as Edge).weight() }
+  var shown: Int = 0
+  foreach e: Edge in cheapest {
+    if shown < 5 {
+      val cu: String = (CITIES.get(e.u()) as City).name()
+      val cv: String = (CITIES.get(e.v()) as City).name()
+      IO::println("  #{(shown+1).lpad(2)}. #{cu.rpad(12)} — #{cv.rpad(12)} #{e.weight().lpad(4)} km")
+      shown = shown + 1
+    }
+  }
+  IO::println("")
+
+  // 6. partition: heavy vs light roads
+  IO::println("=== Road Classification (threshold #{avgKm} km) ===")
+  val parts = ROADS.partition { e -> (e as Edge).weight() > avgKm }
+  val heavy: List[Edge] = parts.get(0)!!
+  val light: List[Edge] = parts.get(1)!!
+  IO::println("  Heavy (> #{avgKm} km): #{heavy.size} segments")
+  IO::println("  Light (<= #{avgKm} km): #{light.size} segments")
+  IO::println("")
+
+  // 7. find: first MST edge longer than 50 km
+  IO::println("=== MST Analysis ===")
+  val firstLong = mst.mstEdges().find { e -> (e as Edge).weight() > 50 }
+  if firstLong != null {
+    IO::println("  First MST edge > 50 km: " + (firstLong as Edge).detail())
+  } else {
+    IO::println("  All MST edges are <= 50 km")
+  }
+  IO::println("")
+
+  // 8. Population total via fold
+  val totalPop: Int = CITIES.fold(0) { acc, c -> (acc as Int) + (c as City).population() } as Int
+  IO::println("  Total network population: #{totalPop}")
+
+  // All MST members from Aldgate (should be all 8 after full MST)
+  val mstDSU = new DSU(CITIES.size)
+  foreach e: Object in mst.mstEdges() {
+    val edge: Edge = e as Edge
+    mstDSU.unite(edge.u(), edge.v())
+  }
+  val fromAldgate: List[Int] = mstDSU.membersOf(0)
+  IO::println("  Cities in Aldgate's MST component (#{fromAldgate.size}):")
+  foreach m: Object in fromAldgate {
+    val idx: Int = m as Int
+    IO::println("    " + (CITIES.get(idx) as City).name())
+  }
+  IO::println("")
+
+  // 9. Social network: friend-group analysis with DSU
+  IO::println("=== Social Network: Six Degrees ===")
+  val people: List[String] = [
+    "Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Hank"
+  ]
+  val social = new DSU(8)
+
+  // Friendship connections
+  social.unite(0, 1); social.unite(1, 2)   // Alice–Bob–Carol
+  social.unite(3, 4); social.unite(4, 5)   // Dave–Eve–Frank
+  social.unite(6, 7)                        // Grace–Hank
+  // Connect two groups at step 2
+  social.unite(2, 3)                        // Carol–Dave bridges groups
+
+  IO::println("  After initial friendships: #{social.componentCount()} component(s)")
+
+  // Connectivity queries (stored as flat index list, processed in pairs)
+  val queries: List[Int] = [0, 5, 0, 6, 3, 0, 7, 6]
+  var qi: Int = 0
+  while qi + 1 < queries.size {
+    val a: Int = queries.get(qi) as Int
+    val b: Int = queries.get(qi + 1) as Int
+    val nameA: String = people.get(a) as String
+    val nameB: String = people.get(b) as String
+    val conn: String = if social.same(a, b) { "connected" } else { "isolated" }
+    IO::println("  #{nameA.rpad(6)} & #{nameB.rpad(6)} -> #{conn}")
+    qi = qi + 2
+  }
+  IO::println("")
+
+  // Alice's component
+  IO::println("  Alice's friend group:")
+  val aliceGroup: List[Int] = social.membersOf(0)
+  foreach m: Object in aliceGroup {
+    val idx: Int = m as Int
+    IO::println("    " + (people.get(idx) as String))
+  }
+  IO::println("")
+
+  // 10. select: classify components by size
+  IO::println("=== Component Size Classification ===")
+  foreach root: Object in [0, 6] {
+    val r: Int = root as Int
+    val members: List[Int] = social.membersOf(r)
+    val sz: Int = members.size
+    val sizeClass: String = select sz {
+      case 1:     "singleton"
+      case 2, 3:  "small"
+      case 4, 5:  "medium"
+      else:       "large"
+    }
+    val rootName: String = people.get(social.find(r)) as String
+    IO::println("  Component rooted near #{rootName}: #{sz} member(s) [#{sizeClass}]")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

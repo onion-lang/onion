@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.125.0] - 2026-09-28
+
 ### Added
 
 - **`run/SensorNetwork.on`** — a 466-line IoT sensor-network simulation, a new domain for the `run/` corpus (a data-carrying enum `SensorKind` (unit/lo/hi/warnLo/warnHi) and `AlertLevel`; an ADT case-enum `ControlAction` (`Increase(delta)`/`Decrease(delta)`/`Maintain`) dispatched via `select`/`is` type patterns; a generic class `RollingBuffer[T]`; records with methods `Sensor`/`Reading`/`Alert`/`ZoneReport`; an interface `AnomalyDetector` implemented by `ThresholdDetector`/`ZScoreDetector`; classes with state `PidController`/`SensorNetwork`; extension methods on `Int` (`stars`/`pct`) and `String` (`padRight`/`truncate`); collection pipelines `map`/`filter`/`fold`/`groupBy`/`find`/`partition`/`sortedBy`/`distinct`/`zip`/`reduce`; nullable `Alert?` with the Elvis operator; closures; string interpolation; `try`/`catch`; a tail-recursive EMA helper; `while`/`foreach` over ranges, lists, and map `(k, v)` entries — rendering an 8-sensor, 288-reading operations report with a PID-controller convergence trace, an EMA calculation, and a parse try/catch demo), added to the `run/` corpus (merged via #1659).

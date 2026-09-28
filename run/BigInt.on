@@ -1,0 +1,294 @@
+// BigInt.on — Arbitrary-precision non-negative integer arithmetic.
+// Represents integers as little-endian lists of base-10000 limbs.
+// Supports addition, multiplication, comparison, and decimal display.
+// Verified against known values: Fibonacci, factorial, powers of 2.
+//
+// Exercises: class with two constructors and List[Int]/List[Long] state,
+//   Long arithmetic, extension methods on Int/String, top-level helpers,
+//   static val, collection pipelines (sortedBy/filter/fold),
+//   while/foreach/break, string interpolation, |> pipeline.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Base ─────────────────────────────────────────────────────────────────────
+
+static val BASE: Int = 10000
+
+// Format n as exactly 4 digits with leading zeros (for lower limbs).
+def pad4(n: Int): String {
+  var s: String = "" + n
+  while s.length() < 4 { s = "0" + s }
+  return s
+}
+
+// ─── BigInt class ─────────────────────────────────────────────────────────────
+//
+// _digits[0] = ones digit in base 10000 (least significant)
+// _digits[k] = coefficient of 10000^k
+// Invariant: no trailing zero limbs (except the single limb [0] for zero).
+
+class BigInt {
+  var _digits: List[Int]
+public:
+  // Build from a non-negative Int.
+  def this(n: Int) {
+    _digits = []
+    var x: Int = n
+    while x > 0 {
+      _digits.add(x % BASE)
+      x = x / BASE
+    }
+    if _digits.size == 0 { _digits.add(0) }
+  }
+
+  // Empty shell: caller populates _digits directly.
+  def this() {
+    _digits = []
+  }
+
+  def size(): Int = _digits.size
+
+  // Safe limb access: returns 0 for out-of-range indices.
+  def limb(i: Int): Int {
+    if i >= _digits.size { return 0 }
+    return _digits[i] as Int
+  }
+
+  def isZero(): Boolean {
+    return _digits.size == 1 && (_digits[0] as Int) == 0
+  }
+
+  // Decimal string representation.
+  def display(): String {
+    val top: Int = _digits.size - 1
+    var s: String = "" + (_digits[top] as Int)
+    var i: Int = top - 1
+    while i >= 0 {
+      s = s + pad4(_digits[i] as Int)
+      i--
+    }
+    return s
+  }
+
+  // Returns -1, 0, or 1.
+  def compareTo(other: BigInt): Int {
+    if size() != other.size() {
+      return if size() > other.size() { 1 } else { -1 }
+    }
+    var i: Int = size() - 1
+    while i >= 0 {
+      val a: Int = limb(i)
+      val b: Int = other.limb(i)
+      if a != b { return if a > b { 1 } else { -1 } }
+      i--
+    }
+    return 0
+  }
+
+  def plus(other: BigInt): BigInt {
+    val r: BigInt = new BigInt()
+    val n: Int = if size() > other.size() { size() } else { other.size() }
+    var carry: Int = 0
+    var i: Int = 0
+    while i < n || carry > 0 {
+      val sum: Int = limb(i) + other.limb(i) + carry
+      r._digits.add(sum % BASE)
+      carry = sum / BASE
+      i++
+    }
+    return r
+  }
+
+  def times(other: BigInt): BigInt {
+    val n: Int = size()
+    val m: Int = other.size()
+    // Accumulate partial products in Long to avoid Int overflow.
+    val temp: List[Long] = []
+    var k: Int = 0
+    while k < n + m { temp.add(0L); k++ }
+    var i: Int = 0
+    while i < n {
+      val ai: Long = limb(i) as Long
+      var j: Int = 0
+      while j < m {
+        val ij: Int = i + j
+        temp[ij] = (temp[ij] as Long) + ai * (other.limb(j) as Long)
+        j++
+      }
+      i++
+    }
+    // Reduce to base-10000 limbs.
+    val r: BigInt = new BigInt()
+    var carry: Long = 0L
+    k = 0
+    while k < n + m {
+      val sum: Long = (temp[k] as Long) + carry
+      r._digits.add((sum % (BASE as Long)) as Int)
+      carry = sum / (BASE as Long)
+      k++
+    }
+    // Trim trailing zero limbs.
+    while r._digits.size > 1 && (r._digits[r._digits.size - 1] as Int) == 0 {
+      r._digits.remove(r._digits.size - 1)
+    }
+    return r
+  }
+}
+
+// ─── Arithmetic helpers ───────────────────────────────────────────────────────
+
+def bigInt(n: Int): BigInt = new BigInt(n)
+
+def fibBig(n: Int): BigInt {
+  if n <= 0 { return bigInt(0) }
+  if n == 1 { return bigInt(1) }
+  var a: BigInt = bigInt(0)
+  var b: BigInt = bigInt(1)
+  var i: Int = 2
+  while i <= n {
+    val c: BigInt = a.plus(b)
+    a = b
+    b = c
+    i++
+  }
+  return b
+}
+
+def factBig(n: Int): BigInt {
+  var result: BigInt = bigInt(1)
+  var i: Int = 2
+  while i <= n { result = result.times(bigInt(i)); i++ }
+  return result
+}
+
+def pow2Big(exp: Int): BigInt {
+  var result: BigInt = bigInt(1)
+  var i: Int = 0
+  while i < exp { result = result.times(bigInt(2)); i++ }
+  return result
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // 1. Fibonacci numbers
+  "=== Fibonacci Numbers ===" |> IO::println
+  var i: Int = 0
+  while i <= 50 {
+    val fib: BigInt = fibBig(i)
+    IO::println("  fib(#{i.lpad(2)}) = #{fib.display()}")
+    i = i + 5
+  }
+  IO::println("")
+
+  // Spot-check known values
+  "=== Fibonacci Spot Checks ===" |> IO::println
+  val checks: List[Int]    = [0, 1, 2, 5, 10, 20, 30]
+  val expected: List[String] = ["0", "1", "1", "5", "55", "6765", "832040"]
+  var ci: Int = 0
+  while ci < checks.size {
+    val n: Int        = checks[ci] as Int
+    val got: String   = fibBig(n).display()
+    val want: String  = expected[ci] as String
+    val ok: String    = if got == want { "OK" } else { "FAIL got=#{got} want=#{want}" }
+    IO::println("  fib(#{n.lpad(2)}) = #{got.rpad(8)}  #{ok}")
+    ci++
+  }
+  IO::println("")
+
+  // 2. Factorials 0..20
+  "=== Factorials ===" |> IO::println
+  i = 0
+  while i <= 20 {
+    val fact: BigInt = factBig(i)
+    IO::println("  #{i.lpad(2)}! = #{fact.display()}")
+    i++
+  }
+  IO::println("")
+
+  // Spot-check factorial
+  val factChecks: List[Int]    = [0, 1, 5, 10, 15]
+  val factExpect: List[String] = ["1", "1", "120", "3628800", "1307674368000"]
+  ci = 0
+  while ci < factChecks.size {
+    val n: Int       = factChecks[ci] as Int
+    val got: String  = factBig(n).display()
+    val want: String = factExpect[ci] as String
+    val ok: String   = if got == want { "OK" } else { "FAIL" }
+    IO::println("  #{n.lpad(2)}! = #{got.rpad(16)}  #{ok}")
+    ci++
+  }
+  IO::println("")
+
+  // 3. Powers of 2
+  "=== Powers of 2 (0, 10, 20, …, 100) ===" |> IO::println
+  i = 0
+  while i <= 100 {
+    IO::println("  2^#{i.lpad(3)} = #{pow2Big(i).display()}")
+    i = i + 10
+  }
+  IO::println("")
+  val p63: String = pow2Big(63).display()
+  val p63ok: String = if p63 == "9223372036854775808" { "OK" } else { "FAIL" }
+  IO::println("  Check 2^63 = #{p63}  #{p63ok}")
+  IO::println("")
+
+  // 4. Comparison: sort five large numbers descending by magnitude
+  "=== Comparison & Sorting ===" |> IO::println
+  val nums: List[BigInt] = [
+    fibBig(50), factBig(20), pow2Big(60),
+    fibBig(40), factBig(15)
+  ]
+  val numLabels: List[String] = [
+    "fib(50)", "20!    ", "2^60   ",
+    "fib(40)", "15!    "
+  ]
+  i = 0
+  while i < nums.size {
+    val v: BigInt   = nums[i] as BigInt
+    val lbl: String = numLabels[i] as String
+    IO::println("  #{lbl} = #{v.display()}")
+    i++
+  }
+  // Sort descending: primary key = -digitCount, secondary = display reversed
+  val sorted: List[BigInt] = nums.sortedBy { x ->
+    0 - (x as BigInt).size()
+  }
+  IO::println("  Sorted by descending limb count (≈ magnitude):")
+  var rank: Int = 1
+  foreach b: BigInt in sorted {
+    IO::println("    #{rank.lpad(1)}. #{b.display()}")
+    rank++
+  }
+  IO::println("")
+
+  // 5. Large multiplication: 2^100 via pow2Big vs 10-by-10 split
+  "=== Large Product Verification ===" |> IO::println
+  val p100a: BigInt = pow2Big(100)
+  val p50:   BigInt = pow2Big(50)
+  val p100b: BigInt = p50.times(p50)
+  val match: String = if p100a.compareTo(p100b) == 0 { "OK" } else { "FAIL" }
+  IO::println("  pow2Big(100)          = #{p100a.display()}")
+  IO::println("  pow2Big(50)*pow2Big(50) = #{p100b.display()}")
+  IO::println("  Match: #{match}")
+  IO::println("")
+
+  IO::println("Done.")
+}

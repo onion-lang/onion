@@ -1,0 +1,573 @@
+// MiniAssembler: a two-pass assembler for a fictional 8-bit CPU.
+//
+// Instruction set:
+//   NOP              -- no operation
+//   LOAD  Rd, imm8   -- Rd = imm8
+//   MOVE  Rd, Rs     -- Rd = Rs
+//   ADD   Rd, Rs     -- Rd = Rd + Rs
+//   SUB   Rd, Rs     -- Rd = Rd - Rs
+//   AND   Rd, Rs     -- Rd = Rd & Rs
+//   OR    Rd, Rs     -- Rd = Rd | Rs
+//   XOR   Rd, Rs     -- Rd = Rd ^ Rs
+//   NOT   Rd         -- Rd = ~Rd
+//   INC   Rd         -- Rd = Rd + 1
+//   DEC   Rd         -- Rd = Rd - 1
+//   CMP   Rd, Rs     -- set flags (Rd - Rs)
+//   JMP   label      -- jump unconditionally
+//   JEQ   label      -- jump if equal
+//   JNE   label      -- jump if not equal
+//   JLT   label      -- jump if less-than
+//   CALL  label      -- call subroutine
+//   RET              -- return from subroutine
+//   PUSH  Rd         -- push register onto stack
+//   POP   Rd         -- pop register from stack
+//   HALT             -- halt execution
+//
+// Registers: R0..R7; SP implicit; PC implicit
+// Memory: 256 bytes
+
+import {
+  java.util.*
+  java.lang.StringBuilder
+}
+
+// ── Value types ───────────────────────────────────────────────────────────────
+
+// An assembled word: opcode byte followed by 0, 1, or 2 operand bytes
+record Word(opcode: Int, op1: Int, op2: Int, size: Int) {
+  public:
+  def bytes(): List[Int] {
+    val result: List[Int] = []
+    result.add(opcode)
+    if size >= 2 { result.add(op1) }
+    if size >= 3 { result.add(op2) }
+    return result
+  }
+  def hex(): String = Word::hexByte(opcode) + (if size >= 2 { " " + Word::hexByte(op1) } else { "" }) +
+                                               (if size >= 3 { " " + Word::hexByte(op2) } else { "" })
+  static def hexByte(b: Int): String {
+    val h: String = Integer::toHexString(b & 0xFF).toUpperCase()
+    return if h.length() == 1 { "0" + h } else { h }
+  }
+}
+
+// A line after first-pass parsing
+record AsmLine(address: Int, label: String?, mnemonic: String, args: List[String])
+
+// Assembly result
+record AsmResult(words: List[Word], symbols: Map[String, Int], errors: List[String])
+
+// ── Assembler ─────────────────────────────────────────────────────────────────
+
+class Assembler {
+  val lines: List[String]
+  val symbols: Map[String, Int]
+  val errors: List[String]
+
+public:
+  def this(src: String) {
+    self.lines = Strings::split(src, "\n")
+    self.symbols = [:]
+    self.errors = []
+  }
+
+  // Pass 1: collect labels and compute addresses
+  def pass1(): List[AsmLine] {
+    val result: List[AsmLine] = []
+    var addr: Int = 0
+    foreach line: String in self.lines {
+      val trimmed: String = line.trim()
+      if trimmed.length() == 0 { continue }
+      if trimmed.startsWith(";") { continue }
+      val noComment: String = Assembler::stripComment(trimmed)
+      val stripped: String = noComment.trim()
+      if stripped.length() == 0 { continue }
+
+      var label: String? = null
+      var rest: String = stripped
+      if stripped.contains(":") {
+        val colonPos: Int = stripped.indexOf(":")
+        val lbl: String = stripped.substring(0, colonPos).trim()
+        if lbl.length() > 0 && !lbl.contains(" ") {
+          label = lbl
+          self.symbols[lbl] = addr
+          rest = stripped.substring(colonPos + 1).trim()
+          if rest.length() == 0 {
+            result.add(new AsmLine(addr, label, "", []))
+            continue
+          }
+        }
+      }
+      val parts: List[String] = Assembler::splitTokens(rest)
+      if parts.size == 0 { continue }
+      val mnemonic: String = (parts[0] as String).toUpperCase()
+      val args: List[String] = []
+      var i: Int = 1
+      while i < parts.size {
+        val raw: String = parts[i] as String
+        val tok: String = raw.replace(",", "").trim()
+        if tok.length() > 0 { args.add(tok) }
+        i++
+      }
+      val sz: Int = Assembler::instrSize(mnemonic)
+      result.add(new AsmLine(addr, label, mnemonic, args))
+      addr = addr + sz
+    }
+    return result
+  }
+
+  // Pass 2: encode instructions to Words
+  def pass2(parsed: List[AsmLine]): List[Word] {
+    val result: List[Word] = []
+    foreach line: AsmLine in parsed {
+      if line.mnemonic().length() == 0 { continue }
+      val word: Word? = self.encode(line)
+      if word != null { result.add(word) }
+    }
+    return result
+  }
+
+  def encode(line: AsmLine): Word? {
+    val m: String = line.mnemonic()
+    val args: List[String] = line.args()
+    return select m {
+      case "NOP":  new Word(0x00, 0, 0, 1)
+      case "HALT": new Word(0x01, 0, 0, 1)
+      case "RET":  new Word(0x02, 0, 0, 1)
+      case "LOAD":
+        if args.size < 2 { self.errWord(line, "LOAD Rd, imm8") }
+        else {
+          val rd: Int = Assembler::parseReg(args[0] as String)
+          val imm: Int = Assembler::parseImm(args[1] as String)
+          if rd < 0 || imm < 0 { self.errWord(line, "bad LOAD args") }
+          else { new Word(0x10 | rd, imm, 0, 2) }
+        }
+      case "MOVE":
+        if args.size < 2 { self.errWord(line, "MOVE Rd, Rs") }
+        else {
+          val rd: Int = Assembler::parseReg(args[0] as String)
+          val rs: Int = Assembler::parseReg(args[1] as String)
+          if rd < 0 || rs < 0 { self.errWord(line, "bad MOVE args") }
+          else { new Word(0x18, (rd << 4) | rs, 0, 2) }
+        }
+      case "ADD":  self.encodeRR(line, 0x20)
+      case "SUB":  self.encodeRR(line, 0x28)
+      case "AND":  self.encodeRR(line, 0x30)
+      case "OR":   self.encodeRR(line, 0x38)
+      case "XOR":  self.encodeRR(line, 0x40)
+      case "CMP":  self.encodeRR(line, 0x48)
+      case "NOT":  self.encodeR1(line, 0x50)
+      case "INC":  self.encodeR1(line, 0x58)
+      case "DEC":  self.encodeR1(line, 0x60)
+      case "PUSH": self.encodeR1(line, 0x68)
+      case "POP":  self.encodeR1(line, 0x70)
+      case "JMP":  self.encodeJmp(line, 0xE0)
+      case "JEQ":  self.encodeJmp(line, 0xE1)
+      case "JNE":  self.encodeJmp(line, 0xE2)
+      case "JLT":  self.encodeJmp(line, 0xE3)
+      case "CALL": self.encodeJmp(line, 0xE8)
+      else: {
+        self.errors.add("unknown mnemonic: " + m + " at address " + line.address())
+        null
+      }
+    }
+  }
+
+  def encodeRR(line: AsmLine, op: Int): Word? {
+    val args: List[String] = line.args()
+    return if args.size < 2 { self.errWord(line, line.mnemonic() + " Rd, Rs") }
+    else {
+      val rd: Int = Assembler::parseReg(args[0] as String)
+      val rs: Int = Assembler::parseReg(args[1] as String)
+      if rd < 0 || rs < 0 { self.errWord(line, "bad register") }
+      else { new Word(op, (rd << 4) | rs, 0, 2) }
+    }
+  }
+
+  def encodeR1(line: AsmLine, op: Int): Word? {
+    val args: List[String] = line.args()
+    return if args.size < 1 { self.errWord(line, line.mnemonic() + " Rd") }
+    else {
+      val rd: Int = Assembler::parseReg(args[0] as String)
+      if rd < 0 { self.errWord(line, "bad register") }
+      else { new Word(op | rd, 0, 0, 1) }
+    }
+  }
+
+  def encodeJmp(line: AsmLine, op: Int): Word? {
+    val args: List[String] = line.args()
+    return if args.size < 1 { self.errWord(line, line.mnemonic() + " label") }
+    else {
+      val lbl: String = args[0] as String
+      val addr: Int? = self.symbols.get(lbl) as Int?
+      if addr == null {
+        self.errors.add("undefined label: " + lbl)
+        null
+      } else {
+        new Word(op, addr, 0, 2)
+      }
+    }
+  }
+
+  def errWord(line: AsmLine, msg: String): Word? {
+    self.errors.add("[addr " + Word::hexByte(line.address()) + "] " + msg)
+    return null
+  }
+
+  def assemble(): AsmResult {
+    val parsed: List[AsmLine] = self.pass1()
+    val words: List[Word] = self.pass2(parsed)
+    return new AsmResult(words, self.symbols, self.errors)
+  }
+
+  static def instrSize(m: String): Int {
+    return select m {
+      case "NOP", "HALT", "RET":                   1
+      case "NOT", "INC", "DEC", "PUSH", "POP":     1
+      case "LOAD", "MOVE", "ADD", "SUB", "AND", "OR", "XOR", "CMP": 2
+      case "JMP", "JEQ", "JNE", "JLT", "CALL":    2
+      else:                                         0
+    }
+  }
+
+  static def parseReg(s: String): Int {
+    val upper: String = s.toUpperCase()
+    return if upper.startsWith("R") && upper.length() == 2 {
+      val digit: Int = upper.charAt(1) - 48
+      if digit >= 0 && digit <= 7 { digit } else { -1 }
+    } else { -1 }
+  }
+
+  static def parseImm(s: String): Int {
+    return try {
+      if s.startsWith("0x") || s.startsWith("0X") {
+        Integer::parseInt(s.substring(2), 16)
+      } else {
+        Integer::parseInt(s)
+      }
+    } catch e: Exception {
+      -1
+    }
+  }
+
+  static def stripComment(line: String): String {
+    val pos: Int = line.indexOf(";")
+    return if pos < 0 { line } else { line.substring(0, pos) }
+  }
+
+  static def splitTokens(line: String): List[String] {
+    val result: List[String] = []
+    val parts: List[String] = Strings::split(line, " ")
+    foreach p: String in parts {
+      val t: String = p.trim()
+      if t.length() > 0 { result.add(t) }
+    }
+    return result
+  }
+}
+
+// ── Disassembler ──────────────────────────────────────────────────────────────
+
+class Disassembler {
+  val mem: List[Int]
+
+public:
+  def this(words: List[Word]) {
+    self.mem = []
+    foreach w: Word in words {
+      foreach b: Int in w.bytes() { self.mem.add(b) }
+    }
+  }
+
+  def disassemble(): List[String] {
+    val result: List[String] = []
+    var pc: Int = 0
+    while pc < self.mem.size {
+      val op: Int = self.mem[pc] as Int
+      result.add(Word::hexByte(pc) + ": " + self.decode(op, pc))
+      pc = pc + Disassembler::opSize(op)
+    }
+    return result
+  }
+
+  def decode(op: Int, pc: Int): String {
+    val hi: Int = op & 0xF8
+    val lo: Int = op & 0x07
+    val b1: Int = if pc + 1 < self.mem.size { self.mem[pc + 1] as Int } else { 0 }
+    return select hi {
+      case 0x00: select op {
+        case 0x00: "NOP"
+        case 0x01: "HALT"
+        case 0x02: "RET"
+        else:      "DB " + Word::hexByte(op)
+      }
+      case 0x10: "LOAD  R" + lo + ", " + Word::hexByte(b1)
+      case 0x18: "MOVE  R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x20: "ADD   R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x28: "SUB   R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x30: "AND   R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x38: "OR    R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x40: "XOR   R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x48: "CMP   R" + ((b1 >> 4) & 0x7) + ", R" + (b1 & 0x7)
+      case 0x50: "NOT   R" + lo
+      case 0x58: "INC   R" + lo
+      case 0x60: "DEC   R" + lo
+      case 0x68: "PUSH  R" + lo
+      case 0x70: "POP   R" + lo
+      case 0xE0: select op {
+        case 0xE0: "JMP   " + Word::hexByte(b1)
+        case 0xE1: "JEQ   " + Word::hexByte(b1)
+        case 0xE2: "JNE   " + Word::hexByte(b1)
+        case 0xE3: "JLT   " + Word::hexByte(b1)
+        case 0xE8: "CALL  " + Word::hexByte(b1)
+        else:      "DB " + Word::hexByte(op)
+      }
+      else: "DB " + Word::hexByte(op)
+    }
+  }
+
+  static def opSize(op: Int): Int {
+    val hi: Int = op & 0xF8
+    return select hi {
+      case 0x50, 0x58, 0x60, 0x68, 0x70: 1
+      case 0x00: 1
+      else: 2
+    }
+  }
+}
+
+// ── Simulator ─────────────────────────────────────────────────────────────────
+
+class Simulator {
+  val regs: Int[]
+  val mem:  Int[]
+  val stack: List[Int]
+  var pc: Int
+  var flagEQ: Boolean
+  var flagLT: Boolean
+  var halted: Boolean
+  var steps: Int
+
+public:
+  def this(image: List[Int]) {
+    self.regs  = new Int[8]
+    self.mem   = new Int[256]
+    self.stack = []
+    self.pc    = 0
+    self.flagEQ = false
+    self.flagLT = false
+    self.halted = false
+    self.steps  = 0
+    var i: Int = 0
+    while i < image.size && i < 256 {
+      self.mem[i] = image[i] as Int
+      i++
+    }
+  }
+
+  def run(maxSteps: Int): void {
+    while !self.halted && self.steps < maxSteps { self.step() }
+  }
+
+  def stepsCount(): Int = self.steps
+  def isHalted(): Boolean = self.halted
+
+  def step(): void {
+    if self.pc >= 256 { self.halted = true; return }
+    val op: Int = self.mem[self.pc]
+    val hi: Int = op & 0xF8
+    val lo: Int = op & 0x07
+    self.steps++
+
+    if hi == 0x00 {
+      if op == 0x00 { self.pc++ }
+      else if op == 0x01 { self.halted = true }
+      else if op == 0x02 {
+        if self.stack.size > 0 {
+          self.pc = self.stack[self.stack.size - 1] as Int
+          self.stack.remove(self.stack.size - 1)
+        } else {
+          self.halted = true
+        }
+      } else { self.pc++ }
+    } else if hi == 0x10 {
+      self.regs[lo] = self.mem[self.pc + 1]
+      self.pc = self.pc + 2
+    } else if hi == 0x18 {
+      val rr: Int = self.mem[self.pc + 1]
+      self.regs[(rr >> 4) & 0x7] = self.regs[rr & 0x7]
+      self.pc = self.pc + 2
+    } else if hi == 0x20 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      self.regs[d] = (self.regs[d] + self.regs[rr & 0x7]) & 0xFF
+      self.pc = self.pc + 2
+    } else if hi == 0x28 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      self.regs[d] = (self.regs[d] - self.regs[rr & 0x7]) & 0xFF
+      self.pc = self.pc + 2
+    } else if hi == 0x30 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      self.regs[d] = self.regs[d] & self.regs[rr & 0x7]
+      self.pc = self.pc + 2
+    } else if hi == 0x38 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      self.regs[d] = self.regs[d] | self.regs[rr & 0x7]
+      self.pc = self.pc + 2
+    } else if hi == 0x40 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      self.regs[d] = self.regs[d] ^ self.regs[rr & 0x7]
+      self.pc = self.pc + 2
+    } else if hi == 0x48 {
+      val rr: Int = self.mem[self.pc + 1]
+      val d: Int = (rr >> 4) & 0x7
+      val diff: Int = self.regs[d] - self.regs[rr & 0x7]
+      self.flagEQ = diff == 0
+      self.flagLT = diff < 0
+      self.pc = self.pc + 2
+    } else if hi == 0x50 {
+      self.regs[lo] = (~self.regs[lo]) & 0xFF; self.pc++
+    } else if hi == 0x58 {
+      self.regs[lo] = (self.regs[lo] + 1) & 0xFF; self.pc++
+    } else if hi == 0x60 {
+      self.regs[lo] = (self.regs[lo] - 1) & 0xFF; self.pc++
+    } else if hi == 0x68 {
+      self.stack.add(self.regs[lo]); self.pc++
+    } else if hi == 0x70 {
+      if self.stack.size > 0 {
+        self.regs[lo] = self.stack[self.stack.size - 1] as Int
+        self.stack.remove(self.stack.size - 1)
+      }
+      self.pc++
+    } else if hi == 0xE0 {
+      val tgt: Int = self.mem[self.pc + 1]
+      if op == 0xE0 {
+        self.pc = tgt
+      } else if op == 0xE1 {
+        if self.flagEQ { self.pc = tgt } else { self.pc = self.pc + 2 }
+      } else if op == 0xE2 {
+        if !self.flagEQ { self.pc = tgt } else { self.pc = self.pc + 2 }
+      } else if op == 0xE3 {
+        if self.flagLT { self.pc = tgt } else { self.pc = self.pc + 2 }
+      } else if op == 0xE8 {
+        self.stack.add(self.pc + 2); self.pc = tgt
+      } else { self.pc++ }
+    } else { self.pc++ }
+  }
+
+  def dumpRegs(): String {
+    val parts: List[String] = []
+    var i: Int = 0
+    while i < 8 {
+      parts.add("R" + i + "=" + Word::hexByte(self.regs[i]))
+      i++
+    }
+    val sb: StringBuilder = new StringBuilder()
+    var j: Int = 0
+    while j < parts.size {
+      if j > 0 { sb.append("  ") }
+      sb.append(parts[j] as String)
+      j++
+    }
+    return sb.toString()
+  }
+}
+
+// ── Sample programs ───────────────────────────────────────────────────────────
+
+def fibSrc(): String =
+  "; Fibonacci: iterative, R1 = fib(10) after running\n" +
+  "        LOAD R1, 0        ; R1 = fib(0) = 0\n" +
+  "        LOAD R2, 1        ; R2 = fib(1) = 1\n" +
+  "        LOAD R0, 10       ; n  = 10\n" +
+  "        LOAD R3, 0        ; counter = 0\n" +
+  "loop:   CMP  R3, R0\n" +
+  "        JEQ  done\n" +
+  "        MOVE R4, R2\n" +
+  "        ADD  R2, R1\n" +
+  "        MOVE R1, R4\n" +
+  "        INC  R3\n" +
+  "        JMP  loop\n" +
+  "done:   HALT\n"
+
+def sumSrc(): String =
+  "; sum 1..8 into R0, R0 should be 36\n" +
+  "  LOAD R0, 0\n" +
+  "  LOAD R1, 1\n" +
+  "  LOAD R2, 8\n" +
+  "again:\n" +
+  "  ADD  R0, R1\n" +
+  "  INC  R1\n" +
+  "  CMP  R1, R2\n" +
+  "  JEQ  finish\n" +
+  "  JLT  again\n" +
+  "finish:\n" +
+  "  ADD  R0, R1\n" +
+  "  HALT\n"
+
+def bitwiseSrc(): String =
+  "; bitwise ops: R0 = 0xAB & 0x0F  => 0x0B; R1 = ~0x0B & 0xFF => 0xF4\n" +
+  "  LOAD R0, 0xAB\n" +
+  "  LOAD R5, 0x0F\n" +
+  "  AND  R0, R5\n" +
+  "  NOT  R1\n" +
+  "  LOAD R1, 0x0B\n" +
+  "  NOT  R1\n" +
+  "  HALT\n"
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+def runDemo(title: String, src: String): void {
+  IO::println("=== " + title + " ===")
+  val asm: Assembler = new Assembler(src)
+  val result: AsmResult = asm.assemble()
+
+  if result.errors().size > 0 {
+    IO::println("Assembly ERRORS:")
+    foreach e: String in result.errors() { IO::println("  " + e) }
+    return
+  }
+
+  IO::println("Symbols:")
+  foreach (label, addr) in result.symbols() {
+    IO::println("  " + label + " -> " + Word::hexByte(addr as Int))
+  }
+
+  val words: List[Word] = result.words()
+  IO::println("Assembled (" + words.size + " words):")
+  var offset: Int = 0
+  foreach w: Word in words {
+    IO::println("  [" + Word::hexByte(offset) + "] " + w.hex())
+    offset = offset + w.size()
+  }
+
+  val dis: Disassembler = new Disassembler(words)
+  IO::println("Disassembly:")
+  foreach line: String in dis.disassemble() { IO::println("  " + line) }
+
+  val image: List[Int] = []
+  foreach w: Word in words {
+    foreach b: Int in w.bytes() { image.add(b) }
+  }
+  val sim: Simulator = new Simulator(image)
+  sim.run(10000)
+  IO::println("After " + sim.stepsCount() + " steps  halted=" + sim.isHalted())
+  IO::println("Registers: " + sim.dumpRegs())
+  IO::println("")
+}
+
+def main(): void {
+  runDemo("Fibonacci fib(10) [R1=55]", fibSrc())
+  runDemo("Sum 1..8 [R0=36]",          sumSrc())
+  runDemo("Bitwise [R0=0B R1=F4]",     bitwiseSrc())
+
+  IO::println("=== Error handling ===")
+  val bad: Assembler = new Assembler("  LOAD R9, 5\n  FOOBAR\n  JMP undefined\n")
+  val res: AsmResult = bad.assemble()
+  IO::println("Errors: " + res.errors().size)
+  foreach e: String in res.errors() { IO::println("  " + e) }
+}

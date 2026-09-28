@@ -1,0 +1,256 @@
+// WordleSolver.on — frequency-guided Wordle solver simulation.
+// Exercises: ADT case-enums with methods (LetterResult), records (Slot, Round),
+// typed collection pipelines (filter/map/fold/sortedBy), extension Int,
+// closures, string interpolation, foreach (ranges + lists),
+// select/type-pattern matching, while loops, if-else expressions,
+// nullable types, Int[] arrays for mutable state.
+
+import {
+  java.util.ArrayList
+  java.lang.Math
+}
+
+// ─── How a single letter was scored ────────────────────────────────────────
+enum LetterResult {
+  case Correct    // right letter, right position
+  case Misplaced  // right letter, wrong position
+  case Absent     // letter not in word
+public:
+  def symbol(): String = select this {
+    case c is Correct:   "G"
+    case m is Misplaced: "Y"
+    case a is Absent:    "."
+  }
+  def color(): String = select this {
+    case c is Correct:   "green "
+    case m is Misplaced: "yellow"
+    case a is Absent:    "grey  "
+  }
+}
+
+// ─── One scored position in a guess ────────────────────────────────────────
+record Slot(letter: Char, result: LetterResult) {
+public:
+  def render(): String = "#{letter()}/#{result().symbol()}"
+}
+
+// ─── Summary of one solver round ───────────────────────────────────────────
+record Round(number: Int, guess: String, slots: List[Slot], remaining: Int)
+
+// ─── Compute Wordle feedback for a guess against a target ──────────────────
+def computeFeedback(guess: String, target: String): List[Slot] {
+  val state: Int[]    = new Int[5]      // 0=absent 1=correct 2=misplaced
+  val used: Boolean[] = new Boolean[5]
+
+  // Pass 1: exact-position matches
+  for var i: Int = 0; i < 5; i++ {
+    if guess.charAt(i) == target.charAt(i) {
+      state[i] = 1
+      used[i]  = true
+    }
+  }
+
+  // Pass 2: in-word but wrong-position
+  for var i: Int = 0; i < 5; i++ {
+    if state[i] == 0 {
+      var j: Int = 0
+      while j < 5 {
+        if !used[j] && guess.charAt(i) == target.charAt(j) {
+          state[i] = 2
+          used[j]  = true
+          j = 5   // break
+        } else {
+          j++
+        }
+      }
+    }
+  }
+
+  val slots: List[Slot] = []
+  for var i: Int = 0; i < 5; i++ {
+    val r: LetterResult =
+      if state[i] == 1 { new Correct() }
+      else if state[i] == 2 { new Misplaced() }
+      else { new Absent() }
+    slots.add(new Slot(guess.charAt(i), r))
+  }
+  return slots
+}
+
+// ─── True if two feedbacks have identical per-slot LetterResult ─────────────
+def feedbackEq(f1: List[Slot], f2: List[Slot]): Boolean {
+  var i: Int = 0
+  while i < 5 {
+    val r1: LetterResult = (f1[i] as Slot).result()
+    val r2: LetterResult = (f2[i] as Slot).result()
+    val same: Boolean =
+      (r1 is Correct   && r2 is Correct)   ||
+      (r1 is Misplaced && r2 is Misplaced) ||
+      (r1 is Absent    && r2 is Absent)
+    if !same { return false }
+    i++
+  }
+  return true
+}
+
+// ─── True if every slot is Correct ─────────────────────────────────────────
+def isSolved(slots: List[Slot]): Boolean {
+  var i: Int = 0
+  while i < 5 {
+    if !((slots[i] as Slot).result() is Correct) { return false }
+    i++
+  }
+  return true
+}
+
+// ─── Render a guess + its feedback on one line ──────────────────────────────
+def renderRound(round: Round): String {
+  var bar: String = ""
+  foreach s: Slot in round.slots() { bar = bar + s.render() }
+  return "  [#{round.number()}] #{round.guess()} #{bar}  pool=#{round.remaining()}"
+}
+
+// ─── Compute letter-frequency score for a word ──────────────────────────────
+def wordScore(word: String, freqs: Int[]): Int {
+  val seen: Boolean[] = new Boolean[26]
+  var total: Int = 0
+  for var i: Int = 0; i < word.length; i++ {
+    val idx: Int = (word.charAt(i) as Int) - ('a' as Int)
+    if !seen[idx] {
+      seen[idx] = true
+      total     = total + freqs[idx]
+    }
+  }
+  return total
+}
+
+// ─── Pick the highest-scoring candidate by letter frequency ─────────────────
+def pickBest(candidates: List[String]): String {
+  val freqs: Int[] = new Int[26]
+  foreach w: String in candidates {
+    for var i: Int = 0; i < w.length; i++ {
+      val idx: Int = (w.charAt(i) as Int) - ('a' as Int)
+      freqs[idx] = freqs[idx] + 1
+    }
+  }
+  var best: String  = candidates[0] as String
+  var bestSc: Int = wordScore(best, freqs)
+  foreach w: String in candidates {
+    val sc: Int = wordScore(w, freqs)
+    if sc > bestSc { bestSc = sc; best = w }
+  }
+  return best
+}
+
+// ─── Five-letter word list ───────────────────────────────────────────────────
+def makeWords(): List[String] = [
+    "crane", "trace", "slate", "crate", "irate", "arise", "raise", "stare",
+    "snare", "share", "shore", "score", "store", "stove", "drove", "grope",
+    "trope", "prose", "those", "phone", "drone", "prone", "ozone", "clone",
+    "stone", "shone", "atone", "alone", "brine", "spine", "swine", "whine",
+    "twine", "shine", "diner", "liner", "miner", "timer", "tiger", "rider",
+    "cider", "elder", "under", "inter", "outer", "after", "ultra", "extra",
+    "intra", "enter", "trend", "blend", "frank", "brand", "plant", "bland",
+    "blank", "black", "block", "clock", "float", "bloat", "coast", "toast",
+    "roast", "feast", "beast", "least", "reach", "beach", "teach", "peach",
+    "place", "grace", "space", "brace", "price", "twice", "voice", "noise",
+    "point", "liver", "river", "given", "risen", "blown", "flown", "grown",
+    "known", "shown", "shorn", "sworn", "scorn", "stern", "birth", "mirth",
+    "worth", "north", "forth", "sport", "short", "snort", "exert", "inert"
+]
+
+// ─── Run the solver against one target word ──────────────────────────────────
+def solve(target: String, allWords: List[String]): List[Round] {
+  var pool: List[String] = []
+  foreach w: String in allWords { pool.add(w) }
+
+  val history: List[Round] = []
+  val firstGuess = "crane"
+  val maxRounds  = 6
+
+  for var rn: Int = 1; rn <= maxRounds; rn++ {
+    val guess: String = if rn == 1 { firstGuess } else { pickBest(pool) }
+    val slots: List[Slot] = computeFeedback(guess, target)
+    val rd: Round = new Round(rn, guess, slots, pool.size)
+    history.add(rd)
+
+    if isSolved(slots) { return history }
+
+    // Filter: keep only candidates whose feedback matches
+    val pg: String     = guess
+    val ps: List[Slot] = slots
+    val next: List[String] = []
+    foreach w: String in pool {
+      val wSlots: List[Slot] = computeFeedback(pg, w)
+      if feedbackEq(wSlots, ps) { next.add(w) }
+    }
+    pool = next
+  }
+  return history
+}
+
+// ─── Letter-result histogram across all rounds ───────────────────────────────
+def resultStats(histories: List[List[Round]]): String {
+  var correct: Int   = 0
+  var misplaced: Int = 0
+  var absent: Int    = 0
+  foreach h: List[Round] in histories {
+    foreach r: Round in h {
+      foreach s: Slot in r.slots() {
+        select s.result() {
+          case c is Correct:   correct   = correct   + 1
+          case m is Misplaced: misplaced = misplaced + 1
+          case a is Absent:    absent    = absent    + 1
+        }
+      }
+    }
+  }
+  val total: Int = correct + misplaced + absent
+  if total == 0 { return "no data" }
+  val cp: Int = (correct   * 100) / total
+  val mp: Int = (misplaced * 100) / total
+  val ap: Int = (absent    * 100) / total
+  return "G=#{cp}%  Y=#{mp}%  .=#{ap}%"
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+def main(): void {
+  val words: List[String] = makeWords()
+  IO::println("=== Wordle Solver  |  dictionary: #{words.size} words  |  opener: crane ===")
+  IO::println("")
+
+  val targets: List[String] = ["stone", "cider", "after", "brine", "elder", "alone",
+                                "black", "coast", "voice", "inter", "risen", "north"]
+  var totalRounds: Int = 0
+  var solved: Int      = 0
+  val allHistories: List[List[Round]] = []
+
+  foreach target: String in targets {
+    IO::println("Target: #{target}")
+    val history: List[Round] = solve(target, words)
+    allHistories.add(history)
+
+    val last: Round    = history[history.size - 1] as Round
+    val didSolve: Boolean = isSolved(last.slots())
+
+    foreach r: Round in history { IO::println(renderRound(r)) }
+
+    if didSolve {
+      IO::println("  → ✓ solved in #{history.size} guess(es)")
+      totalRounds = totalRounds + history.size
+      solved      = solved + 1
+    } else {
+      IO::println("  → ✗ failed (>#{history.size})")
+    }
+    IO::println("")
+  }
+
+  val total: Int = targets.size
+  val pct: Int   = if total > 0 { (solved * 100) / total } else { 0 }
+  val avgN: Int  = if solved > 0 { (totalRounds * 10) / solved } else { 0 }
+  val avg: String = if solved > 0 { "#{avgN / 10}.#{avgN % 10}" } else { "n/a" }
+
+  IO::println("=== Summary ===")
+  IO::println("Solved: #{solved}/#{total}  (#{pct}%)   avg guesses: #{avg}")
+  IO::println("Slot breakdown: #{resultStats(allHistories)}")
+}

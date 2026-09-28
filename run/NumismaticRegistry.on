@@ -1,0 +1,403 @@
+// NumismaticRegistry.on — numismatic (coin) collection management system
+//
+// Features exercised: data-carrying enum (MetalComposition), plain enum (Condition),
+// ADT case-enum (CoinType — 4 cases with typed fields), records with example clauses
+// and methods (Coin, CollectionEntry), interface (Summarizable), class (CoinCollection),
+// extension methods on Double/String/Int, collection pipelines (filter/map/fold/
+// sortedBy/groupBy/find/partition/zip), select/pattern matching on ADT and plain
+// enum cases, nullable handling, closures, string interpolation, recursion, while,
+// foreach over ranges/maps/typed lists.
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
+    val r: Long = Math::round(self * 100.0)
+    val ip: Long = r / 100L
+    val fp: Long = r % 100L
+    return "" + ip + "." + (if fp < 10L { "0" + fp } else { "" + fp })
+  }
+  def fmt0(): String = "" + Math::round(self)
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ── Plain enum: Condition ─────────────────────────────────────────────────────
+
+enum Condition {
+  Poor, Fair, Good, VeryGood, Fine, VeryFine, ExtrFine, AboutUnc, MintState
+}
+
+// ── Data-carrying enum: MetalComposition ──────────────────────────────────────
+
+enum MetalComposition(symbol: String, purity: Double) {
+  Gold("Au",    91.7),
+  Silver("Ag",  90.0),
+  Copper("Cu",  95.0),
+  NiCu("Ni-Cu", 75.0),
+  Clad("Clad",   0.0)
+}
+
+// ── ADT enum: CoinType ────────────────────────────────────────────────────────
+
+enum CoinType {
+  case Circulation(country: String, denomination: String)
+  case Commemorative(country: String, theme: String)
+  case Bullion(metalName: String, fineOz: Double)
+  case ProofIssue(country: String, series: String, mintage: Int)
+public:
+  def typeTag(): String = select this {
+    case c  is Circulation:   "CIRC"
+    case co is Commemorative: "COMM"
+    case b  is Bullion:       "BULL"
+    case p  is ProofIssue:    "PRUF"
+  }
+  def coinCountry(): String = select this {
+    case c  is Circulation:   c.country()
+    case co is Commemorative: co.country()
+    case b  is Bullion:       "Intl"
+    case p  is ProofIssue:    p.country()
+  }
+  def detail(): String = select this {
+    case c  is Circulation:   c.denomination()
+    case co is Commemorative: co.theme()
+    case b  is Bullion:       b.fineOz().fmt2() + " ozt " + b.metalName()
+    case p  is ProofIssue:    p.series() + " (" + p.mintage() + " minted)"
+  }
+}
+
+// ── Record: Coin ──────────────────────────────────────────────────────────────
+
+record Coin(
+  id:          String,
+  year:        Int,
+  name:        String,
+  metal:       MetalComposition,
+  coinType:    CoinType,
+  condition:   Condition,
+  weightGrams: Double,
+  faceValue:   Double
+) {
+  example {
+    new Coin("T1", 1921, "Test", MetalComposition::Silver,
+      new Circulation("USA", "1 Dollar"), Condition::Fine, 26.73, 1.0).year() == 1921
+  }
+  example {
+    new Coin("T2", 1924, "Test2", MetalComposition::Gold,
+      new Circulation("USA", "20 Dollars"), Condition::ExtrFine, 33.44, 20.0)
+        .isCollectorsGrade()
+  }
+public:
+  def decade(): String {
+    val d: Int = (year() / 10) * 10
+    return d + "s"
+  }
+  def conditionCode(): String = select condition() {
+    case Condition::Poor:      "PO"
+    case Condition::Fair:      "FR"
+    case Condition::Good:      "G"
+    case Condition::VeryGood:  "VG"
+    case Condition::Fine:      "F"
+    case Condition::VeryFine:  "VF"
+    case Condition::ExtrFine:  "EF"
+    case Condition::AboutUnc:  "AU"
+    case Condition::MintState: "MS"
+    else: "?"
+  }
+  def isCollectorsGrade(): Boolean =
+    condition().ordinal() >= Condition::Fine.ordinal()
+  def shortRow(): String =
+    id().rpad(6) + year().lpad(4) + "  " + name().rpad(26) +
+    metal().symbol().rpad(7) + conditionCode().rpad(5)
+}
+
+// ── Record: CollectionEntry ───────────────────────────────────────────────────
+
+record CollectionEntry(
+  coin:          Coin,
+  purchasePrice: Double,
+  purchaseYear:  Int,
+  currentValue:  Double
+) {
+  example {
+    new CollectionEntry(
+      new Coin("T3", 1921, "Morgan", MetalComposition::Silver,
+        new Circulation("USA", "1 Dollar"), Condition::VeryFine, 26.73, 1.0),
+      35.0, 2008, 125.0
+    ).profit() == 90.0
+  }
+public:
+  def profit(): Double    = currentValue() - purchasePrice()
+  def roi(): Double       =
+    if purchasePrice() > 0.0 { profit() / purchasePrice() * 100.0 } else { 0.0 }
+  def holdYears(): Int    = 2026 - purchaseYear()
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+  def itemCount(): Int
+}
+
+// ── Class: CoinCollection ─────────────────────────────────────────────────────
+
+class CoinCollection conforms Summarizable {
+  val collName: String
+  val entries:  List[CollectionEntry]
+
+public:
+  def this(n: String) {
+    this.collName = n
+    this.entries  = []
+  }
+
+  def getEntries(): List[CollectionEntry] = entries
+  def add(e: CollectionEntry): void       { entries.add(e) }
+  def itemCount(): Int                    = entries.size
+  def summary(): String                   = "#{collName} — #{entries.size} coins"
+
+  def totalPurchased(): Double =
+    entries.fold(0.0) { acc, e ->
+      (acc as Double) + (e as CollectionEntry).purchasePrice()
+    } as Double
+
+  def totalValue(): Double =
+    entries.fold(0.0) { acc, e ->
+      (acc as Double) + (e as CollectionEntry).currentValue()
+    } as Double
+
+  def totalProfit(): Double = totalValue() - totalPurchased()
+
+  def sortedByValue(): List[CollectionEntry] =
+    entries.sortedBy { e -> 0.0 - (e as CollectionEntry).currentValue() }
+           .map { e -> e as CollectionEntry }
+
+  def sortedByRoi(): List[CollectionEntry] =
+    entries.sortedBy { e -> 0.0 - (e as CollectionEntry).roi() }
+           .map { e -> e as CollectionEntry }
+}
+
+// ── Recursion: sum current values ─────────────────────────────────────────────
+
+def sumValues(list: List[CollectionEntry], idx: Int): Double {
+  if idx >= list.size { return 0.0 }
+  return (list.get(idx) as CollectionEntry).currentValue() + sumValues(list, idx + 1)
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+val registry = new CoinCollection("Avery's Numismatic Portfolio")
+
+foreach e: CollectionEntry in [
+  new CollectionEntry(
+    new Coin("C001", 1921, "Morgan Silver Dollar",
+      MetalComposition::Silver, new Circulation("USA", "1 Dollar"),
+      Condition::VeryFine, 26.73, 1.0),
+    35.0, 2008, 125.0),
+  new CollectionEntry(
+    new Coin("C002", 1924, "Saint-Gaudens Eagle",
+      MetalComposition::Gold, new Circulation("USA", "20 Dollars"),
+      Condition::ExtrFine, 33.44, 20.0),
+    950.0, 2005, 2400.0),
+  new CollectionEntry(
+    new Coin("C003", 1909, "Lincoln Cent VDB",
+      MetalComposition::Copper, new Circulation("USA", "1 Cent"),
+      Condition::Fine, 3.11, 0.01),
+    120.0, 2015, 310.0),
+  new CollectionEntry(
+    new Coin("C004", 1964, "Kennedy Half Dollar",
+      MetalComposition::Silver, new Commemorative("USA", "JFK Memorial"),
+      Condition::MintState, 12.5, 0.5),
+    18.0, 2018, 32.0),
+  new CollectionEntry(
+    new Coin("C005", 2020, "American Silver Eagle",
+      MetalComposition::Silver, new Bullion("Silver", 1.0),
+      Condition::MintState, 31.1, 1.0),
+    28.0, 2020, 34.0),
+  new CollectionEntry(
+    new Coin("C006", 1894, "British Gold Sovereign",
+      MetalComposition::Gold, new Circulation("UK", "1 Sovereign"),
+      Condition::VeryFine, 7.99, 1.0),
+    420.0, 2010, 680.0),
+  new CollectionEntry(
+    new Coin("C007", 1936, "Canadian Silver Dollar",
+      MetalComposition::Silver, new Circulation("Canada", "1 Dollar"),
+      Condition::AboutUnc, 23.33, 1.0),
+    85.0, 2016, 185.0),
+  new CollectionEntry(
+    new Coin("C008", 2019, "Gold Maple Leaf",
+      MetalComposition::Gold, new Bullion("Gold", 1.0),
+      Condition::MintState, 31.1, 50.0),
+    1850.0, 2019, 2200.0),
+  new CollectionEntry(
+    new Coin("C009", 1999, "Delaware State Quarter",
+      MetalComposition::Clad, new Commemorative("USA", "50 States Series"),
+      Condition::MintState, 5.67, 0.25),
+    8.0, 2021, 12.0),
+  new CollectionEntry(
+    new Coin("C010", 1974, "Eisenhower Dollar",
+      MetalComposition::Clad, new Circulation("USA", "1 Dollar"),
+      Condition::AboutUnc, 22.7, 1.0),
+    4.0, 2022, 7.5),
+  new CollectionEntry(
+    new Coin("C011", 2006, "Gold Eagle Proof",
+      MetalComposition::Gold, new ProofIssue("USA", "American Gold Eagle", 47000),
+      Condition::MintState, 33.9, 50.0),
+    1400.0, 2014, 2050.0),
+  new CollectionEntry(
+    new Coin("C012", 1986, "Statue of Liberty Silver",
+      MetalComposition::Silver, new Commemorative("USA", "Liberty Centennial"),
+      Condition::MintState, 26.73, 1.0),
+    22.0, 2019, 45.0)
+] { registry.add(e) }
+
+val entries: List[CollectionEntry] = registry.getEntries()
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+val RULE: String = "─".repeat(62)
+
+IO::println("╔════════════════════════════════════════════════════╗")
+IO::println("║         Numismatic Collection Registry             ║")
+IO::println("╚════════════════════════════════════════════════════╝")
+IO::println(registry.summary())
+IO::println("")
+
+// ① Full catalog
+IO::println("── Full Catalog ─────────────────────────────────────────────")
+IO::println("  ID     Year  Name                        Metal   Cond  Value")
+IO::println("  " + RULE)
+foreach e: CollectionEntry in entries {
+  val c: Coin = e.coin()
+  IO::println("  " + c.shortRow() + " $" + e.currentValue().fmt2())
+}
+IO::println("")
+
+// ② By metal composition
+IO::println("── By Metal Composition ─────────────────────────────────────")
+val byMetal = entries.groupBy { e -> (e as CollectionEntry).coin().metal().symbol() }
+foreach (sym, lst) in byMetal {
+  val metalEntries: List[CollectionEntry] = lst as List[CollectionEntry]
+  val totalV: Double = metalEntries.fold(0.0) { acc, e ->
+    (acc as Double) + (e as CollectionEntry).currentValue()
+  } as Double
+  IO::println("  " + (sym as String).rpad(8) + metalEntries.size + " coins  " +
+              "total: $" + totalV.fmt2())
+}
+IO::println("")
+
+// ③ By coin type (ADT pattern matching)
+IO::println("── By Coin Type ─────────────────────────────────────────────")
+var circCount: Int = 0; var commCount: Int = 0
+var bullCount: Int = 0; var prufCount: Int = 0
+var circVal: Double = 0.0; var commVal: Double = 0.0
+var bullVal: Double = 0.0; var prufVal: Double = 0.0
+foreach e: CollectionEntry in entries {
+  select e.coin().coinType() {
+  case c  is Circulation:   circCount = circCount + 1; circVal = circVal + e.currentValue()
+  case co is Commemorative: commCount = commCount + 1; commVal = commVal + e.currentValue()
+  case b  is Bullion:       bullCount = bullCount + 1; bullVal = bullVal + e.currentValue()
+  case p  is ProofIssue:    prufCount = prufCount + 1; prufVal = prufVal + e.currentValue()
+  }
+}
+IO::println("  Circulation  : " + circCount + " coins   $" + circVal.fmt2())
+IO::println("  Commemorative: " + commCount + " coins   $" + commVal.fmt2())
+IO::println("  Bullion      : " + bullCount + " coins   $" + bullVal.fmt2())
+IO::println("  Proof        : " + prufCount + " coins   $" + prufVal.fmt2())
+IO::println("")
+
+// ④ By decade
+IO::println("── Coins by Decade ──────────────────────────────────────────")
+val byDecade = entries.groupBy { e -> (e as CollectionEntry).coin().decade() }
+foreach (decade, lst) in byDecade {
+  val n: Int = (lst as List[CollectionEntry]).size
+  IO::println("  " + (decade as String).rpad(8) + ": " + n + " coin(s)")
+}
+IO::println("")
+
+// ⑤ Partition: collector's grade vs worn
+IO::println("── Condition Analysis ───────────────────────────────────────")
+val parts = entries.partition { e -> (e as CollectionEntry).coin().isCollectorsGrade() }
+val graded: List[Object]  = parts[0] as List[Object]
+val worn:   List[Object]  = parts[1] as List[Object]
+IO::println("  Collector's grade (Fine or better): " + graded.size())
+IO::println("  Circulated / worn (below Fine):     " + worn.size())
+IO::println("")
+
+// ⑥ Top-5 ROI
+IO::println("── Top-5 ROI ────────────────────────────────────────────────")
+val byRoi: List[CollectionEntry] = registry.sortedByRoi()
+var rank: Int = 0
+foreach e: CollectionEntry in byRoi {
+  if rank >= 5 { break }
+  IO::println("  " + (rank + 1).lpad(2) + ". " + e.coin().name().rpad(30) +
+              " ROI: " + e.roi().fmt0() + "%")
+  rank = rank + 1
+}
+IO::println("")
+
+// ⑦ Most valuable coin (find)
+IO::println("── Most Valuable ────────────────────────────────────────────")
+val topEntry: CollectionEntry = registry.sortedByValue().get(0) as CollectionEntry
+IO::println("  " + topEntry.coin().name() + " (" + topEntry.coin().year() + ")")
+IO::println("  Type   : " + topEntry.coin().coinType().typeTag() +
+            " — " + topEntry.coin().coinType().detail())
+IO::println("  Country: " + topEntry.coin().coinType().coinCountry())
+IO::println("  Value  : $" + topEntry.currentValue().fmt2() +
+            "   (paid $" + topEntry.purchasePrice().fmt2() + ")")
+IO::println("")
+
+// ⑧ Portfolio totals
+IO::println("── Portfolio Summary ────────────────────────────────────────")
+val totalIn:  Double = registry.totalPurchased()
+val totalOut: Double = registry.totalValue()
+val totalPnL: Double = registry.totalProfit()
+val pctGain:  Double = if totalIn > 0.0 { totalPnL / totalIn * 100.0 } else { 0.0 }
+IO::println("  Total invested : $" + totalIn.fmt2())
+IO::println("  Current value  : $" + totalOut.fmt2())
+IO::println("  Profit / Loss  : $" + totalPnL.fmt2() + "  (" + pctGain.fmt0() + "%)")
+IO::println("  Coins held     : " + registry.itemCount())
+IO::println("")
+
+// ⑨ Recursive total verification
+IO::println("── Recursive Value Check ────────────────────────────────────")
+val recursiveTotal: Double = sumValues(entries, 0)
+IO::println("  Sum (recursive): $" + recursiveTotal.fmt2())
+IO::println("")
+
+// ⑩ Zip: purchase year vs hold period
+IO::println("── Purchase Year → Hold Years ───────────────────────────────")
+val pYears: List[Object]  = entries.map { e -> (e as CollectionEntry).purchaseYear() }
+val pHolds: List[Object]  = entries.map { e -> (e as CollectionEntry).holdYears() }
+val zipped = pYears.zip(pHolds)
+foreach pair: Object in zipped {
+  val p = pair as List
+  val yr:  Int = p.get(0) as Int
+  val hd:  Int = p.get(1) as Int
+  IO::println("  bought " + yr + "  →  held " + hd + " year(s)")
+}
+IO::println("")
+
+IO::println("=== Registry complete ===")

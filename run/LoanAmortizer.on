@@ -1,0 +1,376 @@
+// LoanAmortizer.on — mortgage and loan amortization schedule calculator
+// Exercises: data-carrying enums (LoanType), ADT enum (PayClass), records with
+// methods (LoanParams, PaymentEntry, LoanSchedule), top-level functions,
+// extension methods on Double and String, collection pipelines
+// (map/filter/fold/sortedBy), typed List[T], foreach on ranges and lists,
+// select on enum values, if/else expressions, string interpolation,
+// nullable types, while loops.
+
+import { java.lang.Math as JMath }
+
+// ── Formatting extensions ─────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val r: Long = JMath::round(self * 100.0)
+    val ip: Long = r / 100L
+    val fp: Long = if r % 100L < 0L { -(r % 100L) } else { r % 100L }
+    return if fp < 10L { "#{ip}.0#{fp}" } else { "#{ip}.#{fp}" }
+  }
+  def pct2(): String = "#{(self * 100.0).fmt2()}%"
+  def dollars(): String = "$#{self.fmt2()}"
+  def round2(): Double = JMath::round(self * 100.0) as Double / 100.0
+}
+
+extension String {
+  def lpadN(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def rpadN(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ── Loan type (homogeneous data-carrying enum) ────────────────────────────────
+
+enum LoanType(label: String, note: String) {
+  FIXED("Fixed-Rate",     "Constant rate and payment for the full term"),
+  ARM(  "Adjustable ARM", "5-yr fixed window then rate rises 1.5 pp"),
+  BALLOON("Balloon",      "Reduced payments, lump-sum due at month 84"),
+  IO(   "Interest-Only",  "Interest payments only; principal due at maturity")
+}
+
+// ── Payment class (ADT case-enum) ─────────────────────────────────────────────
+
+enum PayClass {
+  case Regular
+  case BalloonPayment
+  case FinalPrincipal
+public:
+  def tag(): String = select this {
+    case r is Regular:        ""
+    case b is BalloonPayment: " [BALLOON]"
+    case f is FinalPrincipal: " [FINAL]"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record LoanParams(
+  name:       String,
+  principal:  Double,
+  annualRate: Double,
+  termMonths: Int,
+  loanType:   LoanType
+) {
+public:
+  def termYears(): Int = termMonths() / 12
+}
+
+record PaymentEntry(
+  month:       Int,
+  payment:     Double,
+  toPrincipal: Double,
+  toInterest:  Double,
+  balance:     Double,
+  payClass:    PayClass
+) {
+public:
+  def fmt(): String =
+    ("" + month()).lpadN(4) + " " +
+    payment().dollars().lpadN(11) + " " +
+    toPrincipal().dollars().lpadN(11) + " " +
+    toInterest().dollars().lpadN(11) + " " +
+    balance().dollars().lpadN(13) +
+    payClass().tag()
+}
+
+record LoanSchedule(params: LoanParams, entries: List[PaymentEntry]) {
+public:
+  def totalPaid(): Double =
+    entries().fold(0.0) { acc, e: PaymentEntry -> (acc as Double) + e.payment() }
+
+  def totalInterest(): Double =
+    entries().fold(0.0) { acc, e: PaymentEntry -> (acc as Double) + e.toInterest() }
+
+  def effectiveRate(): Double {
+    val years: Double = params().termMonths() as Double / 12.0
+    if years == 0.0 { return 0.0 }
+    return totalInterest() / params().principal() / years
+  }
+
+  def entryAt(mo: Int): PaymentEntry? {
+    if mo < 1 || mo > entries().size { return null }
+    return entries()[mo - 1]
+  }
+
+  def printSchedule(rows: Int): void {
+    val hdr = " Mo".rpadN(4) + " " + "Payment".lpadN(11) +
+              " " + "Principal".lpadN(11) +
+              " " + "Interest".lpadN(11) + " " + "Balance".lpadN(13)
+    IO::println(hdr)
+    IO::println("-".rep(54))
+    val total: Int = entries().size
+    var shown: Int = 0
+    foreach e: PaymentEntry in entries() {
+      val isLast: Boolean = e.month() == total
+      if shown < rows || isLast {
+        IO::println(e.fmt())
+      } else if shown == rows && total > rows + 1 {
+        IO::println("  ... #{total - rows - 1} month(s) omitted ...")
+      }
+      shown++
+    }
+  }
+
+  def printSummary(): void {
+    val p = params()
+    IO::println("  Loan       : #{p.name()} (#{p.loanType().label()})")
+    IO::println("  Note       : #{p.loanType().note()}")
+    IO::println("  Principal  : #{p.principal().dollars()}")
+    IO::println("  Annual rate: #{p.annualRate().pct2()}")
+    IO::println("  Term       : #{p.termYears()} yr (#{p.termMonths()} mo)")
+    IO::println("  Total paid : #{totalPaid().dollars()}")
+    IO::println("  Interest   : #{totalInterest().dollars()}")
+    IO::println("  Eff. APR   : #{effectiveRate().pct2()}")
+  }
+}
+
+// ── Calculation helpers ───────────────────────────────────────────────────────
+
+def monthlyRate(annual: Double): Double = annual / 12.0
+
+def pmt(principal: Double, annual: Double, months: Int): Double {
+  val r: Double = monthlyRate(annual)
+  if r == 0.0 { return (principal / months as Double).round2() }
+  val f: Double = JMath::pow(1.0 + r, months as Double)
+  return (principal * r * f / (f - 1.0)).round2()
+}
+
+def clampPos(v: Double): Double = if v < 0.0 { 0.0 } else { v }
+
+// ── Schedule builders ─────────────────────────────────────────────────────────
+
+def buildFixed(p: LoanParams): LoanSchedule {
+  val entries: List[PaymentEntry] = []
+  var bal: Double = p.principal()
+  val mp: Double  = pmt(p.principal(), p.annualRate(), p.termMonths())
+  foreach mo: Int in 1..p.termMonths() {
+    val iAmt: Double = (bal * monthlyRate(p.annualRate())).round2()
+    val pAmt: Double = clampPos(if mp - iAmt > bal { bal } else { mp - iAmt })
+    bal = clampPos(bal - pAmt)
+    entries.add(new PaymentEntry(mo, (iAmt + pAmt).round2(), pAmt, iAmt, bal, new Regular()))
+  }
+  return new LoanSchedule(p, entries)
+}
+
+def buildArm(p: LoanParams): LoanSchedule {
+  val entries: List[PaymentEntry] = []
+  var bal: Double    = p.principal()
+  val adjRate: Double = p.annualRate() + 0.015
+  foreach mo: Int in 1..p.termMonths() {
+    val rate: Double   = if mo <= 60 { p.annualRate() } else { adjRate }
+    val remaining: Int = p.termMonths() - mo + 1
+    val mp: Double     = pmt(bal, rate, remaining)
+    val iAmt: Double   = (bal * monthlyRate(rate)).round2()
+    val pAmt: Double   = clampPos(if mp - iAmt > bal { bal } else { mp - iAmt })
+    bal = clampPos(bal - pAmt)
+    entries.add(new PaymentEntry(mo, (iAmt + pAmt).round2(), pAmt, iAmt, bal, new Regular()))
+  }
+  return new LoanSchedule(p, entries)
+}
+
+def buildBalloon(p: LoanParams): LoanSchedule {
+  // 7-year balloon: payments sized for 30-year amortization, balance due at termMonths
+  val entries: List[PaymentEntry] = []
+  var bal: Double  = p.principal()
+  val shadowPmt: Double = pmt(p.principal(), p.annualRate(), 360)
+  foreach mo: Int in 1..p.termMonths() {
+    val r: Double    = monthlyRate(p.annualRate())
+    val iAmt: Double = (bal * r).round2()
+    if mo < p.termMonths() {
+      val pAmt: Double = clampPos(if shadowPmt - iAmt > bal { bal } else { shadowPmt - iAmt })
+      bal = clampPos(bal - pAmt)
+      entries.add(new PaymentEntry(mo, (iAmt + pAmt).round2(), pAmt, iAmt, bal, new Regular()))
+    } else {
+      val balloon: Double = (bal + iAmt).round2()
+      entries.add(new PaymentEntry(mo, balloon, bal, iAmt, 0.0, new BalloonPayment()))
+    }
+  }
+  return new LoanSchedule(p, entries)
+}
+
+def buildIo(p: LoanParams): LoanSchedule {
+  val entries: List[PaymentEntry] = []
+  var bal: Double = p.principal()
+  val r: Double   = monthlyRate(p.annualRate())
+  foreach mo: Int in 1..p.termMonths() {
+    val iAmt: Double = (bal * r).round2()
+    if mo < p.termMonths() {
+      entries.add(new PaymentEntry(mo, iAmt, 0.0, iAmt, bal, new Regular()))
+    } else {
+      val fin: Double = (bal + iAmt).round2()
+      entries.add(new PaymentEntry(mo, fin, bal, iAmt, 0.0, new FinalPrincipal()))
+    }
+  }
+  return new LoanSchedule(p, entries)
+}
+
+def buildSchedule(p: LoanParams): LoanSchedule = select p.loanType() {
+  case LoanType::FIXED:   buildFixed(p)
+  case LoanType::ARM:     buildArm(p)
+  case LoanType::BALLOON: buildBalloon(p)
+  else:                   buildIo(p)
+}
+
+// ── Milestone analysis ────────────────────────────────────────────────────────
+
+def printMilestones(sched: LoanSchedule): void {
+  IO::println("  Equity milestones (balance remaining):")
+  val n: Int = sched.entries().size
+  foreach pct: Int in [25, 50, 75] {
+    val mo: Int = n * pct / 100
+    val e: PaymentEntry? = sched.entryAt(mo)
+    val balStr: String = if e != null { e.balance().dollars() } else { "N/A" }
+    IO::println("    #{pct}% of term (mo #{mo}): #{balStr}")
+  }
+}
+
+// ── Decade interest breakdown ─────────────────────────────────────────────────
+
+def printDecades(sched: LoanSchedule): void {
+  IO::println("  Interest paid by decade:")
+  val all: List[PaymentEntry] = sched.entries()
+  foreach dec: Int in [1, 2, 3] {
+    val start: Int = (dec - 1) * 120
+    val end: Int   = dec * 120
+    var sum: Double = 0.0
+    var i: Int = start
+    while i < end && i < all.size {
+      sum = sum + all[i].toInterest()
+      i++
+    }
+    IO::println("    Yr #{(dec - 1) * 10 + 1}-#{dec * 10}: #{sum.dollars()}")
+  }
+}
+
+// ── Comparison table ──────────────────────────────────────────────────────────
+
+def printComparison(schedules: List[LoanSchedule]): void {
+  IO::println("\n═══════════════════════════════════════════════════════════════════")
+  IO::println("  Loan Type Comparison")
+  IO::println("═══════════════════════════════════════════════════════════════════")
+  val hdr = "  " + "Type".rpadN(18) + " " + "Monthly(1)".lpadN(11) +
+            " " + "Total Paid".lpadN(13) + " " + "Interest".lpadN(13) +
+            " " + "Eff.APR".lpadN(8)
+  IO::println(hdr)
+  IO::println("  " + "-".rep(68))
+  foreach s: LoanSchedule in schedules {
+    val first: PaymentEntry? = if s.entries().size > 0 { s.entries()[0] } else { null }
+    val pmtStr: String = if first != null { first.payment().dollars() } else { "N/A" }
+    IO::println("  " + s.params().loanType().label().rpadN(18) + " " +
+                pmtStr.lpadN(11) + " " +
+                s.totalPaid().dollars().lpadN(13) + " " +
+                s.totalInterest().dollars().lpadN(13) + " " +
+                s.effectiveRate().pct2().lpadN(8))
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+IO::println("╔═══════════════════════════════════════════════════════════════╗")
+IO::println("║         Loan Amortization Schedule Calculator                 ║")
+IO::println("╚═══════════════════════════════════════════════════════════════╝")
+
+val PRINCIPAL: Double = 350000.0
+val RATE:      Double = 0.068
+val TERM_MO:   Int    = 360
+
+val scenarios: List[LoanParams] = [
+  new LoanParams("Prime30",   PRINCIPAL, RATE,        TERM_MO, LoanType::FIXED),
+  new LoanParams("ARM5/1",    PRINCIPAL, RATE - 0.01, TERM_MO, LoanType::ARM),
+  new LoanParams("Balloon7",  PRINCIPAL, RATE,        84,       LoanType::BALLOON),
+  new LoanParams("IOLoan30",  PRINCIPAL, RATE,        TERM_MO, LoanType::IO)
+]
+
+val schedules: List[LoanSchedule] = scenarios.map { p: LoanParams -> buildSchedule(p) }
+
+// ── Individual schedule reports ───────────────────────────────────────────────
+
+foreach s: LoanSchedule in schedules {
+  IO::println("\n───────────────────────────────────────────────────────────────────")
+  s.printSummary()
+  IO::println("\n  Schedule (first 6 + last month):")
+  s.printSchedule(6)
+  printMilestones(s)
+  if s.params().loanType() == LoanType::FIXED {
+    printDecades(s)
+  }
+}
+
+printComparison(schedules)
+
+// ── Break-even: Fixed vs ARM ──────────────────────────────────────────────────
+
+IO::println("\n═══════════════════════════════════════════════════════════════════")
+IO::println("  Break-Even: Fixed vs ARM (cumulative payment)")
+IO::println("═══════════════════════════════════════════════════════════════════")
+
+val fixedSched: LoanSchedule = schedules[0]
+val armSched:   LoanSchedule = schedules[1]
+var cumulFixed: Double = 0.0
+var cumulArm:   Double = 0.0
+var breakEven:  Int    = -1
+
+foreach mo: Int in 1..TERM_MO {
+  val fe: PaymentEntry? = fixedSched.entryAt(mo)
+  val ae: PaymentEntry? = armSched.entryAt(mo)
+  if fe != null && ae != null {
+    cumulFixed = cumulFixed + fe.payment()
+    cumulArm   = cumulArm   + ae.payment()
+    if breakEven < 0 && cumulArm >= cumulFixed {
+      breakEven = mo
+    }
+  }
+}
+
+if breakEven > 0 {
+  IO::println("  ARM becomes costlier than Fixed at month #{breakEven} (yr #{breakEven / 12 + 1})")
+  IO::println("  ARM cumulative at crossover : #{cumulArm.dollars()}")
+  IO::println("  Fixed cumulative at crossover: #{cumulFixed.dollars()}")
+} else {
+  IO::println("  ARM remains cheaper than Fixed over the full term.")
+}
+
+// ── Best/worst months for Fixed-Rate ─────────────────────────────────────────
+
+IO::println("\n═══════════════════════════════════════════════════════════════════")
+IO::println("  Principal vs Interest ratio over time (Fixed-Rate)")
+IO::println("═══════════════════════════════════════════════════════════════════")
+
+val fixedEntries: List[PaymentEntry] = fixedSched.entries()
+val crossEntry: PaymentEntry? = fixedEntries.find {
+  e: PaymentEntry -> e.toPrincipal() >= e.toInterest()
+}
+if crossEntry != null {
+  IO::println("  Principal exceeds interest from month #{crossEntry.month()} onward")
+  IO::println("    At that month: P=#{crossEntry.toPrincipal().dollars()}, I=#{crossEntry.toInterest().dollars()}")
+} else {
+  IO::println("  Interest exceeds principal for entire term.")
+}
+
+val highInterestMonths: List[PaymentEntry] =
+  fixedEntries.filter { e: PaymentEntry -> e.toInterest() > 2000.0 }
+IO::println("  Months with interest > $2000: #{highInterestMonths.size}")
+
+IO::println("\nDone.")

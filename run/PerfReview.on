@@ -58,10 +58,11 @@ record ReviewMetrics(
   qualityScore: Int,
   teamworkScore: Int,
   innovationScore: Int
-)
+) {
   example { new ReviewMetrics(4, 4, 4, 4).average() == 4 }
   example { new ReviewMetrics(5, 3, 4, 4).average() == 4 }
   example { new ReviewMetrics(1, 1, 1, 1).average() == 1 }
+}
 
 extension ReviewMetrics {
   def average(): Int =

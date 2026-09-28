@@ -78,9 +78,10 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Airport(code: String, city: String, country: String)
+record Airport(code: String, city: String, country: String) {
   example { new Airport("JFK", "New York", "USA").code() == "JFK" }
   example { new Airport("LHR", "London", "UK").city() == "London" }
+}
 
 record Passenger(id: String, firstName: String, lastName: String, email: String) {
 public:

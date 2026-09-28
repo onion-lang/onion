@@ -35,8 +35,9 @@ class LawDiagnosticLocationSpec extends AnyFunSpec {
     // `law wrong` is on line 3 of this source.
     val src =
       s"""|
-          |record Pt(x: Int, y: Int)
+          |record Pt(x: Int, y: Int) {
           |  law wrong(p: Pt) { p.x() == p.y() }
+          |}
           |$main""".stripMargin
 
     it("names the source file the law was written in, not the record") {
@@ -53,8 +54,9 @@ class LawDiagnosticLocationSpec extends AnyFunSpec {
 
   describe("a failed example") {
     val src =
-      s"""|record R(x: Int)
+      s"""|record R(x: Int) {
           |  example { new R(1).x() == 2 }
+          |}
           |$main""".stripMargin
 
     it("carries a location too") {
@@ -68,8 +70,9 @@ class LawDiagnosticLocationSpec extends AnyFunSpec {
   describe("a law that cannot be generated") {
     it("carries a location as well") {
       val src =
-        s"""|record Dummy(v: Int)
+        s"""|record Dummy(v: Int) {
             |  law overArray(xs: Int[]) { xs != null }
+            |}
             |$main""".stripMargin
       val e = errors(src).find(_.errorCode.contains("E0074")).get
       assert(e.sourceFile == "sample.on")

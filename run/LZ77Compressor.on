@@ -1,0 +1,224 @@
+// LZ77Compressor.on — LZ77 sliding-window text compression and analysis.
+// Exercises: records, data-carrying enums, classes/interfaces, generics,
+// collection pipelines, select/pattern-matching, nullable, closures,
+// string interpolation, try/catch, recursion, while/foreach with ranges.
+
+// ---------------------------------------------------------------------------
+// Data Model
+// ---------------------------------------------------------------------------
+
+record Match(offset: Int, length: Int, next: String)
+record Token(offset: Int, length: Int, literal: String)
+
+enum TokenKind {
+  LITERAL, BACK_REF
+}
+
+record EncodedToken(kind: TokenKind, data: Token)
+
+def tokenKindLabel(t: EncodedToken): String {
+  select t.kind() {
+    case TokenKind::LITERAL:  return "L"
+    case TokenKind::BACK_REF: return "R"
+    else: return "?"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LZ77 Encoder
+// ---------------------------------------------------------------------------
+
+class LZ77Encoder {
+  val windowSize: Int
+  val lookahead:  Int
+public:
+  def this(win: Int, look: Int) {
+    this.windowSize = win
+    this.lookahead  = look
+  }
+  def encode(text: String): List[EncodedToken] {
+    val tokens: List[EncodedToken] = []
+    var pos: Int = 0
+    while pos < text.length() {
+      val match: Match = findLongestMatch(text, pos)
+      if match.length() > 1 {
+        tokens.add(new EncodedToken(TokenKind::BACK_REF, new Token(match.offset(), match.length(), match.next())))
+        pos = pos + match.length() + 1
+      } else {
+        val ch: String = if pos < text.length() { text.substring(pos, pos + 1) } else { "" }
+        tokens.add(new EncodedToken(TokenKind::LITERAL, new Token(0, 0, ch)))
+        pos = pos + 1
+      }
+    }
+    return tokens
+  }
+
+  def findLongestMatch(text: String, pos: Int): Match {
+    val winStart: Int = if pos - windowSize > 0 { pos - windowSize } else { 0 }
+    var bestOffset: Int = 0
+    var bestLength: Int = 0
+    var i: Int = winStart
+    while i < pos {
+      val maxLen: Int = if pos + lookahead < text.length() { lookahead } else { text.length() - pos }
+      var len: Int = 0
+      while len < maxLen && text.charAt(i + len) == text.charAt(pos + len) {
+        len = len + 1
+      }
+      if len > bestLength {
+        bestOffset = pos - i
+        bestLength = len
+      }
+      i = i + 1
+    }
+    val nextChar: String = if pos + bestLength < text.length() {
+      text.substring(pos + bestLength, pos + bestLength + 1)
+    } else { "" }
+    return new Match(bestOffset, bestLength, nextChar)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LZ77 Decoder
+// ---------------------------------------------------------------------------
+
+class LZ77Decoder {
+public:
+  def this {}
+  def decode(tokens: List[EncodedToken]): String {
+    var result: String = ""
+    foreach t: EncodedToken in tokens {
+      select t.kind() {
+        case TokenKind::LITERAL:
+          result = result + t.data().literal()
+        case TokenKind::BACK_REF:
+          val off: Int  = t.data().offset()
+          val len: Int  = t.data().length()
+          val start: Int = result.length() - off
+          var j: Int = 0
+          while j < len {
+            result = result + result.substring(start + j, start + j + 1)
+            j = j + 1
+          }
+          result = result + t.data().literal()
+        else: {}
+      }
+    }
+    return result
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Compression Statistics
+// ---------------------------------------------------------------------------
+
+record CompressStats(original: Int, tokenCount: Int, backRefs: Int, literals: Int)
+
+def computeStats(tokens: List[EncodedToken], original: String): CompressStats {
+  val backRefs: Int  = tokens.filter { t -> (t as EncodedToken).kind() == TokenKind::BACK_REF }.size
+  val lits: Int      = tokens.size - backRefs
+  return new CompressStats(original.length(), tokens.size, backRefs, lits)
+}
+
+def ratio(s: CompressStats): Double = (s.tokenCount() as Double) / (s.original() as Double) * 100.0
+
+def printStats(label: String, s: CompressStats): void {
+  IO::println("  #{label}")
+  IO::println("    original chars : #{s.original()}")
+  IO::println("    token count    : #{s.tokenCount()}")
+  IO::println("    back-refs      : #{s.backRefs()}")
+  IO::println("    literals       : #{s.literals()}")
+  IO::println("    token ratio    : #{ratio(s)}%")
+}
+
+// ---------------------------------------------------------------------------
+// Token rendering helpers
+// ---------------------------------------------------------------------------
+
+def renderTokens(tokens: List[EncodedToken]): String {
+  val parts: List[String] = tokens.map { t ->
+    val et: EncodedToken = t as EncodedToken
+    val d: Token  = et.data()
+    if et.kind() == TokenKind::LITERAL {
+      "[L:'#{d.literal()}']"
+    } else {
+      "[R:#{d.offset()},#{d.length()},'#{d.literal()}']"
+    }
+  }
+  var s: String = ""
+  foreach p: String in parts { s = s + p }
+  return s
+}
+
+// ---------------------------------------------------------------------------
+// Test harness
+// ---------------------------------------------------------------------------
+
+interface Experiment {
+  def name(): String
+  def text(): String
+}
+
+class SimpleExperiment extends Object conforms Experiment {
+  val n: String
+  val t: String
+public:
+  def this(n: String, t: String) { this.n = n; this.t = t }
+  def name(): String = n
+  def text(): String = t
+}
+
+def runExperiment(enc: LZ77Encoder, dec: LZ77Decoder, exp: Experiment): Boolean {
+  val original: String       = exp.text()
+  val tokens: List[EncodedToken] = enc.encode(original)
+  val decoded: String        = dec.decode(tokens)
+  val ok: Boolean            = decoded == original
+  val stats: CompressStats   = computeStats(tokens, original)
+
+  IO::println("=== #{exp.name()} ===")
+  IO::println("  input   : #{original}")
+  IO::println("  tokens  : #{renderTokens(tokens)}")
+  IO::println("  decoded : #{decoded}")
+  IO::println("  match   : #{ok}")
+  printStats("stats", stats)
+  IO::println("")
+  return ok
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+def main(): void {
+  val enc: LZ77Encoder = new LZ77Encoder(255, 15)
+  val dec: LZ77Decoder = new LZ77Decoder()
+
+  val experiments: List[Experiment] = [
+    new SimpleExperiment("empty string",      ""),
+    new SimpleExperiment("single char",       "a"),
+    new SimpleExperiment("all same",          "aaaaaaaaaa"),
+    new SimpleExperiment("abab repeat",       "ababababab"),
+    new SimpleExperiment("banana",            "banana"),
+    new SimpleExperiment("abcabcabc",         "abcabcabc"),
+    new SimpleExperiment("no repetition",     "abcdefghij"),
+    new SimpleExperiment("longer text",       "the cat sat on the mat and the rat ran past the cat"),
+    new SimpleExperiment("spaces & punct",    "hello, hello, hello!"),
+    new SimpleExperiment("digits",            "1234512345")
+  ]
+
+  var allOk: Boolean = true
+  foreach exp: Experiment in experiments {
+    val ok: Boolean = runExperiment(enc, dec, exp)
+    if !ok { allOk = false }
+  }
+
+  IO::println(if allOk { "All round-trip checks passed." } else { "SOME CHECKS FAILED." })
+
+  // Summary table: sort by original length descending
+  IO::println("\n--- Summary (by input length desc) ---")
+  val sorted: List[Experiment] = experiments.sortedBy { e -> 0 - (e as Experiment).text().length() }
+  foreach exp: Experiment in sorted {
+    val tokens: List[EncodedToken] = enc.encode(exp.text())
+    val s: CompressStats = computeStats(tokens, exp.text())
+    IO::println("  #{exp.name()} : #{s.original()} chars -> #{s.tokenCount()} tokens (#{ratio(s)}%)")
+  }
+}

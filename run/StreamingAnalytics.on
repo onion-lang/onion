@@ -1,0 +1,409 @@
+// StreamingAnalytics.on — music streaming service analytics and playlist manager
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, generics (Queue[T]), collection pipelines (map/filter/fold/
+// sortedBy/distinct/find/partition), select / type-pattern matching, nullable,
+// closures, string interpolation, HashMap counting, while, foreach.
+
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Genre(label: String, energy: Int) {
+  Pop("Pop", 7),
+  Rock("Rock", 9),
+  Jazz("Jazz", 5),
+  Classical("Classical", 3),
+  Electronic("Electronic", 8),
+  HipHop("Hip-Hop", 8),
+  RnB("R&B", 6),
+  Country("Country", 5)
+}
+
+enum PlayResult {
+  case Played(durationMs: Long)
+  case Skipped(atMs: Long)
+  case Error(message: String)
+public:
+  def isSuccess(): Boolean = select this {
+    case p is Played:  true
+    case _:            false
+  }
+  def label(): String = select this {
+    case p is Played:  "played #{p.durationMs()}ms"
+    case s is Skipped: "skipped at #{s.atMs()}ms"
+    case e is Error:   "error: #{e.message()}"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Song(
+  id:         Int,
+  title:      String,
+  artist:     String,
+  album:      String,
+  genre:      Genre,
+  year:       Int,
+  durationMs: Long
+) {
+public:
+  def minutes(): Int = (durationMs() / 60000L) as Int
+  def seconds(): Int = ((durationMs() % 60000L) / 1000L) as Int
+  def timeStr(): String {
+    val m  = minutes()
+    val s  = seconds()
+    val ss = if s < 10 { "0" + s } else { "" + s }
+    return "#{m}:#{ss}"
+  }
+  def label(): String = "\"#{title()}\" by #{artist()} [#{timeStr()}]"
+}
+
+record PlayEvent(
+  userId: String,
+  song:   Song,
+  result: PlayResult,
+  ts:     Long
+) {
+public:
+  def isPlay(): Boolean = result().isSuccess()
+}
+
+record Artist(
+  name:       String,
+  country:    String,
+  formedYear: Int
+)
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Rankable {
+  def rankScore(): Int
+}
+
+// ─── Generic Queue ────────────────────────────────────────────────────────────
+
+class Queue[T] {
+  var items: List[Object] = []
+public:
+  def enqueue(item: T): void { items.add(item) }
+
+  def dequeue(): T? {
+    if items.size == 0 { return null }
+    val head = items[0] as T
+    items.remove(0)
+    return head
+  }
+
+  def peek(): T? = if items.size == 0 { null } else { items[0] as T }
+  def isEmpty(): Boolean = items.size == 0
+  def size(): Int = items.size
+}
+
+// ─── Playlist ─────────────────────────────────────────────────────────────────
+
+class Playlist {
+public:
+  val name:  String
+  var songs: List[Song]
+
+  def this(n: String) {
+    this.name  = n
+    this.songs = []
+  }
+  def add(song: Song): void { songs.add(song) }
+  def totalMs(): Long {
+    var acc: Long = 0L
+    foreach s: Song in songs { acc = acc + s.durationMs() }
+    return acc
+  }
+  def totalMin(): Int = (totalMs() / 60000L) as Int
+  def summary(): String = "Playlist '#{name}' — #{songs.size} songs, #{totalMin()} min"
+}
+
+// ─── StreamStore ──────────────────────────────────────────────────────────────
+
+class StreamStore {
+public:
+  var catalog: List[Song]
+  var artists: List[Artist]
+  var history: List[PlayEvent]
+
+  def this {
+    this.catalog = []
+    this.artists = []
+    this.history = []
+  }
+
+  def addSong(s: Song): void       { catalog.add(s) }
+  def addArtist(a: Artist): void   { artists.add(a) }
+  def logEvent(e: PlayEvent): void { history.add(e) }
+
+  def find(id: Int): Song? {
+    foreach s: Song in catalog {
+      if s.id() == id { return s }
+    }
+    return null
+  }
+
+  def search(query: String): List[Song] {
+    val q = query.toLowerCase()
+    val result: List[Song] = []
+    foreach s: Song in catalog {
+      if s.title().toLowerCase().contains(q) || s.artist().toLowerCase().contains(q) {
+        result.add(s)
+      }
+    }
+    return result
+  }
+
+  def topArtists(n: Int): List[String] {
+    val counts: HashMap[String, Int] = new HashMap[String, Int]()
+    foreach e: PlayEvent in history {
+      if e.isPlay() {
+        val key: String = e.song().artist()
+        val prev: Int? = counts.get(key) as Int?
+        counts.put(key, (prev ?: 0) + 1)
+      }
+    }
+    val allArtists: List[String] = []
+    foreach s: Song in catalog {
+      if !allArtists.contains(s.artist()) { allArtists.add(s.artist()) }
+    }
+    val sorted = (allArtists as List[Object]).sortedBy { a ->
+      val name: String = a as String
+      val cnt: Int? = counts.get(name) as Int?
+      -(cnt ?: 0)
+    }
+    val result: List[String] = []
+    var i = 0
+    foreach a: Object in sorted {
+      if i < n { result.add(a as String) }
+      i = i + 1
+    }
+    return result
+  }
+
+  def genreStats(): List[String] {
+    val result: List[String] = []
+    val genres = [Genre::Pop, Genre::Rock, Genre::Jazz, Genre::Classical,
+                  Genre::Electronic, Genre::HipHop, Genre::RnB, Genre::Country]
+    foreach g: Object in genres {
+      val genre = g as Genre
+      var count = 0
+      foreach e: PlayEvent in history {
+        if e.isPlay() && e.song().genre() == genre { count = count + 1 }
+      }
+      if count > 0 { result.add("#{genre.label()}: #{count}") }
+    }
+    return result
+  }
+
+  def playRateByUser(): List[String] {
+    val users: List[String] = []
+    foreach e: PlayEvent in history {
+      if !users.contains(e.userId()) { users.add(e.userId()) }
+    }
+    val result: List[String] = []
+    foreach uid: String in users {
+      var total  = 0
+      var played = 0
+      foreach e: PlayEvent in history {
+        if e.userId() == uid {
+          total = total + 1
+          if e.isPlay() { played = played + 1 }
+        }
+      }
+      val rate = if total == 0 { 0.0 } else { (played as Double) / (total as Double) * 100.0 }
+      result.add("#{uid}: #{played}/#{total} plays (#{Format::fixed(rate, 1)}%)")
+    }
+    return result
+  }
+
+  def longestSong(): Song? {
+    var best: Song? = null
+    foreach s: Song in catalog {
+      if best == null || s.durationMs() > best.durationMs() {
+        best = s
+      }
+    }
+    return best
+  }
+
+  def shortestSong(): Song? {
+    var best: Song? = null
+    foreach s: Song in catalog {
+      if best == null || s.durationMs() < best.durationMs() {
+        best = s
+      }
+    }
+    return best
+  }
+}
+
+// ─── Seed helpers ─────────────────────────────────────────────────────────────
+
+def play(store: StreamStore, uid: String, id: Int, ms: Long): void {
+  val song = store.find(id)
+  if song != null {
+    store.logEvent(new PlayEvent(uid, song, new Played(ms), 0L))
+  }
+}
+
+def skip(store: StreamStore, uid: String, id: Int, ms: Long): void {
+  val song = store.find(id)
+  if song != null {
+    store.logEvent(new PlayEvent(uid, song, new Skipped(ms), 0L))
+  }
+}
+
+def seedSongs(store: StreamStore): void {
+  store.addSong(new Song(1,  "Midnight Drive",     "Luna Echo",     "Neon Dreams",   Genre::Electronic, 2021, 214000L))
+  store.addSong(new Song(2,  "River Stone",        "The Wanderers", "Open Road",     Genre::Rock,       2019, 247000L))
+  store.addSong(new Song(3,  "Soft Horizons",      "Aria Vale",     "Soft Horizons", Genre::Pop,        2022, 198000L))
+  store.addSong(new Song(4,  "Blue Tuesday",       "Miles Craft",   "Standards",     Genre::Jazz,       2018, 331000L))
+  store.addSong(new Song(5,  "Electric Sky",       "Luna Echo",     "Neon Dreams",   Genre::Electronic, 2021, 183000L))
+  store.addSong(new Song(6,  "Willow Creek",       "The Wanderers", "Open Road",     Genre::Country,    2019, 222000L))
+  store.addSong(new Song(7,  "Cascade",            "Aria Vale",     "Echoes",        Genre::Pop,        2020, 205000L))
+  store.addSong(new Song(8,  "Autumn Suite",       "Clara Voss",    "Four Seasons",  Genre::Classical,  2016, 412000L))
+  store.addSong(new Song(9,  "City Pulse",         "DJ Apex",       "Voltage",       Genre::HipHop,     2023, 176000L))
+  store.addSong(new Song(10, "Velvet Underground", "Rina Sol",      "Satin",         Genre::RnB,        2022, 256000L))
+  store.addSong(new Song(11, "Snowfall",           "Clara Voss",    "Four Seasons",  Genre::Classical,  2016, 389000L))
+  store.addSong(new Song(12, "Frequency",          "DJ Apex",       "Voltage",       Genre::Electronic, 2023, 162000L))
+  store.addSong(new Song(13, "Painted Skies",      "Aria Vale",     "Echoes",        Genre::Pop,        2020, 219000L))
+  store.addSong(new Song(14, "Thunder Ridge",      "The Wanderers", "Storm Season",  Genre::Rock,       2021, 271000L))
+  store.addSong(new Song(15, "Gentle Bossa",       "Miles Craft",   "Cafe Sessions", Genre::Jazz,       2020, 298000L))
+}
+
+def seedHistory(store: StreamStore): void {
+  play(store, "alice", 1, 214000L); play(store, "alice",  3, 198000L)
+  play(store, "alice", 5, 183000L); play(store, "alice",  7, 205000L)
+  skip(store, "alice", 9,  32000L); play(store, "alice", 13, 219000L)
+  play(store, "bob",   2, 247000L); play(store, "bob",    4, 331000L)
+  play(store, "bob",   6, 222000L); skip(store, "bob",    8,  15000L)
+  play(store, "bob",  14, 271000L); play(store, "bob",   15, 298000L)
+  play(store, "carol", 1, 214000L); play(store, "carol",  2, 247000L)
+  play(store, "carol", 9, 176000L); play(store, "carol", 10, 256000L)
+  skip(store, "carol",11,  20000L); play(store, "carol", 12, 162000L)
+  play(store, "dave",  3, 198000L); play(store, "dave",   5, 183000L)
+  skip(store, "dave",  6,  45000L); play(store, "dave",   7, 205000L)
+  play(store, "dave", 13, 219000L); play(store, "dave",  15, 298000L)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val store = new StreamStore()
+seedSongs(store)
+seedHistory(store)
+
+// 1. Catalog overview
+println("=== Streaming Catalog ===")
+foreach s: Song in store.catalog {
+  println("  [#{s.id()}] #{s.label()} — #{s.genre().label()}, #{s.year()}")
+}
+
+// 2. Search
+println("\n=== Search: 'echo' ===")
+val hits = store.search("echo")
+if hits.size == 0 {
+  println("  (no results)")
+} else {
+  foreach h: Song in hits { println("  " + h.label()) }
+}
+
+// 3. Playlist of Pop + Electronic
+val pl = new Playlist("Vibes")
+foreach s: Song in store.catalog {
+  select s.genre() {
+    case Genre::Pop:        pl.add(s)
+    case Genre::Electronic: pl.add(s)
+    else:
+  }
+}
+println("\n=== #{pl.summary()} ===")
+foreach s: Song in pl.songs { println("  " + s.label()) }
+
+// 4. Genre stats
+println("\n=== Genre Play Counts ===")
+foreach line: String in store.genreStats() { println("  " + line) }
+
+// 5. User play rates
+println("\n=== User Play Rates ===")
+foreach line: String in store.playRateByUser() { println("  " + line) }
+
+// 6. Top 3 artists
+println("\n=== Top Artists ===")
+val top = store.topArtists(3)
+var rank = 1
+foreach a: String in top {
+  println("  #{rank}. #{a}")
+  rank = rank + 1
+}
+
+// 7. Track extremes
+val shortest = store.shortestSong()
+val longest  = store.longestSong()
+println("\n=== Track Extremes ===")
+if shortest != null { println("  Shortest: #{shortest.label()}") }
+if longest  != null { println("  Longest:  #{longest.label()}")  }
+
+// 8. Energy partition of recent songs (2020+)
+val recent  = (store.catalog as List[Object]).filter { s -> (s as Song).year() >= 2020 }
+val parts   = recent.partition { s -> (s as Song).genre().energy() >= 7 }
+val hiE     = parts[0] as List[Object]
+val loE     = parts[1] as List[Object]
+println("\n=== Recent Songs by Energy (2020+) ===")
+println("  High energy (>=7): #{hiE.size} songs")
+foreach s: Object in hiE { println("    " + (s as Song).label()) }
+println("  Low  energy (<7):  #{loE.size} songs")
+foreach s: Object in loE { println("    " + (s as Song).label()) }
+
+// 9. Queue demo — play top-3 longest tracks
+println("\n=== Play Queue Demo ===")
+val q: Queue[Song] = new Queue[Song]()
+val descByDur = (store.catalog as List[Object]).sortedBy { s -> -(s as Song).durationMs() }
+var qi = 0
+foreach s: Object in descByDur {
+  if qi < 3 {
+    q.enqueue(s as Song)
+    qi = qi + 1
+  }
+}
+println("  Queued #{q.size()} songs")
+while !q.isEmpty() {
+  val next: Song? = q.dequeue()
+  if next != null { println("  > " + next.label()) }
+}
+
+// 10. select on PlayResult for last few events
+println("\n=== Recent Play Events ===")
+val lastFive = (store.history as List[Object]).filter { e ->
+  (store.history as List[Object]).indexOf(e) >= store.history.size - 5
+}
+foreach e: Object in lastFive {
+  val ev = e as PlayEvent
+  val res = ev.result()
+  val tag = select res {
+    case r is Played:  "[PLAY]"
+    case r is Skipped: "[SKIP]"
+    case r is Error:   "[ERR]"
+  }
+  println("  #{tag} #{ev.userId()} — #{ev.song().title()} — #{res.label()}")
+}
+
+// 11. Library totals
+var totalMs: Long = 0L
+foreach s: Song in store.catalog { totalMs = totalMs + s.durationMs() }
+val totalMin = (totalMs / 60000L) as Int
+val totalSec = ((totalMs % 60000L) / 1000L) as Int
+println("\n=== Library Stats ===")
+println("  Songs:          #{store.catalog.size}")
+println("  Total duration: #{totalMin} min #{totalSec} sec")
+println("  Play events:    #{store.history.size}")
+val userSet: List[String] = []
+foreach e: PlayEvent in store.history {
+  if !userSet.contains(e.userId()) { userSet.add(e.userId()) }
+}
+println("  Users:          #{userSet.size}")

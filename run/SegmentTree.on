@@ -1,0 +1,240 @@
+// SegmentTree.on — Segment tree for range-sum, range-min, and range-max
+//   queries with point updates, demonstrated on monthly weather data.
+//
+// Two flat Int[] arrays (one per tree type) use the standard 1-indexed
+// heap layout: children of node k are 2k and 2k+1; allocate 4*n slots.
+//
+// Exercises: flat Int[] arrays, recursive build/query/update, ADT
+//   case-enum, records, foreach over ranges, static val, string
+//   interpolation, helper functions returning Int.
+
+import { java.util.List; }
+
+static val INF: Int = 2147483647
+
+// ── Tree helpers ──────────────────────────────────────────────────────────────
+
+def buildSum(t: Int[], data: Int[], nd: Int, lo: Int, hi: Int): void {
+  if lo == hi {
+    t[nd] = data[lo]
+  } else {
+    val mid: Int = (lo + hi) / 2
+    buildSum(t, data, nd * 2, lo, mid)
+    buildSum(t, data, nd * 2 + 1, mid + 1, hi)
+    t[nd] = t[nd * 2] + t[nd * 2 + 1]
+  }
+}
+
+def querySum(t: Int[], nd: Int, lo: Int, hi: Int, l: Int, r: Int): Int {
+  if r < lo || hi < l { return 0 }
+  if l <= lo && hi <= r { return t[nd] }
+  val mid: Int = (lo + hi) / 2
+  return querySum(t, nd * 2, lo, mid, l, r) +
+         querySum(t, nd * 2 + 1, mid + 1, hi, l, r)
+}
+
+def updateSum(t: Int[], nd: Int, lo: Int, hi: Int, pos: Int, nv: Int): void {
+  if lo == hi {
+    t[nd] = nv
+  } else {
+    val mid: Int = (lo + hi) / 2
+    if pos <= mid { updateSum(t, nd * 2, lo, mid, pos, nv) }
+    else          { updateSum(t, nd * 2 + 1, mid + 1, hi, pos, nv) }
+    t[nd] = t[nd * 2] + t[nd * 2 + 1]
+  }
+}
+
+def buildMin(t: Int[], data: Int[], nd: Int, lo: Int, hi: Int): void {
+  if lo == hi {
+    t[nd] = data[lo]
+  } else {
+    val mid: Int = (lo + hi) / 2
+    buildMin(t, data, nd * 2, lo, mid)
+    buildMin(t, data, nd * 2 + 1, mid + 1, hi)
+    t[nd] = if t[nd * 2] < t[nd * 2 + 1] { t[nd * 2] } else { t[nd * 2 + 1] }
+  }
+}
+
+def queryMin(t: Int[], nd: Int, lo: Int, hi: Int, l: Int, r: Int): Int {
+  if r < lo || hi < l { return INF }
+  if l <= lo && hi <= r { return t[nd] }
+  val mid: Int = (lo + hi) / 2
+  val lv: Int = queryMin(t, nd * 2, lo, mid, l, r)
+  val rv: Int = queryMin(t, nd * 2 + 1, mid + 1, hi, l, r)
+  return if lv < rv { lv } else { rv }
+}
+
+def updateMin(t: Int[], nd: Int, lo: Int, hi: Int, pos: Int, nv: Int): void {
+  if lo == hi {
+    t[nd] = nv
+  } else {
+    val mid: Int = (lo + hi) / 2
+    if pos <= mid { updateMin(t, nd * 2, lo, mid, pos, nv) }
+    else          { updateMin(t, nd * 2 + 1, mid + 1, hi, pos, nv) }
+    t[nd] = if t[nd * 2] < t[nd * 2 + 1] { t[nd * 2] } else { t[nd * 2 + 1] }
+  }
+}
+
+def buildMax(t: Int[], data: Int[], nd: Int, lo: Int, hi: Int): void {
+  if lo == hi {
+    t[nd] = data[lo]
+  } else {
+    val mid: Int = (lo + hi) / 2
+    buildMax(t, data, nd * 2, lo, mid)
+    buildMax(t, data, nd * 2 + 1, mid + 1, hi)
+    t[nd] = if t[nd * 2] > t[nd * 2 + 1] { t[nd * 2] } else { t[nd * 2 + 1] }
+  }
+}
+
+def queryMax(t: Int[], nd: Int, lo: Int, hi: Int, l: Int, r: Int): Int {
+  if r < lo || hi < l { return -INF }
+  if l <= lo && hi <= r { return t[nd] }
+  val mid: Int = (lo + hi) / 2
+  val lv: Int = queryMax(t, nd * 2, lo, mid, l, r)
+  val rv: Int = queryMax(t, nd * 2 + 1, mid + 1, hi, l, r)
+  return if lv > rv { lv } else { rv }
+}
+
+def updateMax(t: Int[], nd: Int, lo: Int, hi: Int, pos: Int, nv: Int): void {
+  if lo == hi {
+    t[nd] = nv
+  } else {
+    val mid: Int = (lo + hi) / 2
+    if pos <= mid { updateMax(t, nd * 2, lo, mid, pos, nv) }
+    else          { updateMax(t, nd * 2 + 1, mid + 1, hi, pos, nv) }
+    t[nd] = if t[nd * 2] > t[nd * 2 + 1] { t[nd * 2] } else { t[nd * 2 + 1] }
+  }
+}
+
+// ── Season helper ─────────────────────────────────────────────────────────────
+
+static val MONTHS: List[String] = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+def monthName(i: Int): String = (MONTHS[i] as String)
+
+def seasonName(start: Int, end: Int): String {
+  val s: String = monthName(start)
+  val e: String = monthName(end)
+  return "#{s}-#{e}"
+}
+
+// ── Query result ADT ──────────────────────────────────────────────────────────
+
+enum QueryResult {
+  case SumResult(total: Int, label: String)
+  case MinResult(minimum: Int, label: String)
+  case MaxResult(maximum: Int, label: String)
+public:
+  def display(): String = select this {
+    case r is SumResult: "Sum  [#{r.label()}]: #{r.total()} mm"
+    case r is MinResult: "Min  [#{r.label()}]: #{r.minimum()} °C"
+    case r is MaxResult: "Max  [#{r.label()}]: #{r.maximum()} °C"
+  }
+}
+
+// ── Demo helpers ──────────────────────────────────────────────────────────────
+
+def printArray(label: String, data: Int[], months: Int): void {
+  IO::print("#{label}: [")
+  foreach i: Int in 0..<months {
+    if i > 0 { IO::print(", ") }
+    IO::print("#{data[i]}")
+  }
+  IO::println("]")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val N: Int = 12
+
+  // ── Dataset 1: monthly rainfall (mm) ────────────────────────────────────────
+  val rain: Int[] = new Int[N]
+  rain[0] = 48; rain[1] = 36; rain[2] = 62; rain[3] = 71
+  rain[4] = 55; rain[5] = 38; rain[6] = 22; rain[7] = 19
+  rain[8] = 41; rain[9] = 74; rain[10] = 83; rain[11] = 57
+
+  val sumT: Int[] = new Int[4 * N]
+  buildSum(sumT, rain, 1, 0, N - 1)
+
+  IO::println("=== Monthly Rainfall (mm) ===")
+  printArray("Data", rain, N)
+  IO::println("")
+
+  // season queries (0-indexed months)
+  IO::println("Season totals:")
+  foreach q: Int in 0..<4 {
+    val l: Int = q * 3
+    val r: Int = l + 2
+    val total: Int = querySum(sumT, 1, 0, N - 1, l, r)
+    val res: QueryResult = new SumResult(total, seasonName(l, r))
+    IO::println("  #{res.display()}")
+  }
+
+  // single-month lookup via range query
+  IO::println("")
+  IO::println("Single-month check (June = index 5):")
+  val juneTotal: Int = querySum(sumT, 1, 0, N - 1, 5, 5)
+  IO::println("  querySum[5,5] = #{juneTotal} mm  (raw data: #{rain[5]} mm)")
+
+  // point update: sensor correction for October
+  IO::println("")
+  IO::println("Correction: October reading was 74, corrected to 69 mm")
+  updateSum(sumT, 1, 0, N - 1, 9, 69)
+  rain[9] = 69
+  val q4New: Int = querySum(sumT, 1, 0, N - 1, 9, 11)
+  IO::println("  Q4 total after correction: #{q4New} mm")
+
+  val annualTotal: Int = querySum(sumT, 1, 0, N - 1, 0, N - 1)
+  IO::println("  Annual total: #{annualTotal} mm")
+
+  // ── Dataset 2: mean daily temperature (°C) ──────────────────────────────────
+  val temp: Int[] = new Int[N]
+  temp[0] = 3;  temp[1] = 4;  temp[2] = 8;  temp[3] = 13
+  temp[4] = 18; temp[5] = 22; temp[6] = 25; temp[7] = 24
+  temp[8] = 20; temp[9] = 14; temp[10] = 8; temp[11] = 4
+
+  val minT: Int[] = new Int[4 * N]
+  val maxT: Int[] = new Int[4 * N]
+  buildMin(minT, temp, 1, 0, N - 1)
+  buildMax(maxT, temp, 1, 0, N - 1)
+
+  IO::println("")
+  IO::println("=== Monthly Mean Temperatures (°C) ===")
+  printArray("Data", temp, N)
+  IO::println("")
+
+  // winter span: Dec(11) wraps, so check Nov(10)-Jan(0) as two queries
+  val winterMin1: Int = queryMin(minT, 1, 0, N - 1, 0, 1)   // Jan-Feb
+  val winterMin2: Int = queryMin(minT, 1, 0, N - 1, 10, 11) // Nov-Dec
+  val winterMin: Int  = if winterMin1 < winterMin2 { winterMin1 } else { winterMin2 }
+  IO::println("Winter (Nov-Feb) coldest month: #{winterMin} °C")
+
+  val summerMax: Int = queryMax(maxT, 1, 0, N - 1, 5, 8)
+  IO::println("Summer (Jun-Sep) hottest month: #{summerMax} °C")
+
+  IO::println("")
+  IO::println("Quarter min/max:")
+  foreach q: Int in 0..<4 {
+    val l: Int = q * 3
+    val r: Int = l + 2
+    val mn: Int = queryMin(minT, 1, 0, N - 1, l, r)
+    val mx: Int = queryMax(maxT, 1, 0, N - 1, l, r)
+    val minRes: QueryResult = new MinResult(mn, seasonName(l, r))
+    val maxRes: QueryResult = new MaxResult(mx, seasonName(l, r))
+    IO::println("  #{minRes.display()}")
+    IO::println("  #{maxRes.display()}")
+  }
+
+  // point update: weather station recalibration for July
+  IO::println("")
+  IO::println("Recalibration: July mean corrected from 25 to 26 °C")
+  updateMin(minT, 1, 0, N - 1, 6, 26)
+  updateMax(maxT, 1, 0, N - 1, 6, 26)
+  temp[6] = 26
+  val newSummerMax: Int = queryMax(maxT, 1, 0, N - 1, 5, 8)
+  IO::println("  Summer max after update: #{newSummerMax} °C")
+
+  IO::println("")
+  IO::println("All queries completed. Segment tree height for N=12: ~4 levels.")
+}

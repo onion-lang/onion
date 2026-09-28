@@ -1,0 +1,327 @@
+// RunLengthCoder.on — Run-length encoding and decoding with statistics
+// Exercises: ADT case-enum (RleToken: Literal/Run), records with methods,
+// class with typed-Map state, collection pipelines (map / filter / fold /
+// sortedBy), select type-pattern matching, ranges (0..<n), nullable types,
+// foreach (k,v) over Map[String,Int], string interpolation, while / foreach.
+
+// ─── Token ADT ───────────────────────────────────────────────────────────────
+
+enum RleToken {
+  case Literal(char: String)
+  case Run(char: String, count: Int)
+public:
+  def charVal(): String = select this {
+    case l is Literal: l.char()
+    case r is Run:     r.char()
+  }
+  def length(): Int = select this {
+    case l is Literal: 1
+    case r is Run:     r.count()
+  }
+  def describe(): String = select this {
+    case l is Literal: "'#{l.char()}'"
+    case r is Run:     "#{r.count()}x'#{r.char()}'"
+  }
+}
+
+// ─── Compression result ───────────────────────────────────────────────────────
+
+record CompressionStats(
+  label:        String,
+  originalLen:  Int,
+  encodedLen:   Int,
+  tokensCount:  Int
+) {
+public:
+  def ratio(): Int = if originalLen == 0 { 100 } else { (encodedLen * 100) / originalLen }
+  def saved(): Int = originalLen - encodedLen
+  def expansionLabel(): String =
+    if encodedLen < originalLen { "compressed" }
+    else if encodedLen == originalLen { "unchanged" }
+    else { "expanded" }
+}
+
+// ─── Coder ───────────────────────────────────────────────────────────────────
+
+class RunLengthCoder {
+  var minRun: Int     // minimum run length to encode as a Run token
+
+public:
+  def this(minRun: Int) {
+    this.minRun = minRun
+  }
+
+  /** Tokenise `text` into a list of Literal / Run tokens. */
+  def tokenise(text: String): List[RleToken] {
+    val tokens: List[RleToken] = []
+    if text.length == 0 { return tokens }
+
+    var i: Int = 0
+    while i < text.length {
+      val c     = text.substring(i, i + 1)
+      var runLen: Int = 1
+      while i + runLen < text.length && text.substring(i + runLen, i + runLen + 1) == c {
+        runLen++
+      }
+      if runLen >= minRun {
+        tokens.add(new Run(c, runLen))
+      } else {
+        var j: Int = 0
+        while j < runLen { tokens.add(new Literal(c)); j++ }
+      }
+      i = i + runLen
+    }
+    return tokens
+  }
+
+  /** Encode `text` to a compact string using the format `<count>:<char>` for runs. */
+  def encode(text: String): String {
+    val tokens: List[RleToken] = tokenise(text)
+    var result: String = ""
+    foreach t: RleToken in tokens {
+      select t {
+        case l is Literal: result = result + l.char()
+        case r is Run:     result = result + "#{r.count()}:#{r.char()}"
+      }
+    }
+    return result
+  }
+
+  /** Decode a string produced by `encode`. */
+  def decode(encoded: String): String {
+    var result: String = ""
+    var i: Int = 0
+    while i < encoded.length {
+      val c = encoded.substring(i, i + 1)
+      // Check if this starts a run: a digit followed by ':'
+      if isDigit(c) {
+        // Collect all digit characters
+        var numStr: String = ""
+        while i < encoded.length && isDigit(encoded.substring(i, i + 1)) {
+          numStr = numStr + encoded.substring(i, i + 1)
+          i++
+        }
+        // Expect ':'
+        if i < encoded.length && encoded.substring(i, i + 1) == ":" {
+          i++  // skip ':'
+          if i < encoded.length {
+            val runChar = encoded.substring(i, i + 1)
+            var k: Int = 0
+            while k < JInteger::parseInt(numStr) { result = result + runChar; k++ }
+            i++
+          }
+        } else {
+          // Malformed: treat digits as literals
+          result = result + numStr
+        }
+      } else {
+        result = result + c
+        i++
+      }
+    }
+    return result
+  }
+
+  /** Build a CompressionStats for the given text. */
+  def stats(label: String, text: String): CompressionStats {
+    val tokens  = tokenise(text)
+    val encoded = encode(text)
+    return new CompressionStats(label, text.length, encoded.length, tokens.size)
+  }
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+def isDigit(c: String): Boolean {
+  return "0123456789".indexOf(c) >= 0
+}
+
+// ─── Character frequency analysis ────────────────────────────────────────────
+
+def charFreq(text: String): Map[String, Int] {
+  var freq: Map[String, Int] = [:]
+  var i: Int = 0
+  while i < text.length {
+    val c  = text.substring(i, i + 1)
+    val cur = freq.get(c)
+    if cur == null { freq.put(c, 1) } else { freq.put(c, (cur as Int) + 1) }
+    i++
+  }
+  return freq
+}
+
+def topChars(freq: Map[String, Int], n: Int): List[Object] {
+  var entries: List[Object] = []
+  foreach (k, v) in freq {
+    entries.add("#{v as Int}|#{k as String}")
+  }
+  // Sort descending by count — encode as negative so sortedBy (ascending) works
+  entries = entries.sortedBy { e ->
+    val s = e as String
+    val pipe = s.indexOf("|")
+    -(JInteger::parseInt(s.substring(0, pipe)))
+  }
+  var top: List[Object] = []
+  var i: Int = 0
+  while i < n && i < entries.size { top.add(entries.get(i)); i++ }
+  return top
+}
+
+// ─── Display helpers ──────────────────────────────────────────────────────────
+
+def bar(filled: Int, total: Int, width: Int): String {
+  val filledW = if total == 0 { 0 } else { (filled * width) / total }
+  var s: String = ""
+  var k: Int = 0
+  while k < width {
+    val ch = if k < filledW { "#" } else { "." }
+    s = s + ch
+    k++
+  }
+  return s
+}
+
+def pad(s: String, n: Int): String {
+  var r = s
+  while r.length < n { r = r + " " }
+  return r
+}
+
+def printStats(st: CompressionStats): void {
+  val ratio = st.ratio()
+  IO::println("  #{pad(st.label(), 24)}  #{pad("" + st.originalLen, 5)} → #{pad("" + st.encodedLen, 5)}  " +
+              "[#{bar(st.encodedLen, st.originalLen, 20)}] #{ratio}%  (#{st.expansionLabel()})")
+}
+
+// ─── Test patterns ────────────────────────────────────────────────────────────
+
+def repeat(c: String, n: Int): String {
+  var s: String = ""
+  var k: Int = 0
+  while k < n { s = s + c; k++ }
+  return s
+}
+
+def zigzag(n: Int): String {
+  var s: String = ""
+  foreach i: Int in 0..<n {
+    val ch = if i % 2 == 0 { "A" } else { "B" }
+    s = s + ch
+  }
+  return s
+}
+
+def gradient(n: Int): String {
+  var s: String = ""
+  var c: Int = 0
+  while c < n {
+    val runLen = c + 1
+    val ch = if c % 3 == 0 { "X" } else if c % 3 == 1 { "Y" } else { "Z" }
+    var k: Int = 0
+    while k < runLen { s = s + ch; k++ }
+    c++
+  }
+  return s
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val sep60 = repeat("-", 60)
+  IO::println(sep60)
+  IO::println("  RUN-LENGTH ENCODING SUITE")
+  IO::println(sep60)
+
+  // ── Test cases ─────────────────────────────────────────────────────────────
+  val coder = new RunLengthCoder(3)
+
+  IO::println("\n── Encode / decode roundtrips (minRun=3) ──────────────────")
+  val testCases: List[String] = [
+    "AAABBBCCC",
+    "AAAAAAAABBBBBBBBCCCCCCCC",
+    "the quick brown fox",
+    "AAABBCDDDDEEEEEFFFFFF",
+    repeat("X", 20),
+    zigzag(16),
+    "helloooo world!!!!",
+    ""
+  ]
+
+  foreach raw: String in testCases {
+    val encoded  = coder.encode(raw)
+    val decoded  = coder.decode(encoded)
+    val ok       = decoded == raw
+    val origLen  = raw.length
+    val encLen   = encoded.length
+    val display  = if raw.length > 30 { raw.substring(0, 27) + "..." } else { raw }
+    IO::println("  in : \"#{display}\"  (#{origLen} chars)")
+    IO::println("  enc: \"#{encoded}\"  (#{encLen} chars)  ok=#{ok}")
+  }
+
+  // ── Compression stats across minRun values ─────────────────────────────────
+  IO::println("\n── Compression ratio vs minRun threshold ─────────────────")
+  IO::println("  " + pad("Sample", 24) + "  orig →  enc  [ratio              ]")
+  IO::println("  " + repeat("-", 55))
+
+  val longRepeat  = repeat("A", 40) + repeat("B", 30) + repeat("C", 20)
+  val dna         = "ATGATCGATCGATCGATCGATCGATCGGGGGGGGGGGGGGATTTTTTTTTTT"
+  val lorem       = "Lorem ipsum dolor sit amet consectetur adipiscing elit"
+  val binary      = repeat("10", 25)
+
+  foreach thresh: Int in [2, 3, 4, 5] {
+    val c2 = new RunLengthCoder(thresh)
+    IO::println("  minRun=#{thresh}:")
+    val s1 = c2.stats("long-repeat", longRepeat)
+    val s2 = c2.stats("dna-seq", dna)
+    val s3 = c2.stats("lorem-ipsum", lorem)
+    val s4 = c2.stats("binary-10x25", binary)
+    printStats(s1)
+    printStats(s2)
+    printStats(s3)
+    printStats(s4)
+  }
+
+  // ── Token inspection ───────────────────────────────────────────────────────
+  IO::println("\n── Token breakdown for DNA sample ────────────────────────")
+  val coder3  = new RunLengthCoder(3)
+  val tokens3 = coder3.tokenise(dna)
+  var runCount: Int = 0
+  var litCount: Int = 0
+  foreach t: RleToken in tokens3 {
+    select t {
+      case r is Run:     runCount++
+      case l is Literal: litCount++
+    }
+  }
+  IO::println("  Text    : \"#{dna}\"")
+  IO::println("  Tokens  : #{tokens3.size}  (#{runCount} runs, #{litCount} literals)")
+  IO::println("  Encoded : \"#{coder3.encode(dna)}\"")
+  foreach t: RleToken in tokens3 {
+    IO::println("    #{t.describe()}  (#{t.length()} chars)")
+  }
+
+  // ── Character frequency of the DNA sample ──────────────────────────────────
+  IO::println("\n── Character frequency in DNA sample ─────────────────────")
+  val freq = charFreq(dna)
+  val top  = topChars(freq, freq.size)
+  foreach e: Object in top {
+    val s    = e as String
+    val pipe = s.indexOf("|")
+    val cnt  = JInteger::parseInt(s.substring(0, pipe))
+    val ch   = s.substring(pipe + 1)
+    IO::println("  '#{ch}' : #{cnt}  #{bar(cnt, dna.length, 20)}")
+  }
+
+  // ── Gradient pattern demo ─────────────────────────────────────────────────
+  IO::println("\n── Gradient pattern: run lengths grow ────────────────────")
+  val grad    = gradient(6)
+  val genc    = coder.encode(grad)
+  val gdec    = coder.decode(genc)
+  IO::println("  Pattern : #{grad}")
+  IO::println("  Encoded : #{genc}")
+  IO::println("  Roundtrip OK: #{gdec == grad}")
+
+  IO::println("\n" + sep60)
+  IO::println("  All roundtrips verified.")
+  IO::println(sep60)
+}

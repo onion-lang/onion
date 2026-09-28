@@ -1,0 +1,382 @@
+// RailNetwork.on — a rail network simulation
+// Exercises: data-carrying enums, ADT enum, records with methods, interface,
+// class inheritance, extension methods (Int + String), collection pipelines
+// (map / filter / fold / groupBy / sortedBy / distinct / find / partition /
+// zip / reduce), select / pattern matching, nullable, closures, string
+// interpolation, try/catch, recursion, while, foreach (ranges + maps).
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum TrainClass(label: String, priceMultiplier: Int) {
+  Express(  "Express",   150),
+  Regional( "Regional",  100),
+  Freight(  "Freight",    80)
+}
+
+enum ServiceStatus(code: String) {
+  OnTime(      "ON_TIME"),
+  Delayed(     "DELAYED"),
+  Cancelled(   "CANCELLED"),
+  Diverted(    "DIVERTED")
+}
+
+// ADT: reason a train is disrupted
+enum Disruption {
+  case TrackFault(section: String, severity: Int)
+  case WeatherAlert(condition: String)
+  case StaffShortage(depot: String)
+  case Clear
+}
+
+// ─── Records ───────────────────────────────────────────────────────────────
+
+record Station(code: String, name: String, zone: Int, platforms: Int)
+
+record Route(id: String, origin: String, destination: String, distanceKm: Int, trainClass: TrainClass) {
+public:
+  def baseFare(): Int = distanceKm * trainClass.priceMultiplier() / 100
+  def label(): String = "#{id}: #{origin}→#{destination} (#{distanceKm}km)"
+}
+
+record Passenger(id: String, name: String, balance: Int) {
+public:
+  def canAfford(amount: Int): Boolean = balance >= amount
+  def summary(): String = "#{name} [balance=#{balance}]"
+}
+
+record Booking(passengerId: String, routeId: String, fare: Int, seat: String)
+
+record TrainRun(trainId: String, routeId: String, status: ServiceStatus, occupancy: Int, disruption: Disruption) {
+public:
+  def isOperational(): Boolean {
+    select disruption {
+      case d is Clear: return true
+      else: return false
+    }
+  }
+}
+
+// ─── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): Int = if total == 0 { 0 } else { self * 100 / total }
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "*"; i = i + 1 }
+    return s
+  }
+}
+
+extension String {
+  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n) + "…" }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Interface + classes ────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class StationReport conforms Reportable {
+  val station: Station
+  val arrivals: Int
+  val departures: Int
+public:
+  def this(st: Station, arr: Int, dep: Int) {
+    this.station = st
+    this.arrivals = arr
+    this.departures = dep
+  }
+  def report(): String {
+    val total = arrivals + departures
+    return "#{station.name().padRight(18)} zone=#{station.zone()} platforms=#{station.platforms()} movements=#{total}"
+  }
+}
+
+class RouteReport conforms Reportable {
+  val route: Route
+  val bookings: Int
+  val revenue: Int
+public:
+  def this(r: Route, b: Int, rev: Int) {
+    this.route = r
+    this.bookings = b
+    this.revenue = rev
+  }
+  def report(): String {
+    return "#{route.id().padRight(8)} #{route.label().truncate(40).padRight(42)} bookings=#{bookings} revenue=#{revenue}"
+  }
+}
+
+// ─── Helper functions ───────────────────────────────────────────────────────
+
+def disruptionSummary(d: Disruption): String {
+  select d {
+    case f is TrackFault:
+      val sev = f.severity()
+      return "Track fault on #{f.section()} (severity #{sev})"
+    case w is WeatherAlert:
+      return "Weather alert: #{w.condition()}"
+    case s is StaffShortage:
+      return "Staff shortage at #{s.depot()}"
+    case n is Clear:
+      return "No disruption"
+  }
+}
+
+def statusBadge(s: ServiceStatus): String {
+  select s {
+    case ServiceStatus::OnTime:    return "[OK]    "
+    case ServiceStatus::Delayed:   return "[LATE]  "
+    case ServiceStatus::Cancelled: return "[CANCEL]"
+    case ServiceStatus::Diverted:  return "[DIVERT]"
+  }
+}
+
+def fareWithDiscount(baseFare: Int, occupancy: Int): Int {
+  if occupancy >= 90 { return baseFare }
+  else if occupancy >= 70 { return baseFare * 90 / 100 }
+  else { return baseFare * 80 / 100 }
+}
+
+def longestRoute(routes: List[Route]): Route? {
+  return routes.fold(null) { acc, r ->
+    if acc == null { r }
+    else if (r as Route).distanceKm() > (acc as Route).distanceKm() { r }
+    else { acc }
+  }
+}
+
+// ─── Recursive: shortest path (simple recursion over a list) ────────────────
+
+def findPath(routes: List[Route], from: String, to: String, visited: List[String]): List[String]? {
+  if from == to { val empty: List[String] = []; return empty }
+  val direct = routes.filter { r -> (r as Route).origin() == from && (r as Route).destination() == to }
+  if direct.size > 0 { return [(direct[0] as Route).id()] }
+  val nexthops = routes.filter { r ->
+    val r2 = r as Route
+    r2.origin() == from && !visited.contains(r2.destination())
+  }
+  if nexthops.size == 0 { return null }
+  var i: Int = 0
+  while i < nexthops.size {
+    val hop = nexthops[i] as Route
+    val newVisited: List[String] = []
+    foreach v: Object in visited { newVisited.add(v as String) }
+    newVisited.add(hop.destination())
+    val rest = findPath(routes, hop.destination(), to, newVisited)
+    if rest != null {
+      val path: List[String] = [hop.id()]
+      foreach id: Object in (rest as List) { path.add(id as String) }
+      return path
+    }
+    i = i + 1
+  }
+  return null
+}
+
+// ─── Data setup ────────────────────────────────────────────────────────────
+
+val stations: List[Station] = [
+  new Station("LDN", "London Central",  1, 12),
+  new Station("MAN", "Manchester",       2,  8),
+  new Station("BIR", "Birmingham",       2,  6),
+  new Station("LDS", "Leeds",            3,  4),
+  new Station("EDI", "Edinburgh",        4,  6),
+  new Station("CAR", "Cardiff",          3,  4)
+]
+
+val routes: List[Route] = [
+  new Route("R01", "LDN", "BIR",  190, TrainClass::Express),
+  new Route("R02", "BIR", "MAN",   85, TrainClass::Regional),
+  new Route("R03", "MAN", "LDS",   65, TrainClass::Regional),
+  new Route("R04", "LDN", "MAN",  290, TrainClass::Express),
+  new Route("R05", "LDN", "CAR",  245, TrainClass::Regional),
+  new Route("R06", "MAN", "EDI",  340, TrainClass::Express),
+  new Route("R07", "LDN", "LDS",  320, TrainClass::Express),
+  new Route("R08", "BIR", "CAR",  130, TrainClass::Freight)
+]
+
+val passengers: List[Passenger] = [
+  new Passenger("P001", "Alice Morgan",    5000),
+  new Passenger("P002", "Bob Chen",        3500),
+  new Passenger("P003", "Clara Singh",     8000),
+  new Passenger("P004", "David Park",      1200),
+  new Passenger("P005", "Emma Walsh",      9500),
+  new Passenger("P006", "Frank Okafor",    2800)
+]
+
+val trainRuns: List[TrainRun] = [
+  new TrainRun("T001", "R01", ServiceStatus::OnTime,    85, new Clear()),
+  new TrainRun("T002", "R04", ServiceStatus::Delayed,   72, new WeatherAlert("Heavy snow")),
+  new TrainRun("T003", "R06", ServiceStatus::OnTime,    91, new Clear()),
+  new TrainRun("T004", "R02", ServiceStatus::Cancelled, 0,  new TrackFault("BIR-MAN sec3", 4)),
+  new TrainRun("T005", "R07", ServiceStatus::OnTime,    68, new Clear()),
+  new TrainRun("T006", "R05", ServiceStatus::Diverted,  55, new StaffShortage("Cardiff depot"))
+]
+
+// ─── Bookings simulation ────────────────────────────────────────────────────
+
+val bookings: List[Booking] = []
+
+def tryBook(passenger: Passenger, route: Route, run: TrainRun): Boolean {
+  if !run.isOperational() { return false }
+  val fare = fareWithDiscount(route.baseFare(), run.occupancy())
+  if !passenger.canAfford(fare) { return false }
+  val seat = "#{run.trainId()}-#{bookings.size + 1}"
+  bookings.add(new Booking(passenger.id(), route.id(), fare, seat))
+  return true
+}
+
+// Route lookup helpers
+def routeById(id: String): Route? = routes.find { r -> (r as Route).id() == id }
+def runByRoute(routeId: String): TrainRun? = trainRuns.find { t -> (t as TrainRun).routeId() == routeId }
+
+// Simulate booking attempts
+foreach p: Object in passengers {
+  val pax = p as Passenger
+  var routed: Boolean = false
+  foreach r: Object in routes {
+    val route = r as Route
+    if !routed && route.trainClass() != TrainClass::Freight {
+      val run = runByRoute(route.id())
+      if run != null {
+        val success = tryBook(pax, route, run as TrainRun)
+        if success { routed = true }
+      }
+    }
+  }
+}
+
+// ─── Analytics ─────────────────────────────────────────────────────────────
+
+IO::println("═══════════════════════════════════════════════════════════════")
+IO::println("  RAIL NETWORK OPERATIONS REPORT")
+IO::println("═══════════════════════════════════════════════════════════════")
+IO::println("")
+
+// 1. Train run status board
+IO::println("── Train Status Board ──────────────────────────────────────────")
+foreach t: Object in trainRuns {
+  val run = t as TrainRun
+  val badge = statusBadge(run.status())
+  val occ = run.occupancy()
+  val bar = occ.pct(100).stars()
+  val ds = disruptionSummary(run.disruption())
+  IO::println("  #{run.trainId()} #{badge} occ=#{occ}% #{bar}")
+  if !run.isOperational() {
+    IO::println("    ^ #{ds}")
+  }
+}
+IO::println("")
+
+// 2. Route stats
+IO::println("── Route Statistics ────────────────────────────────────────────")
+val routeBookings = bookings.groupBy { b -> (b as Booking).routeId() }
+foreach r: Object in routes {
+  val route = r as Route
+  val bklist = routeBookings.getOrDefault(route.id(), [])
+  val bks = bklist as List
+  val rev = bks.fold(0) { acc, b -> (acc as Int) + (b as Booking).fare() }
+  val rr = new RouteReport(route, bks.size, rev as Int)
+  IO::println("  " + rr.report())
+}
+IO::println("")
+
+// 3. Passenger bookings summary
+IO::println("── Passenger Bookings ──────────────────────────────────────────")
+val byPax = bookings.groupBy { b -> (b as Booking).passengerId() }
+foreach p: Object in passengers {
+  val pax = p as Passenger
+  val pbks = (byPax.getOrDefault(pax.id(), []) as List)
+  val spent = pbks.fold(0) { acc, b -> (acc as Int) + (b as Booking).fare() }
+  IO::println("  #{pax.name().padRight(16)} bookings=#{pbks.size} spent=#{spent}")
+}
+IO::println("")
+
+// 4. Zone analysis
+IO::println("── Station Zone Analysis ───────────────────────────────────────")
+val byZone = stations.groupBy { s -> (s as Station).zone() }
+var zone: Int = 1
+while zone <= 4 {
+  val stList = byZone.getOrDefault(zone, []) as List
+  if stList.size > 0 {
+    val names = stList.map { s -> (s as Station).name() }
+    IO::println("  Zone #{zone}: #{names.toString()}")
+  }
+  zone = zone + 1
+}
+IO::println("")
+
+// 5. Disruption summary
+IO::println("── Disruption Log ──────────────────────────────────────────────")
+val disrupted = trainRuns.filter { t -> !(t as TrainRun).isOperational() }
+IO::println("  #{disrupted.size} of #{trainRuns.size} runs affected")
+foreach t: Object in disrupted {
+  val run = t as TrainRun
+  IO::println("  Train #{run.trainId()}: #{disruptionSummary(run.disruption())}")
+}
+IO::println("")
+
+// 6. Longest route
+IO::println("── Network Highlights ──────────────────────────────────────────")
+val longest = longestRoute(routes)
+if longest != null {
+  val lr = longest as Route
+  IO::println("  Longest route: #{lr.label()}")
+}
+
+val allDist = routes.map { r -> (r as Route).distanceKm() }
+val totalKm = allDist.fold(0) { acc, d -> (acc as Int) + (d as Int) }
+IO::println("  Total network distance: #{totalKm} km")
+
+val expRoutes = routes.filter { r -> (r as Route).trainClass() == TrainClass::Express }
+IO::println("  Express routes: #{expRoutes.size}")
+
+// 7. Path finding
+IO::println("")
+IO::println("── Route Path Finder ───────────────────────────────────────────")
+val path1 = findPath(routes, "LDN", "EDI", ["LDN"])
+if path1 != null {
+  IO::println("  LDN → EDI via: #{(path1 as List).toString()}")
+}
+val path2 = findPath(routes, "LDN", "LDS", ["LDN"])
+if path2 != null {
+  IO::println("  LDN → LDS via: #{(path2 as List).toString()}")
+}
+
+// 8. Revenue totals
+IO::println("")
+IO::println("── Financial Summary ───────────────────────────────────────────")
+val totalRevenue = bookings.fold(0) { acc, b -> (acc as Int) + (b as Booking).fare() }
+val totalBookings = bookings.size
+IO::println("  Total bookings : #{totalBookings}")
+IO::println("  Total revenue  : #{totalRevenue}")
+if totalBookings > 0 {
+  val avg = totalRevenue / totalBookings
+  IO::println("  Average fare   : #{avg}")
+}
+
+// 9. Per-class revenue
+IO::println("")
+val classLabels: List[String] = ["Express", "Regional", "Freight"]
+foreach cl: String in classLabels {
+  val classRoutes = routes.filter { r -> (r as Route).trainClass().label() == cl }
+  val classRouteIds = classRoutes.map { r -> (r as Route).id() }
+  val classBks = bookings.filter { b ->
+    classRouteIds.contains((b as Booking).routeId())
+  }
+  val classRev = classBks.fold(0) { acc, b -> (acc as Int) + (b as Booking).fare() }
+  IO::println("  #{cl.padRight(10)}: #{classBks.size} bookings, revenue=#{classRev}")
+}
+
+IO::println("")
+IO::println("═══════════════════════════════════════════════════════════════")
+IO::println("  END OF REPORT")
+IO::println("═══════════════════════════════════════════════════════════════")

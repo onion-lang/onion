@@ -1,0 +1,325 @@
+// CountMinSketch.on — Count-Min Sketch: probabilistic frequency estimation.
+//
+// A Count-Min Sketch uses d hash functions and a d×w integer table.
+//   add(k):      for each row i, table[i*w + hash_i(k)] += 1.
+//   estimate(k): min over rows of table[i*w + hash_i(k)].
+// Guarantee: estimate ≤ trueCount + ε·N  (prob ≥ 1-δ),
+//   where ε ≈ e/width and δ ≈ (1/e)^depth.
+// A narrow sketch collides; a wider/deeper sketch reduces both ε and δ.
+//
+// Exercises: class with Int[] state (1-D array simulating 2-D),
+//   polynomial hash functions, extension methods on String/Int,
+//   records with methods (FreqEntry, BenchRow),
+//   collection pipelines (sortedBy/filter/fold),
+//   while/foreach/break, static val, string interpolation,
+//   try/catch, |> pipeline.
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def pct(total: Int): String {
+    if total == 0 { return "n/a" }
+    val p: Int = self * 100 / total
+    return p.lpad(3) + "%"
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "~"
+  }
+  // Shadows built-in charAt, returning Int to avoid Char-typed VerifyError.
+  def charAt(i: Int): Int = self.charAt(i) as Int
+  // Polynomial rolling hash (Horner): result in [0, modulus).
+  def hashMod(base: Int, modulus: Int): Int {
+    var h: Int = 0
+    var i: Int = 0
+    while i < self.length() {
+      val ch: Int = self.charAt(i)
+      h = ((h * base) % modulus + ch) % modulus
+      i++
+    }
+    return h
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record FreqEntry(word: String, exact: Int, estimate: Int) {
+public:
+  def overcount(): Int {
+    val d: Int = estimate() - exact()
+    return if d > 0 { d } else { 0 }
+  }
+  def display(): String {
+    val tag: String = if overcount() == 0 { "exact " } else { "+#{overcount().lpad(3)}" }
+    return "#{word().rpad(16)} exact=#{exact().lpad(3)}  est=#{estimate().lpad(3)}  #{tag}"
+  }
+}
+
+record BenchRow(depth: Int, width: Int, overcounts: Int, total: Int) {
+public:
+  def display(): String =
+    "depth=#{depth().lpad(1)}  width=#{width().lpad(3)}  overcounts=#{overcounts().lpad(3)}" +
+    "  (#{overcounts().pct(total())} of #{total()} unique)"
+}
+
+// ─── Hash bases: one prime per row, depth ≤ 6 ────────────────────────────────
+
+static val BASES: List[Int] = [31, 37, 41, 43, 47, 53]
+
+// ─── CountMinSketch class ─────────────────────────────────────────────────────
+
+class CountMinSketch {
+  var _depth: Int
+  var _width: Int
+  var _table: Int[]
+  var _total: Int
+public:
+  def this(depth: Int, width: Int) {
+    _depth = depth
+    _width = width
+    _table = new Int[depth * width]
+    _total = 0
+  }
+  def depth(): Int = _depth
+  def width(): Int = _width
+  def total(): Int = _total
+
+  def add(key: String): void {
+    var row: Int = 0
+    while row < _depth {
+      val base: Int = BASES[row] as Int
+      val col: Int  = key.hashMod(base, _width)
+      val idx: Int  = row * _width + col
+      _table[idx] = _table[idx] + 1
+      row++
+    }
+    _total++
+  }
+
+  def addAll(keys: List[String]): void {
+    var i: Int = 0
+    while i < keys.size { add(keys[i] as String); i++ }
+  }
+
+  def estimate(key: String): Int {
+    var best: Int = _total + 1
+    var row: Int = 0
+    while row < _depth {
+      val base: Int = BASES[row] as Int
+      val col: Int  = key.hashMod(base, _width)
+      val v: Int    = _table[row * _width + col]
+      if v < best { best = v }
+      row++
+    }
+    return best
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Split text on single space, dropping empty tokens.
+def splitWords(text: String): List[String] {
+  val result: List[String] = []
+  var start: Int = 0
+  var i: Int = 0
+  while i <= text.length() {
+    val atEnd: Boolean = i == text.length()
+    val ch: Int = if atEnd { 32 } else { text.charAt(i) }
+    if ch == 32 {
+      if i > start { result.add(text.substring(start, i)) }
+      start = i + 1
+    }
+    i++
+  }
+  return result
+}
+
+// Collect unique words, count exact occurrences, query the sketch.
+def buildEntries(words: List[String], sketch: CountMinSketch): List[FreqEntry] {
+  val unique: List[String] = []
+  var wi: Int = 0
+  while wi < words.size {
+    val w: String = words[wi] as String
+    var found: Boolean = false
+    var ki: Int = 0
+    while ki < unique.size {
+      if (unique[ki] as String) == w { found = true; break }
+      ki++
+    }
+    if !found { unique.add(w) }
+    wi++
+  }
+  val entries: List[FreqEntry] = []
+  var ui: Int = 0
+  while ui < unique.size {
+    val w: String = unique[ui] as String
+    var cnt: Int = 0
+    wi = 0
+    while wi < words.size {
+      if (words[wi] as String) == w { cnt++ }
+      wi++
+    }
+    entries.add(new FreqEntry(w, cnt, sketch.estimate(w)))
+    ui++
+  }
+  return entries
+}
+
+// ─── Corpora ─────────────────────────────────────────────────────────────────
+
+// 35 fruit-word tokens with varied repetition counts.
+static val FRUITS: List[String] = [
+  "apple",  "banana", "cherry", "date",       "elderberry",
+  "apple",  "banana", "cherry", "fig",        "apple",
+  "banana", "apple",  "grape",  "apple",      "banana",
+  "cherry", "cherry", "grape",  "grape",      "banana",
+  "apple",  "apple",  "date",   "elderberry", "fig",
+  "apple",  "banana", "grape",  "fig",        "jasmine",
+  "apple",  "cherry", "apple",  "banana",     "honeydew"
+]
+
+// Hamlet excerpt — word-level; "to", "the", "and" are common.
+static val HAMLET: String = "to be or not to be that is the question " +
+  "whether tis nobler in the mind to suffer " +
+  "the slings and arrows of outrageous fortune " +
+  "or to take arms against a sea of troubles " +
+  "and by opposing end them to die to sleep " +
+  "no more and by a sleep to say we end " +
+  "the heartache and the thousand natural shocks " +
+  "that flesh is heir to tis a consummation"
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // 1. Narrow sketch (depth=3, width=8): intentionally collides
+  "=== Count-Min Sketch: Fruit Frequency (depth=3, width=8) ===" |> IO::println
+  IO::println("  Narrow sketch forces hash collisions → visible overcounts:")
+  val sk1: CountMinSketch = new CountMinSketch(3, 8)
+  sk1.addAll(FRUITS)
+  IO::println("  Inserted #{sk1.total()} tokens")
+  val ent1: List[FreqEntry] = buildEntries(FRUITS, sk1)
+  val sorted1: List[FreqEntry] = ent1.sortedBy { e -> -(e as FreqEntry).exact() }
+  foreach e: FreqEntry in sorted1 {
+    IO::println("    " + e.display())
+  }
+  val over1: List[FreqEntry] = ent1.filter { e -> (e as FreqEntry).overcount() > 0 }
+  IO::println("  Overcounted: #{over1.size} / #{ent1.size} unique words")
+  IO::println("")
+
+  // 2. Wider sketch (depth=4, width=32): fewer collisions
+  "=== Count-Min Sketch: Fruit Frequency (depth=4, width=32) ===" |> IO::println
+  IO::println("  Wider+deeper sketch reduces collisions:")
+  val sk2: CountMinSketch = new CountMinSketch(4, 32)
+  sk2.addAll(FRUITS)
+  val ent2: List[FreqEntry] = buildEntries(FRUITS, sk2)
+  val sorted2: List[FreqEntry] = ent2.sortedBy { e -> -(e as FreqEntry).exact() }
+  foreach e: FreqEntry in sorted2 {
+    IO::println("    " + e.display())
+  }
+  val over2: List[FreqEntry] = ent2.filter { e -> (e as FreqEntry).overcount() > 0 }
+  IO::println("  Overcounted: #{over2.size} / #{ent2.size} unique words")
+  IO::println("")
+
+  // 3. Shakespeare / Hamlet phrase: depth=4, width=64
+  "=== Count-Min Sketch: Hamlet Excerpt (depth=4, width=64) ===" |> IO::println
+  val hamletWords: List[String] = splitWords(HAMLET)
+  val skH: CountMinSketch = new CountMinSketch(4, 64)
+  skH.addAll(hamletWords)
+  val entH: List[FreqEntry] = buildEntries(hamletWords, skH)
+  val sortedH: List[FreqEntry] = entH.sortedBy { e -> -(e as FreqEntry).exact() }
+  IO::println("  #{hamletWords.size} tokens, #{entH.size} unique words  (N=#{skH.total()})")
+  IO::println("  Top 12 by exact count:")
+  var shown: Int = 0
+  foreach e: FreqEntry in sortedH {
+    if shown >= 12 { break }
+    IO::println("    " + e.display())
+    shown++
+  }
+  val overH: List[FreqEntry] = entH.filter { e -> (e as FreqEntry).overcount() > 0 }
+  IO::println("  Overcounted: #{overH.size} / #{entH.size} unique words")
+  IO::println("")
+
+  // 4. Max overcount vs theoretical ε·N
+  "=== Error Bound Check (Hamlet, depth=4, width=64) ===" |> IO::println
+  val maxOc: Int = entH.fold(0) { mx, e ->
+    val oc: Int  = (e as FreqEntry).overcount()
+    val mi: Int  = mx as Int
+    if oc > mi { oc } else { mi }
+  } as Int
+  val totalN: Int = skH.total()
+  // ε = e/w ≈ 2.718/64 ≈ 0.0425; ε*N rounded up
+  val epsBound: Int = 425 * totalN / 10000 + 1
+  IO::println("  N (total tokens)       = #{totalN}")
+  IO::println("  Max observed overcount = #{maxOc}")
+  IO::println("  Theoretical ε·N bound  = #{epsBound}  (ε=e/64≈0.043)")
+  val holds: String = if maxOc <= epsBound { "YES" } else { "NO" }
+  IO::println("  Guarantee holds: #{holds}")
+  IO::println("")
+
+  // 5. Depth/width sweep on fruit corpus
+  "=== Configuration Sweep (fruit corpus, 35 tokens) ===" |> IO::println
+  IO::println("  Exploring depth × width trade-off:")
+  val depths: List[Int] = [2, 3, 4]
+  val widths: List[Int] = [8, 16, 32]
+  val rows: List[BenchRow] = []
+  foreach d: Object in depths {
+    val depth: Int = d as Int
+    foreach w: Object in widths {
+      val width: Int = w as Int
+      val sk: CountMinSketch = new CountMinSketch(depth, width)
+      sk.addAll(FRUITS)
+      val ents: List[FreqEntry] = buildEntries(FRUITS, sk)
+      val overs: List[FreqEntry] = ents.filter { e -> (e as FreqEntry).overcount() > 0 }
+      rows.add(new BenchRow(depth, width, overs.size, ents.size))
+    }
+  }
+  foreach r: BenchRow in rows {
+    IO::println("    " + r.display())
+  }
+  IO::println("")
+
+  // 6. Round-trip sanity: exact count query vs built-in add
+  "=== Sanity Check: Known Frequencies ===" |> IO::println
+  try {
+    val sk: CountMinSketch = new CountMinSketch(4, 128)
+    val freq: List[Int] = [100, 50, 25, 10, 5, 1]
+    val labels: List[String] = ["common", "moderate", "rare", "scarce", "minimal", "once"]
+    var li: Int = 0
+    while li < freq.size {
+      val word: String = labels[li] as String
+      val count: Int   = freq[li] as Int
+      var fi: Int = 0
+      while fi < count { sk.add(word); fi++ }
+      li++
+    }
+    IO::println("  Inserted #{sk.total()} total tokens")
+    li = 0
+    while li < freq.size {
+      val word: String  = labels[li] as String
+      val exact: Int    = freq[li] as Int
+      val est: Int      = sk.estimate(word)
+      val ok: String    = if est >= exact { "OK" } else { "FAIL" }
+      IO::println("    #{word.rpad(10)} exact=#{exact.lpad(3)}  est=#{est.lpad(3)}  #{ok}")
+      li++
+    }
+  } catch e: Exception {
+    IO::println("  ERROR: " + e.message())
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

@@ -1,0 +1,341 @@
+// SlidingPuzzle.on — 8-puzzle solver via A* search with Manhattan-distance heuristic
+//
+// Exercises: classes with Comparable interface, ADT enum (Move direction), records,
+// generics (PriorityQueue/HashMap/ArrayList), select/pattern matching, while/foreach
+// (ranges and list), nullable types, closures, string interpolation, try/catch,
+// extension methods on Int/String, collection pipelines, |> pipeline, recursion.
+
+import {
+  java.util.PriorityQueue
+  java.util.HashMap
+  java.util.ArrayList
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+  def minWith(other: Int): Int = if self < other { self } else { other }
+  def maxWith(other: Int): Int = if self > other { self } else { other }
+}
+
+extension String {
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def times(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+// ─── Move direction ADT ───────────────────────────────────────────────────────
+
+enum Move {
+  case Up; case Down; case Left; case Right
+public:
+  def label(): String = select this {
+    case m is Up:    "Up"
+    case m is Down:  "Down"
+    case m is Left:  "Left"
+    case m is Right: "Right"
+  }
+  def offset(): Int = select this {
+    case m is Up:    -3
+    case m is Down:   3
+    case m is Left:  -1
+    case m is Right:  1
+  }
+}
+
+val ALL_MOVES: java.util.List[Move] = [new Up(), new Down(), new Left(), new Right()]
+
+// ─── 3×3 board state ─────────────────────────────────────────────────────────
+// Tiles stored flat: index 0..8, row-major. Tile 0 is the blank.
+
+class PuzzleState {
+  public:
+  val tiles: Int[]
+
+  def this(tiles: Int[]) { self.tiles = tiles }
+
+  def blankPos(): Int {
+    var i: Int = 0
+    while i < 9 {
+      if tiles[i] == 0 { return i }
+      i++
+    }
+    return -1
+  }
+
+  def isGoal(): Boolean {
+    var i: Int = 0
+    while i < 8 {
+      if tiles[i] != i + 1 { return false }
+      i++
+    }
+    return tiles[8] == 0
+  }
+
+  // Sum of Manhattan distances of each tile to its goal position.
+  def heuristic(): Int {
+    var dist: Int = 0
+    var i: Int = 0
+    while i < 9 {
+      val tile: Int = tiles[i]
+      if tile != 0 {
+        val goalRow: Int = (tile - 1) / 3
+        val goalCol: Int = (tile - 1) % 3
+        val curRow: Int  = i / 3
+        val curCol: Int  = i % 3
+        dist = dist + (goalRow - curRow).abs() + (goalCol - curCol).abs()
+      }
+      i++
+    }
+    return dist
+  }
+
+  // Slide the blank in the given direction; null if out of bounds.
+  def apply(m: Move): PuzzleState? {
+    val blank: Int = blankPos()
+    val row: Int   = blank / 3
+    val col: Int   = blank % 3
+    val valid: Boolean = select m {
+      case mv is Up:    row > 0
+      case mv is Down:  row < 2
+      case mv is Left:  col > 0
+      case mv is Right: col < 2
+    }
+    if !valid { return null }
+    val newPos: Int = blank + m.offset()
+    val t: Int[] = new Int[9]
+    foreach i: Int in 0..<9 { t[i] = tiles[i] }
+    t[blank]  = t[newPos]
+    t[newPos] = 0
+    return new PuzzleState(t)
+  }
+
+  // Canonical string key for visited-set lookup.
+  def key(): String {
+    val sb: java.lang.StringBuilder = new java.lang.StringBuilder()
+    foreach i: Int in 0..<9 { sb.append(tiles[i]) }
+    return sb.toString()
+  }
+
+  def row(r: Int): String {
+    var line: String = "|"
+    foreach c: Int in 0..<3 {
+      val t: Int = tiles[r * 3 + c]
+      if t == 0 { line = line + " . " }
+      else       { line = line + " " + t + " " }
+      line = line + "|"
+    }
+    return line
+  }
+
+  def display(label: String): void {
+    val bar: String = "+" + "-".times(11) + "+"
+    IO::println(label)
+    IO::println(bar)
+    foreach r: Int in 0..<3 { IO::println(row(r)) }
+    IO::println(bar)
+  }
+}
+
+// ─── A* search node ───────────────────────────────────────────────────────────
+
+class SearchNode conforms java.lang.Comparable[SearchNode] {
+  public:
+  val state:    PuzzleState
+  val cost:     Int       // g: steps from start
+  val fscore:   Int       // f = g + h
+  val prev:     SearchNode?
+  val moveDone: Move?     // move that led to this state (null for the root)
+
+  def this(state: PuzzleState, cost: Int, prev: SearchNode?, moveDone: Move?) {
+    self.state    = state
+    self.cost     = cost
+    self.fscore   = cost + state.heuristic()
+    self.prev     = prev
+    self.moveDone = moveDone
+  }
+
+  override def compareTo(other: SearchNode): Int = self.fscore - other.fscore
+}
+
+// ─── A* solver ────────────────────────────────────────────────────────────────
+
+record SolveResult(found: Boolean, moves: java.util.List[Move], statesExplored: Int)
+
+def solve(init: PuzzleState): SolveResult {
+  val pq:      PriorityQueue[SearchNode] = new PriorityQueue[SearchNode]()
+  val visited: HashMap[String, Int]      = new HashMap[String, Int]()
+  pq.offer(new SearchNode(init, 0, null, null))
+  var explored: Int = 0
+  while !pq.isEmpty() {
+    val node: SearchNode = pq.poll()
+    val k: String = node.state.key()
+    if visited.containsKey(k) { continue }
+    visited.put(k, node.cost)
+    explored = explored + 1
+    if node.state.isGoal() {
+      // Reconstruct move list from tail to head
+      val path: java.util.ArrayList[Move] = new java.util.ArrayList[Move]()
+      var cur: SearchNode? = node
+      while cur != null {
+        val cn: SearchNode = cur as SearchNode
+        if cn.moveDone != null { path.add(cn.moveDone as Move) }
+        cur = cn.prev
+      }
+      java.util.Collections::reverse(path)
+      return new SolveResult(true, path, explored)
+    }
+    foreach m: Move in ALL_MOVES {
+      val nb: PuzzleState? = node.state.apply(m)
+      if nb != null {
+        val nbState: PuzzleState = nb as PuzzleState
+        if !visited.containsKey(nbState.key()) {
+          pq.offer(new SearchNode(nbState, node.cost + 1, node, m))
+        }
+      }
+    }
+  }
+  return new SolveResult(false, new java.util.ArrayList[Move](), explored)
+}
+
+// ─── Apply a move list to a state ─────────────────────────────────────────────
+
+def applyMoves(start: PuzzleState, moves: java.util.List[Move]): PuzzleState {
+  var s: PuzzleState = start
+  foreach m: Move in moves {
+    val nb: PuzzleState? = s.apply(m)
+    if nb != null { s = nb as PuzzleState }
+  }
+  return s
+}
+
+// ─── Statistics collector ─────────────────────────────────────────────────────
+
+record RunStat(label: String, moves: Int, explored: Int, solvable: Boolean)
+
+def runBenchmark(label: String, tiles: Int[]): RunStat {
+  val state: PuzzleState = new PuzzleState(tiles)
+  val result: SolveResult = solve(state)
+  if !result.found() {
+    IO::println("#{label}: unsolvable")
+    return new RunStat(label, -1, result.statesExplored(), false)
+  }
+  return new RunStat(label, result.moves().size(), result.statesExplored(), true)
+}
+
+// ─── Pretty-print solution path ───────────────────────────────────────────────
+
+def showSolution(startTiles: Int[], maxSteps: Int): void {
+  val init: PuzzleState = new PuzzleState(startTiles)
+  val result: SolveResult = solve(init)
+  if !result.found() {
+    IO::println("  (no solution)")
+    return
+  }
+  val moves: java.util.List[Move] = result.moves()
+  IO::println("  Solved in #{moves.size()} moves, #{result.statesExplored()} states explored.")
+  var cur: PuzzleState = init
+  var step: Int = 0
+  cur.display("  Step 0 — start:")
+  foreach m: Move in moves {
+    step = step + 1
+    if step > maxSteps { IO::println("  ... (#{moves.size() - step + 1} more steps)"); break }
+    val nb: PuzzleState? = cur.apply(m)
+    if nb != null {
+      cur = nb as PuzzleState
+      cur.display("  Step #{step} — #{m.label()}:")
+    }
+  }
+  if step >= moves.size() { IO::println("  Goal reached!") }
+}
+
+// ─── Helpers to build a board compactly ──────────────────────────────────────
+
+def board(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int, i: Int): Int[] {
+  val t: Int[] = new Int[9]
+  t[0]=a; t[1]=b; t[2]=c; t[3]=d; t[4]=e; t[5]=f; t[6]=g; t[7]=h; t[8]=i
+  return t
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== 8-Puzzle Solver (A* / Manhattan distance) ===")
+  IO::println("")
+
+  // Demo 1: trivial — 1 move
+  IO::println("── Demo 1: 1-move solve ──────────────────────────────")
+  showSolution(board(1,2,3, 4,5,6, 7,0,8), 5)
+  IO::println("")
+
+  // Demo 2: easy — 7 moves
+  IO::println("── Demo 2: 7-move solve ──────────────────────────────")
+  showSolution(board(1,6,2, 4,5,3, 7,0,8), 5)
+  IO::println("")
+
+  // Demo 3: medium — 14 moves
+  IO::println("── Demo 3: medium difficulty (14 moves) ──────────────")
+  showSolution(board(5,3,2, 4,1,6, 0,7,8), 4)
+  IO::println("")
+
+  // Demo 4: hard — 20 moves  (7,2,4 / 5,0,6 / 8,3,1)
+  IO::println("── Demo 4: hard puzzle (20 moves) ────────────────────")
+  showSolution(board(7,2,4, 5,0,6, 8,3,1), 3)
+  IO::println("")
+
+  // Demo 5: unsolvable board (parity check: an 8-puzzle is solvable iff
+  //         the number of inversions is even; swapping two adjacent tiles
+  //         changes parity, making (1,2,3,4,5,6,8,7,_) unsolvable)
+  IO::println("── Demo 5: unsolvable (odd-inversion board) ──────────")
+  showSolution(board(1,2,3, 4,5,6, 8,7,0), 3)
+  IO::println("")
+
+  // Benchmark: several puzzles, collect stats
+  IO::println("── Benchmark: 8 puzzles ──────────────────────────────")
+  val stats: java.util.ArrayList[RunStat] = new java.util.ArrayList[RunStat]()
+  stats.add(runBenchmark("trivial-1",  board(1,2,3, 4,5,6, 7,0,8)))
+  stats.add(runBenchmark("easy-7",     board(1,6,2, 4,5,3, 7,0,8)))
+  stats.add(runBenchmark("medium-14",  board(5,3,2, 4,1,6, 0,7,8)))
+  stats.add(runBenchmark("medium-15",  board(8,1,2, 0,4,3, 7,5,6)))
+  stats.add(runBenchmark("hard-18",    board(3,5,1, 4,2,6, 0,7,8)))
+  stats.add(runBenchmark("hard-20",    board(7,2,4, 5,0,6, 8,3,1)))
+  stats.add(runBenchmark("hard-31",    board(6,4,7, 8,5,0, 3,2,1)))
+  stats.add(runBenchmark("unsolvable", board(1,2,3, 4,5,6, 8,7,0)))
+  IO::println("")
+  IO::println(("Puzzle".padRight(14) + "Moves".padLeft(6) + "  Explored".padLeft(10)))
+  IO::println("-".times(32))
+  foreach rs: RunStat in stats {
+    val movesStr: String = if rs.solvable() { "" + rs.moves() } else { "—" }
+    val exploredStr: String = "" + rs.explored()
+    IO::println(rs.label().padRight(14) + movesStr.padLeft(6) + "  " + exploredStr.padLeft(10))
+  }
+  IO::println("")
+
+  // Summary statistics
+  val solvable: java.util.List[RunStat] = stats.filter { rs -> rs.solvable() }
+  var totalMoves: Int    = 0
+  var totalExplored: Int = 0
+  var maxMoves: Int      = 0
+  foreach rs: RunStat in solvable  { totalMoves    = totalMoves    + rs.moves()    }
+  foreach rs: RunStat in stats     { totalExplored = totalExplored + rs.explored() }
+  foreach rs: RunStat in solvable  { if rs.moves() > maxMoves { maxMoves = rs.moves() } }
+  IO::println("Solvable puzzles : #{solvable.size()} / #{stats.size()}")
+  IO::println("Total moves      : #{totalMoves}")
+  IO::println("Average moves    : #{if solvable.size() > 0 { totalMoves / solvable.size() } else { 0 }}")
+  IO::println("Hardest (moves)  : #{maxMoves}")
+  IO::println("Total states exp : #{totalExplored}")
+}

@@ -1,0 +1,241 @@
+// SeismicMonitor.on — seismic event tracking, analysis, and alerting system
+
+enum AlertLevel {
+  case Green
+  case Yellow
+  case Orange
+  case Red
+  public:
+  def label(): String = select this {
+    case g is Green:  "GREEN"
+    case y is Yellow: "YELLOW"
+    case o is Orange: "ORANGE"
+    case r is Red:    "RED"
+  }
+  def threshold(): Double = select this {
+    case g is Green:  0.0
+    case y is Yellow: 3.0
+    case o is Orange: 5.0
+    case r is Red:    7.0
+  }
+}
+
+enum EventType {
+  case Tectonic
+  case Volcanic
+  case Collapse
+  case Induced
+  public:
+  def label(): String = select this {
+    case t is Tectonic: "Tectonic"
+    case v is Volcanic: "Volcanic"
+    case c is Collapse: "Collapse"
+    case i is Induced:  "Induced"
+  }
+}
+
+record SeismicEvent(
+  id: Int, region: String, lat: Double, lon: Double,
+  magnitude: Double, depth: Double, eventType: EventType, timestamp: String
+) {
+  public:
+  def intensityDescription(): String =
+    if magnitude < 2.0 { "Micro (imperceptible)" }
+    else if magnitude < 4.0 { "Minor (felt by some)" }
+    else if magnitude < 5.0 { "Light (widely felt)" }
+    else if magnitude < 6.0 { "Moderate (some damage)" }
+    else if magnitude < 7.0 { "Strong (major damage)" }
+    else if magnitude < 8.0 { "Major (serious damage)" }
+    else { "Great (catastrophic)" }
+  def alertLevel(): AlertLevel =
+    if magnitude >= 7.0 { new Red() }
+    else if magnitude >= 5.0 { new Orange() }
+    else if magnitude >= 3.0 { new Yellow() }
+    else { new Green() }
+  def summary(): String =
+    "M#{magnitude} #{eventType.label()} @ #{region} (#{timestamp}) depth=#{depth}km"
+}
+
+enum StationStatus {
+  case Online
+  case Offline
+  case Maintenance
+  public:
+  def label(): String = select this {
+    case o is Online:      "ONLINE"
+    case f is Offline:     "OFFLINE"
+    case m is Maintenance: "MAINTENANCE"
+  }
+}
+
+record MonitoringStation(
+  code: String, name: String, lat: Double, lon: Double, status: StationStatus
+)
+
+// Approximate great-circle distance in km (equirectangular projection, good enough for nearby points)
+def approxDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+  val R: Double = 6371.0
+  val pi: Double = 3.14159265358979
+  val dlat: Double = (lat2 - lat1) * pi / 180.0
+  val dlon: Double = (lon2 - lon1) * pi / 180.0
+  val alat: Double = (lat1 + lat2) / 2.0 * pi / 180.0
+  val dx: Double = R * dlon * Math::cos(alat)
+  val dy: Double = R * dlat
+  return Math::sqrt(dx * dx + dy * dy)
+}
+
+// Recursively count events above threshold in a list
+def countAbove(events: List[SeismicEvent], threshold: Double, idx: Int): Int {
+  if idx >= events.size { return 0 }
+  val rest: Int = countAbove(events, threshold, idx + 1)
+  return if (events[idx] as SeismicEvent).magnitude() >= threshold { rest + 1 } else { rest }
+}
+
+def main(): void {
+  val events: List[SeismicEvent] = [
+    new SeismicEvent(1, "Pacific Ring", 35.7, 139.8, 6.2, 15.0, new Tectonic(), "2025-03-01 08:14"),
+    new SeismicEvent(2, "Mid-Atlantic Ridge", 0.5, -25.3, 4.1, 8.0, new Tectonic(), "2025-03-02 13:22"),
+    new SeismicEvent(3, "Cascadia Zone", 47.5, -122.3, 5.8, 20.5, new Tectonic(), "2025-03-03 19:45"),
+    new SeismicEvent(4, "Yellowstone Caldera", 44.4, -110.6, 2.9, 5.0, new Volcanic(), "2025-03-04 07:11"),
+    new SeismicEvent(5, "Apennines", 42.0, 13.5, 4.7, 12.0, new Tectonic(), "2025-03-05 02:30"),
+    new SeismicEvent(6, "Kamchatka", 52.0, 159.0, 7.4, 30.0, new Tectonic(), "2025-03-06 16:55"),
+    new SeismicEvent(7, "Hawaii Rift Zone", 19.5, -155.0, 3.3, 3.5, new Volcanic(), "2025-03-07 11:08"),
+    new SeismicEvent(8, "North Anatolian Fault", 40.0, 29.0, 5.1, 10.0, new Tectonic(), "2025-03-08 20:22"),
+    new SeismicEvent(9, "Oklahoma Basin", 36.5, -97.5, 3.6, 5.5, new Induced(), "2025-03-09 06:45"),
+    new SeismicEvent(10, "Zagros Belt", 32.0, 48.0, 6.8, 25.0, new Tectonic(), "2025-03-10 14:30")
+  ]
+
+  IO::println("=== SEISMIC MONITORING REPORT ===")
+  IO::println("Total events recorded: #{events.size}")
+  IO::println("")
+
+  // All events with summary and alert level
+  IO::println("--- All Events ---")
+  foreach ev: SeismicEvent in events {
+    IO::println("[#{ev.alertLevel().label()}] #{ev.summary()}")
+  }
+  IO::println("")
+
+  // Statistics
+  val magnitudes: List[Double] = events.map { e -> e.magnitude() }
+  val total: Double = magnitudes.fold(0.0) { acc, m -> acc + m }
+  val count: Double = events.size + 0.0
+  val avg: Double = total / count
+  val maxMag: Double = magnitudes.fold(0.0) { acc, m -> if m > acc { m } else { acc } }
+  val minMag: Double = magnitudes.fold(10.0) { acc, m -> if m < acc { m } else { acc } }
+
+  IO::println("--- Statistics ---")
+  IO::println("Average magnitude: #{avg}")
+  IO::println("Maximum magnitude: #{maxMag}")
+  IO::println("Minimum magnitude: #{minMag}")
+  IO::println("")
+
+  // Events above threshold (M >= 5.0)
+  val significant: List[SeismicEvent] = events.filter { e -> e.magnitude() >= 5.0 }
+  IO::println("--- Significant Events (M >= 5.0): #{significant.size} ---")
+  foreach ev: SeismicEvent in significant {
+    IO::println("  #{ev.summary()}")
+    IO::println("  Intensity: #{ev.intensityDescription()}")
+  }
+  IO::println("")
+
+  // Group by event type
+  IO::println("--- Events by Type ---")
+  val byType: Map[String, List[SeismicEvent]] = events.groupBy { e -> e.eventType().label() }
+  foreach (typeName, typeEvents) in byType {
+    IO::println("#{typeName}: #{typeEvents.size} event(s)")
+    foreach ev: SeismicEvent in typeEvents {
+      IO::println("  M#{ev.magnitude()} @ #{ev.region()}")
+    }
+  }
+  IO::println("")
+
+  // Sorted by magnitude descending
+  val sorted: List[SeismicEvent] = events.sortedBy { e -> -e.magnitude() }
+  IO::println("--- Top 3 by Magnitude ---")
+  var i: Int = 0
+  foreach ev: SeismicEvent in sorted {
+    if i < 3 {
+      IO::println("#{i + 1}. #{ev.summary()}")
+      i++
+    }
+  }
+  IO::println("")
+
+  // Alerts summary
+  val redEvents: List[SeismicEvent] = events.filter { e ->
+    select e.alertLevel() { case r is Red: true; else: false }
+  }
+  val orangeEvents: List[SeismicEvent] = events.filter { e ->
+    select e.alertLevel() { case o is Orange: true; else: false }
+  }
+  IO::println("--- Alert Summary ---")
+  IO::println("RED alerts (M >= 7.0):    #{redEvents.size}")
+  IO::println("ORANGE alerts (M >= 5.0): #{orangeEvents.size}")
+  IO::println("")
+
+  // Count by depth category
+  val shallow: List[SeismicEvent] = events.filter { e -> e.depth() <= 10.0 }
+  val intermediate: List[SeismicEvent] = events.filter { e -> e.depth() > 10.0 && e.depth() <= 70.0 }
+  val deep: List[SeismicEvent] = events.filter { e -> e.depth() > 70.0 }
+  IO::println("--- Depth Classification ---")
+  IO::println("Shallow  (0-10 km):    #{shallow.size}")
+  IO::println("Intermediate (10-70 km): #{intermediate.size}")
+  IO::println("Deep     (>70 km):     #{deep.size}")
+  IO::println("")
+
+  // Recursive count verification
+  val recursiveCount: Int = countAbove(events, 5.0, 0)
+  IO::println("--- Recursive Verification ---")
+  IO::println("Events M>=5.0 (recursive): #{recursiveCount}")
+  IO::println("")
+
+  // Monitoring stations
+  val stations: List[MonitoringStation] = [
+    new MonitoringStation("KMT", "Kamchatka Array",      52.5,  159.5, new Online()),
+    new MonitoringStation("TKY", "Tokyo Seismic Hub",    35.7,  139.7, new Online()),
+    new MonitoringStation("SEA", "Seattle PNSN",         47.6, -122.3, new Online()),
+    new MonitoringStation("ATH", "Athens Network",       38.0,   23.7, new Maintenance()),
+    new MonitoringStation("HNL", "Honolulu IRIS",        21.3, -157.8, new Online()),
+    new MonitoringStation("OKC", "Oklahoma City Array",  35.5,  -97.4, new Online()),
+    new MonitoringStation("ROM", "Rome Broadband",       41.9,   12.5, new Offline()),
+    new MonitoringStation("ZAG", "Zagros Telemetry",     32.5,   48.3, new Online())
+  ]
+
+  IO::println("--- Station Status ---")
+  foreach st: MonitoringStation in stations {
+    IO::println("[#{st.status().label()}] #{st.code()} — #{st.name()}")
+  }
+  IO::println("")
+
+  val onlineCount: Int = stations.filter { s -> select s.status() { case o is Online: true; else: false } }.size
+  val offlineCount: Int = stations.filter { s -> select s.status() { case o is Offline: true; else: false } }.size
+  val maintCount: Int = stations.filter { s -> select s.status() { case m is Maintenance: true; else: false } }.size
+  IO::println("Online: #{onlineCount}  Offline: #{offlineCount}  Maintenance: #{maintCount}")
+  IO::println("")
+
+  // Find closest station for each RED/ORANGE event
+  val alertEvents: List[SeismicEvent] = events.filter { e ->
+    select e.alertLevel() { case r is Red: true; case o is Orange: true; else: false }
+  }
+  val onlineStations: List[MonitoringStation] = stations.filter { s ->
+    select s.status() { case o is Online: true; else: false }
+  }
+
+  IO::println("--- Closest Online Station per Alert Event ---")
+  foreach ev: SeismicEvent in alertEvents {
+    var bestDist: Double = 99999.0
+    var bestCode: String = "NONE"
+    foreach st: MonitoringStation in onlineStations {
+      val d: Double = approxDistanceKm(ev.lat(), ev.lon(), st.lat(), st.lon())
+      if d < bestDist {
+        bestDist = d
+        bestCode = st.code()
+      }
+    }
+    IO::println("  [#{ev.alertLevel().label()}] #{ev.region()} → station #{bestCode} (~#{bestDist} km)")
+  }
+  IO::println("")
+
+  IO::println("=== END OF REPORT ===")
+}

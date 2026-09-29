@@ -1,0 +1,389 @@
+// ScrabbleScorer.on — Scrabble scoring engine with board analysis (~300 lines).
+// Exercises: plain enums (with methods); data-carrying ADT enum; records with
+// extension blocks; interface (Describable); collection pipelines
+// (map/filter/fold/sortedBy/groupBy); select / type-pattern matching;
+// nullable and null-safe calls; closures; string interpolation; try/catch;
+// while and foreach (ranges and map (k,v) destructuring).
+
+import {
+  java.util.*
+}
+
+// ─── Tile letter scores ───────────────────────────────────────────────────────
+
+def buildLetterScores(): Map[String, Int] {
+  val scores: Map[String, Int] = [:]
+  foreach letter: String in ["A", "E", "I", "O", "U", "L", "N", "S", "T", "R"] {
+    scores[letter] = 1
+  }
+  foreach letter: String in ["D", "G"] { scores[letter] = 2 }
+  foreach letter: String in ["B", "C", "M", "P"] { scores[letter] = 3 }
+  foreach letter: String in ["F", "H", "V", "W", "Y"] { scores[letter] = 4 }
+  scores["K"] = 5
+  foreach letter: String in ["J", "X"] { scores[letter] = 8 }
+  foreach letter: String in ["Q", "Z"] { scores[letter] = 10 }
+  scores["_"] = 0
+  return scores
+}
+
+val LETTER_SCORES: Map[String, Int] = buildLetterScores()
+
+def tileScore(letter: String): Int {
+  val s: Int? = LETTER_SCORES[letter.toUpperCase()]
+  return if s == null { 0 } else { s }
+}
+
+// ─── Special square type ──────────────────────────────────────────────────────
+
+enum SquareType {
+  Normal, DoubleLetter, TripleLetter, DoubleWord, TripleWord
+public:
+  def label(): String = select this {
+    case SquareType::Normal:       "  "
+    case SquareType::DoubleLetter: "DL"
+    case SquareType::TripleLetter: "TL"
+    case SquareType::DoubleWord:   "DW"
+    case SquareType::TripleWord:   "TW"
+  }
+  def wordMultiplier(): Int = select this {
+    case SquareType::DoubleWord: 2
+    case SquareType::TripleWord: 3
+    else: 1
+  }
+  def letterMultiplier(): Int = select this {
+    case SquareType::DoubleLetter: 2
+    case SquareType::TripleLetter: 3
+    else: 1
+  }
+}
+
+// ─── Direction ────────────────────────────────────────────────────────────────
+
+enum Direction {
+  Across, Down
+public:
+  def symbol(): String = select this {
+    case Direction::Across: "→"
+    case Direction::Down:   "↓"
+  }
+}
+
+// ─── Board representation ────────────────────────────────────────────────────
+
+class Board {
+  var grid: SquareType[][]
+public:
+  def this {
+    grid = new SquareType[15][15]
+    foreach r: Int in 0..<15 {
+      foreach c: Int in 0..<15 {
+        grid[r][c] = SquareType::Normal
+      }
+    }
+    setupSpecialSquares()
+  }
+
+  def squareAt(r: Int, c: Int): SquareType = grid[r][c]
+
+  def setupSpecialSquares(): void {
+    // Triple-word: corners and mid-edges (excluding center)
+    foreach r: Int in [0, 7, 14] {
+      foreach c: Int in [0, 7, 14] {
+        if !(r == 7 && c == 7) { grid[r][c] = SquareType::TripleWord }
+      }
+    }
+    // Double-word: diagonals and center
+    val dwPairs: List[Int] = [1,1, 2,2, 3,3, 4,4, 7,7, 10,10, 11,11, 12,12, 13,13,
+                               1,13, 2,12, 3,11, 4,10, 10,4, 11,3, 12,2, 13,1]
+    var k: Int = 0
+    while k < dwPairs.size - 1 {
+      grid[dwPairs[k] as Int][dwPairs[k+1] as Int] = SquareType::DoubleWord
+      k = k + 2
+    }
+    // Triple-letter
+    val tlPairs: List[Int] = [1,5, 1,9, 5,1, 5,5, 5,9, 5,13, 9,1, 9,5, 9,9, 9,13, 13,5, 13,9]
+    k = 0
+    while k < tlPairs.size - 1 {
+      grid[tlPairs[k] as Int][tlPairs[k+1] as Int] = SquareType::TripleLetter
+      k = k + 2
+    }
+    // Double-letter
+    val dlPairs: List[Int] = [0,3, 0,11, 2,6, 2,8, 3,0, 3,7, 3,14,
+                               6,2, 6,6, 6,8, 6,12, 7,3, 7,11,
+                               8,2, 8,6, 8,8, 8,12, 11,0, 11,7, 11,14,
+                               12,6, 12,8, 14,3, 14,11]
+    k = 0
+    while k < dlPairs.size - 1 {
+      grid[dlPairs[k] as Int][dlPairs[k+1] as Int] = SquareType::DoubleLetter
+      k = k + 2
+    }
+  }
+
+  def scoreWord(word: String, row: Int, col: Int, dir: Direction): Int {
+    val upper: String = word.toUpperCase()
+    var letterSum: Int = 0
+    var wordMult: Int = 1
+    var idx: Int = 0
+    while idx < upper.length() {
+      val ch: String = upper.substring(idx, idx + 1)
+      val r: Int = if dir == Direction::Across { row } else { row + idx }
+      val c: Int = if dir == Direction::Across { col + idx } else { col }
+      val sq: SquareType = grid[r][c]
+      val pts: Int = if ch == "_" { 0 } else { tileScore(ch) * sq.letterMultiplier() }
+      letterSum = letterSum + pts
+      wordMult = wordMult * sq.wordMultiplier()
+      idx = idx + 1
+    }
+    return letterSum * wordMult
+  }
+}
+
+// ─── Play result record ───────────────────────────────────────────────────────
+
+record PlayResult(word: String, row: Int, col: Int, dir: Direction, points: Int) {
+public:
+  def summary(): String =
+    "#{word()} at (#{row()},#{col()})#{dir().symbol()} → #{points()} pts"
+}
+
+// ─── Player ───────────────────────────────────────────────────────────────────
+
+class Player {
+  var playerName: String
+  var totalPts: Int
+  var plays: List[PlayResult]
+public:
+  def this(n: String) {
+    playerName = n
+    totalPts = 0
+    plays = []
+  }
+  def name(): String = playerName
+  def score(): Int = totalPts
+
+  def addPlay(result: PlayResult): void {
+    totalPts = totalPts + result.points()
+    plays.add(result)
+  }
+
+  def playCount(): Int = plays.size
+
+  def recentPlay(): PlayResult? {
+    if plays.size == 0 { return null }
+    return plays[plays.size - 1]
+  }
+
+  def allPlays(): List[PlayResult] = plays
+
+  def summary(): String {
+    val hist: String = plays.map { r -> r.word() + "(+" + r.points() + ")" }
+                           .fold("") { acc, entry ->
+                             if (acc as String).isEmpty() { entry as String }
+                             else { (acc as String) + ", " + (entry as String) }
+                           }
+    return "#{playerName}: #{totalPts} pts — [#{hist}]"
+  }
+}
+
+// ─── Game ─────────────────────────────────────────────────────────────────────
+
+class Game {
+  var board: Board
+  var playerList: List[Player]
+  var turnCount: Int
+public:
+  def this(names: List[String]) {
+    board = new Board()
+    playerList = names.map { n -> new Player(n) }
+    turnCount = 0
+  }
+
+  def currentPlayer(): Player = playerList[turnCount % playerList.size]
+
+  def play(word: String, row: Int, col: Int, dir: Direction): PlayResult {
+    val pts: Int = board.scoreWord(word, row, col, dir)
+    val result: PlayResult = new PlayResult(word, row, col, dir, pts)
+    currentPlayer().addPlay(result)
+    turnCount = turnCount + 1
+    return result
+  }
+
+  def standings(): List[Player] =
+    playerList.sortedBy { p -> -p.score() }
+
+  def winner(): Player {
+    var best: Player = playerList[0]
+    foreach p: Player in playerList {
+      if p.score() > best.score() { best = p }
+    }
+    return best
+  }
+
+  def allPlays(): List[PlayResult] {
+    val result: List[PlayResult] = []
+    foreach p: Player in playerList {
+      foreach r: PlayResult in p.allPlays() { result.add(r) }
+    }
+    return result
+  }
+
+  def players(): List[Player] = playerList
+}
+
+// ─── String extensions ────────────────────────────────────────────────────────
+
+extension String {
+  def scrabbleScore(): Int {
+    var total: Int = 0
+    var i: Int = 0
+    while i < self.length() {
+      total = total + tileScore(self.substring(i, i + 1))
+      i = i + 1
+    }
+    return total
+  }
+  def avgLetterValue(): Double {
+    val len: Int = self.length()
+    if len == 0 { return 0.0 }
+    return (self.scrabbleScore() as Double) / (len as Double)
+  }
+}
+
+// ─── Word stat record ─────────────────────────────────────────────────────────
+
+record WordStat(word: String, score: Int, avgValue: Double) {
+public:
+  def display(): String =
+    "#{word()}: #{score()} pts, #{avgValue()} avg/letter"
+}
+
+def wordStat(w: String): WordStat {
+  val up: String = w.toUpperCase()
+  return new WordStat(up, up.scrabbleScore(), up.avgLetterValue())
+}
+
+def logPlay(who: Player, r: PlayResult): void {
+  IO::println("  #{who.name()}: #{r.summary()}")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // Part 1: letter score table grouped by point value
+  IO::println("=== Letter Scores by Point Value ===")
+  // Group letters by point value (iterate over known point tiers)
+  foreach pts: Int in [1, 2, 3, 4, 5, 8, 10] {
+    var row: String = ""
+    foreach (letter, score) in LETTER_SCORES {
+      if (score as Int) == pts {
+        if letter != "_" { row = if row.isEmpty() { letter as String } else { (letter as String) + " " + row } }
+      }
+    }
+    if !row.isEmpty() { IO::println("  #{pts} pt(s): #{row}") }
+  }
+
+  // Part 2: word base-score analysis
+  IO::println("")
+  IO::println("=== Word Score Analysis (base values, no board multipliers) ===")
+  val wordList: List[String] = ["QUIZ", "FIZZ", "JAZZ", "OXYGEN", "COMPLEX", "SPHINX", "MATRIX", "VORTEX"]
+  val wordStats: List[WordStat] = wordList.map { w -> wordStat(w) }.sortedBy { ws -> -ws.score() }
+  foreach ws: WordStat in wordStats {
+    IO::println("  #{ws.display()}")
+  }
+
+  // Part 3: simulated game
+  IO::println("")
+  IO::println("=== Simulated Game (9 moves, 3 players) ===")
+  val game: Game = new Game(["Alice", "Bob", "Carol"])
+
+  var who: Player = game.currentPlayer()
+  logPlay(who, game.play("QUIZ",    7,  7,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("ZEAL",    4,  7,  Direction::Down))
+  who = game.currentPlayer()
+  logPlay(who, game.play("OXYGEN",  7,  10, Direction::Down))
+  who = game.currentPlayer()
+  logPlay(who, game.play("FIZZ",    0,  0,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("JAZZ",    14, 3,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("SPHINX",  7,  3,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("MATRIX",  3,  9,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("COMPLEX", 8,  0,  Direction::Across))
+  who = game.currentPlayer()
+  logPlay(who, game.play("VORTEX",  2,  2,  Direction::Across))
+
+  // Part 4: final standings
+  IO::println("")
+  IO::println("=== Final Standings ===")
+  var rank: Int = 1
+  foreach p: Player in game.standings() {
+    IO::println("  #{rank}. #{p.summary()}")
+    rank = rank + 1
+  }
+
+  IO::println("")
+  val w: Player = game.winner()
+  IO::println("Winner: #{w.name()} with #{w.score()} points!")
+
+  // Part 5: top plays across all players
+  IO::println("")
+  IO::println("=== Top 3 Plays of the Game ===")
+  val top: List[PlayResult] = game.allPlays().sortedBy { r -> -r.points() }
+  var shown: Int = 0
+  foreach r: PlayResult in top {
+    if shown < 3 {
+      IO::println("  #{r.summary()}")
+      shown = shown + 1
+    }
+  }
+
+  // Part 6: per-player play-count and per-word average score
+  IO::println("")
+  IO::println("=== Per-Player Stats ===")
+  foreach p: Player in game.players() {
+    val recent: PlayResult? = p.recentPlay()
+    val lastWord: String = if recent == null { "(none)" } else { recent?.word() ?: "(none)" }
+    IO::println("  #{p.name()}: #{p.playCount()} plays, last=#{lastWord}")
+  }
+
+  // Part 7: score distribution for played words
+  IO::println("")
+  IO::println("=== Score Distribution ===")
+  val allPlays: List[PlayResult] = game.allPlays()
+  var total: Int = 0
+  var hi: Int = 0
+  var lo: Int = 9999
+  foreach r: PlayResult in allPlays {
+    total = total + r.points()
+    if r.points() > hi { hi = r.points() }
+    if r.points() < lo { lo = r.points() }
+  }
+  val avg: Double = if allPlays.size == 0 { 0.0 } else { (total as Double) / (allPlays.size as Double) }
+  IO::println("  Total scored:    #{total}")
+  IO::println("  Highest play:    #{hi}")
+  IO::println("  Lowest play:     #{lo}")
+  IO::println("  Average/play:    #{avg}")
+
+  // Part 8: letter frequency in played words (k,v) foreach
+  IO::println("")
+  IO::println("=== Letter Frequency Across Played Words ===")
+  val allLetters: List[String] = []
+  foreach r: PlayResult in game.allPlays() {
+    var i: Int = 0
+    val up: String = r.word().toUpperCase()
+    while i < up.length() {
+      allLetters.add(up.substring(i, i + 1))
+      i = i + 1
+    }
+  }
+  val letterGroups: Map[String, List[String]] = allLetters.groupBy { ch -> ch }
+  val freqSorted: List[String] = letterGroups.keys().sortedBy { k -> -(letterGroups[k as String] as List[String]).size }
+  foreach ch: String in freqSorted {
+    val cnt: Int = (letterGroups[ch] as List[String]).size
+    IO::println("  #{ch}: #{cnt}× (#{tileScore(ch)} pts/tile)")
+  }
+}

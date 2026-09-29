@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/CookbookAnalyzer.on`** — a 268-line recipe catalog and nutrition analytics sample, a new domain for the `run/` corpus (an ADT case-enum `DietaryTag` with 6 zero-field cases dispatched via `select this`; records with expression-body methods `NutritionFacts`/`Ingredient`/`CategoryStats`/`Recipe`; an interface `Filterable` implemented by class `RecipeCatalog`; collection pipelines `filter`/`map`/`fold`/`sortedBy`/`find`; `foreach (k, v) in Map` destructuring for category grouping; a tail-recursive helper `maxCalRecursive`; a nullable `Recipe?` return from `findByName` guarded with a null check; string interpolation throughout — rendering a cookbook statistics report with per-category nutrition summaries, calorie ranking, and overall averages), added to the `run/` corpus (merged via #1725).
+
 ## [0.128.0] - 2026-09-29
 
 ### Added

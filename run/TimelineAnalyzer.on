@@ -1,0 +1,261 @@
+// TimelineAnalyzer.on — historical-timeline analysis system (~250 lines)
+//
+// Exercises: ADT case-enum with select dispatch and shared methods,
+// data-carrying enum, records with methods, extension methods on Int/String,
+// collection pipelines (groupBy/map/filter/fold/sortedBy/take/count/find),
+// foreach over ranges and map(k,v), nullable types and null-checks,
+// closures, string interpolation, pattern matching, recursion,
+// class with public/private sections.
+
+// ── Category (ADT enum) ────────────────────────────────────────────────────────
+
+enum Category {
+  case Scientific
+  case Technological
+  case Political
+  case Cultural
+  case Military
+public:
+  def label(): String = select this {
+    case c is Scientific:    "Science"
+    case c is Technological: "Technology"
+    case c is Political:     "Politics"
+    case c is Cultural:      "Culture"
+    case c is Military:      "Military"
+  }
+  def symbol(): String = select this {
+    case c is Scientific:    "[S]"
+    case c is Technological: "[T]"
+    case c is Political:     "[P]"
+    case c is Cultural:      "[C]"
+    case c is Military:      "[M]"
+  }
+}
+
+// ── Significance (data-carrying enum) ─────────────────────────────────────────
+
+enum Significance(label: String, weight: Int) {
+  PIVOTAL("pivotal",   10),
+  MAJOR  ("major",      6),
+  NOTABLE("notable",   3),
+  MINOR  ("minor",      1)
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+
+extension Int {
+  def decade(): Int = (self / 10) * 10
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "~"
+  }
+  def bar(n: Int): String {
+    var b: String = ""
+    var i: Int = 0
+    while i < n { b = b + "#"; i++ }
+    return b
+  }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────────
+
+record Era(name: String, startYear: Int, endYear: Int) {
+public:
+  def contains(year: Int): Boolean = year >= startYear() && year <= endYear()
+  def span(): Int = endYear() - startYear() + 1
+  def label(): String = "#{name()} (#{startYear()}-#{endYear()})"
+}
+
+record HistoricalEvent(year: Int, title: String, category: Category, significance: Significance) {
+public:
+  def score(): Int    = significance().weight()
+  def decade(): Int   = year().decade()
+  def shortLabel(): String =
+    "[#{year()}] " + category().symbol() + " " + title().truncate(36)
+}
+
+// ── TimelineAnalyzer class ─────────────────────────────────────────────────────
+
+class TimelineAnalyzer {
+  val events: List[HistoricalEvent]
+  val eras: List[Era]
+
+public:
+  def this(events: List[HistoricalEvent], eras: List[Era]) {
+    this.events = events
+    this.eras   = eras
+  }
+
+  def totalEvents(): Int = events.size
+
+  def totalScore(): Int =
+    events.fold(0) { acc, e -> acc + e.score() }
+
+  def eraFor(year: Int): Era? {
+    foreach era: Era in eras {
+      if era.contains(year) { return era }
+    }
+    return null
+  }
+
+  def byCategory(): Map[Object, List[HistoricalEvent]] =
+    events.groupBy { e -> e.category().label() }
+
+  def byDecade(): Map[Object, List[HistoricalEvent]] =
+    events.groupBy { e -> e.decade() }
+
+  def topN(n: Int): List[HistoricalEvent] =
+    events.sortedBy { e -> 0 - e.score() }.take(n)
+
+  def pivotal(): List[HistoricalEvent] =
+    events.filter { e -> e.significance() == Significance::PIVOTAL }
+
+  def inRange(fromYear: Int, toYear: Int): List[HistoricalEvent] =
+    events.filter { e -> e.year() >= fromYear && e.year() <= toYear }
+
+  def decadeHistogram(): void {
+    val byDec: Map[Object, List[HistoricalEvent]] = byDecade()
+    val decades: List[Int] = []
+    foreach k: Object in byDec.keySet() { decades.add(k as Int) }
+    val sorted: List[Int] = decades.sortedBy { d -> d }
+    foreach dec: Int in sorted {
+      val bucket: List[HistoricalEvent] = byDec[(dec as Object)] as List[HistoricalEvent]
+      val bar: String = "#".bar(bucket.size)
+      IO::println("  #{dec}s: #{bar} (#{bucket.size})")
+    }
+  }
+
+  def categoryBreakdown(): void {
+    val byCat: Map[Object, List[HistoricalEvent]] = byCategory()
+    foreach (label, group) in byCat {
+      val evts: List[HistoricalEvent] = group as List[HistoricalEvent]
+      val score: Int = evts.fold(0) { a, e -> a + e.score() }
+      IO::println("  #{("" + label).rpad(12)}: #{evts.size} events, score #{score}")
+    }
+  }
+
+  def eraReport(): void {
+    foreach era: Era in eras {
+      val erEvents: List[HistoricalEvent] = inRange(era.startYear(), era.endYear())
+      if erEvents.size > 0 {
+        val sorted: List[HistoricalEvent] = erEvents.sortedBy { e -> 0 - e.score() }
+        val topEvent: HistoricalEvent? = sorted.find { e -> true }
+        val scoreSum: Int = erEvents.fold(0) { a, e -> a + e.score() }
+        IO::println("  #{era.label()}: #{erEvents.size} events, score #{scoreSum}")
+        if topEvent != null {
+          IO::println("    top: #{topEvent.shortLabel()}")
+        }
+      }
+    }
+  }
+}
+
+// ── Dataset ────────────────────────────────────────────────────────────────────
+
+def buildEras(): List[Era] = [
+  new Era("Ancient",       -3000,  500),
+  new Era("Medieval",        501, 1400),
+  new Era("Early Modern",   1401, 1700),
+  new Era("Enlightenment",  1701, 1800),
+  new Era("Industrial",     1801, 1900),
+  new Era("Modern",         1901, 1950),
+  new Era("Contemporary",   1951, 2025)
+]
+
+def buildEvents(): List[HistoricalEvent] = [
+  new HistoricalEvent(-776, "First Olympic Games",                   new Cultural(),      Significance::NOTABLE),
+  new HistoricalEvent(-264, "Construction of Great Wall begins",     new Political(),     Significance::MAJOR),
+  new HistoricalEvent( 105, "Invention of paper (Cai Lun)",         new Technological(), Significance::MAJOR),
+  new HistoricalEvent( 628, "Brahmagupta defines zero",             new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1045, "Movable-type printing (Bi Sheng)",     new Technological(), Significance::MAJOR),
+  new HistoricalEvent(1215, "Magna Carta signed",                   new Political(),     Significance::MAJOR),
+  new HistoricalEvent(1347, "Black Death reaches Europe",           new Military(),      Significance::MAJOR),
+  new HistoricalEvent(1440, "Gutenberg printing press",             new Technological(), Significance::PIVOTAL),
+  new HistoricalEvent(1492, "Columbus reaches Americas",            new Political(),     Significance::PIVOTAL),
+  new HistoricalEvent(1543, "Heliocentric model (Copernicus)",      new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1687, "Newton publishes Principia",           new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1776, "US Declaration of Independence",       new Political(),     Significance::PIVOTAL),
+  new HistoricalEvent(1789, "French Revolution begins",             new Political(),     Significance::PIVOTAL),
+  new HistoricalEvent(1804, "Steam locomotive (Trevithick)",        new Technological(), Significance::MAJOR),
+  new HistoricalEvent(1831, "Faraday electromagnetic induction",    new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1859, "Darwin's Origin of Species",           new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1869, "Suez Canal opened",                    new Technological(), Significance::MAJOR),
+  new HistoricalEvent(1879, "Edison's incandescent bulb",           new Technological(), Significance::MAJOR),
+  new HistoricalEvent(1895, "Rontgen discovers X-rays",             new Scientific(),    Significance::MAJOR),
+  new HistoricalEvent(1903, "Wright Brothers first flight",         new Technological(), Significance::PIVOTAL),
+  new HistoricalEvent(1905, "Einstein's special relativity",        new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1914, "World War I begins",                   new Military(),      Significance::PIVOTAL),
+  new HistoricalEvent(1928, "Fleming discovers penicillin",         new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1939, "World War II begins",                  new Military(),      Significance::PIVOTAL),
+  new HistoricalEvent(1945, "Atomic bomb detonated",                new Military(),      Significance::PIVOTAL),
+  new HistoricalEvent(1948, "UN Declaration of Human Rights",       new Political(),     Significance::MAJOR),
+  new HistoricalEvent(1953, "Structure of DNA (Watson and Crick)",  new Scientific(),    Significance::PIVOTAL),
+  new HistoricalEvent(1957, "Sputnik 1 launched",                   new Technological(), Significance::PIVOTAL),
+  new HistoricalEvent(1969, "Moon landing (Apollo 11)",             new Technological(), Significance::PIVOTAL),
+  new HistoricalEvent(1989, "Fall of the Berlin Wall",              new Political(),     Significance::PIVOTAL),
+  new HistoricalEvent(1991, "World Wide Web (Berners-Lee)",         new Technological(), Significance::PIVOTAL),
+  new HistoricalEvent(2003, "Human Genome Project completed",       new Scientific(),    Significance::MAJOR),
+  new HistoricalEvent(2007, "First iPhone released",                new Technological(), Significance::MAJOR),
+  new HistoricalEvent(2016, "Gravitational waves detected",         new Scientific(),    Significance::MAJOR),
+  new HistoricalEvent(2022, "James Webb Space Telescope first image", new Scientific(),  Significance::NOTABLE)
+]
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val eras: List[Era]                  = buildEras()
+  val events: List[HistoricalEvent]    = buildEvents()
+  val ta: TimelineAnalyzer             = new TimelineAnalyzer(events, eras)
+
+  IO::println("====================================================")
+  IO::println("  Historical Timeline Analyzer -- #{ta.totalEvents()} events")
+  IO::println("  Total significance score: #{ta.totalScore()}")
+  IO::println("====================================================")
+
+  val pivotalList: List[HistoricalEvent] = ta.pivotal()
+  IO::println("\n-- Pivotal events (#{pivotalList.size}) -----------------------")
+  foreach ev: HistoricalEvent in pivotalList.sortedBy { e -> e.year() } {
+    IO::println("  " + ev.shortLabel())
+  }
+
+  IO::println("\n-- Top 5 by significance score -----------------------")
+  var rank: Int = 1
+  foreach ev: HistoricalEvent in ta.topN(5) {
+    IO::println("  #{rank}. #{ev.shortLabel()} [#{ev.significance().label()}]")
+    rank++
+  }
+
+  IO::println("\n-- Events by category --------------------------------")
+  ta.categoryBreakdown()
+
+  IO::println("\n-- Events by era ------------------------------------")
+  ta.eraReport()
+
+  IO::println("\n-- Decade histogram ---------------------------------")
+  ta.decadeHistogram()
+
+  IO::println("\n-- 20th century spotlight (1900-1999) ---------------")
+  val c20: List[HistoricalEvent] = ta.inRange(1900, 1999)
+  IO::println("  #{c20.size} events, top:")
+  foreach ev: HistoricalEvent in c20.sortedBy { e -> 0 - e.score() }.take(4) {
+    IO::println("    " + ev.shortLabel())
+  }
+
+  IO::println("\n-- Category with highest total score -----------------")
+  val byCat: Map[Object, List[HistoricalEvent]] = ta.byCategory()
+  var bestCat: String = "?"
+  var bestScore: Int = -1
+  foreach (label, group) in byCat {
+    val s: Int = (group as List[HistoricalEvent]).fold(0) { a, e -> a + e.score() }
+    if s > bestScore { bestScore = s; bestCat = label as String }
+  }
+  IO::println("  #{bestCat} (#{bestScore} pts)")
+}

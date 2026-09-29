@@ -1,0 +1,359 @@
+// PodcastManager.on — podcast library tracker and listening analytics
+// Exercises: data-carrying enums, ADT enums, records with methods, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+// closures, string interpolation, foreach over maps, extension methods.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Genre { Technology, Science, History, Comedy, News, Education, TrueCrime }
+
+enum Rating(stars: Int) {
+  Unrated(0), Poor(1), Fair(2), Good(3), VeryGood(4), Excellent(5)
+public:
+  def label(): String = select this {
+    case Rating::Unrated:   "—"
+    case Rating::Poor:      "★☆☆☆☆"
+    case Rating::Fair:      "★★☆☆☆"
+    case Rating::Good:      "★★★☆☆"
+    case Rating::VeryGood:  "★★★★☆"
+    case Rating::Excellent: "★★★★★"
+  }
+}
+
+// ─── ADT: EpisodeStatus ───────────────────────────────────────────────────────
+
+enum EpisodeStatus {
+  case Unplayed
+  case InProgress(positionSec: Int, totalSec: Int)
+  case Played(rating: Rating)
+  case Skipped(reason: String)
+public:
+  def shortLabel(): String = select this {
+    case e is Unplayed:    "⬜ unplayed"
+    case e is InProgress:  "▶ #{e.positionSec()}s / #{e.totalSec()}s"
+    case e is Played:      "✅ #{e.rating().label()}"
+    case e is Skipped:     "⏭ skipped: #{e.reason()}"
+  }
+  def isFinished(): Boolean = select this {
+    case e is Played:  true
+    case e is Skipped: true
+    else:              false
+  }
+  def progressPct(): Int = select this {
+    case e is InProgress: (e.positionSec() * 100) / e.totalSec()
+    case e is Played:     100
+    else:                 0
+  }
+  def starCount(): Int = select this {
+    case e is Played: e.rating().stars()
+    else:             0
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Podcast(
+  id:          String,
+  title:       String,
+  author:      String,
+  genre:       Genre,
+  description: String
+) {
+public:
+  def summary(): String = "#{title()} by #{author()} [#{genre()}]"
+}
+
+record Episode(
+  podcastId:   String,
+  number:      Int,
+  title:       String,
+  durationSec: Int,
+  pubDate:     String,
+  status:      EpisodeStatus
+) {
+public:
+  def durationMin(): Int = durationSec() / 60
+  def durationLabel(): String {
+    val m: Int = durationSec() / 60
+    val s: Int = durationSec() % 60
+    return "#{m}m #{s}s"
+  }
+  def statusLabel(): String = status().shortLabel()
+  def isPlayed(): Boolean = status().isFinished()
+  def progressPct(): Int = status().progressPct()
+  def starCount(): Int = status().starCount()
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def centerPad(width: Int): String {
+    val pad: Int = width - self.length()
+    if pad <= 0 { return self }
+    val left: Int = pad / 2
+    val right: Int = pad - left
+    var result: String = ""
+    var i: Int = 0
+    while i < left  { result = result + " "; i = i + 1 }
+    result = result + self
+    i = 0
+    while i < right { result = result + " "; i = i + 1 }
+    return result
+  }
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+}
+
+extension Int {
+  def toTimeLabel(): String {
+    val h: Int = self / 3600
+    val m: Int = (self % 3600) / 60
+    val s: Int = self % 60
+    if h > 0 { return "#{h}h #{m}m" }
+    return "#{m}m #{s}s"
+  }
+}
+
+// ─── Library ──────────────────────────────────────────────────────────────────
+
+class PodcastLibrary {
+  val podcasts: List[Podcast] = []
+  val episodes: List[Episode] = []
+public:
+  def getPodcasts(): List[Podcast] = podcasts
+  def getEpisodes(): List[Episode] = episodes
+  def addPodcast(p: Podcast): void { podcasts.add(p) }
+  def addEpisode(e: Episode): void { episodes.add(e) }
+
+  def podcastById(id: String): Podcast? {
+    foreach p: Podcast in podcasts {
+      if p.id() == id { return p }
+    }
+    return null
+  }
+
+  def episodesFor(podcastId: String): List[Episode] =
+    episodes.filter  { e: Episode -> e.podcastId() == podcastId }
+            .sortedBy { e: Episode -> e.number() }
+
+  def playedEpisodes(): List[Episode] =
+    episodes.filter { e: Episode -> e.isPlayed() }
+
+  def unplayedEpisodes(): List[Episode] =
+    episodes.filter { e: Episode -> !e.status().isFinished() }
+
+  def inProgressEpisodes(): List[Episode] =
+    episodes.filter { e: Episode ->
+      select e.status() { case s is InProgress: true; else: false }
+    }
+
+  def totalListenedSec(): Int =
+    playedEpisodes().fold(0) { acc, e -> (acc as Int) + (e as Episode).durationSec() } as Int
+
+  def averageRating(): Double {
+    val rated: List[Episode] = episodes.filter { e: Episode -> e.starCount() > 0 }
+    if rated.size == 0 { return 0.0 }
+    val sum: Int = rated.fold(0) { acc, e -> (acc as Int) + (e as Episode).starCount() } as Int
+    return sum * 1.0 / rated.size
+  }
+
+  def topRatedEpisodes(): List[Episode] =
+    episodes.filter  { e: Episode -> e.starCount() >= 4 }
+            .sortedBy { e: Episode -> 0 - e.starCount() }
+
+  def podcastStats(podcastId: String): String {
+    val eps: List[Episode] = episodesFor(podcastId)
+    val played: Int = eps.filter { e: Episode -> e.isPlayed() }.size
+    val totalSec: Int = eps.fold(0) { acc, e -> (acc as Int) + (e as Episode).durationSec() } as Int
+    return "#{eps.size} episodes, #{played} played, #{totalSec.toTimeLabel()} total"
+  }
+
+  def printReport(): void {
+    IO::println("╔══════════════════════════════════════════════════╗")
+    IO::println("║          PODCAST LIBRARY REPORT                  ║")
+    IO::println("╚══════════════════════════════════════════════════╝")
+    IO::println("")
+    IO::println("  Podcasts:       #{podcasts.size}")
+    IO::println("  Episodes:       #{episodes.size}")
+    IO::println("  Played:         #{playedEpisodes().size}")
+    IO::println("  Unplayed:       #{unplayedEpisodes().size}")
+    IO::println("  Total listened: #{totalListenedSec().toTimeLabel()}")
+    val avg: Double = averageRating()
+    IO::println("  Avg rating:     #{avg}")
+    IO::println("")
+
+    IO::println("── By Podcast ──────────────────────────────────────")
+    foreach p: Podcast in podcasts {
+      val stats: String = podcastStats(p.id())
+      IO::println("  #{p.title().truncate(28)} — #{stats}")
+    }
+    IO::println("")
+
+    IO::println("── Top Rated Episodes ──────────────────────────────")
+    foreach e: Episode in topRatedEpisodes() {
+      val rLabel: String = select e.status() {
+        case s is Played: s.rating().label()
+        else: "—"
+      }
+      IO::println("  #{e.title().truncate(38)} #{rLabel}")
+    }
+    IO::println("")
+
+    IO::println("── By Genre ────────────────────────────────────────")
+    val byGenre = episodes.groupBy { e: Episode ->
+      val p: Podcast? = podcastById((e as Episode).podcastId())
+      if p != null { p.genre().toString() } else { "Unknown" }
+    }
+    foreach (genre, eps) in byGenre {
+      val epList: List[Episode] = eps as List[Episode]
+      IO::println("  #{genre}: #{epList.size} episodes")
+    }
+  }
+}
+
+// ─── Playlist ─────────────────────────────────────────────────────────────────
+
+record PlaylistEntry(episode: Episode, queuePosition: Int) {
+public:
+  def label(): String = "#{queuePosition()}. #{episode().title().truncate(45)}"
+}
+
+class Playlist {
+  val name: String
+  val entries: List[PlaylistEntry] = []
+public:
+  def this(name: String) { self.name = name }
+  def add(e: Episode): void {
+    entries.add(new PlaylistEntry(e, entries.size + 1))
+  }
+  def totalDurationSec(): Int =
+    entries.fold(0) { acc, pe ->
+      (acc as Int) + (pe as PlaylistEntry).episode().durationSec()
+    } as Int
+  def print(): void {
+    IO::println("Playlist: #{name} (#{entries.size} episodes, #{totalDurationSec().toTimeLabel()})")
+    foreach pe: PlaylistEntry in entries {
+      IO::println("  #{pe.label()} — #{pe.episode().durationLabel()}")
+    }
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val lib: PodcastLibrary = new PodcastLibrary()
+
+  lib.addPodcast(new Podcast("p1", "Lex Fridman Podcast",   "Lex Fridman",  Genre::Technology, "AI, science, tech"))
+  lib.addPodcast(new Podcast("p2", "Hardcore History",      "Dan Carlin",   Genre::History,    "Deep historical narratives"))
+  lib.addPodcast(new Podcast("p3", "Radiolab",              "WNYC Studios", Genre::Science,    "Science and philosophy"))
+  lib.addPodcast(new Podcast("p4", "My Favorite Murder",    "MFM",          Genre::TrueCrime,  "True crime comedy"))
+  lib.addPodcast(new Podcast("p5", "Syntax FM",             "Wes & Scott",  Genre::Technology, "Web dev podcast"))
+
+  // Lex Fridman episodes
+  lib.addEpisode(new Episode("p1", 1, "Andrej Karpathy: Deep Dive into AI",  7200, "2024-01-15",
+    new Played(Rating::Excellent)))
+  lib.addEpisode(new Episode("p1", 2, "Sam Altman: Future of AI",            5400, "2024-02-01",
+    new Played(Rating::VeryGood)))
+  lib.addEpisode(new Episode("p1", 3, "Yann LeCun on AGI",                   6300, "2024-02-20",
+    new InProgress(1800, 6300)))
+  lib.addEpisode(new Episode("p1", 4, "Elon Musk: First Principles",         8100, "2024-03-10",
+    new Unplayed()))
+
+  // Hardcore History episodes
+  lib.addEpisode(new Episode("p2", 1, "Blueprint for Armageddon I",          18000, "2023-06-01",
+    new Played(Rating::Excellent)))
+  lib.addEpisode(new Episode("p2", 2, "Blueprint for Armageddon II",         19800, "2023-07-15",
+    new Played(Rating::Excellent)))
+  lib.addEpisode(new Episode("p2", 3, "Destroyer of Worlds",                 21600, "2023-11-01",
+    new Skipped("too long for commute")))
+
+  // Radiolab episodes
+  lib.addEpisode(new Episode("p3", 1, "The Primordial Journey",              3600, "2024-01-10",
+    new Played(Rating::Good)))
+  lib.addEpisode(new Episode("p3", 2, "Numbers",                             2700, "2024-01-24",
+    new Played(Rating::VeryGood)))
+  lib.addEpisode(new Episode("p3", 3, "Where Am I?",                         3000, "2024-02-07",
+    new Unplayed()))
+
+  // My Favorite Murder episodes
+  lib.addEpisode(new Episode("p4", 1, "Episode 384",                         3600, "2024-01-05",
+    new Played(Rating::Good)))
+  lib.addEpisode(new Episode("p4", 2, "Episode 385",                         3300, "2024-01-19",
+    new Unplayed()))
+
+  // Syntax FM episodes
+  lib.addEpisode(new Episode("p5", 1, "The State of CSS 2024",               2700, "2024-01-12",
+    new Played(Rating::VeryGood)))
+  lib.addEpisode(new Episode("p5", 2, "React Server Components",             3600, "2024-01-26",
+    new Played(Rating::Good)))
+  lib.addEpisode(new Episode("p5", 3, "TypeScript 5.3 Features",             3000, "2024-02-09",
+    new Played(Rating::VeryGood)))
+  lib.addEpisode(new Episode("p5", 4, "Web Components in 2024",              2400, "2024-02-23",
+    new InProgress(900, 2400)))
+
+  lib.printReport()
+
+  // Status partition
+  val parts = lib.getEpisodes().partition { e: Episode -> e.isPlayed() }
+  val finished: List[Episode] = parts[0] as List[Episode]
+  val ongoing:  List[Episode] = parts[1] as List[Episode]
+  IO::println("── Status Summary ──────────────────────────────────")
+  IO::println("  Finished: #{finished.size}  |  In-progress/unplayed: #{ongoing.size}")
+  IO::println("")
+
+  // In-progress episodes
+  val inProg: List[Episode] = lib.inProgressEpisodes()
+  IO::println("── In Progress ─────────────────────────────────────")
+  foreach e: Episode in inProg {
+    IO::println("  #{e.title().truncate(42)} — #{e.progressPct()}%")
+  }
+  IO::println("")
+
+  // Total duration by podcast
+  IO::println("── Duration by Podcast ─────────────────────────────")
+  foreach p: Podcast in lib.getPodcasts() {
+    val eps: List[Episode] = lib.episodesFor(p.id())
+    val total: Int = eps.fold(0) { acc, e -> (acc as Int) + (e as Episode).durationSec() } as Int
+    IO::println("  #{p.title().truncate(28)}: #{total.toTimeLabel()}")
+  }
+  IO::println("")
+
+  // Build a "binge" playlist from unplayed + in-progress episodes
+  val binge: Playlist = new Playlist("Binge Queue")
+  foreach e: Episode in lib.getEpisodes().sortedBy { e: Episode -> e.pubDate() } {
+    select e.status() {
+      case s is Unplayed:    binge.add(e)
+      case s is InProgress:  binge.add(e)
+      else:
+    }
+  }
+  binge.print()
+  IO::println("")
+
+  // Find the longest unfinished episode
+  val unfinished: List[Episode] = lib.unplayedEpisodes()
+  val firstUnfinished: Episode? = unfinished.find { e: Episode -> true } as Episode?
+  if firstUnfinished != null {
+    var maxEp: Episode = firstUnfinished
+    foreach e: Episode in unfinished {
+      if e.durationSec() > maxEp.durationSec() { maxEp = e }
+    }
+    IO::println("Longest unfinished: #{maxEp.title()} (#{maxEp.durationLabel()})")
+  }
+
+  // Distinct genres represented
+  val genreNames: List[String] = lib.getPodcasts()
+    .map { p: Podcast -> p.genre().toString() }
+    .distinct()
+    .sortedBy { g: String -> g }
+  IO::println("")
+  var genreStr: String = ""
+  foreach g: String in genreNames {
+    if genreStr != "" { genreStr = genreStr + ", " }
+    genreStr = genreStr + g
+  }
+  IO::println("Genres in library: #{genreStr}")
+  IO::println("")
+  IO::println("Done.")
+}

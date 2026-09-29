@@ -1,0 +1,370 @@
+// IntervalTree.on — augmented immutable AVL interval tree for IP-range allocation.
+// Exercises: records with law/example, ADT enums with methods, immutable recursive
+// records, pattern matching with type patterns, recursion, collection pipelines,
+// nullable safety (!!), string interpolation, foreach, while.
+
+import {
+  java.lang.Integer as JInteger
+}
+
+// ─── Interval record ──────────────────────────────────────────────────────────
+
+record Interval(lo: Int, hi: Int) {
+public:
+  def length(): Int = hi - lo + 1
+  def contains(x: Int): Boolean = x >= lo && x <= hi
+  def overlaps(other: Interval): Boolean = lo <= other.hi() && hi >= other.lo()
+  def merge(other: Interval): Interval {
+    val newLo: Int = if lo < other.lo() { lo } else { other.lo() }
+    val newHi: Int = if hi > other.hi() { hi } else { other.hi() }
+    return new Interval(newLo, newHi)
+  }
+  def toStr(): String = "[" + lo + ".." + hi + "]"
+
+  law symmetric(a: Interval, b: Interval) { a.overlaps(b) == b.overlaps(a) }
+  law containsImpliesOverlap(a: Interval, x: Int) {
+    !a.contains(x) || a.overlaps(new Interval(x, x))
+  }
+  example { new Interval(1, 5).overlaps(new Interval(3, 7)) }
+  example { !new Interval(1, 5).overlaps(new Interval(6, 9)) }
+  example { new Interval(1, 5).overlaps(new Interval(5, 9)) }
+  example { new Interval(3, 3).length() == 1 }
+}
+
+// ─── Query result ADT ────────────────────────────────────────────────────────
+
+enum QueryResult {
+  case Found(interval: Interval)
+  case NotFound
+public:
+  def describe(): String = select this {
+    case f is Found:    "found " + f.interval().toStr()
+    case n is NotFound: "not found"
+  }
+}
+
+// ─── Immutable AVL node (augmented with maxHi) ────────────────────────────────
+
+record INode(iv: Interval, maxHi: Int, height: Int, left: INode?, right: INode?) {
+public:
+  static def leaf(iv: Interval): INode = new INode(iv, iv.hi(), 1, null, null)
+  def leftH(): Int  = if left != null { left!!.height() } else { 0 }
+  def rightH(): Int = if right != null { right!!.height() } else { 0 }
+  def bal(): Int    = leftH() - rightH()
+
+  static def computeMax(iv: Interval, l: INode?, r: INode?): Int {
+    var m: Int = iv.hi()
+    if l != null && l!!.maxHi() > m { m = l!!.maxHi() }
+    if r != null && r!!.maxHi() > m { m = r!!.maxHi() }
+    return m
+  }
+
+  static def computeHeight(l: INode?, r: INode?): Int {
+    val lh: Int = if l != null { l!!.height() } else { 0 }
+    val rh: Int = if r != null { r!!.height() } else { 0 }
+    return (if lh > rh { lh } else { rh }) + 1
+  }
+
+  def withLeft(l: INode?): INode =
+    new INode(iv(), INode::computeMax(iv(), l, right()), INode::computeHeight(l, right()), l, right())
+
+  def withRight(r: INode?): INode =
+    new INode(iv(), INode::computeMax(iv(), left(), r), INode::computeHeight(left(), r), left(), r)
+}
+
+// ─── AVL rotation helpers ────────────────────────────────────────────────────
+
+def avlRotateRight(y: INode): INode {
+  val x: INode  = y.left!!
+  val t2: INode? = x.right()
+  val newY: INode = y.withLeft(t2)
+  return x.withRight(newY)
+}
+
+def avlRotateLeft(x: INode): INode {
+  val y: INode  = x.right!!
+  val t2: INode? = y.left()
+  val newX: INode = x.withRight(t2)
+  return y.withLeft(newX)
+}
+
+def avlBalance(node: INode): INode {
+  val bf: Int = node.bal()
+  if bf > 1 {
+    val left: INode = node.left!!
+    if left.bal() < 0 {
+      return avlRotateRight(node.withLeft(avlRotateLeft(left)))
+    }
+    return avlRotateRight(node)
+  }
+  if bf < -1 {
+    val right: INode = node.right!!
+    if right.bal() > 0 {
+      return avlRotateLeft(node.withRight(avlRotateRight(right)))
+    }
+    return avlRotateLeft(node)
+  }
+  return node
+}
+
+// ─── Tree operations ──────────────────────────────────────────────────────────
+
+def itInsert(node: INode?, iv: Interval): INode {
+  if node == null { return INode::leaf(iv) }
+  val n: INode = node!!
+  if iv.lo() < n.iv().lo() {
+    return avlBalance(n.withLeft(itInsert(n.left(), iv)))
+  }
+  if iv.lo() > n.iv().lo() {
+    return avlBalance(n.withRight(itInsert(n.right(), iv)))
+  }
+  // same lo: break tie by hi
+  if iv.hi() <= n.iv().hi() {
+    return avlBalance(n.withLeft(itInsert(n.left(), iv)))
+  }
+  return avlBalance(n.withRight(itInsert(n.right(), iv)))
+}
+
+def itFindMin(node: INode): INode =
+  if node.left() == null { node } else { itFindMin(node.left!!) }
+
+def itRemoveMin(node: INode): INode? {
+  if node.left() == null { return node.right() }
+  return avlBalance(node.withLeft(itRemoveMin(node.left!!)))
+}
+
+def itRemove(node: INode?, iv: Interval): INode? {
+  if node == null { return null }
+  val n: INode = node!!
+  if iv.lo() < n.iv().lo() {
+    return avlBalance(n.withLeft(itRemove(n.left(), iv)))
+  }
+  if iv.lo() > n.iv().lo() {
+    return avlBalance(n.withRight(itRemove(n.right(), iv)))
+  }
+  // same lo
+  if iv.hi() == n.iv().hi() {
+    if n.right() == null { return n.left() }
+    val succ: INode = itFindMin(n.right!!)
+    val newRight: INode? = itRemoveMin(n.right!!)
+    return avlBalance(new INode(
+      succ.iv(),
+      INode::computeMax(succ.iv(), n.left(), newRight),
+      INode::computeHeight(n.left(), newRight),
+      n.left(),
+      newRight
+    ))
+  }
+  if iv.hi() < n.iv().hi() {
+    return avlBalance(n.withLeft(itRemove(n.left(), iv)))
+  }
+  return avlBalance(n.withRight(itRemove(n.right(), iv)))
+}
+
+def itSearchFirst(node: INode?, query: Interval): INode? {
+  if node == null { return null }
+  val n: INode = node!!
+  if n.maxHi() < query.lo() { return null }
+  val leftResult: INode? = itSearchFirst(n.left(), query)
+  if leftResult != null { return leftResult }
+  if n.iv().overlaps(query) { return n }
+  if n.iv().lo() > query.hi() { return null }
+  return itSearchFirst(n.right(), query)
+}
+
+def itSearchPoint(node: INode?, x: Int): INode? {
+  if node == null { return null }
+  val n: INode = node!!
+  if n.maxHi() < x { return null }
+  val leftResult: INode? = itSearchPoint(n.left(), x)
+  if leftResult != null { return leftResult }
+  if n.iv().contains(x) { return n }
+  if n.iv().lo() > x { return null }
+  return itSearchPoint(n.right(), x)
+}
+
+def itCollectAll(node: INode?, query: Interval, out: List[Interval]): void {
+  if node == null { return }
+  val n: INode = node!!
+  if n.maxHi() < query.lo() { return }
+  itCollectAll(n.left(), query, out)
+  if n.iv().overlaps(query) { out.add(n.iv()) }
+  if n.iv().lo() <= query.hi() { itCollectAll(n.right(), query, out) }
+}
+
+def itInOrder(node: INode?, out: List[Interval]): void {
+  if node == null { return }
+  val n: INode = node!!
+  itInOrder(n.left(), out)
+  out.add(n.iv())
+  itInOrder(n.right(), out)
+}
+
+// ─── IntervalTree class ───────────────────────────────────────────────────────
+
+class IntervalTree {
+  var root: INode?
+  var count: Int
+
+public:
+  def this {
+    root = null
+    count = 0
+  }
+
+  def insert(iv: Interval): void {
+    root = itInsert(root, iv)
+    count = count + 1
+  }
+
+  def remove(iv: Interval): Boolean {
+    val newRoot: INode? = itRemove(root, iv)
+    if newRoot == null && root != null && count == 1 {
+      root = null; count = 0; return true
+    }
+    // count the actual removal by checking height change
+    val oldCount: Int = count
+    root = newRoot
+    // recount (simple)
+    val list: List[Interval] = []
+    itInOrder(root, list)
+    count = list.size
+    return count < oldCount
+  }
+
+  def findFirst(query: Interval): QueryResult {
+    val r: INode? = itSearchFirst(root, query)
+    if r == null { return new NotFound() }
+    return new Found(r!!.iv())
+  }
+
+  def findAll(query: Interval): List[Interval] {
+    val out: List[Interval] = []
+    itCollectAll(root, query, out)
+    return out
+  }
+
+  def containsPoint(x: Int): QueryResult {
+    val r: INode? = itSearchPoint(root, x)
+    if r == null { return new NotFound() }
+    return new Found(r!!.iv())
+  }
+
+  def size(): Int = count
+
+  def toSortedList(): List[Interval] {
+    val out: List[Interval] = []
+    itInOrder(root, out)
+    return out
+  }
+
+  def mergeOverlapping(): List[Interval] {
+    val sorted: List[Interval] = toSortedList()
+    if sorted.size == 0 { return sorted }
+    val merged: List[Interval] = []
+    var cur: Interval = sorted.get(0)
+    var i: Int = 1
+    while i < sorted.size {
+      val nxt: Interval = sorted.get(i)
+      if cur.overlaps(nxt) { cur = cur.merge(nxt) } else { merged.add(cur); cur = nxt }
+      i = i + 1
+    }
+    merged.add(cur)
+    return merged
+  }
+}
+
+// ─── IP address utilities ─────────────────────────────────────────────────────
+
+def ipToInt(ip: String): Int {
+  val parts: List[String] = Strings::split(ip, ".")
+  var r: Int = 0
+  var i: Int = 0
+  while i < 4 {
+    r = r * 256 + JInteger::parseInt(parts.get(i))
+    i = i + 1
+  }
+  return r
+}
+
+def intToIp(n: Int): String {
+  val a: Int = (n >>> 24) & 255
+  val b: Int = (n >>> 16) & 255
+  val c: Int = (n >>> 8)  & 255
+  val d: Int = n & 255
+  return "" + a + "." + b + "." + c + "." + d
+}
+
+def cidrToInterval(cidr: String): Interval {
+  val parts: List[String] = Strings::split(cidr, "/")
+  val base: Int  = ipToInt(parts.get(0))
+  val plen: Int  = JInteger::parseInt(parts.get(1))
+  val size: Int  = if plen == 32 { 1 } else { 1 << (32 - plen) }
+  val mask: Int  = -size
+  val lo: Int    = base & mask
+  val hi: Int    = lo + size - 1
+  return new Interval(lo, hi)
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val tree: IntervalTree = new IntervalTree()
+
+  val subnets: List[String] = [
+    "10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24",
+    "192.168.1.0/24", "192.168.2.0/24",
+    "172.16.0.0/16", "10.1.0.0/16"
+  ]
+  foreach cidr: String in subnets { tree.insert(cidrToInterval(cidr)) }
+
+  IO::println("Allocated #{tree.size()} subnets")
+  IO::println("")
+
+  // Point queries
+  foreach probe: String in ["10.0.0.42", "10.0.3.1", "172.16.100.200", "8.8.8.8"] {
+    val r: QueryResult = tree.containsPoint(ipToInt(probe))
+    select r {
+      case f is Found: {
+        val iv: Interval = f.interval()
+        val ipRange: String = intToIp(iv.lo()) + " – " + intToIp(iv.hi())
+        IO::println("#{probe} → #{ipRange} (#{iv.length()} addrs)")
+      }
+      case n is NotFound: IO::println("#{probe} → not allocated")
+    }
+  }
+  IO::println("")
+
+  // Range overlap query
+  val scanRange: Interval = cidrToInterval("10.0.0.0/22")
+  val hits: List[Interval] = tree.findAll(scanRange)
+  IO::println("Subnets overlapping 10.0.0.0/22:")
+  foreach iv: Interval in hits {
+    IO::println("  #{iv.toStr()} (#{iv.length()} addresses)")
+  }
+  IO::println("")
+
+  // Merge demo with simple numeric intervals
+  val m: IntervalTree = new IntervalTree()
+  foreach iv: Interval in [new Interval(1,3), new Interval(2,5), new Interval(7,9),
+                            new Interval(8,12), new Interval(15,20)] {
+    m.insert(iv)
+  }
+  val merged: List[Interval] = m.mergeOverlapping()
+  IO::println("Merge [1,3],[2,5],[7,9],[8,12],[15,20] → #{merged.size} interval(s):")
+  foreach iv: Interval in merged { IO::println("  #{iv.toStr()}") }
+  IO::println("")
+
+  // Remove and recheck
+  val rem: Boolean = tree.remove(cidrToInterval("10.0.1.0/24"))
+  IO::println("Removed 10.0.1.0/24: #{rem}")
+  IO::println("Remaining: #{tree.size()} subnets")
+  IO::println("")
+
+  // Full sorted listing
+  val sorted: List[Interval] = tree.toSortedList()
+  IO::println("All allocated subnets (sorted by start address):")
+  foreach iv: Interval in sorted {
+    IO::println("  #{intToIp(iv.lo())} – #{intToIp(iv.hi())} (#{iv.length()} addresses)")
+  }
+}

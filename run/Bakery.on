@@ -1,0 +1,282 @@
+// Bakery.on — bakery management: products, recipes, ingredients, daily
+// production, sales, and margin analysis.
+// Exercises: records, plain and data-carrying enums, classes, interfaces,
+// generics, collection pipelines, nullable, string interpolation, try/catch,
+// closures, extension methods, while/foreach/range, select/pattern-match.
+
+enum Category { BREAD, PASTRY, CAKE, COOKIE, SAVORY }
+
+enum MeasureUnit { GRAM, ML, PIECE }
+
+record Ingredient(name: String, unit: MeasureUnit, costPer100: Int)
+
+record RecipeLine(ingredient: Ingredient, amount: Int)
+
+record Product(id: Int, name: String, category: Category, salePrice: Int, recipeLines: List[RecipeLine])
+
+record DailySale(product: Product, qty: Int, day: Int)
+
+def ingredientCost(line: RecipeLine): Int =
+  line.amount() * line.ingredient().costPer100() / 100
+
+def productCost(p: Product): Int =
+  p.recipeLines().fold(0) { acc, rl -> (acc as Int) + ingredientCost(rl as RecipeLine) }
+
+def margin(p: Product): Int = p.salePrice() - productCost(p)
+
+def marginPct(p: Product): Int {
+  val cost = productCost(p)
+  if cost == 0 { return 0 }
+  return margin(p) * 100 / p.salePrice()
+}
+
+def categoryLabel(c: Category): String {
+  select c {
+    case Category::BREAD:  return "Bread"
+    case Category::PASTRY: return "Pastry"
+    case Category::CAKE:   return "Cake"
+    case Category::COOKIE: return "Cookie"
+    case Category::SAVORY: return "Savory"
+    else: return "Other"
+  }
+}
+
+// --- Ingredients ---
+val flour   = new Ingredient("Flour",   MeasureUnit::GRAM,  5)
+val butter  = new Ingredient("Butter",  MeasureUnit::GRAM, 18)
+val sugar   = new Ingredient("Sugar",   MeasureUnit::GRAM,  4)
+val eggs    = new Ingredient("Eggs",    MeasureUnit::PIECE, 25)
+val milk    = new Ingredient("Milk",    MeasureUnit::ML,    2)
+val salt    = new Ingredient("Salt",    MeasureUnit::GRAM,  1)
+val yeast   = new Ingredient("Yeast",   MeasureUnit::GRAM, 12)
+val cream   = new Ingredient("Cream",   MeasureUnit::ML,    8)
+val choc    = new Ingredient("Chocolate", MeasureUnit::GRAM, 22)
+
+// --- Products ---
+val sourdough = new Product(1, "Sourdough Loaf", Category::BREAD, 480, [
+  new RecipeLine(flour,  500),
+  new RecipeLine(salt,    10),
+  new RecipeLine(yeast,    5),
+  new RecipeLine(milk,   200)
+])
+
+val croissant = new Product(2, "Croissant", Category::PASTRY, 280, [
+  new RecipeLine(flour,  120),
+  new RecipeLine(butter,  80),
+  new RecipeLine(sugar,   20),
+  new RecipeLine(eggs,     1)
+])
+
+val chocCake = new Product(3, "Chocolate Cake", Category::CAKE, 1800, [
+  new RecipeLine(flour,  250),
+  new RecipeLine(butter, 150),
+  new RecipeLine(sugar,  200),
+  new RecipeLine(eggs,     3),
+  new RecipeLine(choc,   180),
+  new RecipeLine(cream,  100)
+])
+
+val butter_cookie = new Product(4, "Butter Cookie", Category::COOKIE, 180, [
+  new RecipeLine(flour, 100),
+  new RecipeLine(butter, 60),
+  new RecipeLine(sugar,  50),
+  new RecipeLine(eggs,    1)
+])
+
+val quiche = new Product(5, "Quiche", Category::SAVORY, 650, [
+  new RecipeLine(flour,  180),
+  new RecipeLine(butter,  80),
+  new RecipeLine(eggs,     2),
+  new RecipeLine(cream,  150),
+  new RecipeLine(salt,     5)
+])
+
+val products = [sourdough, croissant, chocCake, butter_cookie, quiche]
+
+IO::println("=== Bakery Management System ===")
+IO::println("Products: #{products.size}")
+
+IO::println("\n--- Product Costs & Margins ---")
+foreach p: Product in products {
+  val cost = productCost(p)
+  val mrg = margin(p)
+  val pct = marginPct(p)
+  IO::println("  #{p.name()} | cost #{cost} | price #{p.salePrice()} | margin #{mrg} (#{pct}%)")
+}
+
+IO::println("\n--- Products by Category ---")
+val byCat = products.groupBy { p -> categoryLabel(p.category()) }
+foreach (cat, catProducts) in byCat {
+  IO::println("  #{cat}: #{(catProducts as List).size} product(s)")
+}
+
+IO::println("\n--- Sorted by Margin Pct (desc) ---")
+val sorted = products.sortedBy { p -> 0 - marginPct(p) }
+foreach p: Product in sorted {
+  IO::println("  #{p.name()}: #{marginPct(p)}%")
+}
+
+IO::println("\n--- High-margin products (>60%) ---")
+val highMargin = products.filter { p -> marginPct(p) > 60 }
+foreach p: Product in highMargin {
+  IO::println("  #{p.name()} (#{marginPct(p)}%)")
+}
+if highMargin.size == 0 { IO::println("  none") }
+
+// --- Daily Sales data ---
+val sales = [
+  new DailySale(sourdough,    12, 1),
+  new DailySale(croissant,    25, 1),
+  new DailySale(chocCake,      3, 1),
+  new DailySale(butter_cookie, 40, 1),
+  new DailySale(quiche,        8, 1),
+  new DailySale(sourdough,    15, 2),
+  new DailySale(croissant,    18, 2),
+  new DailySale(chocCake,      5, 2),
+  new DailySale(butter_cookie, 30, 2),
+  new DailySale(quiche,       10, 2)
+]
+
+def saleRevenue(s: DailySale): Int = s.qty() * s.product().salePrice()
+def saleProfit(s: DailySale): Int = s.qty() * margin(s.product())
+
+IO::println("\n--- Daily Revenue ---")
+val byDay = sales.groupBy { s -> s.day().toString() }
+foreach (dayStr, daySales) in byDay {
+  val rev = (daySales as List).fold(0) { acc, s -> (acc as Int) + saleRevenue(s as DailySale) }
+  val profit = (daySales as List).fold(0) { acc, s -> (acc as Int) + saleProfit(s as DailySale) }
+  IO::println("  Day #{dayStr}: revenue=#{rev}, profit=#{profit}")
+}
+
+IO::println("\n--- Total Sales Summary ---")
+val totalRevenue = sales.fold(0) { acc, s -> (acc as Int) + saleRevenue(s as DailySale) }
+val totalProfit = sales.fold(0) { acc, s -> (acc as Int) + saleProfit(s as DailySale) }
+IO::println("  Total revenue: #{totalRevenue}")
+IO::println("  Total profit:  #{totalProfit}")
+
+IO::println("\n--- Best-selling product ---")
+val qtys = products.map { p ->
+  val pSales = sales.filter { s -> s.product().id() == p.id() }
+  val total = pSales.fold(0) { acc, s -> (acc as Int) + (s as DailySale).qty() }
+  total
+}
+var bestIdx = 0
+var bestQty = qtys[0] as Int
+var pi = 1
+while pi < qtys.size {
+  val q = qtys[pi] as Int
+  if q > bestQty { bestQty = q; bestIdx = pi }
+  pi = pi + 1
+}
+val bestProduct = products[bestIdx] as Product
+IO::println("  #{bestProduct.name()} (#{bestQty} units sold)")
+
+// --- Class: ProductionScheduler ---
+class ProductionScheduler {
+  val products: List[Product]
+  val targetUnits: Int
+public:
+  def this(ps: List[Product], t: Int) { this.products = ps; this.targetUnits = t }
+
+  def plan(): List[String] {
+    return this.products.map { p ->
+      val cost = productCost(p)
+      val rev = p.salePrice() * this.targetUnits
+      "#{p.name()}: produce #{this.targetUnits}, cost=#{cost * this.targetUnits}, revenue=#{rev}"
+    }
+  }
+
+  def cheapestToProduce(): Product? {
+    return this.products.sortedBy { p -> productCost(p) }.find { p -> true }
+  }
+}
+
+val sched = new ProductionScheduler(products, 20)
+IO::println("\n--- Production Plan (20 units each) ---")
+foreach item: String in sched.plan() {
+  IO::println("  #{item}")
+}
+val cheapest = sched.cheapestToProduce()
+if cheapest != null {
+  IO::println("\nCheapest to produce: #{(cheapest as Product).name()} (#{productCost(cheapest as Product)} per unit)")
+}
+
+// --- Interface: Priceable ---
+interface Priceable {
+  def displayPrice(): String
+}
+
+class PricedProduct conforms Priceable {
+  val product: Product
+  val taxRate: Int
+public:
+  def this(p: Product, t: Int) { this.product = p; this.taxRate = t }
+  override def displayPrice(): String {
+    val withTax = this.product.salePrice() * (100 + this.taxRate) / 100
+    return "#{this.product.name()}: #{this.product.salePrice()} + #{this.taxRate}% tax = #{withTax}"
+  }
+}
+
+IO::println("\n--- Prices with Tax (8%) ---")
+foreach p: Product in products {
+  val pp: Priceable = new PricedProduct(p, 8)
+  IO::println("  #{pp.displayPrice()}")
+}
+
+// --- Extension methods on Int and String ---
+extension Int {
+  def asCurrency(): String = "¥#{self}"
+  def asGrams(): String = "#{self}g"
+}
+extension String {
+  def rightPad(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+IO::println("\n--- Ingredient Price List ---")
+val allIngredients = [flour, butter, sugar, eggs, milk, salt, yeast, cream, choc]
+foreach ing: Ingredient in allIngredients {
+  IO::println("  #{ing.name().rightPad(12)} #{ing.costPer100().asCurrency()}/100#{ing.unit().toString().toLowerCase()}")
+}
+
+// --- Recursion: pick best product by profitability ---
+def bestProfitIdx(ps: List[Product], idx: Int, bestI: Int): Int {
+  if idx >= ps.size { return bestI }
+  val curr = ps[idx] as Product
+  val best = ps[bestI] as Product
+  val newBest = if marginPct(curr) > marginPct(best) { idx } else { bestI }
+  return bestProfitIdx(ps, idx + 1, newBest)
+}
+val topIdx = bestProfitIdx(products, 1, 0)
+val topProduct = products[topIdx] as Product
+IO::println("\nTop profitability: #{topProduct.name()} (#{marginPct(topProduct)}%)")
+
+// --- try/catch: safe price parse ---
+def parsePrice(s: String): Int {
+  try { return Integer::parseInt(s) }
+  catch e: Exception { return 0 - 1 }
+}
+IO::println("\n--- Price Parse Demo ---")
+IO::println("  '480' -> #{parsePrice("480")}")
+IO::println("  'free' -> #{parsePrice("free")}")
+
+// --- foreach over range: simulate weekly production ---
+IO::println("\n--- Weekly Production Schedule ---")
+foreach day: Int in 1..7 {
+  val extra = if day == 7 { " (weekend — cakes only)" } else { "" }
+  val prod = if day == 7 { 1 } else { products.size }
+  IO::println("  Day #{day}: #{prod} product type(s) active#{extra}")
+}
+
+// --- Closures: discount calculator ---
+val applyDiscount = (price: Int, pct: Int) -> price * (100 - pct) / 100
+IO::println("\n--- End-of-Day Discounts ---")
+foreach p: Product in products {
+  val disc = applyDiscount(p.salePrice(), 20)
+  IO::println("  #{p.name()}: #{p.salePrice().asCurrency()} -> #{disc.asCurrency()} (20% off)")
+}
+
+IO::println("\n=== Done ===")

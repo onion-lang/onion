@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.128.0] - 2026-09-29
+
 ### Added
 
 - **`run/Bakery.on`** — a 282-line bakery management system, a new domain for the `run/` corpus (records `Ingredient`/`RecipeLine`/`Product`/`DailySale`; plain enums `Category`/`MeasureUnit` with `select`-based dispatch (`categoryLabel()`); a class `ProductionScheduler` (`plan()`/`cheapestToProduce()`); an interface `Priceable` implemented via `conforms`/`override` (`PricedProduct`); collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`find`; `foreach (k, v) in Map` destructuring for daily revenue; nullable values with `?:` Elvis; `try`/`catch` for safe price parsing; extension methods on `Int`/`String` (`asCurrency`/`asGrams`/`rightPad`); a closure stored as `val` (discount calculator); `while` loops; `foreach` over an inclusive range (`1..7` weekly schedule); a recursive best-product search — rendering production plans, pricing, weekly schedules, and a best-seller report), added to the `run/` corpus (merged via #1723).

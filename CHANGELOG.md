@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.129.0] - 2026-09-29
+
 ### Added
 
 - **`run/AirQualityMonitor.on`** — a 527-line multi-city air quality monitoring network simulator, a new domain for the `run/` corpus (a homogeneous enum `Pollutant` (`PM25`/`PM10`/`NO2`/`CO`/`O3`/`SO2`) with `unit()`/`displayName()`/`toAQI()` dispatched via `select this`, the latter delegating to piecewise-linear US EPA breakpoint interpolation helpers per pollutant; a homogeneous enum `AQILevel` with `label()`/`color()`; records with methods `Station`/`Measurement` (`override def toString()`)/`DailySummary` (`aqiLevel()`); collection pipelines, `Map` iteration, nullable types, closures, and `while`/`foreach` loops driving station/date/pollutant aggregation — rendering per-station daily AQI summaries, a worst-pollutant breakdown, and a network-wide trend report), added to the `run/` corpus (merged via #1729).

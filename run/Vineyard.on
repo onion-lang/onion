@@ -1,0 +1,207 @@
+// Vineyard.on — grape harvest and fermentation batch tracker for a small winery.
+// Exercises: a plain enum with a method (GrapeVariety); an ADT data-carrying
+// enum dispatched via `select this` (FermentationStage); records with methods
+// (Block/Batch); a class with public/private sections and mutable List
+// state (Winery); extension methods on String; collection pipelines
+// (filter/map/sortedBy/groupBy/fold/find); `foreach (k, v) in Map`
+// destructuring; nullable types with null-safe lookups; `Format::fixed` for
+// locale-independent decimal output; string interpolation throughout.
+
+// ─── Grape variety ────────────────────────────────────────────────────────────
+
+enum GrapeVariety {
+  CABERNET, MERLOT, CHARDONNAY, PINOT_NOIR, RIESLING
+public:
+  def label(): String {
+    select this {
+      case GrapeVariety::CABERNET:   return "Cabernet Sauvignon"
+      case GrapeVariety::MERLOT:     return "Merlot"
+      case GrapeVariety::CHARDONNAY: return "Chardonnay"
+      case GrapeVariety::PINOT_NOIR: return "Pinot Noir"
+      case GrapeVariety::RIESLING:   return "Riesling"
+      else: return "Unknown"
+    }
+  }
+  def isRed(): Boolean {
+    select this {
+      case GrapeVariety::CABERNET, GrapeVariety::MERLOT, GrapeVariety::PINOT_NOIR: return true
+      else: return false
+    }
+  }
+}
+
+// ─── Fermentation stage (ADT enum) ────────────────────────────────────────────
+
+enum FermentationStage {
+  case Crushing
+  case Fermenting(day: Int)
+  case Aging(months: Int)
+  case Bottled
+public:
+  def label(): String {
+    select this {
+      case c is Crushing:    return "crushing"
+      case f is Fermenting:  return "fermenting (day #{f.day()})"
+      case a is Aging:       return "aging (#{a.months()}mo)"
+      case b is Bottled:     return "bottled"
+    }
+  }
+  def isReadyToBottle(): Boolean {
+    select this {
+      case a is Aging: return a.months() >= 12
+      else: return false
+    }
+  }
+}
+
+// ─── Records ───────────────────────────────────────────────────────────────────
+
+record Block(name: String, variety: GrapeVariety, acres: Double, brixAtHarvest: Double) {
+public:
+  def quality(): String {
+    if self.brixAtHarvest() >= 24.0 { return "premium" }
+    else if self.brixAtHarvest() >= 21.0 { return "standard" }
+    else { return "table" }
+  }
+  def estYieldTons(): Double = self.acres() * 3.5
+}
+
+record Batch(id: String, blockName: String, variety: GrapeVariety, stage: FermentationStage, volumeLiters: Double) {
+public:
+  def statusLine(): String =
+    "  #{self.id().pad(10)} #{self.blockName().pad(14)} #{self.variety().label().pad(18)} #{self.stage().label()}"
+}
+
+// ─── Extension helpers ─────────────────────────────────────────────────────────
+
+extension String {
+  def pad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Winery ─────────────────────────────────────────────────────────────────────
+
+class Winery {
+  val blocks: List[Block]
+  val batches: List[Batch]
+public:
+  def this {
+    this.blocks = []
+    this.batches = []
+  }
+
+  def addBlock(b: Block): void { blocks.add(b) }
+  def addBatch(b: Batch): void { batches.add(b) }
+
+  def allBlocks(): List[Block] = blocks
+  def allBatches(): List[Batch] = batches
+
+  def totalAcres(): Double {
+    return blocks.fold(0.0) { acc, b -> acc + (b as Block).acres() }
+  }
+
+  def totalEstYieldTons(): Double {
+    return blocks.fold(0.0) { acc, b -> acc + (b as Block).estYieldTons() }
+  }
+
+  def blockCount(): Int = blocks.size
+  def batchCount(): Int = batches.size
+
+  def findBatch(id: String): Batch? {
+    return batches.find { b -> (b as Batch).id() == id }
+  }
+
+  def batchesByVariety(variety: GrapeVariety): List[Batch] {
+    return batches.filter { b -> (b as Batch).variety() == variety }
+  }
+
+  def readyToBottle(): List[Batch] {
+    return batches.filter { b -> (b as Batch).stage().isReadyToBottle() }
+  }
+}
+
+// ─── Populate the winery ─────────────────────────────────────────────────────────
+
+val w: Winery = new Winery()
+
+w.addBlock(new Block("North Ridge", GrapeVariety::CABERNET, 12.5, 24.8))
+w.addBlock(new Block("South Slope", GrapeVariety::MERLOT, 8.0, 23.1))
+w.addBlock(new Block("River Bend", GrapeVariety::CHARDONNAY, 15.0, 22.4))
+w.addBlock(new Block("Hilltop", GrapeVariety::PINOT_NOIR, 6.5, 25.2))
+w.addBlock(new Block("Valley Floor", GrapeVariety::RIESLING, 9.0, 20.5))
+
+w.addBatch(new Batch("B-101", "North Ridge", GrapeVariety::CABERNET, new Aging(14), 4200.0))
+w.addBatch(new Batch("B-102", "South Slope", GrapeVariety::MERLOT, new Aging(6), 2800.0))
+w.addBatch(new Batch("B-103", "River Bend", GrapeVariety::CHARDONNAY, new Fermenting(9), 5100.0))
+w.addBatch(new Batch("B-104", "Hilltop", GrapeVariety::PINOT_NOIR, new Aging(18), 2100.0))
+w.addBatch(new Batch("B-105", "Valley Floor", GrapeVariety::RIESLING, new Crushing(), 3300.0))
+w.addBatch(new Batch("B-106", "North Ridge", GrapeVariety::CABERNET, new Bottled(), 4000.0))
+
+// ─── Report 1: block summary ─────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Vineyard Blocks (#{w.blockCount()} total, #{Format::fixed(w.totalAcres(), 1)} acres) ===")
+foreach b: Block in w.allBlocks() {
+  IO::println("  #{b.name().pad(14)} #{b.variety().label().pad(18)} #{Format::fixed(b.acres(), 1)} ac  brix=#{Format::fixed(b.brixAtHarvest(), 1)}  [#{b.quality()}]")
+}
+IO::println("  est. total yield: #{Format::fixed(w.totalEstYieldTons(), 1)} tons")
+
+// ─── Report 2: fermentation status ────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Batch Fermentation Status (#{w.batchCount()} batches) ===")
+val sorted: List[Batch] = w.allBatches().sortedBy { b -> (b as Batch).id() }
+foreach b: Batch in sorted {
+  IO::println(b.statusLine())
+}
+
+// ─── Report 3: ready-to-bottle batches ────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Ready to Bottle (aged 12+ months) ===")
+val ready: List[Batch] = w.readyToBottle()
+if ready.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach b: Batch in ready {
+    IO::println("  #{b.id()} - #{b.blockName()} (#{b.variety().label()}), #{Format::fixed(b.volumeLiters(), 0)}L")
+  }
+}
+
+// ─── Report 4: volume by variety, red vs. white ──────────────────────────────
+
+IO::println("")
+IO::println("=== Volume by Variety ===")
+val byVariety = w.allBatches().groupBy { b -> (b as Batch).variety().label() }
+foreach (name, group) in byVariety {
+  val volume: Double = (group as List).fold(0.0) { acc, b -> acc + (b as Batch).volumeLiters() }
+  val first: Batch = (group as List)[0] as Batch
+  val kind: String = if first.variety().isRed() { "red" } else { "white" }
+  IO::println("  #{(name as String).pad(20)} #{Format::fixed(volume, 0).pad(8)}L  [#{kind}]")
+}
+
+// ─── Report 5: lookup by id ────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Batch Lookup ===")
+val lookupIds: List[String] = ["B-103", "B-999"]
+foreach id: String in lookupIds {
+  val found: Batch? = w.findBatch(id)
+  if found != null {
+    IO::println("  #{id}: #{found.stage().label()}, #{Format::fixed(found.volumeLiters(), 0)}L")
+  } else {
+    IO::println("  #{id}: not found")
+  }
+}
+
+// ─── Report 6: batches for a single variety ───────────────────────────────────
+
+IO::println("")
+IO::println("=== Cabernet Batches ===")
+val cab: List[Batch] = w.batchesByVariety(GrapeVariety::CABERNET)
+foreach b: Batch in cab {
+  IO::println("  #{b.id()} (#{b.blockName()}): #{b.stage().label()}")
+}

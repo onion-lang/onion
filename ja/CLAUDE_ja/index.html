@@ -5168,7 +5168,7 @@
 <p><strong>構成:</strong>
 - Scala バージョン: 3.3.7
 - Java バージョン: 17
-- SBT バージョン: ~1.9+
+- SBT バージョン: 2.0.6 (<code>project/build.properties</code>)
 - 主要な依存関係: ASM 9.8 (バイトコード), JavaCC 5.0 (パーサー), ScalaTest 3.2.19 (テスト)</p>
 <h2 id="_2">ビルドコマンド<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>
@@ -5176,7 +5176,7 @@
 <li><code>grammar/JJOnionParser.jj</code> が変更されると、パーサーを自動再生成</li>
 <li><strong>テストの実行</strong>: <code>sbt test</code></li>
 <li><strong>単一テストスイートの実行</strong>: <code>sbt 'testOnly *HelloWorldSpec'</code></li>
-<li><strong>依存関係を含むJARのパッケージ化</strong>: <code>sbt assembly</code> (<code>onion.jar</code>を作成)</li>
+<li><strong>依存関係を含むJARのパッケージ化</strong>: <code>sbt assembly</code> (<code>onion-&lt;version&gt;.jar</code>を作成)</li>
 <li><strong>配布パッケージの作成</strong>: <code>sbt dist</code> (target/にlib/, bin/, run/, onion.jarを含むZIPを作成)</li>
 <li><strong>Onionスクリプトの実行</strong>: <code>sbt 'runScript path/to/script.on [args]'</code></li>
 <li><strong>REPLの起動</strong>: <code>sbt repl</code></li>
@@ -5203,7 +5203,7 @@
 <h3 id="_4">コンパイルパイプライン<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ソースファイル (.on)
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    ↓
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>[1] パース (JavaCC) → 型なしAST
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>[1] パース (手書き高速パス、JavaCCフォールバック) → 型なしAST
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    ↓
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>[2] 書き換え → 正規化された型なしAST
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ↓
@@ -5250,7 +5250,7 @@
 </ul>
 </li>
 <li>
-<p>出力: 型付きAST (<code>TypedAST.scala</code>, 37KB)</p>
+<p>出力: 型付きAST (<code>TypedAST.scala</code>)</p>
 </li>
 <li>
 <p><strong>末尾呼び出し最適化</strong> (<code>src/main/scala/onion/compiler/optimization/TailCallOptimization.scala</code>)</p>
@@ -5399,7 +5399,7 @@
 <p>パーサー文法 (<code>grammar/JJOnionParser.jj</code>) を変更する場合：
 1. JavaCC文法ファイルを編集
 2. <code>sbt compile</code> を実行 - パーサーが自動再生成される
-3. 生成されたパーサーは <code>target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/</code> に出力される</p>
+3. 生成されたパーサーは <code>target/out/jvm/scala-3.3.7/onion/src_managed/main/java/onion/compiler/parser/</code> に出力される（sbt 2 のレイアウト）</p>
 <h2 id="_10">重要なコードの場所<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>メインコンパイラロジック</strong>: <code>src/main/scala/onion/compiler/</code></li>
@@ -5472,7 +5472,7 @@
 <h3 id="_14">関数とラムダ<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// ラムダ式</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="nc">Function1</span><span class="p">[</span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">g</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w">   </span><span class="c1">// 型なし引数には期待される関数型が必要（無ければE0052）</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">// 末尾ラムダ構文</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">list</span><span class="p">.</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
@@ -5897,7 +5897,7 @@
 </tr>
 <tr>
 <td><code>null</code> ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？</td>
-<td><code>record R(...) shape name = re"..."</code> - <code>R::name(): onion.Shape[R]</code> を合成する。<code>.parse(s)</code> は <code>Outcome[R]</code>（値、またはそれが得られなかった全理由を <code>Defect</code> として保持する）を返し、可逆な場合は <code>.print(v)</code> で書き戻せる。<code>shape</code> 節はレコード1つに複数付けられる（正規表現以外に <code>shape name = json</code>/<code>config</code> という書式指定も可）。<code>from re"..."</code> と共存できる</td>
+<td><code>record R(...) { shape name = re"..." }</code> - <code>R::name(): onion.Shape[R]</code> を合成する。<code>.parse(s)</code> は <code>Outcome[R]</code>（値、またはそれが得られなかった全理由を <code>Defect</code> として保持する）を返し、可逆な場合は <code>.print(v)</code> で書き戻せる。<code>shape</code> 節はレコード1つに複数付けられる（正規表現以外に <code>shape name = json</code>/<code>config</code> という書式指定も可）。<code>from re"..."</code> と共存できる</td>
 </tr>
 <tr>
 <td>レコードを手でシリアライズ（JSON/YAML）</td>
@@ -5905,7 +5905,7 @@
 </tr>
 <tr>
 <td>別スイートでレコードをテストする</td>
-<td><code>record R(...) law name(p: T) { boolExpr } example { boolExpr }</code> - コンパイラがビルド時に実行する。偽の <code>example</code> はE0065、反証された <code>law</code> はE0064（反例付き）になる。<code>parse∘format==id</code> のような性質を機械的に検証できる</td>
+<td><code>record R(...) { law name(p: T) { boolExpr } example { boolExpr } }</code> - <code>law</code>/<code>example</code>/<code>shape</code> 節はレコードの波括弧本体の中にメソッドと並べて書く（節の後の <code>;</code> は構文エラー）。コンパイラがビルド時に実行する。偽の <code>example</code> はE0065、反証された <code>law</code> はE0064（反例付き）になる。<code>parse∘format==id</code> のような性質を機械的に検証できる</td>
 </tr>
 </tbody>
 </table>
@@ -5920,7 +5920,7 @@
 <tbody>
 <tr>
 <td><code>x -&gt; x * 2</code></td>
-<td>✓ 正しい - 裸の単一引数はそのまま使える。式本体も使える</td>
+<td>✓ 正しい（期待される関数型がある場合: <code>val h: Int -&gt; Int = x -&gt; x * 2</code>、呼び出しの引数など）。無ければ型なし引数はE0052。式本体も使える</td>
 </tr>
 <tr>
 <td><code>(x) -&gt; expr</code></td>

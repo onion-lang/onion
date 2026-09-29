@@ -1,0 +1,527 @@
+// AirQualityMonitor.on — air pollution tracker with AQI calculation and trend analysis
+// Exercises: records with methods, enums with methods, classes, collection pipelines,
+// select/pattern-matching, string interpolation, closures, Map iteration,
+// statistics (min/max/avg), nullable types, while/foreach loops.
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Pollutant {
+  PM25, PM10, NO2, CO, O3, SO2
+public:
+  def unit(): String = select this {
+    case Pollutant::PM25: "μg/m³"
+    case Pollutant::PM10: "μg/m³"
+    case Pollutant::NO2:  "ppb"
+    case Pollutant::CO:   "ppm"
+    case Pollutant::O3:   "ppb"
+    case Pollutant::SO2:  "ppb"
+  }
+  def displayName(): String = select this {
+    case Pollutant::PM25: "PM2.5"
+    case Pollutant::PM10: "PM10"
+    case Pollutant::NO2:  "NO2"
+    case Pollutant::CO:   "CO"
+    case Pollutant::O3:   "O3"
+    case Pollutant::SO2:  "SO2"
+  }
+  // Simplified AQI for this pollutant from its concentration.
+  // Uses simplified breakpoint-based linear interpolation (US EPA 2023 scale).
+  def toAQI(conc: Double): Int {
+    val aqi = select this {
+      case Pollutant::PM25: pm25AQI(conc)
+      case Pollutant::PM10: pm10AQI(conc)
+      case Pollutant::NO2:  no2AQI(conc)
+      case Pollutant::CO:   coAQI(conc)
+      case Pollutant::O3:   o3AQI(conc)
+      case Pollutant::SO2:  so2AQI(conc)
+    }
+    return aqi
+  }
+}
+
+enum AQILevel {
+  Good, Moderate, UnhealthySensitive, Unhealthy, VeryUnhealthy, Hazardous
+public:
+  def label(): String = select this {
+    case AQILevel::Good:               "Good"
+    case AQILevel::Moderate:           "Moderate"
+    case AQILevel::UnhealthySensitive: "Unhealthy (Sensitive)"
+    case AQILevel::Unhealthy:          "Unhealthy"
+    case AQILevel::VeryUnhealthy:      "Very Unhealthy"
+    case AQILevel::Hazardous:          "Hazardous"
+  }
+  def color(): String = select this {
+    case AQILevel::Good:               "Green"
+    case AQILevel::Moderate:           "Yellow"
+    case AQILevel::UnhealthySensitive: "Orange"
+    case AQILevel::Unhealthy:          "Red"
+    case AQILevel::VeryUnhealthy:      "Purple"
+    case AQILevel::Hazardous:          "Maroon"
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Station(id: String, name: String, city: String)
+
+record Measurement(
+  stationId: String,
+  pollutant: Pollutant,
+  value: Double,
+  date: String,
+  hour: Int
+) {
+  public:
+    override def toString(): String =
+      "#{stationId} #{date}T#{hour}:00 #{pollutant.displayName()}=#{value}#{pollutant.unit()}"
+}
+
+record DailySummary(
+  stationId: String,
+  date: String,
+  pollutant: Pollutant,
+  minVal: Double,
+  maxVal: Double,
+  avgVal: Double,
+  aqiPeak: Int
+) {
+  public:
+    def aqiLevel(): AQILevel = classifyAQI(aqiPeak)
+    override def toString(): String =
+      "#{date} #{pollutant.displayName()}: avg=#{avgVal}, peak AQI=#{aqiPeak} (#{aqiLevel().label()})"
+}
+
+// ─── AQI helper functions (piecewise linear interpolation) ───────────────────
+
+def linearInterp(conc: Double, cLow: Double, cHigh: Double, aqiLow: Int, aqiHigh: Int): Int {
+  val slope = (aqiHigh - aqiLow) as Double / (cHigh - cLow)
+  return (aqiLow + slope * (conc - cLow)).intValue()
+}
+
+def pm25AQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 9.0   { return linearInterp(c, 0.0,   9.0,   0,   50) }
+  if c <= 35.4  { return linearInterp(c, 9.1,   35.4,  51,  100) }
+  if c <= 55.4  { return linearInterp(c, 35.5,  55.4,  101, 150) }
+  if c <= 125.4 { return linearInterp(c, 55.5,  125.4, 151, 200) }
+  if c <= 225.4 { return linearInterp(c, 125.5, 225.4, 201, 300) }
+  return linearInterp(c, 225.5, 325.4, 301, 500)
+}
+
+def pm10AQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 54.0  { return linearInterp(c, 0.0,  54.0,  0,   50) }
+  if c <= 154.0 { return linearInterp(c, 55.0, 154.0, 51,  100) }
+  if c <= 254.0 { return linearInterp(c, 155.0,254.0, 101, 150) }
+  if c <= 354.0 { return linearInterp(c, 255.0,354.0, 151, 200) }
+  return linearInterp(c, 355.0, 504.0, 201, 300)
+}
+
+def no2AQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 53.0  { return linearInterp(c, 0.0,  53.0,  0,   50) }
+  if c <= 100.0 { return linearInterp(c, 54.0, 100.0, 51,  100) }
+  if c <= 360.0 { return linearInterp(c, 101.0,360.0, 101, 150) }
+  if c <= 649.0 { return linearInterp(c, 361.0,649.0, 151, 200) }
+  return linearInterp(c, 650.0, 1249.0, 201, 300)
+}
+
+def coAQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 4.4   { return linearInterp(c, 0.0,  4.4,   0,   50) }
+  if c <= 9.4   { return linearInterp(c, 4.5,  9.4,   51,  100) }
+  if c <= 12.4  { return linearInterp(c, 9.5,  12.4,  101, 150) }
+  if c <= 15.4  { return linearInterp(c, 12.5, 15.4,  151, 200) }
+  return linearInterp(c, 15.5, 30.4, 201, 300)
+}
+
+def o3AQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 54.0  { return linearInterp(c, 0.0,  54.0,  0,   50) }
+  if c <= 70.0  { return linearInterp(c, 55.0, 70.0,  51,  100) }
+  if c <= 85.0  { return linearInterp(c, 71.0, 85.0,  101, 150) }
+  if c <= 105.0 { return linearInterp(c, 86.0, 105.0, 151, 200) }
+  return linearInterp(c, 106.0, 200.0, 201, 300)
+}
+
+def so2AQI(c: Double): Int {
+  if c < 0.0    { return 0 }
+  if c <= 35.0  { return linearInterp(c, 0.0,  35.0,  0,   50) }
+  if c <= 75.0  { return linearInterp(c, 36.0, 75.0,  51,  100) }
+  if c <= 185.0 { return linearInterp(c, 76.0, 185.0, 101, 150) }
+  if c <= 304.0 { return linearInterp(c, 186.0,304.0, 151, 200) }
+  return linearInterp(c, 305.0, 604.0, 201, 300)
+}
+
+def classifyAQI(aqi: Int): AQILevel {
+  if aqi <= 50  { return AQILevel::Good }
+  if aqi <= 100 { return AQILevel::Moderate }
+  if aqi <= 150 { return AQILevel::UnhealthySensitive }
+  if aqi <= 200 { return AQILevel::Unhealthy }
+  if aqi <= 300 { return AQILevel::VeryUnhealthy }
+  return AQILevel::Hazardous
+}
+
+// ─── AirQualityMonitor class ──────────────────────────────────────────────────
+
+class AirQualityMonitor {
+  var stations: Map[String, Station]
+  var measurements: List[Measurement]
+
+  public:
+    def this() {
+      self.stations = [:]
+      self.measurements = []
+    }
+
+    def addStation(s: Station): void { stations[s.id()] = s }
+
+    def addMeasurement(m: Measurement): void { measurements.add(m) }
+
+    def getStation(id: String): Station? = stations.get(id) as Station?
+
+    def forStation(stationId: String): List[Measurement] =
+      measurements.filter { m -> (m as Measurement).stationId() == stationId }
+
+    def forPollutant(p: Pollutant): List[Measurement] =
+      measurements.filter { m -> (m as Measurement).pollutant() == p }
+
+    def forDate(date: String): List[Measurement] =
+      measurements.filter { m -> (m as Measurement).date() == date }
+
+    // Current AQI per station (based on all measurements, using highest pollutant AQI)
+    def currentAQI(stationId: String): Int {
+      val byPollutant: Map[String, Double] = [:]
+      foreach m: Measurement in forStation(stationId) {
+        val key = m.pollutant().name()
+        val prev: Double? = byPollutant.get(key) as Double?
+        val prevVal: Double = if prev != null { prev } else { 0.0 }
+        if m.value() > prevVal { byPollutant[key] = m.value() }
+      }
+      var maxAQI: Int = 0
+      foreach (key, v) in byPollutant {
+        // Determine which pollutant this key maps to
+        val aqi = select key {
+          case "PM25": pm25AQI(v)
+          case "PM10": pm10AQI(v)
+          case "NO2":  no2AQI(v)
+          case "CO":   coAQI(v)
+          case "O3":   o3AQI(v)
+          case "SO2":  so2AQI(v)
+          else: 0
+        }
+        if aqi > maxAQI { maxAQI = aqi }
+      }
+      return maxAQI
+    }
+
+    // Daily summary for one station + pollutant
+    def dailySummary(stationId: String, date: String, p: Pollutant): DailySummary? {
+      val data = measurements.filter { m ->
+        val ms = m as Measurement
+        ms.stationId() == stationId && ms.date() == date && ms.pollutant() == p
+      }
+      if data.size == 0 { return null }
+      var minVal: Double = (data[0] as Measurement).value()
+      var maxVal: Double = minVal
+      var sumVal: Double = 0.0
+      foreach m: Measurement in data {
+        val v = m.value()
+        if v < minVal { minVal = v }
+        if v > maxVal { maxVal = v }
+        sumVal = sumVal + v
+      }
+      val avg = sumVal / data.size
+      val peakAQI = p.toAQI(maxVal)
+      return new DailySummary(stationId, date, p, minVal, maxVal, avg, peakAQI)
+    }
+
+    // Worst air quality stations ranked by AQI
+    def rankStations(): List[String] {
+      val aqiMap: Map[String, Int] = [:]
+      foreach (id, s) in stations {
+        aqiMap[id] = currentAQI(id)
+      }
+      return aqiMap.keys().sortedBy { k -> -(aqiMap[k] as Int) }
+    }
+
+    // Average concentration of a pollutant across all stations for a date
+    def citywideDailyAvg(date: String, p: Pollutant): Double {
+      val data = forDate(date).filter { m -> (m as Measurement).pollutant() == p }
+      if data.size == 0 { return 0.0 }
+      var total: Double = 0.0
+      foreach m: Measurement in data { total = total + m.value() }
+      return total / data.size
+    }
+
+    // Hours of the day with highest PM2.5 (pollution rush hours)
+    def peakHours(stationId: String): List[Int] {
+      val hourly: Map[Int, Double] = [:]
+      val counts: Map[Int, Int] = [:]
+      val data = forStation(stationId).filter { m -> (m as Measurement).pollutant() == Pollutant::PM25 }
+      foreach m: Measurement in data {
+        val h = m.hour()
+        val prev: Double? = hourly.get(h) as Double?
+        val prevSum: Double = if prev != null { prev } else { 0.0 }
+        val prevCount: Int? = counts.get(h) as Int?
+        val prevN: Int = if prevCount != null { prevCount } else { 0 }
+        hourly[h] = prevSum + m.value()
+        counts[h] = prevN + 1
+      }
+      val avgByHour: Map[Int, Double] = [:]
+      foreach (h, total) in hourly {
+        val cnt: Int? = counts.get(h) as Int?
+        val n: Int = if cnt != null { cnt } else { 1 }
+        avgByHour[h] = total / n
+      }
+      val sorted = avgByHour.keys().sortedBy { h -> -(avgByHour[h] as Double) }
+      val result: List[Int] = []
+      var i: Int = 0
+      foreach h: Int in sorted {
+        if i < 3 { result.add(h) }
+        i++
+      }
+      return result
+    }
+
+    def stationIds(): List[String] {
+      val result: List[String] = []
+      foreach k: String in stations.keys() { result.add(k) }
+      return result
+    }
+
+    def allStations(): List[Station] {
+      val result: List[Station] = []
+      foreach s: Station in stations.values() { result.add(s) }
+      return result
+    }
+
+    def measurementCount(): Int = measurements.size
+
+    def stationCount(): Int = stations.size
+
+    def printStationReport(stationId: String): void {
+      val station: Station? = getStation(stationId)
+      if station == null {
+        println("Station #{stationId} not found")
+        return
+      }
+      val aqi = currentAQI(stationId)
+      val level = classifyAQI(aqi)
+      println("Station: #{station.name()} (#{station.city()})")
+      println("  AQI: #{aqi} — #{level.label()} [#{level.color()}]")
+
+      val peaks = peakHours(stationId)
+      if peaks.size > 0 {
+        var hourStr: String = ""
+        foreach h: Int in peaks {
+          if hourStr.length > 0 { hourStr = hourStr + ", " }
+          hourStr = hourStr + "#{h}:00"
+        }
+        println("  Peak PM2.5 hours: #{hourStr}")
+      }
+    }
+}
+
+// ─── Sample data builder ──────────────────────────────────────────────────────
+
+def buildMonitor(): AirQualityMonitor {
+  val m = new AirQualityMonitor()
+
+  // Stations
+  m.addStation(new Station("NYC-MAN", "Manhattan Central",  "New York City"))
+  m.addStation(new Station("NYC-BRX", "Bronx South",        "New York City"))
+  m.addStation(new Station("NYC-BRK", "Brooklyn North",     "New York City"))
+  m.addStation(new Station("LA-DWN",  "Downtown LA",        "Los Angeles"))
+  m.addStation(new Station("LA-POM",  "Pomona Valley",      "Los Angeles"))
+  m.addStation(new Station("CHI-LOP", "Chicago Loop",       "Chicago"))
+
+  // NYC Manhattan — 3 days hourly PM2.5 (μg/m³)
+  val manhattanPM25 = [8.2, 7.1, 6.8, 6.5, 7.0, 9.3, 14.2, 18.7, 22.1, 19.5, 17.2, 15.8,
+                       14.1, 13.7, 14.8, 16.2, 19.8, 24.3, 22.1, 18.6, 14.2, 11.8, 9.5, 8.7]
+  var h: Int = 0
+  foreach v: Double in manhattanPM25 {
+    m.addMeasurement(new Measurement("NYC-MAN", Pollutant::PM25, v as Double, "2024-10-01", h))
+    h++
+  }
+  m.addMeasurement(new Measurement("NYC-MAN", Pollutant::NO2,  45.2, "2024-10-01", 8))
+  m.addMeasurement(new Measurement("NYC-MAN", Pollutant::NO2,  52.8, "2024-10-01", 17))
+  m.addMeasurement(new Measurement("NYC-MAN", Pollutant::CO,   1.8,  "2024-10-01", 8))
+  m.addMeasurement(new Measurement("NYC-MAN", Pollutant::CO,   2.3,  "2024-10-01", 18))
+
+  // NYC day 2 PM2.5 (higher — bad air day)
+  val day2 = [12.1, 11.8, 12.5, 13.2, 15.8, 22.4, 35.7, 42.3, 48.6, 45.2, 41.8, 38.5,
+              36.2, 35.8, 37.2, 40.8, 52.1, 58.3, 55.4, 47.2, 38.6, 29.5, 22.4, 18.7]
+  h = 0
+  foreach v: Double in day2 {
+    m.addMeasurement(new Measurement("NYC-MAN", Pollutant::PM25, v as Double, "2024-10-02", h))
+    h++
+  }
+
+  // Bronx data
+  val bronxPM25 = [15.2, 14.1, 13.8, 14.5, 16.2, 21.4, 32.8, 41.5, 47.2, 44.8, 40.2, 38.5,
+                   35.2, 34.8, 36.5, 42.1, 55.8, 62.4, 58.2, 49.8, 41.2, 32.5, 25.4, 20.1]
+  h = 0
+  foreach v: Double in bronxPM25 {
+    m.addMeasurement(new Measurement("NYC-BRX", Pollutant::PM25, v as Double, "2024-10-01", h))
+    h++
+  }
+  m.addMeasurement(new Measurement("NYC-BRX", Pollutant::NO2, 78.5, "2024-10-01", 8))
+  m.addMeasurement(new Measurement("NYC-BRX", Pollutant::NO2, 92.1, "2024-10-01", 18))
+
+  // Brooklyn
+  val bkPM25 = [10.4, 9.8, 9.2, 9.8, 11.5, 14.2, 20.8, 26.5, 30.2, 28.8, 25.4, 23.5,
+                22.1, 21.8, 23.2, 27.5, 33.8, 38.5, 35.2, 29.8, 24.5, 19.2, 15.4, 12.8]
+  h = 0
+  foreach v: Double in bkPM25 {
+    m.addMeasurement(new Measurement("NYC-BRK", Pollutant::PM25, v as Double, "2024-10-01", h))
+    h++
+  }
+
+  // LA Downtown (higher ozone)
+  val laPM25 = [18.5, 17.2, 16.8, 17.5, 20.2, 28.5, 42.8, 52.5, 58.2, 55.8, 50.4, 48.5,
+                46.2, 47.8, 52.5, 62.8, 75.4, 82.1, 78.5, 65.2, 52.8, 42.5, 34.2, 25.8]
+  h = 0
+  foreach v: Double in laPM25 {
+    m.addMeasurement(new Measurement("LA-DWN", Pollutant::PM25, v as Double, "2024-10-01", h))
+    h++
+  }
+  m.addMeasurement(new Measurement("LA-DWN", Pollutant::O3, 88.5, "2024-10-01", 13))
+  m.addMeasurement(new Measurement("LA-DWN", Pollutant::O3, 95.2, "2024-10-01", 15))
+  m.addMeasurement(new Measurement("LA-DWN", Pollutant::NO2, 58.4, "2024-10-01", 8))
+
+  // Chicago Loop
+  val chiPM25 = [9.2, 8.8, 8.5, 9.2, 11.5, 15.8, 22.5, 28.2, 32.5, 30.8, 27.4, 25.2,
+                 23.8, 24.5, 27.2, 32.8, 42.5, 48.2, 45.8, 38.5, 30.2, 24.5, 18.8, 14.2]
+  h = 0
+  foreach v: Double in chiPM25 {
+    m.addMeasurement(new Measurement("CHI-LOP", Pollutant::PM25, v as Double, "2024-10-01", h))
+    h++
+  }
+  m.addMeasurement(new Measurement("CHI-LOP", Pollutant::SO2, 22.5, "2024-10-01", 10))
+  m.addMeasurement(new Measurement("CHI-LOP", Pollutant::SO2, 38.8, "2024-10-01", 14))
+
+  return m
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+val monitor = buildMonitor()
+
+println("╔══════════════════════════════════════════╗")
+println("║      AIR QUALITY MONITOR — 2024-10-01   ║")
+println("╚══════════════════════════════════════════╝")
+println("")
+
+// ─── Station reports ─────────────────────────────────────────────────────────
+
+println("=== Station AQI Reports ===")
+foreach id: String in monitor.stationIds() {
+  monitor.printStationReport(id)
+  println("")
+}
+
+// ─── Ranked stations ─────────────────────────────────────────────────────────
+
+println("=== Stations Ranked by AQI (worst first) ===")
+val ranked = monitor.rankStations()
+var rank: Int = 1
+foreach stationId: String in ranked {
+  val s: Station? = monitor.getStation(stationId)
+  if s != null {
+    val aqi = monitor.currentAQI(stationId)
+    val level = classifyAQI(aqi)
+    println("  #{rank}. #{s.name()} (#{s.city()}) — AQI #{aqi} [#{level.label()}]")
+  }
+  rank++
+}
+println("")
+
+// ─── Daily summaries ─────────────────────────────────────────────────────────
+
+println("=== Daily PM2.5 Summaries (2024-10-01) ===")
+val stationIds: List[String] = ["NYC-MAN", "NYC-BRX", "NYC-BRK", "LA-DWN", "CHI-LOP"]
+foreach sid: String in stationIds {
+  val summary = monitor.dailySummary(sid, "2024-10-01", Pollutant::PM25)
+  if summary != null {
+    val st: Station? = monitor.getStation(sid)
+    val stName = if st != null { (st as Station).name() } else { sid }
+    println("  #{stName}: #{summary}")
+  }
+}
+println("")
+
+// ─── NYC change between day 1 and day 2 ──────────────────────────────────────
+
+println("=== NYC Manhattan PM2.5 Trend (Day 1 → Day 2) ===")
+val sum1 = monitor.dailySummary("NYC-MAN", "2024-10-01", Pollutant::PM25)
+val sum2 = monitor.dailySummary("NYC-MAN", "2024-10-02", Pollutant::PM25)
+if sum1 != null && sum2 != null {
+  val avg1 = sum1.avgVal()
+  val avg2 = sum2.avgVal()
+  val change = avg2 - avg1
+  val direction = if change > 0.0 { "worsened" } else { "improved" }
+  println("  Day 1: avg PM2.5 = #{avg1} μg/m³, peak AQI = #{sum1.aqiPeak()}")
+  println("  Day 2: avg PM2.5 = #{avg2} μg/m³, peak AQI = #{sum2.aqiPeak()}")
+  println("  Trend: #{direction} by #{change} μg/m³")
+}
+println("")
+
+// ─── Citywide averages ────────────────────────────────────────────────────────
+
+println("=== Citywide PM2.5 Average by Station City ===")
+val cities: List[String] = ["New York City", "Los Angeles", "Chicago"]
+foreach city: String in cities {
+  val cityStations = monitor.allStations().filter { s -> (s as Station).city() == city }
+  var total: Double = 0.0
+  var count: Int = 0
+  foreach s: Station in cityStations {
+    val data = monitor.forStation(s.id()).filter { m -> (m as Measurement).pollutant() == Pollutant::PM25 && (m as Measurement).date() == "2024-10-01" }
+    foreach m: Measurement in data { total = total + m.value(); count++ }
+  }
+  if count > 0 {
+    val avg = total / count
+    val cityAQI = pm25AQI(avg)
+    val level = classifyAQI(cityAQI)
+    println("  #{city}: avg PM2.5 = #{avg} μg/m³, AQI ≈ #{cityAQI} (#{level.label()})")
+  }
+}
+println("")
+
+// ─── Pollutant breakdown for LA Downtown ─────────────────────────────────────
+
+println("=== LA Downtown Pollutant Breakdown ===")
+val pollutants: List[Pollutant] = [Pollutant::PM25, Pollutant::NO2, Pollutant::CO, Pollutant::O3]
+foreach p: Pollutant in pollutants {
+  val data = monitor.forStation("LA-DWN").filter { m -> (m as Measurement).pollutant() == p }
+  if data.size > 0 {
+    var maxV: Double = (data[0] as Measurement).value()
+    foreach m: Measurement in data { if m.value() > maxV { maxV = m.value() } }
+    val aqi = p.toAQI(maxV)
+    val level = classifyAQI(aqi)
+    println("  #{p.displayName()}: peak #{maxV}#{p.unit()}, AQI #{aqi} (#{level.label()})")
+  }
+}
+println("")
+
+// ─── Alert summary ───────────────────────────────────────────────────────────
+
+println("=== Health Alerts ===")
+var alertCount: Int = 0
+foreach id: String in monitor.stationIds() {
+  val aqi = monitor.currentAQI(id)
+  if aqi > 100 {
+    val s: Station? = monitor.getStation(id)
+    val level = classifyAQI(aqi)
+    if s != null {
+      println("  ALERT: #{s.name()} (#{s.city()}) — #{level.label()} [AQI #{aqi}]")
+    }
+    alertCount++
+  }
+}
+if alertCount == 0 {
+  println("  No health alerts today.")
+}
+println("")
+println("Total measurements loaded: #{monitor.measurementCount()}")
+println("Total stations monitored:  #{monitor.stationCount()}")

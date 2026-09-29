@@ -918,8 +918,8 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/ContactBook.on"))
     }
 
-    it("runs CpuScheduler.on") {
-      assert(Shell.Success(null) == runSample("run/CpuScheduler.on"))
+    it("runs CPUScheduler.on") {
+      assert(Shell.Success(null) == runSample("run/CPUScheduler.on"))
     }
 
     it("runs CronScheduler.on") {

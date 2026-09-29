@@ -1,0 +1,255 @@
+// CipherLib.on — classical substitution ciphers: Caesar, ROT13, Vigenere, Atbash
+// Exercises: ADT enum, extension methods on String, foreach over arrays and maps,
+//            records, collection pipeline, pattern matching, string interpolation
+
+import {
+  java.util.*
+}
+
+// ─── String extension helpers ────────────────────────────────────────────────
+extension String {
+  def shiftChars(offset: Int): String {
+    val sb = new StringBuilder()
+    foreach c: Char in self.toCharArray() {
+      if c >= 'A' && c <= 'Z' {
+        val shifted: Int = (((c as Int) - 65 + ((offset % 26) + 26)) % 26) + 65
+        sb.append(shifted as Char)
+      } else if c >= 'a' && c <= 'z' {
+        val shifted: Int = (((c as Int) - 97 + ((offset % 26) + 26)) % 26) + 97
+        sb.append(shifted as Char)
+      } else {
+        sb.append(c)
+      }
+    }
+    return sb.toString()
+  }
+
+  def alphaOnly: String {
+    val sb = new StringBuilder()
+    foreach c: Char in self.toCharArray() {
+      if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+        sb.append(c)
+      }
+    }
+    return sb.toString()
+  }
+
+  def toUpperAlpha: String = self.alphaOnly.toUpperCase()
+}
+
+// ─── Cipher ADT ──────────────────────────────────────────────────────────────
+enum Cipher {
+  case Caesar(shift: Int)
+  case Rot13
+  case Vigenere(key: String)
+  case Atbash
+
+public:
+  def label(): String = select this {
+    case c is Caesar:   "Caesar(shift=#{c.shift()})"
+    case rot is Rot13:  "ROT13"
+    case v  is Vigenere: "Vigenere(key=#{v.key()})"
+    case ab is Atbash:  "Atbash"
+  }
+
+  def encrypt(text: String): String = select this {
+    case c   is Caesar:   text.shiftChars(c.shift())
+    case rot is Rot13:    text.shiftChars(13)
+    case v   is Vigenere: applyVigenere(text, v.key(), true)
+    case ab  is Atbash:   applyAtbash(text)
+  }
+
+  def decrypt(text: String): String = select this {
+    case c   is Caesar:   text.shiftChars(26 - ((c.shift() % 26 + 26) % 26))
+    case rot is Rot13:    text.shiftChars(13)
+    case v   is Vigenere: applyVigenere(text, v.key(), false)
+    case ab  is Atbash:   applyAtbash(text)
+  }
+}
+
+// ─── Cipher helpers ───────────────────────────────────────────────────────────
+def applyAtbash(text: String): String {
+  val sb = new StringBuilder()
+  foreach c: Char in text.toCharArray() {
+    if c >= 'A' && c <= 'Z' {
+      sb.append((90 - ((c as Int) - 65)) as Char)
+    } else if c >= 'a' && c <= 'z' {
+      sb.append((122 - ((c as Int) - 97)) as Char)
+    } else {
+      sb.append(c)
+    }
+  }
+  return sb.toString()
+}
+
+def applyVigenere(text: String, key: String, encrypt: Boolean): String {
+  val sb = new StringBuilder()
+  val k  = key.toUpperAlpha
+  if k.length == 0 { return text }
+  var ki = 0
+  foreach c: Char in text.toCharArray() {
+    if c >= 'A' && c <= 'Z' {
+      val kc    = (k.charAt(ki % k.length) as Int) - 65
+      val s     = if encrypt { kc } else { 26 - kc }
+      val r     = (((c as Int) - 65 + s) % 26 + 65) as Char
+      sb.append(r)
+      ki = ki + 1
+    } else if c >= 'a' && c <= 'z' {
+      val kc    = (k.charAt(ki % k.length) as Int) - 65
+      val s     = if encrypt { kc } else { 26 - kc }
+      val r     = (((c as Int) - 97 + s) % 26 + 97) as Char
+      sb.append(r)
+      ki = ki + 1
+    } else {
+      sb.append(c)
+    }
+  }
+  return sb.toString()
+}
+
+// ─── CipherTest record ────────────────────────────────────────────────────────
+record CipherTest(cipher: Cipher, plaintext: String, expected: String) {
+public:
+  def run(): Boolean {
+    val enc = cipher.encrypt(plaintext)
+    val ok  = enc == expected
+    IO::println("#{if ok { "PASS" } else { "FAIL" }}  #{cipher.label()}  encrypt(#{plaintext}) = #{enc}")
+    return ok
+  }
+
+  def roundTrip(): Boolean {
+    val enc = cipher.encrypt(plaintext)
+    val dec = cipher.decrypt(enc)
+    val ok  = dec == plaintext
+    IO::println("#{if ok { "PASS" } else { "FAIL" }}  #{cipher.label()}  round-trip(#{plaintext}) = #{dec}")
+    return ok
+  }
+}
+
+// ─── Frequency analysis ───────────────────────────────────────────────────────
+def letterFrequency(text: String): Map[String, Int] {
+  val freq: Map[String, Int] = new LinkedHashMap[String, Int]()
+  foreach c: Char in text.toUpperAlpha.toCharArray() {
+    val key  = "" + c
+    val prev = freq.get(key) as Int?
+    freq.put(key, if prev == null { 1 } else { prev + 1 })
+  }
+  return freq
+}
+
+def topNFreq(freq: Map[String, Int], n: Int): String {
+  // Collect letter keys, sort by descending count using sortedBy with negation
+  val letters: List[String] = Colls::toList(freq.keySet())
+  val sorted = letters.sortedBy { letter ->
+    val cnt = freq.get(letter) as Int?
+    if cnt == null { 0 } else { -(cnt) }
+  }
+  val sb = new StringBuilder()
+  var i  = 0
+  foreach letter: String in sorted {
+    if i >= n { break }
+    val cnt = freq.get(letter) as Int?
+    if sb.length > 0 { sb.append(", ") }
+    sb.append("#{letter}=#{cnt}")
+    i = i + 1
+  }
+  return sb.toString()
+}
+
+// ─── Columnar output helper ───────────────────────────────────────────────────
+def pad(s: String, width: Int): String {
+  var result = s
+  while result.length < width {
+    result = result + " "
+  }
+  return result
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  IO::println("=== Classical Cipher Demo ===")
+  IO::println("")
+
+  // --- Basic encrypt tests ---
+  val tests: List[CipherTest] = [
+    new CipherTest(new Caesar(3),       "Hello, World!",   "Khoor, Zruog!"),
+    new CipherTest(new Rot13(),          "Hello, World!",   "Uryyb, Jbeyq!"),
+    new CipherTest(new Vigenere("KEY"),  "ATTACKATDAWN",    "KXRKGIKXBKAL"),
+    new CipherTest(new Atbash(),         "Hello",           "Svool")
+  ]
+
+  IO::println("--- Encryption tests ---")
+  var allPass = true
+  foreach t: CipherTest in tests {
+    if !t.run() { allPass = false }
+  }
+  IO::println(if allPass { "All encryption tests passed." } else { "Some FAILED." })
+  IO::println("")
+
+  // --- Round-trip tests (encrypt then decrypt → plaintext) ---
+  IO::println("--- Round-trip tests ---")
+  val ciphers: List[Cipher] = [
+    new Caesar(7),
+    new Rot13(),
+    new Vigenere("LEMON"),
+    new Atbash()
+  ]
+  val plaintexts: List[String] = ["Hello, World!", "The quick brown fox", "onion lang 123"]
+  var rtPass = true
+  foreach pt: String in plaintexts {
+    foreach c: Cipher in ciphers {
+      val t = new CipherTest(c, pt, c.encrypt(pt))
+      if !t.roundTrip() { rtPass = false }
+    }
+  }
+  IO::println(if rtPass { "All round-trip tests passed." } else { "Some FAILED." })
+  IO::println("")
+
+  // --- Frequency analysis ---
+  IO::println("--- Frequency analysis of Caesar-encrypted text ---")
+  val corpus = "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs."
+  val enc3   = new Caesar(3)
+  val encCorpus = enc3.encrypt(corpus)
+  IO::println("Plaintext top-5:  #{topNFreq(letterFrequency(corpus), 5)}")
+  IO::println("Encrypted top-5:  #{topNFreq(letterFrequency(encCorpus), 5)}")
+  IO::println("(Letters should shift by 3 positions in the frequency table.)")
+  IO::println("")
+
+  // --- Vigenere demo ---
+  IO::println("--- Vigenere cipher demo ---")
+  val msg    = "Meet me at midnight at the old bridge"
+  val vigKey = "SWORDFISH"
+  val vig    = new Vigenere(vigKey)
+  val vigEnc = vig.encrypt(msg)
+  val vigDec = vig.decrypt(vigEnc)
+  IO::println("Key:       #{vigKey}")
+  IO::println("Plaintext: #{msg}")
+  IO::println("Encrypted: #{vigEnc}")
+  IO::println("Decrypted: #{vigDec}")
+  IO::println(if vigDec == msg { "Vigenere round-trip OK." } else { "Vigenere FAILED." })
+  IO::println("")
+
+  // --- Atbash self-inverse demo ---
+  IO::println("--- Atbash self-inverse ---")
+  val atbash   = new Atbash()
+  val samples: List[String] = ["ATTACK", "Hello World", "XYZ"]
+  foreach s: String in samples {
+    val enc = atbash.encrypt(s)
+    val dec = atbash.encrypt(enc)
+    IO::println("#{pad(s, 14)} -> #{pad(enc, 14)} -> #{dec}  #{if dec == s { "OK" } else { "FAIL" }}")
+  }
+  IO::println("")
+
+  // --- Caesar shift table (0..5) ---
+  IO::println("--- Caesar shift table (0–5) for 'ABCDEFG' ---")
+  IO::println(pad("shift", 7) + pad("A", 3) + pad("B", 3) + pad("C", 3) + pad("D", 3) + pad("E", 3) + pad("F", 3) + "G")
+  foreach shift: Int in 0..<6 {
+    val c   = new Caesar(shift)
+    val enc = c.encrypt("ABCDEFG")
+    var row = pad("" + shift, 7)
+    foreach ch: Char in enc.toCharArray() {
+      row = row + pad("" + ch, 3)
+    }
+    IO::println(row)
+  }
+}

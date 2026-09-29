@@ -1,0 +1,391 @@
+// HangmanGame.on — Hangman word-guessing game engine.
+// Exercises: ADT enums, data-carrying enums, records with body methods,
+// classes with interfaces, generics, collection pipelines (map/filter/
+// fold/sortedBy/groupBy/distinct/find), extension methods on Int and
+// String, nullable, foreach on ranges and map (k,v) entries, while loops,
+// select / pattern matching, closures, string interpolation, statistics.
+
+import { java.util.ArrayList }
+
+// ── Difficulty level (homogeneous enum) ──────────────────────────────────────
+enum Difficulty { Easy, Medium, Hard }
+
+// ── Game outcome (ADT sealed enum) ───────────────────────────────────────────
+enum GameOutcome {
+  case Won(guesses: Int, wordStr: String)
+  case Lost(wordStr: String)
+  case InProgress
+public:
+  def isTerminal(): Boolean = select this {
+    case o is InProgress: false
+    else: true
+  }
+  def label(): String = select this {
+    case w is Won:        "WON  (#{w.guesses()} guesses)"
+    case l is Lost:       "LOST (word: #{l.wordStr()})"
+    case o is InProgress: "in progress"
+  }
+  def wonGuesses(): Int = select this {
+    case w is Won: w.guesses()
+    else: 0
+  }
+  def isWon(): Boolean = select this {
+    case w is Won: true
+    else: false
+  }
+}
+
+// ── Word entry ────────────────────────────────────────────────────────────────
+record WordEntry(word: String, category: String, difficulty: Difficulty) {
+public:
+  def diffLabel(): String = select difficulty() {
+    case Difficulty::Easy:   "Easy  "
+    case Difficulty::Medium: "Medium"
+    case Difficulty::Hard:   "Hard  "
+  }
+}
+
+// ── Guess record ──────────────────────────────────────────────────────────────
+record GuessRecord(letter: String, correct: Boolean, turn: Int) {
+public:
+  def mark(): String = if correct() { "✓" } else { "✗" }
+}
+
+// ── Round result: pairs a word entry with its game outcome ───────────────────
+record RoundResult(entry: WordEntry, outcome: GameOutcome) {
+public:
+  def category(): String = entry().category()
+  def diffLabel(): String = entry().diffLabel()
+  def word():     String = entry().word()
+}
+
+// ── Simple aggregate statistics ──────────────────────────────────────────────
+record GameStats(played: Int, won: Int, totalGuesses: Int) {
+public:
+  def lostCount(): Int = played() - won()
+  def winRate(): Double =
+    if played() == 0 { 0.0 } else { (won() * 100.0) / (played() * 1.0) }
+  def avgGuesses(): Double =
+    if won() == 0 { 0.0 } else { (totalGuesses() * 1.0) / (won() * 1.0) }
+
+  def winRateFmt(): String {
+    val pct: Int = (winRate() * 10.0) as Int
+    return "#{pct / 10}.#{pct % 10}%"
+  }
+  def avgGuessFmt(): String {
+    val x: Int = (avgGuesses() * 10.0) as Int
+    return "#{x / 10}.#{x % 10}"
+  }
+  def summary(): String =
+    "played=#{played()} won=#{won()} lost=#{lostCount()} " +
+    "win=#{winRateFmt()} avgGuesses=#{avgGuessFmt()}"
+}
+
+// ── String extension methods ──────────────────────────────────────────────────
+extension String {
+  def pad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+
+  def lpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+
+  def containsLetter(ch: String): Boolean {
+    foreach i: Int in 0..<self.length() {
+      if "" + self.charAt(i) == ch { return true }
+    }
+    return false
+  }
+
+  // Show the word with unguessed letters replaced by _
+  def maskedBy(guessed: List[String]): String {
+    var result: String = ""
+    foreach i: Int in 0..<self.length() {
+      val ch: String = "" + self.charAt(i)
+      if ch == " " {
+        result = result + " "
+      } else if guessed.contains(ch) {
+        result = result + ch
+      } else {
+        result = result + "_"
+      }
+    }
+    return result
+  }
+
+  // True when every non-space character has been guessed
+  def allRevealed(guessed: List[String]): Boolean {
+    foreach i: Int in 0..<self.length() {
+      val ch: String = "" + self.charAt(i)
+      if ch != " " && !guessed.contains(ch) { return false }
+    }
+    return true
+  }
+}
+
+// ── Int extension methods ─────────────────────────────────────────────────────
+extension Int {
+  def repeatStr(ch: String): String {
+    var s: String = ""
+    foreach i: Int in 0..<self { s = s + ch }
+    return s
+  }
+}
+
+// ── Hangman ASCII art ─────────────────────────────────────────────────────────
+def hangmanArt(wrong: Int): String {
+  val head: String = if wrong >= 1 { "O" } else { " " }
+  val body: String = if wrong >= 2 { "|" } else { " " }
+  val la:   String = if wrong >= 3 { "/" } else { " " }
+  val ra:   String = if wrong >= 4 { "\\" } else { " " }
+  val ll:   String = if wrong >= 5 { "/" } else { " " }
+  val rl:   String = if wrong >= 6 { "\\" } else { " " }
+  return "  +--+\n  |  #{head}\n  | #{la}#{body}#{ra}\n  | #{ll} #{rl}\n  |\n====\n"
+}
+
+// ── Guesser interface ─────────────────────────────────────────────────────────
+interface Guesser {
+  def nextGuess(masked: String, guessed: List[String], wrongCount: Int): String
+}
+
+// ── Frequency-ordered guesser (English letter frequency) ─────────────────────
+class FrequencyGuesser conforms Guesser {
+  val freq: List[String]
+public:
+  def this() {
+    freq = ["e","t","a","o","i","n","s","r","h","l",
+            "d","c","u","m","f","p","g","w","y","b",
+            "v","k","x","j","q","z"]
+  }
+  def nextGuess(masked: String, guessed: List[String], wrongCount: Int): String {
+    foreach letter: String in freq {
+      if !guessed.contains(letter) { return letter }
+    }
+    return "?"
+  }
+}
+
+// ── Hangman round: plays one game ─────────────────────────────────────────────
+class HangmanRound {
+  val entry: WordEntry
+  val guesser: Guesser
+  val maxWrong: Int
+  var guessedLetters: List[String]
+  var wrongCount: Int
+  var history: List[GuessRecord]
+  var turnCount: Int
+public:
+  def this(e: WordEntry, g: Guesser, mx: Int) {
+    entry = e
+    guesser = g
+    maxWrong = mx
+    guessedLetters = []
+    wrongCount = 0
+    history = []
+    turnCount = 0
+  }
+
+  def wordLower(): String = entry.word().toLowerCase()
+
+  def play(): GameOutcome {
+    var outcome: GameOutcome = new InProgress()
+    while !outcome.isTerminal() {
+      val masked: String = wordLower().maskedBy(guessedLetters)
+      val letter: String = guesser.nextGuess(masked, guessedLetters, wrongCount)
+      turnCount = turnCount + 1
+      val isCorrect: Boolean = wordLower().containsLetter(letter)
+      guessedLetters.add(letter)
+      history.add(new GuessRecord(letter, isCorrect, turnCount))
+      if !isCorrect { wrongCount = wrongCount + 1 }
+      if wrongCount >= maxWrong {
+        outcome = new Lost(entry.word())
+      } else if wordLower().allRevealed(guessedLetters) {
+        outcome = new Won(turnCount, entry.word())
+      }
+    }
+    return outcome
+  }
+
+  def getWrongCount(): Int = wrongCount
+
+  def printHistory(): void {
+    IO::println("  Word: \"#{entry.word()}\" [#{entry.category()}, #{entry.diffLabel()}]")
+    foreach rec: GuessRecord in history {
+      IO::println("    Turn #{("" + rec.turn()).lpad(2)}: '#{rec.letter()}'  #{rec.mark()}")
+    }
+    IO::println("  Wrong: #{wrongCount}/#{maxWrong}  Final: #{wordLower().maskedBy(guessedLetters)}")
+  }
+}
+
+// ── Stats computation ─────────────────────────────────────────────────────────
+def computeStats(results: List[RoundResult]): GameStats {
+  var played: Int = 0
+  var won: Int = 0
+  var totalGuesses: Int = 0
+  foreach r: RoundResult in results {
+    played = played + 1
+    if r.outcome().isWon() {
+      won = won + 1
+      totalGuesses = totalGuesses + r.outcome().wonGuesses()
+    }
+  }
+  return new GameStats(played, won, totalGuesses)
+}
+
+// ── Word bank ─────────────────────────────────────────────────────────────────
+def makeWordBank(): List[WordEntry] {
+  val ws: List[WordEntry] = []
+  ws.add(new WordEntry("apple",   "fruit",  Difficulty::Easy))
+  ws.add(new WordEntry("grape",   "fruit",  Difficulty::Easy))
+  ws.add(new WordEntry("lemon",   "fruit",  Difficulty::Easy))
+  ws.add(new WordEntry("plum",    "fruit",  Difficulty::Easy))
+  ws.add(new WordEntry("peach",   "fruit",  Difficulty::Easy))
+  ws.add(new WordEntry("cherry",  "fruit",  Difficulty::Medium))
+  ws.add(new WordEntry("mango",   "fruit",  Difficulty::Medium))
+  ws.add(new WordEntry("papaya",  "fruit",  Difficulty::Hard))
+  ws.add(new WordEntry("quince",  "fruit",  Difficulty::Hard))
+  ws.add(new WordEntry("cat",     "animal", Difficulty::Easy))
+  ws.add(new WordEntry("dog",     "animal", Difficulty::Easy))
+  ws.add(new WordEntry("lion",    "animal", Difficulty::Easy))
+  ws.add(new WordEntry("wolf",    "animal", Difficulty::Easy))
+  ws.add(new WordEntry("bear",    "animal", Difficulty::Easy))
+  ws.add(new WordEntry("tiger",   "animal", Difficulty::Medium))
+  ws.add(new WordEntry("eagle",   "animal", Difficulty::Medium))
+  ws.add(new WordEntry("shark",   "animal", Difficulty::Medium))
+  ws.add(new WordEntry("python",  "animal", Difficulty::Hard))
+  ws.add(new WordEntry("jaguar",  "animal", Difficulty::Hard))
+  ws.add(new WordEntry("red",     "color",  Difficulty::Easy))
+  ws.add(new WordEntry("blue",    "color",  Difficulty::Easy))
+  ws.add(new WordEntry("green",   "color",  Difficulty::Easy))
+  ws.add(new WordEntry("black",   "color",  Difficulty::Easy))
+  ws.add(new WordEntry("white",   "color",  Difficulty::Easy))
+  ws.add(new WordEntry("yellow",  "color",  Difficulty::Medium))
+  ws.add(new WordEntry("purple",  "color",  Difficulty::Medium))
+  ws.add(new WordEntry("orange",  "color",  Difficulty::Medium))
+  ws.add(new WordEntry("crimson", "color",  Difficulty::Hard))
+  ws.add(new WordEntry("magenta", "color",  Difficulty::Hard))
+  return ws
+}
+
+// ── Separator line ────────────────────────────────────────────────────────────
+def sep(): void { IO::println(50.repeatStr("-")) }
+
+// ── Run simulation ────────────────────────────────────────────────────────────
+val wordBank: List[WordEntry] = makeWordBank()
+val guesser: Guesser = new FrequencyGuesser()
+val maxWrong: Int = 10
+
+// Play every word and collect results
+val results: List[RoundResult] = []
+foreach entry: WordEntry in wordBank {
+  val round: HangmanRound = new HangmanRound(entry, guesser, maxWrong)
+  val outcome: GameOutcome = round.play()
+  results.add(new RoundResult(entry, outcome))
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+IO::println(50.repeatStr("="))
+IO::println("   HANGMAN ENGINE — SIMULATION REPORT")
+IO::println(50.repeatStr("="))
+IO::println("")
+
+// ── Per-word results table ────────────────────────────────────────────────────
+IO::println("Per-word results:")
+sep()
+IO::println("  #   Word         Category   Diff    Outcome")
+sep()
+
+var idx: Int = 1
+foreach r: RoundResult in results {
+  val idxStr: String = ("" + idx).lpad(3)
+  IO::println("  #{idxStr}  #{r.word().pad(10)} #{r.category().pad(9)} #{r.diffLabel()}  #{r.outcome().label()}")
+  idx = idx + 1
+}
+
+// ── Category breakdown via groupBy ───────────────────────────────────────────
+IO::println("")
+IO::println("Category breakdown:")
+sep()
+val byCat: Map[Object, List[RoundResult]] = results.groupBy { r -> (r as RoundResult).category() }
+foreach (cat, catResults) in byCat {
+  val stats: GameStats = computeStats(catResults as List[RoundResult])
+  IO::println("  #{(cat as String).pad(10)}  #{stats.summary()}")
+}
+
+// ── Difficulty breakdown ──────────────────────────────────────────────────────
+IO::println("")
+IO::println("Difficulty breakdown:")
+sep()
+val byDiff: Map[Object, List[RoundResult]] = results.groupBy { r ->
+  (r as RoundResult).diffLabel()
+}
+foreach (diff, diffResults) in byDiff {
+  val stats: GameStats = computeStats(diffResults as List[RoundResult])
+  IO::println("  #{(diff as String).pad(10)}  #{stats.summary()}")
+}
+
+// ── Overall statistics ────────────────────────────────────────────────────────
+sep()
+val overall: GameStats = computeStats(results)
+IO::println("")
+IO::println("Overall:   #{overall.summary()}")
+
+// ── Best and worst words by guesses (won games only) ─────────────────────────
+val wonResults: List[RoundResult] = results.filter { r -> (r as RoundResult).outcome().isWon() }
+if wonResults.size > 0 {
+  val sorted: List[RoundResult] = wonResults.sortedBy { r -> (r as RoundResult).outcome().wonGuesses() }
+  val best: RoundResult = sorted.get(0) as RoundResult
+  val worst: RoundResult = sorted.get(sorted.size - 1) as RoundResult
+  IO::println("  Easiest word: \"#{best.word()}\" (#{best.outcome().wonGuesses()} guesses)")
+  IO::println("  Hardest word: \"#{worst.word()}\" (#{worst.outcome().wonGuesses()} guesses)")
+}
+
+// ── Top 5 most-guessed letters ────────────────────────────────────────────────
+IO::println("")
+IO::println("Most common first guesses (by frequency guesser ordering):")
+val topLetters: List[String] = ["e","t","a","o","i"]
+foreach letter: String in topLetters {
+  val hits: List[RoundResult] = results.filter { r ->
+    (r as RoundResult).word().containsLetter(letter)
+  }
+  IO::println("  '#{letter}'  appears in #{hits.size}/#{results.size} words")
+}
+
+// ── Detailed history for first 3 rounds ──────────────────────────────────────
+IO::println("")
+IO::println("Detailed play-by-play (first 3 games):")
+sep()
+var shown: Int = 0
+foreach entry: WordEntry in wordBank {
+  if shown >= 3 { break }
+  val r2: HangmanRound = new HangmanRound(entry, guesser, maxWrong)
+  r2.play()
+  r2.printHistory()
+  IO::println(hangmanArt(r2.getWrongCount()))
+  shown = shown + 1
+}
+
+// ── Partition: won vs lost words ──────────────────────────────────────────────
+IO::println("")
+val parts = results.partition { r -> (r as RoundResult).outcome().isWon() }
+val wonList:  List[Object] = parts[0] as List[Object]
+val lostList: List[Object] = parts[1] as List[Object]
+IO::println("Won words  (#{wonList.size}): " +
+  wonList.map { r -> (r as RoundResult).word() }.toString())
+IO::println("Lost words (#{lostList.size}): " +
+  lostList.map { r -> (r as RoundResult).word() }.toString())
+
+// ── Distinct categories ───────────────────────────────────────────────────────
+val categories: List[String] = results.map { r -> (r as RoundResult).category() }.distinct()
+IO::println("Categories: #{categories}")
+
+// ── Summary footer ────────────────────────────────────────────────────────────
+IO::println("")
+IO::println(50.repeatStr("="))
+IO::println("  Simulation complete. #{results.size} games played.")
+IO::println(50.repeatStr("="))

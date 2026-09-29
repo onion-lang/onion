@@ -9,7 +9,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 **Configuration:**
 - Scala version: 3.3.7
 - Java version: 17
-- SBT version: ~1.9+
+- SBT version: 2.0.6 (`project/build.properties`)
 - Main dependencies: ASM 9.8 (bytecode), JavaCC 5.0 (parser), ScalaTest 3.2.19 (testing)
 
 ## Build Commands
@@ -18,7 +18,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
   - Automatically regenerates parser from `grammar/JJOnionParser.jj` if modified
 - **Run tests**: `sbt test`
 - **Run single test suite**: `sbt 'testOnly *HelloWorldSpec'`
-- **Package JAR with dependencies**: `sbt assembly` (creates `onion.jar`)
+- **Package JAR with dependencies**: `sbt assembly` (creates `onion-<version>.jar`)
 - **Create distribution package**: `sbt dist` (creates ZIP with lib/, bin/, run/, onion.jar in target/)
 - **Run Onion script**: `sbt 'runScript path/to/script.on [args]'`
 - **Start REPL**: `sbt repl`
@@ -49,7 +49,7 @@ The Onion compiler is a **multi-phase pipeline compiler** following the classic 
 ```
 Source Files (.on)
     ↓
-[1] Parsing (JavaCC) → Untyped AST
+[1] Parsing (hand-written fast path, JavaCC fallback) → Untyped AST
     ↓
 [2] Rewriting → Normalized Untyped AST
     ↓
@@ -101,7 +101,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
      - `ClassTable.scala` - Class symbol table
      - `LocalContext.scala` - Local variable environments
      - `SemanticErrorReporter.scala` - Error collection
-   - Output: Typed AST (`TypedAST.scala`, 37KB)
+   - Output: Typed AST (`TypedAST.scala`)
 
 4. **Tail Call Optimization** (`src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`)
    - Detects tail-recursive methods (self-calls in return position)
@@ -122,13 +122,13 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
    - Warns with `W0016` when a group is annotated but fails to qualify
    - Output: Optimized Typed AST
 
-6. **Code Generation** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
-   - **ASM-based bytecode generation** (current implementation)
-   - Visitor pattern: `AsmCodeGenerationVisitor.scala`
+6. **Code Generation** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala` → `backend/asm/AsmBackend.scala`)
+   - **ASM-based bytecode generation**; the implementation lives in `src/main/scala/onion/compiler/backend/asm/AsmCodeGeneration.scala` (the top-level `onion/compiler/AsmCodeGeneration.scala` is a thin compatibility facade)
+   - Visitor pattern: `backend/asm/AsmCodeGenerationVisitor.scala`
    - Bytecode utilities:
-     - `bytecode/MethodEmitter.scala` - JVM method generation
-     - `bytecode/LocalVarContext.scala` - Local variable tracking
-     - `bytecode/AsmUtil.scala` - ASM helper functions
+     - `backend/asm/MethodEmitter.scala` - JVM method generation
+     - `backend/asm/LocalVarContext.scala` - Local variable tracking
+     - `backend/asm/AsmUtil.scala` - ASM helper functions
    - Output: `CompiledClass` objects (in-memory or file)
 
 ### Key Architectural Components
@@ -263,7 +263,7 @@ Located in `run/` directory:
 If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 1. Edit the JavaCC grammar file
 2. Run `sbt compile` - parser will auto-regenerate
-3. Generated parser appears in `target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/`
+3. Generated parser appears in `target/out/jvm/scala-3.3.7/onion/src_managed/main/java/onion/compiler/parser/` (sbt 2 layout)
 
 ## Important Code Locations
 
@@ -346,7 +346,7 @@ while true {
 ```onion
 // Lambda expressions
 val f: Function1[Int, Int] = (x: Int) -> x * 2
-val g = (x, y) -> x + y
+val g: (Int, Int) -> Int = (x, y) -> x + y   // untyped params need an expected function type (else E0052)
 
 // Trailing lambda syntax
 list.map { x -> x * 2 }
@@ -469,7 +469,7 @@ These are frequently confused with other languages. **Always check these:**
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
-| `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional now (bare `field` resolves to the field via implicit access) |
+| `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
 | `C::field = v` unsupported? | ✓ correct - static field assignment works (public fields) |
@@ -511,8 +511,8 @@ These are frequently confused with other languages. **Always check these:**
 
 | Wrong | Correct (Onion) |
 |-------|-----------------|
-| `class A : B` (Onion before this change) | `class A extends B` - `extends` for a superclass |
-| `class A <: I` (Onion before this change) | `class A conforms I` - `conforms` for interfaces |
+| `class A : B` (retired Onion syntax) | `class A extends B` - `extends` for a superclass |
+| `class A <: I` (retired Onion syntax) | `class A conforms I` - `conforms` for interfaces |
 | `class A implements I` (Java) | `class A conforms I` |
 | `class A extends B implements I` (Java) | `class A extends B conforms I` - combine both |
 | `class A conforms I, J` | ✓ correct - comma-separated |
@@ -534,13 +534,13 @@ These are frequently confused with other languages. **Always check these:**
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
 | need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) { shape name = re"..." }` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
-| test a record in a separate suite | `record R(...) { law name(p: T) { boolExpr }; example { boolExpr } }` - `law`/`example`/`shape` clauses live inside the record's brace-enclosed body, alongside any methods; the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
+| test a record in a separate suite | `record R(...) { law name(p: T) { boolExpr } example { boolExpr } }` - `law`/`example`/`shape` clauses live inside the record's brace-enclosed body, alongside any methods, separated by newlines or spaces (a `;` after a clause is a syntax error); the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 
 ### Lambdas & Functions
 
 | Wrong | Correct (Onion) |
 |-------|-----------------|
-| `x -> x * 2` | ✓ correct - bare single param works; expression bodies too |
+| `x -> x * 2` | ✓ correct where an expected function type exists (`val h: Int -> Int = x -> x * 2`, a call argument); with none, an untyped param is E0052. Expression bodies work too |
 | `(x) -> expr` | ✓ correct - param types inferred from the expected function type |
 | `lambda x: x * 2` (Python) | `(x) -> x * 2` - no `lambda` keyword, use an arrow lambda |
 | `func(arg)` for lambda | ✓ correct - function values are called directly |
@@ -569,11 +569,11 @@ These are frequently confused with other languages. **Always check these:**
 | `with expr as r { }` (Python) | `try (val r = expr) { }` - try-with-resources, same as above |
 | `catch (Type e)` | `catch e: Type` - no parens, type after colon |
 
-### Tools, capabilities and effects (v0.10)
+### Tools, capabilities and effects
 
 | Wrong | Correct (Onion) |
 |-------|-----------------|
-| bare `readText(p)` / `get(url)` / `now()` / `exit(1)` | **No longer resolve** — default static imports were narrowed to pure classes. Qualify (`Files::readText`) or import explicitly: `import { onion.Files::*; java.lang.System::exit }`. Bare `println` still works (`onion.IO` is the one exception) |
+| bare `readText(p)` / `get(url)` / `now()` / `exit(1)` | **Do not resolve** — the default static imports cover only pure classes. Qualify (`Files::readText`) or import explicitly: `import { onion.Files::*; java.lang.System::exit }`. Bare `println` still works (`onion.IO` is the one exception) |
 | a CLI function with hand-rolled arg parsing | `tool name(args) [: T] [requires { caps }] { body }` — a top-level tool; a script whose top level declares tools (and has no `main`) IS a CLI: `--help`, `--contract` (machine-readable JSON), `--plan` (dry run showing bound effects, executing nothing) all derive from the declaration |
 | undeclared side effects in a tool | E0077 at the call site — the body's effects are inferred transitively and checked against `requires { read(src), write(dst), console, unknown }`. Overclaiming is E0078; a bad capability is E0079. An unlisted Java call is `unknown` and must be admitted explicitly |
 | `shape doc = json` when you need comments preserved | `shape doc = config` — a LOSSLESS shape over commented `key = value` files: `parseLossless` keeps a `Residue` (comments, spacing, key order, unknown keys, value spellings), `r.edit { v -> v.copy(port = 9090) }.render()` rewrites exactly one value slot |

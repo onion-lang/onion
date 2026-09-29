@@ -1,0 +1,223 @@
+// TF-IDF text search engine: records, classes, generics,
+// collection pipelines, closures, and numeric computation.
+
+import {
+  java.util.LinkedHashMap
+  java.lang.Math
+}
+
+// ---------- data model ----------
+
+record Document(id: Int, title: String, body: String)
+
+record SearchResult(doc: Document, score: Double) {
+public:
+  def display(): void {
+    val line: String = "  [" + doc().id() + "] " + doc().title() +
+      " (score=" + Format::fixed(score(), 4) + ")"
+    IO::println(line)
+  }
+}
+
+// ---------- tokenizer ----------
+
+class Tokenizer {
+public:
+  static def tokenize(text: String): List[String] {
+    val lower: String = text.toLowerCase()
+    val parts: List[String] = Strings::splitRegex(lower, "[^a-z0-9]+")
+    val tokens: List[String] = []
+    foreach p: String in parts {
+      if p.length() > 1 { tokens.add(p) }
+    }
+    return tokens
+  }
+
+  static def termFrequencies(tokens: List[String]): Map[String, Int] {
+    val freq: Map[String, Int] = new LinkedHashMap[String, Int]()
+    foreach tok: String in tokens {
+      val prev: Int? = freq.get(tok) as Int?
+      freq.put(tok, if prev == null { 1 } else { prev + 1 })
+    }
+    return freq
+  }
+}
+
+// ---------- inverted index ----------
+
+class InvertedIndex {
+  var docs_: List[Document] = []
+  var postings_: Map[String, List[Int]] = new LinkedHashMap[String, List[Int]]()
+
+public:
+  def addDocument(doc: Document): void {
+    docs_.add(doc)
+    val text: String = doc.title() + " " + doc.body()
+    val tokens: List[String] = Tokenizer::tokenize(text)
+    val seen: Map[String, Boolean] = new LinkedHashMap[String, Boolean]()
+    foreach tok: String in tokens {
+      val alreadySeen: Boolean? = seen.get(tok) as Boolean?
+      if alreadySeen == null {
+        seen.put(tok, true)
+        val bucket: List[Int]? = postings_.get(tok) as List[Int]?
+        if bucket == null {
+          val newBucket: List[Int] = []
+          newBucket.add(doc.id())
+          postings_.put(tok, newBucket)
+        } else {
+          bucket.add(doc.id())
+        }
+      }
+    }
+  }
+
+  def docCount(): Int = docs_.size
+
+  def df(term: String): Int {
+    val bucket: List[Int]? = postings_.get(term) as List[Int]?
+    if bucket == null { return 0 }
+    return bucket.size
+  }
+
+  def idf(term: String): Double {
+    val n: Int = docCount()
+    val d: Int = df(term)
+    if n == 0 || d == 0 { return 0.0 }
+    return Math::log((n + 1.0) / (d + 1.0)) + 1.0
+  }
+
+  def tf(term: String, doc: Document): Double {
+    val text: String = doc.title() + " " + doc.body()
+    val tokens: List[String] = Tokenizer::tokenize(text)
+    if tokens.size == 0 { return 0.0 }
+    var count: Int = 0
+    foreach tok: String in tokens {
+      if tok == term { count++ }
+    }
+    return (count * 1.0) / (tokens.size * 1.0)
+  }
+
+  def score(queryTokens: List[String], doc: Document): Double {
+    var total: Double = 0.0
+    foreach term: String in queryTokens {
+      total = total + tf(term, doc) * idf(term)
+    }
+    return total
+  }
+
+  def search(queryText: String, maxResults: Int): List[SearchResult] {
+    val queryTokens: List[String] = Tokenizer::tokenize(queryText)
+    val results: List[SearchResult] = []
+    foreach doc: Document in docs_ {
+      val s: Double = score(queryTokens, doc)
+      if s > 0.0 { results.add(new SearchResult(doc, s)) }
+    }
+    // Insertion sort descending by score
+    var i: Int = 1
+    while i < results.size {
+      val cur: SearchResult = results[i] as SearchResult
+      var j: Int = i - 1
+      while j >= 0 && (results[j] as SearchResult).score() < cur.score() {
+        results[j + 1] = results[j]
+        j--
+      }
+      results[j + 1] = cur
+      i++
+    }
+    val top: List[SearchResult] = []
+    var k: Int = 0
+    while k < results.size && k < maxResults {
+      top.add(results[k] as SearchResult)
+      k++
+    }
+    return top
+  }
+}
+
+// ---------- sample corpus ----------
+
+def buildIndex(): InvertedIndex {
+  val idx: InvertedIndex = new InvertedIndex()
+  idx.addDocument(new Document(1, "Introduction to Algorithms",
+    "algorithms data structures sorting searching graphs trees complexity"))
+  idx.addDocument(new Document(2, "Design Patterns in Java",
+    "patterns factory singleton observer decorator adapter java design"))
+  idx.addDocument(new Document(3, "Clean Code",
+    "refactoring naming functions methods classes readable maintainable code"))
+  idx.addDocument(new Document(4, "The Pragmatic Programmer",
+    "software craftsmanship tools automation testing debugging pragmatic"))
+  idx.addDocument(new Document(5, "Structure and Interpretation of Computer Programs",
+    "scheme lisp recursion higher order functions closures lambda interpreter"))
+  idx.addDocument(new Document(6, "Compilers: Principles Techniques Tools",
+    "lexer parser grammar tokens ast code generation optimization compiler"))
+  idx.addDocument(new Document(7, "Operating System Concepts",
+    "processes threads scheduling memory paging file systems concurrency"))
+  idx.addDocument(new Document(8, "Computer Networks",
+    "tcp ip routing protocols network sockets bandwidth latency packets"))
+  idx.addDocument(new Document(9, "Database System Concepts",
+    "sql queries transactions indexes normalization relational algebra"))
+  idx.addDocument(new Document(10, "Introduction to Machine Learning",
+    "neural networks training gradient descent backpropagation features"))
+  idx.addDocument(new Document(11, "Functional Programming in Scala",
+    "higher order functions map filter fold closures immutable monads"))
+  idx.addDocument(new Document(12, "Distributed Systems",
+    "consensus replication fault tolerance paxos raft distributed transactions"))
+  return idx
+}
+
+def printDivider(): void { IO::println(Strings::repeat("-", 60)) }
+
+def printResults(results: List[SearchResult]): void {
+  if results.size == 0 {
+    IO::println("  (no matching documents)")
+  } else {
+    foreach r: SearchResult in results { r.display() }
+  }
+}
+
+// ---------- main ----------
+
+def main(): void {
+  val idx: InvertedIndex = buildIndex()
+
+  IO::println("=== TF-IDF Search Engine Demo ===")
+  IO::println("Corpus: " + idx.docCount() + " documents indexed")
+  printDivider()
+
+  val queries: List[String] = [
+    "functions closures lambda",
+    "compiler parser tokens",
+    "sorting algorithms trees",
+    "distributed transactions replication",
+    "machine learning neural networks",
+    "java design patterns"
+  ]
+
+  foreach queryText: String in queries {
+    IO::println("Query: \"" + queryText + "\"")
+    val results: List[SearchResult] = idx.search(queryText, 3)
+    printResults(results)
+    IO::println("")
+  }
+
+  printDivider()
+  IO::println("=== Term Statistics ===")
+  val terms: List[String] = ["functions", "compiler", "java", "algorithms", "distributed"]
+  foreach term: String in terms {
+    val dfVal: Int = idx.df(term)
+    val idfVal: Double = idx.idf(term)
+    IO::println("  \"" + term + "\": df=" + dfVal +
+      ", idf=" + Format::fixed(idfVal, 4))
+  }
+  printDivider()
+
+  IO::println("=== Term Frequency Demo ===")
+  val sampleText: String = "algorithms data structures algorithms sorting algorithms"
+  val tokens: List[String] = Tokenizer::tokenize(sampleText)
+  val freq: Map[String, Int] = Tokenizer::termFrequencies(tokens)
+  IO::println("Text: \"" + sampleText + "\"")
+  IO::println("Token count: " + tokens.size)
+  foreach (term, count) in freq {
+    IO::println("  \"" + term + "\" x" + count)
+  }
+}

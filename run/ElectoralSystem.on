@@ -1,0 +1,319 @@
+// ElectoralSystem.on — instant-runoff voting (IRV) simulator
+// Exercises: static val/var, boolean-exhaustive select, do-notation in record
+//            methods, explicit generic type args (including primitive), ADT enum,
+//            data-carrying enum, records, extension methods, generic functions
+
+import { java.util.List; java.util.Map; java.util.LinkedHashMap; java.util.ArrayList; }
+
+static val MAX_ROUNDS: Int = 20
+static val MAJORITY_THRESHOLD: Int = 50
+static val PARTY_NAMES: List[String] = ["Progressive", "Conservative", "Green", "Liberal", "Independent"]
+
+// Data-carrying enum: each constant carries a colour string
+enum Party(colour: String) {
+  Progressive("Blue"), Conservative("Red"), Green("Green"),
+  Liberal("Yellow"), Independent("Grey")
+public:
+  def display(): String = name() + " (" + colour() + ")"
+  def shortName(): String = name().substring(0, 3).toUpperCase()
+}
+
+// ADT enum: sum type for an election outcome
+enum Outcome {
+  case Won(atRound: Int, withVotes: Int)
+  case Eliminated(atRound: Int)
+  case Undecided
+public:
+  def label(): String = select this {
+    case o is Won:        "WON in round #{o.atRound()} with #{o.withVotes()} votes"
+    case o is Eliminated: "eliminated after round #{o.atRound()}"
+    case u is Undecided:  "undecided"
+  }
+  def isWon(): Boolean = select this {
+    case o is Won:   true
+    case o is Eliminated: false
+    case u is Undecided:  false
+  }
+}
+
+record Candidate(id: String, cname: String, party: Party) {
+public:
+  def display(): String = "#{cname()} [#{party().display()}]"
+  def shortLine(): String = "#{id()}: #{cname()} (#{party().shortName()})"
+}
+
+record Ballot(preferences: List[String]) {
+public:
+  def firstLiveChoice(active: List[String]): String? {
+    foreach pref: String in preferences() {
+      foreach aid: String in active {
+        if pref == aid { return pref }
+      }
+    }
+    return null
+  }
+  def length(): Int = preferences().size
+}
+
+record RoundTally(round: Int, voteCounts: Map[Object, Object], totalVotes: Int) {
+public:
+  def votesFor(id: String): Int {
+    val raw: Object? = voteCounts()[id]
+    if raw == null { return 0 }
+    return raw as Int
+  }
+
+  // do-notation in a record method — exercises the rewriteRecordDeclaration fix
+  def percentLabel(id: String): String {
+    val r = do[Option] {
+      v <- Option::some(votesFor(id))
+      t <- Option::some(totalVotes())
+      ret (v as Int)
+    }
+    val v: Int = r.get() as Int
+    if totalVotes() == 0 { return "#{v} (0%)" }
+    val pct: Int = v * 100 / totalVotes()
+    return "#{v} (#{pct}%)"
+  }
+
+  def lowestId(active: List[String]): String? {
+    if active.size == 0 { return null }
+    var minId: String = active[0]
+    var minV: Int = votesFor(active[0])
+    foreach aid: String in active {
+      val v: Int = votesFor(aid)
+      if v < minV {
+        minV = v
+        minId = aid
+      }
+    }
+    return minId
+  }
+
+  def majorityId(active: List[String]): String? {
+    foreach aid: String in active {
+      val v: Int = votesFor(aid)
+      if v * 2 > totalVotes() { return aid }
+    }
+    return null
+  }
+}
+
+// Generic helper — sum using extractor function
+static def sumAll[T](items: List[T], extract: T -> Int): Int {
+  var total: Int = 0
+  foreach item: T in items { total = total + extract(item) }
+  return total
+}
+
+// Generic helper — highest by score
+static def highestBy[T](items: List[T], score: T -> Int): T? {
+  if items.size == 0 { return null }
+  var best: T = items[0]
+  var bestScore: Int = score(items[0])
+  foreach item: T in items {
+    val s: Int = score(item)
+    if s > bestScore {
+      best = item
+      bestScore = s
+    }
+  }
+  return best
+}
+
+// Build a vote count map for a single round
+static def countVotes(ballots: List[Ballot], active: List[String]): Map[Object, Object] {
+  val counts: Map[Object, Object] = [:]
+  foreach aid: String in active {
+    counts[aid] = 0
+  }
+  foreach ballot: Ballot in ballots {
+    val choice: String? = ballot.firstLiveChoice(active)
+    if choice != null {
+      val prev: Object? = counts[choice]
+      val prevInt: Int = if prev == null { 0 } else { prev as Int }
+      counts[choice] = prevInt + 1
+    }
+  }
+  return counts
+}
+
+class IRVElection {
+  val candidates: List[Candidate]
+  val ballots: List[Ballot]
+  val outcomes: Map[Object, Object]
+public:
+  def this(cands: List[Candidate], bals: List[Ballot]) {
+    candidates = cands
+    ballots = bals
+    outcomes = [:]
+  }
+
+  def candidateById(id: String): Candidate? {
+    foreach c: Candidate in candidates {
+      if c.id() == id { return c }
+    }
+    return null
+  }
+
+  def run(): List[RoundTally] {
+    val tallies: List[RoundTally] = []
+    var active: List[String] = []
+    foreach c: Candidate in candidates { active.add(c.id()) }
+    foreach c: Candidate in candidates { outcomes[c.id()] = new Undecided() }
+
+    var round: Int = 1
+    while round <= MAX_ROUNDS && active.size > 1 {
+      val counts: Map[Object, Object] = countVotes(ballots, active)
+      val total: Int = ballots.size
+      val tally: RoundTally = new RoundTally(round, counts, total)
+      tallies.add(tally)
+
+      val winnerId: String? = tally.majorityId(active)
+      if winnerId != null {
+        val wv: Int = tally.votesFor(winnerId)
+        outcomes[winnerId] = new Won(round, wv)
+        active = active.filter { aid: String -> aid != winnerId }
+        foreach rid: String in active {
+          val cur: Object? = outcomes[rid]
+          if cur is Undecided { outcomes[rid] = new Eliminated(round) }
+        }
+        active = []
+      } else {
+        val dropId: String? = tally.lowestId(active)
+        if dropId != null {
+          outcomes[dropId] = new Eliminated(round)
+          active = active.filter { aid: String -> aid != dropId }
+        }
+      }
+      round = round + 1
+    }
+
+    // If still multiple active (e.g. tie), mark remaining as Undecided
+    return tallies
+  }
+
+  def wasActiveAt(id: String, roundNum: Int): Boolean {
+    val outcomeObj: Object? = outcomes[id]
+    if outcomeObj == null { return true }
+    select outcomeObj as Outcome {
+      case o is Won:        return o.atRound() >= roundNum
+      case o is Eliminated: return o.atRound() >= roundNum
+      case u is Undecided:  return true
+    }
+    return false
+  }
+
+  def printSummary(tallies: List[RoundTally]): void {
+    IO::println("=== INSTANT-RUNOFF VOTING RESULTS ===")
+    IO::println("Candidates: #{candidates.size}  |  Ballots cast: #{ballots.size}")
+    IO::println("")
+
+    foreach tally: RoundTally in tallies {
+      IO::println("--- Round #{tally.round()} ---")
+      foreach c: Candidate in candidates {
+        val id: String = c.id()
+        val isActive: Boolean = wasActiveAt(id, tally.round())
+        val prefix: String = select isActive {
+          case true:  "  [active] "
+          case false: "  [out]    "
+        }
+        IO::println("#{prefix}#{c.cname()}: #{tally.percentLabel(id)}")
+      }
+    }
+
+    IO::println("")
+    IO::println("=== FINAL OUTCOMES ===")
+    foreach c: Candidate in candidates {
+      val id: String = c.id()
+      val outcomeObj: Object? = outcomes[id]
+      val outcome: Outcome = outcomeObj as Outcome
+      IO::println("  #{c.display()} -> #{outcome.label()}")
+    }
+  }
+}
+
+// Build sample ballots split into 5 preference groups
+static def buildBallots(groupCounts: List[Int], groupPrefs: List[List[String]]): List[Ballot] {
+  val result: List[Ballot] = []
+  var g: Int = 0
+  while g < groupCounts.size {
+    val countObj: Object = groupCounts[g] as Object
+    val count: Int = countObj as Int
+    val prefs: List[String] = groupPrefs[g]
+    var i: Int = 0
+    while i < count {
+      result.add(new Ballot(prefs))
+      i = i + 1
+    }
+    g = g + 1
+  }
+  return result
+}
+
+def main(): void {
+  val p1: Party = Party::Progressive
+  val p2: Party = Party::Conservative
+  val p3: Party = Party::Green
+  val p4: Party = Party::Liberal
+  val p5: Party = Party::Independent
+
+  val c1: Candidate = new Candidate("A", "Alice Mercer",    p1)
+  val c2: Candidate = new Candidate("B", "Bob Harrington",  p2)
+  val c3: Candidate = new Candidate("C", "Carol Vance",     p3)
+  val c4: Candidate = new Candidate("D", "David Osei",      p4)
+  val c5: Candidate = new Candidate("E", "Elena Frost",     p5)
+  val cands: List[Candidate] = [c1, c2, c3, c4, c5]
+
+  // Group sizes: 35, 30, 20, 10, 5 — exercises sumAll[Int] with primitive type arg
+  val groupCounts: List[Int] = [35, 30, 20, 10, 5]
+  val total: Int = sumAll[Int](groupCounts, (n: Int) -> n)
+  IO::println("Total ballots: #{total}")
+
+  // Verify party list is accessible via static val
+  IO::println("Registered parties: #{PARTY_NAMES.size}")
+  foreach pname: String in PARTY_NAMES { IO::println("  " + pname) }
+  IO::println("")
+
+  // Preference orderings per group
+  val g1prefs: List[String] = ["A","C","D","B","E"]
+  val g2prefs: List[String] = ["B","D","A","E","C"]
+  val g3prefs: List[String] = ["C","A","D","B","E"]
+  val g4prefs: List[String] = ["D","C","A","B","E"]
+  val g5prefs: List[String] = ["E","C","D","A","B"]
+
+  val groupPrefs: List[List[String]] = [g1prefs, g2prefs, g3prefs, g4prefs, g5prefs]
+  val ballots: List[Ballot] = buildBallots(groupCounts, groupPrefs)
+
+  val election: IRVElection = new IRVElection(cands, ballots)
+  val tallies: List[RoundTally] = election.run()
+
+  election.printSummary(tallies)
+
+  // Boolean exhaustive select: does anyone have a majority in round 1?
+  val firstTally: RoundTally = tallies[0]
+  val hasMajority: Boolean = firstTally.majorityId(["A","B","C","D","E"]) != null
+  val firstRoundMsg: String = select hasMajority {
+    case true:  "A candidate won outright in the first round."
+    case false: "No first-round majority; runoff rounds required."
+  }
+  IO::println("")
+  IO::println(firstRoundMsg)
+
+  // Explicit type arg with primitive: compute total votes cast across all rounds
+  val roundTotals: List[Int] = []
+  foreach t: RoundTally in tallies { roundTotals.add(t.totalVotes()) }
+  val grandTotal: Int = sumAll[Int](roundTotals, (n: Int) -> n)
+  IO::println("Total vote-counts across all rounds: #{grandTotal}")
+
+  // Use highestBy[RoundTally] to find the round with most participation
+  val busiest: RoundTally? = highestBy[RoundTally](tallies, (t: RoundTally) -> t.totalVotes())
+  if busiest != null {
+    IO::println("Highest-participation round: #{(busiest as RoundTally).round()}")
+  }
+
+  IO::println("")
+  IO::println("Max allowed rounds configured: #{MAX_ROUNDS}")
+  IO::println("Majority threshold: #{MAJORITY_THRESHOLD}%")
+  IO::println("Done.")
+}

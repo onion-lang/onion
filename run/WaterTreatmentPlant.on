@@ -1,0 +1,226 @@
+// WaterTreatmentPlant.on — municipal water treatment plant monitoring and chemical-dosing simulator
+
+import { java.util.ArrayList }
+
+enum Stage {
+  case Intake
+  case Coagulation
+  case Sedimentation
+  case Filtration
+  case Chlorination
+  case Distribution
+  public:
+  def label(): String = select this {
+    case i is Intake:        "Intake"
+    case c is Coagulation:   "Coagulation"
+    case s is Sedimentation: "Sedimentation"
+    case f is Filtration:    "Filtration"
+    case h is Chlorination:  "Chlorination"
+    case d is Distribution:  "Distribution"
+  }
+  def order(): Int = select this {
+    case i is Intake:        1
+    case c is Coagulation:   2
+    case s is Sedimentation: 3
+    case f is Filtration:    4
+    case h is Chlorination:  5
+    case d is Distribution:  6
+  }
+}
+
+enum Severity {
+  case Ok
+  case Watch
+  case Violation
+  public:
+  def label(): String = select this {
+    case o is Ok:        "OK"
+    case w is Watch:      "WATCH"
+    case v is Violation:  "VIOLATION"
+  }
+}
+
+record ChemicalSpec(name: String, targetPpm: Double, minPpm: Double, maxPpm: Double) {
+  public:
+  def inRange(actual: Double): Boolean = actual >= minPpm && actual <= maxPpm
+  def doseAdjustment(actual: Double): Double = targetPpm - actual
+}
+
+record Reading(
+  batchId: Int, stage: Stage, turbidityNtu: Double, phLevel: Double,
+  chlorinePpm: Double, flowRateMgd: Double, timestamp: String
+) {
+  public:
+  def turbidityOk(): Boolean = turbidityNtu <= 1.0
+  def phOk(): Boolean = phLevel >= 6.5 && phLevel <= 8.5
+  def chlorineOk(): Boolean = chlorinePpm >= 0.2 && chlorinePpm <= 4.0
+  def issues(): List[String] {
+    val out: List[String] = new ArrayList[String]()
+    if !turbidityOk() { out.add("turbidity #{turbidityNtu} NTU out of range (<=1.0)") }
+    if !phOk() { out.add("pH #{phLevel} out of range (6.5-8.5)") }
+    if !chlorineOk() { out.add("chlorine #{chlorinePpm} ppm out of range (0.2-4.0)") }
+    return out
+  }
+  def severity(): Severity {
+    val n: Int = issues().size
+    return if n == 0 { new Ok() } else if n == 1 { new Watch() } else { new Violation() }
+  }
+  def summary(): String =
+    "Batch ##{batchId} [#{stage.label()}] turb=#{turbidityNtu}NTU pH=#{phLevel} Cl=#{chlorinePpm}ppm flow=#{flowRateMgd}MGD @ #{timestamp}"
+}
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// pounds of chemical/day = ppm adjustment * flow(MGD) * 8.34 (standard water-treatment conversion constant)
+def calcDosePounds(adjustmentPpm: Double, flowMgd: Double): Double {
+  if adjustmentPpm <= 0.0 { return 0.0 }
+  return adjustmentPpm * flowMgd * 8.34
+}
+
+def findSpec(specs: List[ChemicalSpec], name: String): ChemicalSpec? {
+  foreach s: ChemicalSpec in specs {
+    if s.name() == name { return s }
+  }
+  return null
+}
+
+def main(): void {
+  val specs: List[ChemicalSpec] = [
+    new ChemicalSpec("Alum",     25.0, 15.0, 35.0),
+    new ChemicalSpec("Chlorine",  2.0,  0.2,  4.0),
+    new ChemicalSpec("Fluoride",  0.7,  0.5,  1.0),
+    new ChemicalSpec("Lime",     10.0,  5.0, 20.0)
+  ]
+
+  val readings: List[Reading] = [
+    new Reading(1, new Intake(),        3.2, 7.4, 0.0, 12.5, "06:00"),
+    new Reading(1, new Coagulation(),   2.1, 6.9, 0.0, 12.5, "06:15"),
+    new Reading(1, new Sedimentation(), 0.9, 6.8, 0.0, 12.5, "06:45"),
+    new Reading(1, new Filtration(),    0.3, 7.0, 0.0, 12.5, "07:00"),
+    new Reading(1, new Chlorination(),  0.2, 7.2, 1.8, 12.5, "07:15"),
+    new Reading(1, new Distribution(),  0.2, 7.1, 1.6, 12.5, "08:00"),
+
+    new Reading(2, new Intake(),        5.8, 7.9, 0.0, 14.0, "10:00"),
+    new Reading(2, new Coagulation(),   3.4, 7.0, 0.0, 14.0, "10:15"),
+    new Reading(2, new Sedimentation(), 1.4, 6.9, 0.0, 14.0, "10:45"),
+    new Reading(2, new Filtration(),    1.2, 7.1, 0.0, 14.0, "11:00"),
+    new Reading(2, new Chlorination(),  0.4, 7.3, 4.5, 14.0, "11:15"),
+    new Reading(2, new Distribution(),  0.4, 7.2, 3.9, 14.0, "12:00"),
+
+    new Reading(3, new Intake(),        2.5, 6.2, 0.0, 10.8, "14:00"),
+    new Reading(3, new Coagulation(),   1.8, 6.0, 0.0, 10.8, "14:15"),
+    new Reading(3, new Sedimentation(), 0.7, 6.1, 0.0, 10.8, "14:45"),
+    new Reading(3, new Filtration(),    0.2, 6.3, 0.0, 10.8, "15:00"),
+    new Reading(3, new Chlorination(),  0.1, 6.4, 1.5, 10.8, "15:15"),
+    new Reading(3, new Distribution(),  0.1, 6.4, 1.3, 10.8, "16:00")
+  ]
+
+  IO::println("=== WATER TREATMENT PLANT REPORT ===")
+  IO::println("Total readings logged: #{readings.size}")
+  IO::println("")
+
+  IO::println("--- All Readings ---")
+  foreach r: Reading in readings {
+    IO::println("[#{r.severity().label()}] #{r.summary()}")
+  }
+  IO::println("")
+
+  // Flagged readings and their specific issues
+  val flagged: List[Reading] = readings.filter { r -> r.issues().size > 0 }
+  IO::println("--- Flagged Readings (#{flagged.size}) ---")
+  foreach r: Reading in flagged {
+    IO::println("  #{r.summary()}")
+    foreach issue: String in r.issues() {
+      IO::println("    - #{issue}")
+    }
+  }
+  IO::println("")
+
+  // Group by batch, ordered by treatment stage
+  val byBatch: Map[Int, List[Reading]] = readings.groupBy { r -> r.batchId() }
+  IO::println("--- Readings by Batch ---")
+  foreach (batchId, batchReadings) in byBatch {
+    val ordered: List[Reading] = batchReadings.sortedBy { r -> r.stage().order() }
+    val violations: Int = ordered.filter { r -> select r.severity() { case v is Violation: true; else: false } }.size
+    IO::println("Batch ##{batchId}: #{ordered.size} stages, #{violations} violation(s)")
+    foreach r: Reading in ordered {
+      IO::println("  #{r.stage().order()}. #{r.stage().label()}: turb=#{r.turbidityNtu()}NTU pH=#{r.phLevel()} Cl=#{r.chlorinePpm()}ppm")
+    }
+  }
+  IO::println("")
+
+  // Turbidity reduction from Intake to Distribution, per batch
+  IO::println("--- Turbidity Reduction (Intake -> Distribution) ---")
+  foreach (batchId, batchReadings) in byBatch {
+    var intakeNtu: Double = 0.0
+    var distNtu: Double = 0.0
+    foreach r: Reading in batchReadings {
+      select r.stage() {
+        case i is Intake: intakeNtu = r.turbidityNtu()
+        case d is Distribution: distNtu = r.turbidityNtu()
+        else: {}
+      }
+    }
+    val reductionPct: Double = if intakeNtu > 0.0 { (intakeNtu - distNtu) / intakeNtu * 100.0 } else { 0.0 }
+    IO::println("Batch ##{batchId}: #{intakeNtu}NTU -> #{distNtu}NTU (#{String::format("%.1f", reductionPct)}% reduction)")
+  }
+  IO::println("")
+
+  // Chlorine dosing recommendations at the Chlorination stage, per batch
+  IO::println("--- Chlorine Dosing Recommendations ---")
+  val chlorineSpec: ChemicalSpec? = findSpec(specs, "Chlorine")
+  if chlorineSpec != null {
+    val spec: ChemicalSpec = chlorineSpec!!
+    foreach r: Reading in readings {
+      select r.stage() {
+        case c is Chlorination: {
+          val adjustment: Double = spec.doseAdjustment(r.chlorinePpm())
+          val pounds: Double = calcDosePounds(adjustment, r.flowRateMgd())
+          IO::println("Batch ##{r.batchId()}: current=#{r.chlorinePpm()}ppm target=#{spec.targetPpm()}ppm adjust=#{String::format("%.2f", adjustment)}ppm dose=#{String::format("%.2f", pounds)}lb/day")
+        }
+        else: {}
+      }
+    }
+  }
+  IO::println("")
+
+  // Chemical spec compliance table
+  IO::println("--- Chemical Spec Compliance ---")
+  foreach spec: ChemicalSpec in specs {
+    IO::println("#{spec.name()}: target=#{spec.targetPpm()}ppm range=[#{spec.minPpm()}, #{spec.maxPpm()}]")
+  }
+  IO::println("")
+
+  // Overall severity summary
+  val okCount: Int = readings.filter { r -> select r.severity() { case o is Ok: true; else: false } }.size
+  val watchCount: Int = readings.filter { r -> select r.severity() { case w is Watch: true; else: false } }.size
+  val violationCount: Int = readings.filter { r -> select r.severity() { case v is Violation: true; else: false } }.size
+  IO::println("--- Severity Summary ---")
+  IO::println("OK: #{okCount}  WATCH: #{watchCount}  VIOLATION: #{violationCount}")
+  IO::println("")
+
+  // Flow statistics
+  val flows: List[Double] = readings.map { r -> r.flowRateMgd() }.distinct()
+  val totalFlow: Double = flows.fold(0.0) { acc, f -> acc + f }
+  IO::println("--- Flow Statistics ---")
+  IO::println("Distinct batch flow rates: #{flows.size}")
+  IO::println("Combined flow: #{String::format("%.1f", totalFlow)} MGD")
+  IO::println("")
+
+  // Padded stage checklist for the most recent batch
+  IO::println("--- Stage Checklist (Batch #3) ---")
+  val batch3: List[Reading] = (byBatch[3] as List[Reading]).sortedBy { r -> r.stage().order() }
+  foreach r: Reading in batch3 {
+    val mark: String = if r.issues().size == 0 { "[OK]" } else { "[!!]" }
+    IO::println("#{r.stage().order().lpad(2)}. #{mark} #{r.stage().label()}")
+  }
+  IO::println("")
+
+  IO::println("=== END OF REPORT ===")
+}

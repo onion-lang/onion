@@ -1,0 +1,394 @@
+// LibraryLoanManager.on — public library management: books, patrons, loans, fines,
+// and analytical reports.  Exercises records, data-carrying and plain enums,
+// classes with public/private sections, interfaces, generics, collection
+// pipelines, extension methods on Int/String, select/pattern matching,
+// nullable types, string interpolation, try/catch, and foreach with ranges.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def dayLabel(): String = if self == 1 { "1 day" } else { self + " days" }
+  def fineAmount(): Int = self * 10
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "~"
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Genre {
+  FICTION, NON_FICTION, SCI_FI, MYSTERY, BIOGRAPHY, REFERENCE
+public:
+  def label(): String {
+    select this {
+      case Genre::FICTION:     return "Fiction"
+      case Genre::NON_FICTION: return "Non-Fiction"
+      case Genre::SCI_FI:      return "Sci-Fi"
+      case Genre::MYSTERY:     return "Mystery"
+      case Genre::BIOGRAPHY:   return "Biography"
+      case Genre::REFERENCE:   return "Reference"
+      else:                    return "Unknown"
+    }
+  }
+}
+
+enum MemberTier {
+  BASIC, STANDARD, PREMIUM
+public:
+  def loanLimit(): Int {
+    select this {
+      case MemberTier::BASIC:    return 3
+      case MemberTier::STANDARD: return 7
+      case MemberTier::PREMIUM:  return 15
+      else:                      return 3
+    }
+  }
+  def loanDays(): Int {
+    select this {
+      case MemberTier::BASIC:    return 14
+      case MemberTier::STANDARD: return 21
+      case MemberTier::PREMIUM:  return 30
+      else:                      return 14
+    }
+  }
+  def label(): String {
+    select this {
+      case MemberTier::BASIC:    return "BASIC"
+      case MemberTier::STANDARD: return "STANDARD"
+      case MemberTier::PREMIUM:  return "PREMIUM"
+      else:                      return "?"
+    }
+  }
+}
+
+enum LoanStatus {
+  ACTIVE, RETURNED, OVERDUE, LOST
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Book(isbn: String, title: String, author: String,
+            genre: Genre, year: Int, copies: Int)
+
+record Patron(id: String, name: String, email: String, tier: MemberTier)
+
+record Loan(id: String, isbn: String, patronId: String,
+            checkoutDay: Int, dueDay: Int, status: LoanStatus)
+
+// ─── Library Class ───────────────────────────────────────────────────────────
+
+class Library {
+  var books: ArrayList[Book]
+  var patrons: ArrayList[Patron]
+  var loans: ArrayList[Loan]
+  var nextLoanId: Int
+public:
+  def this() {
+    this.books = new ArrayList[Book]()
+    this.patrons = new ArrayList[Patron]()
+    this.loans = new ArrayList[Loan]()
+    this.nextLoanId = 1
+  }
+
+  def addBook(b: Book): void { books.add(b) }
+  def addPatron(p: Patron): void { patrons.add(p) }
+
+  def findBook(isbn: String): Book? {
+    foreach b: Book in books {
+      if b.isbn() == isbn { return b }
+    }
+    return null
+  }
+
+  def findPatron(pid: String): Patron? {
+    foreach p: Patron in patrons {
+      if p.id() == pid { return p }
+    }
+    return null
+  }
+
+  def activeLoansFor(patronId: String): ArrayList[Loan] {
+    val result: ArrayList[Loan] = new ArrayList[Loan]()
+    foreach l: Loan in loans {
+      if l.patronId() == patronId && l.status() == LoanStatus::ACTIVE {
+        result.add(l)
+      }
+    }
+    return result
+  }
+
+  def checkout(isbn: String, patronId: String, currentDay: Int): String? {
+    val book: Book? = findBook(isbn)
+    if book == null { return "Book not found: " + isbn }
+    val patron: Patron? = findPatron(patronId)
+    if patron == null { return "Patron not found: " + patronId }
+    val activeCount: Int = activeLoansFor(patronId).size()
+    if activeCount >= patron.tier().loanLimit() {
+      return "Loan limit reached (" + activeCount + ") for " + patron.name()
+    }
+    if book.copies() <= 0 { return "No copies available: " + book.title() }
+    val dueDay: Int = currentDay + patron.tier().loanDays()
+    val loanId: String = "L" + nextLoanId
+    nextLoanId = nextLoanId + 1
+    loans.add(new Loan(loanId, isbn, patronId, currentDay, dueDay, LoanStatus::ACTIVE))
+    books.remove(book)
+    books.add(new Book(book.isbn(), book.title(), book.author(),
+                       book.genre(), book.year(), book.copies() - 1))
+    return null
+  }
+
+  def returnBook(loanId: String, returnDay: Int): Int {
+    var fine: Int = 0
+    val updated: ArrayList[Loan] = new ArrayList[Loan]()
+    foreach l: Loan in loans {
+      if l.id() == loanId {
+        val overdue: Int = (returnDay - l.dueDay()).clamp(0, 999)
+        fine = overdue.fineAmount()
+        val newStatus: LoanStatus = if overdue > 0 { LoanStatus::OVERDUE } else { LoanStatus::RETURNED }
+        updated.add(new Loan(l.id(), l.isbn(), l.patronId(), l.checkoutDay(), l.dueDay(), newStatus))
+        val bk: Book? = findBook(l.isbn())
+        if bk != null {
+          books.remove(bk)
+          books.add(new Book(bk.isbn(), bk.title(), bk.author(),
+                             bk.genre(), bk.year(), bk.copies() + 1))
+        }
+      } else {
+        updated.add(l)
+      }
+    }
+    loans = updated
+    return fine
+  }
+
+  def overdueLoans(currentDay: Int): ArrayList[Loan] {
+    val result: ArrayList[Loan] = new ArrayList[Loan]()
+    foreach l: Loan in loans {
+      if l.status() == LoanStatus::ACTIVE && l.dueDay() < currentDay {
+        result.add(l)
+      }
+    }
+    return result
+  }
+
+  def booksByGenre(g: Genre): ArrayList[Book] {
+    val result: ArrayList[Book] = new ArrayList[Book]()
+    foreach b: Book in books {
+      if b.genre() == g { result.add(b) }
+    }
+    return result
+  }
+
+  def totalCopies(): Int {
+    var total: Int = 0
+    foreach b: Book in books { total = total + b.copies() }
+    return total
+  }
+
+  def totalActiveLoans(): Int {
+    var count: Int = 0
+    foreach l: Loan in loans {
+      if l.status() == LoanStatus::ACTIVE { count = count + 1 }
+    }
+    return count
+  }
+
+  def allBooks(): ArrayList[Book]   = books
+  def allPatrons(): ArrayList[Patron] = patrons
+  def allLoans(): ArrayList[Loan]   = loans
+}
+
+// ─── Report Helpers ───────────────────────────────────────────────────────────
+
+def sep(): void { IO::println("--------------------------------------------------") }
+
+def printBookRow(b: Book): void {
+  val t: String = b.title().truncate(28).padRight(30)
+  val a: String = b.author().truncate(18).padRight(20)
+  IO::println("  " + t + a + b.genre().label().padRight(12) + "x" + b.copies())
+}
+
+def printLoanRow(l: Loan, lib: Library, today: Int): void {
+  val bk: Book?    = lib.findBook(l.isbn())
+  val pt: Patron?  = lib.findPatron(l.patronId())
+  val title: String  = if bk != null { bk.title().truncate(24) } else { l.isbn() }
+  val pname: String  = if pt != null { pt.name().truncate(16)  } else { l.patronId() }
+  val overdue: Int   = (today - l.dueDay()).clamp(0, 999)
+  val flag: String   = if overdue > 0 { " OVERDUE +" + overdue.dayLabel() } else { "" }
+  IO::println("  " + l.id().padRight(6) + title.padRight(26) + pname.padRight(18) + flag)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val lib: Library = new Library()
+
+lib.addBook(new Book("B001", "To Kill a Mockingbird",  "Harper Lee",      Genre::FICTION,     1960, 4))
+lib.addBook(new Book("B002", "The Great Gatsby",       "F.S. Fitzgerald", Genre::FICTION,     1925, 3))
+lib.addBook(new Book("B003", "1984",                   "George Orwell",   Genre::SCI_FI,      1949, 5))
+lib.addBook(new Book("B004", "Brave New World",        "Aldous Huxley",   Genre::SCI_FI,      1932, 2))
+lib.addBook(new Book("B005", "The Hitchhiker's Guide", "Douglas Adams",   Genre::SCI_FI,      1979, 6))
+lib.addBook(new Book("B006", "And Then There Were None","Agatha Christie", Genre::MYSTERY,     1939, 3))
+lib.addBook(new Book("B007", "Gone Girl",              "Gillian Flynn",   Genre::MYSTERY,     2012, 4))
+lib.addBook(new Book("B008", "Steve Jobs",             "Walter Isaacson", Genre::BIOGRAPHY,   2011, 2))
+lib.addBook(new Book("B009", "A Brief History of Time","Stephen Hawking", Genre::NON_FICTION, 1988, 3))
+lib.addBook(new Book("B010", "Cosmos",                 "Carl Sagan",      Genre::NON_FICTION, 1980, 2))
+
+lib.addPatron(new Patron("P001", "Alice Tanaka",   "alice@mail.com", MemberTier::PREMIUM))
+lib.addPatron(new Patron("P002", "Bob Suzuki",     "bob@mail.com",   MemberTier::STANDARD))
+lib.addPatron(new Patron("P003", "Carol Yamamoto", "carol@mail.com", MemberTier::BASIC))
+lib.addPatron(new Patron("P004", "Dave Nakamura",  "dave@mail.com",  MemberTier::STANDARD))
+lib.addPatron(new Patron("P005", "Eve Kobayashi",  "eve@mail.com",   MemberTier::PREMIUM))
+
+val today: Int = 100
+
+// Checkouts at various days in the past
+var err: String? = null
+err = lib.checkout("B001", "P001", 70)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B003", "P001", 80)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B002", "P002", 85)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B005", "P003", 90)
+if err != null { IO::println("ERROR: " + err) }
+// This should fail: BASIC limit is 3, and P003 already has 1 loan
+err = lib.checkout("B004", "P003", 91)
+if err != null { IO::println("NOTE: " + err) }
+err = lib.checkout("B006", "P004", 88)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B007", "P005", 92)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B008", "P001", 95)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B005", "P002", 60)
+if err != null { IO::println("ERROR: " + err) }
+err = lib.checkout("B010", "P004", 75)
+if err != null { IO::println("ERROR: " + err) }
+
+// Return some books
+val f1: Int = lib.returnBook("L3", today)   // Bob returns B002 (due 85+21=106, fine=0)
+IO::println("Fine L3 (B002/Bob, due 106, ret 100): " + f1 + " yen")
+val f2: Int = lib.returnBook("L1", today)   // Alice returns B001 (due 70+30=100, fine=0)
+IO::println("Fine L1 (B001/Alice, due 100, ret 100): " + f2 + " yen")
+val f3: Int = lib.returnBook("L9", today)   // Bob returns B005 (due 60+21=81, overdue 19)
+IO::println("Fine L9 (B005/Bob, due 81, ret 100): " + f3 + " yen")
+
+// ─── REPORTS ──────────────────────────────────────────────────────────────────
+
+IO::println("")
+sep()
+IO::println("  LIBRARY CATALOG  (" + lib.allBooks().size() + " titles)")
+sep()
+IO::println("  " + "Title".padRight(30) + "Author".padRight(20) + "Genre".padRight(12) + "Qty")
+foreach b: Book in lib.allBooks() { printBookRow(b) }
+
+IO::println("")
+sep()
+IO::println("  ACTIVE LOANS  (day " + today + ")")
+sep()
+IO::println("  " + "ID".padRight(6) + "Title".padRight(26) + "Patron".padRight(18) + "Status")
+foreach l: Loan in lib.allLoans() {
+  if l.status() == LoanStatus::ACTIVE {
+    printLoanRow(l, lib, today)
+  }
+}
+
+IO::println("")
+sep()
+IO::println("  RETURNED LOANS")
+sep()
+foreach l: Loan in lib.allLoans() {
+  if l.status() == LoanStatus::RETURNED || l.status() == LoanStatus::OVERDUE {
+    val bk: Book?   = lib.findBook(l.isbn())
+    val pt: Patron? = lib.findPatron(l.patronId())
+    val title: String = if bk != null { bk.title().truncate(24) } else { l.isbn() }
+    val pname: String = if pt != null { pt.name() } else { l.patronId() }
+    val tag: String = if l.status() == LoanStatus::OVERDUE { " (OVERDUE)" } else { "" }
+    IO::println("  " + l.id().padRight(6) + title.padRight(26) + pname + tag)
+  }
+}
+
+val overdue: ArrayList[Loan] = lib.overdueLoans(today)
+IO::println("")
+sep()
+IO::println("  CURRENTLY OVERDUE LOANS  (" + overdue.size() + ")")
+sep()
+if overdue.size() == 0 {
+  IO::println("  No overdue loans.")
+} else {
+  foreach l: Loan in overdue {
+    val d: Int   = today - l.dueDay()
+    val fine: Int = d.fineAmount()
+    val bk: Book? = lib.findBook(l.isbn())
+    val pt: Patron? = lib.findPatron(l.patronId())
+    val title: String = if bk != null { bk.title().truncate(22) } else { l.isbn() }
+    val pname: String = if pt != null { pt.name() } else { l.patronId() }
+    IO::println("  " + l.id().padRight(6) + title.padRight(24) + pname.padRight(18) +
+                "overdue " + d.dayLabel() + "  fine: " + fine + " yen")
+  }
+}
+
+IO::println("")
+sep()
+IO::println("  PATRON SUMMARY")
+sep()
+IO::println("  " + "Name".padRight(22) + "Tier".padRight(12) + "Active/Limit")
+foreach p: Patron in lib.allPatrons() {
+  val active: Int = lib.activeLoansFor(p.id()).size()
+  IO::println("  " + p.name().padRight(22) + p.tier().label().padRight(12) +
+              active + "/" + p.tier().loanLimit())
+}
+
+IO::println("")
+sep()
+IO::println("  COPIES PER GENRE")
+sep()
+val genres: ArrayList[Genre] = new ArrayList[Genre]()
+genres.add(Genre::FICTION)
+genres.add(Genre::SCI_FI)
+genres.add(Genre::MYSTERY)
+genres.add(Genre::BIOGRAPHY)
+genres.add(Genre::NON_FICTION)
+genres.add(Genre::REFERENCE)
+foreach g: Genre in genres {
+  val gbooks: ArrayList[Book] = lib.booksByGenre(g)
+  var total: Int = 0
+  foreach b: Book in gbooks { total = total + b.copies() }
+  var bar: String = ""
+  var j: Int = 0
+  while j < total.clamp(0, 20) { bar = bar + "#"; j = j + 1 }
+  IO::println("  " + g.label().padRight(14) + bar.padRight(22) + " " + total)
+}
+
+IO::println("")
+sep()
+IO::println("  LIBRARY STATISTICS")
+sep()
+IO::println("  Total book titles   : " + lib.allBooks().size())
+IO::println("  Total copies        : " + lib.totalCopies())
+IO::println("  Total patrons       : " + lib.allPatrons().size())
+IO::println("  Total loans logged  : " + lib.allLoans().size())
+IO::println("  Active loans now    : " + lib.totalActiveLoans())
+IO::println("  Overdue loans now   : " + overdue.size())
+IO::println("")
+IO::println("Done.")

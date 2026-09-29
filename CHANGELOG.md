@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/FraudDetector.on`** — a 294-line credit-card fraud detection simulator, a new domain for the `run/` corpus (an ADT case-enum `TransactionType` (`Purchase`/`Withdrawal`/`Transfer`/`Refund`) with `describe()` dispatched via `select this`; a homogeneous data-carrying enum `RiskLevel(score, tag)`; records with methods `Transaction`/`CardProfile`/`FraudAlert`; an interface `FraudRule` implemented by four rule classes (`AmountThresholdRule`/`ForeignTransactionRule`/`LargeCashRule`/`RapidTransferRule`) each returning a nullable `FraudAlert?`; a `FraudDetector` engine class iterating registered rules over a `Map[String, CardProfile]` profile lookup; `select`-on-`TransactionType` narrowing inside rule bodies; collection pipelines `groupBy`/`sortedBy`/`find`/`map`/`fold`; nullable types with null guards and non-null casts; `try`/`catch`; string interpolation throughout — rendering a fraud analysis report, a per-card risk breakdown, and the highest-risk transaction across 10 simulated transactions), added to the `run/` corpus (merged via #1746).
+
 ## [0.129.0] - 2026-09-29
 
 ### Added

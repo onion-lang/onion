@@ -218,7 +218,16 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         }
       }
     }
-  def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
+  def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Option[ActionStatement] = {
+    if (node.init == null) return None
+    typing.kernelNodeOf[FieldDefinition](node).flatMap { field =>
+      typed(node.init, context, field.`type`).flatMap { value =>
+        val adapted = processAssignable(node.init, field.`type`, value)
+        if (adapted == null) None
+        else Some(new ExpressionActionStatement(new SetStaticField(node.location, field.affiliation, field, adapted)))
+      }
+    }
+  }
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
     assignmentTyping.processLocalAssign(node, context)
   // Removed: processThisFieldAssign - use this.field or self.field instead

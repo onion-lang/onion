@@ -40,7 +40,7 @@ ${JAR} に最新コンパイラがあります。プローブ方法:
   3. 出力・エラーを観察。E00xx、I0000、VerifyError、間違った実行結果が重要
 ※ sbtは絶対に使わない（ロック競合）。javaコマンド直のみ。
 ※ 文法: 補間 "#{expr}"、リスト [1,2,3]、マップ ["k": v]、範囲 1..5 / 0..<5、
-   ラムダ (x: Int) -> x*2 / x -> x*2（要期待型）、trailing lambda xs.map { x => ... }、
+   ラムダ (x: Int) -> x*2 / x -> x*2（要期待型）、trailing lambda xs.map { x -> ... }、
    class A { public: def m(): T { ... } }、def this { }、IO::println、(e as T)、
    static var f: T、C::field 代入可、else if、単一行ブロック可。
 10個前後のプローブを実行し works/broken/awkward で分類。brokenは最小再現必須。日本語で簡潔に。`

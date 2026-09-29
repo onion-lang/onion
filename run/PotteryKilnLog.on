@@ -1,0 +1,310 @@
+// PotteryKilnLog.on — pottery studio and kiln management system (~290 lines)
+//
+// Exercises: records, ADT case-enum with methods (Double/Int fields),
+// plain enum, generics (List[T]/Map[K,V]), collection pipelines
+// (filter/map/groupBy/sortedBy/distinct/count/any), select/type-pattern
+// exhaustiveness, nullable types, closures, string interpolation,
+// foreach (list + map k,v), while, extension Int/String.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum KilnAtmosphere {
+  OXIDATION, REDUCTION, NEUTRAL
+}
+
+enum FiringType {
+  case Bisque(tempC: Int)
+  case Glaze(tempC: Int, atmosphere: KilnAtmosphere)
+  case Raku(tempC: Int)
+  case SaltGlaze(tempC: Int, saltKg: Double)
+  case Woodfire(tempC: Int, durationHours: Int)
+public:
+  def label(): String = select this {
+    case f is Bisque:    "Bisque #{f.tempC()}°C"
+    case f is Glaze:     "Glaze #{f.tempC()}°C / #{f.atmosphere().name()}"
+    case f is Raku:      "Raku #{f.tempC()}°C"
+    case f is SaltGlaze: "Salt Glaze #{f.tempC()}°C (#{f.saltKg()} kg salt)"
+    case f is Woodfire:  "Wood Fire #{f.tempC()}°C / #{f.durationHours()} hrs"
+  }
+  def peakTempC(): Int = select this {
+    case f is Bisque:    f.tempC()
+    case f is Glaze:     f.tempC()
+    case f is Raku:      f.tempC()
+    case f is SaltGlaze: f.tempC()
+    case f is Woodfire:  f.tempC()
+  }
+  def isSpecialty(): Boolean = select this {
+    case f is Bisque:    false
+    case f is Glaze:     false
+    case f is Raku:      true
+    case f is SaltGlaze: true
+    case f is Woodfire:  true
+  }
+  def category(): String = select this {
+    case f is Bisque:    "Preparatory"
+    case f is Glaze:     "Finishing"
+    case f is Raku:      "Specialty"
+    case f is SaltGlaze: "Specialty"
+    case f is Woodfire:  "Specialty"
+  }
+}
+
+enum ClayBody {
+  case Stoneware(grogPct: Int)
+  case Porcelain(translucency: String)
+  case Earthenware(colour: String)
+  case Terracotta(region: String)
+public:
+  def label(): String = select this {
+    case c is Stoneware:   "Stoneware (#{c.grogPct()}% grog)"
+    case c is Porcelain:   "Porcelain (#{c.translucency()})"
+    case c is Earthenware: "Earthenware (#{c.colour()})"
+    case c is Terracotta:  "Terracotta (#{c.region()})"
+  }
+  def familyName(): String = select this {
+    case c is Stoneware:   "Stoneware"
+    case c is Porcelain:   "Porcelain"
+    case c is Earthenware: "Earthenware"
+    case c is Terracotta:  "Terracotta"
+  }
+  def maxFiringTempC(): Int = select this {
+    case c is Stoneware:   1280
+    case c is Porcelain:   1400
+    case c is Earthenware: 1120
+    case c is Terracotta:  1060
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Piece(pieceId: String, title: String, clay: ClayBody, heightCm: Int, diamCm: Int, artist: String, loadId: String)
+record KilnLoad(loadId: String, kilnName: String, firingType: FiringType, durationHours: Int)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+}
+
+extension String {
+  def padRight(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trunc(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+}
+
+// ─── PotteryStudio class ──────────────────────────────────────────────────────
+
+class PotteryStudio {
+  val studioName: String
+  val pieces:     List[Piece]
+  val loads:      List[KilnLoad]
+public:
+  def this(name: String) {
+    studioName = name
+    pieces     = new ArrayList[Piece]()
+    loads      = new ArrayList[KilnLoad]()
+  }
+
+  def name(): String       = studioName
+  def pieceCount(): Int    = pieces.size
+  def loadCount(): Int     = loads.size
+  def allPieces(): List[Piece]      = pieces
+  def allLoads(): List[KilnLoad]    = loads
+
+  def addLoad(id: String, kiln: String, ft: FiringType, hours: Int): KilnLoad = {
+    val l: KilnLoad = new KilnLoad(id, kiln, ft, hours)
+    loads.add(l)
+    return l
+  }
+
+  def addPiece(id: String, title: String, clay: ClayBody, h: Int, d: Int, artist: String, loadId: String): Piece = {
+    val p: Piece = new Piece(id, title, clay, h, d, artist, loadId)
+    pieces.add(p)
+    return p
+  }
+
+  def findLoad(id: String): KilnLoad? = {
+    foreach l: KilnLoad in loads {
+      if l.loadId() == id { return l }
+    }
+    return null
+  }
+
+  def piecesInLoad(loadId: String): List[Piece] =
+    pieces.filter { p: Piece -> p.loadId() == loadId }
+
+  def byArtist(artist: String): List[Piece] =
+    pieces.filter { p: Piece -> p.artist() == artist }
+
+  def byClayFamily(family: String): List[Piece] =
+    pieces.filter { p: Piece -> p.clay().familyName() == family }
+
+  def specialtyLoads(): List[KilnLoad] =
+    loads.filter { l: KilnLoad -> l.firingType().isSpecialty() }
+
+  def incompatiblePieces(): List[String] = {
+    val result: List[String] = new ArrayList[String]()
+    foreach p: Piece in pieces {
+      val l: KilnLoad? = findLoad(p.loadId())
+      if l != null {
+        val maxTemp: Int  = p.clay().maxFiringTempC()
+        val fireTemp: Int = l.firingType().peakTempC()
+        if fireTemp > maxTemp {
+          result.add("#{p.pieceId()} #{p.title().trunc(18)} (#{fireTemp}°C > max #{maxTemp}°C)")
+        }
+      }
+    }
+    return result
+  }
+
+  def loadsByKiln(): List[String] = {
+    val groups: Map[String, List[KilnLoad]] =
+      loads.groupBy { l: KilnLoad -> l.kilnName() }
+    val result: List[String] = new ArrayList[String]()
+    foreach (kiln, kloads) in groups {
+      result.add("#{kiln}: #{kloads.size.plural("firing")}")
+    }
+    return result
+  }
+
+  def artists(): List[String] =
+    pieces.map { p: Piece -> p.artist() }.distinct()
+
+  def clayFamilies(): List[String] =
+    pieces.map { p: Piece -> p.clay().familyName() }.distinct()
+
+  def longestLoad(): KilnLoad? = {
+    if loads.isEmpty() { return null }
+    return loads.sortedBy { l: KilnLoad -> 0 - l.durationHours() }[0]
+  }
+
+  def hottestLoad(): KilnLoad? = {
+    if loads.isEmpty() { return null }
+    return loads.sortedBy { l: KilnLoad -> 0 - l.firingType().peakTempC() }[0]
+  }
+
+  def totalKilnHours(): Int = {
+    var total: Int = 0
+    foreach l: KilnLoad in loads { total = total + l.durationHours() }
+    return total
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def sep(w: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < w { s = s + "-"; i++ }
+  println(s)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val studio: PotteryStudio = new PotteryStudio("Riverside Pottery")
+
+  studio.addLoad("L-01", "Alpha", new Bisque(980),                               8)
+  studio.addLoad("L-02", "Alpha", new Glaze(1240, KilnAtmosphere::OXIDATION),    10)
+  studio.addLoad("L-03", "Beta",  new Glaze(1060, KilnAtmosphere::REDUCTION),    12)
+  studio.addLoad("L-04", "Beta",  new Raku(960),                                 2)
+  studio.addLoad("L-05", "Alpha", new SaltGlaze(1300, 2.5),                      14)
+  studio.addLoad("L-06", "Beta",  new Woodfire(1250, 24),                        24)
+
+  studio.addPiece("W-01", "Morning Cup",      new Stoneware(10),           9,  8,  "Alice", "L-01")
+  studio.addPiece("W-02", "Slipware Bowl",    new Earthenware("cream"),    7,  22, "Bob",   "L-01")
+  studio.addPiece("W-03", "Celadon Vase",     new Porcelain("medium"),     28, 12, "Alice", "L-02")
+  studio.addPiece("W-04", "Garden Pot",       new Terracotta("Tuscany"),   35, 30, "Carol", "L-03")
+  studio.addPiece("W-05", "Yunomi",           new Stoneware(5),            10, 8,  "Bob",   "L-01")
+  studio.addPiece("W-06", "Raku Tea Bowl",    new Stoneware(20),           8,  14, "Alice", "L-04")
+  studio.addPiece("W-07", "Serving Platter",  new Earthenware("buff"),     4,  38, "Carol", "L-02")
+  studio.addPiece("W-08", "Bud Vase",         new Porcelain("high"),       18, 6,  "Bob",   "L-02")
+  studio.addPiece("W-09", "Storage Jar",      new Stoneware(15),           24, 18, "Alice", "L-03")
+  studio.addPiece("W-10", "Salt-Glazed Jug",  new Stoneware(10),           22, 14, "Carol", "L-05")
+  studio.addPiece("W-11", "Wood-Fired Bowl",  new Stoneware(8),            12, 20, "Bob",   "L-06")
+  studio.addPiece("W-12", "Flower Brick",     new Earthenware("red"),      14, 20, "Alice", "L-02")
+
+  println("╔════════════════════════════════════════════════════╗")
+  println("║          POTTERY STUDIO KILN LOG REPORT           ║")
+  println("╚════════════════════════════════════════════════════╝")
+  println("")
+  println("  Studio:      #{studio.name()}")
+  println("  Pieces:      #{studio.pieceCount().plural("work")}")
+  println("  Kiln loads:  #{studio.loadCount().plural("firing")}")
+  println("  Kiln hours:  #{studio.totalKilnHours().plural("hour")} total")
+  println("")
+
+  println("KILN SCHEDULE")
+  sep(68)
+  println("  #{"Load".padRight(6)} #{"Kiln".padRight(8)} #{"Firing Type".padRight(32)} #{"Hrs".padRight(5)} Pieces")
+  sep(68)
+  foreach l: KilnLoad in studio.allLoads() {
+    val n: Int = studio.piecesInLoad(l.loadId()).size
+    println("  #{l.loadId().padRight(6)} #{l.kilnName().padRight(8)} #{l.firingType().label().trunc(32).padRight(32)} #{("#{l.durationHours()}").padRight(5)} #{n}")
+  }
+  println("")
+
+  println("PIECES REGISTER")
+  sep(68)
+  println("  #{"ID".padRight(6)} #{"Title".padRight(20)} #{"Clay".padRight(12)} #{"H×D".padRight(10)} Artist")
+  sep(68)
+  foreach p: Piece in studio.allPieces() {
+    val dims: String = "#{p.heightCm()}×#{p.diamCm()} cm"
+    println("  #{p.pieceId().padRight(6)} #{p.title().padRight(20)} #{p.clay().familyName().padRight(12)} #{dims.padRight(10)} #{p.artist()}")
+  }
+  println("")
+
+  println("COMPATIBILITY CHECK")
+  sep(68)
+  val badFits: List[String] = studio.incompatiblePieces()
+  if badFits.isEmpty() {
+    println("  All pieces are compatible with their assigned firing temperatures.")
+  } else {
+    val n: Int = badFits.size
+    println("  #{n} #{if n == 1 { "incompatibility" } else { "incompatibilities" }} detected:")
+    foreach line: String in badFits {
+      println("  ⚠  #{line}")
+    }
+  }
+  println("")
+
+  println("SPECIALTY FIRINGS")
+  sep(68)
+  val specialty: List[KilnLoad] = studio.specialtyLoads()
+  println("  #{specialty.size.plural("specialty firing")}:")
+  foreach l: KilnLoad in specialty {
+    val ps: List[Piece] = studio.piecesInLoad(l.loadId())
+    println("  #{l.loadId()} #{l.firingType().label().trunc(36)} — #{ps.size.plural("piece")}")
+  }
+  println("")
+
+  println("SUMMARY")
+  sep(68)
+  val longest: KilnLoad? = studio.longestLoad()
+  if longest != null {
+    println("  Longest firing:  #{longest.loadId()} #{longest.firingType().label()} (#{longest.durationHours()} hrs)")
+  }
+  val hottest: KilnLoad? = studio.hottestLoad()
+  if hottest != null {
+    println("  Hottest firing:  #{hottest.loadId()} at #{hottest.firingType().peakTempC()}°C")
+  }
+  println("  Artists:         #{studio.artists().size.plural("potter")}")
+  foreach artist: String in studio.artists() {
+    println("    #{artist}: #{studio.byArtist(artist).size.plural("piece")}")
+  }
+  println("  Clay families:   #{studio.clayFamilies().size} types")
+  foreach fam: String in studio.clayFamilies() {
+    println("    #{fam}: #{studio.byClayFamily(fam).size.plural("piece")}")
+  }
+  println("  Firings per kiln:")
+  foreach line: String in studio.loadsByKiln() {
+    println("    #{line}")
+  }
+}

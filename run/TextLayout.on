@@ -1,0 +1,255 @@
+// TextLayout.on — a document formatter and word-wrapper (~225 lines)
+//
+// Exercises: records; data-carrying ADT case-enum with dispatch methods;
+// interface; classes; closures; string interpolation; collection pipelines
+// (map/filter/fold/find/any/size); select / is exhaustive patterns; nullable;
+// extension method on Int; foreach over ranges and typed lists; while; try/catch;
+// StringBuilder interop.
+
+import { java.lang.StringBuilder; }
+
+// ── Inline span styles ─────────────────────────────────────────────────────────
+
+enum SpanKind {
+  case Plain
+  case Bold
+  case Emph
+  case Code
+  case Link(href: String)
+public:
+  def markers(): String = select this {
+    case p is Plain: ""
+    case b is Bold:  "*"
+    case e is Emph:  "/"
+    case c is Code:  "`"
+    case lk is Link: "<" + lk.href() + ">"
+  }
+}
+
+record Span(text: String, kind: SpanKind) {
+public:
+  def render(): String = {
+    val m = kind().markers()
+    select kind() {
+    case p is Plain: text()
+    case b is Bold:  m + text() + m
+    case e is Emph:  m + text() + m
+    case c is Code:  m + text() + m
+    case lk is Link: text() + m
+    }
+  }
+  def plainText(): String = text()
+}
+
+// ── Block elements ─────────────────────────────────────────────────────────────
+
+enum BlockKind {
+  case Heading(level: Int)
+  case Para
+  case Bullet
+  case Rule
+  case Blank
+}
+
+record Block(kind: BlockKind, spans: List[Span]) {
+public:
+  def plainText(): String =
+    spans().fold("") { acc, s -> (acc as String) + s.plainText() }
+  def renderedSpans(): String =
+    spans().fold("") { acc, s -> (acc as String) + s.render() }
+}
+
+// ── Configuration ──────────────────────────────────────────────────────────────
+
+record Config(width: Int, numberHeadings: Boolean)
+
+// ── Extension: tile a character n times ───────────────────────────────────────
+
+extension Int {
+  def tile(ch: String): String = {
+    val sb = new StringBuilder()
+    foreach i: Int in 0..<self { sb.append(ch) }
+    sb.toString()
+  }
+}
+
+// ── Word-wrap utility ──────────────────────────────────────────────────────────
+
+def wordWrap(text: String, width: Int, firstPrefix: String, hangPrefix: String): List[String] = {
+  val words: List[String] = Strings::split(text, " ")
+  val lines: List[String] = []
+  var line = firstPrefix
+  var first = true
+  foreach w: String in words {
+    if w.length() == 0 { continue }
+    val prefix = if first { firstPrefix } else { hangPrefix }
+    val sep = if line == prefix { "" } else { " " }
+    if line.length() + sep.length() + w.length() > width && line != prefix {
+      lines.add(line)
+      line = hangPrefix + w
+      first = false
+    } else {
+      line = line + sep + w
+    }
+  }
+  if line.length() > 0 { lines.add(line) }
+  lines
+}
+
+// ── Heading numbering counter ──────────────────────────────────────────────────
+
+class HeadingCounter {
+  var h1: Int
+  var h2: Int
+  var h3: Int
+public:
+  def this() { h1 = 0; h2 = 0; h3 = 0 }
+
+  def bump(level: Int): String = {
+    select level {
+    case 1: { h1 = h1 + 1; h2 = 0; h3 = 0; "" + h1 }
+    case 2: { h2 = h2 + 1; h3 = 0; "" + h1 + "." + h2 }
+    case 3: { h3 = h3 + 1; "" + h1 + "." + h2 + "." + h3 }
+    else:   { "" }
+    }
+  }
+}
+
+// ── Renderer ───────────────────────────────────────────────────────────────────
+
+class Renderer {
+  val cfg: Config
+  val counter: HeadingCounter
+public:
+  def this(cfg: Config) {
+    self.cfg = cfg
+    self.counter = new HeadingCounter()
+  }
+
+  def renderBlock(b: Block): List[String] = {
+    select b.kind() {
+    case h is Heading: {
+      val numPart = if cfg.numberHeadings() { counter.bump(h.level()) + " " } else { "" }
+      val marks = h.level().tile("#")
+      val title = marks + " " + numPart + b.plainText()
+      val rule  = cfg.width().tile("─")
+      [title, rule]
+    }
+    case pa is Para: {
+      wordWrap(b.renderedSpans(), cfg.width(), "", "")
+    }
+    case bu is Bullet: {
+      wordWrap(b.renderedSpans(), cfg.width(), "  • ", "    ")
+    }
+    case ru is Rule: {
+      [cfg.width().tile("═")]
+    }
+    case bl is Blank: {
+      [""]
+    }
+    }
+  }
+
+  def render(blocks: List[Block]): String = {
+    val sb = new StringBuilder()
+    foreach b: Block in blocks {
+      val lines: List[String] = renderBlock(b)
+      foreach ln: String in lines {
+        sb.append(ln)
+        sb.append("\n")
+      }
+    }
+    sb.toString()
+  }
+}
+
+// ── Table of contents ──────────────────────────────────────────────────────────
+
+def buildToc(blocks: List[Block]): List[String] = {
+  val ctr = new HeadingCounter()
+  blocks
+    .filter { b -> b.kind() is Heading }
+    .map { b ->
+      val h = b.kind() as Heading
+      val num = ctr.bump(h.level())
+      val indent = (h.level() - 1).tile("  ")
+      indent + num + " " + b.plainText()
+    }
+}
+
+// ── Document statistics ────────────────────────────────────────────────────────
+
+record DocStats(words: Int, paragraphs: Int, headings: Int, bullets: Int) {
+public:
+  def summary(): String =
+    "#{words()} words  |  #{paragraphs()} paragraphs  |  #{headings()} headings  |  #{bullets()} bullets"
+}
+
+def countWords(text: String): Int = Strings::split(text, " ").filter { w -> w != "" }.size
+
+def computeStats(blocks: List[Block]): DocStats = {
+  val wcount = blocks.fold(0) { acc, b ->
+    val extra = if b.kind() is Para { countWords(b.plainText()) }
+                else if b.kind() is Bullet { countWords(b.plainText()) }
+                else { 0 }
+    (acc as Int) + extra
+  }
+  val pcount = blocks.filter { b -> b.kind() is Para }.size
+  val hcount = blocks.filter { b -> b.kind() is Heading }.size
+  val bcount = blocks.filter { b -> b.kind() is Bullet }.size
+  new DocStats(wcount, pcount, hcount, bcount)
+}
+
+// ── Sample document ────────────────────────────────────────────────────────────
+
+val doc: List[Block] = [
+  new Block(new Blank(), []),
+  new Block(new Heading(1), [new Span("Onion Language Overview", new Plain())]),
+  new Block(new Rule(), []),
+  new Block(new Para(), [
+    new Span("Onion is a statically-typed object-oriented language that ", new Plain()),
+    new Span("compiles to JVM bytecode", new Bold()),
+    new Span(". It supports closures, generics, records, and ADT enums.", new Plain())
+  ]),
+  new Block(new Blank(), []),
+  new Block(new Heading(2), [new Span("Key Features", new Plain())]),
+  new Block(new Bullet(), [new Span("Pattern matching via ", new Plain()), new Span("select", new Code()), new Span(" with exhaustive type patterns", new Plain())]),
+  new Block(new Bullet(), [new Span("Collection pipelines: map, filter, fold, groupBy, sortedBy", new Plain())]),
+  new Block(new Bullet(), [new Span("Sealed ADT enums with per-case fields and dispatch methods", new Plain())]),
+  new Block(new Bullet(), [new Span("Extension methods on any type including primitive Int and Long", new Plain())]),
+  new Block(new Blank(), []),
+  new Block(new Heading(2), [new Span("Standard Library", new Plain())]),
+  new Block(new Para(), [
+    new Span("The built-in library covers I/O, HTTP, JSON, YAML, CSV, regex, collections,", new Plain()),
+    new Span(" concurrency, cryptographic hashing, and more.", new Plain())
+  ]),
+  new Block(new Heading(3), [new Span("Design Philosophy", new Plain())]),
+  new Block(new Para(), [
+    new Span("Onion aims to be ", new Plain()),
+    new Span("expressive without magic", new Emph()),
+    new Span(". Every feature desugars to something readable and the type system catches mistakes early.", new Plain())
+  ]),
+  new Block(new Blank(), []),
+  new Block(new Heading(2), [new Span("Getting Started", new Plain())]),
+  new Block(new Para(), [
+    new Span("Visit ", new Plain()),
+    new Span("the docs", new Link("https://onion-lang.org/docs")),
+    new Span(" or explore the 500+ programs in the ", new Plain()),
+    new Span("run/", new Code()),
+    new Span(" corpus directory.", new Plain())
+  ])
+]
+
+val cfg = new Config(64, true)
+val renderer = new Renderer(cfg)
+
+println("═══ TABLE OF CONTENTS " + 43.tile("═"))
+val toc = buildToc(doc)
+foreach line: String in toc { println(line) }
+
+println("\n" + "═══ RENDERED DOCUMENT " + 43.tile("═"))
+print(renderer.render(doc))
+
+val stats = computeStats(doc)
+println("═══ STATISTICS " + 50.tile("═"))
+println(stats.summary())

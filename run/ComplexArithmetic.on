@@ -1,0 +1,274 @@
+// ComplexArithmetic.on — Complex number arithmetic and fractal iteration
+// Exercises: record with operator methods (+,-,*,/), record laws/examples,
+//            extension Double, ADT case-enum (ParsedComplex), do[Option],
+//            recursive functions, collection pipelines, string interpolation,
+//            pattern matching, while loops, foreach over ranges.
+
+import {
+  java.lang.Math
+  java.lang.Double as JDouble
+}
+
+// ─── Core complex number record ───────────────────────────────────────────────
+
+record Complex(re: Double, im: Double) {
+  example { new Complex(1.0, 2.0).re() == 1.0 }
+  example { new Complex(0.0, 0.0).absSquared() == 0.0 }
+  example { new Complex(3.0, 4.0).abs() == 5.0 }
+  example { new Complex(1.0, 0.0).conjugate() == new Complex(1.0, 0.0) }
+
+public:
+  def absSquared(): Double = re() * re() + im() * im()
+  def abs(): Double = Math::sqrt(absSquared())
+  def conjugate(): Complex = new Complex(re(), 0.0 - im())
+  def arg(): Double = Math::atan2(im(), re())
+
+  def plus(other: Complex): Complex =
+    new Complex(re() + other.re(), im() + other.im())
+  def minus(other: Complex): Complex =
+    new Complex(re() - other.re(), im() - other.im())
+  def times(other: Complex): Complex = new Complex(
+    re() * other.re() - im() * other.im(),
+    re() * other.im() + im() * other.re()
+  )
+  def div(other: Complex): Complex? {
+    val denom = other.absSquared()
+    if denom == 0.0 { return null }
+    val num = this.times(other.conjugate())
+    return new Complex(num.re() / denom, num.im() / denom)
+  }
+  def scale(s: Double): Complex = new Complex(re() * s, im() * s)
+  def neg(): Complex = new Complex(0.0 - re(), 0.0 - im())
+
+  def pow(n: Int): Complex {
+    if n == 0 { return new Complex(1.0, 0.0) }
+    if n < 0  { return new Complex(1.0, 0.0).div(this.pow(0 - n)) ?: new Complex(0.0, 0.0) }
+    var result = new Complex(1.0, 0.0)
+    var base   = this
+    var exp    = n
+    while exp > 0 {
+      if exp % 2 == 1 { result = result * base }
+      base = base * base
+      exp  = exp / 2
+    }
+    return result
+  }
+
+  def fmt(): String {
+    val r = roundTo(re(), 4)
+    val i = roundTo(im(), 4)
+    if i == 0.0 { return "" + r }
+    if r == 0.0 { return "" + i + "i" }
+    if i < 0.0  { return "" + r + " - " + (0.0 - i) + "i" }
+    return "" + r + " + " + i + "i"
+  }
+}
+
+// ─── Extension Double for convenience ────────────────────────────────────────
+
+extension Double {
+  def toComplex(): Complex = new Complex(self, 0.0)
+  def i(): Complex = new Complex(0.0, self)
+}
+
+// ─── Helper: round to N decimal places ──────────────────────────────────────
+
+def roundTo(v: Double, places: Int): Double {
+  val factor = Math::pow(10.0, places * 1.0)
+  return Math::round(v * factor) * 1.0 / factor
+}
+
+// ─── Parse "a+bi" / "a-bi" / "bi" / "a" from string (returns null on failure)
+
+def parseComplex(s: String): Complex? {
+  val trimmed = s.trim()
+  if trimmed.length() == 0 { return null }
+  // Try "a+bi" form by splitting on + / - after first char
+  var i = 1
+  while i < trimmed.length() {
+    val ch = trimmed.substring(i, i + 1)
+    if (ch == "+" || ch == "-") && i > 0 {
+      try {
+        val reStr = trimmed.substring(0, i)
+        val imStr = trimmed.substring(i, trimmed.length() - 1)
+        val re = JDouble::parseDouble(reStr)
+        val im = JDouble::parseDouble(imStr)
+        return new Complex(re, im)
+      } catch e: Exception { }
+    }
+    i = i + 1
+  }
+  // Pure imaginary?
+  if trimmed.endsWith("i") {
+    try {
+      val imStr = trimmed.substring(0, trimmed.length() - 1)
+      if imStr == "" || imStr == "+" { return new Complex(0.0, 1.0) }
+      if imStr == "-" { return new Complex(0.0, -1.0) }
+      return new Complex(0.0, JDouble::parseDouble(imStr))
+    } catch e: Exception { }
+  }
+  // Pure real?
+  try {
+    return new Complex(JDouble::parseDouble(trimmed), 0.0)
+  } catch e: Exception { }
+  return null
+}
+
+// ─── Mandelbrot set: returns iteration count (0 = inside set) ────────────────
+
+def mandelbrot(c: Complex, maxIter: Int): Int {
+  var z = new Complex(0.0, 0.0)
+  var iter = 0
+  while iter < maxIter {
+    if z.absSquared() > 4.0 { return iter }
+    z = z * z + c
+    iter = iter + 1
+  }
+  return 0
+}
+
+// ─── Julia set: same but fixed c, varying z₀ ────────────────────────────────
+
+def julia(z0: Complex, c: Complex, maxIter: Int): Int {
+  var z = z0
+  var iter = 0
+  while iter < maxIter {
+    if z.absSquared() > 4.0 { return iter }
+    z = z * z + c
+    iter = iter + 1
+  }
+  return 0
+}
+
+// ─── ASCII art: render a small Mandelbrot slice ───────────────────────────────
+
+def renderMandelbrot(cols: Int, rows: Int, maxIter: Int): void {
+  val xMin = -2.5
+  val xMax =  1.0
+  val yMin = -1.2
+  val yMax =  1.2
+  foreach row: Int in 0..<rows {
+    val im = yMin + (yMax - yMin) * (row * 1.0 / (rows - 1))
+    var line = ""
+    foreach col: Int in 0..<cols {
+      val re = xMin + (xMax - xMin) * (col * 1.0 / (cols - 1))
+      val c = new Complex(re, im)
+      val n = mandelbrot(c, maxIter)
+      val ch = if n == 0 { "#" } else if n < maxIter / 3 { "+" } else if n < maxIter * 2 / 3 { "." } else { " " }
+      line = line + ch
+    }
+    IO::println(line)
+  }
+}
+
+// ─── Main demo ────────────────────────────────────────────────────────────────
+
+IO::println("=== Complex Arithmetic Demo ===")
+IO::println("")
+
+// Basic operations
+val a = new Complex(3.0, 4.0)
+val b = new Complex(1.0, -2.0)
+IO::println("a = " + a.fmt())
+IO::println("b = " + b.fmt())
+IO::println("a + b = " + (a + b).fmt())
+IO::println("a - b = " + (a - b).fmt())
+IO::println("a * b = " + (a * b).fmt())
+val quotient = a / b
+if quotient != null {
+  IO::println("a / b = " + (quotient as Complex).fmt())
+}
+IO::println("|a| = " + roundTo(a.abs(), 4))
+IO::println("conj(a) = " + a.conjugate().fmt())
+IO::println("arg(a) = " + roundTo(a.arg(), 4) + " rad")
+
+IO::println("")
+
+// Powers
+IO::println("--- Powers ---")
+val one = new Complex(1.0, 0.0)
+val i_unit = new Complex(0.0, 1.0)
+IO::println("i^0 = " + i_unit.pow(0).fmt())
+IO::println("i^1 = " + i_unit.pow(1).fmt())
+IO::println("i^2 = " + i_unit.pow(2).fmt())
+IO::println("i^3 = " + i_unit.pow(3).fmt())
+IO::println("i^4 = " + i_unit.pow(4).fmt())
+IO::println("(1+i)^8 = " + (new Complex(1.0, 1.0)).pow(8).fmt())
+
+IO::println("")
+
+// Extension methods on Double
+IO::println("--- Double extensions ---")
+val z1 = (3.0).toComplex()
+val z2 = (4.0).i()
+IO::println("3.0.toComplex() = " + z1.fmt())
+IO::println("4.0.i()         = " + z2.fmt())
+IO::println("z1 + z2         = " + (z1 + z2).fmt())
+
+IO::println("")
+
+// Parsing
+IO::println("--- Parsing ---")
+val inputs: List[Object] = ["3+4i", "2.5-1.5i", "5i", "-3", "1+0i", "bad"]
+foreach inp: Object in inputs {
+  val s = inp as String
+  val parsed = parseComplex(s)
+  if parsed != null {
+    val c = parsed as Complex
+    IO::println("  parse(\"" + s + "\") = " + c.fmt() + "  |z|=" + roundTo(c.abs(), 3))
+  } else {
+    IO::println("  parse(\"" + s + "\") = (failed)")
+  }
+}
+
+IO::println("")
+
+// do[Option] safe division chain
+IO::println("--- do[Option] safe division ---")
+def safeComplexDiv(a: Complex, b: Complex): Option[Complex] {
+  val r = a / b
+  if r == null { return Option::none() }
+  return Option::some(r as Complex)
+}
+
+val chain: Option[Complex] = do[Option] {
+  q1 <- safeComplexDiv(new Complex(10.0, 0.0), new Complex(2.0, 0.0))
+  q2 <- safeComplexDiv((q1 as Complex), new Complex(1.0, 1.0))
+  ret q2
+}
+if chain.isDefined() {
+  IO::println("  10 / 2 / (1+i) = " + (chain.get() as Complex).fmt())
+} else {
+  IO::println("  division failed")
+}
+
+val failDiv: Option[Complex] = do[Option] {
+  q <- safeComplexDiv(new Complex(1.0, 1.0), new Complex(0.0, 0.0))
+  ret q
+}
+IO::println("  1+i / 0 = " + (if failDiv.isDefined() { "some" } else { "none" }))
+
+IO::println("")
+
+// Mandelbrot sample points
+IO::println("--- Mandelbrot iteration counts (max=50) ---")
+val testPoints: List[Object] = [
+  new Complex(0.0, 0.0),
+  new Complex(-2.0, 0.0),
+  new Complex(0.5, 0.5),
+  new Complex(-0.75, 0.1),
+  new Complex(1.0, 1.0)
+]
+foreach pt: Object in testPoints {
+  val c = pt as Complex
+  val n = mandelbrot(c, 50)
+  val status = if n == 0 { "IN set" } else { "escapes at iter " + n }
+  IO::println("  c=" + c.fmt() + "  " + status)
+}
+
+IO::println("")
+IO::println("--- Mandelbrot ASCII (40x18) ---")
+renderMandelbrot(40, 18, 30)
+
+IO::println("")
+IO::println("Done.")

@@ -432,14 +432,20 @@ final class BlockElementLowering(
       // This case converts it to a statement for contexts that need ActionStatement
       context.openScope {
         val lock = typed(node.condition, context).getOrElse(null)
-        if (lock != null && lock.isBasicType) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node.condition, bodyContext.load("java.lang.Object"), lock.`type`)
-          new NOP(node.location)
-        } else if (lock == null) {
-          new NOP(node.location)
-        } else {
-          val block = translate(node.block, context)
-          new Synchronized(node.location, lock, block)
+        lock match {
+          case null => new NOP(node.location)
+          case _ =>
+            lock.`type` match {
+              case nullable: NullableType =>
+                bodyContext.report(NULLABLE_MEMBER_ACCESS, node.condition, nullable.displayName, "synchronized")
+                new NOP(node.location)
+              case _ if lock.isBasicType =>
+                bodyContext.report(INCOMPATIBLE_TYPE, node.condition, bodyContext.load("java.lang.Object"), lock.`type`)
+                new NOP(node.location)
+              case _ =>
+                val block = translate(node.block, context)
+                new Synchronized(node.location, lock, block)
+            }
         }
       }
     case node: AST.ThrowExpression =>

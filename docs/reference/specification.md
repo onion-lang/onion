@@ -270,15 +270,17 @@ a malformed regex is **E0059**), and an unsupported component type is
 
 #### `shape` — a named boundary for a record
 
-A `shape name = re"..."` clause synthesizes a static method returning a
-`Shape[R]` — a first-class, potentially bidirectional correspondence between
-text and the record. `shape` is a soft keyword, recognized only in this
-position, so it stays usable as an ordinary identifier.
+A `shape name = re"..."` clause, written inside a record's brace-enclosed
+body, synthesizes a static method returning a `Shape[R]` — a first-class,
+potentially bidirectional correspondence between text and the record. `shape`
+is a soft keyword, recognized only in this position, so it stays usable as an
+ordinary identifier.
 
 ```onion
-record Access(time: String, method: String, path: String, status: Int)
+record Access(time: String, method: String, path: String, status: Int) {
   shape v1 = re"(\S+) (\w+) (\S+) (\d+)"
   shape v2 = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
+}
 
 val rows = Access::v1().eachLine(logText)
 ```
@@ -287,9 +289,10 @@ A shape may also read a structured document instead of a line, by naming a
 format rather than a pattern:
 
 ```onion
-record Person(name: String, age: Int)
+record Person(name: String, age: Int) {
   shape doc = json
   shape cfg = yaml
+}
 ```
 
 Here the component names are the document keys. A missing key is a defect
@@ -366,19 +369,21 @@ same record; the two features are independent.
 
 #### `law` / `example` — compile-time specification checks
 
-A record declaration may be followed by `law` and `example` clauses. The
-compiler executes these at build time (during the `LawCheckPhase` that runs
-after type-checking). A failing check is a **compile error**, not a
-runtime error.
+A record's brace-enclosed body may contain `law` and `example` clauses,
+alongside any methods. The compiler executes these at build time (during the
+`LawCheckPhase` that runs after type-checking). A failing check is a
+**compile error**, not a runtime error.
 
 ```onion
-record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
   example { Pt::parse("3,4") == new Pt(3, 4) }
+}
 
-record User(name: String, age: Int) derive!(Json)
+record User(name: String, age: Int) derive!(Json) {
   law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
   example { new User("ko", 3).name() == "ko" }
+}
 ```
 
 **`example { boolExpr }`** — a concrete assertion. The compiler evaluates
@@ -397,10 +402,11 @@ Multiple `law` and `example` clauses may appear on a single record, in any
 order. They coexist freely with `from re"..."` and `derive!(...)`:
 
 ```onion
-record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
+record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json) {
   law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
   law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
   example { R::parse("0,0") == new R(0, 0) }
+}
 ```
 
 The purpose of `law` / `example` is to bring specifications — not just
@@ -601,9 +607,10 @@ and the set of things a resource can be read as is closed. `read(shape)` opens
 it:
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape doc = json
   shape line = re"(-?\d+),(-?\d+)"
+}
 
 val one  = file"point.json".read(Pt::doc())        // Outcome[Pt]
 val many = file"points.txt".eachLine(Pt::line())   // List[Outcome[Pt]]

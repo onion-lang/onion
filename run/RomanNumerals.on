@@ -1,0 +1,298 @@
+// RomanNumerals.on — comprehensive Roman numeral toolkit:
+//   - integer-to-Roman conversion
+//   - Roman-to-integer parsing
+//   - ADT-based parse results
+//   - historical-date records with formatted output
+//   - arithmetic on Roman numerals via decode→compute→encode
+//   - collection pipelines: map, sortedBy, foreach
+import {
+  java.lang.Integer as JInteger
+}
+
+// ── Numeral symbol pair ───────────────────────────────────────────────────────
+
+record Numeral(symbol: String, value: Int)
+
+// ── Parse result (ADT enum) ───────────────────────────────────────────────────
+
+enum ParseResult {
+  case Ok(value: Int)
+  case Err(msg: String)
+public:
+  def isOk(): Boolean = select this {
+    case ok is Ok: true
+    case err is Err: false
+  }
+  def get(): Int = select this {
+    case ok is Ok: ok.value()
+    case err is Err: -1
+  }
+  def message(): String = select this {
+    case ok is Ok: "ok"
+    case err is Err: err.msg()
+  }
+}
+
+// ── Conversion table (module-level val) ───────────────────────────────────────
+
+val TABLE: java.util.List[Numeral] = [
+  new Numeral("M",  1000), new Numeral("CM", 900),
+  new Numeral("D",  500),  new Numeral("CD", 400),
+  new Numeral("C",  100),  new Numeral("XC", 90),
+  new Numeral("L",  50),   new Numeral("XL", 40),
+  new Numeral("X",  10),   new Numeral("IX", 9),
+  new Numeral("V",  5),    new Numeral("IV", 4),
+  new Numeral("I",  1)
+]
+
+// ── Core functions ────────────────────────────────────────────────────────────
+
+def toRoman(n: Int): String {
+  if n <= 0 || n > 3999 { return "N/A" }
+  var result: String = ""
+  var remaining: Int = n
+  foreach sym: Numeral in TABLE {
+    while remaining >= sym.value() {
+      result = result + sym.symbol()
+      remaining = remaining - sym.value()
+    }
+  }
+  return result
+}
+
+def findSymbol(sym: String): Numeral? {
+  foreach n: Numeral in TABLE {
+    if n.symbol() == sym { return n }
+  }
+  return null
+}
+
+def fromRoman(s: String): ParseResult {
+  if s == null || s.length() == 0 {
+    return new Err("empty input")
+  }
+  val upper: String = s.toUpperCase()
+  var total: Int = 0
+  var i: Int = 0
+  while i < upper.length() {
+    val twoChar: String = if i + 1 < upper.length() {
+      upper.substring(i, i + 2)
+    } else { "" }
+    val found: Numeral? = findSymbol(twoChar)
+    if found != null {
+      total = total + found.value()
+      i = i + 2
+    } else {
+      val one: String = upper.substring(i, i + 1)
+      val f1: Numeral? = findSymbol(one)
+      if f1 != null {
+        total = total + f1.value()
+        i = i + 1
+      } else {
+        return new Err("invalid character: " + one)
+      }
+    }
+  }
+  if total <= 0 { return new Err("zero or negative") }
+  return new Ok(total)
+}
+
+def addRoman(a: String, b: String): String {
+  val ra: ParseResult = fromRoman(a)
+  val rb: ParseResult = fromRoman(b)
+  if !ra.isOk() || !rb.isOk() { return "ERR" }
+  return toRoman(ra.get() + rb.get())
+}
+
+def subRoman(a: String, b: String): String {
+  val ra: ParseResult = fromRoman(a)
+  val rb: ParseResult = fromRoman(b)
+  if !ra.isOk() || !rb.isOk() { return "ERR" }
+  val diff: Int = ra.get() - rb.get()
+  if diff <= 0 { return "N/A (underflow)" }
+  return toRoman(diff)
+}
+
+def mulRoman(a: String, b: String): String {
+  val ra: ParseResult = fromRoman(a)
+  val rb: ParseResult = fromRoman(b)
+  if !ra.isOk() || !rb.isOk() { return "ERR" }
+  val prod: Int = ra.get() * rb.get()
+  if prod > 3999 { return "overflow" }
+  return toRoman(prod)
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+def pad(s: String, width: Int): String {
+  var r: String = s
+  while r.length() < width { r = r + " " }
+  return r
+}
+
+def bar(count: Int): String {
+  var b: String = ""
+  var i: Int = 0
+  while i < count { b = b + "#"; i = i + 1 }
+  return b
+}
+
+// ── Historical date record ────────────────────────────────────────────────────
+
+record HistoricalDate(roman: String, year: Int, event: String)
+
+// ── Era (plain Java-style enum) ───────────────────────────────────────────────
+
+enum Era {
+  Ancient, Medieval, EarlyModern, Modern
+}
+
+def eraOf(year: Int): Era {
+  if year < 500 { return Era::Ancient }
+  else if year < 1400 { return Era::Medieval }
+  else if year < 1800 { return Era::EarlyModern }
+  return Era::Modern
+}
+
+def eraLabel(era: Era): String = select era {
+  case Era::Ancient:     "Ancient"
+  case Era::Medieval:    "Medieval"
+  case Era::EarlyModern: "Early Modern"
+  case Era::Modern:      "Modern"
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Roman Numeral Toolkit ===")
+  IO::println("")
+
+  // 1. Conversion table: 1–20
+  IO::println("--- Integers 1 to 20 ---")
+  foreach n: Int in 1..20 {
+    IO::println("#{pad(JInteger::toString(n), 4)} -> #{toRoman(n)}")
+  }
+  IO::println("")
+
+  // 2. Round-number spot checks with round-trip validation
+  IO::println("--- Round-number spot checks ---")
+  val spots: java.util.List[Int] = [50, 100, 400, 500, 900, 1000, 1999, 2024, 3999]
+  foreach v: Int in spots {
+    val roman: String = toRoman(v)
+    val back: ParseResult = fromRoman(roman)
+    val ok: String = if back.isOk() && back.get() == v { "OK" } else { "FAIL" }
+    IO::println("#{pad(JInteger::toString(v), 6)} -> #{pad(roman, 15)} -> #{back.get()} [#{ok}]")
+  }
+  IO::println("")
+
+  // 3. Arithmetic
+  IO::println("--- Arithmetic ---")
+  IO::println("XIV + IX    = #{addRoman("XIV",   "IX")}")
+  IO::println("L   - XVII  = #{subRoman("L",     "XVII")}")
+  IO::println("XII * III   = #{mulRoman("XII",   "III")}")
+  IO::println("C   + CM    = #{addRoman("C",     "CM")}")
+  IO::println("I   - II    = #{subRoman("I",     "II")}")
+  IO::println("")
+
+  // 4. Validation round-trip
+  IO::println("--- Validation ---")
+  val cases: java.util.List[String] = ["XIV", "MCMXCIX", "IIII", "mcdxliv", ""]
+  foreach s: String in cases {
+    val pr: ParseResult = fromRoman(s)
+    if pr.isOk() {
+      IO::println("\"#{s}\" -> valid (#{pr.get()})")
+    } else {
+      IO::println("\"#{s}\" -> invalid: #{pr.message()}")
+    }
+  }
+  IO::println("")
+
+  // 5. Historical dates
+  IO::println("--- Notable Historical Dates ---")
+  val dates: java.util.List[HistoricalDate] = [
+    new HistoricalDate(toRoman(753),  753,  "Founding of Rome (traditional)"),
+    new HistoricalDate(toRoman(44),   44,   "Assassination of Julius Caesar"),
+    new HistoricalDate(toRoman(476),  476,  "Fall of the Western Roman Empire"),
+    new HistoricalDate(toRoman(1066), 1066, "Battle of Hastings"),
+    new HistoricalDate(toRoman(1215), 1215, "Magna Carta signed"),
+    new HistoricalDate(toRoman(1492), 1492, "Columbus reaches the Americas"),
+    new HistoricalDate(toRoman(1687), 1687, "Newton's Principia published"),
+    new HistoricalDate(toRoman(1776), 1776, "US Declaration of Independence"),
+    new HistoricalDate(toRoman(1969), 1969, "Moon landing"),
+    new HistoricalDate(toRoman(2024), 2024, "Year of this sample program")
+  ]
+
+  foreach d: HistoricalDate in dates {
+    IO::println("#{pad(d.roman(), 12)} (#{d.year()})  #{d.event()}")
+  }
+  IO::println("")
+
+  // 6. Count dates by era using pattern matching on enum
+  IO::println("--- Dates by Era ---")
+  var ancientCount: Int    = 0
+  var medievalCount: Int   = 0
+  var earlyModernCount: Int = 0
+  var modernCount: Int     = 0
+  foreach d: HistoricalDate in dates {
+    val era: Era = eraOf(d.year())
+    select era {
+      case Era::Ancient:     ancientCount     = ancientCount     + 1
+      case Era::Medieval:    medievalCount    = medievalCount    + 1
+      case Era::EarlyModern: earlyModernCount = earlyModernCount + 1
+      case Era::Modern:      modernCount      = modernCount      + 1
+    }
+  }
+  IO::println("Ancient:      #{ancientCount}")
+  IO::println("Medieval:     #{medievalCount}")
+  IO::println("Early Modern: #{earlyModernCount}")
+  IO::println("Modern:       #{modernCount}")
+  IO::println("")
+
+  // 7. Pipeline: multiples of 100 with their Roman forms, sorted by length of Roman string
+  IO::println("--- Multiples of 100 sorted by Roman length ---")
+  val hundreds: java.util.List[Int] = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+  val withRoman: java.util.List[String] = hundreds.map { n: Int ->
+    val r: String = toRoman(n)
+    "#{pad(JInteger::toString(n), 5)}: #{r}"
+  }
+  val sorted: java.util.List[String] = withRoman.sortedBy { s: String -> s.length() }
+  foreach s: String in sorted { IO::println(s) }
+  IO::println("")
+
+  // 8. Fibonacci sequence in Roman (up to 3999)
+  IO::println("--- Fibonacci in Roman (up to 3999) ---")
+  var a: Int = 1
+  var b: Int = 1
+  var count: Int = 0
+  while a <= 3999 && count < 12 {
+    IO::println("#{pad(toRoman(a), 14)} = #{a}")
+    val next: Int = a + b
+    a = b
+    b = next
+    count = count + 1
+  }
+  IO::println("")
+
+  // 9. ASCII bar chart of era distribution
+  IO::println("--- Era distribution ---")
+  IO::println("Ancient      #{bar(ancientCount    * 5)}")
+  IO::println("Medieval     #{bar(medievalCount   * 5)}")
+  IO::println("Early Modern #{bar(earlyModernCount * 5)}")
+  IO::println("Modern       #{bar(modernCount     * 5)}")
+  IO::println("")
+
+  // 10. Decode several well-known years from their Roman forms
+  IO::println("--- Decode challenge ---")
+  val challenges: java.util.List[String] = ["MCMXCIX", "MMXXIV", "MDCCLXXVI", "MCMLXIX", "CDLXXVI"]
+  foreach challenge: String in challenges {
+    val result: ParseResult = fromRoman(challenge)
+    if result.isOk() {
+      IO::println("#{pad(challenge, 12)} = #{result.get()} (#{eraLabel(eraOf(result.get()))})")
+    } else {
+      IO::println("#{pad(challenge, 12)} = ERROR: #{result.message()}")
+    }
+  }
+  IO::println("")
+
+  IO::println("=== Done ===")
+}

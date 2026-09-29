@@ -10,7 +10,7 @@
 
 ## Build, Test, and Development Commands
 - `sbt compile` builds the compiler; regenerates the parser when the grammar changes.
-- `sbt test` runs the full test suite.
+- `sbt test` is incremental under sbt 2 (it runs `testQuick`); `sbt testFull` runs every suite (see CLAUDE.md, "Running the suite").
 - `sbt 'testOnly <SuiteName>'` runs a single spec (e.g., `GenericsInterfaceBridgeSpec`).
 - `sbt repl` starts the Onion REPL; `sbt 'runScript path/to/app.on [args]'` runs a script.
 - `bin/onionc` compiles to class files; `bin/onion` compiles and runs in-memory.
@@ -20,12 +20,12 @@
 - Scala uses Scala 3 indentation style (2 spaces, no tabs, minimal braces); match surrounding style.
 - Java files use 4-space indentation and standard brace placement.
 - Types/classes use UpperCamelCase; methods/values use lowerCamelCase.
-- Test suites end with `Spec` (e.g., `TypingSpec.scala`).
+- Test suites end with `Spec` (e.g., `HelloWorldSpec.scala`).
 
 ## Testing Guidelines
-- ScalaTest is the primary framework; a few JUnit tests exist alongside it.
+- ScalaTest is the test framework.
 - Add regression tests for compiler behavior and update `run/` samples when syntax changes.
-- Prefer targeted suites for quick checks, then run `sbt test` before submitting.
+- Prefer targeted suites for quick checks, then run `sbt testFull` before submitting.
 
 ## Commit & Pull Request Guidelines
 - Commit messages are short, imperative summaries (e.g., “Add …”, “Fix …”, “Refactor …”); phase tags appear occasionally.

@@ -1,0 +1,418 @@
+// LogisticsPlanner.on — delivery route planning and fleet analytics
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, generics, collection pipelines (filter/map/fold/groupBy/
+// sortedBy/distinct/find/partition), select/pattern matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach,
+// range literals, extension methods, mutable state.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Priority(level: Int, label: String) {
+  Standard(1, "Standard"),
+  Express(2, "Express"),
+  Overnight(3, "Overnight"),
+  Critical(4, "Critical")
+}
+
+enum VehicleType(capacity: Int, costPerKm: Double) {
+  Bike(5,    0.08),
+  Van(100,   0.25),
+  Truck(500, 0.45),
+  Semi(2000, 0.80)
+}
+
+// ─── ADT: DeliveryStatus ──────────────────────────────────────────────────────
+
+enum DeliveryStatus {
+  case Pending
+  case InTransit(vehicleId: String, departedAt: Int)
+  case Delivered(arrivedAt: Int, signature: String?)
+  case Failed(reason: String, attemptCount: Int)
+public:
+  def label(): String = select this {
+    case s is Pending:    "PENDING"
+    case s is InTransit:  "IN TRANSIT (vehicle: #{s.vehicleId()})"
+    case s is Delivered:  "DELIVERED at t=#{s.arrivedAt()}"
+    case s is Failed:     "FAILED (#{s.reason()}, #{s.attemptCount()} attempts)"
+  }
+  def isTerminal(): Boolean = select this {
+    case s is Delivered: true
+    case s is Failed:    true
+    else:                false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Location(name: String, x: Double, y: Double) {
+public:
+  def distanceTo(other: Location): Double {
+    val dx = x() - other.x()
+    val dy = y() - other.y()
+    return Math::sqrt(dx * dx + dy * dy)
+  }
+}
+
+record Package(
+  id:       String,
+  origin:   Location,
+  dest:     Location,
+  weightKg: Double,
+  priority: Priority
+) {
+public:
+  def distance(): Double = origin().distanceTo(dest())
+
+  def shortDesc(): String =
+    "#{id()} [#{weightKg()}kg, #{priority().label()}]"
+}
+
+record Vehicle(
+  id:          String,
+  vehicleType: VehicleType,
+  homeBase:    Location,
+  currentLoad: Double
+) {
+public:
+  def capacityKg(): Int   = vehicleType().capacity()
+  def costPerKm():  Double = vehicleType().costPerKm()
+  def loadPct():    Double = currentLoad() * 100.0 / vehicleType().capacity().toDouble()
+
+  def canCarry(pkg: Package): Boolean =
+    currentLoad() + pkg.weightKg() <= vehicleType().capacity().toDouble()
+}
+
+record Delivery(
+  pkg:     Package,
+  vehicle: Vehicle,
+  status:  DeliveryStatus
+) {
+public:
+  def estimatedCost(): Double =
+    pkg().distance() * vehicle().costPerKm()
+
+  def shortDesc(): String =
+    "#{pkg().shortDesc()} via #{vehicle().id()} — #{status().label()}"
+}
+
+record RouteStop(location: Location, arrivalTime: Int, packageIds: List[String])
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padEnd(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+extension Int {
+  def toDouble(): Double = self * 1.0
+}
+
+extension Double {
+  def toInt():  Int    = self as Int
+  def fmt1():   String {
+    val i  = self.toInt()
+    val d  = ((self - i.toDouble()) * 10.0).toInt()
+    return "#{i}.#{d}"
+  }
+  def fmt2(): String {
+    val i  = self.toInt()
+    val d  = ((self - i.toDouble()) * 100.0).toInt()
+    val ds: String = if d < 10 { "0" + d } else { "" + d }
+    return "#{i}.#{ds}"
+  }
+}
+
+// ─── Dispatcher ───────────────────────────────────────────────────────────────
+
+class Dispatcher {
+  var vehicles:   List[Vehicle]
+  var deliveries: List[Delivery]
+  var clock:      Int
+
+public:
+  def this {
+    vehicles   = []
+    deliveries = []
+    clock      = 0
+  }
+
+  def addVehicle(v: Vehicle): void {
+    vehicles.add(v)
+  }
+
+  def assign(pkg: Package): Boolean {
+    val eligible = vehicles.filter { v ->
+      (v as Vehicle).canCarry(pkg)
+    }
+    if eligible.size == 0 { return false }
+
+    val best = eligible.find { v ->
+      (v as Vehicle).homeBase().distanceTo(pkg.origin()) <=
+      (eligible[0] as Vehicle).homeBase().distanceTo(pkg.origin()) * 1.5
+    }
+
+    val vehicle: Vehicle = if best != null { best as Vehicle } else { eligible[0] as Vehicle }
+    deliveries.add(new Delivery(pkg, vehicle, new InTransit(vehicle.id(), clock)))
+    return true
+  }
+
+  def markDelivered(pkgId: String, signature: String?): Boolean {
+    var found = false
+    var i = 0
+    while i < deliveries.size {
+      val d = deliveries[i] as Delivery
+      if d.pkg().id() == pkgId {
+        val updated = new Delivery(d.pkg(), d.vehicle(), new Delivered(clock, signature))
+        deliveries[i] = updated
+        found = true
+      }
+      i = i + 1
+    }
+    return found
+  }
+
+  def markFailed(pkgId: String, reason: String): Boolean {
+    var found = false
+    var i = 0
+    while i < deliveries.size {
+      val d = deliveries[i] as Delivery
+      if d.pkg().id() == pkgId {
+        val attempts = select d.status() {
+          case s is Failed: s.attemptCount() + 1
+          else: 1
+        }
+        val updated = new Delivery(d.pkg(), d.vehicle(), new Failed(reason, attempts))
+        deliveries[i] = updated
+        found = true
+      }
+      i = i + 1
+    }
+    return found
+  }
+
+  def advanceClock(minutes: Int): void {
+    clock = clock + minutes
+  }
+
+  def pending(): List[Delivery] =
+    deliveries.filter { d ->
+      val st = (d as Delivery).status()
+      select st {
+        case s is Pending: true
+        else: false
+      }
+    }
+
+  def inTransit(): List[Delivery] =
+    deliveries.filter { d ->
+      val st = (d as Delivery).status()
+      select st {
+        case s is InTransit: true
+        else: false
+      }
+    }
+
+  def completed(): List[Delivery] =
+    deliveries.filter { d -> (d as Delivery).status().isTerminal() }
+
+  def totalCost(): Double =
+    deliveries.fold(0.0) { acc, d ->
+      (acc as Double) + (d as Delivery).estimatedCost()
+    } as Double
+
+  def avgCostPerDelivery(): Double {
+    if deliveries.size == 0 { return 0.0 }
+    return totalCost() / deliveries.size.toDouble()
+  }
+
+  def byPriority(): Map[Object, Object] {
+    val groups: Map[Object, Object] = [:]
+    foreach d: Delivery in deliveries {
+      val key = d.pkg().priority().label()
+      val cur = groups.get(key)
+      if cur == null {
+        val list: List[Delivery] = [d]
+        groups.put(key, list)
+      } else {
+        (cur as List[Delivery]).add(d)
+      }
+    }
+    return groups
+  }
+
+  def heaviestPackage(): Package? {
+    if deliveries.size == 0 { return null }
+    var best: Package = (deliveries[0] as Delivery).pkg()
+    foreach d: Delivery in deliveries {
+      if d.pkg().weightKg() > best.weightKg() { best = d.pkg() }
+    }
+    return best
+  }
+
+  def allVehicles():   List[Vehicle]   = vehicles
+  def allDeliveries(): List[Delivery]  = deliveries
+  def currentTime():   Int             = clock
+
+  def vehicleUtilisation(): Map[Object, Object] {
+    val util: Map[Object, Object] = [:]
+    foreach v: Vehicle in vehicles {
+      var assigned = 0.0
+      foreach d: Delivery in deliveries {
+        if d.vehicle().id() == v.id() {
+          assigned = assigned + d.pkg().weightKg()
+        }
+      }
+      util.put(v.id(), assigned)
+    }
+    return util
+  }
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("── " + title + " " + "─".repeat(40 - title.length()))
+}
+
+def statusIcon(d: Delivery): String = select d.status() {
+  case s is Pending:    "⏳"
+  case s is InTransit:  "🚚"
+  case s is Delivered:  "✅"
+  case s is Failed:     "❌"
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // ── Locations ──────────────────────────────────────────────────────────────
+  val depot    = new Location("Central Depot",   0.0,  0.0)
+  val downtown = new Location("Downtown",        3.0,  4.0)
+  val eastSide = new Location("East Side",       8.0,  2.0)
+  val northEnd = new Location("North End",       1.0, 10.0)
+  val westPark = new Location("West Park",      -5.0,  3.0)
+  val airport  = new Location("Airport",         12.0, 8.0)
+  val suburbs  = new Location("Suburbs",         6.0, -4.0)
+
+  // ── Fleet ──────────────────────────────────────────────────────────────────
+  val dispatch = new Dispatcher
+  dispatch.addVehicle(new Vehicle("BIKE-01", VehicleType::Bike,  depot, 0.0))
+  dispatch.addVehicle(new Vehicle("BIKE-02", VehicleType::Bike,  downtown, 0.0))
+  dispatch.addVehicle(new Vehicle("VAN-01",  VehicleType::Van,   depot, 0.0))
+  dispatch.addVehicle(new Vehicle("VAN-02",  VehicleType::Van,   eastSide, 0.0))
+  dispatch.addVehicle(new Vehicle("TRK-01",  VehicleType::Truck, depot, 0.0))
+
+  // ── Packages ───────────────────────────────────────────────────────────────
+  val pkgs: List[Package] = [
+    new Package("PKG-001", depot,    downtown, 2.5,   Priority::Standard),
+    new Package("PKG-002", depot,    eastSide, 0.8,   Priority::Express),
+    new Package("PKG-003", downtown, northEnd, 15.0,  Priority::Standard),
+    new Package("PKG-004", depot,    westPark, 0.3,   Priority::Critical),
+    new Package("PKG-005", eastSide, airport,  45.0,  Priority::Overnight),
+    new Package("PKG-006", depot,    suburbs,  3.2,   Priority::Standard),
+    new Package("PKG-007", northEnd, downtown, 1.1,   Priority::Express),
+    new Package("PKG-008", depot,    airport,  120.0, Priority::Standard),
+    new Package("PKG-009", westPark, eastSide, 0.5,   Priority::Critical),
+    new Package("PKG-010", depot,    northEnd, 8.0,   Priority::Express)
+  ]
+
+  IO::println("╔═══════════════════════════════════════════╗")
+  IO::println("║        LOGISTICS PLANNER REPORT           ║")
+  IO::println("╚═══════════════════════════════════════════╝")
+  IO::println("Fleet size: #{dispatch.allVehicles().size} vehicles")
+  IO::println("Packages:   #{pkgs.size}")
+
+  // ── Assign packages ────────────────────────────────────────────────────────
+  section("Package Assignment")
+  foreach pkg: Package in pkgs.sortedBy { p -> 0 - (p as Package).priority().level() } {
+    val ok = dispatch.assign(pkg)
+    val status = if ok { "assigned" } else { "NO VEHICLE" }
+    IO::println("  #{pkg.id().padEnd(8)} #{pkg.priority().label().padEnd(10)} #{pkg.weightKg()}kg → #{status}")
+  }
+
+  // ── Simulate deliveries ────────────────────────────────────────────────────
+  dispatch.advanceClock(30)
+  dispatch.markDelivered("PKG-004", "R.Smith")
+  dispatch.markDelivered("PKG-002", null)
+  dispatch.markFailed("PKG-005", "address not found")
+
+  dispatch.advanceClock(45)
+  dispatch.markDelivered("PKG-001", "J.Doe")
+  dispatch.markDelivered("PKG-007", "auto-locker")
+  dispatch.markDelivered("PKG-009", "C.Lee")
+  dispatch.markDelivered("PKG-010", "K.Patel")
+
+  dispatch.advanceClock(30)
+  dispatch.markDelivered("PKG-003", null)
+  dispatch.markDelivered("PKG-006", "P.Wang")
+
+  // ── Status report ─────────────────────────────────────────────────────────
+  section("Delivery Status (t=#{dispatch.currentTime()} min)")
+  foreach d: Delivery in dispatch.allDeliveries().sortedBy { d -> (d as Delivery).pkg().id() } {
+    IO::println("  #{statusIcon(d)} #{d.pkg().id().padEnd(8)} #{d.shortDesc()}")
+  }
+
+  // ── Summary ────────────────────────────────────────────────────────────────
+  section("Summary")
+  val done    = dispatch.completed().size
+  val transit = dispatch.inTransit().size
+  val pending = dispatch.pending().size
+  IO::println("  Completed:  #{done}")
+  IO::println("  In Transit: #{transit}")
+  IO::println("  Pending:    #{pending}")
+  IO::println("  Total cost: $#{dispatch.totalCost().fmt2()}")
+  IO::println("  Avg/delivery: $#{dispatch.avgCostPerDelivery().fmt2()}")
+
+  // ── Priority breakdown ─────────────────────────────────────────────────────
+  section("By Priority")
+  val byPrio = dispatch.byPriority()
+  foreach (prio, list) in byPrio {
+    val ds = list as List[Delivery]
+    val deliveredCount = ds.filter { d -> (d as Delivery).status().isTerminal() }.size
+    IO::println("  #{(prio as String).padEnd(12)} #{deliveredCount}/#{ds.size} delivered")
+  }
+
+  // ── Vehicle utilisation ────────────────────────────────────────────────────
+  section("Vehicle Utilisation")
+  val util = dispatch.vehicleUtilisation()
+  foreach v: Vehicle in dispatch.allVehicles() {
+    val loaded = util.get(v.id()) as Double?
+    val kg = if loaded != null { loaded as Double } else { 0.0 }
+    IO::println("  #{v.id().padEnd(8)} #{v.vehicleType().toString().padEnd(6)} cap=#{v.capacityKg()}kg loaded=#{kg.fmt1()}kg (#{(kg * 100.0 / v.capacityKg().toDouble()).fmt1()}%)")
+  }
+
+  // ── Distance and cost analysis ─────────────────────────────────────────────
+  section("Distance & Cost Analysis")
+  val allDelivs = dispatch.allDeliveries()
+  val allDists: List[Object] = allDelivs.map { d -> (d as Delivery).pkg().distance() }
+  var totalDist = 0.0
+  foreach dist: Object in allDists {
+    totalDist = totalDist + (dist as Double)
+  }
+  val avgDist = if allDists.size > 0 { totalDist / allDists.size.toDouble() } else { 0.0 }
+  val longest  = allDelivs.find { d -> (d as Delivery).pkg().distance() >= allDists.fold(0.0) { acc, x -> if (x as Double) > (acc as Double) { x as Double } else { acc as Double } } as Double }
+  val shortest = allDelivs.find { d -> (d as Delivery).pkg().distance() <= allDists.fold(99999.0) { acc, x -> if (x as Double) < (acc as Double) { x as Double } else { acc as Double } } as Double }
+
+  IO::println("  Total route distance: #{totalDist.fmt1()} km")
+  IO::println("  Average per delivery: #{avgDist.fmt1()} km")
+  if longest  != null { IO::println("  Longest route:  #{(longest  as Delivery).pkg().shortDesc()} [#{(longest  as Delivery).pkg().distance().fmt1()} km]") }
+  if shortest != null { IO::println("  Shortest route: #{(shortest as Delivery).pkg().shortDesc()} [#{(shortest as Delivery).pkg().distance().fmt1()} km]") }
+
+  val heaviest = dispatch.heaviestPackage()
+  if heaviest != null {
+    IO::println("  Heaviest package: #{(heaviest as Package).shortDesc()}")
+  }
+
+  IO::println("")
+  IO::println("Report complete.")
+}

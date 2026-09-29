@@ -55,8 +55,9 @@ channel and the command-line interface from that one description.
 
 ```onion
 record Access(time: String, method: String, path: String, status: Int)
-  from re"(\S+) (\w+) (\S+) (\d+)"
+  from re"(\S+) (\w+) (\S+) (\d+)" {
   law roundtrip(a: Access) { Access::parse(Access::format(a)) == a }
+}
 
 def main(path: String, min: Int = 400): void {
   file(path).lines()
@@ -65,6 +66,10 @@ def main(path: String, min: Int = 400): void {
     |> println
 }
 ```
+
+> Note (added later): run as written, this law is falsified (E0064) — `\S+` cannot match an
+> empty `time`, so printing such an `Access` does not parse back. The README therefore puts
+> the round-trip law on `Pt` instead; see its closing paragraph on laws.
 
 One declaration gives you `parse`, `format`, a `law` the **compiler checks at build
 time**, and a CLI with `--min` and `--help` derived from `main`'s signature.

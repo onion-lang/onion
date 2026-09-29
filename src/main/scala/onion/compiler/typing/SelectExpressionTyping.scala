@@ -227,6 +227,22 @@ final class SelectExpressionTyping(
               isExhaustive = true
             }
           }
+        case bt: BasicType if bt == BasicType.BOOLEAN =>
+          // Boolean has exactly two values. If both `true` and `false` appear as
+          // unguarded ExpressionPattern literals, the select covers every case.
+          val allUnguardedPatterns = cases.zip(caseBindingData.toSeq).collect {
+            case ((patterns, _), (_, _, None)) => patterns
+          }.flatten
+          val coversTrue = allUnguardedPatterns.exists {
+            case AST.ExpressionPattern(AST.BooleanLiteral(_, true)) => true
+            case _ => false
+          }
+          val coversFalse = allUnguardedPatterns.exists {
+            case AST.ExpressionPattern(AST.BooleanLiteral(_, false)) => true
+            case _ => false
+          }
+          if (coversTrue && coversFalse) isExhaustive = true
+
         case _ =>
       }
     }

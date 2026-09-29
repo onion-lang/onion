@@ -12,14 +12,16 @@ enum VehicleCategory {
 }
 
 // ── Records ───────────────────────────────────────────────────────────────────
-record Vehicle(plate: String, make: String, model: String, dailyRate: Int)
+record Vehicle(plate: String, make: String, model: String, dailyRate: Int) {
   example { new Vehicle("P1", "Toyota", "Corolla", 4500).dailyRate() == 4500 }
   example { new Vehicle("P1", "Toyota", "Corolla", 4500).make() == "Toyota" }
+}
 
-record Rental(vehicle: Vehicle, category: VehicleCategory, customer: String, days: Int)
+record Rental(vehicle: Vehicle, category: VehicleCategory, customer: String, days: Int) {
   example {
     new Rental(new Vehicle("X", "Honda", "Civic", 4000), new Economy(), "Alice", 3).days() == 3
   }
+}
 
 record VehicleStat(model: String, category: String, count: Int, revenue: Int)
 

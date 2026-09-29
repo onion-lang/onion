@@ -8,8 +8,9 @@ describe the boundary once — and derives the parser, the printer, the failure 
 the command-line interface from that one description.
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 
 def main(path: String, min: Int = 400): void {
   val each = file(path).eachLine(Access::common())
@@ -33,9 +34,10 @@ every other tool hands back 995 rows and no indication the other five ever exist
 Properties can be checked by the compiler, at build time:
 
 ```onion
-record Pt(x: Int, y: Int)
+record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+}
 ```
 
 That law really runs — over generated samples, during `onionc`. It is deliberately not on

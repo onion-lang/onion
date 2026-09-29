@@ -1,0 +1,439 @@
+// MobileCarrier.on — cellular carrier billing and analytics system.
+// Exercises: homogeneous enum (CustomerStatus), data-carrying enum (PlanTier),
+// records with methods (Plan, Customer, Usage, BillLine), class with
+// ArrayList, collection pipelines (filter/fold/sortedBy/take/groupBy),
+// foreach on ArrayList, foreach (k,v) on Map, nullable fields, string
+// interpolation, select/pattern matching on enum, recursive helpers.
+
+import { java.util.ArrayList }
+
+// Int.toDouble() is not built-in; define it as an extension
+extension Int {
+  def toDouble(): Double = self * 1.0
+}
+
+// ── Status enum ──────────────────────────────────────────────────────────────
+
+enum CustomerStatus {
+  ACTIVE, SUSPENDED, CANCELLED
+public:
+  def label(): String = select this {
+    case CustomerStatus::ACTIVE:    "Active"
+    case CustomerStatus::SUSPENDED: "Suspended"
+    case CustomerStatus::CANCELLED: "Cancelled"
+    else: "Unknown"
+  }
+}
+
+// ── Plan tier enum (data-carrying) ───────────────────────────────────────────
+
+enum PlanTier(rank: Int) {
+  BASIC(1), STANDARD(2), PREMIUM(3), DATA_ONLY(0)
+public:
+  def isHigherThan(other: PlanTier): Boolean = rank() > other.rank()
+}
+
+// ── Plan record ──────────────────────────────────────────────────────────────
+
+record Plan(
+  id:               String,
+  name:             String,
+  tier:             PlanTier,
+  incMinutes:       Int,     // -1 = unlimited
+  incSms:           Int,     // -1 = unlimited
+  incDataMb:        Int,     // -1 = unlimited
+  monthlyFee:       Double,
+  perMinuteOverage: Double,
+  perSmsOverage:    Double,
+  perMbOverage:     Double
+) {
+public:
+  def isUnlimitedMinutes(): Boolean = incMinutes() < 0
+  def isUnlimitedSms():     Boolean = incSms()     < 0
+  def isUnlimitedData():    Boolean = incDataMb()  < 0
+
+  def summary(): String {
+    val mins = if incMinutes() < 0 { "unlimited min" } else { "#{incMinutes()} min" }
+    val sms  = if incSms()     < 0 { "unlimited SMS" } else { "#{incSms()} SMS" }
+    val data = if incDataMb()  < 0 { "unlimited data" } else { "#{incDataMb()} MB" }
+    val fee  = String::format("%.2f", monthlyFee())
+    return "#{name()} [#{tier().name()}] $#{fee}/mo — #{mins}, #{sms}, #{data}"
+  }
+}
+
+// ── Customer record ──────────────────────────────────────────────────────────
+
+record Customer(
+  id:     String,
+  name:   String,
+  phone:  String,
+  planId: String,
+  status: CustomerStatus
+) {
+public:
+  def isActive(): Boolean = status() == CustomerStatus::ACTIVE
+}
+
+// ── Monthly usage record ──────────────────────────────────────────────────────
+
+record Usage(
+  customerId:     String,
+  month:          String,
+  minutesUsed:    Int,
+  smsUsed:        Int,
+  dataMbUsed:     Int,
+  roamingMins:    Int,
+  roamingDataMb:  Int
+) {
+public:
+  def totalMinutes(): Int  = minutesUsed()   + roamingMins()
+  def totalDataMb():  Int  = dataMbUsed()    + roamingDataMb()
+  def hasRoaming():   Boolean = roamingMins() > 0 || roamingDataMb() > 0
+}
+
+// ── Bill line ─────────────────────────────────────────────────────────────────
+
+record BillLine(description: String, amount: Double) {
+public:
+  def render(): String {
+    val sign = if amount() >= 0.0 { "+" } else { "" }
+    val fmt  = String::format("%.2f", amount())
+    return "  #{description()}: #{sign}$#{fmt}"
+  }
+}
+
+// ── Carrier class ─────────────────────────────────────────────────────────────
+
+class Carrier {
+  var plans:        ArrayList[Plan]
+  var customers:    ArrayList[Customer]
+  var usageRecords: ArrayList[Usage]
+
+public:
+  def this {
+    plans        = new ArrayList[Plan]()
+    customers    = new ArrayList[Customer]()
+    usageRecords = new ArrayList[Usage]()
+  }
+
+  def addPlan(p: Plan):         void { plans.add(p) }
+  def addCustomer(c: Customer): void { customers.add(c) }
+  def recordUsage(u: Usage):    void { usageRecords.add(u) }
+
+  def findPlan(planId: String): Plan? {
+    var found: Plan? = null
+    foreach p: Plan in plans { if p.id() == planId { found = p } }
+    return found
+  }
+
+  def findCustomer(cid: String): Customer? {
+    var found: Customer? = null
+    foreach c: Customer in customers { if c.id() == cid { found = c } }
+    return found
+  }
+
+  def usageFor(cid: String, month: String): Usage? {
+    var found: Usage? = null
+    foreach u: Usage in usageRecords {
+      if u.customerId() == cid && u.month() == month { found = u }
+    }
+    return found
+  }
+
+  def allUsageForMonth(month: String): List[Usage] {
+    val result: List[Usage] = []
+    foreach u: Usage in usageRecords { if u.month() == month { result << u } }
+    return result
+  }
+
+  def activeCustomers(): List[Customer] {
+    val result: List[Customer] = []
+    foreach c: Customer in customers { if c.isActive() { result << c } }
+    return result
+  }
+
+  // ── Bill calculation ──────────────────────────────────────────────────────
+
+  def buildLines(cid: String, month: String): List[BillLine]? {
+    val cust = findCustomer(cid)
+    if cust == null { return null }
+    val plan = findPlan(cust.planId())
+    if plan == null { return null }
+    val usage = usageFor(cid, month)
+    if usage == null { return null }
+
+    val lines: List[BillLine] = []
+    lines << new BillLine("Base fee", plan.monthlyFee())
+
+    // minute overage
+    if !plan.isUnlimitedMinutes() {
+      val ov: Int = usage.minutesUsed() - plan.incMinutes()
+      if ov > 0 {
+        val charge: Double = ov * plan.perMinuteOverage()
+        lines << new BillLine("Minute overage (#{ov} min)", charge)
+      }
+    }
+    // roaming calls
+    val rm: Int = usage.roamingMins()
+    if rm > 0 {
+      val charge: Double = rm * plan.perMinuteOverage() * 2.0
+      lines << new BillLine("Roaming calls (#{rm} min)", charge)
+    }
+    // SMS overage
+    if !plan.isUnlimitedSms() {
+      val ov: Int = usage.smsUsed() - plan.incSms()
+      if ov > 0 {
+        val charge: Double = ov * plan.perSmsOverage()
+        lines << new BillLine("SMS overage (#{ov} msgs)", charge)
+      }
+    }
+    // data overage
+    if !plan.isUnlimitedData() {
+      val ov: Int = usage.dataMbUsed() - plan.incDataMb()
+      if ov > 0 {
+        val charge: Double = ov * plan.perMbOverage()
+        lines << new BillLine("Data overage (#{ov} MB)", charge)
+      }
+    }
+    // roaming data
+    val rd: Int = usage.roamingDataMb()
+    if rd > 0 {
+      val charge: Double = rd * plan.perMbOverage() * 3.0
+      lines << new BillLine("Roaming data (#{rd} MB)", charge)
+    }
+    return lines
+  }
+
+  def linesTotal(lines: List[BillLine]): Double {
+    return lines.fold(0.0) { acc, ln -> (acc as Double) + (ln as BillLine).amount() } as Double
+  }
+
+  def printBill(cid: String, month: String): void {
+    val cust = findCustomer(cid)
+    if cust == null {
+      IO::println("  [Customer not found: #{cid}]")
+      return
+    }
+    val lines = buildLines(cid, month)
+    if lines == null {
+      IO::println("  [No usage data for #{cust.name()} in #{month}]")
+      return
+    }
+    val total = linesTotal(lines)
+    IO::println("━━ #{cust.name()} (#{cid}) · #{cust.phone()} · #{month} ━━")
+    foreach ln: BillLine in lines { IO::println(ln.render()) }
+    IO::println("  ─────────────────────────────────────")
+    IO::println("  TOTAL: $#{String::format("%.2f", total)}")
+    IO::println("")
+  }
+
+  // ── Plan recommendations ───────────────────────────────────────────────────
+
+  def recommendPlan(cid: String, month: String): String {
+    val cust = findCustomer(cid)
+    if cust == null { return "#{cid}: customer not found" }
+    val plan = findPlan(cust.planId())
+    if plan == null { return "#{cid}: plan not found" }
+    val usage = usageFor(cid, month)
+    if usage == null { return "#{cust.name()}: no usage data" }
+
+    val reasons: List[String] = []
+    if !plan.isUnlimitedMinutes() && plan.incMinutes() > 0 {
+      val pct: Int = usage.minutesUsed() * 100 / plan.incMinutes()
+      if pct > 90 {
+        reasons << "voice at #{pct}% (#{usage.minutesUsed()}/#{plan.incMinutes()} min)"
+      }
+    }
+    if !plan.isUnlimitedSms() && plan.incSms() > 0 {
+      val pct: Int = usage.smsUsed() * 100 / plan.incSms()
+      if pct > 90 {
+        reasons << "SMS at #{pct}% (#{usage.smsUsed()}/#{plan.incSms()} msgs)"
+      }
+    }
+    if !plan.isUnlimitedData() && plan.incDataMb() > 0 {
+      val pct: Int = usage.dataMbUsed() * 100 / plan.incDataMb()
+      if pct > 90 {
+        reasons << "data at #{pct}% (#{usage.dataMbUsed()}/#{plan.incDataMb()} MB)"
+      }
+    }
+
+    if reasons.size == 0 {
+      return "#{cust.name()} — #{plan.name()} fits well"
+    } else {
+      return "#{cust.name()} — consider upgrade: #{Strings::join(reasons, "; ")}"
+    }
+  }
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
+
+  def topDataUsers(month: String, n: Int): List[Usage] {
+    return allUsageForMonth(month)
+      .sortedBy { u -> -((u as Usage).totalDataMb()) }
+      .take(n) as List[Usage]
+  }
+
+  def printAvgDataByPlan(month: String): void {
+    val allUsage = allUsageForMonth(month)
+    // Collect distinct plan IDs appearing in this month's usage
+    val planIds: List[String] = []
+    foreach u: Usage in allUsage {
+      val c = findCustomer(u.customerId())
+      if c != null && !planIds.contains(c.planId()) {
+        planIds << c.planId()
+      }
+    }
+    foreach pid: String in planIds {
+      var total: Int = 0
+      var count: Int = 0
+      foreach u: Usage in allUsage {
+        val c = findCustomer(u.customerId())
+        if c != null && c.planId() == pid {
+          total = total + u.totalDataMb()
+          count = count + 1
+        }
+      }
+      val avg: Double = if count == 0 { 0.0 } else { total.toDouble() / count.toDouble() }
+      val p     = findPlan(pid)
+      val label = if p == null { pid } else { p.name() }
+      IO::println("  #{label}: #{String::format("%.0f", avg)} MB avg (#{count} subscribers)")
+    }
+  }
+
+  def printRevenueByPlan(month: String): Double {
+    val byPlan: Map[Object, Object] = [:]
+    foreach c: Customer in customers {
+      if c.isActive() {
+        val lines = buildLines(c.id(), month)
+        if lines != null {
+          val p     = findPlan(c.planId())
+          val label: Object = if p == null { c.planId() } else { p.name() }
+          val prev  = byPlan[label]
+          val cur: Double = if prev == null { 0.0 } else { prev as Double }
+          byPlan[label] = cur + linesTotal(lines)
+        }
+      }
+    }
+    var grandTotal: Double = 0.0
+    foreach (planName, rev) in byPlan {
+      val r = rev as Double
+      IO::println("  #{planName}: $#{String::format("%.2f", r)}")
+      grandTotal = grandTotal + r
+    }
+    return grandTotal
+  }
+
+  // ── Overage summary ───────────────────────────────────────────────────────
+
+  def printOverageSummary(month: String): void {
+    var overageCount: Int = 0
+    var roamCount:    Int = 0
+    foreach c: Customer in customers {
+      if c.isActive() {
+        val u = usageFor(c.id(), month)
+        if u != null {
+          val plan = findPlan(c.planId())
+          if plan != null {
+            var hasOv: Boolean = false
+            if !plan.isUnlimitedMinutes() && u.minutesUsed() > plan.incMinutes() { hasOv = true }
+            if !plan.isUnlimitedSms()     && u.smsUsed()     > plan.incSms()     { hasOv = true }
+            if !plan.isUnlimitedData()    && u.dataMbUsed()  > plan.incDataMb()  { hasOv = true }
+            if hasOv { overageCount = overageCount + 1 }
+            if u.hasRoaming() { roamCount = roamCount + 1 }
+          }
+        }
+      }
+    }
+    IO::println("  Customers with overage charges : #{overageCount}")
+    IO::println("  Customers with roaming charges : #{roamCount}")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val carrier = new Carrier()
+
+  // ── Define plans ──────────────────────────────────────────────────────────
+  // incMinutes/incSms/incDataMb = -1 means unlimited
+  carrier.addPlan(new Plan("basic",    "Basic",     PlanTier::BASIC,      200,   500,   2000, 29.99, 0.05, 0.010, 0.005))
+  carrier.addPlan(new Plan("standard", "Standard",  PlanTier::STANDARD,   500,  1000,  10000, 49.99, 0.04, 0.008, 0.003))
+  carrier.addPlan(new Plan("premium",  "Premium",   PlanTier::PREMIUM,     -1,    -1,     -1, 79.99, 0.03, 0.005, 0.002))
+  carrier.addPlan(new Plan("dataonly", "Data-Only", PlanTier::DATA_ONLY,    0,     0,  50000, 39.99, 0.10, 0.020, 0.001))
+
+  // ── Register customers ────────────────────────────────────────────────────
+  carrier.addCustomer(new Customer("C001", "Alice Chen",   "+1-555-0101", "basic",    CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C002", "Bob Martinez", "+1-555-0202", "standard", CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C003", "Carol Wang",   "+1-555-0303", "premium",  CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C004", "David Lee",    "+1-555-0404", "basic",    CustomerStatus::SUSPENDED))
+  carrier.addCustomer(new Customer("C005", "Eva Nowak",    "+1-555-0505", "dataonly", CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C006", "Frank Obi",    "+1-555-0606", "standard", CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C007", "Grace Kim",    "+1-555-0707", "premium",  CustomerStatus::ACTIVE))
+  carrier.addCustomer(new Customer("C008", "Hideo Tanaka", "+1-555-0808", "basic",    CustomerStatus::ACTIVE))
+
+  // ── Record October usage ───────────────────────────────────────────────────
+  val mo = "2025-10"
+  //                          cid     month   min  sms  dataMB  roamMin  roamMB
+  carrier.recordUsage(new Usage("C001", mo,   185,  430,   1800,    0,      0))  // within Basic
+  carrier.recordUsage(new Usage("C002", mo,   620,  850,   9500,   30,    200))  // min+data near limit + roaming
+  carrier.recordUsage(new Usage("C003", mo,  1200, 3000,  45000,   60,   1500))  // Premium, heavy; roaming
+  carrier.recordUsage(new Usage("C004", mo,    50,  100,    300,    0,      0))  // Suspended — no bill
+  carrier.recordUsage(new Usage("C005", mo,     0,    0,  38000,    0,   2000))  // Data-Only + roaming data
+  carrier.recordUsage(new Usage("C006", mo,   499,  990,   9999,    0,      0))  // right at Standard limit
+  carrier.recordUsage(new Usage("C007", mo,   800, 1500,  30000,    0,      0))  // Premium, moderate
+  carrier.recordUsage(new Usage("C008", mo,   250,  600,   2800,   10,     50))  // Basic overage + roaming
+
+  // ── Individual bills ───────────────────────────────────────────────────────
+  IO::println("════════════════════════════════════════════════════════════")
+  IO::println("  MONTHLY BILLING REPORT — #{mo}")
+  IO::println("════════════════════════════════════════════════════════════")
+  IO::println("")
+
+  val billIds = ["C001", "C002", "C003", "C005", "C006", "C007", "C008"]
+  foreach cid: String in billIds {
+    carrier.printBill(cid, mo)
+  }
+
+  // ── Plan recommendations ──────────────────────────────────────────────────
+  IO::println("════ PLAN RECOMMENDATIONS ═══════════════════════════════════")
+  foreach cid: String in billIds {
+    IO::println("• " + carrier.recommendPlan(cid, mo))
+  }
+  IO::println("")
+
+  // ── Top data users ────────────────────────────────────────────────────────
+  IO::println("════ TOP 3 DATA USERS ════════════════════════════════════════")
+  val topUsers = carrier.topDataUsers(mo, 3)
+  var rank: Int = 1
+  foreach u: Usage in topUsers {
+    val c = carrier.findCustomer(u.customerId())
+    val name = if c == null { u.customerId() } else { c.name() }
+    IO::println("  #{rank}. #{name}: #{u.totalDataMb()} MB total (domestic: #{u.dataMbUsed()}, roaming: #{u.roamingDataMb()})")
+    rank = rank + 1
+  }
+  IO::println("")
+
+  // ── Average data usage by plan ────────────────────────────────────────────
+  IO::println("════ AVERAGE DATA USAGE BY PLAN ══════════════════════════════")
+  carrier.printAvgDataByPlan(mo)
+  IO::println("")
+
+  // ── Revenue by plan ───────────────────────────────────────────────────────
+  IO::println("════ REVENUE BY PLAN ═════════════════════════════════════════")
+  val grandTotal = carrier.printRevenueByPlan(mo)
+  IO::println("  ─────────────────────────────────────────────────────────")
+  IO::println("  GRAND TOTAL: $#{String::format("%.2f", grandTotal)}")
+  IO::println("")
+
+  // ── Overage summary ───────────────────────────────────────────────────────
+  IO::println("════ OVERAGE SUMMARY ═════════════════════════════════════════")
+  carrier.printOverageSummary(mo)
+  IO::println("")
+
+  // ── Plan catalogue ────────────────────────────────────────────────────────
+  IO::println("════ AVAILABLE PLANS ════════════════════════════════════════")
+  val planIds = ["basic", "standard", "premium", "dataonly"]
+  foreach pid: String in planIds {
+    val p = carrier.findPlan(pid)
+    if p != null { IO::println("  " + p.summary()) }
+  }
+}

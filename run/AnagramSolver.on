@@ -112,9 +112,10 @@ public:
 
 // ─── WordBank record ─────────────────────────────────────────────────────────
 
-record WordScore(word: String, score: Int)
+record WordScore(word: String, score: Int) {
   example { new WordScore("QUIZ", 22).score() == 22 }
   example { new WordScore("HELLO", 8).word() == "HELLO"  }
+}
 
 // ─── AnagramIndex class ──────────────────────────────────────────────────────
 

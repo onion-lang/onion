@@ -15,16 +15,18 @@ enum FrameKind { STRIKE, SPARE, OPEN }
 
 // ─── Records ──────────────────────────────────────────────────────────────
 
-record Player(name: String, rolls: List[Int])
+record Player(name: String, rolls: List[Int]) {
   example { new Player("X", []).name() == "X" }
+}
 
 record ScoreCard(
   name: String,
   frameScores: List[Object],
   total: Int,
   classification: String
-)
+) {
   example { new ScoreCard("Y", [], 0, "BEGINNER").total() == 0 }
+}
 
 record LabeledInt(label: String, value: Int)
 

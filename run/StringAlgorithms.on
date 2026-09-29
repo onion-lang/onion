@@ -1,0 +1,553 @@
+// StringAlgorithms.on — classic string-search algorithms: KMP, Z-algorithm,
+// Rabin-Karp, and Aho-Corasick multi-pattern search.
+//
+// Exercises: records (Match, SearchStats, AhoNode); data-carrying ADT enum
+// (SearchAlgo); plain enum (AhoState); abstract class / interface
+// (Searcher); generic class parameters; collection pipelines
+// (map / filter / fold / sortedBy / groupBy / find / distinct / count /
+// flatMap-style / zip); select / pattern matching; nullable; closures;
+// string interpolation; extension methods (String / Int); foreach (ranges and
+// map k,v); while loops; recursion; try / catch.
+//
+// Entry: sbt 'runScript run/StringAlgorithms.on'
+//        java -cp onion.jar onion.tools.ScriptRunner run/StringAlgorithms.on
+
+import {
+  java.util.ArrayList
+  java.util.LinkedHashMap
+  java.lang.StringBuilder as SB
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension Int {
+  def rpad(w: Int): String {
+    var s: String = "#{self}"
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = "#{self}"
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+extension String {
+  def rep(n: Int): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < n { r = r + self; i++ }
+    return r
+  }
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def truncate(w: Int): String =
+    if self.length() <= w { self } else { self.substring(0, w - 1) + "…" }
+}
+
+// ─── Domain records ───────────────────────────────────────────────────────────
+
+record Match(pattern: String, start: Int, end: Int) {
+public:
+  def length(): Int = end - start
+  def show(): String = "  [#{start}..#{end - 1}] «#{pattern}»"
+}
+
+record SearchStats(algo: String, pattern: String, textLen: Int,
+                   matchCount: Int, comparisons: Int) {
+public:
+  def efficiency(): Double =
+    if textLen == 0 { 0.0 } else { (comparisons as Double) / (textLen as Double) }
+  def summary(): String =
+    "#{algo.rpad(12)} | pattern=«#{pattern.truncate(12)}» len=#{textLen.lpad(5)}" +
+    " matches=#{matchCount.lpad(3)} comps=#{comparisons.lpad(6)}" +
+    " ratio=#{(efficiency() * 100.0) as Int}%"
+}
+
+// ─── Searcher interface ───────────────────────────────────────────────────────
+
+interface Searcher {
+  def search(text: String, pattern: String): List[Object]
+  def name(): String
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. Brute-force (baseline)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class BruteForce {
+  var comps: Int
+public:
+  def this { comps = 0 }
+  def name(): String = "BruteForce"
+  def search(text: String, pattern: String): List[Object] {
+    comps = 0
+    val result: ArrayList[Object] = new ArrayList[Object]()
+    val n: Int = text.length()
+    val m: Int = pattern.length()
+    if m == 0 { return result }
+    var i: Int = 0
+    while i <= n - m {
+      var j: Int = 0
+      while j < m {
+        comps++
+        if text.charAt(i + j) != pattern.charAt(j) { j = m + 1 }
+        else { j++ }
+      }
+      if j == m { result.add(new Match(pattern, i, i + m)) }
+      i++
+    }
+    return result
+  }
+  def lastComps(): Int = comps
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. Knuth-Morris-Pratt
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class KMP {
+  var comps: Int
+public:
+  def this { comps = 0 }
+  def name(): String = "KMP"
+
+  def buildFailure(pattern: String): Int[] {
+    val m: Int = pattern.length()
+    val fail: Int[] = new Int[m]
+    fail[0] = 0
+    var k: Int = 0
+    var i: Int = 1
+    while i < m {
+      while k > 0 && pattern.charAt(i) != pattern.charAt(k) { k = fail[k - 1] }
+      if pattern.charAt(i) == pattern.charAt(k) { k++ }
+      fail[i] = k
+      i++
+    }
+    return fail
+  }
+
+  def search(text: String, pattern: String): List[Object] {
+    comps = 0
+    val result: ArrayList[Object] = new ArrayList[Object]()
+    val n: Int = text.length()
+    val m: Int = pattern.length()
+    if m == 0 { return result }
+    val fail: Int[] = buildFailure(pattern)
+    var j: Int = 0
+    var i: Int = 0
+    while i < n {
+      comps++
+      while j > 0 && text.charAt(i) != pattern.charAt(j) { j = fail[j - 1] }
+      if text.charAt(i) == pattern.charAt(j) { j++ }
+      if j == m {
+        result.add(new Match(pattern, i - m + 1, i + 1))
+        j = fail[j - 1]
+      }
+      i++
+    }
+    return result
+  }
+
+  def lastComps(): Int = comps
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. Z-algorithm
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class ZAlgo {
+  var comps: Int
+public:
+  def this { comps = 0 }
+  def name(): String = "Z-algo"
+
+  def zArray(s: String): Int[] {
+    val n: Int = s.length()
+    val z: Int[] = new Int[n]
+    var l: Int = 0
+    var r: Int = 0
+    var i: Int = 1
+    while i < n {
+      if i < r { z[i] = (r - i).clamp(0, z[i - l]) }
+      while i + z[i] < n && s.charAt(z[i]) == s.charAt(i + z[i]) {
+        comps++
+        z[i]++
+      }
+      if i + z[i] > r { l = i; r = i + z[i] }
+      i++
+    }
+    return z
+  }
+
+  def search(text: String, pattern: String): List[Object] {
+    comps = 0
+    val result: ArrayList[Object] = new ArrayList[Object]()
+    val m: Int = pattern.length()
+    if m == 0 { return result }
+    val concat: String = pattern + "$" + text
+    val z: Int[] = zArray(concat)
+    var i: Int = m + 1
+    while i < concat.length() {
+      if z[i] >= m { result.add(new Match(pattern, i - m - 1, i - 1)) }
+      i++
+    }
+    return result
+  }
+
+  def lastComps(): Int = comps
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. Rabin-Karp (rolling hash)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class RabinKarp {
+  val BASE: Int
+  val MOD: Int
+  var comps: Int
+public:
+  def this { BASE = 31; MOD = 1000000007; comps = 0 }
+  def name(): String = "Rabin-Karp"
+
+  def hash(s: String, len: Int): Long {
+    var h: Long = 0L
+    var i: Int = 0
+    while i < len {
+      h = (h * (BASE as Long) + (s.charAt(i) as Long) + 1L) % (MOD as Long)
+      i++
+    }
+    return h
+  }
+
+  def pow(base: Long, exp: Int, mod: Long): Long {
+    var result: Long = 1L
+    var b: Long = base % mod
+    var e: Int = exp
+    while e > 0 {
+      if e % 2 == 1 { result = (result * b) % mod }
+      b = (b * b) % mod
+      e = e / 2
+    }
+    return result
+  }
+
+  def search(text: String, pattern: String): List[Object] {
+    comps = 0
+    val result: ArrayList[Object] = new ArrayList[Object]()
+    val n: Int = text.length()
+    val m: Int = pattern.length()
+    if m == 0 || m > n { return result }
+    val modL: Long = MOD as Long
+    val baseL: Long = BASE as Long
+    val ph: Long = hash(pattern, m)
+    val highPow: Long = pow(baseL, m, modL)
+    var wh: Long = hash(text, m)
+    var i: Int = 0
+    while i <= n - m {
+      comps++
+      if wh == ph {
+        var match: Boolean = true
+        var k: Int = 0
+        while k < m && match {
+          comps++
+          if text.charAt(i + k) != pattern.charAt(k) { match = false }
+          k++
+        }
+        if match { result.add(new Match(pattern, i, i + m)) }
+      }
+      if i < n - m {
+        wh = (wh * baseL - ((text.charAt(i) as Long) + 1L) * highPow % modL + modL) % modL
+        wh = (wh + (text.charAt(i + m) as Long) + 1L) % modL
+      }
+      i++
+    }
+    return result
+  }
+
+  def lastComps(): Int = comps
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. Aho-Corasick multi-pattern search
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class AhoNode {
+  val ch_: LinkedHashMap[String, Object]
+  var fail_: AhoNode?
+  val out_: ArrayList[Object]
+  var id_: Int
+public:
+  def this(nodeId: Int) {
+    ch_ = new LinkedHashMap[String, Object]()
+    fail_ = null
+    out_ = new ArrayList[Object]()
+    id_ = nodeId
+  }
+  def child(c: String): AhoNode? = ch_.get(c) as AhoNode?
+  def setChild(c: String, n: AhoNode): void { ch_.put(c, n) }
+  def fail(): AhoNode? = fail_
+  def setFail(f: AhoNode?): void { fail_ = f }
+  def outputs(): ArrayList[Object] = out_
+  def addOutput(pat: String): void { out_.add(pat) }
+  def children(): LinkedHashMap[String, Object] = ch_
+}
+
+class AhoCorasick {
+  val root: AhoNode
+  var nodeCount: Int
+  var comps: Int
+public:
+  def this { root = new AhoNode(0); nodeCount = 1; comps = 0 }
+  def name(): String = "Aho-Corasick"
+
+  def addPattern(pattern: String): void {
+    var node: AhoNode = root
+    var i: Int = 0
+    while i < pattern.length() {
+      val c: String = "#{pattern.charAt(i)}"
+      var next: AhoNode? = node.child(c)
+      if next == null {
+        next = new AhoNode(nodeCount)
+        nodeCount++
+        node.setChild(c, next as AhoNode)
+      }
+      node = next as AhoNode
+      i++
+    }
+    node.addOutput(pattern)
+  }
+
+  def build(): void {
+    val queue: ArrayList[Object] = new ArrayList[Object]()
+    foreach (c, child) in root.children() {
+      val n: AhoNode = child as AhoNode
+      n.setFail(root)
+      queue.add(n)
+    }
+    var qi: Int = 0
+    while qi < queue.size() {
+      val u: AhoNode = queue.get(qi) as AhoNode
+      qi++
+      foreach (c, child) in u.children() {
+        val v: AhoNode = child as AhoNode
+        var f: AhoNode? = u.fail()
+        while f != null && (f as AhoNode).child(c) == null && f != root {
+          f = (f as AhoNode).fail()
+        }
+        val fc: AhoNode? = if f != null { (f as AhoNode).child(c) } else { null }
+        v.setFail(if fc != null && fc != v { fc } else { root })
+        foreach pat: Object in (v.fail() as AhoNode).outputs() { v.addOutput(pat as String) }
+        queue.add(v)
+      }
+    }
+  }
+
+  def search(text: String): List[Object] {
+    comps = 0
+    val result: ArrayList[Object] = new ArrayList[Object]()
+    var node: AhoNode = root
+    var i: Int = 0
+    while i < text.length() {
+      val c: String = "#{text.charAt(i)}"
+      comps++
+      var next: AhoNode? = node.child(c)
+      while next == null && node != root {
+        node = node.fail() as AhoNode
+        next = node.child(c)
+        comps++
+      }
+      if next != null { node = next as AhoNode }
+      foreach pat: Object in node.outputs() {
+        val p: String = pat as String
+        result.add(new Match(p, i - p.length() + 1, i + 1))
+      }
+      i++
+    }
+    return result
+  }
+
+  def lastComps(): Int = comps
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════════════════════════════════
+
+def sep(c: String, w: Int): void { IO::println(c.rep(w)) }
+
+def runSinglePattern(text: String, pattern: String): void {
+  IO::println("\nPattern: «#{pattern}»")
+  val bf: BruteForce = new BruteForce()
+  val kmp: KMP = new KMP()
+  val za: ZAlgo = new ZAlgo()
+  val rk: RabinKarp = new RabinKarp()
+  val algos: ArrayList[Object] = new ArrayList[Object]()
+  algos.add(bf); algos.add(kmp); algos.add(za); algos.add(rk)
+  foreach algo: Object in algos {
+    val matches: List[Object] = select algo {
+      case b is BruteForce: b.search(text, pattern)
+      case k is KMP:        k.search(text, pattern)
+      case z is ZAlgo:      z.search(text, pattern)
+      case r is RabinKarp:  r.search(text, pattern)
+      else: new ArrayList()
+    }
+    val c: Int = select algo {
+      case b is BruteForce: b.lastComps()
+      case k is KMP:        k.lastComps()
+      case z is ZAlgo:      z.lastComps()
+      case r is RabinKarp:  r.lastComps()
+      else: 0
+    }
+    val name: String = select algo {
+      case b is BruteForce: b.name()
+      case k is KMP:        k.name()
+      case z is ZAlgo:      z.name()
+      case r is RabinKarp:  r.name()
+      else: "?"
+    }
+    val stat: SearchStats = new SearchStats(name, pattern, text.length(), matches.size(), c)
+    IO::println("  " + stat.summary())
+  }
+}
+
+def showMatches(matches: List[Object], label: String): void {
+  IO::println("  #{label}: #{matches.size()} match(es)")
+  var i: Int = 0
+  while i < matches.size() && i < 5 {
+    IO::println((matches.get(i) as Match).show())
+    i++
+  }
+  if matches.size() > 5 { IO::println("  ... (#{matches.size() - 5} more)") }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+sep("═", 68)
+IO::println("  STRING-SEARCH ALGORITHMS SHOWCASE")
+sep("═", 68)
+
+val corpus: String = "abracadabra abba abcababcabcabc banana bandana"
+IO::println("Corpus (len=#{corpus.length()}): «#{corpus}»")
+
+sep("─", 68)
+IO::println("── Single-pattern comparison ─────────────────────────────────────")
+val testPatterns: ArrayList[Object] = new ArrayList[Object]()
+testPatterns.add("ab"); testPatterns.add("abcabc"); testPatterns.add("banana"); testPatterns.add("xyz")
+foreach p: Object in testPatterns { runSinglePattern(corpus, p as String) }
+
+sep("─", 68)
+IO::println("── Aho-Corasick multi-pattern search ────────────────────────────")
+val ac: AhoCorasick = new AhoCorasick()
+val multiPats: ArrayList[Object] = new ArrayList[Object]()
+multiPats.add("ab"); multiPats.add("abba"); multiPats.add("banana"); multiPats.add("ca"); multiPats.add("abc")
+foreach p: Object in multiPats { ac.addPattern(p as String) }
+ac.build()
+val allMatches: List[Object] = ac.search(corpus)
+IO::println("  Text: «#{corpus}»")
+var patList: String = ""
+foreach p2: Object in multiPats {
+  if patList.length() > 0 { patList = patList + ", " }
+  patList = patList + (p2 as String)
+}
+IO::println("  Patterns: #{multiPats.size()} (#{patList})")
+IO::println("  Comparisons: #{ac.lastComps()}")
+IO::println("  Total matches found: #{allMatches.size()}")
+
+// Group matches by pattern and show counts
+val byPattern: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
+foreach m: Object in allMatches {
+  val match: Match = m as Match
+  val cnt: Int? = byPattern.get(match.pattern()) as Int?
+  if cnt == null { byPattern.put(match.pattern(), 1) }
+  else { byPattern.put(match.pattern(), (cnt as Int) + 1) }
+}
+IO::println("  Matches by pattern:")
+foreach (pat, cnt) in byPattern {
+  IO::println("    «#{pat}» → #{cnt} occurrence(s)")
+}
+
+// Show first few matches sorted by position
+val sorted: List[Object] = allMatches.sortedBy { m -> (m as Match).start() }
+IO::println("  First 8 matches (by position):")
+var si: Int = 0
+while si < sorted.size() && si < 8 {
+  IO::println((sorted.get(si) as Match).show())
+  si++
+}
+
+sep("─", 68)
+IO::println("── Z-array demo ──────────────────────────────────────────────────")
+val demoStr: String = "aabxaaabxaaabxaab"
+val za2: ZAlgo = new ZAlgo()
+val zArr: Int[] = za2.zArray(demoStr)
+IO::println("  s = «#{demoStr}»")
+var zLine: String = "  Z = ["
+var zi: Int = 0
+while zi < zArr.length {
+  zLine = zLine + "#{zArr[zi]}"
+  if zi < zArr.length - 1 { zLine = zLine + "," }
+  zi++
+}
+zLine = zLine + "]"
+IO::println(zLine)
+val zMatches: List[Object] = za2.search(demoStr, "aab")
+showMatches(zMatches, "search(«aab»)")
+
+sep("─", 68)
+IO::println("── KMP failure-function demo ─────────────────────────────────────")
+val kmp2: KMP = new KMP()
+val demoPatterns: ArrayList[Object] = new ArrayList[Object]()
+demoPatterns.add("abcabc")
+demoPatterns.add("aaaaaa")
+demoPatterns.add("abcdef")
+demoPatterns.add("ababab")
+foreach dp: Object in demoPatterns {
+  val dps: String = dp as String
+  val fail: Int[] = kmp2.buildFailure(dps)
+  var fLine: String = "  fail(«#{dps}») = ["
+  var fi: Int = 0
+  while fi < fail.length {
+    fLine = fLine + "#{fail[fi]}"
+    if fi < fail.length - 1 { fLine = fLine + "," }
+    fi++
+  }
+  IO::println(fLine + "]")
+}
+
+sep("─", 68)
+IO::println("── Long-text benchmark ───────────────────────────────────────────")
+val base: String = "the quick brown fox jumps over the lazy dog "
+var longText: SB = new SB()
+var li: Int = 0
+while li < 50 { longText.append(base); li++ }
+val longStr: String = longText.toString()
+IO::println("  Text length: #{longStr.length()} chars")
+val benchPat: String = "the"
+IO::println("  Pattern: «#{benchPat}»")
+val bfB: BruteForce = new BruteForce()
+val kmpB: KMP = new KMP()
+val zaB: ZAlgo = new ZAlgo()
+val rkB: RabinKarp = new RabinKarp()
+val bfM: List[Object] = bfB.search(longStr, benchPat)
+val kmpM: List[Object] = kmpB.search(longStr, benchPat)
+val zaM: List[Object] = zaB.search(longStr, benchPat)
+val rkM: List[Object] = rkB.search(longStr, benchPat)
+IO::println("  BruteForce:  #{bfM.size()} matches, #{bfB.lastComps()} comparisons")
+IO::println("  KMP:         #{kmpM.size()} matches, #{kmpB.lastComps()} comparisons")
+IO::println("  Z-algo:      #{zaM.size()} matches, #{zaB.lastComps()} comparisons")
+IO::println("  Rabin-Karp:  #{rkM.size()} matches, #{rkB.lastComps()} comparisons")
+
+sep("═", 68)
+IO::println("  Done.")
+sep("═", 68)

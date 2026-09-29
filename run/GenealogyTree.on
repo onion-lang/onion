@@ -1,0 +1,461 @@
+// GenealogyTree.on — family-tree builder and lineage analytics.
+//
+// Exercises: records with nullable fields and methods, homogeneous enum,
+// data-carrying enum, sealed ADT enum, interface, class with mutable state,
+// collection pipelines (filter/map/fold/find/distinct/sortedBy/partition),
+// select/pattern matching, foreach (range and list), string interpolation,
+// nullable handling, extension methods on primitives, recursion, while loops.
+
+import { java.lang.StringBuilder }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender { Male, Female, NonBinary }
+
+enum Era(label: String, startYear: Int) {
+  Ancient("Ancient",       0),
+  Medieval("Medieval",  1000),
+  Early("Early Modern", 1500),
+  Modern("Modern",      1800),
+  Contemporary("Contemporary", 1950)
+}
+
+// ─── ADT: LcaResult ───────────────────────────────────────────────────────────
+
+enum LcaResult {
+  case NotFound
+  case Found(ancName: String, distA: Int, distB: Int)
+public:
+  def describe(): String = select this {
+    case r is Found:    "#{r.ancName()} (d=#{r.distA()}+#{r.distB()})"
+    case r is NotFound: "none"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Person(
+  id:        Int,
+  name:      String,
+  birthYear: Int,
+  deathYear: Int?,
+  gender:    Gender
+) {
+public:
+  def isAlive(): Boolean = deathYear() == null
+  def lifespan(): String =
+    if deathYear() != null { "#{birthYear()}–#{deathYear()}" } else { "#{birthYear()}–" }
+  def label(): String = "#{name()} (#{lifespan()})"
+  def era(): Era {
+    val y: Int = birthYear()
+    if y >= 1950 { return Era::Contemporary }
+    if y >= 1800 { return Era::Modern       }
+    if y >= 1500 { return Era::Early        }
+    if y >= 1000 { return Era::Medieval     }
+    return Era::Ancient
+  }
+  def ageAt(year: Int): Int {
+    val end: Int = if deathYear() != null { deathYear() as Int } else { year }
+    return end - birthYear()
+  }
+}
+
+record ParentEdge(childId: Int, parentId: Int)
+
+record LineageStats(
+  name: String, generation: Int,
+  ancestorCount: Int, descendantCount: Int, siblingCount: Int
+) {
+public:
+  def summary(): String =
+    "#{name()} | gen #{generation()} | anc=#{ancestorCount()} desc=#{descendantCount()} sib=#{siblingCount()}"
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface TreeQuery {
+  def describe(): String
+}
+
+// ─── FamilyTree ───────────────────────────────────────────────────────────────
+
+class FamilyTree conforms TreeQuery {
+  val persons_: List[Person]
+  val edges_:   List[ParentEdge]
+
+public:
+  def this {
+    self.persons_ = []
+    self.edges_   = []
+  }
+
+  def addPerson(p: Person): void   { persons_.add(p) }
+  def addParent(childId: Int, parentId: Int): void {
+    edges_.add(new ParentEdge(childId, parentId))
+  }
+
+  def size(): Int = persons_.size
+  def persons(): List[Person] = persons_
+
+  def find(id: Int): Person? =
+    persons_.find { p -> (p as Person).id() == id } as Person?
+
+  def parents(id: Int): List[Person] {
+    val result: List[Person] = []
+    foreach e: ParentEdge in edges_ {
+      if e.childId() == id {
+        val p: Person? = find(e.parentId())
+        if p != null { result.add(p as Person) }
+      }
+    }
+    return result
+  }
+
+  def children(id: Int): List[Person] {
+    val result: List[Person] = []
+    foreach e: ParentEdge in edges_ {
+      if e.parentId() == id {
+        val p: Person? = find(e.childId())
+        if p != null { result.add(p as Person) }
+      }
+    }
+    return result
+  }
+
+  // BFS ancestors up to maxDepth; returns list in breadth-first order.
+  def ancestors(id: Int, maxDepth: Int): List[Person] {
+    val result:  List[Person] = []
+    val visited: List[Int]    = [id]
+    val queue:   List[Int]    = [id]
+    var head:     Int = 0
+    var depth:    Int = 0
+    var levelEnd: Int = 1
+
+    while head < queue.size && depth < maxDepth {
+      val current: Int = queue.get(head) as Int
+      head++
+      foreach p: Person in parents(current) {
+        val pid: Int = p.id()
+        if visited.find { v -> (v as Int) == pid } == null {
+          visited.add(pid)
+          queue.add(pid)
+          result.add(p)
+        }
+      }
+      if head == levelEnd {
+        depth++
+        levelEnd = queue.size
+      }
+    }
+    return result
+  }
+
+  // BFS descendants up to maxDepth.
+  def descendants(id: Int, maxDepth: Int): List[Person] {
+    val result:  List[Person] = []
+    val visited: List[Int]    = [id]
+    val queue:   List[Int]    = [id]
+    var head:     Int = 0
+    var depth:    Int = 0
+    var levelEnd: Int = 1
+
+    while head < queue.size && depth < maxDepth {
+      val current: Int = queue.get(head) as Int
+      head++
+      foreach c: Person in children(current) {
+        val cid: Int = c.id()
+        if visited.find { v -> (v as Int) == cid } == null {
+          visited.add(cid)
+          queue.add(cid)
+          result.add(c)
+        }
+      }
+      if head == levelEnd {
+        depth++
+        levelEnd = queue.size
+      }
+    }
+    return result
+  }
+
+  def siblings(id: Int): List[Person] {
+    val result: List[Person] = []
+    foreach p: Person in parents(id) {
+      foreach c: Person in children(p.id()) {
+        if c.id() != id && result.find { s -> (s as Person).id() == c.id() } == null {
+          result.add(c)
+        }
+      }
+    }
+    return result
+  }
+
+  // Generation (distance from root = person with no parents).
+  def generation(id: Int): Int {
+    val ps: List[Person] = parents(id)
+    if ps.size == 0 { return 0 }
+    var maxG: Int = -1
+    foreach p: Person in ps {
+      val g: Int = generation(p.id())
+      if g > maxG { maxG = g }
+    }
+    return maxG + 1
+  }
+
+  // Lowest common ancestor via ancestor-set intersection.
+  def lca(id1: Int, id2: Int): LcaResult {
+    val anc1: List[Person] = ancestors(id1, 20)
+    val anc2: List[Person] = ancestors(id2, 20)
+    var best: LcaResult = new NotFound()
+    foreach a: Person in anc1 {
+      if anc2.find { x -> (x as Person).id() == a.id() } != null {
+        val d1: Int = ancestorDist(id1, a.id(), 0)
+        val d2: Int = ancestorDist(id2, a.id(), 0)
+        select best {
+          case r is NotFound:
+            best = new Found(a.name(), d1, d2)
+          case r is Found:
+            if d1 + d2 < r.distA() + r.distB() {
+              best = new Found(a.name(), d1, d2)
+            }
+        }
+      }
+    }
+    return best
+  }
+
+  // Recursive distance from `id` up the tree toward `targetId`.
+  def ancestorDist(id: Int, targetId: Int, depth: Int): Int {
+    if id == targetId { return depth }
+    if depth > 15    { return 999   }
+    var best: Int = 999
+    foreach p: Person in parents(id) {
+      val d: Int = ancestorDist(p.id(), targetId, depth + 1)
+      if d < best { best = d }
+    }
+    return best
+  }
+
+  // All persons alive in the given year.
+  def aliveIn(year: Int): List[Person] {
+    return persons_
+      .filter { p ->
+        val pr: Person = p as Person
+        pr.birthYear() <= year &&
+          (pr.isAlive() || (pr.deathYear() as Int) > year)
+      }
+      .map { p -> p as Person }
+  }
+
+  // Lineage stats for one person.
+  def stats(id: Int): LineageStats? {
+    val p: Person? = find(id)
+    if p == null { return null }
+    val pr: Person = p as Person
+    return new LineageStats(
+      pr.name(),
+      generation(id),
+      ancestors(id, 20).size,
+      descendants(id, 20).size,
+      siblings(id).size
+    )
+  }
+
+  def describe(): String = "FamilyTree(#{size()} persons)"
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+def hr(ch: String, n: Int): String {
+  val sb: StringBuilder = new StringBuilder()
+  foreach _: Int in 1..n { sb.append(ch) }
+  return sb.toString()
+}
+
+def section(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println(hr("─", title.length()))
+}
+
+// ─── Build the demo tree ──────────────────────────────────────────────────────
+
+val tree: FamilyTree = new FamilyTree()
+
+// Generation 0 – great-grandparents (~1840s)
+tree.addPerson(new Person(1,  "Wilhelm Koch",    1840, 1912, Gender::Male))
+tree.addPerson(new Person(2,  "Frieda Koch",     1845, 1918, Gender::Female))
+tree.addPerson(new Person(3,  "Johann Braun",    1838, 1908, Gender::Male))
+tree.addPerson(new Person(4,  "Maria Braun",     1843, 1914, Gender::Female))
+
+// Generation 1 – grandparents (~1870s)
+tree.addPerson(new Person(5,  "Ernst Koch",      1870, 1942, Gender::Male))
+tree.addPerson(new Person(6,  "Helena Koch",     1875, 1950, Gender::Female))
+tree.addPerson(new Person(7,  "Klaus Braun",     1872, 1938, Gender::Male))
+tree.addPerson(new Person(8,  "Sophie Braun",    1878, 1960, Gender::Female))
+
+// Generation 2 – parents and their siblings (~1900s)
+tree.addPerson(new Person(9,  "Heinrich Koch",   1900, 1975, Gender::Male))
+tree.addPerson(new Person(10, "Luise Koch",      1902, 1980, Gender::Female))
+tree.addPerson(new Person(11, "Friedrich Koch",  1905, 1985, Gender::Male))
+tree.addPerson(new Person(12, "Anna Braun",      1903, 1992, Gender::Female))
+tree.addPerson(new Person(13, "Gertrude Braun",  1907, 2001, Gender::Female))
+
+// Generation 3 – middle generation (~1930s)
+tree.addPerson(new Person(14, "Werner Koch",     1930, 2010, Gender::Male))
+tree.addPerson(new Person(15, "Irmgard Koch",    1933, null, Gender::Female))
+tree.addPerson(new Person(16, "Dieter Koch",     1935, null, Gender::Male))
+tree.addPerson(new Person(17, "Klaus Braun Jr.", 1932, 2005, Gender::Male))
+tree.addPerson(new Person(18, "Eva Braun",       1936, null, Gender::Female))
+
+// Generation 4 – youngest generation (~1960s)
+tree.addPerson(new Person(19, "Stefan Koch",     1960, null, Gender::Male))
+tree.addPerson(new Person(20, "Petra Koch",      1963, null, Gender::Female))
+tree.addPerson(new Person(21, "Tobias Braun",    1962, null, Gender::Male))
+tree.addPerson(new Person(22, "Nadine Braun",    1966, null, Gender::NonBinary))
+
+// ── parent edges gen0→gen1
+tree.addParent(5, 1);  tree.addParent(5, 2)
+tree.addParent(8, 3);  tree.addParent(8, 4)
+
+// ── parent edges gen1→gen2
+tree.addParent(9,  5);  tree.addParent(9,  6)
+tree.addParent(10, 5);  tree.addParent(10, 6)
+tree.addParent(11, 5);  tree.addParent(11, 6)
+tree.addParent(12, 7);  tree.addParent(12, 8)
+tree.addParent(13, 7);  tree.addParent(13, 8)
+
+// ── parent edges gen2→gen3: Heinrich+Anna → Werner/Irmgard/Dieter
+//                            Friedrich+Gertrude → Klaus Jr./Eva
+tree.addParent(14, 9);  tree.addParent(14, 12)
+tree.addParent(15, 9);  tree.addParent(15, 12)
+tree.addParent(16, 9);  tree.addParent(16, 12)
+tree.addParent(17, 11); tree.addParent(17, 13)
+tree.addParent(18, 11); tree.addParent(18, 13)
+
+// ── parent edges gen3→gen4
+tree.addParent(19, 14); tree.addParent(20, 14)
+tree.addParent(21, 17); tree.addParent(22, 17)
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+IO::println("=== Genealogy Tree Report ===")
+IO::println(tree.describe())
+
+// 1. Ancestors of Stefan Koch (id=19)
+section("Ancestors of Stefan Koch")
+val stefanAnc: List[Person] = tree.ancestors(19, 10)
+IO::println("Found #{stefanAnc.size} ancestors:")
+foreach a: Person in stefanAnc {
+  IO::println("  " + a.label() + "  [gen " + tree.generation(a.id()) + "]")
+}
+
+// 2. Descendants of Ernst Koch (id=5)
+section("Descendants of Ernst Koch")
+val ernstDesc: List[Person] = tree.descendants(5, 10)
+IO::println("Found #{ernstDesc.size} descendants:")
+foreach d: Person in ernstDesc {
+  IO::println("  " + d.label())
+}
+
+// 3. Siblings of Werner Koch (id=14)
+section("Siblings of Werner Koch")
+val wernerSib: List[Person] = tree.siblings(14)
+foreach s: Person in wernerSib { IO::println("  " + s.label()) }
+IO::println("Total: #{wernerSib.size}")
+
+// 4. Lowest common ancestor of three pairs
+section("Lowest Common Ancestors")
+val pairIds: List[Int] = [19, 21,  20, 22,  19, 18]
+var pi: Int = 0
+while pi < pairIds.size {
+  val idA: Int = pairIds.get(pi)   as Int
+  val idB: Int = pairIds.get(pi+1) as Int
+  val na: String = (tree.find(idA) as Person).name()
+  val nb: String = (tree.find(idB) as Person).name()
+  val r: LcaResult = tree.lca(idA, idB)
+  IO::println("  LCA(" + na + ", " + nb + "): " + r.describe())
+  pi = pi + 2
+}
+
+// 5. Lineage stats
+section("Lineage Stats  (generation / ancestors / descendants / siblings)")
+foreach id: Int in 1..22 {
+  val st: LineageStats? = tree.stats(id)
+  if st != null { IO::println("  " + (st as LineageStats).summary()) }
+}
+
+// 6. People alive in 1945
+section("People alive in 1945")
+val alive45: List[Person] = tree.aliveIn(1945)
+IO::println("Count: #{alive45.size}")
+foreach p: Person in alive45 { IO::println("  " + p.label()) }
+
+// 7. People alive in 2025 — oldest and youngest
+section("People alive in 2025")
+val alive25: List[Person] = tree.aliveIn(2025)
+IO::println("Count: #{alive25.size}")
+if alive25.size > 0 {
+  val oldest:   Person = alive25.sortedBy { p -> (p as Person).birthYear()         }.get(0) as Person
+  val youngest: Person = alive25.sortedBy { p -> 0 - (p as Person).birthYear()    }.get(0) as Person
+  IO::println("  Oldest:   " + oldest.name()   + " (born " + oldest.birthYear()   + ", age " + oldest.ageAt(2025)   + ")")
+  IO::println("  Youngest: " + youngest.name() + " (born " + youngest.birthYear() + ", age " + youngest.ageAt(2025) + ")")
+}
+
+// 8. Gender distribution among Stefan's ancestors
+section("Stefan Koch's ancestors by gender")
+val males:   List[Person] = stefanAnc.filter { p -> (p as Person).gender() == Gender::Male }
+val females: List[Person] = stefanAnc.filter { p -> (p as Person).gender() == Gender::Female }
+val nonBin:  List[Person] = stefanAnc.filter { p -> (p as Person).gender() == Gender::NonBinary }
+IO::println("  Male: #{males.size}  Female: #{females.size}  NonBinary: #{nonBin.size}")
+val maleNames: List[String] = males.map { p -> (p as Person).name() }
+IO::println("  Males: " + maleNames.toString())
+
+// 9. Era distribution — partition persons into Modern vs Contemporary
+section("Persons by era (Modern vs Contemporary)")
+val allPersons: List[Person] = tree.persons()
+val eraParts = allPersons.partition { p -> (p as Person).era() == Era::Modern }
+val modern:  List[Object] = eraParts[0] as List[Object]
+val contemp: List[Object] = eraParts[1] as List[Object]
+IO::println("  Modern (1800–1949): #{modern.size}")
+IO::println("  Contemporary (1950+): #{contemp.size}")
+
+// 10. Generation 3 people sorted by birth year, with extension rjust
+section("Generation 3, sorted by birth year")
+val gen3: List[Person] = allPersons
+  .filter { p -> tree.generation((p as Person).id()) == 3 }
+  .map    { p -> p as Person }
+  .sortedBy { p -> (p as Person).birthYear() }
+foreach p: Person in gen3 {
+  IO::println("  " + p.birthYear().rjust(4) + "  " + p.name())
+}
+
+// 11. fold: sum of generation numbers across all persons
+section("Statistics")
+var genSum: Int = 0
+foreach gp: Person in allPersons {
+  genSum = genSum + tree.generation(gp.id())
+}
+IO::println("  Sum of generations: #{genSum}")
+val avgGen: Double = (genSum as Double) / (allPersons.size as Double)
+IO::println("  Average generation: #{((avgGen * 10.0) as Int) as Double / 10.0}")
+
+// 12. distinct names of Stefan's direct parents
+section("Stefan Koch's direct parents")
+val stefanParents: List[Person] = tree.parents(19)
+val parentNames: List[String] = stefanParents.map { p -> (p as Person).name() }.distinct()
+IO::println("  " + parentNames.toString())
+
+IO::println("")
+IO::println(hr("═", 38))
+IO::println("Done.")

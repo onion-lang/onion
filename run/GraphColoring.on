@@ -1,0 +1,431 @@
+// GraphColoring.on — graph-colouring problem solver
+// Exercises: records with methods, ADT enums, data-carrying enums, classes,
+//            interfaces, extension methods, generics, collection pipelines
+//            (map/filter/fold/sortedBy/groupBy/distinct/find/partition/any),
+//            select/pattern matching, nullable types, closures,
+//            string interpolation, try/catch, recursion, while/foreach,
+//            foreach (k,v) in map.
+
+// ─── Plain enum: color palette ───────────────────────────────────────────────
+
+enum ColorPalette { Red, Green, Blue, Yellow, Cyan, Magenta, Orange, Purple }
+
+// ─── Data-carrying enum: graph topology classes ───────────────────────────────
+
+enum TopologyClass(symbol: String, desc: String) {
+  Complete("K",  "complete graph Kₙ"),
+  Bipartite("B", "bipartite graph"),
+  Cycle("C",     "cycle graph Cₙ"),
+  Wheel("W",     "wheel graph Wₙ"),
+  General("G",   "general graph")
+}
+
+// ─── ADT enum: algorithm choice ───────────────────────────────────────────────
+
+enum Algorithm {
+  case Greedy
+  case WelshPowell
+  case Backtrack
+public:
+  def shortName(): String = select this {
+    case a is Greedy:      "Greedy"
+    case a is WelshPowell: "Welsh-Powell"
+    case a is Backtrack:   "Backtrack"
+  }
+  def complexity(): String = select this {
+    case a is Greedy:      "O(V+E)"
+    case a is WelshPowell: "O(V log V + E)"
+    case a is Backtrack:   "O(kᵛ)"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Edge(u: Int, v: Int) {
+public:
+  def label(): String   = "#{u()}─#{v()}"
+  def hasVertex(w: Int): Boolean = u() == w || v() == w
+  def other(w: Int): Int = if u() == w { v() } else { u() }
+}
+
+record ColorAssignment(vertexId: Int, color: Int) {
+public:
+  def colorName(): String {
+    val names: List[String] = ["red", "green", "blue", "yellow",
+                               "cyan", "magenta", "orange", "purple"]
+    if color() < names.size { return names[color()] as String }
+    return "c#{color()}"
+  }
+  def label(): String = "v#{vertexId()}→#{colorName()}"
+}
+
+record ColoringResult(
+  algorithm: String,
+  assignments: List[ColorAssignment],
+  chromaticNumber: Int,
+  valid: Boolean
+) {
+public:
+  def summary(): String =
+    "#{algorithm().rpad(14)} χ=#{chromaticNumber()} #{if valid() { "✓" } else { "✗" }}"
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def repeated(n: Int): String {
+    var s: String = ""
+    foreach _: Int in 0..<n { s = s + self }
+    return s
+  }
+}
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface ColoringStrategy {
+  def color(g: Graph): List[ColorAssignment]
+  def algoName(): String
+}
+
+// ─── Graph ────────────────────────────────────────────────────────────────────
+
+class Graph {
+public:
+  val vertexCount: Int
+  val edges: List[Edge]
+
+  def this(n: Int) {
+    vertexCount = n
+    edges = []
+  }
+
+  def addEdge(u: Int, v: Int): void { edges.add(new Edge(u, v)) }
+
+  def edgeCount(): Int = edges.size
+
+  def neighbors(v: Int): List[Int] {
+    val nb: List[Int] = []
+    foreach e: Edge in edges {
+      if e.u() == v { nb.add(e.v()) }
+      else if e.v() == v { nb.add(e.u()) }
+    }
+    return nb
+  }
+
+  def degree(v: Int): Int = neighbors(v).size
+
+  def maxDegree(): Int {
+    var mx: Int = 0
+    foreach i: Int in 0..<vertexCount { val d: Int = degree(i); if d > mx { mx = d } }
+    return mx
+  }
+
+  def vertexList(): List[Int] {
+    val vs: List[Int] = []
+    foreach i: Int in 0..<vertexCount { vs.add(i) }
+    return vs
+  }
+
+  def isConnected(): Boolean {
+    if vertexCount == 0 { return true }
+    val visited: Boolean[] = new Boolean[vertexCount]
+    val queue: List[Int] = []
+    queue.add(0)
+    visited[0] = true
+    var count: Int = 1
+    var qi: Int = 0
+    while qi < queue.size {
+      val cur: Int = queue[qi] as Int
+      qi++
+      foreach nb: Int in neighbors(cur) {
+        if !visited[nb] { visited[nb] = true; count++; queue.add(nb) }
+      }
+    }
+    return count == vertexCount
+  }
+
+  def validate(): void {
+    foreach e: Edge in edges {
+      if e.u() < 0 || e.u() >= vertexCount || e.v() < 0 || e.v() >= vertexCount {
+        throw new IllegalArgumentException("Edge #{e.label()} out of range")
+      }
+      if e.u() == e.v() {
+        throw new IllegalArgumentException("Self-loop at v#{e.u()}")
+      }
+    }
+  }
+}
+
+// ─── Greedy strategy ─────────────────────────────────────────────────────────
+
+class GreedyStrategy conforms ColoringStrategy {
+public:
+  def this() {}
+
+  def algoName(): String = "Greedy"
+
+  def color(g: Graph): List[ColorAssignment] {
+    val cols: Int[] = new Int[g.vertexCount]
+    foreach i: Int in 0..<g.vertexCount { cols[i] = -1 }
+    foreach v: Int in 0..<g.vertexCount {
+      val used: java.util.HashSet[Object] = new java.util.HashSet[Object]()
+      foreach nb: Int in g.neighbors(v) {
+        if cols[nb] >= 0 { used.add(cols[nb]) }
+      }
+      var c: Int = 0
+      while used.contains(c) { c++ }
+      cols[v] = c
+    }
+    return buildResult(cols, g.vertexCount)
+  }
+
+  def buildResult(cols: Int[], n: Int): List[ColorAssignment] {
+    val r: List[ColorAssignment] = []
+    foreach i: Int in 0..<n { r.add(new ColorAssignment(i, cols[i])) }
+    return r
+  }
+}
+
+// ─── Welsh-Powell strategy ────────────────────────────────────────────────────
+
+class WelshPowellStrategy conforms ColoringStrategy {
+public:
+  def this() {}
+
+  def algoName(): String = "Welsh-Powell"
+
+  def color(g: Graph): List[ColorAssignment] {
+    val ordered: List[Int] = g.vertexList().sortedBy { v -> -(g.degree(v as Int)) }
+    val cols: Int[] = new Int[g.vertexCount]
+    foreach i: Int in 0..<g.vertexCount { cols[i] = -1 }
+    foreach item: Object in ordered {
+      val v: Int = item as Int
+      val used: java.util.HashSet[Object] = new java.util.HashSet[Object]()
+      foreach nb: Int in g.neighbors(v) {
+        if cols[nb] >= 0 { used.add(cols[nb]) }
+      }
+      var c: Int = 0
+      while used.contains(c) { c++ }
+      cols[v] = c
+    }
+    val r: List[ColorAssignment] = []
+    foreach i: Int in 0..<g.vertexCount { r.add(new ColorAssignment(i, cols[i])) }
+    return r
+  }
+}
+
+// ─── Backtracking strategy ────────────────────────────────────────────────────
+
+class BacktrackStrategy conforms ColoringStrategy {
+public:
+  def this() {}
+
+  def algoName(): String = "Backtrack"
+
+  def color(g: Graph): List[ColorAssignment] {
+    var k: Int = 1
+    var found: Boolean = false
+    var best: Int[] = new Int[g.vertexCount]
+    while !found && k <= g.vertexCount {
+      val cols: Int[] = new Int[g.vertexCount]
+      foreach i: Int in 0..<g.vertexCount { cols[i] = -1 }
+      if solve(g, cols, 0, k) {
+        found = true
+        best = cols
+      } else {
+        k++
+      }
+    }
+    val r: List[ColorAssignment] = []
+    foreach i: Int in 0..<g.vertexCount { r.add(new ColorAssignment(i, best[i])) }
+    return r
+  }
+
+  def solve(g: Graph, cols: Int[], v: Int, k: Int): Boolean {
+    if v == g.vertexCount { return true }
+    foreach c: Int in 0..<k {
+      if isSafe(g, cols, v, c) {
+        cols[v] = c
+        if solve(g, cols, v + 1, k) { return true }
+        cols[v] = -1
+      }
+    }
+    return false
+  }
+
+  def isSafe(g: Graph, cols: Int[], v: Int, c: Int): Boolean {
+    foreach nb: Int in g.neighbors(v) {
+      if cols[nb] == c { return false }
+    }
+    return true
+  }
+}
+
+// ─── Analysis helpers ─────────────────────────────────────────────────────────
+
+def chromaticNumber(assignments: List[ColorAssignment]): Int {
+  return assignments.fold(0) { acc, ca ->
+    val c: Int = (ca as ColorAssignment).color()
+    if c > (acc as Int) { c } else { acc as Int }
+  } as Int + 1
+}
+
+def isValid(g: Graph, assignments: List[ColorAssignment]): Boolean {
+  val cols: Int[] = new Int[g.vertexCount]
+  foreach ca: ColorAssignment in assignments { cols[ca.vertexId()] = ca.color() }
+  foreach e: Edge in g.edges {
+    if cols[e.u()] == cols[e.v()] { return false }
+  }
+  return true
+}
+
+def runAlgorithm(g: Graph, algo: Algorithm): ColoringResult {
+  val strategy: ColoringStrategy = select algo {
+    case a is Greedy:      new GreedyStrategy() as ColoringStrategy
+    case a is WelshPowell: new WelshPowellStrategy() as ColoringStrategy
+    case a is Backtrack:   new BacktrackStrategy() as ColoringStrategy
+  }
+  val assignments: List[ColorAssignment] = strategy.color(g)
+  val chi: Int = chromaticNumber(assignments)
+  val valid: Boolean = isValid(g, assignments)
+  return new ColoringResult(algo.shortName(), assignments, chi, valid)
+}
+
+// ─── Report helpers ───────────────────────────────────────────────────────────
+
+def printSectionHeader(title: String): void {
+  IO::println("")
+  IO::println("══════ #{title} ══════")
+}
+
+def printResult(r: ColoringResult): void {
+  IO::println("  #{r.summary()}")
+  val byColor: Map[Object, List[ColorAssignment]] =
+    r.assignments().groupBy { ca -> (ca as ColorAssignment).color() }
+  foreach (colorKey, group) in byColor {
+    var line: String = "    #{(colorKey as Int).lpad(2)}"
+    line = line + " [#{(group as List[ColorAssignment]).find { _ -> true }.colorName().rpad(8)}]"
+    line = line + " : "
+    var first: Boolean = true
+    foreach ca: ColorAssignment in (group as List[ColorAssignment]).sortedBy { ca -> (ca as ColorAssignment).vertexId() } {
+      if !first { line = line + "  " }
+      line = line + "v#{ca.vertexId()}"
+      first = false
+    }
+    IO::println(line)
+  }
+}
+
+def analyseGraph(name: String, topology: TopologyClass, g: Graph, algos: List[Algorithm]): void {
+  try {
+    g.validate()
+  } catch e: Exception {
+    IO::println("⚠ #{name}: #{e.getMessage()}")
+    return
+  }
+  printSectionHeader("#{name}  [#{topology.symbol()}]  #{g.vertexCount} v · #{g.edgeCount()} e · Δ=#{g.maxDegree()} · #{if g.isConnected() { "connected" } else { "disconnected" }}")
+
+  val results: List[ColoringResult] = algos.map { item ->
+    runAlgorithm(g, item as Algorithm)
+  }
+
+  // Partition into valid / invalid results (sanity check)
+  val parts = results.partition { r -> (r as ColoringResult).valid() }
+  val goodResults: List[Object] = parts[0] as List[Object]
+  val badResults: List[Object]  = parts[1] as List[Object]
+  if badResults.size > 0 {
+    IO::println("  WARNING: #{badResults.size} algorithm(s) produced an invalid coloring!")
+  }
+
+  foreach r: ColoringResult in results { printResult(r) }
+
+  // Best (minimum χ) among valid results
+  val bestChi: Int = goodResults.fold(9999) { acc, r ->
+    val chi: Int = (r as ColoringResult).chromaticNumber()
+    if chi < (acc as Int) { chi } else { acc as Int }
+  } as Int
+  IO::println("  → best χ found: #{bestChi}")
+
+  // Summary: any algorithm found a 2-coloring?
+  val bipartiteFound: Boolean = results.any { r -> (r as ColoringResult).chromaticNumber() == 2 }
+  if bipartiteFound { IO::println("  → #{topology.desc()} is 2-colourable (bipartite)") }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val allAlgos: List[Algorithm] = [new Greedy(), new WelshPowell(), new Backtrack()]
+  val fastAlgos: List[Algorithm] = [new Greedy(), new WelshPowell()]
+
+  IO::println("Graph Colouring Solver")
+  IO::println("======================")
+
+  // ── Petersen graph (10 v, 15 e, χ=3) ─────────────────────────────────────
+  val petersen: Graph = new Graph(10)
+  petersen.addEdge(0,1); petersen.addEdge(1,2); petersen.addEdge(2,3)
+  petersen.addEdge(3,4); petersen.addEdge(4,0)
+  petersen.addEdge(5,7); petersen.addEdge(7,9); petersen.addEdge(9,6)
+  petersen.addEdge(6,8); petersen.addEdge(8,5)
+  petersen.addEdge(0,5); petersen.addEdge(1,6); petersen.addEdge(2,7)
+  petersen.addEdge(3,8); petersen.addEdge(4,9)
+  analyseGraph("Petersen", TopologyClass::General, petersen, allAlgos)
+
+  // ── Complete graph K₅ (χ=5) ───────────────────────────────────────────────
+  val k5: Graph = new Graph(5)
+  foreach i: Int in 0..<5 { foreach j: Int in (i+1)..<5 { k5.addEdge(i, j) } }
+  analyseGraph("Complete K₅", TopologyClass::Complete, k5, allAlgos)
+
+  // ── Odd cycle C₅ (χ=3) ────────────────────────────────────────────────────
+  val c5: Graph = new Graph(5)
+  foreach i: Int in 0..<5 { c5.addEdge(i, (i+1) % 5) }
+  analyseGraph("Odd cycle C₅", TopologyClass::Cycle, c5, allAlgos)
+
+  // ── Even cycle C₆ (χ=2) ───────────────────────────────────────────────────
+  val c6: Graph = new Graph(6)
+  foreach i: Int in 0..<6 { c6.addEdge(i, (i+1) % 6) }
+  analyseGraph("Even cycle C₆", TopologyClass::Cycle, c6, allAlgos)
+
+  // ── Complete bipartite K₃,₃ (χ=2) ────────────────────────────────────────
+  val k33: Graph = new Graph(6)
+  foreach i: Int in 0..<3 { foreach j: Int in 3..<6 { k33.addEdge(i, j) } }
+  analyseGraph("Bipartite K₃,₃", TopologyClass::Bipartite, k33, allAlgos)
+
+  // ── Wheel W₅ (hub + 5-cycle rim, χ=4) ────────────────────────────────────
+  val wheel: Graph = new Graph(6)
+  foreach i: Int in 1..<6 { wheel.addEdge(0, i) }
+  foreach i: Int in 1..<5 { wheel.addEdge(i, i + 1) }
+  wheel.addEdge(5, 1)
+  analyseGraph("Wheel W₅", TopologyClass::Wheel, wheel, allAlgos)
+
+  // ── Disconnected pair of triangles (χ=3) ─────────────────────────────────
+  val dbl: Graph = new Graph(6)
+  dbl.addEdge(0,1); dbl.addEdge(1,2); dbl.addEdge(2,0)
+  dbl.addEdge(3,4); dbl.addEdge(4,5); dbl.addEdge(5,3)
+  analyseGraph("Two triangles", TopologyClass::General, dbl, fastAlgos)
+
+  // ── Invalid graph (error path) ────────────────────────────────────────────
+  val bad: Graph = new Graph(3)
+  bad.edges.add(new Edge(0, 5))   // out of range — caught by validate()
+  analyseGraph("Bad graph", TopologyClass::General, bad, fastAlgos)
+
+  IO::println("")
+  IO::println("Done.")
+}

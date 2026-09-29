@@ -1,0 +1,294 @@
+import {
+  java.lang.Math
+}
+
+// ── Transaction type (ADT enum) ────────────────────────────────────────────────
+
+enum TransactionType {
+  case Purchase(merchant: String, category: String)
+  case Withdrawal(location: String)
+  case Transfer(toAccount: String)
+  case Refund(originalTxId: String)
+
+  public:
+  def describe(): String = select this {
+    case p is Purchase:   "Purchase at #{p.merchant()} [#{p.category()}]"
+    case w is Withdrawal: "ATM Withdrawal at #{w.location()}"
+    case t is Transfer:   "Transfer to #{t.toAccount()}"
+    case r is Refund:     "Refund for #{r.originalTxId()}"
+  }
+}
+
+// ── Risk level (homogeneous data-carrying enum) ───────────────────────────────
+
+enum RiskLevel(score: Int, tag: String) {
+  LOW     (1,  "LOW     "),
+  MEDIUM  (3,  "MEDIUM  "),
+  HIGH    (6,  "HIGH    "),
+  CRITICAL(10, "CRITICAL")
+}
+
+// ── Core records ──────────────────────────────────────────────────────────────
+
+record Transaction(
+  id: String, timestamp: Long, amount: Double, currency: String,
+  txType: TransactionType, cardLast4: String, country: String
+) {
+  public:
+  def oneLine(): String =
+    "#{id} | #{txType.describe()} | #{amount} #{currency} | #{country} | card=*#{cardLast4}"
+}
+
+record CardProfile(
+  last4: String, homeCountry: String,
+  avgMonthlySpend: Double, maxSingleTx: Double, flaggedCountries: List[String]
+)
+
+record FraudAlert(txId: String, rule: String, risk: RiskLevel, detail: String)
+
+// ── Rule interface ────────────────────────────────────────────────────────────
+
+interface FraudRule {
+  def name(): String
+  def check(tx: Transaction, profile: CardProfile): FraudAlert?
+}
+
+// ── Rule: amount exceeds profile limit ───────────────────────────────────────
+
+class AmountThresholdRule conforms FraudRule {
+  private:
+    val multiplier: Double
+  public:
+    def this(multiplier: Double) { self.multiplier = multiplier }
+    def name(): String = "AmountThreshold"
+    def check(tx: Transaction, profile: CardProfile): FraudAlert? {
+      val limit: Double = profile.maxSingleTx() * multiplier
+      if tx.amount() > limit {
+        val risk: RiskLevel =
+          if tx.amount() > limit * 2.0 { RiskLevel::CRITICAL } else { RiskLevel::HIGH }
+        return new FraudAlert(tx.id(), self.name(), risk,
+          "#{tx.amount()} #{tx.currency()} exceeds limit #{limit}")
+      }
+      return null
+    }
+}
+
+// ── Rule: foreign transaction ─────────────────────────────────────────────────
+
+class ForeignTransactionRule conforms FraudRule {
+  public:
+    def name(): String = "ForeignTransaction"
+    def check(tx: Transaction, profile: CardProfile): FraudAlert? {
+      if tx.country() != profile.homeCountry() {
+        val flagged: Boolean = profile.flaggedCountries().contains(tx.country())
+        val risk: RiskLevel =
+          if flagged { RiskLevel::CRITICAL }
+          else if tx.amount() > 300.0 { RiskLevel::HIGH }
+          else { RiskLevel::MEDIUM }
+        return new FraudAlert(tx.id(), self.name(), risk,
+          "Country #{tx.country()} (home=#{profile.homeCountry()}#{if flagged { ", FLAGGED" } else { "" }})")
+      }
+      return null
+    }
+}
+
+// ── Rule: large cash withdrawal ───────────────────────────────────────────────
+
+class LargeCashRule conforms FraudRule {
+  private:
+    val threshold: Double
+  public:
+    def this(threshold: Double) { self.threshold = threshold }
+    def name(): String = "LargeCash"
+    def check(tx: Transaction, profile: CardProfile): FraudAlert? {
+      select tx.txType() {
+        case w is Withdrawal:
+          if tx.amount() > threshold {
+            val overProfile: Boolean = tx.amount() > profile.maxSingleTx()
+            val risk: RiskLevel =
+              if tx.amount() > threshold * 2.0 { RiskLevel::CRITICAL }
+              else if overProfile            { RiskLevel::HIGH }
+              else                            { RiskLevel::MEDIUM }
+            return new FraudAlert(tx.id(), self.name(), risk,
+              "Cash withdrawal #{tx.amount()} #{tx.currency()} at #{w.location()}")
+          }
+        else: {}
+      }
+      return null
+    }
+}
+
+// ── Rule: unusual transaction type for card ───────────────────────────────────
+
+class RapidTransferRule conforms FraudRule {
+  public:
+    def name(): String = "RapidTransfer"
+    def check(tx: Transaction, profile: CardProfile): FraudAlert? {
+      select tx.txType() {
+        case t is Transfer:
+          if tx.amount() > profile.avgMonthlySpend() * 0.5 {
+            return new FraudAlert(tx.id(), self.name(), RiskLevel::HIGH,
+              "Large transfer #{tx.amount()} to #{t.toAccount()} (avg monthly=#{profile.avgMonthlySpend()})")
+          }
+        else: {}
+      }
+      return null
+    }
+}
+
+// ── Detector engine ───────────────────────────────────────────────────────────
+
+class FraudDetector {
+  private:
+    val rules: List[FraudRule]
+    val profiles: Map[String, CardProfile]
+  public:
+    def this {
+      self.rules    = []
+      self.profiles = [:]
+    }
+    def addRule(r: FraudRule): void { self.rules.add(r) }
+    def register(p: CardProfile): void { self.profiles[p.last4()] = p }
+
+    def analyze(tx: Transaction): List[FraudAlert] {
+      val alerts: List[FraudAlert] = []
+      val maybeProfile: CardProfile? = self.profiles[tx.cardLast4()]
+      if maybeProfile == null {
+        alerts.add(new FraudAlert(tx.id(), "UnknownCard", RiskLevel::MEDIUM,
+          "No profile found for card *#{tx.cardLast4()}"))
+        return alerts
+      }
+      val profile: CardProfile = (maybeProfile as CardProfile)
+      foreach rule: FraudRule in self.rules {
+        val alert: FraudAlert? = rule.check(tx, profile)
+        if alert != null { alerts.add(alert) }
+      }
+      return alerts
+    }
+
+    def riskScore(alerts: List[FraudAlert]): Int = {
+      var total: Int = 0
+      foreach a: FraudAlert in alerts { total = total + a.risk().score() }
+      return total
+    }
+}
+
+// ── Reporting helpers ─────────────────────────────────────────────────────────
+
+def bar(width: Int): String {
+  var s: String = ""
+  foreach _: Int in 0..<width { s = s + "─" }
+  return s
+}
+
+def riskTag(r: RiskLevel): String = "[#{r.tag()}]"
+
+def printAlert(a: FraudAlert): void {
+  IO::println("    #{riskTag(a.risk())}  #{a.rule()}: #{a.detail()}")
+}
+
+def printSummary(txList: List[Transaction], detector: FraudDetector): void {
+  IO::println("\n" + "━".repeat(70))
+  IO::println(" FRAUD ANALYSIS REPORT")
+  IO::println("━".repeat(70))
+
+  var totalAlerts: Int = 0
+  var highRisk: Int    = 0
+  var clean: Int       = 0
+
+  foreach tx: Transaction in txList {
+    val alerts: List[FraudAlert] = detector.analyze(tx)
+    val score: Int = detector.riskScore(alerts)
+    IO::println("\n  " + tx.oneLine())
+    if alerts.size == 0 {
+      IO::println("    ✓ CLEAN")
+      clean = clean + 1
+    } else {
+      totalAlerts = totalAlerts + alerts.size
+      if score >= 6 { highRisk = highRisk + 1 }
+      foreach a: FraudAlert in alerts { printAlert(a) }
+      IO::println("    → Risk score: #{score}")
+    }
+  }
+
+  IO::println("\n" + bar(70))
+  IO::println("  Transactions : #{txList.size}")
+  IO::println("  Clean        : #{clean}")
+  IO::println("  With alerts  : #{txList.size - clean}")
+  IO::println("  High-risk    : #{highRisk}")
+  IO::println("  Total alerts : #{totalAlerts}")
+  IO::println(bar(70))
+}
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+
+val detector: FraudDetector = new FraudDetector()
+detector.addRule(new AmountThresholdRule(2.0))
+detector.addRule(new ForeignTransactionRule())
+detector.addRule(new LargeCashRule(800.0))
+detector.addRule(new RapidTransferRule())
+
+detector.register(new CardProfile("1234", "US", 2000.0, 500.0,  ["RU", "KP"]))
+detector.register(new CardProfile("5678", "UK",  800.0, 300.0,  ["NG"]))
+detector.register(new CardProfile("9012", "JP", 1500.0, 700.0,  []))
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+
+val transactions: List[Transaction] = [
+  new Transaction("T001", 1700000001L,  150.0, "USD", new Purchase("BookShop",      "Books"),      "1234", "US"),
+  new Transaction("T002", 1700000100L, 1200.0, "USD", new Purchase("ElectroMart",   "Electronics"),"1234", "US"),
+  new Transaction("T003", 1700000200L,  400.0, "EUR", new Purchase("ParisBistro",   "Dining"),     "1234", "FR"),
+  new Transaction("T004", 1700000300L,  900.0, "GBP", new Withdrawal("London ATM"), "5678",        "UK"),
+  new Transaction("T005", 1700000400L,   50.0, "GBP", new Refund("T003"),           "5678",        "UK"),
+  new Transaction("T006", 1700000500L, 2000.0, "USD", new Transfer("US-99887766"),  "9012",        "US"),
+  new Transaction("T007", 1700000600L,  200.0, "USD", new Purchase("CornerStore",   "Groceries"),  "9999", "US"),
+  new Transaction("T008", 1700000700L,  350.0, "RUB", new Purchase("RedSquareMart","Retail"),      "1234", "RU"),
+  new Transaction("T009", 1700000800L,   75.0, "JPY", new Purchase("TokyoRamen",   "Dining"),      "9012", "JP"),
+  new Transaction("T010", 1700000900L, 1600.0, "GBP", new Withdrawal("Airport ATM"),"5678",        "NG")
+]
+
+printSummary(transactions, detector)
+
+// ── Post-analysis: per-card risk summary (groupBy) ────────────────────────────
+
+IO::println("\n" + "━".repeat(70))
+IO::println(" PER-CARD RISK BREAKDOWN")
+IO::println("━".repeat(70))
+
+val byCard: Map[Object, List[Transaction]] = transactions.groupBy { tx -> tx.cardLast4() }
+foreach (card, cardTxList) in byCard {
+  val txl: List[Transaction] = (cardTxList as List[Transaction])
+  var totalScore: Int = 0
+  var alertCount: Int = 0
+  foreach tx: Transaction in txl {
+    val alerts: List[FraudAlert] = detector.analyze(tx)
+    alertCount = alertCount + alerts.size
+    totalScore = totalScore + detector.riskScore(alerts)
+  }
+  val avgAmount: Double = txl.map { t -> t.amount() }.fold(0.0) { acc, v -> acc + v } / txl.size
+  IO::println("  Card *#{card}  txns=#{txl.size}  alerts=#{alertCount}  riskScore=#{totalScore}  avgAmt=#{avgAmount}")
+}
+
+// ── Highest-risk transaction (sortedBy, find) ─────────────────────────────────
+
+IO::println("\n" + bar(70))
+val sorted: List[Transaction] = transactions.sortedBy { tx ->
+  -(detector.riskScore(detector.analyze(tx)))
+}
+val topTx: Transaction? = sorted.find { tx -> detector.riskScore(detector.analyze(tx)) > 0 }
+if topTx != null {
+  val t: Transaction = (topTx as Transaction)
+  IO::println("  Highest-risk: #{t.id()} (score=#{detector.riskScore(detector.analyze(t))})")
+}
+
+// ── Try/catch demo: graceful error boundary ───────────────────────────────────
+
+try {
+  val badTx: Transaction = new Transaction("ERR", 0L, -99.0, "XYZ",
+    new Purchase("Ghost", "Unknown"), "0000", "XX")
+  val errAlerts: List[FraudAlert] = detector.analyze(badTx)
+  IO::println("  Error demo processed #{errAlerts.size} alert(s)")
+} catch e: Exception {
+  IO::println("  Caught exception: #{e.getMessage()}")
+}
+IO::println(bar(70))

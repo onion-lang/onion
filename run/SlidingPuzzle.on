@@ -1,0 +1,273 @@
+// SlidingPuzzle.on — BFS solver for the 3×3 sliding-tile (8-) puzzle.
+//
+// Exercises: classes, records, data-carrying enum, collection pipelines
+// (map/filter/fold), nullable, while/foreach with ranges, string
+// interpolation, closures, select, try/catch, recursion.
+
+enum Dir { UP, DOWN, LEFT, RIGHT }
+
+record Move(dir: Dir, from: Int, to: Int)
+
+class Board {
+  val tiles: List[Int]  // 9 ints, 0 = blank
+
+  public:
+    def this(t: List[Int]) { this.tiles = t }
+
+    def get(i: Int): Int = tiles[i] as Int
+
+    def blankPos: Int {
+      var i: Int = 0
+      while i < 9 {
+        if get(i) == 0 { return i }
+        i++
+      }
+      return -1
+    }
+
+    def key: String {
+      var s: String = ""
+      var i: Int = 0
+      while i < 9 { s = s + get(i); i++ }
+      return s
+    }
+
+    def isGoal: Boolean = this.key == "123456780"
+
+    def moved(from: Int, to: Int): Board {
+      val t: List[Int] = []
+      var i: Int = 0
+      while i < 9 { t.add(tiles[i] as Int); i++ }
+      val tmp = t[from] as Int
+      t[from] = t[to] as Int
+      t[to] = tmp
+      return new Board(t)
+    }
+
+    def neighbors: List[Board] {
+      val result: List[Board] = []
+      val bp = this.blankPos
+      val bx = bp % 3
+      val by = bp / 3
+      if by > 0 { result.add(moved(bp, bp - 3)) }
+      if by < 2 { result.add(moved(bp, bp + 3)) }
+      if bx > 0 { result.add(moved(bp, bp - 1)) }
+      if bx < 2 { result.add(moved(bp, bp + 1)) }
+      return result
+    }
+
+    def display: void {
+      IO::println("+---+---+---+")
+      foreach row: Int in 0..<3 {
+        var line: String = "|"
+        foreach col: Int in 0..<3 {
+          val v = get(row * 3 + col)
+          if v == 0 { line = line + "   |" }
+          else { line = line + " #{v} |" }
+        }
+        IO::println(line)
+        IO::println("+---+---+---+")
+      }
+    }
+}
+
+// ---- Manhattan distance heuristic ----
+def manhattan(b: Board): Int {
+  var total: Int = 0
+  foreach i: Int in 0..<9 {
+    val v = b.get(i)
+    if v != 0 {
+      val gi = v - 1          // goal position of tile v
+      val dx = (i % 3) - (gi % 3)
+      val dy = (i / 3) - (gi / 3)
+      total = total + (if dx < 0 { -dx } else { dx }) + (if dy < 0 { -dy } else { dy })
+    }
+  }
+  return total
+}
+
+// ---- BFS solver: returns move-count or -1 if unsolvable in maxSteps ----
+class Solver {
+  public:
+    def solve(start: Board): Int {
+      if start.isGoal { return 0 }
+      val parent: Map[String, String] = [:]
+      val queue: List[String]  = []
+      val bmap:  Map[String, Board] = [:]
+      val sk = start.key
+      parent[sk] = ""
+      bmap[sk] = start
+      queue.add(sk)
+      var head: Int = 0
+      while head < queue.size {
+        val curKey = queue[head] as String
+        head++
+        val cur = bmap[curKey] as Board
+        foreach nb: Board in cur.neighbors {
+          val nk = nb.key
+          if parent[nk] == null {
+            parent[nk] = curKey
+            bmap[nk] = nb
+            if nb.isGoal {
+              // count steps by tracing parent chain
+              var steps: Int = 0
+              var k: String = nk
+              while k != "" {
+                k = parent[k] as String
+                steps++
+              }
+              return steps - 1
+            }
+            queue.add(nk)
+          }
+        }
+      }
+      return -1
+    }
+
+    def solvePath(start: Board): List[Board]? {
+      if start.isGoal { return [start] }
+      val parent: Map[String, String] = [:]
+      val bmap:   Map[String, Board]  = [:]
+      val queue:  List[String]        = []
+      val sk = start.key
+      parent[sk] = ""
+      bmap[sk] = start
+      queue.add(sk)
+      var head: Int = 0
+      var goalKey: String? = null
+      while head < queue.size && goalKey == null {
+        val curKey = queue[head] as String
+        head++
+        val cur = bmap[curKey] as Board
+        foreach nb: Board in cur.neighbors {
+          val nk = nb.key
+          if parent[nk] == null {
+            parent[nk] = curKey
+            bmap[nk] = nb
+            if nb.isGoal { goalKey = nk }
+            if goalKey == null { queue.add(nk) }
+          }
+        }
+      }
+      if goalKey == null { return null }
+      val path: List[Board] = []
+      var k: String? = goalKey
+      while k != null && (k as String) != "" {
+        path.add(0, bmap[k as String] as Board)
+        k = parent[k as String]
+      }
+      return path
+    }
+}
+
+// ---- helpers ----
+def makeBoard(tiles: List[Int]): Board = new Board(tiles)
+
+def isSolvable(b: Board): Boolean {
+  var inv: Int = 0
+  foreach i: Int in 0..<9 {
+    val vi = b.get(i)
+    if vi == 0 { continue }
+    foreach j: Int in 0..<i {
+      val vj = b.get(j)
+      if vj != 0 && vj > vi { inv++ }
+    }
+  }
+  return inv % 2 == 0
+}
+
+// ---- main ----
+def main(): void {
+  val solver = new Solver()
+
+  IO::println("=== 8-Puzzle BFS Solver ===")
+  IO::println("")
+
+  // ---- case 1: already solved ----
+  val goal = makeBoard([1, 2, 3, 4, 5, 6, 7, 8, 0])
+  IO::println("Goal board (0 moves):")
+  goal.display
+  val steps0 = solver.solve(goal)
+  IO::println("Solved in #{steps0} moves\n")
+
+  // ---- case 2: 1-move puzzle ----
+  val one = makeBoard([1, 2, 3, 4, 5, 6, 7, 0, 8])
+  IO::println("One move away:")
+  one.display
+  val steps1 = solver.solve(one)
+  IO::println("Solved in #{steps1} moves\n")
+
+  // ---- case 3: easy puzzle ----
+  val easy = makeBoard([1, 2, 3, 4, 5, 0, 7, 8, 6])
+  IO::println("Easy puzzle:")
+  easy.display
+  IO::println("Manhattan heuristic: #{manhattan(easy)}")
+  val steps2 = solver.solve(easy)
+  IO::println("Solved in #{steps2} moves\n")
+
+  // ---- case 4: medium puzzle ----
+  val medium = makeBoard([1, 2, 3, 0, 4, 6, 7, 5, 8])
+  IO::println("Medium puzzle:")
+  medium.display
+  IO::println("Solvable: #{isSolvable(medium)}")
+  val steps3 = solver.solve(medium)
+  IO::println("Solved in #{steps3} moves\n")
+
+  // ---- case 5: path reconstruction ----
+  val small = makeBoard([1, 2, 3, 4, 0, 5, 7, 8, 6])
+  IO::println("Step-by-step path for small puzzle:")
+  small.display
+  val path = solver.solvePath(small)
+  if path != null {
+    val steps = (path as List[Board]).size - 1
+    IO::println("Solution in #{steps} moves — showing each board:")
+    var step: Int = 0
+    foreach b: Board in (path as List[Board]) {
+      IO::println("Step #{step}:")
+      b.display
+      step++
+    }
+  } else {
+    IO::println("No solution found")
+  }
+
+  // ---- case 6: unsolvable check ----
+  val unsolvable = makeBoard([1, 2, 3, 4, 5, 6, 8, 7, 0])
+  IO::println("Unsolvable puzzle:")
+  unsolvable.display
+  IO::println("Solvable: #{isSolvable(unsolvable)}")
+  val stepsU = solver.solve(unsolvable)
+  IO::println("Solver result: #{stepsU} (−1 = no solution)\n")
+
+  // ---- statistics: distribution of move counts for random-ish starts ----
+  IO::println("=== Difficulty distribution (10 test cases) ===")
+  val puzzles: List[List[Int]] = [
+    [1, 2, 3, 4, 5, 6, 7, 8, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0, 8],
+    [1, 2, 3, 4, 5, 6, 0, 7, 8],
+    [1, 2, 3, 4, 5, 0, 6, 7, 8],
+    [1, 2, 0, 4, 5, 3, 7, 8, 6],
+    [0, 1, 2, 4, 5, 3, 7, 8, 6],
+    [4, 1, 2, 5, 0, 3, 7, 8, 6],
+    [4, 1, 2, 5, 8, 3, 7, 0, 6],
+    [4, 1, 2, 5, 8, 3, 0, 7, 6],
+    [4, 1, 2, 0, 8, 3, 5, 7, 6]
+  ]
+  val counts: Map[Int, Int] = [:]
+  foreach tiles: List[Int] in puzzles {
+    val b = makeBoard(tiles)
+    if isSolvable(b) {
+      val s = solver.solve(b)
+      val cur = counts[s]
+      counts[s] = if cur != null { (cur as Int) + 1 } else { 1 }
+    }
+  }
+  val sortedKeys: List[Int] = []
+  foreach k: Int in 0..30 {
+    if counts[k] != null { sortedKeys.add(k) }
+  }
+  foreach k: Int in sortedKeys {
+    IO::println("#{k} moves: #{counts[k]} puzzle(s)")
+  }
+}

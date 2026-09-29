@@ -1,0 +1,254 @@
+// RomanLegionBattle.on
+// Roman legion formation-and-combat simulator
+// Features: ADT case-enums, records, mutable classes, foreach,
+//           select-based dispatch, string interpolation, ArrayList
+
+import {
+  java.util.ArrayList
+}
+
+// ── Formation Tactics ──────────────────────────────────────────────────────
+
+enum FormationTactic {
+  case Testudo    // interlocked shields — peak defence, low offence
+  case Wedge      // wedge assault — breaks the enemy line
+  case Line       // standard three-rank engagement
+  case Orbis      // circle — desperate last-stand defence
+
+public:
+  def attackBonus(): Int = select this {
+    case t is Testudo: -3
+    case w is Wedge:    5
+    case l is Line:     1
+    case o is Orbis:    0
+  }
+
+  def defenseBonus(): Int = select this {
+    case t is Testudo:  7
+    case w is Wedge:   -2
+    case l is Line:     2
+    case o is Orbis:    5
+  }
+
+  def label(): String = select this {
+    case t is Testudo: "Testudo"
+    case w is Wedge:   "Wedge"
+    case l is Line:    "Line"
+    case o is Orbis:   "Orbis"
+  }
+}
+
+// ── Soldier Classes ────────────────────────────────────────────────────────
+
+enum SoldierClass {
+  case Velites    // light skirmishers
+  case Hastati    // young heavy infantry — first line
+  case Principes  // experienced veterans — second line
+  case Triarii    // elite spearmen — last reserve
+
+public:
+  def baseAttack(): Int = select this {
+    case v is Velites:    4
+    case h is Hastati:    7
+    case p is Principes:  9
+    case t is Triarii:   12
+  }
+
+  def baseDefense(): Int = select this {
+    case v is Velites:    3
+    case h is Hastati:    6
+    case p is Principes:  8
+    case t is Triarii:   11
+  }
+
+  def label(): String = select this {
+    case v is Velites:   "Velites"
+    case h is Hastati:   "Hastati"
+    case p is Principes: "Principes"
+    case t is Triarii:   "Triarii"
+  }
+}
+
+// ── Battle-Round Log Record ────────────────────────────────────────────────
+
+record RoundLog(
+  round:  Int,
+  tacA:   String, tacB:   String,
+  lostA:  Int,    lostB:  Int,
+  aliveA: Int,    aliveB: Int
+)
+
+// ── Legion Class ──────────────────────────────────────────────────────────
+
+class Legion {
+  var legionName: String
+  var soldierCls: SoldierClass
+  var formation:  FormationTactic
+  var aliveCount: Int
+  var startCount: Int
+  var lostTotal:  Int
+
+public:
+  def this(n: String, sc: SoldierClass, t: FormationTactic, count: Int) {
+    legionName = n
+    soldierCls = sc
+    formation  = t
+    aliveCount = count
+    startCount = count
+    lostTotal  = 0
+  }
+
+  def name():        String  = legionName
+  def alive():       Int     = aliveCount
+  def initial():     Int     = startCount
+  def totalLost():   Int     = lostTotal
+  def isDefeated():  Boolean = aliveCount <= 0
+  def tacLabel():    String  = formation.label()
+  def clsLabel():    String  = soldierCls.label()
+  def clsDef():      Int     = soldierCls.baseDefense()
+  def tacDefBonus(): Int     = formation.defenseBonus()
+
+  // Damage dealt to the opponent this round
+  def strikeForce(opp: Legion): Int {
+    val myAtk:  Int = soldierCls.baseAttack() + formation.attackBonus()
+    val oppDef: Int = opp.clsDef() + opp.tacDefBonus()
+    val netAtk: Int = myAtk - oppDef
+    // Spread over 20 "moments of contact" per round; minimum 1 casualty
+    val base:   Int = (netAtk * aliveCount) / 20
+    val noise:  Int = Rand::nextInt(5) - 2
+    val dmg:    Int = base + noise
+    return if dmg < 1 { 1 } else { dmg }
+  }
+
+  def absorb(n: Int): Int {
+    val lost: Int = if n > aliveCount { aliveCount } else { n }
+    aliveCount    = aliveCount - lost
+    lostTotal     = lostTotal  + lost
+    return lost
+  }
+
+  // Switch to fallback formation under severe casualties
+  def moralCheck(): void {
+    if aliveCount * 10 <= startCount * 2 {
+      formation = new Orbis()
+    } else if aliveCount * 10 <= startCount * 4 {
+      formation = new Testudo()
+    }
+  }
+}
+
+// ── Battle Simulation ─────────────────────────────────────────────────────
+
+class Battle {
+  var legionA:   Legion
+  var legionB:   Legion
+  var roundLog:   ArrayList[RoundLog]
+  var roundsDone: Int
+  var maxRounds:  Int
+
+public:
+  def this(a: Legion, b: Legion) {
+    legionA    = a
+    legionB    = b
+    roundLog   = new ArrayList[RoundLog]()
+    roundsDone = 0
+    maxRounds  = 40
+  }
+
+  def simulate(): void {
+    var r: Int = 1
+    while !legionA.isDefeated() && !legionB.isDefeated() && r <= maxRounds {
+      legionA.moralCheck()
+      legionB.moralCheck()
+
+      val strikeB: Int = legionA.strikeForce(legionB)
+      val strikeA: Int = legionB.strikeForce(legionA)
+      val lostA:   Int = legionA.absorb(strikeA)
+      val lostB:   Int = legionB.absorb(strikeB)
+
+      roundLog.add(new RoundLog(
+        r,
+        legionA.tacLabel(), legionB.tacLabel(),
+        lostA, lostB,
+        legionA.alive(), legionB.alive()
+      ))
+      r = r + 1
+    }
+    roundsDone = r - 1
+  }
+
+  def printLog(): void {
+    IO::println("  Rd  Tactic-A   Tactic-B   -A   -B   Alive-A  Alive-B")
+    IO::println("  -------------------------------------------------------")
+    foreach entry: RoundLog in roundLog {
+      IO::println("  #{entry.round()}   #{entry.tacA()}     #{entry.tacB()}     " +
+        "#{entry.lostA()}    #{entry.lostB()}    #{entry.aliveA()}      #{entry.aliveB()}")
+    }
+    IO::println("")
+  }
+
+  def printOutcome(): void {
+    IO::println("── Outcome ──────────────────────────────────────────────────")
+    if legionA.isDefeated() && legionB.isDefeated() {
+      IO::println("  Mutual annihilation — both legions destroyed in round #{roundsDone}!")
+    } else if legionA.isDefeated() {
+      IO::println("  VICTORY: #{legionB.name()}  " +
+        "(#{legionB.alive()} of #{legionB.initial()} survived)")
+    } else if legionB.isDefeated() {
+      IO::println("  VICTORY: #{legionA.name()}  " +
+        "(#{legionA.alive()} of #{legionA.initial()} survived)")
+    } else {
+      IO::println("  Stalemate after #{roundsDone} rounds")
+      IO::println("    #{legionA.name()}: #{legionA.alive()} remaining")
+      IO::println("    #{legionB.name()}: #{legionB.alive()} remaining")
+    }
+    IO::println("  Casualties — #{legionA.name()}: #{legionA.totalLost()}  |  " +
+      "#{legionB.name()}: #{legionB.totalLost()}")
+    IO::println("")
+  }
+}
+
+// ── Scenario Runner ───────────────────────────────────────────────────────
+
+def runScenario(title: String, a: Legion, b: Legion): void {
+  IO::println("══════════════════════════════════════════════════════════════")
+  IO::println("  #{title}")
+  IO::println("  #{a.name()} [#{a.initial()} #{a.clsLabel()} / #{a.tacLabel()}]")
+  IO::println("    vs")
+  IO::println("  #{b.name()} [#{b.initial()} #{b.clsLabel()} / #{b.tacLabel()}]")
+  IO::println("══════════════════════════════════════════════════════════════")
+  IO::println("")
+  val battle: Battle = new Battle(a, b)
+  battle.simulate()
+  battle.printLog()
+  battle.printOutcome()
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+
+IO::println("ROMAN LEGION BATTLE SIMULATOR")
+IO::println("==============================")
+IO::println("")
+
+// Scenario I: Balanced clash — Hastati Line vs Principes Wedge
+runScenario(
+  "SCENARIO I: Mantinea Plains",
+  new Legion("Legio III Gallica",    new Hastati(),   new Line(),    120),
+  new Legion("Legio V Macedonia",    new Principes(), new Wedge(),   100)
+)
+
+// Scenario II: Elite shell holds against a massed skirmisher swarm
+runScenario(
+  "SCENARIO II: Zama Outskirts",
+  new Legion("Legio X Equestris",    new Triarii(),  new Testudo(), 80),
+  new Legion("Carthaginian Warband", new Velites(),  new Wedge(),   200)
+)
+
+// Scenario III: Mirror match — same class, opposite tactics
+runScenario(
+  "SCENARIO III: Pharsalus Fields",
+  new Legion("Legio VII Caesar",     new Principes(), new Wedge(),   150),
+  new Legion("Legio I Pompei",       new Principes(), new Testudo(), 150)
+)
+
+IO::println("═══════════ Simulation complete. ═══════════")

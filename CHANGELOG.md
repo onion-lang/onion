@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.127.0] - 2026-09-29
+
 ### Added
 
 - **`run/IntervalTree.on`** — a 370-line augmented immutable AVL interval tree used for IP-range allocation, a new domain for the `run/` corpus (immutable records with `law`/`example` clauses — `Interval`/`INode`, four `example` and two `law` clauses verified at compile time; an ADT enum `QueryResult` (`Found(interval)`/`NotFound`) dispatched via `select this`; an augmented AVL tree — insert, remove (recount via in-order walk), first-overlap search, point-in-interval search, sorted in-order traversal, height/balance bookkeeping via immutable `withLeft`/`withRight` helpers; collection pipelines (`mergeOverlapping()` via `toSortedList()` then a linear scan); nullable safety with `!!` non-null assertion throughout tree traversals on `INode?`; Java interop (`import { java.lang.Integer as JInteger }`); top-level functions for IP parsing/AVL rotation; string interpolation — allocating and querying CIDR subnets, merging overlapping intervals, and removing/re-listing allocations sorted by start address), added to the `run/` corpus (merged via #1710).

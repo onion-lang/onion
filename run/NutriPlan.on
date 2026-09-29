@@ -1,0 +1,406 @@
+// MealPlanner.on — weekly meal planning with nutritional budgets
+// Exercises: records, ADT enums, collection pipelines (map/filter/sortedBy/groupBy),
+//            pattern matching with is-patterns, string interpolation,
+//            foreach with ranges, nullable fields, method bodies in records,
+//            extension methods, and select-based dispatch
+
+record Ingredient(name: String, grams: Double, caloriesPer100g: Double,
+                  proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double) {
+public:
+  def calories(): Double = grams * caloriesPer100g / 100.0
+  def protein(): Double  = grams * proteinPer100g  / 100.0
+  def carbs(): Double    = grams * carbsPer100g    / 100.0
+  def fat(): Double      = grams * fatPer100g      / 100.0
+  def scale(f: Double): Ingredient =
+    new Ingredient(name, grams * f, caloriesPer100g, proteinPer100g, carbsPer100g, fatPer100g)
+}
+
+record NutritionalProfile(calories: Double, protein: Double, carbs: Double, fat: Double) {
+public:
+  def plus(other: NutritionalProfile): NutritionalProfile =
+    new NutritionalProfile(calories + other.calories, protein + other.protein,
+                           carbs   + other.carbs,    fat    + other.fat)
+  def perServing(n: Int): NutritionalProfile =
+    new NutritionalProfile(calories / n.doubleValue(), protein / n.doubleValue(),
+                           carbs    / n.doubleValue(), fat     / n.doubleValue())
+  def summary(): String =
+    "#{calories.intValue()} kcal | P #{protein.intValue()}g | C #{carbs.intValue()}g | F #{fat.intValue()}g"
+}
+
+enum MealType {
+  case Breakfast
+  case Lunch
+  case Dinner
+  case Snack
+public:
+  def label(): String = select this {
+    case t is Breakfast: "Breakfast"
+    case t is Lunch:     "Lunch"
+    case t is Dinner:    "Dinner"
+    case t is Snack:     "Snack"
+  }
+  def ordinal(): Int = select this {
+    case t is Breakfast: 0
+    case t is Lunch:     1
+    case t is Snack:     2
+    case t is Dinner:    3
+  }
+}
+
+enum DietTag {
+  case Vegetarian
+  case Vegan
+  case GlutenFree
+  case HighProtein
+  case LowCarb
+public:
+  def label(): String = select this {
+    case t is Vegetarian: "Vegetarian"
+    case t is Vegan:      "Vegan"
+    case t is GlutenFree: "Gluten-Free"
+    case t is HighProtein:"High-Protein"
+    case t is LowCarb:    "Low-Carb"
+  }
+}
+
+record Dish(name: String, servings: Int, ingredients: List[Ingredient],
+            mealType: MealType, tags: List[DietTag], prepMinutes: Int) {
+public:
+  def nutritionTotal(): NutritionalProfile = {
+    var cal: Double  = 0.0
+    var pro: Double  = 0.0
+    var carb: Double = 0.0
+    var fat: Double  = 0.0
+    foreach ing: Ingredient in ingredients {
+      cal  = cal  + ing.calories()
+      pro  = pro  + ing.protein()
+      carb = carb + ing.carbs()
+      fat  = fat  + ing.fat()
+    }
+    new NutritionalProfile(cal, pro, carb, fat)
+  }
+  def nutritionPerServing(): NutritionalProfile = nutritionTotal().perServing(servings)
+  def isQuick(): Boolean = prepMinutes <= 15
+  def hasTag(tag: DietTag): Boolean = {
+    var found: Boolean = false
+    foreach t: DietTag in tags { if t.label() == tag.label() { found = true } }
+    found
+  }
+  def caloriesPerServing(): Double = nutritionPerServing().calories
+  def label(): String =
+    "#{name} (#{mealType.label()}, #{prepMinutes}min, #{nutritionPerServing().calories.intValue()} kcal/srv)"
+}
+
+record ScheduledMeal(day: String, dish: Dish) {
+public:
+  def summary(): String = "#{day} #{dish.mealType.label()}: #{dish.name}"
+}
+
+// ── ingredient helpers ─────────────────────────────────────────────────────
+
+def ing(name: String, g: Double, cal: Double, pro: Double, carb: Double, fat: Double): Ingredient =
+  new Ingredient(name, g, cal, pro, carb, fat)
+
+// ── dish catalogue ─────────────────────────────────────────────────────────
+
+def oatmeal(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Rolled oats", 80.0, 389.0, 16.9, 66.3, 6.9),
+    ing("Banana",      100.0, 89.0,  1.1, 23.0, 0.3),
+    ing("Honey",        15.0, 304.0, 0.3, 82.4, 0.0),
+    ing("Milk",        200.0,  61.0,  3.2,  4.8, 3.3)
+  ]
+  val tags: List[DietTag] = [new Vegetarian()]
+  new Dish("Oatmeal with Banana", 1, ings, new Breakfast(), tags, 10)
+}
+
+def scrambledEggs(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Eggs",          150.0, 155.0, 13.0,  1.1, 11.0),
+    ing("Butter",         10.0, 717.0,  0.8,  0.1, 81.1),
+    ing("Cheddar",        25.0, 402.0, 24.9,  1.3, 33.1),
+    ing("Whole-grain bread", 60.0, 247.0, 9.0, 46.7,  3.4)
+  ]
+  val tags: List[DietTag] = [new Vegetarian(), new HighProtein()]
+  new Dish("Scrambled Eggs on Toast", 1, ings, new Breakfast(), tags, 12)
+}
+
+def greekSalad(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Cucumber",     150.0,  15.0,  0.7,  3.6, 0.1),
+    ing("Tomatoes",     200.0,  18.0,  0.9,  3.9, 0.2),
+    ing("Feta cheese",   80.0, 264.0, 14.2,  4.1, 21.3),
+    ing("Olives",        40.0, 115.0,  0.8,  6.3, 10.9),
+    ing("Red onion",     50.0,  40.0,  1.1,  9.3,  0.1),
+    ing("Olive oil",     15.0, 884.0,  0.0,  0.0, 100.0)
+  ]
+  val tags: List[DietTag] = [new Vegetarian(), new GlutenFree(), new LowCarb()]
+  new Dish("Greek Salad", 2, ings, new Lunch(), tags, 10)
+}
+
+def chickenWrap(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Chicken breast", 150.0, 165.0, 31.0,  0.0,  3.6),
+    ing("Tortilla wrap",   60.0, 305.0,  8.1, 55.4,  7.1),
+    ing("Lettuce",         40.0,  15.0,  1.4,  2.9,  0.2),
+    ing("Tomatoes",        80.0,  18.0,  0.9,  3.9,  0.2),
+    ing("Avocado",         60.0, 160.0,  2.0,  8.5, 14.7),
+    ing("Greek yogurt",    40.0,  59.0, 10.0,  3.6,  0.4)
+  ]
+  val tags: List[DietTag] = [new HighProtein()]
+  new Dish("Chicken & Avocado Wrap", 1, ings, new Lunch(), tags, 15)
+}
+
+def lentilSoup(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Red lentils",  150.0, 352.0, 24.6, 63.4,  1.1),
+    ing("Carrots",      100.0,  41.0,  0.9,  9.6,  0.2),
+    ing("Onion",         80.0,  40.0,  1.1,  9.3,  0.1),
+    ing("Tomato paste",  50.0,  82.0,  4.3, 18.9,  0.5),
+    ing("Olive oil",     10.0, 884.0,  0.0,  0.0, 100.0),
+    ing("Vegetable stock",400.0, 7.0,  0.3,  1.0,  0.1)
+  ]
+  val tags: List[DietTag] = [new Vegan(), new GlutenFree(), new HighProtein()]
+  new Dish("Red Lentil Soup", 4, ings, new Dinner(), tags, 35)
+}
+
+def salmonRiceBowl(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Salmon fillet", 180.0, 208.0, 20.4,  0.0, 13.0),
+    ing("Jasmine rice",  150.0, 365.0,  7.1, 80.3,  0.7),
+    ing("Broccoli",      100.0,  34.0,  2.8,  6.6,  0.4),
+    ing("Soy sauce",      15.0,  53.0,  8.1,  4.9,  0.6),
+    ing("Sesame oil",      5.0, 884.0,  0.0,  0.0, 100.0),
+    ing("Spring onions",  20.0,  32.0,  1.8,  7.3,  0.2)
+  ]
+  val tags: List[DietTag] = [new GlutenFree(), new HighProtein()]
+  new Dish("Soy Salmon Rice Bowl", 2, ings, new Dinner(), tags, 25)
+}
+
+def beefStirFry(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Beef strips",   200.0, 250.0, 26.0,  0.0, 15.0),
+    ing("Noodles",       100.0, 371.0, 13.0, 74.0,  1.5),
+    ing("Mixed veg",     150.0,  50.0,  2.5, 10.0,  0.3),
+    ing("Soy sauce",      20.0,  53.0,  8.1,  4.9,  0.6),
+    ing("Sesame oil",      8.0, 884.0,  0.0,  0.0, 100.0),
+    ing("Garlic",         10.0, 149.0,  6.4, 33.1,  0.5)
+  ]
+  val tags: List[DietTag] = [new HighProtein()]
+  new Dish("Beef Noodle Stir-Fry", 2, ings, new Dinner(), tags, 20)
+}
+
+def yogurtParfait(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Greek yogurt",  150.0,  59.0, 10.0,  3.6,  0.4),
+    ing("Granola",        30.0, 471.0,  8.9, 64.0, 20.0),
+    ing("Mixed berries",  80.0,  50.0,  0.7, 12.0,  0.3),
+    ing("Honey",          10.0, 304.0,  0.3, 82.4,  0.0)
+  ]
+  val tags: List[DietTag] = [new Vegetarian(), new GlutenFree()]
+  new Dish("Yogurt Parfait", 1, ings, new Snack(), tags, 5)
+}
+
+def almondMix(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Almonds",  35.0, 579.0, 21.2, 21.6, 49.9),
+    ing("Cashews",  20.0, 553.0, 18.2, 30.2, 43.9),
+    ing("Raisins",  15.0, 299.0,  3.1, 79.2,  0.5)
+  ]
+  val tags: List[DietTag] = [new Vegan(), new GlutenFree()]
+  new Dish("Trail Mix", 1, ings, new Snack(), tags, 2)
+}
+
+def veggiePasta(): Dish = {
+  val ings: List[Ingredient] = [
+    ing("Penne pasta",    100.0, 371.0, 13.0, 74.7,  1.5),
+    ing("Cherry tomatoes", 150.0, 18.0,  0.9,  3.9,  0.2),
+    ing("Spinach",         80.0,  23.0,  2.9,  3.6,  0.4),
+    ing("Olive oil",       15.0, 884.0,  0.0,  0.0, 100.0),
+    ing("Garlic",          10.0, 149.0,  6.4, 33.1,  0.5),
+    ing("Parmesan",        20.0, 431.0, 38.5,  4.1, 28.6)
+  ]
+  val tags: List[DietTag] = [new Vegetarian()]
+  new Dish("Garlic Spinach Pasta", 2, ings, new Dinner(), tags, 20)
+}
+
+// ── weekly plan ────────────────────────────────────────────────────────────
+
+def buildWeeklyPlan(): List[ScheduledMeal] = {
+  val days: List[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  val breakfasts: List[Dish] = [oatmeal(), scrambledEggs(), oatmeal(), scrambledEggs(), oatmeal(), scrambledEggs(), oatmeal()]
+  val lunches: List[Dish]    = [chickenWrap(), greekSalad(), chickenWrap(), greekSalad(), chickenWrap(), greekSalad(), chickenWrap()]
+  val snacks: List[Dish]     = [yogurtParfait(), almondMix(), yogurtParfait(), almondMix(), yogurtParfait(), almondMix(), yogurtParfait()]
+  val dinners: List[Dish]    = [salmonRiceBowl(), lentilSoup(), beefStirFry(), veggiePasta(), salmonRiceBowl(), lentilSoup(), beefStirFry()]
+  val plan: List[ScheduledMeal] = []
+  foreach i: Int in 0..<7 {
+    val day: String = days[i] as String
+    plan.add(new ScheduledMeal(day, breakfasts[i] as Dish))
+    plan.add(new ScheduledMeal(day, lunches[i]    as Dish))
+    plan.add(new ScheduledMeal(day, snacks[i]     as Dish))
+    plan.add(new ScheduledMeal(day, dinners[i]    as Dish))
+  }
+  plan
+}
+
+// ── analysis helpers ───────────────────────────────────────────────────────
+
+def profileForDay(meals: List[ScheduledMeal], day: String): NutritionalProfile = {
+  var cal: Double  = 0.0
+  var pro: Double  = 0.0
+  var carb: Double = 0.0
+  var fat: Double  = 0.0
+  foreach m: ScheduledMeal in meals {
+    if m.day == day {
+      val np: NutritionalProfile = m.dish.nutritionPerServing()
+      cal  = cal  + np.calories
+      pro  = pro  + np.protein
+      carb = carb + np.carbs
+      fat  = fat  + np.fat
+    }
+  }
+  new NutritionalProfile(cal, pro, carb, fat)
+}
+
+def totalWeekProfile(meals: List[ScheduledMeal]): NutritionalProfile = {
+  var cal: Double  = 0.0
+  var pro: Double  = 0.0
+  var carb: Double = 0.0
+  var fat: Double  = 0.0
+  foreach m: ScheduledMeal in meals {
+    val np: NutritionalProfile = m.dish.nutritionPerServing()
+    cal  = cal  + np.calories
+    pro  = pro  + np.protein
+    carb = carb + np.carbs
+    fat  = fat  + np.fat
+  }
+  new NutritionalProfile(cal, pro, carb, fat)
+}
+
+def printDailyBreakdown(meals: List[ScheduledMeal]): void {
+  val days: List[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  println("Day | Calories | Protein | Carbs | Fat")
+  println("----+----------+---------+-------+------")
+  foreach day: String in days {
+    val p: NutritionalProfile = profileForDay(meals, day)
+    println("#{day} | #{p.calories.intValue()} kcal   | #{p.protein.intValue()}g     | #{p.carbs.intValue()}g   | #{p.fat.intValue()}g")
+  }
+}
+
+def dishesWithTag(meals: List[ScheduledMeal], tag: DietTag): List[String] = {
+  val result: List[String] = []
+  foreach m: ScheduledMeal in meals {
+    if m.dish.hasTag(tag) {
+      val lbl: String = m.dish.name
+      if result.indexOf(lbl) < 0 { result.add(lbl) }
+    }
+  }
+  result
+}
+
+def quickDishes(meals: List[ScheduledMeal]): List[String] = {
+  val seen: List[String] = []
+  foreach m: ScheduledMeal in meals {
+    val name: String = m.dish.name
+    if m.dish.isQuick() && seen.indexOf(name) < 0 { seen.add(name) }
+  }
+  seen
+}
+
+def printCalorieBar(label: String, cal: Int): void {
+  val bars: Int = cal / 100
+  var bar: String = ""
+  foreach i: Int in 0..<bars { bar = bar + "▓" }
+  val pad: String = if label.length < 12 {
+    var s: String = label
+    foreach j: Int in label.length..<12 { s = s + " " }
+    s
+  } else {
+    label.substring(0, 12)
+  }
+  println("#{pad} #{bar} #{cal}")
+}
+
+// ── main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  println("╔══════════════════════════════════════════════════════════╗")
+  println("║              WEEKLY MEAL PLANNER                        ║")
+  println("║     Nutritional analysis for a 7-day plan               ║")
+  println("╚══════════════════════════════════════════════════════════╝")
+  println("")
+
+  val plan: List[ScheduledMeal] = buildWeeklyPlan()
+  println("Plan built: #{plan.size} meals across 7 days")
+  println("")
+
+  // Print Monday's menu
+  println("═══ MONDAY MENU ═══")
+  foreach m: ScheduledMeal in plan {
+    if m.day == "Mon" {
+      val np: NutritionalProfile = m.dish.nutritionPerServing()
+      println("  #{m.dish.mealType.label()}: #{m.dish.name}")
+      println("    └─ #{np.summary()}#{if m.dish.isQuick() { "  ⚡quick" } else { "" }}")
+    }
+  }
+  println("")
+
+  // Daily nutritional breakdown
+  println("═══ DAILY NUTRITIONAL BREAKDOWN ═══")
+  printDailyBreakdown(plan)
+  println("")
+
+  // Weekly totals
+  val weekTotal: NutritionalProfile = totalWeekProfile(plan)
+  val avgPerDay: NutritionalProfile = weekTotal.perServing(7)
+  println("═══ WEEKLY TOTALS ═══")
+  println("Total  : #{weekTotal.summary()}")
+  println("Daily avg: #{avgPerDay.summary()}")
+  println("")
+
+  // Calorie bar chart per day
+  println("═══ DAILY CALORIE BAR CHART (each ▓ = 100 kcal) ═══")
+  val days2: List[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  foreach day: String in days2 {
+    val p: NutritionalProfile = profileForDay(plan, day)
+    printCalorieBar(day, p.calories.intValue())
+  }
+  println("")
+
+  // Tag analysis
+  println("═══ VEGETARIAN DISHES ═══")
+  val vegDishes: List[String] = dishesWithTag(plan, new Vegetarian())
+  foreach d: String in vegDishes { println("  • #{d}") }
+  println("")
+
+  println("═══ HIGH-PROTEIN DISHES ═══")
+  val hiProtDishes: List[String] = dishesWithTag(plan, new HighProtein())
+  foreach d: String in hiProtDishes { println("  • #{d}") }
+  println("")
+
+  println("═══ QUICK DISHES (≤15 min) ═══")
+  val quick: List[String] = quickDishes(plan)
+  foreach d: String in quick { println("  • #{d}") }
+  println("")
+
+  // Unique dishes summary
+  val seen: List[String] = []
+  foreach m: ScheduledMeal in plan {
+    val name: String = m.dish.name
+    if seen.indexOf(name) < 0 { seen.add(name) }
+  }
+  println("═══ ALL UNIQUE DISHES (#{seen.size} total) ═══")
+  foreach name: String in seen {
+    // find the dish
+    var cal: Int = 0
+    foreach m: ScheduledMeal in plan {
+      if m.dish.name == name && cal == 0 {
+        cal = m.dish.caloriesPerServing().intValue()
+      }
+    }
+    println("  #{name}: #{cal} kcal/serving")
+  }
+  println("")
+
+  println("Done. Have a healthy week!")
+}

@@ -9,7 +9,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 **構成:**
 - Scala バージョン: 3.3.7
 - Java バージョン: 17
-- SBT バージョン: ~1.9+
+- SBT バージョン: 2.0.6 (`project/build.properties`)
 - 主要な依存関係: ASM 9.8 (バイトコード), JavaCC 5.0 (パーサー), ScalaTest 3.2.19 (テスト)
 
 ## ビルドコマンド
@@ -18,7 +18,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
   - `grammar/JJOnionParser.jj` が変更されると、パーサーを自動再生成
 - **テストの実行**: `sbt test`
 - **単一テストスイートの実行**: `sbt 'testOnly *HelloWorldSpec'`
-- **依存関係を含むJARのパッケージ化**: `sbt assembly` (`onion.jar`を作成)
+- **依存関係を含むJARのパッケージ化**: `sbt assembly` (`onion-<version>.jar`を作成)
 - **配布パッケージの作成**: `sbt dist` (target/にlib/, bin/, run/, onion.jarを含むZIPを作成)
 - **Onionスクリプトの実行**: `sbt 'runScript path/to/script.on [args]'`
 - **REPLの起動**: `sbt repl`
@@ -49,7 +49,7 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 ```
 ソースファイル (.on)
     ↓
-[1] パース (JavaCC) → 型なしAST
+[1] パース (手書き高速パス、JavaCCフォールバック) → 型なしAST
     ↓
 [2] 書き換え → 正規化された型なしAST
     ↓
@@ -89,7 +89,7 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
      - `LocalContext.scala` - ローカル変数環境
      - `Symbol.scala` - シンボル定義
      - `SemanticErrorReporter.scala` - エラー収集
-   - 出力: 型付きAST (`TypedAST.scala`, 37KB)
+   - 出力: 型付きAST (`TypedAST.scala`)
 
 4. **末尾呼び出し最適化** (`src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`)
    - 末尾再帰メソッド（return位置での自己呼び出し）を検出
@@ -247,7 +247,7 @@ CI はどちらの影響も受けません。差分実行の状態は `target/` 
 パーサー文法 (`grammar/JJOnionParser.jj`) を変更する場合：
 1. JavaCC文法ファイルを編集
 2. `sbt compile` を実行 - パーサーが自動再生成される
-3. 生成されたパーサーは `target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/` に出力される
+3. 生成されたパーサーは `target/out/jvm/scala-3.3.7/onion/src_managed/main/java/onion/compiler/parser/` に出力される（sbt 2 のレイアウト）
 
 ## 重要なコードの場所
 
@@ -330,7 +330,7 @@ while true {
 ```onion
 // ラムダ式
 val f: Function1[Int, Int] = (x: Int) -> x * 2
-val g = (x, y) -> x + y
+val g: (Int, Int) -> Int = (x, y) -> x + y   // 型なし引数には期待される関数型が必要（無ければE0052）
 
 // 末尾ラムダ構文
 list.map { x -> x * 2 }
@@ -514,15 +514,15 @@ try {
 | ADT（直和型）のenum？ | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case` キーワードで宣言する各ケースがそれぞれのフィールドを持つ。sealedインターフェース＋ケースごとのrecordに脱糖され、`select` の網羅性チェック（E0042）が適用される。フィールドが無いケース（シングルトン）は `new Origin()` で作るゼロフィールドrecordになる。`case`-enumは `java.lang.Enum` ではなくsealed階層（`values()`/`ordinal()` は無い）。共有パラメータと `case` ケースの混在はエラー |
 | ジェネリックなADT enum？ | `enum Opt[T] { case Some(value: T); case Nothing }` - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、`Opt[String]` から `Some` をマッチさせると `Some[String]` が束縛され、`s.value()` は `String` になる。*homogeneous*（データを持たない）enumは型パラメータを取れない（`java.lang.Enum`になるため） |
 | レコードから手でパーサーを書く | `record R(...) from re"..."` - `R::parse(s): R?`（アンカー一致、非マッチ/変換失敗はnull）と `R::parseAll(text): List` を合成する。`from` は `conforms` より前に書く |
-| `null` ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？ | `record R(...) shape name = re"..."` - `R::name(): onion.Shape[R]` を合成する。`.parse(s)` は `Outcome[R]`（値、またはそれが得られなかった全理由を `Defect` として保持する）を返し、可逆な場合は `.print(v)` で書き戻せる。`shape` 節はレコード1つに複数付けられる（正規表現以外に `shape name = json`/`config` という書式指定も可）。`from re"..."` と共存できる |
+| `null` ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？ | `record R(...) { shape name = re"..." }` - `R::name(): onion.Shape[R]` を合成する。`.parse(s)` は `Outcome[R]`（値、またはそれが得られなかった全理由を `Defect` として保持する）を返し、可逆な場合は `.print(v)` で書き戻せる。`shape` 節はレコード1つに複数付けられる（正規表現以外に `shape name = json`/`config` という書式指定も可）。`from re"..."` と共存できる |
 | レコードを手でシリアライズ（JSON/YAML） | `record R(...) derive!(Json, Yaml)` - 共通の `toMap`/`fromMap` を介して `R::fromJson`/`toJson`/`fromYaml`/`toYaml` をマクロ生成する。スカラー型のコンポーネントのみ（それ以外はE0062）、未知のマーカーはE0063。`from re"..."` と共存できる |
-| 別スイートでレコードをテストする | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - コンパイラがビルド時に実行する。偽の `example` はE0065、反証された `law` はE0064（反例付き）になる。`parse∘format==id` のような性質を機械的に検証できる |
+| 別スイートでレコードをテストする | `record R(...) { law name(p: T) { boolExpr } example { boolExpr } }` - `law`/`example`/`shape` 節はレコードの波括弧本体の中にメソッドと並べて書く（節の後の `;` は構文エラー）。コンパイラがビルド時に実行する。偽の `example` はE0065、反証された `law` はE0064（反例付き）になる。`parse∘format==id` のような性質を機械的に検証できる |
 
 ### ラムダと関数
 
 | 誤り | 正しい（Onion） |
 |-----|----------------|
-| `x -> x * 2` | ✓ 正しい - 裸の単一引数はそのまま使える。式本体も使える |
+| `x -> x * 2` | ✓ 正しい（期待される関数型がある場合: `val h: Int -> Int = x -> x * 2`、呼び出しの引数など）。無ければ型なし引数はE0052。式本体も使える |
 | `(x) -> expr` | ✓ 正しい - 引数の型は期待される関数型から推論される |
 | `lambda x: x * 2`（Python風） | `(x) -> x * 2` - `lambda`キーワードはなく、アロー式ラムダを使う |
 | `func(arg)` でラムダ呼び出し | ✓ 正しい - 関数値は直接呼び出せる |

@@ -1,0 +1,268 @@
+import {
+  java.util.*
+}
+
+// ── Dietary restriction tags (sealed enum hierarchy) ──────────────────────
+enum DietaryTag {
+  case Vegan
+  case Vegetarian
+  case GlutenFree
+  case DairyFree
+  case LowCarb
+  case HighProtein
+public:
+  def label(): String = select this {
+    case x is Vegan:       "Vegan"
+    case x is Vegetarian:  "Vegetarian"
+    case x is GlutenFree:  "GF"
+    case x is DairyFree:   "DF"
+    case x is LowCarb:     "LC"
+    case x is HighProtein: "HP"
+  }
+}
+
+// ── Data records ───────────────────────────────────────────────────────────
+record NutritionFacts(calories: Int, protein: Double, carbs: Double, fat: Double) {
+public:
+  def description(): String =
+    "#{calories} kcal | P:#{protein}g C:#{carbs}g F:#{fat}g"
+  def isHighProtein(): Boolean = protein > 20.0
+  def isLowCalorie(): Boolean  = calories < 300
+  def score(): Double = protein * 2.0 - fat * 0.5
+}
+
+record Ingredient(name: String, amount: Double, unit: String) {
+public:
+  def description(): String = "#{amount}#{unit} #{name}"
+}
+
+record CategoryStats(category: String, count: Int, avgCalories: Double, avgTime: Int) {
+public:
+  def report(): String =
+    "#{category}: #{count} recipes, avg #{avgCalories as Int} kcal, avg #{avgTime} min"
+}
+
+record Recipe(
+  name: String,
+  category: String,
+  servings: Int,
+  prepTime: Int,
+  cookTime: Int,
+  nutrition: NutritionFacts,
+  ingredients: java.util.List[Ingredient],
+  tags: java.util.List[DietaryTag]
+) {
+public:
+  def totalTime(): Int = prepTime + cookTime
+  def hasTag(lbl: String): Boolean =
+    tags.find { t -> t.label() == lbl } != null
+  def tagLabels(): String =
+    Strings::join(tags.map { t -> t.label() }, ", ")
+  def summary(): String =
+    "#{name} (#{category}) | #{servings}srv | #{totalTime()}min | #{nutrition.calories()}kcal"
+  def nutritionScore(): Double = nutrition.score()
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+def ings(items: java.util.List[String]): java.util.List[Ingredient] {
+  var i = 0
+  return items.map { item ->
+    i++
+    new Ingredient(item, i * 20.0 + 30.0, "g")
+  }
+}
+
+def maxCalRecursive(recipes: java.util.List[Recipe], idx: Int, best: Int): Int {
+  if idx >= recipes.size { return best }
+  var cal = recipes[idx].nutrition().calories()
+  return maxCalRecursive(recipes, idx + 1, if cal > best { cal } else { best })
+}
+
+// ── Catalog class ──────────────────────────────────────────────────────────
+interface Filterable {
+  def size(): Int
+}
+
+class RecipeCatalog conforms Filterable {
+  val recipes: java.util.List[Recipe]
+public:
+  def this(recipes: java.util.List[Recipe]) {
+    self.recipes = recipes
+  }
+  def size(): Int = recipes.size
+  def all(): java.util.List[Recipe] = recipes
+
+  def findByName(query: String): Recipe? =
+    recipes.find { r -> r.name().toLowerCase().contains(query.toLowerCase()) }
+
+  def byTag(lbl: String): java.util.List[Recipe] =
+    recipes.filter { r -> r.hasTag(lbl) }
+
+  def quickRecipes(maxMin: Int): java.util.List[Recipe] =
+    recipes.filter { r -> r.totalTime() <= maxMin }
+           .sortedBy { r -> r.totalTime() }
+
+  def topByNutrition(): java.util.List[Recipe] =
+    recipes.sortedBy { r -> -(r.nutritionScore() as Int) }
+
+  def lowCalorie(): java.util.List[Recipe] =
+    recipes.filter { r -> r.nutrition().isLowCalorie() }
+           .sortedBy { r -> r.nutrition().calories() }
+
+  def categoryStats(): java.util.List[CategoryStats] {
+    var byCat: java.util.Map[String, java.util.List[Recipe]] = [:]
+    foreach r: Recipe in recipes {
+      var cat = r.category()
+      if byCat.containsKey(cat) {
+        byCat.get(cat).add(r)
+      } else {
+        byCat.put(cat, [r])
+      }
+    }
+    var stats: java.util.List[CategoryStats] = []
+    foreach (cat, rs) in byCat {
+      var cnt  = rs.size
+      var sumC = rs.fold(0) { acc, r -> acc + r.nutrition().calories() }
+      var sumT = rs.fold(0) { acc, r -> acc + r.totalTime() }
+      stats.add(new CategoryStats(cat, cnt, sumC * 1.0 / cnt, sumT / cnt))
+    }
+    return stats.sortedBy { s -> s.category() }
+  }
+
+  def overallStats(): String {
+    var total = recipes.fold(0) { acc, r -> acc + r.nutrition().calories() }
+    var avg   = total * 1.0 / recipes.size
+    var maxC  = maxCalRecursive(recipes, 0, 0)
+    var minC  = recipes.fold(99999) { acc, r ->
+      if r.nutrition().calories() < acc { r.nutrition().calories() } else { acc }
+    }
+    return "Avg: #{avg as Int} kcal | Min: #{minC} | Max: #{maxC}"
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+def main(): void {
+  var catalog = new RecipeCatalog([
+    new Recipe("Pasta Primavera",    "Italian",   4, 10, 20,
+      new NutritionFacts(420, 14.0, 68.0, 11.0),
+      ings(["pasta","tomatoes","zucchini","peppers","basil"]),
+      [new Vegetarian()]),
+    new Recipe("Grilled Salmon",     "Seafood",   2,  5, 15,
+      new NutritionFacts(350, 42.0, 2.0, 18.0),
+      ings(["salmon","lemon","garlic","olive oil"]),
+      [new GlutenFree(), new LowCarb(), new HighProtein()]),
+    new Recipe("Lentil Soup",        "Soup",      6, 15, 35,
+      new NutritionFacts(280, 18.0, 45.0, 3.0),
+      ings(["lentils","carrots","onion","tomato","cumin"]),
+      [new Vegan(), new GlutenFree()]),
+    new Recipe("Caesar Salad",       "Salad",     2, 15,  0,
+      new NutritionFacts(320, 12.0, 18.0, 22.0),
+      ings(["romaine","croutons","parmesan","anchovy","egg"]),
+      []),
+    new Recipe("Chicken Stir Fry",   "Asian",     3, 10, 15,
+      new NutritionFacts(380, 35.0, 22.0, 14.0),
+      ings(["chicken","broccoli","peppers","soy sauce","ginger","garlic"]),
+      [new GlutenFree(), new HighProtein()]),
+    new Recipe("Black Bean Tacos",   "Mexican",   4, 10, 10,
+      new NutritionFacts(310, 15.0, 48.0, 8.0),
+      ings(["black beans","tortillas","avocado","salsa","cilantro"]),
+      [new Vegetarian(), new DairyFree()]),
+    new Recipe("Mushroom Risotto",   "Italian",   4, 10, 30,
+      new NutritionFacts(450, 12.0, 72.0, 12.0),
+      ings(["arborio rice","mushrooms","onion","wine","parmesan","butter"]),
+      [new Vegetarian()]),
+    new Recipe("Beef Burger",        "American",  2, 10, 15,
+      new NutritionFacts(680, 38.0, 45.0, 36.0),
+      ings(["beef patty","bun","lettuce","tomato","cheese","onion"]),
+      []),
+    new Recipe("Avocado Toast",      "Breakfast", 1,  5,  5,
+      new NutritionFacts(290,  8.0, 28.0, 18.0),
+      ings(["bread","avocado","lemon","chili flakes"]),
+      [new Vegetarian(), new DairyFree()]),
+    new Recipe("Quinoa Buddha Bowl", "Bowl",      2, 20, 15,
+      new NutritionFacts(480, 22.0, 62.0, 16.0),
+      ings(["quinoa","chickpeas","cucumber","tahini","kale","peppers"]),
+      [new Vegan(), new GlutenFree(), new HighProtein()])
+  ])
+
+  IO::println("╔══════════════════════════════════════╗")
+  IO::println("║       COOKBOOK STATISTICS REPORT      ║")
+  IO::println("╚══════════════════════════════════════╝")
+  IO::println("Total recipes: #{catalog.size()}")
+  IO::println("")
+
+  // ── Quick recipes ─────────────────────────────────────────────────────
+  IO::println("── Quick Recipes (≤25 min) ─────────────────")
+  foreach r: Recipe in catalog.quickRecipes(25) {
+    IO::println("  ✓ #{r.summary()}")
+  }
+  IO::println("")
+
+  // ── Vegetarian / Vegan ────────────────────────────────────────────────
+  IO::println("── Vegetarian / Vegan Options ──────────────")
+  foreach r: Recipe in catalog.byTag("Vegetarian") {
+    IO::println("  #{r.name()} [#{r.tagLabels()}]")
+  }
+  foreach r: Recipe in catalog.byTag("Vegan") {
+    IO::println("  #{r.name()} [#{r.tagLabels()}]")
+  }
+  IO::println("")
+
+  // ── High Protein ──────────────────────────────────────────────────────
+  IO::println("── High Protein Recipes ────────────────────")
+  foreach r: Recipe in catalog.byTag("HP") {
+    IO::println("  #{r.name()}: #{r.nutrition().protein()}g protein")
+  }
+  IO::println("")
+
+  // ── Low Calorie ───────────────────────────────────────────────────────
+  IO::println("── Low Calorie Recipes (<300 kcal) ─────────")
+  foreach r: Recipe in catalog.lowCalorie() {
+    IO::println("  #{r.name()}: #{r.nutrition().calories()} kcal")
+  }
+  IO::println("")
+
+  // ── Nutrition score ranking ───────────────────────────────────────────
+  IO::println("── Nutrition Score Ranking ─────────────────")
+  var ranked = catalog.topByNutrition()
+  foreach i: Int in 0..<ranked.size {
+    var r: Recipe = ranked[i]
+    IO::println("  #{i+1}. #{r.name()} (score: #{r.nutritionScore() as Int})")
+  }
+  IO::println("")
+
+  // ── Category breakdown ────────────────────────────────────────────────
+  IO::println("── Category Breakdown ──────────────────────")
+  foreach stat: CategoryStats in catalog.categoryStats() {
+    IO::println("  #{stat.report()}")
+  }
+  IO::println("")
+
+  // ── Overall nutrition summary ─────────────────────────────────────────
+  IO::println("── Overall Nutrition Summary ───────────────")
+  IO::println("  #{catalog.overallStats()}")
+  IO::println("")
+
+  // ── Detailed recipe lookup ────────────────────────────────────────────
+  IO::println("── Recipe Detail: salmon ───────────────────")
+  var found: Recipe? = catalog.findByName("salmon")
+  if found != null {
+    IO::println("  #{found.summary()}")
+    IO::println("  Nutrition: #{found.nutrition().description()}")
+    IO::println("  Tags: #{found.tagLabels()}")
+    IO::println("  Ingredients (#{found.ingredients().size}):")
+    foreach ing: Ingredient in found.ingredients() {
+      IO::println("    - #{ing.description()}")
+    }
+  } else {
+    IO::println("  (not found)")
+  }
+  IO::println("")
+
+  // ── All recipes alphabetically ────────────────────────────────────────
+  IO::println("── All Recipes (A–Z) ───────────────────────")
+  var alpha = catalog.all().sortedBy { r -> r.name() }
+  foreach r: Recipe in alpha {
+    IO::println("  #{r.name()}")
+  }
+}

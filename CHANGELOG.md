@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ContinuedFraction.on`** — a 231-line continued-fraction arithmetic sample, a new domain for the `run/` corpus (a record with methods `Fraction` (`of()` static factory reducing via GCD/canonicalising sign, `plus`/`minus`/`times`/`recip`, `toDouble`, `toString` rendering `∞` for 1/0, `approxError`); recursive top-level `gcd`/`rationalToCF` (Euclidean algorithm); `while`/`foreach`/ranges (`convergents` h/k recurrence, `bestApprox` over `1..maxDen`, `cfString` over `1..<terms.size`); nullable `Fraction?` in mediant bracketing; a `.map` collection pipeline over CF expansions; string interpolation throughout; `try`/`catch` around the `∞` sentinel — rendering CF expansions and convergents for six rationals, √2/φ/e, best rational approximations of π across five denominator bounds, a fraction-arithmetic sanity check, and a mediant-bracketing demo for √3), added to the `run/` corpus (merged via #1713).
+
 ## [0.127.0] - 2026-09-29
 
 ### Added

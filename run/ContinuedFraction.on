@@ -1,0 +1,231 @@
+// ContinuedFraction.on — continued-fraction expansions and convergents.
+//
+// A continued fraction [a0; a1, a2, ...] represents a number as
+//   a0 + 1/(a1 + 1/(a2 + ...))
+// Convergents are the best rational approximations obtainable
+// from truncating the expansion.
+//
+// Exercises: records with methods, classes, generics, recursion,
+// while/foreach/ranges, nullable, collection pipelines (map/filter/fold),
+// string interpolation, select, closures, try/catch.
+
+// ---- Fraction arithmetic (reduced form) --------------------------------
+
+def gcd(a: Int, b: Int): Int = if b == 0 { if a < 0 { -a } else { a } } else { gcd(b, a % b) }
+
+record Fraction(num: Int, den: Int) {
+  public:
+    static def of(n: Int, d: Int): Fraction {
+      if d == 0 { return new Fraction(1, 0) }
+      val sign = if (n < 0) == (d < 0) { 1 } else { -1 }
+      val an = if n < 0 { -n } else { n }
+      val ad = if d < 0 { -d } else { d }
+      val g = gcd(an, ad)
+      return new Fraction(sign * (an / g), ad / g)
+    }
+
+    def plus(o: Fraction): Fraction  = Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+    def minus(o: Fraction): Fraction = Fraction::of(num() * o.den() - o.num() * den(), den() * o.den())
+    def times(o: Fraction): Fraction = Fraction::of(num() * o.num(), den() * o.den())
+    def recip(): Fraction = Fraction::of(den(), num())
+
+    def isInfinite: Boolean = den() == 0
+
+    def toDouble(): Double = if den() == 0 { 0.0 } else { (num() as Double) / (den() as Double) }
+
+    def toString(): String {
+      if den() == 0 { return "∞" }
+      if den() == 1 { return "" + num() }
+      return "#{num()}/#{den()}"
+    }
+
+    def approxError(target: Double): Double {
+      val d = toDouble() - target
+      return if d < 0.0 { -d } else { d }
+    }
+}
+
+// ---- Continued-fraction operations ------------------------------------
+
+// Expand a positive rational p/q into CF terms [a0; a1, a2, ...]
+def rationalToCF(p: Int, q: Int): List[Int] {
+  val terms: List[Int] = []
+  var a = if p < 0 { -p } else { p }
+  var b = if q < 0 { -q } else { q }
+  while b > 0 {
+    terms.add(a / b)
+    val r = a % b
+    a = b
+    b = r
+  }
+  return terms
+}
+
+// Compute convergents h_n/k_n for terms [a0; a1, ...]
+// Returns list of Fraction, same length as terms.
+def convergents(terms: List[Int]): List[Fraction] {
+  val result: List[Fraction] = []
+  var hPrev: Int = 0
+  var hCur:  Int = 1
+  var kPrev: Int = 1
+  var kCur:  Int = 0
+  foreach t: Int in terms {
+    val hNext = t * hCur + hPrev
+    val kNext = t * kCur + kPrev
+    result.add(Fraction::of(hNext, kNext))
+    hPrev = hCur; hCur = hNext
+    kPrev = kCur; kCur = kNext
+  }
+  return result
+}
+
+// Format terms as [a0; a1, a2, ...]
+def cfString(terms: List[Int]): String {
+  if terms.size == 0 { return "[]" }
+  var s: String = "[" + (terms[0] as Int)
+  if terms.size > 1 {
+    s = s + "; "
+    foreach i: Int in 1..<terms.size {
+      if i > 1 { s = s + ", " }
+      s = s + (terms[i] as Int)
+    }
+  }
+  return s + "]"
+}
+
+// Find the best rational approximation of target with denominator ≤ maxDen
+def bestApprox(target: Double, maxDen: Int): Fraction {
+  var best = Fraction::of(1, 1)
+  var bestErr = best.approxError(target)
+  foreach d: Int in 1..maxDen {
+    val n = (target * (d as Double) + 0.5).intValue()
+    val f = Fraction::of(n, d)
+    val err = f.approxError(target)
+    if err < bestErr {
+      best = f
+      bestErr = err
+    }
+  }
+  return best
+}
+
+// ---- Section helpers ---------------------------------------------------
+def section(title: String): void { IO::println("\n=== #{title} ===") }
+def row(label: String, value: String): void { IO::println("  #{label}: #{value}") }
+
+// ---- Main demo ---------------------------------------------------------
+def main(): void {
+  section("Rational CF expansions")
+  val cases: List[List[Int]] = [
+    [3, 1],    // 3
+    [22, 7],   // 22/7 ≈ π
+    [355, 113],// 355/113 ≈ π (Milü)
+    [7, 5],    // 7/5
+    [17, 12],  // 17/12 ≈ √2
+    [144, 89]  // Fibonacci ratio ≈ φ
+  ]
+  foreach pair: List[Int] in cases {
+    val p = pair[0] as Int
+    val q = pair[1] as Int
+    val terms = rationalToCF(p, q)
+    row("#{p}/#{q}", cfString(terms))
+  }
+
+  section("Convergents of 22/7")
+  val terms227 = rationalToCF(22, 7)
+  val convs227 = convergents(terms227)
+  foreach c: Fraction in convs227 {
+    IO::println("  #{c.toString()} ≈ #{c.toDouble()}")
+  }
+
+  section("Convergents of 355/113 (Milü ≈ π)")
+  val termsM = rationalToCF(355, 113)
+  val convsM = convergents(termsM)
+  foreach c: Fraction in convsM {
+    IO::println("  #{c.toString()} ≈ #{c.toDouble()}")
+  }
+
+  section("√2 ≈ [1; 2, 2, 2, 2, ...] — first 10 convergents")
+  val sqrt2Terms: List[Int] = [1, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+  val sqrt2Convs = convergents(sqrt2Terms)
+  val sqrt2 = 1.41421356237
+  foreach c: Fraction in sqrt2Convs {
+    val err = c.approxError(sqrt2)
+    IO::println("  #{c.toString()} err=#{err}")
+  }
+
+  section("Golden ratio φ ≈ [1; 1, 1, 1, ...] — first 10 convergents")
+  val phiTerms: List[Int] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  val phiConvs = convergents(phiTerms)
+  val phi = 1.61803398875
+  IO::println("  (φ convergents are successive Fibonacci ratios)")
+  foreach c: Fraction in phiConvs {
+    val err = c.approxError(phi)
+    IO::println("  #{c.toString()} ≈ #{c.toDouble()} err=#{err}")
+  }
+
+  section("e ≈ [2; 1, 2, 1, 1, 4, 1, 1, 6, 1] — convergents")
+  val eTerms: List[Int] = [2, 1, 2, 1, 1, 4, 1, 1, 6, 1]
+  val eConvs = convergents(eTerms)
+  val eVal = 2.71828182845
+  foreach c: Fraction in eConvs {
+    val err = c.approxError(eVal)
+    IO::println("  #{c.toString()} err=#{err}")
+  }
+
+  section("Best rational approximations of π (den ≤ 200)")
+  val pi = 3.14159265358
+  foreach dMax: Int in [10, 20, 50, 100, 200] {
+    val b = bestApprox(pi, dMax)
+    IO::println("  den≤#{dMax}: #{b.toString()} err=#{b.approxError(pi)}")
+  }
+
+  section("Fraction arithmetic sanity check")
+  val a = Fraction::of(1, 2)
+  val b = Fraction::of(1, 3)
+  IO::println("  1/2 + 1/3 = #{a.plus(b).toString()}")
+  IO::println("  1/2 - 1/3 = #{a.minus(b).toString()}")
+  IO::println("  1/2 × 1/3 = #{a.times(b).toString()}")
+  IO::println("  recip(3/4) = #{Fraction::of(3,4).recip().toString()}")
+  IO::println("  recip(0/1) = #{Fraction::of(1,0).toString()}")
+
+  section("CF expansion via pipeline")
+  val rationals: List[List[Int]] = [
+    [5, 3], [13, 8], [89, 55], [233, 144]
+  ]
+  val expansions = rationals
+    .map { pair: List[Int] ->
+      val p = pair[0] as Int
+      val q = pair[1] as Int
+      "#{p}/#{q} = #{cfString(rationalToCF(p, q))}"
+    }
+  foreach s: String in expansions {
+    IO::println("  #{s}")
+  }
+
+  section("Mediant property: convergents bracket the true value")
+  val sqrt3Terms: List[Int] = [1, 1, 2, 1, 2, 1, 2, 1, 2, 1]
+  val sqrt3 = 1.73205080757
+  val sqrt3Convs = convergents(sqrt3Terms)
+  var lowC:  Fraction? = null
+  var highC: Fraction? = null
+  foreach c: Fraction in sqrt3Convs {
+    val v = c.toDouble()
+    if v <= sqrt3 {
+      if lowC == null || v > (lowC as Fraction).toDouble() { lowC = c }
+    } else {
+      if highC == null || v < (highC as Fraction).toDouble() { highC = c }
+    }
+  }
+  IO::println("  √3 ≈ #{sqrt3}")
+  if lowC != null { IO::println("  best lower  convergent: #{(lowC as Fraction).toString()}") }
+  if highC != null { IO::println("  best upper  convergent: #{(highC as Fraction).toString()}") }
+
+  section("Try/catch: division by zero in Fraction")
+  try {
+    val bad = Fraction::of(5, 0)
+    IO::println("  5/0 = #{bad.toString()} (∞ sentinel)")
+  } catch e: Exception {
+    IO::println("  caught: #{e.message()}")
+  }
+}

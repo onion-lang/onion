@@ -21,8 +21,12 @@ import org.tomlj.{Toml, TomlArray, TomlTable}
  *
  * The lock records two things, and deliberately keeps them apart:
  *
- *   - the '''whole transitive coordinate set''', which a later build resolves ''instead of''
- *     re-deriving it, so every version is pinned including the ones nobody wrote down;
+ *   - the '''whole transitive coordinate set''', whose versions a later build ''forces'' while
+ *     resolving the manifest's own dependencies, so every version is pinned including the
+ *     ones nobody wrote down. They are forced, not resolved as a flat list of roots: a flat
+ *     list takes each transitive out from under the POM that manages its version, and the
+ *     answer changes (anthropic-java's `<dependencyManagement>` holds kotlin-reflect at
+ *     1.9.0, while the flattened graph lets jackson-module-kotlin pull it to 1.9.25);
  *   - a SHA-256 per artifact '''file''', compared as a set before anything is compiled.
  *
  * They are separate because coursier's result exposes resolved coordinates and downloaded
@@ -56,7 +60,7 @@ object DependencyLock:
   /**
    * @param dependencies the direct dependencies this lock was resolved from, sorted
    * @param repositories the repositories in the order they were searched
-   * @param coordinates  the whole transitive set, sorted — what a later build resolves
+   * @param coordinates  the whole transitive set, sorted — the versions a later build forces
    * @param artifacts    a SHA-256 per artifact file name, compared as a set
    */
   final case class Locked(
@@ -68,6 +72,25 @@ object DependencyLock:
     /** Whether this lock answers the question the manifest is asking. */
     def matches(manifest: ProjectManifest): Boolean =
       dependencies == inputOf(manifest) && repositories == manifest.repositories
+
+    /**
+     * A digest of everything this lock says, and nothing about how the file spells it —
+     * a comment or a reordered artifact table does not change it. It keys the
+     * machine-local classpath record ([[DependencyClasspathRecord]]), so an edited lock
+     * never reuses a classpath recorded for a different one.
+     */
+    lazy val key: String =
+      val canonical = new StringBuilder
+      def section(name: String, values: Iterable[String]): Unit =
+        canonical ++= name ++= "\n"
+        values.foreach(value => canonical ++= value.length.toString ++= ":" ++= value ++= "\n")
+      section("version", Seq(SchemaVersion.toString))
+      section("dependencies", dependencies)
+      section("repositories", repositories)
+      section("coordinates", coordinates)
+      section("artifacts",
+        artifacts.toSeq.sortBy(a => (a.file, a.sha256)).map(a => s"${a.file} ${a.sha256}"))
+      sha256Hex(canonical.toString.getBytes(UTF_8))
 
   final case class LockedArtifact(file: String, sha256: String)
 
@@ -163,7 +186,15 @@ object DependencyLock:
 
   // ------------------------------------------------------------------ verifying
 
-  /** Compares what was just resolved against what the lock recorded. */
+  /**
+   * Compares what was just resolved against what the lock recorded.
+   *
+   * The two ways this can fail mean different things and are worded apart. The same file
+   * name with different bytes is the case where a published version really did change
+   * under the project, and the repository is the thing to question. A different ''set''
+   * of files is a resolution difference — the manifest now resolves to other versions than
+   * the lock records — and blaming the repository for that sends the reader the wrong way.
+   */
   def verify(locked: Locked, resolved: ResolvedDependencies): Either[ProjectError, Unit] =
     val found = fingerprint(resolved)
     if found == locked.artifacts then Right(())
@@ -175,19 +206,46 @@ object DependencyLock:
       }
       val appeared = (found.map(_.file) -- lockedByFile.keySet).toSeq.sorted
       val vanished = (lockedByFile.keySet -- found.map(_.file)).toSeq.sorted
+      val versions = versionDifferences(locked.coordinates, resolved.coordinates)
 
       val report = new StringBuilder(s"Resolved dependencies do not match $FileName:\n")
       if changed.nonEmpty then
         report ++= s"different bytes for the same file:\n${changed.mkString("\n")}\n"
       if appeared.nonEmpty then report ++= s"not in the lock: ${appeared.mkString(", ")}\n"
       if vanished.nonEmpty then report ++= s"missing: ${vanished.mkString(", ")}\n"
-      report ++= "A published version's bytes should never change. Check the repository, or " +
-        s"delete $FileName to accept what it is serving now."
+      if versions.nonEmpty then
+        report ++= s"resolved versions differ from the lock:\n${versions.mkString("\n")}\n"
+      if changed.nonEmpty then
+        report ++= "A published version's bytes should never change. Check the repository, " +
+          s"or delete $FileName to accept what it is serving now."
+      else
+        report ++= "The artifacts resolved differently from the ones the lock records; no " +
+          s"file's bytes changed. Delete $FileName to resolve again and record the new answer."
       Left(ProjectError(report.toString))
+
+  /** `  group:artifact  locked 1.0  resolved 2.0` for each module whose version moved. */
+  private def versionDifferences(locked: Seq[String], resolved: Seq[String]): Seq[String] =
+    def byModule(coordinates: Seq[String]): Map[String, String] =
+      coordinates.flatMap { coordinate =>
+        val cut = coordinate.lastIndexOf(':')
+        if cut <= 0 then None else Some(coordinate.take(cut) -> coordinate.drop(cut + 1))
+      }.toMap
+    val before = byModule(locked)
+    val after = byModule(resolved)
+    (before.keySet ++ after.keySet).toSeq.sorted.flatMap { module =>
+      (before.get(module), after.get(module)) match
+        case (Some(a), Some(b)) if a != b => Some(s"  $module  locked $a  resolved $b")
+        case (Some(a), None) => Some(s"  $module  locked $a  not resolved")
+        case (None, Some(b)) => Some(s"  $module  not locked  resolved $b")
+        case _ => None
+    }
 
   /** A SHA-256 per artifact file — a set, because there is no order to rely on. */
   private def fingerprint(resolved: ResolvedDependencies): Set[LockedArtifact] =
     resolved.classpath.map(file => LockedArtifact(file.getFileName.toString, sha256(file))).toSet
+
+  private def sha256Hex(bytes: Array[Byte]): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes).map(byte => f"${byte & 0xff}%02x").mkString
 
   private[project] def sha256(file: Path): String =
     try

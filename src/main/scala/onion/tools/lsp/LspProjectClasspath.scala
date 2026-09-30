@@ -3,7 +3,7 @@ package onion.tools.lsp
 import java.nio.file.{Files, Path}
 import java.util.concurrent.ConcurrentHashMap
 
-import onion.tools.project.{DependencyResolver, ProjectLocator, ProjectManifest}
+import onion.tools.project.{DependencyClasspathRecord, DependencyLock, DependencyResolver, ProjectLocator, ProjectManifest, ProjectPaths}
 
 /**
  * The classpath the editor should validate a document against.
@@ -45,13 +45,16 @@ object LspProjectClasspath {
           val cached = cache.get(paths.root)
           if cached != null && cached.stamp == stamp then cached.classpath
           else
-            val computed = compute(paths.root, paths.manifest, paths.classes)
+            val computed = compute(paths)
             cache.put(paths.root, Entry(stamp, computed))
             computed
         }
       }
 
-  private def compute(root: Path, manifestPath: Path, classes: Path): Seq[String] =
+  private def compute(paths: ProjectPaths): Seq[String] =
+    val root = paths.root
+    val manifestPath = paths.manifest
+    val classes = paths.classes
     // The project's own build output comes first so that a symbol from a sibling file
     // resolves. It only exists after a build; before that this is simply a path that is
     // not there, which the compiler already tolerates.
@@ -63,7 +66,14 @@ object LspProjectClasspath {
         warn(s"$manifestPath: ${error.message}")
         own
       case Right(manifest) =>
-        DependencyResolver.resolve(manifest.dependencies, manifest.repositories) match
+        // The classpath the last build resolved and verified against `onion.lock`, when
+        // the lock still answers this manifest and every jar is still what it records.
+        // Read-only: the editor never writes the lock or the record, and anything short
+        // of an exact match falls through to resolving as before.
+        val recorded = DependencyLock.read(paths).filter(_.matches(manifest)).flatMap(
+          DependencyClasspathRecord.reuse(DependencyClasspathRecord.path(paths), _))
+        recorded.map(Right(_)).getOrElse(
+          DependencyResolver.resolve(manifest.dependencies, manifest.repositories)) match
           case Left(error) =>
             // Degrading here is deliberate: an editor that refuses to validate because a
             // jar cannot be fetched is worse than one that validates without it. Say so

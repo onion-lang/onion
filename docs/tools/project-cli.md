@@ -215,7 +215,8 @@ in the file.
 
 ### Not yet supported
 
-There is no offline mode. Resolution runs on every build, reading coursier's cache
+There is no offline mode. Resolution runs whenever a build cannot reuse the classpath it
+recorded for the current `onion.lock` (see below), reading coursier's cache
 (`~/.cache/coursier`) for anything already fetched, so a warm build does not hit the
 network — but it is not *prevented* from doing so. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
@@ -232,10 +233,13 @@ builds of a byte-identical `onion.toml` can compile against different jars the m
 transitive publishes a release. That failure appears on one machine, cannot be reproduced on
 another, and nothing in the project changed.
 
-The lock records the whole transitive coordinate set, so a later build resolves *those*
-versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
-anything is compiled. Different bytes for a version that was already published stops the
-build:
+The lock records the whole transitive coordinate set, and a later build resolves
+`[dependencies]` with every one of *those* versions forced, rather than re-deriving them. They
+are forced onto the manifest's own graph, not resolved as a flat list of roots: flattening
+takes a transitive out from under the POM that manages its version (`<dependencyManagement>`,
+a parent BOM) and can pick a different one. The lock also records a SHA-256 for each
+artifact, compared before anything is compiled. Different bytes for a version that was
+already published stops the build:
 
 ```text
 error: Resolved dependencies do not match onion.lock:
@@ -247,6 +251,28 @@ A published version's bytes should never change. Check the repository, or delete
 to accept what it is serving now.
 ```
 
+A different *set* of artifacts is a resolution difference rather than changed bytes, and the
+error says so, listing the versions that moved instead of blaming the repository:
+
+```text
+error: Resolved dependencies do not match onion.lock:
+not in the lock: lib-2.0.0.jar
+missing: lib-1.0.0.jar
+resolved versions differ from the lock:
+  com.example:lib  locked 1.0.0  resolved 2.0.0
+The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+Delete onion.lock to resolve again and record the new answer.
+```
+
+Once a build has resolved and verified a lock, it records the resulting classpath in
+`target/.onion/dependency-classpath.json`, keyed by the lock's contents. The next
+`build`/`run`/`test` with the same lock takes that classpath without asking coursier at all,
+provided every recorded jar still exists and its SHA-256 still matches the lock (a jar is
+re-hashed when its size or modification time has changed). Anything else — a different lock,
+a missing or changed jar, no record — falls back to resolving. The record holds absolute
+paths into this machine's cache, which is why it lives under `target/` and is not committed;
+`onion clean` removes it. The language server reads the same record, read-only.
+
 Change a version in `onion.toml`, or add a repository, and the lock no longer describes what
 you are asking for -- it is discarded and rewritten rather than enforced against a different
 question. Reordering `[dependencies]` is not a change and does not discard it. `onion clean`
@@ -255,7 +281,7 @@ does not remove it: it is an input to the next build, not an output of this one.
 **It is not an offline mode.** coursier's embedding API exposes a cache location, a thread
 pool and a logger, and no cache policy at all, so there is no honest way to promise a build
 that never reaches the network. The lock gives the same answer every time, not the absence
-of the question.
+of the question; the recorded classpath only means the question is usually not asked twice.
 
 ## Source Layout
 

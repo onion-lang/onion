@@ -5,7 +5,7 @@ import java.nio.file.Path
 
 import scala.jdk.CollectionConverters.*
 
-import coursierapi.{Cache, Fetch, Logger}
+import coursierapi.{Cache, Fetch, Logger, Module, ResolutionParams}
 import coursierapi.error.CoursierError
 
 /**
@@ -37,14 +37,32 @@ object ResolvedDependencies:
 object DependencyResolver:
 
   /**
+   * The shape of [[resolve]], so a caller that owns resolution (`ProjectBuilder`) can be
+   * handed a different one — a test counting how often the network would have been asked.
+   */
+  type Resolution = (
+    Seq[Dependency],
+    Seq[String],
+    Option[PrintStream],
+    Seq[Dependency]
+  ) => Either[ProjectError, ResolvedDependencies]
+
+  /**
    * @param progress where to draw download progress. Fetching a driver jar for the first
    *                 time can take a while and silence looks like a hang, so this is on by
    *                 default; pass `None` when the caller owns the terminal (the LSP does).
+   * @param forced   versions to impose on modules wherever they appear in the graph — the
+   *                 lock's transitive set. They are forced rather than added as roots:
+   *                 promoting a transitive to a direct dependency takes it out from under
+   *                 the POM that manages its version (`<dependencyManagement>`, a parent
+   *                 BOM), and resolution then answers a different question than the one the
+   *                 lock recorded.
    */
   def resolve(
     dependencies: Seq[Dependency],
     repositories: Seq[String] = Seq.empty,
-    progress: Option[PrintStream] = None
+    progress: Option[PrintStream] = None,
+    forced: Seq[Dependency] = Seq.empty
   ): Either[ProjectError, ResolvedDependencies] =
     if dependencies.isEmpty then Right(ResolvedDependencies.empty)
     else
@@ -62,10 +80,19 @@ object DependencyResolver:
       val withRepositories =
         if declared.isEmpty then base
         else base.withRepositories((declared ++ base.getRepositories.asScala)*)
-      val fetch = dependencies.foldLeft(withRepositories) { (acc, dependency) =>
+      val withDependencies = dependencies.foldLeft(withRepositories) { (acc, dependency) =>
         acc.addDependencies(
           coursierapi.Dependency.of(dependency.group, dependency.artifact, dependency.version))
       }
+      val fetch =
+        if forced.isEmpty then withDependencies
+        else
+          val params = Option(withDependencies.getResolutionParams)
+            .map(ResolutionParams.of(_))
+            .getOrElse(ResolutionParams.create())
+          withDependencies.withResolutionParams(forced.foldLeft(params) { (acc, pin) =>
+            acc.forceVersion(Module.of(pin.group, pin.artifact), pin.version)
+          })
 
       try
         val result = fetch.fetchResult()

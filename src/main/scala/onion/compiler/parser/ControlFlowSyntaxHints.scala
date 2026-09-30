@@ -15,9 +15,15 @@ private[compiler] object ControlFlowSyntaxHints {
   // above) is never double-matched here.
   private val PostfixMatchExpression = """^\s*\S.*?\bmatch\s*\{\s*$""".r
   private val DefaultCaseLabel = """^\s*default\s*:""".r
-  private val ElifStatement = """\belif\b""".r
-  private val ElsifStatement = """\belsif\b""".r
-  private val ElseifStatement = """\belseif\b""".r
+  // Chained onto the same line as the closing brace (`} elif x == 2 {`) or
+  // leading its own line when the brace is on the line above -- anchored the
+  // same way as ExceptClause/RescueClause below, so `elif`/`elsif`/`elseif`
+  // used as an ordinary identifier anywhere later in an unrelated statement
+  // on the same source line doesn't wrongly trigger this hint instead of
+  // that statement's real mistake.
+  private val ElifStatement = """^\s*\}?\s*elif\b""".r
+  private val ElsifStatement = """^\s*\}?\s*elsif\b""".r
+  private val ElseifStatement = """^\s*\}?\s*elseif\b""".r
   private val LeadingUnlessStatement = """^\s*unless\b""".r
   private val LeadingUntilStatement = """^\s*until\b""".r
   // Chained onto the same line as the closing brace (`} except e: Exception {`)

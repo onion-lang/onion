@@ -78,5 +78,21 @@ class ElifStatementHintSpec extends AbstractShellSpec {
       ).mkString("\n")
       assert(!msgs.contains("else if"), s"hint should not fire without an `elif`, got: $msgs")
     }
+
+    it("does not fire when `elif` is merely an identifier elsewhere on the error line") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    foo bar; val elif = 1
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(!msgs.contains("else if"), s"hint should not fire for an unrelated `elif` identifier, got: $msgs")
+      assert(msgs.contains("foo(...)"), s"expected the missing-call-parens hint instead, got: $msgs")
+    }
   }
 }

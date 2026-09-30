@@ -127,6 +127,7 @@ object ProjectManifest:
             else
               val version = table.getString(at)
               if version.isEmpty then Left(versionError(path, table, at, key))
+              else if isRangeOrDynamicVersion(version) then Left(rangeVersionError(path, table, at, key, version))
               else Right(Dependency(group, artifact, version))
           case _ =>
             Left(errorAt(path, table, at,
@@ -189,6 +190,23 @@ object ProjectManifest:
 
   private def versionError(path: Path, table: TomlTable, at: java.util.List[String], key: String): ProjectError =
     errorAt(path, table, at, s"""dependencies."$key" must be a version string""")
+
+  /**
+   * A Maven version range (`[1.0,2.0)`, `(,2.0]`, `[1.0,)`) or an Ivy/Maven dynamic
+   * revision (`1.2.+`, `LATEST`, `RELEASE`, `latest.release`, `latest.integration`).
+   * Coursier resolves all of these, but the resolved version would then move underneath
+   * a fixed manifest text — exactly what docs/tools/project-cli.md promises `[dependencies]`
+   * does not do ("Versions are exact — no ranges, no `latest`"). Checked structurally
+   * (not against `validVersion`'s SemVer grammar) because `[dependencies]` versions are
+   * Maven coordinates, which are not required to be SemVer.
+   */
+  private[project] def isRangeOrDynamicVersion(version: String): Boolean =
+    val v = version.trim
+    v.startsWith("[") || v.startsWith("(") || v.endsWith("+") ||
+      Set("latest", "release", "latest.release", "latest.integration").contains(v.toLowerCase)
+
+  private def rangeVersionError(path: Path, table: TomlTable, at: java.util.List[String], key: String, version: String): ProjectError =
+    errorAt(path, table, at, s"""dependencies."$key" must be an exact version, not a range or "latest" (found "$version")""")
 
   private def validateValue(path: Path, table: TomlTable, key: String): Either[ProjectError, String] =
     if !table.contains(key) then Left(ProjectError(s"Missing required package key: $key"))

@@ -524,7 +524,7 @@ true になるのは json shape だけです。`jsonSchema()` はそのスキー
 規則で再帰します —— LLM の構造化出力モードが受け取る形式です。
 
 ```onion
-val schema = Json::parse(Summary::doc().jsonSchema())   // リクエスト本文に埋め込む
+val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文に埋め込む
 ```
 
 ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の

@@ -583,7 +583,7 @@ with one property per component, `required` listing every non-nullable one, and
 LLM's structured-output mode takes:
 
 ```onion
-val schema = Json::parse(Summary::doc().jsonSchema())   // embed in a request body
+val schema = Json::parse(summaryShape.jsonSchema())   // embed in a request body
 ```
 
 Any other shape's `jsonSchema()` throws `UnsupportedOperationException`, as does a

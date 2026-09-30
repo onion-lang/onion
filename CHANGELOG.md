@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Yaml::stringify` silently corrupted a String value that looked like a leading-dot number (`.5`, `-.5`, `.5e3`) into a Double on the next `Yaml::parse`.** The quoting guard `looksLikeNumber` was documented as mirroring `parseScalar`'s number detection exactly, but used a looser ad hoc check that quick-rejected any string not starting with a digit or `-`, so a leading-dot float — which `parseScalar`'s own float regex accepts (its digits before `.` are optional) — was never quoted. `looksLikeNumber` now uses the same two regexes `parseScalar` already applies, making the doc comment true instead of aspirational. Covered by new `YamlValueQuotingSpec`.
+
 ## [0.132.0] - 2026-09-30
 
 ### Fixed

@@ -631,6 +631,35 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.messageKey shouldBe "error.parsing.hint.ternary"
     }
 
+    it("recognizes a `?` right after a grouped/function type's closing paren") {
+      val hint = classify(
+        found = "?",
+        expected = "\"->\"",
+        context = "? = null",
+        sourceLine = "  val fn: ((Int) -> Int)? = null"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.nullable_grouped_type"
+    }
+
+    it("also recognizes it for a plain parenthesized (non-function) type") {
+      val hint = classify(
+        found = "?",
+        expected = "\"->\"",
+        context = "? = null",
+        sourceLine = "  val x: (String)? = null"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.nullable_grouped_type"
+    }
+
+    it("does not flag `?` as a grouped-type mistake when `->` isn't what's expected") {
+      val hint = classify(
+        found = "?",
+        context = "? 1 : 2",
+        sourceLine = "val y = (x > 3) ? 1 : 0"
+      )
+      hint.messageKey should not be "error.parsing.hint.nullable_grouped_type"
+    }
+
     it("does not flag `not` when no block is expected next") {
       SyntaxHintClassifier.classify(
         found = "x",

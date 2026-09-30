@@ -401,6 +401,14 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.typescript_style_optional_annotation", matched.group(1), matched.group(2))
       case "?" if NullishCoalescing.findFirstMatchIn(context).isDefined =>
         hint("error.parsing.hint.nullish_coalescing")
+      // Onion has no grouped type `(T)` -- type_impl()'s `(` branch always reads a
+      // function-type parameter list and then requires `->`, so a `?` placed right
+      // after that closing paren (trying to nullable-mark the whole parenthesized
+      // type, e.g. `(String)?` or `((Int) -> Int)?`) lands exactly here, with
+      // nothing else in play. Catch it ahead of the ternary fallback below, which
+      // would otherwise misdiagnose it as a `cond ? a : b` mistake.
+      case "?" if expected == "\"->\"" =>
+        hint("error.parsing.hint.nullable_grouped_type")
       case "?" =>
         hint("error.parsing.hint.ternary")
       case "else" =>

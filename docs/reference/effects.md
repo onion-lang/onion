@@ -96,3 +96,10 @@ table classifies the stdlib as shipped — a user-supplied class named `onion.Fi
 not consulted against its source. And an effect set is not a security sandbox: nothing
 stops a program from running; the set is the honest input to the layers that decide
 whether it *should*.
+
+The same walk also records, for `--plan`, the operands it can read off the source — a
+literal URL's host, a `Proc` command name, a `System::getenv` variable name, a literal
+path (see [Operands the source spells out](../guide/tools.md#operands-the-source-spells-out)).
+Those are a lower bound in the opposite sense from the effect set: every operand listed
+is one the program can reach, but an operand that is not a literal is reported as
+`(operand not statically known)`, never guessed.

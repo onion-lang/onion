@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/WorkflowDag.on`** — a 368-line DAG-based workflow engine, a new domain for the `run/` corpus (an ADT case-enum `TaskStatus` (`Pending`/`Skipped(reason)`/`Done(durationMs, output)`/`Failed(durationMs, message)`) with `label()`/`isTerminal()`/`isSuccess()`/`durationMs()` dispatched via `select this`; data-carrying enums `TaskKind(icon, timeoutMs)` and `Priority(level, label)`; records with methods `TaskDef`/`StepResult`; a class `WorkflowEngine` with mutable `Map[String, StepResult]`/`List[String]`/simulated-clock state running a multi-pass topological execution that propagates upstream failures as skips; extension methods on `Int` (`bar` — block-character progress bar) and `String` (`padRight`/`truncate`); collection pipelines `filter`/`groupBy`/`sortedBy`/`find`/`size`; `foreach` over typed lists and `Map[Object, List[TaskDef]]`/`(k, v)` entries; `select`/`is` pattern matching on the ADT; nullable `TaskStatus?` lookups with null guards; string interpolation throughout — running three scenarios (a 10-task loan-approval workflow that fully succeeds, a 5-task pipeline where a parse failure skips 3 downstream tasks, and a 13-task fan-out/fan-in parallel batch) with execution reports, a priority-group progress-bar summary, and a dependency-graph printer), added to the `run/` corpus (merged via #1765).
+
 ## [0.130.0] - 2026-09-30
 
 ### Added

@@ -45,18 +45,20 @@ class ProjectCommands:
           case Vector() =>
             err.println(
               "error: Project has no entrypoint; add executable top-level code " +
-                "to src/main.on or define a top-level main function"
+                "to src/main.on, define a top-level main function, or declare a top-level tool"
             )
             1
           case Vector(entryPoint) =>
-            ProjectClassRunner.run(
-              // The dependency jars have to be on the *run* classpath too, not only the
-              // compile one, or every project that compiles against a library dies with
-              // NoClassDefFoundError the moment it touches it.
-              build.paths.classes +: build.dependencies.classpath.toVector,
-              entryPoint.className,
-              args
-            ) match
+            ProjectCommands.withProgramName(build.manifest.name) {
+              ProjectClassRunner.run(
+                // The dependency jars have to be on the *run* classpath too, not only the
+                // compile one, or every project that compiles against a library dies with
+                // NoClassDefFoundError the moment it touches it.
+                build.paths.classes +: build.dependencies.classpath.toVector,
+                entryPoint.className,
+                args
+              )
+            } match
               case ProgramResult.Success(value) =>
                 ProjectCommands.programExitCode(value)
               case ProgramResult.Failure(message, cause) =>
@@ -206,6 +208,22 @@ class ProjectCommands:
     yield build
 
 object ProjectCommands:
+  /**
+   * Runs `body` with `onion.cli.script` naming the project, so a synthesized CLI's usage
+   * line (auto-CLI or a `tool`) reads `usage: <package-name> ...` rather than the literal
+   * `<script>` it falls back to. The script runner sets the same property to the script's
+   * file name. The previous value is restored afterwards.
+   */
+  private[project] def withProgramName[A](name: String)(body: => A): A =
+    val key = "onion.cli.script"
+    val previous = Option(System.getProperty(key))
+    System.setProperty(key, name)
+    try body
+    finally
+      previous match
+        case Some(value) => System.setProperty(key, value)
+        case None => System.clearProperty(key)
+
   private[project] def programExitCode(value: Any): Int =
     // Compiler-generated zero-argument/scalar auto-CLI wrappers return void.
     // A numeric value reaches here only from a directly invokable raw-argv main.

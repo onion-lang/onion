@@ -1,0 +1,332 @@
+// WorkflowEngine.on — a generic finite-state-machine workflow engine.
+//
+// Exercises: ADT enums (EventResult); records with methods (WorkflowState,
+// WorkflowEvent); classes with state (Workflow, Transition); inheritance-based
+// specialization (OrderWorkflow, TicketWorkflow); collection pipelines
+// (filter/map/fold/find/count); select/type-pattern matching with ADT cases;
+// closures as guards and actions; nullable types; foreach over lists and ranges;
+// string interpolation; extension methods; mutable state management.
+
+// ── WorkflowState ─────────────────────────────────────────────────────────────
+
+record WorkflowState(name: String, terminal: Boolean, description: String) {
+  public:
+  static def of(name: String, description: String): WorkflowState = new WorkflowState(name, false, description)
+  static def terminal(name: String, description: String): WorkflowState = new WorkflowState(name, true, description)
+  def toString(): String = if terminal() { "[#{name()}]" } else { "(#{name()})" }
+}
+
+// ── EventResult (ADT enum) ────────────────────────────────────────────────────
+
+enum EventResult {
+  case Transitioned(from: WorkflowState, to: WorkflowState, event: String)
+  case Rejected(state: WorkflowState, event: String, reason: String)
+  case NoTransition(state: WorkflowState, event: String)
+}
+
+class EventResultHelper {
+public:
+  static def display(r: EventResult): String {
+    select r {
+      case t is Transitioned: return "OK  #{t.from().toString()} --[#{t.event()}]--> #{t.to().toString()}"
+      case j is Rejected:     return "REJ #{j.state().name()} refused '#{j.event()}': #{j.reason()}"
+      case n is NoTransition: return "--- no transition for '#{n.event()}' in #{n.state().name()}"
+    }
+  }
+  static def succeeded(r: EventResult): Boolean {
+    select r {
+      case t is Transitioned: return true
+      else: return false
+    }
+  }
+}
+
+// ── Transition ────────────────────────────────────────────────────────────────
+
+// Guard: returns null (allowed) or a rejection string.
+// Action: side-effect after a successful transition.
+class Transition {
+  val from: WorkflowState
+  val event: String
+  val to: WorkflowState
+  var guard: (WorkflowState) -> String?
+  var action: (WorkflowState, WorkflowState) -> void
+public:
+  def this(from: WorkflowState, event: String, to: WorkflowState) {
+    self.from = from
+    self.event = event
+    self.to = to
+    guard = (s) -> null
+    action = (a, b) -> {}
+  }
+
+  def withGuard(g: (WorkflowState) -> String?): Transition { guard = g; return self }
+  def withAction(a: (WorkflowState, WorkflowState) -> void): Transition { action = a; return self }
+
+  def from(): WorkflowState = from
+  def event(): String = event
+  def to(): WorkflowState = to
+  def guard(): (WorkflowState) -> String? = guard
+  def action(): (WorkflowState, WorkflowState) -> void = action
+}
+
+// ── WorkflowEvent ─────────────────────────────────────────────────────────────
+
+record WorkflowEvent(step: Int, result: EventResult)
+
+// ── Workflow (core FSM) ───────────────────────────────────────────────────────
+
+class Workflow {
+  val name: String
+  var current: WorkflowState
+  var transitions: List[Transition]
+  var history: List[WorkflowEvent]
+  var step: Int
+public:
+  def this(name: String, initial: WorkflowState) {
+    self.name = name
+    current = initial
+    transitions = []
+    history = []
+    step = 0
+  }
+
+  def add(t: Transition): Workflow { transitions.add(t); return self }
+
+  def fire(event: String): EventResult {
+    step = step + 1
+    if current.terminal() {
+      val r: EventResult = new NoTransition(current, event)
+      history.add(new WorkflowEvent(step, r))
+      return r
+    }
+
+    var found: Transition? = null
+    foreach t: Transition in transitions {
+      if t.from().name() == current.name() && t.event() == event { found = t; break }
+    }
+
+    if found == null {
+      val r: EventResult = new NoTransition(current, event)
+      history.add(new WorkflowEvent(step, r))
+      return r
+    }
+
+    val t = found as Transition
+    val gfn = t.guard()
+    val rejection = gfn(current)
+    if rejection != null {
+      val r: EventResult = new Rejected(current, event, rejection as String)
+      history.add(new WorkflowEvent(step, r))
+      return r
+    }
+
+    val prev = current
+    current = t.to()
+    val afn = t.action()
+    afn(prev, current)
+    val r: EventResult = new Transitioned(prev, current, event)
+    history.add(new WorkflowEvent(step, r))
+    return r
+  }
+
+  def state(): WorkflowState = current
+  def history(): List[WorkflowEvent] = history
+  def isTerminal(): Boolean = current.terminal()
+
+  def successCount(): Int {
+    var n = 0
+    foreach e: WorkflowEvent in history { if EventResultHelper::succeeded(e.result()) { n = n + 1 } }
+    return n
+  }
+
+  def printHistory(): void {
+    IO::println("  Workflow '#{name}' — #{history.size} step(s), final: #{current.toString()}")
+    foreach e: WorkflowEvent in history {
+      IO::println("    #{e.step()}. " + EventResultHelper::display(e.result()))
+    }
+  }
+}
+
+// ── Order workflow factory ────────────────────────────────────────────────────
+
+class OrderWorkflow {
+public:
+  static def build(): Workflow {
+    val pending   = WorkflowState::of("pending",   "Order submitted, awaiting payment")
+    val paid      = WorkflowState::of("paid",      "Payment confirmed")
+    val preparing = WorkflowState::of("preparing", "Order being prepared")
+    val shipped   = WorkflowState::of("shipped",   "Order dispatched")
+    val delivered = WorkflowState::terminal("delivered", "Order delivered")
+    val cancelled = WorkflowState::terminal("cancelled", "Order cancelled")
+
+    val wf = new Workflow("Order", pending)
+
+    wf.add(new Transition(pending,   "pay",     paid     ).withAction((a, b) -> { IO::println("    [action] Payment processed") }))
+    wf.add(new Transition(paid,      "prepare", preparing))
+    wf.add(new Transition(preparing, "ship",    shipped  ))
+    wf.add(new Transition(shipped,   "deliver", delivered).withAction((a, b) -> { IO::println("    [action] Delivery confirmed") }))
+    wf.add(new Transition(pending,   "cancel",  cancelled))
+    wf.add(new Transition(paid,      "cancel",  cancelled))
+    wf.add(new Transition(preparing, "cancel",  cancelled))
+
+    return wf
+  }
+}
+
+// ── Support ticket workflow factory ──────────────────────────────────────────
+
+class TicketWorkflow {
+  var priority: String
+public:
+  def this(p: String) { priority = p }
+
+  def build(): Workflow {
+    val open       = WorkflowState::of("open",        "Ticket submitted")
+    val inProgress = WorkflowState::of("in_progress", "Agent working on it")
+    val pending    = WorkflowState::of("pending",     "Waiting for customer")
+    val resolved   = WorkflowState::of("resolved",   "Issue resolved — awaiting confirmation")
+    val closed     = WorkflowState::terminal("closed", "Ticket closed permanently")
+
+    val prio = priority   // capture String, not Boolean, to avoid closure boxing bug
+
+    val wf = new Workflow("Ticket[#{priority}]", open)
+
+    wf.add(new Transition(open,       "assign",  inProgress))
+    wf.add(new Transition(open,       "close",   closed    ).withGuard((s) -> { val ok = prio == "high" || prio == "critical"; if ok { null } else { "must assign before closing unless high priority" } }))
+    wf.add(new Transition(inProgress, "ask",     pending   ))
+    wf.add(new Transition(inProgress, "resolve", resolved  ))
+    wf.add(new Transition(pending,    "reply",   inProgress))
+    wf.add(new Transition(pending,    "timeout", closed    ))
+    wf.add(new Transition(resolved,   "reopen",  open      ))
+    wf.add(new Transition(resolved,   "close",   closed    ))
+
+    return wf
+  }
+}
+
+// ── Multi-step statistics ────────────────────────────────────────────────────
+
+class WfStats {
+public:
+  static def summarize(workflows: List[Workflow]): void {
+    var total = 0; var ok = 0; var rej = 0
+    foreach wf: Workflow in workflows {
+      foreach e: WorkflowEvent in wf.history() {
+        total = total + 1
+        select e.result() {
+          case t is Transitioned: ok  = ok  + 1
+          case r is Rejected:     rej = rej + 1
+          else: {}
+        }
+      }
+    }
+    val noMatch = total - ok - rej
+    IO::println("  Events  total=#{total}  ok=#{ok}  rejected=#{rej}  no-match=#{noMatch}")
+  }
+}
+
+// ── Extension: fire a sequence and collect results ────────────────────────────
+
+extension Workflow {
+  def fireAll(events: List[String]): List[EventResult] {
+    val results = new java.util.ArrayList[EventResult]()
+    foreach ev: String in events { results.add(self.fire(ev)) }
+    return results
+  }
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
+
+def sep(): void { IO::println(Strings::repeat("=", 55)) }
+
+def main(): void {
+  IO::println("WorkflowEngine — generic FSM demo")
+  sep()
+
+  // Scenario A: happy-path order
+  IO::println("Scenario A: Order — happy path")
+  val order1 = OrderWorkflow::build()
+  val events1 = new java.util.ArrayList[String]()
+  events1.add("pay"); events1.add("prepare"); events1.add("ship"); events1.add("deliver")
+  foreach r: EventResult in order1.fireAll(events1) {
+    IO::println("  " + EventResultHelper::display(r))
+  }
+  order1.printHistory()
+  sep()
+
+  // Scenario B: cancel after payment
+  IO::println("Scenario B: Order — cancel after payment then stale event")
+  val order2 = OrderWorkflow::build()
+  val events2 = new java.util.ArrayList[String]()
+  events2.add("pay"); events2.add("cancel"); events2.add("prepare")
+  foreach r: EventResult in order2.fireAll(events2) {
+    IO::println("  " + EventResultHelper::display(r))
+  }
+  sep()
+
+  // Scenario C: fire on terminal state
+  IO::println("Scenario C: Order — event after terminal state")
+  val order3 = OrderWorkflow::build()
+  val events3 = new java.util.ArrayList[String]()
+  events3.add("pay"); events3.add("prepare"); events3.add("ship"); events3.add("deliver"); events3.add("pay")
+  foreach r: EventResult in order3.fireAll(events3) {
+    IO::println("  " + EventResultHelper::display(r))
+  }
+  sep()
+
+  // Scenario D: ticket — guard rejection
+  IO::println("Scenario D: Ticket[normal] — direct close rejected by guard")
+  val ticket1 = new TicketWorkflow("normal").build()
+  val events4 = new java.util.ArrayList[String]()
+  events4.add("close"); events4.add("assign"); events4.add("resolve")
+  foreach r: EventResult in ticket1.fireAll(events4) {
+    IO::println("  " + EventResultHelper::display(r))
+  }
+  sep()
+
+  // Scenario E: high-priority ticket passes guard
+  IO::println("Scenario E: Ticket[high] — direct close allowed")
+  val ticket2 = new TicketWorkflow("high").build()
+  val r5 = ticket2.fire("close")
+  IO::println("  " + EventResultHelper::display(r5))
+  sep()
+
+  // Scenario F: ticket reopen cycle
+  IO::println("Scenario F: Ticket[normal] — resolve, reopen, re-assign cycle")
+  val ticket3 = new TicketWorkflow("normal").build()
+  val events6 = new java.util.ArrayList[String]()
+  events6.add("assign"); events6.add("resolve"); events6.add("reopen")
+  events6.add("assign"); events6.add("ask"); events6.add("reply"); events6.add("resolve")
+  foreach r: EventResult in ticket3.fireAll(events6) {
+    IO::println("  " + EventResultHelper::display(r))
+  }
+  ticket3.printHistory()
+  sep()
+
+  // Scenario G: all-states reachability check
+  IO::println("Scenario G: Order — all terminal paths explored")
+  val paths = [
+    ["pay", "prepare", "ship", "deliver"],
+    ["pay", "cancel"],
+    ["cancel"],
+    ["pay", "prepare", "cancel"]
+  ]
+  foreach i: Int in 0..<paths.size {
+    val path = paths[i] as List[String]
+    val wf = OrderWorkflow::build()
+    foreach ev: String in path { wf.fire(ev) }
+    IO::println("  path #{i + 1}: #{path.toString()} -> #{wf.state().toString()}")
+  }
+  sep()
+
+  // Summary
+  IO::println("Summary across all workflow runs:")
+  val all = new java.util.ArrayList[Workflow]()
+  all.add(order1); all.add(order2); all.add(order3)
+  all.add(ticket1); all.add(ticket2); all.add(ticket3)
+  WfStats::summarize(all)
+  sep()
+
+  IO::println("Done.")
+}

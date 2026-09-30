@@ -1,0 +1,571 @@
+// SurveyEngine.on — survey creation, response collection, and analytics engine.
+// Exercises: ADT case-enums, data-carrying enums, records with body methods,
+// classes, interfaces, inheritance, generics, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/distinct/find/partition/zip/reduce),
+// select/pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while, foreach (ranges and map k,v), extension methods.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def stars(max: Int): String {
+    val filled: Int = self.clamp(0, max)
+    var out: String = ""
+    foreach i: Int in 0..<filled { out = out + "*" }
+    foreach i: Int in filled..<max { out = out + "." }
+    return out
+  }
+}
+
+extension Double {
+  def round2(): Double = ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n) + "..." }
+  def repeatStr(n: Int): String {
+    var out: String = ""
+    foreach i: Int in 0..<n { out = out + self }
+    return out
+  }
+}
+
+// ─── Sentiment: homogeneous enum ─────────────────────────────────────────────
+
+enum Sentiment { Positive, Neutral, Mixed, Negative }
+
+// ─── QuestionType: data-carrying ADT enum ────────────────────────────────────
+
+enum QuestionType {
+  case YesNo
+  case RatingScale(lo: Int, hi: Int)
+  case MultiChoice(options: List[String])
+  case Likert(labels: List[String])
+  case FreeText
+public:
+  def label(): String = select this {
+    case q is YesNo:       "Yes/No"
+    case q is RatingScale: "Rating #{q.lo()}--#{q.hi()}"
+    case q is MultiChoice: "Multiple choice (#{q.options().size} options)"
+    case q is Likert:      "Likert (#{q.labels().size} levels)"
+    case q is FreeText:    "Free text"
+  }
+  def isNumeric(): Boolean = select this {
+    case q is RatingScale: true
+    case q is Likert:      true
+    else:                  false
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Question(
+  id:       Int,
+  text:     String,
+  kind:     QuestionType,
+  required: Boolean
+) {
+public:
+  def header(): String = "Q#{id()}. #{text().truncate(60)}"
+}
+
+record Answer(questionId: Int, value: String)
+
+record Submission(respondentId: Int, timestamp: Long, answers: List[Answer]) {
+public:
+  def findAnswer(qid: Int): Answer? {
+    foreach a: Answer in answers {
+      if a.questionId() == qid { return a }
+    }
+    return null
+  }
+  def isComplete(required: List[Int]): Boolean {
+    val answered: List[Int] = answers.map { a -> (a as Answer).questionId() }
+    foreach qid: Int in required {
+      if answered.find { id -> (id as Int) == qid } == null { return false }
+    }
+    return true
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def title():   String
+  def describe(): String
+}
+
+// ─── Survey class ─────────────────────────────────────────────────────────────
+
+class Survey conforms Reportable {
+  val id:          String
+  val surveyTitle: String
+  val description: String
+  val questions:   List[Question]
+  val submissions: List[Submission]
+  var nextRespondentId: Int
+
+public:
+  def this(id: String, title: String, desc: String) {
+    this.id          = id
+    this.surveyTitle = title
+    this.description = desc
+    this.questions   = []
+    this.submissions = []
+    this.nextRespondentId = 1
+  }
+
+  def getId():          String = id
+  def title():          String = surveyTitle
+  def getDescription(): String = description
+  def getQuestions():   List[Question]   = questions
+  def getSubmissions(): List[Submission] = submissions
+
+  def describe(): String =
+    "#{surveyTitle} (#{questions.size} questions, #{submissions.size} responses)"
+
+  def addQuestion(q: Question): void { questions.add(q) }
+
+  def submit(answers: List[Answer]): Submission {
+    val ts: Long = System::currentTimeMillis()
+    val sub: Submission = new Submission(nextRespondentId, ts, answers)
+    submissions.add(sub)
+    nextRespondentId = nextRespondentId + 1
+    return sub
+  }
+
+  def getQuestion(qid: Int): Question? {
+    foreach q: Question in questions {
+      if q.id() == qid { return q }
+    }
+    return null
+  }
+
+  def requiredIds(): List[Int] =
+    questions.filter { q -> (q as Question).required() }.map { q -> (q as Question).id() }
+
+  def completeSubmissions(): List[Submission] {
+    val req: List[Int] = requiredIds()
+    return submissions.filter { s -> (s as Submission).isComplete(req) }
+  }
+
+  def allAnswersForQuestion(qid: Int): List[Answer] {
+    val out: List[Answer] = []
+    foreach s: Submission in submissions {
+      val a: Answer? = s.findAnswer(qid)
+      if a != null { out.add(a) }
+    }
+    return out
+  }
+
+  def meanRating(qid: Int): Double {
+    val answers: List[Answer] = allAnswersForQuestion(qid)
+    if answers.size == 0 { return 0.0 }
+    var total: Int = 0
+    var count: Int = 0
+    foreach a: Answer in answers {
+      try {
+        total = total + Integer::parseInt(a.value())
+        count = count + 1
+      } catch e: Exception { }
+    }
+    if count == 0 { return 0.0 }
+    return total * 1.0 / count
+  }
+
+  def choiceCounts(qid: Int): Map[Object, Object] {
+    val counts: Map[Object, Object] = [:]
+    foreach a: Answer in allAnswersForQuestion(qid) {
+      val key: String = a.value()
+      val prev: Object? = counts.get(key)
+      if prev == null {
+        counts.put(key, 1)
+      } else {
+        counts.put(key, (prev as Int) + 1)
+      }
+    }
+    return counts
+  }
+
+  def yesNoCounts(qid: Int): List[Int] {
+    var yes: Int = 0
+    var no: Int  = 0
+    foreach a: Answer in allAnswersForQuestion(qid) {
+      if a.value() == "yes" { yes = yes + 1 }
+      else if a.value() == "no" { no = no + 1 }
+    }
+    return [yes, no]
+  }
+}
+
+// ─── NpsScorer ────────────────────────────────────────────────────────────────
+
+class NpsScorer {
+  val questionId: Int
+
+public:
+  def this(qid: Int) { this.questionId = qid }
+
+  def score(answers: List[Answer]): Double {
+    val ratings: List[Answer] = answers.filter { a ->
+      (a as Answer).questionId() == questionId
+    }
+    if ratings.size == 0 { return 0.0 }
+    var promoters: Int = 0
+    var detractors: Int = 0
+    foreach a: Answer in ratings {
+      try {
+        val v: Int = Integer::parseInt((a as Answer).value())
+        if v >= 9 { promoters = promoters + 1 }
+        else if v <= 6 { detractors = detractors + 1 }
+      } catch e: Exception { }
+    }
+    val n: Int = ratings.size
+    return (promoters - detractors) * 100.0 / n
+  }
+}
+
+// ─── SurveyReport ─────────────────────────────────────────────────────────────
+
+class SurveyReport {
+  val survey: Survey
+
+public:
+  def this(s: Survey) { this.survey = s }
+
+  def hr(c: String): void { IO::println(c.repeatStr(60)) }
+
+  def printHeader(): void {
+    hr("=")
+    IO::println("  SURVEY REPORT: #{survey.title()}")
+    IO::println("  #{survey.describe()}")
+    hr("=")
+    val complete: Int = survey.completeSubmissions().size
+    val total:    Int = survey.getSubmissions().size
+    IO::println("  Complete responses: #{complete} / #{total}")
+    IO::println("")
+  }
+
+  def printQuestionStats(): void {
+    IO::println("PER-QUESTION STATISTICS")
+    hr("-")
+    foreach q: Question in survey.getQuestions() {
+      val answers: List[Answer] = survey.allAnswersForQuestion(q.id())
+      val total:   Int          = survey.getSubmissions().size
+      IO::println("")
+      IO::println(q.header())
+      IO::println("  Type    : #{q.kind().label()}")
+      IO::println("  Answered: #{answers.size} / #{total}")
+      val kind: QuestionType = q.kind()
+      select kind {
+        case k is YesNo: {
+          val counts: List[Int] = survey.yesNoCounts(q.id())
+          val yes: Int = counts.get(0) as Int
+          val no: Int  = counts.get(1) as Int
+          val n: Int = yes + no
+          val yesPct: String = if n == 0 { "n/a" } else { (yes * 100 / n) + "%" }
+          val noPct:  String = if n == 0 { "n/a" } else { (no  * 100 / n) + "%" }
+          IO::println("  Yes: #{yes} (#{yesPct})")
+          IO::println("  No : #{no} (#{noPct})")
+        }
+        case k is RatingScale: {
+          val mean: Double = survey.meanRating(q.id()).round2()
+          val range: Int = k.hi() - k.lo() + 1
+          val bar: Int = if mean == 0.0 { 0 } else {
+            ((mean - k.lo()) * 10.0 / range + 0.5) as Int
+          }
+          IO::println("  Mean: #{mean}  [#{bar.stars(10)}]")
+          IO::println("  Range: #{k.lo()} -- #{k.hi()}")
+        }
+        case k is MultiChoice: {
+          val counts: Map[Object, Object] = survey.choiceCounts(q.id())
+          val n: Int = answers.size
+          foreach (opt, cnt) in counts {
+            val label: String = (opt as String).rpad(20)
+            val c: Int = cnt as Int
+            val pct: Int = if n == 0 { 0 } else { c * 100 / n }
+            IO::println("  #{label} #{c.lpad(3)} (#{pct}%)")
+          }
+        }
+        case k is Likert: {
+          val counts: Map[Object, Object] = survey.choiceCounts(q.id())
+          val n: Int = answers.size
+          foreach (lvl, cnt) in counts {
+            val label: String = (lvl as String).rpad(20)
+            val c: Int = cnt as Int
+            val pct: Int = if n == 0 { 0 } else { c * 100 / n }
+            IO::println("  #{label} #{c.lpad(3)} (#{pct}%)")
+          }
+          val mean: Double = survey.meanRating(q.id()).round2()
+          IO::println("  Mean level index: #{mean}")
+        }
+        case k is FreeText: {
+          IO::println("  Sample responses:")
+          var i: Int = 0
+          while i < answers.size && i < 3 {
+            val a: Answer = answers.get(i) as Answer
+            IO::println("    \"#{a.value().truncate(50)}\"")
+            i = i + 1
+          }
+        }
+        else: IO::println("  (unknown question type)")
+      }
+    }
+    IO::println("")
+  }
+
+  def printNps(npsQid: Int): void {
+    val scorer: NpsScorer = new NpsScorer(npsQid)
+    val allAnswers: List[Answer] = survey.allAnswersForQuestion(npsQid)
+    val nps: Double = scorer.score(allAnswers).round2()
+    IO::println("NET PROMOTER SCORE (Q#{npsQid})")
+    hr("-")
+    IO::println("  NPS = #{nps}  (range: -100 to +100)")
+    val sentiment: Sentiment =
+      if nps >= 50.0      { Sentiment::Positive }
+      else if nps >= 0.0  { Sentiment::Neutral }
+      else if nps >= -30.0 { Sentiment::Mixed }
+      else                 { Sentiment::Negative }
+    val label: String = select sentiment {
+      case Sentiment::Positive: "Excellent"
+      case Sentiment::Neutral:  "Needs work"
+      case Sentiment::Mixed:    "Concerning"
+      case Sentiment::Negative: "Critical"
+    }
+    IO::println("  Interpretation: #{label}")
+    IO::println("")
+  }
+
+  def printTopWords(qid: Int): void {
+    IO::println("TOP WORDS IN FREE TEXT (Q#{qid})")
+    hr("-")
+    val freq: Map[Object, Object] = [:]
+    foreach a: Answer in survey.allAnswersForQuestion(qid) {
+      val words: List[String] = Strings::split(a.value().toLowerCase(), " ")
+      foreach w: String in words {
+        val word: String = w.trim()
+        if word.length() > 3 {
+          val prev: Object? = freq.get(word)
+          if prev == null { freq.put(word, 1) }
+          else { freq.put(word, (prev as Int) + 1) }
+        }
+      }
+    }
+    val entries: List[Object] = []
+    foreach (w, c) in freq { entries.add(w + ":" + c) }
+    val sorted: List[Object] = entries.sortedBy { e ->
+      val parts: List[String] = Strings::split(e as String, ":")
+      0 - Integer::parseInt(parts.get(1))
+    }
+    var shown: Int = 0
+    foreach e: Object in sorted {
+      if shown >= 8 { break }
+      val parts: List[String] = Strings::split(e as String, ":")
+      val word: String = (parts.get(0) as String).rpad(15)
+      val cnt: String  = parts.get(1) as String
+      IO::println("  #{word} #{cnt}")
+      shown = shown + 1
+    }
+    IO::println("")
+  }
+
+  def printCompletionSummary(): void {
+    IO::println("RESPONSE COMPLETENESS")
+    hr("-")
+    val total:    Int = survey.getSubmissions().size
+    val complete: Int = survey.completeSubmissions().size
+    val pct: Int = if total == 0 { 0 } else { complete * 100 / total }
+    IO::println("  Total submissions : #{total}")
+    IO::println("  Complete          : #{complete} (#{pct}%)")
+    IO::println("  Partial           : #{total - complete}")
+    hr("=")
+    IO::println("")
+  }
+}
+
+// ─── Recursive quicksort for Int lists ───────────────────────────────────────
+
+def sortInts(xs: List[Int]): List[Int] {
+  if xs.size <= 1 { return xs }
+  val pivot: Int = xs.get(xs.size / 2) as Int
+  val less:  List[Int] = xs.filter { x -> (x as Int) < pivot }
+  val eq:    List[Int] = xs.filter { x -> (x as Int) == pivot }
+  val more:  List[Int] = xs.filter { x -> (x as Int) > pivot }
+  val result: List[Int] = []
+  foreach v: Int in sortInts(less) { result.add(v) }
+  foreach v: Int in eq             { result.add(v) }
+  foreach v: Int in sortInts(more) { result.add(v) }
+  return result
+}
+
+def median(answers: List[Answer]): Double {
+  val vals: List[Int] = []
+  foreach a: Answer in answers {
+    try { vals.add(Integer::parseInt(a.value())) }
+    catch e: Exception { }
+  }
+  if vals.size == 0 { return 0.0 }
+  val sorted: List[Int] = sortInts(vals)
+  val n: Int = sorted.size
+  if n % 2 == 1 { return (sorted.get(n / 2) as Int) * 1.0 }
+  val lo: Int = sorted.get(n / 2 - 1) as Int
+  val hi: Int = sorted.get(n / 2) as Int
+  return (lo + hi) * 1.0 / 2.0
+}
+
+// ─── Build the survey ─────────────────────────────────────────────────────────
+
+val survey: Survey = new Survey(
+  "SVY-2024-01",
+  "Developer Experience Survey 2024",
+  "Annual survey on tooling, productivity and team satisfaction"
+)
+
+val painOptions: List[String] = ["Build times", "Documentation", "Debugging", "Onboarding", "Tooling"]
+val likertLabels: List[String] = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]
+
+survey.addQuestion(new Question(1,
+  "Overall, how satisfied are you with your developer experience?",
+  new RatingScale(1, 10), true))
+survey.addQuestion(new Question(2,
+  "How likely are you to recommend our tools to a colleague? (0-10)",
+  new RatingScale(0, 10), true))
+survey.addQuestion(new Question(3,
+  "What is your biggest pain point?",
+  new MultiChoice(painOptions), true))
+survey.addQuestion(new Question(4,
+  "Remote work setup meets my productivity needs.",
+  new Likert(likertLabels), false))
+survey.addQuestion(new Question(5,
+  "Would you adopt the new IDE plugin if released today?",
+  new YesNo(), false))
+survey.addQuestion(new Question(6,
+  "Any additional comments or suggestions?",
+  new FreeText(), false))
+
+// ─── Simulate submissions ─────────────────────────────────────────────────────
+
+val freeTexts: List[String] = [
+  "Great tooling overall build times could be faster",
+  "Documentation needs improvement especially for new APIs",
+  "Love the debugger onboarding was smooth",
+  "Build times are the main bottleneck for me",
+  "Excellent IDE support please keep it up",
+  "Some documentation gaps but great community support",
+  "The new plugin sounds promising eager to try it",
+  "Onboarding took too long better guides would help",
+  "Really happy with tooling improvements this year",
+  "Debugging experience is much better than last year"
+]
+
+val painChoices: List[String] = [
+  "Build times", "Documentation", "Build times",
+  "Onboarding",  "Debugging",     "Documentation",
+  "Tooling",     "Build times",   "Onboarding", "Documentation"
+]
+
+val yesNoAnswers: List[String] = ["yes","yes","no","yes","yes","no","yes","yes","yes","no"]
+
+val overallRatings: List[Int] = [8, 7, 9, 6, 9, 7, 8, 6, 9, 8]
+val npsRatings:     List[Int] = [9, 7, 10, 5, 9, 8, 10, 6, 9, 7]
+val likertAnswers:  List[Int] = [3, 4, 4, 2, 5, 3, 4, 3, 5, 4]
+
+foreach i: Int in 0..<10 {
+  val answers: List[Answer] = [
+    new Answer(1, "" + (overallRatings.get(i) as Int)),
+    new Answer(2, "" + (npsRatings.get(i) as Int)),
+    new Answer(3, painChoices.get(i) as String),
+    new Answer(4, "" + (likertAnswers.get(i) as Int)),
+    new Answer(5, yesNoAnswers.get(i) as String),
+    new Answer(6, freeTexts.get(i) as String)
+  ]
+  survey.submit(answers)
+}
+
+// Partial submission (skips Q3, a required question)
+val partialAnswers: List[Answer] = [
+  new Answer(1, "5"),
+  new Answer(2, "4")
+]
+survey.submit(partialAnswers)
+
+// ─── Analytics pipeline ───────────────────────────────────────────────────────
+
+// Partition into complete vs partial
+val parts = survey.getSubmissions().partition { s ->
+  (s as Submission).isComplete(survey.requiredIds())
+}
+val completeList: List[Object] = parts[0] as List[Object]
+val partialList:  List[Object] = parts[1] as List[Object]
+
+// Per-question response rates
+val qRates: List[Object] = survey.getQuestions().map { q ->
+  val qTyped: Question = q as Question
+  val cnt: Int = survey.allAnswersForQuestion(qTyped.id()).size
+  "Q#{qTyped.id()}: #{cnt}/#{survey.getSubmissions().size}"
+}
+
+// Low-response questions (<50%)
+val lowResponse: List[Question] = survey.getQuestions().filter { q ->
+  val cnt: Int = survey.allAnswersForQuestion(q.id()).size
+  cnt * 2 < survey.getSubmissions().size
+}
+
+// Median overall satisfaction
+val medianScore: Double = median(survey.allAnswersForQuestion(1))
+
+// GroupBy pain point
+val painGroups: Map[Object, Object] = survey.choiceCounts(3)
+
+// ─── Print report ─────────────────────────────────────────────────────────────
+
+val report: SurveyReport = new SurveyReport(survey)
+report.printHeader()
+report.printQuestionStats()
+report.printNps(2)
+report.printTopWords(6)
+report.printCompletionSummary()
+
+// ─── Extra analytics ──────────────────────────────────────────────────────────
+
+IO::println("ANALYTICS SUMMARY")
+IO::println("-".repeatStr(60))
+IO::println("  Median overall satisfaction : #{medianScore}")
+IO::println("  Response rates by question  :")
+foreach rate: Object in qRates {
+  IO::println("    #{rate}")
+}
+IO::println("")
+IO::println("  Questions with low response rate (<50%):")
+if lowResponse.size == 0 {
+  IO::println("    (none)")
+} else {
+  foreach q: Question in lowResponse {
+    IO::println("    #{q.header()}")
+  }
+}
+IO::println("")
+
+// Pain-point distribution
+IO::println("  Pain-point distribution:")
+foreach (pain, cnt) in painGroups {
+  IO::println("    #{(pain as String).rpad(20)} #{cnt}")
+}
+
+IO::println("")
+IO::println("Done.")

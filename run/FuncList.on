@@ -1,0 +1,375 @@
+// FuncList.on — persistent, immutable singly-linked list with a rich API.
+//
+// Exercises: generic ADT enum (FList[T]); generic class with type parameters;
+// select/type-pattern matching with ADT cases; closures; generic methods;
+// collection pipelines via explicit recursion (map/filter/fold/find/zip);
+// recursion; foreach over ranges; string interpolation; nullable types;
+// while loops; do[List] list comprehension; structural equality.
+
+import { java.lang.StringBuilder; }
+
+// ── Core ADT ───────────────────────────────────────────────────────────────
+// A persistent singly-linked list: either an empty list (FNil) or a pair
+// of a head element and a rest-of-list (FCons).
+
+enum FList[T] {
+  case FCons(head: T, tail: FList[T])
+  case FNil
+}
+
+// ── Builders ───────────────────────────────────────────────────────────────
+
+class FL {
+public:
+  static def nil[T](): FList[T] = new FNil[T]()
+
+  static def singleton[T](a: T): FList[T] = new FCons[T](a, new FNil[T]())
+
+  static def pair[T](a: T, b: T): FList[T] =
+    new FCons[T](a, new FCons[T](b, new FNil[T]()))
+
+  static def triple[T](a: T, b: T, c: T): FList[T] =
+    new FCons[T](a, new FCons[T](b, new FCons[T](c, new FNil[T]())))
+
+  static def range(from: Int, to: Int): FList[Int] {
+    var result: FList[Int] = new FNil[Int]()
+    var i: Int = to - 1
+    while i >= from {
+      result = new FCons[Int](i, result)
+      i--
+    }
+    return result
+  }
+
+  static def fromJavaList[T](xs: List[T]): FList[T] {
+    var result: FList[T] = new FNil[T]()
+    var i: Int = xs.size - 1
+    while i >= 0 {
+      result = new FCons[T](xs[i], result)
+      i--
+    }
+    return result
+  }
+}
+
+// ── Core operations ────────────────────────────────────────────────────────
+
+class FListOps {
+public:
+  static def isEmpty[T](xs: FList[T]): Boolean = select xs {
+    case n is FNil: true
+    else: false
+  }
+
+  static def head[T](xs: FList[T]): T? = select xs {
+    case c is FCons: c.head()
+    else: null
+  }
+
+  static def tail[T](xs: FList[T]): FList[T]? = select xs {
+    case c is FCons: c.tail()
+    else: null
+  }
+
+  static def length[T](xs: FList[T]): Int {
+    var n: Int = 0
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: { cur = c.tail(); n++ }
+        else: return n
+      }
+    }
+    return 0
+  }
+
+  static def prepend[T](x: T, xs: FList[T]): FList[T] = new FCons[T](x, xs)
+
+  static def append[T](xs: FList[T], x: T): FList[T] =
+    reverse[T](prepend[T](x, reverse[T](xs)))
+
+  static def concat[T](a: FList[T], b: FList[T]): FList[T] {
+    select a {
+      case cn is FCons: return new FCons[T](cn.head(), concat[T](cn.tail(), b))
+      else: return b
+    }
+  }
+
+  static def reverse[T](xs: FList[T]): FList[T] {
+    var acc: FList[T] = new FNil[T]()
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: { acc = new FCons[T](c.head(), acc); cur = c.tail() }
+        else: return acc
+      }
+    }
+    return acc
+  }
+
+  static def map[A, B](xs: FList[A], f: (A) -> B): FList[B] {
+    var acc: FList[B] = new FNil[B]()
+    var cur: FList[A] = xs
+    while true {
+      select cur {
+        case c is FCons: { acc = new FCons[B](f(c.head()), acc); cur = c.tail() }
+        else: return reverse[B](acc)
+      }
+    }
+    return new FNil[B]()
+  }
+
+  static def filter[T](xs: FList[T], pred: (T) -> Boolean): FList[T] {
+    var acc: FList[T] = new FNil[T]()
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: {
+          if pred(c.head()) { acc = new FCons[T](c.head(), acc) }
+          cur = c.tail()
+        }
+        else: return reverse[T](acc)
+      }
+    }
+    return new FNil[T]()
+  }
+
+  static def foldLeft[A, B](xs: FList[A], init: B, f: (B, A) -> B): B {
+    var acc: B = init
+    var cur: FList[A] = xs
+    while true {
+      select cur {
+        case c is FCons: { acc = f(acc, c.head()); cur = c.tail() }
+        else: return acc
+      }
+    }
+    return acc
+  }
+
+  static def foldRight[A, B](xs: FList[A], init: B, f: (A, B) -> B): B =
+    select xs {
+      case c is FCons: f(c.head(), foldRight[A, B](c.tail(), init, f))
+      else: init
+    }
+
+  static def find[T](xs: FList[T], pred: (T) -> Boolean): T? {
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: {
+          if pred(c.head()) { return c.head() }
+          cur = c.tail()
+        }
+        else: return null
+      }
+    }
+    return null
+  }
+
+  static def contains[T](xs: FList[T], x: T): Boolean {
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: {
+          if c.head() == x { return true }
+          cur = c.tail()
+        }
+        else: return false
+      }
+    }
+    return false
+  }
+
+  static def toJavaList[T](xs: FList[T]): List[T] {
+    val result: List[T] = []
+    var cur: FList[T] = xs
+    while true {
+      select cur {
+        case c is FCons: { result.add(c.head()); cur = c.tail() }
+        else: break
+      }
+    }
+    return result
+  }
+
+  static def take[T](xs: FList[T], n: Int): FList[T] {
+    var acc: FList[T] = new FNil[T]()
+    var cur: FList[T] = xs
+    var count: Int = 0
+    while count < n {
+      select cur {
+        case c is FCons: { acc = new FCons[T](c.head(), acc); cur = c.tail(); count++ }
+        else: count = n
+      }
+    }
+    return reverse[T](acc)
+  }
+
+  static def drop[T](xs: FList[T], n: Int): FList[T] {
+    var cur: FList[T] = xs
+    var i: Int = 0
+    while i < n {
+      select cur {
+        case c is FCons: { cur = c.tail(); i++ }
+        else: return new FNil[T]()
+      }
+    }
+    return cur
+  }
+
+  static def zipWith[A, B, C](la: FList[A], lb: FList[B], f: (A, B) -> C): FList[C] {
+    var ra: FList[A] = la
+    var rb: FList[B] = lb
+    var result: FList[C] = new FNil[C]()
+    while true {
+      select ra {
+        case ca is FCons:
+          select rb {
+            case cb is FCons: {
+              result = new FCons[C](f(ca.head(), cb.head()), result)
+              ra = ca.tail()
+              rb = cb.tail()
+            }
+            else: return reverse[C](result)
+          }
+        else: return reverse[C](result)
+      }
+    }
+    return new FNil[C]()
+  }
+
+  static def sum(xs: FList[Int]): Int = foldLeft[Int, Int](xs, 0, (a, b) -> a + b)
+
+  static def product(xs: FList[Int]): Int = foldLeft[Int, Int](xs, 1, (a, b) -> a * b)
+
+  static def maximum(xs: FList[Int]): Int? = select xs {
+    case c is FCons: foldLeft[Int, Int](c.tail(), c.head(), (m, x) -> if x > m { x } else { m })
+    else: null
+  }
+
+  static def minimum(xs: FList[Int]): Int? = select xs {
+    case c is FCons: foldLeft[Int, Int](c.tail(), c.head(), (m, x) -> if x < m { x } else { m })
+    else: null
+  }
+
+  static def mkString[T](xs: FList[T], sep: String): String {
+    val sb: StringBuilder = new StringBuilder()
+    var cur: FList[T] = xs
+    var first: Boolean = true
+    while true {
+      select cur {
+        case c is FCons: {
+          if !first { sb.append(sep) }
+          sb.append(c.head())
+          first = false
+          cur = c.tail()
+        }
+        else: break
+      }
+    }
+    return sb.toString()
+  }
+
+  static def eq[T](a: FList[T], b: FList[T]): Boolean {
+    var ca: FList[T] = a
+    var cb: FList[T] = b
+    while true {
+      select ca {
+        case consA is FCons:
+          select cb {
+            case consB is FCons: {
+              if consA.head() != consB.head() { return false }
+              ca = consA.tail()
+              cb = consB.tail()
+            }
+            else: return false
+          }
+        else:
+          select cb {
+            case n is FNil: return true
+            else: return false
+          }
+      }
+    }
+    return false
+  }
+}
+
+// ── Demo ───────────────────────────────────────────────────────────────────
+
+val nums: FList[Int] = FL::range(1, 11)   // [1..10]
+IO::println("nums      : " + FListOps::mkString[Int](nums, ", "))
+IO::println("length    : " + FListOps::length[Int](nums))
+IO::println("sum       : " + FListOps::sum(nums))
+IO::println("product   : " + FListOps::product(nums))
+IO::println("max       : " + FListOps::maximum(nums))
+IO::println("min       : " + FListOps::minimum(nums))
+
+val evens: FList[Int] = FListOps::filter[Int](nums, n -> n % 2 == 0)
+IO::println("evens     : " + FListOps::mkString[Int](evens, ", "))
+
+val squares: FList[Int] = FListOps::map[Int, Int](nums, n -> n * n)
+IO::println("squares   : " + FListOps::mkString[Int](squares, ", "))
+
+val first5: FList[Int] = FListOps::take[Int](nums, 5)
+IO::println("take 5    : " + FListOps::mkString[Int](first5, ", "))
+
+val last5: FList[Int] = FListOps::drop[Int](nums, 5)
+IO::println("drop 5    : " + FListOps::mkString[Int](last5, ", "))
+
+val rev: FList[Int] = FListOps::reverse[Int](nums)
+IO::println("reversed  : " + FListOps::mkString[Int](rev, ", "))
+
+val abc: FList[String] = FL::triple[String]("alpha", "beta", "gamma")
+IO::println("strings   : " + FListOps::mkString[String](abc, " | "))
+
+val extra: FList[String] = FL::singleton[String]("delta")
+val joined: FList[String] = FListOps::concat[String](abc, extra)
+IO::println("concat    : " + FListOps::mkString[String](joined, " | "))
+
+val found: Int? = FListOps::find[Int](nums, n -> n > 7)
+IO::println("first > 7 : " + found)
+
+val contains: Boolean = FListOps::contains[Int](nums, 5)
+IO::println("has 5     : " + contains)
+
+// Fold: factorial via foldLeft
+val fact5: Int = FListOps::foldLeft[Int, Int](FL::range(1, 6), 1, (acc, x) -> acc * x)
+IO::println("5!        : " + fact5)
+
+// zipWith: dot product of two lists
+val va: FList[Int] = FL::triple[Int](1, 2, 3)
+val vb: FList[Int] = FL::triple[Int](4, 5, 6)
+val dotPairs: FList[Int] = FListOps::zipWith[Int, Int, Int](va, vb, (a, b) -> a * b)
+val dotProduct: Int = FListOps::sum(dotPairs)
+IO::println("dot[1,2,3].[4,5,6]: " + dotProduct)
+
+// do[List] list comprehension
+val pairs: List[String] = do[List] {
+  x <- [1, 2, 3]
+  y <- [10, 20]
+  ret "(" + x + "," + y + ")"
+}
+val pairsFL: FList[String] = FL::fromJavaList[String](pairs)
+IO::println("pairs     : " + FListOps::mkString[String](pairsFL, " "))
+
+// toJavaList round-trip
+val roundTrip: List[Int] = FListOps::toJavaList[Int](nums)
+IO::println("round-trip: " + roundTrip.size + " elements, first=" + roundTrip[0] + " last=" + roundTrip[9])
+
+// Structural equality
+val xs: FList[Int] = FL::triple[Int](1, 2, 3)
+val ys: FList[Int] = FL::triple[Int](1, 2, 3)
+val zs: FList[Int] = FL::triple[Int](1, 2, 4)
+IO::println("eq xs ys  : " + FListOps::eq[Int](xs, ys))
+IO::println("eq xs zs  : " + FListOps::eq[Int](xs, zs))
+
+// foldRight: build a reversed list via cons
+val built: FList[Int] = FListOps::foldRight[Int, FList[Int]](
+  FL::range(1, 5),
+  new FNil[Int](),
+  (x, acc) -> new FCons[Int](x, acc)
+)
+IO::println("foldRight : " + FListOps::mkString[Int](built, ", "))
+
+IO::println("done.")

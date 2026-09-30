@@ -1,0 +1,386 @@
+// ConstraintSolver.on — generic CSP solver: N-Queens and graph coloring.
+//
+// Exercises: records, ADT enum, data-carrying enum, interface, classes,
+// generics, collection pipelines (map/filter/fold/find/partition),
+// closures as record fields, select/pattern matching, nullable/!!,
+// string interpolation, foreach (ranges, List[T]), try/catch, recursion.
+
+import { java.lang.StringBuilder }
+
+// ─── Constraint record ────────────────────────────────────────────────────────
+// Binary constraint between variable indices varI and varJ.
+// 'check(vi, vj)' must return true for an assignment to be locally consistent.
+
+record Constraint(varI: Int, varJ: Int, check: (Int, Int) -> Boolean)
+
+// ─── Result types ─────────────────────────────────────────────────────────────
+
+enum SolveStatus { Satisfied, Infeasible }
+
+record SolveResult(status: SolveStatus, assignment: Int[]?, nodes: Int) {
+public:
+  def isSatisfied(): Boolean = status() == SolveStatus::Satisfied
+  def summary(): String = select status() {
+    case SolveStatus::Satisfied:  "satisfied (#{nodes()} nodes)"
+    case SolveStatus::Infeasible: "infeasible after #{nodes()} nodes"
+  }
+}
+
+// Summary statistics for a puzzle run
+record PuzzleStats(name: String, firstNodes: Int, totalSolutions: Int, allNodes: Int) {
+public:
+  def report(): String =
+    "#{name()}: #{totalSolutions()} sol, #{firstNodes()} nodes first, #{allNodes()} nodes all"
+}
+
+// ─── Puzzle interface ─────────────────────────────────────────────────────────
+
+interface Puzzle {
+  def title(): String
+  def run(): void
+}
+
+// ─── Generic backtracking solver ─────────────────────────────────────────────
+
+class Solver {
+  val n_:           Int
+  val domainSize_:  Int
+  val constraints_: List[Constraint]
+  var nodeCount_:   Int
+public:
+  def this(n: Int, ds: Int, cs: List[Constraint]) {
+    self.n_           = n
+    self.domainSize_  = ds
+    self.constraints_ = cs
+    self.nodeCount_   = 0
+  }
+  def nodeCount(): Int = nodeCount_
+  def varCount():  Int = n_
+  def domainSize(): Int = domainSize_
+
+  // Returns true iff assigning v to variable col is consistent with rows.
+  def isConsistent(rows: Int[], col: Int, v: Int): Boolean {
+    foreach c: Constraint in constraints_ {
+      val ci: Int = c.varI()
+      val cj: Int = c.varJ()
+      if ci == col {
+        val jv: Int = rows[cj]
+        if jv >= 0 {
+          val fn: (Int, Int) -> Boolean = c.check()
+          if !fn(v, jv) { return false }
+        }
+      } else if cj == col {
+        val iv: Int = rows[ci]
+        if iv >= 0 {
+          val fn: (Int, Int) -> Boolean = c.check()
+          if !fn(iv, v) { return false }
+        }
+      }
+    }
+    return true
+  }
+
+  def backtrack(rows: Int[], col: Int): Boolean {
+    if col == n_ { return true }
+    nodeCount_ = nodeCount_ + 1
+    for var v: Int = 0; v < domainSize_; v++ {
+      if isConsistent(rows, col, v) {
+        rows[col] = v
+        if backtrack(rows, col + 1) { return true }
+        rows[col] = -1
+      }
+    }
+    return false
+  }
+
+  def solve(): SolveResult {
+    val rows: Int[] = new Int[n_]
+    foreach i: Int in 0..<n_ { rows[i] = -1 }
+    nodeCount_ = 0
+    if backtrack(rows, 0) {
+      return new SolveResult(SolveStatus::Satisfied, rows, nodeCount_)
+    }
+    return new SolveResult(SolveStatus::Infeasible, null, nodeCount_)
+  }
+
+  def countRec(rows: Int[], col: Int): Int {
+    if col == n_ { return 1 }
+    nodeCount_ = nodeCount_ + 1
+    var total: Int = 0
+    for var v: Int = 0; v < domainSize_; v++ {
+      if isConsistent(rows, col, v) {
+        rows[col] = v
+        total = total + countRec(rows, col + 1)
+        rows[col] = -1
+      }
+    }
+    return total
+  }
+
+  // Count all solutions (for small problems only).
+  def countAll(): Int {
+    val rows: Int[] = new Int[n_]
+    foreach i: Int in 0..<n_ { rows[i] = -1 }
+    nodeCount_ = 0
+    return countRec(rows, 0)
+  }
+
+  // Collect (up to limit) solutions as a list of Int[] arrays.
+  def collectRec(rows: Int[], col: Int, out: List[Int[]], limit: Int): void {
+    if out.size >= limit { return }
+    if col == n_ {
+      val copy: Int[] = new Int[n_]
+      foreach i: Int in 0..<n_ { copy[i] = rows[i] }
+      out.add(copy)
+      return
+    }
+    nodeCount_ = nodeCount_ + 1
+    for var v: Int = 0; v < domainSize_; v++ {
+      if out.size < limit && isConsistent(rows, col, v) {
+        rows[col] = v
+        collectRec(rows, col + 1, out, limit)
+        rows[col] = -1
+      }
+    }
+  }
+
+  def collectFirst(limit: Int): List[Int[]] {
+    val rows: Int[] = new Int[n_]
+    foreach i: Int in 0..<n_ { rows[i] = -1 }
+    nodeCount_ = 0
+    val out: List[Int[]] = []
+    collectRec(rows, 0, out, limit)
+    return out
+  }
+}
+
+// ─── N-Queens puzzle ──────────────────────────────────────────────────────────
+
+class NQueensPuzzle conforms Puzzle {
+  val n_: Int
+public:
+  def this(n: Int) { self.n_ = n }
+  def title(): String = "#{n_}-Queens"
+
+  // Build a solver for n-queens: all (i,j) pairs with i<j get a constraint
+  // checking row-difference and diagonal-difference.
+  static def buildSolver(n: Int): Solver {
+    val cs: List[Constraint] = []
+    for var i: Int = 0; i < n; i++ {
+      for var j: Int = i + 1; j < n; j++ {
+        val di: Int = j - i
+        cs.add(new Constraint(i, j,
+          (ri, rj) -> ri != rj && (if ri > rj { ri - rj } else { rj - ri }) != di))
+      }
+    }
+    return new Solver(n, n, cs)
+  }
+
+  static def renderBoard(rows: Int[], n: Int): String {
+    val sb: StringBuilder = new StringBuilder()
+    foreach col: Int in 0..<n {
+      foreach r: Int in 0..<n {
+        sb.append(if rows[col] == r { "Q " } else { ". " })
+      }
+      sb.append("\n")
+    }
+    return sb.toString()
+  }
+
+  def run(): void {
+    val n: Int = n_
+    IO::println("── #{title()} " + "─".repeat(30 - title().length()) + "──")
+    val solver: Solver = NQueensPuzzle::buildSolver(n)
+    val result: SolveResult = solver.solve()
+    IO::println("First solution: " + result.summary())
+    if result.isSatisfied() {
+      IO::print(NQueensPuzzle::renderBoard(result.assignment()!!, n))
+    }
+    if n <= 10 {
+      val counter: Solver = NQueensPuzzle::buildSolver(n)
+      val total: Int = counter.countAll()
+      IO::println("Total solutions: #{total}  (#{counter.nodeCount()} nodes)")
+    }
+    IO::println("")
+  }
+}
+
+// ─── Graph-coloring puzzle ────────────────────────────────────────────────────
+
+record ColorEdge(u: Int, v: Int)
+
+// Known solution counts / chromatic numbers for well-known graphs
+enum KnownGraph(chromatic: Int, label: String) {
+  Australia(3, "Australia map"),
+  Petersen(3,  "Petersen graph"),
+  Complete4(4, "K4"),
+  Complete5(5, "K5")
+}
+
+class ColorPuzzle conforms Puzzle {
+  val title_:     String
+  val nodeNames_: List[String]
+  val edges_:     List[ColorEdge]
+  val numColors_: Int
+public:
+  def this(t: String, nodes: List[String], es: List[ColorEdge], k: Int) {
+    self.title_     = t
+    self.nodeNames_ = nodes
+    self.edges_     = es
+    self.numColors_ = k
+  }
+  def title(): String = title_
+
+  def buildSolver(): Solver {
+    val cs: List[Constraint] = []
+    foreach e: ColorEdge in edges_ {
+      cs.add(new Constraint(e.u(), e.v(), (cu, cv) -> cu != cv))
+    }
+    return new Solver(nodeNames_.size, numColors_, cs)
+  }
+
+  static def colorName(idx: Int): String = select idx {
+    case 0: "Red"
+    case 1: "Green"
+    case 2: "Blue"
+    case 3: "Yellow"
+    case 4: "Purple"
+    else:   "Color" + idx
+  }
+
+  def run(): void {
+    val sepLen: Int = 32 - title_.length()
+    val sep: String = if sepLen > 0 { "─".repeat(sepLen) } else { "" }
+    IO::println("── #{title_} #{sep}──")
+    val solver: Solver = buildSolver()
+    val result: SolveResult = solver.solve()
+    IO::println(result.summary())
+    if result.isSatisfied() {
+      val sol: Int[] = result.assignment()!!
+      val n: Int = nodeNames_.size
+      foreach i: Int in 0..<n {
+        val node: String  = nodeNames_[i] as String
+        val color: String = ColorPuzzle::colorName(sol[i])
+        IO::println("  #{node} → #{color}")
+      }
+    }
+    IO::println("")
+  }
+}
+
+// ─── Helper: partition and summary stats ─────────────────────────────────────
+
+def partition(solutions: List[Int[]], n: Int): List[List[Int[]]] {
+  // Group 8-queens solutions by queen position in col 0
+  val groups: List[List[Int[]]] = []
+  foreach i: Int in 0..<n {
+    groups.add([])
+  }
+  foreach sol: Int[] in solutions {
+    val col0row: Int = sol[0]
+    if col0row >= 0 && col0row < n {
+      val g: List[Int[]] = groups[col0row] as List[Int[]]
+      g.add(sol)
+    }
+  }
+  return groups
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("╔══════════════════════════════════════════╗")
+  IO::println("║  Constraint Satisfaction Problem Solver  ║")
+  IO::println("╚══════════════════════════════════════════╝")
+  IO::println("")
+
+  // ── N-Queens ──────────────────────────────────────────────────────────────
+  foreach n: Int in [4, 5, 6, 8] {
+    val p: Puzzle = new NQueensPuzzle(n as Int)
+    p.run()
+  }
+
+  // Show all 4-Queens solutions
+  IO::println("── All 4-Queens solutions ──────────────────────────────")
+  val q4solver: Solver = NQueensPuzzle::buildSolver(4)
+  val q4all: List[Int[]] = q4solver.collectFirst(20)
+  IO::println("Found #{q4all.size} solutions:")
+  foreach sol: Int[] in q4all {
+    var line: String = "  "
+    foreach col: Int in 0..<4 {
+      line = line + "col#{col}=#{sol[col]} "
+    }
+    IO::println(line)
+  }
+  IO::println("")
+
+  // ── 8-Queens by symmetry partition (by row of queen in column 0) ──────────
+  IO::println("── 8-Queens by first-queen row ──────────────────────────")
+  val q8solver: Solver = NQueensPuzzle::buildSolver(8)
+  val q8all: List[Int[]] = q8solver.collectFirst(200)
+  val groups: List[List[Int[]]] = partition(q8all, 8)
+  foreach row: Int in 0..<8 {
+    val g: List[Int[]] = groups[row] as List[Int[]]
+    IO::println("  Queen in column 0, row #{row}: #{g.size} solutions")
+  }
+  IO::println("")
+
+  // ── Graph coloring ─────────────────────────────────────────────────────────
+
+  // Australia map
+  val ausNodes: List[String] = ["WA", "NT", "SA", "QLD", "NSW", "VIC", "TAS"]
+  val ausBorders: List[ColorEdge] = [
+    new ColorEdge(0, 1),  // WA-NT
+    new ColorEdge(0, 2),  // WA-SA
+    new ColorEdge(1, 2),  // NT-SA
+    new ColorEdge(1, 3),  // NT-QLD
+    new ColorEdge(2, 3),  // SA-QLD
+    new ColorEdge(2, 4),  // SA-NSW
+    new ColorEdge(2, 5),  // SA-VIC
+    new ColorEdge(3, 4),  // QLD-NSW
+    new ColorEdge(4, 5)   // NSW-VIC
+  ]
+  (new ColorPuzzle("Australia 3-coloring", ausNodes, ausBorders, 3) as Puzzle).run()
+  // 2-coloring is infeasible: Australia has triangles (odd cycles)
+  (new ColorPuzzle("Australia 2-coloring (expect: infeasible)", ausNodes, ausBorders, 2) as Puzzle).run()
+
+  // Petersen graph (chromatic number = 3, but edge-chromatic = 4)
+  val petNodes: List[String] = ["v0","v1","v2","v3","v4","u0","u1","u2","u3","u4"]
+  val petEdges: List[ColorEdge] = [
+    new ColorEdge(0,1), new ColorEdge(1,2), new ColorEdge(2,3),
+    new ColorEdge(3,4), new ColorEdge(4,0),  // outer pentagon
+    new ColorEdge(0,5), new ColorEdge(1,6), new ColorEdge(2,7),
+    new ColorEdge(3,8), new ColorEdge(4,9),  // spokes
+    new ColorEdge(5,7), new ColorEdge(7,9), new ColorEdge(9,6),
+    new ColorEdge(6,8), new ColorEdge(8,5)   // inner pentagram
+  ]
+  (new ColorPuzzle("Petersen graph 3-coloring", petNodes, petEdges, 3) as Puzzle).run()
+
+  // K5 (complete graph on 5 vertices; chromatic number = 5)
+  val k5Nodes: List[String] = ["A", "B", "C", "D", "E"]
+  val k5Edges: List[ColorEdge] = [
+    new ColorEdge(0,1), new ColorEdge(0,2), new ColorEdge(0,3), new ColorEdge(0,4),
+    new ColorEdge(1,2), new ColorEdge(1,3), new ColorEdge(1,4),
+    new ColorEdge(2,3), new ColorEdge(2,4),
+    new ColorEdge(3,4)
+  ]
+  (new ColorPuzzle("K5 (4-coloring; expect: infeasible)", k5Nodes, k5Edges, 4) as Puzzle).run()
+  (new ColorPuzzle("K5 (5-coloring; expect: satisfied)", k5Nodes, k5Edges, 5) as Puzzle).run()
+
+  // ── Statistics summary ────────────────────────────────────────────────────
+  val allQueenCounts: List[Int] = []
+  val sizes: List[Int] = [1, 2, 3, 4, 5, 6, 7, 8]
+  foreach sz: Int in sizes {
+    val s: Solver = NQueensPuzzle::buildSolver(sz as Int)
+    allQueenCounts.add(s.countAll())
+  }
+  IO::println("── N-Queens solution counts (OEIS A000170) ──────────────")
+  foreach i: Int in 0..<sizes.size {
+    val sz: Int  = sizes[i] as Int
+    val cnt: Int = allQueenCounts[i] as Int
+    IO::println("  #{sz}-Queens: #{cnt}")
+  }
+
+  IO::println("")
+  IO::println("All puzzles complete.")
+}

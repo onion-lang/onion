@@ -552,7 +552,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = mapFrom(node.typeRef).foreach { typeRef =>
-    val modifier = node.modifiers | AST.M_PUBLIC
+    // Strip M_FINAL: the initializer runs in `start` (a regular method), and JVM
+    // forbids writing a static-final field from anywhere other than <clinit>.
+    // Onion's own type-checker still enforces val immutability at the language level.
+    val modifier = (node.modifiers | AST.M_PUBLIC) & ~AST.M_FINAL
     loadTopClass match {
       case classType: ClassDefinition =>
         val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)

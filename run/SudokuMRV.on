@@ -1,0 +1,322 @@
+// SudokuSolver.on — Sudoku solver with MRV heuristic, difficulty classification,
+// and a library of classic puzzles.
+// Exercises: records, case-enum (ADT), plain enum, extension methods on Int/String,
+// closures, collection pipelines, select/pattern-matching, foreach over ranges,
+// recursion, nullable, and string interpolation.
+
+// ── Difficulty ───────────────────────────────────────────────────────────────
+enum Difficulty {
+  Easy, Medium, Hard, Expert
+public:
+  def label(): String = select this {
+    case Difficulty::Easy:   "Easy"
+    case Difficulty::Medium: "Medium"
+    case Difficulty::Hard:   "Hard"
+    case Difficulty::Expert: "Expert"
+  }
+  def stars(): String = select this {
+    case Difficulty::Easy:   "★☆☆☆"
+    case Difficulty::Medium: "★★☆☆"
+    case Difficulty::Hard:   "★★★☆"
+    case Difficulty::Expert: "★★★★"
+  }
+}
+
+// ── Solve outcome ─────────────────────────────────────────────────────────────
+enum Outcome {
+  case Solved(cells: Int[], backtracks: Int)
+  case NoSolution
+}
+
+// ── Puzzle descriptor ─────────────────────────────────────────────────────────
+record Puzzle(name: String, clues: String, difficulty: Difficulty)
+
+// ── Solve result ──────────────────────────────────────────────────────────────
+record SolveResult(puzzle: Puzzle, outcome: Outcome, giveCount: Int)
+
+// ── Extension: bit-count ──────────────────────────────────────────────────────
+extension Int {
+  def bitCount(): Int = {
+    var x: Int = self
+    var c: Int = 0
+    while x != 0 { x = x & (x - 1); c++ }
+    c
+  }
+  def padded(width: Int): String = {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    s
+  }
+}
+
+extension String {
+  def padLeft(n: Int): String = {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    s
+  }
+  def repeated(n: Int): String = {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    s
+  }
+}
+
+// ── Core solver ───────────────────────────────────────────────────────────────
+def isValid(cells: Int[], pos: Int, d: Int): Boolean = {
+  val row: Int = pos / 9
+  val col: Int = pos % 9
+  var c: Int = 0
+  while c < 9 {
+    if c != col && cells[row * 9 + c] == d { return false }
+    c++
+  }
+  var r: Int = 0
+  while r < 9 {
+    if r != row && cells[r * 9 + col] == d { return false }
+    r++
+  }
+  val br: Int = (row / 3) * 3
+  val bc: Int = (col / 3) * 3
+  var dr: Int = 0
+  while dr < 3 {
+    var dc: Int = 0
+    while dc < 3 {
+      val idx: Int = (br + dr) * 9 + (bc + dc)
+      if idx != pos && cells[idx] == d { return false }
+      dc++
+    }
+    dr++
+  }
+  true
+}
+
+def optionCount(cells: Int[], pos: Int): Int = {
+  var mask: Int = 0
+  var d: Int = 1
+  while d <= 9 {
+    if isValid(cells, pos, d) { mask = mask | (1 << d) }
+    d++
+  }
+  mask.bitCount()
+}
+
+// MRV: pick cell with fewest remaining options
+def findBestCell(cells: Int[]): Int = {
+  var best: Int = -1
+  var bestCount: Int = 10
+  var i: Int = 0
+  while i < 81 {
+    if cells[i] == 0 {
+      val cnt: Int = optionCount(cells, i)
+      if cnt == 0 { return -2 }  // dead end: a cell has no valid options
+      if cnt < bestCount { bestCount = cnt; best = i }
+    }
+    i++
+  }
+  best
+}
+
+var backtracks: Int = 0
+
+def solve(cells: Int[]): Boolean = {
+  val pos: Int = findBestCell(cells)
+  if pos == -2 { return false }  // dead end
+  if pos == -1 { return true }   // all cells filled
+  var d: Int = 1
+  while d <= 9 {
+    if isValid(cells, pos, d) {
+      cells[pos] = d
+      if solve(cells) { return true }
+      cells[pos] = 0
+      backtracks++
+    }
+    d++
+  }
+  false
+}
+
+def countGiven(cells: Int[]): Int = {
+  var n: Int = 0
+  var i: Int = 0
+  while i < 81 {
+    if cells[i] != 0 { n++ }
+    i++
+  }
+  n
+}
+
+def parseCells(s: String): Int[] = {
+  val cells: Int[] = new Int[81]
+  var i: Int = 0
+  while i < 81 && i < s.length() {
+    val ch: Char = s.charAt(i)
+    if ch >= '1' && ch <= '9' { cells[i] = (ch as Int) - ('0' as Int) }
+    i++
+  }
+  cells
+}
+
+def copyCells(src: Int[]): Int[] = {
+  val dst: Int[] = new Int[81]
+  var i: Int = 0
+  while i < 81 { dst[i] = src[i]; i++ }
+  dst
+}
+
+def isValidSolution(cells: Int[]): Boolean = {
+  var r: Int = 0
+  while r < 9 {
+    var seen: Int = 0
+    var c: Int = 0
+    while c < 9 {
+      val bit: Int = 1 << cells[r * 9 + c]
+      if (seen & bit) != 0 { return false }
+      seen = seen | bit
+      c++
+    }
+    r++
+  }
+  var col: Int = 0
+  while col < 9 {
+    var seen: Int = 0
+    var row: Int = 0
+    while row < 9 {
+      val bit: Int = 1 << cells[row * 9 + col]
+      if (seen & bit) != 0 { return false }
+      seen = seen | bit
+      row++
+    }
+    col++
+  }
+  var br: Int = 0
+  while br < 3 {
+    var bc: Int = 0
+    while bc < 3 {
+      var seen: Int = 0
+      var dr: Int = 0
+      while dr < 3 {
+        var dc: Int = 0
+        while dc < 3 {
+          val bit: Int = 1 << cells[(br*3+dr)*9 + (bc*3+dc)]
+          if (seen & bit) != 0 { return false }
+          seen = seen | bit
+          dc++
+        }
+        dr++
+      }
+      bc++
+    }
+    br++
+  }
+  true
+}
+
+def solvePuzzle(p: Puzzle): SolveResult = {
+  val cells: Int[] = parseCells(p.clues())
+  val given: Int = countGiven(cells)
+  backtracks = 0
+  val ok: Boolean = solve(cells)
+  val outcome: Outcome = if ok { new Solved(cells, backtracks) } else { new NoSolution() }
+  new SolveResult(p, outcome, given)
+}
+
+// ── Pretty-print ──────────────────────────────────────────────────────────────
+def printBoard(cells: Int[]): void {
+  IO::println("+-------+-------+-------+")
+  var r: Int = 0
+  while r < 9 {
+    if r == 3 || r == 6 { IO::println("+-------+-------+-------+") }
+    var c: Int = 0
+    var line: String = "| "
+    while c < 9 {
+      val v: Int = cells[r * 9 + c]
+      val ch: String = if v == 0 { "." } else { "" + v }
+      line = line + ch + " "
+      if c == 2 || c == 5 { line = line + "| " }
+      c++
+    }
+    IO::println(line + "|")
+    r++
+  }
+  IO::println("+-------+-------+-------+")
+}
+
+// ── Puzzle library ─────────────────────────────────────────────────────────────
+val puzzles: List[Puzzle] = [
+  new Puzzle("Classic Easy",
+    "003020600900305001001806400008102900700000008006708200002609500800203009005010300",
+    Difficulty::Easy),
+  new Puzzle("Wikipedia Easy",
+    "530070000600195000098000060800060003400803001700020006060000280000419005000080079",
+    Difficulty::Easy),
+  new Puzzle("PE Grid 02",
+    "200080300060070084030500209000105408000000000402706000301007040720040060004010003",
+    Difficulty::Medium),
+  new Puzzle("PE Grid 03",
+    "000000907000420180000705026100904000050000040000507009920108000034059000507000000",
+    Difficulty::Hard),
+  new Puzzle("Fiendish",
+    "100007090030020008009600500005300900010080002600004000300000010041000007007000300",
+    Difficulty::Expert)
+]
+
+def main(): void {
+  IO::println("╔═══════════════════════════════════════╗")
+  IO::println("║     S U D O K U   S O L V E R        ║")
+  IO::println("║   MRV Backtracking Solver             ║")
+  IO::println("╚═══════════════════════════════════════╝")
+  IO::println("")
+
+  val results: List[SolveResult] = puzzles.map { p -> solvePuzzle(p) }
+
+  // Summary table
+  IO::println("  Name".padLeft(22) + " | Diff   | Given | Backtracks | Status")
+  IO::println("  " + "─".repeated(22) + "+────────+───────+────────────+─────────")
+  foreach res: SolveResult in results {
+    val ok: Boolean = select res.outcome() {
+      case s is Solved: true
+      case n is NoSolution: false
+    }
+    val bt: Int = select res.outcome() {
+      case s is Solved: s.backtracks()
+      case n is NoSolution: 0
+    }
+    val status: String = if ok { "✓" } else { "✗" }
+    val name: String = res.puzzle().name()
+    val diff: String = res.puzzle().difficulty().label()
+    val given: Int = res.giveCount()
+    IO::println("  #{name.padLeft(22)} | #{diff.padLeft(6)} | #{given.padded(5)} | #{bt.padded(10)} | #{status}")
+  }
+  IO::println("")
+
+  // Detail: first puzzle
+  val first: SolveResult = results[0]
+  IO::println("── Solution: #{first.puzzle().name()} [#{first.puzzle().difficulty().stars()}] ──")
+  IO::println("")
+  select first.outcome() {
+    case s is Solved:
+      printBoard(s.cells())
+      IO::println("Valid solution: #{isValidSolution(s.cells())}")
+    case n is NoSolution:
+      IO::println("(no solution)")
+  }
+  IO::println("")
+
+  // Aggregate stats
+  val solvedList: List[SolveResult] = results.filter { r ->
+    select r.outcome() { case s is Solved: true; case n is NoSolution: false }
+  }
+  var totalBt: Int = 0
+  foreach res: SolveResult in results {
+    select res.outcome() {
+      case s is Solved: totalBt = totalBt + s.backtracks()
+      case n is NoSolution: totalBt = totalBt + 0
+    }
+  }
+
+  IO::println("═".repeated(45))
+  IO::println("Solved #{solvedList.size} / #{results.size} puzzles")
+  IO::println("Total backtracks across all puzzles: #{totalBt}")
+}

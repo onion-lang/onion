@@ -1,0 +1,620 @@
+// HomeEnergy.on — smart home energy management and reporting system
+// Exercises: records with methods, data-carrying enums, ADT enums, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach,
+// extension methods on Int/Double.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum DeviceCategory(label: String, baseEfficiency: Double) {
+  Light("Lighting",     0.85),
+  Appliance("Appliance",  0.75),
+  HVAC("HVAC",       0.60),
+  Security("Security",   0.90),
+  Entertainment("Entertainment", 0.70)
+}
+
+enum Season { Spring, Summer, Autumn, Winter }
+
+// ADT: alert types
+enum EnergyAlert {
+  case PeakUsage(deviceId: String, watts: Int)
+  case BudgetExceeded(roomName: String, dailyKwh: Double)
+  case DeviceFault(deviceId: String, reason: String)
+  case EfficiencyWarning(deviceId: String, score: Double)
+public:
+  def severity(): Int = select this {
+    case a is PeakUsage:          3
+    case a is BudgetExceeded:     2
+    case a is DeviceFault:        4
+    case a is EfficiencyWarning:  1
+  }
+  def describe(): String = select this {
+    case a is PeakUsage:         "PEAK    #{a.deviceId()}: #{a.watts()}W spike"
+    case a is BudgetExceeded:    "BUDGET  Room '#{a.roomName()}': #{a.dailyKwh()} kWh/day"
+    case a is DeviceFault:       "FAULT   #{a.deviceId()}: #{a.reason()}"
+    case a is EfficiencyWarning: "EFFIC   #{a.deviceId()}: score #{a.score()}"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Device(
+  id:         String,
+  name:       String,
+  room:       String,
+  category:   DeviceCategory,
+  ratedWatts: Int
+) {
+public:
+  def label(): String = "[#{id()}] #{name()} (#{room()}, #{category().label()}, #{ratedWatts()}W rated)"
+  def efficiency(actualWatts: Int): Double {
+    if ratedWatts() == 0 { return 0.0 }
+    val ratio = (actualWatts * 1.0) / (ratedWatts() * 1.0)
+    val base = category().baseEfficiency()
+    if ratio <= 1.0 { return base + (1.0 - ratio) * (1.0 - base) }
+    return base * (1.0 / ratio)
+  }
+}
+
+record EnergyReading(deviceId: String, hour: Int, watts: Int) {
+public:
+  def kwh(): Double = (watts() * 1.0) / 1000.0
+  def timeLabel(): String {
+    val h = hour()
+    if h < 12 { return "#{h}:00am" }
+    if h == 12 { return "12:00pm" }
+    return "#{h - 12}:00pm"
+  }
+  def isPeak(): Boolean = hour() >= 17 && hour() <= 21
+}
+
+record UsageSummary(
+  deviceId:   String,
+  deviceName: String,
+  room:       String,
+  totalKwh:   Double,
+  peakWatts:  Int,
+  avgWatts:   Double,
+  readings:   Int
+) {
+public:
+  def costAt(ratePerKwh: Double): Double = totalKwh() * ratePerKwh
+  def statusLabel(): String {
+    if totalKwh() > 5.0  { return "HIGH" }
+    if totalKwh() > 2.0  { return "MED " }
+    return "LOW "
+  }
+}
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+interface Alertable {
+  def checkAlerts(threshold: Int): List[EnergyAlert]
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def wToKw(): String {
+    val kw = (self * 10) / 10000
+    val rem = ((self * 10) % 10000) / 1000
+    return "#{kw}.#{rem}kW"
+  }
+  def bar(max: Int): String {
+    if max == 0 { return "          " }
+    var n = (self * 10) / max
+    if n > 10 { n = 10 }
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + "█"; i++ }
+    while i < 10 { s = s + "░"; i++ }
+    return s
+  }
+}
+
+extension Double {
+  def round2(): Double = ((self * 100.0 + 0.5) as Int * 1.0) / 100.0
+  def pct(total: Double): String {
+    if total == 0.0 { return "0.0%" }
+    return "" + (((self / total) * 1000.0 + 0.5) as Int * 1.0 / 10.0) + "%"
+  }
+}
+
+// ─── SmartRoom class ──────────────────────────────────────────────────────────
+
+class SmartRoom {
+  val name:    String
+  val floor:   Int
+  val devices: List[Device]
+
+public:
+  def this(name: String, floor: Int) {
+    self.name    = name
+    self.floor   = floor
+    self.devices = []
+  }
+  def getName(): String = name
+  def getFloor(): Int = floor
+  def addDevice(d: Device): void { devices.add(d) }
+  def getDevices(): List[Device] = devices
+  def deviceCount(): Int = devices.size
+
+  // Total rated capacity
+  def ratedCapacity(): Int =
+    devices.fold(0) { acc, d -> (acc as Int) + (d as Device).ratedWatts() } as Int
+
+  def report(): String {
+    var lines: String = "  Room: #{name} (floor #{floor}, #{deviceCount()} devices, #{ratedCapacity()}W rated)\n"
+    foreach d: Device in devices {
+      lines = lines + "    " + d.label() + "\n"
+    }
+    return lines
+  }
+}
+
+// ─── HomeEnergyMonitor class ──────────────────────────────────────────────────
+
+class HomeEnergyMonitor conforms Reportable, Alertable {
+  val rooms:    List[SmartRoom]
+  val readings: List[EnergyReading]
+  val devices:  List[Device]
+
+public:
+  def this {
+    self.rooms    = []
+    self.readings = []
+    self.devices  = []
+  }
+
+  def addRoom(r: SmartRoom): void { rooms.add(r) }
+
+  def addReading(r: EnergyReading): void { readings.add(r) }
+
+  def findDevice(id: String): Device? {
+    val found = devices.find { d -> (d as Device).id() == id }
+    if found == null { return null }
+    return found as Device
+  }
+
+  def allDevices(): List[Device] {
+    val result: List[Device] = []
+    foreach r: SmartRoom in rooms {
+      foreach d: Device in r.getDevices() {
+        result.add(d)
+        devices.add(d)
+      }
+    }
+    return result
+  }
+
+  def buildSummary(d: Device): UsageSummary {
+    val devReadings = readings.filter { r -> (r as EnergyReading).deviceId() == d.id() }
+    if devReadings.size == 0 {
+      return new UsageSummary(d.id(), d.name(), d.room(), 0.0, 0, 0.0, 0)
+    }
+    val total = devReadings.fold(0.0) { acc, r ->
+      (acc as Double) + (r as EnergyReading).kwh()
+    } as Double
+    val peak = devReadings.fold(0) { acc, r ->
+      val w = (r as EnergyReading).watts()
+      if w > (acc as Int) { w } else { acc as Int }
+    } as Int
+    val avg = total / (devReadings.size * 1.0)
+    return new UsageSummary(d.id(), d.name(), d.room(), total.round2(), peak, avg.round2(), devReadings.size)
+  }
+
+  def getRooms(): List[SmartRoom] = rooms
+
+  def report(): String = "HomeEnergyMonitor: #{rooms.size} rooms, #{readings.size} readings"
+
+  def checkAlerts(threshold: Int): List[EnergyAlert] {
+    val alerts: List[EnergyAlert] = []
+    foreach r: EnergyReading in readings {
+      if r.watts() > threshold {
+        alerts.add(new PeakUsage(r.deviceId(), r.watts()))
+      }
+    }
+    // Check room daily kWh budgets (>3.0 kWh/day per room is flagged)
+    val byRoom = readings.groupBy { r -> {
+      val id = (r as EnergyReading).deviceId()
+      val dev = findDevice(id)
+      if dev == null { "unknown" } else { (dev as Device).room() }
+    }}
+    foreach (roomName, roomReadings) in byRoom {
+      val total = (roomReadings as List[EnergyReading]).fold(0.0) { acc, r ->
+        (acc as Double) + (r as EnergyReading).kwh()
+      } as Double
+      if total > 3.0 {
+        alerts.add(new BudgetExceeded(roomName as String, total.round2()))
+      }
+    }
+    return alerts
+  }
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println(Strings::repeat("-", 60))
+}
+
+def fmtKwh(kwh: Double): String = "" + kwh + " kWh"
+
+// Recursive: sum readings in a slice
+def sumReadings(list: List[EnergyReading], i: Int): Double {
+  if i >= list.size { return 0.0 }
+  return (list.get(i) as EnergyReading).kwh() + sumReadings(list, i + 1)
+}
+
+// ─── Main Program ─────────────────────────────────────────────────────────────
+
+val monitor = new HomeEnergyMonitor()
+
+// Build rooms
+val living = new SmartRoom("Living Room", 1)
+val kitchen = new SmartRoom("Kitchen", 1)
+val bedroom = new SmartRoom("Master Bedroom", 2)
+val office = new SmartRoom("Home Office", 2)
+val garage = new SmartRoom("Garage", 0)
+
+// Populate devices
+living.addDevice(new Device("L01", "Ceiling Light",     "Living Room", DeviceCategory::Light,         60))
+living.addDevice(new Device("L02", "Floor Lamp",        "Living Room", DeviceCategory::Light,         40))
+living.addDevice(new Device("L03", "Smart TV",          "Living Room", DeviceCategory::Entertainment, 120))
+living.addDevice(new Device("L04", "Air Conditioner",   "Living Room", DeviceCategory::HVAC,          1800))
+living.addDevice(new Device("L05", "Stereo System",     "Living Room", DeviceCategory::Entertainment, 80))
+
+kitchen.addDevice(new Device("K01", "Refrigerator",     "Kitchen", DeviceCategory::Appliance,  150))
+kitchen.addDevice(new Device("K02", "Microwave",        "Kitchen", DeviceCategory::Appliance,  900))
+kitchen.addDevice(new Device("K03", "Dishwasher",       "Kitchen", DeviceCategory::Appliance,  1200))
+kitchen.addDevice(new Device("K04", "Coffee Maker",     "Kitchen", DeviceCategory::Appliance,  1000))
+kitchen.addDevice(new Device("K05", "Under-Counter LED","Kitchen", DeviceCategory::Light,      30))
+
+bedroom.addDevice(new Device("B01", "Ceiling Fan",      "Master Bedroom", DeviceCategory::HVAC,       75))
+bedroom.addDevice(new Device("B02", "Bedside Lamp",     "Master Bedroom", DeviceCategory::Light,      25))
+bedroom.addDevice(new Device("B03", "Electric Blanket", "Master Bedroom", DeviceCategory::Appliance,  200))
+bedroom.addDevice(new Device("B04", "Air Purifier",     "Master Bedroom", DeviceCategory::Appliance,  55))
+
+office.addDevice(new Device("O01", "Desktop PC",        "Home Office", DeviceCategory::Appliance,   350))
+office.addDevice(new Device("O02", "Monitor x2",        "Home Office", DeviceCategory::Appliance,   80))
+office.addDevice(new Device("O03", "Desk Lamp",         "Home Office", DeviceCategory::Light,       18))
+office.addDevice(new Device("O04", "Laser Printer",     "Home Office", DeviceCategory::Appliance,   500))
+office.addDevice(new Device("O05", "Mini Fridge",       "Home Office", DeviceCategory::Appliance,   65))
+
+garage.addDevice(new Device("G01", "Garage Door Motor", "Garage", DeviceCategory::Appliance, 370))
+garage.addDevice(new Device("G02", "Security Camera",   "Garage", DeviceCategory::Security,  8))
+garage.addDevice(new Device("G03", "EV Charger",        "Garage", DeviceCategory::Appliance, 7200))
+garage.addDevice(new Device("G04", "Work Light",        "Garage", DeviceCategory::Light,     100))
+
+monitor.addRoom(living)
+monitor.addRoom(kitchen)
+monitor.addRoom(bedroom)
+monitor.addRoom(office)
+monitor.addRoom(garage)
+
+val allDevices = monitor.allDevices()
+
+// Generate 24-hour readings for each device
+val hoursPerDay: List[Int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+// Helper: is hour active for this device category?
+def isActive(cat: DeviceCategory, hour: Int): Boolean = select cat {
+  case DeviceCategory::Light:         hour >= 7 && hour <= 23
+  case DeviceCategory::Appliance:     hour >= 6 && hour <= 22
+  case DeviceCategory::HVAC:          hour >= 8 && hour <= 22
+  case DeviceCategory::Security:      true
+  case DeviceCategory::Entertainment: hour >= 18 && hour <= 23
+}
+
+def wattageAt(d: Device, hour: Int): Int {
+  if !isActive(d.category(), hour) { return 0 }
+  // Simulate variable load
+  val base = d.ratedWatts()
+  // EV charger only active late night
+  if d.id() == "G03" {
+    if hour >= 22 || hour <= 6 { return base }
+    return 0
+  }
+  // Dishwasher runs once in evening
+  if d.id() == "K03" {
+    if hour == 19 { return base }
+    return 0
+  }
+  // Microwave brief bursts
+  if d.id() == "K02" {
+    if hour == 7 || hour == 12 || hour == 18 { return base }
+    return 0
+  }
+  // Coffee maker morning only
+  if d.id() == "K04" {
+    if hour >= 6 && hour <= 9 { return base }
+    return 0
+  }
+  // A/C usage peaks in afternoon
+  if d.id() == "L04" {
+    if hour >= 14 && hour <= 20 { return base }
+    if hour >= 8 && hour <= 13  { return base / 2 }
+    return 0
+  }
+  // PC and monitor active during work hours
+  if d.id() == "O01" || d.id() == "O02" {
+    if hour >= 9 && hour <= 18 { return base }
+    return 0
+  }
+  // Printer occasional bursts
+  if d.id() == "O04" {
+    if hour == 10 || hour == 15 { return base }
+    return 0
+  }
+  // Refrigerator constant
+  if d.id() == "K01" { return base }
+  // Security camera constant
+  if d.id() == "G02" { return base }
+  // Default: rated wattage if active
+  return base
+}
+
+// Feed all readings into the monitor
+foreach d: Device in allDevices {
+  foreach h: Int in hoursPerDay {
+    val w = wattageAt(d, h)
+    if w > 0 {
+      monitor.addReading(new EnergyReading(d.id(), h, w))
+    }
+  }
+}
+
+// ─── Section 1: Room overview ─────────────────────────────────────────────────
+
+printHeader("=== Home Energy Monitor — Room Overview ===")
+foreach r: SmartRoom in monitor.getRooms() {
+  IO::println(r.report())
+}
+
+// ─── Section 2: Per-device usage summaries ────────────────────────────────────
+
+printHeader("=== Per-Device Energy Summaries ===")
+val summaries: List[UsageSummary] = allDevices.map { d ->
+  monitor.buildSummary(d as Device)
+}
+foreach s: UsageSummary in summaries.sortedBy { s -> 0.0 - (s as UsageSummary).totalKwh() } {
+  val bar = s.peakWatts().bar(8000)
+  IO::println("  [#{s.statusLabel()}] #{Strings::padRight(s.deviceName(), 22, ' ')} #{Strings::padRight(s.room(), 18, ' ')} #{bar}  #{fmtKwh(s.totalKwh())}  peak #{s.peakWatts()}W")
+}
+
+// ─── Section 3: Total consumption by category ─────────────────────────────────
+
+printHeader("=== Consumption by Category ===")
+val byCategory = summaries.groupBy { s ->
+  val id = (s as UsageSummary).deviceId()
+  val dev = allDevices.find { d -> (d as Device).id() == id }
+  if dev == null { "Unknown" } else { (dev as Device).category().label() }
+}
+val totalKwh = summaries.fold(0.0) { acc, s -> (acc as Double) + (s as UsageSummary).totalKwh() } as Double
+foreach (cat, catSums) in byCategory {
+  val catTotal = (catSums as List[UsageSummary]).fold(0.0) { acc, s ->
+    (acc as Double) + (s as UsageSummary).totalKwh()
+  } as Double
+  IO::println("  #{Strings::padRight(cat as String, 16, ' ')} #{fmtKwh(catTotal.round2())}  (#{catTotal.pct(totalKwh)})")
+}
+IO::println("  " + Strings::repeat("-", 40))
+IO::println("  Total                 " + fmtKwh(totalKwh.round2()))
+
+// ─── Section 4: Per-room consumption ─────────────────────────────────────────
+
+printHeader("=== Room-Level Daily Consumption ===")
+val byRoom = summaries.groupBy { s -> (s as UsageSummary).room() }
+val roomTotals: List[Object] = []
+foreach (roomName, roomSums) in byRoom {
+  val roomKwh = (roomSums as List[UsageSummary]).fold(0.0) { acc, s ->
+    (acc as Double) + (s as UsageSummary).totalKwh()
+  } as Double
+  roomTotals.add([roomName, roomKwh] as Object)
+}
+foreach entry: Object in roomTotals.sortedBy { e ->
+  0.0 - ((e as List[Object]).get(1) as Double)
+} {
+  val pair = entry as List[Object]
+  val rName = pair.get(0) as String
+  val rKwh  = pair.get(1) as Double
+  IO::println("  #{Strings::padRight(rName, 20, ' ')}  #{fmtKwh(rKwh.round2())}  (#{rKwh.pct(totalKwh)})")
+}
+
+// ─── Section 5: Energy alerts ─────────────────────────────────────────────────
+
+printHeader("=== Energy Alerts (threshold: 2000W) ===")
+val alerts = monitor.checkAlerts(2000)
+if alerts.size == 0 {
+  IO::println("  No alerts.")
+} else {
+  val sorted = alerts.sortedBy { a -> 0 - (a as EnergyAlert).severity() }
+  foreach a: EnergyAlert in sorted {
+    IO::println("  [SEV #{a.severity()}] " + a.describe())
+  }
+}
+IO::println("  Total alerts: " + alerts.size)
+
+// ─── Section 6: Peak hours analysis ──────────────────────────────────────────
+
+printHeader("=== Peak Hours Analysis (17:00–21:00) ===")
+val allReadings = allDevices.fold([] as List[EnergyReading]) { acc, d ->
+  val devR = allDevices.filter { x -> (x as Device).id() == (d as Device).id() }
+  acc as List[EnergyReading]
+}
+
+// Gather all readings from the monitor through a different path
+val peakReadings: List[EnergyReading] = []
+var nonPeakReadings: List[EnergyReading] = []
+foreach d: Device in allDevices {
+  foreach h: Int in hoursPerDay {
+    val w = wattageAt(d, h)
+    if w > 0 {
+      val r = new EnergyReading(d.id(), h, w)
+      if r.isPeak() { peakReadings.add(r) }
+      else          { nonPeakReadings.add(r) }
+    }
+  }
+}
+val peakKwh    = peakReadings.fold(0.0)    { acc, r -> (acc as Double) + (r as EnergyReading).kwh() } as Double
+val nonPeakKwh = nonPeakReadings.fold(0.0) { acc, r -> (acc as Double) + (r as EnergyReading).kwh() } as Double
+IO::println("  Peak hours kWh:     " + peakKwh.round2())
+IO::println("  Off-peak hours kWh: " + nonPeakKwh.round2())
+IO::println("  Peak fraction:      " + peakKwh.pct(peakKwh + nonPeakKwh))
+
+// Top 3 consumers during peak
+val peakByDevice = peakReadings.groupBy { r -> (r as EnergyReading).deviceId() }
+val peakSums: List[Object] = []
+foreach (devId, devReadings) in peakByDevice {
+  val kwh = (devReadings as List[EnergyReading]).fold(0.0) { acc, r ->
+    (acc as Double) + (r as EnergyReading).kwh()
+  } as Double
+  peakSums.add([devId, kwh] as Object)
+}
+IO::println("  Top consumers during peak hours:")
+var shown: Int = 0
+foreach entry: Object in peakSums.sortedBy { e -> 0.0 - ((e as List[Object]).get(1) as Double) } {
+  if shown >= 5 { break }
+  val pair = entry as List[Object]
+  val id   = pair.get(0) as String
+  val kwh  = pair.get(1) as Double
+  val dev  = allDevices.find { d -> (d as Device).id() == id }
+  val dname = if dev == null { id } else { (dev as Device).name() }
+  IO::println("    " + Strings::padRight(dname, 24, ' ') + " " + fmtKwh(kwh.round2()))
+  shown++
+}
+
+// ─── Section 7: Device efficiency rankings ────────────────────────────────────
+
+printHeader("=== Device Efficiency Scores ===")
+val efficiencies: List[Object] = allDevices.map { d ->
+  val dev  = d as Device
+  val s    = monitor.buildSummary(dev)
+  val eff  = if s.peakWatts() == 0 { 1.0 } else { dev.efficiency(s.peakWatts()) }
+  [dev.name(), dev.room(), eff] as Object
+}
+foreach e: Object in efficiencies.sortedBy { e ->
+  0.0 - ((e as List[Object]).get(2) as Double)
+} {
+  val row   = e as List[Object]
+  val dname = row.get(0) as String
+  val room  = row.get(1) as String
+  val eff   = row.get(2) as Double
+  val stars = if eff >= 0.9 { "★★★" } else if eff >= 0.7 { "★★☆" } else { "★☆☆" }
+  IO::println("  #{stars}  #{Strings::padRight(dname, 22, ' ')}  #{Strings::padRight(room, 18, ' ')}  #{eff.round2()}")
+}
+
+// ─── Section 8: Hourly load profile ──────────────────────────────────────────
+
+printHeader("=== Hourly Total Load Profile ===")
+foreach h: Int in hoursPerDay {
+  val totalW = allDevices.fold(0) { acc, d ->
+    (acc as Int) + wattageAt(d as Device, h)
+  } as Int
+  val bar = totalW.bar(12000)
+  val peakMark = if h >= 17 && h <= 21 { " ◀ PEAK" } else { "" }
+  IO::println("  " + Strings::padRight(h + ":00", 6, ' ') + " " + bar + "  " + totalW + "W" + peakMark)
+}
+
+// ─── Section 9: Cost estimate ─────────────────────────────────────────────────
+
+printHeader("=== Cost Estimates ===")
+val ratePerKwh: Double = 0.14
+val dailyCost  = totalKwh * ratePerKwh
+val monthlyCost = dailyCost * 30.0
+val yearlyCost  = dailyCost * 365.0
+IO::println("  Rate:          $#{ratePerKwh}/kWh")
+IO::println("  Daily usage:   " + fmtKwh(totalKwh.round2()) + "  → $#{dailyCost.round2()}")
+IO::println("  Monthly est.:  $#{monthlyCost.round2()}")
+IO::println("  Annual est.:   $#{yearlyCost.round2()}")
+
+// Cost breakdown by room
+IO::println("  Per-room daily cost:")
+foreach entry: Object in roomTotals.sortedBy { e ->
+  0.0 - ((e as List[Object]).get(1) as Double)
+} {
+  val pair  = entry as List[Object]
+  val rName = pair.get(0) as String
+  val rKwh  = pair.get(1) as Double
+  val cost  = (rKwh * ratePerKwh).round2()
+  IO::println("    " + Strings::padRight(rName, 20, ' ') + "  $#{cost}/day")
+}
+
+// ─── Section 10: Recursive total verification ────────────────────────────────
+
+printHeader("=== Recursive Consumption Verification ===")
+val allFlatReadings: List[EnergyReading] = []
+foreach d: Device in allDevices {
+  foreach h: Int in hoursPerDay {
+    val w = wattageAt(d, h)
+    if w > 0 { allFlatReadings.add(new EnergyReading(d.id(), h, w)) }
+  }
+}
+val recursiveTotal = sumReadings(allFlatReadings, 0)
+IO::println("  Recursive sum of all readings: " + fmtKwh(recursiveTotal.round2()))
+IO::println("  Iterative total:               " + fmtKwh(totalKwh.round2()))
+IO::println("  Match: " + (recursiveTotal.round2() == totalKwh.round2()))
+
+// ─── Section 11: try/catch — safe device lookup ───────────────────────────────
+
+printHeader("=== Safe Device Lookup (try/catch) ===")
+def lookupDevice(id: String): String {
+  try {
+    val found = allDevices.find { d -> (d as Device).id() == id }
+    if found == null { throw new Exception("Device not found: " + id) }
+    return (found as Device).label()
+  } catch e: Exception {
+    return "ERROR: " + e.getMessage()
+  }
+}
+IO::println("  " + lookupDevice("G03"))
+IO::println("  " + lookupDevice("L04"))
+IO::println("  " + lookupDevice("X99"))
+
+// ─── Section 12: Partition — high vs low consumers ──────────────────────────
+
+printHeader("=== High vs Low Consumers (partition) ===")
+val parts   = summaries.partition { s -> (s as UsageSummary).totalKwh() > 2.0 }
+val highUse = parts.get(0) as List[UsageSummary]
+val lowUse  = parts.get(1) as List[UsageSummary]
+IO::println("  High-use devices (>2 kWh/day): " + highUse.size)
+foreach s: UsageSummary in highUse.sortedBy { s -> 0.0 - (s as UsageSummary).totalKwh() } {
+  IO::println("    " + s.deviceName() + " — " + fmtKwh(s.totalKwh()))
+}
+IO::println("  Low-use devices (<=2 kWh/day): " + lowUse.size)
+
+// ─── Section 13: Zip — device vs rated power comparison ─────────────────────
+
+printHeader("=== Actual vs Rated (zip) ===")
+val topFive = summaries.sortedBy { s -> 0.0 - (s as UsageSummary).totalKwh() }
+val devNames = topFive.map { s -> (s as UsageSummary).deviceName() }
+val devPeaks = topFive.map { s -> (s as UsageSummary).peakWatts() }
+val pairs = devNames.zip(devPeaks)
+IO::println("  Top devices peak vs name:")
+foreach p: Object in pairs {
+  val pair   = p as List[Object]
+  val dname  = pair.get(0) as String
+  val peakW  = pair.get(1) as Int
+  IO::println("    " + Strings::padRight(dname, 22, ' ') + "  " + peakW + "W actual peak")
+}
+
+// ─── Final summary ────────────────────────────────────────────────────────────
+
+printHeader("=== Final Summary ===")
+IO::println("  Rooms monitored:      " + monitor.getRooms().size)
+IO::println("  Devices tracked:      " + allDevices.size)
+IO::println("  Daily consumption:    " + fmtKwh(totalKwh.round2()))
+IO::println("  Daily cost:           $#{dailyCost.round2()}")
+IO::println("  Alerts raised:        " + alerts.size)
+IO::println("  Highest-use device:   " +
+  summaries.sortedBy { s -> 0.0 - (s as UsageSummary).totalKwh() }.get(0).deviceName())
+val topRoom = roomTotals.sortedBy { e -> 0.0 - ((e as List[Object]).get(1) as Double) }.get(0) as List[Object]
+IO::println("  Highest-use room:     " + (topRoom.get(0) as String))
+IO::println("")

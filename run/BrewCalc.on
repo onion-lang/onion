@@ -1,0 +1,366 @@
+// BrewCalc.on — Homebrewing Recipe Calculator
+// Calculates OG, FG, ABV, IBU, SRM for malt/hop/yeast recipes.
+// Exercises: plain enums, data-carrying enums, records with methods,
+// classes with mutable ArrayList[T] fields, collection pipelines
+// (groupBy/sortedBy/filter/map), Text::table, Format::fixed,
+// pattern matching, string interpolation, nullable types,
+// foreach over list and (k,v) map, while loop, recursion.
+
+import { java.util.ArrayList }
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum GrainType { Base, Crystal, Roasted, Adjunct }
+
+enum HopUsage { Bittering, Flavoring, Aroma, DryHop }
+
+enum YeastFamily { Ale, Lager, Wheat, Brett }
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record Grain(name: String, grainType: GrainType, ppg: Int, color: Double) {
+public:
+  // PPG × lbs / gallons = gravity points contributed
+  def gravityPoints(pounds: Double, gallons: Double): Double =
+    ppg * pounds / gallons
+}
+
+record HopAddition(name: String, alphaAcid: Double, ounces: Double, usage: HopUsage, minutes: Int) {
+public:
+  // Tinseth IBU formula: utilization × alpha% × oz × 74.89 / gallons
+  def ibu(og: Double, gallons: Double): Double {
+    if usage == HopUsage::DryHop { return 0.0 }
+    val bignessFactor = 1.65 * Math::pow(0.000125, og - 1.0)
+    val timeFactor    = (1.0 - Math::exp(-0.04 * (minutes as Double))) / 4.15
+    val utilization   = bignessFactor * timeFactor
+    return utilization * alphaAcid * ounces * 74.89 / gallons
+  }
+}
+
+record Yeast(name: String, family: YeastFamily, attenuation: Double)
+
+record GrainBill(grain: Grain, pounds: Double)
+
+record RecipeStats(og: Double, fg: Double, abv: Double, ibu: Double, srm: Double, colorName: String)
+
+// ── Recipe class ───────────────────────────────────────────────────────────
+
+class Recipe {
+  var name_:    String
+  var style_:   String
+  var gallons_: Double
+  var grains_:  ArrayList[GrainBill]
+  var hops_:    ArrayList[HopAddition]
+  var yeast_:   Yeast?
+
+public:
+  def this(name: String, style: String, gallons: Double) {
+    name_    = name
+    style_   = style
+    gallons_ = gallons
+    grains_  = new ArrayList[GrainBill]()
+    hops_    = new ArrayList[HopAddition]()
+    yeast_   = null
+  }
+
+  def addGrain(grain: Grain, pounds: Double): void {
+    grains_.add(new GrainBill(grain, pounds))
+  }
+
+  def addHop(hop: HopAddition): void {
+    hops_.add(hop)
+  }
+
+  def setYeast(y: Yeast): void { yeast_ = y }
+
+  def name(): String  = name_
+  def style(): String = style_
+
+  def og(): Double {
+    var total: Double = 0.0
+    foreach gb: GrainBill in grains_ {
+      total = total + gb.grain().gravityPoints(gb.pounds(), gallons_)
+    }
+    return 1.0 + total / 1000.0
+  }
+
+  def fg(): Double {
+    val o = og()
+    val attn: Double = if yeast_ != null { (yeast_ as Yeast).attenuation() } else { 0.75 }
+    return o - (o - 1.0) * attn
+  }
+
+  def abv(): Double = (og() - fg()) * 131.25
+
+  def ibu(): Double {
+    val o = og()
+    var total: Double = 0.0
+    foreach hop: HopAddition in hops_ {
+      total = total + hop.ibu(o, gallons_)
+    }
+    return total
+  }
+
+  def srm(): Double {
+    var mcu: Double = 0.0
+    foreach gb: GrainBill in grains_ {
+      mcu = mcu + gb.grain().color() * gb.pounds() / gallons_
+    }
+    return 1.4922 * Math::pow(mcu, 0.6859)
+  }
+
+  def colorName(): String {
+    val s = srm()
+    if s < 3.0  { return "Pale Straw" }
+    if s < 6.0  { return "Straw" }
+    if s < 9.0  { return "Gold" }
+    if s < 14.0 { return "Amber" }
+    if s < 20.0 { return "Dark Amber/Copper" }
+    if s < 30.0 { return "Brown" }
+    if s < 40.0 { return "Dark Brown" }
+    return "Black"
+  }
+
+  def stats(): RecipeStats =
+    new RecipeStats(og(), fg(), abv(), ibu(), srm(), colorName())
+}
+
+// ── Analysis helpers ───────────────────────────────────────────────────────
+
+def abvCategory(abv: Double): String {
+  if abv < 3.5 { return "Session" }
+  if abv < 5.0 { return "Standard" }
+  if abv < 7.5 { return "Strong" }
+  return "Extra Strong"
+}
+
+def ibuCategory(ibu: Double): String {
+  if ibu < 20.0 { return "Low" }
+  if ibu < 40.0 { return "Medium" }
+  if ibu < 60.0 { return "High" }
+  return "Very High"
+}
+
+def bitterBalance(og: Double, ibu: Double): String {
+  val rr = ibu / ((og - 1.0) * 1000.0)
+  if rr < 0.5 { return "Malt-forward" }
+  if rr < 0.8 { return "Balanced" }
+  if rr < 1.5 { return "Bitter" }
+  return "Very Bitter"
+}
+
+// ── Recipe factory functions ───────────────────────────────────────────────
+
+def makeAmericanPaleAle(): Recipe {
+  val r = new Recipe("American Pale Ale", "BJCP 18B", 5.0)
+  r.addGrain(new Grain("Pale 2-Row",   GrainType::Base,    37, 1.8),  9.0)
+  r.addGrain(new Grain("Crystal 40L",  GrainType::Crystal, 34, 40.0), 0.5)
+  r.addGrain(new Grain("Carapils",     GrainType::Crystal, 33, 2.0),  0.25)
+  r.addHop(new HopAddition("Centennial", 10.0, 1.0, HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Cascade",     5.5, 0.5, HopUsage::Flavoring, 15))
+  r.addHop(new HopAddition("Citra",      12.0, 0.5, HopUsage::Aroma,      5))
+  r.addHop(new HopAddition("Citra",      12.0, 1.0, HopUsage::DryHop,     0))
+  r.setYeast(new Yeast("US-05",  YeastFamily::Ale, 0.77))
+  return r
+}
+
+def makeIrishStout(): Recipe {
+  val r = new Recipe("Irish Dry Stout", "BJCP 15B", 5.0)
+  r.addGrain(new Grain("Pale 2-Row",     GrainType::Base,    37, 1.8),   7.0)
+  r.addGrain(new Grain("Flaked Barley",  GrainType::Adjunct, 32, 2.0),   1.5)
+  r.addGrain(new Grain("Roasted Barley", GrainType::Roasted, 28, 500.0), 0.75)
+  r.addGrain(new Grain("Black Patent",   GrainType::Roasted, 27, 525.0), 0.25)
+  r.addHop(new HopAddition("Magnum",  14.0, 0.75, HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Fuggles",  4.5, 0.25, HopUsage::Flavoring, 10))
+  r.setYeast(new Yeast("WY1084", YeastFamily::Ale, 0.72))
+  return r
+}
+
+def makeHefeweizen(): Recipe {
+  val r = new Recipe("Bavarian Hefeweizen", "BJCP 10A", 5.0)
+  r.addGrain(new Grain("Wheat Malt",   GrainType::Base, 38, 2.0), 6.0)
+  r.addGrain(new Grain("Pilsner Malt", GrainType::Base, 37, 1.5), 4.0)
+  r.addHop(new HopAddition("Hallertau", 4.0, 1.0, HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Saaz",      3.5, 0.5, HopUsage::Aroma,      5))
+  r.setYeast(new Yeast("WY3068", YeastFamily::Wheat, 0.73))
+  return r
+}
+
+def makeNEIPA(): Recipe {
+  val r = new Recipe("New England IPA", "BJCP 21C", 5.0)
+  r.addGrain(new Grain("Pale 2-Row",   GrainType::Base,    37, 1.8), 10.0)
+  r.addGrain(new Grain("Flaked Oats",  GrainType::Adjunct, 33, 2.0),  2.0)
+  r.addGrain(new Grain("Flaked Wheat", GrainType::Adjunct, 34, 2.0),  2.0)
+  r.addGrain(new Grain("Crystal 20L",  GrainType::Crystal, 35, 20.0), 0.5)
+  r.addHop(new HopAddition("Magnum",  14.0, 0.5,  HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Galaxy",  13.0, 1.0,  HopUsage::Flavoring, 10))
+  r.addHop(new HopAddition("Mosaic",  12.5, 1.0,  HopUsage::Aroma,      5))
+  r.addHop(new HopAddition("Citra",   12.0, 1.5,  HopUsage::DryHop,     0))
+  r.addHop(new HopAddition("Galaxy",  13.0, 1.5,  HopUsage::DryHop,     0))
+  r.setYeast(new Yeast("LondonAle3", YeastFamily::Ale, 0.73))
+  return r
+}
+
+def makePilsner(): Recipe {
+  val r = new Recipe("German Pilsner", "BJCP 5D", 5.0)
+  r.addGrain(new Grain("Pilsner Malt",    GrainType::Base,    37, 1.5), 10.0)
+  r.addGrain(new Grain("Acidulated Malt", GrainType::Adjunct, 27, 3.0),  0.25)
+  r.addHop(new HopAddition("Hallertau", 4.0, 1.5, HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Saaz",      3.5, 1.0, HopUsage::Flavoring, 15))
+  r.addHop(new HopAddition("Saaz",      3.5, 0.5, HopUsage::Aroma,      5))
+  r.setYeast(new Yeast("WLP830", YeastFamily::Lager, 0.76))
+  return r
+}
+
+def makeWildAle(): Recipe {
+  val r = new Recipe("Farmhouse Wild Ale", "Experimental", 5.0)
+  r.addGrain(new Grain("Pilsner Malt", GrainType::Base,    37, 1.5), 8.0)
+  r.addGrain(new Grain("Spelt Malt",   GrainType::Adjunct, 35, 3.0), 2.0)
+  r.addGrain(new Grain("Vienna Malt",  GrainType::Base,    36, 4.0), 1.0)
+  r.addHop(new HopAddition("Styrian Goldings", 5.0, 1.0, HopUsage::Bittering, 60))
+  r.addHop(new HopAddition("Saaz",             3.5, 0.5, HopUsage::Aroma,      5))
+  r.setYeast(new Yeast("WLP650 Brett", YeastFamily::Brett, 0.85))
+  return r
+}
+
+// ── Print a single recipe ──────────────────────────────────────────────────
+
+def printRecipe(r: Recipe): void {
+  val s = r.stats()
+  IO::println("  " + r.name() + "  [" + r.style() + "]")
+  IO::println("    OG  : " + Format::fixed(s.og(), 3))
+  IO::println("    FG  : " + Format::fixed(s.fg(), 3))
+  IO::println("    ABV : " + Format::fixed(s.abv(), 1) + "%  (" + abvCategory(s.abv()) + ")")
+  IO::println("    IBU : " + Format::integer(s.ibu() as Long) + "  (" + ibuCategory(s.ibu()) + ")")
+  IO::println("    SRM : " + Format::integer(s.srm() as Long)  + "  (" + s.colorName() + ")")
+  IO::println("    Bal : " + bitterBalance(s.og(), s.ibu()))
+  IO::println("")
+}
+
+// ── Recursive helper: compute Fibonacci brew size ─────────────────────────
+
+def fibBatch(n: Int): Int {
+  if n <= 1 { return n }
+  return fibBatch(n - 1) + fibBatch(n - 2)
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+val recipes: ArrayList[Recipe] = new ArrayList[Recipe]()
+recipes.add(makeAmericanPaleAle())
+recipes.add(makeIrishStout())
+recipes.add(makeHefeweizen())
+recipes.add(makeNEIPA())
+recipes.add(makePilsner())
+recipes.add(makeWildAle())
+
+IO::println("╔══════════════════════════════════════════════╗")
+IO::println("║        BrewCalc — Recipe Report              ║")
+IO::println("╚══════════════════════════════════════════════╝")
+IO::println("")
+
+// Per-recipe detail block
+foreach r: Recipe in recipes {
+  IO::println("─────────────────────────────────────────────────")
+  printRecipe(r)
+}
+
+// Summary table via Text::table
+IO::println("═══════════════════════════════════════════════════════════════")
+IO::println("Summary")
+IO::println("═══════════════════════════════════════════════════════════════")
+val rows: ArrayList[List[String]] = new ArrayList[List[String]]()
+rows.add(["Recipe", "OG", "FG", "ABV%", "IBU", "SRM", "Colour", "Balance"])
+foreach r: Recipe in recipes {
+  val s = r.stats()
+  rows.add([
+    r.name(),
+    Format::fixed(s.og(), 3),
+    Format::fixed(s.fg(), 3),
+    Format::fixed(s.abv(), 1),
+    Format::integer(s.ibu() as Long),
+    Format::integer(s.srm() as Long),
+    s.colorName(),
+    bitterBalance(s.og(), s.ibu())
+  ])
+}
+IO::println(Text::table(rows))
+
+// Yeast family breakdown via groupBy
+IO::println("")
+IO::println("── Yeast by Family ─────────────────────────────────────────────")
+val allYeasts: ArrayList[Yeast] = new ArrayList[Yeast]()
+allYeasts.add(new Yeast("US-05",      YeastFamily::Ale,   0.77))
+allYeasts.add(new Yeast("WY1084",     YeastFamily::Ale,   0.72))
+allYeasts.add(new Yeast("WY3068",     YeastFamily::Wheat, 0.73))
+allYeasts.add(new Yeast("LondonAle3", YeastFamily::Ale,   0.73))
+allYeasts.add(new Yeast("WLP830",     YeastFamily::Lager, 0.76))
+allYeasts.add(new Yeast("WLP650",     YeastFamily::Brett, 0.85))
+
+val grouped = Colls::groupBy(allYeasts, (y: Yeast) -> y.family().toString())
+foreach (familyName, members) in grouped {
+  val mList = members as List[Object]
+  IO::println("  " + familyName + " (" + mList.size() + " yeast(s)):")
+  foreach obj: Object in mList {
+    val y = obj as Yeast
+    IO::println("    - " + y.name() + " (att " + Format::percent(y.attenuation(), 0) + ")")
+  }
+}
+
+// IBU histogram
+IO::println("")
+IO::println("── IBU Distribution ────────────────────────────────────────────")
+var lowCnt: Int    = 0
+var medCnt: Int    = 0
+var highCnt: Int   = 0
+var vhighCnt: Int  = 0
+foreach r: Recipe in recipes {
+  val cat = ibuCategory(r.ibu())
+  if      cat == "Low"       { lowCnt++   }
+  else if cat == "Medium"    { medCnt++   }
+  else if cat == "High"      { highCnt++  }
+  else                       { vhighCnt++ }
+}
+
+def histBar(label: String, count: Int): void {
+  if count == 0 { return }
+  var bar: String = ""
+  foreach i: Int in 0..<count { bar = bar + "█" }
+  IO::println("  " + label + ": " + bar + " (" + count + ")")
+}
+histBar("Low     ", lowCnt)
+histBar("Medium  ", medCnt)
+histBar("High    ", highCnt)
+histBar("VeryHigh", vhighCnt)
+
+// ABV statistics via sortedBy
+IO::println("")
+IO::println("── ABV Statistics ──────────────────────────────────────────────")
+val abvValues: ArrayList[Double] = new ArrayList[Double]()
+foreach r: Recipe in recipes { abvValues.add(r.abv()) }
+val sortedAbv = abvValues.sortedBy { v -> v }
+var sumAbv: Double = 0.0
+foreach v: Double in abvValues { sumAbv = sumAbv + v }
+val avgAbv = sumAbv / abvValues.size()
+IO::println("  Min ABV : " + Format::fixed(sortedAbv[0] as Double, 1) + "%")
+IO::println("  Max ABV : " + Format::fixed(sortedAbv[sortedAbv.size() - 1] as Double, 1) + "%")
+IO::println("  Avg ABV : " + Format::fixed(avgAbv, 1) + "%")
+
+// Fibonacci batch size demo (recursive)
+IO::println("")
+IO::println("── Fibonacci Batch Sizes (gallons) ─────────────────────────────")
+val fibRows: ArrayList[List[String]] = new ArrayList[List[String]]()
+fibRows.add(["n", "Fib(n)", "Category"])
+foreach i: Int in 1..10 {
+  val fb = fibBatch(i)
+  val cat: String =
+    if fb <= 3  { "Pilot" }
+    else if fb <= 10 { "Home" }
+    else if fb <= 55 { "Nano" }
+    else { "Micro" }
+  fibRows.add(["" + i, "" + fb, cat])
+}
+IO::println(Text::table(fibRows))
+
+IO::println("")
+IO::println("All " + recipes.size() + " recipes processed.")

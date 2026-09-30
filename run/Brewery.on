@@ -1,0 +1,350 @@
+import {
+  java.util.List as JList
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum BeerStyle {
+  case Lager
+  case Ale
+  case Stout
+  case Wheat
+  case IPA
+  case Sour
+  public:
+  def label(): String = select this {
+    case s is Lager: "Lager"
+    case s is Ale:   "Ale"
+    case s is Stout: "Stout"
+    case s is Wheat: "Wheat"
+    case s is IPA:   "IPA"
+    case s is Sour:  "Sour"
+  }
+  def abvRange(): String = select this {
+    case s is Lager: "4–5%"
+    case s is Ale:   "4–6%"
+    case s is Stout: "4–8%"
+    case s is Wheat: "4–5%"
+    case s is IPA:   "5–8%"
+    case s is Sour:  "3–6%"
+  }
+}
+
+enum FermentStage {
+  case Mashing
+  case Lautering
+  case Boiling
+  case Fermenting
+  case Conditioning
+  case Packaging
+  case Complete
+  public:
+  def label(): String = select this {
+    case s is Mashing:     "Mashing"
+    case s is Lautering:   "Lautering"
+    case s is Boiling:     "Boiling"
+    case s is Fermenting:  "Fermenting"
+    case s is Conditioning:"Conditioning"
+    case s is Packaging:   "Packaging"
+    case s is Complete:    "Complete"
+  }
+  def isActive(): Boolean = select this {
+    case s is Complete: false
+    else: true
+  }
+  def next(): FermentStage = select this {
+    case s is Mashing:     new Lautering()
+    case s is Lautering:   new Boiling()
+    case s is Boiling:     new Fermenting()
+    case s is Fermenting:  new Conditioning()
+    case s is Conditioning:new Packaging()
+    case s is Packaging:   new Complete()
+    case s is Complete:    new Complete()
+  }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record Ingredient(name: String, kg: Double)
+
+record Recipe(name: String, style: BeerStyle, ingredients: List[Object], targetAbv: Double, ibuTarget: Int) {
+  public:
+  def summary(): String =
+    "#{name()} [#{style().label()}] ABV≈#{targetAbv()}% IBU≈#{ibuTarget()}"
+  def grainBill(): Double {
+    var total: Double = 0.0
+    foreach item: Object in ingredients() {
+      val ing: Ingredient = item as Ingredient
+      if ing.name().endsWith("Malt") || ing.name().endsWith("Barley") {
+        total = total + ing.kg()
+      }
+    }
+    return total
+  }
+}
+
+record Batch(id: Int, recipe: Recipe, liters: Double, stage: FermentStage) {
+  public:
+  def advance(): Batch = new Batch(id(), recipe(), liters(), stage().next())
+  def isComplete(): Boolean = !stage().isActive()
+  def costPerLiter(grainCostPerKg: Double): Double =
+    if liters() == 0.0 { 0.0 }
+    else { recipe().grainBill() * grainCostPerKg / liters() }
+}
+
+// ── Brewery class ──────────────────────────────────────────────────────────
+
+class Brewery {
+  val name: String
+  var batches: List[Batch]
+  var nextId: Int
+
+public:
+  def this(n: String) {
+    name = n
+    batches = []
+    nextId = 1
+  }
+
+  def allBatches(): List[Batch] = batches
+
+  def brew(recipe: Recipe, liters: Double): Batch {
+    val b: Batch = new Batch(nextId, recipe, liters, new Mashing())
+    batches.add(b)
+    nextId = nextId + 1
+    return b
+  }
+
+  def advanceBatch(id: Int): Boolean {
+    var found: Boolean = false
+    val newList: List[Batch] = []
+    foreach b: Batch in batches {
+      if b.id() == id && b.stage().isActive() {
+        found = true
+        newList.add(b.advance())
+      } else {
+        newList.add(b)
+      }
+    }
+    batches = newList
+    return found
+  }
+
+  def activeBatches(): List[Batch] {
+    val result: List[Batch] = []
+    foreach b: Batch in batches {
+      if !b.isComplete() { result.add(b) }
+    }
+    return result
+  }
+
+  def completedBatches(): List[Batch] {
+    val result: List[Batch] = []
+    foreach b: Batch in batches {
+      if b.isComplete() { result.add(b) }
+    }
+    return result
+  }
+
+  def totalLitersInProgress(): Double {
+    var total: Double = 0.0
+    foreach b: Batch in activeBatches() { total = total + b.liters() }
+    return total
+  }
+
+  def batchesByStyle(style: BeerStyle): List[Batch] {
+    val result: List[Batch] = []
+    foreach b: Batch in batches {
+      if b.recipe().style().label() == style.label() { result.add(b) }
+    }
+    return result
+  }
+
+  def printStatus(): void {
+    IO::println("═══════════════════════════════════════")
+    IO::println("  #{name} — Batch Status")
+    IO::println("═══════════════════════════════════════")
+    if batches.size == 0 {
+      IO::println("  (no batches)")
+    } else {
+      foreach b: Batch in batches {
+        val mark: String = if b.isComplete() { "✓" } else { "⊙" }
+        IO::println("  [#{b.id()}] #{mark} #{b.recipe().name()} — #{b.stage().label()} (#{b.liters()}L)")
+      }
+    }
+    IO::println("═══════════════════════════════════════")
+  }
+}
+
+// ── Sales record ───────────────────────────────────────────────────────────
+
+record Sale(batchId: Int, recipeName: String, liters: Double, pricePerLiter: Double) {
+  public:
+  def revenue(): Double = liters() * pricePerLiter()
+}
+
+class SalesLedger {
+  var sales: List[Sale]
+
+public:
+  def this() { sales = [] }
+
+  def addSale(sale: Sale): void { sales.add(sale) }
+
+  def totalRevenue(): Double {
+    var total: Double = 0.0
+    foreach s: Sale in sales { total = total + s.revenue() }
+    return total
+  }
+
+  def revenueByBatch(batchId: Int): Double {
+    var total: Double = 0.0
+    foreach s: Sale in sales {
+      if s.batchId() == batchId { total = total + s.revenue() }
+    }
+    return total
+  }
+
+  def topSeller(): Sale? {
+    if sales.size == 0 { return null }
+    var best: Sale = sales[0]
+    foreach s: Sale in sales {
+      if s.revenue() > best.revenue() { best = s }
+    }
+    return best
+  }
+
+  def printReport(): void {
+    IO::println("─── Sales Report ─────────────────────")
+    foreach s: Sale in sales {
+      val rev: Double = s.revenue()
+      IO::println("  Batch ##{s.batchId()} #{s.recipeName()}: #{s.liters()}L @ $#{s.pricePerLiter()}/L = $#{rev}")
+    }
+    IO::println("  Total revenue: $#{totalRevenue()}")
+    val top: Sale? = topSeller()
+    if top != null {
+      IO::println("  Top seller: #{top.recipeName()} ($#{top.revenue()})")
+    }
+    IO::println("──────────────────────────────────────")
+  }
+}
+
+// ── Helper: advance a batch all the way to complete ────────────────────────
+
+def runToCompletion(brewery: Brewery, batchId: Int): void {
+  var steps: Int = 0
+  while steps < 10 {
+    val ok: Boolean = brewery.advanceBatch(batchId)
+    if !ok { steps = 10 }
+    else { steps = steps + 1 }
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+val brewery: Brewery = new Brewery("Hillside Craft Brewery")
+val ledger: SalesLedger = new SalesLedger()
+
+// Build recipes
+val goldenAle: Recipe = new Recipe(
+  "Golden Ale",
+  new Ale(),
+  [new Ingredient("Pale Malt", 8.0), new Ingredient("Cara Malt", 1.5), new Ingredient("Cascade Hops", 0.2)],
+  4.8,
+  35
+)
+
+val blackStout: Recipe = new Recipe(
+  "Midnight Stout",
+  new Stout(),
+  [new Ingredient("Dark Malt", 9.0), new Ingredient("Roasted Barley", 2.0), new Ingredient("Chocolate Malt", 1.0)],
+  6.2,
+  45
+)
+
+val citraIpa: Recipe = new Recipe(
+  "Citra IPA",
+  new IPA(),
+  [new Ingredient("Vienna Malt", 10.0), new Ingredient("Citra Hops", 0.5), new Ingredient("Columbus Hops", 0.3)],
+  7.0,
+  75
+)
+
+val berlinWeizen: Recipe = new Recipe(
+  "Berlin Weizen",
+  new Wheat(),
+  [new Ingredient("Wheat Malt", 6.0), new Ingredient("Pilsner Malt", 4.0)],
+  4.5,
+  12
+)
+
+// Brew some batches
+val b1: Batch = brewery.brew(goldenAle, 500.0)
+val b2: Batch = brewery.brew(blackStout, 300.0)
+val b3: Batch = brewery.brew(citraIpa, 400.0)
+val b4: Batch = brewery.brew(berlinWeizen, 250.0)
+
+// Show initial status
+brewery.printStatus()
+
+// Advance b1 (Golden Ale) all the way to complete
+runToCompletion(brewery, b1.id())
+
+// Advance b2 (Stout) a few stages manually
+brewery.advanceBatch(b2.id())
+brewery.advanceBatch(b2.id())
+brewery.advanceBatch(b2.id())
+
+// Advance b3 (IPA) to fermenting
+brewery.advanceBatch(b3.id())
+brewery.advanceBatch(b3.id())
+brewery.advanceBatch(b3.id())
+
+brewery.printStatus()
+
+// Recipe summaries
+IO::println("\n── Recipe Summaries ──")
+foreach r: Recipe in [goldenAle, blackStout, citraIpa, berlinWeizen] {
+  IO::println("  " + r.summary())
+  IO::println("    Grain bill: #{r.grainBill()}kg")
+}
+
+// Style breakdown
+IO::println("\n── Batches by style ──")
+foreach s: BeerStyle in [new Ale(), new Stout(), new IPA(), new Wheat()] {
+  val count: Int = brewery.batchesByStyle(s).size
+  IO::println("  #{s.label()}: #{count} batch(es)")
+}
+
+// Liters in progress
+IO::println("\n── Production ──")
+IO::println("  Active batches : #{brewery.activeBatches().size}")
+IO::println("  Completed      : #{brewery.completedBatches().size}")
+IO::println("  Liters in progress: #{brewery.totalLitersInProgress()}L")
+
+// Record some sales for completed batch
+ledger.addSale(new Sale(b1.id(), goldenAle.name(), 200.0, 4.5))
+ledger.addSale(new Sale(b1.id(), goldenAle.name(), 150.0, 4.5))
+ledger.addSale(new Sale(b1.id(), goldenAle.name(), 100.0, 5.0))
+
+// Revenue for a simulated future batch (batch 5) also gets a sale
+ledger.addSale(new Sale(5, blackStout.name(), 80.0, 6.0))
+
+IO::println("")
+ledger.printReport()
+
+// Grain cost analysis
+val grainCostPerKg: Double = 1.2
+IO::println("── Cost Analysis (grain @$#{grainCostPerKg}/kg) ──")
+foreach b: Batch in brewery.allBatches() {
+  val cost: Double = b.costPerLiter(grainCostPerKg)
+  IO::println("  Batch ##{b.id()} #{b.recipe().name()}: $#{cost}/L grain cost")
+}
+
+// Stage transition demo
+IO::println("\n── Fermentation stage chain ──")
+var stage: FermentStage = new Mashing()
+foreach i: Int in 0..6 {
+  IO::println("  Step #{i}: #{stage.label()}")
+  stage = stage.next()
+}

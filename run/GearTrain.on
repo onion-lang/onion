@@ -1,0 +1,209 @@
+// GearTrain.on — mechanical gear-train calculator.
+//
+// Models compound gear trains: chains of meshing gears that transmit rotation
+// between shafts.  For each gear mesh the speed ratio is driven/driver teeth
+// count (output turns faster when the driven gear is smaller) and the torque
+// ratio is the reciprocal.  A compound train multiplies all individual ratios.
+//
+// Exercises: ADT enums, records with methods, classes, generic Lists
+// (List[GearMesh]), fold/map/reduce pipelines, extension methods on Double,
+// foreach, while, string interpolation, select/pattern matching.
+
+import { java.lang.Math; }
+
+// ─── Gear type ────────────────────────────────────────────────────────────────
+
+enum GearType {
+  case Spur      // parallel shafts, external teeth (most common)
+  case Helical   // parallel shafts, angled teeth (quieter, more efficient)
+  case Bevel     // intersecting shafts, conical shape (right angles, etc.)
+  case Worm      // 90° skew shafts, high reduction ratio in one stage
+}
+
+def gearTypeLabel(g: GearType): String = select g {
+  case x is Spur:    "spur"
+  case x is Helical: "helical"
+  case x is Bevel:   "bevel"
+  case x is Worm:    "worm"
+}
+
+// ─── Gear and mesh records ────────────────────────────────────────────────────
+
+record Gear(name: String, teeth: Int, kind: GearType) {
+public:
+  // Pitch diameter = module * tooth count (module = tooth size in mm).
+  def pitchDiameter(mod: Double): Double = (teeth() as Double) * mod
+
+  def label(): String = "#{name()}(#{teeth()}T/#{gearTypeLabel(kind())})"
+}
+
+// One gear pair: driver turns and drives the driven gear.
+// Speed ratio > 1 means speed increase (step-up); < 1 means reduction (step-down).
+record GearMesh(driver: Gear, driven: Gear) {
+public:
+  def speedRatio(): Double = (driver().teeth() as Double) / (driven().teeth() as Double)
+
+  // output RPM = input RPM * speed ratio
+  def outputRpm(inputRpm: Double): Double = inputRpm * speedRatio()
+
+  // Torque is inversely proportional to speed (ignoring losses).
+  def outputTorque(inputNm: Double): Double = inputNm / speedRatio()
+
+  def label(): String = "#{driver().label()} → #{driven().label()}"
+}
+
+// ─── Gear train (chain of meshed pairs) ──────────────────────────────────────
+
+class GearTrain {
+  var name: String
+  var meshes: List[GearMesh]
+  var inputRpm: Double
+  var inputTorque: Double   // Newton-metres
+
+public:
+  def this(trainName: String, rpm: Double, torqueNm: Double) {
+    name = trainName
+    meshes = []
+    inputRpm = rpm
+    inputTorque = torqueNm
+  }
+
+  def trainName(): String = name
+
+  def addMesh(m: GearMesh): GearTrain { meshes << m; return self }
+
+  // Overall speed ratio = product of individual speed ratios.
+  def overallRatio(): Double {
+    var ratio: Double = 1.0
+    foreach m: GearMesh in meshes { ratio = ratio * m.speedRatio() }
+    return ratio
+  }
+
+  def outputRpm(): Double    = inputRpm    * overallRatio()
+  def outputTorque(): Double = inputTorque / overallRatio()
+  def efficiency(): Double   = 0.97        // assumed 97 % per mesh stage
+
+  // Combined efficiency falls as (0.97)^stages.
+  def combinedEfficiency(): Double {
+    var eff: Double = 1.0
+    var i: Int = 0
+    while i < meshes.size { eff = eff * efficiency(); i = i + 1 }
+    return eff * 100.0
+  }
+
+  def print(): void {
+    IO::println("\n── #{name} ─────────────────────────────────────────────")
+    IO::println("   Input:    #{fmt(inputRpm)} RPM  /  #{fmt(inputTorque)} N·m")
+    IO::println("   Stages:")
+    var rpm: Double = inputRpm
+    var torq: Double = inputTorque
+    foreach mesh: GearMesh in meshes {
+      val nextRpm:  Double = mesh.outputRpm(rpm)
+      val nextTorq: Double = mesh.outputTorque(torq)
+      IO::println("     #{mesh.label()}")
+      IO::println("       ratio #{fmt(mesh.speedRatio())}  →  #{fmt(nextRpm)} RPM, #{fmt(nextTorq)} N·m")
+      rpm  = nextRpm
+      torq = nextTorq
+    }
+    val ratio: Double = overallRatio()
+    val eff:   Double = combinedEfficiency()
+    IO::println("   Overall ratio : #{fmt(ratio)}")
+    IO::println("   Output RPM    : #{fmt(outputRpm())}")
+    IO::println("   Output torque : #{fmt(outputTorque())} N·m")
+    IO::println("   Efficiency    : #{fmt(eff)} %")
+  }
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+// Format a Double to 2 decimal places without scientific notation.
+def fmt(d: Double): String {
+  val sign: String = if d < 0.0 { "-" } else { "" }
+  val abs: Double = if d < 0.0 { 0.0 - d } else { d }
+  val whole: Int = abs as Int
+  val frac: Int = ((abs - (whole as Double)) * 100.0 + 0.5) as Int
+  val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+  return sign + whole + "." + fracStr
+}
+
+// ─── Example gear trains ──────────────────────────────────────────────────────
+
+def main(): void {
+
+  // ── 1. Bicycle drivetrain ─────────────────────────────────────────────────
+  // Chainring (big sprocket at pedals) drives rear cassette sprocket.
+  // A 53-tooth chainring with a 12-tooth sprocket gives ~4.4:1 step-up.
+  val chain53x12: GearTrain = new GearTrain("Bicycle: 53T chainring × 12T sprocket", 80.0, 25.0)
+  chain53x12.addMesh(new GearMesh(
+    new Gear("chainring", 53, new Spur()),
+    new Gear("sprocket",  12, new Spur())))
+  chain53x12.print()
+
+  // Same chainring in the smallest gear: 53T × 25T is easier to pedal.
+  val chain53x25: GearTrain = new GearTrain("Bicycle: 53T chainring × 25T sprocket", 80.0, 25.0)
+  chain53x25.addMesh(new GearMesh(
+    new Gear("chainring", 53, new Spur()),
+    new Gear("sprocket",  25, new Spur())))
+  chain53x25.print()
+
+  // ── 2. Clock gear train (pendulum clock, simplified) ─────────────────────
+  // Great wheel → centre wheel → third wheel → escape wheel.
+  // Each stage reduces speed so the escape wheel ticks once per second.
+  val clock: GearTrain = new GearTrain("Pendulum clock (4-stage)", 1.0, 0.05)
+  clock
+    .addMesh(new GearMesh(new Gear("great-wheel",   96, new Spur()),
+                          new Gear("centre-pinion",  8, new Spur())))
+    .addMesh(new GearMesh(new Gear("centre-wheel",  80, new Spur()),
+                          new Gear("third-pinion",   8, new Spur())))
+    .addMesh(new GearMesh(new Gear("third-wheel",   75, new Spur()),
+                          new Gear("escape-pinion",  7, new Spur())))
+    .addMesh(new GearMesh(new Gear("escape-wheel",  30, new Spur()),
+                          new Gear("anchor-arbor",   1, new Spur())))
+  clock.print()
+
+  // ── 3. Compound reduction (industrial conveyor) ───────────────────────────
+  // Motor → helical stage 1 (20:64) → spur stage 2 (16:80) → output shaft.
+  val conveyor: GearTrain = new GearTrain("Industrial conveyor drive", 1450.0, 5.0)
+  conveyor
+    .addMesh(new GearMesh(new Gear("motor-pinion",    20, new Helical()),
+                          new Gear("intermediate",    64, new Helical())))
+    .addMesh(new GearMesh(new Gear("intermed-pinion", 16, new Spur()),
+                          new Gear("output-gear",     80, new Spur())))
+  conveyor.print()
+
+  // ── 4. Bevel right-angle drive (hand drill) ──────────────────────────────
+  // Handle (bevel driver 8T) drives spindle bevel (bevel driven 32T),
+  // then spur pinion (12T) steps up to drill chuck (24T) for speed.
+  val drill: GearTrain = new GearTrain("Hand drill bevel + spur", 200.0, 2.0)
+  drill
+    .addMesh(new GearMesh(new Gear("handle-bevel",  8,  new Bevel()),
+                          new Gear("spindle-bevel", 32, new Bevel())))
+    .addMesh(new GearMesh(new Gear("spur-pinion",   12, new Spur()),
+                          new Gear("chuck-gear",    24, new Spur())))
+  drill.print()
+
+  // ── 5. Worm-gear hoist (very high reduction) ─────────────────────────────
+  // Worm with 1 start (thread) drives a 40-tooth worm wheel.
+  // Self-locking: load cannot back-drive the motor.
+  val hoist: GearTrain = new GearTrain("Worm hoist (1-start × 40T)", 1200.0, 3.0)
+  hoist.addMesh(new GearMesh(
+    new Gear("worm",       1,  new Worm()),
+    new Gear("worm-wheel", 40, new Worm())))
+  hoist.print()
+
+  // ── Comparison table ──────────────────────────────────────────────────────
+  IO::println("\n═══ Gear Train Summary ═══════════════════════════════════")
+  IO::println("  Train                           Ratio   Out-RPM  Out-Nm")
+  IO::println("  ─────────────────────────────── ─────── ──────── ──────")
+  val trains: List[GearTrain] = [chain53x12, chain53x25, clock, conveyor, drill, hoist]
+  foreach t: GearTrain in trains {
+    var lbl: String = t.trainName()
+    if lbl.length() > 31 { lbl = lbl.substring(0, 31) }
+    val pad: Int = 32 - lbl.length()
+    var spaces: String = ""
+    var k: Int = 0
+    while k < pad { spaces = spaces + " "; k = k + 1 }
+    IO::println("  " + lbl + spaces + fmt(t.overallRatio()) + "  " +
+                fmt(t.outputRpm()) + "   " + fmt(t.outputTorque()))
+  }
+}

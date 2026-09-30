@@ -1,0 +1,481 @@
+// CricketScorecard.on — Cricket match scorecard, statistics, and commentary.
+// Exercises: ADT case-enums, data-carrying homogeneous enum, records with
+//            methods, class with interface-like helper methods, extension
+//            methods on Int and Double, collection pipelines (map/filter/
+//            fold/sortedBy/groupBy), pattern matching, nullable types,
+//            string interpolation, closures, foreach, while, recursion.
+
+import { java.lang.Math }
+
+// ─── Dismissal (ADT case-enum) ────────────────────────────────────────────────
+
+enum Dismissal {
+  case Bowled(bowler: String)
+  case Caught(fielder: String, bowler: String)
+  case LBW(bowler: String)
+  case RunOut(thrower: String)
+  case Stumped(keeper: String, bowler: String)
+  case HitWicket(bowler: String)
+  case NotOut
+  case DidNotBat
+}
+
+// ─── Batting position role enum ───────────────────────────────────────────────
+
+enum Role(short: String) {
+  OPENER("OPN"), TOP_ORDER("TOP"), MIDDLE_ORDER("MID"),
+  LOWER_ORDER("LOW"), TAILENDER("TAIL")
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Player(name: String, role: Role)
+
+record BattingLine(player: Player, runs: Int, balls: Int, fours: Int, sixes: Int, dismissal: Dismissal) {
+public:
+  def strikeRate(): Double {
+    if balls() == 0 { return 0.0 }
+    return runs() * 100.0 / balls()
+  }
+  def isOut(): Boolean {
+    select dismissal() {
+      case d is NotOut:     return false
+      case d is DidNotBat:  return false
+      else:                 return true
+    }
+    return false
+  }
+  def dismissalStr(): String {
+    select dismissal() {
+      case d is NotOut:     return "not out"
+      case d is DidNotBat:  return "did not bat"
+      case d is Bowled:     return "b " + (d as Bowled).bowler()
+      case d is LBW:        return "lbw b " + (d as LBW).bowler()
+      case d is HitWicket:  return "hit-wkt b " + (d as HitWicket).bowler()
+      case d is Caught:     return "c " + (d as Caught).fielder() + " b " + (d as Caught).bowler()
+      case d is Stumped:    return "st " + (d as Stumped).keeper() + " b " + (d as Stumped).bowler()
+      case d is RunOut:     return "run out (" + (d as RunOut).thrower() + ")"
+    }
+    return "?"
+  }
+}
+
+record BowlingLine(player: Player, overs: Int, extraBalls: Int, runs: Int, wickets: Int, wides: Int, noballs: Int) {
+public:
+  def totalBalls(): Int = overs() * 6 + extraBalls()
+  def economy(): Double {
+    if overs() == 0 && extraBalls() == 0 { return 0.0 }
+    val ov = overs() * 1.0 + extraBalls() * 1.0 / 6.0
+    return runs() / ov
+  }
+  def average(): Double {
+    if wickets() == 0 { return 0.0 }
+    return runs() * 1.0 / wickets()
+  }
+  def oversStr(): String = "" + overs() + (if extraBalls() > 0 { "." + extraBalls() } else { "" })
+}
+
+record Partnership(bat1: String, bat2: String, runs: Int, balls: Int) {
+public:
+  def runRate(): Double {
+    if balls() == 0 { return 0.0 }
+    return runs() * 6.0 / balls()
+  }
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def roundTo(n: Int): Double {
+    val factor = Math::pow(10.0, n * 1.0)
+    return Math::round(self * factor) * 1.0 / factor
+  }
+  def fmt1(): String {
+    val scaled = (self * 10.0 + 0.05) as Int
+    val ipart = scaled / 10
+    val fpart = scaled % 10
+    return "" + ipart + "." + fpart
+  }
+  def fmt2(): String {
+    val scaled = (self * 100.0 + 0.005) as Int
+    val ipart = scaled / 100
+    val fpart = scaled % 100
+    val fp = if fpart < 10 { "0" + fpart } else { "" + fpart }
+    return "" + ipart + "." + fp
+  }
+}
+
+extension Int {
+  def pad(w: Int): String {
+    var s = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s = "" + self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Innings class ────────────────────────────────────────────────────────────
+
+class Innings {
+  val team:     String
+  val batting:  List[BattingLine]
+  val bowling:  List[BowlingLine]
+  val byes:     Int
+  val legbyes:  Int
+  val wideRuns: Int
+  val noballRuns: Int
+  val totalOvers: Int
+  val extraBalls: Int
+
+public:
+  def this(team: String, batting: List[BattingLine], bowling: List[BowlingLine],
+           byes: Int, legbyes: Int, wideRuns: Int, noballRuns: Int,
+           totalOvers: Int, extraBalls: Int) {
+    this.team       = team
+    this.batting    = batting
+    this.bowling    = bowling
+    this.byes       = byes
+    this.legbyes    = legbyes
+    this.wideRuns   = wideRuns
+    this.noballRuns = noballRuns
+    this.totalOvers = totalOvers
+    this.extraBalls = extraBalls
+  }
+
+  def extras(): Int = byes + legbyes + wideRuns + noballRuns
+
+  def totalRuns(): Int {
+    var sum = 0
+    foreach line: BattingLine in batting { sum = sum + line.runs() }
+    return sum + extras()
+  }
+
+  def wicketsFallen(): Int = batting.filter { l -> (l as BattingLine).isOut() }.size
+
+  def scoreStr(): String {
+    val w = wicketsFallen()
+    val r = totalRuns()
+    val ov = totalOvers
+    val eb = extraBalls
+    return "" + r + "/" + w + (if w < 10 { "" } else { "" }) +
+           "  (" + ov + (if eb > 0 { "." + eb } else { "" }) + " ov)"
+  }
+
+  def runRate(): Double {
+    val balls = totalOvers * 6 + extraBalls
+    if balls == 0 { return 0.0 }
+    return totalRuns() * 6.0 / balls
+  }
+
+  def topScorers(): List[BattingLine] =
+    batting.sortedBy { l -> 0 - (l as BattingLine).runs() }
+
+  def bestBowler(): BowlingLine? {
+    if bowling.size == 0 { return null }
+    var best: BowlingLine? = null
+    var bestWkts = -1
+    var bestEcon = 1000.0
+    foreach b: BowlingLine in bowling {
+      if b.wickets() > bestWkts || (b.wickets() == bestWkts && b.economy() < bestEcon) {
+        bestWkts = b.wickets()
+        bestEcon = b.economy()
+        best = b
+      }
+    }
+    return best
+  }
+
+  def printBatting(): void {
+    IO::println("BATTING                           R    B   4s  6s   SR")
+    IO::println("─────────────────────────────────────────────────────────")
+    foreach line: BattingLine in batting {
+      val b = line
+      if b.dismissal() != new DidNotBat() {
+        val name = b.player().name().rpad(18)
+        val dism = b.dismissalStr().rpad(14)
+        val r    = b.runs().pad(4)
+        val bl   = b.balls().pad(4)
+        val fo   = b.fours().pad(4)
+        val si   = b.sixes().pad(3)
+        val sr   = b.strikeRate().fmt1().lpad(6)
+        IO::println("#{name} #{dism} #{r} #{bl} #{fo} #{si} #{sr}")
+      }
+    }
+    IO::println("─────────────────────────────────────────────────────────")
+    val extrasStr = "Extras (b #{byes}, lb #{legbyes}, w #{wideRuns}, nb #{noballRuns})"
+    IO::println("#{extrasStr.rpad(45)}#{extras().pad(4)}")
+    IO::println("TOTAL #{scoreStr()}")
+    IO::println("")
+  }
+
+  def printBowling(): void {
+    IO::println("BOWLING            O    R   W   Wd  Nb  Econ  Avg")
+    IO::println("──────────────────────────────────────────────────")
+    foreach line: BowlingLine in bowling {
+      val b    = line
+      val name = b.player().name().rpad(18)
+      val ov   = b.oversStr().lpad(4)
+      val r    = b.runs().pad(4)
+      val w    = b.wickets().pad(3)
+      val wd   = b.wides().pad(4)
+      val nb   = b.noballs().pad(3)
+      val econ = b.economy().fmt2().lpad(6)
+      val avg  = if b.wickets() == 0 { "  -  " } else { b.average().fmt1().lpad(5) }
+      IO::println("#{name} #{ov} #{r} #{w} #{wd} #{nb} #{econ}  #{avg}")
+    }
+    IO::println("──────────────────────────────────────────────────")
+    IO::println("")
+  }
+
+  def mostBoundaries(): String {
+    val sorted = batting.sortedBy { l ->
+      val b = (l as BattingLine)
+      0 - (b.fours() * 4 + b.sixes() * 6)
+    }
+    if sorted.size == 0 { return "none" }
+    val top = sorted[0] as BattingLine
+    return "#{top.player().name()} (#{top.fours()}×4 + #{top.sixes()}×6)"
+  }
+
+  def strikeLeaders(minBalls: Int): List[BattingLine] {
+    return batting.filter { l ->
+      val b = (l as BattingLine)
+      b.balls() >= minBalls && b.dismissal() != new DidNotBat()
+    }.sortedBy { l -> 0.0 - (l as BattingLine).strikeRate() }
+  }
+
+  def printRoleBreakdown(): void {
+    val openers = batting.filter { l ->
+      (l as BattingLine).player().role() == Role::OPENER
+    }
+    val topOrder = batting.filter { l ->
+      (l as BattingLine).player().role() == Role::TOP_ORDER
+    }
+    val mid = batting.filter { l ->
+      (l as BattingLine).player().role() == Role::MIDDLE_ORDER
+    }
+    val low = batting.filter { l ->
+      val r = (l as BattingLine).player().role()
+      r == Role::LOWER_ORDER || r == Role::TAILENDER
+    }
+    var oRuns = 0
+    foreach e: Object in openers   { oRuns = oRuns + (e as BattingLine).runs() }
+    var tRuns = 0
+    foreach e: Object in topOrder  { tRuns = tRuns + (e as BattingLine).runs() }
+    var mRuns = 0
+    foreach e: Object in mid       { mRuns = mRuns + (e as BattingLine).runs() }
+    var lRuns = 0
+    foreach e: Object in low       { lRuns = lRuns + (e as BattingLine).runs() }
+    IO::println("  Openers:       #{oRuns} runs")
+    IO::println("  Top order:     #{tRuns} runs")
+    IO::println("  Middle order:  #{mRuns} runs")
+    IO::println("  Lower/tail:    #{lRuns} runs")
+  }
+}
+
+// ─── Match class ──────────────────────────────────────────────────────────────
+
+class CricketMatch {
+  val team1: String
+  val team2: String
+  val venue: String
+  val inn1:  Innings
+  val inn2:  Innings
+
+public:
+  def this(team1: String, team2: String, venue: String, inn1: Innings, inn2: Innings) {
+    this.team1 = team1
+    this.team2 = team2
+    this.venue = venue
+    this.inn1  = inn1
+    this.inn2  = inn2
+  }
+
+  def winner(): String {
+    val r1 = inn1.totalRuns()
+    val r2 = inn2.totalRuns()
+    if r1 > r2      { return team1 + " won by " + (r1 - r2) + " runs" }
+    else if r2 > r1 { return team2 + " won by " + (10 - inn2.wicketsFallen()) + " wickets" }
+    else            { return "Match tied" }
+  }
+
+  def netRunRate(): Double {
+    val rr1 = inn1.runRate()
+    val rr2 = inn2.runRate()
+    return rr1 - rr2
+  }
+
+  def printSummary(): void {
+    IO::println("╔══════════════════════════════════════════════════════════╗")
+    IO::println("║  CRICKET SCORECARD                                       ║")
+    IO::println("╠══════════════════════════════════════════════════════════╣")
+    IO::println("║  Venue : #{venue.rpad(48)}║")
+    IO::println("║  Match : #{(team1 + " vs " + team2).rpad(48)}║")
+    IO::println("╚══════════════════════════════════════════════════════════╝")
+    IO::println("")
+    IO::println("── 1st Innings: #{team1} ──")
+    inn1.printBatting()
+    inn1.printBowling()
+    IO::println("── 2nd Innings: #{team2} ──")
+    inn2.printBatting()
+    inn2.printBowling()
+    IO::println("════════════════════════════════════")
+    IO::println("RESULT : #{winner()}")
+    IO::println("NRR    : #{netRunRate().fmt2()}")
+    IO::println("════════════════════════════════════")
+    IO::println("")
+  }
+}
+
+// ─── Analytics helpers (public methods on Innings — see above) ────────────────
+
+// ─── Main: build and analyse a T20 match ──────────────────────────────────────
+
+// Players
+val rSharma   = new Player("Rohit Sharma",   Role::OPENER)
+val vKohli    = new Player("Virat Kohli",    Role::OPENER)
+val sIyer     = new Player("Shreyas Iyer",   Role::TOP_ORDER)
+val sRathod   = new Player("S. Rathod",      Role::MIDDLE_ORDER)
+val hPandya   = new Player("Hardik Pandya",  Role::MIDDLE_ORDER)
+val rJadeja   = new Player("R. Jadeja",      Role::LOWER_ORDER)
+val dKarthik  = new Player("D. Karthik",     Role::LOWER_ORDER)
+val bKumar    = new Player("Bhuvneshwar K.", Role::TAILENDER)
+val jBumrah   = new Player("J. Bumrah",      Role::TAILENDER)
+val ySharma   = new Player("Y. Sharma",      Role::TAILENDER)
+val aChandila = new Player("A. Chandila",    Role::TAILENDER)
+
+val gGayle    = new Player("Chris Gayle",    Role::OPENER)
+val kPowell   = new Player("K. Powell",      Role::OPENER)
+val mSimons   = new Player("M. Simons",      Role::TOP_ORDER)
+val dBravo    = new Player("D. Bravo",       Role::MIDDLE_ORDER)
+val nPooran   = new Player("N. Pooran",      Role::MIDDLE_ORDER)
+val rChase    = new Player("R. Chase",       Role::LOWER_ORDER)
+val aRussell  = new Player("Andre Russell",  Role::LOWER_ORDER)
+val oThomas   = new Player("O. Thomas",      Role::TAILENDER)
+val jHolder   = new Player("J. Holder",      Role::TAILENDER)
+val rRampaul  = new Player("R. Rampaul",     Role::TAILENDER)
+val rPaul     = new Player("R. Paul",        Role::TAILENDER)
+
+// India 1st innings batting
+val indBat = [
+  new BattingLine(rSharma,  72, 46, 8, 3, new Bowled("J. Holder")),
+  new BattingLine(vKohli,   89, 63, 7, 4, new Caught("N. Pooran", "O. Thomas")),
+  new BattingLine(sIyer,    34, 28, 3, 1, new LBW("R. Rampaul")),
+  new BattingLine(sRathod,  18, 14, 1, 1, new RunOut("R. Chase")),
+  new BattingLine(hPandya,  41, 24, 2, 3, new Caught("D. Bravo", "A. Russell")),
+  new BattingLine(rJadeja,  12,  9, 1, 0, new Stumped("N. Pooran", "R. Paul")),
+  new BattingLine(dKarthik,  8,  5, 0, 1, new Bowled("J. Holder")),
+  new BattingLine(bKumar,    4,  3, 0, 0, new NotOut()),
+  new BattingLine(jBumrah,   0,  1, 0, 0, new Bowled("O. Thomas")),
+  new BattingLine(ySharma,   0,  0, 0, 0, new DidNotBat()),
+  new BattingLine(aChandila, 0,  0, 0, 0, new DidNotBat())
+]
+
+// West Indies bowling in India 1st innings
+val wiiBowl = [
+  new BowlingLine(jHolder,   4, 0, 38, 2, 1, 0),
+  new BowlingLine(oThomas,   4, 0, 41, 2, 2, 0),
+  new BowlingLine(rRampaul,  4, 0, 42, 1, 0, 1),
+  new BowlingLine(aRussell,  4, 0, 35, 1, 1, 0),
+  new BowlingLine(rPaul,     4, 0, 28, 1, 0, 0)
+]
+
+val indInnings = new Innings("India", indBat, wiiBowl, 2, 3, 4, 2, 20, 0)
+
+// West Indies 2nd innings batting
+val wiBat = [
+  new BattingLine(gGayle,   64, 38, 7, 4, new Caught("R. Jadeja",   "J. Bumrah")),
+  new BattingLine(kPowell,  28, 21, 3, 1, new Bowled("Bhuvneshwar K.")),
+  new BattingLine(mSimons,  14, 12, 1, 0, new LBW("A. Chandila")),
+  new BattingLine(dBravo,   36, 25, 3, 2, new Caught("V. Kohli",     "R. Jadeja")),
+  new BattingLine(nPooran,  52, 34, 3, 4, new NotOut()),
+  new BattingLine(rChase,   12, 10, 1, 0, new RunOut("H. Pandya")),
+  new BattingLine(aRussell, 26, 14, 1, 2, new Caught("D. Karthik",   "Bhuvneshwar K.")),
+  new BattingLine(oThomas,   3,  3, 0, 0, new Bowled("J. Bumrah")),
+  new BattingLine(jHolder,   2,  2, 0, 0, new NotOut()),
+  new BattingLine(rRampaul,  0,  0, 0, 0, new DidNotBat()),
+  new BattingLine(rPaul,     0,  0, 0, 0, new DidNotBat())
+]
+
+// India bowling in West Indies innings
+val indBowl = [
+  new BowlingLine(jBumrah,   4, 0, 31, 2, 0, 0),
+  new BowlingLine(bKumar,    4, 0, 37, 2, 1, 0),
+  new BowlingLine(aChandila, 4, 0, 43, 1, 2, 0),
+  new BowlingLine(rJadeja,   4, 0, 35, 1, 0, 0),
+  new BowlingLine(hPandya,   4, 0, 42, 0, 0, 1)
+]
+
+val wiInnings = new Innings("West Indies", wiBat, indBowl, 1, 2, 3, 1, 20, 0)
+
+val match = new CricketMatch("India", "West Indies",
+                             "Eden Gardens, Kolkata", indInnings, wiInnings)
+
+match.printSummary()
+
+// ─── Additional analytics ─────────────────────────────────────────────────────
+
+IO::println("─── Performance Analytics ───────────────────────────────────")
+IO::println("")
+IO::println("India innings run rate   : #{indInnings.runRate().fmt2()}")
+IO::println("West Indies run rate     : #{wiInnings.runRate().fmt2()}")
+IO::println("")
+
+IO::println("Top scorer (India)   : #{(indInnings.topScorers()[0] as BattingLine).player().name()} " +
+            "— #{(indInnings.topScorers()[0] as BattingLine).runs()} " +
+            "(#{(indInnings.topScorers()[0] as BattingLine).balls()} balls)")
+IO::println("Top scorer (WI)      : #{(wiInnings.topScorers()[0] as BattingLine).player().name()} " +
+            "— #{(wiInnings.topScorers()[0] as BattingLine).runs()} " +
+            "(#{(wiInnings.topScorers()[0] as BattingLine).balls()} balls)")
+IO::println("")
+
+val bb1 = indInnings.bestBowler()
+val bb2 = wiInnings.bestBowler()
+if bb1 != null {
+  IO::println("Best bowler (India inn) : #{bb1.player().name()} #{bb1.wickets()}/#{bb1.runs()} " +
+              "(econ #{bb1.economy().fmt2()})")
+}
+if bb2 != null {
+  IO::println("Best bowler (WI inn)   : #{bb2.player().name()} #{bb2.wickets()}/#{bb2.runs()} " +
+              "(econ #{bb2.economy().fmt2()})")
+}
+IO::println("")
+
+IO::println("Boundary king (India)  : #{indInnings.mostBoundaries()}")
+IO::println("Boundary king (WI)     : #{wiInnings.mostBoundaries()}")
+IO::println("")
+
+IO::println("India batting by role:")
+indInnings.printRoleBreakdown()
+IO::println("")
+IO::println("West Indies batting by role:")
+wiInnings.printRoleBreakdown()
+IO::println("")
+
+// Strike rate leaders
+val strikeLeaders = indInnings.strikeLeaders(10)
+
+IO::println("India strike-rate leaders (min 10 balls):")
+foreach entry: Object in strikeLeaders {
+  val b = entry as BattingLine
+  IO::println("  #{b.player().name().rpad(18)} #{b.runs().pad(3)} (#{b.balls()}b) SR #{b.strikeRate().fmt1()}")
+}
+IO::println("")
+IO::println("Done.")

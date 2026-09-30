@@ -1,0 +1,301 @@
+// RobotMission.on — robot fleet mission control with BFS path planning (~220 lines)
+// Exercises: records, simple enums, ADT case-enum, 2D Boolean grid, extension
+// methods on Int/String, BFS shortest-path, collection pipelines (map/filter/
+// find/reduce), closures, pattern matching (select/is), string interpolation,
+// foreach over ranges, mutable class state, multiple interacting classes.
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum RobotStatus { IDLE, MOVING, AT_GOAL, BLOCKED }
+
+enum CellType { EMPTY, OBSTACLE, GOAL }
+
+// ── ADT result for path lookup ─────────────────────────────────────────────────
+
+enum PathResult {
+  case Found(path: Int[])
+  case Unreachable
+}
+
+// ── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record RobotState(id: String, row: Int, col: Int, status: RobotStatus, pathRemaining: Int) {
+public:
+  def label(): String = select status() {
+    case s when s == RobotStatus::AT_GOAL: id().toLowerCase().charAt(0) + ""
+    case s when s == RobotStatus::BLOCKED: "?"
+    else: id().charAt(0) + ""
+  }
+  def toStr(): String = "#{id()} at (#{row()},#{col()}) status=#{status()} steps=#{pathRemaining()}"
+}
+
+record MissionRecord(robotId: String, goalRow: Int, goalCol: Int,
+                     path: Int[], cursor: Int, done: Boolean) {
+public:
+  def advance(): MissionRecord {
+    val next: Int = cursor() + 1
+    return new MissionRecord(robotId(), goalRow(), goalCol(), path(), next, next >= path().length)
+  }
+  def currentStep(): Int = path()[cursor()]
+  def hasSteps(): Boolean = cursor() < path().length
+}
+
+// ── Grid ─────────────────────────────────────────────────────────────────────
+
+class Grid {
+  val rows: Int
+  val cols: Int
+  var cells: Boolean[][]   // true = blocked
+
+public:
+  def this(r: Int, c: Int) {
+    rows = r
+    cols = c
+    cells = new Boolean[r][c]
+  }
+
+  def block(r: Int, c: Int): void {
+    if r >= 0 && r < rows && c >= 0 && c < cols { cells[r][c] = true }
+  }
+
+  def isBlocked(r: Int, c: Int): Boolean {
+    if r < 0 || r >= rows || c < 0 || c >= cols { return true }
+    return cells[r][c]
+  }
+
+  def idx(r: Int, c: Int): Int = r * cols + c
+  def row(i: Int): Int = i / cols
+  def col(i: Int): Int = i % cols
+
+  def bfs(sr: Int, sc: Int, gr: Int, gc: Int): PathResult {
+    if isBlocked(sr, sc) || isBlocked(gr, gc) { return new Unreachable() }
+    val start: Int = idx(sr, sc)
+    val goal: Int = idx(gr, gc)
+    if start == goal { return new Found(new Int[0]) }
+
+    val N: Int = rows * cols
+    val parent: Int[] = new Int[N]
+    var k: Int = 0
+    while k < N { parent[k] = -1; k++ }
+    parent[start] = start
+
+    val queue: List[Int] = []
+    queue << start
+    var qHead: Int = 0
+
+    val drs: Int[] = new Int[4]; drs[0] = -1; drs[1] = 1; drs[2] = 0; drs[3] = 0
+    val dcs: Int[] = new Int[4]; dcs[0] = 0; dcs[1] = 0; dcs[2] = -1; dcs[3] = 1
+
+    var found: Boolean = false
+    while qHead < queue.size && !found {
+      val cur: Int = queue[qHead] as Int
+      qHead++
+      var d: Int = 0
+      while d < 4 {
+        val nr: Int = row(cur) + drs[d]
+        val nc: Int = col(cur) + dcs[d]
+        if !isBlocked(nr, nc) {
+          val ni: Int = idx(nr, nc)
+          if parent[ni] == -1 {
+            parent[ni] = cur
+            if ni == goal { found = true }
+            else { queue << ni }
+          }
+        }
+        d++
+      }
+    }
+
+    if !found { return new Unreachable() }
+
+    val steps: List[Int] = []
+    var at: Int = goal
+    while at != start {
+      steps.add(0, at)
+      at = parent[at]
+    }
+    val arr: Int[] = new Int[steps.size()]
+    var si: Int = 0
+    foreach sv: Int in steps { arr[si] = sv; si++ }
+    return new Found(arr)
+  }
+
+  def render(robots: List[RobotState], goals: List[MissionRecord]): void {
+    var r: Int = 0
+    while r < rows {
+      var line: String = ""
+      var c: Int = 0
+      while c < cols {
+        if cells[r][c] {
+          line = line + "#"
+        } else {
+          val here = robots.find { rb -> rb.row() == r && rb.col() == c }
+          if here != null {
+            line = line + (here as RobotState).label()
+          } else {
+            val isGoal = goals.find { m -> !m.done() && m.goalRow() == r && m.goalCol() == c }
+            if isGoal != null { line = line + "G" } else { line = line + "." }
+          }
+        }
+        c++
+      }
+      println(line)
+      r++
+    }
+  }
+}
+
+// ── Mission control ───────────────────────────────────────────────────────────
+
+class Fleet {
+  val grid: Grid
+  var robots: List[RobotState]
+  var missions: List[MissionRecord]
+  var tick: Int
+
+public:
+  def this(rows: Int, cols: Int) {
+    grid = new Grid(rows, cols)
+    robots = []
+    missions = []
+    tick = 0
+  }
+
+  def addObstacle(r: Int, c: Int): void { grid.block(r, c) }
+
+  def renderGrid(): void { grid.render(robots, missions) }
+
+  def getTick(): Int = tick
+
+  def getRobots(): List[RobotState] = robots
+
+  def getMissions(): List[MissionRecord] = missions
+
+  def addRobot(id: String, r: Int, c: Int): void {
+    robots.add(new RobotState(id, r, c, RobotStatus::IDLE, 0))
+  }
+
+  def assign(robotId: String, gr: Int, gc: Int): Boolean {
+    val rb = robots.find { r -> r.id() == robotId }
+    if rb == null { return false }
+    val robot: RobotState = rb as RobotState
+    val result = grid.bfs(robot.row(), robot.col(), gr, gc)
+    select result {
+      case r is Found:
+        val m: MissionRecord = new MissionRecord(robotId, gr, gc, r.path(), 0, r.path().length == 0)
+        missions.add(m)
+        val idx: Int = robots.indexOf(robot)
+        robots[idx] = new RobotState(robot.id(), robot.row(), robot.col(),
+                                     if r.path().length == 0 { RobotStatus::AT_GOAL } else { RobotStatus::MOVING },
+                                     r.path().length)
+        return true
+      case r is Unreachable:
+        val idx: Int = robots.indexOf(robot)
+        robots[idx] = new RobotState(robot.id(), robot.row(), robot.col(), RobotStatus::BLOCKED, 0)
+        return false
+    }
+  }
+
+  def step(): void {
+    tick++
+    var i: Int = 0
+    while i < missions.size() {
+      val m: MissionRecord = missions[i] as MissionRecord
+      if m.done() { i++; continue }
+      val rb = robots.find { r -> r.id() == m.robotId() }
+      if rb == null { i++; continue }
+      val robot: RobotState = rb as RobotState
+      val rIdx: Int = robots.indexOf(robot)
+      if !m.hasSteps() {
+        missions[i] = new MissionRecord(m.robotId(), m.goalRow(), m.goalCol(), m.path(), m.cursor(), true)
+        robots[rIdx] = new RobotState(robot.id(), robot.row(), robot.col(), RobotStatus::AT_GOAL, 0)
+      } else {
+        val nextIdx: Int = m.currentStep()
+        val nr: Int = grid.row(nextIdx)
+        val nc: Int = grid.col(nextIdx)
+        val adv: MissionRecord = m.advance()
+        missions[i] = adv
+        robots[rIdx] = new RobotState(robot.id(), nr, nc,
+          if adv.done() { RobotStatus::AT_GOAL } else { RobotStatus::MOVING },
+          m.path().length - adv.cursor())
+      }
+      i++
+    }
+  }
+
+  def summary(): void {
+    println("=== Fleet Summary (tick #{tick}) ===")
+    foreach robot: RobotState in robots { println("  " + robot.toStr()) }
+    val done: Int = missions.filter { m -> m.done() }.size()
+    val moving: Int = robots.filter { r -> r.status() == RobotStatus::MOVING }.size()
+    val blocked: Int = robots.filter { r -> r.status() == RobotStatus::BLOCKED }.size()
+    println("  Missions: #{done}/#{missions.size()} completed  moving=#{moving}  blocked=#{blocked}")
+  }
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  println("=== Robot Mission Control ===")
+
+  val fleet: Fleet = new Fleet(8, 14)
+
+  // obstacles: two horizontal walls with a gap
+  foreach c: Int in [2, 3, 4, 5, 6, 7] { fleet.addObstacle(3, c) }
+  foreach c: Int in [6, 7, 8, 9, 10, 11] { fleet.addObstacle(5, c) }
+  fleet.addObstacle(1, 5); fleet.addObstacle(1, 6); fleet.addObstacle(1, 7)
+
+  fleet.addRobot("A", 0, 0)
+  fleet.addRobot("B", 7, 13)
+  fleet.addRobot("C", 0, 13)
+
+  println("\nInitial grid (# = obstacle, G = goal, letter = robot):")
+  fleet.renderGrid()
+
+  val ok1: Boolean = fleet.assign("A", 7, 12)
+  val ok2: Boolean = fleet.assign("B", 0, 1)
+  val ok3: Boolean = fleet.assign("C", 7, 1)
+  println("\nAssignments: A->goal=#{ok1}  B->goal=#{ok2}  C->goal=#{ok3}")
+
+  println("\nGrid after assignments:")
+  fleet.renderGrid()
+
+  // Run simulation
+  var t: Int = 0
+  while t < 40 {
+    fleet.step()
+    t++
+  }
+
+  println("\nFinal grid after #{fleet.getTick()} ticks:")
+  fleet.renderGrid()
+  fleet.summary()
+
+  // Analytics
+  val atGoal: List[RobotState] = fleet.getRobots().filter { r -> r.status() == RobotStatus::AT_GOAL }
+  var totalSteps: Int = 0
+  foreach ms: MissionRecord in fleet.getMissions() { totalSteps = totalSteps + ms.path().length }
+  println("\nTotal path steps planned: #{totalSteps}")
+  println("Robots at goal: #{atGoal.size()}/#{fleet.getRobots().size()}")
+
+  foreach rb: RobotState in fleet.getRobots() {
+    val status: String = select rb.status() {
+      case s when s == RobotStatus::AT_GOAL: "reached goal"
+      case s when s == RobotStatus::BLOCKED: "path blocked"
+      case s when s == RobotStatus::MOVING:  "still moving"
+      else: "idle"
+    }
+    println("  #{rb.id()}: #{status} at (#{rb.row()},#{rb.col()})")
+  }
+  println("Done.")
+}

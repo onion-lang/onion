@@ -108,9 +108,8 @@ record Player(
   tpm: Int,
   fta: Int,
   ftm: Int
-)
+) {
   example { new Player("T", "X", Position::PG, 25, 82, 3000, 2000, 400, 600, 100, 50, 250, 1500, 750, 500, 200, 400, 330).ppg() > 20.0 }
-{
 public:
   def ppg(): Double  = if games() == 0 { 0.0 } else { points().doubleValue() / games().doubleValue() }
   def rpg(): Double  = if games() == 0 { 0.0 } else { rebounds().doubleValue() / games().doubleValue() }

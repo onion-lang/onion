@@ -1,0 +1,349 @@
+// ReleaseManager.on — software release registry with semantic versioning.
+// Exercises: records with `from re` pattern; ADT data-carrying enums; plain
+// enums; classes; extension methods on records and String; generics; collection
+// pipelines (map/filter/sortedBy/groupBy/find/fold/any/count/distinct); select
+// / type-pattern matching; nullable types and null-safe calls; closures; string
+// interpolation; try/catch; while and foreach (ranges and map (k,v)).
+
+// ─── Semantic version ─────────────────────────────────────────────────────────
+
+record Version(major: Int, minor: Int, patch: Int)
+  from re"(\d+)\.(\d+)\.(\d+)"
+
+// Compare two versions: negative / zero / positive like Java compareTo.
+def versionCmp(a: Version, b: Version): Int {
+  if a.major() != b.major() { return a.major() - b.major() }
+  if a.minor() != b.minor() { return a.minor() - b.minor() }
+  return a.patch() - b.patch()
+}
+
+extension Version {
+  def isNewerThan(other: Version): Boolean = versionCmp(self, other) > 0
+  def isCompatibleWith(other: Version): Boolean = self.major() == other.major()
+  def display(): String = "#{self.major()}.#{self.minor()}.#{self.patch()}"
+  def bumpMinor(): Version = new Version(self.major(), self.minor() + 1, 0)
+  def bumpPatch(): Version = new Version(self.major(), self.minor(), self.patch() + 1)
+}
+
+// ─── Release state (ADT enum) ────────────────────────────────────────────────
+
+enum ReleaseState {
+  case Alpha
+  case Beta
+  case ReleaseCandidate(number: Int)
+  case Stable
+public:
+  def label(): String {
+    select this {
+      case a is Alpha:           return "alpha"
+      case b is Beta:            return "beta"
+      case rc is ReleaseCandidate: return "rc#{rc.number()}"
+      case s is Stable:          return "stable"
+    }
+  }
+  def isProduction(): Boolean {
+    select this {
+      case s is Stable: return true
+      else:             return false
+    }
+  }
+}
+
+// ─── Compatibility constraint ─────────────────────────────────────────────────
+
+enum Constraint {
+  case Exact(v: Version)
+  case AtLeast(v: Version)
+  case Compatible(v: Version)   // same major, any minor/patch
+public:
+  def matches(candidate: Version): Boolean {
+    select this {
+      case e is Exact:      return versionCmp(candidate, e.v()) == 0
+      case a is AtLeast:    return versionCmp(candidate, a.v()) >= 0
+      case c is Compatible: return candidate.isCompatibleWith(c.v())
+    }
+  }
+  def display(): String {
+    select this {
+      case e is Exact:      return "=#{e.v().display()}"
+      case a is AtLeast:    return ">=#{a.v().display()}"
+      case c is Compatible: return "~#{c.v().display()}"
+    }
+  }
+}
+
+// ─── Package and dependency record ───────────────────────────────────────────
+
+record Dependency(pkgName: String, constraint: Constraint) {
+public:
+  def display(): String = "#{self.pkgName()} #{self.constraint().display()}"
+}
+
+record Package(
+  name: String,
+  version: Version,
+  state: ReleaseState,
+  description: String,
+  deps: List[Dependency]
+) {
+public:
+  def id(): String = "#{self.name()}@#{self.version().display()}"
+  def isStable(): Boolean = self.state().isProduction()
+  def shortInfo(): String =
+    "[#{self.state().label()}] #{self.id()} — #{self.description()}"
+}
+
+// ─── Registry: stores packages, keyed by name + version ──────────────────────
+
+class Registry {
+  val packages: List[Package]
+public:
+  def this {
+    this.packages = []
+  }
+
+  def register(pkg: Package): void {
+    packages.add(pkg)
+  }
+
+  def findLatest(name: String): Package? {
+    val candidates: List[Package] = packages
+      .filter { p -> (p as Package).name() == name }
+    if candidates.size == 0 { return null }
+    var best: Package = candidates[0] as Package
+    foreach p: Package in candidates {
+      if p.version().isNewerThan(best.version()) { best = p }
+    }
+    return best
+  }
+
+  def findStable(name: String): Package? {
+    val candidates: List[Package] = packages
+      .filter { p -> (p as Package).name() == name && (p as Package).isStable() }
+    if candidates.size == 0 { return null }
+    var best: Package = candidates[0] as Package
+    foreach p: Package in candidates {
+      if p.version().isNewerThan(best.version()) { best = p }
+    }
+    return best
+  }
+
+  def allByName(name: String): List[Package] {
+    val result: List[Package] = packages
+      .filter { p -> (p as Package).name() == name }
+      .map { p -> p as Package }
+    return result.sortedBy { p -> 0 - p.version().major() * 10000
+                                    - p.version().minor() * 100
+                                    - p.version().patch() }
+  }
+
+  def stablePackages(): List[Package] {
+    return packages
+      .filter { p -> (p as Package).isStable() }
+      .map { p -> p as Package }
+  }
+
+  def packageCount(): Int = packages.size
+
+  def allPackages(): List[Package] = packages
+
+  def resolve(name: String, constraint: Constraint): Package? {
+    return packages
+      .filter { p ->
+        val pkg: Package = p as Package
+        pkg.name() == name && constraint.matches(pkg.version())
+      }
+      .map { p -> p as Package }
+      .find { p -> p.isStable() }
+  }
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension String {
+  def center(width: Int): String {
+    val pad: Int = width - self.length()
+    if pad <= 0 { return self }
+    val left: Int = pad / 2
+    val right: Int = pad - left
+    var s: String = ""
+    var i: Int = 0
+    while i < left  { s = s + " "; i++ }
+    s = s + self
+    i = 0
+    while i < right { s = s + " "; i++ }
+    return s
+  }
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}
+
+def separator(): void { IO::println("─".repeat(60)) }
+
+def printPackageTable(packages: List[Package]): void {
+  IO::println("  #{"NAME".center(20)}  #{"VERSION".center(10)}  #{"STATE".center(10)}  DESC")
+  IO::println("  " + "─".repeat(56))
+  foreach p: Package in packages {
+    val nameCol: String = p.name().center(20)
+    val verCol:  String = p.version().display().center(10)
+    val stateCol: String = p.state().label().center(10)
+    IO::println("  #{nameCol}  #{verCol}  #{stateCol}  #{p.description()}")
+  }
+}
+
+// ─── Populate the registry ────────────────────────────────────────────────────
+
+val reg: Registry = new Registry()
+
+// json-core: three releases
+reg.register(new Package("json-core", new Version(1, 0, 0), new Stable(),     "JSON parser v1",     []))
+reg.register(new Package("json-core", new Version(1, 1, 0), new Stable(),     "JSON parser v1.1",   []))
+reg.register(new Package("json-core", new Version(1, 2, 0), new Beta(),       "JSON parser v1.2b",  []))
+reg.register(new Package("json-core", new Version(2, 0, 0), new Alpha(),      "JSON parser v2",     []))
+
+// http-client: depends on json-core
+val jsonDep: Dependency = new Dependency("json-core", new Compatible(new Version(1, 0, 0)))
+reg.register(new Package("http-client", new Version(0, 9, 0), new Beta(),   "HTTP client beta",   [jsonDep]))
+reg.register(new Package("http-client", new Version(1, 0, 0), new Stable(), "HTTP client stable", [jsonDep]))
+reg.register(new Package("http-client", new Version(1, 0, 3), new Stable(), "HTTP client patch",  [jsonDep]))
+
+// db-driver: depends on both
+val dbDeps: List[Dependency] = [
+  new Dependency("json-core",   new AtLeast(new Version(1, 1, 0))),
+  new Dependency("http-client", new Compatible(new Version(1, 0, 0)))
+]
+reg.register(new Package("db-driver", new Version(3, 0, 0), new ReleaseCandidate(2), "DB driver rc2", dbDeps))
+reg.register(new Package("db-driver", new Version(3, 0, 1), new Stable(),             "DB driver 3",   dbDeps))
+
+// cli-tool: no deps, multiple versions
+reg.register(new Package("cli-tool", new Version(2, 3, 0), new Stable(),    "CLI utility", []))
+reg.register(new Package("cli-tool", new Version(2, 4, 0), new ReleaseCandidate(1), "CLI utility rc1", []))
+reg.register(new Package("cli-tool", new Version(3, 0, 0), new Alpha(),     "CLI utility v3 alpha", []))
+
+// ─── Report 1: all stable packages ───────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Stable Packages in Registry (#{reg.packageCount()} total) ===")
+val stableList: List[Package] = reg.stablePackages().sortedBy { p -> p.name() }
+printPackageTable(stableList)
+
+// ─── Report 2: version history for json-core ─────────────────────────────────
+
+IO::println("")
+IO::println("=== json-core version history ===")
+val history: List[Package] = reg.allByName("json-core")
+foreach p: Package in history {
+  IO::println("  #{p.version().display().center(10)}  #{p.state().label()}")
+}
+
+// ─── Report 3: latest and latest-stable per package name ─────────────────────
+
+IO::println("")
+IO::println("=== Latest (any) vs Latest stable ===")
+val pkgNames: List[String] = reg.stablePackages()
+  .map { p -> (p as Package).name() }
+  .distinct()
+  .sortedBy { n -> n as String }
+
+foreach name: String in pkgNames {
+  val latest: Package? = reg.findLatest(name)
+  val stable: Package? = reg.findStable(name)
+  val latestStr: String = if latest != null { latest.version().display() } else { "none" }
+  val stableStr: String = if stable != null { stable.version().display() } else { "none" }
+  IO::println("  #{name}: latest=#{latestStr}  stable=#{stableStr}")
+}
+
+// ─── Report 4: dependency resolution ─────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Dependency resolution ===")
+
+def resolveDeps(pkg: Package, registry: Registry): void {
+  IO::println("  Resolving deps for #{pkg.id()}:")
+  if pkg.deps().size == 0 {
+    IO::println("    (no dependencies)")
+    return
+  }
+  foreach dep: Dependency in pkg.deps() {
+    val resolved: Package? = registry.resolve(dep.pkgName(), dep.constraint())
+    if resolved != null {
+      IO::println("    #{dep.display()} → #{resolved.id()} [#{resolved.state().label()}]")
+    } else {
+      IO::println("    #{dep.display()} → UNRESOLVED")
+    }
+  }
+}
+
+val dbPkg: Package? = reg.findStable("db-driver")
+if dbPkg != null {
+  resolveDeps(dbPkg, reg)
+}
+val httpPkg: Package? = reg.findStable("http-client")
+if httpPkg != null {
+  resolveDeps(httpPkg, reg)
+}
+
+// ─── Report 5: version extension methods ─────────────────────────────────────
+
+IO::println("")
+IO::println("=== Version arithmetic ===")
+val v100: Version = new Version(1, 0, 0)
+val v110: Version = v100.bumpMinor()
+val v111: Version = v110.bumpPatch()
+IO::println("  base:         #{v100.display()}")
+IO::println("  bumpMinor:    #{v110.display()}")
+IO::println("  bumpPatch:    #{v111.display()}")
+IO::println("  1.1.0 newer than 1.0.0?   #{v110.isNewerThan(v100)}")
+IO::println("  1.1.0 compatible 1.0.0?   #{v110.isCompatibleWith(v100)}")
+IO::println("  2.0.0 compatible 1.0.0?   #{(new Version(2,0,0)).isCompatibleWith(v100)}")
+
+// ─── Report 6: groupBy state label ───────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Packages grouped by state ===")
+val grouped = reg.allPackages().groupBy { p -> (p as Package).state().label() }
+foreach (label, pkgs) in grouped {
+  val names: String = ((pkgs as List)
+    .map { p -> (p as Package).id() }
+    .fold("") { acc, s -> if (acc as String) == "" { s as String } else { (acc as String) + ", " + (s as String) } }) as String
+  IO::println("  #{label}: #{names}")
+}
+
+// ─── Report 7: constraint matching demo ──────────────────────────────────────
+
+IO::println("")
+IO::println("=== Constraint matching ===")
+val versions: List[Version] = [
+  new Version(1, 0, 0), new Version(1, 1, 0), new Version(1, 2, 0),
+  new Version(2, 0, 0), new Version(0, 9, 0)
+]
+val constraints: List[Constraint] = [
+  new Exact(new Version(1, 1, 0)),
+  new AtLeast(new Version(1, 0, 0)),
+  new Compatible(new Version(1, 0, 0))
+]
+foreach c: Constraint in constraints {
+  val matched: String = (versions
+    .filter { v -> c.matches(v as Version) }
+    .map { v -> (v as Version).display() }
+    .fold("") { acc, s -> if (acc as String) == "" { s as String } else { (acc as String) + " " + (s as String) } }) as String
+  IO::println("  #{c.display()}: #{matched}")
+}
+
+// ─── Report 8: try/catch + Version::parse ────────────────────────────────────
+
+IO::println("")
+IO::println("=== Version parsing ===")
+val inputs: List[String] = ["1.2.3", "2.0.0", "bad", "1.0"]
+foreach s: String in inputs {
+  val v: Version? = Version::parse(s)
+  if v != null {
+    IO::println("  parse(\"#{s}\") = #{v.display()}")
+  } else {
+    IO::println("  parse(\"#{s}\") = (invalid)")
+  }
+}

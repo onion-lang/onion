@@ -1,0 +1,355 @@
+// SprintAnalytics.on — Agile sprint tracker and analytics engine (~260 lines).
+//
+// Exercises: ADT case-enum (Status, Priority); plain enum with methods
+// (Complexity); records with methods and derive!(Json) (Story, SprintSummary);
+// record from re"..." (RawEntry); extension methods on Double and Int;
+// class SprintAnalyzer with typed mutable state; collection pipelines
+// (map/filter/fold/groupBy/sortedBy/find/partition/zip/distinct);
+// do[Option] for chaining fallible lookups; @TailRecursive self-recursion;
+// select pattern matching; string interpolation; try/catch; foreach with
+// ranges and map (k,v) destructuring.
+//
+// Run: onion run/SprintAnalytics.on
+
+import { java.util.ArrayList }
+
+// ── Status ADT ────────────────────────────────────────────────────────────────
+
+enum Status {
+  case Todo
+  case InProgress(assignee: String)
+  case Done(hoursActual: Double)
+  case Blocked(reason: String)
+public:
+  def label(): String = select this {
+    case s is Todo:       "TODO      "
+    case s is InProgress: "IN-PROG   "
+    case s is Done:       "DONE      "
+    case s is Blocked:    "BLOCKED   "
+  }
+  def isDone(): Boolean = select this {
+    case s is Done: true
+    else:           false
+  }
+  def isBlocked(): Boolean = select this {
+    case s is Blocked: true
+    else:              false
+  }
+  def actualHours(): Double = select this {
+    case s is Done: s.hoursActual()
+    else:           0.0
+  }
+}
+
+// ── Priority enum ─────────────────────────────────────────────────────────────
+
+enum Priority {
+  Critical, High, Medium, Low
+public:
+  def score(): Int = select this {
+    case Priority::Critical: 4
+    case Priority::High:     3
+    case Priority::Medium:   2
+    case Priority::Low:      1
+    else:                    0
+  }
+  def label(): String = select this {
+    case Priority::Critical: "CRIT"
+    case Priority::High:     "HIGH"
+    case Priority::Medium:   "MED "
+    case Priority::Low:      "LOW "
+    else:                    "????"
+  }
+}
+
+// ── Complexity (Fibonacci scale) ──────────────────────────────────────────────
+
+enum Complexity {
+  XS, S, M, L, XL, XXL
+public:
+  def points(): Int = select this {
+    case Complexity::XS:  1
+    case Complexity::S:   2
+    case Complexity::M:   3
+    case Complexity::L:   5
+    case Complexity::XL:  8
+    case Complexity::XXL: 13
+    else:                 0
+  }
+  def label(): String = select this {
+    case Complexity::XS:  "XS "
+    case Complexity::S:   "S  "
+    case Complexity::M:   "M  "
+    case Complexity::L:   "L  "
+    case Complexity::XL:  "XL "
+    case Complexity::XXL: "XXL"
+    else:                 "???"
+  }
+}
+
+// ── RawEntry (record from regex) ──────────────────────────────────────────────
+
+record RawEntry(id: String, title: String, estimate: Int)
+  from re"(\w+-\d+)\|([^|]+)\|(\d+)" {
+  example { RawEntry::parse("SP-001|Implement login|5")?.id() == "SP-001" }
+  example { RawEntry::parse("bad line") == null }
+}
+
+// ── Story record ──────────────────────────────────────────────────────────────
+
+record Story(
+  id: String,
+  title: String,
+  estimatedHours: Double,
+  status: Status,
+  priority: Priority,
+  complexity: Complexity,
+  tags: List[String]
+) {
+public:
+  def isComplete(): Boolean = status().isDone()
+  def isBlocked(): Boolean  = status().isBlocked()
+
+  def velocityRatio(): Double =
+    if status().isDone() && estimatedHours() > 0.0 {
+      status().actualHours() / estimatedHours()
+    } else { 0.0 }
+
+  def priorityScore(): Int = priority().score() * complexity().points()
+
+  def shortDesc(): String =
+    "[#{id()}] #{priority().label()} #{complexity().label()} #{status().label()} #{title()}"
+}
+
+// ── SprintSummary record ──────────────────────────────────────────────────────
+
+record SprintSummary(
+  sprintName: String,
+  totalStories: Int,
+  doneCount: Int,
+  blockedCount: Int,
+  estimatedHours: Double,
+  actualHours: Double,
+  velocityPercent: Double,
+  topPriorityId: String
+) derive!(Json) {
+public:
+  def completionPct(): Double =
+    if totalStories() > 0 { doneCount() * 100.0 / totalStories() }
+    else { 0.0 }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def pct(): String {
+    val v: Int = (self + 0.5) as Int
+    return "#{v}%"
+  }
+  def hrs(): String {
+    val i: Int = self as Int
+    val f: Int = ((self - (i * 1.0)) * 10.0 + 0.5) as Int
+    return "#{i}.#{f}h"
+  }
+}
+
+extension Int {
+  def pad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── SprintAnalyzer class ──────────────────────────────────────────────────────
+
+class SprintAnalyzer {
+  var stories_: List[Story]
+  var sprintName_: String
+public:
+  def this(sprintName: String) {
+    sprintName_ = sprintName
+    stories_ = new ArrayList[Story]()
+  }
+
+  def add(story: Story): void { stories_.add(story) }
+
+  def stories(): List[Story] = stories_
+
+  def sprintName(): String = sprintName_
+
+  def doneStories(): List[Story] =
+    stories_.filter { s -> s.isComplete() }
+
+  def blockedStories(): List[Story] =
+    stories_.filter { s -> s.isBlocked() }
+
+  def totalEstimated(): Double {
+    var total: Double = 0.0
+    foreach s: Story in stories_ { total = total + s.estimatedHours() }
+    return total
+  }
+
+  def totalActual(): Double {
+    var total: Double = 0.0
+    foreach s: Story in doneStories() { total = total + s.status().actualHours() }
+    return total
+  }
+
+  def velocityScore(): Double {
+    val done = doneStories()
+    if done.size == 0 { return 0.0 }
+    val total = done.fold(0.0) { acc, s -> acc + s.velocityRatio() }
+    return total / done.size
+  }
+
+  def topPriority(): Story? =
+    stories_.filter { s -> !s.isComplete() }
+            .sortedBy { s -> 0 - s.priorityScore() }
+            .find { s -> true }
+
+  def byPriority(): Map[String, List[Story]] =
+    stories_.groupBy { s -> s.priority().label().trim() }
+
+  def byComplexity(): Map[String, List[Story]] =
+    stories_.groupBy { s -> s.complexity().label().trim() }
+
+  @TailRecursive
+  def maxPriorityScore(stories: List[Story], idx: Int, best: Int): Int {
+    if idx >= stories.size { return best }
+    val score = stories[idx].priorityScore()
+    val newBest = if score > best { score } else { best }
+    return maxPriorityScore(stories, idx + 1, newBest)
+  }
+
+  def findById(id: String): Story? = stories_.find { s -> s.id() == id }
+
+  def findByTag(tag: String): List[Story] =
+    stories_.filter { s -> s.tags().find { t -> t == tag } != null }
+
+  def summary(): SprintSummary {
+    val done = doneStories()
+    val blocked = blockedStories()
+    val est = totalEstimated()
+    val act = totalActual()
+    val velPct = if est > 0.0 { act * 100.0 / est } else { 0.0 }
+    val top = topPriority()
+    val topId = if top != null { top.id() } else { "none" }
+    return new SprintSummary(
+      sprintName(),
+      stories_.size,
+      done.size,
+      blocked.size,
+      est,
+      act,
+      velPct,
+      topId
+    )
+  }
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+
+class Reports {
+public:
+  static def header(title: String): void {
+    println("═══════════════════════════════════════════")
+    println("  " + title)
+    println("═══════════════════════════════════════════")
+  }
+
+  static def printSummary(s: SprintSummary): void {
+    println("Sprint   : " + s.sprintName())
+    println("Stories  : " + s.totalStories() + " total, " + s.doneCount() + " done, " + s.blockedCount() + " blocked")
+    println("Est/Act  : " + s.estimatedHours().hrs() + " / " + s.actualHours().hrs())
+    println("Velocity : " + s.velocityPercent().hrs())
+    println("Complete : " + s.completionPct().pct())
+    println("Top item : " + s.topPriorityId())
+  }
+
+  static def printGroupStats(label: String, byGroup: Map[String, List[Story]]): void {
+    println(label)
+    foreach (k, v) in byGroup {
+      val done = v.filter { s -> s.isComplete() }.size
+      println("  " + k + " : " + v.size + " stories, " + done + " done")
+    }
+  }
+}
+
+// ── Option helpers ────────────────────────────────────────────────────────────
+
+def storyOpt(s: Story?): Option[Story] =
+  if s == null { Option::none() } else { Option::some(s) }
+
+def stringOpt(s: String?): Option[String] =
+  if s == null { Option::none() } else { Option::some(s) }
+
+// ── Seed data ─────────────────────────────────────────────────────────────────
+
+val analyzer: SprintAnalyzer = new SprintAnalyzer("Sprint 42")
+
+analyzer.add(new Story("SP-001", "User login via OAuth2",      8.0, new Done(7.5),            Priority::Critical, Complexity::M,  ["auth", "backend"]))
+analyzer.add(new Story("SP-002", "Forgot-password flow",       5.0, new Done(6.0),            Priority::High,     Complexity::S,  ["auth", "email"]))
+analyzer.add(new Story("SP-003", "Profile page",               4.0, new InProgress("Alice"),  Priority::Medium,   Complexity::S,  ["ui"]))
+analyzer.add(new Story("SP-004", "Search index rebuild",      13.0, new Blocked("infra team"),Priority::High,     Complexity::XL, ["search", "backend"]))
+analyzer.add(new Story("SP-005", "CSV export",                 3.0, new Done(2.5),            Priority::Medium,   Complexity::XS, ["export"]))
+analyzer.add(new Story("SP-006", "Dark mode toggle",           2.0, new Todo(),               Priority::Low,      Complexity::XS, ["ui"]))
+analyzer.add(new Story("SP-007", "API rate limiting",          8.0, new InProgress("Bob"),    Priority::Critical, Complexity::L,  ["backend", "security"]))
+analyzer.add(new Story("SP-008", "Notification digest email",  5.0, new Done(5.0),            Priority::Medium,   Complexity::M,  ["email"]))
+analyzer.add(new Story("SP-009", "Dashboard charts",           6.0, new Todo(),               Priority::High,     Complexity::M,  ["ui", "charts"]))
+analyzer.add(new Story("SP-010", "Audit log viewer",           4.0, new Blocked("security review"), Priority::High, Complexity::S, ["security", "ui"]))
+
+// ── Print report ──────────────────────────────────────────────────────────────
+
+Reports::header("SPRINT ANALYTICS REPORT")
+val summ: SprintSummary = analyzer.summary()
+Reports::printSummary(summ)
+
+println("")
+println("── Story List ──────────────────────────────")
+foreach s: Story in analyzer.stories().sortedBy { s -> 0 - s.priorityScore() } {
+  println(s.shortDesc())
+}
+
+println("")
+println("── Blocked ──────────────────────────────────")
+foreach s: Story in analyzer.blockedStories() {
+  select s.status() {
+    case b is Blocked: println("  " + s.id() + ": " + b.reason())
+    else: {}
+  }
+}
+
+println("")
+Reports::printGroupStats("── By Priority ──────────────────────────────", analyzer.byPriority())
+println("")
+Reports::printGroupStats("── By Complexity ────────────────────────────", analyzer.byComplexity())
+
+println("")
+println("── do[Option] lookup chains ────────────────")
+val found1: Option[String] = do[Option] {
+  s  <- storyOpt(analyzer.findById("SP-001"))
+  tag <- stringOpt(s.tags().find { t -> t.length() > 3 })
+  ret "SP-001 first long tag: " + tag
+}
+println(if found1 == null { "not found" } else { found1.get() })
+
+val found2: Option[String] = do[Option] {
+  s <- storyOpt(analyzer.findById("SP-007"))
+  t <- storyOpt(analyzer.findByTag("security").find { x -> x.priorityScore() > 10 })
+  ret "security+critical story: " + t.id()
+}
+println(if found2 == null { "not found" } else { found2.get() })
+
+println("")
+println("── Max priority score (tail-recursive) ─────")
+val maxScore: Int = analyzer.maxPriorityScore(analyzer.stories(), 0, 0)
+println("Max priority score: " + maxScore)
+
+println("")
+println("── RawEntry parsing ─────────────────────────")
+val entries: List[RawEntry] = RawEntry::parseAll("SP-011|New feature A|8\nSP-012|Bug fix B|2\nbad line\nSP-013|Refactor C|5")
+println("Parsed " + entries.size + " entries (skipped bad lines)")
+foreach e: RawEntry in entries {
+  println("  " + e.id() + " : " + e.title() + " (est " + e.estimate() + "h)")
+}

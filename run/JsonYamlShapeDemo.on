@@ -1,19 +1,21 @@
 // JsonYamlShapeDemo — `shape name = json` / `yaml`, the named boundary over a structured
 // document.
 //
-// `record R(...) shape doc = json` (or `= yaml`) gives a record a named parse/print pair
-// over that document format, the same way `shape name = re"..."` names one over a line of
-// text. Unlike `derive!(Json, Yaml)`, a missing or wrongly-typed key is reported as a
-// Defect rather than silently building a record with a null non-nullable field, and a
-// record can carry a shape per format at once.
+// `record R(...) { shape doc = json }` (or `= yaml`) gives a record a named parse/print
+// pair over that document format, the same way `shape name = re"..."` names one over a
+// line of text. Unlike `derive!(Json, Yaml)`, a missing or wrongly-typed key is reported
+// as a Defect rather than silently building a record with a null non-nullable field, and
+// a record can carry a shape per format at once.
 //
 //   onion JsonYamlShapeDemo.on
 
-record Person(name: String, age: Int)
+record Person(name: String, age: Int) {
   shape doc = json
+}
 
-record Config(host: String, port: Int)
+record Config(host: String, port: Int) {
   shape doc = yaml
+}
 
 class JsonYamlShapeDemo {
 public:

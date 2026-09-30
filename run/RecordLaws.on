@@ -3,9 +3,10 @@
 // build time (LawCheckPhase). A false `example` or a falsified `law` fails compilation
 // before the program ever runs, so a passing build is a machine-checked guarantee.
 
-record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
   law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
   example { Point::parse("3,4") == new Point(3, 4) }
+}
 
 class RecordLaws {
 public:

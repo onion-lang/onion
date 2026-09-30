@@ -1,0 +1,350 @@
+// RecyclingCenter.on — recycling centre intake, processing, and environmental-
+// impact reporting system.
+// Exercises: records with methods, data-carrying enums, ADT case enums,
+// interfaces, collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find), select/pattern matching, nullable and null checks,
+// closures, string interpolation, try/catch, recursion, while, foreach
+// (list, range, map (k,v)), extension methods on Int and Double.
+
+// ─── Plain Enum ───────────────────────────────────────────────────────────────
+
+enum MaterialType {
+  Plastic, Glass, Metal, Paper, Organic, Electronics
+}
+
+// ─── Data-Carrying Enum ───────────────────────────────────────────────────────
+
+enum MaterialGrade(label: String, pricePerKg: Double) {
+  GradeA("Grade A", 2.50),
+  GradeB("Grade B", 1.20),
+  GradeC("Grade C", 0.45),
+  Rejected("Rejected", 0.0)
+}
+
+// ─── ADT Enum ─────────────────────────────────────────────────────────────────
+
+enum BinStatus {
+  case Available
+  case Collecting(fillPercent: Int)
+  case Processing(remainingMins: Int)
+  case Full
+
+public:
+  def label(): String = select this {
+    case s is Available:  "available"
+    case s is Collecting: "collecting (#{s.fillPercent()}%)"
+    case s is Processing: "processing (#{s.remainingMins()} min left)"
+    case s is Full:       "full — awaiting pickup"
+  }
+
+  def isAccepting(): Boolean = select this {
+    case s is Available:  true
+    case s is Collecting: s.fillPercent() < 90
+    else:                 false
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    return ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+  }
+  def fmt(): String {
+    val r: Double = self.round2()
+    val whole: Int = r as Int
+    val frac: Int  = ((r - (whole as Double)) * 100.0 + 0.5) as Int
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Trackable {
+  def trackId(): String
+  def summary(): String
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Material(
+  id:         Int,
+  mtype:      MaterialType,
+  grade:      MaterialGrade,
+  weightKg:   Double,
+  sourceId:   String
+) conforms Trackable {
+public:
+  def trackId(): String = "MAT-#{id().lpad(4)}"
+  def summary(): String =
+    "#{trackId()} #{mtype()} #{grade().label()} #{weightKg().fmt()} kg from #{sourceId()}"
+  def value(): Double   = weightKg() * grade().pricePerKg()
+  def isAccepted(): Boolean = grade() != MaterialGrade::Rejected
+}
+
+record Bin(
+  id:       Int,
+  mtype:    MaterialType,
+  capacity: Int,
+  status:   BinStatus
+) {
+public:
+  def label(): String = "Bin-#{id().lpad(3)} [#{mtype()}] #{status().label()}"
+  def canAccept(m: Material): Boolean =
+    m.mtype() == mtype() && status().isAccepting()
+}
+
+record ProcessingRecord(
+  binId:    Int,
+  date:     String,
+  inputKg:  Double,
+  outputKg: Double,
+  rejectKg: Double
+) {
+public:
+  def yieldPct(): Double =
+    if inputKg() == 0.0 { 0.0 } else { (outputKg() / inputKg() * 100.0).round2() }
+  def summary(): String =
+    "Bin-#{binId().lpad(3)} on #{date()}: " +
+    "in=#{inputKg().fmt()} kg  out=#{outputKg().fmt()} kg  " +
+    "rej=#{rejectKg().fmt()} kg  yield=#{yieldPct()}%"
+}
+
+// ─── Centre Manager ───────────────────────────────────────────────────────────
+
+class RecyclingCentre {
+  val materials:  List[Material]
+  val bins:       List[Bin]
+  val records:    List[ProcessingRecord]
+  var nextId:     Int
+
+public:
+  def this {
+    this.materials = []
+    this.bins      = []
+    this.records   = []
+    this.nextId    = 1
+    bins.add(new Bin(1, MaterialType::Plastic,     500, new Available()))
+    bins.add(new Bin(2, MaterialType::Glass,        300, new Collecting(40)))
+    bins.add(new Bin(3, MaterialType::Metal,        400, new Available()))
+    bins.add(new Bin(4, MaterialType::Paper,        600, new Collecting(70)))
+    bins.add(new Bin(5, MaterialType::Organic,      200, new Full()))
+    bins.add(new Bin(6, MaterialType::Electronics,  150, new Processing(25)))
+  }
+
+  def intake(mtype: MaterialType, grade: MaterialGrade, weightKg: Double, source: String): Material {
+    val m: Material = new Material(nextId, mtype, grade, weightKg, source)
+    nextId = nextId + 1
+    materials.add(m)
+    return m
+  }
+
+  def addProcessingRecord(binId: Int, date: String, inKg: Double, outKg: Double, rejKg: Double): void {
+    records.add(new ProcessingRecord(binId, date, inKg, outKg, rejKg))
+  }
+
+  def getMaterials(): List[Material]          = materials
+  def getBins(): List[Bin]                    = bins
+  def getRecords(): List[ProcessingRecord]    = records
+
+  def acceptedMaterials(): List[Material] =
+    materials.filter { m -> (m as Material).isAccepted() } as List[Material]
+
+  def rejectedMaterials(): List[Material] =
+    materials.filter { m -> !(m as Material).isAccepted() } as List[Material]
+
+  def totalWeightKg(): Double =
+    (materials.fold(0.0) { acc, m -> (acc as Double) + (m as Material).weightKg() }) as Double
+
+  def totalValue(): Double =
+    (materials.fold(0.0) { acc, m -> (acc as Double) + (m as Material).value() }) as Double
+
+  def findBin(id: Int): Bin? =
+    bins.find { b -> (b as Bin).id() == id } as Bin?
+
+  def availableBinsFor(mtype: MaterialType): List[Bin] =
+    bins.filter { b ->
+      val bin: Bin = b as Bin
+      bin.mtype() == mtype && bin.status().isAccepting()
+    } as List[Bin]
+
+  def processingRecordsFor(binId: Int): List[ProcessingRecord] =
+    records.filter { r -> (r as ProcessingRecord).binId() == binId } as List[ProcessingRecord]
+
+  // Recursive: sum output kg from a list of processing records by index
+  static def sumYield(recs: List[ProcessingRecord], idx: Int): Double {
+    if idx >= recs.size { return 0.0 }
+    val r: ProcessingRecord = recs[idx] as ProcessingRecord
+    return r.outputKg() + RecyclingCentre::sumYield(recs, idx + 1)
+  }
+}
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
+
+val centre: RecyclingCentre = new RecyclingCentre()
+
+centre.intake(MaterialType::Plastic,     MaterialGrade::GradeA,   12.5, "School-01")
+centre.intake(MaterialType::Plastic,     MaterialGrade::GradeB,    8.0, "Office-02")
+centre.intake(MaterialType::Plastic,     MaterialGrade::Rejected,  2.3, "Site-05")
+centre.intake(MaterialType::Glass,       MaterialGrade::GradeA,   20.0, "Restaurant-03")
+centre.intake(MaterialType::Glass,       MaterialGrade::GradeB,   15.5, "Home-12")
+centre.intake(MaterialType::Metal,       MaterialGrade::GradeA,   35.0, "Factory-07")
+centre.intake(MaterialType::Metal,       MaterialGrade::GradeB,   18.2, "Garage-08")
+centre.intake(MaterialType::Paper,       MaterialGrade::GradeA,   50.0, "Office-01")
+centre.intake(MaterialType::Paper,       MaterialGrade::GradeB,   30.0, "School-01")
+centre.intake(MaterialType::Paper,       MaterialGrade::GradeC,   10.0, "Mixed-11")
+centre.intake(MaterialType::Organic,     MaterialGrade::GradeA,    5.0, "Cafe-04")
+centre.intake(MaterialType::Electronics, MaterialGrade::GradeA,    3.7, "Corporate-09")
+centre.intake(MaterialType::Electronics, MaterialGrade::GradeB,    2.1, "Home-14")
+
+centre.addProcessingRecord(1, "2025-09-01", 20.0, 18.5, 1.5)
+centre.addProcessingRecord(1, "2025-09-08", 22.3, 20.0, 2.3)
+centre.addProcessingRecord(2, "2025-09-03", 30.0, 28.0, 2.0)
+centre.addProcessingRecord(4, "2025-09-05", 70.0, 67.0, 3.0)
+centre.addProcessingRecord(3, "2025-09-10", 45.0, 43.5, 1.5)
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════════╗")
+IO::println("║          CITY RECYCLING CENTRE — DAILY REPORT        ║")
+IO::println("╚══════════════════════════════════════════════════════╝")
+
+IO::println("\n── Intake Summary ─────────────────────────────────────")
+IO::println("  Total items : " + centre.getMaterials().size)
+IO::println("  Total weight: " + centre.totalWeightKg().fmt() + " kg")
+IO::println("  Total value : $" + centre.totalValue().fmt())
+IO::println("  Accepted    : " + centre.acceptedMaterials().size)
+IO::println("  Rejected    : " + centre.rejectedMaterials().size)
+
+IO::println("\n── All Intake Items ────────────────────────────────────")
+foreach m: Material in centre.getMaterials().sortedBy { x -> (x as Material).mtype().name() } {
+  val mark: String = if m.isAccepted() { "+" } else { "-" }
+  IO::println("  [#{mark}] #{m.summary()}")
+}
+
+IO::println("\n── By Material Type ────────────────────────────────────")
+val byType = centre.getMaterials().groupBy { m -> (m as Material).mtype().name() }
+foreach (typeName, items) in byType {
+  val mats: List[Material] = items as List[Material]
+  val weight: Double = (mats.fold(0.0) { acc, m ->
+    (acc as Double) + (m as Material).weightKg()
+  }) as Double
+  val value: Double = (mats.fold(0.0) { acc, m ->
+    (acc as Double) + (m as Material).value()
+  }) as Double
+  IO::println("  #{typeName}: #{mats.size} item(s), #{weight.fmt()} kg, $#{value.fmt()}")
+}
+
+IO::println("\n── Grade Breakdown ─────────────────────────────────────")
+val byGrade = centre.getMaterials().groupBy { m -> (m as Material).grade().label() }
+foreach (gradeName, items) in byGrade {
+  val mats: List[Material] = items as List[Material]
+  val weight: Double = (mats.fold(0.0) { acc, m ->
+    (acc as Double) + (m as Material).weightKg()
+  }) as Double
+  IO::println("  #{gradeName}: #{mats.size} item(s), #{weight.fmt()} kg")
+}
+
+IO::println("\n── Bin Status ──────────────────────────────────────────")
+foreach b: Bin in centre.getBins().sortedBy { x -> (x as Bin).id() } {
+  IO::println("  #{b.label()}")
+}
+
+IO::println("\n── Processing Records ──────────────────────────────────")
+foreach r: ProcessingRecord in centre.getRecords().sortedBy { x -> (x as ProcessingRecord).binId() } {
+  IO::println("  #{r.summary()}")
+}
+
+IO::println("\n── Total Yield (recursive sum) ─────────────────────────")
+val totalYield: Double = RecyclingCentre::sumYield(centre.getRecords(), 0)
+IO::println("  Total output across all batches: " + totalYield.fmt() + " kg")
+
+IO::println("\n── Available Bins for Plastic ─────────────────────────")
+val plasticBins: List[Bin] = centre.availableBinsFor(MaterialType::Plastic)
+if plasticBins.size == 0 {
+  IO::println("  None available")
+} else {
+  foreach b: Bin in plasticBins {
+    IO::println("  #{b.label()}")
+  }
+}
+
+IO::println("\n── Top-3 Value Items (accepted only) ───────────────────")
+val topAll: List[Material] = centre.acceptedMaterials().sortedBy { m -> 0.0 - (m as Material).value() } as List[Material]
+foreach i: Int in 0..<3 {
+  if i < topAll.size {
+    val m: Material = topAll[i] as Material
+    IO::println("  ##{i + 1} #{m.summary()}  value=$#{m.value().fmt()}")
+  }
+}
+
+IO::println("\n── High vs Low Value Items ─────────────────────────────")
+val threshold: Double = 20.0
+val highItems: List[Material] = centre.acceptedMaterials()
+  .filter { m -> (m as Material).value() >= threshold } as List[Material]
+val lowItems: List[Material] = centre.acceptedMaterials()
+  .filter { m -> (m as Material).value() < threshold } as List[Material]
+IO::println("  High-value (>=$#{threshold.fmt()}): #{highItems.size} item(s)")
+IO::println("  Low-value  (< $#{threshold.fmt()}): #{lowItems.size} item(s)")
+
+IO::println("\n── Bin Lookup (try/catch) ───────────────────────────────")
+foreach testId: Int in [2, 3, 99] {
+  try {
+    val bin: Bin? = centre.findBin(testId as Int)
+    if bin != null {
+      IO::println("  Bin #{testId}: #{bin.label()}")
+    } else {
+      IO::println("  Bin #{testId}: not found")
+    }
+  } catch e: Exception {
+    IO::println("  Error looking up bin #{testId}: " + e.message())
+  }
+}
+
+IO::println("\n── Select on BinStatus ──────────────────────────────────")
+foreach b: Bin in centre.getBins() {
+  val note: String = select b.status() {
+    case s is Available:  "ready for intake"
+    case s is Collecting: if s.fillPercent() >= 80 { "almost full!" } else { "collecting" }
+    case s is Processing: "busy for " + s.remainingMins() + " min"
+    case s is Full:       "schedule pickup"
+  }
+  IO::println("  Bin-#{b.id().lpad(3)}: #{note}")
+}
+
+IO::println("\n── Distinct Sources ────────────────────────────────────")
+val sources: List[String] = centre.getMaterials()
+  .map { m -> (m as Material).sourceId() }
+  .distinct() as List[String]
+val srcList: String = (sources.sortedBy { s -> s as String }
+  .fold("") { acc, s ->
+    val sep: String = if (acc as String) == "" { "" } else { ", " }
+    (acc as String) + sep + (s as String)
+  }) as String
+IO::println("  #{sources.size} unique source(s): #{srcList}")
+
+IO::println("\n── Accepted vs Rejected by Type ────────────────────────")
+val allTypes: List[MaterialType] = [
+  MaterialType::Plastic, MaterialType::Glass, MaterialType::Metal,
+  MaterialType::Paper, MaterialType::Organic, MaterialType::Electronics
+]
+foreach mt: MaterialType in allTypes {
+  val acc: List[Material] = centre.acceptedMaterials()
+    .filter { m -> (m as Material).mtype() == mt } as List[Material]
+  val rej: List[Material] = centre.rejectedMaterials()
+    .filter { m -> (m as Material).mtype() == mt } as List[Material]
+  if acc.size > 0 || rej.size > 0 {
+    IO::println("  #{mt}: #{acc.size} accepted, #{rej.size} rejected")
+  }
+}
+
+IO::println("\n── Done. ────────────────────────────────────────────────")

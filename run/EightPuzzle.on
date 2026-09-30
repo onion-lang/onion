@@ -1,0 +1,278 @@
+// EightPuzzle.on — optimal 8-puzzle (3×3 sliding tiles) solver using BFS.
+//
+// Exercises: ADT enums (Dir); records (Solution, PuzzleCase); extension
+//            methods on Int; BFS with HashMap[String,Int]; nullable returns;
+//            string interpolation; Int[] arrays; foreach over List; while
+//            loops; collection pipelines (map → sumBy); select exhaustiveness.
+
+import {
+  java.util.HashMap
+  java.lang.Integer
+}
+
+// ─── Direction ────────────────────────────────────────────────────────────────
+
+enum Dir {
+  case North
+  case South
+  case West
+  case East
+}
+
+def dirDRow(d: Dir): Int = select d {
+  case n is North: -1
+  case s is South:  1
+  case w is West:   0
+  case e is East:   0
+}
+
+def dirDCol(d: Dir): Int = select d {
+  case n is North:  0
+  case s is South:  0
+  case w is West:  -1
+  case e is East:   1
+}
+
+def dirLabel(d: Dir): String = select d {
+  case n is North: "N"
+  case s is South: "S"
+  case w is West:  "W"
+  case e is East:  "E"
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+extension Int {
+  def absVal(): Int = if self >= 0 { self } else { -self }
+}
+
+val DRS: Int[] = new Int[4]
+val DCS: Int[] = new Int[4]
+
+def initDirs(): void {
+  DRS[0] = -1; DRS[1] = 1; DRS[2] = 0; DRS[3] = 0
+  DCS[0] =  0; DCS[1] = 0; DCS[2] = -1; DCS[3] = 1
+}
+
+def tiles9(t0: Int, t1: Int, t2: Int, t3: Int, t4: Int,
+           t5: Int, t6: Int, t7: Int, t8: Int): Int[] {
+  val t: Int[] = new Int[9]
+  t[0]=t0; t[1]=t1; t[2]=t2; t[3]=t3; t[4]=t4
+  t[5]=t5; t[6]=t6; t[7]=t7; t[8]=t8
+  return t
+}
+
+def stateKey(tiles: Int[]): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < 9 {
+    if i > 0 { s = s + "," }
+    s = s + tiles[i]
+    i++
+  }
+  return s
+}
+
+def parseState(key: String): Int[] {
+  val parts: List[String] = Strings::split(key, ",")
+  val t: Int[] = new Int[9]
+  var i: Int = 0
+  while i < 9 {
+    t[i] = Integer::parseInt(parts[i])
+    i++
+  }
+  return t
+}
+
+def findBlank(tiles: Int[]): Int {
+  var i: Int = 0
+  while i < 9 {
+    if tiles[i] == 0 { return i }
+    i++
+  }
+  return -1
+}
+
+def copySwap(tiles: Int[], a: Int, b: Int): Int[] {
+  val c: Int[] = new Int[9]
+  var k: Int = 0
+  while k < 9 { c[k] = tiles[k]; k++ }
+  val tmp: Int = c[a]; c[a] = c[b]; c[b] = tmp
+  return c
+}
+
+def successors(key: String): List[String] {
+  val tiles: Int[] = parseState(key)
+  val blank: Int = findBlank(tiles)
+  val br: Int = blank / 3
+  val bc: Int = blank % 3
+  val result: List[String] = []
+  var di: Int = 0
+  while di < 4 {
+    val nr: Int = br + DRS[di]
+    val nc: Int = bc + DCS[di]
+    if nr >= 0 && nr < 3 && nc >= 0 && nc < 3 {
+      result << stateKey(copySwap(tiles, blank, nr * 3 + nc))
+    }
+    di++
+  }
+  return result
+}
+
+// Manhattan distance heuristic: sum of per-tile distances to goal positions.
+def manhattan(key: String): Int {
+  val tiles: Int[] = parseState(key)
+  var dist: Int = 0
+  var i: Int = 0
+  while i < 9 {
+    val tile: Int = tiles[i]
+    if tile != 0 {
+      val gi: Int = tile - 1
+      val dr: Int = (i / 3 - gi / 3).absVal()
+      val dc: Int = (i % 3 - gi % 3).absVal()
+      dist = dist + dr + dc
+    }
+    i++
+  }
+  return dist
+}
+
+// ─── BFS solver ──────────────────────────────────────────────────────────────
+
+val GOAL: String = "1,2,3,4,5,6,7,8,0"
+
+record Solution(moves: Int, explored: Int) {
+  public:
+  def summary(): String = "#{moves()} moves optimal (explored #{explored()} states)"
+}
+
+// BFS tracking parent keys (empty string = root/start).
+// When goal is found, traces back through the parent chain to count moves.
+def solveBfs(startKey: String): Solution? {
+  if startKey == GOAL { return new Solution(0, 1) }
+
+  val parent: HashMap[String, String] = new HashMap[String, String]()
+  parent.put(startKey, "")
+
+  val queue: List[String] = [startKey]
+  var qHead: Int = 0
+
+  while qHead < queue.size {
+    val cur: String = (queue[qHead] as String)
+    qHead++
+
+    foreach nxt: String in successors(cur) {
+      if !parent.containsKey(nxt) {
+        parent.put(nxt, cur)
+        if nxt == GOAL {
+          var steps: Int = 0
+          var trace: String = nxt
+          while trace != startKey {
+            trace = (parent.get(trace) as String)
+            steps++
+          }
+          return new Solution(steps, parent.size())
+        }
+        queue << nxt
+      }
+    }
+  }
+  return null
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────────────
+
+def renderState(key: String, label: String): void {
+  val tiles: Int[] = parseState(key)
+  IO::println("  #{label}")
+  IO::println("  +-------+")
+  var row: Int = 0
+  while row < 3 {
+    var line: String = "  | "
+    var col: Int = 0
+    while col < 3 {
+      val tile: Int = tiles[row * 3 + col]
+      val ch: String = if tile == 0 { "_" } else { "" + tile }
+      line = line + ch + " "
+      col++
+    }
+    IO::println(line + "|")
+    row++
+  }
+  IO::println("  +-------+")
+}
+
+// ─── Puzzle catalogue ────────────────────────────────────────────────────────
+
+record PuzzleCase(name: String, startKey: String, optimalMoves: Int) {
+  public:
+  def header(): String = "#{name()} — optimal #{optimalMoves()} moves, h=#{manhattan(startKey())}"
+}
+
+val CASES: List[PuzzleCase] = [
+  new PuzzleCase("Already solved",        "1,2,3,4,5,6,7,8,0",  0),
+  new PuzzleCase("One move from goal",    "1,2,3,4,5,0,7,8,6",  1),
+  new PuzzleCase("Three-move warm-up",    "1,2,3,0,4,6,7,5,8",  3),
+  new PuzzleCase("Depth-8 challenge",     "0,5,2,1,8,3,4,7,6",  8),
+  new PuzzleCase("Depth-10 stretch",      "5,8,2,1,0,3,4,7,6", 10),
+  new PuzzleCase("Depth-14 hard",         "0,8,2,5,7,3,1,4,6", 14),
+  new PuzzleCase("Depth-20 hardest",      "8,7,0,5,4,2,1,6,3", 20)
+]
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  initDirs()
+
+  IO::println("┌─────────────────────────────────────────┐")
+  IO::println("│       Eight-Puzzle BFS Solver           │")
+  IO::println("│  Goal: 1 2 3 / 4 5 6 / 7 8 _           │")
+  IO::println("└─────────────────────────────────────────┘")
+  IO::println("")
+
+  var allCorrect: Boolean = true
+  var totalMoves: Int = 0
+  var totalExplored: Int = 0
+
+  foreach pc: PuzzleCase in CASES {
+    IO::println("═══ #{pc.header()} ═══")
+    renderState(pc.startKey(), "Start")
+    renderState(GOAL, "Goal")
+
+    val sol: Solution? = solveBfs(pc.startKey())
+    if sol != null {
+      IO::println("  ✓ #{sol.summary()}")
+      if sol.moves() == pc.optimalMoves() {
+        IO::println("  ✓ Optimality confirmed")
+      } else {
+        IO::println("  ✗ Expected #{pc.optimalMoves()}, got #{sol.moves()}")
+        allCorrect = false
+      }
+      totalMoves = totalMoves + sol.moves()
+      totalExplored = totalExplored + sol.explored()
+    } else {
+      IO::println("  ✗ No solution (unsolvable configuration?)")
+      allCorrect = false
+    }
+    IO::println("")
+  }
+
+  var totalOptimal: Int = 0
+  foreach pc2: PuzzleCase in CASES { totalOptimal = totalOptimal + pc2.optimalMoves() }
+
+  // Build a comma-separated list of puzzle names using fold on List[PuzzleCase]
+  val nameList: String = CASES.fold("") { acc: String, pc: PuzzleCase ->
+    if acc.length() == 0 { pc.name() } else { acc + ", " + pc.name() }
+  }
+
+  IO::println("─────────────────────────────────────────")
+  IO::println("Puzzles:            #{nameList}")
+  IO::println("Count:              #{CASES.size}")
+  IO::println("Sum optimal depths: #{totalOptimal}")
+  IO::println("States explored:    #{totalExplored}")
+  if allCorrect {
+    IO::println("All puzzles solved with confirmed optimal move counts.")
+  } else {
+    IO::println("One or more puzzles failed the optimality check.")
+  }
+}

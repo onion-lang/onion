@@ -1,0 +1,280 @@
+// SokobanSolver.on — classic Sokoban box-pushing puzzle with BFS optimal-path solver
+//
+// Exercises: ADT case-enum (Cell) with exhaustive select/is patterns and shared
+// methods, immutable Board where every move returns a new instance (flat-string
+// representation, O(1) copy), nullable return type from tryMove (Board?), BFS
+// over a java.util.HashSet[String] visited set keyed by board data, record types
+// for BFS state and results, string interpolation, foreach/while loops, and
+// collection operations.
+
+import {
+  java.util.HashSet;
+}
+
+// ── Cell: what each grid square holds ────────────────────────────────────────
+
+enum Cell {
+  case Wall
+  case Floor
+  case Box
+  case Player
+  case Target
+  case BoxOnTarget
+  case PlayerOnTarget
+public:
+  def ch(): String = select this {
+    case w is Wall:             "#"
+    case f is Floor:            " "
+    case b is Box:              "$"
+    case p is Player:           "@"
+    case t is Target:           "."
+    case bt is BoxOnTarget:     "*"
+    case pt is PlayerOnTarget:  "+"
+  }
+  def isBox(): Boolean = select this {
+    case b is Box:          true
+    case bt is BoxOnTarget: true
+    else:                   false
+  }
+  def isTarget(): Boolean = select this {
+    case t is Target:           true
+    case bt is BoxOnTarget:     true
+    case pt is PlayerOnTarget:  true
+    else:                       false
+  }
+  def isPushable(): Boolean = select this {
+    case f is Floor:  true
+    case t is Target: true
+    else:             false
+  }
+  static def from(ch: String): Cell = select ch {
+    case "#": new Wall()
+    case "$": new Box()
+    case "@": new Player()
+    case ".": new Target()
+    case "*": new BoxOnTarget()
+    case "+": new PlayerOnTarget()
+    else:     new Floor()
+  }
+}
+
+// ── Board: immutable flat-string grid ────────────────────────────────────────
+
+class Board {
+public:
+  var cols: Int
+  var rows: Int
+  var data: String
+
+  def this(c: Int, r: Int, d: String) { cols = c; rows = r; data = d }
+
+  def cellAt(row: Int, col: Int): Cell =
+    Cell::from("" + data.charAt(row * cols + col))
+
+  def setCell(row: Int, col: Int, cell: Cell): Board {
+    val idx = row * cols + col
+    return new Board(cols, rows,
+      data.substring(0, idx) + cell.ch() + data.substring(idx + 1))
+  }
+
+  def playerRow(): Int {
+    var i = 0
+    while i < data.length() {
+      val ch = "" + data.charAt(i)
+      if ch == "@" || ch == "+" { return i / cols }
+      i = i + 1
+    }
+    return 0
+  }
+
+  def playerCol(): Int {
+    var i = 0
+    while i < data.length() {
+      val ch = "" + data.charAt(i)
+      if ch == "@" || ch == "+" { return i % cols }
+      i = i + 1
+    }
+    return 0
+  }
+
+  def isSolved(): Boolean = !data.contains("$")
+
+  // Returns null when the move is illegal (wall, off-grid, blocked push).
+  def tryMove(dr: Int, dc: Int): Board? {
+    val pr = playerRow(); val pc = playerCol()
+    val nr = pr + dr; val nc = pc + dc
+    if nr < 0 || nr >= rows || nc < 0 || nc >= cols { return null }
+    val curr = cellAt(pr, pc)
+    val next = cellAt(nr, nc)
+    val vacated: Cell  = if curr.isTarget() { new Target() }          else { new Floor() }
+    val entered: Cell  = if next.isTarget() { new PlayerOnTarget() }  else { new Player() }
+    if next.isBox() {
+      val br = nr + dr; val bc = nc + dc
+      if br < 0 || br >= rows || bc < 0 || bc >= cols { return null }
+      val beyond = cellAt(br, bc)
+      if !beyond.isPushable() { return null }
+      val boxLands: Cell = if beyond.isTarget() { new BoxOnTarget() } else { new Box() }
+      var b = setCell(pr, pc, vacated)
+      b = b.setCell(nr, nc, entered)
+      b = b.setCell(br, bc, boxLands)
+      return b
+    } else if next.isPushable() {
+      var b = setCell(pr, pc, vacated)
+      b = b.setCell(nr, nc, entered)
+      return b
+    }
+    return null
+  }
+
+  def display(): void {
+    var r = 0
+    while r < rows {
+      var line = ""
+      var c = 0
+      while c < cols { line = line + cellAt(r, c).ch(); c = c + 1 }
+      IO::println("  " + line)
+      r = r + 1
+    }
+  }
+}
+
+// ── Puzzle loader ─────────────────────────────────────────────────────────────
+
+def loadPuzzle(lines: List[String]): Board {
+  val numRows = lines.size
+  var numCols = 0
+  foreach s: String in lines { if s.length() > numCols { numCols = s.length() } }
+  var flat = ""
+  foreach s: String in lines {
+    var row = s
+    while row.length() < numCols { row = row + " " }
+    flat = flat + row
+  }
+  return new Board(numCols, numRows, flat)
+}
+
+// ── BFS solver ────────────────────────────────────────────────────────────────
+
+record SearchState(boardData: String, moves: String)
+record SolveResult(found: Boolean, moves: String, nodesExplored: Int)
+
+class Solver {
+public:
+  static def solve(initial: Board): SolveResult {
+    val visited = new HashSet[String]()
+    val queue: List[SearchState] = []
+    queue << new SearchState(initial.data, "")
+    visited.add(initial.data)
+
+    val drs = new Int[4]; drs[0] = -1; drs[1] = 1; drs[2] = 0; drs[3] = 0
+    val dcs = new Int[4]; dcs[0] = 0; dcs[1] = 0; dcs[2] = -1; dcs[3] = 1
+    val lbls = new String[4]; lbls[0] = "U"; lbls[1] = "D"; lbls[2] = "L"; lbls[3] = "R"
+
+    var head = 0
+    var explored = 0
+    while head < queue.size {
+      val state = queue[head] as SearchState
+      head = head + 1
+      explored = explored + 1
+      val board = new Board(initial.cols, initial.rows, state.boardData())
+      if board.isSolved() {
+        return new SolveResult(true, state.moves(), explored)
+      }
+      var d = 0
+      while d < 4 {
+        val nb = board.tryMove(drs[d], dcs[d])
+        if nb != null {
+          if !visited.contains(nb.data) {
+            visited.add(nb.data)
+            queue << new SearchState(nb.data, state.moves() + lbls[d])
+          }
+        }
+        d = d + 1
+      }
+    }
+    return new SolveResult(false, "", explored)
+  }
+}
+
+// ── Direction helpers ─────────────────────────────────────────────────────────
+
+def labelDr(lbl: String): Int {
+  if lbl == "U" { return -1 }
+  if lbl == "D" { return 1 }
+  return 0
+}
+def labelDc(lbl: String): Int {
+  if lbl == "L" { return -1 }
+  if lbl == "R" { return 1 }
+  return 0
+}
+
+// ── Replay helper ─────────────────────────────────────────────────────────────
+
+def replayMoves(initial: Board, moves: String): void {
+  var pushes = 0
+  var current = initial
+  var step = 0
+  while step < moves.length() {
+    val lbl = "" + moves.charAt(step)
+    val dr = labelDr(lbl); val dc = labelDc(lbl)
+    val pr = current.playerRow(); val pc = current.playerCol()
+    val nr = pr + dr; val nc = pc + dc
+    val isPush = current.cellAt(nr, nc).isBox()
+    if isPush { pushes = pushes + 1 }
+    current = current.tryMove(dr, dc) ?: current
+    val tag = if isPush { "push " + lbl } else { "move " + lbl }
+    IO::println("  Step #{step + 1}: #{tag}")
+    current.display()
+    step = step + 1
+  }
+  IO::println("  Solved in #{moves.length()} moves, #{pushes} pushes.")
+}
+
+// ── Run a single puzzle by name ───────────────────────────────────────────────
+
+def runPuzzle(name: String, lines: List[String]): void {
+  val initial = loadPuzzle(lines)
+  IO::println("┌─ #{name} ─────────────────────────────────────────┐")
+  IO::println("│ (@=player  $=box  .=target  *=box-on-target)")
+  initial.display()
+  IO::println("")
+  val result = Solver::solve(initial)
+  if !result.found() {
+    IO::println("│ No solution found. (#{result.nodesExplored()} states explored)")
+  } else {
+    IO::println("│ Optimal solution: #{result.moves()}  (#{result.moves().length()} moves)")
+    IO::println("│ BFS states explored: #{result.nodesExplored()}")
+    IO::println("")
+    replayMoves(initial, result.moves())
+  }
+  IO::println("└──────────────────────────────────────────────────────┘")
+  IO::println("")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  IO::println("")
+  IO::println("  Sokoban Solver — BFS optimal-path search")
+  IO::println("  ==========================================")
+  IO::println("")
+
+  // Puzzle 1: single box, 6 moves  (U L L D L U)
+  runPuzzle("Puzzle 1 — single box", [
+    "#######",
+    "#.    #",
+    "# $   #",
+    "#   @ #",
+    "#######"
+  ])
+
+  // Puzzle 2: two boxes, symmetric targets, 6 moves  (U D R R R U)
+  runPuzzle("Puzzle 2 — two boxes", [
+    "########",
+    "# .  . #",
+    "# $  $ #",
+    "# @    #",
+    "########"
+  ])
+}

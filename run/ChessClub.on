@@ -1,0 +1,449 @@
+// ChessClub.on — chess club management: players, tournaments, Elo ratings
+// Exercises: records, data-carrying enums, ADT enums, classes, interfaces,
+// generics, collection pipelines (map/filter/fold/groupBy/sortedBy/find/
+// partition/zip), select/pattern matching, nullable, closures,
+// string interpolation, try/catch, recursion, while, foreach (ranges + maps).
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TitleType(abbr: String, minRating: Int) {
+  GrandMaster("GM", 2500),
+  InternationalMaster("IM", 2400),
+  FideMaster("FM", 2300),
+  CandidateMaster("CM", 2200),
+  ClubPlayer("CP", 0)
+}
+
+enum RoundResult {
+  WhiteWins,
+  BlackWins,
+  Draw
+}
+
+// ─── ADT: MatchOutcome ────────────────────────────────────────────────────────
+
+enum MatchOutcome {
+  case Decisive(winnerId: String, loserId: String, ratingSwing: Int)
+  case DrawnGame(player1Id: String, player2Id: String)
+public:
+  def describe(): String = select this {
+    case d is Decisive:
+      "#{d.winnerId()} beat #{d.loserId()} (+/-#{d.ratingSwing()} pts)"
+    case g is DrawnGame:
+      "#{g.player1Id()} drew #{g.player2Id()}"
+  }
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Int {
+  def pad3(): String {
+    val s: String = "" + self
+    if self < 0 { return s }
+    else if self < 10 { return "  " + s }
+    else if self < 100 { return " " + s }
+    else { return s }
+  }
+  def showDiff(): String =
+    if self > 0 { "+" + self } else { "" + self }
+}
+
+extension Double {
+  def fmt1(): String {
+    val whole: Int = self as Int
+    val frac: Int = ((self - whole as Double) * 10.0 + 0.5) as Int
+    return "#{whole}.#{frac}"
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Player(
+  id:     String,
+  name:   String,
+  title:  TitleType,
+  rating: Int
+) {
+public:
+  def label(): String = "#{title().abbr()} #{name()} (#{rating()})"
+  def isElite(): Boolean = rating() >= 2400
+  def ratingBand(): String =
+    if rating() >= 2500 { "Super-GM" }
+    else if rating() >= 2400 { "IM+" }
+    else if rating() >= 2300 { "FM+" }
+    else if rating() >= 2200 { "CM+" }
+    else if rating() >= 2000 { "Club A" }
+    else { "Club B" }
+}
+
+record GameRecord(
+  roundNum:  Int,
+  whiteId:   String,
+  blackId:   String,
+  result:    RoundResult,
+  whiteDiff: Int,
+  blackDiff: Int
+) {
+public:
+  def resultSymbol(): String = select result() {
+    case RoundResult::WhiteWins: "1-0"
+    case RoundResult::BlackWins: "0-1"
+    case RoundResult::Draw:      "1/2-1/2"
+    else:                        "?"
+  }
+  def scoreFor(pid: String): Double = select result() {
+    case RoundResult::WhiteWins: if pid == whiteId() { 1.0 } else { 0.0 }
+    case RoundResult::BlackWins: if pid == blackId() { 1.0 } else { 0.0 }
+    case RoundResult::Draw:      0.5
+    else:                        0.0
+  }
+}
+
+record StandingEntry(
+  playerId:     String,
+  playerName:   String,
+  score:        Double,
+  wins:         Int,
+  draws:        Int,
+  losses:       Int,
+  ratingChange: Int
+) {
+public:
+  def gamesPlayed(): Int = wins() + draws() + losses()
+  def tpeScore(): Double = score() * 100.0
+}
+
+record Pairing(whiteId: String, blackId: String)
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Rankable {
+  def rankScore(): Double
+  def displayName(): String
+}
+
+// ─── Elo Calculation ──────────────────────────────────────────────────────────
+
+class EloCalc {
+private:
+  // 10^x via Taylor series for the fractional part
+  static def pow10(x: Double): Double {
+    if x == 0.0 { return 1.0 }
+    if x < 0.0 { return 1.0 / pow10(-x) }
+    val whole: Int = x as Int
+    val frac: Double = x - (whole as Double)
+    var intPow: Double = 1.0
+    var i: Int = 0
+    while i < whole { intPow = intPow * 10.0; i++ }
+    val ln10: Double = 2.302585
+    val t: Double = frac * ln10
+    val approx: Double = 1.0 + t + t * t / 2.0 + t * t * t / 6.0
+    return intPow * approx
+  }
+public:
+  static def expectedScore(playerRating: Int, opponentRating: Int): Double {
+    val diff: Double = (opponentRating - playerRating) as Double
+    return 1.0 / (1.0 + pow10(diff / 400.0))
+  }
+
+  static def ratingDelta(playerRating: Int, opponentRating: Int, score: Double, kFactor: Int): Int {
+    val expected: Double = expectedScore(playerRating, opponentRating)
+    return ((score - expected) * (kFactor as Double) + 0.5) as Int
+  }
+
+  static def kFactor(rating: Int, gamesPlayed: Int): Int =
+    if gamesPlayed < 30 { 40 }
+    else if rating < 2300 { 20 }
+    else { 10 }
+}
+
+// ─── Chess Club ───────────────────────────────────────────────────────────────
+
+class ChessClub {
+  val name: String
+  var players: java.util.List[Player]
+  var games:   java.util.List[GameRecord]
+
+public:
+  def this(clubName: String) {
+    name = clubName
+    players = []
+    games = []
+  }
+
+  def getName(): String = name
+  def getPlayers(): java.util.List[Player] = players
+  def getGames(): java.util.List[GameRecord] = games
+  def gameCount(): Int = games.size
+  def memberCount(): Int = players.size
+
+  def addPlayer(p: Player): void { players.add(p) }
+
+  def playerById(id: String): Player? {
+    var found: Player? = null
+    foreach p: Player in players { if p.id() == id { found = p } }
+    return found
+  }
+
+  def recordGame(g: GameRecord): void { games.add(g) }
+
+  def standings(): java.util.List[StandingEntry] {
+    val result: java.util.List[StandingEntry] = []
+    foreach p: Player in players {
+      val pid: String = p.id()
+      val myGames: java.util.List[GameRecord] = games.filter { g: GameRecord ->
+        g.whiteId() == pid || g.blackId() == pid
+      }
+      var score: Double = 0.0
+      var wins: Int = 0
+      var draws: Int = 0
+      var losses: Int = 0
+      var ratingChange: Int = 0
+      foreach g: GameRecord in myGames {
+        val s: Double = g.scoreFor(pid)
+        score = score + s
+        if s == 1.0 { wins++ }
+        else if s == 0.5 { draws++ }
+        else { losses++ }
+        if g.whiteId() == pid { ratingChange = ratingChange + g.whiteDiff() }
+        else { ratingChange = ratingChange + g.blackDiff() }
+      }
+      result.add(new StandingEntry(pid, p.name(), score, wins, draws, losses, ratingChange))
+    }
+    return result.sortedBy { e: StandingEntry -> -e.tpeScore() }
+  }
+
+  def outcomes(): java.util.List[MatchOutcome] {
+    return games.map { g: GameRecord ->
+      select g.result() {
+        case RoundResult::WhiteWins:
+          new Decisive(g.whiteId(), g.blackId(), g.whiteDiff()) as MatchOutcome
+        case RoundResult::BlackWins:
+          new Decisive(g.blackId(), g.whiteId(), g.blackDiff()) as MatchOutcome
+        else:
+          new DrawnGame(g.whiteId(), g.blackId()) as MatchOutcome
+      }
+    }
+  }
+
+  def updatedPlayers(): java.util.List[Player] {
+    val byId: java.util.Map[String, Int] = [:]
+    foreach g: GameRecord in games {
+      val w0: Int? = byId[g.whiteId()] as Int?
+      byId[g.whiteId()] = (w0 ?: 0) + g.whiteDiff()
+      val b0: Int? = byId[g.blackId()] as Int?
+      byId[g.blackId()] = (b0 ?: 0) + g.blackDiff()
+    }
+    return players.map { p: Player ->
+      val delta: Int? = byId[p.id()] as Int?
+      new Player(p.id(), p.name(), p.title(), p.rating() + (delta ?: 0))
+    }.sortedBy { p: Player -> -p.rating() }
+  }
+
+  def eliteCount(): Int =
+    players.filter { p: Player -> p.isElite() }.size
+
+  def averageRating(): Double {
+    if players.size == 0 { return 0.0 }
+    val total: Int = players.fold(0) { acc: Int, p: Player -> acc + p.rating() }
+    return (total as Double) / (players.size as Double)
+  }
+
+  def bandSummary(): java.util.Map[String, Int] {
+    val counts: java.util.Map[String, Int] = [:]
+    foreach p: Player in players {
+      val band: String = p.ratingBand()
+      val cur: Int? = counts[band] as Int?
+      counts[band] = (cur ?: 0) + 1
+    }
+    return counts
+  }
+}
+
+// ─── Tournament Round Simulation ─────────────────────────────────────────────
+
+def simulateRound(
+  club: ChessClub,
+  roundNum: Int,
+  pairings: java.util.List[Pairing],
+  results: java.util.List[RoundResult]
+): void {
+  var i: Int = 0
+  foreach pair: Pairing in pairings {
+    val wPlayer: Player? = club.playerById(pair.whiteId())
+    val bPlayer: Player? = club.playerById(pair.blackId())
+    if wPlayer == null || bPlayer == null { i++; continue }
+    val result: RoundResult = if i < results.size { results[i] } else { RoundResult::Draw }
+    val wScore: Double = select result {
+      case RoundResult::WhiteWins: 1.0
+      case RoundResult::BlackWins: 0.0
+      else: 0.5
+    }
+    val bScore: Double = 1.0 - wScore
+    val k: Int = 20
+    val wDelta: Int = EloCalc::ratingDelta(wPlayer.rating(), bPlayer.rating(), wScore, k)
+    val bDelta: Int = EloCalc::ratingDelta(bPlayer.rating(), wPlayer.rating(), bScore, k)
+    club.recordGame(new GameRecord(roundNum, pair.whiteId(), pair.blackId(), result, wDelta, bDelta))
+    i++
+  }
+}
+
+// ─── Reporting Helpers ────────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  IO::println("─".repeat(56))
+  IO::println("  " + title)
+  IO::println("─".repeat(56))
+}
+
+def printStandings(club: ChessClub): void {
+  printHeader("#{club.getName()} — Standings")
+  IO::println("  Rank  Name                  Score  W   D   L   ΔRtg")
+  IO::println("  " + "─".repeat(54))
+  val entries: java.util.List[StandingEntry] = club.standings()
+  var rank: Int = 1
+  foreach e: StandingEntry in entries {
+    IO::println("  #{rank.pad3()}   #{e.playerName().padRight(20)}  #{e.score().fmt1()}   #{e.wins().pad3()}  #{e.draws().pad3()}  #{e.losses().pad3()}  #{e.ratingChange().showDiff().padLeft(4)}")
+    rank++
+  }
+  IO::println("")
+}
+
+def printOutcomes(club: ChessClub): void {
+  printHeader("#{club.getName()} — Match Outcomes")
+  foreach o: MatchOutcome in club.outcomes() {
+    IO::println("  " + o.describe())
+  }
+  IO::println("")
+}
+
+def printUpdatedRatings(club: ChessClub): void {
+  printHeader("#{club.getName()} — Updated Ratings")
+  foreach p: Player in club.updatedPlayers() {
+    IO::println("  " + p.label())
+  }
+  IO::println("")
+}
+
+def printClubStats(club: ChessClub): void {
+  printHeader("#{club.getName()} — Club Statistics")
+  IO::println("  Members       : #{club.memberCount()}")
+  IO::println("  Elite (>=2400): #{club.eliteCount()}")
+  IO::println("  Avg Rating    : #{club.averageRating().fmt1()}")
+  IO::println("  Games recorded: #{club.gameCount()}")
+  IO::println("")
+  IO::println("  Rating Bands:")
+  val bands: java.util.Map[String, Int] = club.bandSummary()
+  foreach (band, count) in bands {
+    IO::println("    #{band.padRight(12)} #{count}")
+  }
+  IO::println("")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val club: ChessClub = new ChessClub("Riverside Chess Club")
+
+club.addPlayer(new Player("p1", "Alice Chen",     TitleType::GrandMaster,         2534))
+club.addPlayer(new Player("p2", "Boris Ivanov",   TitleType::InternationalMaster, 2461))
+club.addPlayer(new Player("p3", "Clara Diaz",     TitleType::FideMaster,          2318))
+club.addPlayer(new Player("p4", "David Park",     TitleType::CandidateMaster,     2245))
+club.addPlayer(new Player("p5", "Elena Morozova", TitleType::ClubPlayer,          1998))
+club.addPlayer(new Player("p6", "Frank Mueller",  TitleType::ClubPlayer,          1872))
+
+printClubStats(club)
+
+// Round 1
+simulateRound(club, 1,
+  [new Pairing("p1","p2"), new Pairing("p3","p4"), new Pairing("p5","p6")],
+  [RoundResult::WhiteWins, RoundResult::Draw, RoundResult::BlackWins])
+
+// Round 2
+simulateRound(club, 2,
+  [new Pairing("p1","p3"), new Pairing("p2","p5"), new Pairing("p4","p6")],
+  [RoundResult::WhiteWins, RoundResult::WhiteWins, RoundResult::Draw])
+
+// Round 3
+simulateRound(club, 3,
+  [new Pairing("p2","p3"), new Pairing("p1","p4"), new Pairing("p5","p6")],
+  [RoundResult::Draw, RoundResult::WhiteWins, RoundResult::WhiteWins])
+
+printOutcomes(club)
+printStandings(club)
+printUpdatedRatings(club)
+
+// ─── Elo spot-checks ──────────────────────────────────────────────────────────
+
+printHeader("Elo Expected-Score Spot-checks")
+val eloData: java.util.List[java.util.List[Int]] = [
+  [2600, 2400], [2400, 2400], [2200, 2400], [2100, 2500]
+]
+foreach pair: java.util.List[Int] in eloData {
+  val a: Int = pair[0]
+  val b: Int = pair[1]
+  val exp: Double = EloCalc::expectedScore(a, b)
+  IO::println("  Rating #{a} vs #{b}: expected = #{exp.fmt1()}")
+}
+IO::println("")
+
+// ─── Collection pipeline exercises ───────────────────────────────────────────
+
+val byBand: java.util.Map[String, java.util.List[Player]] =
+  club.getPlayers().groupBy { p: Player -> p.ratingBand() }
+
+printHeader("Players Grouped by Rating Band")
+foreach (band, ps) in byBand {
+  val names: java.util.List[String] = ps.map { p: Player -> p.name() }
+  IO::println("  #{band.padRight(10)}: #{Strings::join(names, ", ")}")
+}
+IO::println("")
+
+val parts = club.getPlayers().partition { p: Player -> p.isElite() }
+val eliteList: java.util.List[Player] = parts[0] as java.util.List[Player]
+val restList: java.util.List[Player]  = parts[1] as java.util.List[Player]
+
+printHeader("Elite vs Rest")
+IO::println("  Elite players (>= 2400):")
+foreach p: Player in eliteList { IO::println("    " + p.label()) }
+IO::println("  Rest of club:")
+foreach p: Player in restList  { IO::println("    " + p.label()) }
+IO::println("")
+
+// combined rank/band view using index iteration
+val entries: java.util.List[StandingEntry] = club.standings()
+
+printHeader("Combined Rank / Band View")
+var ri: Int = 0
+while ri < entries.size {
+  val e: StandingEntry = entries[ri] as StandingEntry
+  val p: Player? = club.playerById(e.playerId())
+  val band: String = if p != null { p.ratingBand() } else { "?" }
+  IO::println("  #{e.playerName().padRight(22)} #{e.score().fmt1()} pts  #{band}")
+  ri++
+}
+IO::println("")
+
+// find the top player
+val top: Player? = club.updatedPlayers().find { p: Player -> true }
+if top != null {
+  IO::println("Top-rated after tournament: #{top.label()}")
+}
+IO::println("")
+
+// distinct bands
+val distinctBands: java.util.List[String] =
+  club.getPlayers().map { p: Player -> p.ratingBand() }.distinct()
+IO::println("Distinct bands in club: #{Strings::join(distinctBands, ", ")}")

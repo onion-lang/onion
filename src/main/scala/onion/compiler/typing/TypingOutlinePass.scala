@@ -309,7 +309,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           else Nil
         unsupportedFrom.foreach { case (arg, argType) =>
           report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
-            ScalarConversions.supportedNames)
+            ScalarConversions.supportedNames, "from re\"...\"")
         }
         val unsupportedData =
           if (hasData) node.args.zip(argTypes).filterNot { case (_, argType) => isDataDerivableType(argType) }
@@ -323,9 +323,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         val unsupportedShape =
           if (hasShapes) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
           else Nil
+        // Name the clause the user wrote, not `from`: a `shape doc = json` record has no `from`.
         if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType) =>
           report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
-            ScalarConversions.supportedNames)
+            ScalarConversions.supportedNames, shapeClauseSyntax(node.shapes.head))
         }
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
         // a shape lowers to a Shapes.regex call, so the same two checks are made here.
@@ -344,6 +345,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     node.sections.foreach(processAccessSection)
     }
   }
+
+  /** How a shape clause reads in source, for diagnostics: `shape doc = json`, `shape s = re"..."`. */
+  private def shapeClauseSyntax(sc: AST.ShapeClause): String = sc.source match
+    case AST.FormatSource(format) => s"shape ${sc.name} = $format"
+    case AST.RegexSource(_)       => s"""shape ${sc.name} = re"...""""
 
   /** Component types a `from re"..."` clause can produce from a captured String. */
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)

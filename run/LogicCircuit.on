@@ -1,0 +1,290 @@
+// LogicCircuit.on — digital logic gate circuit simulator with truth-table generation.
+// Exercises: ADT enums with recursive types, records, classes, interfaces,
+// collection pipelines, closures, pattern matching, foreach, while, recursion,
+// nullable, string interpolation.
+
+// ─── Signal: two-state wire value ─────────────────────────────────────────────
+
+enum Signal {
+  Low, High
+public:
+  def label(): String = select this {
+    case Signal::Low:  "0"
+    case Signal::High: "1"
+  }
+  def not(): Signal = select this {
+    case Signal::Low:  Signal::High
+    case Signal::High: Signal::Low
+  }
+  static def and_(a: Signal, b: Signal): Signal =
+    if a == Signal::High && b == Signal::High { Signal::High } else { Signal::Low }
+  static def or_(a: Signal, b: Signal): Signal =
+    if a == Signal::High || b == Signal::High { Signal::High } else { Signal::Low }
+  static def xor_(a: Signal, b: Signal): Signal =
+    if a != b { Signal::High } else { Signal::Low }
+  static def fromInt(n: Int): Signal = if n != 0 { Signal::High } else { Signal::Low }
+}
+
+// ─── WireEnv: maps input wire names to signal values ──────────────────────────
+
+class WireEnv {
+  val names:   List[String]
+  val signals: List[Signal]
+public:
+  def this(names: List[String], signals: List[Signal]) {
+    this.names   = names
+    this.signals = signals
+  }
+  def get(name: String): Signal {
+    var j: Int = 0
+    while j < names.size {
+      if names[j] == name { return signals[j] }
+      j++
+    }
+    return Signal::Low
+  }
+}
+
+// ─── Gate: recursive ADT for combinational logic ──────────────────────────────
+
+enum Gate {
+  case In(name: String)
+  case AndG(a: Gate, b: Gate)
+  case OrG(a: Gate, b: Gate)
+  case NotG(a: Gate)
+  case NandG(a: Gate, b: Gate)
+  case NorG(a: Gate, b: Gate)
+  case XorG(a: Gate, b: Gate)
+  case XnorG(a: Gate, b: Gate)
+public:
+  def eval(env: WireEnv): Signal = select this {
+    case g is In:    env.get(g.name())
+    case g is AndG:  Signal::and_(g.a().eval(env), g.b().eval(env))
+    case g is OrG:   Signal::or_(g.a().eval(env), g.b().eval(env))
+    case g is NotG:  g.a().eval(env).not()
+    case g is NandG: Signal::and_(g.a().eval(env), g.b().eval(env)).not()
+    case g is NorG:  Signal::or_(g.a().eval(env), g.b().eval(env)).not()
+    case g is XorG:  Signal::xor_(g.a().eval(env), g.b().eval(env))
+    case g is XnorG: Signal::xor_(g.a().eval(env), g.b().eval(env)).not()
+  }
+  def label(): String = select this {
+    case g is In:    g.name()
+    case g is AndG:  "(#{g.a().label()} AND #{g.b().label()})"
+    case g is OrG:   "(#{g.a().label()} OR #{g.b().label()})"
+    case g is NotG:  "(NOT #{g.a().label()})"
+    case g is NandG: "(#{g.a().label()} NAND #{g.b().label()})"
+    case g is NorG:  "(#{g.a().label()} NOR #{g.b().label()})"
+    case g is XorG:  "(#{g.a().label()} XOR #{g.b().label()})"
+    case g is XnorG: "(#{g.a().label()} XNOR #{g.b().label()})"
+  }
+}
+
+// ─── Circuit: named gate network ──────────────────────────────────────────────
+
+record Circuit(
+  name:    String,
+  inputs:  List[String],
+  outputs: List[String],
+  gates:   List[Gate]
+)
+
+// ─── Test pair for the adder ──────────────────────────────────────────────────
+
+record Pair(x: Int, y: Int)
+
+// ─── Arithmetic helpers ───────────────────────────────────────────────────────
+
+def pow2(n: Int): Int {
+  var r: Int = 1
+  var i: Int = 0
+  while i < n { r = r * 2; i++ }
+  return r
+}
+
+def bitAt(value: Int, pos: Int): Int {
+  var v: Int = value
+  var i: Int = 0
+  while i < pos { v = v / 2; i++ }
+  return v % 2
+}
+
+// ─── Truth-table printer ──────────────────────────────────────────────────────
+
+def buildHeader(c: Circuit): String {
+  var h: String = ""
+  foreach inp: String in c.inputs() { h = h + " " + inp }
+  h = h + " |"
+  foreach out: String in c.outputs() { h = h + " " + out }
+  return h
+}
+
+def printTruthTable(c: Circuit): void {
+  IO::println("=== #{c.name()} ===")
+  val h: String = buildHeader(c)
+  IO::println(h)
+  var sep: String = ""
+  var k: Int = 0
+  while k <= h.length() { sep = sep + "-"; k++ }
+  IO::println(sep)
+
+  val n:     Int = c.inputs().size
+  val total: Int = pow2(n)
+  var combo: Int = 0
+  while combo < total {
+    val sigs: List[Signal] = []
+    var i: Int = 0
+    while i < n {
+      sigs.add(Signal::fromInt(bitAt(combo, n - 1 - i)))
+      i++
+    }
+    val env: WireEnv = new WireEnv(c.inputs(), sigs)
+    var row: String = ""
+    foreach s: Signal in sigs { row = row + " " + s.label() }
+    row = row + " |"
+    foreach g: Gate in c.gates() { row = row + " " + g.eval(env).label() }
+    IO::println(row)
+    combo++
+  }
+  IO::println("")
+}
+
+// ─── Circuit constructors ─────────────────────────────────────────────────────
+
+def halfAdder(): Circuit {
+  val a: Gate = new In("A")
+  val b: Gate = new In("B")
+  return new Circuit("Half Adder", ["A", "B"], ["Sum", "Carry"],
+    [new XorG(a, b), new AndG(a, b)])
+}
+
+def fullAdder(): Circuit {
+  val a:   Gate = new In("A")
+  val b:   Gate = new In("B")
+  val cin: Gate = new In("Cin")
+  val xab: Gate = new XorG(a, b)
+  return new Circuit("Full Adder", ["A", "B", "Cin"], ["Sum", "Cout"], [
+    new XorG(xab, cin),
+    new OrG(new AndG(a, b), new AndG(xab, cin))
+  ])
+}
+
+def twoInputCircuits(): List[Circuit] {
+  val a: Gate = new In("A")
+  val b: Gate = new In("B")
+  return [
+    new Circuit("AND",  ["A", "B"], ["Out"], [new AndG(a, b)]),
+    new Circuit("OR",   ["A", "B"], ["Out"], [new OrG(a, b)]),
+    new Circuit("NAND", ["A", "B"], ["Out"], [new NandG(a, b)]),
+    new Circuit("NOR",  ["A", "B"], ["Out"], [new NorG(a, b)]),
+    new Circuit("XOR",  ["A", "B"], ["Out"], [new XorG(a, b)]),
+    new Circuit("XNOR", ["A", "B"], ["Out"], [new XnorG(a, b)])
+  ]
+}
+
+// ─── Ripple-carry N-bit adder built from Gate trees ───────────────────────────
+
+def rippleAdd(a: Int, b: Int, bits: Int): Int {
+  var carry: Signal = Signal::Low
+  var result: Int   = 0
+  var bit: Int      = 0
+  while bit < bits {
+    val aBit: Signal = Signal::fromInt(bitAt(a, bit))
+    val bBit: Signal = Signal::fromInt(bitAt(b, bit))
+    val inNames:   List[String] = ["A", "B", "Cin"]
+    val inSignals: List[Signal] = [aBit, bBit, carry]
+    val env: WireEnv = new WireEnv(inNames, inSignals)
+
+    // Full adder: Sum = A XOR B XOR Cin ; Cout = (A AND B) OR ((A XOR B) AND Cin)
+    val xab:  Gate = new XorG(new In("A"), new In("B"))
+    val sum:  Gate = new XorG(xab, new In("Cin"))
+    val cout: Gate = new OrG(new AndG(new In("A"), new In("B")), new AndG(xab, new In("Cin")))
+
+    val sumBit:  Signal = sum.eval(env)
+    val carryOut: Signal = cout.eval(env)
+    if sumBit == Signal::High { result = result + pow2(bit) }
+    carry = carryOut
+    bit++
+  }
+  return result
+}
+
+// ─── Structural equality check for a circuit's truth table ────────────────────
+
+def circuitAgrees(c1: Circuit, c2: Circuit): Boolean {
+  if c1.inputs().size != c2.inputs().size { return false }
+  if c1.gates().size  != c2.gates().size  { return false }
+  val n:     Int = c1.inputs().size
+  val total: Int = pow2(n)
+  var combo: Int = 0
+  while combo < total {
+    val sigs: List[Signal] = []
+    var i: Int = 0
+    while i < n {
+      sigs.add(Signal::fromInt(bitAt(combo, n - 1 - i)))
+      i++
+    }
+    val e1: WireEnv = new WireEnv(c1.inputs(), sigs)
+    val e2: WireEnv = new WireEnv(c2.inputs(), sigs)
+    var gi: Int = 0
+    while gi < c1.gates().size {
+      val g1: Gate = c1.gates()[gi] as Gate
+      val g2: Gate = c2.gates()[gi] as Gate
+      if g1.eval(e1) != g2.eval(e2) { return false }
+      gi++
+    }
+    combo++
+  }
+  return true
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("════════════════════════════════════")
+  IO::println("  LOGIC CIRCUIT SIMULATOR")
+  IO::println("════════════════════════════════════")
+  IO::println("")
+
+  IO::println("── Basic two-input gates ──")
+  foreach c: Circuit in twoInputCircuits() { printTruthTable(c) }
+
+  IO::println("── Adder circuits ──")
+  printTruthTable(halfAdder())
+  printTruthTable(fullAdder())
+
+  IO::println("── 4-bit ripple-carry adder ──")
+  val tests: List[Pair] = [
+    new Pair(3,  5),
+    new Pair(7,  8),
+    new Pair(1, 14),
+    new Pair(6,  9),
+    new Pair(0,  0),
+    new Pair(15, 0)
+  ]
+  foreach p: Pair in tests {
+    val r: Int = rippleAdd(p.x(), p.y(), 4)
+    IO::println("  #{p.x()} + #{p.y()} = #{r}")
+  }
+
+  IO::println("")
+  IO::println("── Gate label demo ──")
+  val fa: Circuit = fullAdder()
+  IO::println("  Sum  gate: #{(fa.gates()[0] as Gate).label()}")
+  IO::println("  Cout gate: #{(fa.gates()[1] as Gate).label()}")
+
+  IO::println("")
+  IO::println("── Equivalence check: NAND composed as NOT(AND) ──")
+  val a: Gate = new In("A")
+  val b: Gate = new In("B")
+  val nandDirect: Circuit = new Circuit("NAND",       ["A", "B"], ["Out"], [new NandG(a, b)])
+  val nandComposed: Circuit = new Circuit("NOT(AND)", ["A", "B"], ["Out"], [new NotG(new AndG(a, b))])
+  IO::println("  Agree: #{circuitAgrees(nandDirect, nandComposed)}")
+
+  val norDirect:   Circuit = new Circuit("NOR",      ["A", "B"], ["Out"], [new NorG(a, b)])
+  val norComposed: Circuit = new Circuit("NOT(OR)",  ["A", "B"], ["Out"], [new NotG(new OrG(a, b))])
+  IO::println("  Agree: #{circuitAgrees(norDirect, norComposed)}")
+
+  val xnorDirect:   Circuit = new Circuit("XNOR",       ["A", "B"], ["Out"], [new XnorG(a, b)])
+  val xnorComposed: Circuit = new Circuit("NOT(XOR)",   ["A", "B"], ["Out"], [new NotG(new XorG(a, b))])
+  IO::println("  Agree: #{circuitAgrees(xnorDirect, xnorComposed)}")
+}

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.130.0] - 2026-09-30
+
 ### Added
 
 - **`run/FuncList.on`** — a 375-line persistent, immutable singly-linked list library, a new domain for the `run/` corpus (a generic ADT case-enum `FList[T]` (`FCons(head: T, tail: FList[T])`/`FNil`, the latter a zero-field case in a generic enum); a generic class `FListOps[A, B]` with multi-type-parameter static methods; `select`/`is` type-pattern matching over the ADT with exhaustiveness; closures passed as higher-order-function arguments; recursive generic methods (`concat`, `foldRight`); core list operations `map`/`filter`/`foldLeft`/`foldRight`/`find`/`contains`/`take`/`drop`/`zipWith`/`reverse`/`concat`/`append`/`mkString`/`eq` (structural equality); a `do[List]` list comprehension; nullable return types (`Int?`) for `head`/`maximum`/`minimum`; `foreach` over ranges in `FL::range`; string interpolation throughout — rendering length/sum/product/max/min, filtered/mapped/take/drop/reversed views, string-list concatenation, a `find`/`contains` lookup, a factorial via `foldLeft`, a `zipWith` dot product, a `do[List]` comprehension round-tripped through `toJavaList`, structural-equality checks, and a `foldRight`-built list), added to the `run/` corpus (merged via #1763).

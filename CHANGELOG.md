@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.132.0] - 2026-09-30
+
 ### Fixed
 
 - **A `?` placed right after a grouped/function type's closing paren (`(String)?`, `((Int) -> Int)?`) reported the unrelated ternary-operator hint** instead of explaining that Onion has no grouped type `(T)`. `type_impl()`'s `(` branch in the grammar always reads a function-type parameter list and then requires `->`, so this `?` lands in a syntax-error state (`expecting "->"`) that `SyntaxHintClassifier`'s generic `case "?" =>` fallback previously misdiagnosed as a `cond ? a : b` mistake. Added a more specific case ahead of that fallback, keyed on `expected == "\"->\""`, with a new bilingual `error.parsing.hint.nullable_grouped_type` message pointing at the actual fix — the named interface form (`Function1[Int, Int]?`) or a `type` alias (`type F = (Int) -> Int`, then `F?`). Covered by new unit tests in `SyntaxHintClassifierSpec` and an end-to-end bilingual `NullableGroupedTypeHintI18nSpec`.

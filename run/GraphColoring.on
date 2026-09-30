@@ -1,0 +1,357 @@
+// GraphColoring.on — graph k-coloring via greedy and backtracking algorithms
+// Exercises: records with methods, ADT enums, data-carrying enums, classes,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition/zip), select/pattern matching, nullable, closures, string
+// interpolation, try/catch, recursion, while, foreach, generics.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Algorithm {
+  case Greedy
+  case Backtrack(maxColors: Int)
+public:
+  def label(): String = select this {
+    case a is Greedy:    "Greedy"
+    case a is Backtrack: "Backtrack(k=" + a.maxColors() + ")"
+  }
+}
+
+enum ColorResult {
+  case Colored(assignment: Map[Int, Int], chromatic: Int)
+  case NoSolution
+public:
+  def display(): String = select this {
+    case r is Colored:    "Solved with #{r.chromatic()} colors"
+    case r is NoSolution: "No solution found"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Vertex(id: Int, label: String)
+
+record Edge(u: Int, v: Int) {
+public:
+  def connects(a: Int, b: Int): Boolean =
+    (u() == a && v() == b) || (u() == b && v() == a)
+}
+
+record ColoringStats(
+  vertices: Int,
+  edges:    Int,
+  colors:   Int,
+  alg:      String
+) {
+public:
+  def summary(): String =
+    "#{vertices()} vertices, #{edges()} edges → #{colors()} colors [#{alg()}]"
+}
+
+// ─── Graph class ──────────────────────────────────────────────────────────────
+
+class Graph {
+  var verts: Map[Int, Vertex]
+  var edgeList: List[Object]
+  var adj: Map[Int, List[Object]]
+public:
+  def this {
+    self.verts    = [:]
+    self.edgeList = []
+    self.adj      = [:]
+  }
+  def addVertex(id: Int, lbl: String): void {
+    verts[id] = new Vertex(id, lbl)
+    if adj[id] == null { adj[id] = [] }
+  }
+  def addEdge(u: Int, v: Int): void {
+    edgeList.add(new Edge(u, v))
+    if adj[u] == null { adj[u] = [] }
+    if adj[v] == null { adj[v] = [] }
+    (adj[u] as List[Object]).add(v)
+    (adj[v] as List[Object]).add(u)
+  }
+  def neighbors(id: Int): List[Object] = {
+    val ns: List[Object]? = adj[id] as List[Object]?
+    if ns != null { ns } else { [] }
+  }
+  def allIds(): List[Int] = {
+    val ids: List[Int] = []
+    foreach (k, v) in verts { ids.add(k as Int) }
+    ids
+  }
+  def getVertex(id: Int): Vertex? = verts[id] as Vertex?
+  def vertexCount: Int = verts.size
+  def edgeCount:   Int = edgeList.size
+}
+
+// ─── Coloring algorithms ──────────────────────────────────────────────────────
+
+class GraphColorSolver {
+  var graph: Graph
+public:
+  def this(g: Graph) { self.graph = g }
+
+  // Greedy: sort vertices by degree (highest first), assign smallest valid color
+  def greedy(): ColorResult {
+    val ids: List[Object] = graph.allIds().map { id -> id as Object }
+    val sorted: List[Object] = ids.sortedBy { id ->
+      0 - graph.neighbors(id as Int).size
+    }
+    val assignment: Map[Int, Int] = [:]
+    foreach id: Object in sorted {
+      val v: Int = id as Int
+      val neighborColors: List[Int] = []
+      foreach n: Object in graph.neighbors(v) {
+        val c: Int? = assignment[n as Int]
+        if c != null { neighborColors.add(c as Int) }
+      }
+      var color: Int = 0
+      var found: Boolean = false
+      while !found {
+        val col: Int = color
+        val used: Boolean = neighborColors.find { c -> c == col } != null
+        if !used { found = true } else { color++ }
+      }
+      assignment[v] = color
+    }
+    var maxColor: Int = 0
+    foreach (k, c) in assignment {
+      if (c as Int) > maxColor { maxColor = c as Int }
+    }
+    return new Colored(assignment, maxColor + 1)
+  }
+
+  // Backtracking: try to color with exactly k colors
+  def backtrack(k: Int): ColorResult {
+    val ids: List[Object] = graph.allIds().map { id -> id as Object }
+    val sortedIds: List[Object] = ids.sortedBy { id ->
+      0 - graph.neighbors(id as Int).size
+    }
+    val assignment: Map[Int, Int] = [:]
+    if btSolve(sortedIds, 0, k, assignment) {
+      var maxColor: Int = 0
+      foreach (k2, c) in assignment {
+        if (c as Int) > maxColor { maxColor = c as Int }
+      }
+      return new Colored(assignment, maxColor + 1)
+    }
+    return new NoSolution()
+  }
+
+  def btSolve(order: List[Object], pos: Int, k: Int, assignment: Map[Int, Int]): Boolean {
+    if pos == order.size { return true }
+    val vid: Int = order[pos] as Int
+    var color: Int = 0
+    while color < k {
+      if isValid(vid, color, assignment) {
+        assignment[vid] = color
+        if btSolve(order, pos + 1, k, assignment) { return true }
+        assignment.remove(vid)
+      }
+      color++
+    }
+    return false
+  }
+
+  def isValid(vid: Int, color: Int, assignment: Map[Int, Int]): Boolean = {
+    val ns: List[Object] = graph.neighbors(vid)
+    ns.find { n ->
+      val c: Object? = (assignment as Map[Object, Object])[n]
+      c != null && (c as Int) == color
+    } == null
+  }
+
+  def solve(alg: Algorithm): ColorResult = select alg {
+    case a is Greedy:    greedy()
+    case a is Backtrack: backtrack(a.maxColors())
+  }
+}
+
+// ─── Display helpers ──────────────────────────────────────────────────────────
+
+val COLOR_NAMES: List[String] = [
+  "Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Cyan", "White"
+]
+
+def colorName(c: Int): String = {
+  if c < COLOR_NAMES.size { COLOR_NAMES[c] } else { "Color" + c }
+}
+
+def printAssignment(g: Graph, assignment: Map[Int, Int]): void {
+  val sorted: List[Object] = g.allIds().sortedBy { id -> id as Int }.map { id -> id as Object }
+  foreach id: Object in sorted {
+    val vid: Int = id as Int
+    val v: Vertex? = g.getVertex(vid)
+    val lbl: String = if v != null { (v as Vertex).label() } else { "v" + vid }
+    val c: Int? = assignment[vid]
+    val cn: String = if c != null { colorName(c as Int) } else { "?" }
+    IO::println("  #{lbl} → #{cn}")
+  }
+}
+
+def runDemo(name: String, g: Graph, alg: Algorithm): void {
+  IO::println("── #{name} (#{alg.label()}) ──")
+  val solver: GraphColorSolver = new GraphColorSolver(g)
+  val result: ColorResult = solver.solve(alg)
+  IO::println("  " + result.display())
+  select result {
+    case r is Colored: printAssignment(g, r.assignment())
+    else: {}
+  }
+  IO::println("")
+}
+
+// ─── Graph builders ───────────────────────────────────────────────────────────
+
+// Petersen graph (chromatic number = 3)
+def petersenGraph(): Graph = {
+  val g: Graph = new Graph()
+  foreach i: Int in 0..<10 { g.addVertex(i, "v" + i) }
+  g.addEdge(0, 1); g.addEdge(1, 2); g.addEdge(2, 3); g.addEdge(3, 4); g.addEdge(4, 0)
+  g.addEdge(5, 7); g.addEdge(7, 9); g.addEdge(9, 6); g.addEdge(6, 8); g.addEdge(8, 5)
+  g.addEdge(0, 5); g.addEdge(1, 6); g.addEdge(2, 7); g.addEdge(3, 8); g.addEdge(4, 9)
+  g
+}
+
+// Australia map coloring (chromatic number = 3)
+def australiaGraph(): Graph = {
+  val g: Graph = new Graph()
+  g.addVertex(0, "WA");  g.addVertex(1, "NT");  g.addVertex(2, "SA")
+  g.addVertex(3, "QLD"); g.addVertex(4, "NSW"); g.addVertex(5, "VIC")
+  g.addVertex(6, "TAS")
+  g.addEdge(0, 1); g.addEdge(0, 2)
+  g.addEdge(1, 2); g.addEdge(1, 3)
+  g.addEdge(2, 3); g.addEdge(2, 4); g.addEdge(2, 5)
+  g.addEdge(3, 4); g.addEdge(4, 5); g.addEdge(5, 6)
+  g
+}
+
+// Complete graph K4 (chromatic number = 4)
+def k4Graph(): Graph = {
+  val g: Graph = new Graph()
+  foreach i: Int in 0..<4 { g.addVertex(i, "K" + i) }
+  foreach i: Int in 0..<4 {
+    foreach j: Int in (i + 1)..<4 { g.addEdge(i, j) }
+  }
+  g
+}
+
+// Bipartite graph K(4,3) (chromatic number = 2)
+def bipartiteGraph(): Graph = {
+  val g: Graph = new Graph()
+  foreach i: Int in 0..<4 { g.addVertex(i, "L" + i) }
+  foreach i: Int in 4..<7 { g.addVertex(i, "R" + (i - 4)) }
+  g.addEdge(0, 4); g.addEdge(0, 5)
+  g.addEdge(1, 4); g.addEdge(1, 6)
+  g.addEdge(2, 5); g.addEdge(2, 6)
+  g.addEdge(3, 5)
+  g
+}
+
+// Course scheduling: courses must have different timeslots if they share students
+def scheduleGraph(): Graph = {
+  val g: Graph = new Graph()
+  val courses: List[String] = ["Math", "CS", "Physics", "English", "History", "Art"]
+  foreach i: Int in 0..<courses.size { g.addVertex(i, courses[i]) }
+  g.addEdge(0, 1); g.addEdge(0, 2); g.addEdge(1, 2)
+  g.addEdge(1, 3); g.addEdge(2, 4); g.addEdge(3, 4)
+  g.addEdge(3, 5); g.addEdge(4, 5)
+  g
+}
+
+// ─── Pad helper ───────────────────────────────────────────────────────────────
+
+def pad(s: String, w: Int): String = {
+  if s.length() >= w { s.substring(0, w) }
+  else { s + Strings::repeat(" ", w - s.length()) }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Graph Coloring Demo ===")
+  IO::println("")
+
+  val au: Graph = australiaGraph()
+  runDemo("Australia (map)", au, new Greedy())
+  runDemo("Australia (map)", au, new Backtrack(3))
+
+  val bip: Graph = bipartiteGraph()
+  runDemo("Bipartite K(4,3)", bip, new Greedy())
+  runDemo("Bipartite K(4,3)", bip, new Backtrack(2))
+
+  val k4: Graph = k4Graph()
+  runDemo("Complete K4", k4, new Greedy())
+  runDemo("Complete K4", k4, new Backtrack(4))
+
+  val sched: Graph = scheduleGraph()
+  runDemo("Course Schedule", sched, new Greedy())
+
+  val pet: Graph = petersenGraph()
+  runDemo("Petersen graph", pet, new Greedy())
+  runDemo("Petersen graph", pet, new Backtrack(3))
+
+  // Summary table
+  IO::println("=== Summary ===")
+  IO::println("  " + pad("Graph", 20) + pad("V", 4) + pad("E", 4) + pad("Greedy", 10) + "Expected")
+  IO::println("  " + Strings::repeat("-", 50))
+
+  val graphNames: List[String]  = ["Australia", "Bipartite K4,3", "Complete K4", "Courses", "Petersen"]
+  val graphList:  List[Object]  = [australiaGraph(), bipartiteGraph(), k4Graph(), scheduleGraph(), petersenGraph()]
+  val expected:   List[Int]     = [3, 2, 4, 0, 3]
+
+  foreach i: Int in 0..<graphList.size {
+    val g:   Graph  = graphList[i] as Graph
+    val nm:  String = graphNames[i]
+    val exp: Int    = expected[i]
+    val solver: GraphColorSolver = new GraphColorSolver(g)
+    val result: ColorResult = solver.greedy()
+    val colors: Int = select result {
+      case c is Colored: c.chromatic()
+      else: -1
+    }
+    val expStr: String = if exp > 0 { Integer::toString(exp) } else { "?" }
+    IO::println("  " + pad(nm, 20) + pad(Integer::toString(g.vertexCount), 4) +
+      pad(Integer::toString(g.edgeCount), 4) +
+      pad(Integer::toString(colors), 10) + expStr)
+  }
+  IO::println("")
+
+  // Verify backtracking can FAIL
+  IO::println("=== Infeasibility check ===")
+  val k4solver: GraphColorSolver = new GraphColorSolver(k4Graph())
+  val impossible: ColorResult = k4solver.backtrack(3)
+  IO::println("  K4 with 3 colors: #{impossible.display()}")
+  val possible: ColorResult = k4solver.backtrack(4)
+  IO::println("  K4 with 4 colors: #{possible.display()}")
+
+  // Partition vertices by color group in Australia solution
+  IO::println("")
+  IO::println("=== Color groups (Australia, greedy) ===")
+  val auResult: ColorResult = new GraphColorSolver(australiaGraph()).greedy()
+  select auResult {
+    case r is Colored: {
+      val groups: Map[Int, List[Object]] = [:]
+      foreach (vid, c) in r.assignment() {
+        val color: Int = c as Int
+        if groups[color] == null { groups[color] = [] }
+        val vt: Vertex? = australiaGraph().getVertex(vid as Int)
+        val lbl: String = if vt != null { (vt as Vertex).label() } else { "?" }
+        (groups[color] as List[Object]).add(lbl)
+      }
+      foreach (color, members) in groups {
+        val ml: List[Object] = members as List[Object]
+        var line: String = "  " + colorName(color as Int) + ": "
+        foreach j: Int in 0..<ml.size {
+          if j > 0 { line = line + ", " }
+          line = line + (ml[j] as String)
+        }
+        IO::println(line)
+      }
+    }
+    else: {}
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

@@ -2476,10 +2476,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0061-from-re" class="md-nav__link">
+  <a href="#e0061-from-re-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0061 — from re"..." がサポートしないレコード成分型
+        E0061 — from re"..." や shape 句がサポートしないレコード成分型
       
     </span>
   </a>
@@ -6119,10 +6119,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0061-from-re" class="md-nav__link">
+  <a href="#e0061-from-re-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0061 — from re"..." がサポートしないレコード成分型
+        E0061 — from re"..." や shape 句がサポートしないレコード成分型
       
     </span>
   </a>
@@ -7331,13 +7331,15 @@ Double is used」として表面化し、修正方法を何も示しませんで
 </span></code></pre></div>
 <p>対処: まず <code>null</code> を除外してください（<code>if b != null { ... }</code>、<code>b ?: default</code>、
 <code>b?.method()</code> / <code>b?[...]</code> など）。レシーバーが確定した非 null 型を持つようにします。</p>
-<h3 id="e0061-from-re"><code>E0061</code> — <code>from re"..."</code> がサポートしないレコード成分型<a class="headerlink" href="#e0061-from-re" title="Permanent link">&para;</a></h3>
+<h3 id="e0061-from-re-shape"><code>E0061</code> — <code>from re"..."</code> や <code>shape</code> 句がサポートしないレコード成分型<a class="headerlink" href="#e0061-from-re-shape" title="Permanent link">&para;</a></h3>
 <p><code>record ... from re"..."</code> 句は、各正規表現キャプチャグループをレコード成分の型に
 変換することで <code>parse</code>/<code>parseAll</code> を導出します。この方法で生成できるのは
 <code>String</code>、<code>Int</code>、<code>Long</code>、<code>Double</code>、<code>Float</code>、<code>Boolean</code>、<code>Short</code>、<code>Byte</code> の成分だけです。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Inner</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Inner</span><span class="p">)</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr">"</span><span class="w">   </span><span class="c1">// E0061: Inner はサポートされていない成分型</span>
 </span></code></pre></div>
+<p><code>shape name = ...</code> 句（正規表現、<code>json</code>、<code>yaml</code>、<code>config</code>）も同じ方法で成分を読むため、
+同じ制限がかかります。メッセージには成分を作れなかった句（<code>shape doc = json</code>、<code>from re"..."</code>）が表示されます。</p>
 <p>対処: すべての成分をサポートされているスカラー型にとどめるか、通常の <code>from re"..."</code>
 マッチのあとで該当フィールドを手動でパースしてください。</p>
 <h3 id="e0062-derive"><code>E0062</code> — <code>derive!</code> がサポートしないレコード成分型<a class="headerlink" href="#e0062-derive" title="Permanent link">&para;</a></h3>
@@ -8233,7 +8235,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>E0061</code></td>
-<td>record component … has type …, which cannot be derived from a <code>from re"..."</code> clause</td>
+<td>record component … has type …, which cannot be derived from a <code>…</code> clause</td>
 </tr>
 <tr>
 <td><code>E0062</code></td>

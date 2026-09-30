@@ -4522,8 +4522,10 @@ mostly-pure class declares its exceptions:</p>
 <p>The table ships with the whole effectful surface of the standard library classified —
 <code>Files</code>, <code>FileResource</code>, <code>Proc</code>, <code>Http</code>, <code>HttpResource</code>, <code>Config</code>, <code>IO</code>, <code>Cli</code>,
 <code>DateTime</code>, <code>Timing</code>, <code>Rand</code>, <code>OnionMath</code>, <code>Archive</code>, <code>Db</code>, <code>Net</code>, <code>Server</code>, <code>Future</code>,
-<code>Concurrent</code>, <code>ToolCli</code> — plus the pure remainder of the stdlib, a
-pure baseline for common JDK value and collection types, and the JDK's well-known
+<code>Concurrent</code>, <code>ToolCli</code> — plus the pure remainder of the stdlib (including the nested
+values its entry points hand back, such as <code>Proc</code>'s result, <code>Http</code>'s response and
+<code>Json::value</code>), a pure baseline for common JDK value and collection types and for
+<code>java.time</code> (whose <code>now</code> methods are <code>clock</code>), and the JDK's well-known
 effect points (<code>System::getenv</code>, <code>System::exit</code>, <code>Runtime::exec</code>, <code>Thread::sleep</code>,
 <code>PrintStream</code> as the type of <code>System::out</code>).</p>
 <p>Granularity is per-type, not per-instance. A <code>PrintStream</code> over a file would be a

@@ -4276,10 +4276,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0061-record-component-type-unsupported-by-from-re" class="md-nav__link">
+  <a href="#e0061-record-component-type-unsupported-by-from-re-or-a-shape-clause" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0061 — Record component type unsupported by from re"..."
+        E0061 — Record component type unsupported by from re"..." or a shape clause
       
     </span>
   </a>
@@ -6101,10 +6101,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0061-record-component-type-unsupported-by-from-re" class="md-nav__link">
+  <a href="#e0061-record-component-type-unsupported-by-from-re-or-a-shape-clause" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0061 — Record component type unsupported by from re"..."
+        E0061 — Record component type unsupported by from re"..." or a shape clause
       
     </span>
   </a>
@@ -7315,7 +7315,7 @@ been unwrapped, or a wildcard type with no concrete upper bound.</p>
 </span></code></pre></div>
 <p>Fix: exclude <code>null</code> first (<code>if b != null { ... }</code>, <code>b ?: default</code>, or
 <code>b?.method()</code>/<code>b?[...]</code>) so the receiver has a definite, non-null type.</p>
-<h3 id="e0061-record-component-type-unsupported-by-from-re"><code>E0061</code> — Record component type unsupported by <code>from re"..."</code><a class="headerlink" href="#e0061-record-component-type-unsupported-by-from-re" title="Permanent link">&para;</a></h3>
+<h3 id="e0061-record-component-type-unsupported-by-from-re-or-a-shape-clause"><code>E0061</code> — Record component type unsupported by <code>from re"..."</code> or a <code>shape</code> clause<a class="headerlink" href="#e0061-record-component-type-unsupported-by-from-re-or-a-shape-clause" title="Permanent link">&para;</a></h3>
 <p>A <code>record ... from re"..."</code> clause derives <code>parse</code>/<code>parseAll</code> by converting each
 regex capture group to its component's type. Only <code>String</code>, <code>Int</code>, <code>Long</code>,
 <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, and <code>Byte</code> components can be produced
@@ -7323,6 +7323,9 @@ this way.</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Inner</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
 </span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Inner</span><span class="p">)</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr"> </span><span class="o">(</span><span class="se">\S</span><span class="o">+)</span><span class="sr">"</span><span class="w">   </span><span class="c1">// E0061: Inner is not a supported component type</span>
 </span></code></pre></div>
+<p>A <code>shape name = ...</code> clause (regex, <code>json</code>, <code>yaml</code> or <code>config</code>) reads its components the
+same way, so the same restriction applies; the message names the clause that could not
+produce the component (<code>shape doc = json</code>, <code>from re"..."</code>).</p>
 <p>Fix: keep every component in the supported scalar set, or parse the field
 manually after a plain <code>from re"..."</code> match on the rest.</p>
 <h3 id="e0062-record-component-type-unsupported-by-derive"><code>E0062</code> — Record component type unsupported by <code>derive!</code><a class="headerlink" href="#e0062-record-component-type-unsupported-by-derive" title="Permanent link">&para;</a></h3>
@@ -8226,7 +8229,7 @@ up; see <a href="#warnings">Warnings</a> above for the <code>W</code> codes.</p>
 </tr>
 <tr>
 <td><code>E0061</code></td>
-<td>record component … has type …, which cannot be derived from a <code>from re"..."</code> clause</td>
+<td>record component … has type …, which cannot be derived from a <code>…</code> clause</td>
 </tr>
 <tr>
 <td><code>E0062</code></td>

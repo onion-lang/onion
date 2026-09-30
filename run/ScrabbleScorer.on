@@ -1,0 +1,378 @@
+// ScrabbleScorer.on — Word scoring engine for a Scrabble-like game (~280 lines).
+// Exercises: extension String/Int, ADT enum (SquareBonus), homogeneous enum
+// with data-carrying variant, records with inline methods, interface + class
+// conformance, classes with mutable typed fields, collection pipelines
+// (map/filter/fold/groupBy/sortedBy/find/partition/any/count/distinct),
+// select/pattern-match, nullable, closures, string interpolation, recursion,
+// while/foreach, try/catch, << append.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def repeatStr(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def isAllAlpha(): Boolean {
+    if self.length() == 0 { return false }
+    var ok: Boolean = true
+    var i: Int = 0
+    while i < self.length() {
+      val code: Int = self.charAt(i) as Int
+      if code < 65 || (code > 90 && code < 97) || code > 122 { ok = false }
+      i = i + 1
+    }
+    return ok
+  }
+}
+
+extension Int {
+  def absVal(): Int = if self < 0 { -self } else { self }
+}
+
+// ─── ADT enum: board square bonus types ────────────────────────────────────────
+
+enum SquareBonus {
+  case Normal
+  case DoubleLetter
+  case TripleLetter
+  case DoubleWord
+  case TripleWord
+public:
+  def label(): String = select this {
+    case n  is Normal:        "  "
+    case dl is DoubleLetter:  "DL"
+    case tl is TripleLetter:  "TL"
+    case dw is DoubleWord:    "DW"
+    case tw is TripleWord:    "TW"
+  }
+  def letterMult(): Int = select this {
+    case dl is DoubleLetter:  2
+    case tl is TripleLetter:  3
+    else:                     1
+  }
+  def wordMult(): Int = select this {
+    case dw is DoubleWord:  2
+    case tw is TripleWord:  3
+    else:                   1
+  }
+}
+
+// ─── Homogeneous enum: player result ─────────────────────────────────────────
+
+enum GameResult {
+  WIN, DRAW, LOSS
+public:
+  def label(): String = select this {
+    case GameResult::WIN:  "Win"
+    case GameResult::DRAW: "Draw"
+    case GameResult::LOSS: "Loss"
+    else:                  "?"
+  }
+  def points(): Int = select this {
+    case GameResult::WIN:  2
+    case GameResult::DRAW: 1
+    case GameResult::LOSS: 0
+    else:                  0
+  }
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Tile(letter: String, pts: Int) {
+public:
+  def display(): String = "#{letter()}(#{pts()})"
+}
+
+record Move(player: String, word: String, score: Int, turnNo: Int) {
+public:
+  def summary(): String = "#{player()} played '#{word()}' for #{score()} pts (turn #{turnNo()})"
+  def isHighValue(): Boolean = score() >= 40
+}
+
+record Standing(player: String, score: Int, words: Int, result: GameResult) {
+public:
+  def row(): String =
+    player().padRight(14) + ("" + score()).padLeft(6) + "   " +
+    ("" + words()).padLeft(5) + "   " + result().label()
+}
+
+// ─── Interface + implementation ───────────────────────────────────────────────
+
+interface WordValidator {
+  def isValid(word: String): Boolean
+  def reason(word: String): String
+}
+
+class SimpleValidator conforms WordValidator {
+  val minLen: Int
+  val maxLen: Int
+public:
+  def this(minLen: Int, maxLen: Int) {
+    this.minLen = minLen
+    this.maxLen = maxLen
+  }
+  def isValid(word: String): Boolean =
+    word.length() >= minLen && word.length() <= maxLen && word.isAllAlpha()
+  def reason(word: String): String {
+    if !word.isAllAlpha()      { return "non-alpha characters" }
+    if word.length() < minLen  { return "too short (min #{minLen})" }
+    if word.length() > maxLen  { return "too long (max #{maxLen})" }
+    return "ok"
+  }
+}
+
+// ─── Scoring functions ────────────────────────────────────────────────────────
+
+def letterPoints(ch: String): Int {
+  val up: String = ch.toUpperCase()
+  select up {
+    case "A": return 1
+    case "E": return 1
+    case "I": return 1
+    case "O": return 1
+    case "U": return 1
+    case "L": return 1
+    case "N": return 1
+    case "S": return 1
+    case "T": return 1
+    case "R": return 1
+    case "D": return 2
+    case "G": return 2
+    case "B": return 3
+    case "C": return 3
+    case "M": return 3
+    case "P": return 3
+    case "F": return 4
+    case "H": return 4
+    case "V": return 4
+    case "W": return 4
+    case "Y": return 4
+    case "K": return 5
+    case "J": return 8
+    case "X": return 8
+    case "Q": return 10
+    case "Z": return 10
+    else: return 0
+  }
+}
+
+def scoreWord(word: String, bonuses: List[SquareBonus]): Int {
+  val upper: String = word.toUpperCase()
+  var letterSum: Int = 0
+  var wordMult: Int = 1
+  var i: Int = 0
+  while i < upper.length() {
+    val ch: String = upper.substring(i, i + 1)
+    val base: Int = letterPoints(ch)
+    val bm: SquareBonus = if i < bonuses.size { bonuses[i] as SquareBonus } else { new Normal() }
+    letterSum = letterSum + base * bm.letterMult()
+    wordMult = wordMult * bm.wordMult()
+    i = i + 1
+  }
+  val bonus: Int = if upper.length() == 7 { 50 } else { 0 }
+  return letterSum * wordMult + bonus
+}
+
+// recursive: sum base scores for a word list
+def totalBaseScore(words: List[String], idx: Int): Int {
+  if idx >= words.size { return 0 }
+  val w: String = words[idx] as String
+  return scoreWord(w, []) + totalBaseScore(words, idx + 1)
+}
+
+// ─── Game state ───────────────────────────────────────────────────────────────
+
+class ScrabbleGame {
+  var moves: List[Move]
+  val validator: WordValidator
+  var turnNo: Int
+public:
+  def this(v: WordValidator) {
+    this.moves = []
+    this.validator = v
+    this.turnNo = 1
+  }
+  def getMoves(): List[Move] = moves
+  def moveCount(): Int = moves.size
+  def playWord(player: String, word: String, bonuses: List[SquareBonus]): Boolean {
+    if !validator.isValid(word) {
+      IO::println("  INVALID: '#{word}' — " + validator.reason(word))
+      return false
+    }
+    val sc: Int = scoreWord(word, bonuses)
+    moves << new Move(player, word.toUpperCase(), sc, turnNo)
+    turnNo = turnNo + 1
+    return true
+  }
+  def standings(): List[Standing] {
+    val byPlayer = moves.groupBy { m -> (m as Move).player() }
+    var result: List[Standing] = []
+    foreach (p, ms) in byPlayer {
+      val total: Int = (ms as List[Object]).fold(0) { acc, m -> (acc as Int) + (m as Move).score() }
+      val wc: Int = (ms as List[Object]).size
+      val res: GameResult = if total >= 100 { GameResult::WIN } else { GameResult::LOSS }
+      result << new Standing(p as String, total, wc, res)
+    }
+    return result.sortedBy { s -> 0 - (s as Standing).score() }
+  }
+  def highScoreMove(): Move? {
+    if moves.size == 0 { return null }
+    return moves.fold(moves[0]) { best, m ->
+      if (m as Move).score() > (best as Move).score() { m } else { best }
+    } as Move
+  }
+  def wordsLongerThan(n: Int): List[String] {
+    return moves
+      .filter { m -> (m as Move).word().length() > n }
+      .map    { m -> (m as Move).word() }
+      .distinct()
+  }
+  def playerScore(player: String): Int {
+    return moves
+      .filter { m -> (m as Move).player() == player }
+      .fold(0) { acc, m -> (acc as Int) + (m as Move).score() }
+  }
+}
+
+// ─── Main program ─────────────────────────────────────────────────────────────
+
+def main(): void {
+  val v: SimpleValidator = new SimpleValidator(2, 15)
+  val game: ScrabbleGame = new ScrabbleGame(v)
+
+  IO::println("=".repeatStr(48))
+  IO::println("SCRABBLE SCORER — 2-player demo game")
+  IO::println("=".repeatStr(48))
+
+  // Round 1
+  game.playWord("Alice", "QUARTZ",  [new TripleWord(), new Normal(), new Normal(),
+                                     new Normal(), new Normal(), new Normal()])
+  game.playWord("Bob",   "FJORD",   [new Normal(), new Normal(), new DoubleLetter(),
+                                     new Normal(), new DoubleWord()])
+  // Round 2
+  game.playWord("Alice", "OXYGEN",  [new DoubleLetter(), new Normal(), new Normal(),
+                                     new Normal(), new TripleLetter(), new Normal()])
+  game.playWord("Bob",   "SPHINX",  [new TripleLetter(), new Normal(), new Normal(),
+                                     new Normal(), new Normal(), new DoubleWord()])
+  // Round 3 — Alice plays all 7 tiles (bingo bonus +50)
+  game.playWord("Alice", "BLAZING", [new Normal(), new Normal(), new Normal(),
+                                     new Normal(), new Normal(), new Normal(),
+                                     new Normal()])
+  game.playWord("Bob",   "WALTZ",   [new Normal(), new Normal(), new TripleLetter(),
+                                     new Normal(), new DoubleWord()])
+  // Round 4
+  game.playWord("Alice", "JUMPY",   [new Normal(), new Normal(), new Normal(),
+                                     new Normal(), new DoubleLetter()])
+  game.playWord("Bob",   "CRYPTS",  [new Normal(), new Normal(), new DoubleWord(),
+                                     new Normal(), new Normal(), new Normal()])
+
+  // Validation failures
+  IO::println("\n--- Validation tests ---")
+  game.playWord("Alice", "A",   [])
+  game.playWord("Bob",   "123", [])
+
+  // Move history
+  IO::println("\n--- Move history ---")
+  val allMoves: List[Move] = game.getMoves()
+  foreach m: Move in allMoves {
+    IO::println("  " + m.summary())
+  }
+
+  // Standings
+  IO::println("\n--- Standings ---")
+  IO::println("Player        Score   Words   Result")
+  IO::println("-".repeatStr(40))
+  foreach s: Standing in game.standings() {
+    IO::println(s.row())
+  }
+
+  val best: Move? = game.highScoreMove()
+  if best != null {
+    IO::println("\nBest move: " + (best as Move).summary())
+  }
+
+  IO::println("\nWords longer than 5 letters: " + game.wordsLongerThan(5).toString())
+
+  // Collection pipeline examples
+  val allScores: List[Int] = allMoves.map { m -> (m as Move).score() }
+  val total: Int = allScores.fold(0) { acc, s -> (acc as Int) + (s as Int) }
+  val avg: Int = if game.moveCount() > 0 { total / game.moveCount() } else { 0 }
+  IO::println("\nAll scores: " + allScores.toString())
+  IO::println("Total scored: #{total}  Average per move: #{avg}")
+
+  val highMoves: List[Move] = allMoves.filter { m -> (m as Move).isHighValue() }
+  IO::println("Moves scoring 40+: " + highMoves.size)
+
+  // partition
+  val parts = allMoves.partition { m -> (m as Move).player() == "Alice" }
+  val alicePart: List[Object] = parts[0] as List[Object]
+  val bobPart:   List[Object] = parts[1] as List[Object]
+  IO::println("Alice: #{alicePart.size} words (#{game.playerScore("Alice")} pts), Bob: #{bobPart.size} words (#{game.playerScore("Bob")} pts)")
+
+  // groupBy word-length bucket
+  val byLen = allMoves.groupBy { m ->
+    val len: Int = (m as Move).word().length()
+    if len <= 4 { "short" } else if len <= 6 { "medium" } else { "long" }
+  }
+  IO::println("\nWords by length bucket:")
+  foreach (bucket, ms) in byLen {
+    IO::println("  #{bucket}: " + (ms as List[Object]).size + " word(s)")
+  }
+
+  // recursive sum of base scores
+  val wordList: List[String] = ["QUARTZ", "SPHINX", "BLAZING"]
+  val baseTotal: Int = totalBaseScore(wordList, 0)
+  IO::println("\nBase scores for " + wordList.toString() + " = #{baseTotal}")
+
+  // any / find
+  val hasHighScore: Boolean = allMoves.any { m -> (m as Move).score() > 60 }
+  IO::println("Any move > 60 pts: #{hasHighScore}")
+
+  val firstAlice: Move? = allMoves.find { m -> (m as Move).player() == "Alice" }
+  if firstAlice != null {
+    IO::println("Alice's first move: " + (firstAlice as Move).word())
+  }
+
+  // sortedBy score descending — top 3
+  val ranked: List[Move] = allMoves.sortedBy { m -> 0 - (m as Move).score() }
+  IO::println("\nTop 3 moves:")
+  var rank: Int = 1
+  foreach m: Move in ranked {
+    if rank <= 3 {
+      IO::println("  " + rank + ". " + m.summary())
+      rank = rank + 1
+    }
+  }
+
+  // try/catch
+  IO::println("\n--- Error handling ---")
+  try {
+    val divisor: Int = allMoves.filter { m -> (m as Move).score() > 9999 }.size
+    val bad: Int = total / divisor
+    IO::println("unreachable: " + bad)
+  } catch e: Exception {
+    IO::println("Caught expected: division by zero guard fired")
+  }
+
+  // distinct + count
+  val distinctWords: List[String] = allMoves.map { m -> (m as Move).word() }.distinct()
+  val longWordCount: Int = allMoves.count { m -> (m as Move).word().length() >= 6 }
+  IO::println("\nDistinct words played: " + distinctWords.size)
+  IO::println("Words with 6+ letters: " + longWordCount)
+
+  IO::println("\n" + "=".repeatStr(48))
+  IO::println("Demo complete — " + game.moveCount() + " valid moves played.")
+}

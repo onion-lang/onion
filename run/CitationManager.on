@@ -1,0 +1,293 @@
+// CitationManager.on — academic citation management system
+// Exercises: records with methods, data-carrying enums, ADT enum, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/
+// sortedBy/distinct/find/partition/zip), select/pattern matching, nullable,
+// closures, string interpolation, try/catch, recursion, while, foreach ranges.
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CitationStyle { APA, MLA, BibTeX, Chicago }
+
+enum VenueType(abbrev: String, prestigious: Boolean) {
+  Journal("J", true),
+  Conference("C", true),
+  Workshop("W", false),
+  Preprint("P", false),
+  Book("B", true)
+}
+
+// ─── ADT: SearchResult ────────────────────────────────────────────────────────
+
+enum SearchResult {
+  case Found(paperId: Int)
+  case Ambiguous(candidates: Int)
+  case NotFound
+public:
+  def describe(): String = select this {
+    case r is Found:     "found paper ##{r.paperId()}"
+    case r is Ambiguous: "#{r.candidates()} matches — please narrow"
+    case n is NotFound:  "no results"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Author(firstName: String, lastName: String, affiliation: String) {
+public:
+  def fullName(): String     = "#{firstName()} #{lastName()}"
+  def shortName(): String    = "#{firstName().charAt(0)}. #{lastName()}"
+  def key(): String          = lastName().toLowerCase() + firstName().toLowerCase().charAt(0)
+}
+
+record Paper(
+  id: Int,
+  title: String,
+  authors: List[Author],
+  year: Int,
+  venueType: VenueType,
+  venue: String,
+  keywords: List[String],
+  doi: String
+) {
+public:
+  def firstAuthor(): Author = authors()[0] as Author
+  def shortCite(): String   = "#{firstAuthor().lastName()} et al. (#{year()})"
+  def isJournalOrConf(): Boolean =
+    venueType() == VenueType::Journal || venueType() == VenueType::Conference
+}
+
+record CitationEdge(fromId: Int, toId: Int)
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension String {
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n) + "…"
+  }
+  def repeat(n: Int): String {
+    var result: String = ""
+    var i = 0
+    while i < n { result = result + self; i = i + 1 }
+    return result
+  }
+}
+
+extension Int {
+  def pad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── Sample Data ──────────────────────────────────────────────────────────────
+
+val alice  = new Author("Alice", "Chen",    "MIT")
+val bob    = new Author("Bob",   "Nguyen",  "Stanford")
+val carol  = new Author("Carol", "Martins", "CMU")
+val dave   = new Author("Dave",  "Okafor",  "Berkeley")
+val eve    = new Author("Eve",   "Schulz",  "Oxford")
+
+val papers: List[Paper] = [
+  new Paper(1, "Efficient Graph Traversal for Large-Scale Networks",
+    [alice, bob], 2019, VenueType::Journal, "IEEE Trans. Netw.", ["graph", "BFS", "DFS"], "10.1109/tnet.2019.01"),
+  new Paper(2, "Neural Compression of Knowledge Graphs",
+    [carol], 2020, VenueType::Conference, "NeurIPS", ["neural", "compression", "graphs"], "10.5555/neurips.2020.02"),
+  new Paper(3, "Adaptive Caching Strategies in Distributed Systems",
+    [bob, dave], 2021, VenueType::Journal, "VLDB J.", ["cache", "distributed", "adaptive"], "10.1007/vldb.2021.03"),
+  new Paper(4, "Towards Explainable Graph Neural Networks",
+    [carol, alice, eve], 2021, VenueType::Conference, "ICML", ["GNN", "explainability", "neural"], "10.5555/icml.2021.04"),
+  new Paper(5, "Concurrent B-Tree Operations Without Locking",
+    [dave], 2022, VenueType::Journal, "ACM TODS", ["B-tree", "concurrency", "lock-free"], "10.1145/tods.2022.05"),
+  new Paper(6, "Self-Supervised Learning on Heterogeneous Graphs",
+    [eve, carol], 2022, VenueType::Conference, "KDD", ["graphs", "self-supervised", "neural"], "10.1145/kdd.2022.06"),
+  new Paper(7, "Streaming Joins for Real-Time Analytics",
+    [alice, dave], 2023, VenueType::Workshop, "VLDB Workshop", ["streaming", "joins", "analytics"], "10.1145/vldb-ws.2023.07"),
+  new Paper(8, "A Survey of Graph Database Query Languages",
+    [bob, eve, alice], 2023, VenueType::Journal, "ACM Comput. Surv.", ["survey", "graph", "query"], "10.1145/csur.2023.08"),
+  new Paper(9, "Privacy-Preserving Federated Learning",
+    [carol, dave], 2023, VenueType::Preprint, "arXiv", ["federated", "privacy", "learning"], "arXiv:2309.09"),
+  new Paper(10, "Learned Index Structures: A Decade Later",
+    [alice, bob, carol], 2024, VenueType::Conference, "SIGMOD", ["index", "learned", "database"], "10.1145/sigmod.2024.10")
+]
+
+val edges: List[CitationEdge] = [
+  new CitationEdge(2, 1),
+  new CitationEdge(4, 2),
+  new CitationEdge(4, 1),
+  new CitationEdge(6, 2),
+  new CitationEdge(6, 4),
+  new CitationEdge(7, 3),
+  new CitationEdge(8, 1),
+  new CitationEdge(8, 3),
+  new CitationEdge(8, 5),
+  new CitationEdge(9, 4),
+  new CitationEdge(9, 6),
+  new CitationEdge(10, 1),
+  new CitationEdge(10, 3),
+  new CitationEdge(10, 8)
+]
+
+// ─── Analysis functions ───────────────────────────────────────────────────────
+
+def citationCount(paperId: Int): Int =
+  edges.filter { e -> (e as CitationEdge).toId() == paperId }.size
+
+def paperById(id: Int): Paper? =
+  papers.find { p -> (p as Paper).id() == id } as Paper?
+
+def searchByKeyword(kw: String): SearchResult {
+  val matches = papers.filter { p ->
+    (p as Paper).keywords().find { k -> (k as String).toLowerCase() == kw.toLowerCase() } != null
+  }
+  select matches.size {
+    case 0: return new NotFound()
+    case 1: return new Found((matches[0] as Paper).id())
+    else:   return new Ambiguous(matches.size)
+  }
+}
+
+def formatAPA(p: Paper): String {
+  val authorStr: String = if p.authors().size == 1 {
+    (p.authors()[0] as Author).fullName()
+  } else if p.authors().size == 2 {
+    (p.authors()[0] as Author).fullName() + " & " + (p.authors()[1] as Author).fullName()
+  } else {
+    (p.authors()[0] as Author).fullName() + " et al."
+  }
+  return "#{authorStr} (#{p.year()}). #{p.title()}. #{p.venue()}."
+}
+
+def formatBibTeX(p: Paper): String {
+  val key = p.firstAuthor().lastName().toLowerCase() + p.year()
+  val type_ = select p.venueType() {
+    case VenueType::Journal:    "@article"
+    case VenueType::Conference: "@inproceedings"
+    case VenueType::Book:       "@book"
+    else:                       "@misc"
+  }
+  return "#{type_}{#{key},\n  title={#{p.title()}},\n  author={#{(p.authors()[0] as Author).fullName()}},\n  year={#{p.year()}},\n  doi={#{p.doi()}}\n}"
+}
+
+def authorPaperCount(a: Author): Int =
+  papers.filter { p ->
+    (p as Paper).authors().find { au -> (au as Author).key() == a.key() } != null
+  }.size
+
+// ─── Separator helper ─────────────────────────────────────────────────────────
+def sep(title: String): void {
+  IO::println("\n── " + title + " " + "─".repeat(50 - title.length()))
+}
+
+// ─── Main output ──────────────────────────────────────────────────────────────
+
+sep("ALL PAPERS")
+foreach p: Paper in papers {
+  val cnt = citationCount(p.id())
+  IO::println("  [#{p.id().pad(2)}] #{p.title().truncate(50)} (#{p.year()}) #{p.venueType().abbrev()} cited:#{cnt}")
+}
+
+sep("PAPERS BY VENUE TYPE")
+val byVenue = papers.groupBy { p -> (p as Paper).venueType().abbrev() }
+foreach (k, v) in byVenue {
+  val vtype = k as String
+  val vpapers = v as List[Paper]
+  IO::println("  #{vtype} (#{vpapers.size} papers): " +
+    vpapers.map { p -> (p as Paper).id() }.toString())
+}
+
+sep("TOP CITED PAPERS")
+val ranked = papers.sortedBy { p -> 0 - citationCount((p as Paper).id()) }
+foreach p: Paper in ranked {
+  val cnt = citationCount(p.id())
+  if cnt > 0 {
+    IO::println("  #{cnt} citation(s): #{p.title().truncate(45)}")
+  }
+}
+
+sep("PAPERS PER YEAR")
+val byYear = papers.groupBy { p -> "" + (p as Paper).year() }
+val years = papers.map { p -> "" + (p as Paper).year() }.distinct().sortedBy { y -> y as String }
+foreach yr: String in years {
+  val ypapers = byYear.get(yr) as List[Paper]
+  IO::println("  #{yr}: #{ypapers.size} paper(s)")
+}
+
+sep("AUTHOR PRODUCTIVITY")
+val authors: List[Author] = [alice, bob, carol, dave, eve]
+val sorted = authors.sortedBy { a -> 0 - authorPaperCount(a as Author) }
+foreach a: Author in sorted {
+  val cnt = authorPaperCount(a)
+  IO::println("  #{a.fullName()} (#{a.affiliation()}): #{cnt} paper(s)")
+}
+
+sep("KEYWORD SEARCH")
+val kwTests: List[String] = ["graph", "neural", "streaming", "quantum"]
+foreach kw: String in kwTests {
+  val result = searchByKeyword(kw)
+  IO::println("  search(#{kw}): #{result.describe()}")
+}
+
+sep("APA CITATION SAMPLES")
+val topPapers = papers.filter { p -> citationCount((p as Paper).id()) >= 3 }
+foreach p: Paper in topPapers {
+  IO::println("  " + formatAPA(p))
+}
+
+sep("BIBTEX SAMPLE")
+val p1 = paperById(1)
+if p1 != null {
+  IO::println(formatBibTeX(p1 as Paper))
+}
+
+sep("CITED-BY CHAINS")
+def inboundIds(id: Int): List[Int] =
+  edges.filter { e -> (e as CitationEdge).toId() == id }
+       .map    { e -> (e as CitationEdge).fromId() }
+
+def outboundIds(id: Int): List[Int] =
+  edges.filter { e -> (e as CitationEdge).fromId() == id }
+       .map    { e -> (e as CitationEdge).toId() }
+
+foreach p: Paper in papers {
+  val ins = inboundIds(p.id())
+  if ins.size > 0 {
+    IO::println("  #{p.title().truncate(40)} ← cited by ids #{ins.toString()}")
+  }
+}
+
+sep("CO-AUTHOR PAIRS")
+var pairCount = 0
+foreach p: Paper in papers {
+  val auths = p.authors()
+  if auths.size >= 2 {
+    var i = 0
+    while i < auths.size - 1 {
+      var j = i + 1
+      while j < auths.size {
+        val a1 = auths[i] as Author
+        val a2 = auths[j] as Author
+        IO::println("  #{a1.shortName()} & #{a2.shortName()} (paper ##{p.id()})")
+        pairCount = pairCount + 1
+        j = j + 1
+      }
+      i = i + 1
+    }
+  }
+}
+IO::println("  Total co-author relationships: #{pairCount}")
+
+sep("PRESTIGIOUS VENUES ONLY")
+val prestigious = papers.filter { p -> (p as Paper).venueType().prestigious() }
+IO::println("  #{prestigious.size} of #{papers.size} papers in prestigious venues")
+
+sep("SUMMARY STATISTICS")
+val totalCited = papers.filter { p -> citationCount((p as Paper).id()) > 0 }.size
+val totalEdges = edges.size
+val avgCitations = if papers.size > 0 { totalEdges * 10 / papers.size } else { 0 }
+IO::println("  Total papers:    #{papers.size}")
+IO::println("  Total citations: #{totalEdges}")
+IO::println("  Cited papers:    #{totalCited}")
+IO::println("  Avg citations:   #{avgCitations / 10}.#{avgCitations % 10}")
+IO::println("  Authors tracked: #{authors.size}")

@@ -1,0 +1,322 @@
+// SegmentTree.on — segment tree with lazy-propagation range-add
+// Exercises: ADT enums, records with methods, classes with accessors,
+// recursion, foreach (list + range), pattern matching, closures,
+// string interpolation, nullable, Boolean pipelines.
+
+import {
+  java.lang.Long as JLong
+}
+
+// ─── ADT: query flavour ───────────────────────────────────────────────────────
+
+enum QueryOp {
+  case RangeSum
+  case RangeMin
+  case RangeMax
+public:
+  def label(): String = select this {
+    case q is RangeSum: "SUM"
+    case q is RangeMin: "MIN"
+    case q is RangeMax: "MAX"
+  }
+}
+
+// ─── ADT: update flavour ──────────────────────────────────────────────────────
+
+enum UpdateOp {
+  case PointSet(index: Int, value: Long)
+  case RangeAdd(lo: Int, hi: Int, delta: Long)
+public:
+  def describe(): String = select this {
+    case u is PointSet: "set[#{u.index()}]=#{u.value()}"
+    case u is RangeAdd: "add #{u.delta()} to [#{u.lo()}..#{u.hi()}]"
+  }
+}
+
+// ─── Record: a checked query ─────────────────────────────────────────────────
+
+record QueryResult(op: QueryOp, lo: Int, hi: Int, expected: Long) {
+public:
+  def label(): String = "#{op().label()}[#{lo()}..#{hi()}] = #{expected()}"
+}
+
+// ─── Segment-tree node (lazy add-delta) ───────────────────────────────────────
+
+class SegNode {
+  var sum:  Long
+  var minV: Long
+  var maxV: Long
+  var lazy: Long
+  var cnt:  Int
+
+public:
+  def this(s: Long, mn: Long, mx: Long, c: Int) {
+    self.sum  = s
+    self.minV = mn
+    self.maxV = mx
+    self.lazy = 0L
+    self.cnt  = c
+  }
+
+  def getSum(): Long = sum
+  def getMin(): Long = minV
+  def getMax(): Long = maxV
+
+  def forceSet(v: Long): void {
+    sum  = v
+    minV = v
+    maxV = v
+    lazy = 0L
+  }
+
+  def applyAdd(delta: Long): void {
+    sum  = sum  + delta * cnt
+    minV = minV + delta
+    maxV = maxV + delta
+    lazy = lazy + delta
+  }
+
+  def pushDown(left: SegNode, right: SegNode): void {
+    if lazy != 0L {
+      left.applyAdd(lazy)
+      right.applyAdd(lazy)
+      lazy = 0L
+    }
+  }
+
+  def pullUp(left: SegNode, right: SegNode): void {
+    sum  = left.sum  + right.sum
+    minV = if left.minV < right.minV { left.minV } else { right.minV }
+    maxV = if left.maxV > right.maxV { left.maxV } else { right.maxV }
+  }
+}
+
+// ─── Segment Tree ─────────────────────────────────────────────────────────────
+
+class SegmentTree {
+  val n:    Int
+  val tree: SegNode[]
+
+public:
+  def this(data: Long[]) {
+    self.n    = data.length
+    self.tree = new SegNode[4 * n]
+    build(data, 1, 0, n - 1)
+  }
+
+  def build(data: Long[], node: Int, lo: Int, hi: Int): void {
+    if lo == hi {
+      tree[node] = new SegNode(data[lo], data[lo], data[lo], 1)
+      return
+    }
+    val mid: Int = (lo + hi) / 2
+    build(data, 2 * node,     lo,      mid)
+    build(data, 2 * node + 1, mid + 1, hi)
+    tree[node] = new SegNode(0L, 0L, 0L, hi - lo + 1)
+    tree[node].pullUp(tree[2 * node], tree[2 * node + 1])
+  }
+
+  def queryRange(op: QueryOp, lo: Int, hi: Int): Long =
+    doQuery(op, 1, 0, n - 1, lo, hi)
+
+  def doQuery(op: QueryOp, node: Int, lo: Int, hi: Int, qlo: Int, qhi: Int): Long {
+    if qlo > hi || qhi < lo {
+      return select op {
+        case q is RangeSum: 0L
+        case q is RangeMin: JLong::MAX_VALUE
+        case q is RangeMax: JLong::MIN_VALUE
+      }
+    }
+    if qlo <= lo && hi <= qhi {
+      return select op {
+        case q is RangeSum: tree[node].getSum()
+        case q is RangeMin: tree[node].getMin()
+        case q is RangeMax: tree[node].getMax()
+      }
+    }
+    val mid: Int = (lo + hi) / 2
+    tree[node].pushDown(tree[2 * node], tree[2 * node + 1])
+    val lv: Long = doQuery(op, 2 * node,     lo,      mid, qlo, qhi)
+    val rv: Long = doQuery(op, 2 * node + 1, mid + 1, hi,  qlo, qhi)
+    return select op {
+      case q is RangeSum: lv + rv
+      case q is RangeMin: if lv < rv { lv } else { rv }
+      case q is RangeMax: if lv > rv { lv } else { rv }
+    }
+  }
+
+  def update(op: UpdateOp): void {
+    select op {
+      case u is PointSet: doPointSet(1, 0, n - 1, u.index(), u.value())
+      case u is RangeAdd: doRangeAdd(1, 0, n - 1, u.lo(), u.hi(), u.delta())
+    }
+  }
+
+  def doPointSet(node: Int, lo: Int, hi: Int, idx: Int, v: Long): void {
+    if lo == hi {
+      tree[node].forceSet(v)
+      return
+    }
+    val mid: Int = (lo + hi) / 2
+    tree[node].pushDown(tree[2 * node], tree[2 * node + 1])
+    if idx <= mid { doPointSet(2 * node,     lo,      mid, idx, v) }
+    else          { doPointSet(2 * node + 1, mid + 1, hi,  idx, v) }
+    tree[node].pullUp(tree[2 * node], tree[2 * node + 1])
+  }
+
+  def doRangeAdd(node: Int, lo: Int, hi: Int, qlo: Int, qhi: Int, delta: Long): void {
+    if qlo > hi || qhi < lo { return }
+    if qlo <= lo && hi <= qhi {
+      tree[node].applyAdd(delta)
+      return
+    }
+    val mid: Int = (lo + hi) / 2
+    tree[node].pushDown(tree[2 * node], tree[2 * node + 1])
+    doRangeAdd(2 * node,     lo,      mid, qlo, qhi, delta)
+    doRangeAdd(2 * node + 1, mid + 1, hi,  qlo, qhi, delta)
+    tree[node].pullUp(tree[2 * node], tree[2 * node + 1])
+  }
+}
+
+// ─── Suite runner ─────────────────────────────────────────────────────────────
+
+def runSuite(name: String, data: Long[], ops: List[UpdateOp], checks: List[QueryResult]): Boolean {
+  IO::println("── #{name} ─────────────────────────────────────────────────")
+  val st: SegmentTree = new SegmentTree(data)
+  foreach op: UpdateOp in ops {
+    IO::println("  upd: #{op.describe()}")
+    st.update(op)
+  }
+  var allOk: Boolean = true
+  foreach chk: QueryResult in checks {
+    val got: Long = st.queryRange(chk.op(), chk.lo(), chk.hi())
+    val ok: Boolean = got == chk.expected()
+    IO::println("  #{if ok { "✓" } else { "✗" }} #{chk.label()} (got=#{got})")
+    if !ok { allOk = false }
+  }
+  return allOk
+}
+
+def makeData(ints: List[Int]): Long[] {
+  val a: Long[] = new Long[ints.size]
+  var i: Int = 0
+  foreach v: Int in ints {
+    a[i] = v
+    i++
+  }
+  return a
+}
+
+// ─── Suite 1: basic, no updates ───────────────────────────────────────────────
+
+val r1: Boolean = runSuite(
+  "Basic sum/min/max",
+  makeData([1, 2, 3, 4, 5]),
+  [],
+  [
+    new QueryResult(new RangeSum(), 0, 4, 15L),
+    new QueryResult(new RangeMin(), 0, 4, 1L),
+    new QueryResult(new RangeMax(), 0, 4, 5L),
+    new QueryResult(new RangeSum(), 1, 3, 9L),
+    new QueryResult(new RangeMin(), 2, 4, 3L),
+    new QueryResult(new RangeMax(), 0, 2, 3L)
+  ]
+)
+IO::println("")
+
+// ─── Suite 2: point-set + range-add ──────────────────────────────────────────
+// [10,20,30,40,50] → set[2]=100 → [10,20,100,40,50]
+//                 → add+5 on [1..3] → [10,25,105,45,50]
+
+val r2: Boolean = runSuite(
+  "Point-set + range-add",
+  makeData([10, 20, 30, 40, 50]),
+  [
+    new PointSet(2, 100L),
+    new RangeAdd(1, 3, 5L)
+  ],
+  [
+    new QueryResult(new RangeSum(), 0, 4, 235L),
+    new QueryResult(new RangeMin(), 0, 4, 10L),
+    new QueryResult(new RangeMax(), 0, 4, 105L),
+    new QueryResult(new RangeSum(), 1, 3, 175L),
+    new QueryResult(new RangeMin(), 1, 3, 25L),
+    new QueryResult(new RangeMax(), 1, 3, 105L)
+  ]
+)
+IO::println("")
+
+// ─── Suite 3: nested lazy range-adds ─────────────────────────────────────────
+// [7×8] → +3 all → [10×8]
+//       → −4 on [2..5] → [10,10,6,6,6,6,10,10]
+//       → +10 on [4..6] → [10,10,6,6,16,16,20,10]  sum=94
+
+val r3: Boolean = runSuite(
+  "Nested lazy range-adds",
+  makeData([7, 7, 7, 7, 7, 7, 7, 7]),
+  [
+    new RangeAdd(0, 7, 3L),
+    new RangeAdd(2, 5, -4L),
+    new RangeAdd(4, 6, 10L)
+  ],
+  [
+    new QueryResult(new RangeSum(), 0, 7, 94L),
+    new QueryResult(new RangeMin(), 0, 7, 6L),
+    new QueryResult(new RangeMax(), 0, 7, 20L),
+    new QueryResult(new RangeSum(), 2, 5, 44L),
+    new QueryResult(new RangeMax(), 4, 6, 20L)
+  ]
+)
+IO::println("")
+
+// ─── Suite 4: 16-element descending ──────────────────────────────────────────
+
+val r4: Boolean = runSuite(
+  "Descending 16..1",
+  makeData([16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1]),
+  [],
+  [
+    new QueryResult(new RangeSum(), 0, 15, 136L),
+    new QueryResult(new RangeSum(), 0,  7, 100L),
+    new QueryResult(new RangeSum(), 8, 15,  36L),
+    new QueryResult(new RangeMin(), 0, 15,   1L),
+    new QueryResult(new RangeMax(), 0, 15,  16L)
+  ]
+)
+IO::println("")
+
+// ─── Suite 5: interleaved point-set + range-add ───────────────────────────────
+// [1..8] → set[0]=100 → [100,2..8]
+//        → set[7]=200 → [100,2,3,4,5,6,7,200]
+//        → add+1 all  → [101,3,4,5,6,7,8,201]  sum=335
+
+val r5: Boolean = runSuite(
+  "Interleaved point-set + range-add",
+  makeData([1, 2, 3, 4, 5, 6, 7, 8]),
+  [
+    new PointSet(0, 100L),
+    new PointSet(7, 200L),
+    new RangeAdd(0, 7, 1L)
+  ],
+  [
+    new QueryResult(new RangeSum(), 0, 7, 335L),
+    new QueryResult(new RangeMin(), 0, 7, 3L),
+    new QueryResult(new RangeMax(), 0, 7, 201L),
+    new QueryResult(new RangeSum(), 1, 6,  33L)
+  ]
+)
+IO::println("")
+
+// ─── Summary ─────────────────────────────────────────────────────────────────
+
+val results: List[Boolean] = [r1, r2, r3, r4, r5]
+val total:  Int = results.size
+val passed: Int = results.filter { b -> (b as Boolean) }.size
+
+IO::println("═══════════════════════════════════════════════════════════")
+IO::println("#{passed}/#{total} suites passed")
+if passed == total {
+  IO::println("All segment-tree tests passed.")
+} else {
+  IO::println("FAILURES detected — see above.")
+}

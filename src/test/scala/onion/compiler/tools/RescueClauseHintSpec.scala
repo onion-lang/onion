@@ -54,5 +54,42 @@ class RescueClauseHintSpec extends AbstractShellSpec {
       ).mkString("\n")
       assert(!msgs.contains("rescue"), s"hint should not fire without a `rescue`, got: $msgs")
     }
+
+    it("hints at catch when the closing brace is on the previous line") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    try {
+          |      IO::println("risky")
+          |    }
+          |    rescue e: Exception {
+          |      IO::println("caught")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("catch"), s"expected a hint mentioning catch, got: $msgs")
+      assert(msgs.contains("rescue"), s"expected the hint to name rescue, got: $msgs")
+    }
+
+    it("does not fire when `rescue` is merely an identifier elsewhere on the error line") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    foo bar; val rescue = 1
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(!msgs.contains("rescue"), s"hint should not fire for an unrelated `rescue` identifier, got: $msgs")
+      assert(msgs.contains("foo(...)"), s"expected the missing-call-parens hint instead, got: $msgs")
+    }
   }
 }

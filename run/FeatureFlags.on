@@ -1,0 +1,245 @@
+// Feature Flag / Feature Toggle Management System
+// Demonstrates: records, enums, classes, pipelines, pattern matching,
+// nullable types, string interpolation, generics, closures, ArrayList
+
+import {
+  java.util.ArrayList
+}
+
+enum Environment { Development, Staging, Production }
+
+enum FlagStatus { Active, Disabled, Deprecated }
+
+enum RuleType { AlwaysOn, AlwaysOff, UserAllowlist, PercentRollout, EnvironmentFilter, DateRange }
+
+record Rule(ruleType: RuleType, value: String) {
+public:
+  def description(): String = select ruleType() {
+    case RuleType::AlwaysOn:          "always enabled"
+    case RuleType::AlwaysOff:         "always disabled"
+    case RuleType::UserAllowlist:     "users: #{value()}"
+    case RuleType::PercentRollout:    "#{value()}% rollout"
+    case RuleType::EnvironmentFilter: "env: #{value()}"
+    case RuleType::DateRange:         "dates: #{value()}"
+    else: "unknown rule"
+  }
+}
+
+record EvaluationContext(userId: String, env: Environment, nowDate: String)
+
+record EvaluationResult(flagName: String, enabled: Boolean, reason: String) {
+public:
+  def summary(): String = "#{flagName()}: #{if enabled() { "ON" } else { "OFF" }} (#{reason()})"
+}
+
+// Evaluate a single rule against a context; returns null if the rule doesn't match
+def evalRule(flagName: String, rule: Rule, ctx: EvaluationContext): EvaluationResult? {
+  select rule.ruleType() {
+    case RuleType::AlwaysOn:
+      return new EvaluationResult(flagName, true, "always-on rule")
+    case RuleType::AlwaysOff:
+      return new EvaluationResult(flagName, false, "always-off rule")
+    case RuleType::UserAllowlist: {
+      val allowed: List[String] = Strings::split(rule.value(), ",")
+      if allowed.contains(ctx.userId()) {
+        return new EvaluationResult(flagName, true, "user #{ctx.userId()} allowlisted")
+      } else {
+        return null
+      }
+    }
+    case RuleType::PercentRollout: {
+      val pct: Int = Integer::parseInt(rule.value())
+      val raw: Int = ctx.userId().hashCode() % 100
+      val hash: Int = if raw < 0 { raw + 100 } else { raw }
+      if hash < pct {
+        return new EvaluationResult(flagName, true, "#{pct}% rollout (hash=#{hash})")
+      } else {
+        return new EvaluationResult(flagName, false, "outside #{pct}% rollout (hash=#{hash})")
+      }
+    }
+    case RuleType::EnvironmentFilter: {
+      val targetEnv: String = rule.value()
+      val ctxEnv: String = ctx.env().name()
+      if ctxEnv == targetEnv {
+        return new EvaluationResult(flagName, true, "env matched: #{targetEnv}")
+      } else {
+        return null
+      }
+    }
+    case RuleType::DateRange: {
+      val parts: List[String] = Strings::split(rule.value(), ":")
+      val from: String = parts[0]
+      val to: String = parts[1]
+      val now: String = ctx.nowDate()
+      if now.compareTo(from) >= 0 && now.compareTo(to) <= 0 {
+        return new EvaluationResult(flagName, true, "in date range #{from}..#{to}")
+      } else {
+        return new EvaluationResult(flagName, false, "outside date range #{from}..#{to}")
+      }
+    }
+    else:
+      return null
+  }
+}
+
+record Flag(
+  name: String,
+  status: FlagStatus,
+  description: String,
+  rules: List[Rule]
+) {
+public:
+  def isLive(): Boolean = status() == FlagStatus::Active
+  def ruleCount(): Int = rules().size
+
+  def evaluate(ctx: EvaluationContext): EvaluationResult {
+    if status() == FlagStatus::Disabled {
+      return new EvaluationResult(name(), false, "flag disabled")
+    }
+    if status() == FlagStatus::Deprecated {
+      return new EvaluationResult(name(), false, "flag deprecated")
+    }
+    var first: EvaluationResult? = null
+    foreach rule: Rule in rules() {
+      if first == null {
+        val outcome: EvaluationResult? = evalRule(name(), rule, ctx)
+        if outcome != null { first = outcome }
+      }
+    }
+    return first ?: new EvaluationResult(name(), false, "no matching rule")
+  }
+}
+
+class FlagRegistry {
+  var flags: ArrayList[Flag]
+
+public:
+  def this {
+    flags = new ArrayList[Flag]()
+  }
+
+  def register(f: Flag): void { flags.add(f) }
+
+  def get(flagName: String): Flag? {
+    val list: List[Flag] = flags
+    return list.find { f: Flag -> f.name() == flagName }
+  }
+
+  def evaluate(ctx: EvaluationContext): List[EvaluationResult] {
+    val list: List[Flag] = flags
+    return list.map { f: Flag -> f.evaluate(ctx) }
+  }
+
+  def evaluateActive(ctx: EvaluationContext): List[EvaluationResult] {
+    val list: List[Flag] = flags
+    return list.filter { f: Flag -> f.isLive() }.map { f: Flag -> f.evaluate(ctx) }
+  }
+
+  def activeCount(): Int {
+    val list: List[Flag] = flags
+    return list.filter { f: Flag -> f.isLive() }.size
+  }
+
+  def totalCount(): Int { return flags.size }
+
+  def allFlags(): List[Flag] { return flags }
+}
+
+// ──── Factory helpers ────────────────────────────────────────────────────────
+
+def alwaysOn(): Rule  = new Rule(RuleType::AlwaysOn,  "")
+def alwaysOff(): Rule = new Rule(RuleType::AlwaysOff, "")
+def forUsers(csv: String): Rule = new Rule(RuleType::UserAllowlist,     csv)
+def forPct(pct: Int): Rule      = new Rule(RuleType::PercentRollout,    pct + "")
+def forEnv(env: String): Rule   = new Rule(RuleType::EnvironmentFilter, env)
+def forDates(from: String, to: String): Rule = new Rule(RuleType::DateRange, from + ":" + to)
+
+def buildRegistry(): FlagRegistry {
+  val reg: FlagRegistry = new FlagRegistry()
+  reg.register(new Flag("dark_mode",         FlagStatus::Active,     "Dark UI theme",            [alwaysOn()]))
+  reg.register(new Flag("new_dashboard",     FlagStatus::Active,     "Redesigned dashboard",     [forPct(30)]))
+  reg.register(new Flag("beta_editor",       FlagStatus::Active,     "New code editor",          [forUsers("alice,bob,carol"), forEnv("Development")]))
+  reg.register(new Flag("ml_recommendations",FlagStatus::Active,     "ML recommendations",       [forPct(50)]))
+  reg.register(new Flag("legacy_export",     FlagStatus::Deprecated, "Old CSV export path",      [alwaysOff()]))
+  reg.register(new Flag("holiday_banner",    FlagStatus::Active,     "Holiday banner",           [forDates("2025-12-01", "2025-12-31")]))
+  reg.register(new Flag("canary_api",        FlagStatus::Active,     "Canary API v2 rollout",    [forEnv("Staging"), forPct(10)]))
+  reg.register(new Flag("maintenance_mode",  FlagStatus::Disabled,   "Emergency maintenance",    [alwaysOn()]))
+  return reg
+}
+
+def printResults(ctx: EvaluationContext, results: List[EvaluationResult]): void {
+  IO::println("  User=#{ctx.userId()}  Env=#{ctx.env().name()}  Date=#{ctx.nowDate()}")
+  foreach r: EvaluationResult in results {
+    IO::println("    " + r.summary())
+  }
+}
+
+// ──── Main ───────────────────────────────────────────────────────────────────
+
+val registry: FlagRegistry = buildRegistry()
+IO::println("Feature Flag Registry: #{registry.totalCount()} flags (#{registry.activeCount()} active)\n")
+
+val users: List[String] = ["alice", "charlie", "dave", "eve"]
+val envs: List[Environment] = [Environment::Development, Environment::Production]
+val today: String = "2025-12-15"
+
+foreach env: Environment in envs {
+  IO::println("=== Environment: #{env.name()} ===")
+  foreach userId: String in users {
+    val ctx: EvaluationContext = new EvaluationContext(userId, env, today)
+    val results: List[EvaluationResult] = registry.evaluateActive(ctx)
+    printResults(ctx, results)
+  }
+  IO::println("")
+}
+
+// Flag inventory
+IO::println("=== Flag Inventory ===")
+foreach f: Flag in registry.allFlags() {
+  IO::println("  [#{f.status().name()}] #{f.name()} — #{f.description()} (#{f.ruleCount()} rule(s))")
+  foreach r: Rule in f.rules() {
+    IO::println("    └─ #{r.description()}")
+  }
+}
+
+// Deep-dive into beta_editor
+IO::println("\n=== beta_editor deep-dive ===")
+val betaFlag: Flag? = registry.get("beta_editor")
+if betaFlag != null {
+  val testUsers: List[String] = ["alice", "dave"]
+  val testEnvs: List[Environment] = [Environment::Development, Environment::Staging, Environment::Production]
+  foreach u: String in testUsers {
+    foreach e: Environment in testEnvs {
+      val ctx: EvaluationContext = new EvaluationContext(u, e, today)
+      val result: EvaluationResult = betaFlag.evaluate(ctx)
+      IO::println("  " + result.summary() + "  [user=#{u} env=#{e.name()}]")
+    }
+  }
+}
+
+// Rollout sampling for new_dashboard
+IO::println("\n=== new_dashboard rollout sampling (10 users) ===")
+val dashFlag: Flag? = registry.get("new_dashboard")
+if dashFlag != null {
+  val sampleUsers: List[String] = ["u00","u10","u20","u30","u40","u50","u60","u70","u80","u90"]
+  var onCount: Int = 0
+  foreach u: String in sampleUsers {
+    val ctx: EvaluationContext = new EvaluationContext(u, Environment::Production, today)
+    val result: EvaluationResult = dashFlag.evaluate(ctx)
+    if result.enabled() { onCount++ }
+    IO::println("  #{u}: #{if result.enabled() { "ON " } else { "off" }}")
+  }
+  IO::println("  On: #{onCount}/#{sampleUsers.size}")
+}
+
+// Holiday banner check - before, during, after
+IO::println("\n=== holiday_banner date range check ===")
+val bannerFlag: Flag? = registry.get("holiday_banner")
+if bannerFlag != null {
+  val testDates: List[String] = ["2025-11-30", "2025-12-01", "2025-12-15", "2025-12-31", "2026-01-01"]
+  foreach d: String in testDates {
+    val ctx: EvaluationContext = new EvaluationContext("user1", Environment::Production, d)
+    val result: EvaluationResult = bannerFlag.evaluate(ctx)
+    IO::println("  #{d}: #{if result.enabled() { "ON " } else { "off" }} — #{result.reason()}")
+  }
+}

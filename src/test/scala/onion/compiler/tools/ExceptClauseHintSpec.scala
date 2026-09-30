@@ -74,5 +74,42 @@ class ExceptClauseHintSpec extends AbstractShellSpec {
       ).mkString("\n")
       assert(!msgs.contains("except"), s"hint should not fire without an `except`, got: $msgs")
     }
+
+    it("hints at catch when the closing brace is on the previous line") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    try {
+          |      IO::println("risky")
+          |    }
+          |    except e: Exception {
+          |      IO::println("caught")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("catch"), s"expected a hint mentioning catch, got: $msgs")
+      assert(msgs.contains("except"), s"expected the hint to name except, got: $msgs")
+    }
+
+    it("does not fire when `except` is merely an identifier elsewhere on the error line") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    foo bar; val except = 1
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(!msgs.contains("except"), s"hint should not fire for an unrelated `except` identifier, got: $msgs")
+      assert(msgs.contains("foo(...)"), s"expected the missing-call-parens hint instead, got: $msgs")
+    }
   }
 }

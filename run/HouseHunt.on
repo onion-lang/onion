@@ -1,0 +1,206 @@
+// HouseHunt.on — real-estate listing search and mortgage analysis
+// Exercises: records, enum, class, collection pipelines
+//            (filter/map/fold/sortedBy/find/partition/groupBy/maxBy/minBy),
+//            select/pattern, nullable, closures, string interpolation,
+//            foreach (ranges + map k,v), while loop.
+
+import { java.lang.Math::pow }
+
+enum PropertyType { House, Condo, Apartment, Townhouse, Studio }
+
+enum Neighborhood { Downtown, Midtown, Uptown, Suburban, Rural }
+
+record Listing(id: Int, propType: PropertyType, neighborhood: Neighborhood,
+               price: Int, bedrooms: Int, bathrooms: Double, sqft: Int,
+               yearBuilt: Int, daysOnMarket: Int) {
+  public:
+  def pricePerSqft(): Double = (price as Double) / (sqft as Double)
+  def isNew(): Boolean = daysOnMarket <= 14
+  def age(): Int = 2024 - yearBuilt
+  def summary(): String =
+    "Listing ##{id}: #{propType} in #{neighborhood} — $#{price} / #{sqft} sqft / #{bedrooms}bd #{bathrooms}ba"
+  def display(): void {
+    IO::println("  " + summary())
+    val pps: Int = ((pricePerSqft() * 100.0) as Int) / 100
+    IO::println("    Price/sqft: $#{pps} | Age: #{age()} yrs | DOM: #{daysOnMarket}")
+  }
+}
+
+record MortgageParams(principal: Int, annualRatePct: Double, termYears: Int) {
+  public:
+  def monthlyPayment(): Double = {
+    val r: Double = annualRatePct / 100.0 / 12.0
+    val n: Int = termYears * 12
+    if r == 0.0 {
+      (principal as Double) / (n as Double)
+    } else {
+      val denom: Double = 1.0 - pow(1.0 + r, -(n as Double))
+      (principal as Double) * r / denom
+    }
+  }
+  def totalCost(): Double = monthlyPayment() * (termYears * 12 as Double)
+  def totalInterest(): Double = totalCost() - (principal as Double)
+}
+
+class ListingSearch {
+  var listings: List[Listing]
+public:
+  def this { listings = [] }
+  def add(l: Listing): void { listings.add(l) }
+  def count(): Int = listings.size
+  def underPrice(max: Int): List[Listing] =
+    listings.filter { l -> l.price() <= max }
+  def byType(t: PropertyType): List[Listing] =
+    listings.filter { l -> l.propType() == t }
+  def byNeighborhood(n: Neighborhood): List[Listing] =
+    listings.filter { l -> l.neighborhood() == n }
+  def minBeds(beds: Int): List[Listing] =
+    listings.filter { l -> l.bedrooms() >= beds }
+  def sortedByPrice(): List[Listing] =
+    listings.sortedBy { l -> l.price() }
+  def sortedByPricePerSqft(): List[Listing] =
+    listings.sortedBy { l -> l.pricePerSqft() }
+  def newListings(): List[Listing] =
+    listings.filter { l -> l.isNew() }
+  def averagePrice(): Double = {
+    val total: Int = listings.fold(0) { acc, l -> (acc as Int) + l.price() } as Int
+    (total as Double) / (listings.size as Double)
+  }
+  def priceHistogram(): Map[String, Int] = {
+    val hist: Map[String, Int] = [:]
+    foreach l: Listing in listings {
+      val bucket: String =
+        if l.price() < 300000 { "<300k" }
+        else if l.price() < 500000 { "300-500k" }
+        else if l.price() < 750000 { "500-750k" }
+        else if l.price() < 1000000 { "750k-1M" }
+        else { ">1M" }
+      if hist.containsKey(bucket) { hist[bucket] = (hist[bucket] as Int) + 1 } else { hist[bucket] = 1 }
+    }
+    hist
+  }
+  def topValue(n: Int): List[Listing] =
+    listings.sortedBy { l -> l.pricePerSqft() }.take(n)
+  def summary(): void {
+    IO::println("=== Listing Search — #{count()} properties ===")
+    IO::println("Average price: $#{(averagePrice() as Int)}")
+    val cheapest: Listing? = listings.minBy { l -> l.price() }
+    val priciest: Listing? = listings.maxBy { l -> l.price() }
+    if cheapest != null { IO::println("Cheapest: " + cheapest.summary()) }
+    if priciest != null { IO::println("Priciest: " + priciest.summary()) }
+    IO::println("Price distribution:")
+    foreach (bucket, cnt) in priceHistogram() {
+      IO::println("  #{bucket}: #{cnt}")
+    }
+  }
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+val search: ListingSearch = new ListingSearch()
+search.add(new Listing(101, PropertyType::House,       Neighborhood::Suburban,  450000, 4, 2.5, 2200, 1998, 5))
+search.add(new Listing(102, PropertyType::Condo,       Neighborhood::Downtown,  320000, 2, 1.0, 950,  2015, 3))
+search.add(new Listing(103, PropertyType::Apartment,   Neighborhood::Midtown,   285000, 1, 1.0, 720,  2010, 21))
+search.add(new Listing(104, PropertyType::House,       Neighborhood::Suburban,  625000, 5, 3.0, 3100, 1985, 9))
+search.add(new Listing(105, PropertyType::Townhouse,   Neighborhood::Uptown,    485000, 3, 2.5, 1800, 2008, 7))
+search.add(new Listing(106, PropertyType::Studio,      Neighborhood::Downtown,  199000, 0, 1.0, 450,  2019, 2))
+search.add(new Listing(107, PropertyType::House,       Neighborhood::Rural,     375000, 4, 2.0, 2800, 1972, 45))
+search.add(new Listing(108, PropertyType::Condo,       Neighborhood::Uptown,    410000, 2, 2.0, 1100, 2012, 11))
+search.add(new Listing(109, PropertyType::Apartment,   Neighborhood::Downtown,  260000, 1, 1.0, 680,  2001, 30))
+search.add(new Listing(110, PropertyType::House,       Neighborhood::Midtown,   550000, 4, 2.5, 2400, 1995, 14))
+search.add(new Listing(111, PropertyType::Townhouse,   Neighborhood::Suburban,  395000, 3, 1.5, 1650, 2003, 6))
+search.add(new Listing(112, PropertyType::Condo,       Neighborhood::Downtown,  1150000, 3, 2.0, 1500, 2022, 1))
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+search.summary()
+IO::println("")
+
+IO::println("--- Houses under $500k (sorted by price) ---")
+val affordable: List[Listing] = search.byType(PropertyType::House).filter { l -> l.price() <= 500000 }
+foreach l: Listing in affordable.sortedBy { l -> l.price() } {
+  l.display()
+}
+IO::println("")
+
+IO::println("--- Best value (lowest $/sqft) top 5 ---")
+foreach l: Listing in search.topValue(5) {
+  val pps: Int = ((l.pricePerSqft() * 100.0) as Int) / 100
+  IO::println("  ##{l.id()} #{l.propType()} in #{l.neighborhood()}: $#{pps}/sqft")
+}
+IO::println("")
+
+IO::println("--- New listings (on market ≤14 days) ---")
+foreach l: Listing in search.newListings().sortedBy { l -> l.daysOnMarket() } {
+  IO::println("  Day #{l.daysOnMarket()}: " + l.summary())
+}
+IO::println("")
+
+IO::println("--- Downtown properties ---")
+foreach l: Listing in search.byNeighborhood(Neighborhood::Downtown) {
+  l.display()
+}
+IO::println("")
+
+IO::println("--- Mortgage analysis: 3-bed home at $450k ---")
+val down: Int = 90000
+val loan: Int = 450000 - down
+val rates: List[Double] = [3.5, 5.0, 6.5, 7.5]
+IO::println("  Loan: $#{loan}, Down: $#{down}")
+IO::println("  Rate  | Monthly  | Total Paid | Interest")
+IO::println("  ------|----------|------------|----------")
+foreach rate: Double in rates {
+  val mp: MortgageParams = new MortgageParams(loan, rate, 30)
+  val monthly: Int = mp.monthlyPayment() as Int
+  val total: Int = mp.totalCost() as Int
+  val interest: Int = mp.totalInterest() as Int
+  IO::println("  #{rate}%  | $#{monthly}   | $#{total}  | $#{interest}")
+}
+
+IO::println("")
+IO::println("--- Partition: at or under $400k vs above ---")
+val parts = search.sortedByPrice().partition { l -> l.price() <= 400000 }
+val under: List[Listing] = parts[0] as List[Listing]
+val over: List[Listing] = parts[1] as List[Listing]
+IO::println("At or under $400k: #{under.size} listing(s)")
+IO::println("Above $400k: #{over.size} listing(s)")
+// ─── Neighborhood analysis ───────────────────────────────────────────────────
+
+IO::println("")
+IO::println("--- Average price by neighborhood ---")
+val neighborhoods: List[Neighborhood] = [
+  Neighborhood::Downtown, Neighborhood::Midtown,
+  Neighborhood::Uptown,   Neighborhood::Suburban,
+  Neighborhood::Rural
+]
+foreach nbr: Neighborhood in neighborhoods {
+  val nbList: List[Listing] = search.byNeighborhood(nbr)
+  if nbList.size > 0 {
+    val tot: Int = nbList.fold(0) { acc, l -> (acc as Int) + l.price() } as Int
+    val avg: Int = tot / nbList.size
+    IO::println("  #{nbr}: $#{avg} avg (#{nbList.size} listing(s))")
+  }
+}
+
+IO::println("")
+IO::println("--- Fixer-uppers: built before 1990, under $500k ---")
+val fixers: List[Listing] = search.sortedByPrice()
+  .filter { l -> l.yearBuilt() < 1990 && l.price() < 500000 }
+if fixers.size == 0 {
+  IO::println("  None found.")
+} else {
+  foreach l: Listing in fixers {
+    IO::println("  #{l.summary()} (built #{l.yearBuilt()})")
+  }
+}
+
+IO::println("")
+IO::println("--- 3+ bedroom properties sorted by value ($/sqft) ---")
+val family: List[Listing] = search.minBeds(3).sortedBy { l -> l.pricePerSqft() }
+foreach l: Listing in family {
+  val ppsFmt: Int = ((l.pricePerSqft() * 100.0) as Int) / 100
+  IO::println("  #{l.summary()} — $#{ppsFmt}/sqft")
+}
+
+IO::println("")
+IO::println("Done.")

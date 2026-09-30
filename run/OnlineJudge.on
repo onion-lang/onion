@@ -1,0 +1,325 @@
+// OnlineJudge — simulates a competitive programming judge:
+// problems, test cases, submissions, verdicts, and a leaderboard.
+// Exercises: records, ADT enums, plain enums, classes, interfaces,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/count/distinct/
+// partition/find/any/zip/flatten), pattern matching, extension methods,
+// lambdas, string interpolation, nullable types, try/catch, recursion,
+// while/foreach, range literals, and map entry iteration.
+
+// ── Plain enum: problem difficulty ──────────────────────────────────────
+enum Difficulty {
+  EASY, MEDIUM, HARD
+}
+
+// ── Plain enum: problem category ────────────────────────────────────────
+enum Category {
+  ARRAY, STRING, GRAPH, DP, MATH
+}
+
+// ── ADT enum: submission verdict ────────────────────────────────────────
+enum Verdict {
+  case Accepted(time: Int, memory: Int)
+  case WrongAnswer(failedCase: Int)
+  case TimeLimitExceeded(testNum: Int)
+  case RuntimeError(msg: String)
+  case CompileError(line: Int)
+
+public:
+  def label(): String = select this {
+    case v is Accepted:           "AC"
+    case v is WrongAnswer:        "WA"
+    case v is TimeLimitExceeded:  "TLE"
+    case v is RuntimeError:       "RE"
+    case v is CompileError:       "CE"
+  }
+
+  def isAccepted(): Boolean = select this {
+    case v is Accepted: true
+    else: false
+  }
+
+  def score(): Int = select this {
+    case v is Accepted: 100
+    case v is WrongAnswer: 0
+    case v is TimeLimitExceeded: 0
+    case v is RuntimeError: 0
+    case v is CompileError: 0
+  }
+}
+
+// ── Record: a single test case ──────────────────────────────────────────
+record TestCase(id: Int, input: String, expected: String, timeLimitMs: Int)
+
+// ── Record: a problem definition ────────────────────────────────────────
+record Problem(
+  id: String,
+  title: String,
+  difficulty: Difficulty,
+  category: Category,
+  points: Int
+)
+
+// ── Record: a submission ─────────────────────────────────────────────────
+record Submission(
+  id: Int,
+  userId: String,
+  problemId: String,
+  code: String,
+  verdict: Verdict,
+  submittedAt: Int
+)
+
+// ── Record: leaderboard entry ────────────────────────────────────────────
+record LeaderboardEntry(rank: Int, userId: String, solvedCount: Int, totalScore: Int)
+
+// ── Interface: anything that can be summarized ────────────────────────────
+interface Summarizable {
+  def summary(): String
+}
+
+// ── Extension on String: pad to width ────────────────────────────────────
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = s + " "
+    }
+    return s
+  }
+  def truncate(max: Int): String =
+    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+}
+
+// ── Extension on Int: format as ms ───────────────────────────────────────
+extension Int {
+  def ms(): String = self + "ms"
+  def kb(): String = self + "KB"
+}
+
+// ── Helper: difficulty label ──────────────────────────────────────────────
+def diffLabel(d: Difficulty): String = select d {
+  case Difficulty::EASY:   "[E]"
+  case Difficulty::MEDIUM: "[M]"
+  case Difficulty::HARD:   "[H]"
+}
+
+// ── Helper: category label ────────────────────────────────────────────────
+def catLabel(c: Category): String = select c {
+  case Category::ARRAY:  "Arr"
+  case Category::STRING: "Str"
+  case Category::GRAPH:  "Gph"
+  case Category::DP:     "DP "
+  case Category::MATH:   "Mth"
+}
+
+// ── Problem store ──────────────────────────────────────────────────────────
+val problems: List[Problem] = [
+  new Problem("P001", "Two Sum",             Difficulty::EASY,   Category::ARRAY,  100),
+  new Problem("P002", "Longest Substring",   Difficulty::MEDIUM, Category::STRING, 200),
+  new Problem("P003", "Minimum Path Sum",    Difficulty::MEDIUM, Category::DP,     200),
+  new Problem("P004", "Network Delay",       Difficulty::HARD,   Category::GRAPH,  300),
+  new Problem("P005", "Coin Change",         Difficulty::MEDIUM, Category::DP,     200),
+  new Problem("P006", "Valid Anagram",       Difficulty::EASY,   Category::STRING, 100),
+  new Problem("P007", "Climbing Stairs",     Difficulty::EASY,   Category::MATH,   100),
+  new Problem("P008", "Longest Common Sub",  Difficulty::HARD,   Category::DP,     300),
+  new Problem("P009", "Word Search",         Difficulty::HARD,   Category::GRAPH,  300),
+  new Problem("P010", "Fibonacci Number",    Difficulty::EASY,   Category::MATH,   100)
+]
+
+// ── Submissions (simulated judge results) ────────────────────────────────
+val subs: List[Submission] = [
+  new Submission(1,  "alice",  "P001", "...", new Accepted(12, 256),      1000),
+  new Submission(2,  "bob",    "P001", "...", new WrongAnswer(3),          1001),
+  new Submission(3,  "alice",  "P002", "...", new Accepted(45, 512),       1002),
+  new Submission(4,  "carol",  "P001", "...", new Accepted(8, 128),        1003),
+  new Submission(5,  "bob",    "P002", "...", new TimeLimitExceeded(5),     1004),
+  new Submission(6,  "carol",  "P003", "...", new Accepted(78, 768),        1005),
+  new Submission(7,  "alice",  "P004", "...", new RuntimeError("NullPtr"),  1006),
+  new Submission(8,  "dave",   "P001", "...", new Accepted(15, 256),        1007),
+  new Submission(9,  "bob",    "P001", "...", new Accepted(11, 256),        1008),
+  new Submission(10, "dave",   "P003", "...", new Accepted(90, 896),        1009),
+  new Submission(11, "carol",  "P005", "...", new Accepted(33, 384),        1010),
+  new Submission(12, "eve",    "P006", "...", new Accepted(5, 128),         1011),
+  new Submission(13, "eve",    "P007", "...", new Accepted(3, 64),          1012),
+  new Submission(14, "alice",  "P005", "...", new Accepted(40, 512),        1013),
+  new Submission(15, "bob",    "P006", "...", new CompileError(7),          1014),
+  new Submission(16, "dave",   "P007", "...", new Accepted(2, 64),          1015),
+  new Submission(17, "carol",  "P009", "...", new WrongAnswer(2),           1016),
+  new Submission(18, "alice",  "P006", "...", new Accepted(4, 128),         1017),
+  new Submission(19, "dave",   "P005", "...", new Accepted(55, 640),        1018),
+  new Submission(20, "eve",    "P003", "...", new Accepted(88, 768),        1019)
+]
+
+// ── 1. Print problem list ─────────────────────────────────────────────────
+IO::println("=== Problems ===")
+foreach p: Problem in problems {
+  IO::println("#{diffLabel(p.difficulty())} #{catLabel(p.category())}  #{(p.id() + " " + p.title()).padRight(32)}  #{p.points()}pts")
+}
+
+// ── 2. Submission verdict summary ────────────────────────────────────────
+IO::println("")
+IO::println("=== Verdict Summary ===")
+val verdictGroups = subs.groupBy { s -> s.verdict().label() }
+foreach (label, group) in verdictGroups {
+  IO::println("  #{(label as String).padRight(5)}: #{(group as List[Submission]).size}")
+}
+
+// ── 3. Accepted submissions only ─────────────────────────────────────────
+val accepted: List[Submission] = subs.filter { s -> s.verdict().isAccepted() }
+IO::println("")
+IO::println("Accepted: #{accepted.size} / #{subs.size}")
+
+// ── 4. Per-user accepted problem IDs (distinct) ──────────────────────────
+IO::println("")
+IO::println("=== Solved Problems per User ===")
+val byUser = subs
+  .filter { s -> s.verdict().isAccepted() }
+  .groupBy { s -> s.userId() }
+foreach (uid, userSubs) in byUser {
+  val problems_ = (userSubs as List[Submission]).map { s -> s.problemId() }.distinct()
+  IO::println("  #{(uid as String).padRight(8)} solved #{problems_.size}: #{problems_.toString()}")
+}
+
+// ── 5. Leaderboard: score = sum of unique solved problem points ───────────
+IO::println("")
+IO::println("=== Leaderboard ===")
+
+def problemPoints(pid: String): Int {
+  val found: Problem? = problems.find { p -> p.id() == pid }
+  return if found != null { found.points() } else { 0 }
+}
+
+val userIds: List[String] = subs.map { s -> s.userId() }.distinct()
+val entries: List[LeaderboardEntry] = []
+foreach uid: String in userIds {
+  val solvedPids: List[String] = subs
+    .filter { s -> s.userId() == uid && s.verdict().isAccepted() }
+    .map { s -> s.problemId() }
+    .distinct()
+  var score: Int = 0
+  foreach pid: String in solvedPids {
+    score = score + problemPoints(pid)
+  }
+  entries.add(new LeaderboardEntry(0, uid, solvedPids.size, score))
+}
+
+val ranked: List[LeaderboardEntry] = entries.sortedBy { e -> 0 - e.totalScore() }
+var rank: Int = 1
+foreach e: LeaderboardEntry in ranked {
+  IO::println("  #{rank}. #{e.userId().padRight(8)} solved=#{e.solvedCount()} score=#{e.totalScore()}")
+  rank = rank + 1
+}
+
+// ── 6. Difficulty distribution of accepted submissions ───────────────────
+IO::println("")
+IO::println("=== Accepted by Difficulty ===")
+val pidToProb: Map[String, Problem] = [:]
+foreach p: Problem in problems {
+  pidToProb[p.id()] = p
+}
+val acByDiff = accepted
+  .map { s -> {
+    val prob: Problem? = pidToProb[s.problemId()]
+    if prob != null { prob.difficulty().name() } else { "?" }
+  }}
+  .groupBy { d -> d }
+foreach (diff, ds) in acByDiff {
+  IO::println("  #{(diff as String).padRight(8)}: #{(ds as List[String]).size}")
+}
+
+// ── 7. Fastest accepted submission per problem ───────────────────────────
+IO::println("")
+IO::println("=== Fastest Accepted Submission per Problem ===")
+val byProblem = accepted.groupBy { s -> s.problemId() }
+foreach (pid, psubs) in byProblem {
+  val psubsList: List[Submission] = psubs as List[Submission]
+  var best: Submission? = null
+  foreach s: Submission in psubsList {
+    val timeMs: Int = select s.verdict() {
+      case v is Accepted: v.time()
+      else: 999999
+    }
+    if best == null {
+      best = s
+    } else {
+      val bestSub: Submission = best!!
+      val bestTime: Int = select bestSub.verdict() {
+        case v is Accepted: v.time()
+        else: 999999
+      }
+      if timeMs < bestTime { best = s }
+    }
+  }
+  if best != null {
+    val bestFinal: Submission = best!!
+    val t: Int = select bestFinal.verdict() { case v is Accepted: v.time(); else: 0 }
+    IO::println("  #{(pid as String).padRight(6)} user=#{bestFinal.userId().padRight(8)} time=#{t.ms()}")
+  }
+}
+
+// ── 8. Try/catch: safe lookup ─────────────────────────────────────────────
+IO::println("")
+IO::println("=== Safe Lookup ===")
+def findProblem(id: String): String {
+  try {
+    val hit = problems.find { p -> (p as Problem).id() == id }
+    if hit != null {
+      val p: Problem = hit as Problem
+      return "#{p.id()} #{p.title()} (#{p.points()}pts)"
+    } else {
+      return "not found: #{id}"
+    }
+  } catch e: Exception {
+    return "error: " + e.message()
+  }
+}
+IO::println(findProblem("P003"))
+IO::println(findProblem("P999"))
+
+// ── 9. Recursion: compute nth triangular number ────────────────────────────
+def triangular(n: Int): Int = if n <= 0 { 0 } else { n + triangular(n - 1) }
+IO::println("")
+IO::println("triangular(10) = #{triangular(10)}")
+
+// ── 10. While loop: count distinct users with 3+ solved ────────────────────
+IO::println("")
+IO::println("=== Users with 3+ Solved ===")
+var elite: Int = 0
+foreach e2: LeaderboardEntry in ranked {
+  if e2.solvedCount() >= 3 {
+    IO::println("  #{e2.userId()} (#{e2.solvedCount()} solved)")
+    elite = elite + 1
+  }
+}
+IO::println("Total elite users: #{elite}")
+
+// ── 11. Category stats via foreach range ────────────────────────────────────
+IO::println("")
+IO::println("=== Category Counts in Accepted ===")
+val categories: List[Category] = [Category::ARRAY, Category::STRING, Category::GRAPH, Category::DP, Category::MATH]
+foreach cat: Category in categories {
+  val cnt = accepted.count { s -> {
+    val prob: Problem? = pidToProb[s.problemId()]
+    if prob != null { prob.category() == cat } else { false }
+  }}
+  IO::println("  #{catLabel(cat)}: #{cnt}")
+}
+
+// ── 12. Partition: hard vs non-hard problems ─────────────────────────────
+val parts = problems.partition { p -> p.difficulty() == Difficulty::HARD }
+val hardProbs: List[Problem] = parts[0] as List[Problem]
+val nonHard: List[Problem] = parts[1] as List[Problem]
+IO::println("")
+IO::println("Hard problems: #{hardProbs.size}, Non-hard: #{nonHard.size}")
+
+// ── 13. Acceptance rate per problem ──────────────────────────────────────
+IO::println("")
+IO::println("=== Acceptance Rate ===")
+foreach p: Problem in problems {
+  val pid: String = p.id()
+  val total = subs.count { s -> (s as Submission).problemId() == pid }
+  val acs   = subs.count { s -> (s as Submission).problemId() == pid && (s as Submission).verdict().isAccepted() }
+  val rate: Int = if total > 0 { acs * 100 / total } else { 0 }
+  IO::println("  #{(p.id() + " " + p.title()).truncate(28).padRight(30)} #{rate}%")
+}
+

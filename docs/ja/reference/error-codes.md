@@ -647,7 +647,7 @@ public:
 対処: まず `null` を除外してください（`if b != null { ... }`、`b ?: default`、
 `b?.method()` / `b?[...]` など）。レシーバーが確定した非 null 型を持つようにします。
 
-### `E0061` — `from re"..."` がサポートしないレコード成分型
+### `E0061` — `from re"..."` や `shape` 句がサポートしないレコード成分型
 
 `record ... from re"..."` 句は、各正規表現キャプチャグループをレコード成分の型に
 変換することで `parse`/`parseAll` を導出します。この方法で生成できるのは
@@ -657,6 +657,9 @@ public:
 record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポートされていない成分型
 ```
+
+`shape name = ...` 句（正規表現、`json`、`yaml`、`config`）も同じ方法で成分を読むため、
+同じ制限がかかります。メッセージには成分を作れなかった句（`shape doc = json`、`from re"..."`）が表示されます。
 
 対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
 マッチのあとで該当フィールドを手動でパースしてください。
@@ -1578,7 +1581,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0058` | label … is not defined on any enclosing loop |
 | `E0059` | invalid regular expression literal: … |
 | `E0060` | the regex pattern has … capture group(s) but … binding(s) was/were given |
-| `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
+| `E0061` | record component … has type …, which cannot be derived from a `…` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
 | `E0064` | law violation |

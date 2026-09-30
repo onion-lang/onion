@@ -6,13 +6,20 @@ import org.scalatest.funspec.AnyFunSpec
 import java.io.StringReader
 
 /**
- * The elsif hint (`ControlFlowSyntaxHints`'s `RubyStyleElsif` case) must
- * resolve through the bilingual `error.parsing.hint.*` bundle in both
- * locales, like every other hint in that match -- see OldForInHintI18nSpec
- * for the motivating regression.
+ * The nullable-grouped-type hint (`SyntaxHintClassifier`'s case for a `?`
+ * where the grammar's grouped/function-type production wants `->` next)
+ * must resolve through the bilingual `error.parsing.hint.*` bundle in both
+ * locales, like every other hint in that match -- see
+ * NullableUnionTypeHintI18nSpec for the same pattern.
+ *
+ * Onion has no grouped type `(T)`: the parser's `(` branch inside a type
+ * always reads a function-type parameter list and then requires `->`, so
+ * `(String)?` or `((Int) -> Int)?` both fail right at the `?` with "expecting
+ * \"->\"" -- a plain `?` there, with nothing else in play, would otherwise
+ * fall through to the unrelated ternary-operator hint.
  */
-class RubyStyleElsifHintI18nSpec extends AnyFunSpec with Diagrams {
-  private val key = "error.parsing.hint.elsif_not_supported"
+class NullableGroupedTypeHintI18nSpec extends AnyFunSpec with Diagrams {
+  private val key = "error.parsing.hint.nullable_grouped_type"
   private val en = MessageBundles.english
   private val ja = MessageBundles.japanese
 
@@ -27,19 +34,15 @@ class RubyStyleElsifHintI18nSpec extends AnyFunSpec with Diagrams {
     assert(text != en.getString(key))
   }
 
-  it("fires for a Ruby-style `elsif` clause") {
+  it("fires for a nullable arrow-syntax function type wrapped in parens") {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
     val src =
       """
-        |class Main {
+        |class Test {
         |public:
         |  static def main(args: String[]): Int {
-        |    val x = 1
-        |    if x == 1 {
-        |      IO::println("one")
-        |    } elsif x == 2 {
-        |      IO::println("two")
-        |    }
+        |    val fn: ((Int) -> Int)? = null
+        |    IO::println(fn)
         |    return 0
         |  }
         |}
@@ -48,19 +51,20 @@ class RubyStyleElsifHintI18nSpec extends AnyFunSpec with Diagrams {
       case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
       case _ => ""
     }
-    // The example code shown in the hint is literal, identical in both bundles,
-    // so this assertion holds regardless of the JVM's default locale.
-    assert(msgs.contains("else if"), s"expected the hint's `else if` example, got: $msgs")
+    // The example text is literal, identical in both bundles, so this
+    // assertion holds regardless of the JVM's default locale.
+    assert(msgs.contains("Function1"), s"expected the hint's `Function1[...]?` example, got: $msgs")
   }
 
-  it("does not fire when `elsif` is merely an identifier elsewhere on the error line") {
+  it("also fires for a plain (non-function) parenthesized type") {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
     val src =
       """
-        |class Main {
+        |class Test {
         |public:
         |  static def main(args: String[]): Int {
-        |    foo bar; val elsif = 1
+        |    val x: (String)? = null
+        |    IO::println(x)
         |    return 0
         |  }
         |}
@@ -69,7 +73,6 @@ class RubyStyleElsifHintI18nSpec extends AnyFunSpec with Diagrams {
       case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
       case _ => ""
     }
-    assert(!msgs.contains("else if"), s"hint should not fire for an unrelated `elsif` identifier, got: $msgs")
-    assert(msgs.contains("foo(...)"), s"expected the missing-call-parens hint instead, got: $msgs")
+    assert(msgs.contains("Function1"), s"expected the hint's `Function1[...]?` example, got: $msgs")
   }
 }

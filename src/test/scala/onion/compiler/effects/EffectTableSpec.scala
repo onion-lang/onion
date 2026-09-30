@@ -91,6 +91,16 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("java.lang.Thread", "sleep") == Set(Clock))
       assert(of("java.io.PrintStream", "println") == Set(Console))
     }
+    it("reads the clock only through java.time's now, and treats the rest as values") {
+      for (cls <- Seq("java.time.LocalDate", "java.time.LocalDateTime", "java.time.Instant",
+                      "java.time.ZonedDateTime"))
+        assert(of(cls, "now") == Set(Clock), cls)
+      assert(of("java.time.LocalDate", "minusDays").isEmpty)
+      assert(of("java.time.LocalDate", "parse").isEmpty)
+      assert(of("java.time.Duration", "ofSeconds").isEmpty)
+      assert(of("java.time.format.DateTimeFormatter", "ofPattern").isEmpty)
+      assert(of("java.time.ZoneId", "systemDefault") == Set(Env))
+    }
   }
 
   describe("the pure baseline") {
@@ -106,6 +116,13 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("java.util.LinkedHashMap", "put").isEmpty)
       assert(of("java.lang.Object", "<init>").isEmpty)
       assert(of("java.lang.Integer", "parseInt").isEmpty)
+    }
+    it("covers what the stdlib entry points hand back (nested result and value classes)") {
+      // A tool that reads a Proc result, an Http response or a Json value does no I/O
+      // by doing so; before these rows it had to admit `unknown` for it.
+      for (cls <- Seq("onion.Proc$Result", "onion.Http$Response", "onion.Json$Value",
+                      "onion.Args$Parsed", "onion.Outcome$Ok", "onion.Result$Err", "onion.Option$Some"))
+        assert(of(cls, "anything").isEmpty, cls)
     }
     it("treats invoking a function value as pure (charged at creation)") {
       assert(of("onion.Function1", "call").isEmpty)

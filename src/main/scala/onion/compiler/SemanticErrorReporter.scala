@@ -971,9 +971,11 @@ object SemanticErrorReporter {
         items => pluralizeCountVerb(asString(items(1)).toInt, "binding", "was given", "were given")
       )
     ),
+    // {3} is the clause as written: `from re"..."`, or `shape doc = json` for a shape.
     SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
       "error.semantic.recordFromComponentUnsupported",
-      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)),
+        items => asString(items(3)))
     ),
     SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED -> ErrorDef(
       "error.semantic.recordDeriveComponentUnsupported",

@@ -52,4 +52,24 @@ class PhpStyleElseifHintI18nSpec extends AnyFunSpec with Diagrams {
     // so this assertion holds regardless of the JVM's default locale.
     assert(msgs.contains("else if"), s"expected the hint's `else if` example, got: $msgs")
   }
+
+  it("does not fire when `elseif` is merely an identifier elsewhere on the error line") {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    val src =
+      """
+        |class Main {
+        |public:
+        |  static def main(args: String[]): Int {
+        |    foo bar; val elseif = 1
+        |    return 0
+        |  }
+        |}
+        |""".stripMargin
+    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+    assert(!msgs.contains("else if"), s"hint should not fire for an unrelated `elseif` identifier, got: $msgs")
+    assert(msgs.contains("foo(...)"), s"expected the missing-call-parens hint instead, got: $msgs")
+  }
 }

@@ -14,6 +14,11 @@ import scala.jdk.CollectionConverters._
  * which is exactly how `onion.Residue` (shipped in v0.10.0, #362) went unregistered
  * and would silently resolve every one of its (currently nonexistent) methods to
  * `Effect.Unknown`.
+ *
+ * The file scan only sees top-level classes, so the nested ones the stdlib hands back
+ * (`Proc$Result`, `Http$Response`, `Json$Value`, ...) slipped through the same way:
+ * reading a `Json::value` inside a `tool` forced `requires { unknown }`. The nested
+ * classes are found by reflection instead.
  */
 class EffectTableStdlibCoverageSpec extends AnyFunSpec {
 
@@ -44,10 +49,30 @@ class EffectTableStdlibCoverageSpec extends AnyFunSpec {
       s"onion.* stdlib classes with no effect-table.txt entry (add a Class#*= or Class#method= row): ${missing.toSeq.sorted.mkString(", ")}")
   }
 
+  /** Public nested classes of the stdlib that declare something callable, e.g. `Json$Value`. */
+  private def nestedClassNames: Set[String] =
+    stdlibClassNames.flatMap { outer =>
+      Class.forName(s"onion.$outer").getDeclaredClasses.toSeq
+        .filter(c => java.lang.reflect.Modifier.isPublic(c.getModifiers))
+        .filter(c => c.getDeclaredMethods.exists(m =>
+          java.lang.reflect.Modifier.isPublic(m.getModifiers) && !m.isSynthetic))
+        .map(c => c.getName.stripPrefix("onion."))
+    }
+
+  it("every public nested stdlib class with methods has an effect-table.txt entry") {
+    val nested = nestedClassNames
+    assert(nested.contains("Json$Value"), "reflection found no nested stdlib classes -- the scan has rotted")
+    val missing = nested -- registeredClasses
+    assert(missing.isEmpty,
+      s"nested onion.* classes with no effect-table.txt entry (add an Outer$$Inner#*= row): ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
   it("the table names no onion.* class that no longer exists") {
     val table = java.nio.file.Files.readString(
       java.nio.file.Path.of("src/main/resources/onion/effect-table.txt"))
-    val declared = """(?m)^onion\.([A-Za-z0-9_]+)#""".r
+    // Nested rows (`onion.Json$Value#...`) count toward their outer class's file here;
+    // whether the nested class itself still exists is checked just below.
+    val declared = """(?m)^onion\.([A-Za-z0-9_]+)[#$]""".r
       .findAllMatchIn(table).map(_.group(1)).toSet
     val present = {
       val out = scala.collection.mutable.Set[String]()
@@ -59,6 +84,15 @@ class EffectTableStdlibCoverageSpec extends AnyFunSpec {
     }
     assert((declared -- present).isEmpty,
       s"effect-table entries for classes that no longer exist: ${(declared -- present).mkString(", ")}")
+  }
+
+  it("the table names no nested onion.* class that no longer exists") {
+    val table = java.nio.file.Files.readString(
+      java.nio.file.Path.of("src/main/resources/onion/effect-table.txt"))
+    val nestedRows = """(?m)^onion\.([A-Za-z0-9_]+\$[A-Za-z0-9_$]+)#""".r
+      .findAllMatchIn(table).map(_.group(1)).toSet
+    val gone = nestedRows.filter(n => scala.util.Try(Class.forName(s"onion.$n")).isFailure)
+    assert(gone.isEmpty, s"effect-table entries for nested classes that no longer exist: ${gone.mkString(", ")}")
   }
 
   it("the whole table parses, so a malformed edit fails here rather than at first use") {

@@ -138,6 +138,23 @@ class ProjectManifestSpec extends AnyFunSuite with Matchers:
     error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b\" = \"\"\n") shouldBe
       "onion.toml:5:1: dependencies.\"a:b\" must be a version string"
 
+  test("rejects a dependency version range or dynamic revision, with a position"):
+    // docs/tools/project-cli.md promises "Versions are exact — no ranges, no `latest`."
+    // A range or a dynamic revision would make coursier's resolved version a moving
+    // target — not caught by the build fingerprint like a real version bump is —
+    // so the manifest must refuse these itself rather than let coursier accept them.
+    Seq("[1.0,2.0)", "(,2.0]", "[1.0,)", "1.2.+", "LATEST", "RELEASE", "latest.release", "latest.integration").foreach { version =>
+      error(s"[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b\" = \"$version\"\n") shouldBe
+        s"""onion.toml:5:1: dependencies."a:b" must be an exact version, not a range or "latest" (found "$version")"""
+    }
+
+  test("accepts a dependency version that merely contains a plus sign in its build metadata"):
+    // "1.0.0+build.5" is a real SemVer version, not a "1.2.+" Ivy dynamic revision;
+    // the range/dynamic check must tell the two apart.
+    load(
+      "[package]\nname = \"h\"\nversion = \"1.0.0\"\n[dependencies]\n\"a:b\" = \"1.0.0+build.5\"\n"
+    ).toOption.value.dependencies.map(_.render) shouldBe Seq("a:b:1.0.0+build.5")
+
   test("still rejects root tables other than package and dependencies"):
     error("[package]\nname = \"h\"\nversion = \"1.0.0\"\n[profile]\nx = 1\n") shouldBe
       "onion.toml:4:1: Unknown root table: profile"

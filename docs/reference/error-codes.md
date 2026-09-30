@@ -649,7 +649,7 @@ public:
 Fix: exclude `null` first (`if b != null { ... }`, `b ?: default`, or
 `b?.method()`/`b?[...]`) so the receiver has a definite, non-null type.
 
-### `E0061` — Record component type unsupported by `from re"..."`
+### `E0061` — Record component type unsupported by `from re"..."` or a `shape` clause
 
 A `record ... from re"..."` clause derives `parse`/`parseAll` by converting each
 regex capture group to its component's type. Only `String`, `Int`, `Long`,
@@ -660,6 +660,10 @@ this way.
 record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner is not a supported component type
 ```
+
+A `shape name = ...` clause (regex, `json`, `yaml` or `config`) reads its components the
+same way, so the same restriction applies; the message names the clause that could not
+produce the component (`shape doc = json`, `from re"..."`).
 
 Fix: keep every component in the supported scalar set, or parse the field
 manually after a plain `from re"..."` match on the rest.
@@ -1589,7 +1593,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0058` | label … is not defined on any enclosing loop |
 | `E0059` | invalid regular expression literal: … |
 | `E0060` | the regex pattern has … capture group(s) but … binding(s) was/were given |
-| `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
+| `E0061` | record component … has type …, which cannot be derived from a `…` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
 | `E0064` | law violation |

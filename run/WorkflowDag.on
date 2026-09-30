@@ -1,0 +1,368 @@
+// WorkflowDag.on — task-dependency DAG workflow engine with topological execution
+// Exercises: ADT enums with methods, data-carrying enums, records with methods,
+// classes, interfaces, generics, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/find/partition), select/pattern matching, nullable, closures,
+// string interpolation, recursion, foreach, extension methods.
+
+// ─── Task Status ADT ─────────────────────────────────────────────────────────
+
+enum TaskStatus {
+  case Pending
+  case Skipped(reason: String)
+  case Done(durationMs: Long, output: String)
+  case Failed(durationMs: Long, message: String)
+public:
+  def label(): String = select this {
+    case s is Pending:  "PENDING"
+    case s is Skipped:  "SKIPPED(#{s.reason()})"
+    case s is Done:     "DONE(#{s.durationMs()}ms)"
+    case s is Failed:   "FAILED: #{s.message()}"
+  }
+  def isTerminal(): Boolean = select this {
+    case s is Pending: false
+    else: true
+  }
+  def isSuccess(): Boolean = select this {
+    case s is Done: true
+    else: false
+  }
+  def durationMs(): Long = select this {
+    case s is Done:   s.durationMs()
+    case s is Failed: s.durationMs()
+    else: 0L
+  }
+}
+
+// ─── Task Kind ────────────────────────────────────────────────────────────────
+
+enum TaskKind(icon: String, timeoutMs: Long) {
+  Validation("✓", 1000L),
+  Computation("⚙", 3000L),
+  Notification("✉", 500L),
+  ExternalCall("↗", 5000L),
+  HumanReview("👁", 86400000L)
+}
+
+// ─── Priority ─────────────────────────────────────────────────────────────────
+
+enum Priority(level: Int, label: String) {
+  Low(3, "LOW"),
+  Normal(2, "NORMAL"),
+  High(1, "HIGH"),
+  Critical(0, "CRIT")
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record TaskDef(
+  id: String,
+  name: String,
+  kind: TaskKind,
+  priority: Priority,
+  deps: List[String],
+  simulatedMs: Long,
+  failWith: String
+) {
+public:
+  def willFail(): Boolean = failWith().length() > 0
+  def header(): String = "[#{priority().label()}] #{id()}: #{name()} #{kind().icon()}"
+  def timeoutMs(): Long = kind().timeoutMs()
+}
+
+record StepResult(
+  taskId: String,
+  status: TaskStatus
+) {
+public:
+  def ok(): Boolean = status().isSuccess()
+  def row(): String = "  #{taskId()}: #{status().label()}"
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Int {
+  def bar(max: Int, width: Int): String {
+    val filled: Int = if max == 0 { 0 } else { (self * width) / max }
+    var s: String = ""
+    foreach i: Int in 0..<width {
+      s = s + (if i < filled { "█" } else { "░" })
+    }
+    return s
+  }
+}
+
+extension String {
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def truncate(max: Int): String =
+    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+}
+
+// ─── Workflow Engine ──────────────────────────────────────────────────────────
+
+class WorkflowEngine {
+  var _results: Map[String, StepResult]
+  var _log: List[String]
+  var _clock: Long
+
+private:
+  def addResult(r: StepResult): void {
+    _results.put(r.taskId(), r)
+    _log.add(r.row())
+  }
+  def elapsed(startMs: Long): Long = _clock - startMs
+
+public:
+  def this {
+    _results = [:]
+    _log = []
+    _clock = 1000L
+  }
+
+  def statusOf(id: String): TaskStatus? {
+    val r: StepResult? = _results.get(id) as StepResult?
+    return if r != null { r.status() } else { null }
+  }
+
+  def isTerminal(id: String): Boolean {
+    val s: TaskStatus? = statusOf(id)
+    return s != null && s.isTerminal()
+  }
+
+  def isSuccess(id: String): Boolean {
+    val s: TaskStatus? = statusOf(id)
+    return s != null && s.isSuccess()
+  }
+
+  def depsReady(task: TaskDef): Boolean {
+    foreach dep: String in task.deps() {
+      if !isSuccess(dep) { return false }
+    }
+    return true
+  }
+
+  def anyDepFailed(task: TaskDef): Boolean {
+    foreach dep: String in task.deps() {
+      val s: TaskStatus? = statusOf(dep)
+      if s != null && !s.isSuccess() && s.isTerminal() { return true }
+    }
+    return false
+  }
+
+  def runTask(task: TaskDef): void {
+    val startMs: Long = _clock
+    _clock = _clock + task.simulatedMs()
+    if task.willFail() {
+      addResult(new StepResult(task.id(), new Failed(elapsed(startMs), task.failWith())))
+    } else {
+      addResult(new StepResult(task.id(), new Done(elapsed(startMs), "ok")))
+    }
+  }
+
+  def skipTask(task: TaskDef, reason: String): void {
+    addResult(new StepResult(task.id(), new Skipped(reason)))
+  }
+
+  def execute(workflow: List[TaskDef]): void {
+    // Sort by priority level then id for deterministic ordering
+    val sorted: List[TaskDef] = workflow.sortedBy { t ->
+      "" + (t as TaskDef).priority().level() + (t as TaskDef).id()
+    }
+
+    var remaining: Int = sorted.size
+    var maxPasses: Int = sorted.size * 2 + 1
+    var pass: Int = 0
+
+    while remaining > 0 && pass < maxPasses {
+      pass = pass + 1
+      remaining = 0
+      foreach t: TaskDef in sorted {
+        if !isTerminal(t.id()) {
+          if anyDepFailed(t) {
+            skipTask(t, "upstream failure")
+          } else if depsReady(t) {
+            runTask(t)
+          } else {
+            remaining = remaining + 1
+          }
+        }
+      }
+    }
+  }
+
+  def log(): List[String] = _log
+
+  def report(workflow: List[TaskDef]): void {
+    val total: Int = workflow.size
+    val done: Int = workflow.filter { t -> isSuccess((t as TaskDef).id()) }.size
+    val failed: Int = workflow.filter { t ->
+      val s: TaskStatus? = statusOf((t as TaskDef).id())
+      s != null && (s is Failed)
+    }.size
+    val skipped: Int = workflow.filter { t ->
+      val s: TaskStatus? = statusOf((t as TaskDef).id())
+      s != null && (s is Skipped)
+    }.size
+
+    IO::println("═══════════════════════════════════════════════════")
+    IO::println(" Workflow Execution Report")
+    IO::println("═══════════════════════════════════════════════════")
+    IO::println(" Tasks: #{total}  Done: #{done}  Failed: #{failed}  Skipped: #{skipped}")
+    IO::println("───────────────────────────────────────────────────")
+    foreach t: TaskDef in workflow.sortedBy { t -> (t as TaskDef).id() } {
+      val s: TaskStatus? = statusOf(t.id())
+      val statusStr: String = if s != null { s.label() } else { "PENDING" }
+      IO::println("  #{t.id().padRight(18)} #{statusStr}")
+    }
+    IO::println("───────────────────────────────────────────────────")
+
+    // Stats by kind
+    IO::println(" By kind:")
+    val byKind: Map[Object, List[TaskDef]] = workflow.groupBy { t -> (t as TaskDef).kind().icon() }
+    foreach (icon, tasks) in byKind {
+      val taskList: List[TaskDef] = tasks as List[TaskDef]
+      val kindDone: Int = taskList.filter { t -> isSuccess((t as TaskDef).id()) }.size
+      IO::println("  #{(icon as String).padRight(4)} #{kindDone}/#{taskList.size}")
+    }
+    IO::println("───────────────────────────────────────────────────")
+
+    // Total simulated duration
+    var totalMs: Long = 0L
+    foreach t: TaskDef in workflow {
+      val s: TaskStatus? = statusOf(t.id())
+      if s != null { totalMs = totalMs + s.durationMs() }
+    }
+    IO::println(" Total simulated duration: #{totalMs}ms")
+    IO::println("═══════════════════════════════════════════════════")
+  }
+}
+
+// ─── Workflow Definitions ────────────────────────────────────────────────────
+
+def loanApprovalWorkflow(): List[TaskDef] {
+  return [
+    new TaskDef("intake",      "Receive Application",  TaskKind::Validation,   Priority::High,     [],                         200L,  ""),
+    new TaskDef("idcheck",     "Identity Check",       TaskKind::ExternalCall, Priority::High,     ["intake"],                  800L,  ""),
+    new TaskDef("credit",      "Credit Score Lookup",  TaskKind::ExternalCall, Priority::High,     ["idcheck"],                1200L,  ""),
+    new TaskDef("income",      "Income Verification",  TaskKind::Computation,  Priority::Normal,   ["idcheck"],                 600L,  ""),
+    new TaskDef("risk",        "Risk Assessment",      TaskKind::Computation,  Priority::Normal,   ["credit", "income"],       1500L,  ""),
+    new TaskDef("compliance",  "Compliance Check",     TaskKind::Validation,   Priority::Critical, ["intake"],                  400L,  ""),
+    new TaskDef("review",      "Underwriter Review",   TaskKind::HumanReview,  Priority::Normal,   ["risk", "compliance"],     2000L,  ""),
+    new TaskDef("decision",    "Approval Decision",    TaskKind::Computation,  Priority::High,     ["review"],                  300L,  ""),
+    new TaskDef("notify",      "Notify Applicant",     TaskKind::Notification, Priority::Low,      ["decision"],                100L,  ""),
+    new TaskDef("archive",     "Archive Records",      TaskKind::Validation,   Priority::Low,      ["notify"],                  200L,  "")
+  ]
+}
+
+def failingWorkflow(): List[TaskDef] {
+  return [
+    new TaskDef("fetch",    "Fetch Data",         TaskKind::ExternalCall, Priority::High,   [],          500L, ""),
+    new TaskDef("parse",    "Parse Response",     TaskKind::Computation,  Priority::Normal, ["fetch"],   300L, "invalid JSON"),
+    new TaskDef("validate", "Validate Schema",    TaskKind::Validation,   Priority::High,   ["parse"],   200L, ""),
+    new TaskDef("store",    "Store Result",       TaskKind::ExternalCall, Priority::Normal, ["validate"],400L, ""),
+    new TaskDef("report",   "Generate Report",   TaskKind::Computation,  Priority::Low,    ["store"],   600L, "")
+  ]
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val engine1: WorkflowEngine = new WorkflowEngine()
+val loan: List[TaskDef] = loanApprovalWorkflow()
+
+IO::println("")
+IO::println("Running: Loan Approval Workflow (#{loan.size} tasks)")
+IO::println("")
+
+engine1.execute(loan)
+engine1.report(loan)
+
+IO::println("")
+IO::println("Execution log:")
+foreach line: String in engine1.log() {
+  IO::println(line)
+}
+
+IO::println("")
+IO::println("──────────────────────────────────────────────────────")
+IO::println("Running: Failing Pipeline (parse error)")
+IO::println("")
+
+val engine2: WorkflowEngine = new WorkflowEngine()
+val pipe: List[TaskDef] = failingWorkflow()
+engine2.execute(pipe)
+engine2.report(pipe)
+// ─── Priority Summary ────────────────────────────────────────────────────────
+
+def prioritySummary(engine: WorkflowEngine, workflow: List[TaskDef]): void {
+  IO::println(" By priority:")
+  val byPriority: Map[Object, List[TaskDef]] = workflow.groupBy { t -> (t as TaskDef).priority().label() }
+  val labels: List[String] = ["CRIT", "HIGH", "NORMAL", "LOW"]
+  foreach lbl: String in labels {
+    val group: Object? = byPriority.get(lbl)
+    if group != null {
+      val tasks: List[TaskDef] = group as List[TaskDef]
+      val ok: Int = tasks.filter { t -> engine.isSuccess((t as TaskDef).id()) }.size
+      val total: Int = tasks.size
+      IO::println("  #{lbl.padRight(7)} #{ok}/#{total}  #{ok.bar(total, 10)}")
+    }
+  }
+}
+
+// ─── Dependency Graph Print ──────────────────────────────────────────────────
+
+def printDeps(workflow: List[TaskDef]): void {
+  IO::println(" Dependency graph:")
+  foreach t: TaskDef in workflow {
+    if t.deps().size == 0 {
+      IO::println("  #{t.id()} (root)")
+    } else {
+      var depStr: String = ""
+      foreach dep: String in t.deps() {
+        if depStr.length() > 0 { depStr = depStr + ", " }
+        depStr = depStr + dep
+      }
+      IO::println("  #{t.id()} ← #{depStr}")
+    }
+  }
+}
+
+// ─── Third Scenario: Parallel Batch ─────────────────────────────────────────
+
+def batchProcessWorkflow(): List[TaskDef] {
+  return [
+    new TaskDef("start",    "Start Batch",         TaskKind::Validation,   Priority::Critical, [],                    100L,  ""),
+    new TaskDef("split",    "Split Input",         TaskKind::Computation,  Priority::High,     ["start"],             200L,  ""),
+    new TaskDef("proc1",    "Process Chunk 1",     TaskKind::Computation,  Priority::Normal,   ["split"],             600L,  ""),
+    new TaskDef("proc2",    "Process Chunk 2",     TaskKind::Computation,  Priority::Normal,   ["split"],             700L,  ""),
+    new TaskDef("proc3",    "Process Chunk 3",     TaskKind::Computation,  Priority::Normal,   ["split"],             550L,  ""),
+    new TaskDef("notify1",  "Notify Shard 1",      TaskKind::Notification, Priority::Low,      ["proc1"],             80L,   ""),
+    new TaskDef("notify2",  "Notify Shard 2",      TaskKind::Notification, Priority::Low,      ["proc2"],             80L,   ""),
+    new TaskDef("notify3",  "Notify Shard 3",      TaskKind::Notification, Priority::Low,      ["proc3"],             80L,   ""),
+    new TaskDef("merge",    "Merge Results",       TaskKind::Computation,  Priority::High,     ["proc1","proc2","proc3"], 400L, ""),
+    new TaskDef("validate", "Validate Output",     TaskKind::Validation,   Priority::High,     ["merge"],             300L,  ""),
+    new TaskDef("store",    "Persist to DB",       TaskKind::ExternalCall, Priority::Normal,   ["validate"],          500L,  ""),
+    new TaskDef("audit",    "Write Audit Log",     TaskKind::ExternalCall, Priority::Low,      ["store"],             150L,  ""),
+    new TaskDef("done",     "Mark Batch Done",     TaskKind::Validation,   Priority::Critical, ["audit","notify1","notify2","notify3"], 50L, "")
+  ]
+}
+
+IO::println("")
+IO::println("──────────────────────────────────────────────────────")
+IO::println("Running: Parallel Batch Workflow (13 tasks)")
+IO::println("")
+
+val engine3: WorkflowEngine = new WorkflowEngine()
+val batch: List[TaskDef] = batchProcessWorkflow()
+engine3.execute(batch)
+engine3.report(batch)
+IO::println("")
+prioritySummary(engine3, batch)
+IO::println("")
+printDeps(batch)
+
+IO::println("")
+IO::println("──────────────────────────────────────────────────────")
+IO::println(" All workflows complete.")

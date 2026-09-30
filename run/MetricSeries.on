@@ -1,0 +1,304 @@
+// MetricSeries.on — server-monitoring metrics time-series with alerting
+// Exercises: extension methods on Int/Long/Double, records with methods,
+// data-carrying enum, ADT (case) enum, class/interface, generics, collection
+// pipelines (map/filter/fold/sortedBy/distinct/find/partition/zip),
+// select/pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while, foreach (ranges and map (k,v)).
+
+import {
+  java.lang.Math
+}
+
+// ─── Extension Methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def hbar(width: Int): String {
+    var b: String = ""
+    foreach i: Int in 0..<width {
+      if i < self { b = b + "█" } else { b = b + "░" }
+    }
+    return b
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def truncate(max: Int): String {
+    if self.length() <= max { return self }
+    return self.substring(0, max - 2) + ".."
+  }
+}
+
+extension Long {
+  def toHms(): String {
+    val secs = self / 1000L
+    if secs < 60L { return secs + "s" }
+    val mins = secs / 60L
+    if mins < 60L { return mins + "m" + (secs % 60L) + "s" }
+    return (mins / 60L) + "h" + (mins % 60L) + "m"
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    val f = 100.0
+    return (Math::round(self * f) as Double) / f
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum MetricKind(unit: String, maxValue: Int) {
+  CPU("%",    100),
+  Memory("%", 100),
+  Disk("%",   100),
+  Net("MB/s", 500)
+}
+
+enum Severity { Critical, Warning, Info }
+
+// ─── ADT: AlertState ──────────────────────────────────────────────────────────
+
+enum AlertState {
+  case Firing(since: Long, msg: String)
+  case Resolved(at: Long)
+  case Watching
+public:
+  def summary(): String = select this {
+    case f is Firing:   "[FIRE] #{f.msg()} (#{f.since().toHms()} ago)"
+    case r is Resolved: "[OK]   resolved at #{r.at().toHms()}"
+    case w is Watching: "[~]    watching"
+  }
+  def isFiring(): Boolean = this is Firing
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Sample(kind: MetricKind, value: Double, ts: Long) {
+public:
+  def line(): String =
+    "+#{ts().toHms()}  #{kind().name().rpad(7)} #{("" + value().round2()).lpad(7)}#{kind().unit()}"
+}
+
+record Threshold(name: String, kind: MetricKind, level: Double, sev: Severity) {
+public:
+  def key(): String = "#{name()}[#{kind().name()}]"
+  def check(v: Double): Boolean = v >= level()
+  def describe(): String {
+    val suf = select sev() {
+      case Severity::Critical: " !! CRITICAL"
+      case Severity::Warning:  " !  WARNING"
+      case Severity::Info:     " i  INFO"
+    }
+    return "#{key()} > #{level()}#{kind().unit()}" + suf
+  }
+}
+
+record MetricSummary(kind: MetricKind, n: Int, avg: Double, peak: Double, latest: Double) {
+public:
+  def barWidth(): Int = if kind().maxValue() == 0 { 0 } else {
+    (avg() * 20.0 / (kind().maxValue() as Double)) as Int
+  }
+  def report(): String {
+    val barFill = barWidth()
+    return "#{kind().name().rpad(7)} n=#{("" + n()).lpad(3)}" +
+           "  avg=#{("" + avg().round2()).lpad(6)}#{kind().unit()}" +
+           "  peak=#{("" + peak().round2()).lpad(6)}#{kind().unit()}" +
+           "  [#{barFill.hbar(20)}]"
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): void
+}
+
+// ─── AlertTracker ─────────────────────────────────────────────────────────────
+
+class AlertTracker {
+  val thresholds: List[Threshold]
+  val stateMap: Map[String, AlertState]
+
+public:
+  def this {
+    this.thresholds = []
+    this.stateMap = [:]
+  }
+
+  def add(t: Threshold): void { thresholds.add(t) }
+
+  def update(s: Sample): void {
+    foreach t: Threshold in thresholds {
+      if t.kind() != s.kind() { continue }
+      val k = t.key()
+      val cur = stateMap.get(k) as AlertState?
+      if t.check(s.value()) {
+        if !(cur is Firing) {
+          stateMap.put(k, new Firing(s.ts(), t.describe()))
+        }
+      } else {
+        if cur is Firing {
+          stateMap.put(k, new Resolved(s.ts()))
+        } else if cur == null {
+          stateMap.put(k, new Watching())
+        }
+      }
+    }
+  }
+
+  def firingCount(): Int {
+    var c: Int = 0
+    foreach (_, v) in stateMap {
+      if (v as AlertState).isFiring() { c++ }
+    }
+    return c
+  }
+
+  def printAlerts(): void {
+    foreach (_, v) in stateMap {
+      IO::println("  " + (v as AlertState).summary())
+    }
+  }
+}
+
+// ─── MetricStore ──────────────────────────────────────────────────────────────
+
+class MetricStore conforms Reportable {
+  val all: List[Sample]
+  val tracker: AlertTracker
+
+public:
+  def this(at: AlertTracker) {
+    this.all = []
+    this.tracker = at
+  }
+
+  def push(s: Sample): void {
+    all.add(s)
+    tracker.update(s)
+  }
+
+  def forKind(kind: MetricKind): List[Sample] =
+    all.filter { s -> (s as Sample).kind() == kind }
+
+  def summarize(kind: MetricKind): MetricSummary? {
+    val data = forKind(kind)
+    if data.isEmpty { return null }
+    val n = data.size
+    val total = data.fold(0.0) { acc, s -> (acc as Double) + (s as Sample).value() }
+    val avg_  = (total as Double) / (n as Double)
+    val peak_ = data.fold(0.0) { acc, s ->
+      val v = (s as Sample).value()
+      if v > (acc as Double) { v } else { (acc as Double) }
+    }
+    val lat   = (data.get(n - 1) as Sample).value()
+    return new MetricSummary(kind, n, avg_.round2(), (peak_ as Double).round2(), lat.round2())
+  }
+
+  def allSamples(): List[Sample] = all
+  def totalSamples(): Int = all.size
+
+  def topSamples(kind: MetricKind, count: Int): List[Sample] =
+    forKind(kind).sortedBy { s -> 0.0 - (s as Sample).value() }.take(count)
+
+  def outliers(kind: MetricKind, threshold: Double): List[Sample] =
+    forKind(kind).filter { s -> (s as Sample).value() >= threshold }
+
+  def report(): void {
+    IO::println("┌─────────────────────────────────────────────────────────┐")
+    IO::println("│              Server Metrics — 10-min window             │")
+    IO::println("├─────────────────────────────────────────────────────────┤")
+    foreach mk: MetricKind in MetricKind::values() {
+      val sm = summarize(mk)
+      if sm != null {
+        IO::println("│ " + sm.report().truncate(55).rpad(55) + " │")
+      }
+    }
+    IO::println("├─────────────────────────────────────────────────────────┤")
+    IO::println("│ Alerts (" + tracker.firingCount() + " firing):                                     │")
+    tracker.printAlerts()
+    IO::println("└─────────────────────────────────────────────────────────┘")
+  }
+}
+
+// ─── Data & Analysis ──────────────────────────────────────────────────────────
+
+val at = new AlertTracker()
+at.add(new Threshold("cpu-crit",   MetricKind::CPU,    90.0, Severity::Critical))
+at.add(new Threshold("cpu-warn",   MetricKind::CPU,    70.0, Severity::Warning))
+at.add(new Threshold("mem-warn",   MetricKind::Memory, 85.0, Severity::Warning))
+at.add(new Threshold("disk-warn",  MetricKind::Disk,   80.0, Severity::Warning))
+at.add(new Threshold("net-warn",   MetricKind::Net,   400.0, Severity::Warning))
+
+val store = new MetricStore(at)
+
+// 10 samples at 1-minute intervals (t in ms)
+val cpuPct:  List[Double] = [42.0, 55.0, 63.0, 72.0, 88.0, 95.0, 91.0, 76.0, 58.0, 40.0]
+val memPct:  List[Double] = [60.0, 62.0, 66.0, 71.0, 78.0, 84.0, 87.0, 85.0, 83.0, 80.0]
+val diskPct: List[Double] = [54.0, 55.0, 56.0, 57.0, 58.0, 59.0, 60.0, 62.0, 63.0, 65.0]
+val netMbs:  List[Double] = [45.0, 120.0, 260.0, 310.0, 420.0, 390.0, 350.0, 180.0, 90.0, 50.0]
+
+foreach i: Int in 0..<10 {
+  val t: Long = i as Long * 60000L
+  store.push(new Sample(MetricKind::CPU,    cpuPct.get(i)  as Double, t))
+  store.push(new Sample(MetricKind::Memory, memPct.get(i)  as Double, t))
+  store.push(new Sample(MetricKind::Disk,   diskPct.get(i) as Double, t))
+  store.push(new Sample(MetricKind::Net,    netMbs.get(i)  as Double, t))
+}
+
+store.report()
+
+// Partition CPU samples into high/normal zones
+val cpuParts  = store.forKind(MetricKind::CPU).partition { s -> (s as Sample).value() >= 80.0 }
+val highCpu   = cpuParts.get(0) as List
+val normalCpu = cpuParts.get(1) as List
+IO::println("")
+IO::println("CPU zone split: #{highCpu.size} high (≥80%), #{normalCpu.size} normal (<80%)")
+
+// Top 3 CPU spikes
+IO::println("")
+IO::println("Top 3 CPU spikes:")
+foreach s: Sample in store.topSamples(MetricKind::CPU, 3) {
+  IO::println("  " + s.line())
+}
+
+// Network outliers above 300 MB/s
+IO::println("")
+IO::println("Network outliers (≥300 MB/s):")
+foreach s: Sample in store.outliers(MetricKind::Net, 300.0) {
+  IO::println("  " + s.line())
+}
+
+// Zip CPU and memory averages for correlation glimpse
+val cpuSorted = store.forKind(MetricKind::CPU).sortedBy    { s -> (s as Sample).ts() }
+val memSorted = store.forKind(MetricKind::Memory).sortedBy { s -> (s as Sample).ts() }
+val paired = cpuSorted.zip(memSorted)
+IO::println("")
+IO::println("CPU vs Memory (first 5 paired samples):")
+foreach i: Int in 0..<5 {
+  val pair = paired.get(i) as List
+  val cpu = (pair.get(0) as Sample).value().round2()
+  val mem = (pair.get(1) as Sample).value().round2()
+  IO::println("  cpu=#{cpu}%  mem=#{mem}%")
+}
+
+// Distinct kinds confirmed
+val kinds = store.allSamples().map { s -> (s as Sample).kind().name() }.distinct().sortedBy { n -> n as String }
+IO::println("")
+IO::println("Distinct metric kinds: #{kinds}")
+IO::println("Total samples: #{store.totalSamples()}")

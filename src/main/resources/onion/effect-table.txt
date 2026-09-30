@@ -77,6 +77,7 @@ onion.FileResource#append=write
 # ---- processes -------------------------------------------------------------
 
 onion.Proc#*=exec
+onion.Proc$Result#*=pure
 
 # ---- network ---------------------------------------------------------------
 
@@ -93,6 +94,7 @@ onion.Http#encodeUrl=pure
 onion.Http#decodeUrl=pure
 onion.Http#isOk=pure
 onion.Http#isError=pure
+onion.Http$Response#*=pure
 
 # TCP sockets. Everything that touches the socket is `net`; the accessors that only
 # report what was already established are not.
@@ -100,6 +102,7 @@ onion.Http#isError=pure
 # embedded file database would really be read/write, but the table's granularity is
 # per-type, and over-reporting a boundary is safer than under-reporting one.
 onion.Db#connect=net
+onion.Db$Work#*=pure
 onion.Db$Conn#query=net
 onion.Db$Conn#queryOne=net
 onion.Db$Conn#queryValue=net
@@ -129,6 +132,7 @@ onion.Net$Listener#isClosed=pure
 # HTTP server. Starting or stopping one is `net`; building a response value is not,
 # which is what lets a handler be tested without a socket.
 onion.Server#start=net
+onion.Server$Handler#*=pure
 onion.Server#text=pure
 onion.Server#json=pure
 onion.Server#html=pure
@@ -211,6 +215,7 @@ onion.Concurrent$Channel#receiveTimeout=clock
 onion.Future#*=pure
 onion.Future#delay=clock
 onion.Future#awaitTimeout=clock
+onion.Future$ThrowingSupplier#*=pure
 
 # ---- randomness ------------------------------------------------------------
 
@@ -222,6 +227,7 @@ onion.OnionMath#randomInt=rand
 # ---- pure onion stdlib -----------------------------------------------------
 
 onion.Args#*=pure
+onion.Args$Parsed#*=pure
 onion.Assert#*=pure
 onion.Codec#*=pure
 onion.Colls#*=pure
@@ -231,19 +237,27 @@ onion.Format#*=pure
 onion.Hash#*=pure
 onion.Iterables#*=pure
 onion.Json#*=pure
+onion.Json$Value#*=pure
+onion.Json$JsonParseException#*=pure
 onion.ConfigShape#*=pure
 onion.Lossless#*=pure
 onion.LineShape#*=pure
 onion.MappedShape#*=pure
 onion.Maps#*=pure
 onion.Option#*=pure
+onion.Option$Some#*=pure
+onion.Option$None#*=pure
 onion.OrElseShape#*=pure
 onion.Origin#*=pure
 onion.Outcome#*=pure
+onion.Outcome$Ok#*=pure
+onion.Outcome$Bad#*=pure
 onion.Range#*=pure
 onion.Regex#*=pure
 onion.Resources#*=pure
 onion.Result#*=pure
+onion.Result$Ok#*=pure
+onion.Result$Err#*=pure
 onion.Scalars#*=pure
 onion.SepByShape#*=pure
 onion.Sets#*=pure
@@ -255,6 +269,7 @@ onion.Text#*=pure
 onion.View#*=pure
 onion.XmapShape#*=pure
 onion.Yaml#*=pure
+onion.Yaml$YamlParseException#*=pure
 
 # invoking a function value is charged where the closure was created
 onion.Function0#*=pure
@@ -323,6 +338,37 @@ java.util.StringJoiner#*=pure
 java.util.regex.Pattern#*=pure
 java.util.regex.Matcher#*=pure
 
+# java.time value types. `now` reads the clock (every overload, including now(Clock));
+# everything else is arithmetic on values. ZoneId.systemDefault reads the JVM default zone.
+java.time.LocalDate#*=pure
+java.time.LocalDate#now=clock
+java.time.LocalDateTime#*=pure
+java.time.LocalDateTime#now=clock
+java.time.LocalTime#*=pure
+java.time.LocalTime#now=clock
+java.time.ZonedDateTime#*=pure
+java.time.ZonedDateTime#now=clock
+java.time.OffsetDateTime#*=pure
+java.time.OffsetDateTime#now=clock
+java.time.Instant#*=pure
+java.time.Instant#now=clock
+java.time.Year#*=pure
+java.time.Year#now=clock
+java.time.YearMonth#*=pure
+java.time.YearMonth#now=clock
+java.time.MonthDay#*=pure
+java.time.MonthDay#now=clock
+java.time.Clock#*=clock
+java.time.Duration#*=pure
+java.time.Period#*=pure
+java.time.ZoneOffset#*=pure
+java.time.ZoneId#*=pure
+java.time.ZoneId#systemDefault=env
+java.time.DayOfWeek#*=pure
+java.time.Month#*=pure
+java.time.format.DateTimeFormatter#*=pure
+java.time.temporal.ChronoUnit#*=pure
+
 # ---- JDK effect points -----------------------------------------------------
 
 java.lang.System#getenv=env
@@ -355,6 +401,7 @@ java.lang.Class#getSimpleName=pure
 # System::out / System::err are PrintStreams
 java.io.PrintStream#*=console
 onion.ToolCli#*=console
+onion.ToolCli$Result#*=pure
 
 # marker interface for Lossless residues (no methods)
 onion.Residue#*=pure

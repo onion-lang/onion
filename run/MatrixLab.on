@@ -1,0 +1,307 @@
+// MatrixLab.on — dense matrix algebra: construction, arithmetic, Gaussian
+// elimination with partial pivoting, and least-squares linear regression.
+//
+// Exercises: records with static factories and instance methods; extension
+// methods on Double/Int; Format::fixed; collection pipelines (map/filter/
+// fold/sortedBy/reduce/find/zip); foreach over ranges and map (k,v); while
+// loops; string interpolation; nullable; select patterns; closures; recursion;
+// try/catch; ADT enum.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt(d: Int): String = Format::fixed(self, d)
+  def sq(): Double = self * self
+  def abs(): Double = if self < 0.0 { -self } else { self }
+}
+
+extension Int {
+  def upto(hi: Int): List[Int] {
+    val xs: List[Int] = []
+    var i: Int = self
+    while i < hi { xs.add(i); i++ }
+    return xs
+  }
+  def pad(w: Int): String {
+    val s: String = "" + self
+    var r: String = s
+    while r.length < w { r = " " + r }
+    return r
+  }
+}
+
+// ─── Matrix ───────────────────────────────────────────────────────────────────
+
+// Dense matrix, row-major flat storage.
+record Matrix(nrow: Int, ncol: Int, data: List[Double]) {
+public:
+  static def zeros(r: Int, c: Int): Matrix {
+    val d: List[Double] = []
+    foreach k: Int in 0..<(r * c) { d.add(0.0) }
+    return new Matrix(r, c, d)
+  }
+
+  static def eye(n: Int): Matrix {
+    val m = Matrix::zeros(n, n)
+    foreach i: Int in 0..<n { m.set(i, i, 1.0) }
+    return m
+  }
+
+  static def from(r: Int, c: Int, vals: List[Double]): Matrix =
+    new Matrix(r, c, vals)
+
+  def get(r: Int, c: Int): Double = (data()[r * ncol() + c] as Double)
+
+  def set(r: Int, c: Int, v: Double): void {
+    data()[r * ncol() + c] = v
+  }
+
+  def copy(): Matrix {
+    val d: List[Double] = []
+    foreach v: Double in data() { d.add(v) }
+    return new Matrix(nrow(), ncol(), d)
+  }
+
+  def plus(b: Matrix): Matrix {
+    val r = copy()
+    foreach k: Int in 0..<(nrow() * ncol()) {
+      r.data()[k] = data()[k] + b.data()[k]
+    }
+    return r
+  }
+
+  def minus(b: Matrix): Matrix {
+    val r = copy()
+    foreach k: Int in 0..<(nrow() * ncol()) {
+      r.data()[k] = data()[k] - b.data()[k]
+    }
+    return r
+  }
+
+  def scale(s: Double): Matrix {
+    val d: List[Double] = []
+    foreach v: Double in data() { d.add(v * s) }
+    return new Matrix(nrow(), ncol(), d)
+  }
+
+  // Matrix multiply: (m×k) · (k×n) → (m×n)
+  def times(b: Matrix): Matrix {
+    val m = nrow(); val k = ncol(); val n = b.ncol()
+    val res = Matrix::zeros(m, n)
+    foreach i: Int in 0..<m {
+      foreach j: Int in 0..<n {
+        var s: Double = 0.0
+        foreach p: Int in 0..<k { s = s + get(i, p) * b.get(p, j) }
+        res.set(i, j, s)
+      }
+    }
+    return res
+  }
+
+  def transpose(): Matrix {
+    val res = Matrix::zeros(ncol(), nrow())
+    foreach i: Int in 0..<nrow() {
+      foreach j: Int in 0..<ncol() { res.set(j, i, get(i, j)) }
+    }
+    return res
+  }
+
+  // Frobenius norm
+  def norm(): Double {
+    var sumSq: Double = 0.0
+    foreach v: Double in data() { sumSq = sumSq + v.sq() }
+    return Math::sqrt(sumSq)
+  }
+
+  def print(name: String): void {
+    IO::println("#{name} (#{nrow()}×#{ncol()}):")
+    foreach i: Int in 0..<nrow() {
+      var line: String = "  ["
+      foreach j: Int in 0..<ncol() {
+        if j > 0 { line = line + "  " }
+        line = line + get(i, j).fmt(4)
+      }
+      IO::println(line + "]")
+    }
+  }
+}
+
+// ─── Linear algebra helpers ───────────────────────────────────────────────────
+
+// Solve the linear system A·x = b via Gaussian elimination with partial
+// pivoting.  Returns null if A is singular (|pivot| < tol).
+def solve(A: Matrix, b: Matrix): Matrix? {
+  val n: Int = A.nrow()
+  val aug: Matrix = Matrix::zeros(n, n + 1)
+  foreach i: Int in 0..<n {
+    foreach j: Int in 0..<n { aug.set(i, j, A.get(i, j)) }
+    aug.set(i, n, b.get(i, 0))
+  }
+  // Forward elimination with partial pivoting
+  foreach col: Int in 0..<n {
+    // Find pivot row
+    var pivRow: Int = col
+    var pivVal: Double = aug.get(col, col).abs()
+    foreach row: Int in (col + 1).upto(n) {
+      val v: Double = aug.get(row, col).abs()
+      if v > pivVal { pivVal = v; pivRow = row }
+    }
+    if pivVal < 1.0e-12 { return null }   // singular
+    // Swap rows col ↔ pivRow
+    if pivRow != col {
+      foreach j: Int in 0.upto(n + 1) {
+        val tmp: Double = aug.get(col, j)
+        aug.set(col, j, aug.get(pivRow, j))
+        aug.set(pivRow, j, tmp)
+      }
+    }
+    // Eliminate below
+    foreach row: Int in (col + 1).upto(n) {
+      val factor: Double = aug.get(row, col) / aug.get(col, col)
+      foreach j: Int in col.upto(n + 1) {
+        aug.set(row, j, aug.get(row, j) - factor * aug.get(col, j))
+      }
+    }
+  }
+  // Back substitution
+  val x: Matrix = Matrix::zeros(n, 1)
+  var i: Int = n - 1
+  while i >= 0 {
+    var s: Double = aug.get(i, n)
+    foreach j: Int in (i + 1).upto(n) { s = s - aug.get(i, j) * x.get(j, 0) }
+    x.set(i, 0, s / aug.get(i, i))
+    i--
+  }
+  return x
+}
+
+// 2×2 determinant
+def det2(m: Matrix): Double =
+  m.get(0,0) * m.get(1,1) - m.get(0,1) * m.get(1,0)
+
+// 3×3 determinant (cofactor expansion)
+def det3(m: Matrix): Double {
+  val c0: Double = m.get(0,0) * (m.get(1,1)*m.get(2,2) - m.get(1,2)*m.get(2,1))
+  val c1: Double = m.get(0,1) * (m.get(1,0)*m.get(2,2) - m.get(1,2)*m.get(2,0))
+  val c2: Double = m.get(0,2) * (m.get(1,0)*m.get(2,1) - m.get(1,1)*m.get(2,0))
+  return c0 - c1 + c2
+}
+
+// Least-squares linear fit y = a·x + b over paired samples.
+// Returns [a, b] as a 2×1 matrix, or null if the system is degenerate.
+def linearFit(xs: List[Double], ys: List[Double]): Matrix? {
+  val n: Double = xs.size as Double
+  var sx: Double = 0.0; foreach x: Double in xs { sx = sx + x }
+  var sy: Double = 0.0; foreach y: Double in ys { sy = sy + y }
+  var sxx: Double = 0.0; foreach x: Double in xs { sxx = sxx + x.sq() }
+  var sxy: Double = 0.0
+  foreach i: Int in 0.upto(xs.size) { sxy = sxy + xs[i] * ys[i] }
+  // Normal equations:  [sxx  sx ] [a]   [sxy]
+  //                    [sx   n  ] [b] = [sy ]
+  val A: Matrix = Matrix::from(2, 2, [sxx, sx, sx, n])
+  val b: Matrix = Matrix::from(2, 1, [sxy, sy])
+  return solve(A, b)
+}
+
+// ─── 2-D rotation matrix ──────────────────────────────────────────────────────
+
+def rotation2d(deg: Double): Matrix {
+  val rad: Double = deg * Math::PI / 180.0
+  return Matrix::from(2, 2,
+    [Math::cos(rad), -Math::sin(rad),
+     Math::sin(rad),  Math::cos(rad)])
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+IO::println("=== Matrix arithmetic ===")
+val A: Matrix = Matrix::from(2, 2, [1.0, 2.0, 3.0, 4.0])
+val B: Matrix = Matrix::from(2, 2, [5.0, 6.0, 7.0, 8.0])
+A.print("A")
+B.print("B")
+A.plus(B).print("A + B")
+A.times(B).print("A × B")
+A.transpose().print("Aᵀ")
+IO::println("‖A‖_F = #{A.norm().fmt(4)}")
+IO::println("det(A) = #{det2(A).fmt(4)}")
+
+IO::println("")
+IO::println("=== 3×3 determinant ===")
+val C: Matrix = Matrix::from(3, 3, [2.0,1.0,3.0, 1.0,4.0,2.0, 3.0,2.0,5.0])
+C.print("C")
+IO::println("det(C) = #{det3(C).fmt(4)}")
+
+IO::println("")
+IO::println("=== Solve 2×2 linear system ===")
+// 2x + y = 5,  x + 3y = 10  →  x=1, y=3
+val Asys: Matrix = Matrix::from(2, 2, [2.0, 1.0, 1.0, 3.0])
+val bsys: Matrix = Matrix::from(2, 1, [5.0, 10.0])
+val sol: Matrix? = solve(Asys, bsys)
+if sol != null {
+  IO::println("x = #{(sol as Matrix).get(0,0).fmt(4)}")
+  IO::println("y = #{(sol as Matrix).get(1,0).fmt(4)}")
+} else {
+  IO::println("singular — no unique solution")
+}
+
+IO::println("")
+IO::println("=== Solve 3×3 linear system ===")
+//  x +  y +  z =  6  (→ x=1, y=2, z=3)
+//  x -  y +  z =  2
+//  x +  y -  z =  0
+val A3: Matrix = Matrix::from(3, 3, [1.0,1.0,1.0, 1.0,-1.0,1.0, 1.0,1.0,-1.0])
+val b3: Matrix = Matrix::from(3, 1, [6.0, 2.0, 0.0])
+val sol3: Matrix? = solve(A3, b3)
+if sol3 != null {
+  val s3 = sol3 as Matrix
+  IO::println("x=#{s3.get(0,0).fmt(2)}  y=#{s3.get(1,0).fmt(2)}  z=#{s3.get(2,0).fmt(2)}")
+  IO::println("(expected x=1.00  y=2.00  z=3.00)")
+} else {
+  IO::println("singular")
+}
+
+IO::println("")
+IO::println("=== Least-squares linear regression ===")
+// Points close to y = 2x + 1
+val xs: List[Double] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+val ys: List[Double] = [1.1, 3.0, 4.9, 7.1, 9.0, 11.1]
+val fit: Matrix? = linearFit(xs, ys)
+if fit != null {
+  val f = fit as Matrix
+  IO::println("slope = #{f.get(0,0).fmt(4)},  intercept = #{f.get(1,0).fmt(4)}")
+  IO::println("(expected ~2.0000, ~1.0000)")
+} else {
+  IO::println("degenerate system")
+}
+
+IO::println("")
+IO::println("=== 2-D rotation matrix ===")
+val R90: Matrix = rotation2d(90.0)
+R90.print("R(90°)")
+// Rotate (1,0) by 90° → should be (~0, ~1)
+val v: Matrix = Matrix::from(2, 1, [1.0, 0.0])
+val rv: Matrix = R90.times(v)
+IO::println("R(90°)·[1,0]ᵀ = [#{rv.get(0,0).fmt(4)}, #{rv.get(1,0).fmt(4)}]")
+
+IO::println("")
+IO::println("=== Identity and orthogonality check ===")
+val I2: Matrix = Matrix::eye(2)
+I2.print("I₂")
+// R * Rᵀ should equal I (since rotation is orthogonal)
+val RRt: Matrix = R90.times(R90.transpose())
+RRt.print("R(90°)·R(90°)ᵀ (should be I₂)")
+
+IO::println("")
+IO::println("=== Column stats ===")
+// Use a 4×2 data matrix; compute mean and variance of each column
+val D: Matrix = Matrix::from(4, 2, [2.0, 4.0, 4.0, 4.0, 4.0, 6.0, 6.0, 8.0])
+D.print("D")
+foreach col: Int in 0.upto(D.ncol()) {
+  val vals: List[Double] = 0.upto(D.nrow()).map { r -> D.get(r, col) }
+  val mean: Double = vals.fold(0.0) { acc, x -> acc + x } / (vals.size as Double)
+  val variance: Double = vals.fold(0.0) { acc, x -> acc + (x - mean).sq() } / (vals.size as Double)
+  IO::println("  col #{col}: mean=#{mean.fmt(2)}  var=#{variance.fmt(2)}  std=#{Math::sqrt(variance).fmt(2)}")
+}
+
+IO::println("")
+IO::println("Done.")

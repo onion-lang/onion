@@ -562,7 +562,8 @@ try {
 | 誤り | 正しい（Onion） |
 |-----|----------------|
 | 裸の`readText(p)` / `get(url)` / `now()` / `exit(1)` | **もう解決しない** — デフォルトの静的インポートが純粋なクラスに限定された。`Files::readText`のように修飾するか、明示的にインポートする: `import { onion.Files::*; java.lang.System::exit }`。裸の`println`だけは引き続き使用可能（`onion.IO`が唯一の例外） |
-| 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される |
+| 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される。プロジェクトではtoolだけのソースが `onion run` のエントリーポイントになる（`onion run -- --plan ...`） |
+| スクリプトにMavenライブラリを渡すための `-classpath` | スクリプト先頭のコメントブロック（コードより前）に `//> using dep "g:a:v"`（必要なら `//> using repository "url"` も）を書く — プロジェクトの `[dependencies]` と同じく解決され、ディレクティブの組ごとにキャッシュされる。バージョンは厳密指定のみ。ロックファイルはない（推移的依存を再現可能にするにはプロジェクトを使う） |
 | tool内の未宣言の副作用 | 呼び出し箇所でE0077 — 本体の効果は推移的に推論され、`requires { read(src), write(dst), console, unknown }`と照合される。過剰申告はE0078、不正なcapabilityはE0079。リストにないJava呼び出しは`unknown`として明示的に許可する必要がある |
 | コメントを保持したい場合の`shape doc = json` | `shape doc = config` — コメント付きの`key = value`形式ファイル向けのLOSSLESSなshape。`parseLossless`は`Residue`（コメント、空白、キー順序、未知キー、値の表記）を保持し、`r.edit { v -> v.copy(port = 9090) }.render()`は該当する値のスロットだけを書き換える |
 | その場しのぎのカスタムフォーマット実装 | `class MyShape conforms Shape[T]` — ユーザー定義のshapeはコンビネータとOutcome/Defectを無償で得られるが、そのファイルは法則を主張しなければならない（`example l1 { s.parse(s.print(v)).get() == v }`）。さもなければそのクラスはE0080になる |

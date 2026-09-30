@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`Yaml::stringify` silently corrupted a String value that looked like a leading-dot number (`.5`, `-.5`, `.5e3`) into a Double on the next `Yaml::parse`.** The quoting guard `looksLikeNumber` was documented as mirroring `parseScalar`'s number detection exactly, but used a looser ad hoc check that quick-rejected any string not starting with a digit or `-`, so a leading-dot float — which `parseScalar`'s own float regex accepts (its digits before `.` are optional) — was never quoted. `looksLikeNumber` now uses the same two regexes `parseScalar` already applies, making the doc comment true instead of aspirational. Covered by new `YamlValueQuotingSpec`.
 
+### Added
+
+- **`run/SymbolicDiff.on`** — a 385-line symbolic differentiation engine, a new domain for the `run/` corpus (an ADT case-enum `Expr` with 12 heterogeneous cases — `Const`/`Var`/`Add`/`Sub`/`Mul`/`Div`/`Pow`/`Neg`/`Sin`/`Cos`/`Ln`/`Exp`; deep recursive `select`/`is` pattern matching with sealed exhaustiveness; algebraic simplification rules (`x+0`→`x`, `x*1`→`x`, `x*0`→`0`, `x^0`→`1`, `x^1`→`x`, constant folding) converging via multi-pass string-equality comparison; expression evaluation against a `HashMap[String, Double]` environment; partial derivatives and chained second derivatives; pretty-printing via `show()`; top-level helper functions in both expression- and block-body styles — covering polynomial, trigonometric, exponential, product/quotient-rule, partial, and second derivatives with numerical spot-checks against known analytic values), added to the `run/` corpus (merged via #1806).
+
 ## [0.132.0] - 2026-09-30
 
 ### Fixed

@@ -632,9 +632,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
     // carry laws/examples (the law's own params drive generation).
     val shapeMethods = declaration.shapes.flatMap(sc => synthesizeShapeMethod(declaration, sc))
+    // A record with a json shape can be a component of another json shape; the nesting
+    // record reaches it through this one hidden method rather than by the shape's name.
+    val hiddenJsonShape = JsonShapeComponents.firstJsonClause(declaration)
+      .filter(sc => shapeMethods.exists(_.name == sc.name))
+      .map(sc => synthesizeHiddenJsonShape(declaration, sc)).toList
     val lawMethods = declaration.laws.map(synthesizeLawMethod)
     val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
-    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ lawMethods ++ exampleMethods
+    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ hiddenJsonShape ++ lawMethods ++ exampleMethods
     // A record's own user-written methods (e.g. `def f(): ... { do[Option] { ... } }`) need
     // the same body-level rewriting (do-notation desugaring, trait method lowering) that a
     // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
@@ -686,29 +691,71 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
       AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
-    val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
-    if (kinds.exists(_.isEmpty)) return None
-    val tags = kinds.map(_.get)
     val factory = ShapeFormats.factoryFor(format) match {
       case Some(f) => f
       case None    => return None // typing reports the unknown format
     }
+    // A json shape also reads lists, nested records and absent keys (JsonShapeComponents);
+    // every other format keeps to the scalars. Typing reports what cannot be read (E0061).
+    val kinds =
+      if (JsonShapeComponents.isJsonFormat(format)) declaration.args.map(a => JsonShapeComponents.tagOfAst(a.typeRef))
+      else declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+    if (kinds.exists(_.isEmpty)) return None
+    val tags = kinds.map(_.get)
+    val structured = !tags.forall(JsonShapeComponents.isPlainScalar)
     // explode: { __v => [__v.c0(), __v.c1(), ...] }  (boxing is automatic into the list)
     val exploded = AST.ListLiteral(loc, declaration.args.map(a => AST.MethodCall(loc, AST.Id(loc, "__v"), a.name, Nil)))
     val explodeLambda = AST.ClosureExpression(loc,
       AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
       List(AST.Argument(loc, "__v", recordType)), null,
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, exploded))))
+    // An all-scalar record lowers exactly as before; only a structured one needs the
+    // nested-shape list, whose entries are thunks so that a record may contain itself.
+    // Each entry is cast to Object so the literal is a List[Object], which is what the
+    // runtime parameter takes (type arguments are invariant).
+    val objectType = AST.TypeNode(loc, AST.ReferenceType("java.lang.Object", true), false)
+    val nested =
+      if (structured) List(AST.ListLiteral(loc, declaration.args.map { a =>
+        JsonShapeComponents.nestedRecordOfAst(a.typeRef) match {
+          case Some(desc) => AST.Cast(loc, nestedShapeThunk(loc, desc), objectType)
+          case None       => AST.Cast(loc, AST.NullLiteral(loc), objectType)
+        }
+      }))
+      else Nil
     val call = AST.StaticMethodCall(loc,
       AST.TypeNode(loc, AST.ReferenceType("onion.Shapes", true), false), factory,
       List(
         shapeStringList(loc, declaration.args.map(_.name)),
-        shapeStringList(loc, tags),
+        shapeStringList(loc, tags)
+      ) ++ nested ++ List(
         shapeBuildLambda(loc, declaration, recordType, tags),
         explodeLambda
       ))
     Some(AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, clause.name, Nil, shapeType,
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call)))))
+  }
+
+  /** `{ -> Inner::onion$$jsonShape() }` -- resolved by the runtime on first use. */
+  private def nestedShapeThunk(loc: Location, record: AST.TypeDescriptor): AST.Expression = {
+    val call = AST.StaticMethodCall(loc, AST.TypeNode(loc, record, false), JsonShapeComponents.HiddenShapeMethod, Nil)
+    AST.ClosureExpression(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Function0", true), true), "call",
+      Nil, null, AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call))))
+  }
+
+  /**
+   * `static def onion$$jsonShape(): Shape[R] = R::<first json shape>()` -- what a record
+   * nesting this one calls. The first json clause in declaration order is the one used;
+   * a record with several names the one it wants nested first.
+   */
+  private def synthesizeHiddenJsonShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause): AST.MethodDeclaration = {
+    val loc = clause.location
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
+    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
+      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(declaration.name, false))), false)
+    val call = AST.StaticMethodCall(loc, recordType, clause.name, Nil)
+    AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, JsonShapeComponents.HiddenShapeMethod, Nil, shapeType,
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call))))
   }
 
   private def shapeStringList(loc: Location, values: List[String]): AST.Expression =
@@ -717,8 +764,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   /** `{ __p => new R(__p[0] as K0, ...) }` — shared by every shape source. */
   private def shapeBuildLambda(loc: Location, declaration: AST.RecordDeclaration, recordType: AST.TypeNode, tags: List[String]): AST.Expression = {
     val partsName = "__p"
-    val ctorArgs = declaration.args.zipWithIndex.map { case (_, i) =>
-      AST.Cast(loc, AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i)), boxedTypeNodeFor(loc, tags(i)))
+    val ctorArgs = declaration.args.zipWithIndex.map { case (a, i) =>
+      AST.Cast(loc, AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i)), partTypeNodeFor(loc, a, tags(i)))
     }
     AST.ClosureExpression(loc,
       AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
@@ -772,6 +819,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     Some(AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, clause.name, Nil, shapeType,
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call)))))
+  }
+
+  /**
+   * The type a component arrives as inside the erased parts list: the boxed scalar, or --
+   * for a json shape's list or nested record -- the component's own written type, minus
+   * a `?` (a cast lets null through, and the constructor parameter keeps its nullability).
+   */
+  private def partTypeNodeFor(loc: Location, arg: AST.Argument, tag: String): AST.TypeNode = {
+    val base = tag.stripSuffix("?")
+    if (ScalarConversions.byTag(base).isDefined) boxedTypeNodeFor(loc, base)
+    else arg.typeRef.desc match {
+      case AST.NullableType(inner) => AST.TypeNode(loc, inner, false)
+      case d                       => AST.TypeNode(loc, d, false)
+    }
   }
 
   /** The boxed type a component of `tag` arrives as inside the erased parts list. */

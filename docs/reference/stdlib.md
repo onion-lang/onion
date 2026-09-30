@@ -567,6 +567,28 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 behind `shape name = config` / `shape name = yaml` -- all four for when you want the
 `Shape[T]` value directly instead of the sugar.
 
+### Structured JSON and JSON Schema
+
+A json shape's components may also be `List[S]` of a scalar, a nested record that
+declares a json shape, `List[R]` of such records, and `T?` of any of these (the key may be
+absent or `null`); a defect inside a structure carries its path (`actions[2].owner`).
+`Shapes::json(names, tags, nested, build, explode)` is the overload behind that: the tags
+take `List[K]`, `Nested` and a trailing `?`, and `nested` holds a `Function0` returning
+the nested shape for each `Nested` component (`null` for the others).
+
+`hasJsonSchema()` answers whether a shape can describe what it reads as a JSON Schema —
+true only for a json shape. `jsonSchema()` returns that schema as JSON text: an `object`
+with one property per component, `required` listing every non-nullable one, and
+`additionalProperties: false`, recursing into arrays and nested objects — the form an
+LLM's structured-output mode takes:
+
+```onion
+val schema = Json::parse(Summary::doc().jsonSchema())   // embed in a request body
+```
+
+Any other shape's `jsonSchema()` throws `UnsupportedOperationException`, as does a
+recursive record's, which has no finite inline schema.
+
 ### Combinators
 
 - `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that

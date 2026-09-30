@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/HouseHunt.on`** — a 206-line real-estate listing search and mortgage analysis tool, a new domain for the `run/` corpus (records with computed methods — `Listing` (`pricePerSqft`/`isNew`/`age`/`display`), `MortgageParams` (`monthlyPayment`/`totalCost`/`totalInterest`); homogeneous enums `PropertyType`/`Neighborhood`; a class with mutable `List[Listing]` state and query/analysis methods; collection pipelines `filter`/`map`/`fold`/`sortedBy`/`find`/`partition`/`maxBy`/`minBy`/`take`; nullable `T?` results from `maxBy`/`minBy`; closures; string interpolation; `foreach` over lists and map `(k, v)` entries; a `while` loop; `import { java.lang.Math::pow }` for the mortgage payment formula), added to the `run/` corpus (merged via #1783).
+
 ## [0.131.0] - 2026-09-30
 
 ### Added

@@ -1,0 +1,327 @@
+// IteratedPD.on — Iterated Prisoner's Dilemma tournament (~230 lines)
+//
+// Simulates the classic game-theory experiment: five strategies compete in
+// a round-robin tournament playing the Iterated Prisoner's Dilemma.  Each
+// pair plays 200 rounds; raw points accumulate; final standings rank by
+// total score and tournament points (3 per win, 1 per draw).
+//
+// Payoff matrix (T > R > P > S):
+//   C vs C → R = 3   (reward for mutual cooperation)
+//   C vs D → S = 0   (sucker's payoff)
+//   D vs C → T = 5   (temptation to defect)
+//   D vs D → P = 1   (punishment for mutual defection)
+//
+// Exercises: ADT case-enum with a method; interface + five classes conforms
+// it; records with methods; mutable class for score tracking; foreach over
+// a range and a typed collection; select / type-pattern matching; extension
+// methods on Double and String; closures; string interpolation #{}.
+
+// ── Action ─────────────────────────────────────────────────────────────────
+
+enum Action {
+  case Cooperate
+  case Defect
+public:
+  def label(): String = select this {
+    case _c is Cooperate: "C"
+    case _d is Defect:    "D"
+  }
+}
+
+def payoff(mine: Action, theirs: Action): Int =
+  select mine {
+    case _c is Cooperate: select theirs {
+      case _c2 is Cooperate: 3
+      case _d  is Defect:    0
+    }
+    case _d is Defect: select theirs {
+      case _c  is Cooperate: 5
+      case _d2 is Defect:    1
+    }
+  }
+
+// ── Strategy interface ─────────────────────────────────────────────────────
+
+interface Strategy {
+  def name(): String
+  def nextAction(myHistory: List[Action], theirHistory: List[Action]): Action
+  def reset(): Strategy    // return a fresh copy for each match
+}
+
+// ── Strategy implementations ───────────────────────────────────────────────
+
+// Always cooperate.
+class AllCooperate conforms Strategy {
+public:
+  def name(): String = "AllC"
+  def nextAction(_myH: List[Action], _theirH: List[Action]): Action = new Cooperate()
+  def reset(): Strategy = new AllCooperate()
+}
+
+// Always defect.
+class AllDefect conforms Strategy {
+public:
+  def name(): String = "AllD"
+  def nextAction(_myH: List[Action], _theirH: List[Action]): Action = new Defect()
+  def reset(): Strategy = new AllDefect()
+}
+
+// Cooperate first, then mirror the opponent's last move.
+class TitForTat conforms Strategy {
+public:
+  def name(): String = "TitForTat"
+  def nextAction(_myH: List[Action], theirHistory: List[Action]): Action {
+    if theirHistory.size == 0 { return new Cooperate() }
+    return theirHistory.get(theirHistory.size - 1) as Action
+  }
+  def reset(): Strategy = new TitForTat()
+}
+
+// Cooperate until the opponent defects once, then defect forever.
+class GrimTrigger conforms Strategy {
+  var triggered: Boolean = false
+public:
+  def name(): String = "GrimTrigger"
+  def nextAction(_myH: List[Action], theirHistory: List[Action]): Action {
+    if !triggered {
+      foreach a: Action in theirHistory {
+        if a is Defect { triggered = true }
+      }
+    }
+    if triggered { return new Defect() }
+    return new Cooperate()
+  }
+  def reset(): Strategy = new GrimTrigger()
+}
+
+// Win-Stay, Lose-Shift: cooperate first; keep last action when it paid >= 3,
+// otherwise switch.
+class Pavlov conforms Strategy {
+public:
+  def name(): String = "Pavlov"
+  def nextAction(myHistory: List[Action], theirHistory: List[Action]): Action {
+    if myHistory.size == 0 { return new Cooperate() }
+    val n: Int = myHistory.size
+    val myLast:    Action = myHistory.get(n - 1) as Action
+    val theirLast: Action = theirHistory.get(n - 1) as Action
+    if payoff(myLast, theirLast) >= 3 { return myLast }
+    return select myLast {
+      case _c is Cooperate: new Defect()
+      case _d is Defect:    new Cooperate()
+    }
+  }
+  def reset(): Strategy = new Pavlov()
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record MatchResult(p1: String, p2: String, p1Score: Int, p2Score: Int) {
+public:
+  def winner(): String {
+    if p1Score() > p2Score() { return p1() }
+    if p2Score() > p1Score() { return p2() }
+    return "draw"
+  }
+  def scoreFor(playerName: String): Int {
+    if playerName == p1() { return p1Score() }
+    if playerName == p2() { return p2Score() }
+    return 0
+  }
+}
+
+// Mutable per-player accumulator used during tournament aggregation.
+class PlayerState {
+  val playerName: String
+  var totalScore: Int = 0
+  var wins: Int = 0
+  var losses: Int = 0
+  var draws: Int = 0
+public:
+  def this(n: String) { playerName = n }
+  def playerName(): String = playerName
+  def totalScore(): Int = totalScore
+  def wins(): Int = wins
+  def losses(): Int = losses
+  def draws(): Int = draws
+  def points(): Int = wins * 3 + draws
+  def winRate(): Double {
+    val total: Int = wins + losses + draws
+    if total == 0 { return 0.0 }
+    return wins as Double * 100.0 / total as Double
+  }
+  def addScore(s: Int): void { totalScore = totalScore + s }
+  def recordOutcome(won: Boolean, drawn: Boolean): void {
+    if won { wins = wins + 1 }
+    else if drawn { draws = draws + 1 }
+    else { losses = losses + 1 }
+  }
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension Double {
+  def fmt1(): String = Format::fixed(self, 1)
+}
+
+extension String {
+  def rpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def lpad(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── Match simulation ───────────────────────────────────────────────────────
+
+def runMatch(s1: Strategy, s2: Strategy, rounds: Int): MatchResult {
+  val h1: List[Action] = []
+  val h2: List[Action] = []
+  var score1: Int = 0
+  var score2: Int = 0
+  foreach _r: Int in 0..<rounds {
+    val a1: Action = s1.nextAction(h1, h2)
+    val a2: Action = s2.nextAction(h2, h1)
+    score1 = score1 + payoff(a1, a2)
+    score2 = score2 + payoff(a2, a1)
+    h1.add(a1)
+    h2.add(a2)
+  }
+  return new MatchResult(s1.name(), s2.name(), score1, score2)
+}
+
+// ── Tournament (round-robin) ───────────────────────────────────────────────
+
+def runTournament(strategies: List[Strategy], rounds: Int): List[PlayerState] {
+  // Build a PlayerState per strategy.
+  val stateMap: Map[Object, PlayerState] = [:]
+  foreach s: Strategy in strategies {
+    stateMap.put(s.name(), new PlayerState(s.name()))
+  }
+
+  // Every ordered pair (i < j) plays one match.
+  val n: Int = strategies.size
+  foreach i: Int in 0..<n {
+    foreach j: Int in (i + 1)..<n {
+      val s1: Strategy = strategies.get(i) as Strategy
+      val s2: Strategy = strategies.get(j) as Strategy
+      val mr: MatchResult = runMatch(s1.reset(), s2.reset(), rounds)
+
+      val st1: PlayerState = stateMap.get(mr.p1()) as PlayerState
+      val st2: PlayerState = stateMap.get(mr.p2()) as PlayerState
+      st1.addScore(mr.p1Score())
+      st2.addScore(mr.p2Score())
+
+      val winner: String = mr.winner()
+      st1.recordOutcome(winner == mr.p1(), winner == "draw")
+      st2.recordOutcome(winner == mr.p2(), winner == "draw")
+    }
+  }
+
+  // Collect states and sort by total score descending.
+  val allStates: List[PlayerState] = []
+  foreach s: Strategy in strategies {
+    allStates.add(stateMap.get(s.name()) as PlayerState)
+  }
+  return allStates.sortedBy { ps: PlayerState -> -(ps.totalScore()) }
+}
+
+// ── Output ─────────────────────────────────────────────────────────────────
+
+def printHeader(): void {
+  println("┌──────────────────────────────────────────────────────┐")
+  println("│  Iterated Prisoner's Dilemma — Round-Robin Tournament│")
+  println("└──────────────────────────────────────────────────────┘")
+}
+
+def printStandings(standings: List[PlayerState]): void {
+  println("")
+  println("  Rank  Strategy       Score    W    L    D   Pts  Win%")
+  println("  ────  ─────────────  ─────  ───  ───  ───  ───  ────")
+  var rank: Int = 1
+  foreach ps: PlayerState in standings {
+    val row: String = "  " + ("" + rank).lpad(4) + "  " +
+      ps.playerName().rpad(13) + "  " +
+      ("" + ps.totalScore()).lpad(5) + "  " +
+      ("" + ps.wins()).lpad(3) + "  " +
+      ("" + ps.losses()).lpad(3) + "  " +
+      ("" + ps.draws()).lpad(3) + "  " +
+      ("" + ps.points()).lpad(3) + "  " +
+      ps.winRate().fmt1() + "%"
+    println(row)
+    rank = rank + 1
+  }
+}
+
+// Build and display the full head-to-head match matrix.
+def printMatchMatrix(strategies: List[Strategy], rounds: Int): void {
+  println("")
+  println("  ── Head-to-head scores (row vs column) ────────────────")
+  // Header
+  var header: String = "  " + "           ".rpad(13) + " │"
+  foreach s: Strategy in strategies {
+    header = header + " " + s.name().lpad(11) + " │"
+  }
+  println(header)
+
+  // Run all matches and store in map.
+  val scoreMap: Map[Object, MatchResult] = [:]
+  val n: Int = strategies.size
+  foreach i: Int in 0..<n {
+    foreach j: Int in 0..<n {
+      if i != j {
+        val s1: Strategy = (strategies.get(i) as Strategy).reset()
+        val s2: Strategy = (strategies.get(j) as Strategy).reset()
+        val key: String = s1.name() + "|" + s2.name()
+        scoreMap.put(key, runMatch(s1, s2, rounds))
+      }
+    }
+  }
+
+  // Rows
+  foreach s1: Strategy in strategies {
+    var row: String = "  " + s1.name().rpad(13) + " │"
+    foreach s2: Strategy in strategies {
+      if s1.name() == s2.name() {
+        row = row + "       —     │"
+      } else {
+        val key: String = s1.name() + "|" + s2.name()
+        val mr: MatchResult = scoreMap.get(key) as MatchResult
+        val cell: String = ("" + mr.p1Score()).lpad(5)
+        row = row + " " + cell + "       │"
+      }
+    }
+    println(row)
+  }
+}
+
+def main(): void {
+  printHeader()
+  val strategies: List[Strategy] = [
+    new AllCooperate(),
+    new AllDefect(),
+    new TitForTat(),
+    new GrimTrigger(),
+    new Pavlov()
+  ]
+
+  val roundsPerMatch: Int = 200
+  println("")
+  println("  Strategies: #{strategies.size}   Rounds per match: #{roundsPerMatch}")
+  println("  Total matches: #{strategies.size * (strategies.size - 1) / 2}")
+
+  val standings: List[PlayerState] = runTournament(strategies, roundsPerMatch)
+  printStandings(standings)
+
+  // Show winner.
+  val winner: PlayerState = standings.get(0) as PlayerState
+  println("")
+  println("  Winner: #{winner.playerName()} with #{winner.totalScore()} raw points  (#{winner.points()} tournament pts)")
+
+  // Print the head-to-head matrix.
+  printMatchMatrix(strategies, roundsPerMatch)
+}

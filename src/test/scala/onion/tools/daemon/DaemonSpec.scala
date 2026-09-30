@@ -79,6 +79,30 @@ class DaemonSpec extends AnyFunSpec with Matchers {
       }
     }
 
+    it("compiles a script against its //> using dep jars and returns them in the class path") {
+      // The daemon's half directly, without a socket: the directive handling is in
+      // ScriptRunner.prepare, which the daemon runs.
+      if (System.getProperty("onion.cache.dir") == null)
+        System.setProperty("onion.cache.dir", Files.createTempDirectory("onion-script-cache").toString)
+      val repository = onion.tools.project.FixtureMavenRepository.publish()
+      locally {
+        val work = Files.createTempDirectory("onion-daemon-deps")
+        val source = work.resolve("Deps.on")
+        Files.writeString(source,
+          s"""//> using repository "${repository.toUri}"
+             |//> using dep "${onion.tools.project.FixtureMavenRepository.Coordinate.render}"
+             |import { com.example.oniontest.Greeter }
+             |IO::println(Greeter::greet())
+             |""".stripMargin)
+        val runner = DaemonClient.absolutizeRunnerOptions(Array.empty, work) :+ source.toString
+        val (response, bundle) = OnionDaemon.compileScript(runner)
+        withClue(response.err) { response.exitCode shouldBe 0 }
+        bundle.classPath.head shouldBe work.toString
+        bundle.classPath.exists(_.endsWith("greeter-1.0.0.jar")) shouldBe true
+        bundle.classPath.exists(_.endsWith("core-1.0.0.jar")) shouldBe true
+      }
+    }
+
     it("makes source, -d and -classpath paths absolute and supplies the defaults") {
       val cwd = Path.of("/work/dir")
       val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)

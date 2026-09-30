@@ -1,0 +1,307 @@
+// Rope.on — persistent rope data structure for efficient large-text editing
+// Exercises: recursive ADT enum (Leaf/Cat), records, classes, extension methods
+//            on Int/String, select/type-pattern matching (exhaustive), recursive
+//            algorithms, collection pipelines (map/filter/fold/groupBy/sortedBy),
+//            foreach (ranges and map k,v), while loops, string interpolation,
+//            nullable, closures.
+
+import {
+  java.lang.StringBuilder as SB
+  java.lang.Math as JMath
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+val CHUNK: Int = 12   // max chars per leaf
+
+// ── Rope ADT ──────────────────────────────────────────────────────────────────
+
+enum Rope {
+  case Leaf(text: String)
+  case Cat(left: Rope, right: Rope, len: Int)
+public:
+  def length(): Int = select this {
+    case l is Leaf: l.text().length()
+    case c is Cat:  c.len()
+  }
+  def isEmpty(): Boolean = length() == 0
+
+  def appendTo(sb: SB): void {
+    select this {
+      case l is Leaf: sb.append(l.text())
+      case c is Cat:  { c.left().appendTo(sb); c.right().appendTo(sb) }
+    }
+  }
+
+  def flatten(): String {
+    val sb: SB = new SB(length())
+    appendTo(sb)
+    return sb.toString()
+  }
+
+  def charAt(i: Int): String = select this {
+    case l is Leaf: l.text().substring(i, i + 1)
+    case c is Cat:
+      if i < c.left().length() { c.left().charAt(i) }
+      else { c.right().charAt(i - c.left().length()) }
+  }
+
+  def depth(): Int = select this {
+    case l is Leaf: 1
+    case c is Cat:  1 + JMath::max(c.left().depth(), c.right().depth())
+  }
+}
+
+// ── Smart constructors ────────────────────────────────────────────────────────
+
+def ropeOf(s: String): Rope {
+  if s.length() <= CHUNK { return new Leaf(s) }
+  val mid: Int = s.length() / 2
+  return ropeConcat(ropeOf(s.substring(0, mid)), ropeOf(s.substring(mid)))
+}
+
+def ropeConcat(a: Rope, b: Rope): Rope {
+  if a.isEmpty() { return b }
+  if b.isEmpty() { return a }
+  return new Cat(a, b, a.length() + b.length())
+}
+
+// ── Split/insert/delete ───────────────────────────────────────────────────────
+
+record RopeSplit(left: Rope, right: Rope)
+
+def ropeSplit(r: Rope, pos: Int): RopeSplit {
+  select r {
+    case l is Leaf: {
+      val t: String = l.text()
+      return new RopeSplit(new Leaf(t.substring(0, pos)),
+                           new Leaf(t.substring(pos)))
+    }
+    case c is Cat: {
+      val ll: Int = c.left().length()
+      if pos == ll {
+        return new RopeSplit(c.left(), c.right())
+      } else if pos < ll {
+        val s: RopeSplit = ropeSplit(c.left(), pos)
+        return new RopeSplit(s.left(), ropeConcat(s.right(), c.right()))
+      } else {
+        val s: RopeSplit = ropeSplit(c.right(), pos - ll)
+        return new RopeSplit(ropeConcat(c.left(), s.left()), s.right())
+      }
+    }
+  }
+}
+
+def ropeInsert(r: Rope, pos: Int, text: String): Rope {
+  val s: RopeSplit = ropeSplit(r, pos)
+  return ropeConcat(ropeConcat(s.left(), ropeOf(text)), s.right())
+}
+
+def ropeDelete(r: Rope, from: Int, to: Int): Rope {
+  if from >= to { return r }
+  val s1: RopeSplit = ropeSplit(r, from)
+  val s2: RopeSplit = ropeSplit(s1.right(), to - from)
+  return ropeConcat(s1.left(), s2.right())
+}
+
+def ropeSubstring(r: Rope, from: Int, to: Int): String {
+  val s1: RopeSplit = ropeSplit(r, from)
+  val s2: RopeSplit = ropeSplit(s1.right(), to - from)
+  return s2.left().flatten()
+}
+
+// ── Edit operations ───────────────────────────────────────────────────────────
+
+enum EditOp {
+  case Insert(pos: Int, text: String)
+  case Delete(from: Int, to: Int)
+  case Replace(from: Int, to: Int, newText: String)
+public:
+  def describe(): String = select this {
+    case e is Insert:  "insert(#{e.pos()}, '#{e.text()}')"
+    case e is Delete:  "delete(#{e.from()}..#{e.to()})"
+    case e is Replace: "replace(#{e.from()}..#{e.to()}, '#{e.newText()}')"
+  }
+}
+
+// ── TextBuffer ────────────────────────────────────────────────────────────────
+
+class TextBuffer {
+  var rope:    Rope
+  var history: List[EditOp]
+  var version: Int
+
+public:
+  def this(initial: String) {
+    rope    = ropeOf(initial)
+    history = []
+    version = 0
+  }
+
+  def insert(pos: Int, text: String): void {
+    rope = ropeInsert(rope, pos, text)
+    history << new Insert(pos, text)
+    version++
+  }
+
+  def delete(from: Int, to: Int): void {
+    rope = ropeDelete(rope, from, to)
+    history << new Delete(from, to)
+    version++
+  }
+
+  def replace(from: Int, to: Int, text: String): void {
+    rope = ropeDelete(rope, from, to)
+    rope = ropeInsert(rope, from, text)
+    history << new Replace(from, to, text)
+    version++
+  }
+
+  def append(text: String): void {
+    insert(rope.length(), text)
+  }
+
+  def text():          String  = rope.flatten()
+  def length():        Int     = rope.length()
+  def charAt(i: Int):  String  = rope.charAt(i)
+  def treeDepth():     Int     = rope.depth()
+  def editCount():       Int           = history.size()
+  def currentVersion():  Int           = version
+  def getHistory():      List[EditOp]  = history
+
+  def substring(from: Int, to: Int): String =
+    ropeSubstring(rope, from, JMath::min(to, rope.length()))
+}
+
+// ── Stats record ──────────────────────────────────────────────────────────────
+
+record TextStats(chars: Int, words: Int, lines: Int,
+                 edits: Int, treeDepth: Int, version: Int) {
+public:
+  def report(): String =
+    "chars=#{chars()}, words=#{words()}, lines=#{lines()}, " +
+    "edits=#{edits()}, depth=#{treeDepth()}, v#{version()}"
+}
+
+def gatherStats(buf: TextBuffer): TextStats {
+  val t:     String = buf.text()
+  val chars: Int    = t.length()
+  val words: Int    = if chars == 0 { 0 }
+                      else { t.trim().split("\\s+").length }
+  val lines: Int    = if chars == 0 { 1 }
+                      else { t.split("\n", -1).length }
+  return new TextStats(chars, words, lines,
+                       buf.editCount(), buf.treeDepth(), buf.currentVersion())
+}
+
+// ── Word-frequency helper ─────────────────────────────────────────────────────
+
+record WordFreq(word: String, count: Int) {
+public:
+  def label(): String = "#{word()} ×#{count()}"
+}
+
+def wordFrequencies(text: String): List[WordFreq] {
+  val tokens: List[String] = text.toLowerCase().split("[^a-z]+").toList()
+    .filter { w -> (w as String).length() > 0 }
+  val freq: Map[String, Int] = [:]
+  foreach tok: Object in tokens {
+    val w: String = tok as String
+    val n: Int    = if freq.containsKey(w) { freq.get(w) as Int } else { 0 }
+    freq.put(w, n + 1)
+  }
+  val result: List[WordFreq] = []
+  foreach (k, v) in freq {
+    result << new WordFreq(k as String, v as Int)
+  }
+  return result.sortedBy { wf -> 0 - (wf as WordFreq).count() }
+}
+
+// ── Main demo ─────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== Rope Data Structure Demo ===")
+  IO::println("")
+
+  // ── Basic editing ─────────────────────────────────────────────────────────
+  IO::println("── Basic Editing ──")
+  val buf: TextBuffer = new TextBuffer("Hello, World!")
+  IO::println("Initial   : '#{buf.text()}' (len=#{buf.length()})")
+
+  buf.insert(7, "Beautiful ")
+  IO::println("Insert    : '#{buf.text()}'")
+
+  buf.delete(7, 17)
+  IO::println("Delete    : '#{buf.text()}'")
+
+  buf.replace(0, 5, "Greetings")
+  IO::println("Replace   : '#{buf.text()}'")
+
+  buf.append(" How are you?")
+  IO::println("Append    : '#{buf.text()}'")
+
+  IO::println("")
+  IO::println("Substring [0,9): '#{buf.substring(0, 9)}'")
+  IO::println("Char at 9 : '#{buf.charAt(9)}'")
+  IO::println("")
+
+  IO::println("── Edit History ──")
+  foreach op: EditOp in buf.getHistory() {
+    IO::println("  " + op.describe())
+  }
+  IO::println("")
+
+  val stats: TextStats = gatherStats(buf)
+  IO::println("── Stats: #{stats.report()} ──")
+  IO::println("")
+
+  // ── Rope-building demo ────────────────────────────────────────────────────
+  IO::println("── Building from long string ──")
+  val pangram: String = "The quick brown fox jumps over the lazy dog"
+  val pbuf: TextBuffer = new TextBuffer(pangram)
+  IO::println("Tree depth: #{pbuf.treeDepth()} (chars=#{pbuf.length()})")
+  pbuf.insert(10, "red ")
+  IO::println("After insert 'red ' @10: '#{pbuf.text()}'")
+  IO::println("Tree depth: #{pbuf.treeDepth()}")
+  IO::println("")
+
+  // ── Stress editing ────────────────────────────────────────────────────────
+  IO::println("── 50-edit stress test ──")
+  val words: List[String] = ["alpha", "beta", "gamma", "delta", "epsilon",
+                              "zeta", "eta", "theta", "iota", "kappa"]
+  val stress: TextBuffer = new TextBuffer("")
+  foreach i: Int in 0..<50 {
+    val w: String = (words.get(i % words.size()) as String) + " "
+    stress.append(w)
+  }
+  IO::println("After 50 appends: len=#{stress.length()}, depth=#{stress.treeDepth()}")
+
+  // 10 mid-string inserts
+  foreach i: Int in 0..<10 {
+    val mid: Int = stress.length() / 2
+    stress.insert(mid, "[x]")
+  }
+  IO::println("After 10 mid-inserts: len=#{stress.length()}, depth=#{stress.treeDepth()}")
+
+  // 5 deletes
+  foreach i: Int in 0..<5 {
+    val from: Int = i * 4
+    stress.delete(from, from + 3)
+  }
+  IO::println("After 5 deletes: len=#{stress.length()}")
+
+  val sstats: TextStats = gatherStats(stress)
+  IO::println("Stress stats: #{sstats.report()}")
+  IO::println("")
+
+  // ── Word frequency ────────────────────────────────────────────────────────
+  IO::println("── Word Frequencies (stress text, top 5) ──")
+  val freqs: List[WordFreq] = wordFrequencies(stress.text())
+  val top: List[WordFreq]   = freqs.filter { wf -> (wf as WordFreq).count() >= 3 }
+  foreach wf: WordFreq in top {
+    IO::println("  " + wf.label())
+  }
+
+  IO::println("")
+  IO::println("=== Done ===")
+}

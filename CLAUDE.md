@@ -28,11 +28,17 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 ### Compiler Options (for onionc/onion)
 
 - `-classpath <path>` - Set classpath for compilation
+- `-super <class>` - Set the superclass a top-level script's synthesized class extends (`onion`/`onionc`)
 - `-encoding <encoding>` - Set source file encoding
-- `-d <dir>` - Set output directory for class files
+- `-d <dir>` - Set output directory for class files (`onionc`)
+- `-g:none` - Omit debug info (no LocalVariableTable), named after javac's `-g:none` (`onionc`)
 - `-maxErrorReport <n>` - Limit number of errors reported
+- `--verbose` - Print extra diagnostic output during compilation
 - `--dump-ast` - Print parsed AST to stderr
 - `--dump-typed-ast` - Print typed AST summary to stderr
+- `--profile-compile` - Record a per-phase compile-time profile
+- `--profile-format <text|json>` - Set the profile's output format
+- `--profile-output <target>` - Set where the profile is written
 - `--warn <off|on|error>` - Set warning level
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
 - `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)

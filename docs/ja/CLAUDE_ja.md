@@ -28,11 +28,17 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 ### コンパイラオプション (onionc/onion用)
 
 - `-classpath <path>` - コンパイル用のクラスパスを設定
+- `-super <class>` - トップレベルスクリプトが合成するクラスの親クラスを設定 (`onion`/`onionc`)
 - `-encoding <encoding>` - ソースファイルのエンコーディングを設定
-- `-d <dir>` - クラスファイルの出力ディレクトリを設定
+- `-d <dir>` - クラスファイルの出力ディレクトリを設定 (`onionc`)
+- `-g:none` - デバッグ情報（LocalVariableTable）を省略する。javacの`-g:none`と同名・同義 (`onionc`)
 - `-maxErrorReport <n>` - 報告するエラーの数を制限
+- `--verbose` - コンパイル中に詳細な診断出力を表示
 - `--dump-ast` - パースされたASTを標準エラー出力に表示
 - `--dump-typed-ast` - 型付けされたASTの概要を標準エラー出力に表示
+- `--profile-compile` - フェーズ別のコンパイル時間プロファイルを記録
+- `--profile-format <text|json>` - プロファイルの出力形式を設定
+- `--profile-output <target>` - プロファイルの出力先を設定
 - `--warn <off|on|error>` - 警告レベルを設定
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
 - `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）

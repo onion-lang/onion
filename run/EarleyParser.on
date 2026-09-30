@@ -1,0 +1,323 @@
+// EarleyParser.on — General context-free grammar parser (Earley's algorithm)
+// Recognises any CFG including ambiguous and left-recursive ones in O(n³).
+// Demonstrates: ADT enums, records, if-is dispatch, nested generic lists,
+//               foreach + while loops, collection pipelines, nullable handling,
+//               string interpolation, recursive algorithms.
+
+// ── Grammar symbols ───────────────────────────────────────────────────────────
+
+enum Symbol {
+  case Term(value: String)
+  case NonTerm(name: String)
+
+  public:
+    def show(): String {
+      if this is Term    { return "\"" + (this as Term).value() + "\"" }
+      if this is NonTerm { return (this as NonTerm).name() }
+      return "?"
+    }
+}
+
+// ── Production rules ──────────────────────────────────────────────────────────
+
+record Rule(lhs: String, rhs: List[Symbol]) {
+  public:
+    def show(): String {
+      if rhs().size == 0 { return "#{lhs()} → ε" }
+      val body = rhs().map { s -> s.show() }
+        .fold("") { acc, s -> if acc == "" { s } else { "#{acc} #{s}" } }
+      return "#{lhs()} → #{body}"
+    }
+}
+
+// ── Earley items: (rule, dot-position, chart-origin) ─────────────────────────
+
+record EarleyItem(rule: Rule, dot: Int, origin: Int) {
+  public:
+    def isComplete(): Boolean = dot() >= rule().rhs().size
+
+    def nextSym(): Symbol? {
+      if isComplete() { return null }
+      return rule().rhs()[dot()]
+    }
+
+    def advance(): EarleyItem = new EarleyItem(rule(), dot() + 1, origin())
+
+    def show(): String {
+      val parts: List[String] = []
+      var i: Int = 0
+      foreach s: Symbol in rule().rhs() {
+        if i == dot() { parts.add("•") }
+        parts.add(s.show())
+        i++
+      }
+      if dot() >= rule().rhs().size { parts.add("•") }
+      val body = parts.fold("") { acc, s -> if acc == "" { s } else { "#{acc} #{s}" } }
+      return "(#{rule().lhs()} → #{body}, #{origin()})"
+    }
+}
+
+// ── Grammar ───────────────────────────────────────────────────────────────────
+
+class Grammar {
+  var rules: List[Rule]
+
+public:
+  def this { rules = [] }
+
+  def add(lhs: String, rhs: List[Symbol]): Grammar {
+    rules.add(new Rule(lhs, rhs))
+    return this
+  }
+
+  def rulesFor(name: String): List[Rule] =
+    rules.filter { r -> r.lhs() == name }
+
+  def show(): void {
+    IO::println("  Rules:")
+    foreach r: Rule in rules { IO::println("    #{r.show()}") }
+  }
+}
+
+// ── Earley parser ─────────────────────────────────────────────────────────────
+
+class EarleyParser {
+  val grammar: Grammar
+
+public:
+  def this(g: Grammar) { grammar = g }
+
+  // Returns true iff the token sequence is in the language of `start`.
+  def recognise(tokens: List[String], start: String): Boolean {
+    val n   = tokens.size
+    val chart: List[List[EarleyItem]] = []
+    var k: Int = 0
+    while k <= n {
+      val set: List[EarleyItem] = []
+      chart.add(set)
+      k++
+    }
+
+    foreach r: Rule in grammar.rulesFor(start) {
+      addItem(chart[0], new EarleyItem(r, 0, 0))
+    }
+
+    var i: Int = 0
+    while i <= n {
+      var j: Int = 0
+      while j < chart[i].size {
+        val item = chart[i][j]
+        val next = item.nextSym()
+        if next == null {
+          complete(chart, i, item)
+        } else if next is NonTerm {
+          val nt = next as NonTerm
+          foreach r: Rule in grammar.rulesFor(nt.name()) {
+            addItem(chart[i], new EarleyItem(r, 0, i))
+          }
+        }
+        j++
+      }
+      if i < n {
+        foreach item: EarleyItem in chart[i] {
+          val next = item.nextSym()
+          if next is Term {
+            val t = next as Term
+            if t.value() == tokens[i] {
+              addItem(chart[i + 1], item.advance())
+            }
+          }
+        }
+      }
+      i++
+    }
+
+    val accepted = chart[n].find { item ->
+      item.rule().lhs() == start && item.isComplete() && item.origin() == 0
+    }
+    return accepted != null
+  }
+
+  def printChart(tokens: List[String], start: String): void {
+    val n   = tokens.size
+    val chart: List[List[EarleyItem]] = []
+    var k: Int = 0
+    while k <= n {
+      val set: List[EarleyItem] = []
+      chart.add(set)
+      k++
+    }
+    foreach r: Rule in grammar.rulesFor(start) {
+      addItem(chart[0], new EarleyItem(r, 0, 0))
+    }
+    var i: Int = 0
+    while i <= n {
+      var j: Int = 0
+      while j < chart[i].size {
+        val item = chart[i][j]
+        val next = item.nextSym()
+        if next == null {
+          complete(chart, i, item)
+        } else if next is NonTerm {
+          val nt = next as NonTerm
+          foreach r: Rule in grammar.rulesFor(nt.name()) {
+            addItem(chart[i], new EarleyItem(r, 0, i))
+          }
+        }
+        j++
+      }
+      IO::println("  Chart[#{i}]:")
+      foreach item: EarleyItem in chart[i] {
+        IO::println("    #{item.show()}")
+      }
+      if i < n {
+        foreach item: EarleyItem in chart[i] {
+          val next = item.nextSym()
+          if next is Term {
+            val t = next as Term
+            if t.value() == tokens[i] {
+              addItem(chart[i + 1], item.advance())
+            }
+          }
+        }
+      }
+      i++
+    }
+  }
+
+  def complete(chart: List[List[EarleyItem]], pos: Int, done: EarleyItem): void {
+    val orig  = done.origin()
+    val cname = done.rule().lhs()
+    var k: Int = 0
+    while k < chart[orig].size {
+      val item = chart[orig][k]
+      val next = item.nextSym()
+      if next is NonTerm {
+        val nt = next as NonTerm
+        if nt.name() == cname {
+          addItem(chart[pos], item.advance())
+        }
+      }
+      k++
+    }
+  }
+
+  def addItem(set: List[EarleyItem], item: EarleyItem): void {
+    val dup = set.find { x ->
+      x.rule() === item.rule() &&
+      x.dot()   == item.dot() &&
+      x.origin() == item.origin()
+    }
+    if dup == null { set.add(item) }
+  }
+}
+
+// ── Token helpers ─────────────────────────────────────────────────────────────
+
+def tok(s: String): List[String] {
+  if s.trim().length == 0 { return [] }
+  val result: List[String] = []
+  foreach t: String in Strings::split(s, " ") {
+    val w = t.trim()
+    if w.length > 0 { result.add(w) }
+  }
+  return result
+}
+
+def nt(n: String): Symbol = new NonTerm(n)
+def  t(v: String): Symbol = new Term(v)
+
+// ── Test runner ───────────────────────────────────────────────────────────────
+
+var totalPass: Int = 0
+var totalFail: Int = 0
+
+def check(parser: EarleyParser, start: String, input: String, want: Boolean): void {
+  val got    = parser.recognise(tok(input), start)
+  val ok     = got == want
+  val status = if ok { "PASS" } else { "FAIL" }
+  val verdict = if got { "ACCEPT" } else { "REJECT" }
+  IO::println("  #{status}  #{verdict}  \"#{input}\"")
+  if ok { totalPass++ } else { totalFail++ }
+}
+
+// ── Grammar 1: Left-recursive arithmetic ─────────────────────────────────────
+// E → T | E "+" T     (left-recursive — works in Earley, breaks in LL/LR)
+// T → F | T "*" F
+// F → "(" E ")" | "n"
+
+IO::println("Grammar 1: Arithmetic  (E → T | E + T, T → F | T * F, F → n | ( E ))")
+val arith = new Grammar()
+  .add("E", [nt("T")])
+  .add("E", [nt("E"), t("+"), nt("T")])
+  .add("T", [nt("F")])
+  .add("T", [nt("T"), t("*"), nt("F")])
+  .add("F", [t("("), nt("E"), t(")")])
+  .add("F", [t("n")])
+
+val arithP = new EarleyParser(arith)
+check(arithP, "E", "n",               true)
+check(arithP, "E", "n + n",           true)
+check(arithP, "E", "n * n + n",       true)
+check(arithP, "E", "( n + n ) * n",   true)
+check(arithP, "E", "n + + n",         false)
+check(arithP, "E", "n n",             false)
+check(arithP, "E", "",                false)
+
+IO::println("")
+IO::println("Grammar 2: Palindromes over {a, b}  (S → ε | a | b | a S a | b S b)")
+val pal = new Grammar()
+  .add("S", [])
+  .add("S", [t("a")])
+  .add("S", [t("b")])
+  .add("S", [t("a"), nt("S"), t("a")])
+  .add("S", [t("b"), nt("S"), t("b")])
+
+val palP = new EarleyParser(pal)
+check(palP, "S", "",          true)
+check(palP, "S", "a",         true)
+check(palP, "S", "b",         true)
+check(palP, "S", "a a",       true)
+check(palP, "S", "b a b",     true)
+check(palP, "S", "a b a",     true)
+check(palP, "S", "a b b a",   true)
+check(palP, "S", "a b a b a", true)
+check(palP, "S", "a b",       false)
+check(palP, "S", "a b b",     false)
+
+IO::println("")
+IO::println("Grammar 3: Balanced parentheses  (S → ε | ( S ) | S S)  [ambiguous]")
+val paren = new Grammar()
+  .add("S", [])
+  .add("S", [t("("), nt("S"), t(")")])
+  .add("S", [nt("S"), nt("S")])
+
+val parenP = new EarleyParser(paren)
+check(parenP, "S", "",                true)
+check(parenP, "S", "( )",             true)
+check(parenP, "S", "( ( ) )",         true)
+check(parenP, "S", "( ) ( )",         true)
+check(parenP, "S", "( ( ) ) ( )",     true)
+check(parenP, "S", "( ( )",           false)
+check(parenP, "S", ") (",             false)
+
+IO::println("")
+IO::println("Grammar 4: anbn  (S → ε | a S b)  [context-free, not regular]")
+val anbn = new Grammar()
+  .add("S", [])
+  .add("S", [t("a"), nt("S"), t("b")])
+
+val anbnP = new EarleyParser(anbn)
+check(anbnP, "S", "",                 true)
+check(anbnP, "S", "a b",             true)
+check(anbnP, "S", "a a b b",         true)
+check(anbnP, "S", "a a a b b b",     true)
+check(anbnP, "S", "a a b",           false)
+check(anbnP, "S", "a b b",           false)
+
+IO::println("")
+IO::println("=== Total: #{totalPass} passed, #{totalFail} failed ===")
+
+IO::println("")
+IO::println("Grammar 1 chart for \"n + n\":")
+arithP.printChart(tok("n + n"), "E")

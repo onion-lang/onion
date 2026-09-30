@@ -1,0 +1,364 @@
+// SnakeGame.on — deterministic Snake simulation (~320 lines).
+// The snake follows a pre-scripted move sequence so the run is reproducible
+// without real-time input.  Food positions are deterministic; the script is
+// engineered to eat three pieces of food before the demo ends.
+//
+// Exercises: ADT enum (Direction, Cell), homogeneous enum (GameEvent),
+// records with inline methods (Pos, Snapshot), interface (Renderer) + class
+// conformance, class with mutable state (SnakeGame), collection pipelines
+// (map/filter/fold/any/find/distinct/sortedBy/groupBy/count), select/type-
+// pattern, nullable, closures, extension String/Int, string interpolation,
+// recursion, while/foreach, try/catch, << append.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def repeatStr(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def inBounds(lo: Int, hi: Int): Boolean = self >= lo && self < hi
+}
+
+// ─── ADT enum: movement direction ────────────────────────────────────────────
+
+enum Direction {
+  case Up
+  case Down
+  case Left
+  case Right
+public:
+  def dr(): Int = select this {
+    case u is Up:   -1
+    case d is Down:  1
+    else:            0
+  }
+  def dc(): Int = select this {
+    case l is Left:  -1
+    case r is Right:  1
+    else:             0
+  }
+  def label(): String = select this {
+    case u is Up:    "UP   "
+    case d is Down:  "DOWN "
+    case l is Left:  "LEFT "
+    case r is Right: "RIGHT"
+  }
+  def isOpposite(other: Direction): Boolean = select this {
+    case u is Up:    other.dr() == 1
+    case d is Down:  other.dr() == -1
+    case l is Left:  other.dc() == 1
+    case r is Right: other.dc() == -1
+  }
+}
+
+// ─── ADT enum: what occupies a cell ──────────────────────────────────────────
+
+enum Cell {
+  case Empty
+  case SnakeHead
+  case SnakeBody
+  case Food
+public:
+  def glyph(): String = select this {
+    case e is Empty:     "."
+    case h is SnakeHead: "@"
+    case b is SnakeBody: "o"
+    case f is Food:      "*"
+  }
+}
+
+// ─── Homogeneous enum: logged game events ────────────────────────────────────
+
+enum GameEvent {
+  ATE_FOOD, HIT_WALL, HIT_SELF, MOVED
+public:
+  def label(): String = select this {
+    case GameEvent::ATE_FOOD: "ate food"
+    case GameEvent::HIT_WALL: "hit wall"
+    case GameEvent::HIT_SELF: "hit self"
+    case GameEvent::MOVED:    "moved   "
+    else:                     "?       "
+  }
+  def isTerminal(): Boolean = select this {
+    case GameEvent::HIT_WALL: true
+    case GameEvent::HIT_SELF: true
+    else:                     false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Pos(row: Int, col: Int) {
+public:
+  def sameAs(other: Pos): Boolean = row() == other.row() && col() == other.col()
+  def moved(dir: Direction): Pos = new Pos(row() + dir.dr(), col() + dir.dc())
+  def label(): String = "(#{row()},#{col()})"
+}
+
+record Snapshot(turn: Int, event: GameEvent, score: Int, length: Int, dir: Direction) {
+public:
+  def summary(): String =
+    "T#{("" + turn()).padRight(3)} [#{dir().label()}] #{event().label()} — " +
+    "score=#{("" + score()).padRight(3)} len=#{length()}"
+}
+
+// ─── Interface + ASCII renderer ───────────────────────────────────────────────
+
+interface Renderer {
+  def render(grid: List[List[Cell]], rows: Int, cols: Int): String
+}
+
+class AsciiRenderer conforms Renderer {
+public:
+  def render(grid: List[List[Cell]], rows: Int, cols: Int): String {
+    var sb: String = "+" + "-".repeatStr(cols) + "+\n"
+    var r: Int = 0
+    while r < rows {
+      var line: String = "|"
+      val row: List[Cell] = grid[r] as List[Cell]
+      var c: Int = 0
+      while c < cols {
+        line = line + (row[c] as Cell).glyph()
+        c = c + 1
+      }
+      sb = sb + line + "|\n"
+      r = r + 1
+    }
+    sb = sb + "+" + "-".repeatStr(cols) + "+"
+    return sb
+  }
+}
+
+// ─── SnakeGame class ──────────────────────────────────────────────────────────
+
+class SnakeGame {
+  val rows: Int
+  val cols: Int
+  var body: List[Pos]
+  var dir: Direction
+  var food: Pos?
+  var alive: Boolean
+  var score: Int
+  var history: List[Snapshot]
+  var turnCount: Int
+  var foodEaten: Int
+public:
+  def this(rows: Int, cols: Int, startRow: Int, startCol: Int, initDir: Direction) {
+    this.rows = rows
+    this.cols = cols
+    this.body = [new Pos(startRow, startCol)]
+    this.dir = initDir
+    this.food = null
+    this.alive = true
+    this.score = 0
+    this.history = []
+    this.turnCount = 0
+    this.foodEaten = 0
+    spawnFood()
+  }
+  def spawnFood(): void {
+    // deterministic food positions cycle through four spots
+    val fp: Pos = select foodEaten % 4 {
+      case 0: new Pos(rows / 2, cols / 2)
+      case 1: new Pos(2, cols - 3)
+      case 2: new Pos(rows - 2, 3)
+      else:   new Pos(rows / 3, cols / 3)
+    }
+    food = if bodyContains(fp) { new Pos((fp.row() + 2) % rows, (fp.col() + 3) % cols) } else { fp }
+  }
+  def bodyContains(p: Pos): Boolean = body.any { b -> (b as Pos).sameAs(p) }
+  def head(): Pos = body[0] as Pos
+  def turn(newDir: Direction): void {
+    if !dir.isOpposite(newDir) { dir = newDir }
+  }
+  def step(): GameEvent {
+    if !alive { return GameEvent::MOVED }
+    turnCount = turnCount + 1
+    val next: Pos = head().moved(dir)
+    if !next.row().inBounds(0, rows) || !next.col().inBounds(0, cols) {
+      alive = false
+      history << new Snapshot(turnCount, GameEvent::HIT_WALL, score, body.size, dir)
+      return GameEvent::HIT_WALL
+    }
+    // self check: all but tail (which vacates this step unless growing)
+    val selfHit: Boolean = body.filter { b ->
+      !(b as Pos).sameAs(body[body.size - 1] as Pos)
+    }.any { b -> (b as Pos).sameAs(next) }
+    if selfHit {
+      alive = false
+      history << new Snapshot(turnCount, GameEvent::HIT_SELF, score, body.size, dir)
+      return GameEvent::HIT_SELF
+    }
+    val ateFood: Boolean = food != null && (food as Pos).sameAs(next)
+    // build new body: prepend next, drop tail unless growing
+    var newBody: List[Pos] = [next]
+    val keepLen: Int = if ateFood { body.size } else { body.size - 1 }
+    var i: Int = 0
+    while i < keepLen { newBody << (body[i] as Pos); i = i + 1 }
+    body = newBody
+    if ateFood {
+      score = score + 10 + body.size
+      foodEaten = foodEaten + 1
+      food = null
+      spawnFood()
+      history << new Snapshot(turnCount, GameEvent::ATE_FOOD, score, body.size, dir)
+      return GameEvent::ATE_FOOD
+    }
+    history << new Snapshot(turnCount, GameEvent::MOVED, score, body.size, dir)
+    return GameEvent::MOVED
+  }
+  def buildGrid(): List[List[Cell]] {
+    var grid: List[List[Cell]] = []
+    var r: Int = 0
+    while r < rows {
+      var row: List[Cell] = []
+      var c: Int = 0
+      while c < cols { row << new Empty(); c = c + 1 }
+      grid << row
+      r = r + 1
+    }
+    var i: Int = 0
+    while i < body.size {
+      val p: Pos = body[i] as Pos
+      val row: List[Cell] = grid[p.row()] as List[Cell]
+      row[p.col()] = if i == 0 { new SnakeHead() } else { new SnakeBody() }
+      i = i + 1
+    }
+    if food != null {
+      val fp: Pos = food as Pos
+      val frow: List[Cell] = grid[fp.row()] as List[Cell]
+      frow[fp.col()] = new Food()
+    }
+    return grid
+  }
+  def getHistory(): List[Snapshot] = history
+  def isAlive(): Boolean = alive
+  def getScore(): Int = score
+  def getLength(): Int = body.size
+  def getFoodEaten(): Int = foodEaten
+  def getTurns(): Int = turnCount
+}
+
+// ─── Helper: run n steps in given direction ───────────────────────────────────
+
+def run(game: SnakeGame, newDir: Direction, steps: Int): void {
+  game.turn(newDir)
+  var i: Int = 0
+  while i < steps && game.isAlive() {
+    game.step()
+    i = i + 1
+  }
+}
+
+// recursive sum of scores at food-eating events
+def sumFoodScores(events: List[Snapshot], idx: Int): Int {
+  if idx >= events.size { return 0 }
+  return (events[idx] as Snapshot).score() + sumFoodScores(events, idx + 1)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // 8 rows × 14 cols; snake starts at (4,1) facing RIGHT
+  // Food spawns: f0=(4,7)  f1=(2,11)  f2=(6,3)  f3=(2,4)
+  val ROWS: Int = 8
+  val COLS: Int = 14
+  val game: SnakeGame = new SnakeGame(ROWS, COLS, 4, 1, new Right())
+  val renderer: AsciiRenderer = new AsciiRenderer()
+
+  IO::println("=".repeatStr(44))
+  IO::println("SNAKE GAME — deterministic 3-food demo")
+  IO::println("Grid #{ROWS}×#{COLS}  |  @ head  o body  * food")
+  IO::println("=".repeatStr(44))
+
+  // Script engineered to eat f0=(4,7), f1=(2,11), f2=(6,3) in order:
+  //   6 RIGHT  → (4,7) EAT f0
+  //   2 UP     → (2,7)
+  //   4 RIGHT  → (2,11) EAT f1
+  //   4 DOWN   → (6,11)
+  //   8 LEFT   → (6,3) EAT f2
+  //   2 DOWN   → (8,3) — hits wall (row 8 = out of bounds)
+  run(game, new Right(), 6)
+  run(game, new Up(),    2)
+  run(game, new Right(), 4)
+  run(game, new Down(),  4)
+  run(game, new Left(),  8)
+  run(game, new Down(),  2)   // expected: hits wall
+
+  // Final board
+  IO::println("\nFinal board:")
+  IO::println(renderer.render(game.buildGrid(), ROWS, COLS))
+
+  // Summary
+  IO::println("Score:      #{game.getScore()}")
+  IO::println("Length:     #{game.getLength()}")
+  IO::println("Food eaten: #{game.getFoodEaten()}")
+  IO::println("Turns:      #{game.getTurns()}")
+  IO::println("Alive:      #{game.isAlive()}")
+
+  // Full history
+  IO::println("\n--- Full move log ---")
+  val hist: List[Snapshot] = game.getHistory()
+  foreach s: Snapshot in hist {
+    IO::println("  " + s.summary())
+  }
+
+  // Pipeline analysis
+  val foodSnaps: List[Snapshot] = hist.filter { s -> (s as Snapshot).event() == GameEvent::ATE_FOOD }
+  IO::println("\nFood events: " + foodSnaps.size)
+  val foodScoreSum: Int = sumFoodScores(foodSnaps, 0)
+  IO::println("Sum of scores at food turns (recursive): #{foodScoreSum}")
+
+  val termSnap: Snapshot? = hist.find { s -> (s as Snapshot).event().isTerminal() }
+  if termSnap != null {
+    IO::println("Termination: " + (termSnap as Snapshot).summary())
+  } else {
+    IO::println("Script exhausted — snake still alive")
+  }
+
+  // groupBy direction
+  val byDir = hist.groupBy { s -> (s as Snapshot).dir().label() }
+  IO::println("\nTurns per heading:")
+  foreach (d, ss) in byDir {
+    IO::println("  #{d}: " + (ss as List[Object]).size)
+  }
+
+  // Count moves per event type
+  val movedCount: Int = hist.count { s -> (s as Snapshot).event() == GameEvent::MOVED }
+  val ateCount:   Int = hist.count { s -> (s as Snapshot).event() == GameEvent::ATE_FOOD }
+  IO::println("\nMoved: #{movedCount}   Ate food: #{ateCount}")
+
+  // Partition into food-turn vs non-food-turn snapshots
+  val parts = hist.partition { s -> (s as Snapshot).event() == GameEvent::ATE_FOOD }
+  val foodPart:    List[Object] = parts[0] as List[Object]
+  val nonFoodPart: List[Object] = parts[1] as List[Object]
+  IO::println("Partition: #{foodPart.size} food-eat turns, #{nonFoodPart.size} other turns")
+
+  // Scores at food turns using map+fold
+  val foodScores: List[Int] = foodSnaps.map { s -> (s as Snapshot).score() }
+  IO::println("Scores at food-eat turns: " + foodScores.toString())
+
+  // try/catch: index out of bounds guard
+  IO::println("\n--- Error handling ---")
+  try {
+    val empty: List[Snapshot] = []
+    val bad: Snapshot = empty[5] as Snapshot
+    IO::println("unreachable: " + bad.score())
+  } catch e: Exception {
+    IO::println("Caught expected: index-out-of-bounds guard fired")
+  }
+
+  IO::println("\n" + "=".repeatStr(44))
+  IO::println("Simulation complete.")
+}

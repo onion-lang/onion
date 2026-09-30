@@ -1,0 +1,269 @@
+// ProceduralMap.on — procedural dungeon-map generator using Binary Space Partitioning (BSP)
+//
+// A 60×25 grid is recursively split into rectangular leaves; each leaf spawns one room,
+// connected to its sibling via L-shaped corridors. Rendered as ASCII with statistics.
+//
+// Exercises: records (Rect, Room, Corridor), ADT case-enum (BSPNode Leaf/Branch),
+//   classes with mutable state (BSPBuilder, DungeonMap), collection pipelines
+//   (filter/map/fold/sortedBy/find), generics (List[Room], List[Corridor]),
+//   nullable references (Room? inside Leaf), select / type-pattern matching,
+//   string interpolation, foreach ranges and List, while, recursion, closures.
+
+import { java.util.ArrayList; }
+
+// ── constants ──────────────────────────────────────────────────────────────────
+
+val COLS: Int    = 60
+val ROWS: Int    = 25
+val MIN_DIM: Int = 8
+val MARGIN: Int  = 1
+
+// ── Rect record ───────────────────────────────────────────────────────────────
+
+record Rect(x: Int, y: Int, w: Int, h: Int) {
+public:
+  def right(): Int  = x() + w()
+  def bottom(): Int = y() + h()
+  def cx(): Int     = x() + w() / 2
+  def cy(): Int     = y() + h() / 2
+  def area(): Int   = w() * h()
+  def shrink(m: Int): Rect = new Rect(x() + m, y() + m, w() - m * 2, h() - m * 2)
+}
+
+// ── Room record ───────────────────────────────────────────────────────────────
+
+record Room(id: Int, rect: Rect) {
+public:
+  def cx(): Int   = rect().cx()
+  def cy(): Int   = rect().cy()
+  def area(): Int = rect().area()
+  def label(): String = "R#{id()}"
+}
+
+// ── Corridor record ────────────────────────────────────────────────────────────
+
+record Corridor(fromId: Int, toId: Int, x1: Int, y1: Int, x2: Int, y2: Int)
+
+// ── BSP tree ───────────────────────────────────────────────────────────────────
+
+enum BSPNode {
+  case Leaf(bounds: Rect, room: Room?)
+  case Branch(bounds: Rect, splitH: Boolean, left: BSPNode, right: BSPNode)
+
+public:
+  def bounds(): Rect = select this {
+    case l is Leaf:   l.bounds()
+    case b is Branch: b.bounds()
+  }
+
+  def allRooms(out: List[Room]): void {
+    select this {
+      case l is Leaf:
+        if l.room() != null { out.add(l.room()!!) }
+      case b is Branch:
+        b.left().allRooms(out)
+        b.right().allRooms(out)
+      else: {}
+    }
+  }
+
+  def centralRoom(): Room? = select this {
+    case l is Leaf:   l.room()
+    case b is Branch:
+      val rooms: List[Room] = new ArrayList[Room]()
+      allRooms(rooms)
+      if rooms.isEmpty() {
+        null
+      } else {
+        val cx: Int = bounds().cx()
+        val cy: Int = bounds().cy()
+        rooms.sortedBy { r: Room -> (r.cx() - cx) * (r.cx() - cx) + (r.cy() - cy) * (r.cy() - cy) }.get(0)
+      }
+  }
+}
+
+// ── BSP builder ───────────────────────────────────────────────────────────────
+
+class BSPBuilder {
+  var nextId: Int
+
+  public:
+  def this { nextId = 1 }
+
+  def build(bounds: Rect, depth: Int): BSPNode {
+    val canH: Boolean = bounds.h() >= MIN_DIM * 2
+    val canV: Boolean = bounds.w() >= MIN_DIM * 2
+    if !canH && !canV {
+      val inner: Rect = bounds.shrink(MARGIN)
+      if inner.w() < 3 || inner.h() < 3 { return new Leaf(bounds, null) }
+      val room: Room = new Room(nextId, inner)
+      nextId = nextId + 1
+      return new Leaf(bounds, room)
+    }
+
+    val splitH: Boolean = if canH && canV { bounds.h() >= bounds.w() } else { canH }
+    val dim: Int = if splitH { bounds.h() } else { bounds.w() }
+    val cut: Int = dim * 4 / 10 + Rand::nextInt(dim * 2 / 10 + 1)
+
+    val leftB: Rect =
+      if splitH { new Rect(bounds.x(), bounds.y(), bounds.w(), cut) }
+      else      { new Rect(bounds.x(), bounds.y(), cut, bounds.h()) }
+    val rightB: Rect =
+      if splitH { new Rect(bounds.x(), bounds.y() + cut, bounds.w(), bounds.h() - cut) }
+      else      { new Rect(bounds.x() + cut, bounds.y(), bounds.w() - cut, bounds.h()) }
+
+    return new Branch(bounds, splitH, build(leftB, depth + 1), build(rightB, depth + 1))
+  }
+}
+
+// ── Dungeon map (flat Int grid) ────────────────────────────────────────────────
+
+class DungeonMap {
+  var grid: Int[]
+
+  public:
+  def this {
+    grid = new Int[COLS * ROWS]
+    foreach i: Int in 0..<(COLS * ROWS) { grid[i] = 0 }
+  }
+
+  def set(x: Int, y: Int, v: Int): void {
+    if x >= 0 && x < COLS && y >= 0 && y < ROWS { grid[y * COLS + x] = v }
+  }
+
+  def at(x: Int, y: Int): Int =
+    if x >= 0 && x < COLS && y >= 0 && y < ROWS { grid[y * COLS + x] } else { 0 }
+
+  def carveRoom(room: Room): void {
+    val r: Rect = room.rect()
+    foreach ry: Int in r.y()..<r.bottom() {
+      foreach rx: Int in r.x()..<r.right() {
+        set(rx, ry, 1)
+      }
+    }
+  }
+
+  def carveCorridor(c: Corridor): void {
+    // Horizontal leg from (x1,y1) to (x2,y1)
+    val hlo: Int = if c.x1() < c.x2() { c.x1() } else { c.x2() }
+    val hhi: Int = if c.x1() > c.x2() { c.x1() } else { c.x2() }
+    foreach cx: Int in hlo..hhi {
+      if at(cx, c.y1()) == 0 { set(cx, c.y1(), 2) }
+    }
+    // Vertical leg from (x2,y1) to (x2,y2)
+    val vlo: Int = if c.y1() < c.y2() { c.y1() } else { c.y2() }
+    val vhi: Int = if c.y1() > c.y2() { c.y1() } else { c.y2() }
+    foreach cy: Int in vlo..vhi {
+      if at(c.x2(), cy) == 0 { set(c.x2(), cy, 2) }
+    }
+  }
+
+  def render(): void {
+    val border: String = "+" + "-".repeat(COLS) + "+"
+    IO::println(border)
+    foreach row: Int in 0..<ROWS {
+      val sb: StringBuilder = new StringBuilder("|")
+      foreach col: Int in 0..<COLS {
+        val ch: String = select at(col, row) {
+          case 1: "."
+          case 2: "#"
+          else:   " "
+        }
+        sb.append(ch)
+      }
+      sb.append("|")
+      IO::println(sb.toString())
+    }
+    IO::println(border)
+  }
+}
+
+// ── Corridor builder ──────────────────────────────────────────────────────────
+
+def buildCorridors(node: BSPNode, out: List[Corridor]): void {
+  select node {
+    case b is Branch:
+      val la: Room? = b.left().centralRoom()
+      val ra: Room? = b.right().centralRoom()
+      if la != null && ra != null {
+        out.add(new Corridor(la!!.id(), ra!!.id(), la!!.cx(), la!!.cy(), ra!!.cx(), ra!!.cy()))
+      }
+      buildCorridors(b.left(),  out)
+      buildCorridors(b.right(), out)
+    else: {}
+  }
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+def printStats(rooms: List[Room], corridors: List[Corridor]): void {
+  if rooms.isEmpty() { IO::println("(no rooms generated)"); return }
+  val totalArea: Int = rooms.fold(0) { acc: Int, r: Room -> acc + r.area() }
+  val avg: Double    = totalArea * 1.0 / rooms.size()
+  val sorted: List[Room] = rooms.sortedBy { r: Room -> r.area() }
+  val smallest: Room = sorted.get(0)
+  val largest:  Room = sorted.get(sorted.size() - 1)
+
+  IO::println("── Statistics ──────────────────────────────────")
+  IO::println("  Rooms:      #{rooms.size()}   Corridors: #{corridors.size()}")
+  IO::println("  Floor area: #{totalArea} tiles (avg #{Format::number(avg, 1)} per room)")
+  IO::println("  Largest:    #{largest.label()} #{largest.rect().w()}×#{largest.rect().h()} = #{largest.area()} tiles")
+  IO::println("  Smallest:   #{smallest.label()} #{smallest.rect().w()}×#{smallest.rect().h()} = #{smallest.area()} tiles")
+  val big: List[Room] = rooms.filter { r: Room -> r.area() > 30 }
+  val med: List[Room] = rooms.filter { r: Room -> r.area() >= 15 && r.area() <= 30 }
+  val sml: List[Room] = rooms.filter { r: Room -> r.area() < 15 }
+  IO::println("  Large (>30): #{big.size()}  Medium (15-30): #{med.size()}  Small (<15): #{sml.size()}")
+}
+
+// ── Room size histogram (while loop demo) ────────────────────────────────────
+
+def printHistogram(rooms: List[Room]): void {
+  if rooms.isEmpty() { return }
+  IO::println("── Room Size Histogram (area) ───────────────────")
+  val sorted: List[Room] = rooms.sortedBy { r: Room -> r.id() }
+  val maxArea: Int = rooms.fold(0) { acc: Int, r: Room -> if r.area() > acc { r.area() } else { acc } }
+  val barWidth: Int = 30
+  foreach room: Room in sorted {
+    val label: String = room.label()
+    val pad: String   = if label.length() < 4 { " " } else { "" }
+    val barLen: Int = room.area() * barWidth / maxArea
+    val sb: StringBuilder = new StringBuilder()
+    var i: Int = 0
+    while i < barLen { sb.append("█"); i = i + 1 }
+    IO::println("  #{pad}#{label} [#{sb.toString()}] #{room.area()}")
+  }
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  try {
+    val dungeon: DungeonMap = new DungeonMap()
+    val bspBuilder: BSPBuilder = new BSPBuilder()
+    val root: BSPNode = bspBuilder.build(new Rect(0, 0, COLS, ROWS), 0)
+
+    val rooms: List[Room] = new ArrayList[Room]()
+    root.allRooms(rooms)
+    foreach room: Room in rooms { dungeon.carveRoom(room) }
+
+    val corridors: List[Corridor] = new ArrayList[Corridor]()
+    buildCorridors(root, corridors)
+    foreach c: Corridor in corridors { dungeon.carveCorridor(c) }
+
+    IO::println("╔══ Procedural BSP Dungeon (#{COLS}×#{ROWS}) ══╗")
+    dungeon.render()
+    IO::println("")
+    printStats(rooms, corridors)
+    IO::println("")
+    printHistogram(rooms)
+
+    IO::println("")
+    IO::println("── Room List ───────────────────────────────────")
+    foreach room: Room in rooms.sortedBy { r: Room -> r.id() } {
+      val r: Rect = room.rect()
+      IO::println("  #{room.label()}: origin=(#{r.x()},#{r.y()}) #{r.w()}×#{r.h()} area=#{room.area()}")
+    }
+  } catch e: Exception {
+    IO::println("Error generating dungeon: " + e.message())
+  }
+}
